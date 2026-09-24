@@ -37,7 +37,15 @@ locals {
     "firebasehosting.googleapis.com",
     "aiplatform.googleapis.com",
     "cloudbuild.googleapis.com",
+    "compute.googleapis.com",
   ])
+
+  # ALL_TRAFFIC: every request from api and harness leaves through the VPC
+  # subnet, so calls to internal-only services pass the ingress check and
+  # Google APIs are reached via Private Google Access (network.tf). There is
+  # no Cloud NAT, so these two services have no public-internet egress;
+  # third-party calls belong in connectors or channels (PRD 6.1).
+  caller_vpc_egress = "ALL_TRAFFIC"
 
   # Public placeholder image until CI deploys real images per service.
   placeholder_image = "us-docker.pkg.dev/cloudrun/container/hello"
@@ -52,6 +60,7 @@ locals {
       ingress            = "INGRESS_TRAFFIC_ALL"
       public             = true
       invoked_by         = []
+      vpc_egress         = local.caller_vpc_egress # calls harness directly
     }
     "harness" = {
       image              = local.placeholder_image
@@ -62,6 +71,8 @@ locals {
       # PRD 6.1: API --> Cloud Tasks --> harness. The Cloud Tasks OIDC
       # identity is granted below via extra_invokers.
       invoked_by = ["api"]
+      # Calls connectors, browser and render (all internal-only).
+      vpc_egress = local.caller_vpc_egress
     }
     "channels" = {
       image              = local.placeholder_image
@@ -195,6 +206,9 @@ module "service" {
   project_id = var.project_id
   region     = var.region
   services   = local.cloud_run_services
+
+  vpc_network    = google_compute_network.vpc.name
+  vpc_subnetwork = google_compute_subnetwork.run_egress.name
 
   # Cloud Tasks delivers runs to harness with an OIDC token for this SA.
   extra_invokers = {

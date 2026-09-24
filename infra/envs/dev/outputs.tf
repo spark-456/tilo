@@ -103,3 +103,12 @@ output "billing_budget_amount_usd" {
 output "billing_budget_threshold_percentages" {
   value = module.budget.threshold_percentages
 }
+
+output "vpc_egress_subnetwork" {
+  value = {
+    name                     = google_compute_subnetwork.run_egress.name
+    network                  = google_compute_network.vpc.name
+    region                   = google_compute_subnetwork.run_egress.region
+    private_ip_google_access = google_compute_subnetwork.run_egress.private_ip_google_access
+  }
+}

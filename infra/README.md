@@ -78,6 +78,11 @@ terraform -chdir=infra/envs/dev destroy `
 The `oauth-tokens` and `archive` KMS keys have `prevent_destroy`; remove that
 lifecycle block first if you really mean to destroy the environment.
 
+The buckets have `force_destroy = false`, so destroy fails on any bucket that
+still holds objects (including old versions in `artifacts`). Empty them first,
+for example `gcloud storage rm --recursive --all-versions "gs://BUCKET_NAME/**"` for each
+bucket named in `terraform -chdir=infra/envs/dev output`, then rerun destroy.
+
 ## Checks (no credentials, no network calls to GCP)
 
 ```powershell

@@ -39,6 +39,21 @@ resource "google_cloud_run_v2_service" "this" {
   template {
     service_account = local.service_account_emails[each.key]
 
+    # Direct VPC egress for callers of internal-only services (PRD 6.1):
+    # a Cloud Run service that calls another over the public internet is
+    # rejected by INGRESS_TRAFFIC_INTERNAL_ONLY; traffic leaving through the
+    # VPC subnet (Private Google Access on) counts as internal.
+    dynamic "vpc_access" {
+      for_each = each.value.vpc_egress == null ? [] : [each.value.vpc_egress]
+      content {
+        egress = vpc_access.value
+        network_interfaces {
+          network    = var.vpc_network
+          subnetwork = var.vpc_subnetwork
+        }
+      }
+    }
+
     scaling {
       min_instance_count = each.value.min_instance_count
       max_instance_count = each.value.max_instance_count

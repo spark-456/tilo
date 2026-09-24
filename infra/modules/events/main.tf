@@ -1,8 +1,11 @@
 # Reusable piece: the tilo-events topic and its append-only BigQuery ledger
 # (PRD 6.2, 6.3, 13.2 event ledger, 15.3). The Pub/Sub BigQuery subscription
-# writes directly; its service agent is granted a custom insert-only role
-# instead of a broad dataEditor/dataOwner role, so the ledger stays
-# append-only (PRD 13.2: "Deduplicated by id").
+# writes directly; its service agent gets a minimal custom role (tables.get +
+# tables.updateData, which the Storage Write API needs) on this dataset only,
+# instead of dataEditor/dataOwner. updateData also permits DML UPDATE/DELETE,
+# so this limits who can write rather than making rows immutable: no Tilo
+# service holds any BigQuery role, and the Pub/Sub agent only ever appends
+# (PRD 13.2: "Deduplicated by id").
 
 resource "google_pubsub_topic" "events" {
   project = var.project_id
@@ -52,7 +55,7 @@ resource "google_project_iam_custom_role" "bq_ledger_inserter" {
   project     = var.project_id
   role_id     = "tiloBqLedgerInserter"
   title       = "Tilo BigQuery ledger inserter"
-  description = "Insert-only access for the Pub/Sub subscription that streams events into the append-only ledger (PRD 13.2)."
+  description = "Minimal write access for the Pub/Sub subscription that streams events into the append-only ledger (PRD 13.2)."
   permissions = [
     "bigquery.tables.get",
     "bigquery.tables.updateData",

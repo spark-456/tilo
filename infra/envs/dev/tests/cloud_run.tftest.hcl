@@ -133,3 +133,30 @@ run "PRD_6_1_internal_services_invokable_only_by_their_callers" {
     error_message = "connectors, browser and render must be invokable only by tilo-harness (PRD 6.1)."
   }
 }
+
+run "PRD_6_1_callers_reach_internal_services_through_vpc" {
+  command = plan
+
+  assert {
+    condition     = output.vpc_egress_subnetwork.private_ip_google_access && output.vpc_egress_subnetwork.region == var.region
+    error_message = "The Direct VPC egress subnet must be in var.region with Private Google Access on (PRD 6.1)."
+  }
+
+  assert {
+    condition = alltrue([
+      for name in ["api", "harness"] :
+      output.cloud_run_services[name].vpc_egress == "ALL_TRAFFIC" &&
+      output.cloud_run_services[name].vpc_network == output.vpc_egress_subnetwork.network &&
+      output.cloud_run_services[name].vpc_subnetwork == output.vpc_egress_subnetwork.name
+    ])
+    error_message = "api and harness call internal-only services, so they need Direct VPC egress with ALL_TRAFFIC (PRD 6.1)."
+  }
+
+  assert {
+    condition = alltrue([
+      for name in ["channels", "connectors", "browser", "render", "sandbox-web"] :
+      output.cloud_run_services[name].vpc_egress == null
+    ])
+    error_message = "Only the callers of internal services (api, harness) route egress through the VPC."
+  }
+}

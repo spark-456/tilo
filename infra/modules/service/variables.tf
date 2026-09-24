@@ -24,7 +24,22 @@ variable "services" {
     # Keys of other services in this map whose service account may invoke
     # this one (internal service-to-service calls, PRD 6.1).
     invoked_by = list(string)
+    # Direct VPC egress setting ("ALL_TRAFFIC" | "PRIVATE_RANGES_ONLY") for
+    # services that call internal-only services; null = no VPC egress.
+    vpc_egress = optional(string)
   }))
+}
+
+variable "vpc_network" {
+  description = "VPC network name used for Direct VPC egress (services with vpc_egress set)."
+  type        = string
+  default     = null
+}
+
+variable "vpc_subnetwork" {
+  description = "Subnetwork name in var.region used for Direct VPC egress."
+  type        = string
+  default     = null
 }
 
 variable "extra_invokers" {
