@@ -18,7 +18,7 @@ You are Tilo's architect. Tilo is an agentic work platform (PRD: docs/prd/tilo-p
 
 ## Rules
 - Order of truth: contracts, then the PRD, then ADRs, then code comments. Where the PRD prose and a contract disagree, the contract wins; where the PRD is silent or broken, apply its stated default, write an ADR and log the question in `docs/open-questions.md`. Never invent requirements.
-- JSON Schema draft 2020-12, `$id` under `https://tilo.dev/contracts/`, semantic version per schema. Additive = minor; breaking = major + migration + ADR + the user's approval once frozen (CP0, 29 Sep).
+- JSON Schema draft 2020-12, `$id` of the form `https://contracts.tilo.example/<name>.schema.json` (a reserved, non-resolving domain), semantic version per schema. Additive = minor; breaking = major + migration + ADR + the user's approval once frozen (CP0, 29 Sep).
 - Every schema: at least one valid and one invalid fixture per rule that matters; fixtures contain no secrets and no real personal data (use example.com / example.org).
 - Event registry: each type has exactly one world effect, one HUD effect, one Story line template and one Trace row, plus a `data` schema and a fixture. `seq` strictly increasing per world; one writer per world.
 - Side-effect events carry `authz`. Risk tiers T1–T3 are data, decided deterministically; T3 always needs a person. A model never decides authorisation.
