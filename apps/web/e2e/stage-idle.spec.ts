@@ -1,0 +1,21 @@
+import { expect, test } from "@playwright/test";
+import { DESKTOP } from "./support/viewports";
+
+test.use({ viewport: DESKTOP });
+
+test("PRD-9.7/HR-2 stage: the iso grid has no idle animation of any kind", async ({ page }) => {
+  await page.goto("/");
+
+  const canvas = page.getByTestId("stage-frame").locator("canvas");
+  await expect(canvas).toBeVisible();
+  await page.waitForTimeout(500); // let any initial mount animation finish
+
+  const first = await canvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
+  await page.waitForTimeout(1500); // no user interaction and no event in between
+  const second = await canvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
+
+  expect(
+    second === first,
+    "the canvas' pixels changed with no interaction and no event — that is idle animation, forbidden by HR-2",
+  ).toBe(true);
+});
