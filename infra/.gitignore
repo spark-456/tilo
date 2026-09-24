@@ -1,0 +1,5 @@
+# Per-person backend config (copied from backend.hcl.example) and saved
+# plans (infra/README.md uses -out=tfplan). The root .gitignore covers
+# .terraform/, *.tfstate and *.tfplan.
+envs/*/backend.hcl
+tfplan

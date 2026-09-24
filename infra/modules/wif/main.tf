@@ -24,9 +24,10 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "attribute.ref"        = "assertion.ref"
   }
 
-  # Only tokens asserting this exact repository may exchange for a Google
-  # credential (PRD 6.5, SEC-12 least privilege).
-  attribute_condition = "assertion.repository == \"${var.github_repository}\""
+  # Only tokens from this exact repository, on main or a release tag, may
+  # exchange for a Google credential: a workflow on any other branch cannot
+  # deploy (PRD 6.5, SEC-02, SEC-12 least privilege).
+  attribute_condition = "assertion.repository == \"${var.github_repository}\" && (assertion.ref == \"refs/heads/main\" || assertion.ref.startsWith(\"refs/tags/\"))"
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"

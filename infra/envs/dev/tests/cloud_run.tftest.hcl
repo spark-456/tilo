@@ -93,3 +93,43 @@ run "PRD_6_5_one_least_privilege_service_account_per_service" {
     error_message = "Each of the seven services must run under its own distinct service account (PRD 6.5)."
   }
 }
+
+run "PRD_6_5_public_services_invokable_without_google_identity" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for name in ["api", "channels", "sandbox-web"] :
+      output.cloud_run_services[name].public && contains(output.cloud_run_services[name].invokers, "allUsers")
+    ])
+    error_message = "api, channels and sandbox-web need allUsers run.invoker; they verify callers themselves (PRD 6.5, SEC-08)."
+  }
+
+  assert {
+    condition = alltrue([
+      for name in ["harness", "connectors", "browser", "render"] :
+      !output.cloud_run_services[name].public && !contains(output.cloud_run_services[name].invokers, "allUsers") && !contains(output.cloud_run_services[name].invokers, "allAuthenticatedUsers")
+    ])
+    error_message = "Internal services must never be invokable by allUsers or allAuthenticatedUsers (PRD 6.5)."
+  }
+}
+
+run "PRD_6_1_internal_services_invokable_only_by_their_callers" {
+  command = plan
+
+  assert {
+    condition = toset(output.cloud_run_services["harness"].invokers) == toset([
+      "serviceAccount:tilo-api@${var.project_id}.iam.gserviceaccount.com",
+      "serviceAccount:tilo-tasks-invoker@${var.project_id}.iam.gserviceaccount.com",
+    ])
+    error_message = "harness must be invokable by exactly tilo-api and the Cloud Tasks OIDC service account (PRD 6.1)."
+  }
+
+  assert {
+    condition = alltrue([
+      for name in ["connectors", "browser", "render"] :
+      output.cloud_run_services[name].invokers == ["serviceAccount:tilo-harness@${var.project_id}.iam.gserviceaccount.com"]
+    ])
+    error_message = "connectors, browser and render must be invokable only by tilo-harness (PRD 6.1)."
+  }
+}

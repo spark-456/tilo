@@ -59,4 +59,48 @@ resource "google_cloud_run_v2_service" "this" {
       }
     }
   }
+
+  # CI deploys real images (PRD 6.5); a later plan must not roll services
+  # back to the placeholder image.
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+      client,
+      client_version,
+    ]
+  }
+}
+
+locals {
+  # Static keys "<service>::<invoker>" so for_each is known at plan time.
+  invoker_bindings = merge(
+    { for k, v in var.services : "${k}::allUsers" => { service = k, member = "allUsers" } if v.public },
+    { for combo in flatten([
+      for k, v in var.services : [
+        for caller in v.invoked_by : {
+          key     = "${k}::${caller}"
+          service = k
+          member  = "serviceAccount:${local.service_account_emails[caller]}"
+        }
+      ]
+      ]) : combo.key => { service = combo.service, member = combo.member }
+    },
+    var.extra_invokers,
+  )
+}
+
+# Ingress only opens the network path; run.invoker decides who may call.
+# Public services get allUsers (they verify webhook signatures or Firebase
+# ID tokens themselves, SEC-08, FR-CHN-02); internal services get only
+# their real callers (PRD 6.1).
+resource "google_cloud_run_v2_service_iam_member" "invoker" {
+  for_each = local.invoker_bindings
+
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.this[each.value.service].name
+  role     = "roles/run.invoker"
+  member   = each.value.member
+
+  depends_on = [google_service_account.this]
 }

@@ -63,3 +63,22 @@ run "PRD_17_3_billing_budget_matches_ceiling_with_three_alerts" {
     error_message = "The billing budget must alert at 50%, 90% and 100% (PRD 6.5/17.3 lean infrastructure and cost ceilings)."
   }
 }
+
+run "SEC_02_deployer_limited_to_main_and_runtime_service_accounts" {
+  command = plan
+
+  assert {
+    condition     = strcontains(output.wif_provider_attribute_condition, "refs/heads/main")
+    error_message = "The WIF provider must only accept tokens from main (or release tags), not any branch (SEC-02, SEC-12)."
+  }
+
+  assert {
+    condition     = alltrue([for b in output.project_iam_bindings : b.role != "roles/iam.serviceAccountUser"])
+    error_message = "serviceAccountUser must be granted per service account, never project-wide (SEC-12)."
+  }
+
+  assert {
+    condition     = length(output.deployer_act_as_service_accounts) == 7
+    error_message = "The deployer may act as exactly the seven runtime service accounts (PRD 6.5)."
+  }
+}

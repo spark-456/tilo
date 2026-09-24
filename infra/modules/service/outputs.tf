@@ -13,6 +13,11 @@ output "services" {
       ingress               = svc.ingress
       cpu_idle              = true
       service_account_email = local.service_account_emails[k]
+      public                = var.services[k].public
+      invokers = [
+        for key, b in google_cloud_run_v2_service_iam_member.invoker : b.member
+        if local.invoker_bindings[key].service == k
+      ]
     }
   }
 }

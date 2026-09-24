@@ -33,17 +33,51 @@ output "oauth_token_key_decrypters" {
 }
 
 output "browser_service_account_project_roles" {
-  value = local.service_project_roles["browser"]
+  value = [
+    for b in values(module.iam.bindings) : b.role
+    if b.member == "serviceAccount:${module.service.service_accounts["browser"]}"
+  ]
+}
+
+output "project_iam_bindings" {
+  description = "Every project-level binding (role, member) in the plan."
+  value       = values(module.iam.bindings)
+}
+
+output "events_topic_publishers" {
+  description = "Members granted roles/pubsub.publisher on tilo-events."
+  value       = [for b in google_pubsub_topic_iam_member.events_publishers : b.member]
+}
+
+output "secret_accessors" {
+  description = "secret id => members granted secretAccessor on it."
+  value = {
+    for s in local.secret_placeholders : s => [
+      for b in google_secret_manager_secret_iam_member.accessors : b.member if b.secret_id == s
+    ]
+  }
+}
+
+output "deployer_act_as_service_accounts" {
+  description = "Service accounts the WIF deployer may act as."
+  value       = [for b in google_service_account_iam_member.deployer_act_as : b.service_account_id]
+}
+
+# Counted from the HCL source of every module under infra/, so a key or
+# secret version added anywhere makes these non-zero (PRD 16.1 rules 4, 5).
+locals {
+  infra_root    = "${path.module}/../.."
+  infra_sources = [for f in fileset(local.infra_root, "**/*.tf") : file("${local.infra_root}/${f}")]
 }
 
 output "service_account_key_count" {
-  description = "No google_service_account_key resource exists anywhere in this plan (PRD 16.1 rule 5)."
-  value       = 0
+  description = "google_service_account_key resources declared anywhere under infra/ (PRD 16.1 rule 5)."
+  value       = sum([for s in local.infra_sources : length(regexall("resource\\s+\"google_service_account_key\"", s))])
 }
 
 output "secret_manager_secret_version_count" {
-  description = "No google_secret_manager_secret_version resource exists; secrets are placeholders (PRD 16.1 rule 4)."
-  value       = 0
+  description = "google_secret_manager_secret_version resources declared anywhere under infra/ (PRD 16.1 rule 4)."
+  value       = sum([for s in local.infra_sources : length(regexall("resource\\s+\"google_secret_manager_secret_version\"", s))])
 }
 
 output "storage_buckets" {

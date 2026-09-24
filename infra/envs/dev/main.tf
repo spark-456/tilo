@@ -50,42 +50,58 @@ locals {
       min_instance_count = 0
       max_instance_count = 3
       ingress            = "INGRESS_TRAFFIC_ALL"
+      public             = true
+      invoked_by         = []
     }
     "harness" = {
       image              = local.placeholder_image
       min_instance_count = 0
       max_instance_count = 3
       ingress            = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+      public             = false
+      # PRD 6.1: API --> Cloud Tasks --> harness. The Cloud Tasks OIDC
+      # identity is granted below via extra_invokers.
+      invoked_by = ["api"]
     }
     "channels" = {
       image              = local.placeholder_image
       min_instance_count = 0
       max_instance_count = 3
       ingress            = "INGRESS_TRAFFIC_ALL"
+      public             = true
+      invoked_by         = []
     }
     "connectors" = {
       image              = local.placeholder_image
       min_instance_count = 0
       max_instance_count = 2
       ingress            = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+      public             = false
+      invoked_by         = ["harness"] # PRD 6.1: harness --> connectors
     }
     "browser" = {
       image              = local.placeholder_image
       min_instance_count = 0
       max_instance_count = 2
       ingress            = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+      public             = false
+      invoked_by         = ["harness"] # PRD 6.1: harness --> browser
     }
     "render" = {
       image              = local.placeholder_image
       min_instance_count = 0
       max_instance_count = 2
       ingress            = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+      public             = false
+      invoked_by         = ["harness"] # PRD 6.1: harness --> render
     }
     "sandbox-web" = {
       image              = local.placeholder_image
       min_instance_count = 0
       max_instance_count = 2
       ingress            = "INGRESS_TRAFFIC_ALL"
+      public             = true
+      invoked_by         = []
     }
   }
 
@@ -97,21 +113,40 @@ locals {
   # module.storage): a project-level storage role would reach every bucket
   # in the project, including the CMEK archive bucket and the Terraform
   # state bucket, not just the bucket a given service actually needs.
+  # Pub/Sub publish is granted on the tilo-events topic to harness only
+  # (PRD 15.3: harness is the only event writer), and Secret Manager access
+  # per secret (secret_accessors below), never project-wide. tilo-channels
+  # is internet-facing and writes only through the API (PRD 6.1), so it
+  # holds no project role at all.
   service_project_roles = {
-    "api"         = ["roles/datastore.user", "roles/pubsub.publisher", "roles/cloudtasks.enqueuer"]
-    "harness"     = ["roles/datastore.user", "roles/pubsub.publisher", "roles/cloudtasks.enqueuer", "roles/aiplatform.user"]
-    "channels"    = ["roles/datastore.user", "roles/pubsub.publisher"]
-    "connectors"  = ["roles/datastore.user", "roles/secretmanager.secretAccessor"]
+    "api"         = ["roles/datastore.user", "roles/cloudtasks.enqueuer"]
+    "harness"     = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user"]
+    "channels"    = []
+    "connectors"  = ["roles/datastore.user"]
     "browser"     = []
     "render"      = ["roles/datastore.user"]
     "sandbox-web" = []
   }
 
+  # serviceAccountUser is granted per runtime SA (google_service_account_iam_member
+  # below), never project-wide.
   deployer_project_roles = [
     "roles/run.admin",
     "roles/artifactregistry.writer",
-    "roles/iam.serviceAccountUser",
   ]
+
+  # secret => services allowed roles/secretmanager.secretAccessor on it.
+  secret_accessors = {
+    "workspace-oauth-client"        = ["connectors"]
+    "whatsapp-api-token"            = ["channels"]
+    "channels-webhook-signing-key"  = ["channels"]
+    "email-action-link-signing-key" = ["api"]
+  }
+  secret_accessor_bindings = { for combo in flatten([
+    for secret, services in local.secret_accessors : [
+      for svc in services : { key = "${secret}::${svc}", secret = secret, svc = svc }
+    ]
+  ]) : combo.key => combo }
 
   # Keyed statically (service/role names, never a computed attribute) so
   # terraform test can plan module.iam against mock providers.
@@ -136,12 +171,7 @@ locals {
 
   # Secret Manager placeholders: names only. Values are added by the user
   # out of band, never in Terraform (PRD 16.1 rule 4).
-  secret_placeholders = toset([
-    "workspace-oauth-client",
-    "whatsapp-api-token",
-    "channels-webhook-signing-key",
-    "email-action-link-signing-key",
-  ])
+  secret_placeholders = toset(keys(local.secret_accessors))
 }
 
 resource "google_project_service" "apis" {
@@ -164,7 +194,35 @@ module "service" {
   region     = var.region
   services   = local.cloud_run_services
 
+  # Cloud Tasks delivers runs to harness with an OIDC token for this SA.
+  extra_invokers = {
+    "harness::cloud-tasks" = {
+      service = "harness"
+      member  = "serviceAccount:${google_service_account.tasks_invoker.account_id}@${var.project_id}.iam.gserviceaccount.com"
+    }
+  }
+
   depends_on = [google_project_service.apis]
+}
+
+# OIDC identity Cloud Tasks uses to call tilo-harness for the runs queue.
+# It holds no role except run.invoker on harness (module.service).
+resource "google_service_account" "tasks_invoker" {
+  project      = var.project_id
+  account_id   = "tilo-tasks-invoker"
+  display_name = "Tilo Cloud Tasks -> harness OIDC invoker"
+
+  depends_on = [google_project_service.apis]
+}
+
+# The enqueuers (api, harness) must be able to act as the invoker SA to
+# attach its OIDC token to a task.
+resource "google_service_account_iam_member" "tasks_invoker_users" {
+  for_each = toset(["api", "harness"])
+
+  service_account_id = google_service_account.tasks_invoker.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${module.service.service_accounts[each.key]}"
 }
 
 # ---------------------------------------------------------------------------
@@ -187,6 +245,15 @@ module "iam" {
   bindings   = local.project_bindings
 }
 
+# The deployer may act as each runtime SA it deploys, and nothing else.
+resource "google_service_account_iam_member" "deployer_act_as" {
+  for_each = local.cloud_run_services
+
+  service_account_id = "projects/${var.project_id}/serviceAccounts/${module.service.service_accounts[each.key]}"
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${module.wif.deployer_service_account_email}"
+}
+
 # ---------------------------------------------------------------------------
 # Cloud KMS: oauth-tokens (connectors-only decrypt) and archive keys.
 # ---------------------------------------------------------------------------
@@ -201,11 +268,9 @@ module "kms" {
     connectors = "serviceAccount:${module.service.service_accounts["connectors"]}"
   }
 
+  # CMEK: only Cloud Storage's service agent uses the archive key; services
+  # read and write the archive bucket through Storage IAM, never the key.
   archive_key_principals = {
-    connectors = "serviceAccount:${module.service.service_accounts["connectors"]}"
-    harness    = "serviceAccount:${module.service.service_accounts["harness"]}"
-    # Cloud Storage's own service agent must be able to use the archive key
-    # to encrypt/decrypt objects in the CMEK-encrypted archive bucket.
     gcs_agent = "serviceAccount:${data.google_storage_project_service_account.gcs.email_address}"
   }
 
@@ -303,6 +368,17 @@ module "events" {
   depends_on = [google_project_service.apis]
 }
 
+# PRD 15.3: harness is the only writer of events, so it is the only
+# publisher on tilo-events (feeds the append-only ledger, SEC-11).
+resource "google_pubsub_topic_iam_member" "events_publishers" {
+  for_each = toset(["harness"])
+
+  project = var.project_id
+  topic   = module.events.topic_name
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:${module.service.service_accounts[each.key]}"
+}
+
 resource "google_cloud_tasks_queue" "runs" {
   project  = var.project_id
   name     = "runs"
@@ -336,6 +412,16 @@ resource "google_secret_manager_secret" "placeholders" {
   }
 
   depends_on = [google_project_service.apis]
+}
+
+# Per-secret access (SEC-06, SEC-08, SEC-12): no service reads every secret.
+resource "google_secret_manager_secret_iam_member" "accessors" {
+  for_each = local.secret_accessor_bindings
+
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.placeholders[each.value.secret].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${module.service.service_accounts[each.value.svc]}"
 }
 
 resource "google_firebase_project" "default" {

@@ -75,3 +75,48 @@ run "SEC_16_1_secrets_are_placeholders_with_no_versions" {
     error_message = "Secret Manager secrets are declared but no versions are created in Terraform; values come from the user (PRD 16.1 rule 4)."
   }
 }
+
+run "SEC_12_channels_cannot_write_firestore_or_publish_events" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for b in output.project_iam_bindings :
+      !(strcontains(b.member, "tilo-channels@") && contains(["roles/datastore.user", "roles/datastore.owner", "roles/firebase.admin", "roles/editor", "roles/owner", "roles/pubsub.publisher", "roles/pubsub.editor", "roles/pubsub.admin"], b.role))
+    ])
+    error_message = "tilo-channels writes only through the API: no Firestore write or Pub/Sub publish role (PRD 6.1, 15.3, SEC-12)."
+  }
+}
+
+run "SEC_11_only_harness_publishes_to_tilo_events" {
+  command = plan
+
+  assert {
+    condition     = output.events_topic_publishers == ["serviceAccount:tilo-harness@${var.project_id}.iam.gserviceaccount.com"]
+    error_message = "Only tilo-harness may publish to tilo-events (PRD 15.3, SEC-11)."
+  }
+
+  assert {
+    condition     = alltrue([for b in output.project_iam_bindings : !contains(["roles/pubsub.publisher", "roles/pubsub.editor", "roles/pubsub.admin"], b.role)])
+    error_message = "No project-wide Pub/Sub publish role: publish is granted on tilo-events only (SEC-12)."
+  }
+}
+
+run "SEC_12_secrets_are_readable_only_by_their_owning_service" {
+  command = plan
+
+  assert {
+    condition     = alltrue([for b in output.project_iam_bindings : b.role != "roles/secretmanager.secretAccessor"])
+    error_message = "No project-wide secretAccessor; access is granted per secret (SEC-06, SEC-08, SEC-12)."
+  }
+
+  assert {
+    condition = output.secret_accessors == {
+      "workspace-oauth-client"        = ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
+      "whatsapp-api-token"            = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
+      "channels-webhook-signing-key"  = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
+      "email-action-link-signing-key" = ["serviceAccount:tilo-api@${var.project_id}.iam.gserviceaccount.com"]
+    }
+    error_message = "Each secret must be readable only by the service that owns it (SEC-12)."
+  }
+}
