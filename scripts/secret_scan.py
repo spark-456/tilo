@@ -11,6 +11,7 @@ two are independent by design so neither depends on the other).
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 
 SECRET_PATTERNS = [
@@ -31,8 +32,9 @@ def scan_file(path: str) -> list[str]:
     try:
         with open(path, encoding="utf-8", errors="ignore") as handle:
             text = handle.read()
-    except OSError:
-        return []
+    except OSError as error:
+        # Fail closed: a path we cannot read is never treated as clean.
+        return [f"{path}: could not be read ({error.strerror or error})"]
     findings = []
     for pattern, label in COMPILED:
         if pattern.search(text):
@@ -40,9 +42,16 @@ def scan_file(path: str) -> list[str]:
     return findings
 
 
+def tracked_files() -> list[str]:
+    """Every tracked path, NUL-separated so spaces and non-ASCII survive."""
+    out = subprocess.run(["git", "ls-files", "-z"], check=True, capture_output=True).stdout
+    return [name for name in out.decode("utf-8").split("\0") if name]
+
+
 def main(argv: list[str]) -> int:
+    paths = tracked_files() if argv == ["--all-tracked"] else argv
     findings: list[str] = []
-    for path in argv:
+    for path in paths:
         findings.extend(scan_file(path))
     if findings:
         sys.stderr.write("secret_scan.py found possible secrets:\n")

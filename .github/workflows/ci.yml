@@ -47,7 +47,7 @@ jobs:
         run: just check
 
       - name: Secret scan (staged-file patterns, over the full tree in CI)
-        run: uv run python scripts/secret_scan.py $(git ls-files)
+        run: uv run python scripts/secret_scan.py --all-tracked
 
       - name: Python dependency audit (SEC-13)
         # `pip-audit` with no args audits its OWN uvx venv, not Tilo's locked
