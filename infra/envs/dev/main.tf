@@ -6,6 +6,14 @@ data "google_project" "current" {
   project_id = var.project_id
 }
 
+# The Cloud Storage service agent is provisioned on demand; reading it here
+# (rather than constructing its email from the project number) makes sure it
+# actually exists before module.kms grants it a role, so that grant cannot
+# silently fail on a fresh project.
+data "google_storage_project_service_account" "gcs" {
+  project = var.project_id
+}
+
 locals {
   project_number = data.google_project.current.number
 
@@ -84,14 +92,18 @@ locals {
   # Project-level roles per service (PRD 6.5 one least-privilege SA per
   # service; SEC-12: tilo-browser holds no Firestore/Datastore or Storage
   # role). KMS decrypt access is scoped to the oauth-tokens key itself, not
-  # granted here (see module.kms).
+  # granted here (see module.kms). Cloud Storage access is bucket-scoped,
+  # not project-wide (see the google_storage_bucket_iam_member grants below
+  # module.storage): a project-level storage role would reach every bucket
+  # in the project, including the CMEK archive bucket and the Terraform
+  # state bucket, not just the bucket a given service actually needs.
   service_project_roles = {
     "api"         = ["roles/datastore.user", "roles/pubsub.publisher", "roles/cloudtasks.enqueuer"]
     "harness"     = ["roles/datastore.user", "roles/pubsub.publisher", "roles/cloudtasks.enqueuer", "roles/aiplatform.user"]
     "channels"    = ["roles/datastore.user", "roles/pubsub.publisher"]
     "connectors"  = ["roles/datastore.user", "roles/secretmanager.secretAccessor"]
     "browser"     = []
-    "render"      = ["roles/datastore.user", "roles/storage.objectAdmin"]
+    "render"      = ["roles/datastore.user"]
     "sandbox-web" = []
   }
 
@@ -194,7 +206,7 @@ module "kms" {
     harness    = "serviceAccount:${module.service.service_accounts["harness"]}"
     # Cloud Storage's own service agent must be able to use the archive key
     # to encrypt/decrypt objects in the CMEK-encrypted archive bucket.
-    gcs_agent = "serviceAccount:service-${local.project_number}@gs-project-accounts.iam.gserviceaccount.com"
+    gcs_agent = "serviceAccount:${data.google_storage_project_service_account.gcs.email_address}"
   }
 
   depends_on = [google_project_service.apis]
@@ -209,6 +221,15 @@ module "storage" {
   source = "../../modules/storage"
 
   project_id = var.project_id
+
+  # The archive bucket's CMEK config (below) references module.kms.archive_key_id,
+  # which is a plan-time string, not a reference to the key or its IAM grant
+  # -- so Terraform would otherwise be free to create this bucket before the
+  # archive key and the GCS service agent's decrypt/encrypt grant on it
+  # exist, and the first apply could fail. depends_on the whole module (as
+  # well as the APIs) so the bucket is created only once the key and that
+  # IAM member both exist.
+  depends_on = [google_project_service.apis, module.kms]
 
   buckets = {
     "artifacts" = {
@@ -236,8 +257,25 @@ module "storage" {
       ]
     }
   }
+}
 
-  depends_on = [google_project_service.apis]
+# Bucket-scoped Storage IAM (PRD 6.5 least privilege, SEC-12): grants live on
+# the one bucket a service needs, never on the whole project.
+#   - tilo-render writes deliverables (PPTX, PDF, charts) into "artifacts"
+#     (PRD 13.2 artifact versions) and may overwrite/delete its own output.
+#   - tilo-harness is the archive writer (PRD 13.2 raw archive): it may only
+#     create new objects in "archive", never overwrite or delete one, so the
+#     per-record hash chain cannot be tampered with after the fact.
+resource "google_storage_bucket_iam_member" "render_artifacts_writer" {
+  bucket = module.storage.buckets["artifacts"].name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${module.service.service_accounts["render"]}"
+}
+
+resource "google_storage_bucket_iam_member" "harness_archive_writer" {
+  bucket = module.storage.buckets["archive"].name
+  role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${module.service.service_accounts["harness"]}"
 }
 
 # ---------------------------------------------------------------------------
