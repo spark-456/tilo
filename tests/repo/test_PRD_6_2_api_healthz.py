@@ -7,6 +7,7 @@ setup` has created the workspace. Not importable with only
 `--with pytest --with pyyaml`, so this test fails at collection with a clear
 ModuleNotFoundError until then; that is failing for the right reason.
 """
+
 from __future__ import annotations
 
 import importlib

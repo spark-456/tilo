@@ -4,6 +4,7 @@ ADR-0001 maps every PRD `make <x>` recipe to `just <x>`, plus `check-fast`
 (used by .claude/hooks/stop_check.py), `skills-test` (FR-AGT-04) and
 `deploy env=dev`.
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -58,7 +59,7 @@ def test_PRD_20_3_justfile_declares_windows_shell(repo_root: pathlib.Path) -> No
     assert justfile.is_file(), "justfile must exist before its shell setting can be checked"
     text = justfile.read_text(encoding="utf-8")
     assert "windows-shell" in text and "pwsh" in text, (
-        "ADR-0001: justfile must set `set windows-shell := [\"pwsh\", ...]` so recipes run on native Windows"
+        'ADR-0001: justfile must set `set windows-shell := ["pwsh", ...]` so recipes run on native Windows'
     )
 
 

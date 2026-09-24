@@ -54,4 +54,12 @@ Changing a frozen contract (ADR first); applying infrastructure or spending mone
 `docs/prd` `docs/adr` `contracts/` `config/` `prompts/` `skills/` `templates/` `packages/providers` `packages/contracts-py` `packages/contracts-ts` `apps/web` `services/{api,harness,channels,connectors,browser,render,sandbox-web}` `evals/` `infra/` `.github/workflows/` `design/`. Each service has its own `CLAUDE.md`.
 
 ## Commands
-Filled in by the scaffold ticket: `just dev`, `just check`, `just check-fast`, `just test`, `just eval`, `just deploy env=dev`.
+- `just setup` — `uv sync` + `pnpm install` for every workspace member
+- `just dev` — run the `tilo-api` dev server
+- `just check` — format check + lint + typecheck + all tests (the full gate; run before finishing a ticket)
+- `just check-fast` — format + lint + tests, used by `.claude/hooks/stop_check.py`, under 2 minutes
+- `just test` — all Python and JS test suites
+- `just fmt` / `just lint` / `just typecheck` — individual gate steps
+- `just eval` — run the eval harness (not built yet; prints a message and exits 0 until P3)
+- `just skills-test` — run `skills/` tests (FR-AGT-04); passes with none present
+- `just deploy env=dev` — refuses anything but `dev`, and infra isn't applied yet either way (ticket P0-07)

@@ -2,6 +2,7 @@
 and 6.6 EFF-01 (dev/CI make no paid model calls unless LIVE=1, proven by
 blocking egress to model endpoints and the run still passing).
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -83,7 +84,9 @@ def test_SEC_13_ci_runs_dependency_audit_and_can_fail_on_critical(repo_root: pat
 
     assert "pip-audit" in text, "SEC-13: ci.yml must run a Python dependency audit (pip-audit)"
     assert "pnpm audit" in text, "SEC-13: ci.yml must run a JS dependency audit (pnpm audit)"
-    assert "audit-level" in text or "critical" in text, "SEC-13: the JS audit must be scoped to fail on critical findings"
+    assert "audit-level" in text or "critical" in text, (
+        "SEC-13: the JS audit must be scoped to fail on critical findings"
+    )
 
 
 def test_PRD_16_4_ci_workflow_has_no_secrets_or_cloud_auth(repo_root: pathlib.Path) -> None:

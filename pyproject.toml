@@ -1,0 +1,32 @@
+[project]
+name = "tilo"
+version = "0.1.0"
+description = "Tilo monorepo root — uv workspace"
+requires-python = "==3.12.*"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "hypothesis>=6.112",
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pre-commit>=4.0",
+    "pyyaml>=6.0",
+    "httpx>=0.27",
+]
+
+[tool.uv.workspace]
+members = ["services/api", "packages/providers"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".claude"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true

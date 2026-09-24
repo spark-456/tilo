@@ -7,6 +7,7 @@ stdlib + tomllib + pyyaml only: no third-party test dependencies beyond
 pytest and pyyaml, so these tests run before `just setup` has created the
 uv/pnpm workspaces they are checking for.
 """
+
 from __future__ import annotations
 
 import pathlib

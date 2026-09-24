@@ -4,6 +4,7 @@
 and writes, config it uses, requirement IDs it owns, and local rules."
 Kept under 40 lines per the ticket's size budget.
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -55,11 +56,7 @@ def test_PRD_20_4_service_claude_md_has_required_sections(repo_root: pathlib.Pat
     text = claude_md.read_text(encoding="utf-8")
     headings = " ".join(h.lower() for h in HEADING_RE.findall(text))
 
-    missing = [
-        label
-        for label, keywords in REQUIRED_SECTIONS.items()
-        if not any(kw in headings for kw in keywords)
-    ]
+    missing = [label for label, keywords in REQUIRED_SECTIONS.items() if not any(kw in headings for kw in keywords)]
     assert not missing, f"{service_dir}/CLAUDE.md is missing sections: {missing}"
 
 
@@ -79,6 +76,15 @@ def test_PRD_20_4_root_claude_md_commands_section_filled(repo_root: pathlib.Path
     match = re.search(r"^## Commands\s*$(.*?)(^## |\Z)", text, re.MULTILINE | re.DOTALL)
     assert match, "root CLAUDE.md must have a ## Commands section"
     body = match.group(1).strip()
-    assert "Filled in by the scaffold ticket" not in body, "ticket P0-01 must fill in the root CLAUDE.md Commands section"
-    for cmd in ["just dev", "just check", "just check-fast", "just test", "just eval", "just deploy"]:
+    assert "Filled in by the scaffold ticket" not in body, (
+        "ticket P0-01 must fill in the root CLAUDE.md Commands section"
+    )
+    for cmd in [
+        "just dev",
+        "just check",
+        "just check-fast",
+        "just test",
+        "just eval",
+        "just deploy",
+    ]:
         assert cmd in body, f"root CLAUDE.md Commands section must document `{cmd}`"

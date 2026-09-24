@@ -1,0 +1,19 @@
+{
+  "name": "tilo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Tilo monorepo root — pnpm workspace",
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "typescript": "^5.7.2"
+  },
+  "scripts": {
+    "lint": "biome lint .",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format ."
+  }
+}

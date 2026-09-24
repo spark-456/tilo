@@ -4,6 +4,7 @@ docs/licences.md must list every direct dependency declared in any
 pyproject.toml (project.dependencies + dependency-groups/optional-dependencies)
 or package.json (dependencies + devDependencies) in the repo.
 """
+
 from __future__ import annotations
 
 import json

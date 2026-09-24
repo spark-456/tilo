@@ -2,6 +2,7 @@
 root-level scaffold deliverables: pyproject.toml, pnpm workspace, pre-commit
 config, secret scanner, .env.example, .editorconfig, README skeleton.
 """
+
 from __future__ import annotations
 
 import json

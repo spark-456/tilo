@@ -4,6 +4,7 @@ Ticket P0-01 scaffolds the monorepo layout except `contracts/` (P0-02) and
 `infra/` (P0-07, running in parallel) -- those two are asserted by their own
 tickets' acceptance tests, not here.
 """
+
 from __future__ import annotations
 
 import pathlib

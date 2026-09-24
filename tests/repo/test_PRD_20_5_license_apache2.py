@@ -2,6 +2,7 @@
 fresh code only, every dependency's licence recorded. The ticket specifies
 Apache-2.0.
 """
+
 from __future__ import annotations
 
 import pathlib
