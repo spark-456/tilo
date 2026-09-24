@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="./tilo-world.js"></script>
+<style>
+body{margin:0;background:#E9E7E1;-webkit-font-smoothing:antialiased}
+a{color:#5A3FE0;font-weight:800}a:hover{color:#3F2AAE}
+@keyframes tiloDash{to{stroke-dashoffset:-14}}
+@keyframes tiloBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</helmet>
+<div style="padding:80px;display:flex;flex-direction:column;gap:80px;font-family:'Nunito Sans',sans-serif;color:#1F1D2B;min-width:2100px">
+
+<header style="display:flex;gap:56px;align-items:flex-end;max-width:1960px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:980px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#5A5768">Tilo · World kit · v3 · from round 2 (Balanced refined)</div>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:52px;line-height:1.02">The world, as a system</div>
+    <div style="font-size:18px;line-height:1.5;color:#5A5768;text-wrap:pretty">Everything on this canvas is drawn by one renderer from a plan. Nothing is hand-placed. District blocks are sized from their buildings. Blocks sit on a grid, the gaps between them become roads, and agents stand at doors or walk real routes along those roads. Change the plan and a different town comes out.</div>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;font-size:15px;line-height:1.45">
+    <div style="background:#FFFFFF;border:2px solid #E3E0D8;border-radius:16px;padding:16px"><div style="font-weight:800">Projection</div><div style="color:#5A5768">True isometric at 30°. One light: top faces lightest, left faces mid, right faces darkest. Flat fills, no gradients or blur.</div></div>
+    <div style="background:#FFFFFF;border:2px solid #E3E0D8;border-radius:16px;padding:16px"><div style="font-weight:800">Grid</div><div style="color:#5A5768">48-unit tile. Roads are 1.05 tiles wide. Buildings are inset 5 units from their cell, and a lane in front of each row is where agents stand.</div></div>
+    <div style="background:#FFFFFF;border:2px solid #E3E0D8;border-radius:16px;padding:16px"><div style="font-weight:800">Budget</div><div style="color:#5A5768">11 common buildings, 4 footprints × 4 floor counts × 3 roofs × 3 facades, 1 agent rig, 6 accessories, 8 faces, 6 road pieces.</div></div>
+  </div>
+</header>
+
+<section style="display:flex;gap:40px;align-items:flex-start">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">W1 · Generator · 1600×960 · rendered live from the plan</div>
+    <div data-screen-label="W1 Generator" style="width:1600px;height:960px;position:relative;background:#F7F6F2;border-radius:24px;outline:2px solid #E3E0D8;overflow:hidden">
+      <div style="position:absolute;inset:0">{{ hero }}</div>
+      <div style="position:absolute;left:24px;top:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;background:#FFFFFF;border:2px solid #E3E0D8;border-bottom-width:4px;border-radius:16px;padding:4px;gap:4px">
+          <sc-for list="{{ scenarios }}" as="sc" hint-placeholder-count="3">
+            <button onClick="{{ sc.pick }}" style="height:40px;padding:0 16px;border:0;border-radius:12px;background:{{ sc.bg }};color:{{ sc.fg }};font-family:'Nunito Sans',sans-serif;font-weight:800;font-size:15px;cursor:pointer">{{ sc.label }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex;background:#FFFFFF;border:2px solid #E3E0D8;border-bottom-width:4px;border-radius:16px;padding:4px;gap:4px;align-items:center">
+          <div style="font-size:13px;font-weight:800;color:#5A5768;padding:0 8px 0 10px">Build</div>
+          <sc-for list="{{ stages }}" as="sg" hint-placeholder-count="4">
+            <button onClick="{{ sg.pick }}" style="height:40px;padding:0 14px;border:0;border-radius:12px;background:{{ sg.bg }};color:{{ sg.fg }};font-family:'Nunito Sans',sans-serif;font-weight:800;font-size:15px;cursor:pointer">{{ sg.label }}</button>
+          </sc-for>
+        </div>
+        <button onClick="{{ shuffle }}" style="height:52px;padding:0 18px;border:0;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;cursor:pointer" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #3F2AAE">Shuffle generated buildings</button>
+        <button onClick="{{ toggleLabels }}" style="height:52px;padding:0 16px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;color:#1F1D2B;font-family:'Nunito Sans',sans-serif;font-weight:800;font-size:15px;cursor:pointer" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #CFCABF">{{ labelsText }}</button>
+      </div>
+      <div style="position:absolute;left:24px;bottom:24px;background:#FFFFFF;border:2px solid #E3E0D8;border-radius:16px;padding:12px 16px;font-size:14px;line-height:1.45;max-width:560px">
+        <div style="font-weight:800">{{ heroTitle }}</div>
+        <div style="color:#5A5768;font-family:'JetBrains Mono',monospace;font-size:12.5px">{{ heroMeta }}</div>
+      </div>
+    </div>
+  </div>
+  <div style="width:300px;padding-top:40px;display:flex;flex-direction:column;gap:18px;font-size:15px;line-height:1.45;color:#5A5768">
+    <div style="font-weight:800;color:#1F1D2B">How the generator works</div>
+    <div><b style="color:#1F1D2B">1 · Pack.</b> Each district's buildings are packed into rows of up to 7 tiles. The block is sized to fit, with a lane in front of every row.</div>
+    <div><b style="color:#1F1D2B">2 · Arrange.</b> Town Hall takes the centre slot of a 3×3 grid. Other districts fill slots in a fixed order, and empty rows and columns collapse.</div>
+    <div><b style="color:#1F1D2B">3 · Roads.</b> Every gap between blocks, plus a ring road, becomes road. Handoff routes use doors, lanes, road rows and the nearest cross street.</div>
+    <div><b style="color:#1F1D2B">4 · Style.</b> The planner names a generated building and gives it an icon. If it leaves out floors, roof or facade, the renderer picks them from a hash of the name. Shuffle changes the seed; a given seed always gives the same town.</div>
+    <div><b style="color:#1F1D2B">5 · Honest motion.</b> Only three things move: dashed routes (walking, from real routes), bobbing walkers, and pins for work in progress.</div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:12px">
+  <div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">W2 · Same kit, three plans · Village / Town / City</div>
+  <div style="display:flex;gap:24px">
+    <sc-for list="{{ trio }}" as="t" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;gap:12px;width:700px">
+        <div data-screen-label="W2 World" style="width:700px;height:500px;background:#F7F6F2;border-radius:24px;outline:2px solid #E3E0D8;overflow:hidden">{{ t.el }}</div>
+        <div style="display:flex;align-items:baseline;gap:10px"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">{{ t.tier }}</div><div style="font-size:15px;color:#5A5768">{{ t.stats }}</div></div>
+        <div style="font-size:15px;line-height:1.45">{{ t.task }}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.55;color:#5A5768;background:#FFFFFF;border:2px solid #E3E0D8;border-radius:16px;padding:12px 14px;white-space:pre-wrap">{{ t.plan }}</div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:12px">
+  <div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">W3 · World build sequence · the first delight moment · Town</div>
+  <div style="display:flex;gap:20px">
+    <sc-for list="{{ build }}" as="b" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;gap:10px;width:510px">
+        <div data-screen-label="W3 Build frame" style="width:510px;height:360px;background:#F7F6F2;border-radius:24px;outline:2px solid #E3E0D8;overflow:hidden">{{ b.el }}</div>
+        <div style="font-weight:800;font-size:16px">{{ b.label }}</div>
+        <div style="font-size:14.5px;color:#5A5768;line-height:1.45">{{ b.note }}</div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:12px">
+  <div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">W4 · Building kit · modular parts, common buildings, states</div>
+  <div data-screen-label="W4 Building kit" style="width:2100px;background:#FFFFFF;border-radius:24px;outline:2px solid #E3E0D8;padding:40px;box-sizing:border-box;display:flex;flex-direction:column;gap:36px">
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px">
+      <sc-for list="{{ parts }}" as="pg" hint-placeholder-count="4">
+        <div>
+          <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">{{ pg.title }}</div>
+          <div style="font-size:14px;color:#5A5768;margin:2px 0 12px">{{ pg.note }}</div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+            <sc-for list="{{ pg.items }}" as="it" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;background:#F7F6F2;border-radius:16px;padding:8px 6px"><div>{{ it.el }}</div><div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#5A5768">{{ it.label }}</div></div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">Common buildings</div>
+      <div style="font-size:14px;color:#5A5768;margin:2px 0 12px">The same parts with a fixed recipe. District tint comes from wherever the building is placed.</div>
+      <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+        <sc-for list="{{ commons }}" as="it" hint-placeholder-count="11">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;background:#F7F6F2;border-radius:16px;padding:10px 8px"><div>{{ it.el }}</div><div style="font-weight:800;font-size:14px">{{ it.label }}</div><div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#5A5768">{{ it.note }}</div></div>
+        </sc-for>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">One building, every state</div>
+      <div style="font-size:14px;color:#5A5768;margin:2px 0 12px">Each state has its own shape as well as a colour: dashed ghost, scaffold, dark windows, lit windows, flag, diamond, check, grey, cloud.</div>
+      <div style="display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:12px">
+        <sc-for list="{{ states }}" as="it" hint-placeholder-count="9">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;background:#F7F6F2;border-radius:16px;padding:10px 6px 14px"><div>{{ it.el }}</div><div style="font-weight:800;font-size:15px">{{ it.label }}</div><div style="font-size:13px;color:#5A5768;text-align:center">{{ it.note }}</div></div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:12px">
+  <div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">W5 · Agents · one 3D tile rig</div>
+  <div data-screen-label="W5 Agents" style="width:2100px;background:#FFFFFF;border-radius:24px;outline:2px solid #E3E0D8;padding:40px;box-sizing:border-box;display:flex;flex-direction:column;gap:36px">
+    <div style="display:grid;grid-template-columns:420px 1fr 380px;gap:40px">
+      <div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">Ranks</div>
+        <div style="font-size:14px;color:#5A5768;margin:2px 0 12px">Rank shows as crest cubes and height: 3 / 1 / 0.</div>
+        <div style="display:flex;gap:12px;align-items:flex-end">
+          <sc-for list="{{ ranks }}" as="it" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;align-items:center;gap:6px;background:#F7F6F2;border-radius:16px;padding:12px 10px;flex:1"><div>{{ it.el }}</div><div style="font-weight:800;font-size:15px">{{ it.label }}</div></div></sc-for>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">Roles</div>
+        <div style="font-size:14px;color:#5A5768;margin:2px 0 12px">Colour plus accessory, so each role still reads in greyscale.</div>
+        <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px">
+          <sc-for list="{{ roles }}" as="it" hint-placeholder-count="6"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;background:#F7F6F2;border-radius:16px;padding:12px 6px"><div>{{ it.el }}</div><div style="font-weight:800;font-size:15px">{{ it.label }}</div><div style="font-size:13px;color:#5A5768">{{ it.note }}</div></div></sc-for>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">Facing and grounding</div>
+        <div style="font-size:14px;color:#5A5768;margin:2px 0 12px">The face moves to whichever side the agent is walking along. A flat contact ellipse, no blur.</div>
+        <div style="display:flex;gap:12px">
+          <sc-for list="{{ facings }}" as="it" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;background:#F7F6F2;border-radius:16px;padding:12px 6px;flex:1"><div>{{ it.el }}</div><div style="font-weight:800;font-size:14px;text-align:center">{{ it.label }}</div></div></sc-for>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">Expressions · each one is an agent state</div>
+      <div style="font-size:14px;color:#5A5768;margin:2px 0 12px">Drawn on the front face of the cube, so they stay in perspective. Arms are camera-facing capsules, so every pose reads at any scale.</div>
+      <div style="display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:12px">
+        <sc-for list="{{ exprs }}" as="it" hint-placeholder-count="8"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;background:#F7F6F2;border-radius:16px;padding:14px 6px"><div>{{ it.el }}</div><div style="font-weight:800;font-size:15px">{{ it.label }}</div><div style="font-size:13px;color:#5A5768">{{ it.note }}</div></div></sc-for>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:12px">
+  <div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">W6 · Ground, roads and event overlays</div>
+  <div data-screen-label="W6 Ground and roads" style="width:2100px;background:#FFFFFF;border-radius:24px;outline:2px solid #E3E0D8;padding:40px;box-sizing:border-box;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px">
+    <sc-for list="{{ pieces }}" as="it" hint-placeholder-count="10">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px;background:#F7F6F2;border-radius:16px;padding:14px 8px 16px"><div>{{ it.el }}</div><div style="font-weight:800;font-size:15px">{{ it.label }}</div><div style="font-size:13px;color:#5A5768;text-align:center;line-height:1.4;max-width:300px">{{ it.note }}</div></div>
+    </sc-for>
+  </div>
+</section>
+
+<section style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:24px;width:2100px">
+  <div style="background:#1F1D2B;color:#E3E0D8;border-radius:24px;padding:32px;display:flex;flex-direction:column;gap:12px">
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;color:#FFFFFF">Plan schema · what the planner outputs</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13.5px;line-height:1.6;white-space:pre-wrap">{{ schema }}</div>
+  </div>
+  <div style="background:#FFFFFF;border:2px solid #E3E0D8;border-radius:24px;padding:32px;display:flex;flex-direction:column;gap:14px;font-size:16px;line-height:1.5">
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">Rules that keep any plan looking good</div>
+    <div><b>Colour is reserved.</b> Tints appear only on roofs, plots and signs. Amber, red and green appear only on pins, rings and gates.</div>
+    <div><b>One loud thing.</b> Needs-you gets a flag pin plus an amber ring on the ground around the agent. Nothing else is saturated at that size.</div>
+    <div><b>Height budget.</b> The renderer caps floors at 4 and at 2 for footprints of 2×2 or more, so tall buildings never hide a row.</div>
+    <div><b>Back to front.</b> Districts fill slots behind or beside Town Hall first, so the most active work sits where the camera sees it.</div>
+    <div><b>Access.</b> A locked district still takes up its space, so the layout doesn't shift when access changes, but it is drawn only as clouds and a lock. No partial data.</div>
+    <div><b>Performance.</b> Every part is a flat polygon with no filters. A 40-agent City is about 2,400 SVG nodes. Canvas or WebGL instancing takes over above that.</div>
+  </div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { ready: !!window.TiloWorld, scenario: 'town', seed: 1, labels: true, stage: 4 };
+  componentDidMount() {
+    if (!window.TiloWorld) this.t = setInterval(() => { if (window.TiloWorld) { clearInterval(this.t); this.setState({ ready: true }); } }, 50);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  plans() {
+    const town = {
+      title: 'Competitor pricing for Thursday', tier: 'Town',
+      districts: [
+        { id: 'hall', name: 'Town Hall', hall: true, icon: 'hall', buildings: [{ id: 'townhall', kit: 'townhall', state: 'active' }, { id: 'treasury', kit: 'treasury' }, { id: 'connector', kit: 'connector' }] },
+        { id: 'research', name: 'Research', icon: 'search', buildings: [{ id: 'library', kit: 'library', state: 'complete' }, { id: 'observatory', gen: { name: 'Price Observatory', fp: [1, 1], i: 'tag' }, state: 'active', event: 'search', count: '4 / 7' }, { id: 'browser', kit: 'browser', state: 'needs' }] },
+        { id: 'analysis', name: 'Analysis', icon: 'chart', buildings: [{ id: 'vault', kit: 'vault', state: 'active', event: 'vault' }, { id: 'chart', gen: { name: 'Chart Studio', fp: [2, 1], i: 'chart' }, state: 'construction' }] },
+        { id: 'delivery', name: 'Delivery', icon: 'parcel', buildings: [{ id: 'writing', gen: { name: 'Writing Room', fp: [1, 1], i: 'doc' }, state: 'planned' }, { id: 'dock', kit: 'dock', state: 'planned' }] }
+      ],
+      routes: [{ id: 'walk', from: 'library', to: 'observatory', kind: 'walk' }, { id: 'mem', from: 'vault', to: 'chart', kind: 'memory' }],
+      gates: [{ before: 'dock', state: 'closed' }],
+      agents: [
+        { rank: 'director', at: 'townhall', expr: 'neutral' }, { role: 'connector', at: 'connector', expr: 'neutral' },
+        { role: 'research', rank: 'lead', at: 'observatory', expr: 'focused', dx: -9 }, { role: 'research', at: 'observatory', expr: 'focused', dx: 12, facing: 'R' },
+        { role: 'research', route: 'walk', t: .45, expr: 'walking' },
+        { role: 'browser', at: 'browser', expr: 'needs', ring: true },
+        { role: 'builder', rank: 'lead', at: 'vault', expr: 'focused' }, { role: 'builder', at: 'chart', expr: 'focused' },
+        { role: 'delivery', rank: 'lead', at: 'writing', expr: 'neutral' }
+      ]
+    };
+    const village = {
+      title: 'Every Monday: match invoices to purchase orders', tier: 'Village',
+      districts: [
+        { id: 'hall', name: 'Town Hall', hall: true, icon: 'hall', buildings: [{ id: 'townhall', kit: 'townhall', state: 'active' }, { id: 'clock', kit: 'clock', state: 'active' }] },
+        { id: 'matching', tint: 'analysis', name: 'Matching', icon: 'swap', buildings: [{ id: 'portal', kit: 'browser', state: 'complete' }, { id: 'mill', gen: { name: 'Reconciliation Mill', fp: [2, 2], i: 'swap' }, state: 'active', event: 'swap', count: '41 / 58' }, { id: 'vault', kit: 'vault', state: 'active', event: 'vault' }, { id: 'dock', kit: 'dock', state: 'idle' }] }
+      ],
+      routes: [{ id: 'mem', from: 'vault', to: 'mill', kind: 'memory' }, { id: 'walk', from: 'portal', to: 'mill', kind: 'walk' }],
+      gates: [{ before: 'dock', state: 'closed' }],
+      agents: [{ rank: 'director', at: 'townhall', expr: 'neutral' }, { role: 'browser', at: 'portal', expr: 'delighted' }, { role: 'builder', rank: 'lead', at: 'mill', expr: 'focused' }, { role: 'builder', at: 'mill', expr: 'focused', dx: 16 }, { role: 'research', route: 'walk', t: .5, expr: 'walking', parcel: true }]
+    };
+    const city = {
+      title: 'Onboard 12 new hires across email, HR, laptops and training', tier: 'City',
+      districts: [
+        { id: 'hall', name: 'Town Hall', hall: true, icon: 'hall', buildings: [{ id: 'townhall', kit: 'townhall', state: 'active' }, { id: 'treasury', kit: 'treasury' }, { id: 'watch', kit: 'watchtower', state: 'active' }] },
+        { id: 'accounts', name: 'Accounts & devices', icon: 'laptop', buildings: [{ id: 'office', gen: { name: 'Account Setup Office', fp: [2, 1], i: 'person' }, state: 'active', event: 'person', count: '7 / 12' }, { id: 'depot', gen: { name: 'Laptop Depot', fp: [2, 1], i: 'laptop' }, state: 'needs' }, { id: 'conn', kit: 'connector' }] },
+        { id: 'people', name: 'HR system', icon: 'doc', buildings: [{ id: 'browser', kit: 'browser', state: 'active', event: 'screen', count: '4 live' }, { id: 'records', gen: { name: 'HR Records Office', fp: [1, 1], i: 'doc' }, state: 'complete' }] },
+        { id: 'mail', name: 'Email', icon: 'mail', buildings: [{ id: 'mailroom', gen: { name: 'Mail Room', fp: [2, 1], i: 'mail' }, state: 'active' }, { id: 'yard', kit: 'testyard', state: 'active' }] },
+        { id: 'learning', name: 'Training', icon: 'cap', buildings: [{ id: 'training', gen: { name: 'Training Hall', fp: [2, 2], i: 'cap' }, state: 'construction' }] },
+        { id: 'delivery', name: 'Delivery', icon: 'parcel', buildings: [{ id: 'pack', gen: { name: 'Welcome Pack Studio', fp: [1, 1], i: 'doc' }, state: 'planned' }, { id: 'dock', kit: 'dock', state: 'planned' }] },
+        { id: 'payroll', name: 'Payroll', icon: 'lock', locked: true, buildings: [{ id: 'p1', kit: 'treasury' }, { id: 'p2', kit: 'vault' }] }
+      ],
+      routes: [{ id: 'h1', from: 'office', to: 'depot', kind: 'walk' }, { id: 'h2', from: 'records', to: 'office', kind: 'walk' }],
+      gates: [{ before: 'mailroom', state: 'waiting' }],
+      agents: [
+        { rank: 'director', at: 'townhall', expr: 'neutral' }, { role: 'tester', at: 'watch', expr: 'focused' },
+        { role: 'connector', rank: 'lead', at: 'office', expr: 'focused', dx: -8 }, { role: 'connector', at: 'office', expr: 'focused', dx: 12 }, { role: 'builder', at: 'depot', expr: 'needs', ring: true }, { role: 'connector', at: 'conn', expr: 'neutral' },
+        { role: 'browser', rank: 'lead', at: 'browser', expr: 'focused', dx: -10 }, { role: 'browser', at: 'browser', expr: 'focused', dx: 6 }, { role: 'browser', at: 'browser', expr: 'focused', dx: 22 }, { role: 'browser', at: 'browser', expr: 'recovering', dx: 38 },
+        { role: 'research', at: 'records', expr: 'delighted' },
+        { role: 'delivery', rank: 'lead', at: 'mailroom', expr: 'focused' }, { role: 'tester', at: 'yard', expr: 'focused' },
+        { role: 'builder', rank: 'lead', at: 'training', expr: 'focused' }, { role: 'builder', at: 'training', expr: 'focused', dx: 18 },
+        { role: 'delivery', at: 'pack', expr: 'neutral' },
+        { role: 'research', route: 'h1', t: .5, expr: 'walking', parcel: true }, { role: 'research', route: 'h2', t: .4, expr: 'walking' }
+      ]
+    };
+    return { village, town, city };
+  }
+  renderVals() {
+    if (!window.TiloWorld) return {};
+    const h = React.createElement, W = window.TiloWorld(h), PL = this.plans(), s = this.state;
+    const plan = PL[s.scenario];
+    const on = { bg: '#5A3FE0', fg: '#FFFFFF' }, off = { bg: 'transparent', fg: '#1F1D2B' };
+    const count = p => p.agents.length, bld = p => p.districts.reduce((a, d) => a + d.buildings.length, 0);
+    const schemaText = p => {
+      const d = p.districts.filter(x => !x.hall).map(x => `  ${x.id}: ${x.buildings.map(b => b.kit || ('gen:"' + b.gen.name + '"')).join(', ')}${x.locked ? '  (locked)' : ''}`).join('\n');
+      return `tier: ${p.tier.toLowerCase()}\ndistricts:\n  hall: ${p.districts[0].buildings.map(b => b.kit).join(', ')}\n${d}\nroutes: ${(p.routes || []).map(r => r.kind + ' ' + r.from + '→' + r.to).join(' · ')}`;
+    };
+    const X = (el, label, note) => ({ el, label, note });
+    const gen = (fp, fl, roof, fa, i) => ({ n: '', fp, fl, roof, fa, i: i || 'dot' });
+    const A = (a, size) => W.soloAgent(a, size || 96);
+    return {
+      hero: W.world(plan, { seed: s.seed, labels: s.labels, stage: s.stage }),
+      heroTitle: plan.title,
+      heroMeta: `${plan.tier} · ${plan.districts.length} districts · ${bld(plan)} buildings · ${count(plan)} agents · seed ${s.seed}`,
+      labelsText: s.labels ? 'Hide labels' : 'Show labels',
+      shuffle: () => this.setState(q => ({ seed: q.seed + 1 })),
+      toggleLabels: () => this.setState(q => ({ labels: !q.labels })),
+      scenarios: [['village', 'Village'], ['town', 'Town'], ['city', 'City']].map(([k, l]) => ({ label: l, ...(s.scenario === k ? on : off), pick: () => this.setState({ scenario: k }) })),
+      stages: [[1, 'Ground'], [2, 'Plan'], [3, 'Build'], [4, 'Live']].map(([k, l]) => ({ label: l, ...(s.stage === k ? on : off), pick: () => this.setState({ stage: k }) })),
+      trio: [['village', 'Every Monday, match supplier invoices to purchase orders and flag mismatches over 1%.'], ['town', 'Prepare a competitor pricing analysis for Thursday: a 10-slide deck and a one-page summary.'], ['city', 'Onboard 12 new hires across email, the HR system, laptop requests and the training portal.']].map(([k, task]) => ({
+        el: W.world(PL[k], { seed: 1, labels: false, anim: false }), tier: PL[k].tier, task,
+        stats: `${PL[k].districts.length} districts · ${bld(PL[k])} buildings · ${count(PL[k])} agents`, plan: schemaText(PL[k])
+      })),
+      build: [[1, '1 · Ground', 'The island slab and ring road appear. Soft 300ms rise.'], [2, '2 · Plan', 'Plots rise and every building appears as a dashed ghost, so the whole plan is visible from the start.'], [3, '3 · Build', 'Buildings pop into their real state with a 280ms overshoot, back to front, 60ms apart.'], [4, '4 · Live', 'Agents walk out of Town Hall to their doors. Routes and pins appear only as real events arrive.']].map(([st, label, note]) => ({ el: W.world(PL.town, { seed: 1, stage: st, labels: false, anim: false, tags: st >= 2 }), label, note })),
+      parts: [
+        { title: 'Footprint', note: 'Cells: 1×1 · 2×1 · 2×2 · 3×2', items: [[1, 1], [2, 1], [2, 2], [3, 2]].map(fp => X(W.soloBuilding(gen(fp, 1, 'flat', 'windows'), 'idle', { d: 'research', height: 120 }), fp.join('×'))) },
+        { title: 'Floors', note: 'Ground 26 + 22 per floor · capped at 4', items: [1, 2, 3, 4].map(n => X(W.soloBuilding(gen([1, 1], n, 'flat', 'windows'), 'idle', { d: 'analysis', height: 150 }), n + ' fl')) },
+        { title: 'Roof', note: 'The gable ridge follows the longer side', items: ['flat', 'gable', 'dome'].map(r => X(W.soloBuilding(gen([2, 1], 2, r, 'windows'), 'idle', { d: 'delivery', height: 130 }), r)) },
+        { title: 'Facade', note: 'Punched · band · arches', items: ['windows', 'band', 'arches'].map(f => X(W.soloBuilding(gen([2, 1], 2, 'flat', f), 'active', { d: 'hall', height: 120 }), f)) }
+      ],
+      commons: Object.keys(W.KIT).map(k => { const s0 = W.KIT[k]; return X(W.soloBuilding(k, 'idle', { d: k === 'library' || k === 'browser' ? 'research' : k === 'workshop' || k === 'vault' || k === 'testyard' ? 'analysis' : k === 'dock' ? 'delivery' : 'hall', height: 140 }), s0.n, `${s0.fp.join('×')} · ${s0.fl}fl · ${s0.roof}`); }),
+      states: [['planned', 'Planned', 'Dashed ghost'], ['construction', 'Building', 'Scaffold + ghost'], ['idle', 'Idle', 'Windows dark'], ['active', 'Active', 'Windows lit, sign lit'], ['needs', 'Needs you', 'Amber flag pin'], ['blocked', 'Blocked', 'Red diamond pin'], ['complete', 'Complete', 'Green check pin'], ['skipped', 'Skipped', 'Desaturated'], ['locked', 'No access', 'Cloud cover + lock']].map(([st, l, n]) => X(W.soloBuilding('library', st === 'locked' ? 'idle' : st, { d: 'research', height: 150, pin: ['active', 'needs', 'blocked', 'complete', 'skipped'].includes(st), cloud: st === 'locked' }), l, n)),
+      ranks: [X(A({ rank: 'director' }, 120), 'Director'), X(A({ role: 'research', rank: 'lead' }, 120), 'Lead'), X(A({ role: 'research' }, 120), 'Specialist')],
+      roles: [['research', 'Research', 'Magnifier'], ['builder', 'Builder', 'Toolbelt'], ['tester', 'Tester', 'Clipboard'], ['browser', 'Browser', 'Headset'], ['connector', 'Connector', 'Key-card'], ['delivery', 'Delivery', 'Satchel']].map(([r, l, n]) => X(A({ role: r }, 110), l, n)),
+      facings: [X(A({ role: 'research', facing: 'L' }, 110), 'Facing left'), X(A({ role: 'research', facing: 'R' }, 110), 'Facing right'), X(A({ role: 'browser', expr: 'needs', ring: true }, 110), 'Needs you ring')],
+      exprs: [['neutral', 'Neutral', 'Idle'], ['walking', 'Walking', 'Walk cycle'], ['focused', 'Focused', 'Working'], ['talking', 'Talking', 'Handing off'], ['needs', 'Hand up', 'Needs you'], ['puzzled', 'Puzzled', 'Blocked'], ['recovering', 'Determined', 'Recovering'], ['delighted', 'Delighted', 'Done']].map(([e, l, n]) => X(A({ role: 'research', expr: e }, 120), l, n)),
+      pieces: [['island', 'Island slab', 'Two-tier base, so the town reads as an object on a projector.'], ['plot', 'District plot', 'Raised 3 units, tinted, with a lighter lane in front of each row.'], ['road', 'Road', 'Gutters between blocks. Flat, one colour, no markings when idle.'], ['walk', 'Active route', 'Grey dashes move toward the destination. Maps to "task assigned".'], ['memory', 'Memory shortcut', 'Hero-coloured band. Maps to a cache hit from the Memory Vault.'], ['handoff', 'Handoff', 'Two agents meet on the road and a parcel passes between them.'], ['gate-closed', 'Gate · ahead', 'Approval checkpoint before an irreversible step. Neutral while ahead.'], ['gate-waiting', 'Gate · waiting', 'Reached and waiting for a person. Amber pin names the action.'], ['gate-open', 'Gate · approved', 'The bar lifts. Green check, attributed in Story.'], ['cloud', 'No access', 'Clouds and a lock. The district keeps its size, with no partial data.']].map(([k, l, n]) => X(W.soloPiece(k, 150), l, n)),
+      schema: `{
+  "tier": "town",
+  "districts": [
+    { "id": "research", "name": "Research", "icon": "search",
+      "buildings": [
+        { "id": "library", "kit": "library", "state": "complete" },
+        { "id": "observatory", "state": "active",
+          "gen": { "name": "Price Observatory", "fp": [1,1], "i": "tag" },
+          "event": "search", "count": "4 / 7" } ] } ],
+  "routes": [ { "id": "walk", "from": "library", "to": "observatory",
+                "kind": "walk | memory | handoff" } ],
+  "gates":  [ { "before": "dock", "state": "closed | waiting | open" } ],
+  "agents": [ { "role": "browser", "at": "browser", "expr": "needs" },
+              { "role": "research", "route": "walk", "t": 0.45 } ]
+}
+// Omitted "fl", "roof" and "fa" are chosen from hash(name) + seed.
+// Every field maps to a real agent event; the renderer invents nothing.`
+    };
+  }
+}
+</script>
+</body>
+</html>

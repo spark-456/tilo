@@ -1,0 +1,739 @@
+{
+ "world": "K1 electric scooter",
+ "seed": 2,
+ "tier": "City",
+ "levels": [
+  {
+   "id": "concept",
+   "code": "L1",
+   "name": "Concept & requirements",
+   "color": "#21748A",
+   "districts": [
+    {
+     "id": "hq",
+     "name": "Town Hall",
+     "tint": "hall",
+     "icon": "hall",
+     "buildings": [
+      {
+       "id": "townhall",
+       "kit": "townhall"
+      },
+      {
+       "id": "desk",
+       "kit": "desk"
+      }
+     ],
+     "hall": true
+    },
+    {
+     "id": "market",
+     "name": "Market research",
+     "tint": "research",
+     "icon": "search",
+     "buildings": [
+      {
+       "id": "library",
+       "kit": "library"
+      },
+      {
+       "id": "survey",
+       "gen": {
+        "name": "Rider Survey Lab",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "person"
+       }
+      }
+     ]
+    },
+    {
+     "id": "req",
+     "name": "Requirements",
+     "tint": "analysis",
+     "icon": "doc",
+     "buildings": [
+      {
+       "id": "reqhall",
+       "gen": {
+        "name": "Requirements Hall",
+        "fp": [
+         2,
+         2
+        ],
+        "i": "doc",
+        "fl": 2,
+        "roof": "gable"
+       }
+      },
+      {
+       "id": "costdesk",
+       "gen": {
+        "name": "Cost Target Desk",
+        "fp": [
+         1,
+         1
+        ],
+        "i": "coin"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "design",
+   "code": "L2",
+   "name": "Industrial design",
+   "color": "#89466E",
+   "districts": [
+    {
+     "id": "style",
+     "name": "Styling",
+     "tint": "delivery",
+     "icon": "make",
+     "buildings": [
+      {
+       "id": "sketch",
+       "gen": {
+        "name": "Sketch Studio",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "make"
+       }
+      },
+      {
+       "id": "clay",
+       "gen": {
+        "name": "Clay Studio",
+        "fp": [
+         2,
+         2
+        ],
+        "i": "make",
+        "fl": 1,
+        "roof": "dome"
+       }
+      }
+     ]
+    },
+    {
+     "id": "cmf",
+     "name": "Colour & finish",
+     "tint": "people",
+     "icon": "tag",
+     "buildings": [
+      {
+       "id": "cmflib",
+       "gen": {
+        "name": "CMF Library",
+        "fp": [
+         1,
+         1
+        ],
+        "i": "tag"
+       }
+      }
+     ]
+    },
+    {
+     "id": "ergo",
+     "name": "Ergonomics",
+     "tint": "learning",
+     "icon": "person",
+     "buildings": [
+      {
+       "id": "ergolab",
+       "gen": {
+        "name": "Ergonomics Lab",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "person"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "eng",
+   "code": "L3",
+   "name": "Engineering",
+   "color": "#A5663C",
+   "districts": [
+    {
+     "id": "chassis",
+     "name": "Chassis",
+     "tint": "analysis",
+     "icon": "wheel",
+     "buildings": [
+      {
+       "id": "frame",
+       "gen": {
+        "name": "Frame Workshop",
+        "fp": [
+         2,
+         2
+        ],
+        "i": "make",
+        "fl": 2,
+        "roof": "gable"
+       }
+      },
+      {
+       "id": "susp",
+       "gen": {
+        "name": "Suspension Bay",
+        "fp": [
+         1,
+         1
+        ],
+        "i": "wheel"
+       }
+      }
+     ]
+    },
+    {
+     "id": "battery",
+     "name": "Battery & powertrain",
+     "tint": "research",
+     "icon": "battery",
+     "buildings": [
+      {
+       "id": "pack",
+       "gen": {
+        "name": "Battery Pack Lab",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "battery"
+       }
+      },
+      {
+       "id": "motor",
+       "gen": {
+        "name": "Motor Test Bench",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "cog"
+       }
+      }
+     ]
+    },
+    {
+     "id": "commons",
+     "name": "Commons",
+     "tint": "hall",
+     "icon": "hall",
+     "buildings": [
+      {
+       "id": "vault",
+       "kit": "vault"
+      },
+      {
+       "id": "treasury",
+       "kit": "treasury"
+      },
+      {
+       "id": "connector",
+       "kit": "connector"
+      },
+      {
+       "id": "meeting",
+       "kit": "meeting"
+      }
+     ],
+     "hall": true
+    },
+    {
+     "id": "elec",
+     "name": "Electronics & firmware",
+     "tint": "learning",
+     "icon": "screen",
+     "buildings": [
+      {
+       "id": "ctrl",
+       "gen": {
+        "name": "Controller Lab",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "screen"
+       }
+      },
+      {
+       "id": "fw",
+       "gen": {
+        "name": "Firmware Workshop",
+        "fp": [
+         1,
+         1
+        ],
+        "i": "doc"
+       }
+      }
+     ]
+    },
+    {
+     "id": "apps",
+     "name": "Parts & apps",
+     "tint": "mail",
+     "icon": "screen",
+     "buildings": [
+      {
+       "id": "bom",
+       "gen": {
+        "name": "BOM Office",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "doc",
+        "fl": 1,
+        "roof": "flat"
+       }
+      },
+      {
+       "id": "appstudio",
+       "kit": "appstudio"
+      },
+      {
+       "id": "testyard",
+       "kit": "testyard"
+      },
+      {
+       "id": "pwatch",
+       "gen": {
+        "name": "Parts Watch",
+        "fp": [
+         1,
+         1
+        ],
+        "i": "screen",
+        "fl": 1,
+        "roof": "flat",
+        "fa": "band"
+       }
+      }
+     ]
+    }
+   ],
+   "gates": [
+    {
+     "before": "pwatch",
+     "state": "closed"
+    }
+   ]
+  },
+  {
+   "id": "valid",
+   "code": "L4",
+   "name": "Validation",
+   "color": "#5F6770",
+   "districts": [
+    {
+     "id": "proto",
+     "name": "Prototype build",
+     "tint": "analysis",
+     "icon": "make",
+     "buildings": [
+      {
+       "id": "garage",
+       "gen": {
+        "name": "Prototype Garage",
+        "fp": [
+         2,
+         2
+        ],
+        "i": "make",
+        "fl": 1,
+        "roof": "gable"
+       }
+      }
+     ]
+    },
+    {
+     "id": "track",
+     "name": "Test track",
+     "tint": "people",
+     "icon": "flask",
+     "buildings": [
+      {
+       "id": "testtrack",
+       "kit": "testyard",
+       "name": "Test Track"
+      },
+      {
+       "id": "drop",
+       "gen": {
+        "name": "Drop Tower",
+        "fp": [
+         1,
+         1
+        ],
+        "i": "eye",
+        "fl": 4,
+        "roof": "flat"
+       }
+      }
+     ]
+    },
+    {
+     "id": "safety",
+     "name": "Battery safety",
+     "tint": "research",
+     "icon": "battery",
+     "buildings": [
+      {
+       "id": "thermal",
+       "gen": {
+        "name": "Thermal Chamber",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "flask"
+       }
+      },
+      {
+       "id": "samplelab",
+       "gen": {
+        "name": "Sample Lab",
+        "fp": [
+         1,
+         1
+        ],
+        "i": "flask"
+       }
+      }
+     ]
+    },
+    {
+     "id": "cert",
+     "name": "Certification",
+     "tint": "learning",
+     "icon": "check",
+     "buildings": [
+      {
+       "id": "homolog",
+       "gen": {
+        "name": "Homologation Office",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "doc"
+       }
+      }
+     ]
+    }
+   ],
+   "gates": [
+    {
+     "before": "homolog",
+     "state": "closed"
+    }
+   ]
+  },
+  {
+   "id": "mfg",
+   "code": "L5",
+   "name": "Manufacturing",
+   "color": "#6C7A30",
+   "districts": [
+    {
+     "id": "plant",
+     "name": "Plant",
+     "tint": "accounts",
+     "icon": "cog",
+     "buildings": [
+      {
+       "id": "line",
+       "gen": {
+        "name": "Assembly Line",
+        "fp": [
+         3,
+         2
+        ],
+        "i": "cog",
+        "fl": 1,
+        "roof": "gable"
+       }
+      },
+      {
+       "id": "qc",
+       "gen": {
+        "name": "Quality Gate Office",
+        "fp": [
+         1,
+         1
+        ],
+        "i": "check"
+       }
+      }
+     ]
+    },
+    {
+     "id": "tooling",
+     "name": "Tooling",
+     "tint": "analysis",
+     "icon": "make",
+     "buildings": [
+      {
+       "id": "toolshop",
+       "gen": {
+        "name": "Tooling Shop",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "make"
+       }
+      },
+      {
+       "id": "fixture",
+       "gen": {
+        "name": "Fixture Bay",
+        "fp": [
+         1,
+         1
+        ],
+        "i": "make"
+       }
+      }
+     ]
+    },
+    {
+     "id": "logistics",
+     "name": "Logistics",
+     "tint": "delivery",
+     "icon": "parcel",
+     "buildings": [
+      {
+       "id": "warehouse",
+       "gen": {
+        "name": "Parts Warehouse",
+        "fp": [
+         2,
+         2
+        ],
+        "i": "parcel",
+        "fl": 1,
+        "roof": "flat"
+       }
+      },
+      {
+       "id": "dock",
+       "kit": "dock"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "launch",
+   "code": "L6",
+   "name": "Launch & service",
+   "color": "#5A3FE0",
+   "districts": [
+    {
+     "id": "mkt",
+     "name": "Marketing",
+     "tint": "delivery",
+     "icon": "chart",
+     "buildings": [
+      {
+       "id": "launchstudio",
+       "gen": {
+        "name": "Launch Studio",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "chart"
+       }
+      }
+     ]
+    },
+    {
+     "id": "dealers",
+     "name": "Dealers",
+     "tint": "accounts",
+     "icon": "screen",
+     "buildings": [
+      {
+       "id": "portal",
+       "gen": {
+        "name": "Dealer Portal",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "screen"
+       }
+      }
+     ]
+    },
+    {
+     "id": "service",
+     "name": "Service",
+     "tint": "learning",
+     "icon": "doc",
+     "buildings": [
+      {
+       "id": "manual",
+       "gen": {
+        "name": "Service Manual Press",
+        "fp": [
+         1,
+         1
+        ],
+        "i": "doc"
+       }
+      },
+      {
+       "id": "spares",
+       "gen": {
+        "name": "Spare Parts Depot",
+        "fp": [
+         2,
+         1
+        ],
+        "i": "parcel"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "islands": [
+  {
+   "id": "cells",
+   "level": "eng",
+   "name": "Voltacell · cells",
+   "tint": "research",
+   "icon": "battery",
+   "side": "x",
+   "bridge": {
+    "id": "br-cells",
+    "type": "api",
+    "name": "Voltacell API"
+   },
+   "buildings": [
+    {
+     "id": "cellplant",
+     "gen": {
+      "name": "Cell Plant",
+      "fp": [
+       2,
+       1
+      ],
+      "i": "battery"
+     }
+    }
+   ]
+  },
+  {
+   "id": "motors",
+   "level": "eng",
+   "name": "Northline Motors",
+   "tint": "learning",
+   "icon": "cog",
+   "side": "x",
+   "bridge": {
+    "id": "br-motors",
+    "type": "mcp",
+    "name": "Northline agent server (MCP)"
+   },
+   "buildings": [
+    {
+     "id": "motorworks",
+     "gen": {
+      "name": "Motor Works",
+      "fp": [
+       2,
+       1
+      ],
+      "i": "cog"
+     }
+    }
+   ]
+  },
+  {
+   "id": "pricing",
+   "level": "eng",
+   "name": "Supplier pricing",
+   "tint": "payroll",
+   "icon": "lock",
+   "side": "y",
+   "locked": true,
+   "bridge": {
+    "id": "br-pricing",
+    "type": "browser",
+    "name": "Pricing portal (browser)"
+   },
+   "buildings": [
+    {
+     "id": "pricebook",
+     "gen": {
+      "name": "Price Book",
+      "fp": [
+       2,
+       1
+      ],
+      "i": "coin"
+     }
+    },
+    {
+     "id": "contracts",
+     "gen": {
+      "name": "Contract Files",
+      "fp": [
+       1,
+       1
+      ],
+      "i": "doc"
+     }
+    }
+   ]
+  },
+  {
+   "id": "kelvra",
+   "level": "eng",
+   "name": "Kelvra Cells",
+   "tint": "research",
+   "icon": "battery",
+   "side": "y",
+   "hidden": true,
+   "bridge": {
+    "id": "br-kelvra",
+    "type": "api",
+    "name": "Kelvra API"
+   },
+   "buildings": [
+    {
+     "id": "kelvrafab",
+     "gen": {
+      "name": "Kelvra Cell Works",
+      "fp": [
+       2,
+       1
+      ],
+      "i": "battery"
+     }
+    }
+   ]
+  }
+ ]
+}

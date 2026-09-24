@@ -1,0 +1,4645 @@
+{
+ "world": "k1",
+ "version": 1,
+ "events": [
+  {
+   "id": "e001",
+   "ts": 0,
+   "type": "world.created",
+   "actor": "director",
+   "data": {
+    "cam": "all",
+    "title": "Take the K1 electric scooter from concept to launch"
+   },
+   "summary": "New task: take the K1 electric scooter from concept to launch."
+  },
+  {
+   "id": "e002",
+   "ts": 0.3,
+   "type": "level.created",
+   "level": "concept",
+   "data": {
+    "nocam": true
+   },
+   "summary": "Planned Level 1 · Concept & requirements"
+  },
+  {
+   "id": "e003",
+   "ts": 0.5,
+   "type": "district.created",
+   "level": "concept",
+   "district": "hq",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e004",
+   "ts": 0.55,
+   "type": "building.planned",
+   "target": "townhall",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e005",
+   "ts": 0.55,
+   "type": "building.planned",
+   "target": "desk",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e006",
+   "ts": 0.65,
+   "type": "district.created",
+   "level": "concept",
+   "district": "market",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e007",
+   "ts": 0.7,
+   "type": "building.planned",
+   "target": "library",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e008",
+   "ts": 0.7,
+   "type": "building.planned",
+   "target": "survey",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e009",
+   "ts": 0.8,
+   "type": "district.created",
+   "level": "concept",
+   "district": "req",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e010",
+   "ts": 0.85,
+   "type": "building.planned",
+   "target": "reqhall",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e011",
+   "ts": 0.85,
+   "type": "building.planned",
+   "target": "costdesk",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e012",
+   "ts": 0.9,
+   "type": "building.constructing",
+   "target": "townhall",
+   "actor": "bots",
+   "summary": "Built the Town Hall"
+  },
+  {
+   "id": "e014",
+   "ts": 1.2,
+   "type": "building.constructing",
+   "target": "desk",
+   "actor": "bots",
+   "summary": "Built Your Desk. Requests for you arrive here."
+  },
+  {
+   "id": "e013",
+   "ts": 2.4,
+   "type": "building.operational",
+   "target": "townhall"
+  },
+  {
+   "id": "e016",
+   "ts": 2.6,
+   "type": "agent.spawned",
+   "actor": "director",
+   "target": "townhall",
+   "data": {
+    "role": "director",
+    "rank": "director",
+    "name": "Director",
+    "title": "Director",
+    "tools": [
+     "Planner",
+     "Every district"
+    ],
+    "scope": [
+     "All bridges"
+    ],
+    "budget": 2400,
+    "loc": {
+     "slot": 0
+    }
+   },
+   "summary": "Director built Director, Director"
+  },
+  {
+   "id": "e015",
+   "ts": 2.7,
+   "type": "building.operational",
+   "target": "desk"
+  },
+  {
+   "id": "e017",
+   "ts": 3.2,
+   "type": "level.created",
+   "level": "design",
+   "actor": "director",
+   "data": {
+    "nocam": true
+   },
+   "summary": "Planned Level 2 · Industrial design"
+  },
+  {
+   "id": "e018",
+   "ts": 3.4,
+   "type": "district.created",
+   "level": "design",
+   "district": "style",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e019",
+   "ts": 3.45,
+   "type": "building.planned",
+   "target": "sketch",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e020",
+   "ts": 3.45,
+   "type": "building.planned",
+   "target": "clay",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e021",
+   "ts": 3.5,
+   "type": "district.created",
+   "level": "design",
+   "district": "cmf",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e022",
+   "ts": 3.55,
+   "type": "building.planned",
+   "target": "cmflib",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e023",
+   "ts": 3.6,
+   "type": "district.created",
+   "level": "design",
+   "district": "ergo",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e024",
+   "ts": 3.65,
+   "type": "building.planned",
+   "target": "ergolab",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e025",
+   "ts": 3.8,
+   "type": "level.created",
+   "level": "eng",
+   "actor": "director",
+   "data": {
+    "nocam": true
+   },
+   "summary": "Planned Level 3 · Engineering, 5 workstreams, 3 supplier islands"
+  },
+  {
+   "id": "e026",
+   "ts": 4,
+   "type": "district.created",
+   "level": "eng",
+   "district": "chassis",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e027",
+   "ts": 4.05,
+   "type": "building.planned",
+   "target": "frame",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e028",
+   "ts": 4.05,
+   "type": "building.planned",
+   "target": "susp",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e029",
+   "ts": 4.1,
+   "type": "district.created",
+   "level": "eng",
+   "district": "battery",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e030",
+   "ts": 4.15,
+   "type": "building.planned",
+   "target": "pack",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e031",
+   "ts": 4.15,
+   "type": "building.planned",
+   "target": "motor",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e032",
+   "ts": 4.2,
+   "type": "district.created",
+   "level": "eng",
+   "district": "commons",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e033",
+   "ts": 4.25,
+   "type": "building.planned",
+   "target": "vault",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e034",
+   "ts": 4.25,
+   "type": "building.planned",
+   "target": "treasury",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e035",
+   "ts": 4.25,
+   "type": "building.planned",
+   "target": "connector",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e036",
+   "ts": 4.25,
+   "type": "building.planned",
+   "target": "meeting",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e037",
+   "ts": 4.3,
+   "type": "district.created",
+   "level": "eng",
+   "district": "elec",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e038",
+   "ts": 4.35,
+   "type": "building.planned",
+   "target": "ctrl",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e039",
+   "ts": 4.35,
+   "type": "building.planned",
+   "target": "fw",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e040",
+   "ts": 4.4,
+   "type": "district.created",
+   "level": "eng",
+   "district": "apps",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e049",
+   "ts": 4.4,
+   "type": "level.created",
+   "level": "valid",
+   "actor": "director",
+   "data": {
+    "nocam": true
+   },
+   "summary": "Planned Level 4 · Validation"
+  },
+  {
+   "id": "e041",
+   "ts": 4.45,
+   "type": "building.planned",
+   "target": "bom",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e042",
+   "ts": 4.45,
+   "type": "building.planned",
+   "target": "appstudio",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e043",
+   "ts": 4.45,
+   "type": "building.planned",
+   "target": "testyard",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e044",
+   "ts": 4.45,
+   "type": "building.planned",
+   "target": "pwatch",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e045",
+   "ts": 4.5,
+   "type": "building.planned",
+   "target": "cellplant",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e046",
+   "ts": 4.5,
+   "type": "building.planned",
+   "target": "motorworks",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e047",
+   "ts": 4.5,
+   "type": "building.planned",
+   "target": "pricebook",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e048",
+   "ts": 4.5,
+   "type": "building.planned",
+   "target": "contracts",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e050",
+   "ts": 4.6,
+   "type": "district.created",
+   "level": "valid",
+   "district": "proto",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e051",
+   "ts": 4.65,
+   "type": "building.planned",
+   "target": "garage",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e052",
+   "ts": 4.7,
+   "type": "district.created",
+   "level": "valid",
+   "district": "track",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e053",
+   "ts": 4.75,
+   "type": "building.planned",
+   "target": "testtrack",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e054",
+   "ts": 4.75,
+   "type": "building.planned",
+   "target": "drop",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e055",
+   "ts": 4.8,
+   "type": "district.created",
+   "level": "valid",
+   "district": "safety",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e056",
+   "ts": 4.85,
+   "type": "building.planned",
+   "target": "thermal",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e057",
+   "ts": 4.85,
+   "type": "building.planned",
+   "target": "samplelab",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e058",
+   "ts": 4.9,
+   "type": "district.created",
+   "level": "valid",
+   "district": "cert",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e059",
+   "ts": 4.95,
+   "type": "building.planned",
+   "target": "homolog",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e060",
+   "ts": 5,
+   "type": "level.created",
+   "level": "mfg",
+   "actor": "director",
+   "data": {
+    "nocam": true
+   },
+   "summary": "Planned Level 5 · Manufacturing"
+  },
+  {
+   "id": "e061",
+   "ts": 5.2,
+   "type": "district.created",
+   "level": "mfg",
+   "district": "plant",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e062",
+   "ts": 5.25,
+   "type": "building.planned",
+   "target": "line",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e063",
+   "ts": 5.25,
+   "type": "building.planned",
+   "target": "qc",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e064",
+   "ts": 5.3,
+   "type": "district.created",
+   "level": "mfg",
+   "district": "tooling",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e065",
+   "ts": 5.35,
+   "type": "building.planned",
+   "target": "toolshop",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e066",
+   "ts": 5.35,
+   "type": "building.planned",
+   "target": "fixture",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e067",
+   "ts": 5.4,
+   "type": "district.created",
+   "level": "mfg",
+   "district": "logistics",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e068",
+   "ts": 5.45,
+   "type": "building.planned",
+   "target": "warehouse",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e069",
+   "ts": 5.45,
+   "type": "building.planned",
+   "target": "dock",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e070",
+   "ts": 5.6,
+   "type": "level.created",
+   "level": "launch",
+   "actor": "director",
+   "data": {
+    "nocam": true
+   },
+   "summary": "Planned Level 6 · Launch & service"
+  },
+  {
+   "id": "e071",
+   "ts": 5.8,
+   "type": "district.created",
+   "level": "launch",
+   "district": "mkt",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e072",
+   "ts": 5.85,
+   "type": "building.planned",
+   "target": "launchstudio",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e073",
+   "ts": 5.9,
+   "type": "district.created",
+   "level": "launch",
+   "district": "dealers",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e074",
+   "ts": 5.95,
+   "type": "building.planned",
+   "target": "portal",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e075",
+   "ts": 6,
+   "type": "district.created",
+   "level": "launch",
+   "district": "service",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e076",
+   "ts": 6.05,
+   "type": "building.planned",
+   "target": "manual",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e077",
+   "ts": 6.05,
+   "type": "building.planned",
+   "target": "spares",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e078",
+   "ts": 6.4,
+   "type": "alert.raised",
+   "actor": "director",
+   "target": "townhall",
+   "severity": "nudge",
+   "data": {
+    "id": "a-plan",
+    "kind": "nudge"
+   },
+   "summary": "Plan ready: 6 levels, 21 workstreams, 3 suppliers. Starting with Concept.",
+   "credits": 5
+  },
+  {
+   "id": "e079",
+   "ts": 6.8,
+   "type": "agent.spawned",
+   "actor": "ivo",
+   "target": "townhall",
+   "data": {
+    "role": "research",
+    "rank": "lead",
+    "name": "Ivo",
+    "title": "Research Lead",
+    "tools": [
+     "Browser",
+     "Library"
+    ],
+    "scope": [
+     "Public web"
+    ],
+    "budget": 40,
+    "loc": {
+     "slot": 1
+    }
+   },
+   "summary": "Director built Ivo, Research Lead"
+  },
+  {
+   "id": "e080",
+   "ts": 7.2,
+   "type": "agent.spawned",
+   "actor": "pim",
+   "target": "townhall",
+   "data": {
+    "role": "research",
+    "name": "Pim",
+    "title": "Survey Analyst",
+    "tools": [
+     "Survey tool"
+    ],
+    "scope": [
+     "Survey panel"
+    ],
+    "budget": 20,
+    "loc": {
+     "slot": 2
+    }
+   },
+   "summary": "Director built Pim, Survey Analyst"
+  },
+  {
+   "id": "e082",
+   "ts": 7.4,
+   "type": "agent.moved",
+   "actor": "ivo",
+   "target": "library"
+  },
+  {
+   "id": "e081",
+   "ts": 7.6,
+   "type": "agent.spawned",
+   "actor": "tess",
+   "target": "townhall",
+   "data": {
+    "role": "tester",
+    "name": "Tess",
+    "title": "Reviewer",
+    "tools": [
+     "Checklist"
+    ],
+    "scope": [],
+    "budget": 10,
+    "loc": {
+     "slot": 3
+    }
+   },
+   "summary": "Director built Tess, Reviewer"
+  },
+  {
+   "id": "e085",
+   "ts": 7.8,
+   "type": "agent.moved",
+   "actor": "pim",
+   "target": "survey"
+  },
+  {
+   "id": "e088",
+   "ts": 8.2,
+   "type": "agent.moved",
+   "actor": "tess",
+   "target": "costdesk"
+  },
+  {
+   "id": "e083",
+   "ts": 8.87,
+   "type": "building.constructing",
+   "target": "library",
+   "actor": "bots",
+   "summary": "Built the Library for rider and market research"
+  },
+  {
+   "id": "e091",
+   "ts": 9.07,
+   "type": "agent.working",
+   "actor": "ivo",
+   "target": "library",
+   "credits": 7,
+   "summary": "Ivo is reading 212 rider interviews and 9 market reports"
+  },
+  {
+   "id": "e113",
+   "ts": 9.2,
+   "type": "agent.spawned",
+   "actor": "fenn",
+   "target": "townhall",
+   "data": {
+    "role": "builder",
+    "rank": "lead",
+    "name": "Fenn",
+    "title": "Chassis Lead",
+    "tools": [
+     "CAD",
+     "FEA"
+    ],
+    "scope": [
+     "PLM"
+    ],
+    "budget": 60,
+    "loc": {
+     "slot": 0
+    }
+   },
+   "summary": "Director built Fenn, Chassis Lead"
+  },
+  {
+   "id": "e161",
+   "ts": 9.2,
+   "type": "agent.assigned",
+   "actor": "director",
+   "data": {
+    "nocam": true
+   },
+   "summary": "Director assigned 14 agents to Engineering. They are walking up now."
+  },
+  {
+   "id": "e092",
+   "ts": 9.47,
+   "type": "memory.hit",
+   "actor": "ivo",
+   "target": "library",
+   "data": {
+    "saved": 22,
+    "from": "library"
+   },
+   "summary": "Reused S1 rider research from memory. 22 credits saved."
+  },
+  {
+   "id": "e114",
+   "ts": 9.7,
+   "type": "agent.moved",
+   "actor": "fenn",
+   "target": "frame",
+   "data": {
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e117",
+   "ts": 9.75,
+   "type": "agent.spawned",
+   "actor": "bo",
+   "target": "townhall",
+   "data": {
+    "role": "builder",
+    "name": "Bo",
+    "title": "Frame Engineer",
+    "tools": [
+     "CAD"
+    ],
+    "scope": [
+     "PLM"
+    ],
+    "budget": 30,
+    "loc": {
+     "slot": 1
+    }
+   },
+   "summary": "Director built Bo, Frame Engineer"
+  },
+  {
+   "id": "e086",
+   "ts": 9.78,
+   "type": "building.constructing",
+   "target": "survey",
+   "actor": "bots",
+   "summary": "Built Rider Survey Lab"
+  },
+  {
+   "id": "e093",
+   "ts": 9.98,
+   "type": "agent.working",
+   "actor": "pim",
+   "target": "survey",
+   "credits": 5,
+   "summary": "Pim is running the rider survey (1,140 replies)"
+  },
+  {
+   "id": "e163",
+   "ts": 10,
+   "type": "agent.spawned",
+   "actor": "juno",
+   "target": "townhall",
+   "data": {
+    "role": "designer",
+    "rank": "lead",
+    "name": "Juno",
+    "title": "Design Lead",
+    "tools": [
+     "Sketch",
+     "Clay",
+     "CAD"
+    ],
+    "scope": [
+     "PLM"
+    ],
+    "budget": 60,
+    "loc": {
+     "slot": 0
+    }
+   },
+   "summary": "Director built Juno, Design Lead"
+  },
+  {
+   "id": "e118",
+   "ts": 10.25,
+   "type": "agent.moved",
+   "actor": "bo",
+   "target": "frame",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e119",
+   "ts": 10.3,
+   "type": "agent.spawned",
+   "actor": "cy",
+   "target": "townhall",
+   "data": {
+    "role": "tester",
+    "name": "Cy",
+    "title": "Fatigue Tester",
+    "tools": [
+     "Test rig"
+    ],
+    "scope": [],
+    "budget": 20,
+    "loc": {
+     "slot": 2
+    }
+   },
+   "summary": "Director built Cy, Fatigue Tester"
+  },
+  {
+   "id": "e164",
+   "ts": 10.3,
+   "type": "agent.moved",
+   "actor": "juno",
+   "target": "sketch"
+  },
+  {
+   "id": "e084",
+   "ts": 10.37,
+   "type": "building.operational",
+   "target": "library"
+  },
+  {
+   "id": "e167",
+   "ts": 10.6,
+   "type": "agent.spawned",
+   "actor": "oren",
+   "target": "townhall",
+   "data": {
+    "role": "research",
+    "name": "Oren",
+    "title": "Ergonomist",
+    "tools": [
+     "Fit rig"
+    ],
+    "scope": [],
+    "budget": 20,
+    "loc": {
+     "slot": 1
+    }
+   },
+   "summary": "Director built Oren, Ergonomist"
+  },
+  {
+   "id": "e120",
+   "ts": 10.8,
+   "type": "agent.moved",
+   "actor": "cy",
+   "target": "susp",
+   "data": {
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e123",
+   "ts": 10.85,
+   "type": "agent.spawned",
+   "actor": "rue",
+   "target": "townhall",
+   "data": {
+    "role": "research",
+    "rank": "lead",
+    "name": "Rue",
+    "title": "Battery Lead",
+    "tools": [
+     "Cell models",
+     "Parts Watch"
+    ],
+    "scope": [
+     "Voltacell",
+     "Kelvra"
+    ],
+    "budget": 60,
+    "loc": {
+     "slot": 3
+    }
+   },
+   "summary": "Director built Rue, Battery Lead"
+  },
+  {
+   "id": "e168",
+   "ts": 10.9,
+   "type": "agent.moved",
+   "actor": "oren",
+   "target": "ergolab"
+  },
+  {
+   "id": "e089",
+   "ts": 11.14,
+   "type": "building.constructing",
+   "target": "costdesk",
+   "actor": "bots",
+   "summary": "Built Cost Target Desk"
+  },
+  {
+   "id": "e087",
+   "ts": 11.28,
+   "type": "building.operational",
+   "target": "survey"
+  },
+  {
+   "id": "e094",
+   "ts": 11.34,
+   "type": "agent.working",
+   "actor": "tess",
+   "target": "costdesk",
+   "credits": 3,
+   "summary": "Tess is setting the cost target: €1,450 bill of materials"
+  },
+  {
+   "id": "e124",
+   "ts": 11.35,
+   "type": "agent.moved",
+   "actor": "rue",
+   "target": "pack",
+   "data": {
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e127",
+   "ts": 11.4,
+   "type": "agent.spawned",
+   "actor": "sol",
+   "target": "townhall",
+   "data": {
+    "role": "research",
+    "name": "Sol",
+    "title": "Cell Specialist",
+    "tools": [
+     "Cell models"
+    ],
+    "scope": [
+     "Voltacell"
+    ],
+    "budget": 30,
+    "loc": {
+     "slot": 0
+    }
+   },
+   "summary": "Director built Sol, Cell Specialist"
+  },
+  {
+   "id": "e128",
+   "ts": 11.9,
+   "type": "agent.moved",
+   "actor": "sol",
+   "target": "pack",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e129",
+   "ts": 11.95,
+   "type": "agent.spawned",
+   "actor": "dex",
+   "target": "townhall",
+   "data": {
+    "role": "builder",
+    "name": "Dex",
+    "title": "Motor Engineer",
+    "tools": [
+     "Dyno"
+    ],
+    "scope": [
+     "Northline"
+    ],
+    "budget": 30,
+    "loc": {
+     "slot": 1
+    }
+   },
+   "summary": "Director built Dex, Motor Engineer"
+  },
+  {
+   "id": "e095",
+   "ts": 12.07,
+   "type": "artifact.created",
+   "actor": "ivo",
+   "target": "library",
+   "item": "scroll",
+   "summary": "Market brief: commuters want 40 km range and a 14 kg frame",
+   "data": {
+    "minutes": 30,
+    "hold": true
+   }
+  },
+  {
+   "id": "e096",
+   "ts": 12.27,
+   "type": "agent.moved",
+   "actor": "ivo",
+   "target": "reqhall",
+   "item": "scroll",
+   "data": {
+    "hold": true
+   }
+  },
+  {
+   "id": "e130",
+   "ts": 12.45,
+   "type": "agent.moved",
+   "actor": "dex",
+   "target": "motor",
+   "data": {
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e133",
+   "ts": 12.5,
+   "type": "agent.spawned",
+   "actor": "lark",
+   "target": "townhall",
+   "data": {
+    "role": "browser",
+    "rank": "lead",
+    "name": "Lark",
+    "title": "Electronics Lead",
+    "tools": [
+     "EMC scanner",
+     "Browser"
+    ],
+    "scope": [
+     "Lab portal"
+    ],
+    "budget": 50,
+    "loc": {
+     "slot": 2
+    }
+   },
+   "summary": "Director built Lark, Electronics Lead"
+  },
+  {
+   "id": "e090",
+   "ts": 12.64,
+   "type": "building.operational",
+   "target": "costdesk"
+  },
+  {
+   "id": "e134",
+   "ts": 13,
+   "type": "agent.moved",
+   "actor": "lark",
+   "target": "ctrl",
+   "data": {
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e137",
+   "ts": 13.05,
+   "type": "agent.spawned",
+   "actor": "nell",
+   "target": "townhall",
+   "data": {
+    "role": "builder",
+    "name": "Nell",
+    "title": "Firmware Engineer",
+    "tools": [
+     "Compiler"
+    ],
+    "scope": [],
+    "budget": 30,
+    "loc": {
+     "slot": 3
+    }
+   },
+   "summary": "Director built Nell, Firmware Engineer"
+  },
+  {
+   "id": "e138",
+   "ts": 13.55,
+   "type": "agent.moved",
+   "actor": "nell",
+   "target": "fw",
+   "data": {
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e141",
+   "ts": 13.6,
+   "type": "agent.spawned",
+   "actor": "wren",
+   "target": "townhall",
+   "data": {
+    "role": "delivery",
+    "rank": "lead",
+    "name": "Wren",
+    "title": "BOM Lead",
+    "tools": [
+     "PLM",
+     "ERP"
+    ],
+    "scope": [
+     "PLM",
+     "ERP"
+    ],
+    "budget": 50,
+    "loc": {
+     "slot": 0
+    }
+   },
+   "summary": "Director built Wren, BOM Lead"
+  },
+  {
+   "id": "e142",
+   "ts": 14.1,
+   "type": "agent.moved",
+   "actor": "wren",
+   "target": "bom",
+   "data": {
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e145",
+   "ts": 14.15,
+   "type": "agent.spawned",
+   "actor": "mae",
+   "target": "townhall",
+   "data": {
+    "role": "designer",
+    "name": "Mae",
+    "title": "App Designer",
+    "tools": [
+     "App Studio"
+    ],
+    "scope": [],
+    "budget": 30,
+    "loc": {
+     "slot": 1
+    }
+   },
+   "summary": "Director built Mae, App Designer"
+  },
+  {
+   "id": "e146",
+   "ts": 14.65,
+   "type": "agent.moved",
+   "actor": "mae",
+   "target": "appstudio",
+   "data": {
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e149",
+   "ts": 14.7,
+   "type": "agent.spawned",
+   "actor": "taz",
+   "target": "townhall",
+   "data": {
+    "role": "builder",
+    "name": "Taz",
+    "title": "App Builder",
+    "tools": [
+     "App Studio"
+    ],
+    "scope": [
+     "Voltacell",
+     "Northline"
+    ],
+    "budget": 40,
+    "loc": {
+     "slot": 2
+    }
+   },
+   "summary": "Director built Taz, App Builder"
+  },
+  {
+   "id": "e150",
+   "ts": 15.2,
+   "type": "agent.moved",
+   "actor": "taz",
+   "target": "appstudio",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e151",
+   "ts": 15.25,
+   "type": "agent.spawned",
+   "actor": "kip",
+   "target": "townhall",
+   "data": {
+    "role": "tester",
+    "name": "Kip",
+    "title": "App Tester",
+    "tools": [
+     "Test Yard"
+    ],
+    "scope": [],
+    "budget": 20,
+    "loc": {
+     "slot": 3
+    }
+   },
+   "summary": "Director built Kip, App Tester"
+  },
+  {
+   "id": "e162",
+   "ts": 15.5,
+   "type": "agent.moved",
+   "actor": "director",
+   "target": "meeting",
+   "data": {
+    "loc": {
+     "slot": 0
+    }
+   }
+  },
+  {
+   "id": "e152",
+   "ts": 15.75,
+   "type": "agent.moved",
+   "actor": "kip",
+   "target": "testyard",
+   "data": {
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e155",
+   "ts": 15.8,
+   "type": "agent.spawned",
+   "actor": "lu",
+   "target": "townhall",
+   "data": {
+    "role": "connector",
+    "rank": "lead",
+    "name": "Lu",
+    "title": "Connections Lead",
+    "tools": [
+     "Connector Post"
+    ],
+    "scope": [
+     "Voltacell",
+     "Northline"
+    ],
+    "budget": 40,
+    "loc": {
+     "slot": 0
+    }
+   },
+   "summary": "Director built Lu, Connections Lead"
+  },
+  {
+   "id": "e165",
+   "ts": 16.21,
+   "type": "building.constructing",
+   "target": "sketch",
+   "actor": "bots",
+   "summary": "Built Sketch Studio"
+  },
+  {
+   "id": "e097",
+   "ts": 16.22,
+   "type": "building.constructing",
+   "target": "reqhall",
+   "actor": "bots",
+   "summary": "Built Requirements Hall"
+  },
+  {
+   "id": "e156",
+   "ts": 16.3,
+   "type": "agent.moved",
+   "actor": "lu",
+   "target": "connector",
+   "data": {
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e159",
+   "ts": 16.35,
+   "type": "agent.spawned",
+   "actor": "pip",
+   "target": "townhall",
+   "data": {
+    "role": "delivery",
+    "name": "Pip",
+    "title": "Courier",
+    "tools": [
+     "Satchel"
+    ],
+    "scope": [],
+    "budget": 10,
+    "loc": {
+     "slot": 1
+    }
+   },
+   "summary": "Director built Pip, Courier"
+  },
+  {
+   "id": "e099",
+   "ts": 16.42,
+   "type": "agent.working",
+   "actor": "ivo",
+   "target": "reqhall",
+   "credits": 8,
+   "summary": "Ivo is drafting requirements"
+  },
+  {
+   "id": "e169",
+   "ts": 16.76,
+   "type": "building.constructing",
+   "target": "ergolab",
+   "actor": "bots",
+   "summary": "Built Ergonomics Lab"
+  },
+  {
+   "id": "e160",
+   "ts": 16.85,
+   "type": "agent.moved",
+   "actor": "pip",
+   "target": "connector",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "mode": "walk"
+   }
+  },
+  {
+   "id": "e171",
+   "ts": 16.96,
+   "type": "agent.working",
+   "actor": "oren",
+   "target": "ergolab",
+   "credits": 6,
+   "summary": "Oren is fitting 5th to 95th percentile riders",
+   "data": {
+    "tag": "rider fit v3",
+    "tagIcon": "person"
+   }
+  },
+  {
+   "id": "e166",
+   "ts": 17.71,
+   "type": "building.operational",
+   "target": "sketch"
+  },
+  {
+   "id": "e098",
+   "ts": 17.72,
+   "type": "building.operational",
+   "target": "reqhall"
+  },
+  {
+   "id": "e170",
+   "ts": 18.26,
+   "type": "building.operational",
+   "target": "ergolab"
+  },
+  {
+   "id": "e100",
+   "ts": 18.62,
+   "type": "artifact.created",
+   "actor": "ivo",
+   "target": "reqhall",
+   "item": "doc",
+   "summary": "Requirements v1: 64 requirements",
+   "data": {
+    "minutes": 36,
+    "hold": true,
+    "tag": "64 reqs",
+    "tagIcon": "doc"
+   }
+  },
+  {
+   "id": "e101",
+   "ts": 18.82,
+   "type": "agent.moved",
+   "actor": "ivo",
+   "target": "costdesk",
+   "item": "doc",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "hold": true
+   }
+  },
+  {
+   "id": "e102",
+   "ts": 19.57,
+   "type": "artifact.reviewed",
+   "actor": "tess",
+   "target": "costdesk",
+   "item": "doc",
+   "data": {
+    "result": "changes"
+   },
+   "summary": "Tess sent requirements back: 3 conflict with the cost target",
+   "credits": 2
+  },
+  {
+   "id": "e115",
+   "ts": 19.83,
+   "type": "building.constructing",
+   "target": "frame",
+   "actor": "bots",
+   "summary": "Built Frame Workshop"
+  },
+  {
+   "id": "e201",
+   "ts": 20.61,
+   "type": "agent.working",
+   "actor": "bo",
+   "target": "frame",
+   "credits": 5,
+   "summary": "Bo is modelling the steering head"
+  },
+  {
+   "id": "e103",
+   "ts": 21.17,
+   "type": "agent.working",
+   "actor": "ivo",
+   "target": "costdesk",
+   "credits": 3,
+   "summary": "Ivo reconciled the 3 conflicting requirements"
+  },
+  {
+   "id": "e116",
+   "ts": 21.33,
+   "type": "building.operational",
+   "target": "frame"
+  },
+  {
+   "id": "e121",
+   "ts": 21.46,
+   "type": "building.constructing",
+   "target": "susp",
+   "actor": "bots",
+   "summary": "Built Suspension Bay"
+  },
+  {
+   "id": "e202",
+   "ts": 21.56,
+   "type": "agent.working",
+   "actor": "cy",
+   "target": "susp",
+   "credits": 4,
+   "summary": "Cy is preparing the fatigue rig"
+  },
+  {
+   "id": "e135",
+   "ts": 22.42,
+   "type": "building.constructing",
+   "target": "ctrl",
+   "actor": "bots",
+   "summary": "Built Controller Lab"
+  },
+  {
+   "id": "e206",
+   "ts": 22.52,
+   "type": "agent.working",
+   "actor": "lark",
+   "target": "ctrl",
+   "credits": 7,
+   "summary": "Lark is running the EMC pre-scan"
+  },
+  {
+   "id": "e104",
+   "ts": 22.57,
+   "type": "artifact.reviewed",
+   "actor": "tess",
+   "target": "costdesk",
+   "item": "doc",
+   "data": {
+    "result": "approved"
+   },
+   "summary": "Tess approved Requirements v1.1",
+   "credits": 2
+  },
+  {
+   "id": "e122",
+   "ts": 22.96,
+   "type": "building.operational",
+   "target": "susp"
+  },
+  {
+   "id": "e172",
+   "ts": 23.27,
+   "type": "agent.moved",
+   "actor": "ivo",
+   "target": "sketch",
+   "item": "doc",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "hold": true,
+    "follow": true
+   },
+   "summary": "Ivo is taking Requirements v1.1 up to Design"
+  },
+  {
+   "id": "e109",
+   "ts": 23.37,
+   "type": "agent.idle",
+   "actor": "pim",
+   "summary": "Pim is idle: survey closed"
+  },
+  {
+   "id": "e139",
+   "ts": 23.43,
+   "type": "building.constructing",
+   "target": "fw",
+   "actor": "bots",
+   "summary": "Built Firmware Workshop"
+  },
+  {
+   "id": "e207",
+   "ts": 23.53,
+   "type": "agent.working",
+   "actor": "nell",
+   "target": "fw",
+   "credits": 5,
+   "summary": "Nell is writing the battery-management firmware"
+  },
+  {
+   "id": "e105",
+   "ts": 23.57,
+   "type": "building.archived",
+   "target": "library",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e106",
+   "ts": 23.72,
+   "type": "building.archived",
+   "target": "survey",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e125",
+   "ts": 23.81,
+   "type": "building.constructing",
+   "target": "pack",
+   "actor": "bots",
+   "summary": "Built Battery Pack Lab"
+  },
+  {
+   "id": "e107",
+   "ts": 23.87,
+   "type": "building.archived",
+   "target": "reqhall",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e203",
+   "ts": 23.91,
+   "type": "agent.working",
+   "actor": "rue",
+   "target": "pack",
+   "credits": 7,
+   "summary": "Rue is sizing the battery pack: 48 V, 15 Ah"
+  },
+  {
+   "id": "e136",
+   "ts": 23.92,
+   "type": "building.operational",
+   "target": "ctrl"
+  },
+  {
+   "id": "e110",
+   "ts": 23.97,
+   "type": "agent.moved",
+   "actor": "tess",
+   "target": "townhall",
+   "data": {
+    "loc": {
+     "slot": 3
+    }
+   }
+  },
+  {
+   "id": "e108",
+   "ts": 24.02,
+   "type": "building.archived",
+   "target": "costdesk",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e204",
+   "ts": 24.33,
+   "type": "agent.working",
+   "actor": "sol",
+   "target": "pack",
+   "credits": 4,
+   "summary": "Sol is comparing cell datasheets"
+  },
+  {
+   "id": "e140",
+   "ts": 24.93,
+   "type": "building.operational",
+   "target": "fw"
+  },
+  {
+   "id": "e131",
+   "ts": 25.23,
+   "type": "building.constructing",
+   "target": "motor",
+   "actor": "bots",
+   "summary": "Built Motor Test Bench"
+  },
+  {
+   "id": "e126",
+   "ts": 25.31,
+   "type": "building.operational",
+   "target": "pack"
+  },
+  {
+   "id": "e205",
+   "ts": 25.33,
+   "type": "agent.working",
+   "actor": "dex",
+   "target": "motor",
+   "credits": 5,
+   "summary": "Dex is running the motor on the dyno"
+  },
+  {
+   "id": "e231",
+   "ts": 25.42,
+   "type": "agent.blocked",
+   "actor": "lark",
+   "target": "ctrl",
+   "summary": "Controller fails the EMC pre-scan at 150 MHz",
+   "severity": "blocked",
+   "credits": 3
+  },
+  {
+   "id": "e143",
+   "ts": 25.48,
+   "type": "building.constructing",
+   "target": "bom",
+   "actor": "bots",
+   "summary": "Built BOM Office"
+  },
+  {
+   "id": "e208",
+   "ts": 25.58,
+   "type": "agent.working",
+   "actor": "wren",
+   "target": "bom",
+   "credits": 5,
+   "summary": "Wren is assembling the bill of materials",
+   "data": {
+    "tag": "412 parts",
+    "tagIcon": "doc"
+   }
+  },
+  {
+   "id": "e260",
+   "ts": 26.23,
+   "type": "agent.moved",
+   "actor": "sol",
+   "target": "treasury"
+  },
+  {
+   "id": "e209",
+   "ts": 26.28,
+   "type": "memory.hit",
+   "actor": "wren",
+   "target": "bom",
+   "data": {
+    "saved": 38,
+    "from": "vault"
+   },
+   "summary": "Reused 318 parts from the S1 BOM in memory. 38 credits saved."
+  },
+  {
+   "id": "e147",
+   "ts": 26.54,
+   "type": "building.constructing",
+   "target": "appstudio",
+   "actor": "bots",
+   "summary": "Built App Studio"
+  },
+  {
+   "id": "e132",
+   "ts": 26.73,
+   "type": "building.operational",
+   "target": "motor"
+  },
+  {
+   "id": "e153",
+   "ts": 26.87,
+   "type": "building.constructing",
+   "target": "testyard",
+   "actor": "bots",
+   "summary": "Built Test Yard"
+  },
+  {
+   "id": "e144",
+   "ts": 26.98,
+   "type": "building.operational",
+   "target": "bom"
+  },
+  {
+   "id": "e111",
+   "ts": 27.01,
+   "type": "memory.saved",
+   "actor": "tess",
+   "target": "townhall",
+   "item": "scroll",
+   "summary": "Tess filed her review learnings to the Memory Vault"
+  },
+  {
+   "id": "e112",
+   "ts": 27.31,
+   "type": "agent.retired",
+   "actor": "tess",
+   "summary": "Tess handed in her key-card and retired"
+  },
+  {
+   "id": "e232",
+   "ts": 27.82,
+   "type": "memory.hit",
+   "actor": "lark",
+   "target": "ctrl",
+   "data": {
+    "saved": 16,
+    "from": "vault"
+   },
+   "summary": "Found the S1 ferrite fix in memory. 16 credits saved."
+  },
+  {
+   "id": "e233",
+   "ts": 28.02,
+   "type": "agent.recovered",
+   "actor": "lark",
+   "target": "ctrl",
+   "summary": "Lark is trying another way: a ferrite filter on the motor lead",
+   "credits": 4
+  },
+  {
+   "id": "e148",
+   "ts": 28.04,
+   "type": "building.operational",
+   "target": "appstudio"
+  },
+  {
+   "id": "e154",
+   "ts": 28.37,
+   "type": "building.operational",
+   "target": "testyard"
+  },
+  {
+   "id": "e157",
+   "ts": 28.38,
+   "type": "building.constructing",
+   "target": "connector",
+   "actor": "bots",
+   "summary": "Built Connector Post"
+  },
+  {
+   "id": "e210",
+   "ts": 28.48,
+   "type": "agent.working",
+   "actor": "lu",
+   "target": "connector",
+   "credits": 3,
+   "summary": "Lu is checking supplier connections"
+  },
+  {
+   "id": "e211",
+   "ts": 28.98,
+   "type": "connection.requested",
+   "actor": "lu",
+   "target": "br-cells",
+   "summary": "Lu asked for the Voltacell API connection (pre-approved by Kestrel IT)"
+  },
+  {
+   "id": "e261",
+   "ts": 29.2,
+   "type": "budget.requested",
+   "actor": "sol",
+   "target": "treasury",
+   "data": {
+    "amount": 30
+   },
+   "summary": "Sol asked the Treasury for 30 credits to order sample cells"
+  },
+  {
+   "id": "e264",
+   "ts": 29.48,
+   "type": "agent.moved",
+   "actor": "wren",
+   "target": "appstudio",
+   "item": "crate",
+   "data": {
+    "loc": {
+     "slot": 2
+    },
+    "hold": true
+   },
+   "summary": "Wren is carrying the 412-part list to App Studio"
+  },
+  {
+   "id": "e235",
+   "ts": 29.52,
+   "type": "agent.working",
+   "actor": "lark",
+   "target": "ctrl",
+   "credits": 0
+  },
+  {
+   "id": "e212",
+   "ts": 29.58,
+   "type": "connection.established",
+   "actor": "lu",
+   "target": "br-cells",
+   "summary": "Connected to Voltacell over API (read-only)"
+  },
+  {
+   "id": "e158",
+   "ts": 29.88,
+   "type": "building.operational",
+   "target": "connector"
+  },
+  {
+   "id": "e236",
+   "ts": 29.98,
+   "type": "agent.help_requested",
+   "actor": "dex",
+   "target": "wren",
+   "summary": "4 part-change requests are queueing at the BOM Office"
+  },
+  {
+   "id": "e237",
+   "ts": 29.98,
+   "type": "agent.moved",
+   "actor": "dex",
+   "target": "bom",
+   "item": "doc",
+   "data": {
+    "loc": {
+     "q": 0
+    },
+    "hold": true
+   }
+  },
+  {
+   "id": "e238",
+   "ts": 30.23,
+   "type": "agent.help_requested",
+   "actor": "nell",
+   "target": "wren"
+  },
+  {
+   "id": "e239",
+   "ts": 30.23,
+   "type": "agent.moved",
+   "actor": "nell",
+   "target": "bom",
+   "item": "doc",
+   "data": {
+    "loc": {
+     "q": 1
+    },
+    "hold": true
+   }
+  },
+  {
+   "id": "e265",
+   "ts": 30.26,
+   "type": "agent.handoff",
+   "actor": "wren",
+   "target": "mae",
+   "item": "crate",
+   "summary": "Wren handed the 412-part list to App Studio"
+  },
+  {
+   "id": "e266",
+   "ts": 30.46,
+   "type": "app.spec",
+   "actor": "wren",
+   "target": "appstudio",
+   "item": "scroll",
+   "summary": "App spec: track lead time, price, stock and certification for 412 vendor parts. Flag anything that lands after the build date.",
+   "credits": 4
+  },
+  {
+   "id": "e240",
+   "ts": 30.48,
+   "type": "agent.help_requested",
+   "actor": "sol",
+   "target": "wren"
+  },
+  {
+   "id": "e241",
+   "ts": 30.48,
+   "type": "agent.moved",
+   "actor": "sol",
+   "target": "bom",
+   "item": "doc",
+   "data": {
+    "loc": {
+     "q": 2
+    },
+    "hold": true
+   }
+  },
+  {
+   "id": "e262",
+   "ts": 30.7,
+   "type": "budget.granted",
+   "actor": "sol",
+   "target": "treasury",
+   "data": {
+    "amount": 30
+   },
+   "summary": "Granted automatically (under the 50-credit limit)",
+   "credits": 27
+  },
+  {
+   "id": "e242",
+   "ts": 30.73,
+   "type": "agent.help_requested",
+   "actor": "bo",
+   "target": "wren"
+  },
+  {
+   "id": "e243",
+   "ts": 30.73,
+   "type": "agent.moved",
+   "actor": "bo",
+   "target": "bom",
+   "item": "doc",
+   "data": {
+    "loc": {
+     "q": 3
+    },
+    "hold": true
+   }
+  },
+  {
+   "id": "e173",
+   "ts": 30.77,
+   "type": "agent.handoff",
+   "actor": "ivo",
+   "target": "juno",
+   "item": "doc",
+   "summary": "Ivo handed Requirements v1.1 to Juno (Design)"
+  },
+  {
+   "id": "e267",
+   "ts": 30.96,
+   "type": "agent.moved",
+   "actor": "wren",
+   "target": "bom"
+  },
+  {
+   "id": "e268",
+   "ts": 31.06,
+   "type": "app.building",
+   "actor": "mae",
+   "target": "appstudio",
+   "data": {
+    "step": "wireframe",
+    "dur": 3
+   },
+   "summary": "Mae is sketching the Parts Watch wireframe",
+   "credits": 5
+  },
+  {
+   "id": "e263",
+   "ts": 31.1,
+   "type": "agent.moved",
+   "actor": "sol",
+   "target": "pack",
+   "data": {
+    "loc": {
+     "slot": 1
+    }
+   }
+  },
+  {
+   "id": "e269",
+   "ts": 31.36,
+   "type": "connection.requested",
+   "actor": "lu",
+   "target": "br-motors",
+   "summary": "Lu requested read-only access to Northline Motors"
+  },
+  {
+   "id": "e213",
+   "ts": 31.38,
+   "type": "data.transfer",
+   "target": "br-cells",
+   "data": {
+    "dir": "in",
+    "size": "cart",
+    "mb": 2
+   },
+   "summary": "Pulled Voltacell catalogue: 48 cell parts"
+  },
+  {
+   "id": "e270",
+   "ts": 31.56,
+   "type": "agent.moved",
+   "actor": "pip",
+   "target": "desk",
+   "item": "key",
+   "data": {
+    "mode": "run",
+    "hold": true
+   },
+   "summary": "Pip is running the access request to Your Desk"
+  },
+  {
+   "id": "e174",
+   "ts": 31.67,
+   "type": "agent.cloned",
+   "actor": "juno",
+   "data": {
+    "ids": [
+     "juno2",
+     "juno3"
+    ]
+   },
+   "summary": "Juno split into 3 to sketch, sculpt and pick finishes in parallel"
+  },
+  {
+   "id": "e190",
+   "ts": 31.77,
+   "type": "agent.moved",
+   "actor": "ivo",
+   "target": "townhall",
+   "data": {
+    "loc": {
+     "slot": 1
+    }
+   }
+  },
+  {
+   "id": "e181",
+   "ts": 31.97,
+   "type": "agent.working",
+   "actor": "juno",
+   "target": "sketch",
+   "credits": 7,
+   "summary": "Juno is sketching 3 surface directions"
+  },
+  {
+   "id": "e175",
+   "ts": 32.17,
+   "type": "agent.moved",
+   "actor": "juno2",
+   "target": "clay"
+  },
+  {
+   "id": "e178",
+   "ts": 32.27,
+   "type": "agent.moved",
+   "actor": "juno3",
+   "target": "cmflib"
+  },
+  {
+   "id": "e234",
+   "ts": 32.42,
+   "type": "artifact.reviewed",
+   "actor": "lark",
+   "target": "ctrl",
+   "data": {
+    "result": "approved"
+   },
+   "summary": "EMC pre-scan passes with 6 dB margin",
+   "credits": 2
+  },
+  {
+   "id": "e176",
+   "ts": 32.67,
+   "type": "building.constructing",
+   "target": "clay",
+   "actor": "bots",
+   "summary": "Built Clay Studio"
+  },
+  {
+   "id": "e182",
+   "ts": 32.87,
+   "type": "agent.working",
+   "actor": "juno2",
+   "target": "clay",
+   "credits": 7,
+   "summary": "Clay model of direction B"
+  },
+  {
+   "id": "e275",
+   "ts": 33.16,
+   "type": "user.joined",
+   "actor": "am",
+   "target": "pack",
+   "data": {
+    "initials": "AM",
+    "color": "#5A3FE0",
+    "who": "Anita M. (Approver)"
+   },
+   "summary": "Anita M. joined and is looking at the Battery Pack Lab"
+  },
+  {
+   "id": "e179",
+   "ts": 33.8,
+   "type": "building.constructing",
+   "target": "cmflib",
+   "actor": "bots",
+   "summary": "Built CMF Library"
+  },
+  {
+   "id": "e183",
+   "ts": 34,
+   "type": "agent.working",
+   "actor": "juno3",
+   "target": "cmflib",
+   "credits": 4,
+   "summary": "Picking colours and finishes"
+  },
+  {
+   "id": "e272",
+   "ts": 34.16,
+   "type": "app.building",
+   "actor": "taz",
+   "target": "appstudio",
+   "data": {
+    "step": "assemble",
+    "dur": 4
+   },
+   "summary": "Taz is assembling Parts Watch from 9 components",
+   "credits": 9
+  },
+  {
+   "id": "e177",
+   "ts": 34.17,
+   "type": "building.operational",
+   "target": "clay"
+  },
+  {
+   "id": "e244",
+   "ts": 34.48,
+   "type": "building.scaled",
+   "target": "bom",
+   "data": {
+    "fl": 2,
+    "tag": "412 parts · queue 4",
+    "tagIcon": "doc"
+   },
+   "summary": "BOM Office added a floor to clear the queue"
+  },
+  {
+   "id": "e273",
+   "ts": 34.56,
+   "type": "agent.cloned",
+   "actor": "taz",
+   "data": {
+    "ids": [
+     "taz2"
+    ]
+   },
+   "summary": "Taz cloned to build the table and the trend charts at the same time"
+  },
+  {
+   "id": "e245",
+   "ts": 34.88,
+   "type": "agent.cloned",
+   "actor": "wren",
+   "data": {
+    "ids": [
+     "wren2"
+    ]
+   },
+   "summary": "Wren cloned to review part changes in parallel"
+  },
+  {
+   "id": "e276",
+   "ts": 35.16,
+   "type": "user.commented",
+   "actor": "am",
+   "target": "frame",
+   "data": {
+    "n": 1,
+    "by": "Anita M."
+   },
+   "summary": "Anita M. on Frame Workshop: \"Keep the rev C mounting points. Tooling is already quoted.\""
+  },
+  {
+   "id": "e180",
+   "ts": 35.3,
+   "type": "building.operational",
+   "target": "cmflib"
+  },
+  {
+   "id": "e246",
+   "ts": 35.68,
+   "type": "agent.handoff",
+   "actor": "dex",
+   "target": "wren",
+   "item": "doc"
+  },
+  {
+   "id": "e250",
+   "ts": 36.38,
+   "type": "agent.moved",
+   "actor": "dex",
+   "target": "motor"
+  },
+  {
+   "id": "e184",
+   "ts": 36.4,
+   "type": "artifact.created",
+   "actor": "juno2",
+   "target": "clay",
+   "item": "blueprint",
+   "summary": "Surface CAD v2.4 frozen",
+   "data": {
+    "minutes": 48
+   }
+  },
+  {
+   "id": "e247",
+   "ts": 36.58,
+   "type": "agent.handoff",
+   "actor": "nell",
+   "target": "wren2",
+   "item": "doc"
+  },
+  {
+   "id": "e185",
+   "ts": 36.8,
+   "type": "agent.moved",
+   "actor": "juno2",
+   "target": "sketch",
+   "data": {
+    "loc": {
+     "dx": 15
+    }
+   }
+  },
+  {
+   "id": "e186",
+   "ts": 36.9,
+   "type": "agent.moved",
+   "actor": "juno3",
+   "target": "sketch",
+   "data": {
+    "loc": {
+     "dx": 30
+    }
+   }
+  },
+  {
+   "id": "e252",
+   "ts": 37.28,
+   "type": "agent.moved",
+   "actor": "nell",
+   "target": "fw"
+  },
+  {
+   "id": "e248",
+   "ts": 37.48,
+   "type": "agent.handoff",
+   "actor": "sol",
+   "target": "wren",
+   "item": "doc"
+  },
+  {
+   "id": "e191",
+   "ts": 37.91,
+   "type": "memory.saved",
+   "actor": "ivo",
+   "target": "townhall",
+   "item": "scroll",
+   "summary": "Ivo filed rider research to memory"
+  },
+  {
+   "id": "e254",
+   "ts": 38.18,
+   "type": "agent.moved",
+   "actor": "sol",
+   "target": "pack",
+   "data": {
+    "loc": {
+     "slot": 1
+    }
+   }
+  },
+  {
+   "id": "e192",
+   "ts": 38.21,
+   "type": "agent.retired",
+   "actor": "ivo",
+   "summary": "Ivo retired. Research is done."
+  },
+  {
+   "id": "e249",
+   "ts": 38.38,
+   "type": "agent.handoff",
+   "actor": "bo",
+   "target": "wren2",
+   "item": "doc",
+   "summary": "All 4 part changes reviewed"
+  },
+  {
+   "id": "e274",
+   "ts": 38.56,
+   "type": "agent.retired",
+   "actor": "taz2",
+   "data": {
+    "merge": true
+   }
+  },
+  {
+   "id": "e187",
+   "ts": 38.64,
+   "type": "agent.retired",
+   "actor": "juno2",
+   "data": {
+    "merge": true
+   },
+   "summary": "Juno's clones merged back"
+  },
+  {
+   "id": "e188",
+   "ts": 38.64,
+   "type": "agent.retired",
+   "actor": "juno3",
+   "data": {
+    "merge": true
+   }
+  },
+  {
+   "id": "e189",
+   "ts": 38.94,
+   "type": "artifact.created",
+   "actor": "juno",
+   "target": "sketch",
+   "item": "blueprint",
+   "summary": "Surface CAD v2.4 released to Engineering",
+   "data": {
+    "hold": true,
+    "minutes": 18
+   }
+  },
+  {
+   "id": "e256",
+   "ts": 39.08,
+   "type": "agent.moved",
+   "actor": "bo",
+   "target": "frame",
+   "data": {
+    "loc": {
+     "slot": 1
+    }
+   }
+  },
+  {
+   "id": "e193",
+   "ts": 39.24,
+   "type": "agent.moved",
+   "actor": "juno",
+   "target": "frame",
+   "item": "blueprint",
+   "data": {
+    "loc": {
+     "slot": 2
+    },
+    "hold": true,
+    "follow": true
+   },
+   "summary": "Juno is riding the lift to Engineering with Surface CAD v2.4"
+  },
+  {
+   "id": "e253",
+   "ts": 39.59,
+   "type": "agent.working",
+   "actor": "nell",
+   "target": "fw",
+   "credits": 3
+  },
+  {
+   "id": "e271",
+   "ts": 39.76,
+   "type": "alert.raised",
+   "actor": "pip",
+   "target": "desk",
+   "severity": "needs",
+   "data": {
+    "id": "a-motor",
+    "kind": "consent",
+    "decision": "motor",
+    "needBy": 48.66036371130049,
+    "default": "notnow",
+    "defaultBy": "Director",
+    "timer": 40,
+    "anchor": "connector",
+    "card": {
+     "title": "Parts Watch needs read-only access to Northline Motors",
+     "why": "64 motor parts would have no lead-time data. You can still build Proto 3 without it.",
+     "service": "Northline Motors",
+     "method": "Agent protocol (MCP)",
+     "perms": [
+      [
+       "Read part numbers, lead times and stock",
+       "So Parts Watch can flag late motor parts"
+      ],
+      [
+       "Read certification status",
+       "To catch parts missing UN 38.3 or CE marks"
+      ]
+     ],
+     "duration": "90 days, then Tilo asks again",
+     "never": "No write access and no pricing. Tilo never sees your password: you sign in with Northline directly.",
+     "options": [
+      {
+       "id": "allow",
+       "label": "Allow read-only access",
+       "suggested": true,
+       "reason": "Motor parts are 16% of the BOM"
+      },
+      {
+       "id": "notnow",
+       "label": "Not now",
+       "detail": "Parts Watch shows motor rows as \"no data\""
+      }
+     ]
+    }
+   },
+   "summary": "Needs you: allow read-only access to Northline Motors?"
+  },
+  {
+   "id": "e258",
+   "ts": 39.88,
+   "type": "agent.retired",
+   "actor": "wren2",
+   "data": {
+    "merge": true
+   },
+   "summary": "Wren's clone merged back. Queue cleared."
+  },
+  {
+   "id": "e259",
+   "ts": 39.98,
+   "type": "building.scaled",
+   "target": "bom",
+   "data": {
+    "fl": 1,
+    "tag": "412 parts",
+    "tagIcon": "doc"
+   },
+   "summary": "BOM Office scaled back down"
+  },
+  {
+   "id": "e198",
+   "ts": 40.14,
+   "type": "agent.idle",
+   "actor": "oren",
+   "summary": "Oren is idle: fit study signed off"
+  },
+  {
+   "id": "e194",
+   "ts": 40.64,
+   "type": "building.archived",
+   "target": "sketch",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e195",
+   "ts": 40.79,
+   "type": "building.archived",
+   "target": "clay",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e196",
+   "ts": 40.94,
+   "type": "building.archived",
+   "target": "cmflib",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e197",
+   "ts": 41.09,
+   "type": "building.archived",
+   "target": "ergolab",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e251",
+   "ts": 41.31,
+   "type": "agent.working",
+   "actor": "dex",
+   "target": "motor",
+   "credits": 3
+  },
+  {
+   "id": "e255",
+   "ts": 43.81,
+   "type": "agent.working",
+   "actor": "sol",
+   "target": "pack",
+   "credits": 3
+  },
+  {
+   "id": "e257",
+   "ts": 44.01,
+   "type": "agent.working",
+   "actor": "bo",
+   "target": "frame",
+   "credits": 3
+  },
+  {
+   "id": "e199",
+   "ts": 47.54,
+   "type": "agent.handoff",
+   "actor": "juno",
+   "target": "fenn",
+   "item": "blueprint",
+   "summary": "Juno handed Surface CAD v2.4 to Fenn (Chassis)"
+  },
+  {
+   "id": "e200",
+   "ts": 48.34,
+   "type": "agent.working",
+   "actor": "fenn",
+   "target": "frame",
+   "credits": 9,
+   "summary": "Fenn is revising the frame to rev C",
+   "data": {
+    "tag": "rev C",
+    "tagIcon": "make"
+   }
+  },
+  {
+   "id": "e278",
+   "ts": 48.86,
+   "type": "connection.consented",
+   "actor": "you",
+   "target": "br-motors",
+   "summary": "Northline access granted (read-only, 90 days)",
+   "when": {
+    "motor": "allow"
+   }
+  },
+  {
+   "id": "e277",
+   "ts": 48.96,
+   "type": "agent.moved",
+   "actor": "pip",
+   "target": "connector",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "mode": "run"
+   }
+  },
+  {
+   "id": "e279",
+   "ts": 49.06,
+   "type": "connection.established",
+   "actor": "lu",
+   "target": "br-motors",
+   "summary": "Bridge to Northline Motors built (MCP)",
+   "when": {
+    "motor": "allow"
+   }
+  },
+  {
+   "id": "e280",
+   "ts": 49.26,
+   "type": "app.building",
+   "actor": "taz",
+   "target": "appstudio",
+   "data": {
+    "step": "wire",
+    "dur": 3,
+    "wires": [
+     "br-cells",
+     "br-motors"
+    ]
+   },
+   "summary": "Wiring Parts Watch to Voltacell and Northline",
+   "credits": 5,
+   "when": {
+    "motor": "allow"
+   }
+  },
+  {
+   "id": "e282",
+   "ts": 49.26,
+   "type": "app.building",
+   "actor": "taz",
+   "target": "appstudio",
+   "data": {
+    "step": "wire",
+    "dur": 3,
+    "wires": [
+     "br-cells"
+    ]
+   },
+   "summary": "Wiring Parts Watch to Voltacell only. Motor rows show no data.",
+   "credits": 4,
+   "when": {
+    "motor": "notnow"
+   }
+  },
+  {
+   "id": "e214",
+   "ts": 49.94,
+   "type": "meeting.called",
+   "actor": "fenn",
+   "target": "frame",
+   "data": {
+    "id": "m-standup",
+    "kind": "standup",
+    "title": "Chassis stand-up",
+    "attendees": [
+     "fenn",
+     "bo",
+     "cy",
+     "juno"
+    ],
+    "agenda": [
+     "Rev C status",
+     "Fatigue rig",
+     "CAD v2.4 impact"
+    ]
+   },
+   "summary": "Fenn called the Chassis stand-up"
+  },
+  {
+   "id": "e215",
+   "ts": 50.04,
+   "type": "agent.moved",
+   "actor": "fenn",
+   "target": "frame",
+   "data": {
+    "loc": {
+     "seat": 0,
+     "of": 4
+    }
+   }
+  },
+  {
+   "id": "e216",
+   "ts": 50.04,
+   "type": "agent.moved",
+   "actor": "bo",
+   "target": "frame",
+   "data": {
+    "loc": {
+     "seat": 1,
+     "of": 4
+    }
+   }
+  },
+  {
+   "id": "e217",
+   "ts": 50.04,
+   "type": "agent.moved",
+   "actor": "cy",
+   "target": "frame",
+   "data": {
+    "loc": {
+     "seat": 2,
+     "of": 4
+    }
+   }
+  },
+  {
+   "id": "e218",
+   "ts": 50.04,
+   "type": "agent.moved",
+   "actor": "juno",
+   "target": "frame",
+   "data": {
+    "loc": {
+     "seat": 3,
+     "of": 4
+    }
+   }
+  },
+  {
+   "id": "e283",
+   "ts": 50.26,
+   "type": "data.transfer",
+   "target": "br-cells",
+   "data": {
+    "dir": "in",
+    "size": "truck",
+    "mb": 6
+   },
+   "summary": "Synced 348 cell and pack parts from Voltacell"
+  },
+  {
+   "id": "e219",
+   "ts": 50.58,
+   "type": "meeting.started",
+   "target": "frame",
+   "data": {
+    "id": "m-standup"
+   },
+   "summary": "Stand-up started: 4 agents"
+  },
+  {
+   "id": "e281",
+   "ts": 51.06,
+   "type": "data.transfer",
+   "target": "br-motors",
+   "data": {
+    "dir": "in",
+    "size": "cart",
+    "mb": 1
+   },
+   "summary": "Pulled 64 motor parts from Northline",
+   "when": {
+    "motor": "allow"
+   }
+  },
+  {
+   "id": "e284",
+   "ts": 52.46,
+   "type": "agent.moved",
+   "actor": "taz",
+   "target": "testyard",
+   "item": "app",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "hold": true
+   },
+   "summary": "Taz is taking Parts Watch to the Test Yard"
+  },
+  {
+   "id": "e285",
+   "ts": 55.73,
+   "type": "agent.handoff",
+   "actor": "taz",
+   "target": "kip",
+   "item": "app"
+  },
+  {
+   "id": "e286",
+   "ts": 56.23,
+   "type": "agent.working",
+   "actor": "kip",
+   "target": "testyard",
+   "credits": 5,
+   "summary": "Kip is testing Parts Watch with 3 months of history"
+  },
+  {
+   "id": "e220",
+   "ts": 56.28,
+   "type": "meeting.decision",
+   "target": "frame",
+   "data": {
+    "id": "m-standup",
+    "by": "Fenn",
+    "why": "CAD v2.4 moved the deck 12 mm"
+   },
+   "summary": "Decided: keep rev C mounting points; Suspension Bay runs fatigue after the frame is released",
+   "credits": 4
+  },
+  {
+   "id": "e221",
+   "ts": 56.68,
+   "type": "meeting.ended",
+   "target": "frame",
+   "data": {
+    "id": "m-standup"
+   }
+  },
+  {
+   "id": "e222",
+   "ts": 56.78,
+   "type": "memory.saved",
+   "actor": "fenn",
+   "target": "frame",
+   "item": "scroll",
+   "summary": "Stand-up minutes filed to the Memory Vault"
+  },
+  {
+   "id": "e223",
+   "ts": 56.88,
+   "type": "agent.moved",
+   "actor": "fenn",
+   "target": "frame"
+  },
+  {
+   "id": "e224",
+   "ts": 56.88,
+   "type": "agent.moved",
+   "actor": "bo",
+   "target": "frame",
+   "data": {
+    "loc": {
+     "slot": 1
+    }
+   }
+  },
+  {
+   "id": "e225",
+   "ts": 56.98,
+   "type": "agent.moved",
+   "actor": "cy",
+   "target": "susp"
+  },
+  {
+   "id": "e229",
+   "ts": 57.08,
+   "type": "agent.moved",
+   "actor": "juno",
+   "target": "sketch"
+  },
+  {
+   "id": "e226",
+   "ts": 57.48,
+   "type": "agent.working",
+   "actor": "fenn",
+   "target": "frame",
+   "credits": 5
+  },
+  {
+   "id": "e227",
+   "ts": 57.48,
+   "type": "agent.working",
+   "actor": "bo",
+   "target": "frame",
+   "credits": 4
+  },
+  {
+   "id": "e228",
+   "ts": 57.72,
+   "type": "agent.idle",
+   "actor": "cy",
+   "summary": "Cy is idle: fatigue rig waits for the frame release"
+  },
+  {
+   "id": "e287",
+   "ts": 59.23,
+   "type": "app.tested",
+   "actor": "kip",
+   "target": "testyard",
+   "summary": "Parts Watch passed 22 of 22 checks",
+   "data": {
+    "minutes": 24
+   }
+  },
+  {
+   "id": "e288",
+   "ts": 59.33,
+   "type": "artifact.reviewed",
+   "actor": "kip",
+   "target": "testyard",
+   "data": {
+    "result": "approved"
+   },
+   "summary": "Kip approved Parts Watch"
+  },
+  {
+   "id": "e289",
+   "ts": 59.63,
+   "type": "agent.moved",
+   "actor": "taz",
+   "target": "appstudio",
+   "data": {
+    "loc": {
+     "slot": 1
+    }
+   }
+  },
+  {
+   "id": "e290",
+   "ts": 59.83,
+   "type": "agent.moved",
+   "actor": "kip",
+   "target": "desk",
+   "item": "card",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "mode": "run",
+    "hold": true
+   },
+   "summary": "Kip is taking the sharing approval to Your Desk"
+  },
+  {
+   "id": "e291",
+   "ts": 59.93,
+   "type": "approval.requested",
+   "actor": "kip",
+   "target": "pwatch",
+   "severity": "needs",
+   "data": {
+    "id": "a-share",
+    "kind": "approval",
+    "decision": "share",
+    "gate": "pwatch",
+    "needBy": 75.26024488035053,
+    "default": "ops",
+    "defaultBy": "Anita M.",
+    "timer": 14,
+    "anchor": "appstudio",
+    "card": {
+     "title": "Share Parts Watch beyond the Engineering team?",
+     "why": "Kestrel ops (14 people) would see supplier lead times and stock. Nothing is sent outside Kestrel.",
+     "options": [
+      {
+       "id": "ops",
+       "label": "Share with Kestrel ops",
+       "suggested": true,
+       "reason": "Ops plans the Proto 3 build and needs the lead times"
+      },
+      {
+       "id": "team",
+       "label": "Keep it to Engineering",
+       "detail": "You can share it later"
+      }
+     ]
+    }
+   },
+   "summary": "Approval: share Parts Watch with Kestrel ops? Anita M. can also answer."
+  },
+  {
+   "id": "e230",
+   "ts": 64.19,
+   "type": "agent.retired",
+   "actor": "juno",
+   "summary": "Juno retired. Design is complete."
+  },
+  {
+   "id": "e307",
+   "ts": 68.66,
+   "type": "agent.spawned",
+   "actor": "mo",
+   "target": "townhall",
+   "data": {
+    "role": "connector",
+    "rank": "lead",
+    "name": "Mo",
+    "title": "Manufacturing Lead",
+    "tools": [
+     "ERP",
+     "Supplier terms"
+    ],
+    "scope": [
+     "Voltacell",
+     "ERP"
+    ],
+    "budget": 60,
+    "loc": {
+     "slot": 2
+    }
+   },
+   "summary": "Director built Mo, Manufacturing Lead"
+  },
+  {
+   "id": "e308",
+   "ts": 69.06,
+   "type": "agent.moved",
+   "actor": "mo",
+   "target": "pack",
+   "data": {
+    "loc": {
+     "dx": -34,
+     "face": "R"
+    }
+   }
+  },
+  {
+   "id": "e292",
+   "ts": 75.66,
+   "type": "agent.moved",
+   "actor": "kip",
+   "target": "testyard",
+   "data": {
+    "mode": "run"
+   }
+  },
+  {
+   "id": "e293",
+   "ts": 76.06,
+   "type": "app.deployed",
+   "actor": "taz",
+   "target": "pwatch",
+   "summary": "Parts Watch is live in Parts & apps"
+  },
+  {
+   "id": "e294",
+   "ts": 76.06,
+   "type": "building.constructing",
+   "target": "pwatch",
+   "actor": "bots",
+   "summary": "Built the Parts Watch kiosk"
+  },
+  {
+   "id": "e298",
+   "ts": 77.06,
+   "type": "connection.requested",
+   "actor": "lu",
+   "target": "br-pricing",
+   "summary": "Lu asked for access to Supplier pricing so Parts Watch can show negotiated prices"
+  },
+  {
+   "id": "e299",
+   "ts": 77.26,
+   "type": "agent.moved",
+   "actor": "pip",
+   "target": "desk",
+   "item": "key",
+   "data": {
+    "mode": "run",
+    "hold": true
+   },
+   "summary": "Pip is running the pricing access request to Your Desk"
+  },
+  {
+   "id": "e295",
+   "ts": 77.56,
+   "type": "building.operational",
+   "target": "pwatch"
+  },
+  {
+   "id": "e296",
+   "ts": 77.66,
+   "type": "app.refreshed",
+   "target": "pwatch",
+   "data": {
+    "tag": "412 parts · ops",
+    "tagIcon": "screen"
+   },
+   "summary": "Parts Watch shared with Kestrel ops",
+   "when": {
+    "share": "ops"
+   }
+  },
+  {
+   "id": "e297",
+   "ts": 77.66,
+   "type": "app.refreshed",
+   "target": "pwatch",
+   "data": {
+    "tag": "412 parts · team",
+    "tagIcon": "screen"
+   },
+   "summary": "Parts Watch shared with Engineering only",
+   "when": {
+    "share": "team"
+   }
+  },
+  {
+   "id": "e300",
+   "ts": 79.26,
+   "type": "data.transfer",
+   "target": "br-cells",
+   "data": {
+    "dir": "in",
+    "size": "truck",
+    "mb": 4
+   },
+   "summary": "Scheduled Voltacell sync"
+  },
+  {
+   "id": "e301",
+   "ts": 81.66,
+   "type": "app.refreshed",
+   "target": "pwatch",
+   "data": {
+    "tag": "3 at risk",
+    "tagIcon": "flag"
+   },
+   "summary": "Parts Watch: Voltacell cell lead time slipped from 6 to 11 weeks"
+  },
+  {
+   "id": "e302",
+   "ts": 81.76,
+   "type": "alert.raised",
+   "actor": "sol",
+   "target": "pack",
+   "severity": "fyi",
+   "data": {
+    "id": "a-slip",
+    "kind": "fyi"
+   },
+   "summary": "Voltacell cells now land in week 25. Proto 3 builds in week 22.",
+   "credits": 3
+  },
+  {
+   "id": "e303",
+   "ts": 82.06,
+   "type": "alert.batched",
+   "target": "pwatch",
+   "data": {
+    "count": 3
+   },
+   "summary": "3 at-risk parts merged into one issue: all are Voltacell cells"
+  },
+  {
+   "id": "e305",
+   "ts": 82.66,
+   "type": "agent.help_requested",
+   "actor": "sol",
+   "target": "rue",
+   "summary": "Sol asked Rue what to do about the Voltacell slip"
+  },
+  {
+   "id": "e306",
+   "ts": 82.86,
+   "type": "agent.escalated",
+   "actor": "sol",
+   "target": "rue",
+   "summary": "Sol escalated to Rue (Battery Lead)"
+  },
+  {
+   "id": "e309",
+   "ts": 84.06,
+   "type": "agent.working",
+   "actor": "rue",
+   "target": "pack",
+   "data": {
+    "expr": "talking",
+    "until": 2.6
+   },
+   "summary": "Rue: switch to the Kelvra cell validated in the Sample Lab"
+  },
+  {
+   "id": "e310",
+   "ts": 84.06,
+   "type": "agent.working",
+   "actor": "mo",
+   "target": "pack",
+   "data": {
+    "expr": "talking",
+    "until": 2.6
+   },
+   "summary": "Mo: expedite Voltacell. Changing cells means new tooling."
+  },
+  {
+   "id": "e311",
+   "ts": 84.16,
+   "type": "budget.requested",
+   "actor": "mo",
+   "target": "pack",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e304",
+   "ts": 85.46,
+   "type": "alert.raised",
+   "actor": "pip",
+   "target": "desk",
+   "severity": "needs",
+   "data": {
+    "id": "a-pricing",
+    "kind": "consent",
+    "decision": "pricing",
+    "needBy": 116.80585668396614,
+    "default": "decline",
+    "defaultBy": "Director",
+    "timer": 45,
+    "anchor": "connector",
+    "card": {
+     "title": "Allow Tilo to read Supplier pricing?",
+     "why": "Parts Watch would show negotiated prices, not list prices. Cost decisions get more accurate.",
+     "service": "Kestrel supplier pricing portal",
+     "method": "Browser, signed in by you",
+     "perms": [
+      [
+       "Read negotiated unit prices for 412 parts",
+       "So price changes show up in Parts Watch"
+      ],
+      [
+       "Read contract end dates",
+       "To warn before a price agreement expires"
+      ]
+     ],
+     "duration": "Until the end of Manufacturing (week 40)",
+     "never": "Read-only. Tilo never stores or shows your sign-in; you sign in on the portal itself.",
+     "options": [
+      {
+       "id": "grant",
+       "label": "Allow read-only access",
+       "suggested": true,
+       "reason": "The expedite and switch costs depend on negotiated prices"
+      },
+      {
+       "id": "decline",
+       "label": "Keep pricing private",
+       "detail": "Agents use list prices and route around the island"
+      }
+     ]
+    }
+   },
+   "summary": "Needs you: allow Tilo to read Supplier pricing?"
+  },
+  {
+   "id": "e312",
+   "ts": 86.86,
+   "type": "agent.escalated",
+   "actor": "rue",
+   "target": "director",
+   "summary": "Rue and Mo disagree. Rue escalated to the Director."
+  },
+  {
+   "id": "e313",
+   "ts": 87.46,
+   "type": "meeting.called",
+   "actor": "director",
+   "target": "meeting",
+   "data": {
+    "id": "m-supplier",
+    "kind": "decision",
+    "title": "Cell supply decision",
+    "attendees": [
+     "director",
+     "rue",
+     "mo",
+     "wren"
+    ],
+    "agenda": [
+     "Voltacell slip: 6 to 11 weeks",
+     "Options and costs",
+     "Impact on Proto 3"
+    ]
+   },
+   "summary": "Director called a decision meeting and invited you"
+  },
+  {
+   "id": "e314",
+   "ts": 87.66,
+   "type": "agent.moved",
+   "actor": "director",
+   "target": "meeting",
+   "data": {
+    "loc": {
+     "seat": 0,
+     "of": 4
+    }
+   }
+  },
+  {
+   "id": "e315",
+   "ts": 87.66,
+   "type": "agent.moved",
+   "actor": "rue",
+   "target": "meeting",
+   "data": {
+    "loc": {
+     "seat": 1,
+     "of": 4
+    }
+   }
+  },
+  {
+   "id": "e316",
+   "ts": 87.66,
+   "type": "agent.moved",
+   "actor": "mo",
+   "target": "meeting",
+   "data": {
+    "loc": {
+     "seat": 2,
+     "of": 4
+    }
+   }
+  },
+  {
+   "id": "e317",
+   "ts": 87.66,
+   "type": "agent.moved",
+   "actor": "wren",
+   "target": "meeting",
+   "data": {
+    "loc": {
+     "seat": 3,
+     "of": 4
+    }
+   }
+  },
+  {
+   "id": "e374",
+   "ts": 87.81,
+   "type": "agent.spawned",
+   "actor": "gus",
+   "target": "townhall",
+   "data": {
+    "role": "builder",
+    "rank": "lead",
+    "name": "Gus",
+    "title": "Prototype Lead",
+    "tools": [
+     "Garage"
+    ],
+    "scope": [],
+    "budget": 50,
+    "loc": {
+     "slot": 0
+    }
+   },
+   "summary": "Director built Gus, Prototype Lead"
+  },
+  {
+   "id": "e375",
+   "ts": 88.21,
+   "type": "agent.moved",
+   "actor": "gus",
+   "target": "garage"
+  },
+  {
+   "id": "e378",
+   "ts": 88.41,
+   "type": "agent.spawned",
+   "actor": "tia",
+   "target": "townhall",
+   "data": {
+    "role": "tester",
+    "rank": "lead",
+    "name": "Tia",
+    "title": "Validation Lead",
+    "tools": [
+     "Test Track",
+     "Drop Tower"
+    ],
+    "scope": [],
+    "budget": 50,
+    "loc": {
+     "slot": 1
+    }
+   },
+   "summary": "Director built Tia, Validation Lead"
+  },
+  {
+   "id": "e379",
+   "ts": 88.81,
+   "type": "agent.moved",
+   "actor": "tia",
+   "target": "testtrack"
+  },
+  {
+   "id": "e382",
+   "ts": 89.01,
+   "type": "agent.spawned",
+   "actor": "sam",
+   "target": "townhall",
+   "data": {
+    "role": "tester",
+    "name": "Sam",
+    "title": "Safety Tester",
+    "tools": [
+     "Thermal Chamber"
+    ],
+    "scope": [],
+    "budget": 30,
+    "loc": {
+     "slot": 2
+    }
+   },
+   "summary": "Director built Sam, Safety Tester"
+  },
+  {
+   "id": "e383",
+   "ts": 89.41,
+   "type": "agent.moved",
+   "actor": "sam",
+   "target": "thermal"
+  },
+  {
+   "id": "e318",
+   "ts": 93.51,
+   "type": "meeting.started",
+   "target": "meeting",
+   "data": {
+    "id": "m-supplier"
+   },
+   "summary": "Decision meeting started in the Meeting Hall"
+  },
+  {
+   "id": "e319",
+   "ts": 93.71,
+   "type": "agent.handoff",
+   "actor": "director",
+   "target": "pip",
+   "item": "card"
+  },
+  {
+   "id": "e320",
+   "ts": 93.81,
+   "type": "alert.raised",
+   "actor": "director",
+   "target": "meeting",
+   "severity": "needs",
+   "data": {
+    "id": "a-supplier",
+    "kind": "invite",
+    "decision": "supplier",
+    "meeting": "m-supplier",
+    "needBy": 103.80585668396614,
+    "default": "move",
+    "defaultBy": "Director",
+    "timer": 45,
+    "anchor": "meeting",
+    "card": {
+     "title": "Voltacell cells slipped from 6 to 11 weeks. Proto 3 is at risk.",
+     "why": "Proto 3 builds in week 22 and the cells now land in week 25. Rue and Mo disagree on the fix.",
+     "options": [
+      {
+       "id": "expedite",
+       "label": "Expedite Voltacell at a premium",
+       "detail": "€18,400 premium. Cells in 7 weeks. Keeps the date, uses 9% of the contingency.",
+       "irreversible": true,
+       "approve": {
+        "button": "Approve and pay €18,400",
+        "what": [
+         "Tilo sends a signed expedite order to Voltacell",
+         "€18,400 is charged to the K1 contingency budget",
+         "Voltacell commits to week 21 delivery"
+        ]
+       }
+      },
+      {
+       "id": "switch",
+       "label": "Switch to the Kelvra alternate cell",
+       "detail": "Same price. Passed Sample Lab tests in week 14. Needs one retest.",
+       "suggested": true,
+       "reason": "Keeps the Proto 3 date with no premium, and the cell is already validated"
+      },
+      {
+       "id": "move",
+       "label": "Move the Proto 3 date",
+       "detail": "Proto 3 moves 5 weeks and launch moves 3. No cost."
+      }
+     ]
+    }
+   },
+   "summary": "Meeting invite: cell supply decision. Join, answer async, or delegate."
+  },
+  {
+   "id": "e321",
+   "ts": 94.81,
+   "type": "meeting.decision",
+   "target": "meeting",
+   "data": {
+    "id": "m-supplier",
+    "by": "Director",
+    "nocam": true
+   },
+   "summary": "Director laid out 3 options for you"
+  },
+  {
+   "id": "e376",
+   "ts": 100.1,
+   "type": "building.constructing",
+   "target": "garage",
+   "actor": "bots",
+   "summary": "Built Prototype Garage"
+  },
+  {
+   "id": "e384",
+   "ts": 100.84,
+   "type": "building.constructing",
+   "target": "thermal",
+   "actor": "bots",
+   "summary": "Built Thermal Chamber"
+  },
+  {
+   "id": "e390",
+   "ts": 101.04,
+   "type": "agent.working",
+   "actor": "sam",
+   "target": "thermal",
+   "credits": 4,
+   "summary": "Sam is running thermal soak at 45 °C"
+  },
+  {
+   "id": "e380",
+   "ts": 101.46,
+   "type": "building.constructing",
+   "target": "testtrack",
+   "actor": "bots",
+   "summary": "Built Test Track"
+  },
+  {
+   "id": "e377",
+   "ts": 101.6,
+   "type": "building.operational",
+   "target": "garage"
+  },
+  {
+   "id": "e389",
+   "ts": 101.66,
+   "type": "agent.working",
+   "actor": "tia",
+   "target": "testtrack",
+   "credits": 4,
+   "summary": "Tia is preparing the Test Track"
+  },
+  {
+   "id": "e385",
+   "ts": 102.34,
+   "type": "building.operational",
+   "target": "thermal"
+  },
+  {
+   "id": "e381",
+   "ts": 102.96,
+   "type": "building.operational",
+   "target": "testtrack"
+  },
+  {
+   "id": "e322",
+   "ts": 104.21,
+   "type": "meeting.decision",
+   "target": "meeting",
+   "data": {
+    "id": "m-supplier",
+    "by": "You",
+    "why": "Protect the Proto 3 date"
+   },
+   "summary": "Decided: expedite Voltacell at a €18,400 premium",
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e336",
+   "ts": 104.21,
+   "type": "meeting.decision",
+   "target": "meeting",
+   "data": {
+    "id": "m-supplier",
+    "by": "You",
+    "why": "Validated cell, no premium"
+   },
+   "summary": "Decided: switch to the Kelvra alternate cell",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e354",
+   "ts": 104.21,
+   "type": "meeting.decision",
+   "target": "meeting",
+   "data": {
+    "id": "m-supplier",
+    "by": "You",
+    "why": "No cost, launch slips 3 weeks"
+   },
+   "summary": "Decided: move Proto 3 by 5 weeks",
+   "when": {
+    "supplier": "move"
+   }
+  },
+  {
+   "id": "e323",
+   "ts": 104.81,
+   "type": "meeting.ended",
+   "target": "meeting",
+   "data": {
+    "id": "m-supplier"
+   },
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e337",
+   "ts": 104.81,
+   "type": "meeting.ended",
+   "target": "meeting",
+   "data": {
+    "id": "m-supplier"
+   },
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e355",
+   "ts": 104.81,
+   "type": "meeting.ended",
+   "target": "meeting",
+   "data": {
+    "id": "m-supplier"
+   },
+   "when": {
+    "supplier": "move"
+   }
+  },
+  {
+   "id": "e324",
+   "ts": 104.91,
+   "type": "memory.saved",
+   "actor": "director",
+   "target": "meeting",
+   "item": "decision",
+   "summary": "Decision card filed to the Memory Vault",
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e338",
+   "ts": 104.91,
+   "type": "memory.saved",
+   "actor": "director",
+   "target": "meeting",
+   "item": "decision",
+   "summary": "Decision card filed to the Memory Vault",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e356",
+   "ts": 104.91,
+   "type": "memory.saved",
+   "actor": "director",
+   "target": "meeting",
+   "item": "decision",
+   "summary": "Decision card filed to the Memory Vault",
+   "when": {
+    "supplier": "move"
+   }
+  },
+  {
+   "id": "e325",
+   "ts": 105.01,
+   "type": "agent.moved",
+   "actor": "mo",
+   "target": "treasury",
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e332",
+   "ts": 105.01,
+   "type": "agent.moved",
+   "actor": "rue",
+   "target": "pack",
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e349",
+   "ts": 105.01,
+   "type": "agent.moved",
+   "actor": "rue",
+   "target": "pack",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e352",
+   "ts": 105.01,
+   "type": "agent.moved",
+   "actor": "mo",
+   "target": "pack",
+   "data": {
+    "loc": {
+     "dx": -34,
+     "face": "R"
+    }
+   },
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e358",
+   "ts": 105.01,
+   "type": "agent.moved",
+   "actor": "rue",
+   "target": "pack",
+   "when": {
+    "supplier": "move"
+   }
+  },
+  {
+   "id": "e361",
+   "ts": 105.01,
+   "type": "agent.moved",
+   "actor": "mo",
+   "target": "pack",
+   "data": {
+    "loc": {
+     "dx": -34,
+     "face": "R"
+    }
+   },
+   "when": {
+    "supplier": "move"
+   }
+  },
+  {
+   "id": "e333",
+   "ts": 105.11,
+   "type": "agent.moved",
+   "actor": "wren",
+   "target": "bom",
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e350",
+   "ts": 105.11,
+   "type": "agent.moved",
+   "actor": "wren",
+   "target": "bom",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e359",
+   "ts": 105.11,
+   "type": "agent.moved",
+   "actor": "wren",
+   "target": "bom",
+   "when": {
+    "supplier": "move"
+   }
+  },
+  {
+   "id": "e334",
+   "ts": 105.21,
+   "type": "agent.moved",
+   "actor": "director",
+   "target": "meeting",
+   "data": {
+    "loc": {
+     "slot": 0
+    }
+   },
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e339",
+   "ts": 105.21,
+   "type": "building.planned",
+   "target": "kelvrafab",
+   "summary": "Kelvra Cells island is now in the plan",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e351",
+   "ts": 105.21,
+   "type": "agent.moved",
+   "actor": "director",
+   "target": "meeting",
+   "data": {
+    "loc": {
+     "slot": 0
+    }
+   },
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e360",
+   "ts": 105.21,
+   "type": "agent.moved",
+   "actor": "director",
+   "target": "meeting",
+   "data": {
+    "loc": {
+     "slot": 0
+    }
+   },
+   "when": {
+    "supplier": "move"
+   }
+  },
+  {
+   "id": "e357",
+   "ts": 105.41,
+   "type": "alert.raised",
+   "actor": "director",
+   "target": "meeting",
+   "severity": "nudge",
+   "data": {
+    "id": "a-move",
+    "kind": "nudge"
+   },
+   "summary": "Plan updated: Proto 3 moves to week 27; launch moves 3 weeks.",
+   "when": {
+    "supplier": "move"
+   }
+  },
+  {
+   "id": "e340",
+   "ts": 105.61,
+   "type": "connection.requested",
+   "actor": "lu",
+   "target": "br-kelvra",
+   "summary": "Lu requested the Kelvra API (covered by your decision)",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e328",
+   "ts": 106.21,
+   "type": "data.transfer",
+   "target": "br-cells",
+   "data": {
+    "dir": "out",
+    "size": "cart"
+   },
+   "summary": "Signed expedite order sent to Voltacell",
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e341",
+   "ts": 106.41,
+   "type": "connection.established",
+   "actor": "lu",
+   "target": "br-kelvra",
+   "summary": "Bridge to Kelvra Cells built",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e353",
+   "ts": 106.85,
+   "type": "agent.working",
+   "actor": "mo",
+   "target": "pack",
+   "summary": "Mo is re-quoting tooling for the Kelvra cell holder",
+   "credits": 4,
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e326",
+   "ts": 107,
+   "type": "budget.requested",
+   "actor": "mo",
+   "target": "treasury",
+   "data": {
+    "amount": 18400
+   },
+   "summary": "Mo took the €18,400 expedite to the Treasury",
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e342",
+   "ts": 107.61,
+   "type": "agent.moved",
+   "actor": "sol",
+   "target": "kelvrafab",
+   "summary": "Sol is crossing to Kelvra to collect sample cells",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e362",
+   "ts": 108.21,
+   "type": "agent.idle",
+   "actor": "dex",
+   "summary": "Dex is idle until the new build date",
+   "when": {
+    "supplier": "move"
+   }
+  },
+  {
+   "id": "e327",
+   "ts": 108.3,
+   "type": "budget.granted",
+   "actor": "mo",
+   "target": "treasury",
+   "summary": "Treasury released €18,400 from contingency (you approved)",
+   "credits": 4,
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e363",
+   "ts": 108.61,
+   "type": "app.refreshed",
+   "target": "pwatch",
+   "data": {
+    "tag": "on new date",
+    "tagIcon": "check"
+   },
+   "summary": "Parts Watch re-baselined to the week 27 build",
+   "when": {
+    "supplier": "move"
+   }
+  },
+  {
+   "id": "e331",
+   "ts": 108.9,
+   "type": "agent.moved",
+   "actor": "mo",
+   "target": "pack",
+   "data": {
+    "loc": {
+     "dx": -34,
+     "face": "R"
+    }
+   },
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e329",
+   "ts": 109.21,
+   "type": "data.transfer",
+   "target": "br-cells",
+   "data": {
+    "dir": "in",
+    "size": "truck",
+    "mb": 3
+   },
+   "summary": "Voltacell confirmed week 21 delivery",
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e330",
+   "ts": 111.81,
+   "type": "app.refreshed",
+   "target": "pwatch",
+   "data": {
+    "tag": "cells 7 wks",
+    "tagIcon": "check"
+   },
+   "summary": "Parts Watch: cells back on time for Proto 3",
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e335",
+   "ts": 113.21,
+   "type": "agent.working",
+   "actor": "rue",
+   "target": "pack",
+   "credits": 5,
+   "summary": "Rue is locking the pack design on Voltacell cells",
+   "when": {
+    "supplier": "expedite"
+   }
+  },
+  {
+   "id": "e343",
+   "ts": 114.18,
+   "type": "agent.working",
+   "actor": "sol",
+   "target": "kelvrafab",
+   "credits": 3,
+   "summary": "Sol collected 12 Kelvra sample cells",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e344",
+   "ts": 114.98,
+   "type": "agent.moved",
+   "actor": "sol",
+   "target": "pack",
+   "item": "crate",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "hold": true
+   },
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e365",
+   "ts": 117.01,
+   "type": "connection.consented",
+   "actor": "you",
+   "target": "br-pricing",
+   "summary": "You allowed read-only access to Supplier pricing",
+   "when": {
+    "pricing": "grant"
+   }
+  },
+  {
+   "id": "e364",
+   "ts": 117.11,
+   "type": "agent.moved",
+   "actor": "pip",
+   "target": "connector",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "mode": "run"
+   }
+  },
+  {
+   "id": "e372",
+   "ts": 117.21,
+   "type": "agent.recovered",
+   "actor": "lu",
+   "target": "connector",
+   "summary": "Pricing stays private. Lu is routing around it with list prices from public catalogues.",
+   "when": {
+    "pricing": "decline"
+   }
+  },
+  {
+   "id": "e366",
+   "ts": 117.31,
+   "type": "connection.established",
+   "actor": "lu",
+   "target": "br-pricing",
+   "data": {
+    "unlock": true
+   },
+   "summary": "Cloud lifted: Supplier pricing is visible. Footpath and browser kiosk built.",
+   "when": {
+    "pricing": "grant"
+   }
+  },
+  {
+   "id": "e368",
+   "ts": 117.81,
+   "type": "agent.moved",
+   "actor": "lu",
+   "target": "pricebook",
+   "summary": "Lu is crossing to the Price Book",
+   "when": {
+    "pricing": "grant"
+   }
+  },
+  {
+   "id": "e386",
+   "ts": 117.81,
+   "type": "agent.moved",
+   "actor": "fenn",
+   "target": "garage",
+   "item": "parcel",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "hold": true,
+    "follow": true
+   },
+   "summary": "Fenn is riding the lift to Validation with the Proto 3 build pack"
+  },
+  {
+   "id": "e404",
+   "ts": 119.02,
+   "type": "agent.spawned",
+   "actor": "hal",
+   "target": "townhall",
+   "data": {
+    "role": "builder",
+    "rank": "lead",
+    "name": "Hal",
+    "title": "Plant Lead",
+    "tools": [
+     "Line planner"
+    ],
+    "scope": [
+     "ERP"
+    ],
+    "budget": 60,
+    "loc": {
+     "slot": 1
+    }
+   },
+   "summary": "Director built Hal, Plant Lead"
+  },
+  {
+   "id": "e367",
+   "ts": 119.21,
+   "type": "data.transfer",
+   "target": "br-pricing",
+   "data": {
+    "dir": "in",
+    "size": "cart",
+    "mb": 1
+   },
+   "summary": "Read 412 negotiated prices",
+   "when": {
+    "pricing": "grant"
+   }
+  },
+  {
+   "id": "e373",
+   "ts": 119.41,
+   "type": "app.refreshed",
+   "target": "pwatch",
+   "data": {
+    "tag": "list prices",
+    "tagIcon": "coin"
+   },
+   "summary": "Parts Watch uses list prices (marked as estimates)",
+   "when": {
+    "pricing": "decline"
+   }
+  },
+  {
+   "id": "e405",
+   "ts": 119.42,
+   "type": "agent.moved",
+   "actor": "hal",
+   "target": "line"
+  },
+  {
+   "id": "e345",
+   "ts": 122.67,
+   "type": "artifact.reviewed",
+   "actor": "rue",
+   "target": "pack",
+   "data": {
+    "result": "approved"
+   },
+   "summary": "Rue retested the Kelvra cell: 1C discharge passes",
+   "credits": 5,
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e346",
+   "ts": 122.97,
+   "type": "app.refreshed",
+   "target": "pwatch",
+   "data": {
+    "tag": "Kelvra · 6 wks",
+    "tagIcon": "check"
+   },
+   "summary": "Parts Watch now tracks Kelvra cells: 6 weeks, on time",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e347",
+   "ts": 123.07,
+   "type": "data.transfer",
+   "target": "br-kelvra",
+   "data": {
+    "dir": "in",
+    "size": "truck",
+    "mb": 3
+   },
+   "summary": "Synced Kelvra catalogue",
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e348",
+   "ts": 123.37,
+   "type": "agent.moved",
+   "actor": "sol",
+   "target": "pack",
+   "data": {
+    "loc": {
+     "slot": 1
+    }
+   },
+   "when": {
+    "supplier": "switch"
+   }
+  },
+  {
+   "id": "e369",
+   "ts": 125.64,
+   "type": "agent.working",
+   "actor": "lu",
+   "target": "pricebook",
+   "credits": 4,
+   "summary": "Lu is reading negotiated prices",
+   "when": {
+    "pricing": "grant"
+   }
+  },
+  {
+   "id": "e387",
+   "ts": 125.83,
+   "type": "agent.handoff",
+   "actor": "fenn",
+   "target": "gus",
+   "item": "parcel",
+   "summary": "Fenn handed the Proto 3 build pack to Gus"
+  },
+  {
+   "id": "e388",
+   "ts": 126.33,
+   "type": "agent.working",
+   "actor": "gus",
+   "target": "garage",
+   "credits": 7,
+   "summary": "Gus is building Proto 3",
+   "data": {
+    "tag": "proto 3 of 5",
+    "tagIcon": "make"
+   }
+  },
+  {
+   "id": "e391",
+   "ts": 126.53,
+   "type": "building.constructing",
+   "target": "drop",
+   "actor": "bots",
+   "summary": "Built the Drop Tower"
+  },
+  {
+   "id": "e398",
+   "ts": 126.73,
+   "type": "agent.moved",
+   "actor": "fenn",
+   "target": "frame"
+  },
+  {
+   "id": "e392",
+   "ts": 128.03,
+   "type": "building.operational",
+   "target": "drop"
+  },
+  {
+   "id": "e370",
+   "ts": 128.04,
+   "type": "app.refreshed",
+   "target": "pwatch",
+   "data": {
+    "tag": "+ prices",
+    "tagIcon": "coin"
+   },
+   "summary": "Parts Watch now shows negotiated prices",
+   "when": {
+    "pricing": "grant"
+   }
+  },
+  {
+   "id": "e371",
+   "ts": 128.44,
+   "type": "agent.moved",
+   "actor": "lu",
+   "target": "connector",
+   "when": {
+    "pricing": "grant"
+   }
+  },
+  {
+   "id": "e393",
+   "ts": 129.73,
+   "type": "agent.moved",
+   "actor": "gus",
+   "target": "testtrack",
+   "item": "parcel",
+   "data": {
+    "loc": {
+     "slot": 1
+    },
+    "hold": true
+   },
+   "summary": "Gus rolled Proto 3 onto the Test Track"
+  },
+  {
+   "id": "e394",
+   "ts": 131.12,
+   "type": "agent.handoff",
+   "actor": "gus",
+   "target": "tia",
+   "item": "parcel"
+  },
+  {
+   "id": "e395",
+   "ts": 131.42,
+   "type": "agent.working",
+   "actor": "tia",
+   "target": "testtrack",
+   "credits": 7,
+   "summary": "Test Track: braking, range and hill-start runs"
+  },
+  {
+   "id": "e406",
+   "ts": 134.78,
+   "type": "building.constructing",
+   "target": "line",
+   "actor": "bots",
+   "summary": "Built Assembly Line"
+  },
+  {
+   "id": "e396",
+   "ts": 135.02,
+   "type": "artifact.reviewed",
+   "actor": "tia",
+   "target": "testtrack",
+   "data": {
+    "result": "approved",
+    "minutes": 36
+   },
+   "summary": "Test Track signed off Proto 3: braking, 41 km range and hill starts pass"
+  },
+  {
+   "id": "e397",
+   "ts": 135.32,
+   "type": "agent.moved",
+   "actor": "gus",
+   "target": "garage"
+  },
+  {
+   "id": "e399",
+   "ts": 135.62,
+   "type": "building.archived",
+   "target": "frame",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e400",
+   "ts": 135.77,
+   "type": "building.archived",
+   "target": "susp",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e401",
+   "ts": 135.92,
+   "type": "building.archived",
+   "target": "ctrl",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e402",
+   "ts": 136.07,
+   "type": "building.archived",
+   "target": "fw",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e403",
+   "ts": 136.22,
+   "type": "building.archived",
+   "target": "motor",
+   "data": {
+    "nocam": true
+   }
+  },
+  {
+   "id": "e407",
+   "ts": 136.28,
+   "type": "building.operational",
+   "target": "line"
+  },
+  {
+   "id": "e408",
+   "ts": 136.38,
+   "type": "agent.working",
+   "actor": "hal",
+   "target": "line",
+   "credits": 5,
+   "summary": "Hal is planning the line build-out",
+   "data": {
+    "tag": "line build-out",
+    "tagIcon": "cog"
+   }
+  },
+  {
+   "id": "e409",
+   "ts": 137.18,
+   "type": "alert.raised",
+   "actor": "director",
+   "target": "line",
+   "severity": "nudge",
+   "data": {
+    "id": "a-end",
+    "kind": "nudge"
+   },
+   "summary": "The run reached Manufacturing. Every decision is in the Story.",
+   "credits": 2
+  }
+ ]
+}

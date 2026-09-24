@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="./tilo-world.js"></script>
+<style>
+body{margin:0;background:#F7F6F2;-webkit-font-smoothing:antialiased}
+a{color:#5A3FE0;font-weight:800;text-decoration:none}a:hover{color:#3F2AAE}
+button,input,select{font-family:inherit}
+*:focus-visible{outline:3px solid #1F1D2B;outline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div data-screen-label="Team" style="min-height:100vh;font-family:'Nunito Sans',sans-serif;color:#1F1D2B;background:#F7F6F2">
+
+<header style="background:#FFFFFF;border-bottom:2px solid #E3E0D8">
+  <div style="max-width:1240px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;gap:20px">
+    <a href="Tilo Home v2.dc.html" aria-label="Tilo home" style="display:flex;align-items:center;gap:10px;flex:none">
+      <div style="width:34px;height:34px;border-radius:12px;background:#5A3FE0;box-shadow:0 4px 0 0 #3F2AAE;display:flex;align-items:center;justify-content:center"><div style="width:22px;height:12px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><div style="width:3px;height:3px;border-radius:9px;background:#1F1D2B"></div><div style="width:3px;height:3px;border-radius:9px;background:#1F1D2B"></div></div></div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:28px;color:#5A3FE0;letter-spacing:-0.5px">tilo</div>
+    </a>
+    <nav style="display:flex;gap:4px;flex:1;min-width:0;overflow-x:auto">
+      <a href="Tilo Home v2.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Home</a>
+      <a href="Tilo Worlds.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Worlds<span style="min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:99px;background:#F0A500;color:#1F1D2B;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center">2</span></a>
+      <a href="Tilo Skills.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Skills</a>
+      <a href="Tilo Ledger.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Ledger</a>
+      <a href="Tilo Team.dc.html" aria-current="page" style="height:40px;padding:0 14px;border-radius:14px;background:#ECE8FD;color:#5A3FE0;font-weight:800;font-size:15px;display:flex;align-items:center;flex:none">Team</a>
+    </nav>
+    <div style="height:28px;padding:0 10px;border-radius:999px;border:2px solid #E3E0D8;font-size:12.5px;font-weight:800;color:#5A5768;display:flex;align-items:center;flex:none">{{ planLabel }}</div>
+    <div style="width:38px;height:38px;border-radius:999px;background:#E3E0D8;box-shadow:0 0 0 2px #FFFFFF,0 0 0 4px #5A3FE0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none">AM</div>
+  </div>
+</header>
+
+<main style="max-width:1240px;margin:0 auto;padding:32px 24px 72px;display:flex;flex-direction:column;gap:40px">
+
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(32px,3.6vw,44px);line-height:1.05;letter-spacing:-0.5px">Team</h1>
+    <div style="font-size:16px;color:#5A5768;max-width:640px;text-wrap:pretty">Who can start work, who signs off, and how much each person can approve.</div>
+  </div>
+
+  <sc-if value="{{ isEnterprise }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#FFFFFF;border:2px solid #E3E0D8;border-radius:18px;padding:12px 16px">
+      <span style="height:26px;padding:0 10px;border-radius:999px;background:#1F1D2B;color:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center">Enterprise</span>
+      <span style="font-size:14px;font-weight:700">Single sign-on</span><span style="color:#CFCABF">·</span>
+      <span style="font-size:14px;font-weight:700">Directory sync, 214 people</span><span style="color:#CFCABF">·</span>
+      <span style="font-size:14px;font-weight:700">EU data residency</span><span style="color:#CFCABF">·</span>
+      <span style="font-size:14px;font-weight:700">Audit export</span>
+      <a href="#" style="margin-left:auto;font-size:14px">Security settings</a>
+    </div>
+  </sc-if>
+
+  <section style="background:#FFFFFF;border:2px solid #E3E0D8;border-radius:24px;padding:18px 16px 12px;display:flex;flex-direction:column;gap:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:0 8px 10px;flex-wrap:wrap">
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px">People <span style="color:#5A5768;font-size:16px">{{ count }}</span></div>
+      <sc-if value="{{ canInvite }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;gap:8px;flex:1 1 320px;max-width:440px">
+          <input aria-label="Invite by email" value="{{ email }}" onInput="{{ onEmail }}" placeholder="name@northwind.co" style="flex:1;min-width:0;height:44px;padding:0 14px;border:2px solid #E3E0D8;border-radius:14px;font-size:15px;font-weight:600;outline:none;color:#1F1D2B;background:#FFFFFF"></input>
+          <button onClick="{{ invite }}" style="height:44px;padding:0 18px;border:0;border-radius:14px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;cursor:pointer;flex:none" style-hover="filter:brightness(1.08)" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #3F2AAE">Invite</button>
+        </div>
+      </sc-if>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 150px 120px 90px;gap:14px;padding:0 10px 6px;font-size:12.5px;font-weight:800;color:#5A5768">
+      <span>Name</span><span>Role</span><span>Can approve</span><span style="text-align:right">Active</span>
+    </div>
+    <sc-for list="{{ people }}" as="p" hint-placeholder-count="5">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 150px 120px 90px;gap:14px;align-items:center;padding:8px 10px;border-radius:16px" style-hover="background:#F7F6F2">
+        <div style="display:flex;gap:12px;align-items:center;min-width:0">
+          <div style="width:42px;height:42px;border-radius:999px;background:{{ p.av }};color:{{ p.avFg }};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex:none;border:2px dashed {{ p.avBd }};box-sizing:border-box">{{ p.initials }}</div>
+          <div style="min-width:0"><div style="font-weight:800;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}<sc-if value="{{ p.you }}" hint-placeholder-val="{{ false }}"><span style="margin-left:6px;font-size:12px;font-weight:800;color:#5A3FE0;background:#ECE8FD;border-radius:999px;padding:2px 8px">You</span></sc-if></div><div style="font-size:13px;color:#5A5768;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.sub }}</div></div>
+        </div>
+        <select aria-label="Role" value="{{ p.role }}" onChange="{{ p.setRole }}" disabled="{{ p.locked }}" style="height:38px;border:2px solid #E3E0D8;border-radius:12px;background:#FFFFFF;padding:0 10px;font-size:14px;font-weight:800;color:#1F1D2B;cursor:pointer;min-width:0">
+          <option value="Owner">Owner</option>
+          <option value="Approver">Approver</option>
+          <option value="Member">Member</option>
+          <option value="Viewer">Viewer</option>
+        </select>
+        <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:15.5px">{{ p.limit }}</span>
+        <span style="font-size:13px;font-weight:700;color:#5A5768;text-align:right">{{ p.active }}</span>
+      </div>
+    </sc-for>
+  </section>
+
+  <sc-if value="{{ isPersonal }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:#ECE8FD;border:2px solid #CFC5F7;border-radius:24px;padding:18px 22px">
+      <div style="display:flex;align-items:flex-end">{{ crew }}</div>
+      <div style="flex:1 1 280px;line-height:1.4"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px">Bring your team in</div><div style="font-size:14.5px;color:#4A3E8C;font-weight:600">The Team plan adds approvers, spend limits per person and shared routines.</div></div>
+      <button style="height:46px;padding:0 20px;border:0;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;cursor:pointer" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #3F2AAE">See Team plan</button>
+    </div>
+  </sc-if>
+
+  <section style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+    <div style="flex:1.3 1 460px;min-width:0;background:#FFFFFF;border:2px solid #E3E0D8;border-radius:24px;padding:20px 22px;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;gap:14px;align-items:center;margin-bottom:8px">
+        <div style="width:56px;height:56px;border-radius:16px;background:#FFF3D6;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ askAgent }}</div>
+        <div><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px">When Tilo stops and asks</div><div style="font-size:14px;color:#5A5768;font-weight:600">Agents pause at these moments and wait for a person.</div></div>
+      </div>
+      <sc-for list="{{ rules }}" as="r" hint-placeholder-count="5">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 4px;border-top:2px solid #F0EEE8">
+          <div style="min-width:0;line-height:1.35"><div style="font-weight:800;font-size:15.5px">{{ r.when }}</div><div style="font-size:13.5px;color:#5A5768;font-weight:600">{{ r.who }}</div></div>
+          <button role="switch" aria-checked="{{ r.on }}" aria-label="{{ r.when }}" onClick="{{ r.toggle }}" disabled="{{ r.disabled }}" style="width:52px;height:30px;border:0;border-radius:999px;background:{{ r.track }};padding:3px;display:flex;justify-content:{{ r.justify }};cursor:pointer;opacity:{{ r.op }}"><span style="width:24px;height:24px;border-radius:999px;background:#FFFFFF;box-shadow:0 2px 0 0 rgba(31,29,43,.2)"></span></button>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="flex:1 1 380px;min-width:0;background:#FFFFFF;border:2px solid #E3E0D8;border-radius:24px;padding:20px 22px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px">What each role can do</div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) repeat(4,56px);gap:0;font-size:14px">
+        <span></span>
+        <span style="font-size:12px;font-weight:800;color:#5A5768;text-align:center;padding-bottom:8px">Owner</span>
+        <span style="font-size:12px;font-weight:800;color:#5A5768;text-align:center;padding-bottom:8px">Approver</span>
+        <span style="font-size:12px;font-weight:800;color:#5A5768;text-align:center;padding-bottom:8px">Member</span>
+        <span style="font-size:12px;font-weight:800;color:#5A5768;text-align:center;padding-bottom:8px">Viewer</span>
+      </div>
+      <sc-for list="{{ matrix }}" as="m" hint-placeholder-count="7">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) repeat(4,56px);align-items:center;border-top:2px solid #F0EEE8;padding:8px 0">
+          <span style="font-weight:700;font-size:14px;line-height:1.3;padding-right:8px">{{ m.label }}</span>
+          <sc-for list="{{ m.cells }}" as="c" hint-placeholder-count="4">
+            <span style="display:flex;justify-content:center"><span style="width:22px;height:22px;border-radius:99px;background:{{ c.bg }};color:#1F7F44;display:flex;align-items:center;justify-content:center">{{ c.mark }}</span></span>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;plan&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Personal&quot;,&quot;Team&quot;,&quot;Enterprise&quot;],&quot;default&quot;:&quot;Team&quot;,&quot;tsType&quot;:&quot;'Personal'|'Team'|'Enterprise'&quot;},&quot;spendThreshold&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[100,250,500,1000],&quot;default&quot;:250,&quot;tsType&quot;:&quot;number&quot;,&quot;unit&quot;:&quot;£&quot;}}">
+class Component extends DCLogic {
+  state = {
+    email: '',
+    people: [
+      { name: 'Alex Morgan', sub: 'alex@northwind.co · Operations lead', role: 'Owner', active: 'Now', you: true, c: '#E3E0D8' },
+      { name: 'Priya Shah', sub: 'priya@northwind.co · Finance', role: 'Approver', limit: '£2,500', active: '2h ago', c: '#DDF1F0' },
+      { name: 'Jin Park', sub: 'jin@northwind.co · Supply chain', role: 'Approver', limit: '£1,000', active: 'Yesterday', c: '#FBE4EE' },
+      { name: 'Tom Reyes', sub: 'tom@northwind.co · Sales', role: 'Member', active: 'Mon', c: '#FDEBDD' },
+      { name: 'Sam Ode', sub: 'sam@northwind.co · Design', role: 'Viewer', active: 'Last week', c: '#E2ECFB' }
+    ],
+    rules: { spend: true, share: true, undo: true, tools: true, weekend: false },
+    ready: !!window.TiloWorld
+  };
+  componentDidMount() {
+    if (!window.TiloWorld) this.t = setInterval(() => { if (window.TiloWorld) { clearInterval(this.t); this.setState({ ready: true }); } }, 50);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const plan = this.props.plan ?? 'Team';
+    const threshold = this.props.spendThreshold ?? 250;
+    const { people, rules, email } = this.state;
+    const personal = plan === 'Personal';
+    const W = window.TiloWorld ? window.TiloWorld(React.createElement) : null, h = React.createElement;
+    const ui = (n, c) => W ? h('svg', { width: 13, height: 13, viewBox: '-10 -10 20 20', style: { display: 'block' } }, W.icon(n, c, 0, 0, .9, '#FFFFFF')) : null;
+    const defLimit = { Owner: 'No limit', Approver: '£1,000', Member: '£' + threshold, Viewer: '—' };
+    const list = personal ? people.slice(0, 1) : people;
+    const shown = list.map((p, i) => ({
+      name: p.pending ? p.email : p.name, sub: p.pending ? 'Invite sent · just now' : p.sub, role: p.role, you: !!p.you, locked: !!p.you,
+      limit: p.pending ? '—' : (p.limit && p.role === 'Approver' ? p.limit : defLimit[p.role]), active: p.pending ? 'Pending' : p.active,
+      initials: p.pending ? '?' : p.name.split(' ').map(s => s[0]).join(''), av: p.pending ? '#FFFFFF' : p.c, avFg: p.pending ? '#5A5768' : '#1F1D2B', avBd: p.pending ? '#CFCABF' : 'transparent',
+      setRole: e => { const v = e.target.value; this.setState(s => ({ people: s.people.map((q, j) => j === i ? { ...q, role: v, limit: undefined } : q) })); }
+    }));
+    const R = [
+      ['spend', 'Spending over £' + threshold, 'An approver signs off, within their limit'],
+      ['share', 'Sharing anything outside the company', 'The owner or an approver signs off'],
+      ['undo', 'Actions that can’t be undone', 'Deleting, paying or mass emails need two people', true],
+      ['tools', 'Giving a skill more access to a tool', 'Only the owner can change tool access'],
+      ['weekend', 'Routines that fall on a weekend', 'Hold until Monday morning']
+    ];
+    const ruleVals = R.map(([k, when, who, needsTwo]) => {
+      const dis = personal && needsTwo, on = rules[k] && !dis;
+      return { when, who: dis ? 'Needs a second person on the Team plan' : who, on, disabled: dis, op: dis ? .45 : 1,
+        track: on ? '#1F7F44' : '#CFCABF', justify: on ? 'flex-end' : 'flex-start',
+        toggle: () => this.setState(s => ({ rules: { ...s.rules, [k]: !s.rules[k] } })) };
+    });
+    const M = [['Start quick tasks', 7], ['Build routines', 7], ['Open workspaces', 3], ['Approve spend up to their limit', 3], ['Approve sharing outside', 3], ['Change tool access', 1], ['Invite people', 1], ['See the ledger', 15]];
+    const matrix = M.map(([label, bits]) => ({ label, cells: [1, 2, 4, 8].map(b => (bits & b) ? { bg: '#E3F2E8', mark: ui('check', '#1F7F44') } : { bg: 'transparent', mark: ui('dot', '#D6D0C0') }) }));
+    return {
+      planLabel: plan + ' plan', isPersonal: personal, isEnterprise: plan === 'Enterprise', canInvite: !personal,
+      count: shown.length, people: shown, rules: ruleVals, matrix, email,
+      onEmail: e => this.setState({ email: e.target.value }),
+      invite: () => { const v = email.trim(); if (!v.includes('@')) return; this.setState(s => ({ email: '', people: [...s.people, { pending: true, email: v, role: 'Member' }] })); },
+      askAgent: W ? W.soloAgent({ role: 'builder', expr: 'needs' }, 54) : null,
+      crew: W ? [W.soloAgent({ rank: 'director', expr: 'delighted' }, 64), W.soloAgent({ role: 'research', expr: 'talking', facing: 'R' }, 54)].map((x, i) => h('div', { key: i }, x)) : null
+    };
+  }
+}
+</script>
+</body>
+</html>

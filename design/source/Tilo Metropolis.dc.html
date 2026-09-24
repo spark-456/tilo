@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="./tilo-world.js"></script>
+<style>
+body{margin:0;background:#E9E7E1;-webkit-font-smoothing:antialiased}
+a{color:#5A3FE0;font-weight:800}a:hover{color:#3F2AAE}
+@keyframes tiloDash{to{stroke-dashoffset:-14}}
+@keyframes tiloBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</helmet>
+<div style="padding:80px;display:flex;flex-direction:column;gap:88px;font-family:'Nunito Sans',sans-serif;color:#1F1D2B;min-width:3100px">
+
+<header style="display:flex;gap:56px;align-items:flex-end;max-width:2040px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:1000px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#5A5768">Tilo · Metropolis tier · stress test · <a href="Tilo Cities.dc.html">Cities</a> · <a href="Tilo World Kit.dc.html">World kit</a></div>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:52px;line-height:1.02">Build an electric scooter, end to end</div>
+    <div style="font-size:18px;line-height:1.5;color:#5A5768;text-wrap:pretty">A product-lifecycle job is too big for one flat city, so the world grows in three directions. Phases stack upward as levels. Suppliers grow sideways as islands joined by bridges. Each level is still an ordinary city from the same renderer, and handoffs between phases ride lifts.</div>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;font-size:15px;line-height:1.45">
+    <div style="background:#FFFFFF;border:2px solid #E3E0D8;border-radius:16px;padding:16px"><div style="font-weight:800">Up · levels</div><div style="color:#5A5768">One level per phase, 330 units apart. Odd levels shift sideways so no level hides the Town Hall row of the one below.</div></div>
+    <div style="background:#FFFFFF;border:2px solid #E3E0D8;border-radius:16px;padding:16px"><div style="font-weight:800">Between · lifts</div><div style="color:#5A5768">A lift cab is a real phase handoff, such as "CAD v2.4 released to Engineering". It sits on the handoff's actual progress. Dashed shafts are handoffs still to come.</div></div>
+    <div style="background:#FFFFFF;border:2px solid #E3E0D8;border-radius:16px;padding:16px"><div style="font-weight:800">Out · satellites</div><div style="color:#5A5768">External parties get their own islands on bridges. A truck on a bridge is a parts shipment. A locked island is a supplier this viewer can't see.</div></div>
+  </div>
+</header>
+
+<section style="display:flex;gap:40px;align-items:flex-start">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">M1 · The whole lifecycle · 7 levels · mid-run</div>
+    <div data-screen-label="M1 Metropolis" style="width:2640px;height:2500px;position:relative;background:#F7F6F2;border-radius:24px;outline:2px solid #E3E0D8;overflow:hidden;display:grid;grid-template-columns:440px minmax(0,1fr)">
+      <div style="position:absolute;left:0;right:0;top:0;height:8px;background:#E3E0D8;z-index:1"><div style="height:8px;width:38%;background:#5A3FE0;border-radius:0 999px 999px 0"></div></div>
+      <div style="background:#FFFFFF;border-right:2px solid #E3E0D8;padding:36px 26px 26px;display:flex;flex-direction:column;gap:18px;box-sizing:border-box;min-height:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="height:26px;padding:0 10px;border-radius:999px;background:#1F1D2B;color:#FFFFFF;font-size:13px;font-weight:800;display:flex;align-items:center">Metropolis</div>
+          <div style="font-size:14px;font-weight:700;color:#5A5768">38% done · week 19 of 52</div>
+        </div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:26px;line-height:1.2;text-wrap:pretty">Take the Kestrel S1 electric scooter from concept to first 500 units at dealers.</div>
+        <div style="font-size:14px;font-weight:700;color:#5A5768">{{ stats }}</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:15px;font-weight:600;line-height:1.4;background:#F7F6F2;border-radius:16px;padding:12px 14px"><div style="width:10px;height:10px;border-radius:99px;background:#5A3FE0;flex:none;margin-top:5px"></div>Engineering is on chassis rev C and battery sizing. Prototype 3 is heading up to Validation.</div>
+        <div style="font-size:13px;font-weight:800;color:#5A5768;margin-top:4px">Levels · top to bottom</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ levelRows }}" as="lv" hint-placeholder-count="7">
+            <div style="display:grid;grid-template-columns:40px minmax(0,1fr) 54px;gap:10px;align-items:center;border:2px solid #E3E0D8;border-bottom-width:4px;border-radius:16px;padding:10px 12px">
+              <div style="width:40px;height:32px;border-radius:12px;background:{{ lv.color }};color:#FFFFFF;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center">{{ lv.code }}</div>
+              <div style="min-width:0"><div style="font-weight:800;font-size:15px">{{ lv.name }}</div><div style="height:8px;border-radius:999px;background:#E3E0D8;margin-top:6px;position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ lv.pctW }};border-radius:999px;background:{{ lv.color }}"></div></div><div style="font-size:12.5px;color:#5A5768;font-weight:600;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lv.sub }}</div></div>
+              <div style="font-weight:800;font-size:15px;text-align:right">{{ lv.pct }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="font-size:13px;font-weight:800;color:#5A5768;margin-top:4px">Needs you · 2</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ alerts }}" as="al" hint-placeholder-count="4">
+            <div style="background:{{ al.bg }};border:2px solid {{ al.bd }};border-bottom-width:4px;border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+              <div style="align-self:flex-start;height:24px;padding:0 10px;border-radius:999px;background:{{ al.chip }};color:{{ al.chipFg }};font-size:12.5px;font-weight:800;display:flex;align-items:center">{{ al.kind }}</div>
+              <div style="font-weight:800;font-size:15px;line-height:1.35">{{ al.title }}</div>
+              <div style="font-size:13.5px;color:#5A5768;line-height:1.35">{{ al.where }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:1"></div>
+        <div style="height:52px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800;font-size:16px;flex:none"><div style="display:flex;gap:4px"><div style="width:4px;height:14px;border-radius:2px;background:#1F1D2B"></div><div style="width:4px;height:14px;border-radius:2px;background:#1F1D2B"></div></div>Pause all</div>
+      </div>
+      <div style="position:relative;min-width:0;min-height:0;padding:24px 12px 12px">{{ tower }}</div>
+    </div>
+  </div>
+  <div style="width:320px;padding-top:40px;display:flex;flex-direction:column;gap:18px;font-size:15px;line-height:1.45;color:#5A5768">
+    <div style="font-weight:800;color:#1F1D2B">Reading the tower</div>
+    <div><b style="color:#1F1D2B">Bottom to top is time.</b> HQ sits at the base with the Director, budget and connections. Finished phases are below and planned ones above. Launch is still all dashed ghosts, so the whole plan is visible on day one.</div>
+    <div><b style="color:#1F1D2B">Heat is where the work is.</b> Engineering and Validation have the lit windows, walkers and pins. Lower levels are calm because they're done, and that calm is honest.</div>
+    <div><b style="color:#1F1D2B">Two lifts are moving.</b> Surface CAD v2.4 is going from Design to Engineering, and the Proto 3 build pack from Engineering to Validation.</div>
+    <div><b style="color:#1F1D2B">Camera.</b> Live view follows the level with the newest event, and the others stay put. Select a level tag to fly to it; M2 and M3 show that close-up.</div>
+    <div><b style="color:#1F1D2B">Scale.</b> 7 levels, 3 supplier islands, {{ totals }}. This is the 40-agent performance target, drawn as flat polygons.</div>
+  </div>
+</section>
+
+<section style="display:flex;gap:24px;align-items:flex-start">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">M2 · Level focus · L3 Engineering · 1100×760</div>
+    <div data-screen-label="M2 Engineering level" style="width:1100px;height:760px;background:#F7F6F2;border-radius:24px;outline:2px solid #E3E0D8;overflow:hidden;padding:16px;box-sizing:border-box">{{ eng }}</div>
+    <div style="font-size:15px;color:#5A5768;max-width:1080px;line-height:1.45">The busiest level at full size. Battery Pack Lab has the amber flag, where cost is 8% over target. Controller Lab's agent looks determined while it retries EMC with a filter change. The Memory Vault reuses the previous model's BOM, and the Release Desk gate is where design freeze goes.</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">M3 · Sideways · L5 Manufacturing + suppliers · 1100×760</div>
+    <div data-screen-label="M3 Manufacturing level" style="width:1100px;height:760px;background:#F7F6F2;border-radius:24px;outline:2px solid #E3E0D8;overflow:hidden;padding:16px;box-sizing:border-box">{{ mfg }}</div>
+    <div style="font-size:15px;color:#5A5768;max-width:1080px;line-height:1.45">The plant sits on the main island. Cell, motor and frame suppliers get their own islands, and the truck on the cell bridge is sample cells in transit. Supplier pricing is locked to this viewer. The waiting gate on Tooling Shop is the frame die order: irreversible, with a 6-week lead time.</div>
+  </div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { ready: !!window.TiloWorld };
+  componentDidMount() {
+    if (!window.TiloWorld) this.t = setInterval(() => { if (window.TiloWorld) { clearInterval(this.t); this.setState({ ready: true }); } }, 50);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  levels() {
+    const g = (id, name, fp, i, state, x) => { const { gen, ...rest } = x || {}; return { id, gen: { name, fp, i, ...(gen || {}) }, state, ...rest }; };
+    const k = (id, kit, state, x) => ({ id, kit, state, ...(x || {}) });
+    const D = (id, name, tint, icon, buildings, x) => ({ id, name, tint, icon, buildings, ...(x || {}) });
+    const hq = { districts: [
+      D('hall', 'Town Hall', 'hall', 'hall', [k('townhall', 'townhall', 'active'), k('treasury', 'treasury', 'active', { event: 'coin' }), k('watch', 'watchtower', 'active'), k('vault', 'vault', 'active', { event: 'vault' })], { hall: true }),
+      D('conn', 'Connections', 'mail', 'key', [k('plm', 'connector', 'idle'), k('cad', 'connector', 'idle'), k('erp', 'connector', 'idle'), g('dataroom', 'Data Room', [2, 1], 'lock', 'idle')])
+    ], agents: [{ rank: 'director', at: 'townhall', expr: 'talking' }, { role: 'tester', at: 'watch', expr: 'focused' }, { role: 'research', at: 'vault', expr: 'focused' }, { role: 'connector', rank: 'lead', at: 'plm' }, { role: 'connector', at: 'erp' }] };
+    const concept = { districts: [
+      D('market', 'Market research', 'research', 'search', [k('library', 'library', 'complete'), g('survey', 'Rider Survey Lab', [2, 1], 'person', 'complete')]),
+      D('req', 'Requirements', 'analysis', 'doc', [g('reqhall', 'Requirements Hall', [2, 2], 'doc', 'complete', { gen: { fl: 2, roof: 'gable' } }), g('cost', 'Cost Target Desk', [1, 1], 'coin', 'complete')])
+    ], agents: [{ role: 'research', rank: 'lead', at: 'library', expr: 'delighted' }, { role: 'research', at: 'reqhall' }] };
+    const design = { districts: [
+      D('style', 'Styling', 'delivery', 'make', [g('sketch', 'Sketch Studio', [2, 1], 'make', 'complete'), g('clay', 'Clay Studio', [2, 2], 'make', 'complete', { gen: { fl: 1, roof: 'dome' } })]),
+      D('cmf', 'Colour & finish', 'people', 'tag', [g('cmflib', 'CMF Library', [1, 1], 'tag', 'complete')]),
+      D('ergo', 'Ergonomics', 'learning', 'person', [g('ergolab', 'Ergonomics Lab', [2, 1], 'person', 'active', { event: 'person', count: 'rider fit v3' })])
+    ], agents: [{ role: 'builder', rank: 'lead', at: 'sketch', expr: 'neutral' }, { role: 'builder', at: 'clay', expr: 'delighted' }, { role: 'research', at: 'ergolab', expr: 'focused' }] };
+    const eng = { districts: [
+      D('chassis', 'Chassis', 'analysis', 'wheel', [g('frame', 'Frame Workshop', [2, 2], 'make', 'active', { event: 'make', count: 'rev C', gen: { fl: 2, roof: 'gable' } }), g('susp', 'Suspension Bay', [1, 1], 'wheel', 'active')]),
+      D('battery', 'Battery & powertrain', 'research', 'battery', [g('pack', 'Battery Pack Lab', [2, 1], 'battery', 'needs'), g('motor', 'Motor Test Bench', [2, 1], 'cog', 'active')]),
+      D('elec', 'Electronics & firmware', 'learning', 'screen', [g('ctrl', 'Controller Lab', [2, 1], 'screen', 'active'), g('fw', 'Firmware Workshop', [1, 1], 'doc', 'active')]),
+      D('app', 'Connected app', 'mail', 'screen', [g('appstudio', 'App Studio', [2, 1], 'screen', 'active'), k('yard', 'testyard', 'active')]),
+      D('bom', 'BOM & release', 'accounts', 'doc', [g('bomoffice', 'BOM Office', [2, 1], 'doc', 'active', { event: 'doc', count: '412 parts' }), k('vault', 'vault', 'active', { event: 'vault' }), g('release', 'Release Desk', [1, 1], 'check', 'planned')])
+    ],
+    routes: [{ id: 'm1', from: 'vault', to: 'bomoffice', kind: 'memory' }, { id: 'w1', from: 'frame', to: 'susp', kind: 'walk' }, { id: 'w2', from: 'pack', to: 'motor', kind: 'walk' }],
+    gates: [{ before: 'release', state: 'closed' }],
+    presence: [{ at: 'pack', initials: 'AM', color: '#5A3FE0' }], comments: [{ at: 'frame', n: 4 }],
+    agents: [
+      { role: 'builder', rank: 'lead', at: 'frame', expr: 'focused' }, { role: 'builder', at: 'frame', expr: 'focused', dx: 16 }, { role: 'builder', at: 'frame', expr: 'focused', dx: 32 }, { role: 'tester', at: 'susp', expr: 'focused' },
+      { role: 'research', rank: 'lead', at: 'pack', expr: 'needs', ring: true }, { role: 'tester', at: 'motor', expr: 'focused' }, { role: 'builder', at: 'motor', expr: 'focused', dx: 16 },
+      { role: 'browser', rank: 'lead', at: 'ctrl', expr: 'recovering' }, { role: 'builder', at: 'fw', expr: 'focused' },
+      { role: 'browser', at: 'appstudio', expr: 'focused' }, { role: 'tester', at: 'yard', expr: 'focused' },
+      { role: 'delivery', rank: 'lead', at: 'bomoffice', expr: 'focused' }, { role: 'research', at: 'vault', expr: 'focused' }, { role: 'delivery', at: 'release', expr: 'neutral' },
+      { role: 'builder', route: 'w1', t: .5, expr: 'walking', parcel: true }, { role: 'research', route: 'w2', t: .5, expr: 'walking' }
+    ] };
+    const valid = { districts: [
+      D('proto', 'Prototype build', 'analysis', 'make', [g('garage', 'Prototype Garage', [2, 2], 'make', 'active', { event: 'make', count: 'proto 3 of 5', gen: { fl: 1, roof: 'gable' } })]),
+      D('track', 'Test track', 'people', 'flask', [k('yard', 'testyard', 'active'), g('drop', 'Drop Tower', [1, 1], 'eye', 'complete', { gen: { fl: 4, roof: 'flat' } })]),
+      D('safety', 'Battery safety', 'research', 'battery', [g('thermal', 'Thermal Chamber', [2, 1], 'flask', 'active')]),
+      D('cert', 'Certification', 'learning', 'check', [g('homolog', 'Homologation Office', [2, 1], 'doc', 'planned')])
+    ], gates: [{ before: 'homolog', state: 'closed' }],
+    agents: [{ role: 'builder', rank: 'lead', at: 'garage', expr: 'focused' }, { role: 'builder', at: 'garage', expr: 'focused', dx: 18 }, { role: 'tester', rank: 'lead', at: 'yard', expr: 'focused' }, { role: 'tester', at: 'drop', expr: 'delighted' }, { role: 'tester', at: 'thermal', expr: 'focused' }, { role: 'delivery', at: 'homolog', expr: 'neutral' }] };
+    const sup = (id, name, tint, icon, b, locked) => ({ districts: [D(id, name, tint, icon, b, { locked })], agents: locked ? [] : [{ role: 'connector', at: b[0].id, expr: 'focused' }] });
+    const mfg = { districts: [
+      D('plant', 'Plant', 'accounts', 'cog', [g('line', 'Assembly Line', [3, 2], 'cog', 'construction', { gen: { fl: 1, roof: 'gable' } }), g('qc', 'Quality Gate Office', [1, 1], 'check', 'planned')]),
+      D('tooling', 'Tooling', 'analysis', 'make', [g('toolshop', 'Tooling Shop', [2, 1], 'make', 'needs'), g('fixture', 'Fixture Bay', [1, 1], 'make', 'construction')]),
+      D('logistics', 'Logistics', 'delivery', 'parcel', [g('warehouse', 'Parts Warehouse', [2, 2], 'parcel', 'planned', { gen: { fl: 1, roof: 'flat' } }), k('dock', 'dock', 'planned')])
+    ], gates: [{ before: 'toolshop', state: 'waiting' }],
+    agents: [{ role: 'builder', rank: 'lead', at: 'line', expr: 'focused' }, { role: 'builder', at: 'line', expr: 'focused', dx: 20 }, { role: 'connector', rank: 'lead', at: 'toolshop', expr: 'needs', ring: true }, { role: 'builder', at: 'fixture', expr: 'focused' }, { role: 'delivery', rank: 'lead', at: 'warehouse', expr: 'neutral' }] };
+    const sats = [
+      { plan: sup('cells', 'Cell supplier', 'research', 'battery', [g('cellfab', 'Cell Plant', [2, 1], 'battery', 'active'), g('celllab', 'Sample Lab', [1, 1], 'flask', 'complete')]), truck: .45 },
+      { plan: sup('motors', 'Motor supplier', 'learning', 'cog', [g('motorfab', 'Motor Works', [2, 1], 'cog', 'active')]) },
+      { plan: sup('pricing', 'Supplier pricing', 'payroll', 'lock', [k('p1', 'treasury', 'idle'), k('p2', 'vault', 'idle')], true) }
+    ];
+    const launch = { districts: [
+      D('mkt', 'Marketing', 'delivery', 'chart', [g('launchstudio', 'Launch Studio', [2, 1], 'chart', 'planned')]),
+      D('dealers', 'Dealers', 'accounts', 'screen', [g('dealerportal', 'Dealer Portal', [2, 1], 'screen', 'planned')]),
+      D('service', 'Service', 'learning', 'doc', [g('manual', 'Service Manual Press', [1, 1], 'doc', 'planned'), g('spares', 'Spare Parts Depot', [2, 1], 'parcel', 'planned')]),
+      D('field', 'Field feedback', 'research', 'eye', [g('listener', 'Feedback Listener', [1, 1], 'eye', 'planned')])
+    ], agents: [] };
+    return [
+      { code: 'L0', name: 'HQ', color: '#1F1D2B', plan: hq, pct: 100, sub: 'Director, budget, PLM/CAD/ERP connections', lifts: [{ t: 0, state: 'idle' }] },
+      { code: 'L1', name: 'Concept & requirements', color: '#21748A', plan: concept, pct: 100, sub: '64 requirements, cost target set', lifts: [{ t: 1, state: 'idle' }] },
+      { code: 'L2', name: 'Industrial design', color: '#89466E', plan: design, pct: 92, sub: 'Surface frozen · rider fit v3', lifts: [{ t: .72, state: 'active', parcel: true, label: 'Surface CAD v2.4' }] },
+      { code: 'L3', name: 'Engineering', color: '#A5663C', plan: eng, pct: 46, sub: 'Chassis rev C · battery sizing · EMC retry', lifts: [{ t: .38, state: 'active', parcel: true, label: 'Proto 3 build pack' }] },
+      { code: 'L4', name: 'Validation', color: '#5F6770', plan: valid, pct: 30, sub: 'Proto 2 passed drop · thermal running', lifts: [{ t: 0, state: 'idle' }] },
+      { code: 'L5', name: 'Manufacturing', color: '#6C7A30', plan: mfg, sats, pct: 12, sub: 'Line build-out · 3 suppliers · die order waiting', lifts: [{ state: 'planned' }] },
+      { code: 'L6', name: 'Launch & service', color: '#5A3FE0', plan: launch, pct: 0, sub: 'Planned · all ghosts', stage: 4 }
+    ];
+  }
+  renderVals() {
+    if (!window.TiloWorld) return {};
+    const W = window.TiloWorld(React.createElement), LV = this.levels();
+    const all = LV.flatMap(l => [l.plan, ...((l.sats || []).map(s => s.plan))]);
+    const nA = all.reduce((a, p) => a + (p.agents || []).length, 0), nB = all.reduce((a, p) => a + p.districts.reduce((b, d) => b + d.buildings.length, 0), 0), nD = all.reduce((a, p) => a + p.districts.length, 0);
+    const AL = { 'Needs you': { bg: '#FFF3D6', bd: '#F0A500', chip: '#F0A500', chipFg: '#1F1D2B' }, 'Recovering': { bg: '#FFFFFF', bd: '#E3E0D8', chip: '#1F1D2B', chipFg: '#FFFFFF' }, 'Passed': { bg: '#E3F2E8', bd: '#1F7F44', chip: '#1F7F44', chipFg: '#FFFFFF' } };
+    const alerts = [
+      ['Needs you', 'Battery pack is 8% over the cost target. Accept it, or switch to the 21700-cell option?', 'L3 Engineering · Battery Pack Lab · you are viewing'],
+      ['Needs you', 'Release the frame die order to the frame supplier. This can\'t be undone, and lead time is 6 weeks.', 'L5 Manufacturing · gate before Tooling Shop'],
+      ['Recovering', 'Controller fails the EMC pre-scan at 150 MHz. Trying a ferrite filter change.', 'L3 Engineering · Controller Lab · no action needed'],
+      ['Passed', 'Proto 2 passed the 1 m drop test on all six faces.', 'L4 Validation · Drop Tower']
+    ].map(([kind, title, where]) => ({ kind, title, where, ...AL[kind] }));
+    return {
+      tower: W.metro(LV.map(l => ({ code: l.code, name: l.name, color: l.color, plan: l.plan, sats: l.sats, lifts: l.lifts })), { seed: 2, labels: true, anim: false }),
+      eng: W.world(LV[3].plan, { seed: 5, labels: true, anim: true }),
+      mfg: W.metro([{ code: 'L5', name: 'Manufacturing', color: '#6C7A30', plan: LV[5].plan, sats: LV[5].sats }], { seed: 7, labels: true, anim: true }),
+      levelRows: LV.slice().reverse().map(l => ({ code: l.code, name: l.name, color: l.color, pct: l.pct + '%', pctW: l.pct + '%', sub: l.sub })),
+      alerts,
+      stats: `7 levels · ${nD} districts · ${nB} buildings · ${nA} agents`,
+      totals: `${nD} districts, ${nB} buildings and ${nA} agents`
+    };
+  }
+}
+</script>
+</body>
+</html>

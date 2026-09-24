@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="./tilo-world.js"></script>
+<style>
+body{margin:0;background:#F7F6F2;-webkit-font-smoothing:antialiased}
+a{color:#5A3FE0;font-weight:800;text-decoration:none}a:hover{color:#3F2AAE}
+button,input{font-family:inherit}
+*:focus-visible{outline:3px solid #1F1D2B;outline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div data-screen-label="Ledger" style="min-height:100vh;font-family:'Nunito Sans',sans-serif;color:#1F1D2B;background:#F7F6F2">
+
+<header style="background:#FFFFFF;border-bottom:2px solid #E3E0D8">
+  <div style="max-width:1240px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;gap:20px">
+    <a href="Tilo Home v2.dc.html" aria-label="Tilo home" style="display:flex;align-items:center;gap:10px;flex:none">
+      <div style="width:34px;height:34px;border-radius:12px;background:#5A3FE0;box-shadow:0 4px 0 0 #3F2AAE;display:flex;align-items:center;justify-content:center"><div style="width:22px;height:12px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><div style="width:3px;height:3px;border-radius:9px;background:#1F1D2B"></div><div style="width:3px;height:3px;border-radius:9px;background:#1F1D2B"></div></div></div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:28px;color:#5A3FE0;letter-spacing:-0.5px">tilo</div>
+    </a>
+    <nav style="display:flex;gap:4px;flex:1;min-width:0;overflow-x:auto">
+      <a href="Tilo Home v2.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Home</a>
+      <a href="Tilo Worlds.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Worlds<span style="min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:99px;background:#F0A500;color:#1F1D2B;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center">2</span></a>
+      <a href="Tilo Skills.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Skills</a>
+      <a href="Tilo Ledger.dc.html" aria-current="page" style="height:40px;padding:0 14px;border-radius:14px;background:#ECE8FD;color:#5A3FE0;font-weight:800;font-size:15px;display:flex;align-items:center;flex:none">Ledger</a>
+      <a href="Tilo Team.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Team</a>
+    </nav>
+    <div style="height:28px;padding:0 10px;border-radius:999px;border:2px solid #E3E0D8;font-size:12.5px;font-weight:800;color:#5A5768;display:flex;align-items:center;flex:none">Team plan</div>
+    <div style="width:38px;height:38px;border-radius:999px;background:#E3E0D8;box-shadow:0 0 0 2px #FFFFFF,0 0 0 4px #5A3FE0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none">AM</div>
+  </div>
+</header>
+
+<main style="max-width:1240px;margin:0 auto;padding:32px 24px 72px;display:flex;flex-direction:column;gap:28px">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(32px,3.6vw,44px);line-height:1.05;letter-spacing:-0.5px">Ledger</h1>
+      <div style="font-size:16px;color:#5A5768">Every cost and every decision, in one place. September 2026.</div>
+    </div>
+    <button style="height:46px;padding:0 18px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;color:#1F1D2B;font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;cursor:pointer" style-hover="background:#F7F6F2" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #CFCABF">Export CSV</button>
+  </div>
+
+  <section style="display:flex;flex-wrap:wrap;gap:20px;align-items:stretch">
+    <div style="flex:1.6 1 520px;min-width:0;background:#FFFFFF;border:2px solid #E3E0D8;border-bottom:5px solid #CFCABF;border-radius:24px;padding:22px 24px;display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+      <div style="flex:none;width:150px;display:flex;justify-content:center">{{ treasury }}</div>
+      <div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <div><div style="font-size:13px;font-weight:800;color:#5A5768">Spent this month</div><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:40px;line-height:1.05">£2,412 <span style="font-size:18px;color:#5A5768">of £8,000</span></div></div>
+          <div style="font-size:13.5px;font-weight:700;color:#5A5768;text-align:right">Forecast <span style="color:#1F1D2B;font-weight:800">£6,300</span><br>6 days left</div>
+        </div>
+        <div style="position:relative;height:18px;border-radius:99px;background:#EEEBE2;display:flex;overflow:visible">
+          <div style="width:3.9%;background:#8A74F0;border-radius:99px 0 0 99px"></div>
+          <div style="width:6.1%;background:#139E9A"></div>
+          <div style="width:20.2%;background:#1F1D2B"></div>
+          <div style="width:42.7%;background:repeating-linear-gradient(135deg,#F6DDA0 0 6px,#FFF3D6 6px 12px);border-radius:0 99px 99px 0"></div>
+          <div style="position:absolute;left:78.75%;top:-5px;bottom:-5px;width:3px;border-radius:2px;background:#5A5768"></div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:700;color:#5A5768">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:#8A74F0"></span>Quick tasks £312</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:#139E9A"></span>Routines £486</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:#1F1D2B"></span>Workspaces £1,614</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:#F6DDA0"></span>Waiting on you £3,420</span>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1 1 300px;min-width:0;background:#FFFFFF;border:2px solid #E3E0D8;border-radius:24px;padding:20px 22px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:18px">By world</div>
+      <sc-for list="{{ byWorld }}" as="b" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between;gap:10px;font-size:14px;font-weight:700"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.name }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;flex:none">{{ b.amt }}</span></div>
+          <div style="height:6px;border-radius:99px;background:#F0EEE8"><div style="height:100%;width:{{ b.w }};background:{{ b.c }};border-radius:99px"></div></div>
+        </div>
+      </sc-for>
+      <div style="border-top:2px solid #F0EEE8;padding-top:10px;font-size:13.5px;font-weight:700;color:#155E32">Memory saved £640 on repeat work this month</div>
+    </div>
+  </section>
+
+  <section style="background:#FFFFFF;border:2px solid #E3E0D8;border-radius:24px;padding:18px 16px 12px;display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:0 8px 8px;flex-wrap:wrap">
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px">Activity</div>
+      <div role="tablist" aria-label="Entry type" style="display:flex;background:#F7F6F2;border-radius:15px;padding:3px;gap:2px;flex-wrap:wrap">
+        <sc-for list="{{ kinds }}" as="k" hint-placeholder-count="6">
+          <button role="tab" onClick="{{ k.pick }}" style="height:34px;padding:0 12px;border:0;border-radius:12px;background:{{ k.bg }};box-shadow:{{ k.sh }};color:{{ k.fg }};font-weight:800;font-size:13.5px;cursor:pointer">{{ k.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="font-size:12.5px;font-weight:800;color:#5A5768;padding:10px 10px 4px;letter-spacing:.3px">{{ g.day }}</div>
+        <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+          <div style="border-radius:16px;background:{{ r.rowBg }}">
+            <button onClick="{{ r.toggle }}" aria-expanded="{{ r.open }}" style="width:100%;display:grid;grid-template-columns:54px 40px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 10px;border:0;background:transparent;border-radius:16px;text-align:left;cursor:pointer;color:#1F1D2B" style-hover="background:#F7F6F2">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#5A5768">{{ r.time }}</span>
+              <span style="width:40px;height:40px;border-radius:13px;background:{{ r.tile }};color:{{ r.ic }};display:flex;align-items:center;justify-content:center">{{ r.icon }}</span>
+              <span style="min-width:0"><span style="display:block;font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.what }}</span><span style="display:block;font-size:13px;color:#5A5768;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.world }} · {{ r.who }}</span></span>
+              <span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;color:{{ r.amtC }};white-space:nowrap">{{ r.amt }}</span><span style="font-size:12px;font-weight:800;color:{{ r.tagC }};white-space:nowrap">{{ r.tag }}</span></span>
+            </button>
+            <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:2px 16px 14px 128px;display:flex;flex-wrap:wrap;gap:8px 24px;font-size:13.5px;line-height:1.4">
+                <sc-for list="{{ r.detail }}" as="d" hint-placeholder-count="3">
+                  <div><div style="font-size:12px;font-weight:800;color:#5A5768">{{ d.k }}</div><div style="font-weight:700">{{ d.v }}</div></div>
+                </sc-for>
+                <a href="Tilo World Player.dc.html" style="align-self:flex-end;font-size:13.5px">Open in world</a>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </sc-for>
+  </section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { k: 'all', open: 0, ready: !!window.TiloWorld };
+  componentDidMount() {
+    if (!window.TiloWorld) this.t = setInterval(() => { if (window.TiloWorld) { clearInterval(this.t); this.setState({ ready: true }); } }, 50);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const { k, open } = this.state;
+    const W = window.TiloWorld ? window.TiloWorld(React.createElement) : null, h = React.createElement;
+    const ui = (n, c, s) => W ? h('svg', { width: s || 18, height: s || 18, viewBox: '-10 -10 20 20', style: { display: 'block' } }, W.icon(n, c || 'currentColor', 0, 0, .9, '#FFFFFF')) : null;
+    const K = {
+      spend: { icon: 'coin', tile: '#ECE8FD', ic: '#5A3FE0', tag: 'Spend' },
+      approval: { icon: 'check', tile: '#E3F2E8', ic: '#1F7F44', tag: 'Approved' },
+      declined: { icon: 'lock', tile: '#FBE3E1', ic: '#B3261E', tag: 'Declined', f: 'approval' },
+      gate: { icon: 'flag', tile: '#EEF0F1', ic: '#4C555C', tag: 'Gate passed' },
+      waiting: { icon: 'help', tile: '#FFF3D6', ic: '#B97E00', tag: 'Waiting on you', f: 'gate' },
+      share: { icon: 'up', tile: '#E2ECFB', ic: '#2A6FD6', tag: 'Shared outside' },
+      saved: { icon: 'vault', tile: '#DDF1F0', ic: '#0A6664', tag: 'Memory saving' }
+    };
+    const E = [
+      ['Today', '10:42', 'waiting', 'Laptop Depot asked for sign-off', 'K1 electric scooter', 'Builder agent', '£3,420', [['Why it asked', 'Above £2,500 district limit'], ['Can approve', 'Alex or Priya'], ['Paused', '2 buildings']]],
+      ['Today', '09:15', 'spend', 'Licensed 3 industry price reports', 'Competitor pricing', 'Researcher', '£18.40', [['Budget', '£40 approved'], ['Remaining', '£21.60'], ['Receipt', 'Attached']]],
+      ['Today', '09:02', 'approval', 'Approved plan and £40 budget', 'Competitor pricing', 'Alex Morgan', '£40', [['Plan', '2 agents, 1 district'], ['Estimate', '£14–£25'], ['Approved in', 'Home']]],
+      ['Mon 22 Sep', '09:12', 'spend', 'Weekly run · 142 matched, 3 flagged', 'Weekly invoice match', 'Builder agent', '£0.60', [['Run time', '11 min'], ['Flagged', '3 for review'], ['Limit', '£5 per run']]],
+      ['Mon 22 Sep', '09:12', 'saved', 'Reused invoice layouts from memory', 'Weekly invoice match', 'Memory Vault', '+£2.20', [['First run cost', '£2.80'], ['This run', '£0.60'], ['Runs so far', '142']]],
+      ['Sun 21 Sep', '16:31', 'spend', 'Prototype parts ordered from Voltcell', 'K1 electric scooter', 'Builder agent', '£1,200', [['Approved by', 'Priya Shah'], ['Order', 'Battery cells ×40'], ['Delivery', 'Fri 26 Sep']]],
+      ['Sun 21 Sep', '16:30', 'approval', 'Approved prototype parts order', 'K1 electric scooter', 'Priya Shah', '£1,200', [['Her limit', '£2,500'], ['Asked by', 'Builder agent'], ['Waited', '14 min']]],
+      ['Sat 20 Sep', '11:04', 'share', 'Sent supplier brief to Northline', 'Supplier onboarding', 'Courier · approved by Jin', '—', [['Recipient', 'ops@northline'], ['Files', 'Brief, NDA'], ['Approved by', 'Jin Park']]],
+      ['Fri 19 Sep', '17:20', 'gate', 'Level 2 · Design review passed', 'K1 electric scooter', 'Alex and Jin', '—', [['Checks', '12 of 12 passed'], ['Signed off', 'Alex Morgan, Jin Park'], ['Next', 'Level 3 · Prototype']]],
+      ['Thu 18 Sep', '08:31', 'spend', 'Pricing check before leadership', 'Pricing check', 'Tester agent', '£3.10', [['Sites checked', '14'], ['Changes found', '3'], ['Limit', '£10 per run']]],
+      ['Thu 18 Sep', '08:40', 'declined', 'Send new price list to all customers', 'Pricing check', 'Tom Reyes', '—', [['Reason', '“Wait for leadership”'], ['Recipients', '1,240 customers'], ['Rule', 'Can’t be undone']]]
+    ];
+    const kinds = [['all', 'All'], ['spend', 'Spend'], ['approval', 'Approvals'], ['gate', 'Gates'], ['share', 'Shared'], ['saved', 'Savings']].map(([key, label]) => ({ label, pick: () => this.setState({ k: key }), ...(k === key ? { bg: '#FFFFFF', sh: '0 2px 0 0 #CFCABF', fg: '#5A3FE0' } : { bg: 'transparent', sh: 'none', fg: '#1F1D2B' }) }));
+    const groups = [];
+    E.forEach((e, i) => {
+      const m = K[e[2]], fam = m.f || e[2];
+      if (k !== 'all' && fam !== k) return;
+      let g = groups.find(x => x.day === e[0]); if (!g) groups.push(g = { day: e[0], rows: [] });
+      const isOpen = open === i;
+      g.rows.push({ time: e[1], what: e[3], world: e[4], who: e[5], amt: e[6], tag: m.tag, tile: m.tile, ic: m.ic, icon: ui(m.icon, m.ic),
+        amtC: e[2] === 'saved' ? '#155E32' : e[2] === 'waiting' ? '#8A5B00' : e[2] === 'spend' ? '#1F1D2B' : '#5A5768',
+        tagC: e[2] === 'waiting' ? '#8A5B00' : e[2] === 'declined' ? '#B3261E' : '#5A5768',
+        open: isOpen, rowBg: isOpen ? '#F7F6F2' : 'transparent', detail: e[7].map(([k2, v]) => ({ k: k2, v })),
+        toggle: () => this.setState({ open: isOpen ? -1 : i }) });
+    });
+    const byWorld = [['K1 electric scooter', 1386, '#1F1D2B'], ['Supplier onboarding', 342, '#139E9A'], ['Onboard 12 new hires', 228, '#1F1D2B'], ['11 quick tasks', 312, '#8A74F0'], ['Daily inbox triage', 64, '#139E9A']]
+      .map(([name, v, c]) => ({ name, amt: '£' + v.toLocaleString('en-GB'), w: (v / 1386 * 100).toFixed(1) + '%', c }));
+    return { kinds, groups, byWorld, treasury: W ? W.soloBuilding('treasury', 'active', { d: 'hall', height: 130 }) : null };
+  }
+}
+</script>
+</body>
+</html>

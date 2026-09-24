@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="./tilo-world.js"></script>
+<style>
+body{margin:0;background:#F7F6F2;-webkit-font-smoothing:antialiased}
+a{color:#5A3FE0;font-weight:800;text-decoration:none}a:hover{color:#3F2AAE}
+button,input{font-family:inherit}
+*:focus-visible{outline:3px solid #1F1D2B;outline-offset:3px}
+@keyframes tiloDash{to{stroke-dashoffset:-14}}
+@keyframes tiloBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div data-screen-label="Worlds" style="min-height:100vh;font-family:'Nunito Sans',sans-serif;color:#1F1D2B;background:#F7F6F2">
+
+<header style="background:#FFFFFF;border-bottom:2px solid #E3E0D8">
+  <div style="max-width:1240px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;gap:20px">
+    <a href="Tilo Home v2.dc.html" aria-label="Tilo home" style="display:flex;align-items:center;gap:10px;flex:none">
+      <div style="width:34px;height:34px;border-radius:12px;background:#5A3FE0;box-shadow:0 4px 0 0 #3F2AAE;display:flex;align-items:center;justify-content:center"><div style="width:22px;height:12px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><div style="width:3px;height:3px;border-radius:9px;background:#1F1D2B"></div><div style="width:3px;height:3px;border-radius:9px;background:#1F1D2B"></div></div></div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:28px;color:#5A3FE0;letter-spacing:-0.5px">tilo</div>
+    </a>
+    <nav style="display:flex;gap:4px;flex:1;min-width:0;overflow-x:auto">
+      <a href="Tilo Home v2.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Home</a>
+      <a href="Tilo Worlds.dc.html" aria-current="page" style="height:40px;padding:0 14px;border-radius:14px;background:#ECE8FD;color:#5A3FE0;font-weight:800;font-size:15px;display:flex;align-items:center;gap:6px;flex:none">Worlds<sc-if value="{{ hasNeeds }}" hint-placeholder-val="{{ true }}"><span style="min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:99px;background:#F0A500;color:#1F1D2B;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center">{{ needsLeft }}</span></sc-if></a>
+      <a href="Tilo Skills.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Skills</a>
+      <a href="Tilo Ledger.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Ledger</a>
+      <a href="Tilo Team.dc.html" style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;color:#1F1D2B;flex:none" style-hover="background:#F7F6F2;color:#1F1D2B">Team</a>
+    </nav>
+    <div style="height:28px;padding:0 10px;border-radius:999px;border:2px solid #E3E0D8;font-size:12.5px;font-weight:800;color:#5A5768;display:flex;align-items:center;flex:none">Team plan</div>
+    <div style="width:38px;height:38px;border-radius:999px;background:#E3E0D8;box-shadow:0 0 0 2px #FFFFFF,0 0 0 4px #5A3FE0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none">AM</div>
+  </div>
+</header>
+
+<main style="max-width:1240px;margin:0 auto;padding:32px 24px 72px;display:flex;flex-direction:column;gap:28px">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(32px,3.6vw,44px);line-height:1.05;letter-spacing:-0.5px">Worlds</h1>
+      <div style="font-size:16px;color:#5A5768">Every job Tilo is running, has scheduled or has finished for you.</div>
+    </div>
+    <a href="Tilo Home v2.dc.html" style="height:48px;padding:0 20px;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;gap:8px" style-hover="color:#FFFFFF;filter:brightness(1.08)" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #3F2AAE">New task</a>
+  </div>
+
+  <sc-if value="{{ hasNeeds }}" hint-placeholder-val="{{ true }}">
+  <section style="background:#FFFFFF;border:2px solid #F0A500;border-bottom-width:5px;border-radius:28px;overflow:hidden;display:flex;flex-wrap:wrap">
+    <div style="flex:1 1 420px;min-width:0;height:340px;position:relative;background:#FFFBF0">
+      <div style="position:absolute;inset:40px 8px 8px">{{ featured }}</div>
+      <div style="position:absolute;left:16px;top:16px;display:flex;gap:6px;flex-wrap:wrap">
+        <div style="height:30px;padding:0 12px;border-radius:999px;background:#1F1D2B;color:#FFFFFF;font-size:13px;font-weight:800;display:flex;align-items:center">City · workspace</div>
+        <div style="height:30px;padding:0 12px;border-radius:999px;background:#FFFFFF;border:2px solid #E3E0D8;box-sizing:border-box;font-size:13px;font-weight:800;display:flex;align-items:center;color:#5A5768">Level 3 of 6 · Prototype</div>
+      </div>
+    </div>
+    <div style="flex:1 1 380px;min-width:0;padding:24px 26px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:13px;font-weight:800;color:#8A5B00;letter-spacing:.3px">WAITING FOR YOU</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:26px;line-height:1.1">K1 electric scooter</div>
+        <div style="font-size:14.5px;color:#5A5768;font-weight:600">38 agents · 2 districts paused until you decide</div>
+      </div>
+      <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="2">
+        <div style="border:2px solid {{ d.bd }};background:{{ d.bg }};border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <div style="width:36px;height:36px;border-radius:12px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;flex:none;color:{{ d.ic }}">{{ d.icon }}</div>
+            <div style="min-width:0;flex:1;line-height:1.4"><div style="font-weight:800;font-size:15.5px">{{ d.title }}</div><div style="font-size:14px;color:#5A5768;text-wrap:pretty">{{ d.body }}</div></div>
+          </div>
+          <sc-if value="{{ d.open }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;padding-left:48px">
+              <button onClick="{{ d.approve }}" style="height:40px;padding:0 16px;border:0;border-radius:14px;background:#F0A500;box-shadow:0 4px 0 0 #B97E00;color:#1F1D2B;font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;cursor:pointer" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #B97E00">{{ d.yes }}</button>
+              <a href="Tilo World Player.dc.html" style="height:40px;padding:0 16px;box-sizing:border-box;border-radius:14px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;color:#1F1D2B;font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;display:flex;align-items:center" style-hover="color:#1F1D2B;background:#F7F6F2">{{ d.no }}</a>
+            </div>
+          </sc-if>
+          <sc-if value="{{ d.done }}" hint-placeholder-val="{{ false }}">
+            <div style="padding-left:48px;font-size:14px;font-weight:800;color:#155E32;display:flex;align-items:center;gap:6px">{{ d.doneIcon }} {{ d.doneText }}</div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+  </sc-if>
+  <sc-if value="{{ allClear }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:14px;background:#E3F2E8;border:2px solid #9BCFAE;border-radius:18px;padding:8px 16px 8px 8px">
+      <div style="width:52px;height:52px;border-radius:14px;background:#FFFFFF;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ happyAgent }}</div>
+      <div style="line-height:1.35"><div style="font-weight:800;font-size:15.5px">You’re all caught up</div><div style="font-size:13.5px;color:#3C5A46;font-weight:600">K1 electric scooter is moving again. Tilo will ask if anything else needs you.</div></div>
+    </div>
+  </sc-if>
+
+  <section style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div role="tablist" aria-label="Status" style="display:flex;background:#EEEBE2;border-radius:17px;padding:3px;gap:2px;flex-wrap:wrap">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+          <button role="tab" onClick="{{ t.pick }}" style="height:38px;padding:0 14px;border:0;border-radius:14px;background:{{ t.bg }};box-shadow:{{ t.sh }};color:{{ t.fg }};font-weight:800;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">{{ t.label }}<span style="font-size:12.5px;font-weight:800;color:#5A5768">{{ t.n }}</span></button>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <sc-for list="{{ tiers }}" as="t" hint-placeholder-count="4">
+          <button onClick="{{ t.pick }}" style="height:36px;padding:0 13px;border-radius:999px;background:{{ t.bg }};border:2px solid {{ t.bd }};color:{{ t.fg }};font-weight:800;font-size:13.5px;cursor:pointer">{{ t.label }}</button>
+        </sc-for>
+      </div>
+      <div style="flex:1 1 200px;display:flex;justify-content:flex-end;min-width:0">
+        <div style="height:42px;width:100%;max-width:300px;background:#FFFFFF;border:2px solid #E3E0D8;border-radius:14px;display:flex;align-items:center;gap:8px;padding:0 12px;box-sizing:border-box;color:#5A5768">
+          {{ ic.search }}
+          <input aria-label="Search worlds" value="{{ q }}" onInput="{{ onQ }}" placeholder="Search worlds" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:15px;font-weight:600;color:#1F1D2B"></input>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px">
+      <sc-for list="{{ worlds }}" as="w" hint-placeholder-count="6">
+        <a href="Tilo World Player.dc.html" style="background:#FFFFFF;border:2px solid {{ w.bd }};border-bottom:5px solid {{ w.lip }};border-radius:24px;overflow:hidden;display:flex;flex-direction:column;color:#1F1D2B;font-weight:600;transition:transform .15s" style-hover="color:#1F1D2B;transform:translateY(-3px)">
+          <div style="height:150px;background:{{ w.tile }};position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;box-sizing:border-box">
+            <div style="position:absolute;left:12px;top:12px;height:26px;padding:0 10px;border-radius:999px;background:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center;color:#5A5768">{{ w.tierLabel }}</div>
+            <div style="position:absolute;right:12px;top:12px;height:26px;padding:0 10px;border-radius:999px;background:{{ w.sbg }};color:{{ w.sfg }};font-size:12.5px;font-weight:800;display:flex;align-items:center">{{ w.status }}</div>
+            <div>{{ w.art }}</div>
+            <div style="position:absolute;right:10px;bottom:6px;display:flex;align-items:flex-end">
+              <sc-for list="{{ w.crew }}" as="a" hint-placeholder-count="2"><div style="margin-left:-10px">{{ a }}</div></sc-for>
+            </div>
+          </div>
+          <div style="padding:16px 20px 18px;display:flex;flex-direction:column;gap:10px;flex:1">
+            <div style="min-width:0">
+              <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:19px;line-height:1.2;text-wrap:pretty">{{ w.name }}</div>
+              <div style="font-size:13.5px;color:#5A5768;font-weight:600;margin-top:4px">{{ w.meta }}</div>
+            </div>
+            <sc-if value="{{ w.hasProg }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="flex:1;height:8px;border-radius:99px;background:#EEEBE2;overflow:hidden"><div style="height:100%;width:{{ w.progW }};background:{{ w.progC }};border-radius:99px"></div></div>
+                <div style="font-size:12.5px;font-weight:800;color:#5A5768;font-family:'JetBrains Mono',monospace">{{ w.progW }}</div>
+              </div>
+            </sc-if>
+            <div style="flex:1"></div>
+            <div style="display:flex;justify-content:space-between;gap:10px;border-top:2px solid #F0EEE8;padding-top:10px;font-size:13px;font-weight:700;color:#5A5768">
+              <span>{{ w.spend }}</span><span style="color:#1F1D2B">{{ w.when }}</span>
+            </div>
+          </div>
+        </a>
+      </sc-for>
+    </div>
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+      <div style="background:#FFFFFF;border:2px dashed #CFCABF;border-radius:24px;padding:40px 24px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+        <div>{{ calmAgent }}</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px">{{ emptyTitle }}</div>
+        <div style="font-size:14.5px;color:#5A5768;max-width:360px">Try another filter, or start something new from Home.</div>
+      </div>
+    </sc-if>
+  </section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { f: 'all', tier: 'all', q: '', dec: { depot: false, mail: false }, ready: !!window.TiloWorld };
+  componentDidMount() {
+    if (!window.TiloWorld) this.t = setInterval(() => { if (window.TiloWorld) { clearInterval(this.t); this.setState({ ready: true }); } }, 50);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  city(dec) {
+    return { districts: [
+      { id: 'hall', name: 'Town Hall', hall: true, icon: 'hall', buildings: [{ id: 'townhall', kit: 'townhall', state: 'active' }, { id: 'treasury', kit: 'treasury' }, { id: 'watch', kit: 'watchtower', state: 'active' }] },
+      { id: 'accounts', name: 'Firmware', icon: 'laptop', buildings: [{ id: 'office', kit: 'workshop', state: 'active', event: 'make', count: '7 / 12' }, { id: 'depot', gen: { name: 'Laptop Depot', fp: [2, 1], i: 'laptop' }, state: dec.depot ? 'active' : 'needs' }] },
+      { id: 'research', name: 'Research', icon: 'search', buildings: [{ id: 'browser', kit: 'browser', state: 'active' }, { id: 'lib', kit: 'library', state: 'complete' }] },
+      { id: 'mail', name: 'Suppliers', icon: 'mail', buildings: [{ id: 'mailroom', gen: { name: 'Mail Room', fp: [2, 1], i: 'mail' }, state: 'active' }, { id: 'yard', kit: 'testyard', state: 'active' }] },
+      { id: 'delivery', name: 'Launch', icon: 'parcel', buildings: [{ id: 'pack', gen: { name: 'Launch Kit', fp: [1, 1], i: 'doc' }, state: 'planned' }, { id: 'dock', kit: 'dock', state: 'planned' }] }
+    ], routes: [{ id: 'h1', from: 'office', to: 'depot', kind: 'walk' }],
+    gates: [{ before: 'mailroom', state: dec.mail ? 'open' : 'waiting' }],
+    agents: [{ rank: 'director', at: 'townhall' }, { role: 'tester', at: 'watch', expr: 'focused' }, { role: 'builder', rank: 'lead', at: 'office', expr: 'focused' }, { role: 'builder', at: 'depot', expr: dec.depot ? 'focused' : 'needs', ring: !dec.depot }, { role: 'browser', rank: 'lead', at: 'browser', expr: 'focused' }, { role: 'research', at: 'lib', expr: 'delighted' }, { role: 'delivery', rank: 'lead', at: 'mailroom', expr: dec.mail ? 'walking' : 'neutral' }, { role: 'research', route: 'h1', t: .5, expr: 'walking', parcel: true }] };
+  }
+  renderVals() {
+    const { f, tier, q, dec } = this.state;
+    const needsLeft = (dec.depot ? 0 : 1) + (dec.mail ? 0 : 1);
+    const all = [
+      { name: 'K1 electric scooter · concept to launch', tier: 'City', tool: 'Workspace', st: needsLeft ? 'needs' : 'running', meta: '6 levels · 38 agents · started 4 Aug', prog: 46, spend: '£1,386 of £4,000', when: 'Launch 14 Nov', art: ['townhall', 'active', 'hall'], crew: [{ rank: 'director', expr: needsLeft ? 'neutral' : 'delighted' }, { role: 'builder', expr: needsLeft ? 'needs' : 'focused' }] },
+      { name: 'Onboard 12 new hires', tier: 'City', tool: 'Workspace', st: 'running', meta: '4 districts · 14 agents · Accounts, HR, Email', prog: 58, spend: '£228 of £600', when: 'Due Fri 3 Oct', art: [{ fp: [2, 1], fl: 2, roof: 'flat', fa: 'band', i: 'person' }, 'active', 'accounts'], crew: [{ role: 'connector', expr: 'focused' }, { role: 'research', expr: 'delighted' }] },
+      { name: 'Supplier onboarding · Northline', tier: 'Town', tool: 'Workspace', st: 'running', meta: '7 agents · contracts and portal access', prog: 72, spend: '£342 of £500', when: 'Due Tue 30 Sep', art: ['connector', 'active', 'mail'], crew: [{ role: 'delivery', expr: 'walking', parcel: true }] },
+      { name: 'Summarise yesterday’s calls', tier: 'Village', tool: 'Quick task', st: 'running', meta: '2 agents · 9 call recordings', prog: 80, spend: '£1.90 so far', when: 'About 3 min left', art: ['desk', 'active', 'research'], crew: [{ role: 'research', expr: 'focused' }] },
+      { name: 'Weekly invoice match', tier: 'Town', tool: 'Routine', st: 'scheduled', meta: '5 agents · last run 142 matched, 3 flagged', spend: '£0.60 per run', when: 'Mon 09:00', art: ['vault', 'idle', 'analysis'], crew: [{ role: 'builder', expr: 'neutral' }] },
+      { name: 'Daily inbox triage', tier: 'Town', tool: 'Routine', st: 'scheduled', meta: '4 agents · sorts, drafts, flags urgent', spend: '£0.30 per run', when: 'Tomorrow 07:30', art: [{ fp: [2, 1], fl: 1, roof: 'flat', fa: 'windows', i: 'mail' }, 'idle', 'mail'], crew: [{ role: 'delivery', expr: 'neutral' }] },
+      { name: 'Pricing check before leadership', tier: 'Town', tool: 'Routine', st: 'scheduled', meta: '6 agents · 14 competitor sites', spend: '£3.10 per run', when: 'Thu 08:30', art: ['watchtower', 'idle', 'research'], crew: [{ role: 'tester', expr: 'neutral' }] },
+      { name: 'Competitor pricing for Thursday', tier: 'Village', tool: 'Quick task', st: 'finished', meta: 'Deck and one-page summary', spend: '£18.40 spent', when: 'Today 11:18', art: ['library', 'complete', 'research'], crew: [{ role: 'research', expr: 'delighted' }] },
+      { name: 'Q3 audit prep', tier: 'City', tool: 'Workspace', st: 'finished', meta: '22 agents · evidence pack signed off', spend: '£2,140 of £2,500', when: '12 Sep', art: ['treasury', 'complete', 'accounts'], crew: [{ rank: 'director', expr: 'delighted' }] }
+    ];
+    const S = {
+      needs: { l: needsLeft + ' need' + (needsLeft === 1 ? 's' : '') + ' you', bg: '#F0A500', fg: '#1F1D2B', bd: '#F0A500', lip: '#B97E00', pc: '#F0A500' },
+      running: { l: 'Running', bg: '#ECE8FD', fg: '#5A3FE0', bd: '#E3E0D8', lip: '#CFCABF', pc: '#5A3FE0' },
+      scheduled: { l: 'Scheduled', bg: '#DDF1F0', fg: '#0A6664', bd: '#E3E0D8', lip: '#CFCABF' },
+      finished: { l: 'Ready', bg: '#E3F2E8', fg: '#155E32', bd: '#E3E0D8', lip: '#CFCABF' }
+    };
+    const tileOf = { Village: '#ECE8FD', Town: '#DDF1F0', City: '#EEF0F1' };
+    const tierOk = w => tier === 'all' || w.tier === tier;
+    const qOk = w => !q || w.name.toLowerCase().includes(q.toLowerCase());
+    const count = k => all.filter(w => tierOk(w) && qOk(w) && (k === 'all' || w.st === k || (k === 'running' && w.st === 'needs'))).length;
+    const seg = on => on ? { bg: '#FFFFFF', sh: '0 2px 0 0 #CFCABF', fg: '#5A3FE0' } : { bg: 'transparent', sh: 'none', fg: '#1F1D2B' };
+    const tabs = [['all', 'All'], ['needs', 'Needs you'], ['running', 'Running'], ['scheduled', 'Scheduled'], ['finished', 'Finished']].map(([k, label]) => ({ label, n: count(k), pick: () => this.setState({ f: k }), ...seg(f === k) }));
+    const tiers = [['all', 'All sizes'], ['Village', 'Village'], ['Town', 'Town'], ['City', 'City']].map(([k, label]) => tier === k ? { label, bg: '#1F1D2B', bd: '#1F1D2B', fg: '#FFFFFF', pick: () => this.setState({ tier: k }) } : { label, bg: '#FFFFFF', bd: '#E3E0D8', fg: '#1F1D2B', pick: () => this.setState({ tier: k }) });
+    const list = all.filter(w => tierOk(w) && qOk(w) && (f === 'all' || w.st === f || (f === 'running' && w.st === 'needs')));
+    const approve = k => () => this.setState(s => ({ dec: { ...s.dec, [k]: true } }));
+    const base = {
+      needsLeft, hasNeeds: needsLeft > 0, allClear: needsLeft === 0, tabs, tiers, q,
+      onQ: e => this.setState({ q: e.target.value }),
+      empty: list.length === 0, emptyTitle: f === 'needs' ? 'Nothing needs you right now' : 'No worlds match',
+      ic: {}
+    };
+    const W = window.TiloWorld ? window.TiloWorld(React.createElement) : null;
+    const h = React.createElement;
+    const ui = (n, c, s) => W ? h('svg', { width: s || 16, height: s || 16, viewBox: '-10 -10 20 20', style: { display: 'block' } }, W.icon(n, c || 'currentColor', 0, 0, .9, '#FFFFFF')) : null;
+    const decisions = [
+      { k: 'depot', title: 'Laptop Depot · budget sign-off', body: '6 test laptops for the firmware team, £3,420. That’s above the £2,500 district limit.', yes: 'Approve £3,420', no: 'Open in world', icon: ui('coin', '#B97E00', 18), ic: '#B97E00', doneText: 'Approved by you · just now' },
+      { k: 'mail', title: 'Mail Room gate · supplier brief', body: 'Brief ready for 3 battery suppliers outside the company. Nothing has been sent yet.', yes: 'Send brief', no: 'Review draft', icon: ui('mail', '#B97E00', 18), ic: '#B97E00', doneText: 'Sent · 3 suppliers · just now' }
+    ].map(d => ({ ...d, open: !dec[d.k], done: dec[d.k], approve: approve(d.k), bg: dec[d.k] ? '#F4FAF6' : '#FFFBF0', bd: dec[d.k] ? '#CBE6D4' : '#F6DDA0', doneIcon: ui('check', '#1F7F44', 14) }));
+    const worlds = list.map(w => {
+      const s = S[w.st];
+      return {
+        name: w.name, meta: w.meta, spend: w.spend, when: w.when, status: w.st === 'scheduled' ? w.when.split(' ')[0] === 'Tomorrow' ? 'Tomorrow' : 'Scheduled' : s.l,
+        tierLabel: w.tier + ' · ' + w.tool, tile: tileOf[w.tier], sbg: s.bg, sfg: s.fg, bd: s.bd, lip: s.lip,
+        hasProg: w.prog != null, progW: (w.prog || 0) + '%', progC: s.pc || '#5A3FE0',
+        art: W ? W.soloBuilding(w.art[0], w.art[1], { d: w.art[2], height: 116 }) : null,
+        crew: W ? w.crew.map(a => W.soloAgent(a, 46)) : []
+      };
+    });
+    if (!W) return { ...base, decisions, worlds };
+    return {
+      ...base, decisions, worlds,
+      ic: { search: ui('search', '#5A5768', 16) },
+      featured: h('div', { key: needsLeft, style: { width: '100%', height: '100%' } }, W.world(this.city(dec), { seed: 3, labels: false, tags: true, anim: true })),
+      happyAgent: W.soloAgent({ rank: 'director', expr: 'delighted' }, 50),
+      calmAgent: W.soloAgent({ role: 'research', expr: 'neutral' }, 80)
+    };
+  }
+}
+</script>
+</body>
+</html>

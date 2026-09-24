@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="./tilo-kit.js"></script>
+<style>
+body{margin:0;background:#F7F6F2;-webkit-font-smoothing:antialiased}
+a{color:#5A3FE0;font-weight:800;text-decoration:none}a:hover{color:#3F2AAE}
+button,input{font-family:inherit}
+*:focus-visible{outline:3px solid #1F1D2B;outline-offset:3px}
+@keyframes tiloBreath{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.03)}}
+@keyframes tiloBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes tiloDash{to{stroke-dashoffset:-16}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div data-screen-label="Home" style="min-height:100vh;font-family:'Nunito Sans',sans-serif;color:#1F1D2B;background:#F7F6F2">
+
+<header style="background:#FFFFFF;border-bottom:2px solid #E3E0D8">
+  <div style="max-width:1240px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;gap:20px">
+    <div style="display:flex;align-items:center;gap:10px;flex:none">
+      <div style="width:34px;height:34px;border-radius:14px;background:#5A3FE0;box-shadow:0 4px 0 0 #3F2AAE;display:flex;align-items:center;justify-content:center;gap:6px"><div style="width:5px;height:5px;border-radius:99px;background:#FFFFFF"></div><div style="width:5px;height:5px;border-radius:99px;background:#FFFFFF"></div></div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:28px;color:#5A3FE0;letter-spacing:-0.5px">tilo</div>
+    </div>
+    <nav style="display:flex;gap:4px;flex:1;min-width:0;overflow:hidden">
+      <div style="height:40px;padding:0 14px;border-radius:14px;background:#ECE8FD;color:#5A3FE0;font-weight:800;font-size:15px;display:flex;align-items:center">Home</div>
+      <div style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;cursor:pointer" style-hover="background:#F7F6F2">Inbox <span style="min-width:22px;height:22px;border-radius:999px;background:#F0A500;color:#1F1D2B;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center">3</span></div>
+      <div style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;cursor:pointer" style-hover="background:#F7F6F2">Skills</div>
+      <div style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;cursor:pointer" style-hover="background:#F7F6F2">Ledger</div>
+      <div style="height:40px;padding:0 14px;border-radius:14px;font-weight:700;font-size:15px;display:flex;align-items:center;cursor:pointer" style-hover="background:#F7F6F2">Team</div>
+    </nav>
+    <div style="height:28px;padding:0 10px;border-radius:999px;border:2px solid #E3E0D8;font-size:12.5px;font-weight:800;color:#5A5768;display:flex;align-items:center;flex:none">{{ planLabel }}</div>
+    <div style="width:38px;height:38px;border-radius:999px;background:#E3E0D8;box-shadow:0 0 0 2px #FFFFFF,0 0 0 4px #5A3FE0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none">AM</div>
+  </div>
+</header>
+
+<main style="max-width:1240px;margin:0 auto;padding:48px 24px 72px;display:flex;flex-direction:column;gap:56px">
+
+  <section style="display:flex;flex-direction:column;gap:20px;max-width:880px;width:100%;margin:0 auto">
+    <div style="text-align:center;display:flex;flex-direction:column;gap:8px">
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(32px,4.4vw,48px);line-height:1.08;letter-spacing:-0.5px;text-wrap:pretty">Good morning, Alex. What should Tilo do?</div>
+      <div style="font-size:17px;color:#5A5768;text-wrap:pretty">Describe the job. Tilo builds a world the right size for it, from one agent to a full city.</div>
+    </div>
+    <div style="background:#FFFFFF;border:2px solid #E3E0D8;border-bottom:5px solid #CFCABF;border-radius:24px;padding:10px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input aria-label="Describe your task" placeholder="{{ placeholder }}" style="flex:1 1 320px;min-width:0;height:56px;border:0;outline:none;padding:0 14px;font-size:18px;font-weight:600;color:#1F1D2B;background:transparent"></input>
+        <button style="height:52px;padding:0 22px;border:0;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;gap:8px;flex:none" style-hover="filter:brightness(1.08)" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #3F2AAE">{{ startLabel }}</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:2px solid #F0EEE8;padding:10px 4px 2px">
+        <div role="tablist" aria-label="Tool" style="display:flex;background:#F7F6F2;border:2px solid #E3E0D8;border-radius:16px;padding:3px;gap:2px">
+          <button role="tab" onClick="{{ pickQuick }}" style="height:34px;padding:0 14px;border:0;border-radius:11px;background:{{ sq.bg }};box-shadow:{{ sq.sh }};color:{{ sq.fg }};font-weight:800;font-size:14px;cursor:pointer">Quick task</button>
+          <button role="tab" onClick="{{ pickRoutine }}" style="height:34px;padding:0 14px;border:0;border-radius:11px;background:{{ sr.bg }};box-shadow:{{ sr.sh }};color:{{ sr.fg }};font-weight:800;font-size:14px;cursor:pointer">Routine</button>
+          <button role="tab" onClick="{{ pickWork }}" style="height:34px;padding:0 14px;border:0;border-radius:11px;background:{{ sw.bg }};box-shadow:{{ sw.sh }};color:{{ sw.fg }};font-weight:800;font-size:14px;cursor:pointer">Workspace project</button>
+        </div>
+        <div style="font-size:13.5px;color:#5A5768;font-weight:600">{{ modeHint }}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+      <sc-for list="{{ chips }}" as="c" hint-placeholder-count="3">
+        <button style="height:38px;padding:0 14px;border-radius:999px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 3px 0 0 #CFCABF;font-weight:700;font-size:14px;color:#1F1D2B;cursor:pointer" style-hover="border-color:#5A3FE0;color:#5A3FE0" style-active="transform:translateY(3px);box-shadow:0 0 0 0 #CFCABF">{{ c }}</button>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:26px">Three ways to work</div>
+      <div style="font-size:14.5px;color:#5A5768">Same agents, same approvals. Pick the size of the job.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px">
+
+      <article style="background:#FFFFFF;border:2px solid {{ cq.bd }};border-bottom:5px solid {{ cq.lip }};border-radius:24px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="height:176px;background:#ECE8FD;position:relative;display:flex;align-items:flex-end;justify-content:center;gap:0;overflow:hidden">
+          <div style="position:absolute;left:14px;top:14px;height:28px;padding:0 10px;border-radius:999px;background:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:6px">Most finish in minutes</div>
+          <sc-if value="{{ recQuick }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;right:14px;top:14px;height:28px;padding:0 10px;border-radius:999px;background:#5A3FE0;color:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center">For you</div></sc-if>
+          <div style="zoom:.7;margin-bottom:8px">{{ artQuick }}</div>
+          <div style="margin:0 0 14px -26px">{{ chQuick }}</div>
+        </div>
+        <div style="padding:20px 22px 22px;display:flex;flex-direction:column;gap:14px;flex:1">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12.5px;font-weight:800;color:#5A3FE0;background:#ECE8FD;border-radius:999px;padding:3px 10px">Daily use</span><span style="font-size:13px;color:#5A5768;font-weight:700">Village · 1–3 agents</span></div>
+          <div>
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:26px;line-height:1.1">Quick tasks</div>
+            <div style="font-size:15.5px;color:#5A5768;margin-top:6px;line-height:1.45;text-wrap:pretty">Ask once, get the result, move on. For research, drafts, summaries and small errands.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:14.5px;font-weight:600">
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#1F7F44;margin-top:1px">{{ ic.check }}</span>No setup. Type it and go.</div>
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#1F7F44;margin-top:1px">{{ ic.check }}</span>See the cost before it starts</div>
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#1F7F44;margin-top:1px">{{ ic.check }}</span>Save any result as a routine</div>
+          </div>
+          <div style="flex:1"></div>
+          <button onClick="{{ pickQuick }}" style="height:48px;border:0;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;cursor:pointer" style-hover="filter:brightness(1.08)" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #3F2AAE">Start a task</button>
+        </div>
+      </article>
+
+      <article style="background:#FFFFFF;border:2px solid {{ cr.bd }};border-bottom:5px solid {{ cr.lip }};border-radius:24px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="height:176px;background:#DDEFF4;position:relative;display:flex;align-items:flex-end;justify-content:center;overflow:hidden">
+          <div style="position:absolute;left:14px;top:14px;height:28px;padding:0 10px;border-radius:999px;background:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:6px"><span style="color:#0E8A87">{{ ic.repeat }}</span>Every Monday · 09:00</div>
+          <sc-if value="{{ recRoutine }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;right:14px;top:14px;height:28px;padding:0 10px;border-radius:999px;background:#5A3FE0;color:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center">For you</div></sc-if>
+          <div style="zoom:.55;margin-bottom:8px">{{ artR1 }}</div>
+          <div style="zoom:.55;margin:0 0 8px -40px">{{ artR2 }}</div>
+          <div style="margin:0 0 14px -30px">{{ chRoutine }}</div>
+        </div>
+        <div style="padding:20px 22px 22px;display:flex;flex-direction:column;gap:14px;flex:1">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12.5px;font-weight:800;color:#0A6664;background:#DDF1F0;border-radius:999px;padding:3px 10px">Automation</span><span style="font-size:13px;color:#5A5768;font-weight:700">Town · runs on its own</span></div>
+          <div>
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:26px;line-height:1.1">Routines</div>
+            <div style="font-size:15.5px;color:#5A5768;margin-top:6px;line-height:1.45;text-wrap:pretty">Set it up once and Tilo runs it on time: weekly reports, invoice matching, inbox triage.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:14.5px;font-weight:600">
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#1F7F44;margin-top:1px">{{ ic.check }}</span>Run on a schedule, an email or a new file</div>
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#1F7F44;margin-top:1px">{{ ic.check }}</span>Memory reuses past work, so repeats cost less</div>
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#1F7F44;margin-top:1px">{{ ic.check }}</span>Pauses and asks when something changes</div>
+          </div>
+          <div style="flex:1"></div>
+          <button onClick="{{ pickRoutine }}" style="height:48px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;color:#5A3FE0;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;cursor:pointer" style-hover="background:#F7F6F2" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #CFCABF">Build a routine</button>
+        </div>
+      </article>
+
+      <article style="background:#FFFFFF;border:2px solid {{ cw.bd }};border-bottom:5px solid {{ cw.lip }};border-radius:24px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="height:176px;background:#EEF0F1;position:relative;display:flex;align-items:flex-end;justify-content:center;overflow:hidden">
+          <div style="position:absolute;left:14px;top:14px;height:28px;padding:0 10px;border-radius:999px;background:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:6px"><span style="color:#5A5768">{{ ic.lock }}</span>Roles, gates and audit</div>
+          <sc-if value="{{ recWork }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;right:14px;top:14px;height:28px;padding:0 10px;border-radius:999px;background:#5A3FE0;color:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center">For you</div></sc-if>
+          <div style="zoom:.44;margin-bottom:8px">{{ artW1 }}</div>
+          <div style="zoom:.44;margin:0 0 8px -40px">{{ artW2 }}</div>
+          <div style="zoom:.44;margin:0 0 8px -40px">{{ artW3 }}</div>
+          <div style="margin:0 0 14px -34px">{{ chWork }}</div>
+        </div>
+        <div style="padding:20px 22px 22px;display:flex;flex-direction:column;gap:14px;flex:1">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12.5px;font-weight:800;color:#FFFFFF;background:#1F1D2B;border-radius:999px;padding:3px 10px">Industry</span><span style="font-size:13px;color:#5A5768;font-weight:700">City · teams and levels</span></div>
+          <div>
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:26px;line-height:1.1">Workspace</div>
+            <div style="font-size:15.5px;color:#5A5768;margin-top:6px;line-height:1.45;text-wrap:pretty">A full city of agents for programmes that span departments, from concept to launch.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:14.5px;font-weight:600">
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#1F7F44;margin-top:1px">{{ ic.check }}</span>Levels, gates and sign-offs per team</div>
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#1F7F44;margin-top:1px">{{ ic.check }}</span>Spend limits, roles and a full audit trail</div>
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#1F7F44;margin-top:1px">{{ ic.check }}</span>Connects to company tools, read-only by default</div>
+          </div>
+          <div style="flex:1"></div>
+          <a href="Tilo World Player.dc.html" style="height:48px;border-radius:16px;background:#1F1D2B;color:#FFFFFF;box-shadow:0 4px 0 0 #000000;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center" style-hover="color:#FFFFFF;filter:brightness(1.25)" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #000000">{{ workCta }}</a>
+          <sc-if value="{{ workLocked }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#5A5768;text-align:center;margin-top:-6px">Included with Team and Enterprise plans</div></sc-if>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <sc-if value="{{ showActivity }}" hint-placeholder-val="{{ true }}">
+  <section style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+    <div style="flex:2 1 520px;min-width:0;background:#FFFFFF;border:2px solid #E3E0D8;border-radius:24px;padding:20px 22px;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px">Pick up where you left off</div><a href="#" style="font-size:14px">All worlds</a></div>
+      <sc-for list="{{ runs }}" as="r" hint-placeholder-count="3">
+        <div style="display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:14px;align-items:center;padding:10px;border-radius:16px;cursor:pointer;background:{{ r.bg }};border:2px solid {{ r.bd }}" style-hover="filter:brightness(.98)">
+          <div style="width:40px;height:40px;border-radius:14px;background:{{ r.tile }};color:#FFFFFF;display:flex;align-items:center;justify-content:center">{{ r.icon }}</div>
+          <div style="min-width:0"><div style="font-weight:800;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div><div style="font-size:13px;color:#5A5768;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.meta }}</div></div>
+          <div style="height:28px;padding:0 10px;border-radius:999px;background:{{ r.sbg }};color:{{ r.sfg }};font-size:12.5px;font-weight:800;display:flex;align-items:center;white-space:nowrap">{{ r.status }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:1 1 280px;min-width:0;background:#FFFFFF;border:2px solid #E3E0D8;border-radius:24px;padding:20px 22px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px">Coming up</div>
+      <sc-for list="{{ upcoming }}" as="u" hint-placeholder-count="2">
+        <div style="display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;align-items:center">
+          <div style="height:52px;border-radius:14px;background:#F7F6F2;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1"><span style="font-size:11.5px;font-weight:800;color:#5A5768">{{ u.day }}</span><span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:16px">{{ u.time }}</span></div>
+          <div style="min-width:0"><div style="font-weight:800;font-size:15px">{{ u.name }}</div><div style="font-size:13px;color:#5A5768;font-weight:600">{{ u.meta }}</div></div>
+        </div>
+      </sc-for>
+      <div style="border-top:2px solid #F0EEE8;padding-top:12px;font-size:13.5px;color:#5A5768;line-height:1.45">Routines never share or spend beyond their limits without asking you.</div>
+    </div>
+  </section>
+  </sc-if>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;plan&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Personal&quot;,&quot;Team&quot;,&quot;Enterprise&quot;],&quot;default&quot;:&quot;Team&quot;,&quot;tsType&quot;:&quot;'Personal'|'Team'|'Enterprise'&quot;},&quot;showActivity&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { mode: 'quick', ready: !!window.TiloKit };
+  componentDidMount() {
+    if (!window.TiloKit) this.t = setInterval(() => { if (window.TiloKit) { clearInterval(this.t); this.setState({ ready: true }); } }, 50);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const plan = this.props.plan ?? 'Team';
+    const showActivity = this.props.showActivity ?? true;
+    const m = this.state.mode;
+    const set = mode => () => { this.setState({ mode }); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    const seg = k => m === k ? { bg: '#FFFFFF', sh: '0 2px 0 0 #CFCABF', fg: '#5A3FE0' } : { bg: 'transparent', sh: 'none', fg: '#5A5768' };
+    const card = k => m === k ? { bd: '#5A3FE0', lip: '#3F2AAE' } : { bd: '#E3E0D8', lip: '#CFCABF' };
+    const M = {
+      quick: { ph: 'e.g. Summarise this week’s customer feedback', start: 'Start task', hint: 'Tilo shows the plan and cost before any agent starts.', chips: ['Compare three suppliers', 'Draft a reply to Northline', 'Summarise yesterday’s calls'] },
+      routine: { ph: 'e.g. Every Monday, match invoices to purchase orders', start: 'Set up routine', hint: 'You approve the first run. After that it runs on its own.', chips: ['Weekly invoice match', 'Monday pricing check', 'Daily inbox triage'] },
+      workspace: { ph: 'e.g. Take the K1 scooter from concept to launch', start: plan === 'Personal' ? 'Preview plan' : 'Plan project', hint: 'Tilo drafts levels, teams and gates for your sign-off.', chips: ['Product launch', 'Supplier onboarding', 'Quarterly audit prep'] }
+    }[m];
+    const rec = { Personal: 'quick', Team: 'routine', Enterprise: 'workspace' }[plan] || 'routine';
+    const base = {
+      planLabel: plan + ' plan', placeholder: M.ph, startLabel: M.start, modeHint: M.hint, chips: M.chips,
+      sq: seg('quick'), sr: seg('routine'), sw: seg('workspace'),
+      cq: card('quick'), cr: card('routine'), cw: card('workspace'),
+      pickQuick: set('quick'), pickRoutine: set('routine'), pickWork: () => this.setState({ mode: 'workspace' }),
+      recQuick: rec === 'quick', recRoutine: rec === 'routine', recWork: rec === 'workspace',
+      workLocked: plan === 'Personal', workCta: plan === 'Personal' ? 'Explore Workspace' : 'Open workspace',
+      showActivity
+    };
+    if (!window.TiloKit) return base;
+    const K = window.TiloKit(React.createElement, 'balanced2');
+    const ic = {};
+    ['check', 'repeat', 'lock', 'flag', 'play', 'worlds', 'parcel', 'search'].forEach(n => ic[n] = K.ui(n, 18));
+    const big = n => K.ui(n, 20);
+    const runs = [
+      { name: 'K1 electric scooter · concept to launch', meta: 'Workspace · City · 6 levels · 38 agents', status: '2 need you', icon: big('flag'), tile: '#1F1D2B', bg: '#FFF3D6', bd: '#F0A500', sbg: '#F0A500', sfg: '#1F1D2B' },
+      { name: 'Competitor pricing for Thursday', meta: 'Quick task · finished 11:18 · deck and summary', status: 'Ready', icon: big('parcel'), tile: '#5A3FE0', bg: '#FFFFFF', bd: 'transparent', sbg: '#E3F2E8', sfg: '#155E32' },
+      { name: 'Weekly invoice match', meta: 'Routine · last run Monday · 142 matched', status: 'On schedule', icon: big('repeat'), tile: '#0E8A87', bg: '#FFFFFF', bd: 'transparent', sbg: '#EEF0F1', sfg: '#4C555C' }
+    ];
+    const upcoming = [
+      { day: 'MON', time: '09:00', name: 'Weekly invoice match', meta: 'Routine · about 12 min' },
+      { day: 'THU', time: '08:30', name: 'Pricing check before leadership', meta: 'Routine · about 25 min' }
+    ];
+    return {
+      ...base, ic, runs, upcoming,
+      artQuick: K.bldSheet('library', 'active'),
+      artR1: K.bldSheet('workshop', 'active'), artR2: K.bldSheet('dock', 'idle'),
+      artW1: K.bldSheet('observatory', 'active'), artW2: K.bldSheet('townhall', 'idle'), artW3: K.bldSheet('chart', 'construction'),
+      chQuick: K.Char({ role: 'research', expr: 'focused', size: 52 }),
+      chRoutine: K.Char({ role: 'builder', expr: 'walking', size: 52 }),
+      chWork: K.Char({ rank: 'director', size: 56 })
+    };
+  }
+}
+</script>
+</body>
+</html>

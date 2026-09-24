@@ -1,0 +1,75 @@
+# Dependencies and virtual environments
+node_modules/
+.pnpm-store/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Environment files and secrets (Tilo never stores secrets in the repo)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+service-account*.json
+*-credentials.json
+application_default_credentials.json
+
+# Build output and caches
+dist/
+build/
+out/
+coverage/
+htmlcov/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+*.tsbuildinfo
+.vite/
+.turbo/
+playwright-report/
+test-results/
+blob-report/
+
+# Terraform state and plans (state lives in a GCS backend)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Firebase emulators
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+pubsub-debug.log
+
+# Recordings (screen captures, video takes, recorded model responses stay in fixtures/)
+recordings/
+*.webm
+*.mp4
+*.mov
+
+# Design archive (zip of design/source, kept locally only)
+design/archive/
+
+# Local-only progress dashboard (generated from docs/progress.md)
+docs/progress.html
+
+# Claude Code local state
+.claude/worktrees/
+.claude/settings.local.json
+
+# OS and editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json

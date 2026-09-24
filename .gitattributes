@@ -1,0 +1,31 @@
+# Force LF everywhere so Windows checkouts, CI (Linux) and containers see identical bytes.
+* text=auto eol=lf
+
+# Windows batch files break with LF line endings; the only exception.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.avif binary
+*.riv binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.pdf binary
+*.pptx binary
+*.docx binary
+*.xlsx binary
+*.mp4 binary
+*.webm binary
+
+# Generated contract types: collapse in diffs, still tracked (CI fails on drift).
+packages/contracts-py/src/** linguist-generated=true
+packages/contracts-ts/src/** linguist-generated=true

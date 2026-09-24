@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=Figtree:wght@400;500;600;700;800&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=Fredoka:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="./tilo-kit.js"></script>
+<style>
+body{margin:0;background:#E7E9E6;-webkit-font-smoothing:antialiased}
+a{color:#5A3FE0;font-weight:700}a:hover{color:#3F2AAE}
+@keyframes tiloBreath{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.03)}}
+@keyframes tiloBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes tiloDash{to{stroke-dashoffset:-16}}
+@keyframes tiloPop{from{transform:scale(0)}to{transform:scale(1)}}
+@keyframes tiloJump{0%,100%{transform:translateY(0)}40%{transform:translateY(-14px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div style="padding:80px;display:flex;flex-direction:column;gap:88px;font-family:'Nunito Sans',sans-serif;color:#1F1D2B;min-width:2400px">
+
+<header style="display:flex;gap:48px;align-items:flex-start;max-width:1900px">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div style="width:64px;height:64px;border-radius:24px;background:#5A3FE0;box-shadow:0 4px 0 0 #3F2AAE;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;font-weight:900;font-size:26px">2</div>
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:44px;line-height:1">Balanced · refined</div>
+      <div style="font-size:16px;color:#5A5768;margin-top:6px">Tilo · Round 2 · built from <a href="Tilo 1b Balanced.dc.html">1b</a> after two review passes · <a href="Tilo Phase 1 Overview.dc.html">Phase 1 overview</a></div>
+    </div>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;font-size:16px;line-height:1.45">
+    <div><div style="font-weight:800;margin-bottom:4px">Design read</div><div style="color:#5A5768;text-wrap:pretty">The middle ground: a gentle isometric town with fully expressive characters, where a confident iris hero sets the brand and state colours still win every argument.</div></div>
+    <div><div style="font-weight:800;margin-bottom:4px">Tokens</div><div style="color:#5A5768;text-wrap:pretty">Iris #5A3FE0 on paper #F7F6F2 · Nunito 900 display + Nunito Sans · radii 10/16/24/pill · 4px lip</div></div>
+    <div><div style="font-weight:800;margin-bottom:4px">Characters and motion</div><div style="color:#5A5768;text-wrap:pretty">White face plates, brows, arms and cheeks on delight. Motion is springy but brief; the Director and leads carry a parcel at the finish.</div></div>
+  </div>
+</header>
+
+<section id="review" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) minmax(0,.8fr);gap:24px;max-width:2200px">
+  <sc-for list="{{ reviewers }}" as="rv" hint-placeholder-count="2">
+    <div style="background:#FFFFFF;border:2px solid #E3E0D8;border-bottom:5px solid #CFCABF;border-radius:24px;padding:28px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:44px;height:44px;border-radius:999px;background:#1F1D2B;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none">{{ rv.initials }}</div>
+        <div style="line-height:1.25"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">{{ rv.title }}</div><div style="font-size:14px;color:#5A5768">{{ rv.lens }}</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.4fr) 56px 56px minmax(0,1fr);gap:8px 12px;align-items:center;font-size:15px">
+        <div style="font-size:12.5px;font-weight:800;color:#5A5768">Criterion</div><div style="font-size:12.5px;font-weight:800;color:#5A5768">1b</div><div style="font-size:12.5px;font-weight:800;color:#5A3FE0">2</div><div></div>
+        <sc-for list="{{ rv.scores }}" as="sc" hint-placeholder-count="6">
+          <div style="font-weight:700">{{ sc.k }}</div><div style="font-weight:800;color:#5A5768">{{ sc.a }}</div><div style="font-weight:900;color:#5A3FE0">{{ sc.b }}</div>
+          <div style="height:10px;border-radius:999px;background:#E3E0D8;position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ sc.w }};border-radius:999px;background:#5A3FE0"></div></div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;border-top:2px solid #E3E0D8;padding-top:14px">
+        <sc-for list="{{ rv.findings }}" as="f" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:78px minmax(0,1fr);gap:12px;align-items:start">
+            <div style="height:26px;border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center">{{ f.status }}</div>
+            <div style="font-size:14.5px;line-height:1.45"><b>{{ f.issue }}</b> <span style="color:#5A5768">{{ f.fix }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+  <div style="background:#5A3FE0;color:#FFFFFF;border-radius:24px;box-shadow:0 5px 0 0 #3F2AAE;padding:28px;display:flex;flex-direction:column;gap:14px;align-self:start">
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">How this round was reviewed</div>
+    <div style="font-size:15px;line-height:1.5">I ran two critique passes myself, each with its own brief and lens, and scored 1b against both. Every "Fixed" item is changed in the artboards below. The background verifier reviews this file independently after delivery.</div>
+    <div style="font-size:15px;line-height:1.5;border-top:2px solid #7C66E8;padding-top:12px"><b>Open for your call</b><br>Camera nudge when a card opens · credit pace indicator · whether Trace should be hidden from Viewers.</div>
+  </div>
+</section>
+
+<section style="display:flex;gap:40px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">2-1 · Live world · Desktop 1440×900 · mid-run, intervention open</div>
+<div data-screen-label="2-1 Live world desktop" style="width:1440px;height:900px;background:#F7F6F2;display:grid;grid-template-columns:232px 868px 340px;overflow:hidden;border-radius:16px;outline:2px solid #E3E0D8">
+
+  <nav style="background:#FFFFFF;border-right:2px solid #E3E0D8;padding:20px 16px;display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;align-items:center;gap:10px;padding:4px 8px 18px">
+      <div style="width:34px;height:34px;border-radius:16px;background:#5A3FE0;box-shadow:0 4px 0 0 #3F2AAE;display:flex;align-items:center;justify-content:center;gap:6px"><div style="width:5px;height:5px;border-radius:99px;background:#FFFFFF"></div><div style="width:5px;height:5px;border-radius:99px;background:#FFFFFF"></div></div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:30px;color:#5A3FE0;letter-spacing:-0.5px">tilo</div>
+    </div>
+    <button style="height:48px;border:0;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;margin-bottom:14px" style-hover="filter:brightness(1.08)" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #3F2AAE">{{ ic.plus }} New task</button>
+    <div style="height:44px;border-radius:16px;background:#ECE8FD;color:#5A3FE0;display:flex;align-items:center;gap:12px;padding:0 12px;font-weight:700;font-size:16px">{{ ic.worlds }} Worlds</div>
+    <div style="height:44px;border-radius:16px;display:flex;align-items:center;gap:12px;padding:0 12px;font-weight:600;font-size:16px;color:#1F1D2B">{{ ic.inbox }} <span style="flex:1">Inbox</span><span style="min-width:24px;height:24px;border-radius:999px;background:#F0A500;color:#1F1D2B;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center">3</span></div>
+    <div style="height:44px;border-radius:16px;display:flex;align-items:center;gap:12px;padding:0 12px;font-weight:600;font-size:16px">{{ ic.skills }} Skills</div>
+    <div style="height:44px;border-radius:16px;display:flex;align-items:center;gap:12px;padding:0 12px;font-weight:600;font-size:16px">{{ ic.chart }} Ledger</div>
+    <div style="height:44px;border-radius:16px;display:flex;align-items:center;gap:12px;padding:0 12px;font-weight:600;font-size:16px">{{ ic.team }} Team</div>
+    <div style="height:44px;border-radius:16px;display:flex;align-items:center;gap:12px;padding:0 12px;font-weight:600;font-size:16px">{{ ic.settings }} Settings</div>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-top:2px solid #E3E0D8">
+      <div style="width:36px;height:36px;border-radius:999px;background:#E3E0D8;box-shadow:0 0 0 2px #FFFFFF,0 0 0 4px #5A3FE0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">AM</div>
+      <div style="line-height:1.25"><div style="font-weight:700;font-size:15px">Alex Moreno</div><div style="font-size:13px;color:#5A5768">Strategy · Kestrel Freight</div></div>
+    </div>
+  </nav>
+
+  <main style="display:flex;flex-direction:column;min-width:0">
+    <div style="height:8px;background:#E3E0D8;position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:46%;background:#5A3FE0;border-radius:0 999px 999px 0"></div></div>
+    <div style="height:56px;display:flex;align-items:center;gap:16px;padding:0 20px;background:#FFFFFF;border-bottom:2px solid #E3E0D8">
+      <div style="flex:1;min-width:0">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Competitor pricing for Thursday</div>
+        <div style="font-size:13px;color:#5A5768;font-weight:600">Town · 9 agents · 4 districts · 46% done</div>
+      </div>
+      <div style="display:flex;background:#F7F6F2;border:2px solid #E3E0D8;border-radius:16px;padding:3px;gap:2px">
+        <div style="height:30px;padding:0 14px;border-radius:10px;background:#FFFFFF;box-shadow:0 2px 0 0 #CFCABF;display:flex;align-items:center;font-weight:800;font-size:14px;color:#5A3FE0">World</div>
+        <div style="height:30px;padding:0 14px;border-radius:10px;display:flex;align-items:center;font-weight:700;font-size:14px;color:#5A5768">Story</div>
+        <div style="height:30px;padding:0 14px;border-radius:10px;display:flex;align-items:center;font-weight:700;font-size:14px;color:#5A5768">Trace</div>
+      </div>
+      <button style="height:40px;padding:0 14px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;color:#1F1D2B;font-family:'Nunito Sans',sans-serif;font-weight:800;font-size:14px;display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #CFCABF">{{ ic.pause }} Pause all</button>
+    </div>
+    <div style="height:44px;display:flex;align-items:center;gap:12px;padding:0 20px;background:#FFFFFF;border-bottom:2px solid #E3E0D8">
+      <div style="width:10px;height:10px;border-radius:99px;background:#5A3FE0;flex:none"></div>
+      <div style="flex:1;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Comparing 7 competitors' pricing pages — 4 done. Brightway needs you.</div>
+      
+    </div>
+    <div style="position:relative;height:728px;overflow:hidden">
+      {{ world }}
+      <div style="position:absolute;left:500px;top:16px;width:352px;background:#FFFFFF;border:2px solid #E3E0D8;border-bottom:4px solid #CFCABF;border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:12px;box-sizing:border-box">
+        <div style="position:absolute;left:-9px;top:148px;width:14px;height:14px;background:#FFFFFF;border-left:2px solid #E3E0D8;border-bottom:2px solid #E3E0D8;transform:rotate(45deg)"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:48px;height:48px;border-radius:16px;background:#FFF3D6;display:flex;align-items:flex-end;justify-content:center;overflow:hidden">{{ cardChar }}</div>
+          <div style="flex:1;line-height:1.3">
+            <div style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:#F0A500;color:#1F1D2B;font-size:12.5px;font-weight:800">{{ ic.flag }} Needs you</div>
+            <div style="font-size:13px;color:#5A5768;font-weight:600;margin-top:3px">Research · Browser Station</div>
+          </div>
+        </div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;line-height:1.25;text-wrap:pretty">Brightway Logistics' pricing page needs a login.</div>
+        <div style="font-size:15px;color:#5A5768;line-height:1.4;margin-top:-4px">Without it, the comparison covers 6 of 7 competitors.</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="border:2px solid #5A3FE0;border-bottom-width:4px;border-radius:16px;background:#ECE8FD;padding:10px 12px;display:flex;gap:10px">
+            <div style="width:20px;height:20px;border-radius:99px;border:2px solid #5A3FE0;background:#FFFFFF;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px"><div style="width:10px;height:10px;border-radius:99px;background:#5A3FE0"></div></div>
+            <div style="line-height:1.35"><div style="font-weight:800;font-size:15px">Use the copy saved in March <span style="font-size:12px;color:#FFFFFF;background:#5A3FE0;border-radius:999px;padding:2px 8px;margin-left:4px;vertical-align:1px">Suggested</span></div><div style="font-size:13.5px;color:#5A5768">Prices from 14 March, marked as 6 months old in the deck.</div></div>
+          </div>
+          <div style="border:2px solid #E3E0D8;border-bottom-width:4px;border-radius:16px;padding:10px 12px;display:flex;gap:10px">
+            <div style="width:20px;height:20px;border-radius:99px;border:2px solid #CFCABF;flex:none;margin-top:1px;box-sizing:border-box"></div>
+            <div style="line-height:1.35"><div style="font-weight:800;font-size:15px">Share access</div><div style="font-size:13.5px;color:#5A5768">Sign in on Brightway's own page. Tilo never sees your password.</div></div>
+          </div>
+          <div style="border:2px solid #E3E0D8;border-bottom-width:4px;border-radius:16px;padding:10px 12px;display:flex;gap:10px">
+            <div style="width:20px;height:20px;border-radius:99px;border:2px solid #CFCABF;flex:none;margin-top:1px;box-sizing:border-box"></div>
+            <div style="line-height:1.35"><div style="font-weight:800;font-size:15px">Skip Brightway</div><div style="font-size:13.5px;color:#5A5768">Cover 6 competitors and note the gap.</div></div>
+          </div>
+        </div>
+        <div style="height:42px;border:2px solid #E3E0D8;border-radius:16px;display:flex;align-items:center;padding:0 12px;font-size:15px;color:#5A5768">Add context (optional)</div>
+        <div style="font-size:13.5px;color:#5A5768;font-weight:600;margin-top:-2px">Other districts keep working while you decide.</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button style="flex:1;height:48px;border:0;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;cursor:pointer" style-hover="filter:brightness(1.08)" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #3F2AAE">Use the March copy</button>
+          <button style="height:48px;padding:0 14px;border:0;background:transparent;color:#5A3FE0;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;border-radius:16px;cursor:pointer" style-hover="background:#ECE8FD">Decide later</button>
+        </div>
+      </div>
+    </div>
+    <div style="height:64px;flex:1;display:flex;align-items:center;gap:14px;padding:0 20px;background:#FFFFFF;border-top:2px solid #E3E0D8">
+      <button style="height:40px;padding:0 12px;border-radius:16px;background:#ECE8FD;border:2px solid #5A3FE0;box-shadow:0 4px 0 0 #3F2AAE;color:#5A3FE0;font-family:'Nunito Sans',sans-serif;font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px">{{ ic.follow }} Following</button>
+      <div style="display:flex;border:2px solid #E3E0D8;border-radius:16px;overflow:hidden;height:36px">
+        <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#5A5768">{{ ic.minus }}</div>
+        <div style="padding:0 10px;display:flex;align-items:center;font-size:13px;font-weight:700;border-left:2px solid #E3E0D8;border-right:2px solid #E3E0D8">World</div>
+        <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#5A5768">{{ ic.plus }}</div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+        <div style="position:relative;height:10px;border-radius:999px;background:#E3E0D8">
+          <div style="position:absolute;left:0;top:0;bottom:0;width:46%;border-radius:999px;background:#5A3FE0"></div>
+          <div style="position:absolute;left:12%;top:-3px;width:16px;height:16px;border-radius:99px;background:#1F7F44;border:2px solid #FFFFFF;box-sizing:border-box"></div>
+          <div style="position:absolute;left:31%;top:-2px;width:14px;height:14px;border-radius:99px;background:#2A6FD6;border:2px solid #FFFFFF;box-sizing:border-box"></div>
+          <div style="position:absolute;left:44%;top:-5px;width:20px;height:20px;border-radius:99px;background:#F0A500;border:3px solid #FFFFFF;box-sizing:border-box"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;color:#5A5768;font-weight:600"><span>10:05 plan approved</span><span>Now · 10:52</span><span>About 11:20</span></div>
+      </div>
+      <div style="width:104px;height:44px;border-radius:10px;background:#F7F6F2;border:2px solid #E3E0D8;position:relative;overflow:hidden;flex:none">
+        <div style="position:absolute;left:6px;top:5px;width:52px;height:9px;border-radius:3px;background:#BFE2EC"></div>
+        <div style="position:absolute;left:6px;top:17px;width:52px;height:9px;border-radius:3px;background:#D4D8DB"></div>
+        <div style="position:absolute;left:6px;top:29px;width:52px;height:9px;border-radius:3px;background:#EBD5C3"></div>
+        <div style="position:absolute;left:62px;top:29px;width:36px;height:9px;border-radius:3px;background:#E6CCDC"></div>
+        <div style="position:absolute;left:4px;top:3px;width:66px;height:37px;border-radius:5px;border:2px solid #5A3FE0"></div>
+      </div>
+    </div>
+  </main>
+
+  <aside style="background:#FFFFFF;border-left:2px solid #E3E0D8;padding:18px;display:flex;flex-direction:column;gap:16px;overflow:hidden;box-sizing:border-box">
+    <div style="border:2px solid #E3E0D8;border-radius:24px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="grid-column:1 / 3;font-size:13px;font-weight:800;color:#5A5768">Live meter</div>
+      <div><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;line-height:1">3 h 10 m</div><div style="font-size:13px;color:#5A5768;margin-top:4px">saved so far · estimate</div></div>
+      <div><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;line-height:1">214</div><div style="font-size:13px;color:#5A5768;margin-top:4px">credits of 520</div></div>
+      <div style="grid-column:1 / 3;display:flex;align-items:center;gap:10px;background:#ECE8FD;border-radius:16px;padding:8px 10px">
+        <div style="color:#5A3FE0">{{ ic.vault }}</div>
+        <div style="flex:1;font-size:14px;font-weight:700;color:#5A3FE0">96 credits saved by memory</div>
+        <div style="font-size:12px;font-weight:800;color:#FFFFFF;background:#5A3FE0;border-radius:999px;padding:2px 8px">+12</div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:800;color:#5A5768;margin-bottom:8px">Needs you · 1</div>
+      <div style="border:2px solid #F0A500;border-bottom-width:4px;border-radius:16px;padding:10px 12px;display:flex;align-items:center;gap:10px;background:#FFF3D6">
+        <div style="color:#B97E00">{{ ic.flag }}</div>
+        <div style="flex:1;line-height:1.3"><div style="font-weight:800;font-size:15px">Brightway login</div><div style="font-size:13px;color:#5A5768">Research · 2 min ago</div></div>
+        <div style="font-size:12.5px;font-weight:800;color:#7A5200">Open</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;color:#5A5768">
+        <div>{{ ic.lock }}</div><div style="font-size:13.5px;line-height:1.3"><b style="color:#1F1D2B">Coming up:</b> gate before sharing the deck with leadership</div>
+      </div>
+    </div>
+    <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:13px;font-weight:800;color:#5A5768">Districts · 9 agents</div>
+      <sc-for list="{{ districts }}" as="dd" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:2px solid {{ dd.border }};border-bottom-width:4px;border-radius:16px;background:{{ dd.bg }}">
+          {{ dd.tile }}
+          <div style="flex:1;min-width:0;line-height:1.3"><div style="font-weight:800;font-size:15px">{{ dd.name }}</div><div style="font-size:13px;color:{{ dd.tone }};font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ dd.status }}</div></div>
+          {{ dd.avatars }}
+        </div>
+      </sc-for>
+      <div style="font-size:13px;color:#5A5768">Select a district to see each agent's live step.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;border-top:2px solid #E3E0D8;padding-top:14px">
+      {{ goalRing }}
+      <div style="line-height:1.3"><div style="font-weight:800;font-size:15px">5 of 8 hours saved this week</div><div style="font-size:13px;color:#5A5768">Weekly goal · resets Monday</div></div>
+    </div>
+  </aside>
+</div>
+</div>
+<div style="width:300px;padding-top:40px;display:flex;flex-direction:column;gap:18px;font-size:15px;line-height:1.45;color:#5A5768">
+  <div style="font-weight:800;color:#1F1D2B">Notes</div>
+  <div><b style="color:#1F1D2B">1 · Projection.</b> Gentle isometric town: a low 12° rotation on the 64px grid, so every row still reads left to right. District plots are raised slabs with a darker lip; roads sit flush.</div>
+  <div><b style="color:#1F1D2B">2 · One loud thing.</b> The amber flag, raised hand and callout all point to Browser Station. Nothing else on screen is saturated. The hand-raised agent also gets an amber ground ring, so the state reads without the flag.</div>
+  <div><b style="color:#1F1D2B">3 · Honest motion.</b> Dashed road = researcher walking (task assigned). Iris shortcut = cache hit from the Memory Vault. Magnifier bob = web research. Idle agents only breathe.</div>
+  <div><b style="color:#1F1D2B">4 · Primary action.</b> Always bottom-left of the intervention card. Pause all sits in the same header slot on every world screen.</div>
+  <div><b style="color:#1F1D2B">5 · Sound (off by default).</b> A soft two-note cue would play when the hand is raised.</div>
+</div>
+</section>
+
+<section style="display:flex;gap:40px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">2-2 · Live world · Mobile 390×844 · same moment</div>
+<div data-screen-label="2-2 Live world mobile" style="width:390px;height:844px;position:relative;overflow:hidden;background:#F7F6F2;border-radius:40px;outline:2px solid #E3E0D8">
+  <div style="position:absolute;left:0;top:-522px;width:390px">{{ path }}</div>
+  <div style="position:absolute;left:0;top:0;right:0;background:#FFFFFF;border-bottom:2px solid #E3E0D8">
+    <div style="height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-weight:700;font-size:15px"><span>9:41</span><span style="display:flex;gap:4px"><span style="width:16px;height:10px;border-radius:3px;background:#1F1D2B"></span><span style="width:22px;height:10px;border-radius:3px;border:2px solid #1F1D2B;box-sizing:border-box"></span></span></div>
+    <div style="height:56px;display:flex;align-items:center;gap:8px;padding:0 12px 0 4px">
+      <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;color:#1F1D2B">{{ ic.back }}</div>
+      <div style="flex:1;min-width:0;line-height:1.2"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Competitor pricing</div><div style="font-size:13px;color:#5A5768;font-weight:600">Town · 9 agents</div></div>
+      <button style="height:48px;padding:0 14px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;color:#1F1D2B;font-family:'Nunito Sans',sans-serif;font-weight:800;font-size:15px;display:flex;align-items:center;gap:6px;white-space:nowrap" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #CFCABF">{{ ic.pause }} Pause all</button>
+    </div>
+    <div style="margin:4px 16px 10px;height:10px;border-radius:999px;background:#E3E0D8;position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:46%;border-radius:999px;background:#5A3FE0"></div></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 16px 10px;font-size:14px;font-weight:600"><div style="width:9px;height:9px;border-radius:9px;background:#5A3FE0;flex:none"></div><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Comparing pricing pages — 4 of 7 done</span></div>
+    <div style="padding:0 16px 10px"><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#F7F6F2;border:2px solid #E3E0D8;border-radius:16px;padding:3px;gap:2px">
+      <div style="height:42px;border-radius:12px;background:#FFFFFF;box-shadow:0 2px 0 0 #CFCABF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#5A3FE0">World</div>
+      <div style="height:42px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#5A5768">Story</div>
+      <div style="height:42px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#5A5768">Trace</div>
+    </div></div>
+  </div>
+  <div style="position:absolute;left:0;right:0;bottom:0;height:474px;background:#FFFFFF;border-top:2px solid #E3E0D8;border-radius:24px 24px 0 0;padding:10px 20px 30px;display:flex;flex-direction:column;gap:12px;box-sizing:border-box">
+    <div style="width:44px;height:5px;border-radius:999px;background:#E3E0D8;align-self:center"></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:44px;height:44px;border-radius:16px;background:#FFF3D6;display:flex;align-items:flex-end;justify-content:center;overflow:hidden">{{ sheetChar }}</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;background:#F0A500;color:#1F1D2B;font-size:13px;font-weight:800">{{ ic.flag }} Needs you</div>
+      <div style="font-size:13px;color:#5A5768;font-weight:600">Research</div>
+    </div>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;line-height:1.25;text-wrap:pretty">Brightway Logistics' pricing page needs a login.</div>
+    <div style="font-size:15px;color:#5A5768;margin-top:-6px">Without it, the deck covers 6 of 7. Other districts keep working.</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="min-height:52px;border:2px solid #5A3FE0;border-bottom-width:4px;border-radius:16px;background:#ECE8FD;padding:0 12px;display:flex;align-items:center;gap:10px">
+        <div style="width:20px;height:20px;border-radius:99px;border:2px solid #5A3FE0;background:#FFFFFF;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:10px;height:10px;border-radius:99px;background:#5A3FE0"></div></div>
+        <div style="flex:1;font-weight:800;font-size:15px">Use the March copy</div><span style="font-size:12px;font-weight:800;color:#FFFFFF;background:#5A3FE0;border-radius:999px;padding:2px 8px">Suggested</span>
+      </div>
+      <div style="min-height:52px;border:2px solid #E3E0D8;border-bottom-width:4px;border-radius:16px;padding:0 12px;display:flex;align-items:center;gap:10px">
+        <div style="width:20px;height:20px;border-radius:99px;border:2px solid #CFCABF;flex:none;box-sizing:border-box"></div><div style="font-weight:800;font-size:15px">Share access</div><div style="font-size:13px;color:#5A5768">via Brightway sign-in</div>
+      </div>
+      <div style="min-height:52px;border:2px solid #E3E0D8;border-bottom-width:4px;border-radius:16px;padding:0 12px;display:flex;align-items:center;gap:10px">
+        <div style="width:20px;height:20px;border-radius:99px;border:2px solid #CFCABF;flex:none;box-sizing:border-box"></div><div style="font-weight:800;font-size:15px">Skip Brightway</div>
+      </div>
+    </div>
+    <div style="height:44px;border:2px solid #E3E0D8;border-radius:16px;display:flex;align-items:center;padding:0 12px;font-size:15px;color:#5A5768;flex:none">Add context (optional)</div>
+    <div style="flex:1"></div>
+    <button style="height:56px;border:0;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:17px;flex:none" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #3F2AAE">Use the March copy</button>
+  </div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">2-3 · Celebration · Mobile 390×844</div>
+<div data-screen-label="2-3 Celebration mobile" style="width:390px;height:844px;position:relative;overflow:hidden;background:#FFFFFF;border-radius:40px;outline:2px solid #E3E0D8;display:flex;flex-direction:column">
+  <div style="height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-weight:700;font-size:15px;flex:none"><span>9:41</span><span style="display:flex;gap:4px"><span style="width:16px;height:10px;border-radius:3px;background:#1F1D2B"></span><span style="width:22px;height:10px;border-radius:3px;border:2px solid #1F1D2B;box-sizing:border-box"></span></span></div>
+  <div style="height:48px;display:flex;align-items:center;padding:0 6px;flex:none">
+    <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center">{{ ic.close }}</div>
+    <div style="flex:1;text-align:center;font-size:14px;font-weight:700;color:#5A5768">Competitor pricing · finished 11:18</div>
+    <div style="width:44px"></div>
+  </div>
+  <div style="flex:none">{{ celebration }}</div>
+  <div style="padding:16px 20px 0;display:flex;flex-direction:column;gap:14px;flex:1">
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:26px;line-height:1.15">Your deck is ready for Thursday</div>
+      <div style="font-size:16px;color:#5A5768;margin-top:4px;text-wrap:pretty">Deck and one-page summary for Thursday's leadership meeting.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+      <div style="border:2px solid #5A3FE0;border-bottom-width:4px;border-radius:16px;overflow:hidden">
+        <div style="background:#5A3FE0;color:#FFFFFF;font-size:12.5px;font-weight:800;padding:5px 8px">Time saved</div>
+        <div style="padding:8px"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;line-height:1.1">6 h 40 m</div><div style="font-size:12.5px;color:#5A5768;margin-top:2px">estimate</div></div>
+      </div>
+      <div style="border:2px solid #5A3FE0;border-bottom-width:4px;border-radius:16px;overflow:hidden">
+        <div style="background:#5A3FE0;color:#FFFFFF;font-size:12.5px;font-weight:800;padding:5px 8px">Credits used</div>
+        <div style="padding:8px"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;line-height:1.1">468</div><div style="font-size:12.5px;color:#5A5768;margin-top:2px">131 saved by memory</div></div>
+      </div>
+      <div style="border:2px solid #5A3FE0;border-bottom-width:4px;border-radius:16px;overflow:hidden">
+        <div style="background:#5A3FE0;color:#FFFFFF;font-size:12.5px;font-weight:800;padding:5px 8px">Sources</div>
+        <div style="padding:8px"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;line-height:1.1">23</div><div style="font-size:12.5px;color:#5A5768;margin-top:2px">checked</div></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="border:2px solid #E3E0D8;border-radius:16px;padding:8px;display:flex;gap:8px;align-items:center">
+        <div style="width:44px;height:32px;border-radius:10px;flex:none;background:repeating-linear-gradient(135deg,#ECE8FD 0 5px,#FFFFFF 5px 10px);border:1.5px solid #5A3FE0;font-family:'JetBrains Mono',monospace;font-size:8px;color:#5A3FE0;display:flex;align-items:center;justify-content:center">deck</div>
+        <div style="line-height:1.2"><div style="font-weight:800;font-size:14px">Pricing deck</div><div style="font-size:12.5px;color:#5A5768">10 slides</div></div>
+      </div>
+      <div style="border:2px solid #E3E0D8;border-radius:16px;padding:8px;display:flex;gap:8px;align-items:center">
+        <div style="width:32px;height:40px;border-radius:6px;flex:none;background:repeating-linear-gradient(135deg,#ECE8FD 0 5px,#FFFFFF 5px 10px);border:1.5px solid #5A3FE0;font-family:'JetBrains Mono',monospace;font-size:8px;color:#5A3FE0;display:flex;align-items:center;justify-content:center">doc</div>
+        <div style="line-height:1.2"><div style="font-weight:800;font-size:14px">Summary</div><div style="font-size:12.5px;color:#5A5768">1 page</div></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px">
+      <div style="height:56px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#5A3FE0;font-size:12.5px;font-weight:800;text-align:center;line-height:1.15">{{ ic.share }} Share</div>
+      <div style="height:56px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#5A3FE0;font-size:12.5px;font-weight:800;text-align:center;line-height:1.15">{{ ic.play }} Run again</div>
+      <div style="height:56px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#5A3FE0;font-size:12.5px;font-weight:800;text-align:center;line-height:1.15">{{ ic.repeat }} Make recurring</div>
+      <div style="height:56px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#5A3FE0;font-size:12.5px;font-weight:800;text-align:center;line-height:1.15">{{ ic.bookmark }} Save as skill</div>
+    </div>
+  </div>
+  <div style="padding:8px 20px 30px;display:flex;flex-direction:column;gap:8px;flex:none">
+    <button style="height:56px;border:0;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px" style-active="transform:translateY(4px);box-shadow:0 0 0 0 #3F2AAE">{{ ic.download }} Download deck and summary</button>
+    <div style="text-align:center;font-size:13px"><a href="#">How we estimate time saved</a></div>
+  </div>
+</div>
+</div>
+<div style="width:300px;padding-top:40px;display:flex;flex-direction:column;gap:18px;font-size:15px;line-height:1.45;color:#5A5768">
+  <div style="font-weight:800;color:#1F1D2B">Notes</div>
+  <div><b style="color:#1F1D2B">1 · Same data, second shape.</b> Districts become banner cards; buildings sit along one road. The done stretch of road is tinted in the hero colour, so progress reads as distance travelled.</div>
+  <div><b style="color:#1F1D2B">2 · Camera.</b> Keeps the active building (Browser Station) centred above the sheet.</div>
+  <div><b style="color:#1F1D2B">3 · Thumb reach.</b> Options and the primary button sit in the bottom 55%. The pinned button repeats the suggested option as a verb.</div>
+  <div><b style="color:#1F1D2B">4 · Celebration.</b> Balanced adds a character moment: Director and two leads jump twice, with the finished parcel held up. The rays pop in once.</div>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:12px">
+<div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">2-4 · Component strip</div>
+<div data-screen-label="2-4 Component strip" style="width:1440px;background:#FFFFFF;border-radius:16px;outline:2px solid #E3E0D8;padding:40px;box-sizing:border-box;display:grid;grid-template-columns:860px 1fr;gap:48px">
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">Buttons · desktop 48 / mobile 56</div>
+    <div style="display:grid;grid-template-columns:90px repeat(6,minmax(0,1fr));gap:14px 12px;align-items:center;font-size:13px;font-weight:700;color:#5A5768">
+      <div></div><div>Default</div><div>Hover</div><div>Pressed</div><div>Focus</div><div>Disabled</div><div>Loading</div>
+      <div>Primary</div>
+      <div style="height:48px;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Continue</div>
+      <div style="height:48px;border-radius:16px;background:#5A3FE0;filter:brightness(1.08);color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Continue</div>
+      <div style="height:48px;border-radius:16px;background:#5A3FE0;color:#FFFFFF;transform:translateY(4px);font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Continue</div>
+      <div style="height:48px;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;outline:3px solid #1F1D2B;outline-offset:3px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Continue</div>
+      <div style="height:48px;border-radius:16px;background:#E3E0D8;color:#5A5768;box-shadow:0 4px 0 0 #CFCABF;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Continue</div>
+      <div style="height:48px;border-radius:16px;background:#5A3FE0;box-shadow:0 4px 0 0 #3F2AAE;display:flex;align-items:center;justify-content:center;gap:6px"><div style="width:8px;height:8px;border-radius:9px;background:#FFFFFF"></div><div style="width:8px;height:8px;border-radius:9px;background:#FFFFFF;opacity:.7"></div><div style="width:8px;height:8px;border-radius:9px;background:#FFFFFF;opacity:.4"></div></div>
+      <div>Secondary</div>
+      <div style="height:48px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;color:#5A3FE0;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;box-sizing:border-box">Add context</div>
+      <div style="height:48px;border-radius:16px;background:#F7F6F2;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;color:#5A3FE0;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;box-sizing:border-box">Add context</div>
+      <div style="height:48px;border-radius:16px;background:#F7F6F2;border:2px solid #E3E0D8;transform:translateY(4px);color:#5A3FE0;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;box-sizing:border-box">Add context</div>
+      <div style="height:48px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;outline:3px solid #1F1D2B;outline-offset:3px;color:#5A3FE0;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;box-sizing:border-box">Add context</div>
+      <div style="height:48px;border-radius:16px;background:#F7F6F2;border:2px solid #E3E0D8;color:#5A5768;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;box-sizing:border-box">Add context</div>
+      <div style="height:48px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;display:flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box"><div style="width:8px;height:8px;border-radius:9px;background:#5A3FE0"></div><div style="width:8px;height:8px;border-radius:9px;background:#5A3FE0;opacity:.6"></div><div style="width:8px;height:8px;border-radius:9px;background:#5A3FE0;opacity:.3"></div></div>
+      <div>Quiet</div>
+      <div style="height:48px;border-radius:16px;color:#5A3FE0;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Decide later</div>
+      <div style="height:48px;border-radius:16px;background:#ECE8FD;color:#5A3FE0;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Decide later</div>
+      <div style="height:48px;border-radius:16px;background:#ECE8FD;color:#3F2AAE;transform:translateY(1px);font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Decide later</div>
+      <div style="height:48px;border-radius:16px;outline:3px solid #1F1D2B;outline-offset:3px;color:#5A3FE0;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Decide later</div>
+      <div style="height:48px;border-radius:16px;color:#5A5768;opacity:.6;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Decide later</div>
+      <div style="height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:6px"><div style="width:8px;height:8px;border-radius:9px;background:#5A3FE0"></div><div style="width:8px;height:8px;border-radius:9px;background:#5A3FE0;opacity:.6"></div><div style="width:8px;height:8px;border-radius:9px;background:#5A3FE0;opacity:.3"></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:390px 1fr;gap:32px;align-items:start;margin-top:8px">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:13px;font-weight:700;color:#5A5768">Mobile · full width, pinned bottom</div>
+        <div style="height:56px;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px">{{ ic.check }} Approve plan and budget</div>
+        <div style="height:56px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;color:#5A3FE0;font-family:'Nunito',sans-serif;font-weight:900;font-size:17px;display:flex;align-items:center;justify-content:center;box-sizing:border-box">Change approach</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:13px;font-weight:700;color:#5A5768">Anatomy</div>
+        <div style="position:relative;height:64px;width:300px;border-radius:16px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 4px 0 0 #3F2AAE;font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;display:flex;align-items:center;justify-content:center;gap:10px">{{ ic.download }} Download</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:13.5px;color:#5A5768;line-height:1.4;width:360px">
+          <div><b style="color:#1F1D2B">Fill</b> hero, flat</div><div><b style="color:#1F1D2B">Lip</b> 4px, hero-lip, solid</div>
+          <div><b style="color:#1F1D2B">Label</b> display 800, sentence case</div><div><b style="color:#1F1D2B">Icon slot</b> 20px, leading</div>
+          <div style="grid-column:1 / 3"><b style="color:#1F1D2B">Press</b> label drops 4px and the lip collapses in 100ms · focus ring 3px ink, offset 3px</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px">Cards, chips, sheet</div>
+    <div style="border:2px solid #5A3FE0;border-bottom-width:4px;border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:10px;background:#FFFFFF">
+      <div style="display:flex;align-items:center;gap:8px"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:19px;flex:1">Deep dive</div><span style="font-size:12.5px;font-weight:800;color:#5A3FE0;background:#ECE8FD;border-radius:999px;padding:3px 10px">Recommended</span></div>
+      <div style="font-size:14.5px;color:#5A5768;line-height:1.4">Adds your saved analyst reports and customer reviews, so the deck can explain why prices moved.</div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;border-top:2px solid #E3E0D8;padding-top:10px">
+        <div><div style="font-size:12.5px;color:#5A5768">Time</div><div style="font-weight:800;font-size:15px">~70 min</div></div>
+        <div><div style="font-size:12.5px;color:#5A5768">Credits</div><div style="font-weight:800;font-size:15px">~520</div></div>
+        <div><div style="font-size:12.5px;color:#5A5768">Depth</div><div style="font-weight:800;font-size:15px">High</div></div>
+        <div><div style="font-size:12.5px;color:#5A5768">Your effort</div><div style="font-weight:800;font-size:15px">2 taps</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#1F1D2B;background:#F7F6F2;border-radius:10px;padding:6px 10px">{{ ic.key }} Needs Drive access · read-only</div>
+    </div>
+    <div style="display:flex;gap:16px;align-items:flex-start">
+      <div style="width:170px;border:2px solid #5A3FE0;border-bottom-width:4px;border-radius:16px;overflow:hidden;flex:none">
+        <div style="background:#5A3FE0;color:#FFFFFF;font-size:13px;font-weight:800;padding:6px 10px">Time saved</div>
+        <div style="padding:10px"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:26px;line-height:1.1">6 h 40 m</div><div style="font-size:13px;color:#5A5768;margin-top:2px">estimate</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:14px;font-weight:700">Include regional carriers?</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="height:40px;padding:0 16px;border-radius:999px;background:#ECE8FD;border:2px solid #5A3FE0;box-shadow:0 4px 0 0 #3F2AAE;color:#5A3FE0;font-weight:800;font-size:15px;display:flex;align-items:center;gap:6px;box-sizing:border-box">{{ ic.check }} Yes, 3 of them</div>
+          <div style="height:40px;padding:0 16px;border-radius:999px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;font-weight:700;font-size:15px;display:flex;align-items:center;box-sizing:border-box">National only</div>
+        </div>
+        <div style="font-size:13px;color:#5A5768">Chip · selected and default · 40px, pill</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px">
+      <div style="width:300px;background:#1F7F44;border-radius:24px 24px 0 0;padding:10px 18px 18px;color:#FFFFFF;display:flex;flex-direction:column;gap:10px">
+        <div style="width:40px;height:5px;border-radius:9px;background:#155E32;align-self:center"></div>
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:32px;height:32px;border-radius:99px;background:#FFFFFF;color:#1F7F44;display:flex;align-items:center;justify-content:center">{{ ic.check }}</div><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:17px;line-height:1.25">Approved. Priya can see this in the story.</div></div>
+        <div style="height:48px;border-radius:16px;background:#FFFFFF;box-shadow:0 4px 0 0 #155E32;color:#1F7F44;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Back to the world</div>
+      </div>
+      <div style="width:250px;background:#66717A;border-radius:24px 24px 0 0;padding:10px 18px 18px;color:#FFFFFF;display:flex;flex-direction:column;gap:10px">
+        <div style="width:40px;height:5px;border-radius:9px;background:#4C555C;align-self:center"></div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:17px;line-height:1.25">Skipped Brightway. The deck will note the gap.</div>
+        <div style="height:48px;border-radius:16px;background:#FFFFFF;box-shadow:0 4px 0 0 #4C555C;color:#1F1D2B;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center">Undo</div>
+      </div>
+    </div>
+    <div style="font-size:13px;color:#5A5768;margin-top:-12px">Feedback sheets · approve in success green, decline in calm neutral, never red</div>
+  </div>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:12px">
+<div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">2-5 · Character and kit sheet</div>
+<div data-screen-label="2-5 Character and kit sheet" style="width:1440px;background:#FFFFFF;border-radius:16px;outline:2px solid #E3E0D8;padding:40px;box-sizing:border-box;display:flex;flex-direction:column;gap:36px">
+  <div style="display:grid;grid-template-columns:420px 1fr;gap:48px">
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;margin-bottom:4px">Ranks</div>
+      <div style="font-size:14px;color:#5A5768;margin-bottom:16px">Rank is shown by crest tiles and size: 3 / 1 / none.</div>
+      <div style="display:flex;gap:28px;align-items:flex-end">
+        <sc-for list="{{ ranks }}" as="c" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div>{{ c.el }}</div><div style="font-weight:800;font-size:15px">{{ c.label }}</div></div></sc-for>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;margin-bottom:4px">Roles</div>
+      <div style="font-size:14px;color:#5A5768;margin-bottom:16px">Colour plus accessory. Readable without colour.</div>
+      <div style="display:flex;gap:22px;align-items:flex-end">
+        <sc-for list="{{ roles }}" as="c" hint-placeholder-count="6"><div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:112px"><div>{{ c.el }}</div><div style="font-weight:800;font-size:15px">{{ c.label }}</div><div style="font-size:13px;color:#5A5768">{{ c.note }}</div></div></sc-for>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;margin-bottom:4px">Expressions · one character, eight states</div>
+    <div style="font-size:14px;color:#5A5768;margin-bottom:16px">Each expression is one agent state. Shape carries it: eyes, brows, mouth, arm pose, tilt.</div>
+    <div style="display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:12px">
+      <sc-for list="{{ exprs }}" as="c" hint-placeholder-count="8"><div style="display:flex;flex-direction:column;align-items:center;gap:6px;background:#F7F6F2;border-radius:24px;padding:16px 6px 12px"><div>{{ c.el }}</div><div style="font-weight:800;font-size:15px">{{ c.label }}</div><div style="font-size:13px;color:#5A5768">{{ c.note }}</div></div></sc-for>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 380px;gap:48px">
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;margin-bottom:4px">Common buildings</div>
+      <div style="font-size:14px;color:#5A5768;margin-bottom:12px">64px tile · 1–3 tile footprint · one-shade-darker side face · icon sign</div>
+      <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+        <sc-for list="{{ commons }}" as="c" hint-placeholder-count="6"><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div>{{ c.el }}</div><div style="font-weight:800;font-size:14px">{{ c.label }}</div></div></sc-for>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;margin-bottom:4px">Generated from the kit</div>
+      <div style="font-size:14px;color:#5A5768;margin-bottom:12px">Footprint × body × roof × sign × district tint</div>
+      <div style="display:flex;gap:18px;align-items:flex-end">
+        <sc-for list="{{ gens }}" as="c" hint-placeholder-count="2"><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div>{{ c.el }}</div><div style="font-weight:800;font-size:14px">{{ c.label }}</div><div style="font-size:12.5px;color:#5A5768;font-family:'JetBrains Mono',monospace">{{ c.note }}</div></div></sc-for>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;margin-bottom:4px">One building, seven states</div>
+    <div style="font-size:14px;color:#5A5768;margin-bottom:12px">Each state has its own shape (dashes, scaffold, lit sign, flag, diamond, check, grey) as well as a colour.</div>
+    <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px">
+      <sc-for list="{{ states }}" as="c" hint-placeholder-count="7"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;background:#F7F6F2;border-radius:24px;padding:8px 4px 12px"><div>{{ c.el }}</div><div style="font-weight:800;font-size:15px">{{ c.label }}</div><div style="font-size:13px;color:#5A5768">{{ c.note }}</div></div></sc-for>
+    </div>
+  </div>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:12px">
+<div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">2-6 · Token card</div>
+<div data-screen-label="2-6 Token card" style="width:1440px;background:#FFFFFF;border-radius:16px;outline:2px solid #E3E0D8;padding:40px;box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:40px 56px">
+  <div>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;margin-bottom:16px">Palette · fill and lip</div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px">
+      <div><div style="height:64px;border-radius:16px;background:#5A3FE0;box-shadow:0 5px 0 0 #3F2AAE"></div><div style="font-weight:800;font-size:14px;margin-top:12px">Iris · hero</div><div style="font-size:13px;color:#5A5768;font-family:'JetBrains Mono',monospace">#5A3FE0 / #3F2AAE</div></div>
+      <div><div style="height:64px;border-radius:16px;background:#0E8A87;box-shadow:0 5px 0 0 #0A6664"></div><div style="font-weight:800;font-size:14px;margin-top:12px">Tide · accent</div><div style="font-size:13px;color:#5A5768;font-family:'JetBrains Mono',monospace">#0E8A87 / #0A6664</div></div>
+      <div><div style="height:64px;border-radius:16px;background:#1F1D2B;box-shadow:0 5px 0 0 #000000"></div><div style="font-weight:800;font-size:14px;margin-top:12px">Ink</div><div style="font-size:13px;color:#5A5768;font-family:'JetBrains Mono',monospace">#1F1D2B · #5A5768</div></div>
+      <div><div style="height:64px;border-radius:16px;background:#F7F6F2;border:2px solid #E3E0D8;box-shadow:0 5px 0 0 #CFCABF;box-sizing:border-box"></div><div style="font-weight:800;font-size:14px;margin-top:12px">Ground · line</div><div style="font-size:13px;color:#5A5768;font-family:'JetBrains Mono',monospace">#F7F6F2 · #E3E0D8</div></div>
+    </div>
+    <div style="font-size:13px;font-weight:800;color:#5A5768;margin:24px 0 12px">States · same across variations</div>
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px">
+      <div><div style="height:48px;border-radius:16px;background:#1F7F44;box-shadow:0 4px 0 0 #155E32;color:#FFFFFF;display:flex;align-items:center;justify-content:center">{{ ic.check }}</div><div style="font-weight:800;font-size:14px;margin-top:10px">Success</div><div style="font-size:12.5px;color:#5A5768;font-family:'JetBrains Mono',monospace">#1F7F44</div></div>
+      <div><div style="height:48px;border-radius:16px;background:#F0A500;box-shadow:0 4px 0 0 #B97E00;color:#1F1D2B;display:flex;align-items:center;justify-content:center">{{ ic.flag }}</div><div style="font-weight:800;font-size:14px;margin-top:10px">Needs you</div><div style="font-size:12.5px;color:#5A5768;font-family:'JetBrains Mono',monospace">#F0A500 · ink text</div></div>
+      <div><div style="height:48px;border-radius:16px;background:#D23B30;box-shadow:0 4px 0 0 #A12A22;color:#FFFFFF;display:flex;align-items:center;justify-content:center">{{ ic.marker }}</div><div style="font-weight:800;font-size:14px;margin-top:10px">Blocked</div><div style="font-size:12.5px;color:#5A5768;font-family:'JetBrains Mono',monospace">#D23B30</div></div>
+      <div><div style="height:48px;border-radius:16px;background:#2A6FD6;box-shadow:0 4px 0 0 #1F54A5;color:#FFFFFF;display:flex;align-items:center;justify-content:center">{{ ic.bell }}</div><div style="font-weight:800;font-size:14px;margin-top:10px">Info</div><div style="font-size:12.5px;color:#5A5768;font-family:'JetBrains Mono',monospace">#2A6FD6</div></div>
+      <div><div style="height:48px;border-radius:16px;background:#66717A;box-shadow:0 4px 0 0 #4C555C;color:#FFFFFF;display:flex;align-items:center;justify-content:center">{{ ic.minus }}</div><div style="font-weight:800;font-size:14px;margin-top:10px">Neutral</div><div style="font-size:12.5px;color:#5A5768;font-family:'JetBrains Mono',monospace">#66717A</div></div>
+    </div>
+    <div style="font-size:13px;font-weight:800;color:#5A5768;margin:24px 0 12px">District tints · roofs and plots only, never states</div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+      <div><div style="height:40px;border-radius:10px;background:#7D8793;box-shadow:0 4px 0 0 #5F6770"></div><div style="height:16px;border-radius:6px;background:#E7E9EB;margin-top:8px"></div><div style="font-weight:800;font-size:14px;margin-top:8px">Town Hall</div><div style="font-size:12.5px;color:#5A5768;font-family:'JetBrains Mono',monospace">#7D8793</div></div>
+      <div><div style="height:40px;border-radius:10px;background:#2B98B5;box-shadow:0 4px 0 0 #21748A"></div><div style="height:16px;border-radius:6px;background:#DDEFF4;margin-top:8px"></div><div style="font-weight:800;font-size:14px;margin-top:8px">Research</div><div style="font-size:12.5px;color:#5A5768;font-family:'JetBrains Mono',monospace">#2B98B5</div></div>
+      <div><div style="height:40px;border-radius:10px;background:#D7864F;box-shadow:0 4px 0 0 #A5663C"></div><div style="height:16px;border-radius:6px;background:#F7E7DC;margin-top:8px"></div><div style="font-weight:800;font-size:14px;margin-top:8px">Analysis</div><div style="font-size:12.5px;color:#5A5768;font-family:'JetBrains Mono',monospace">#D7864F</div></div>
+      <div><div style="height:40px;border-radius:10px;background:#B35C8F;box-shadow:0 4px 0 0 #89466E"></div><div style="height:16px;border-radius:6px;background:#F1E0EA;margin-top:8px"></div><div style="font-weight:800;font-size:14px;margin-top:8px">Delivery</div><div style="font-size:12.5px;color:#5A5768;font-family:'JetBrains Mono',monospace">#B35C8F</div></div>
+    </div>
+    <div style="font-size:13px;color:#5A5768;margin-top:16px;line-height:1.45">White on hero 6.4:1 · white on success 5.0:1 · ink on amber 9.1:1 · white on blocked 4.8:1. All pass AA.</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:22px">
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;margin-bottom:12px">Type</div>
+      <div style="display:flex;align-items:baseline;gap:18px;flex-wrap:wrap">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:56px;line-height:1;color:#5A3FE0">tilo</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:32px;line-height:1">Your deck is ready for Thursday</div>
+      </div>
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:14px;margin-top:14px;color:#5A5768">
+        <div style="font-family:'JetBrains Mono',monospace">Display</div><div><b style="color:#1F1D2B">Nunito 900</b> · 56 / 32 / 24 / 20</div>
+        <div style="font-family:'JetBrains Mono',monospace">Body and UI</div><div><b style="color:#1F1D2B">Nunito Sans 400–800</b> · 16 body · 15 UI · 13 meta</div>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;margin-bottom:12px">Radii</div>
+      <div style="display:flex;gap:16px;align-items:flex-end">
+        <div style="text-align:center"><div style="width:64px;height:64px;border-radius:10px;background:#ECE8FD;border:2px solid #5A3FE0"></div><div style="font-size:13px;margin-top:6px;font-family:'JetBrains Mono',monospace">10 · chips in</div></div>
+        <div style="text-align:center"><div style="width:64px;height:64px;border-radius:16px;background:#ECE8FD;border:2px solid #5A3FE0"></div><div style="font-size:13px;margin-top:6px;font-family:'JetBrains Mono',monospace">16 · buttons</div></div>
+        <div style="text-align:center"><div style="width:64px;height:64px;border-radius:24px;background:#ECE8FD;border:2px solid #5A3FE0"></div><div style="font-size:13px;margin-top:6px;font-family:'JetBrains Mono',monospace">24 · cards</div></div>
+        <div style="text-align:center"><div style="width:96px;height:40px;border-radius:999px;background:#ECE8FD;border:2px solid #5A3FE0"></div><div style="font-size:13px;margin-top:6px;font-family:'JetBrains Mono',monospace">pill · tags</div></div>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;margin-bottom:8px">Motion personality</div>
+      <div style="font-size:16px;line-height:1.5;color:#1F1D2B;text-wrap:pretty">Friendly spring: press 100ms ease-out, pops 300ms overshoot (1.5), camera 650ms ease-in-out, celebration 1.3s with two jumps.</div>
+    </div>
+  </div>
+</div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { ready: !!window.TiloKit };
+  componentDidMount() {
+    if (!window.TiloKit) this.t = setInterval(() => { if (window.TiloKit) { clearInterval(this.t); this.setState({ ready: true }); } }, 50);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const THEME = 'balanced2';
+    if (!window.TiloKit) return {};
+    const K = window.TiloKit(React.createElement, THEME);
+    const h = React.createElement;
+    const ic = {};
+    ['worlds','plus','inbox','skills','chart','team','settings','pause','play','back','close','follow','minus','download','share','repeat','bookmark','flag','lock','check','bell','marker','vault','key'].forEach(n => ic[n] = K.ui(n, 20));
+    const A = (o, name, status, needs) => ({ el: K.Char({ ...o, size: 28 }), name, status, tone: needs ? '#7A5200' : K.T.ink2 });
+    const roster = [
+      { name: 'TOWN HALL', agents: [A({ rank: 'director' }, 'Director', 'Coordinating 4 districts'), A({ role: 'connector' }, 'Connector', 'Drive connected · idle')] },
+      { name: 'RESEARCH', agents: [A({ role: 'research', rank: 'lead', expr: 'focused' }, 'Research lead', 'Comparing prices · 4 of 7'), A({ role: 'research', expr: 'focused' }, 'Researcher', 'Reading Northline pricing'), A({ role: 'research', expr: 'walking' }, 'Researcher', 'Walking to Observatory'), A({ role: 'browser', expr: 'needs' }, 'Browser op.', 'Needs you · login', true)] },
+      { name: 'ANALYSIS', agents: [A({ role: 'builder', rank: 'lead', expr: 'focused' }, 'Analysis lead', 'Reusing March analysis'), A({ role: 'builder', expr: 'focused' }, 'Builder', 'Building Chart Studio')] },
+      { name: 'DELIVERY', agents: [A({ role: 'delivery', rank: 'lead' }, 'Delivery lead', 'Waiting for analysis')] }
+    ];
+    const r = 26, C = 2 * Math.PI * r;
+    const goalRing = h('svg', { width: 64, height: 64, viewBox: '0 0 64 64', style: { flex: 'none' } },
+      h('circle', { cx: 32, cy: 32, r, fill: 'none', stroke: '#E3E0D8', strokeWidth: 9 }),
+      h('circle', { cx: 32, cy: 32, r, fill: 'none', stroke: K.T.hero, strokeWidth: 9, strokeLinecap: 'round', strokeDasharray: `${C * 5 / 8} ${C}`, transform: 'rotate(-90 32 32)' }),
+      h('text', { x: 32, y: 37, textAnchor: 'middle', fontFamily: K.T.body, fontWeight: 800, fontSize: 15, fill: K.T.ink }, '5/8'));
+    const X = (o, label, note, size) => ({ el: K.Char({ ...o, size: size || 80 }), label, note });
+    const DI = [
+      { k: 'hall', icon: 'hall', name: 'Town Hall', status: 'Coordinating · Drive connected', ag: [{ rank: 'director' }, { role: 'connector' }] },
+      { k: 'research', icon: 'search', name: 'Research', status: '4 of 7 compared · 1 needs you', needs: true, ag: [{ role: 'research', rank: 'lead', expr: 'focused' }, { role: 'research', expr: 'focused' }, { role: 'browser', expr: 'needs' }] },
+      { k: 'analysis', icon: 'vault', name: 'Analysis', status: 'Reusing March analysis', ag: [{ role: 'builder', rank: 'lead', expr: 'focused' }, { role: 'builder', expr: 'focused' }] },
+      { k: 'delivery', icon: 'parcel', name: 'Delivery', status: 'Waiting for analysis', ag: [{ role: 'delivery', rank: 'lead' }] }
+    ];
+    const districts = DI.map(x => {
+      const col = K.dk(K.T.dist[x.k], .25);
+      return {
+        name: x.name, status: x.status, tone: x.needs ? '#7A5200' : K.T.ink2,
+        border: x.needs ? '#F0A500' : '#E3E0D8', bg: x.needs ? '#FFF3D6' : '#FFFFFF',
+        tile: h('svg', { width: 36, height: 36, viewBox: '0 0 36 36', style: { flex: 'none', display: 'block' } }, h('rect', { x: 0, y: 0, width: 36, height: 36, rx: 12, fill: col }), K.icon(x.icon, '#FFFFFF', 18, 18, 1.05, col)),
+        avatars: h('div', { style: { display: 'flex', flex: 'none' } }, ...x.ag.map((a, i) => h('div', { key: i, style: { marginLeft: i ? -10 : 0 } }, K.Char({ ...a, size: 26 }))))
+      };
+    });
+    const S = (k, a, b) => ({ k, a, b, w: (b / 5 * 100) + '%' });
+    const F = (st, issue, fix) => ({ status: st, issue, fix, bg: st === 'Fixed' ? '#E3F2E8' : '#EEF0F1', fg: st === 'Fixed' ? '#155E32' : '#4C555C' });
+    const reviewers = [
+      { initials: 'RA', title: 'Reviewer A · Operations lead', lens: 'Ease of use, professionalism, simplicity. Someone approving work between meetings.',
+        scores: [S('Ease of use', 3, 4), S('Professionalism', 4, 5), S('Simplicity', 3, 4), S('Effectiveness', 4, 4), S('Visual design', 4, 4), S('UI/UX', 3, 4)],
+        findings: [
+          F('Fixed', 'Needs-you was shown four times on desktop.', 'Removed the header chip. The nav badge, rail queue and card remain, and each does a different job.'),
+          F('Fixed', 'The agent roster was nine text rows and read like a dashboard.', 'Now four district rows with avatar stacks; per-agent detail opens on select.'),
+          F('Fixed', '"Not now" was vague at a decision point.', 'Now "Decide later", with a line confirming other districts keep working.'),
+          F('Fixed', 'Mobile lens tabs were 30px and Pause all 40px, under the 48px target.', 'Full-width 42px tabs in a 48px track; Pause all and Back are now 48px.'),
+          F('Open', 'Credits used "214 of 520" gives no sense of pace.', 'Proposed for the Phase 2 Treasury: "on track" or "running hot" in plain words.')
+        ] },
+      { initials: 'RB', title: 'Reviewer B · Product design critic', lens: 'Effectiveness, visual design, UI/UX. Judged on a projector and in a 1080p video.',
+        scores: [S('Ease of use', 4, 4), S('Professionalism', 4, 4), S('Simplicity', 3, 4), S('Effectiveness', 3, 4), S('Visual design', 4, 5), S('UI/UX', 3, 4)],
+        findings: [
+          F('Fixed', 'The rose Research district sat right beside blocked red.', 'Research is now cyan. Rose moved to Delivery, which is mostly dashed (planned).'),
+          F('Fixed', 'Agents at 0.58 scale read as dots in a 1080p video.', 'Now 0.7 in the town. The hand-raised agent gets an amber ground ring: a shape plus a colour, no glow.'),
+          F('Fixed', 'The mobile narration pill floated over the road.', 'Moved into the header under the progress bar, so the world is uncovered.'),
+          F('Fixed', 'The celebration tiles used three unrelated header colours.', 'One hero header; the numbers do the work.'),
+          F('Fixed', 'The token card had no district tints, so tint vs state was ambiguous.', 'Added a tint row labelled "never states".'),
+          F('Open', 'The card covers the Delivery plot at 1440.', 'Phase 2: the camera eases left 120px while a card is open.')
+        ] }
+    ];
+    return {
+      ic, roster, goalRing, districts, reviewers,
+      world: K.worldDesk(868, 728),
+      path: K.worldPath().el,
+      celebration: K.celebrate(390, 220),
+      cardChar: K.Char({ role: 'browser', expr: 'needs', size: 42 }),
+      sheetChar: K.Char({ role: 'browser', expr: 'needs', size: 38 }),
+      ranks: [X({ rank: 'director' }, 'Director', '', 104), X({ role: 'research', rank: 'lead' }, 'Lead', '', 92), X({ role: 'research' }, 'Specialist', '', 84)],
+      roles: [X({ role: 'research' }, 'Research', 'Magnifier'), X({ role: 'builder' }, 'Builder', 'Toolbelt'), X({ role: 'tester' }, 'Tester', 'Clipboard'), X({ role: 'browser' }, 'Browser', 'Headset'), X({ role: 'connector' }, 'Connector', 'Key-card'), X({ role: 'delivery' }, 'Delivery', 'Satchel')],
+      exprs: [['neutral','Neutral','Idle'],['walking','Walking','Walk cycle'],['focused','Focused','Working'],['talking','Talking','Handing off'],['needs','Hand up','Needs you'],['puzzled','Puzzled','Blocked'],['recovering','Determined','Recovering'],['delighted','Delighted','Done']].map(([e, l, n]) => X({ role: 'research', expr: e }, l, n, 84)),
+      commons: ['townhall','library','browser','workshop','vault','dock'].map(t => ({ el: K.bldSheet(t, 'idle'), label: K.B[t].n })),
+      gens: [{ el: K.bldSheet('observatory', 'active'), label: 'Price Observatory', note: '1 · tower · dome · tag' }, { el: K.bldSheet('chart', 'active'), label: 'Chart Studio', note: '2 · block · gable · chart' }],
+      states: [['planned','Planned','Dashed outline'],['construction','Building','Scaffold'],['active','Active','Lit sign'],['needs','Needs you','Amber flag'],['blocked','Blocked','Red diamond'],['complete','Complete','Check badge'],['skipped','Skipped','Desaturated']].map(([s, l, n]) => ({ el: K.bldSheet('library', s), label: l, note: n }))
+    };
+  }
+}
+</script>
+</body>
+</html>

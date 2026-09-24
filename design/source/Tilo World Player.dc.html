@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="./tilo-world.js"></script>
+<script src="./tilo-player.js"></script>
+<style>
+html,body{margin:0;height:100%;background:#E9E7E1;-webkit-font-smoothing:antialiased;overflow:hidden}
+a{color:#5A3FE0;font-weight:800}a:hover{color:#3F2AAE}
+button{font-family:inherit}
+*:focus-visible{outline:3px solid #1F1D2B;outline-offset:2px}
+</style>
+</helmet>
+<div style="height:100vh;display:grid;grid-template-rows:64px minmax(0,1fr) auto;font-family:'Nunito Sans',sans-serif;color:#1F1D2B;zoom:{{ zoom }}">
+
+<header style="display:flex;align-items:center;gap:14px;padding:0 16px;background:#FFFFFF;border-bottom:2px solid #E3E0D8;min-width:0">
+  <div style="height:32px;padding:0 12px;border-radius:999px;background:#1F1D2B;color:#FFFFFF;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;display:flex;align-items:center;flex:none">Tilo</div>
+  <select aria-label="Scenario" onChange="{{ onScenario }}" style="height:36px;border:2px solid #E3E0D8;border-radius:12px;padding:0 10px;font-family:'Nunito Sans',sans-serif;font-weight:800;font-size:14px;color:#1F1D2B;background:#FFFFFF;flex:none">
+    <option value="k1">K1 scooter · City · hero</option>
+    <option value="pricing" disabled="">Competitor pricing · Town (after checkpoint)</option>
+    <option value="invoices" disabled="">Weekly invoice match · Village (after checkpoint)</option>
+    <option value="kitchen" disabled="">Kitchen renovation · Town (after checkpoint)</option>
+  </select>
+  <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">Take the K1 electric scooter from concept to launch</div>
+  <div style="display:flex;gap:8px;align-items:center;flex:none">
+    <div title="Estimate" style="display:flex;flex-direction:column;line-height:1.1;padding:4px 10px;border-radius:12px;background:#F7F6F2"><span style="font-size:11.5px;font-weight:700;color:#5A5768">Time saved (est.)</span><span style="font-weight:900;font-size:15px">{{ mSaved }}</span></div>
+    <div style="display:flex;flex-direction:column;line-height:1.1;padding:4px 10px;border-radius:12px;background:#F7F6F2"><span style="font-size:11.5px;font-weight:700;color:#5A5768">Credits used</span><span style="font-weight:900;font-size:15px">{{ mCredits }}</span></div>
+    <div style="display:flex;flex-direction:column;line-height:1.1;padding:4px 10px;border-radius:12px;background:#EEEAFD"><span style="font-size:11.5px;font-weight:700;color:#3F2AAE">Saved by memory</span><span style="font-weight:900;font-size:15px;color:#3F2AAE">{{ mMemory }}</span></div>
+    <button onClick="{{ openFirstAlert }}" style="height:40px;padding:0 14px;border-radius:14px;border:none;background:{{ needsBg }};color:#1F1D2B;font-weight:900;font-size:14px;display:flex;align-items:center;gap:8px;cursor:pointer;box-shadow:0 4px 0 0 {{ needsLip }}">Needs you <span style="min-width:22px;height:22px;border-radius:99px;background:#1F1D2B;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:12.5px">{{ needsCount }}</span></button>
+    <button onClick="{{ togglePlay }}" aria-label="Pause all" style="height:40px;padding:0 16px;border-radius:14px;border:2px solid #E3E0D8;background:#FFFFFF;box-shadow:0 4px 0 0 #CFCABF;font-weight:900;font-size:14px;display:flex;align-items:center;gap:8px;cursor:pointer;color:#1F1D2B"><span style="display:flex;gap:3px"><span style="width:4px;height:13px;border-radius:2px;background:#1F1D2B"></span><span style="width:4px;height:13px;border-radius:2px;background:#1F1D2B"></span></span>{{ pauseLabel }}</button>
+  </div>
+</header>
+
+<div style="display:grid;grid-template-columns:{{ cols }};min-height:0">
+  <aside style="background:#FFFFFF;border-right:2px solid #E3E0D8;padding:16px 14px;display:{{ leftDisp }};flex-direction:column;gap:10px;overflow-y:auto;overflow-x:hidden;min-height:0;min-width:0">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="height:24px;padding:0 10px;border-radius:999px;background:#1F1D2B;color:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center">City</div><div style="font-size:13px;font-weight:700;color:#5A5768">{{ tierStats }}</div></div>
+    <div style="font-size:13px;font-weight:800;color:#5A5768;margin-top:4px">Levels · top to bottom</div>
+    <sc-for list="{{ levelRows }}" as="lv" hint-placeholder-count="6">
+      <button onClick="{{ lv.onClick }}" style="text-align:left;display:grid;grid-template-columns:34px minmax(0,1fr) 38px;gap:8px;align-items:center;border:2px solid {{ lv.bd }};border-bottom-width:4px;border-radius:14px;padding:8px 10px;background:{{ lv.bg }};cursor:pointer;color:#1F1D2B;opacity:{{ lv.op }}">
+        <div style="width:34px;height:28px;border-radius:10px;background:{{ lv.color }};color:#FFFFFF;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center">{{ lv.code }}</div>
+        <div style="min-width:0"><div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lv.name }}</div><div style="height:7px;border-radius:999px;background:#E3E0D8;margin-top:5px;position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ lv.pctW }};border-radius:999px;background:{{ lv.color }}"></div></div><div style="font-size:12px;color:#5A5768;font-weight:600;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lv.sub }}</div></div>
+        <div style="font-weight:800;font-size:13.5px;text-align:right">{{ lv.pct }}</div>
+      </button>
+    </sc-for>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;line-height:1.45;color:#5A5768;background:#F7F6F2;border-radius:14px;padding:10px 12px">Click anything in the world to inspect it. Tab moves between buildings and Enter opens one. Space plays or pauses.</div>
+  </aside>
+
+  <main ref="{{ setWorld }}" onMouseDown="{{ onDown }}" onMouseMove="{{ onMove }}" onMouseUp="{{ onUp }}" onMouseLeave="{{ onUp }}" onClick="{{ onBgClick }}" style="position:relative;min-width:0;min-height:0;overflow:hidden;background:#F7F6F2;cursor:{{ cursor }}">
+    {{ worldSvg }}
+    <div style="position:absolute;left:14px;top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pointer-events:auto">
+      <div style="height:32px;padding:0 12px;border-radius:999px;background:#FFFFFF;border:2px solid #E3E0D8;font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:99px;background:{{ followDot }}"></span>{{ camLabel }}</div>
+      <sc-if value="{{ showFollow }}" hint-placeholder-val="{{ false }}"><button onClick="{{ doFollow }}" style="height:32px;padding:0 12px;border-radius:12px;border:none;background:#5A3FE0;color:#FFFFFF;font-weight:800;font-size:13px;box-shadow:0 3px 0 0 #3F2AAE;cursor:pointer">Follow</button></sc-if>
+      <div style="display:flex;border:2px solid #E3E0D8;border-radius:12px;background:#FFFFFF;overflow:hidden"><button onClick="{{ zoomOut }}" aria-label="Zoom out" style="width:32px;height:28px;border:none;background:#FFFFFF;font-weight:900;font-size:16px;cursor:pointer">−</button><div style="padding:0 8px;font-size:12px;font-weight:800;color:#5A5768;display:flex;align-items:center;border-left:2px solid #E3E0D8;border-right:2px solid #E3E0D8">{{ lodLabel }}</div><button onClick="{{ zoomIn }}" aria-label="Zoom in" style="width:32px;height:28px;border:none;background:#FFFFFF;font-weight:900;font-size:16px;cursor:pointer">+</button></div>
+    </div>
+    <div style="position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(520px,80%)">
+      <sc-if value="{{ holding }}" hint-placeholder-val="{{ false }}"><div style="background:#1F1D2B;color:#FFFFFF;border-radius:14px;padding:9px 14px;font-weight:800;font-size:14px;text-align:center">{{ holdText }}</div></sc-if>
+      <sc-for list="{{ toasts }}" as="ts" hint-placeholder-count="0"><div style="background:#FFFFFF;border:2px solid {{ ts.bd }};border-bottom-width:4px;border-radius:14px;padding:9px 14px;font-weight:700;font-size:14px;line-height:1.35;display:flex;gap:10px;align-items:flex-start;box-shadow:0 6px 18px rgba(31,29,43,.08)"><span style="width:10px;height:10px;border-radius:99px;background:{{ ts.dot }};flex:none;margin-top:5px"></span>{{ ts.text }}</div></sc-for>
+    </div>
+
+    <sc-if value="{{ cardOn }}" hint-placeholder-val="{{ false }}">
+      <div role="dialog" aria-label="{{ card.chip }}" onMouseDown="{{ stop }}" onClick="{{ stop }}" style="position:absolute;left:{{ card.x }}px;top:{{ card.y }}px;width:380px;max-height:{{ card.maxH }}px;overflow:auto;background:#FFFFFF;border:2px solid {{ card.bd }};border-bottom-width:5px;border-radius:20px;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 32px rgba(31,29,43,.14);cursor:default">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="height:24px;padding:0 10px;border-radius:999px;background:{{ card.chipBg }};color:{{ card.chipFg }};font-size:12.5px;font-weight:900;display:flex;align-items:center">{{ card.chip }}</div><div style="font-size:12.5px;font-weight:700;color:#5A5768">{{ card.where }}</div></div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:19px;line-height:1.25;text-wrap:pretty">{{ card.title }}</div>
+        <div style="font-size:14px;line-height:1.45;color:#5A5768;text-wrap:pretty">{{ card.why }}</div>
+        <sc-if value="{{ card.consent }}" hint-placeholder-val="{{ false }}">
+          <div style="border:2px solid #E3E0D8;border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:13px;font-weight:800">{{ card.service }} <span style="color:#5A5768;font-weight:700">· {{ card.method }}</span></div>
+            <sc-for list="{{ card.perms }}" as="pm" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;font-size:13.5px;line-height:1.35"><span style="width:14px;height:14px;border-radius:5px;background:#1F7F44;margin-top:2px"></span><span><b>{{ pm.p }}</b><br><span style="color:#5A5768">{{ pm.why }}</span></span></div></sc-for>
+            <div style="font-size:13px;color:#5A5768;line-height:1.4"><b style="color:#1F1D2B">How long:</b> {{ card.duration }}</div>
+            <div style="font-size:13px;color:#5A5768;line-height:1.4">{{ card.never }} You can revoke access at any time from the Connector Post.</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ card.invite }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button onClick="{{ card.join }}" style="height:46px;border-radius:14px;border:none;background:#5A3FE0;color:#FFFFFF;font-weight:900;font-size:15px;box-shadow:0 4px 0 0 #3F2AAE;cursor:pointer">Join now</button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button onClick="{{ card.async }}" style="height:42px;border-radius:14px;border:2px solid #E3E0D8;background:#FFFFFF;box-shadow:0 4px 0 0 #CFCABF;font-weight:800;font-size:14px;cursor:pointer;color:#1F1D2B">Answer async</button><button onClick="{{ card.delegate }}" style="height:42px;border-radius:14px;border:2px solid #E3E0D8;background:#FFFFFF;box-shadow:0 4px 0 0 #CFCABF;font-weight:800;font-size:14px;cursor:pointer;color:#1F1D2B">Delegate to Director</button></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ card.showOptions }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ card.options }}" as="op" hint-placeholder-count="3">
+              <button onClick="{{ op.onClick }}" aria-pressed="{{ op.pressed }}" style="text-align:left;border:2px solid {{ op.bd }};border-bottom-width:4px;border-radius:14px;padding:10px 12px;background:{{ op.bg }};cursor:pointer;display:flex;flex-direction:column;gap:4px;color:#1F1D2B">
+                <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="width:16px;height:16px;border-radius:99px;border:2px solid {{ op.ring }};box-sizing:border-box;display:flex;align-items:center;justify-content:center;flex:none"><span style="width:8px;height:8px;border-radius:99px;background:{{ op.dot }}"></span></span><span style="font-weight:900;font-size:14.5px">{{ op.label }}</span><sc-if value="{{ op.suggested }}" hint-placeholder-val="{{ false }}"><span style="height:20px;padding:0 8px;border-radius:999px;background:#EEEAFD;color:#3F2AAE;font-size:11.5px;font-weight:900;display:flex;align-items:center">Suggested</span></sc-if></span>
+                <span style="font-size:13px;color:#5A5768;line-height:1.35;padding-left:24px">{{ op.detail }}</span>
+              </button>
+            </sc-for>
+            <textarea value="{{ ctx }}" onChange="{{ onCtx }}" placeholder="Add context for the agents (optional)" rows="2" style="border:2px solid #E3E0D8;border-radius:12px;padding:8px 10px;font-family:'Nunito Sans',sans-serif;font-size:14px;resize:vertical;color:#1F1D2B"></textarea>
+            <button onClick="{{ card.confirm }}" style="height:48px;border-radius:14px;border:none;background:#5A3FE0;color:#FFFFFF;font-weight:900;font-size:15px;box-shadow:0 4px 0 0 #3F2AAE;cursor:pointer;padding:0 12px">{{ card.primary }}</button>
+          </div>
+        </sc-if>
+        <div style="font-size:12.5px;color:#5A5768;line-height:1.4;background:#F7F6F2;border-radius:10px;padding:7px 10px">{{ card.timer }}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onClick="{{ card.showMe }}" style="height:34px;padding:0 12px;border-radius:12px;border:2px solid #E3E0D8;background:#FFFFFF;box-shadow:0 3px 0 0 #CFCABF;font-weight:800;font-size:13px;cursor:pointer;color:#1F1D2B">Show me</button>
+          <button onClick="{{ card.snooze }}" style="height:34px;padding:0 12px;border-radius:12px;border:2px solid #E3E0D8;background:#FFFFFF;box-shadow:0 3px 0 0 #CFCABF;font-weight:800;font-size:13px;cursor:pointer;color:#1F1D2B">Snooze</button>
+          <sc-if value="{{ card.canDelegate }}" hint-placeholder-val="{{ true }}"><button onClick="{{ card.delegate }}" style="height:34px;padding:0 12px;border-radius:12px;border:2px solid #E3E0D8;background:#FFFFFF;box-shadow:0 3px 0 0 #CFCABF;font-weight:800;font-size:13px;cursor:pointer;color:#1F1D2B">Delegate to Director</button></sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ inspOn }}" hint-placeholder-val="{{ false }}">
+      <div onMouseDown="{{ stop }}" onClick="{{ stop }}" style="position:absolute;left:14px;bottom:14px;width:330px;max-height:calc(100% - 80px);overflow:auto;background:#FFFFFF;border:2px solid #E3E0D8;border-bottom-width:5px;border-radius:20px;padding:14px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;cursor:default">
+        <div style="display:flex;align-items:flex-start;gap:10px"><div style="width:12px;height:12px;border-radius:4px;background:{{ insp.color }};margin-top:6px;flex:none"></div><div style="flex:1;min-width:0"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:18px;line-height:1.2">{{ insp.title }}</div><div style="font-size:13px;color:#5A5768;font-weight:700">{{ insp.sub }}</div></div><button onClick="{{ closeInsp }}" aria-label="Close" style="width:30px;height:30px;border-radius:10px;border:2px solid #E3E0D8;background:#FFFFFF;font-weight:900;cursor:pointer;flex:none">×</button></div>
+        <div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 12px;font-size:13.5px;line-height:1.35">
+          <sc-for list="{{ insp.rows }}" as="r" hint-placeholder-count="5"><div style="color:#5A5768;font-weight:700">{{ r.k }}</div><div style="font-weight:700">{{ r.v }}</div></sc-for>
+        </div>
+        <sc-if value="{{ insp.hasEvents }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:12.5px;font-weight:800;color:#5A5768">Recent events</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ insp.events }}" as="ie" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:40px minmax(0,1fr);gap:8px;font-size:13px;line-height:1.35"><span style="font-family:'JetBrains Mono',monospace;color:#5A5768;font-size:12px">{{ ie.time }}</span><span>{{ ie.text }}</span></div></sc-for>
+          </div>
+        </sc-if>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <sc-for list="{{ insp.actions }}" as="ac" hint-placeholder-count="1"><button onClick="{{ ac.onClick }}" style="height:34px;padding:0 12px;border-radius:12px;border:2px solid #E3E0D8;background:#FFFFFF;box-shadow:0 3px 0 0 #CFCABF;font-weight:800;font-size:13px;cursor:pointer;color:#1F1D2B">{{ ac.label }}</button></sc-for>
+          <sc-if value="{{ insp.appLink }}" hint-placeholder-val="{{ false }}"><a href="Parts Watch.dc.html" target="_blank" style="height:34px;padding:0 12px;border-radius:12px;background:#5A3FE0;color:#FFFFFF;box-shadow:0 3px 0 0 #3F2AAE;font-weight:800;font-size:13px;display:flex;align-items:center;text-decoration:none">Open Parts Watch</a></sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ loading }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;color:#5A5768">{{ loadText }}</div></sc-if>
+  </main>
+
+  <aside style="background:#FFFFFF;border-left:2px solid #E3E0D8;display:flex;flex-direction:column;min-height:0">
+    <sc-if value="{{ hasQueue }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:12px 14px 4px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:13px;font-weight:800;color:#5A5768">Needs you · {{ needsCount }}</div>
+        <sc-for list="{{ queue }}" as="qq" hint-placeholder-count="1">
+          <button onClick="{{ qq.onClick }}" style="text-align:left;background:{{ qq.bg }};border:2px solid {{ qq.bd }};border-bottom-width:4px;border-radius:14px;padding:9px 12px;display:flex;flex-direction:column;gap:5px;cursor:pointer;color:#1F1D2B">
+            <span style="display:flex;gap:6px;align-items:center"><span style="height:22px;padding:0 9px;border-radius:999px;background:{{ qq.chipBg }};color:{{ qq.chipFg }};font-size:12px;font-weight:900;display:flex;align-items:center">{{ qq.chip }}</span><span style="font-size:12px;font-weight:700;color:#5A5768">{{ qq.where }}</span></span>
+            <span style="font-weight:800;font-size:14px;line-height:1.3">{{ qq.title }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+    <div style="display:flex;gap:6px;padding:12px 14px 8px">
+      <button onClick="{{ lensStory }}" aria-pressed="{{ isStory }}" style="flex:1;height:36px;border-radius:12px;border:2px solid {{ storyBd }};background:{{ storyBg }};font-weight:800;font-size:14px;cursor:pointer;color:#1F1D2B">Story</button>
+      <button onClick="{{ lensTrace }}" aria-pressed="{{ isTrace }}" style="flex:1;height:36px;border-radius:12px;border:2px solid {{ traceBd }};background:{{ traceBg }};font-weight:800;font-size:14px;cursor:pointer;color:#1F1D2B">Trace</button>
+    </div>
+    <div style="flex:1;overflow:auto;min-height:0;padding:0 14px 14px">
+      <sc-if value="{{ isStory }}" hint-placeholder-val="{{ true }}">
+        <div aria-live="polite" style="display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ story }}" as="s" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:42px minmax(0,1fr);gap:8px;padding:8px 0;border-bottom:1.5px solid #EFECE4;opacity:{{ s.op }}">
+              <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start"><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#5A5768">{{ s.time }}</span><span style="height:18px;padding:0 6px;border-radius:6px;background:{{ s.color }};color:#FFFFFF;font-size:11px;font-weight:800;display:flex;align-items:center">{{ s.code }}</span></div>
+              <div style="font-size:14px;line-height:1.4;font-weight:{{ s.fw }};text-wrap:pretty">{{ s.text }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isTrace }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:2px;font-family:'JetBrains Mono',monospace;font-size:12px">
+          <sc-for list="{{ trace }}" as="tr" hint-placeholder-count="10">
+            <button onClick="{{ tr.onClick }}" style="text-align:left;display:grid;grid-template-columns:44px minmax(0,1fr);gap:6px;padding:6px 6px;border-radius:8px;border:none;background:{{ tr.bg }};cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;color:#1F1D2B">
+              <span style="color:#5A5768">{{ tr.time }}</span>
+              <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-weight:700;color:{{ tr.col }}">{{ tr.type }}</span><span style="color:#5A5768;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ tr.detail }}</span></span>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </aside>
+</div>
+
+<footer style="background:#FFFFFF;border-top:2px solid #E3E0D8;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <button onClick="{{ togglePlay }}" aria-label="{{ playAria }}" style="width:44px;height:44px;border-radius:14px;border:none;background:#5A3FE0;box-shadow:0 4px 0 0 #3F2AAE;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none">{{ playIcon }}</button>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;white-space:nowrap">{{ timeText }}</div>
+  <div ref="{{ setScrub }}" onMouseDown="{{ onScrubDown }}" style="flex:1;min-width:240px;height:36px;position:relative;cursor:pointer">
+    <div style="position:absolute;left:0;right:0;top:15px;height:6px;border-radius:99px;background:#E3E0D8"></div>
+    <div style="position:absolute;left:0;top:15px;height:6px;border-radius:99px;background:#5A3FE0;width:{{ progW }}"></div>
+    <sc-for list="{{ markers }}" as="mk" hint-placeholder-count="0"><div title="{{ mk.title }}" style="position:absolute;left:{{ mk.left }};top:{{ mk.top }}px;width:{{ mk.w }}px;height:{{ mk.h }}px;border-radius:99px;background:{{ mk.col }};transform:translateX(-50%)"></div></sc-for>
+    <div style="position:absolute;left:{{ progW }};top:8px;width:20px;height:20px;border-radius:99px;background:#FFFFFF;border:3px solid #5A3FE0;box-sizing:border-box;transform:translateX(-50%)"></div>
+  </div>
+  <div style="display:flex;border:2px solid #E3E0D8;border-radius:12px;overflow:hidden;flex:none">
+    <sc-for list="{{ speeds }}" as="sp" hint-placeholder-count="4"><button onClick="{{ sp.onClick }}" aria-pressed="{{ sp.on }}" style="height:32px;padding:0 10px;border:none;background:{{ sp.bg }};color:{{ sp.fg }};font-weight:800;font-size:13px;cursor:pointer">{{ sp.label }}</button></sc-for>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <sc-for list="{{ overlayChips }}" as="oc" hint-placeholder-count="5"><button onClick="{{ oc.onClick }}" aria-pressed="{{ oc.on }}" style="height:32px;padding:0 11px;border-radius:999px;border:2px solid {{ oc.bd }};background:{{ oc.bg }};color:{{ oc.fg }};font-weight:800;font-size:13px;cursor:pointer">{{ oc.label }}</button></sc-for>
+  </div>
+  <button onClick="{{ restart }}" style="height:32px;padding:0 11px;border-radius:12px;border:2px solid #E3E0D8;background:#FFFFFF;font-weight:800;font-size:13px;cursor:pointer;color:#1F1D2B">Restart run</button>
+</footer>
+</div>
+
+<sc-if value="{{ approvalOn }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;background:rgba(31,29,43,.5);display:flex;align-items:center;justify-content:center;z-index:10;font-family:'Nunito Sans',sans-serif;color:#1F1D2B">
+    <div role="alertdialog" aria-label="Approval" style="width:520px;max-width:92vw;background:#FFFFFF;border-radius:24px;border:2px solid #E3E0D8;border-bottom-width:6px;padding:24px;display:flex;flex-direction:column;gap:14px">
+      <div style="align-self:flex-start;height:26px;padding:0 10px;border-radius:999px;background:#1F1D2B;color:#FFFFFF;font-size:12.5px;font-weight:900;display:flex;align-items:center">Approval · can't be undone</div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;line-height:1.2">{{ appr.title }}</div>
+      <div style="font-size:14.5px;color:#5A5768">Here is exactly what will happen:</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ appr.what }}" as="w" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;font-size:15px;line-height:1.4;font-weight:700"><span style="width:20px;height:20px;border-radius:7px;background:#F7F6F2;border:2px solid #E3E0D8;box-sizing:border-box;font-size:11px;display:flex;align-items:center;justify-content:center">{{ w.n }}</span>{{ w.text }}</div></sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:10px;margin-top:6px">
+        <button onClick="{{ apprCancel }}" style="height:50px;padding:0 18px;border-radius:14px;border:2px solid #E3E0D8;background:#FFFFFF;box-shadow:0 4px 0 0 #CFCABF;font-weight:800;font-size:15px;cursor:pointer;color:#1F1D2B">Go back</button>
+        <button onClick="{{ apprOk }}" style="height:50px;border-radius:14px;border:none;background:#5A3FE0;color:#FFFFFF;font-weight:900;font-size:16px;box-shadow:0 4px 0 0 #3F2AAE;cursor:pointer">{{ appr.button }}</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { ready:false, err:null, t:0, playing:true, speed:1, answers:{}, uev:[], follow:true, sel:null, hover:null, lens:'story', ov:{heat:false,bottle:false,conn:false,people:true,trail:false}, reduced:false, stage:false, inviteStage:{}, snooze:{}, ctx:'', pick:{}, approval:null, activeAlert:null, toasts:[], kfocus:null, vw:1000, vh:700 };
+  el = {}; cam = null; camT = null;
+  componentDidMount() {
+    let saved = null; try { saved = JSON.parse(localStorage.getItem('tilo-player-k1') || 'null'); } catch (e) {}
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) this.setState({ reduced: true });
+    this.wait = setInterval(() => { if (window.TiloWorld && window.TiloPlayer) { clearInterval(this.wait); this.boot(saved); } }, 40);
+    this.onKey = e => { const tg = e.target && e.target.tagName; if (tg === 'TEXTAREA' || tg === 'INPUT' || tg === 'SELECT') return; if (e.code === 'Space') { e.preventDefault(); this.togglePlay(); } };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { clearInterval(this.wait); clearInterval(this.watch); cancelAnimationFrame(this.raf); window.removeEventListener('keydown', this.onKey); if (this.ro) this.ro.disconnect(); }
+  async boot(saved) {
+    try {
+      const [lay, evs] = await Promise.all([fetch('worlds/k1.layout.json').then(r => r.json()), fetch('worlds/k1.events.json').then(r => r.json())]);
+      this.TP = window.TiloPlayer(React.createElement); this.geo = this.TP.geometry(lay); this.events = evs.events; this.lay = lay;
+      const s = saved || {};
+      this.C = this.TP.compile(this.geo, this.events, s.answers || {}, s.uev || []); this.setState({ ready: true, t: s.t || 0, answers: s.answers || {}, uev: s.uev || [], speed: s.speed || 1 }); this.loop();
+    } catch (e) { this.setState({ err: String(e) }); }
+  }
+  recompile(a, u) { this.C = this.TP.compile(this.geo, this.events, a || this.state.answers, u || this.state.uev); }
+  save() { try { localStorage.setItem('tilo-player-k1', JSON.stringify({ t: this.state.t, answers: this.state.answers, uev: this.state.uev, speed: this.state.speed })); } catch (e) {} }
+  loop() {
+    let last = performance.now();
+    const run = () => { const now = performance.now(); if (now - last < 8) return; const dt = Math.min(.1, (now - last) / 1000); last = now; this.tick(dt); };
+    const step = () => { run(); this.raf = requestAnimationFrame(step); };
+    this.raf = requestAnimationFrame(step);
+    this.watch = setInterval(() => { if (performance.now() - last > 70) run(); }, 50);
+  }
+  tick(dt) {
+    const C = this.C; if (!C) return; window.__tilo = this; if (window.__tiloFreeze) return;
+    let { t, playing, speed } = this.state; let hold = null;
+    if (playing && !this.scrubbing) t += dt * speed;
+    for (const al of C.decisions) { if (this.state.answers[al.decision] != null) continue; if (al.needBy != null && t >= al.needBy) { t = al.needBy; hold = al; break; } }
+    if (playing && !this.state.approval) for (const al of C.decisions) { if (this.state.answers[al.decision] != null || t < al.t0) continue; this.el[al.id] = (this.el[al.id] || 0) + dt; if (this.el[al.id] >= al.timer) { this.answer(al, al.def, al.defBy, true); break; } }
+    t = Math.min(t, C.end);
+    this.hold = hold;
+    this.updateCam(dt, t);
+    const now = Date.now(); const toasts = this.state.toasts.filter(x => x.until > now);
+    this.setState({ t, toasts: toasts.length !== this.state.toasts.length ? toasts : this.state.toasts });
+    if (Math.floor(t) !== this.lastSave) { this.lastSave = Math.floor(t); this.save(); }
+  }
+  fit(b, pad) { const { vw, vh } = this.state; const w = b[1] - b[0], h = b[3] - b[2]; const s = Math.min((vw - (pad || 30)) / w, (vh - (pad || 30)) / h); return { x: (b[0] + b[1]) / 2, y: (b[2] + b[3]) / 2, s }; }
+  updateCam(dt, t) {
+    if (!this.cam) this.cam = this.fit(this.geo.box);
+    if (this.state.follow) { const lv = this.TP.camLevel(this.C, t); const b = lv === 'all' || lv == null ? this.geo.box : this.geo.levels[lv].box; this.camT = this.fit(b); this.focusLv = lv === 'all' || lv == null ? null : lv; }
+    if (this.camT) { const k = this.state.reduced ? 1 : 1 - Math.exp(-dt / 0.17); ['x', 'y', 's'].forEach(q => this.cam[q] += (this.camT[q] - this.cam[q]) * k); }
+  }
+  setWorld = el => {
+    if (!el || el === this.worldEl) return; this.worldEl = el;
+    const measure = () => { const r = el.getBoundingClientRect(); const z = this.state.stage ? 1.2 : 1; this.setState({ vw: Math.max(200, r.width / z), vh: Math.max(200, r.height / z) }); };
+    measure(); if (window.ResizeObserver) { this.ro = new ResizeObserver(measure); this.ro.observe(el); }
+    el.addEventListener('wheel', e => { e.preventDefault(); if (!this.cam) return; const r = el.getBoundingClientRect(); const z = this.state.stage ? 1.2 : 1; const mx = (e.clientX - r.left) / z, my = (e.clientY - r.top) / z; const c = this.cam, { vw, vh } = this.state; const wx = (mx - vw / 2) / c.s + c.x, wy = (my - vh / 2) / c.s + c.y; const ns = Math.max(.12, Math.min(3.5, c.s * Math.exp(-e.deltaY * .0015))); this.cam = { s: ns, x: wx - (mx - vw / 2) / ns, y: wy - (my - vh / 2) / ns }; this.camT = null; if (this.state.follow) this.setState({ follow: false }); }, { passive: false });
+  };
+  setScrub = el => { this.scrubEl = el; };
+  togglePlay = () => this.setState(s => ({ playing: !s.playing }));
+  seekFrac(clientX) { const r = this.scrubEl.getBoundingClientRect(); const f = Math.max(0, Math.min(1, (clientX - r.left) / r.width)); let t = f * this.C.end; for (const al of this.C.decisions) { if (this.state.answers[al.decision] == null && al.needBy != null && t > al.needBy) { t = al.needBy; break; } } this.setState({ t }); }
+  onScrubDown = e => { if (!this.C) return; this.scrubbing = true; this.seekFrac(e.clientX); const mv = ev => this.seekFrac(ev.clientX); const up = () => { this.scrubbing = false; window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); }; window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up); };
+  onDown = e => { if (e.button !== 0) return; this.drag = { x: e.clientX, y: e.clientY, cx: this.cam && this.cam.x, cy: this.cam && this.cam.y, moved: false }; };
+  onMove = e => { const d = this.drag; if (!d || !this.cam) return; const z = this.state.stage ? 1.2 : 1; const dx = (e.clientX - d.x) / z, dy = (e.clientY - d.y) / z; if (Math.abs(dx) + Math.abs(dy) > 4) { d.moved = true; this.cam.x = d.cx - dx / this.cam.s; this.cam.y = d.cy - dy / this.cam.s; this.camT = null; if (this.state.follow) this.setState({ follow: false }); } };
+  onUp = () => { if (this.drag) { this.lastDragMoved = this.drag.moved; this.drag = null; } };
+  onBgClick = () => { if (this.lastDragMoved) { this.lastDragMoved = false; return; } if (this.state.sel) this.setState({ sel: null }); };
+  pick = obj => { if (this.lastDragMoved) { this.lastDragMoved = false; return; } this.setState({ sel: obj }); };
+  flyTo(box, s) { const f = this.fit(box); if (s) f.s = s; this.camT = f; this.setState({ follow: false }); }
+  flyToLevel(i) { this.focusLv = i; this.flyTo(this.geo.levels[i].box); }
+  showMe(target) { const a = this.TP.anchorOf(this.C, target, this.state.t); if (!a) return; this.camT = { x: a[0], y: a[1] + 60, s: 1.35 }; const bi = this.geo.bIdx[target]; if (bi) this.focusLv = bi.pc.kind === 'island' ? bi.pc.level.i : bi.pc.i; this.setState({ follow: false }); }
+  toast(text, kind) { const col = { ok: '#1F7F44', info: '#5A3FE0', warn: '#F0A500' }[kind || 'ok']; this.setState(s => ({ toasts: [...s.toasts, { text, dot: col, bd: kind === 'warn' ? '#F0A500' : '#E3E0D8', until: Date.now() + 4200 }].slice(-3) })); }
+  answer(al, opt, by, auto) {
+    if (this.state.answers[al.decision] != null) return;
+    const o = (al.card.options || []).find(x => x.id === opt) || { label: opt };
+    if (!auto && o.irreversible && !this.state.approval) { this.setState({ approval: { al, o } }); return; }
+    const t = this.state.t, ctx = (this.state.ctx || '').trim();
+    const note = auto ? (by === 'Director' ? ' (safe default: no answer in time)' : ' (on your behalf)') : '';
+    const ue = [...this.state.uev, { id: 'u' + Date.now(), ts: t, type: al.type === 'approval.requested' ? 'approval.resolved' : 'alert.resolved', actor: by === 'You' ? 'you' : by, target: al.target, data: { alert: al.id, by, choice: opt }, summary: `${by} chose "${o.label}"${note}${ctx ? ' · Context: "' + ctx + '"' : ''}` }];
+    if (o.irreversible && o.approve) ue.push({ id: 'u' + Date.now() + 'a', ts: t + .01, type: 'approval.resolved', actor: 'you', target: al.target, data: { alert: al.id + '-appr', by }, summary: `${by} approved: ${o.approve.button}` });
+    const answers = { ...this.state.answers, [al.decision]: opt };
+    this.toast(auto ? `${by}${by === 'Director' ? ' applied the safe default' : ' answered for you'}: ${o.label}` : `Done. ${o.label}. Work resumes.`, auto ? 'warn' : 'ok');
+    this.recompile(answers, ue); this.setState({ answers, uev: ue, ctx: '', approval: null, activeAlert: null });
+  }
+  joinMeeting(al, join) {
+    const st = { ...this.state.inviteStage, [al.id]: 'options' };
+    if (join) { const ue = [...this.state.uev, { id: 'u' + Date.now(), ts: this.state.t, type: 'user.joined', actor: 'you', target: al.anchor || al.target, data: { meeting: al.meeting, initials: 'You', color: '#5A3FE0', until: Math.max(1, (al.needBy || this.state.t) - this.state.t + 1.2) }, summary: 'You joined the decision meeting' }]; this.recompile(null, ue); this.setState({ uev: ue, inviteStage: st }); }
+    else this.setState({ inviteStage: st });
+  }
+  restart = () => { this.el = {}; this.cam = null; this.recompile({}, []); this.setState({ t: 0, answers: {}, uev: [], inviteStage: {}, snooze: {}, pick: {}, sel: null, follow: true, playing: true, activeAlert: null }); };
+  fmt(t) { t = Math.max(0, t); const m = Math.floor(t / 60), s = Math.floor(t % 60); return m + ':' + String(s).padStart(2, '0'); }
+  renderVals() {
+    const S = this.state;
+    const ww = window.innerWidth / (S.stage ? 1.2 : 1); const base = { cols: ww >= 1500 ? '250px minmax(0,1fr) 350px' : ww >= 1120 ? '220px minmax(0,1fr) 320px' : 'minmax(0,1fr) 300px', leftDisp: ww >= 1120 ? 'flex' : 'none', zoom: S.stage ? 1.2 : 1, loading: !this.C, loadText: S.err ? 'Could not load the world: ' + S.err : 'Loading world…', setWorld: this.setWorld, setScrub: this.setScrub, onScenario: () => {}, stop: e => e.stopPropagation() };
+    if (!this.C || !this.cam) return { ...base, levelRows: [], story: [], trace: [], markers: [], queue: [], toasts: [], speeds: [], overlayChips: [], mSaved: '—', mCredits: '—', mMemory: '—', needsCount: 0, needsBg: '#F7F6F2', needsLip: '#E3E0D8', pauseLabel: 'Pause all', timeText: '0:00', progW: '0%', playIcon: null, cardOn: false, inspOn: false, approvalOn: false, isStory: true };
+    const TP = this.TP, C = this.C, geo = this.geo, t = S.t, h = React.createElement;
+    const cam = this.cam, { vw, vh } = S;
+    const lod = cam.s < .45 ? 'far' : cam.s > 1.25 ? 'near' : 'mid';
+    const ls = Math.round(Math.max(1, Math.min(1.5, 13.5 / (10.5 * cam.s))) * (S.stage ? 1.15 : 1) * 4) / 4;
+    const view = { view: [cam.x - vw / 2 / cam.s, cam.x + vw / 2 / cam.s, cam.y - vh / 2 / cam.s, cam.y + vh / 2 / cam.s], lod, ls, focus: this.focusLv, ghost: true, sel: S.sel, overlays: S.ov, lens: S.lens, reduced: S.reduced, pick: this.pick, hover: S.hover, onHover: id => { if (id !== this.state.hover) this.setState({ hover: id }); }, kfocus: S.kfocus, onKFocus: id => this.setState({ kfocus: id }) };
+    const scene = TP.render(C, t, view);
+    const toScr = p => [(p[0] - cam.x) * cam.s + vw / 2, (p[1] - cam.y) * cam.s + vh / 2];
+    // alerts
+    const open = TP.openAlerts(C, t).filter(a => a.sev !== 'nudge' && a.sev !== 'fyi' && S.answers[a.decision] == null);
+    const pr = a => (a.sev === 'blocked' ? 0 : 1) * 10 + (this.hold === a ? -5 : 0) + (a.kind === 'approval' ? 1 : 2);
+    open.sort((a, b) => pr(a) - pr(b) || a.t0 - b.t0);
+    const chipOf = a => a.sev === 'blocked' ? ['Blocked', '#D23B30', '#FFFFFF'] : ({ consent: ['Access request', '#F0A500', '#1F1D2B'], approval: ['Approval', '#1F1D2B', '#FFFFFF'], invite: ['Meeting invite', '#5A3FE0', '#FFFFFF'] }[a.kind] || ['Needs you', '#F0A500', '#1F1D2B']);
+    const whereOf = a => { const bi = geo.bIdx[a.anchor || a.target]; const lvl = bi ? (bi.pc.kind === 'island' ? bi.pc.level.lv : bi.pc.lv) : null; return (lvl ? lvl.code + ' · ' : '') + (bi ? bi.bb.s.n : '') + ' · arrived at Your Desk'; };
+    let act = (S.activeAlert && open.find(a => a.id === S.activeAlert)) || this.hold && open.find(a => a === this.hold) || open.find(a => !(S.snooze[a.id] > t));
+    let card = null, cardOn = false, lead = null;
+    if (act) {
+      const cd = act.card || {}, [chip, chipBg, chipFg] = chipOf(act);
+      const anc = TP.anchorOf(C, act.anchor || act.target, t); const sp = anc ? toScr(anc) : null;
+      const W = 380, maxH = vh - 24;
+      let x = sp ? sp[0] + 60 : vw - W - 16, y = sp ? sp[1] - 120 : 60;
+      if (x + W > vw - 12) x = sp ? sp[0] - W - 60 : vw - W - 16; x = Math.max(12, Math.min(vw - W - 12, x)); y = Math.max(56, Math.min(vh - 360, y));
+      if (S.sel && x < 360 && y > vh - 460) x = Math.min(vw - W - 12, 360);
+      if (sp && sp[0] > -20 && sp[0] < vw + 20 && sp[1] > -20 && sp[1] < vh + 20) lead = [sp, [x < sp[0] ? x + W : x, y + 40]];
+      const pickId = S.pick[act.id] || (cd.options || []).find(o => o.suggested)?.id || (cd.options || [])[0]?.id;
+      const sel = (cd.options || []).find(o => o.id === pickId) || {};
+      const stageOk = act.kind !== 'invite' || S.inviteStage[act.id] === 'options';
+      const rem = Math.max(0, Math.ceil(act.timer - (this.el[act.id] || 0)));
+      const defO = (cd.options || []).find(o => o.id === act.def) || {};
+      const who = act.defBy;
+      card = {
+        chip, chipBg, chipFg, bd: act.sev === 'blocked' ? '#D23B30' : '#F0A500', where: whereOf(act), title: cd.title || act.summary, why: cd.why || '', x, y, maxH,
+        consent: act.kind === 'consent', service: cd.service, method: cd.method, perms: (cd.perms || []).map(([p, why]) => ({ p, why })), duration: cd.duration, never: cd.never,
+        invite: act.kind === 'invite' && !stageOk, showOptions: stageOk,
+        options: (cd.options || []).map(o => { const on = o.id === pickId; return { label: o.label, detail: o.suggested ? (o.detail ? o.detail + ' ' : '') + 'Why: ' + o.reason + '.' : (o.detail || ''), suggested: !!o.suggested, pressed: on ? 'true' : 'false', bd: on ? '#5A3FE0' : '#E3E0D8', bg: on ? '#F4F1FE' : '#FFFFFF', ring: on ? '#5A3FE0' : '#B8B3A6', dot: on ? '#5A3FE0' : 'transparent', onClick: () => this.setState({ pick: { ...this.state.pick, [act.id]: o.id } }) }; }),
+        primary: sel.irreversible ? 'Review: ' + sel.label : (act.kind === 'consent' ? sel.label + (sel.id === 'allow' || sel.id === 'grant' ? ' · sign in with the service' : '') : 'Confirm: ' + sel.label),
+        confirm: () => this.answer(act, pickId, 'You'),
+        join: () => this.joinMeeting(act, true), async: () => this.joinMeeting(act, false),
+        delegate: () => { const sg = (cd.options || []).find(o => o.suggested) || defO; this.answer(act, sg.id, 'Director', true); },
+        canDelegate: act.kind !== 'invite' || stageOk,
+        timer: (this.hold === act ? 'This branch is paused until you answer. ' : 'Other work continues. ') + (who === 'Director' ? `If there's no answer in ${rem}s, the Director applies the safe default: "${defO.label}".` : `Anita M. (Approver) can answer for you. She will pick "${defO.label}" in ${rem}s if you don't.`),
+        showMe: () => this.showMe(act.anchor || act.target), snooze: () => this.setState({ snooze: { ...this.state.snooze, [act.id]: t + 8 }, activeAlert: null })
+      };
+      cardOn = true;
+    }
+    const svgKids = [h('g', { key: 'cam', transform: `translate(${vw / 2} ${vh / 2}) scale(${cam.s}) translate(${-cam.x} ${-cam.y})` }, scene)];
+    if (lead) svgKids.push(h('g', { key: 'lead' }, h('path', { d: `M${lead[0][0]} ${lead[0][1]} L${lead[1][0]} ${lead[1][1]}`, stroke: '#1F1D2B', strokeWidth: 2, strokeDasharray: '5 4', fill: 'none' }), h('circle', { cx: lead[0][0], cy: lead[0][1], r: 6, fill: '#F0A500', stroke: '#FFFFFF', strokeWidth: 2 })));
+    const worldSvg = h('svg', { width: '100%', height: '100%', viewBox: `0 0 ${vw} ${vh}`, style: { display: 'block', position: 'absolute', inset: 0 } }, svgKids);
+    // HUD
+    const m = TP.metersAt(C, t); const mins = Math.round(m[3]);
+    const needsCount = open.length;
+    const lvName = this.focusLv == null ? 'Whole world' : geo.levels[this.focusLv].code + ' ' + geo.levels[this.focusLv].name;
+    const levelRows = geo.levels.slice().reverse().map(l => { const p = Math.round(TP.levelProgress(C, l, t) * 100); const shown = C.LV[l.id] != null && t >= C.LV[l.id]; const lastS = C.story.filter(e => e.ts <= t && e._lv === l.i).slice(-1)[0]; const on = this.focusLv === l.i; return { code: l.code, name: l.name, color: l.color, pct: p + '%', pctW: p + '%', sub: shown ? (lastS ? lastS.summary : 'Planned') : 'Not planned yet', op: shown ? 1 : .45, bd: on ? '#5A3FE0' : '#E3E0D8', bg: on ? '#F4F1FE' : '#FFFFFF', onClick: () => this.flyToLevel(l.i) }; });
+    const agNow = Object.values(C.A).filter(a => t >= a.born && (a.died == null || t < a.died) && a.role !== 'bot').length;
+    const bNow = Object.keys(C.B).filter(id => { const s = TP.bState(C, id, t); return s && s.state !== 'planned'; }).length;
+    const lvOf = e => e._lv != null ? geo.levels[e._lv] : null;
+    const story = C.story.filter(e => e.ts <= t).slice(-60).reverse().map((e, i) => { const l = lvOf(e); const imp = ['alert.raised', 'approval.requested', 'meeting.decision', 'alert.resolved', 'approval.resolved', 'artifact.reviewed', 'app.deployed', 'agent.blocked'].includes(e.type); return { time: this.fmt(e.ts), code: l ? l.code : 'All', color: l ? l.color : '#1F1D2B', text: e.summary, fw: imp ? 800 : 500, op: 1 }; });
+    const TC = { alert: '#B97E00', approval: '#B97E00', meeting: '#5A3FE0', connection: '#21748A', data: '#21748A', agent: '#1F1D2B', building: '#5A5768', app: '#5A3FE0', artifact: '#1F7F44', memory: '#3F2AAE', budget: '#8A6D1A', user: '#89466E', level: '#1F1D2B', district: '#5A5768', world: '#1F1D2B' };
+    const trace = C.ev.filter(e => e.ts <= t).slice(-45).reverse().map((e, i) => ({ time: this.fmt(e.ts) + '.' + String(Math.floor((e.ts % 1) * 10)), type: e.type + (e.severity ? ' · ' + e.severity : ''), col: TC[e.type.split('.')[0]] || '#1F1D2B', detail: [e.actor, e.target, e.item, e.credits ? e.credits + ' cr' : null].filter(Boolean).join(' → ') || e.summary || '', bg: i === 0 ? '#F4F1FE' : 'transparent', onClick: () => this.setState({ t: e.ts, follow: true }) }));
+    const MC = { 'alert.raised': ['#F0A500', 8, 14, 11], 'approval.requested': ['#F0A500', 8, 14, 11], 'meeting.called': ['#5A3FE0', 6, 12, 12], 'meeting.decision': ['#5A3FE0', 6, 12, 12], 'connection.requested': ['#21748A', 5, 10, 13], 'connection.established': ['#21748A', 5, 10, 13], 'artifact.reviewed': ['#1F7F44', 5, 10, 13], 'agent.blocked': ['#D23B30', 6, 12, 12], 'level.created': ['#1F1D2B', 4, 8, 14], 'app.deployed': ['#5A3FE0', 8, 8, 14], 'alert.resolved': ['#1F7F44', 8, 8, 14], 'approval.resolved': ['#1F7F44', 8, 8, 14] };
+    const markers = C.markers.filter(mk => !(mk.type === 'alert.raised' && (mk.sev === 'nudge' || mk.sev === 'fyi'))).map(mk => { const c = MC[mk.type] || ['#5A5768', 4, 8, 14]; return { left: (mk.ts / C.end * 100) + '%', col: c[0], w: c[1], h: c[2], top: c[3], title: mk.type }; });
+    // toasts from nudges
+    const nudges = C.alerts.filter(a => a.sev === 'nudge' && t >= a.t0 && t < a.t0 + 4.5).map(a => ({ text: a.summary, dot: '#5A3FE0', bd: '#E3E0D8' }));
+    const fyis = C.alerts.filter(a => a.sev === 'fyi' && t >= a.t0 && t < a.t0 + 4.5).map(a => ({ text: 'FYI · ' + a.summary, dot: '#2A6FD6', bd: '#E3E0D8' }));
+    const toasts = [...nudges, ...fyis, ...S.toasts].slice(-3);
+    const queue = open.map(a => { const [chip, chipBg, chipFg] = chipOf(a); const on = act && act.id === a.id; return { chip, chipBg, chipFg, where: whereOf(a).replace(' · arrived at Your Desk', ''), title: (a.card && a.card.title) || a.summary, bg: on ? '#FFF3D6' : '#FFFFFF', bd: on ? '#F0A500' : '#E3E0D8', onClick: () => this.setState({ activeAlert: a.id, snooze: { ...this.state.snooze, [a.id]: 0 } }) }; });
+    // inspector
+    let insp = null;
+    if (S.sel) insp = this.inspect(S.sel, t);
+    const ovDefs = [['heat', 'Heat'], ['bottle', 'Bottlenecks'], ['conn', 'Connections'], ['people', 'People'], ['trail', 'Trails'], ['reduced', 'Reduced motion'], ['stage', 'Stage mode']];
+    const overlayChips = ovDefs.map(([k, label]) => { const on = k === 'reduced' ? S.reduced : k === 'stage' ? S.stage : !!S.ov[k]; return { label, on: on ? 'true' : 'false', bd: on ? '#5A3FE0' : '#E3E0D8', bg: on ? '#5A3FE0' : '#FFFFFF', fg: on ? '#FFFFFF' : '#1F1D2B', onClick: () => { if (k === 'reduced') this.setState({ reduced: !S.reduced }); else if (k === 'stage') { const ns = !S.stage; this.setState({ stage: ns }); setTimeout(() => { if (this.worldEl) { const r = this.worldEl.getBoundingClientRect(); const z = ns ? 1.2 : 1; this.setState({ vw: r.width / z, vh: r.height / z }); } }, 60); } else this.setState({ ov: { ...S.ov, [k]: !S.ov[k] } }); } }; });
+    const speeds = [.5, 1, 2, 4].map(v => ({ label: v + '×', on: S.speed === v ? 'true' : 'false', bg: S.speed === v ? '#1F1D2B' : '#FFFFFF', fg: S.speed === v ? '#FFFFFF' : '#1F1D2B', onClick: () => this.setState({ speed: v }) }));
+    const playIcon = S.playing ? h('span', { style: { display: 'flex', gap: 4 } }, h('span', { style: { width: 5, height: 16, borderRadius: 2, background: '#FFFFFF' } }), h('span', { style: { width: 5, height: 16, borderRadius: 2, background: '#FFFFFF' } })) : h('span', { style: { width: 0, height: 0, borderLeft: '14px solid #FFFFFF', borderTop: '9px solid transparent', borderBottom: '9px solid transparent', marginLeft: 3 } });
+    const ap = S.approval;
+    return {
+      ...base, worldSvg, cursor: this.drag && this.drag.moved ? 'grabbing' : 'grab',
+      mSaved: mins >= 60 ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' m' : mins + ' m', mCredits: String(Math.round(m[1])), mMemory: Math.round(m[2]) + ' cr',
+      needsCount, needsBg: needsCount ? '#F0A500' : '#F7F6F2', needsLip: needsCount ? '#B97E00' : '#E3E0D8', openFirstAlert: () => { if (open[0]) this.setState({ activeAlert: open[0].id, snooze: {} }); },
+      pauseLabel: S.playing ? 'Pause all' : 'Resume all', togglePlay: this.togglePlay, playAria: S.playing ? 'Pause' : 'Play', playIcon,
+      tierStats: `${agNow} agents · ${bNow} buildings · ${C.decisions.length} decisions`, levelRows,
+      camLabel: (S.follow ? 'Following · ' : '') + lvName, followDot: S.follow ? '#1F7F44' : '#B8B3A6', showFollow: !S.follow, doFollow: () => this.setState({ follow: true }),
+      zoomIn: e => { e.stopPropagation(); this.camT = { ...this.cam, s: Math.min(3.5, this.cam.s * 1.25) }; this.setState({ follow: false }); }, zoomOut: e => { e.stopPropagation(); this.camT = { ...this.cam, s: Math.max(.12, this.cam.s / 1.25) }; this.setState({ follow: false }); },
+      lodLabel: { far: 'Far', mid: 'Mid', near: 'Near' }[lod],
+      onDown: this.onDown, onMove: this.onMove, onUp: this.onUp, onBgClick: this.onBgClick,
+      holding: !!this.hold && !cardOn ? true : !!this.hold, holdText: this.hold ? 'Waiting on you. Only the ' + (this.hold.decision === 'supplier' ? 'Proto 3' : this.hold.decision === 'pricing' ? 'pricing' : this.hold.decision === 'share' ? 'Parts Watch sharing' : 'motor data') + ' branch is paused.' : '',
+      toasts, cardOn, card: card || {}, ctx: S.ctx, onCtx: e => this.setState({ ctx: e.target.value }),
+      inspOn: !!insp, insp: insp || {}, closeInsp: () => this.setState({ sel: null }),
+      hasQueue: open.length > 0, queue,
+      isStory: S.lens === 'story', isTrace: S.lens === 'trace', lensStory: () => this.setState({ lens: 'story' }), lensTrace: () => this.setState({ lens: 'trace' }),
+      storyBd: S.lens === 'story' ? '#5A3FE0' : '#E3E0D8', storyBg: S.lens === 'story' ? '#F4F1FE' : '#FFFFFF', traceBd: S.lens === 'trace' ? '#5A3FE0' : '#E3E0D8', traceBg: S.lens === 'trace' ? '#F4F1FE' : '#FFFFFF',
+      story, trace, markers, timeText: this.fmt(t) + ' / ' + this.fmt(C.end), progW: (t / C.end * 100) + '%', onScrubDown: this.onScrubDown,
+      speeds, overlayChips, restart: this.restart,
+      approvalOn: !!ap, appr: ap ? { title: ap.o.approve.button + '?', button: ap.o.approve.button, what: ap.o.approve.what.map((w, i) => ({ n: i + 1, text: w })) } : {},
+      apprCancel: () => this.setState({ approval: null }), apprOk: () => { const a = this.state.approval; this.state.approval = { ...a, ok: true }; this.answer(a.al, a.o.id, 'You', false); }
+    };
+  }
+  inspect(sel, t) {
+    const TP = this.TP, C = this.C, geo = this.geo, fmt = x => this.fmt(x);
+    const evs = f => C.ev.filter(e => e.ts <= t && f(e) && e.summary).slice(-5).reverse().map(e => ({ time: fmt(e.ts), text: e.summary }));
+    const nm = id => C.A[id] ? C.A[id].name : id;
+    if (sel.kind === 'agent') {
+      const a = C.A[sel.id]; if (!a) return null; const s = TP.agentAt(C, a, t) || {};
+      const lastW = C.ev.filter(e => e.ts <= t && e.actor === a.id && e.type === 'agent.working' && e.summary).slice(-1)[0];
+      const cr = C.ev.filter(e => e.ts <= t && e.actor === a.id).reduce((x, e) => x + (e.credits || 0), 0);
+      const hits = C.ev.filter(e => e.ts <= t && e.actor === a.id && e.type === 'memory.hit').length;
+      const bi = s.loc && geo.bIdx[s.loc.at];
+      return { title: a.name, sub: (a.title || a.role) + ' · ' + ({ director: 'Director', lead: 'Lead', specialist: 'Specialist' }[a.rank] || a.rank), color: window.TiloWorld(React.createElement).ROLE[a.role] || '#5A3FE0',
+        rows: [{ k: 'Now', v: s.moving ? 'Walking' + (s.item ? ' with ' + s.item : '') : s.waiting ? 'Waiting on you' : lastW ? lastW.summary : 'At post' }, { k: 'Where', v: bi ? bi.bb.s.n : '—' }, { k: 'On task', v: lastW ? fmt(t - lastW.ts) : '—' }, { k: 'Credits', v: cr + ' of ' + (a.budget || '—') }, { k: 'Tools', v: (a.tools || []).join(', ') || '—' }, { k: 'Key-card', v: (a.scope || []).join(', ') || 'No outside access' }, { k: 'Memory hits', v: String(hits) }],
+        hasEvents: true, events: evs(e => e.actor === a.id || e.target === a.id), actions: [{ label: this.state.ov.trail ? 'Hide path trail' : 'Show path trail', onClick: () => this.setState({ ov: { ...this.state.ov, trail: !this.state.ov.trail } }) }], appLink: false };
+    }
+    if (sel.kind === 'building') {
+      const bi = geo.bIdx[sel.id]; if (!bi) return null; const s = TP.bState(C, sel.id, t) || {};
+      const here = Object.values(C.A).map(a => ({ a, s: TP.agentAt(C, a, t) })).filter(q => q.s && !q.s.moving && q.s.loc && q.s.loc.at === sel.id);
+      const q = here.filter(x => x.s.loc.q != null).length;
+      const arts = C.ev.filter(e => e.ts <= t && e.target === sel.id && e.type === 'artifact.created');
+      const thr = C.ev.filter(e => e.ts <= t && e.target === sel.id && ['artifact.created', 'artifact.reviewed', 'agent.handoff', 'app.building', 'agent.working'].includes(e.type)).length;
+      const lvl = bi.pc.kind === 'island' ? bi.pc.level.lv : bi.pc.lv;
+      const st = { planned: 'Planned', construction: 'Under construction', idle: 'Open', active: 'Working', complete: 'Archived · done' }[s.state] || s.state;
+      return { title: bi.bb.s.n, sub: lvl.code + ' · ' + bi.d.name + (bi.bb.kit ? ' · common kit' : ' · generated'), color: window.TiloWorld(React.createElement).DIST[bi.d.tint] || '#7D8793',
+        rows: [{ k: 'State', v: st + (s.flag ? ' · ' + ({ needs: 'needs you', blocked: 'blocked', fyi: 'FYI' }[s.flag]) : '') }, { k: 'Status', v: s.tag || '—' }, { k: 'Throughput', v: thr + ' events' }, { k: 'Queue', v: q ? q + ' waiting' + (q > 3 ? ' · bottleneck' : '') : 'none' }, { k: 'Artifacts', v: arts.map(e => e.summary.split(':')[0]).slice(-2).join('; ') || '—' }, { k: 'Agents here', v: here.map(x => x.a.name).join(', ') || 'none' }],
+        hasEvents: true, events: evs(e => e.target === sel.id), actions: [{ label: 'Show me', onClick: () => this.showMe(sel.id) }], appLink: sel.id === 'pwatch' && s.state !== 'planned' };
+    }
+    if (sel.kind === 'bridge') {
+      const br = geo.bridges[sel.id]; const b = C.BR[sel.id] || { st: [], calls: 0, vol: 0 }; const sv = TP.last(b.st, t); const state = sv ? sv[1] : 'none';
+      const tr = C.ev.filter(e => e.ts <= t && e.target === sel.id && e.type === 'data.transfer'); const al = C.alerts.find(a => a.card && a.card.service && a.anchor === 'connector' && ((sel.id === 'br-motors' && a.decision === 'motor') || (sel.id === 'br-pricing' && a.decision === 'pricing')));
+      const who = Object.values(C.A).filter(a => (a.scope || []).some(sc => br.name.toLowerCase().includes(sc.toLowerCase().split(' ')[0]))).map(a => a.name);
+      return { title: br.name, sub: br.island.is.name + ' · ' + ({ api: 'Paved road · API', mcp: 'Rail · agent protocol (MCP)', browser: 'Footpath · browser access' }[br.type]), color: '#21748A',
+        rows: [{ k: 'State', v: { none: 'Not connected', requested: 'Requested, waiting on consent', building: 'Building', connected: 'Connected', rate: 'Rate-limited', expiring: 'Expiring soon', expired: 'Expired', revoked: 'Revoked' }[state] }, { k: 'Calls', v: String(tr.length * 37) }, { k: 'Data', v: tr.reduce((x, e) => x + ((e.data && e.data.mb) || 0), 0) + ' MB' }, { k: 'Last sync', v: tr.length ? fmt(tr[tr.length - 1].ts) : '—' }, { k: 'Latency', v: { api: '180 ms', mcp: '240 ms', browser: '2.1 s' }[br.type] }, { k: 'Errors', v: '0' }, { k: 'Scopes', v: al ? al.card.perms.map(p => p[0]).join('; ') : 'Read-only catalogue' }, { k: 'May cross', v: who.join(', ') || 'Connections Lead only' }, { k: 'Secrets', v: 'Never shown. Held by the service.' }],
+        hasEvents: true, events: evs(e => e.target === sel.id), actions: [], appLink: false };
+    }
+    if (sel.kind === 'meeting') {
+      const m = C.meet[sel.id]; if (!m) return null;
+      const fu = m.decisions.length ? C.ev.filter(e => e.ts > m.decisions[m.decisions.length - 1].t && e.ts <= Math.min(t, m.decisions[m.decisions.length - 1].t + 12) && e.summary && e.type !== 'meeting.ended').slice(0, 4).map(e => e.summary) : [];
+      return { title: m.title, sub: ({ standup: 'Stand-up', review: 'Review', decision: 'Decision meeting' }[m.kind]) + ' · called by ' + nm(m.by), color: '#5A3FE0',
+        rows: [{ k: 'Attendees', v: m.attendees.map(nm).join(', ') + (C.presence.some(p => p.meeting === m.id) ? ', You' : '') }, { k: 'Agenda', v: m.agenda.join(' · ') }, { k: 'Duration', v: m.t0 != null ? fmt(((m.t1 != null && m.t1 < t) ? m.t1 : t) - m.t0) : 'not started' }, { k: 'Decisions', v: m.decisions.filter(d => d.t <= t).map(d => d.text + ' (' + d.by + ')').join(' · ') || 'none yet' }, { k: 'Follow-ups', v: fu.join(' · ') || '—' }],
+        hasEvents: false, events: [], actions: [], appLink: false };
+    }
+    if (sel.kind === 'level') {
+      const l = geo.levels.find(x => x.id === sel.id); const i = l.i; const first = C.ev.find(e => e._lv === i && e.type !== 'level.created' && e.type !== 'building.planned' && e.type !== 'district.created');
+      const blockers = TP.openAlerts(C, t).filter(a => a.level === i && a.sev !== 'nudge').length + Object.keys(C.B).filter(id => { const s = TP.bState(C, id, t); const bi = geo.bIdx[id]; return s && s.flag === 'blocked' && bi && (bi.pc.i === i || (bi.pc.level && bi.pc.level.i === i)); }).length;
+      return { title: l.code + ' · ' + l.name, sub: l.districts.length + ' workstreams · ' + l.districts.reduce((x, d) => x + d.buildings.length, 0) + ' capabilities', color: l.color,
+        rows: [{ k: 'Progress', v: Math.round(TP.levelProgress(C, l, t) * 100) + '%' }, { k: 'Time spent', v: first && first.ts <= t ? fmt(t - first.ts) : 'not started' }, { k: 'Blockers', v: String(blockers) }, { k: 'Islands', v: l.islands.map(s => s.is.name).join(', ') || 'none' }],
+        hasEvents: true, events: evs(e => e._lv === i), actions: [{ label: 'Fly here', onClick: () => this.flyToLevel(i) }], appLink: false };
+    }
+    return null;
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="./tilo-world.js"></script>
+<style>
+body{margin:0;background:#E9E7E1;-webkit-font-smoothing:antialiased}
+a{color:#5A3FE0;font-weight:800}a:hover{color:#3F2AAE}
+@keyframes tiloDash{to{stroke-dashoffset:-14}}
+@keyframes tiloBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</helmet>
+<div style="padding:80px;display:flex;flex-direction:column;gap:88px;font-family:'Nunito Sans',sans-serif;color:#1F1D2B;min-width:2080px">
+
+<header style="display:flex;flex-direction:column;gap:10px;max-width:1100px">
+  <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#5A5768">Tilo · City tier · four real tasks, one renderer · <a href="Tilo World Kit.dc.html">World kit</a></div>
+  <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:52px;line-height:1.02">Four cities, four jobs</div>
+  <div style="font-size:18px;line-height:1.5;color:#5A5768;text-wrap:pretty">Each city below comes from a different Kestrel Freight task, captured mid-run. The planner outputs districts, buildings, routes, gates and agents; the renderer does the rest. There is no per-city artwork, so every difference you see comes from the plan.</div>
+</header>
+
+<sc-for list="{{ cities }}" as="c" hint-placeholder-count="4">
+<section style="display:flex;gap:40px;align-items:flex-start">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:15px;font-weight:700;color:#5A5768;font-family:'JetBrains Mono',monospace">{{ c.code }} · {{ c.short }} · 1600×1000 · mid-run</div>
+    <div data-screen-label="City" style="width:1600px;height:1000px;position:relative;background:#F7F6F2;border-radius:24px;outline:2px solid #E3E0D8;overflow:hidden;display:grid;grid-template-columns:400px minmax(0,1fr)">
+      <div style="position:absolute;left:0;right:0;top:0;height:8px;background:#E3E0D8;z-index:1"><div style="height:8px;width:{{ c.pct }};background:#5A3FE0;border-radius:0 999px 999px 0"></div></div>
+      <div style="background:#FFFFFF;border-right:2px solid #E3E0D8;padding:32px 24px 24px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box;min-height:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="height:26px;padding:0 10px;border-radius:999px;background:#5A3FE0;color:#FFFFFF;font-size:13px;font-weight:800;display:flex;align-items:center">City</div>
+          <div style="font-size:14px;font-weight:700;color:#5A5768">{{ c.pctLabel }} done</div>
+        </div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;line-height:1.2;text-wrap:pretty">{{ c.title }}</div>
+        <div style="font-size:14px;font-weight:700;color:#5A5768">{{ c.stats }}</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:15px;font-weight:600;line-height:1.4;background:#F7F6F2;border-radius:16px;padding:12px 14px"><div style="width:10px;height:10px;border-radius:99px;background:#5A3FE0;flex:none;margin-top:5px"></div>{{ c.narration }}</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ c.alerts }}" as="al" hint-placeholder-count="2">
+            <div style="background:{{ al.bg }};border:2px solid {{ al.bd }};border-bottom-width:4px;border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+              <div style="align-self:flex-start;height:24px;padding:0 10px;border-radius:999px;background:{{ al.chip }};color:{{ al.chipFg }};font-size:12.5px;font-weight:800;display:flex;align-items:center">{{ al.kind }}</div>
+              <div style="font-weight:800;font-size:15px;line-height:1.35">{{ al.title }}</div>
+              <div style="font-size:13.5px;color:#5A5768;line-height:1.35">{{ al.where }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:1"></div>
+        <div style="height:52px;border-radius:16px;background:#FFFFFF;border:2px solid #E3E0D8;box-shadow:0 4px 0 0 #CFCABF;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800;font-size:16px;flex:none"><div style="display:flex;gap:4px"><div style="width:4px;height:14px;border-radius:2px;background:#1F1D2B"></div><div style="width:4px;height:14px;border-radius:2px;background:#1F1D2B"></div></div>Pause all</div>
+      </div>
+      <div style="position:relative;min-width:0;min-height:0;padding-top:8px">{{ c.el }}</div>
+    </div>
+  </div>
+  <div style="width:340px;padding-top:40px;display:flex;flex-direction:column;gap:18px;font-size:15px;line-height:1.45;color:#5A5768">
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;color:#1F1D2B">{{ c.short }}</div>
+    <div>{{ c.why }}</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <sc-for list="{{ c.legend }}" as="lg" hint-placeholder-count="7">
+        <div style="display:flex;gap:10px;align-items:flex-start"><div style="width:14px;height:14px;border-radius:5px;background:{{ lg.col }};flex:none;margin-top:3px"></div><div><b style="color:#1F1D2B">{{ lg.name }}</b> · {{ lg.what }}</div></div>
+      </sc-for>
+    </div>
+    <div style="border-top:2px solid #E3E0D8;padding-top:14px"><b style="color:#1F1D2B">What's moving:</b> {{ c.moving }}</div>
+  </div>
+</section>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { ready: !!window.TiloWorld };
+  componentDidMount() {
+    if (!window.TiloWorld) this.t = setInterval(() => { if (window.TiloWorld) { clearInterval(this.t); this.setState({ ready: true }); } }, 50);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  cities() {
+    const g = (name, fp, i, extra) => ({ gen: { name, fp, i, ...(extra || {}) } });
+    return [
+      {
+        code: 'C1', short: 'Month-end close', pct: 58,
+        title: 'Close the September books: reconcile 9 bank accounts, post accruals, and prepare the flash report for the CFO.',
+        narration: 'Reconciling bank accounts — 7 of 9 done. One feed needs a fresh sign-in.',
+        why: 'Finance work is heavy on gates and review. Posting to the ledger is irreversible, so the Ledger district sits behind a named gate, and the Review district is where people step in.',
+        moving: 'Bank Feed Station to Reconciliation Mill (walk), Memory Vault to Accrual Workshop (last month\'s accrual schedule reused), Intercompany to Review (handoff with a parcel).',
+        plan: {
+          districts: [
+            { id: 'hall', name: 'Town Hall', hall: true, icon: 'hall', buildings: [{ id: 'townhall', kit: 'townhall', state: 'active' }, { id: 'treasury', kit: 'treasury' }, { id: 'watch', kit: 'watchtower', state: 'active' }] },
+            { id: 'bank', tint: 'research', name: 'Bank reconciliation', icon: 'swap', buildings: [{ id: 'feed', ...g('Bank Feed Station', [2, 1], 'screen'), state: 'active', event: 'screen', count: '7 / 9' }, { id: 'mill', ...g('Reconciliation Mill', [2, 2], 'swap', { fl: 2, roof: 'gable' }), state: 'active' }, { id: 'bankconn', kit: 'connector', state: 'blocked' }] },
+            { id: 'accruals', tint: 'analysis', name: 'Accruals', icon: 'doc', buildings: [{ id: 'accrual', ...g('Accrual Workshop', [2, 1], 'doc'), state: 'active', event: 'doc', count: '31 / 44' }, { id: 'vault', kit: 'vault', state: 'active', event: 'vault' }] },
+            { id: 'interco', tint: 'accounts', name: 'Intercompany', icon: 'swap', buildings: [{ id: 'bridge', ...g('Intercompany Bridge', [2, 1], 'swap'), state: 'complete' }, { id: 'fx', ...g('FX Desk', [1, 1], 'coin'), state: 'complete' }] },
+            { id: 'review', tint: 'people', name: 'Review', icon: 'search', buildings: [{ id: 'variance', ...g('Variance Office', [2, 1], 'search'), state: 'needs' }, { id: 'yard', kit: 'testyard', state: 'active' }] },
+            { id: 'report', tint: 'delivery', name: 'Flash report', icon: 'chart', buildings: [{ id: 'chart', ...g('Chart Studio', [2, 1], 'chart'), state: 'construction' }, { id: 'press', ...g('Report Press', [1, 1], 'doc'), state: 'planned' }, { id: 'dock', kit: 'dock', state: 'planned' }] },
+            { id: 'ledger', tint: 'learning', name: 'Ledger', icon: 'doc', buildings: [{ id: 'journal', ...g('Journal Office', [2, 1], 'doc', { fl: 2, roof: 'flat' }), state: 'planned' }, { id: 'erp', kit: 'connector', state: 'idle' }] }
+          ],
+          routes: [{ id: 'w1', from: 'feed', to: 'mill', kind: 'walk' }, { id: 'm1', from: 'vault', to: 'accrual', kind: 'memory' }, { id: 'h1', from: 'bridge', to: 'variance', kind: 'walk' }],
+          gates: [{ before: 'journal', state: 'closed' }],
+          presence: [{ at: 'variance', initials: 'PR', color: '#2A6FD6' }],
+          comments: [{ at: 'mill', n: 2 }],
+          agents: [
+            { rank: 'director', at: 'townhall' }, { role: 'tester', at: 'watch', expr: 'focused' },
+            { role: 'browser', rank: 'lead', at: 'feed', expr: 'focused', dx: -8 }, { role: 'browser', at: 'feed', expr: 'focused', dx: 12 }, { role: 'builder', at: 'mill', expr: 'focused' }, { role: 'builder', at: 'mill', expr: 'focused', dx: 18 }, { role: 'connector', at: 'bankconn', expr: 'puzzled' },
+            { role: 'builder', rank: 'lead', at: 'accrual', expr: 'focused' }, { role: 'research', at: 'vault', expr: 'focused' },
+            { role: 'connector', rank: 'lead', at: 'bridge', expr: 'delighted' }, { role: 'research', at: 'fx', expr: 'neutral' },
+            { role: 'research', rank: 'lead', at: 'variance', expr: 'needs', ring: true }, { role: 'tester', at: 'yard', expr: 'focused' },
+            { role: 'builder', at: 'chart', expr: 'focused' }, { role: 'delivery', rank: 'lead', at: 'press', expr: 'neutral' },
+            { role: 'delivery', at: 'journal', expr: 'neutral' },
+            { role: 'browser', route: 'w1', t: .5, expr: 'walking', parcel: true }, { role: 'connector', route: 'h1', t: .55, expr: 'walking', parcel: true }
+          ]
+        },
+        alerts: [
+          { kind: 'Needs you', title: 'Freight costs are 7.2% over August. Add an explanation?', where: 'Review · Variance Office · Priya is viewing' },
+          { kind: 'Blocked', title: 'Bank feed for the account ending 4471 has expired.', where: 'Bank reconciliation · Connector Post · trying the statement export instead' }
+        ],
+        legend: [['bank', 'research', 'Bank reconciliation', 'feeds pulled, lines matched'], ['accruals', 'analysis', 'Accruals', '44 accruals drafted from last month\'s schedule'], ['interco', 'accounts', 'Intercompany', 'balances between entities agreed'], ['review', 'people', 'Review', 'variances over 5% need a human reason'], ['report', 'delivery', 'Flash report', 'charts and a one-page CFO summary'], ['ledger', 'learning', 'Ledger', 'posting, behind a named gate']]
+      },
+      {
+        code: 'C2', short: 'Rate-change rollout', pct: 71,
+        title: 'Roll out the Q4 fuel-surcharge change: update the rate tables, rewrite the customer notice, test it, and email 3,200 customers.',
+        narration: 'All test sends passed. Waiting at the gate before sending 3,200 emails.',
+        why: 'A communications job where the whole city points at one gate. Everything upstream is done or finishing, so the amber gate is the single loudest thing on the map.',
+        moving: 'Segment Sorter to Mail Room (walk), Memory Vault to Template Workshop (last surcharge notice reused), four inbox previews live in the Browser Station.',
+        plan: {
+          districts: [
+            { id: 'hall', name: 'Town Hall', hall: true, icon: 'hall', buildings: [{ id: 'townhall', kit: 'townhall', state: 'active' }, { id: 'treasury', kit: 'treasury' }, { id: 'watch', kit: 'watchtower' }] },
+            { id: 'market', tint: 'research', name: 'Market check', icon: 'search', buildings: [{ id: 'library', kit: 'library', state: 'complete' }, { id: 'obs', ...g('Price Observatory', [1, 1], 'tag'), state: 'complete' }] },
+            { id: 'rates', tint: 'analysis', name: 'Rates', icon: 'chart', buildings: [{ id: 'calc', ...g('Rate Calculator', [2, 1], 'chart'), state: 'complete' }, { id: 'tariff', ...g('Tariff Archive', [1, 1], 'doc'), state: 'complete' }, { id: 'vault', kit: 'vault', state: 'active', event: 'vault' }] },
+            { id: 'segments', tint: 'accounts', name: 'Customer segments', icon: 'person', buildings: [{ id: 'sorter', ...g('Segment Sorter', [2, 2], 'person', { fl: 2 }), state: 'complete' }, { id: 'crm', kit: 'connector', state: 'idle' }] },
+            { id: 'notice', tint: 'delivery', name: 'Notice', icon: 'doc', buildings: [{ id: 'writing', ...g('Writing Room', [1, 1], 'doc'), state: 'complete' }, { id: 'template', ...g('Template Workshop', [2, 1], 'mail'), state: 'active' }] },
+            { id: 'tests', tint: 'people', name: 'Test sends', icon: 'flask', buildings: [{ id: 'yard', kit: 'testyard', state: 'complete' }, { id: 'inbox', kit: 'browser', state: 'active', event: 'screen', count: '4 live' }] },
+            { id: 'web', tint: 'learning', name: 'Website', icon: 'screen', buildings: [{ id: 'ratepage', ...g('Rate Page Studio', [2, 1], 'screen'), state: 'construction' }] },
+            { id: 'send', tint: 'mail', name: 'Send', icon: 'mail', buildings: [{ id: 'mailroom', ...g('Mail Room', [2, 1], 'mail', { fl: 2, roof: 'gable' }), state: 'idle' }, { id: 'dock', kit: 'dock', state: 'planned' }] }
+          ],
+          routes: [{ id: 'w1', from: 'sorter', to: 'mailroom', kind: 'walk' }, { id: 'm1', from: 'vault', to: 'template', kind: 'memory' }],
+          gates: [{ before: 'mailroom', state: 'waiting' }],
+          comments: [{ at: 'template', n: 1 }],
+          agents: [
+            { rank: 'director', at: 'townhall', expr: 'talking' },
+            { role: 'research', at: 'library', expr: 'delighted' }, { role: 'research', at: 'obs', expr: 'neutral' },
+            { role: 'builder', rank: 'lead', at: 'calc', expr: 'neutral' }, { role: 'research', at: 'vault', expr: 'focused' },
+            { role: 'connector', rank: 'lead', at: 'sorter', expr: 'delighted' },
+            { role: 'delivery', rank: 'lead', at: 'template', expr: 'focused' }, { role: 'delivery', at: 'writing', expr: 'neutral' },
+            { role: 'tester', rank: 'lead', at: 'yard', expr: 'delighted' }, { role: 'browser', at: 'inbox', expr: 'focused', dx: -12 }, { role: 'browser', at: 'inbox', expr: 'focused', dx: 4 }, { role: 'browser', at: 'inbox', expr: 'focused', dx: 20 }, { role: 'browser', at: 'inbox', expr: 'focused', dx: 36 },
+            { role: 'builder', at: 'ratepage', expr: 'focused' },
+            { role: 'delivery', at: 'mailroom', expr: 'needs', ring: true },
+            { role: 'connector', route: 'w1', t: .6, expr: 'walking', parcel: true }
+          ]
+        },
+        alerts: [{ kind: 'Needs you', title: 'Send 3,200 fuel-surcharge emails from rates@kestrelfreight…', where: 'Send · Gate before the Mail Room · 3 test sends approved by Priya' }],
+        legend: [['market', 'research', 'Market check', 'what other carriers charge'], ['rates', 'analysis', 'Rates', 'new tables, checked against the tariff'], ['segments', 'accounts', 'Customer segments', '3,200 customers in 4 notice variants'], ['notice', 'delivery', 'Notice', 'plain-language rewrite'], ['tests', 'people', 'Test sends', 'sandbox sends and inbox previews'], ['web', 'learning', 'Website', 'rate page update, then publish'], ['send', 'mail', 'Send', 'the one irreversible step']]
+      },
+      {
+        code: 'C3', short: 'RFP response', pct: 44,
+        title: 'Answer the Northgate Retail carrier RFP by Friday: 120 questions, a lane-by-lane rate card, and compliance attachments.',
+        narration: 'Drafting answers — 86 of 120. Last year\'s answers cover 51 of them.',
+        why: 'A writing-heavy job with a locked district. Legal review belongs to another team, so this viewer sees cloud cover and a lock. The district keeps its space, with no partial data.',
+        moving: 'Memory Vault to Answer Workshop (a big cache hit from last year\'s RFP), RFP Reader to Answer Workshop (walk), a pricing agent retrying the Lane Planner.',
+        plan: {
+          districts: [
+            { id: 'hall', name: 'Town Hall', hall: true, icon: 'hall', buildings: [{ id: 'townhall', kit: 'townhall', state: 'active' }, { id: 'treasury', kit: 'treasury' }, { id: 'conn', kit: 'connector' }] },
+            { id: 'intake', tint: 'research', name: 'RFP intake', icon: 'doc', buildings: [{ id: 'reader', ...g('RFP Reader', [2, 1], 'doc'), state: 'complete' }, { id: 'library', kit: 'library', state: 'complete' }] },
+            { id: 'answers', tint: 'analysis', name: 'Answers', icon: 'doc', buildings: [{ id: 'workshop', ...g('Answer Workshop', [2, 2], 'doc', { fl: 2, roof: 'gable' }), state: 'active', event: 'doc', count: '86 / 120' }, { id: 'vault', kit: 'vault', state: 'active', event: 'vault' }] },
+            { id: 'pricing', tint: 'accounts', name: 'Rate card', icon: 'chart', buildings: [{ id: 'cost', ...g('Cost Model Mill', [2, 1], 'chart'), state: 'active' }, { id: 'lanes', ...g('Lane Planner', [1, 1], 'swap'), state: 'active' }] },
+            { id: 'compliance', tint: 'people', name: 'Compliance', icon: 'lock', buildings: [{ id: 'policy', ...g('Policy Archive', [2, 1], 'lock'), state: 'complete' }, { id: 'checklist', ...g('Checklist Office', [1, 1], 'check'), state: 'needs' }] },
+            { id: 'legal', name: 'Legal review', icon: 'lock', locked: true, buildings: [{ id: 'l1', kit: 'library' }, { id: 'l2', kit: 'treasury' }] },
+            { id: 'submit', tint: 'delivery', name: 'Submission', icon: 'parcel', buildings: [{ id: 'studio', ...g('Proposal Studio', [2, 1], 'doc'), state: 'construction' }, { id: 'portal', kit: 'browser', state: 'planned' }] }
+          ],
+          routes: [{ id: 'm1', from: 'vault', to: 'workshop', kind: 'memory' }, { id: 'w1', from: 'reader', to: 'workshop', kind: 'walk' }],
+          gates: [{ before: 'portal', state: 'closed' }],
+          presence: [{ at: 'checklist', initials: 'AM', color: '#5A3FE0' }],
+          agents: [
+            { rank: 'director', at: 'townhall' }, { role: 'connector', at: 'conn' },
+            { role: 'research', rank: 'lead', at: 'reader', expr: 'delighted' }, { role: 'research', at: 'library', expr: 'neutral' },
+            { role: 'delivery', rank: 'lead', at: 'workshop', expr: 'focused' }, { role: 'delivery', at: 'workshop', expr: 'focused', dx: 16 }, { role: 'delivery', at: 'workshop', expr: 'focused', dx: 32 }, { role: 'research', at: 'vault', expr: 'focused' },
+            { role: 'builder', rank: 'lead', at: 'cost', expr: 'focused' }, { role: 'builder', at: 'lanes', expr: 'recovering' },
+            { role: 'tester', rank: 'lead', at: 'policy', expr: 'neutral' }, { role: 'tester', at: 'checklist', expr: 'needs', ring: true },
+            { role: 'builder', at: 'studio', expr: 'focused' }, { role: 'browser', at: 'portal', expr: 'neutral' },
+            { role: 'research', route: 'w1', t: .5, expr: 'walking', parcel: true }
+          ]
+        },
+        alerts: [
+          { kind: 'Needs you', title: 'The insurance certificate on file expires before the contract starts.', where: 'Compliance · Checklist Office · upload the renewal or add a note' },
+          { kind: 'Recovering', title: 'Lane Planner timed out on 3 cross-border lanes. Trying another way.', where: 'Rate card · Lane Planner · no action needed' }
+        ],
+        legend: [['intake', 'research', 'RFP intake', '120 questions split and tagged'], ['answers', 'analysis', 'Answers', 'drafts, reusing last year where it fits'], ['pricing', 'accounts', 'Rate card', 'cost model to lane prices'], ['compliance', 'people', 'Compliance', 'certificates and policies attached'], ['legal', 'payroll', 'Legal review', 'another team, shown as cloud'], ['submit', 'delivery', 'Submission', 'proposal and portal upload, behind a gate']]
+      },
+      {
+        code: 'C4', short: 'New-hire onboarding', pct: 52,
+        title: 'Onboard 12 new hires across email, the HR system, laptop requests and the training portal before Monday.',
+        narration: 'Setting up accounts — 7 of 12. Four HR sessions are running at once.',
+        why: 'The parallel-browser city. HR needs four live sessions at once, Tom from IT is scoped to Accounts & devices, and Payroll stays locked to this viewer.',
+        moving: 'HR Records to Account Setup (walk with a parcel), Account Setup to Laptop Depot (handoff), four browser operators in the HR Browser Station.',
+        plan: {
+          districts: [
+            { id: 'hall', name: 'Town Hall', hall: true, icon: 'hall', buildings: [{ id: 'townhall', kit: 'townhall', state: 'active' }, { id: 'treasury', kit: 'treasury' }, { id: 'watch', kit: 'watchtower', state: 'active' }] },
+            { id: 'accounts', name: 'Accounts & devices', icon: 'laptop', buildings: [{ id: 'office', ...g('Account Setup Office', [2, 1], 'person'), state: 'active', event: 'person', count: '7 / 12' }, { id: 'depot', ...g('Laptop Depot', [2, 1], 'laptop'), state: 'needs' }, { id: 'badge', ...g('Badge Office', [1, 1], 'key'), state: 'active' }] },
+            { id: 'people', name: 'HR system', icon: 'doc', buildings: [{ id: 'browser', kit: 'browser', state: 'active', event: 'screen', count: '4 live' }, { id: 'records', ...g('HR Records Office', [1, 1], 'doc'), state: 'complete' }, { id: 'hrconn', kit: 'connector' }] },
+            { id: 'mail', name: 'Email', icon: 'mail', buildings: [{ id: 'mailroom', ...g('Mail Room', [2, 1], 'mail'), state: 'active' }, { id: 'yard', kit: 'testyard', state: 'complete' }] },
+            { id: 'learning', name: 'Training', icon: 'cap', buildings: [{ id: 'training', ...g('Training Hall', [2, 2], 'cap', { fl: 2 }), state: 'construction' }, { id: 'buddy', ...g('Buddy Matcher', [1, 1], 'person'), state: 'active' }] },
+            { id: 'delivery', name: 'Welcome', icon: 'parcel', buildings: [{ id: 'pack', ...g('Welcome Pack Studio', [1, 1], 'doc'), state: 'planned' }, { id: 'dock', kit: 'dock', state: 'planned' }] },
+            { id: 'payroll', name: 'Payroll', icon: 'lock', locked: true, buildings: [{ id: 'p1', kit: 'treasury' }, { id: 'p2', kit: 'vault' }] }
+          ],
+          routes: [{ id: 'h1', from: 'records', to: 'office', kind: 'walk' }, { id: 'h2', from: 'office', to: 'depot', kind: 'walk' }],
+          gates: [{ before: 'mailroom', state: 'open' }],
+          presence: [{ at: 'depot', initials: 'TK', color: '#A8784A' }],
+          comments: [{ at: 'training', n: 3 }],
+          agents: [
+            { rank: 'director', at: 'townhall' }, { role: 'tester', at: 'watch', expr: 'focused' },
+            { role: 'connector', rank: 'lead', at: 'office', expr: 'focused', dx: -8 }, { role: 'connector', at: 'office', expr: 'focused', dx: 12 }, { role: 'builder', at: 'depot', expr: 'needs', ring: true }, { role: 'connector', at: 'badge', expr: 'focused' },
+            { role: 'browser', rank: 'lead', at: 'browser', expr: 'focused', dx: -12 }, { role: 'browser', at: 'browser', expr: 'focused', dx: 4 }, { role: 'browser', at: 'browser', expr: 'focused', dx: 20 }, { role: 'browser', at: 'browser', expr: 'recovering', dx: 36 },
+            { role: 'research', at: 'records', expr: 'delighted' }, { role: 'connector', at: 'hrconn' },
+            { role: 'delivery', rank: 'lead', at: 'mailroom', expr: 'focused' }, { role: 'tester', at: 'yard', expr: 'delighted' },
+            { role: 'builder', rank: 'lead', at: 'training', expr: 'focused' }, { role: 'builder', at: 'training', expr: 'focused', dx: 18 }, { role: 'research', at: 'buddy', expr: 'focused' },
+            { role: 'delivery', at: 'pack', expr: 'neutral' },
+            { role: 'research', route: 'h1', t: .5, expr: 'walking', parcel: true }, { role: 'connector', route: 'h2', t: .45, expr: 'walking' }
+          ]
+        },
+        alerts: [
+          { kind: 'Needs you', title: 'Two laptop models are out of stock. Approve the substitute?', where: 'Accounts & devices · Laptop Depot · Tom is viewing' },
+          { kind: 'Approved', title: 'Welcome emails approved by Priya at 10:14.', where: 'Email · gate open · recorded in Story' }
+        ],
+        legend: [['accounts', 'accounts', 'Accounts & devices', 'logins, laptops and badges · Tom\'s scope'], ['people', 'people', 'HR system', 'four live sessions in parallel'], ['mail', 'mail', 'Email', 'welcome emails, tested, then sent'], ['learning', 'learning', 'Training', 'courses assigned, buddies matched'], ['delivery', 'delivery', 'Welcome', 'day-one packs'], ['payroll', 'payroll', 'Payroll', 'locked to this viewer']]
+      }
+    ];
+  }
+  renderVals() {
+    if (!window.TiloWorld) return {};
+    const W = window.TiloWorld(React.createElement);
+    const AL = {
+      'Needs you': { bg: '#FFF3D6', bd: '#F0A500', chip: '#F0A500', chipFg: '#1F1D2B' },
+      'Blocked': { bg: '#FCE7E5', bd: '#D23B30', chip: '#D23B30', chipFg: '#FFFFFF' },
+      'Recovering': { bg: '#FFFFFF', bd: '#E3E0D8', chip: '#1F1D2B', chipFg: '#FFFFFF' },
+      'Approved': { bg: '#E3F2E8', bd: '#1F7F44', chip: '#1F7F44', chipFg: '#FFFFFF' }
+    };
+    return {
+      cities: this.cities().map((c, i) => {
+        const p = c.plan, nB = p.districts.reduce((a, d) => a + d.buildings.length, 0);
+        return {
+          ...c,
+          el: W.world(p, { seed: 3 + i, labels: true, anim: i === 0 }),
+          pct: c.pct + '%', pctLabel: c.pct + '%',
+          stats: `${p.districts.length} districts · ${nB} buildings · ${p.agents.length} agents`,
+          alerts: c.alerts.map(a => ({ ...a, ...AL[a.kind] })),
+          legend: c.legend.map(([id, tint, name, what]) => ({ name, what, col: W.DIST[tint] }))
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>
