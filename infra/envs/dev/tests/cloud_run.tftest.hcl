@@ -1,0 +1,95 @@
+# Acceptance tests for P0-07 / PRD-6.5 (Cloud Run services, PRD 6.2, 6.3, 6.5, 6.6).
+#
+# Runs offline against mock providers -- no credentials, no real project.
+#   terraform -chdir=infra/envs/dev init -backend=false
+#   terraform -chdir=infra/envs/dev test
+#
+# Expected root-module output contract (not yet implemented -- these tests
+# fail on that missing contract until the builder ticket composes
+# infra/modules/service/* into infra/envs/dev/main.tf):
+#
+#   output "cloud_run_services" -> map(service_name => object({
+#     region                : string
+#     min_instance_count    : number
+#     max_instance_count    : number
+#     ingress               : string  # "INGRESS_TRAFFIC_ALL" | "INGRESS_TRAFFIC_INTERNAL_ONLY"
+#     cpu_idle              : bool    # true = request-based CPU billing
+#     service_account_email : string
+#   }))
+#
+# Keys must be exactly: api, harness, channels, connectors, browser, render,
+# sandbox-web (PRD 6.2).
+
+variables {
+  project_id         = "tilo-dev-test"
+  region             = "asia-southeast1"
+  billing_account_id = "000000-000000-000000"
+  github_repository  = "tilo-org/tilo"
+  budget_amount_usd  = 150
+}
+
+mock_provider "google" {}
+mock_provider "google-beta" {}
+
+run "PRD_6_2_all_seven_services_exist_in_region" {
+  command = plan
+
+  assert {
+    condition = toset(keys(output.cloud_run_services)) == toset([
+      "api", "harness", "channels", "connectors", "browser", "render", "sandbox-web",
+    ])
+    error_message = "Expected exactly the seven Cloud Run services from PRD 6.2."
+  }
+
+  assert {
+    condition     = alltrue([for s in values(output.cloud_run_services) : s.region == var.region])
+    error_message = "Every Cloud Run service must deploy to var.region (asia-southeast1, PRD 6.5)."
+  }
+}
+
+run "PRD_6_5_dev_scales_to_zero" {
+  command = plan
+
+  assert {
+    condition     = alltrue([for s in values(output.cloud_run_services) : s.min_instance_count == 0])
+    error_message = "tilo-dev must scale to zero: every service needs min_instance_count = 0 (PRD 6.5 lean infrastructure)."
+  }
+}
+
+run "PRD_6_6_request_based_cpu_billing" {
+  command = plan
+
+  assert {
+    condition     = alltrue([for s in values(output.cloud_run_services) : s.cpu_idle == true])
+    error_message = "Every Cloud Run service must bill CPU only during request processing (PRD 6.6 lean infrastructure)."
+  }
+}
+
+run "PRD_6_5_ingress_public_only_for_api_channels_sandbox_web" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for name in ["api", "channels", "sandbox-web"] :
+      output.cloud_run_services[name].ingress == "INGRESS_TRAFFIC_ALL"
+    ])
+    error_message = "api, channels and sandbox-web must be publicly reachable (PRD 6.5)."
+  }
+
+  assert {
+    condition = alltrue([
+      for name in ["harness", "connectors", "browser", "render"] :
+      output.cloud_run_services[name].ingress == "INGRESS_TRAFFIC_INTERNAL_ONLY"
+    ])
+    error_message = "harness, connectors, browser and render must not be publicly reachable (PRD 6.5)."
+  }
+}
+
+run "PRD_6_5_one_least_privilege_service_account_per_service" {
+  command = plan
+
+  assert {
+    condition     = length(distinct([for s in values(output.cloud_run_services) : s.service_account_email])) == 7
+    error_message = "Each of the seven services must run under its own distinct service account (PRD 6.5)."
+  }
+}
