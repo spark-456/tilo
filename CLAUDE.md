@@ -62,4 +62,4 @@ Changing a frozen contract (ADR first); applying infrastructure or spending mone
 - `just fmt` / `just lint` / `just typecheck` — individual gate steps
 - `just eval` — run the eval harness (not built yet; prints a message and exits 0 until P3)
 - `just skills-test` — run `skills/` tests (FR-AGT-04); passes with none present
-- `just deploy env=dev` — refuses anything but `dev`, and infra isn't applied yet either way (ticket P0-07)
+- `just deploy dev` — refuses anything but `dev`, and infra isn't applied yet either way (ticket P0-07)

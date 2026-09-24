@@ -6,6 +6,7 @@ blocking egress to model endpoints and the run still passing).
 from __future__ import annotations
 
 import pathlib
+import re
 
 import yaml
 
@@ -69,9 +70,8 @@ def test_EFF_01_ci_blocks_model_endpoints_before_tests(repo_root: pathlib.Path) 
             None,
         )
         if hosts_step_idx is not None and check_step_idx is not None:
-            assert hosts_step_idx < check_step_idx, (
-                "EFF-01: the model-endpoint-blocking step must run before `just setup`/`just check`"
-            )
+            order_msg = "EFF-01: the model-endpoint-blocking step must run before `just setup`/`just check`"
+            assert hosts_step_idx < check_step_idx, order_msg
             break
     else:
         raise AssertionError("no job blocks model endpoints before running `just check`")
@@ -84,9 +84,27 @@ def test_SEC_13_ci_runs_dependency_audit_and_can_fail_on_critical(repo_root: pat
 
     assert "pip-audit" in text, "SEC-13: ci.yml must run a Python dependency audit (pip-audit)"
     assert "pnpm audit" in text, "SEC-13: ci.yml must run a JS dependency audit (pnpm audit)"
-    assert "audit-level" in text or "critical" in text, (
-        "SEC-13: the JS audit must be scoped to fail on critical findings"
+    audit_level_msg = "SEC-13: the JS audit must be scoped to fail on critical findings"
+    assert "audit-level" in text or "critical" in text, audit_level_msg
+
+    # A bare `uvx pip-audit` with no arguments audits pip-audit's own throwaway
+    # uvx venv, not Tilo's locked dependencies — it always passes regardless of
+    # what's in uv.lock. Require an explicit project input (a requirements
+    # export or `-r`/`--requirement` flag) and a pinned pip-audit version.
+    pip_audit_calls = re.findall(r"pip-audit[^\n]*", text)
+    assert pip_audit_calls, "SEC-13: no pip-audit invocation found"
+    pin_msg = (
+        "SEC-13: pip-audit must be installed at a pinned version (e.g. `uvx pip-audit@2.10.1`), "
+        "not an unpinned `uvx pip-audit`"
     )
+    assert any(re.search(r"pip-audit@\d", call) for call in pip_audit_calls), pin_msg
+    scope_msg = (
+        "SEC-13: pip-audit must be pointed at Tilo's locked project set (e.g. `-r audit-requirements.txt` "
+        "exported via `uv export`), not run bare against its own uvx environment"
+    )
+    assert any("-r " in call or "--requirement" in call for call in pip_audit_calls), scope_msg
+    export_msg = "SEC-13: ci.yml must export the locked dependency set (`uv export ...`) for pip-audit to scan"
+    assert "uv export" in text, export_msg
 
 
 def test_PRD_16_4_ci_workflow_has_no_secrets_or_cloud_auth(repo_root: pathlib.Path) -> None:

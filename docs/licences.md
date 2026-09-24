@@ -42,6 +42,7 @@ No third-party runtime dependencies yet (empty scaffold; code lands in ticket P0
 | pnpm | MIT | https://github.com/pnpm/pnpm |
 | Biome | MIT | https://github.com/biomejs/biome |
 | Terraform | BUSL-1.1 (HashiCorp; run only by the user per CLAUDE.md, never `terraform apply` from an agent) | https://github.com/hashicorp/terraform |
+| pip-audit | Apache-2.0 | https://github.com/pypa/pip-audit |
 
 ## Fonts, icons and design assets
 

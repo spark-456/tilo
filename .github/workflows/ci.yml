@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -43,8 +46,16 @@ jobs:
       - name: just check
         run: just check
 
+      - name: Secret scan (staged-file patterns, over the full tree in CI)
+        run: uv run python scripts/secret_scan.py $(git ls-files)
+
       - name: Python dependency audit (SEC-13)
-        run: uvx pip-audit
+        # `pip-audit` with no args audits its OWN uvx venv, not Tilo's locked
+        # deps — export the locked project set first and audit that, with a
+        # pinned tool version so the audit itself isn't a moving target.
+        run: |
+          uv export --frozen --all-packages --no-emit-workspace -o audit-requirements.txt
+          uvx pip-audit@2.10.1 --disable-pip -r audit-requirements.txt
 
       - name: JS dependency audit (SEC-13)
         run: pnpm audit --audit-level critical
