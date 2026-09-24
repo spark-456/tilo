@@ -30,6 +30,10 @@ gcloud auth application-default login
 #    another id and pass it as project_id in later steps.
 gcloud projects create tilo-dev --name="Tilo dev"
 gcloud config set project tilo-dev
+#    Make the project the quota project for your application-default
+#    credentials. The billing-budget and Firebase APIs reject user
+#    credentials without one (providers.tf also sets billing_project).
+gcloud auth application-default set-quota-project tilo-dev
 
 # 4. Link a billing account (required before any API can be enabled).
 gcloud billing accounts list

@@ -82,3 +82,20 @@ run "SEC_02_deployer_limited_to_main_and_runtime_service_accounts" {
     error_message = "The deployer may act as exactly the seven runtime service accounts (PRD 6.5)."
   }
 }
+
+run "SEC_02_deployer_cannot_change_cloud_run_iam" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for b in output.project_iam_bindings :
+      !(strcontains(b.member, "tilo-deployer@") && contains(["roles/run.admin", "roles/owner", "roles/editor"], b.role))
+    ])
+    error_message = "The WIF deployer must not hold run.admin, owner or editor: those can set allUsers run.invoker on internal services (PRD 6.5 ingress, SEC-02)."
+  }
+
+  assert {
+    condition     = alltrue([for b in output.project_iam_bindings : b.role != "roles/artifactregistry.writer"])
+    error_message = "Artifact Registry write is scoped to the tilo repository, never project-wide (SEC-12)."
+  }
+}

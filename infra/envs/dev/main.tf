@@ -129,10 +129,12 @@ locals {
   }
 
   # serviceAccountUser is granted per runtime SA (google_service_account_iam_member
-  # below), never project-wide.
+  # below), never project-wide. run.developer deploys revisions, tags and
+  # shifts traffic but cannot set IAM: invoker IAM is owned by Terraform
+  # (modules/service), so CI can never make an internal service public.
+  # Artifact Registry write is scoped to the tilo repository (below).
   deployer_project_roles = [
-    "roles/run.admin",
-    "roles/artifactregistry.writer",
+    "roles/run.developer",
   ]
 
   # secret => services allowed roles/secretmanager.secretAccessor on it.
@@ -395,6 +397,15 @@ resource "google_artifact_registry_repository" "containers" {
   description   = "Tilo service container images (PRD 6.3 Cloud Build, Artifact Registry)."
 
   depends_on = [google_project_service.apis]
+}
+
+# CI pushes images to the tilo repository only, not every repo in the project.
+resource "google_artifact_registry_repository_iam_member" "deployer_writer" {
+  project    = var.project_id
+  location   = google_artifact_registry_repository.containers.location
+  repository = google_artifact_registry_repository.containers.name
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${module.wif.deployer_service_account_email}"
 }
 
 resource "google_secret_manager_secret" "placeholders" {
