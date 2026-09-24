@@ -8,7 +8,7 @@ set shell := ["sh", "-cu"]
 # Install Python and JS dependencies for every workspace member, and install
 # the pre-commit git hook so the local secret scan / lint hooks run on commit.
 setup:
-    uv sync --all-packages
+    uv sync --all-packages --locked
     pnpm install
     uv run pre-commit install
 
