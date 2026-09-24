@@ -8,7 +8,9 @@ resource "google_storage_bucket" "this" {
   name                        = "${var.project_id}-${each.key}"
   location                    = each.value.location
   uniform_bucket_level_access = true
-  force_destroy               = false
+  # No bucket may ever be made public, whatever IAM is later added (SEC-12).
+  public_access_prevention = "enforced"
+  force_destroy            = false
 
   versioning {
     enabled = each.value.versioning_enabled

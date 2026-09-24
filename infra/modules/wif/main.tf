@@ -1,7 +1,8 @@
 # Reusable piece: Workload Identity Federation for GitHub Actions CI/CD
 # (PRD 6.5: "GitHub Actions with Workload Identity Federation"; PRD 16.1
 # rule 5: "no keys in the repo"). The attribute condition restricts token
-# exchange to var.github_repository; the deployer service account is the
+# exchange to var.github_repository (name, repository id and owner id) on
+# refs/heads/main; the deployer service account is the
 # only identity the provider may impersonate, and project roles for it are
 # granted by the environment root through modules/iam.
 
@@ -19,15 +20,25 @@ resource "google_iam_workload_identity_pool_provider" "github" {
   display_name                       = "GitHub OIDC"
 
   attribute_mapping = {
-    "google.subject"       = "assertion.sub"
-    "attribute.repository" = "assertion.repository"
-    "attribute.ref"        = "assertion.ref"
+    "google.subject"                = "assertion.sub"
+    "attribute.repository"          = "assertion.repository"
+    "attribute.repository_id"       = "assertion.repository_id"
+    "attribute.repository_owner_id" = "assertion.repository_owner_id"
+    "attribute.ref"                 = "assertion.ref"
   }
 
-  # Only tokens from this exact repository, on main or a release tag, may
-  # exchange for a Google credential: a workflow on any other branch cannot
-  # deploy (PRD 6.5, SEC-02, SEC-12 least privilege).
-  attribute_condition = "assertion.repository == \"${var.github_repository}\" && (assertion.ref == \"refs/heads/main\" || assertion.ref.startsWith(\"refs/tags/\"))"
+  # Only tokens from this exact repository (name plus immutable numeric
+  # repository and owner ids, so a renamed or recreated repo cannot match),
+  # on refs/heads/main only, may exchange for a Google credential. Tags are
+  # not accepted: anyone with push access can tag an unreviewed commit,
+  # bypassing branch protection, and the deployer can act as tilo-connectors
+  # (PRD 6.5, SEC-02, SEC-12 least privilege).
+  attribute_condition = join(" && ", [
+    "assertion.repository == \"${var.github_repository}\"",
+    "assertion.repository_id == \"${var.github_repository_id}\"",
+    "assertion.repository_owner_id == \"${var.github_repository_owner_id}\"",
+    "assertion.ref == \"refs/heads/main\"",
+  ])
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
@@ -43,5 +54,5 @@ resource "google_service_account" "deployer" {
 resource "google_service_account_iam_member" "wif_impersonation" {
   service_account_id = google_service_account.deployer.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repository}"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository_id/${var.github_repository_id}"
 }

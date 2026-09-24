@@ -21,6 +21,10 @@ output "services" {
         for key, b in google_cloud_run_v2_service_iam_member.invoker : b.member
         if local.invoker_bindings[key].service == k
       ]
+      developers = [
+        for key, b in google_cloud_run_v2_service_iam_member.developer : b.member
+        if local.developer_bindings[key].service == k
+      ]
     }
   }
 }

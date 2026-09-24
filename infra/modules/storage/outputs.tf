@@ -5,6 +5,7 @@ output "buckets" {
       name                        = b.name
       location                    = b.location
       uniform_bucket_level_access = b.uniform_bucket_level_access
+      public_access_prevention    = b.public_access_prevention
       versioning_enabled          = var.buckets[k].versioning_enabled
       kms_key_name                = var.buckets[k].kms_key_name
       lifecycle_rule_count        = length(var.buckets[k].lifecycle_rules)

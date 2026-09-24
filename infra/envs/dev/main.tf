@@ -139,15 +139,6 @@ locals {
     "sandbox-web" = []
   }
 
-  # serviceAccountUser is granted per runtime SA (google_service_account_iam_member
-  # below), never project-wide. run.developer deploys revisions, tags and
-  # shifts traffic but cannot set IAM: invoker IAM is owned by Terraform
-  # (modules/service), so CI can never make an internal service public.
-  # Artifact Registry write is scoped to the tilo repository (below).
-  deployer_project_roles = [
-    "roles/run.developer",
-  ]
-
   # secret => services allowed roles/secretmanager.secretAccessor on it.
   secret_accessors = {
     "workspace-oauth-client"        = ["connectors"]
@@ -163,24 +154,19 @@ locals {
 
   # Keyed statically (service/role names, never a computed attribute) so
   # terraform test can plan module.iam against mock providers.
-  project_bindings = merge(
-    { for combo in flatten([
-      for name, roles in local.service_project_roles : [
-        for role in roles : {
-          key    = "${name}::${role}"
-          role   = role
-          member = "serviceAccount:${module.service.service_accounts[name]}"
-        }
-      ]
-      ]) : combo.key => { role = combo.role, member = combo.member }
-    },
-    { for role in local.deployer_project_roles :
-      "deployer::${role}" => {
+  # The WIF deployer holds no project role: run.developer is granted on the
+  # seven services (module.service developers), serviceAccountUser per
+  # runtime SA and Artifact Registry write on the tilo repository (below).
+  project_bindings = { for combo in flatten([
+    for name, roles in local.service_project_roles : [
+      for role in roles : {
+        key    = "${name}::${role}"
         role   = role
-        member = "serviceAccount:${module.wif.deployer_service_account_email}"
+        member = "serviceAccount:${module.service.service_accounts[name]}"
       }
-    }
-  )
+    ]
+    ]) : combo.key => { role = combo.role, member = combo.member }
+  }
 
   # Secret Manager placeholders: names only. Values are added by the user
   # out of band, never in Terraform (PRD 16.1 rule 4).
@@ -209,6 +195,13 @@ module "service" {
 
   vpc_network    = google_compute_network.vpc.name
   vpc_subnetwork = google_compute_subnetwork.run_egress.name
+
+  # CI deploys revisions of these services only (run.developer per service,
+  # never project-wide). run.developer cannot set IAM, so CI can never make
+  # an internal service public.
+  developers = {
+    deployer = "serviceAccount:${module.wif.deployer_service_account_email}"
+  }
 
   # Cloud Tasks delivers runs to harness with an OIDC token for this SA.
   extra_invokers = {
@@ -248,8 +241,10 @@ resource "google_service_account_iam_member" "tasks_invoker_users" {
 module "wif" {
   source = "../../modules/wif"
 
-  project_id        = var.project_id
-  github_repository = var.github_repository
+  project_id                 = var.project_id
+  github_repository          = var.github_repository
+  github_repository_id       = var.github_repository_id
+  github_repository_owner_id = var.github_repository_owner_id
 
   depends_on = [google_project_service.apis]
 }
@@ -259,6 +254,8 @@ module "iam" {
 
   project_id = var.project_id
   bindings   = local.project_bindings
+
+  depends_on = [google_project_service.apis]
 }
 
 # The deployer may act as each runtime SA it deploys, and nothing else.
@@ -476,4 +473,7 @@ module "budget" {
   display_name          = "tilo-${var.project_id}-monthly"
   amount_usd            = var.budget_amount_usd
   threshold_percentages = [0.5, 0.9, 1.0]
+
+  # The budget needs billingbudgets.googleapis.com enabled first.
+  depends_on = [google_project_service.apis]
 }

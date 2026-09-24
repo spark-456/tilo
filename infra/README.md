@@ -42,7 +42,7 @@ gcloud billing projects link tilo-dev --billing-account=YOUR_BILLING_ACCOUNT_ID
 # 5. Create the Terraform state bucket (name must be globally unique).
 gcloud storage buckets create gs://tilo-dev-tfstate `
   --project=tilo-dev --location=asia-southeast1 `
-  --uniform-bucket-level-access
+  --uniform-bucket-level-access --public-access-prevention
 gcloud storage buckets update gs://tilo-dev-tfstate --versioning
 
 # 6. Point Terraform at that bucket.
@@ -52,10 +52,16 @@ Copy-Item infra/envs/dev/backend.hcl.example infra/envs/dev/backend.hcl
 # 7. Initialise, using the backend config from step 6.
 terraform -chdir=infra/envs/dev init -backend-config=backend.hcl
 
-# 8. Plan. Supply the variables that have no default.
+# 8. Plan. Supply the variables that have no default. The WIF provider
+#    pins the GitHub repository's numeric id and owner id as well as its
+#    name, and accepts tokens from refs/heads/main only (no tags). Look the
+#    ids up with the GitHub CLI (or the repo's API page):
+gh api repos/owner/tilo --jq '.id, .owner.id'
 terraform -chdir=infra/envs/dev plan `
   -var="billing_account_id=YOUR_BILLING_ACCOUNT_ID" `
   -var="github_repository=owner/tilo" `
+  -var="github_repository_id=REPO_ID" `
+  -var="github_repository_owner_id=OWNER_ID" `
   -out=tfplan
 
 # 9. Apply -- YOU run this, never an agent.
@@ -72,7 +78,9 @@ Terraform declares the secrets but never writes a version (PRD 16.1 rule 4).
 ```powershell
 terraform -chdir=infra/envs/dev destroy `
   -var="billing_account_id=YOUR_BILLING_ACCOUNT_ID" `
-  -var="github_repository=owner/tilo"
+  -var="github_repository=owner/tilo" `
+  -var="github_repository_id=REPO_ID" `
+  -var="github_repository_owner_id=OWNER_ID"
 ```
 
 The `oauth-tokens` and `archive` KMS keys have `prevent_destroy`; remove that

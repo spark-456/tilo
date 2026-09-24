@@ -15,11 +15,13 @@
 #     dataEditor/dataOwner roles, so the ledger stays append-only.
 
 variables {
-  project_id         = "tilo-dev-test"
-  region             = "asia-southeast1"
-  billing_account_id = "000000-000000-000000"
-  github_repository  = "tilo-org/tilo"
-  budget_amount_usd  = 150
+  project_id                 = "tilo-dev-test"
+  region                     = "asia-southeast1"
+  billing_account_id         = "000000-000000-000000"
+  github_repository          = "tilo-org/tilo"
+  github_repository_id       = "123456789"
+  github_repository_owner_id = "987654321"
+  budget_amount_usd          = 150
 }
 
 mock_provider "google" {}

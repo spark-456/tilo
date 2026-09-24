@@ -3,17 +3,13 @@
 # No project-level IAM roles are granted here -- see modules/iam, composed by
 # the environment root so all project bindings are visible in one place.
 #
-# Service account emails are built from account_id + project_id rather than
-# read off the resource's computed `email` attribute: the format is a fixed
-# GCP convention, and building it this way keeps the value known at plan
-# time (required for `terraform test` to assert on it against mock
-# providers, PRD 6.5 one SA per service).
-
-locals {
-  service_account_emails = {
-    for k, _ in var.services : k => "tilo-${k}@${var.project_id}.iam.gserviceaccount.com"
-  }
-}
+# Service account emails are built from the google_service_account.this
+# resource's own account_id and project attributes (fixed GCP convention)
+# rather than its computed `email`: this keeps the value known at plan time
+# (so `terraform test` can assert on it against mock providers) while still
+# being a reference to the resource, so every consumer of the emails -- here
+# and through outputs.service_accounts in the environment root -- waits
+# until the service account exists before granting it anything.
 
 resource "google_service_account" "this" {
   for_each = var.services
@@ -21,6 +17,12 @@ resource "google_service_account" "this" {
   project      = var.project_id
   account_id   = "tilo-${each.key}"
   display_name = "Tilo ${each.key} service (PRD 6.2)"
+}
+
+locals {
+  service_account_emails = {
+    for k, sa in google_service_account.this : k => "${sa.account_id}@${sa.project}.iam.gserviceaccount.com"
+  }
 }
 
 resource "google_cloud_run_v2_service" "this" {
@@ -31,10 +33,6 @@ resource "google_cloud_run_v2_service" "this" {
   location            = var.region
   deletion_protection = false
   ingress             = each.value.ingress
-
-  # Depends on the service accounts existing even though the field below is
-  # a constructed string, not a resource attribute reference.
-  depends_on = [google_service_account.this]
 
   template {
     service_account = local.service_account_emails[each.key]
@@ -118,4 +116,25 @@ resource "google_cloud_run_v2_service_iam_member" "invoker" {
   member   = each.value.member
 
   depends_on = [google_service_account.this]
+}
+
+locals {
+  # Static keys "<service>::<developer key>" so for_each is known at plan time.
+  developer_bindings = { for combo in setproduct(keys(var.services), keys(var.developers)) :
+    "${combo[0]}::${combo[1]}" => { service = combo[0], member = var.developers[combo[1]] }
+  }
+}
+
+# CI deploys revisions to these services only: roles/run.developer is
+# granted per service, never project-wide, so the deployer cannot touch any
+# other Cloud Run service in the project. run.developer cannot set IAM, so
+# invoker bindings stay owned by Terraform (above).
+resource "google_cloud_run_v2_service_iam_member" "developer" {
+  for_each = local.developer_bindings
+
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.this[each.value.service].name
+  role     = "roles/run.developer"
+  member   = each.value.member
 }

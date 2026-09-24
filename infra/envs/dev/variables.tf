@@ -33,3 +33,23 @@ variable "budget_amount_usd" {
   type        = number
   default     = 150
 }
+
+variable "github_repository_id" {
+  description = "Numeric GitHub id of var.github_repository (gh api repos/OWNER/REPO --jq .id). Pinned in the WIF condition so a deleted-and-recreated repo with the same name cannot deploy. No default: must be supplied by the user."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.github_repository_id))
+    error_message = "github_repository_id must be the numeric GitHub repository id."
+  }
+}
+
+variable "github_repository_owner_id" {
+  description = "Numeric GitHub id of the repository owner (gh api repos/OWNER/REPO --jq .owner.id). No default: must be supplied by the user."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.github_repository_owner_id))
+    error_message = "github_repository_owner_id must be the numeric GitHub owner id."
+  }
+}

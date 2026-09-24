@@ -9,6 +9,7 @@
 #     name                        : string
 #     location                    : string
 #     uniform_bucket_level_access : bool
+#     public_access_prevention    : string   # "enforced"
 #     versioning_enabled          : bool
 #     kms_key_name                : string   # "" when not CMEK-encrypted
 #     lifecycle_rule_count        : number
@@ -16,11 +17,13 @@
 #   Keys: "artifacts", "archive", "snapshots".
 
 variables {
-  project_id         = "tilo-dev-test"
-  region             = "asia-southeast1"
-  billing_account_id = "000000-000000-000000"
-  github_repository  = "tilo-org/tilo"
-  budget_amount_usd  = 150
+  project_id                 = "tilo-dev-test"
+  region                     = "asia-southeast1"
+  billing_account_id         = "000000-000000-000000"
+  github_repository          = "tilo-org/tilo"
+  github_repository_id       = "123456789"
+  github_repository_owner_id = "987654321"
+  budget_amount_usd          = 150
 }
 
 mock_provider "google" {}
@@ -37,6 +40,11 @@ run "PRD_6_2_three_buckets_exist_with_uniform_access" {
   assert {
     condition     = alltrue([for b in values(output.storage_buckets) : b.uniform_bucket_level_access])
     error_message = "Every bucket must enforce uniform bucket-level access."
+  }
+
+  assert {
+    condition     = alltrue([for b in values(output.storage_buckets) : b.public_access_prevention == "enforced"])
+    error_message = "Every bucket must enforce public access prevention (SEC-12)."
   }
 
   assert {

@@ -53,3 +53,12 @@ variable "extra_invokers" {
   }))
   default = {}
 }
+
+variable "developers" {
+  description = <<-EOT
+    Members granted roles/run.developer on every service in var.services,
+    keyed statically, e.g. { deployer = "serviceAccount:..." } (PRD 6.5 CI/CD).
+  EOT
+  type        = map(string)
+  default     = {}
+}
