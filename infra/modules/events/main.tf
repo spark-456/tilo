@@ -62,15 +62,21 @@ resource "google_project_iam_custom_role" "bq_ledger_inserter" {
   ]
 }
 
-locals {
-  pubsub_service_agent = "serviceAccount:service-${var.project_number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+# The Pub/Sub service agent is provisioned on demand. Creating it through the
+# Service Usage API (rather than constructing its email from the project
+# number) makes sure it actually exists before the dataset grant below, so
+# that grant cannot fail on a fresh project.
+resource "google_project_service_identity" "pubsub" {
+  provider = google-beta
+  project  = var.project_id
+  service  = "pubsub.googleapis.com"
 }
 
 resource "google_bigquery_dataset_iam_member" "ledger_insert_only" {
   project    = var.project_id
   dataset_id = google_bigquery_dataset.ledger.dataset_id
   role       = google_project_iam_custom_role.bq_ledger_inserter.id
-  member     = local.pubsub_service_agent
+  member     = "serviceAccount:${google_project_service_identity.pubsub.email}"
 }
 
 resource "google_pubsub_subscription" "events_to_bigquery" {

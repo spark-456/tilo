@@ -374,9 +374,8 @@ resource "google_firestore_database" "default" {
 module "events" {
   source = "../../modules/events"
 
-  project_id     = var.project_id
-  project_number = local.project_number
-  region         = var.region
+  project_id = var.project_id
+  region     = var.region
 
   depends_on = [google_project_service.apis]
 }

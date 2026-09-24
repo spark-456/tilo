@@ -38,6 +38,12 @@ gcloud auth application-default set-quota-project tilo-dev
 # 4. Link a billing account (required before any API can be enabled).
 gcloud billing accounts list
 gcloud billing projects link tilo-dev --billing-account=YOUR_BILLING_ACCOUNT_ID
+#    Enable the two APIs Terraform needs before it can enable the rest.
+#    The plan reads the project (Cloud Resource Manager) and enables APIs
+#    (Service Usage), and every request is quota-checked against tilo-dev
+#    (step 3). A new project does not have Cloud Resource Manager enabled,
+#    so without this the first plan fails with 403 SERVICE_DISABLED.
+gcloud services enable cloudresourcemanager.googleapis.com serviceusage.googleapis.com --project=tilo-dev
 
 # 5. Create the Terraform state bucket (name must be globally unique).
 gcloud storage buckets create gs://tilo-dev-tfstate `
