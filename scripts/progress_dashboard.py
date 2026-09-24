@@ -70,7 +70,9 @@ def render(markdown: str) -> str:
             head, body = split_row(rows[0]), [split_row(r) for r in rows[2:]]
             thead = "".join(cell(c, "th") for c in head)
             tbody = "".join("<tr>" + "".join(cell(c, "td") for c in r) + "</tr>" for r in body)
-            blocks.append(f'<div class="table"><table><thead><tr>{thead}</tr></thead><tbody>{tbody}</tbody></table></div>')
+            blocks.append(
+                f'<div class="table"><table><thead><tr>{thead}</tr></thead><tbody>{tbody}</tbody></table></div>'
+            )
             continue
         if line.startswith("- "):
             items = []

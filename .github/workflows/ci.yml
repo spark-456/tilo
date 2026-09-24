@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # EFF-01: dev and CI make no paid model calls unless LIVE=1. Block egress
+      # to model endpoints before any setup or test step runs.
+      - name: Block model endpoints (EFF-01)
+        run: |
+          echo "0.0.0.0 generativelanguage.googleapis.com" | sudo tee -a /etc/hosts
+          echo "0.0.0.0 aiplatform.googleapis.com" | sudo tee -a /etc/hosts
+          echo "0.0.0.0 asia-southeast1-aiplatform.googleapis.com" | sudo tee -a /etc/hosts
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.5.11"
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+
+      - name: Install just
+        uses: extractions/setup-just@v2
+        with:
+          just-version: "1.36.0"
+
+      - name: just setup
+        run: just setup
+
+      - name: just check
+        run: just check
+
+      - name: Secret scan (staged-file patterns, over the full tree in CI)
+        run: uv run python scripts/secret_scan.py --all-tracked
+
+      - name: Python dependency audit (SEC-13)
+        # `pip-audit` with no args audits its OWN uvx venv, not Tilo's locked
+        # deps — export the locked project set first and audit that, with a
+        # pinned tool version so the audit itself isn't a moving target.
+        run: |
+          uv export --frozen --all-packages --no-emit-workspace -o audit-requirements.txt
+          uvx pip-audit@2.10.1 --disable-pip -r audit-requirements.txt
+
+      - name: JS dependency audit (SEC-13)
+        run: pnpm audit --audit-level critical
