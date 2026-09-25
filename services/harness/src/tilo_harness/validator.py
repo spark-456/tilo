@@ -87,7 +87,8 @@ def _finiteness_problems(value: Any, path: str = "") -> list[str]:
             problems.append(f"schema: {label}: {value!r} is not a finite JSON number")
     elif isinstance(value, int):
         if not (_INT64_MIN <= value <= _INT64_MAX):
-            problems.append(f"schema: {label}: {value!r} is outside the int64 range")
+            # bit_length, not repr: repr of an int past 4300 digits raises ValueError.
+            problems.append(f"schema: {label}: a {value.bit_length()}-bit integer is outside the int64 range")
     elif isinstance(value, dict):
         for key, child in value.items():
             problems += _finiteness_problems(child, f"{path}/{_segment(key)}" if path else _segment(key))

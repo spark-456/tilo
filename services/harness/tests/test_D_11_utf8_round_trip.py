@@ -341,3 +341,28 @@ def test_D_11_utf8_problem_messages_round_trip_for_a_bad_key(validator, village_
     str(excinfo.value).encode("utf-8")
     "; ".join(excinfo.value.problems).encode("utf-8")
     assert store.read_events("org_demo", "w_village_basic") == []
+
+
+@pytest.mark.parametrize("where", ["top_level_credits", "data_value", "data_value_under_bad_key"])
+def test_D_11_huge_int_is_rejected_with_a_printable_problem(validator, village_basic_layout: dict, where) -> None:
+    """repr() of an int past Python's 4300-digit limit raises ValueError; the rejection must not."""
+    from tilo_harness.writer import EventRejected
+
+    huge = 10**5000
+    event = _full_event()
+    if where == "top_level_credits":
+        event["credits"] = huge
+    elif where == "data_value":
+        event["data"] = {**event["data"], "title": huge}
+    else:
+        event["data"] = {**event["data"], "k" + LONE_SURROGATE: huge}
+
+    problems = validator.problems(event)
+    assert problems and all(p.startswith("schema") for p in problems), problems
+    "; ".join(problems).encode("utf-8")
+
+    writer, store = make_memory_writer(village_basic_layout, world_id="w_village_basic")
+    with pytest.raises(EventRejected) as excinfo:
+        writer.append(event)
+    str(excinfo.value).encode("utf-8")
+    assert store.read_events("org_demo", "w_village_basic") == []
