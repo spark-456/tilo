@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
-from .record import VALID_KINDS, ZERO_HASH, canonical_json, format_ts, record_hash
+from .record import VALID_KINDS, ZERO_HASH, canonical_json, format_ts, record_hash, split_jsonl
 from .redact import redact
 
 ORG_ID_RE = re.compile(r"^org_[0-9A-Za-z_]{1,48}$")
@@ -49,7 +49,7 @@ class LocalDirStore:
     def _heal_missing_trailing_newline(path: Path) -> None:
         """A crash between writing a record's JSON and its trailing "\\n"
         leaves an otherwise-complete last line with no newline after it.
-        `read_lines` (via `splitlines()`) tolerates that on a plain read, so
+        `read_lines` (via `split_jsonl`) tolerates that on a plain read, so
         a reopen after such a crash succeeds -- but opening the file in
         append mode and writing straight onto it would then glue the next
         record onto that unterminated line, silently destroying a record
@@ -69,8 +69,9 @@ class LocalDirStore:
         path = self._path(org_id, run_id)
         if not path.exists():
             return []
-        with path.open("r", encoding="utf-8") as handle:
-            return [line for line in handle.read().splitlines() if line.strip()]
+        # Bytes, not text mode: text mode's universal newlines would also
+        # rewrite a stray "\r". split_jsonl splits on "\n" only.
+        return split_jsonl(path.read_bytes().decode("utf-8"))
 
 
 def _parse_records(lines: list[str]) -> list[dict]:

@@ -10,6 +10,7 @@ import json
 import sys
 
 from .archive import verify_chain
+from .record import split_jsonl
 
 
 def _parse_lines(lines: list[str]) -> tuple[list[dict], list[str]]:
@@ -32,8 +33,8 @@ def main(argv: list[str]) -> int:
         print(json.dumps({"ok": False, "records": 0, "problems": ["usage: python -m tilo_archive.verify <path>"]}))
         return 1
     try:
-        with open(argv[0], encoding="utf-8") as handle:
-            lines = [line for line in handle.read().splitlines() if line.strip()]
+        with open(argv[0], "rb") as handle:
+            lines = split_jsonl(handle.read().decode("utf-8"))
     except UnicodeDecodeError as exc:
         print(json.dumps({"ok": False, "records": 0, "problems": [f"file is not valid UTF-8: {exc}"]}))
         return 1

@@ -16,6 +16,21 @@ def canonical_json(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
+def split_jsonl(text: str) -> list[str]:
+    """The non-blank lines of stored JSONL, split on "\\n" only. Never
+    `str.splitlines()`: it also breaks on U+2028, U+2029, U+0085, \\x0b,
+    \\x0c and \\x1c-\\x1e, which `canonical_json` (ensure_ascii=False) can
+    leave raw inside a record, and would shred that record in two. A
+    trailing "\\r" (CRLF) is dropped; only " \\t\\r" count as blank."""
+    lines = []
+    for line in text.split("\n"):
+        if line.endswith("\r"):
+            line = line[:-1]
+        if line.strip(" \t\r"):
+            lines.append(line)
+    return lines
+
+
 def record_hash(record: dict) -> str:
     """SHA-256 hex of the canonical JSON of `record` without its "hash" field."""
     body = {k: v for k, v in record.items() if k != "hash"}

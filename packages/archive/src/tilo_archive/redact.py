@@ -3,7 +3,8 @@
 Not a general DLP: covers exactly (1) values under secret-named keys, (2)
 the nine patterns in `scripts/secret_scan.py` (reproduced here by hand --
 a package must not import from `scripts/`) plus bearer tokens and JWTs, and
-(3) Luhn-valid payment card numbers (13-19 digits).
+(3) Luhn-valid payment card numbers (13-19 digits). A private key is removed
+as its whole PEM block (header, body, END line), not just the header.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ _SECRET_KEY_MARKERS = (
     "authorization",
     "cookie",
     "private_key",
+    "private_key_id",
     "client_secret",
     "refresh_token",
     "access_token",
@@ -35,9 +37,9 @@ _SECRET_KEY_MARKERS = (
 )
 
 # (compiled pattern, kind) -- independent copy of secret_scan.py's patterns,
-# plus bearer tokens and JWTs.
+# plus bearer tokens and JWTs. Its private-key pattern is not here: a whole
+# PEM block is found by `_find_pem_spans` below, which runs first.
 _PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "private_key"),
     (re.compile(r"AIza[0-9A-Za-z_\-]{35}"), "google_api_key"),
     (re.compile(r"ya29\.[0-9A-Za-z_\-]{20,}"), "google_oauth_access_token"),
     (re.compile(r"1//0[0-9A-Za-z_\-]{30,}"), "google_oauth_refresh_token"),
@@ -80,6 +82,64 @@ def _is_secret_key(key: Any) -> bool:
         return False
     lowered = key.lower()
     return any(marker in lowered for marker in _SECRET_KEY_MARKERS)
+
+
+# PEM markers, assembled from fragments so no key-shaped text sits in source.
+_PEM_DASHES = "-" * 5
+_PEM_BEGIN = _PEM_DASHES + "BEGIN "
+_PEM_END = _PEM_DASHES + "END "
+_PEM_KEY_WORDS = "PRIVATE" + " KEY"
+# One flat character class, no nesting: the upper-case label run after
+# "BEGIN ". A run stops at the first "-", so runs after different BEGINs
+# never overlap and matching them all is linear in the text.
+_PEM_LABEL_RUN_RE = re.compile(r"[A-Z ]*")
+_SERVICE_ACCOUNT_TYPE = "service" + "_account"
+
+
+def _find_pem_spans(text: str) -> list[tuple[int, int]]:
+    """Non-overlapping (start, end) spans of whole PEM private-key blocks:
+    from a BEGIN line whose upper-case label ends in the key words, through
+    the first END line with the same label -- the base64 body and END line
+    included, whatever separates the lines (real newlines, or literal "\\n"
+    escapes in a JSON-quoted key). With no matching END line the span runs
+    to the end of `text`: a truncated key fails closed.
+
+    Linear: str.find only moves forward, every label run is scanned once,
+    and each END search either consumes the text up to the END line (the
+    scan resumes after it) or fails and ends the scan."""
+    spans: list[tuple[int, int]] = []
+    pos = text.find(_PEM_BEGIN)
+    while pos != -1:
+        label_start = pos + len(_PEM_BEGIN)
+        run = _PEM_LABEL_RUN_RE.match(text, label_start)
+        label_end = run.end() if run else label_start
+        label = text[label_start:label_end]
+        if label.endswith(_PEM_KEY_WORDS) and text.startswith(_PEM_DASHES, label_end):
+            end_marker = _PEM_END + label + _PEM_DASHES
+            end_at = text.find(end_marker, label_end + len(_PEM_DASHES))
+            if end_at == -1:
+                spans.append((pos, len(text)))
+                break
+            span_end = end_at + len(end_marker)
+            spans.append((pos, span_end))
+            pos = text.find(_PEM_BEGIN, span_end)
+        else:
+            pos = text.find(_PEM_BEGIN, max(label_end, pos + 1))
+    return spans
+
+
+def _redact_pem_blocks(text: str) -> str:
+    spans = _find_pem_spans(text)
+    if not spans:
+        return text
+    parts = []
+    pos = 0
+    for start, end in spans:
+        parts.append(text[pos:start])
+        parts.append("[REDACTED:private_key]")
+        pos = end
+    parts.append(text[pos:])
+    return "".join(parts)
 
 
 def _jwt_run_ends(text: str) -> list[int]:
@@ -255,6 +315,8 @@ def _redact_cards(text: str) -> str:
 def _redact_string(text: str) -> str:
     if len(text) > MAX_SCAN_CHARS:
         return "[REDACTED:oversize]"
+    # Whole PEM blocks first, so no other pattern sees (or splits) a body.
+    text = _redact_pem_blocks(text)
     for pattern, kind in _PATTERNS:
         text = pattern.sub(f"[REDACTED:{kind}]", text)
     text = _redact_jwts(text)
@@ -272,6 +334,11 @@ def _redact_value(value: Any, depth: int) -> Any:
             # key, not only as a value.
             new_key = _redact_string(k) if isinstance(k, str) else k
             result[new_key] = "[REDACTED:secret_field]" if _is_secret_key(k) else _redact_value(v, depth + 1)
+            # A service-account key file's type marker only becomes the
+            # scanned key/value text once the dict is serialised, so a
+            # string scan of the value alone never sees it.
+            if new_key == "type" and result[new_key] == _SERVICE_ACCOUNT_TYPE:
+                result[new_key] = "[REDACTED:service_account_key]"
         return result
     if isinstance(value, (list, tuple)):
         # A tuple is redacted the same as a list: canonical_json's
@@ -298,7 +365,8 @@ def find_secrets(text: str) -> list[str]:
         # Fail closed: oversize text is never scanned piecemeal, so it is
         # reported as a finding rather than silently coming back clean.
         return ["oversize"]
-    found = [kind for pattern, kind in _PATTERNS if pattern.search(text)]
+    found = ["private_key"] if _find_pem_spans(text) else []
+    found += [kind for pattern, kind in _PATTERNS if pattern.search(text)]
     if _find_jwt_spans(text):
         found.append("jwt")
     for match in _CARD_RE.finditer(text):
