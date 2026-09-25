@@ -58,6 +58,9 @@ the policy (OB-01).
 
 - `fixtures/events/valid/<type>.json`: one valid event per registered type (the registry's
   `fixture`); each passes every rule above and round-trips through the generated models.
+  `fixtures/events/valid/<type>--<case>.json` is a further valid case of a type, checked the same
+  way (`question.answered--from_decision.json` cites the Decision
+  `fixtures/decision/valid/owner_answer_all_worlds.json`).
 - `fixtures/events/invalid/`: each fails `event.schema.json` or its type's data schema; the file
   name says which rule.
 - `fixtures/events/registry/invalid/evNN_*.json`: each passes both schemas and breaks only rule
