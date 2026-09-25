@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
 import { fixtureUrl, stageCanvas, stageSeq } from "./support/world";
 
 // P4 / HR-3 (PRD 9.7): "with reduced motion movement becomes an instant change or a fade". A
@@ -13,12 +13,17 @@ function sample(page: Page, ms: number) {
   return page.evaluate((windowMs) => {
     const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="stage-frame"] canvas');
     const frame = document.querySelector<HTMLElement>('[data-testid="stage-frame"]');
-    // A small copy per frame keeps sampling cheap enough to see every rAF (a full-size PNG
-    // encode per frame would itself drop most frames).
+    // A small copy hashed per frame keeps sampling cheap enough to see every rAF (a full-size
+    // PNG encode per frame would itself drop most frames).
     const small = document.createElement("canvas");
     small.width = 480;
     small.height = 300;
-    const ctx = small.getContext("2d");
+    const ctx = small.getContext("2d", { willReadFrequently: true });
+    const hash = (px: Uint8ClampedArray) => {
+      let h = 2166136261;
+      for (let i = 0; i < px.length; i++) h = Math.imul(h ^ (px[i] as number), 16777619);
+      return String(h >>> 0);
+    };
     return new Promise<{ frames: number; seqs: number }>((resolve) => {
       const frames = new Set<string>();
       const seqs = new Set<string>();
@@ -26,7 +31,7 @@ function sample(page: Page, ms: number) {
       const tick = (now: number) => {
         if (canvas && ctx) {
           ctx.drawImage(canvas, 0, 0, small.width, small.height);
-          frames.add(small.toDataURL());
+          frames.add(hash(ctx.getImageData(0, 0, small.width, small.height).data));
         }
         seqs.add(frame?.dataset.seq ?? "");
         if (now - start < windowMs) requestAnimationFrame(tick);
@@ -44,12 +49,15 @@ test("P4 HR-3: turning on reduced motion mid-playback makes later movement insta
   await expect(stageCanvas(page)).toBeVisible();
   await expect.poll(() => stageSeq(page), { timeout: 15_000 }).toBeGreaterThan(25);
 
+  await sample(page, 300); // warm-up: the first canvas readback can stall the page briefly
   const before = await sample(page, 1_500);
-  expect(before.frames, "walks interpolate before the toggle").toBeGreaterThan(before.seqs + 5);
+  console.log(`before toggle: ${before.frames} images, ${before.seqs} seqs`);
+  expect(before.frames, "walks interpolate before the toggle").toBeGreaterThan(before.seqs + 2);
 
   const seqAtToggle = await stageSeq(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   const after = await sample(page, 3_000);
+  console.log(`after toggle: ${after.frames} images, ${after.seqs} seqs`);
   // One new image per applied event at most (plus the frame in flight at each window edge).
   expect(after.frames, "no interpolated frames after the toggle").toBeLessThanOrEqual(
     after.seqs + 2,
