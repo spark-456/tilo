@@ -16,8 +16,8 @@ class UnpricedError(Exception):
 
 
 def read_yaml(path: str | Path) -> object:
-    """Parse a YAML file; unreadable or malformed files raise MeteringConfigError."""
+    """Parse a YAML file; unreadable, non-UTF-8 or malformed files raise MeteringConfigError."""
     try:
         return yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
-    except (OSError, yaml.YAMLError) as exc:
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
         raise MeteringConfigError(f"{path}: cannot read YAML: {exc}") from exc

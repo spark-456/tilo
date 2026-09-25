@@ -129,6 +129,13 @@ def test_FR_MTR_01_loaders_refuse_malformed_yaml(tmp_path, load):
         load(bad)
 
 
+@pytest.mark.parametrize("load", [PriceBook.load, MeteringConfig.load])
+def test_FR_MTR_01_loaders_refuse_non_utf8_file(tmp_path, load):
+    (bad := tmp_path / "m.yaml").write_bytes(b"treasury: caf\xe9\n")
+    with pytest.raises(MeteringConfigError):
+        load(bad)
+
+
 @pytest.mark.parametrize("name", ["nope.yaml", "."])
 def test_FR_MTR_01_pricebook_refuses_missing_prices_file(tmp_path, name):
     with pytest.raises(MeteringConfigError):
