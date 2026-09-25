@@ -227,8 +227,8 @@ def running_emulator() -> Iterator[str]:
         # since `start_new_session` above already gives POSIX a process group `_stop()` can
         # SIGKILL, which survives this process dying uncleanly -- win32 has no equivalent short
         # of a Job Object.
-        job = _create_kill_on_close_job() if sys.platform == "win32" else None
-        if job is not None:
+        if sys.platform == "win32":
+            job = _create_kill_on_close_job()
             _assign_to_job(job, process)
         try:
             _wait_until_ready(host, _READY_TIMEOUT_S)
@@ -237,5 +237,5 @@ def running_emulator() -> Iterator[str]:
         finally:
             os.environ.pop("FIRESTORE_EMULATOR_HOST", None)
             _stop(process)
-            if job is not None:
+            if sys.platform == "win32":
                 _kernel32.CloseHandle(job)
