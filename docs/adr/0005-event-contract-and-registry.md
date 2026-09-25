@@ -52,7 +52,8 @@ silent the defaults below apply; each is logged as a BQ in `docs/open-questions.
    (both events carry `destination`, set from where the message came, never by a model), and
    HR-7 links it beside the policy; at L3 it is null. Only a channel where Tilo knows the
    sender is the owner carries an instruction: a `world.requested` from the web or mobile web
-   (signed in) or a `channel.message_in` from the owner's bound WhatsApp number. Email is
+   (signed in) or a `channel.message_in` the owner typed from their bound WhatsApp number, never
+   a tapped card option or an answer to a gate, consent or meeting card (ADR-0007). Email is
    never one, since its sender is not authenticated (PRD 10.3: email answers questions only).
    Each instruction opens at most one entry, and a send cancelled in its undo window uses it
    up, so Undo is never followed by a redraft sent under the same words. L2 and L3 policies need a daily limit

@@ -2,7 +2,7 @@
 # contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
-# card.schema.json 1.0.0 sha256:e258a50bbe417029
+# card.schema.json 1.0.0 sha256:2666292eb19087d0
 # common.schema.json 1.0.0 sha256:cdb1a1ceeeebb299
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -43,7 +43,7 @@
 # events/data/building.operational.schema.json 1.0.0 sha256:9fcf73cb4c895c6f
 # events/data/building.planned.schema.json 1.0.0 sha256:b44f9bbe889e72d7
 # events/data/building.scaled.schema.json 1.0.0 sha256:6acdd4fb4e291cd1
-# events/data/channel.message_in.schema.json 1.0.0 sha256:bbf6598f915733f0
+# events/data/channel.message_in.schema.json 1.0.0 sha256:2b052fa89605631c
 # events/data/channel.message_out.schema.json 1.0.0 sha256:dd42d2db8385a110
 # events/data/connection.consented.schema.json 1.0.0 sha256:6664b8f2558850bd
 # events/data/connection.established.schema.json 1.0.0 sha256:b595213ce8aae265
@@ -86,7 +86,7 @@
 # providers.schema.json 1.1.0 sha256:ece7537b584e69f8
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
-# events/registry.yaml 1.0.0 sha256:82aaca6089b684c1
+# events/registry.yaml 1.0.0 sha256:29d7a2b0b4a0cef2
 
 from __future__ import annotations
 
@@ -119,6 +119,9 @@ class BriefAssumption(BaseModel):
     The clarifying question that was skipped, or null when nothing was asked.
     """
     assumed: Annotated[str, Field(max_length=300, min_length=1)]
+
+
+type CardKind = Literal["needs_you", "gate", "consent", "meeting"]
 
 
 type CardOptionId = Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,31}$")]
@@ -761,7 +764,7 @@ class BuildingScaledData(BaseModel):
 
 class ChannelMessageInData(BaseModel):
     """
-    data of channel.message_in (PRD 9.5). A message from a bound WhatsApp number or to Tilo's email address. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message answers a card. destination is the thread or folder the message was sent about (an email thread forwarded to Tilo, or the one the card it answers showed), as an opaque id set by the channel, never read out of the text by a model; null otherwise (BQ-29). For whatsapp, actor is the user whose number is bound and confirmed (FR-CHN-03), looked up after the webhook signature check. An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is whatsapp; an email's sender is not authenticated, so an email is never an instruction, whoever its actor is.
+    data of channel.message_in (PRD 9.5). A message from a bound WhatsApp number or to Tilo's email address. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message answers a card; card_kind is then that card's kind, copied by the channels service from the card, and null otherwise. option is the id of the card option the person tapped (a WhatsApp reply button), taken from the button's payload; null when the person typed the message. destination is the thread or folder the message was sent about (an email thread forwarded to Tilo, or the one the card it answers showed), as an opaque id set by the channel, never read out of the text by a model; null otherwise (BQ-29). For whatsapp, actor is the user whose number is bound and confirmed (FR-CHN-03), looked up after the webhook signature check. An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is whatsapp, option is null (the owner's own typed words) and card_kind is null or needs_you (BQ-56): a tapped option, such as Hold on a gate card, and any answer to a gate, consent or meeting card is recorded by its own answering event and is never an instruction. An email's sender is not authenticated, so an email is never an instruction, whoever its actor is.
     """
 
     model_config = ConfigDict(
@@ -770,6 +773,8 @@ class ChannelMessageInData(BaseModel):
     channel: Literal["whatsapp", "email"]
     message_ref: EventArchiveRef
     card_id: Ulid | None
+    card_kind: CardKind | None
+    option: CardOptionId | None
     destination: Destination | None
 
 
@@ -2539,7 +2544,7 @@ class Card(BaseModel):
     id: Ulid
     world_id: WorldId
     run_id: RunId
-    kind: Literal["needs_you", "gate", "consent", "meeting"]
+    kind: CardKind
     rung: Literal["needs_you", "blocked", "meeting", "gate", "consent"]
     """
     Escalation ladder rung (PRD 10.2); needs_you cards may be blocked.
@@ -3486,7 +3491,9 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                       'hud_effect': 'none',
                                       'story_template': 'A {data.channel} message arrived.',
                                       'trace_row': 'channel={data.channel} message={data.message_ref} '
-                                                   'card={data.card_id} destination={data.destination}',
+                                                   'card={data.card_id} kind={data.card_kind} '
+                                                   'option={data.option} '
+                                                   'destination={data.destination}',
                                       'data_schema': 'events/data/channel.message_in.schema.json',
                                       'fixture': 'fixtures/events/valid/channel.message_in.json'},
                'channel.message_out': {'family': 'channel',

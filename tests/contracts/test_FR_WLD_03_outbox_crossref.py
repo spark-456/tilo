@@ -13,8 +13,9 @@ undo window, created before and not expired, at the applied level when the send 
 owned by the world's owner and created and changed only by that owner (every history entry
 included, PRD 10.1), connector, recipients and district in scope; at L2 also the owner's
 own earlier instruction in this world about the same destination, PRD 10.4 "instruction is
-approval", given where Tilo knows who sent it: signed in on the web or mobile web, or from the
-owner's bound WhatsApp number, never by email, PRD 10.3 and 11.1; and no earlier policy.applied
+approval", given where Tilo knows who sent it: signed in on the web or mobile web, or typed from
+the owner's bound WhatsApp number, never by email, PRD 10.3 and 11.1, and never a tapped card
+option or an answer to a gate, consent or meeting card, BQ-56; and no earlier policy.applied
 used that instruction, even if its entry was cancelled); the entry's authz equals
 that event's authz, and the data.transfer it emitted carries the same authz. OB-05: its action
 type, tier and pinned item (artifact id and version) equal those approval.requested reserved or
@@ -51,6 +52,9 @@ CASE_KEYS = {
 EVENT_KEYS = {"type", "authz", "data"}
 # OB-01, L2: the channels on which Tilo knows the sender is the owner, per instruction type.
 INSTRUCTION_CHANNELS = {"world.requested": ("web", "mobile_web"), "channel.message_in": ("whatsapp",)}
+# OB-01, L2 (BQ-56): a channel.message_in is an instruction only as typed words answering no card or
+# a question card; a tapped option or an answer to a gate, consent or meeting card never is.
+INSTRUCTION_CARD_KINDS = (None, "needs_you")
 INSTRUCTION_TYPES = tuple(INSTRUCTION_CHANNELS)
 SLOT_TYPES = {
     "reserved_by": ("approval.requested",),
@@ -157,16 +161,29 @@ def _may_answer(gate, answer, owner, lead, policy) -> bool:
     )
 
 
+def _typed_by_owner(instruction) -> bool:
+    """OB-01, L2 (BQ-56): a WhatsApp message counts only as the owner's own typed words (no tapped
+    option) answering no card or a question card. Hold on a gate card, any tapped option and any
+    answer to a gate, consent or meeting card is recorded by its own answering event, and only
+    approve opens a gate (CR-07)."""
+    data = instruction["data"]
+    if instruction["type"] != "channel.message_in":
+        return True
+    return data["option"] is None and data["card_kind"] in INSTRUCTION_CARD_KINDS
+
+
 def _instructed(entry, applied, level, policy, instruction, earlier) -> bool:
     """OB-01, L2: the policy owner's own earlier instruction in this world, from a signed-in session
-    or the owner's bound WhatsApp number (never email), asked for this send, and no earlier
-    policy.applied used it up (whatever became of that entry, cancelled included)."""
+    or typed from the owner's bound WhatsApp number (never email, never a card answer but a typed
+    answer to a question), asked for this send, and no earlier policy.applied used it up (whatever
+    became of that entry, cancelled included)."""
     if level != "L2":
         return applied["instruction_id"] is None and instruction is None
     return (
         instruction is not None
         and instruction["id"] == applied["instruction_id"]
         and instruction["data"]["channel"] in INSTRUCTION_CHANNELS[instruction["type"]]
+        and _typed_by_owner(instruction)
         and all(used["data"]["instruction_id"] != applied["instruction_id"] for used in earlier)
         and instruction["world_id"] == entry["world_id"]
         and instruction["ts"] < entry["authz"]["at"]
@@ -386,6 +403,9 @@ def test_FR_WLD_03_OB_01_OB_05_policy_path_has_an_invalid_case_per_binding(repo_
         "ob01_l2_instruction_by_email",
         "ob01_l2_world_requested_by_email",
         "ob01_l2_instruction_reused",
+        "ob01_l2_instruction_is_a_gate_card_hold",
+        "ob01_l2_instruction_is_a_tapped_question_option",
+        "ob01_l2_instruction_typed_on_a_gate_card",
         "ob01_policy_daily_limit_reached",
         "ob01_policy_daily_credits_reached",
         "ob05_policy_undo_window_dropped",
