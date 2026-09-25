@@ -3,13 +3,16 @@ policies to L1 in <= 5 s; confirmed on every channel." PI-13 and PI-18
 (docs/security/p4-policy-invariants.md): Stop all autopilot sets every policy to L1, one
 `policy.changed` per policy, only the owner may do it, and one writer per world stamps every
 event -- tilo-api itself never does. Routes and shapes pinned in
-services/api/tests/API_ST3a.md (round 3, after code/security/qa review round 2 failed on: a
-policy read as L1 being skipped even when its own history disagreed (silent history repair), a
-kill switch that could not lower autonomy when the event writer was down, two concurrent kill
-switches double-writing, and policy.changed's vis carrying a district id foreign to the target
-world's own layout). Round 1's fixes (run_id/seq stamping, the 403/404 membership oracle,
-half-applied Stop-alls, the pause channel enum, and policy.changed's per-scope vis) are unchanged
-here and still pinned below.
+services/api/tests/API_ST3a.md (round 4, after code/security/qa review round 3 failed on: Pause's
+dedupe keyed on "did this call lower any policy" instead of a durable `paused` flag, a
+process-wide lock held across writer I/O so a slow/failing writer for one world stalled a kill
+switch against a different world, policy.changed's vis computed against the Stop-all *request*
+world instead of the policy's own *target* world, a redacted view still leaking a caller's own
+visibility scope through `vis`/`target`/`actor` and through nested `data` values, `pending` only
+ever counting the request's own world, and revoke raising a 500 on a down writer instead of
+queuing pending like stop/pause do). Round 1-3's own fixes (run_id/seq stamping, the 403/404
+membership oracle, half-applied Stop-alls, the pause channel enum, per-scope vis, no silent
+history repair, and pending-on-failure for stop/pause) are unchanged here and still pinned below.
 """
 
 from __future__ import annotations
@@ -21,10 +24,13 @@ import time
 
 from _api_lib import (
     OWNER,
+    PRINCIPAL_HEADER,
     WORLD,
     FlakyEventWriter,
     SlowEventWriter,
+    SlowFlakyEventWriter,
     as_principal,
+    as_principal_by_header,
     as_writer,
     assert_part_carries_no_stamped_fields,
     base_policy,
@@ -296,6 +302,7 @@ def test_FR_HIL_07_pause_all_emits_world_paused_and_sets_l1(client, store):
     assert event["authz"] is None  # world.paused is side_effect: false (events/registry.yaml)
     assert event["vis"] == "all"
     validate_event(event)
+    assert store.worlds[WORLD].paused is True, "round-4: the durable paused flag must be set too"
 
 
 def test_FR_HIL_07_pause_channel_outside_the_schema_enum_is_422(client, store, writer):
@@ -898,3 +905,314 @@ def test_FR_HIL_07_concurrent_pause_alls_produce_exactly_one_world_paused(client
 
     paused_events = [e for e in store.events.get(WORLD, []) if e["type"] == "world.paused"]
     assert len(paused_events) == 1, f"expected exactly one world.paused, got {len(paused_events)}"
+    assert store.worlds[WORLD].paused is True
+
+
+# ---------------------------------------------------------------------------
+# Round-4 finding 1 (security, biggest): Pause's dedupe must come from WorldRecord.paused, checked
+# under the same lock that serializes the route's own mutation -- never from whether this call's
+# own Stop-all step happened to lower a policy. The round-3 implementation built a world.paused
+# part only when stopped > 0, which silently dropped two kinds of genuine, first-time pauses.
+
+
+def test_FR_HIL_07_pause_after_stop_all_still_emits_exactly_one_world_paused(client, store):
+    """A Stop-all followed by a single Pause-all must still leave exactly one world.paused: every
+    owned policy is already L1 by the time Pause-all runs (stopped == 0 for Pause-all's own call),
+    but the world itself was never paused before -- a durable record is still owed. This is the
+    exact scenario round 3's `stopped > 0` gate silently dropped."""
+    ids = _world_with_policies(store, 3, level="L2")
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    stop_resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert stop_resp.status_code == 200
+    for pid in ids:
+        assert store.policies[pid]["level"] == "L1"
+    assert store.worlds[WORLD].paused is False
+
+    pause_resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+
+    assert pause_resp.status_code == 200, pause_resp.text
+    body = pause_resp.json()
+    assert body["paused"] is True
+    assert body["stopped"] == 0, "every policy was already L1 from Stop-all"
+    paused_events = [e for e in store.events[WORLD] if e["type"] == "world.paused"]
+    assert len(paused_events) == 1, "Pause-all must still leave a durable record even though stopped == 0"
+    validate_event(paused_events[0])
+    assert store.worlds[WORLD].paused is True
+
+
+def test_FR_HIL_07_pause_with_zero_l2_l3_policies_still_emits_exactly_one_world_paused(client, store):
+    """A world with no L2/L3 policies at all (nothing whatsoever for Pause-all to lower) must
+    still get exactly one world.paused on its first Pause-all call -- stopped == 0 here too, on
+    the very first call, which round 3's `stopped > 0` gate also silently dropped."""
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    # No policies at all in store.policies for this world's owner.
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "email"})
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["paused"] is True
+    assert body["stopped"] == 0
+    assert body["already_l1"] == 0
+    paused_events = [e for e in store.events[WORLD] if e["type"] == "world.paused"]
+    assert len(paused_events) == 1
+    validate_event(paused_events[0])
+    assert store.worlds[WORLD].paused is True
+
+
+def test_FR_HIL_07_pause_all_is_idempotent_no_duplicate_world_paused_on_a_second_sequential_call(client, store):
+    """An already-paused world (the flag is True) gets no second world.paused on a later,
+    sequential Pause-all -- the flag is the one thing that dedupes, exactly as PI-13-style
+    idempotency dedupes Stop-all's already-L1 policies via history, not via "did anything change
+    this call." "paused": true is still reported both times."""
+    _world_with_policies(store, 2, level="L2")
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    first = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+    assert first.status_code == 200, first.text
+    assert first.json()["paused"] is True
+    assert store.worlds[WORLD].paused is True
+
+    second = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+    assert second.status_code == 200, second.text
+    assert second.json()["paused"] is True
+
+    paused_events = [e for e in store.events[WORLD] if e["type"] == "world.paused"]
+    assert len(paused_events) == 1, "a second Pause-all on an already-paused world must not file a duplicate"
+
+
+# ---------------------------------------------------------------------------
+# Round-4 finding 2 (qa, biggest): the store lock (or whatever serializes a kill switch's own
+# mutation) must never be held across writer I/O -- a kill switch against one world must never
+# wait on another world's writer latency, and a slow-then-failing writer for 200 policies must
+# never itself blow the 5s budget by being flushed serially and synchronously.
+
+
+def test_FR_HIL_07_stop_all_meets_5s_budget_with_a_slow_failing_writer_on_first_call_and_retry(client, store):
+    """200 policies, a writer that sleeps 30ms then always raises: 30ms * 200 = 6s if flushed
+    serially and synchronously inside whatever the route uses to serialize its own mutation --
+    well over the 5s budget. Every policy must still reach L1 within 5s on the first call, and a
+    second Stop-all issued while the writer is still down (now only re-attempting the flush, since
+    nothing is left to lower) must also finish within 5s."""
+    ids = _world_with_policies(store, 200, level="L3")
+    slow_flaky = SlowFlakyEventWriter(store, delay_s=0.03)
+    as_writer(slow_flaky)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    started = time.perf_counter()
+    first = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    first_elapsed = time.perf_counter() - started
+
+    assert first.status_code in (200, 202), first.text
+    assert first_elapsed <= 5.0, f"first stop-all took {first_elapsed:.2f}s with a slow failing writer"
+    assert first.json()["stopped"] == 200
+    for pid in ids:
+        assert store.policies[pid]["level"] == "L1"
+
+    started_2 = time.perf_counter()
+    second = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    second_elapsed = time.perf_counter() - started_2
+
+    assert second.status_code in (200, 202), second.text
+    assert second_elapsed <= 5.0, f"second stop-all (writer still down) took {second_elapsed:.2f}s"
+    assert second.json()["already_l1"] == 200
+    assert second.json()["stopped"] == 0
+
+
+def test_FR_HIL_07_stop_all_on_one_world_never_waits_on_another_worlds_writer_latency(client, store):
+    """qa finding (biggest): a Stop-all against world A with 200 policies and a slow-then-failing
+    writer must not block a concurrently-issued, single-policy Stop-all against a different world
+    B. Uses as_principal_by_header instead of as_principal since the two concurrent requests need
+    two *different* owner principals at once -- as_principal's single global override would race
+    between the two threads."""
+    big_ids = _world_with_policies(store, 200, level="L3", world_id=WORLD)
+    small_ids = _world_with_policies(store, 1, owner=OTHER_OWNER, level="L2", world_id=OTHER_WORLD)
+    slow_flaky = SlowFlakyEventWriter(store, delay_s=0.03)
+    as_writer(slow_flaky)
+    as_principal_by_header(
+        {
+            "big": make_principal(user_id=OWNER, role="owner", world_id=WORLD),
+            "small": make_principal(user_id=OTHER_OWNER, role="owner", world_id=OTHER_WORLD),
+        }
+    )
+
+    ready = threading.Event()
+    big_result: dict = {}
+
+    def stop_big():
+        started = time.perf_counter()
+        ready.set()
+        resp = client.post(f"/worlds/{WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "big"})
+        big_result["resp"] = resp
+        big_result["elapsed"] = time.perf_counter() - started
+
+    t = threading.Thread(target=stop_big)
+    t.start()
+    assert ready.wait(timeout=5), "the big world's call never started"
+    time.sleep(0.01)  # give it a moment to actually enter the handler
+
+    started_small = time.perf_counter()
+    small_resp = client.post(f"/worlds/{OTHER_WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "small"})
+    small_elapsed = time.perf_counter() - started_small
+
+    t.join(timeout=10)
+    assert "resp" in big_result, "the big world's call never finished"
+
+    assert small_resp.status_code in (200, 202), small_resp.text
+    assert small_elapsed < 1.0, f"stop on the other world took {small_elapsed:.2f}s, must be < 1s"
+    for pid in small_ids:
+        assert store.policies[pid]["level"] == "L1"
+
+    assert big_result["resp"].status_code in (200, 202), big_result["resp"].text
+    assert big_result["elapsed"] <= 5.0
+    for pid in big_ids:
+        assert store.policies[pid]["level"] == "L1"
+
+
+# ---------------------------------------------------------------------------
+# Round-4 finding 3 (code, biggest): policy.changed's vis must be computed against the policy's
+# own *target* world (where the event is actually filed), never the Stop-all *request* world.
+
+
+def test_FR_HIL_07_policy_changed_vis_uses_the_target_worlds_own_layout_not_the_stop_request_worlds(
+    client, store, writer
+):
+    """A policy mapped to world B, whose scope districts exist only in B (not in the request
+    world A at all), must get its policy.changed's vis computed against B's own layout. Round 3
+    computed it against A's layout instead, which has nothing to intersect against -- silently
+    falling back to "all" and broadcasting the change to everyone, not just B's own viewers."""
+    district_only_in_b = "D5"
+    store.worlds[WORLD] = make_world(owner=OWNER, districts={})  # world A: no districts at all
+    store.worlds[OTHER_WORLD] = make_world(
+        owner=OWNER, districts={district_only_in_b: make_district("Payroll", "Running payroll")}
+    )
+    store.policies["pol_mapped_to_b"] = base_policy(
+        id_="pol_mapped_to_b", owner=OWNER, level="L2", districts=(district_only_in_b,)
+    )
+    store.policy_worlds["pol_mapped_to_b"] = OTHER_WORLD
+
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert resp.status_code == 200, resp.text
+
+    changed = [e for e in store.events.get(OTHER_WORLD, []) if e["type"] == "policy.changed"]
+    assert len(changed) == 1
+    event = changed[0]
+    assert event["vis"] == [district_only_in_b], (
+        "vis must come from world B's own layout (where district_only_in_b actually exists), not "
+        "world A's (empty) layout -- the old, wrong behaviour fell back to 'all' here"
+    )
+    validate_event(event)
+    assert store.events.get(WORLD, []) == [], "the event belongs to B's stream, not A's"
+
+
+# ---------------------------------------------------------------------------
+# Round-4 finding 5 (security): "pending" must count, and a later call must flush, parts queued
+# for *any* world this call touches -- not only the request's own world_id.
+
+
+def test_FR_HIL_07_pending_counts_parts_queued_for_another_world_too(client, store):
+    """A Stop-all against world A owns two policies: one mapped to A itself, one mapped to a
+    different world B. Both fail to write. The response's "pending" must count both, not just A's
+    own queue, and both must actually be sitting in their own worlds' pending_events."""
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.worlds[OTHER_WORLD] = make_world(owner=OWNER)
+    store.policies["pol_in_a"] = base_policy(id_="pol_in_a", owner=OWNER, level="L2")
+    store.policy_worlds["pol_in_a"] = WORLD
+    store.policies["pol_in_b"] = base_policy(id_="pol_in_b", owner=OWNER, level="L2")
+    store.policy_worlds["pol_in_b"] = OTHER_WORLD
+
+    flaky = FlakyEventWriter(store, failing=True)
+    as_writer(flaky)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+
+    assert resp.status_code == 202, resp.text
+    body = resp.json()
+    assert body["stopped"] == 2
+    assert body["pending"] == 2, "pending must count both A's own queue and B's, not just A's"
+    assert len(store.pending_events.get(WORLD, [])) == 1
+    assert len(store.pending_events.get(OTHER_WORLD, [])) == 1
+    assert store.pending_events[WORLD][0]["data"]["policy_id"] == "pol_in_a"
+    assert store.pending_events[OTHER_WORLD][0]["data"]["policy_id"] == "pol_in_b"
+
+
+def test_FR_HIL_07_a_later_stop_all_flushes_pending_parts_of_every_world_it_touches(client, store):
+    """After a failing first call leaves parts pending in both A and the mapped world B, a second
+    Stop-all against A -- even though every owned policy is already L1, so it changes nothing new
+    -- must still flush both A's and B's pending queues, since both are worlds this call's owned
+    policies touch."""
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.worlds[OTHER_WORLD] = make_world(owner=OWNER)
+    store.policies["pol_in_a"] = base_policy(id_="pol_in_a", owner=OWNER, level="L2")
+    store.policy_worlds["pol_in_a"] = WORLD
+    store.policies["pol_in_b"] = base_policy(id_="pol_in_b", owner=OWNER, level="L2")
+    store.policy_worlds["pol_in_b"] = OTHER_WORLD
+
+    flaky = FlakyEventWriter(store, failing=True)
+    as_writer(flaky)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    first = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert first.status_code == 202, first.text
+    assert first.json()["pending"] == 2
+    assert store.events.get(WORLD, []) == []
+    assert store.events.get(OTHER_WORLD, []) == []
+
+    flaky.failing = False  # "the harness" is back up
+
+    second = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert second.status_code == 200, second.text
+    assert second.json()["already_l1"] == 2
+    assert second.json()["stopped"] == 0
+    assert second.json()["pending"] == 0
+    assert store.pending_events.get(WORLD, []) == []
+    assert store.pending_events.get(OTHER_WORLD, []) == [], "B's pending part must be flushed too"
+
+    a_changed = [e for e in store.events[WORLD] if e["type"] == "policy.changed"]
+    b_changed = [e for e in store.events[OTHER_WORLD] if e["type"] == "policy.changed"]
+    assert len(a_changed) == 1
+    assert len(b_changed) == 1
+    validate_event(a_changed[0])
+    validate_event(b_changed[0])
+
+
+# ---------------------------------------------------------------------------
+# Round-4 finding 6 (qa/security follow-up): revoke must never 500 when the writer is down -- the
+# policy is lowered, the event goes to pending, and it is flushed by a later mutating call.
+
+
+def test_FR_HIL_07_revoke_with_the_writer_down_lowers_the_policy_and_queues_a_pending_event(client, store):
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.policies["pol_autopilot_l2"] = base_policy(id_="pol_autopilot_l2", owner=OWNER, level="L2")
+    store.policy_worlds["pol_autopilot_l2"] = WORLD
+    flaky = FlakyEventWriter(store, failing=True)
+    as_writer(flaky)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post("/policies/pol_autopilot_l2/revoke")
+
+    assert resp.status_code == 200, resp.text  # never a 500, even with the writer down
+    policy = store.policies["pol_autopilot_l2"]
+    assert policy["level"] == "L1"
+    assert policy["history"][-1]["change"] == "revoked"
+    assert store.events.get(WORLD, []) == []
+
+    pending = store.pending_events.get(WORLD, [])
+    assert len(pending) == 1
+    assert pending[0]["type"] == "policy.changed"
+    assert pending[0]["data"]["change"] == "revoked"
+    assert pending[0]["data"]["policy_id"] == "pol_autopilot_l2"
+    assert_part_carries_no_stamped_fields(pending[0])
+
+    flaky.failing = False  # "the harness" is back up
+    follow_up = client.post(f"/worlds/{WORLD}/autopilot/stop")  # a later mutating call touching WORLD
+    assert follow_up.status_code == 200, follow_up.text
+    assert store.pending_events.get(WORLD, []) == []
+
+    changed = [e for e in store.events[WORLD] if e["type"] == "policy.changed" and e["data"]["change"] == "revoked"]
+    assert len(changed) == 1
+    validate_event(changed[0])

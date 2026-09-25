@@ -1,17 +1,17 @@
 """FR-HIL-09 (PRD 10.1, 10.6): "Roles and redaction as in 10.1: a Viewer's API responses never
 contain hidden-district names." SEC-07 (PRD 16.4): "Redacted event views per role: scoped users
 never receive hidden names or counts." Routes and shapes pinned in
-services/api/tests/API_ST3a.md (round 3, after code/security/qa review round 2 failed on: a
-scoped view being built by copying the event forward rather than allowlisting -- so it still
-leaked the real event `id` (a viewer could correlate it against another view or use its
-ULID ordering to guess how much happened between two visible events), a `trace.archive_ref` or
-`data.message_ref` (both name a position in the run-wide raw archive), any other ULID-shaped
-value in `data` naming an event (for example policy.applied's instruction_id), and a `district`
-field naming a hidden district even on an otherwise vis: "all" event; plus a malformed event
-(missing `id`, a non-string `cause`) was never proven not to 500, and Principal.districts being
-some non-tuple value (a bare string) was never proven not to be matched by substring). Round 1's
-fixes (the 403/404 membership oracle, the view's own dense `seq`, a dangling `cause` nulled, and a
-malformed district record failing closed) are unchanged here and still pinned below.
+services/api/tests/API_ST3a.md (round 4, after code/security/qa review round 3 failed on: a
+scoped view's `vis` field returning the stored event's *full* district list unfiltered (leaking a
+district beyond the caller's own scope through a field previously assumed safe), `target`/`actor`
+never being checked against the caller's visible districts even though either can legally be a
+district id, and `data` only being redacted at its top level -- a ULID or district id nested
+inside a sub-object or list, or stored under `data.district` specifically, passed through
+unchanged). Round 1-3's fixes (the 403/404 membership oracle, the view's own dense `seq` and
+view-local `id`, a dangling `cause` nulled/remapped, a malformed district record and a malformed
+event both failing closed, Principal.districts of the wrong type never matched by substring, and
+`trace.archive_ref`/`data.message_ref` always nulled for a scoped viewer) are unchanged here and
+still pinned below.
 """
 
 from __future__ import annotations
@@ -623,3 +623,253 @@ def test_SEC_07_property_scoped_view_never_returns_a_real_store_id_or_archive_re
         seen_ids = {e["id"] for e in seen}
         assert seen_ids.isdisjoint(real_ids), "a scoped view must never return a real store event id"
         assert all(e["trace"]["archive_ref"] is None for e in seen), "archive_ref must never reach a scoped viewer"
+
+
+# ---------------------------------------------------------------------------
+# Round-4 finding 4 (security): a redacted view still leaked the caller's own visibility scope
+# through `vis` (the full, unfiltered stored list, not just the caller's own intersection),
+# through `target`/`actor` (either can legally be a district id per event.schema.json's own
+# `target` anyOf, and neither was checked), and through `data` (round 3 only walked its top
+# level -- a ULID or district id nested inside a sub-object or list, or `data.district`
+# specifically, passed through unredacted).
+
+
+def test_SEC_07_vis_list_in_scoped_view_is_filtered_to_the_callers_own_districts(client, store):
+    """A kept event's vis can name more districts than the caller can see -- the event is kept
+    whenever vis intersects principal.districts at all, not only when vis is a subset of it. The
+    full, unfiltered list must never reach a scoped viewer; only the intersection with what that
+    viewer can actually see."""
+    store.worlds[WORLD] = make_world(
+        owner=OWNER,
+        districts={D1: make_district("Mail", "Triaging the inbox"), D2: make_district("Finance Ops", "Ledger")},
+    )
+    store.events[WORLD] = [
+        base_event(seq=1, type_="agent.working", data={}, district=D1, vis=[D1, D2], summary="shared D1 and D2"),
+    ]
+    as_principal(make_principal(user_id="u_viewer", role="viewer", districts=(D1,)))
+
+    resp = client.get(f"/worlds/{WORLD}/events")
+    assert resp.status_code == 200
+    events = resp.json()["events"]
+    assert len(events) == 1
+    assert events[0]["vis"] == [D1], "vis must be filtered to the caller's own districts, not the full stored list"
+    assert D2 not in json.dumps(events[0])
+
+    as_principal(make_principal(user_id=OWNER, role="owner"))
+    owner_events = client.get(f"/worlds/{WORLD}/events").json()["events"]
+    assert owner_events[0]["vis"] == [D1, D2], "the owner still sees the full, unfiltered vis list"
+
+
+def test_SEC_07_target_naming_a_hidden_district_is_nulled_in_scoped_views(client, store):
+    """target may legally be a district id (event.schema.json#/$defs/target's own anyOf includes
+    district_id); one naming a hidden district must be nulled for a scoped viewer even though the
+    event itself is kept via vis: "all", exactly like the dedicated district field already is."""
+    hidden = "D9"
+    store.worlds[WORLD] = make_world(
+        owner=OWNER,
+        districts={
+            D1: make_district("Mail", "Triaging the inbox"),
+            hidden: make_district("Payroll", "Running payroll"),
+        },
+    )
+    store.events[WORLD] = [
+        base_event(
+            seq=1, type_="agent.working", data={}, target=hidden, vis="all", summary="target names a hidden district"
+        ),
+    ]
+    as_principal(make_principal(user_id="u_viewer", role="viewer", districts=(D1,)))
+
+    resp = client.get(f"/worlds/{WORLD}/events")
+    events = resp.json()["events"]
+    assert len(events) == 1
+    assert events[0]["target"] is None
+    assert hidden not in json.dumps(events[0])
+
+    as_principal(make_principal(user_id=OWNER, role="owner"))
+    owner_events = client.get(f"/worlds/{WORLD}/events").json()["events"]
+    assert owner_events[0]["target"] == hidden
+
+
+def test_SEC_07_actor_naming_a_hidden_district_is_nulled_in_scoped_views(client, store):
+    """Same fail-safe treatment as target above, applied to actor -- defensive: event.schema.json's
+    own actor anyOf does not currently include district_id, but API_ST3a.md pins the redaction
+    rule generically (by shape, not by field-specific semantics) so a scoped viewer is never one
+    schema change away from a leak here. This event is deliberately not schema-valid (actor would
+    never really be district-shaped in production data) so it is built directly, not validated."""
+    hidden = "D9"
+    store.worlds[WORLD] = make_world(
+        owner=OWNER,
+        districts={
+            D1: make_district("Mail", "Triaging the inbox"),
+            hidden: make_district("Payroll", "Running payroll"),
+        },
+    )
+    store.events[WORLD] = [
+        base_event(
+            seq=1, type_="agent.working", data={}, actor=hidden, vis="all", summary="actor names a hidden district"
+        ),
+    ]
+    as_principal(make_principal(user_id="u_viewer", role="viewer", districts=(D1,)))
+
+    resp = client.get(f"/worlds/{WORLD}/events")
+    events = resp.json()["events"]
+    assert len(events) == 1
+    assert events[0]["actor"] is None
+    assert hidden not in json.dumps(events[0])
+
+    as_principal(make_principal(user_id=OWNER, role="owner"))
+    owner_events = client.get(f"/worlds/{WORLD}/events").json()["events"]
+    assert owner_events[0]["actor"] == hidden
+
+
+def test_SEC_07_data_district_field_is_redacted_like_the_top_level_district_field(client, store):
+    """`data.district` is not ULID-shaped, so round 3's ULID-only data pass never touched it --
+    it must get exactly the same visibility treatment as the event's own top-level district
+    field."""
+    hidden = "D9"
+    store.worlds[WORLD] = make_world(
+        owner=OWNER,
+        districts={
+            D1: make_district("Mail", "Triaging the inbox"),
+            hidden: make_district("Payroll", "Running payroll"),
+        },
+    )
+    store.events[WORLD] = [
+        base_event(
+            seq=1,
+            type_="agent.working",
+            data={"district": hidden, "note": "unrelated payload field"},
+            vis="all",
+            summary="data.district names a hidden district",
+        ),
+        base_event(
+            seq=2,
+            type_="agent.working",
+            data={"district": D1},
+            vis="all",
+            summary="data.district names a visible district",
+        ),
+    ]
+    as_principal(make_principal(user_id="u_viewer", role="viewer", districts=(D1,)))
+
+    resp = client.get(f"/worlds/{WORLD}/events")
+    events = resp.json()["events"]
+    by_summary = {e["summary"]: e for e in events}
+    assert by_summary["data.district names a hidden district"]["data"]["district"] is None
+    assert by_summary["data.district names a hidden district"]["data"]["note"] == "unrelated payload field"
+    assert by_summary["data.district names a visible district"]["data"]["district"] == D1
+    assert hidden not in json.dumps(events)
+
+    as_principal(make_principal(user_id=OWNER, role="owner"))
+    owner_events = client.get(f"/worlds/{WORLD}/events").json()["events"]
+    by_summary_owner = {e["summary"]: e for e in owner_events}
+    assert by_summary_owner["data.district names a hidden district"]["data"]["district"] == hidden
+
+
+def test_SEC_07_nested_district_and_ulid_values_in_data_are_redacted_at_any_depth(client, store):
+    """A ULID or district id can be nested inside a list item or a sub-object within `data`, not
+    only at its top level -- round 3's pass only walked data's own top-level values. Every such
+    value, at any depth, gets the same treatment it would get at the top level: a ULID-shaped
+    value naming an event is remapped to that event's view-local id when it survived filtering,
+    else nulled; a district-shaped value is nulled when it names a hidden district."""
+    hidden = "D9"
+    store.worlds[WORLD] = make_world(
+        owner=OWNER,
+        districts={
+            D1: make_district("Mail", "Triaging the inbox"),
+            hidden: make_district("Payroll", "Running payroll"),
+        },
+    )
+    visible_ref = base_event(seq=1, type_="world.requested", data={}, vis="all", summary="a visible reference event")
+    hidden_ref = base_event(
+        seq=2, type_="agent.working", data={}, district=hidden, vis=[hidden], summary="a hidden reference event"
+    )
+    nested = base_event(
+        seq=3,
+        type_="agent.working",
+        data={
+            "refs": [visible_ref["id"], {"inner_ref": hidden_ref["id"], "inner_district": hidden}],
+            "district": D1,
+            "outer": {"deep": {"deeper": [visible_ref["id"], hidden]}},
+        },
+        vis="all",
+        summary="deeply nested data",
+    )
+    store.events[WORLD] = [visible_ref, hidden_ref, nested]
+
+    as_principal(make_principal(user_id="u_viewer", role="viewer", districts=(D1,)))
+    resp = client.get(f"/worlds/{WORLD}/events")
+    events = resp.json()["events"]
+    assert len(events) == 2, "the hidden reference event (store seq 2) must be dropped entirely"
+    by_summary = {e["summary"]: e for e in events}
+    visible_view_id = by_summary["a visible reference event"]["id"]
+    nested_view = by_summary["deeply nested data"]
+
+    assert nested_view["data"]["refs"][0] == visible_view_id
+    assert nested_view["data"]["refs"][1]["inner_ref"] is None, "named a hidden/dropped event"
+    assert nested_view["data"]["refs"][1]["inner_district"] is None, "hidden district, nested in a list item's dict"
+    assert nested_view["data"]["district"] == D1, "a visible district stays unchanged"
+    assert nested_view["data"]["outer"]["deep"]["deeper"][0] == visible_view_id
+    assert nested_view["data"]["outer"]["deep"]["deeper"][1] is None, "hidden district three levels deep"
+
+    text = json.dumps(events)
+    assert hidden not in text
+    assert hidden_ref["id"] not in text
+    assert visible_ref["id"] not in text, "the real store id must never appear, remapped only"
+
+
+@settings(max_examples=30, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@given(data=st.data())
+def test_SEC_07_property_nested_data_never_leaks_hidden_districts_or_real_ids(client, store, data):
+    """Property: whatever shape (dict/list nesting, up to depth 3) a data payload takes, a hidden
+    district id and a real store event id (visible or hidden) never appear anywhere in a scoped
+    viewer's response, however deeply either is buried."""
+    hidden_district = "D9"
+    visible_district = "D1"
+    store.worlds[WORLD] = make_world(
+        owner=OWNER,
+        districts={
+            visible_district: make_district("Mail", "Triaging the inbox"),
+            hidden_district: make_district("Payroll", "Running payroll"),
+        },
+    )
+    visible_ref = base_event(seq=1, type_="world.requested", data={}, vis="all", summary="a visible reference event")
+    hidden_ref = base_event(
+        seq=2,
+        type_="agent.working",
+        data={},
+        district=hidden_district,
+        vis=[hidden_district],
+        summary="a hidden reference event",
+    )
+    leaves = [hidden_district, visible_district, hidden_ref["id"], visible_ref["id"], "plain_marker_value"]
+
+    def build(depth: int):
+        if depth <= 0:
+            return data.draw(st.sampled_from(leaves))
+        choice = data.draw(st.integers(min_value=0, max_value=2))
+        if choice == 0:
+            return data.draw(st.sampled_from(leaves))
+        if choice == 1:
+            width = data.draw(st.integers(min_value=0, max_value=3))
+            return [build(depth - 1) for _ in range(width)]
+        keys = data.draw(st.lists(st.sampled_from(["a", "b", "district", "ref"]), min_size=0, max_size=3, unique=True))
+        return {k: build(depth - 1) for k in keys}
+
+    # event.schema.json pins `data` as always an object (`{"type": "object"}`) -- the top level is
+    # forced to a dict, with build()'s own random leaf/list/dict choice only applying two levels
+    # further down, so this never constructs a contractually-impossible bare-string `data`.
+    top_keys = data.draw(st.lists(st.sampled_from(["a", "b", "district", "ref"]), min_size=1, max_size=4, unique=True))
+    nested_shape = {k: build(2) for k in top_keys}
+    nested_event = base_event(seq=3, type_="agent.working", data=nested_shape, vis="all", summary="deeply nested data")
+    store.events[WORLD] = [visible_ref, hidden_ref, nested_event]
+
+    as_principal(make_principal(user_id="u_viewer", role="viewer", districts=(visible_district,)))
+    resp = client.get(f"/worlds/{WORLD}/events")
+    assert resp.status_code == 200
+    events = resp.json()["events"]
+    text = json.dumps(events)
+
+    assert hidden_district not in text, "a hidden district id must never leak, however deeply nested"
+    assert hidden_ref["id"] not in text, "a hidden event's real id must never leak, however deeply nested"
+    assert visible_ref["id"] not in text, "a real store id must never leak either, even for a visible event"
