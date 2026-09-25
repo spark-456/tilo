@@ -49,3 +49,8 @@ Questions found while building. Each has the default we build on until the user 
 | BQ-10 | PRD 18.2 values win (user go-ahead on the default). | 2026-09-25 |
 | BQ-11 | Colours taken from the exports' own palette: `policy` #0E8A87 (lip #0A6664), `signal.gate` #5A5768, `ink.3` #66717A. User may override (ADR-0003). | 2026-09-25 |
 | Repo | Private GitHub repository `spark-456/tilo`; not public for now. | 2026-09-25 |
+| BQ-41 | Decided by the orchestrator (user said not to wait): the ten v0 skills ship as drafts with `reviewer: Pending domain expert review` and version 0.1.0; no invented reviewer names. | 2026-09-25 |
+| BQ-42 | Decided by the orchestrator: no separate per-org daily cap (`null`); the US$15 soft and US$25 hard daily spend caps apply to every org. | 2026-09-25 |
+| BQ-43 | Decided by the orchestrator: eval credit caps full 2,000 (US$10), smoke 200 (US$1), gate 1,000 (US$5), inside the US$150 programme ceiling. | 2026-09-25 |
+| BQ-44 | Decided by the orchestrator: the policy engine defaults stand; the daily-cap day is the UTC calendar day. | 2026-09-25 |
+| BQ-45 to BQ-49 | Decided by the orchestrator: SW builds S-05 mobile, S-10 mobile, S-11, the S-14 replay entry and banner, and the HR-7 policy stamp on its stated defaults, using existing tokens only. | 2026-09-25 |
