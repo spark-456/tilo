@@ -56,6 +56,7 @@ fmt-check:
 lint:
     uv run ruff check .
     pnpm exec biome lint .
+    uv run python scripts/lint_model_ids.py
 
 # Type-check everything.
 typecheck:
