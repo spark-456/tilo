@@ -1,0 +1,109 @@
+"""PL-02 / ADR-0003: "An example profile set for NVIDIA NIM
+(https://integrate.api.nvidia.com/v1, key from NVIDIA_API_KEY in the
+git-ignored .env) is added alongside the Google examples, preferring Gemma
+models where NIM hosts them." Ticket P0-05 item 3: "add them to the example
+config so a user can route roles to NIM for live tests: provider
+openai_compat, base_url https://integrate.api.nvidia.com/v1, api_key_env
+NVIDIA_API_KEY... Provide a way to select NIM routing without editing code:
+e.g. a second example file config/models.nim.yaml selected by an env var
+such as TILO_MODELS_FILE, validated by the same loader and denylist."
+
+Contract note (resolved, P0-02b/ADR-0002 1.1.0): `ProvidersProfile`
+(`contracts/providers.schema.json` `$defs.profile`) now carries optional
+`base_url`/`api_key_env`, allowed only when `provider == "openai_compat"`.
+`test_PL_02_nim_profiles_load_through_the_same_loader_and_denylist` loads
+`config/models.nim.yaml` through the real start-up checks (PL-06/PL-07/
+NFR-25); every other test in this file checks the example file directly
+(raw YAML) and never depended on the contract change.
+"""
+
+from __future__ import annotations
+
+import re
+
+import pytest
+import yaml
+
+NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
+NIM_API_KEY_ENV = "NVIDIA_API_KEY"
+
+
+@pytest.fixture
+def nim_models_path(repo_root):
+    path = repo_root / "config" / "models.nim.yaml"
+    if not path.exists():
+        pytest.fail(
+            f"PL-02/ADR-0003: {path} does not exist yet -- ticket P0-05 item 3 adds it "
+            "(a second example config, alongside config/models.yaml, routing roles to NVIDIA NIM)."
+        )
+    return path
+
+
+def _load_raw(path) -> dict:
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def test_PL_02_nim_profiles_use_the_openai_compat_provider_and_nim_base_url(nim_models_path):
+    raw = _load_raw(nim_models_path)
+    profiles = raw["profiles"]
+    assert profiles, "config/models.nim.yaml must declare at least one profile"
+    for profile_id, profile in profiles.items():
+        assert profile["provider"] == "openai_compat", f"{profile_id}: provider must be openai_compat"
+        assert profile["base_url"] == NIM_BASE_URL, f"{profile_id}: base_url must be NVIDIA's NIM endpoint"
+
+
+def test_PL_02_nim_profiles_name_their_key_by_env_var_and_never_contain_a_key(nim_models_path):
+    raw_text = nim_models_path.read_text(encoding="utf-8")
+    raw = yaml.safe_load(raw_text)
+    for profile_id, profile in raw["profiles"].items():
+        assert profile.get("api_key_env") == NIM_API_KEY_ENV, (
+            f"{profile_id}: must name the key by env var ({NIM_API_KEY_ENV}), 16.1 rule 4 / ADR-0003"
+        )
+        assert "api_key" not in profile, f"{profile_id}: must not carry a literal api_key field"
+
+    # No secret-shaped literal anywhere in the file: a plausible API key is a
+    # long run of base64url-ish characters that is not just the env var name.
+    suspicious = re.findall(r"[A-Za-z0-9_-]{24,}", raw_text)
+    leaked = [token for token in suspicious if token not in {NIM_API_KEY_ENV, "integrate.api.nvidia.com"}]
+    assert not leaked, f"16.1 rule 4: config/models.nim.yaml must never contain a secret-shaped value, found {leaked}"
+
+
+def test_PL_02_nim_profiles_prefer_gemma_models(nim_models_path):
+    raw = _load_raw(nim_models_path)
+    models = [profile["model"] for profile in raw["profiles"].values()]
+    assert any("gemma" in model.lower() for model in models), (
+        f"ADR-0003: NIM profiles must prefer Gemma models where NIM hosts them, got {models}"
+    )
+
+
+def test_PL_02_nim_profiles_cite_their_source_and_a_retrieval_date(nim_models_path):
+    """Ticket item 3: "Verify the current model ids from NVIDIA's public
+    model catalog or API docs... and cite the source and date in a config
+    comment." """
+    raw_text = nim_models_path.read_text(encoding="utf-8")
+    comment_lines = [line for line in raw_text.splitlines() if line.strip().startswith("#")]
+    commentary = "\n".join(comment_lines)
+    assert "nvidia" in commentary.lower(), "must cite NVIDIA's catalog/docs as the source, in a comment"
+    assert re.search(r"20\d{2}-\d{2}-\d{2}", commentary), "must cite a retrieval date (YYYY-MM-DD), in a comment"
+
+
+def test_PL_02_nim_profiles_selectable_by_env_var_without_editing_code(monkeypatch, repo_root, nim_models_path):
+    """Ticket item 3: "Provide a way to select NIM routing without editing
+    code... selected by an env var such as TILO_MODELS_FILE." Assumption
+    (see report): `tilo_providers.config.resolve_models_path` reads
+    `TILO_MODELS_FILE`, defaulting to `config/models.yaml`."""
+    from tilo_providers.config import resolve_models_path  # noqa: PLC0415
+
+    monkeypatch.setenv("TILO_MODELS_FILE", str(nim_models_path))
+    assert resolve_models_path(repo_root=repo_root) == nim_models_path
+
+    monkeypatch.delenv("TILO_MODELS_FILE", raising=False)
+    assert resolve_models_path(repo_root=repo_root) == repo_root / "config" / "models.yaml"
+
+
+def test_PL_02_nim_profiles_load_through_the_same_loader_and_denylist(nim_models_path, repo_root):
+    from tilo_providers.config import load_providers_config  # noqa: PLC0415
+
+    config = load_providers_config(nim_models_path, repo_root / "config" / "prices.yaml")
+
+    assert config.profiles, "NIM profiles must load through the same start-up checks as config/models.yaml"

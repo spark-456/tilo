@@ -9,6 +9,8 @@ price: an unset status, or any null price field, raises (PL-06)."""
 from __future__ import annotations
 
 import fnmatch
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -17,9 +19,22 @@ import yaml
 from pydantic import ValidationError
 from tilo_contracts import ProvidersModels, ProvidersPrices, ProvidersProfile, ProvidersRole
 
+# packages/providers/src/tilo_providers/config.py -> repo root is 4 parents up
+# (same depth as tilo_providers.prompts.DEFAULT_PROMPTS_ROOT).
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
 
 class ProviderConfigError(Exception):
     """Config failed to parse/validate, or failed a start-up check (PL-06, PL-07, NFR-25)."""
+
+
+def resolve_models_path(repo_root: Path | str | None = None, *, env: Mapping[str, str] | None = None) -> Path:
+    """PL-02 / ADR-0003: picks `config/models.yaml` unless `TILO_MODELS_FILE`
+    names another file (e.g. `config/models.nim.yaml`, to route roles to
+    NVIDIA NIM for live tests) — no code edit needed to switch."""
+    root = Path(repo_root) if repo_root is not None else _REPO_ROOT
+    override = (env if env is not None else os.environ).get("TILO_MODELS_FILE")
+    return Path(override) if override else root / "config" / "models.yaml"
 
 
 @dataclass(frozen=True)
@@ -79,6 +94,23 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ProviderConfigError(f"{path} must contain a YAML mapping at the top level")
     return raw
+
+
+def _validate_profile_endpoint_fields(models: ProvidersModels) -> None:
+    """contracts/providers.schema.json's profile if/else (`$defs.profile`,
+    1.1.0) forbids `base_url`/`api_key_env` on any profile whose `provider`
+    is not `openai_compat`. The generated pydantic `ProvidersProfile` does
+    not enforce a JSON Schema if/else (same gap P0-04 handled for prices'
+    if/then in `_validate_price_fields_when_set`) — a `google` or `fake`
+    profile carrying either field validates against the model fine and
+    would only be caught here, at load time."""
+    for profile_id, profile in models.profiles.items():
+        if profile.provider != "openai_compat" and (profile.base_url is not None or profile.api_key_env is not None):
+            raise ProviderConfigError(
+                f"PL-02: profile {profile_id!r} has provider {profile.provider!r} but declares "
+                "base_url/api_key_env -- only an openai_compat profile may (contracts/providers.schema.json "
+                "$defs.profile)"
+            )
 
 
 def _validate_startup_rules(models: ProvidersModels, prices: ProvidersPrices) -> None:
@@ -148,6 +180,7 @@ def load_providers_config(models_path: Path | str, prices_path: Path | str) -> P
         raise ProviderConfigError(f"{prices_path} failed schema validation: {error}") from error
 
     _validate_price_fields_when_set(prices, prices_path)
+    _validate_profile_endpoint_fields(models)
 
     _validate_startup_rules(models, prices)
 
