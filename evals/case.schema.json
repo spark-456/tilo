@@ -25,7 +25,11 @@
       "enum": ["E-PLAN", "E-RES", "E-DOC", "E-MAIL", "E-CHN", "E-ROUTE", "E-HAND", "E-RED"]
     },
     "title": { "type": "string", "minLength": 1 },
-    "measures": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+    "measures": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^(EV|FR|EFF)-[A-Z0-9]" },
+      "minItems": 1
+    },
     "status": { "type": "string", "enum": ["skeleton", "ready"] },
     "deploy_gate": { "type": "boolean" },
     "inputs": { "type": "object" },
@@ -53,7 +57,7 @@
         }
       }
     },
-    "recording": { "type": ["string", "null"] },
+    "recording": { "type": ["string", "null"], "pattern": "^(?!/)(?!(.*/)?\\.\\.(/|$))[^\\\\:]+$" },
     "notes": { "type": "string" }
   },
   "allOf": [

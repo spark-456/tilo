@@ -29,7 +29,8 @@ def _expect_error(tmp_path, needle: str | None, **kwargs) -> None:
 
 
 def test_EFF_07_load_cases_loads_a_well_formed_case(tmp_path):
-    case = _load_one(tmp_path, case_id="E-PLAN-01", group="E-PLAN", ground_truth={"ok": True})
+    rec = "evals/recordings/E-PLAN-01.jsonl"
+    case = _load_one(tmp_path, case_id="E-PLAN-01", group="E-PLAN", ground_truth={"ok": True}, recording=rec)
     assert case.id == "E-PLAN-01" and case.status == "ready"
     assert case.checks == [{"check": "no_side_effects", "args": {}}]
 
@@ -66,8 +67,12 @@ def test_EFF_07_load_cases_allows_notes_and_an_autorater_check(tmp_path):
         ("nope", dict(case_id="E-PLAN-01", group="E-PLAN", checks=[{"check": "nope", "args": {}}])),
         (None, dict(case_id="E-PLAN-01", group="E-PLAN", status="ready", ground_truth=None)),
         (None, dict(case_id="E-PLAN-01", group="E-PLAN", checks=[])),
+        (None, dict(case_id="E-PLAN-01", group="E-PLAN", recording="evals/../../etc/passwd")),
+        (None, dict(case_id="E-PLAN-01", group="E-PLAN", recording="C:/Windows/x.jsonl")),
+        (None, dict(case_id="E-PLAN-01", group="E-PLAN", recording="/etc/x.jsonl")),
+        (None, dict(case_id="E-PLAN-01", group="E-PLAN", measures=["nope"])),
     ],
-    ids=["bad-id", "group-mismatch", "name-mismatch", "bad-check", "need-truth", "need-check"],
+    ids="bad-id group-mismatch name-mismatch bad-check need-truth need-check rec-up rec-drive rec-abs measure".split(),
 )
 def test_EFF_07_load_cases_rejects_malformed_cases(tmp_path, needle, kwargs):
     _expect_error(tmp_path, needle, ground_truth=kwargs.pop("ground_truth", {"ok": True}), **kwargs)
