@@ -331,3 +331,37 @@ def test_EFF_07_live_flag_with_LIVE_env_says_not_built_yet(fake_repo, monkeypatc
     text = (captured.out + captured.err).lower()
     assert "live" in text
     assert "not" in text
+
+
+@pytest.mark.parametrize(
+    "bad_event",
+    [
+        {"trace": "oops"},
+        {"trace": {"model_role": "r"}, "credits": "lots"},
+        {"trace": {"model_role": "r"}, "credits": -1e308},
+    ],
+    ids=["string_trace", "string_event_credits", "negative_event_credits"],
+)
+def test_EFF_07_bad_event_line_is_not_runnable_and_report_is_written(fake_repo, bad_event):
+    """qa review round 2: a bad event field is not runnable; the pass goes on and writes its report."""
+    cases_root = fake_repo / "evals" / "cases"
+    write_evals_config(fake_repo / "config", credit_cap={"full": 100, "smoke": 100, "gate": 100})
+    for case_id, events in (("E-RED-01", [{"type": "x", **bad_event}]), ("E-RED-02", [make_event(seq=1)])):
+        recording = write_recording(
+            fake_repo / "evals" / "recordings" / f"{case_id}.jsonl", events, outputs={}, credits=1
+        )
+        write_case(
+            cases_root,
+            case_id=case_id,
+            group="E-RED",
+            ground_truth={"ok": True},
+            checks=[{"check": "no_side_effects", "args": {}}],
+            recording=_recording_relpath(fake_repo, recording),
+        )
+
+    main(["run", "--pass", "full", "--results-json", "results.json"])
+
+    data = json.loads((fake_repo / "results.json").read_text(encoding="utf-8"))
+    assert data["not_runnable"] == ["E-RED-01"]
+    assert data["ran"] == ["E-RED-02"]
+    assert "E-RED-01" in (fake_repo / "evals" / "results.md").read_text(encoding="utf-8")

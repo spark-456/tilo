@@ -46,6 +46,18 @@ def _validated_credits(case: Any, raw: Any) -> float:
     return value
 
 
+def _validated_event(case: Any, event: dict[str, Any]) -> dict[str, Any]:
+    """Checks every event field the runner reads (qa review round 2)."""
+    trace = event.get("trace")
+    if trace is not None and not isinstance(trace, dict):
+        raise ExecutorError(f"case {case.id}: event trace must be an object, got {type(trace).__name__}")
+    for key in ("model_role", "profile"):
+        value = (trace or {}).get(key)
+        if value is not None and not isinstance(value, str):
+            raise ExecutorError(f"case {case.id}: event trace.{key} must be a string")
+    return {**event, "credits": _validated_credits(case, event.get("credits"))}
+
+
 class ReplayExecutor:
     """Replays a recorded case. A recording line with a "type" key is a
     TiloEvent; the one line without one (if present) is the final
@@ -75,7 +87,7 @@ class ReplayExecutor:
                     f"case {case.id}: recording line must be a JSON object, got {type(record).__name__}"
                 )
             if "type" in record:
-                events.append(record)
+                events.append(_validated_event(case, record))
             else:
                 outputs = record.get("outputs") or {}
                 credits = _validated_credits(case, record.get("credits"))
