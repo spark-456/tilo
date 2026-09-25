@@ -1,1 +1,2 @@
 - [Contracts review patterns](contracts-review-patterns.md) — probe cross-reference rules, rules.md numbering, drift-check probe technique
+- [Outbox review patterns](outbox-review-patterns.md) — dispatch error paths: stuck "sending", batch abort, Grant not bound to the send

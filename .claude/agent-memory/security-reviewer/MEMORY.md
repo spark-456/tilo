@@ -1,1 +1,2 @@
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); open: two tier sources
+- [Outbox runtime gaps](outbox-runtime-gaps.md): ST-2 r1 FAIL. Same id with a new key overwrites a stored entry (resend, Undo reversed); "failed" skips the undo window; Grant can be forged; AST scan has gaps
