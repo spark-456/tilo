@@ -1,29 +1,10 @@
 """tilo_providers.openai_compat_adapter — generic OpenAI-compatible adapter
-(PL-02, PRD 6.4). Works against any endpoint speaking the OpenAI chat
-completions/embeddings shape, including NVIDIA NIM
-(https://integrate.api.nvidia.com/v1, ADR-0003). `base_url`/`api_key_env`
-are `contracts/providers.schema.json` `$defs.profile` fields (1.1.0,
-ADR-0002/ADR-0003, `provider: openai_compat` only); the factory reads them
-off the profile, but stay constructor args so a caller can build directly.
-
-Built on `httpx` (BSD-3-Clause, `docs/licences.md`); `transport` is injected
-by tests so no real socket opens in dev/CI. Without an injected `transport`,
-construction refuses to build a real `httpx.Client` unless `LIVE=1`
-(EFF-01: the gate must hold at every direct-construction path, not only
-inside `RecordReplayProvider`). The API key is read once from the named env
-var and sent only as `Authorization`; `redact()` scrubs it out of any text
-handed to it (`tilo_providers.replay`, PRD 16.1 rule 4), so a recording
-stays clean even if a misbehaving endpoint echoes the key back into output.
-
-Secret hygiene (PRD 16.1 rule 4): the env value is checked at construction
-for stray whitespace/control characters (e.g. a trailing CR pasted on
-Windows) and rejected by naming only the variable, never the value — an
-unchecked CR/LF makes h11 raise "Illegal header value" with the value
-inlined in its own message, which would otherwise leak the key through
-`_post`'s exception. `_post`/`_raise_for_status` also never fold a raw
-`httpx` exception's `str()` or an unbounded/verbatim response body into a
-raised error: fixed messages plus the status code, or the server's own
-message truncated and scrubbed."""
+(PL-02, PRD 6.4): any endpoint speaking the OpenAI chat completions/
+embeddings shape, including NVIDIA NIM (ADR-0003). `base_url`/`api_key_env`
+come off the profile (`$defs.profile` 1.1.0, ADR-0002/0003). `transport` is
+injected by tests; without one, construction requires `LIVE=1` (EFF-01).
+The API key is scrubbed from any text via `redact()` (PRD 16.1 rule 4), and
+never folded raw into a raised error."""
 
 from __future__ import annotations
 
@@ -58,8 +39,7 @@ class OpenAICompatModelProvider(ModelProvider):
         self._profile_id = profile_id
         self._price = price
 
-        # The key rides in a header, so it only ever goes over TLS; plain
-        # http is allowed for loopback test servers only.
+        # The key rides in a header: TLS only, except loopback test servers.
         url = httpx.URL(base_url)
         if not (url.scheme == "https" or (url.scheme == "http" and url.host in _LOOPBACK_HOSTS)):
             raise ProviderError("PL-02: base_url must use https (plain http only for localhost/127.0.0.1)")
@@ -69,17 +49,13 @@ class OpenAICompatModelProvider(ModelProvider):
             raise ProviderError(f"PL-02: environment variable {api_key_env!r} (api_key_env) is not set")
         if not _CLEAN_TOKEN_RE.fullmatch(api_key):
             # Never include the value: it may be exactly the malformed
-            # content (whitespace/control characters) this check exists to
-            # catch before it reaches an HTTP header.
+            # whitespace/control content this check exists to catch.
             raise ProviderError(
                 f"PL-02: environment variable {api_key_env!r} (api_key_env) is not a clean ASCII token "
                 "(no whitespace or control characters)"
             )
 
-        # EFF-01: a test injects `transport`; anything else building a real
-        # `httpx.Client` must say LIVE=1 first -- the gate cannot live only
-        # in RecordReplayProvider, since this constructor is reachable
-        # directly (the factory's live_factory, or a caller's own code).
+        # EFF-01: reachable directly (not only via RecordReplayProvider).
         if transport is None and os.environ.get("LIVE") != "1":
             raise ProviderError(
                 "PL-02/EFF-01: refusing to build a real network client without LIVE=1 (inject transport= for tests)"
@@ -98,10 +74,8 @@ class OpenAICompatModelProvider(ModelProvider):
         return messages
 
     def _post(self, path: str, body: dict[str, Any]) -> httpx.Response:
-        # A raw httpx/h11 exception's own str() can inline a malformed
-        # header value verbatim (e.g. a CR-suffixed API key), so it is never
-        # folded into our message, and `from None` keeps it out of the
-        # formatted traceback's chained-cause section too (PRD 16.1 rule 4).
+        # A raw httpx/h11 exception's str() can inline a malformed header
+        # value verbatim, so it never folds into our message (PRD 16.1 r.4).
         try:
             return self._client.post(path, json=body)
         except httpx.HTTPError as error:
@@ -110,9 +84,7 @@ class OpenAICompatModelProvider(ModelProvider):
             raise mapped from None
 
     def redact(self, text: str) -> str:
-        # Replace every occurrence of the raw key, whole, before any caller
-        # truncates -- a truncate-then-scrub order lets a key straddling the
-        # cut survive as an unmatched prefix (PRD 16.1 rule 4).
+        # Scrub before any truncation, or a key straddling the cut survives.
         return text.replace(self._api_key, "***")
 
     def _scrub(self, message: str) -> str:
@@ -136,19 +108,24 @@ class OpenAICompatModelProvider(ModelProvider):
                 candidate = None
             if isinstance(candidate, str) and candidate:
                 message = candidate
-        # Never copy an unbounded or verbatim body into the exception: bound
-        # it and scrub the key in case a misbehaving/echoing proxy reflected
-        # it back (PRD 16.1 rule 4).
+        # Bound and scrub: never copy an unbounded/verbatim body (PRD 16.1 r.4).
         raise map_http_status(response.status_code, self._scrub(message))
+
+    def _parse(self, response: httpx.Response) -> dict[str, Any]:
+        # A 2xx body that is not the shape we expect (bad JSON, or a
+        # missing/short "choices"/"data") must reach the caller as a
+        # ProviderError, not a raw JSONDecodeError/KeyError/IndexError.
+        try:
+            return response.json()
+        except (json.JSONDecodeError, ValueError) as error:
+            raise ProviderError(self._scrub(f"PL-02: provider returned a malformed response body: {error}")) from None
 
     def _map_message(
         self, message: dict[str, Any], usage_raw: dict[str, Any] | None, finish_reason: str | None = None
     ) -> GenerateResponse:
         if finish_reason == "content_filter":
-            # Honesty rule, same mapping as the google adapter's
-            # prompt_feedback.block_reason check: a blocked completion
-            # surfaces as SafetyError, never as ordinary (possibly empty)
-            # text -- the router (P0-06) must see this, not a silent None.
+            # Honesty rule: a blocked completion surfaces as SafetyError,
+            # not as ordinary (possibly empty) text.
             raise SafetyError(f"PL-02: blocked by content filter (finish_reason={finish_reason!r})")
         tool_calls: list[dict[str, Any]] | None = None
         raw_tool_calls = message.get("tool_calls")
@@ -191,9 +168,12 @@ class OpenAICompatModelProvider(ModelProvider):
 
         response = self._post("/chat/completions", body)
         self._raise_for_status(response)
-        data = response.json()
-        choice = data["choices"][0]
-        return self._map_message(choice["message"], data.get("usage"), choice.get("finish_reason"))
+        data = self._parse(response)
+        try:
+            choice = data["choices"][0]
+            return self._map_message(choice["message"], data.get("usage"), choice.get("finish_reason"))
+        except (KeyError, IndexError, TypeError) as error:
+            raise ProviderError(self._scrub(f"PL-02: provider response missing {error}")) from None
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
         body: dict[str, Any] = {"model": self._profile.model, "messages": self._messages(request), "stream": True}
@@ -205,22 +185,16 @@ class OpenAICompatModelProvider(ModelProvider):
         if response_format is not None:
             body["response_format"] = response_format
 
-        # Review fix: a plain `client.post()` (as `_post` uses for generate())
-        # reads the whole response body before returning, so nothing would
-        # be yielded until the SSE stream had already finished -- `stream=True`
-        # over `client.stream()` keeps the connection open and hands lines to
-        # `iter_lines()` as they arrive, so a caller sees each chunk as soon
-        # as the server sends it, not all at once at the end.
+        # `client.stream()` keeps the connection open so each SSE line is
+        # yielded as it arrives, instead of only after the body completes.
         buffers: dict[int, dict[str, Any]] = {}
         try:
             with self._client.stream("POST", "/chat/completions", json=body) as response:
                 if response.status_code >= 400:
                     response.read()  # a streamed response must be read before .json()/.text is usable
                     self._raise_for_status(response)
-                # Tool-call deltas arrive fragmented by `index` (name in the
-                # first fragment, `arguments` accumulated in later ones);
-                # collected here and yielded once complete, as one chunk,
-                # mirroring `generate()`'s shape (PL-02 tool calling).
+                # Tool-call deltas arrive fragmented by `index`; collected
+                # here and yielded once complete, mirroring generate()'s shape.
                 for line in response.iter_lines():
                     line = line.strip()
                     if not line.startswith("data:"):
@@ -231,9 +205,6 @@ class OpenAICompatModelProvider(ModelProvider):
                     choice = json.loads(payload)["choices"][0]
                     finish_reason = choice.get("finish_reason")
                     if finish_reason == "content_filter":
-                        # Same mapping as generate()/the google adapter: a
-                        # blocked stream must raise, not silently end with
-                        # partial/no text.
                         raise SafetyError(f"PL-02: blocked by content filter (finish_reason={finish_reason!r})")
                     delta = choice.get("delta", {})
                     content = delta.get("content")
@@ -245,8 +216,6 @@ class OpenAICompatModelProvider(ModelProvider):
                         buffer["name"] = function.get("name") or buffer["name"]
                         buffer["args"] += function.get("arguments") or ""
         except httpx.HTTPError as error:
-            # Same mapping as `_post`: never fold a raw httpx/h11 exception's
-            # str() into our message (PRD 16.1 rule 4).
             mapped = map_transport_error(error)
             assert mapped is not None  # httpx.HTTPError always maps
             raise mapped from None
@@ -261,14 +230,16 @@ class OpenAICompatModelProvider(ModelProvider):
         texts = request["input"] if isinstance(request, dict) else request
         response = self._post("/embeddings", {"model": self._profile.model, "input": texts})
         self._raise_for_status(response)
-        data = response.json()
-        vectors = [item["embedding"] for item in data["data"]]
+        data = self._parse(response)
+        try:
+            vectors = [item["embedding"] for item in data["data"]]
+        except (KeyError, TypeError) as error:
+            raise ProviderError(self._scrub(f"PL-02: provider response missing {error}")) from None
         return {"vectors": vectors, "usage": data.get("usage", {})}
 
     def count_tokens(self, text: str) -> int:
-        # OpenAI-compatible endpoints (including NIM) offer no universal
-        # tokenize route; a whitespace count is a deterministic, offline
-        # estimate until a profile-specific tokenizer is wired in (P0-06).
+        # No universal tokenize route across OpenAI-compatible endpoints;
+        # a whitespace count is a deterministic estimate until P0-06.
         return len(text.split())
 
     def capabilities(self) -> set[Capability]:

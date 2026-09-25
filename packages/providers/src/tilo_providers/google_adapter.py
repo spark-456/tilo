@@ -1,24 +1,15 @@
 """tilo_providers.google_adapter — Google Gen AI SDK adapter (PL-02, PRD 6.4,
 6.5). Wraps `google.genai.Client` against Agent Platform / Vertex, through
-the global endpoint (PRD 6.5), behind `ModelProvider`: `generate`, `stream`,
-`embed`, `count_tokens`, `capabilities`, `price`. Tool calling passes
-straight through the SDK's own request/response shapes; structured output
-(`.json_mode`/`.response_schema`) maps onto `GenerateContentConfig(
-response_mime_type="application/json", response_schema=...)`. SDK/transport
-errors map onto `tilo_providers.errors` (quota/retryable/request/safety).
+the global endpoint, behind `ModelProvider`. Structured output maps onto
+`GenerateContentConfig(response_mime_type=..., response_schema=...)`;
+SDK/transport errors map onto `tilo_providers.errors`.
 
-Imports `google.genai`/`.types`/`.errors` through `importlib.import_module`
+Imports `google.genai`/`.types`/`.errors` via `importlib.import_module`
 rather than `from google import genai`, so the module works whether that
-import path resolves to the real installed SDK or to a fake installed
-straight into `sys.modules` for tests (`tests/_fake_genai_sdk.py`) — `from
-google import genai` would additionally require the fake to register itself
-as an attribute of the real `google` namespace package, which it
-deliberately does not do. No adapter test ever builds a real `genai.Client`;
-`client` is always injected (EFF-01: "tested with mocked transport or
-recorded responses only"). Without an injected `client`, construction
-refuses to build a real one unless `LIVE=1` — the same EFF-01 gate as
-`openai_compat_adapter`, so a direct construction of either adapter can
-never open a real client/transport in dev or CI."""
+path resolves to the real SDK or to the fake installed into `sys.modules`
+for tests (`tests/_fake_genai_sdk.py`). `client` is always injected in
+tests; without one, construction requires `LIVE=1` (same EFF-01 gate as
+`openai_compat_adapter`)."""
 
 from __future__ import annotations
 
@@ -53,10 +44,7 @@ class GoogleModelProvider(ModelProvider):
         self._location = location
         self._price = price
         if client is None:
-            # EFF-01: the LIVE gate cannot live only in RecordReplayProvider
-            # -- this constructor is directly reachable (the factory's
-            # live_factory, or a caller's own code), so it refuses to build
-            # a real client itself.
+            # EFF-01: reachable directly (not only via RecordReplayProvider).
             if os.environ.get("LIVE") != "1":
                 raise ProviderError(
                     "PL-02/EFF-01: refusing to build a real network client without LIVE=1 (inject client= for tests)"
@@ -89,17 +77,15 @@ class GoogleModelProvider(ModelProvider):
         if isinstance(error, errors_mod.APIError):
             message = str(getattr(error, "message", error))
             return map_http_status(error.code, message)
-        # The SDK's own transport is httpx too, so a timeout/connection
-        # failure maps the same way as openai_compat_adapter's (PL-02:
-        # error mapping must not depend on which adapter served the call).
+        # The SDK's transport is httpx too, so this maps the same as
+        # openai_compat_adapter's (mapping must not depend on the adapter).
         return map_transport_error(error) or error
 
     def _map_response(self, response: Any) -> GenerateResponse:
         prompt_feedback = getattr(response, "prompt_feedback", None)
         block_reason = getattr(prompt_feedback, "block_reason", None) if prompt_feedback is not None else None
         if block_reason:
-            # Honesty rule: never invent output the model did not produce —
-            # a blocked response surfaces as SafetyError, not as text.
+            # Honesty rule: a blocked response surfaces as SafetyError, not text.
             raise SafetyError(f"blocked by safety filter: {block_reason}")
 
         tool_calls: list[dict[str, Any]] | None = None
@@ -143,10 +129,8 @@ class GoogleModelProvider(ModelProvider):
             response = self._client.models.embed_content(model=self._profile.model, contents=contents)
         except Exception as error:
             raise self._map_error(error) from error
-        # `response.embeddings` items are `types.ContentEmbedding` (a
-        # pydantic model): `.values` is the float vector -- `list(item)`
-        # would iterate its *fields* instead (`[("values", [...]),
-        # ("statistics", None)]`), not the vector.
+        # `.values` is the float vector; `list(item)` would iterate the
+        # pydantic model's *fields* instead.
         return {"vectors": [item.values for item in response.embeddings], "profile_id": self._profile_id}
 
     def count_tokens(self, text: str) -> int:

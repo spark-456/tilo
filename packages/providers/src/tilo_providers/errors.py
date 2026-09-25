@@ -1,15 +1,8 @@
 """tilo_providers.errors — provider-layer error types (PL-02, PRD 6.4).
-
-Every adapter (google, openai_compat) maps its own SDK/HTTP error shape onto
-these four types, so the router (P0-06) and business code can react the same
-way regardless of which adapter served the call: retry, escalate to a
-fallback profile, or stop. Messages carry only the server's own error text —
-never headers, API keys or other secret material (PRD 16.1 rule 4).
-
-`map_transport_error` is the one mapping shared by every adapter's HTTP
-transport (both `google-genai` and `openai_compat_adapter` send requests
-over `httpx`): a timeout or connection failure always becomes the same
-`RetryableError`, so the two adapters cannot drift apart on this case."""
+Every adapter maps its own SDK/HTTP error shape onto these four types, so
+the router (P0-06) can react the same way regardless of which adapter
+served the call. Messages carry only the server's own error text — never
+headers, API keys or other secret material (PRD 16.1 rule 4)."""
 
 from __future__ import annotations
 

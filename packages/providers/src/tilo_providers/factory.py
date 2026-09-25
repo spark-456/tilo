@@ -1,17 +1,10 @@
 """tilo_providers.factory — role -> `ModelProvider` factory (EFF-01, PRD
-6.6). `build_provider` resolves a role's primary profile and decides which
-kind of `ModelProvider` business code gets:
-
-- `provider: fake` profiles always return `tilo_providers.fake.
-  FakeModelProvider` directly, whatever `LIVE` is set to — fixture/UI work
-  never needs a recording.
-- every other profile returns `tilo_providers.replay.RecordReplayProvider`,
-  which replays unless `LIVE=1`. The real adapter (`google_adapter` /
-  `openai_compat_adapter`) is only ever built lazily, inside the
-  `live_factory` closure the replay provider calls — and only when a call
-  actually goes live (`LIVE=1`; `TILO_RECORD=1` also records). Nothing here imports an
-  adapter module or builds a network client at import time or for a plain
-  replay hit."""
+6.6). `build_provider` resolves a role's primary profile: `provider: fake`
+always returns `FakeModelProvider` directly; every other profile returns a
+`RecordReplayProvider`, whose real adapter is built lazily inside the
+`live_factory` closure only when a call actually goes live (`LIVE=1`).
+Nothing here imports an adapter module or builds a network client for a
+plain replay hit."""
 
 from __future__ import annotations
 

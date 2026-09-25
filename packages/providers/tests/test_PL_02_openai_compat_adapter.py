@@ -512,3 +512,51 @@ def test_PL_02_openai_compat_adapter_post_exception_never_leaks_the_api_key(monk
         assert FAKE_KEY not in formatted
     finally:
         server.close()
+
+
+def test_PL_02_openai_compat_adapter_generate_maps_a_malformed_2xx_body(monkeypatch):
+    """A 2xx response whose body is not valid JSON must surface as a
+    ProviderError, not a raw JSONDecodeError."""
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"not json")
+
+    provider = _provider(handler)
+
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    with pytest.raises(provider_errors.ProviderError):
+        provider.generate(GenerateRequest(prompt="hi"))
+
+
+def test_PL_02_openai_compat_adapter_generate_maps_a_2xx_body_missing_choices(monkeypatch):
+    """A 2xx response with valid JSON but no usable "choices" must surface
+    as a ProviderError, not a raw KeyError/IndexError."""
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"choices": []})
+
+    provider = _provider(handler)
+
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    with pytest.raises(provider_errors.ProviderError):
+        provider.generate(GenerateRequest(prompt="hi"))
+
+
+def test_PL_02_openai_compat_adapter_embeddings_maps_a_2xx_body_missing_data(monkeypatch):
+    """A 2xx embeddings response missing "data"/"embedding" must surface as
+    a ProviderError, not a raw KeyError."""
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": [{}]})
+
+    provider = _provider(handler)
+
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    with pytest.raises(provider_errors.ProviderError):
+        provider.embed(["hi"])

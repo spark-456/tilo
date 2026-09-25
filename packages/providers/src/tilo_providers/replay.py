@@ -2,26 +2,14 @@
 6.6 "Record and replay" row). Default mode (`LIVE` unset) replays a
 recording from `fixtures/model-recordings/<role>/<key>.json`, keyed by a
 stable hash of the role, profile and normalised request; a miss raises
-`ReplayMissError` naming the key, so a failure always says exactly what to
-record. `LIVE=1` sends every call to the injected live provider; adding
-`TILO_RECORD=1` also writes a redacted recording — only the
-`ModelProvider`-level request/response ever reaches the file, never a
-header, API key or env value (PRD 16.1 rule 4). `live_factory` is a
-zero-argument callable so nothing here imports an adapter module or builds a
-network client unless a call actually goes live.
-
-Redaction runs on every string *value* of the response, before the payload
-is serialised — never on the already-`json.dumps`-escaped text. `json.dumps`
-escapes a value's own `"`/`\\`, so scrubbing after serialising would miss an
-echoed secret containing either character (PL-02's `_CLEAN_TOKEN_RE` allows
-both) and could match a span that straddles JSON syntax `json.dumps` adds
-around it, corrupting the file. Two layers deep: the live provider's own
-`ModelProvider.redact()` (an adapter holding a raw secret, e.g.
-`openai_compat_adapter`, scrubs its own key value) runs first, then
-`_scrub_authorization_like` strips any remaining `Authorization: ...`/
-`Bearer ...`-shaped text as a provider-agnostic backstop — covering the case
-a recorded model *output* echoes a secret back, not only headers/env values
-that never reached `GenerateResponse` in the first place."""
+`ReplayMissError` naming the key. `LIVE=1` sends every call to the injected
+live provider; adding `TILO_RECORD=1` also writes a redacted recording
+(PRD 16.1 rule 4) — the adapter's own `redact()` runs first, then
+`_scrub_authorization_like` as a provider-agnostic backstop. Redaction runs
+on every string *value* before serialising, never on the already-escaped
+JSON text, so a match can't straddle syntax `json.dumps` adds. `live_factory`
+is zero-argument so nothing here builds a network client unless a call
+actually goes live."""
 
 from __future__ import annotations
 
@@ -50,18 +38,14 @@ def _scrub_authorization_like(text: str) -> str:
 
 def _redact_strings(value: Any, live_provider: ModelProvider | None) -> Any:
     """Walks a JSON-able structure and applies `live_provider.redact()` plus
-    the Authorization/Bearer backstop to every string, so a secret's raw
-    value is matched exactly -- not against the escaped form `json.dumps`
-    would later produce (PRD 16.1 rule 4)."""
+    the Authorization/Bearer backstop to every string (PRD 16.1 rule 4)."""
     if isinstance(value, str):
         if live_provider is not None:
             value = live_provider.redact(value)
         return _scrub_authorization_like(value)
     if isinstance(value, dict):
-        # A tool-call argument name (or any other dict key) can echo a
-        # secret back just as readily as a value -- e.g. a misbehaving
-        # endpoint reflecting the Authorization header into an object key
-        # -- so keys are redacted the same way values are, not left raw.
+        # A dict key (e.g. a tool-call argument name) can echo a secret
+        # back just as readily as a value, so it is redacted the same way.
         return {
             _redact_strings(key, live_provider): _redact_strings(item, live_provider) for key, item in value.items()
         }
@@ -119,7 +103,6 @@ class RecordReplayProvider(ModelProvider):
         return self._is_live() and os.environ.get("TILO_RECORD") == "1"
 
     def _live(self) -> ModelProvider:
-        # Built lazily on the first live call, then reused.
         if self._live_provider is None:
             self._live_provider = self._live_factory()
         return self._live_provider
@@ -188,5 +171,4 @@ class RecordReplayProvider(ModelProvider):
         # PRD 16.1 rule 4: redact every string value before serialising, not
         # the serialised text -- see the module docstring for why.
         redacted = _redact_strings(payload, self._live_provider)
-        text = json.dumps(redacted, indent=2, sort_keys=True)
-        path.write_text(text + "\n", encoding="utf-8")
+        path.write_text(json.dumps(redacted, indent=2, sort_keys=True) + "\n", encoding="utf-8")
