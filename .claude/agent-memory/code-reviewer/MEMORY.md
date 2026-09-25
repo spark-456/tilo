@@ -1,1 +1,4 @@
 - [Contracts review patterns](contracts-review-patterns.md) — probe cross-reference rules, rules.md numbering, drift-check probe technique
+- [Harness single-writer probe](harness-single-writer-probe.md) — race two writers with the same writer_id; commit must CAS head.last_seq
+- [Flaky timing tests](flaky-timing-tests.md) — run suite 2-3x; tight wall-clock bounds in linear-time tests flake under load
+- [Skill checker probes](skill-checker-probes.md) — FR-AGT-04 check.py: mutate example outputs; refs checked for existence, not value/row match
