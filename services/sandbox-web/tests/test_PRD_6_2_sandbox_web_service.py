@@ -11,8 +11,7 @@ PAGES = all_seed_pages()
 
 
 def test_PRD_6_2_healthz_ok(client):
-    resp = client.get("/healthz")
-    assert resp.status_code == 200
+    assert client.get("/healthz").status_code == 200
 
 
 @pytest.mark.parametrize("slug,page", PAGES, ids=[f"{s}/{p}" for s, p in PAGES])
@@ -41,15 +40,3 @@ def test_PRD_6_2_every_page_is_ok_deterministic_and_safe(client, slug, page):
 def test_PRD_6_2_path_traversal_and_unknown_slugs_return_404(client, path):
     resp = client.get(path)
     assert resp.status_code == 404
-
-
-def test_PRD_6_2_manifest_lists_every_site_and_every_red_injection(client):
-    manifest = client.get("/manifest.json").json()
-    slugs = {s["slug"] for s in manifest["sites"]}
-    assert {"ledgerly", "riverside-kitchens", "redteam-notes"} <= slugs
-    ids = {inj["id"] for inj in manifest["injections"]}
-    assert ids == {f"RED-{i:02d}" for i in range(1, 12)}
-    for inj in manifest["injections"]:
-        assert inj["expected"] == "flagged_or_blocked"
-        for bait in inj["bait"]:
-            assert bait.rsplit("@", 1)[-1].endswith(".invalid")

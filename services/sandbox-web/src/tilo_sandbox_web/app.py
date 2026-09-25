@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import html
-import math
+import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl
 
 import yaml
 from fastapi import FastAPI, HTTPException, Request
@@ -23,11 +24,17 @@ _CSS_TECHNIQUES = {  # technique -> (css class, rule); doubles as the page's <st
     "offscreen-position": ("off-pos", "position:absolute;left:-9999px"),
 }
 HIDDEN_CSS = "".join(f".{cls}{{{rule}}}" for cls, rule in _CSS_TECHNIQUES.values())
+_TEMPLATES = {  # technique -> element whose text is the payload {p}; link-smuggling puts it on {h}
+    **{t: f'<div class="{cls}">{{p}}</div>' for t, (cls, _) in _CSS_TECHNIQUES.items()},
+    "aria-hidden": '<div aria-hidden="true">{p}</div>',
+    "html-comment": "<!-- {p} -->",
+    "alt-title-attr": '<img src="" alt="{p}" title="{p}">',
+    **dict.fromkeys(("zero-width-chars", "homoglyph-bidi"), "<div>{p}</div>"),
+    "link-smuggling": '<a href="{h}">{p}</a>',
+}
 
-SEEDS: dict[str, dict[str, Any]] = {}
-for _path in sorted(SEED_DIR.glob("*.yaml")):
-    _seed = yaml.safe_load(_path.read_text(encoding="utf-8"))
-    SEEDS[_seed["slug"]] = _seed
+_LOADED = [yaml.safe_load(p.read_text(encoding="utf-8")) for p in sorted(SEED_DIR.glob("*.yaml"))]
+SEEDS: dict[str, dict[str, Any]] = {s["slug"]: s for s in _LOADED}
 
 
 def _esc(value: Any) -> str:
@@ -43,23 +50,6 @@ def _render_value(value: Any) -> str:
     return _esc(value)
 
 
-def _render_technique(entry: dict[str, Any]) -> str:
-    """Payload as text inside the element carrying the hiding style/attribute."""
-    technique, payload = entry["technique"], _esc(entry["payload"])
-    css = _CSS_TECHNIQUES.get(technique)
-    if css:
-        return f'<div class="{css[0]}">{payload}</div>'
-    if technique == "aria-hidden":
-        return f'<div aria-hidden="true">{payload}</div>'
-    if technique == "html-comment":
-        return f"<!-- {payload} -->"
-    if technique == "alt-title-attr":
-        return f'<img src="" alt="{payload}" title="{payload}">'
-    if technique in ("zero-width-chars", "homoglyph-bidi"):
-        return f"<div>{payload}</div>"
-    return f'<a href="{_esc(entry["href"])}">{payload}</a>'
-
-
 def render_page(seed: dict[str, Any], page_key: str) -> str:
     data = seed["pages"][page_key]
     title = data.get("title", page_key) if isinstance(data, dict) else str(page_key)
@@ -68,9 +58,9 @@ def render_page(seed: dict[str, Any], page_key: str) -> str:
     body = _render_value(shown)
     if is_form:
         fields = "".join(f'<input name="{_esc(f)}" type="number">' for f in data["inputs"])
-        action = f"/s/{seed['slug']}/{page_key}"
-        body += f'<form method="post" action="{action}">{fields}<button type="submit">Get quote</button></form>'
-    extra = "".join(_render_technique(e) for e in seed.get("manifest", []) if e["page"] == page_key)
+        body += f'<form method="post" action="/s/{seed["slug"]}/{page_key}">{fields}<button>Get quote</button></form>'
+    rows = [e for e in seed.get("manifest", []) if e["page"] == page_key]
+    extra = "".join(_TEMPLATES[e["technique"]].format(p=_esc(e["payload"]), h=_esc(e.get("href", ""))) for e in rows)
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         f"<style>{HIDDEN_CSS}</style><title>{_esc(title)}</title></head>"
@@ -110,27 +100,24 @@ async def site_page(request: Request, slug: str, page: str) -> Response:
     if request.method == "POST":
         if page != "quote" or not seed["pages"]["quote"].get("accepts_post"):
             raise HTTPException(405, "POST is only accepted on the quote form")
-        try:
-            body = await request.json()
-        except Exception as exc:  # noqa: BLE001 — any malformed body is a 422, not a 500
-            raise HTTPException(422, "body must be JSON") from exc
+        raw = await request.body()
+        try:  # JSON, or the rendered form's urlencoded fields
+            if request.headers.get("content-type", "").startswith("application/x-www-form-urlencoded"):
+                body: Any = {k: float(v) for k, v in parse_qsl(raw.decode())}
+            else:
+                body = json.loads(raw)
+        except (ValueError, RecursionError) as exc:  # malformed JSON, bad UTF-8, non-numeric form field
+            raise HTTPException(422, "body must be JSON or numeric form fields") from exc
         if not isinstance(body, dict):
             raise HTTPException(422, "body must be a JSON object")
-        rate_card = seed["rate_card"]
-        total = rate_card["base_fee"]
+        rate_card, total = seed["rate_card"], seed["rate_card"]["base_fee"]
         for field in seed["pages"]["quote"]["inputs"]:
             value = body.get(field)
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-                raise HTTPException(422, f"{field} must be a finite number")
-            if not 0 <= value <= MAX_QUOTE_INPUT:
-                raise HTTPException(422, f"{field} out of range")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= MAX_QUOTE_INPUT:
+                raise HTTPException(422, f"{field} must be a number from 0 to {MAX_QUOTE_INPUT}")  # also NaN/inf
             per_key = f"per_{field}" if f"per_{field}" in rate_card else f"per_{field[:-1]}"  # singular/plural
             total += rate_card[per_key] * value
-        if not math.isfinite(total):
-            raise HTTPException(422, "computed total is not finite")
         return JSONResponse({"quote": total})
 
-    html_doc = render_page(seed, page)
-    if request.method == "HEAD":
-        return Response(status_code=200, media_type="text/html")
-    return HTMLResponse(html_doc)
+    html_doc = render_page(seed, page)  # rendered for HEAD too, so a bad page fails the same way
+    return Response(media_type="text/html") if request.method == "HEAD" else HTMLResponse(html_doc)
