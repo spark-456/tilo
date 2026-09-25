@@ -20,10 +20,7 @@
   ],
   "properties": {
     "id": { "type": "string", "pattern": "^E-(PLAN|RES|DOC|MAIL|CHN|ROUTE|HAND|RED)-\\d{2}$" },
-    "group": {
-      "type": "string",
-      "enum": ["E-PLAN", "E-RES", "E-DOC", "E-MAIL", "E-CHN", "E-ROUTE", "E-HAND", "E-RED"]
-    },
+    "group": { "type": "string", "description": "Must match the directory and the id prefix." },
     "title": { "type": "string", "minLength": 1 },
     "measures": {
       "type": "array",
@@ -63,10 +60,6 @@
     },
     "notes": { "type": "string" }
   },
-  "allOf": [
-    {
-      "if": { "properties": { "status": { "const": "ready" } }, "required": ["status"] },
-      "then": { "properties": { "ground_truth": { "not": { "type": "null" } } } }
-    }
-  ]
+  "if": { "properties": { "status": { "const": "ready" } }, "required": ["status"] },
+  "then": { "properties": { "ground_truth": { "not": { "type": "null" } } } }
 }

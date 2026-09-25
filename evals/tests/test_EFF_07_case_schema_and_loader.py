@@ -4,12 +4,13 @@ import json
 
 import jsonschema
 import pytest
-from conftest import write_case
-from tilo_evals import CaseError, load_cases
+import yaml
+from conftest import REPO_ROOT, write_case
+from tilo_evals import CaseError, EvalsConfig, EvalsConfigError, load_cases
 
 
-def test_EFF_07_case_schema_exists_and_is_draft_2020_12(repo_root):
-    schema = json.loads((repo_root / "evals" / "case.schema.json").read_text(encoding="utf-8"))
+def test_EFF_07_case_schema_exists_and_is_draft_2020_12():
+    schema = json.loads((REPO_ROOT / "evals" / "case.schema.json").read_text(encoding="utf-8"))
     assert schema.get("$schema", "").endswith("2020-12/schema")
     jsonschema.Draft202012Validator.check_schema(schema)
 
@@ -35,27 +36,11 @@ def test_EFF_07_load_cases_loads_a_well_formed_case(tmp_path):
     assert case.checks == [{"check": "no_side_effects", "args": {}}]
 
 
-def test_EFF_07_load_cases_allows_null_ground_truth_when_status_is_skeleton(tmp_path):
-    case = _load_one(
-        tmp_path, case_id="E-PLAN-01", group="E-PLAN", status="skeleton", ground_truth=None, recording=None
-    )
-    assert case.status == "skeleton" and case.ground_truth is None
-
-
-def test_EFF_07_load_cases_allows_notes_and_an_autorater_check(tmp_path):
+def test_EFF_07_load_cases_allows_a_skeleton_with_null_truth_notes_and_an_autorater_check(tmp_path):
     """P8-08 skeletons carry `notes`; E-RES declares `kind: autorater` checks not looked up in the registry."""
-    autorater = {"check": "groundedness", "args": {}, "kind": "autorater"}
-    case = _load_one(
-        tmp_path,
-        case_id="E-RES-01",
-        group="E-RES",
-        status="skeleton",
-        ground_truth=None,
-        recording=None,
-        notes="needs a groundedness autorater",
-        checks=[{"check": "no_side_effects", "args": {}}, autorater],
-    )
-    assert case.notes == "needs a groundedness autorater" and case.checks[1] == autorater
+    checks = [{"check": "no_side_effects", "args": {}}, {"check": "groundedness", "args": {}, "kind": "autorater"}]
+    case = _load_one(tmp_path, case_id="E-RES-01", group="E-RES", status="skeleton", notes="n", checks=checks)
+    assert case.ground_truth is None and case.notes == "n" and case.checks == checks
 
 
 @pytest.mark.parametrize(
@@ -81,10 +66,31 @@ def test_EFF_07_load_cases_rejects_malformed_cases(tmp_path, needle, kwargs):
 
 def test_EFF_07_load_cases_rejects_a_duplicate_id(tmp_path):
     """Both copies match filename and dir (one nested under E-PLAN), so only the duplicate check fires."""
-    write_case(tmp_path / "cases", case_id="E-PLAN-01", group="E-PLAN", ground_truth={})
-    write_case(
-        tmp_path / "cases", case_id="E-PLAN-01", group="E-PLAN", ground_truth={}, filename="dup/E-PLAN/E-PLAN-01.yaml"
-    )
-    with pytest.raises(CaseError) as excinfo:
+    for name in ("E-PLAN-01.yaml", "dup/E-PLAN/E-PLAN-01.yaml"):
+        write_case(tmp_path / "cases", case_id="E-PLAN-01", group="E-PLAN", ground_truth={}, filename=name)
+    with pytest.raises(CaseError, match="duplicate case id 'E-PLAN-01'"):
         load_cases(root=str(tmp_path / "cases"))
-    assert "E-PLAN-01" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "name,data", [("x.yaml", b"id: [unclosed"), ("x.yaml", b"\xff\xfe id: x"), ("E-PLAN-01.yml", b"")]
+)
+def test_EFF_07_load_cases_raises_case_error_naming_an_unreadable_or_yml_file(tmp_path, name, data):
+    path = write_case(tmp_path / "cases", case_id="E-PLAN-01", group="E-PLAN", ground_truth={}, filename=name)
+    path.write_bytes(data or path.read_bytes())
+    with pytest.raises(CaseError, match=name.replace(".", "[.]")):
+        load_cases(root=str(tmp_path / "cases"))
+
+
+_CONFIG = {"credit_cap": {"full": 2000}, "deploy_gate_repeats": 3, "cost_regression_threshold": 0.2, "groups": {}}
+_BAD = "cost_regression_threshold: a|cost_regression_threshold: ~|credit_cap: {a: -5}|deploy_gate_repeats: -3|groups: x"
+
+
+@pytest.mark.parametrize("patch", ["", *_BAD.split("|")])
+def test_EFF_07_evals_config_loads_an_explicit_path_and_rejects_bad_values(tmp_path, patch):
+    (path := tmp_path / "evals.yaml").write_text(yaml.safe_dump({**_CONFIG, **yaml.safe_load("{" + patch + "}")}))
+    if not patch:
+        assert EvalsConfig.load(str(path)) == EvalsConfig(**_CONFIG)
+    else:
+        with pytest.raises(EvalsConfigError, match=patch.split(":")[0]):
+            EvalsConfig.load(str(path))

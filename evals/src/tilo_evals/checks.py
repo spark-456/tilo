@@ -18,8 +18,6 @@ _REGISTRY: dict[str, CheckFn] = {}
 
 
 def register(name: str) -> Callable[[CheckFn], CheckFn]:
-    """Adds the decorated check function to the registry under `name`."""
-
     def decorator(fn: CheckFn) -> CheckFn:
         _REGISTRY[name] = fn
         return fn

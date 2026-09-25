@@ -2,7 +2,6 @@
 case.schema.json, then checks what the schema can't: id/group/dir/filename, unique ids, registered checks."""
 
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -14,7 +13,6 @@ from . import checks as checks_registry
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CASE_SCHEMA_PATH = REPO_ROOT / "evals" / "case.schema.json"
-_ID_PATTERN = re.compile(r"^E-(PLAN|RES|DOC|MAIL|CHN|ROUTE|HAND|RED)-\d{2}$")
 
 
 class CaseError(Exception):
@@ -45,8 +43,11 @@ def load_cases(root: str = "evals/cases") -> list[Case]:
     validator = jsonschema.Draft202012Validator(json.loads(CASE_SCHEMA_PATH.read_text(encoding="utf-8")))
     seen: dict[str, Path] = {}
     cases: list[Case] = []
-    for case_path in sorted(root_path.rglob("*.yaml")):
-        raw: Any = yaml.safe_load(case_path.read_text(encoding="utf-8")) or {}
+    for case_path in sorted(p for p in root_path.rglob("*") if p.suffix.lower() in (".yaml", ".yml")):
+        try:
+            raw: Any = yaml.safe_load(case_path.read_text(encoding="utf-8")) or {}
+        except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
+            raise CaseError(f"{case_path}: not a readable UTF-8 YAML file: {exc}") from exc
         case_id = raw.get("id", "<missing id>") if isinstance(raw, dict) else "<not a mapping>"
         errors = sorted(validator.iter_errors(raw), key=lambda e: list(e.path))
         if errors:
@@ -54,11 +55,10 @@ def load_cases(root: str = "evals/cases") -> list[Case]:
                 f"{case_path}: {case_id!r} failed case.schema.json: " + "; ".join(e.message for e in errors)
             )
         group, dir_name = raw["group"], case_path.parent.name
-        match = _ID_PATTERN.match(case_id)  # schema enforces the pattern; guard against drift
-        if dir_name != group or (f"E-{match.group(1)}" if match else None) != group:
+        if dir_name != group or not case_id.startswith(f"{group}-"):
             raise CaseError(f"{case_path}: {case_id!r} group/dir mismatch (group={group!r}, dir={dir_name!r})")
-        if case_path.stem != case_id:
-            raise CaseError(f"{case_path}: filename {case_path.stem!r} does not match id {case_id!r}")
+        if case_path.name != f"{case_id}.yaml":
+            raise CaseError(f"{case_path}: filename {case_path.name!r} must be {case_id + '.yaml'!r}")
         for entry in raw["checks"]:  # kind: autorater is declared, not run in replay; skip the lookup
             if entry.get("kind") != "autorater" and not checks_registry.is_registered(entry.get("check")):
                 raise CaseError(f"{case_path}: {case_id!r} uses an unregistered check {entry.get('check')!r}")
