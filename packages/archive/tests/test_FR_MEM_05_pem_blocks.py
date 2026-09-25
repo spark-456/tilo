@@ -393,6 +393,39 @@ def test_FR_MEM_05_a_key_split_across_values_leaves_no_body(shape):
     assert ("-" * 5 + "END") not in text
 
 
+def _all_text(value) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return "".join(_all_text(k) + _all_text(v) for k, v in value.items())
+    if isinstance(value, (list, tuple)):
+        return "".join(_all_text(v) for v in value)
+    return ""
+
+
+def test_FR_MEM_05_a_key_cut_into_chunks_of_any_size_leaves_no_body():
+    block, body_lines = build_pem_block(RNG, "RSA", n_lines=4, include_end=True)
+    body = "".join(body_lines)
+    for size in range(1, 201):
+        chunks = [block[i : i + size] for i in range(0, len(block), size)]
+        text = _all_text(redact_mod.redact({"stdout_chunks": chunks}))
+        assert body[:16] not in text.replace("\n", ""), f"chunk size {size} leaked the body"
+
+
+def test_FR_MEM_05_markers_cut_mid_word_or_oversize_pieces_leave_no_body():
+    block, body_lines = build_pem_block(RNG, "RSA", n_lines=4, include_end=True)
+    cut_a, cut_b = block.index("PRI") + 3, block.rindex("PRI") + 3
+    three_way = [block[:cut_a], block[cut_a:cut_b], block[cut_b:]]
+    head, rest = block.split("\n", 1)
+    body_part, end_line = rest.rsplit("\n", 1)
+    pad = "x" * (redact_mod.MAX_SCAN_CHARS + 1)
+    oversize = [head + pad, body_part, pad + end_line]
+    for value in (three_way, oversize):
+        text = _all_text(redact_mod.redact({"parts": value}))
+        for line in body_lines:
+            assert line not in text
+
+
 def test_FR_MEM_05_a_lone_end_line_redacts_from_the_start_of_its_value():
     header, middle, end_line, body_lines = _split_block("EC")
     text = redact_mod.redact_prompt("\n".join([*middle, end_line]) + " after")

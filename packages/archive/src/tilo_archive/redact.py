@@ -90,6 +90,7 @@ _PEM_BEGIN = _PEM_DASHES + "BEGIN "
 _PEM_END = _PEM_DASHES + "END "
 _PEM_KEY_WORDS = "PRIVATE" + " KEY"
 _PEM_REDACTED = "[REDACTED:private_key]"
+_MAX_JOINED_CHARS = 64 * MAX_SCAN_CHARS
 # One flat character class, no nesting: the upper-case label run after
 # "BEGIN ". A run stops at the first "-", so runs after different BEGINs
 # never overlap and matching them all is linear in the text.
@@ -107,20 +108,18 @@ def _key_label_end(text: str, label_start: int) -> int | None:
     return None
 
 
-def _scan_pem(text: str) -> tuple[list[tuple[int, int]], bool]:
+def _find_pem_spans(text: str) -> list[tuple[int, int]]:
     """Sorted, non-overlapping (start, end) spans to redact for PEM private
-    keys, and whether `text` holds only part of a key. A BEGIN line runs
-    through the first END line with the same label -- body and END line
-    included, whatever separates the lines (real newlines, or literal "\n"
-    escapes in a JSON-quoted key). With no END line the span runs to the end
-    of `text`; an END line with no BEGIN before it runs from the end of the
-    previous span (or the start). Either way the key is partial: the rest of
-    it may sit in another value, which `_has_split_key` then withholds.
+    keys. A BEGIN line runs through the first END line with the same label --
+    body and END line included, whatever separates the lines (real newlines,
+    or literal "\n" escapes in a JSON-quoted key). With no END line the span
+    runs to the end of `text`; an END line with no BEGIN before it runs from
+    the end of the previous span (or the start): a truncated key fails closed
+    either way.
 
     Linear: the next BEGIN and END positions are cached and only searched
     again once the scan has passed them, and label runs stop at the first "-"."""
     spans: list[tuple[int, int]] = []
-    partial = False
     pos = 0
     begin, end = text.find(_PEM_BEGIN), text.find(_PEM_END)
     while begin != -1 or end != -1:
@@ -132,7 +131,6 @@ def _scan_pem(text: str) -> tuple[list[tuple[int, int]], bool]:
                 start = spans[-1][1] if spans else 0
                 pos = label_end + len(_PEM_DASHES)
                 spans.append((start, pos))
-                partial = True
         else:
             label_start = begin + len(_PEM_BEGIN)
             label_end = _key_label_end(text, label_start)
@@ -143,54 +141,53 @@ def _scan_pem(text: str) -> tuple[list[tuple[int, int]], bool]:
                 end_at = text.find(end_marker, label_end + len(_PEM_DASHES))
                 if end_at == -1:
                     spans.append((begin, len(text)))
-                    return spans, True
+                    return spans
                 pos = end_at + len(end_marker)
                 spans.append((begin, pos))
         if begin != -1 and begin < pos:
             begin = text.find(_PEM_BEGIN, pos)
         if end != -1 and end < pos:
             end = text.find(_PEM_END, pos)
-    return spans, partial
-
-
-def _find_pem_spans(text: str) -> list[tuple[int, int]]:
-    return _scan_pem(text)[0]
-
-
-def _is_partial_key(text: str) -> bool:
-    return len(text) <= MAX_SCAN_CHARS and _scan_pem(text)[1]
+    return spans
 
 
 def _has_split_key(value: Any) -> bool:
-    """True when a string in the tree (a key or a value) holds only part of a
-    private key, and some other string in the tree -- not one of its own
-    ancestor keys -- could hold the rest (a key stored as a list of lines,
-    split across dict entries, or across log msg and args). Redacting the
-    pieces one by one cannot be made safe for every arrangement, so the whole
-    value is withheld instead. Iterative and depth-capped, like the redactor."""
-    pieces: list[tuple[tuple[Any, ...], bool]] = []
-    stack: list[tuple[Any, tuple[Any, ...], int]] = [(value, (), 0)]
+    """True when a private key -- whole or partial -- spans more than one string
+    of the tree. Every string (keys before their values, in order) is joined
+    and scanned once, so a key stored as a list of lines, split across dict
+    entries or log args, reordered, or cut into chunks through its own BEGIN
+    and END lines is still found. Redacting such pieces one by one cannot be
+    made safe, so the whole value is withheld instead. Iterative, depth-capped
+    like the redactor, linear in the total text, and fail closed past
+    _MAX_JOINED_CHARS."""
+    pieces: list[str] = []
+    total = 0
+    stack: list[tuple[Any, int]] = [(value, 0)]
     while stack:
-        node, path, depth = stack.pop()
+        node, depth = stack.pop()
         if depth > _MAX_DEPTH:
             continue
         if isinstance(node, str):
-            pieces.append((path, _is_partial_key(node)))
+            pieces.append(node)
+            total += len(node)
+            if total > _MAX_JOINED_CHARS:
+                return True
         elif isinstance(node, dict):
-            for index, (key, child) in enumerate(node.items()):
+            for key, child in reversed(list(node.items())):
+                stack.append((child, depth + 1))
                 if isinstance(key, str):
-                    pieces.append(((*path, index, "key"), _is_partial_key(key)))
-                stack.append((child, (*path, index), depth + 1))
+                    stack.append((key, depth + 1))
         elif isinstance(node, (list, tuple)):
-            stack.extend((child, (*path, index), depth + 1) for index, child in enumerate(node))
-    partial = [path for path, is_partial in pieces if is_partial]
-    if not partial:
-        return False
-    if len(partial) > 1:
-        return True
-    only = partial[0]
-    ancestor_keys = {(*only[:n], "key") for n in range(1, len(only) + 1)}
-    return any(path != only and path not in ancestor_keys for path, _ in pieces)
+            stack.extend((child, depth + 1) for child in reversed(node))
+    ends: list[int] = []
+    offset = 0
+    for piece in pieces:
+        offset += len(piece)
+        ends.append(offset)
+    for start, end in _find_pem_spans("".join(pieces)):
+        if bisect.bisect_right(ends, start) != bisect.bisect_right(ends, end - 1):
+            return True
+    return False
 
 
 def _redact_pem_blocks(text: str) -> str:
