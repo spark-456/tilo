@@ -12,5 +12,7 @@ ST-2 round 2 (2026-09-25) FAILED again. Fixes addressed round-1 repros; new brea
 - "sending" is in the claimable states, so concurrent dispatchers both call the adapter; two adapter instances (two processes) = two real sends.
 - undo_window_s has no schema max: huge value or year-9999 created_at raises uncaught OverflowError (add_seconds catches only ValueError/TypeError).
 
+ST-2 round 4 FAILED: leases fixed races but lease *expiry while the holder is alive* still double-acts. Transfer lease 30 s by the injected clock; slow emit + clock.advance(31) -> second instance emits same data.transfer; also cross-instance clock skew does it with no delay. A poison transfer at the head blocks all later transfers in every world forever. Script: st2_r4.py (run from services/connectors with PYTHONPATH=tests).
+
 **Why:** state that must survive a crash was put in process memory; per-instance config was treated as global truth.
 **How to apply:** for any outbox/queue, always test: new instance after injected failure, two instances with different config on one store, slow adapter + 2 threads. Script pattern: scratchpad st2_r2.py. Related: [[api-kill-switch-attack-patterns]].
