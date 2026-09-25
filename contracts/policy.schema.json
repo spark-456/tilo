@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/policy.schema.json",
+  "x-version": "1.0.0",
+  "title": "Policy",
+  "description": "Autonomy policy (PRD 10.4): a user's pre-authorisation of one action type within a scope and limits. Data only: the deterministic policy engine decides, a model never does, and a T3 action never runs above L1. $defs.risk_tier_table is the shape of the risk tiers in config/autonomy.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "owner",
+    "action_type",
+    "scope",
+    "limits",
+    "conditions",
+    "level",
+    "undo_window_s",
+    "expiry",
+    "notify_channel",
+    "created_by",
+    "changed_by",
+    "history"
+  ],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/policy_id" },
+    "owner": { "$ref": "common.schema.json#/$defs/user_id" },
+    "action_type": { "$ref": "common.schema.json#/$defs/action_type" },
+    "scope": { "$ref": "#/$defs/scope" },
+    "limits": { "$ref": "#/$defs/limits" },
+    "conditions": { "$ref": "#/$defs/conditions" },
+    "level": { "$ref": "common.schema.json#/$defs/autonomy_level" },
+    "undo_window_s": {
+      "description": "Seconds an L2 action can still be undone.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3600,
+      "default": 60
+    },
+    "expiry": {
+      "description": "When the policy stops applying, or null for no expiry.",
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+    },
+    "notify_channel": { "$ref": "common.schema.json#/$defs/channel" },
+    "created_by": { "$ref": "#/$defs/stamp" },
+    "changed_by": { "anyOf": [{ "$ref": "#/$defs/stamp" }, { "type": "null" }] },
+    "history": { "type": "array", "items": { "$ref": "#/$defs/history_entry" } }
+  },
+  "if": { "properties": { "level": { "const": "L3" } }, "required": ["level"] },
+  "then": {
+    "description": "L3 standing rules need a daily limit (FR-HIL-06).",
+    "properties": { "limits": { "properties": { "per_day": { "type": "integer" } } } }
+  },
+  "$defs": {
+    "scope": {
+      "description": "Where the policy applies. An empty recipients, domains or districts list means no restriction on that dimension.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["connectors", "recipients", "domains", "districts"],
+      "properties": {
+        "connectors": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/connector_id" }
+        },
+        "recipients": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/email_address" }
+        },
+        "domains": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^([a-z0-9-]+\\.)+[a-z]{2,}$", "maxLength": 253 }
+        },
+        "districts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/district_id" }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["per_day", "credits"],
+      "properties": {
+        "per_day": {
+          "description": "Most actions per day, or null for no daily cap.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "credits": {
+          "description": "Most credits per day spent by actions under this policy, or null.",
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/credits" }, { "type": "null" }]
+        }
+      }
+    },
+    "conditions": {
+      "description": "Always true: attachments, new recipients and safety-flagged content are T3 (PRD 10.4), and T3 never runs above L1, so no policy can pre-authorise them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["no_attachments", "no_new_recipients", "no_safety_flags"],
+      "properties": {
+        "no_attachments": { "const": true },
+        "no_new_recipients": { "const": true },
+        "no_safety_flags": { "const": true }
+      }
+    },
+    "stamp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "at"],
+      "properties": {
+        "by": { "$ref": "common.schema.json#/$defs/user_id" },
+        "at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      }
+    },
+    "history_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "at", "change", "level"],
+      "properties": {
+        "by": { "$ref": "common.schema.json#/$defs/user_id" },
+        "at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "change": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "level": {
+          "description": "Level after the change.",
+          "$ref": "common.schema.json#/$defs/autonomy_level"
+        }
+      }
+    },
+    "risk_tier_table": {
+      "description": "Risk tiers (PRD 10.4): each action type's base tier, the context modifiers that raise any action to T3, and the highest level each tier allows. A modifier applies whatever the base tier, so a deletion or an external share is T3 even when its action type is listed lower.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actions", "modifiers", "max_level"],
+      "properties": {
+        "actions": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "common.schema.json#/$defs/action_type" },
+          "additionalProperties": { "$ref": "common.schema.json#/$defs/risk_tier" }
+        },
+        "modifiers": {
+          "description": "All six PRD 10.4 T3 conditions, each exactly once: six unique items over a closed six-value enum with a fixed raises_to, so none can be dropped.",
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/tier_modifier" }
+        },
+        "max_level": { "$ref": "#/$defs/max_level" }
+      }
+    },
+    "tier_modifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition", "raises_to"],
+      "properties": {
+        "condition": {
+          "type": "string",
+          "enum": [
+            "new_recipients",
+            "attachments",
+            "external_sharing",
+            "deletion",
+            "money_or_legal",
+            "safety_flag"
+          ]
+        },
+        "raises_to": { "const": "T3" }
+      }
+    },
+    "max_level": {
+      "description": "Highest autonomy level per tier; T3 is always L1 (a person).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["T1", "T2", "T3"],
+      "properties": {
+        "T1": { "$ref": "common.schema.json#/$defs/autonomy_level" },
+        "T2": { "$ref": "common.schema.json#/$defs/autonomy_level" },
+        "T3": { "const": "L1" }
+      }
+    }
+  }
+}

@@ -3,7 +3,14 @@
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": true,
-    "ignore": ["**/dist/**", "**/build/**", "**/node_modules/**", "**/*.md", "design/**"]
+    "ignore": [
+      "**/dist/**",
+      "**/build/**",
+      "**/node_modules/**",
+      "**/*.md",
+      "design/**",
+      "packages/contracts-ts/src/**"
+    ]
   },
   "formatter": {
     "enabled": true,

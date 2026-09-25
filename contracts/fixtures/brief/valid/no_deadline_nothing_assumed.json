@@ -1,0 +1,16 @@
+{
+  "goal": "Summarise this week's customer emails.",
+  "deliverables": [
+    {
+      "title": "Weekly summary",
+      "format": "in_app"
+    }
+  ],
+  "audience": "Me",
+  "deadline": null,
+  "constraints": [],
+  "sources": [],
+  "sensitivity": "personal",
+  "assumptions": [],
+  "applied_preferences": []
+}

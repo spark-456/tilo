@@ -14,15 +14,24 @@ dev = [
     "pre-commit>=4.0",
     "pyyaml>=6.0",
     "httpx>=0.27",
+    "jsonschema>=4.18",
+    "referencing>=0.30",
+    "datamodel-code-generator>=0.83.0",
 ]
 
 [tool.uv.workspace]
-members = ["services/api", "packages/providers"]
+members = ["services/api", "packages/providers", "packages/contracts-py"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: exercises a real subprocess (e.g. `just contracts-check` on a temp copy); still runs in `just check`, just not instantaneous.",
+]
 
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-extend-exclude = [".claude"]
+# Generated contract types (FR-WLD-02) are checked for drift by `just contracts-check`, not linted.
+extend-exclude = [".claude", "packages/contracts-py/src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]

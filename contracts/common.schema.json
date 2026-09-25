@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/common.schema.json",
+  "x-version": "1.0.0",
+  "title": "Common",
+  "description": "Definitions shared by every Tilo contract. The root is a sampler with one optional property per definition so that fixtures and generated types cover each one; no service sends a Common document.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "ulid": { "$ref": "#/$defs/ulid" },
+    "timestamp": { "$ref": "#/$defs/timestamp" },
+    "calendar_date": { "$ref": "#/$defs/calendar_date" },
+    "credits": { "$ref": "#/$defs/credits" },
+    "severity": { "$ref": "#/$defs/severity" },
+    "risk_tier": { "$ref": "#/$defs/risk_tier" },
+    "autonomy_level": { "$ref": "#/$defs/autonomy_level" },
+    "authz": { "$ref": "#/$defs/authz" },
+    "artifact_ref": { "$ref": "#/$defs/artifact_ref" },
+    "tier": { "$ref": "#/$defs/tier" },
+    "world_id": { "$ref": "#/$defs/world_id" },
+    "run_id": { "$ref": "#/$defs/run_id" },
+    "user_id": { "$ref": "#/$defs/user_id" },
+    "org_id": { "$ref": "#/$defs/org_id" },
+    "agent_id": { "$ref": "#/$defs/agent_id" },
+    "district_id": { "$ref": "#/$defs/district_id" },
+    "level_id": { "$ref": "#/$defs/level_id" },
+    "building_id": { "$ref": "#/$defs/building_id" },
+    "unit_id": { "$ref": "#/$defs/unit_id" },
+    "gate_id": { "$ref": "#/$defs/gate_id" },
+    "island_id": { "$ref": "#/$defs/island_id" },
+    "policy_id": { "$ref": "#/$defs/policy_id" },
+    "team_lead_id": { "$ref": "#/$defs/team_lead_id" },
+    "artifact_id": { "$ref": "#/$defs/artifact_id" },
+    "connector_id": { "$ref": "#/$defs/connector_id" },
+    "skill_id": { "$ref": "#/$defs/skill_id" },
+    "action_type": { "$ref": "#/$defs/action_type" },
+    "email_address": { "$ref": "#/$defs/email_address" },
+    "slug": { "$ref": "#/$defs/slug" },
+    "semver": { "$ref": "#/$defs/semver" },
+    "plain_name": { "$ref": "#/$defs/plain_name" },
+    "icon_name": { "$ref": "#/$defs/icon_name" },
+    "agent_role": { "$ref": "#/$defs/agent_role" },
+    "channel": { "$ref": "#/$defs/channel" },
+    "data_class": { "$ref": "#/$defs/data_class" },
+    "deliverable_format": { "$ref": "#/$defs/deliverable_format" },
+    "credit_range": { "$ref": "#/$defs/credit_range" },
+    "time_range": { "$ref": "#/$defs/time_range" }
+  },
+  "$defs": {
+    "ulid": {
+      "description": "ULID in canonical upper-case Crockford base32 (26 characters).",
+      "type": "string",
+      "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "timestamp": {
+      "description": "RFC 3339 timestamp in UTC with exactly three fractional digits, e.g. 2026-09-29T09:30:00.000Z.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}Z$"
+    },
+    "calendar_date": {
+      "description": "Calendar date YYYY-MM-DD (RFC 3339 full-date).",
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+    },
+    "credits": {
+      "description": "Tilo credits (PRD 14.1: 1 credit = US$0.005 at standard list prices).",
+      "type": "number",
+      "minimum": 0
+    },
+    "severity": {
+      "description": "Escalation ladder severity (PRD 9.3, 10.2).",
+      "type": "string",
+      "enum": ["info", "fyi", "nudge", "needs_you", "blocked", "gate"]
+    },
+    "risk_tier": {
+      "description": "Deterministic risk tier (PRD 10.4). T3 always needs a person.",
+      "type": "string",
+      "enum": ["T1", "T2", "T3"]
+    },
+    "autonomy_level": {
+      "description": "Autonomy level (PRD 10.4): L0 observe, L1 ask each time (default), L2 instruction is approval, L3 standing rules.",
+      "type": "string",
+      "enum": ["L0", "L1", "L2", "L3"]
+    },
+    "authz": {
+      "description": "Who authorised a side effect (BQ-01, ADR-0002): a person, a policy or a Team Lead, with the id of that authority and when. A model is never an authority. ref must match by: a user id for a person, a policy id for a policy, a Team Lead id for a Team Lead.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "ref", "at"],
+      "properties": {
+        "by": { "type": "string", "enum": ["person", "policy", "team_lead"] },
+        "ref": {
+          "description": "Id of the authority: a user id for a person, a policy id, or a Team Lead id.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "at": { "$ref": "#/$defs/timestamp" }
+      },
+      "if": { "properties": { "by": { "const": "person" } }, "required": ["by"] },
+      "then": { "properties": { "ref": { "$ref": "#/$defs/user_id" } } },
+      "else": {
+        "if": { "properties": { "by": { "const": "policy" } }, "required": ["by"] },
+        "then": { "properties": { "ref": { "$ref": "#/$defs/policy_id" } } },
+        "else": {
+          "if": { "properties": { "by": { "const": "team_lead" } }, "required": ["by"] },
+          "then": { "properties": { "ref": { "$ref": "#/$defs/team_lead_id" } } }
+        }
+      }
+    },
+    "artifact_ref": {
+      "description": "A pinned version of a stored artifact.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "version"],
+      "properties": {
+        "artifact_id": { "$ref": "#/$defs/artifact_id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string", "minLength": 1, "maxLength": 80 }
+      }
+    },
+    "tier": {
+      "description": "World size by agent count (PRD 9.1): outpost 1-2, village 3-6, town 7-15, city 16+.",
+      "type": "string",
+      "enum": ["outpost", "village", "town", "city"]
+    },
+    "world_id": { "type": "string", "pattern": "^w_[0-9A-Za-z_]{1,48}$" },
+    "run_id": { "type": "string", "pattern": "^r_[0-9A-Za-z_]{1,48}$" },
+    "user_id": { "type": "string", "pattern": "^u_[0-9A-Za-z_]{1,48}$" },
+    "org_id": { "type": "string", "pattern": "^org_[0-9A-Za-z_]{1,48}$" },
+    "agent_id": { "type": "string", "pattern": "^A_[0-9A-Za-z_]{1,48}$" },
+    "district_id": { "type": "string", "pattern": "^D[0-9]{1,4}$" },
+    "level_id": { "type": "string", "pattern": "^L[0-9]{1,4}$" },
+    "building_id": { "type": "string", "pattern": "^B[0-9]{1,4}$" },
+    "unit_id": { "type": "string", "pattern": "^U[0-9]{1,4}$" },
+    "gate_id": { "type": "string", "pattern": "^G[0-9]{1,4}$" },
+    "island_id": { "type": "string", "pattern": "^I[0-9]{1,4}$" },
+    "policy_id": { "type": "string", "pattern": "^pol_[0-9a-z_]{1,48}$" },
+    "team_lead_id": { "type": "string", "pattern": "^tl_[0-9a-z_]{1,48}$" },
+    "artifact_id": { "type": "string", "pattern": "^art_[0-9A-Za-z_]{1,48}$" },
+    "connector_id": {
+      "description": "Connector id as declared in config/connectors.yaml.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,31}$"
+    },
+    "skill_id": {
+      "description": "Skill id from skill.yaml (skills/<domain>/<skill-id>/).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*([_-][a-z0-9]+)*$",
+      "maxLength": 64
+    },
+    "action_type": {
+      "description": "Side-effect or tool action type, e.g. send_email; the key of the risk-tier table.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,47}$"
+    },
+    "email_address": {
+      "description": "An email address (syntax check only).",
+      "type": "string",
+      "maxLength": 254,
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    },
+    "slug": {
+      "description": "Lower-case machine name.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$"
+    },
+    "plain_name": {
+      "description": "Display name of 2-24 plain characters (PRD 9.2): letters, digits, spaces and & ' . , ( ) / + -, starting with a letter or digit.",
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 24,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 &'.,()/+-]*[A-Za-z0-9).]$"
+    },
+    "icon_name": {
+      "description": "Icon name from the published icon list (layout rule WE-08).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+    },
+    "agent_role": {
+      "description": "Agent rank and model role (PRD 8.1).",
+      "type": "string",
+      "enum": ["director", "lead", "specialist", "verifier", "writer", "narrator"]
+    },
+    "channel": {
+      "description": "Where a person sees and answers Tilo (PRD 10.3, 11.1).",
+      "type": "string",
+      "enum": ["web", "mobile_web", "whatsapp", "email"]
+    },
+    "data_class": {
+      "description": "Data class (PRD 12.1): personal, business or public.",
+      "type": "string",
+      "enum": ["personal", "business", "public"]
+    },
+    "deliverable_format": {
+      "description": "Deliverable format (PRD 12.4), plus email for replies and in_app for answers shown in Tilo.",
+      "type": "string",
+      "enum": [
+        "pdf",
+        "pptx",
+        "docx",
+        "xlsx",
+        "csv",
+        "markdown",
+        "google_slides",
+        "google_docs",
+        "google_sheets",
+        "email",
+        "in_app"
+      ]
+    },
+    "credit_range": {
+      "description": "Estimated credits as a range; min <= max is checked by validators.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "$ref": "#/$defs/credits" },
+        "max": { "$ref": "#/$defs/credits" }
+      }
+    },
+    "time_range": {
+      "description": "Estimated wall-clock seconds as a range; min_s <= max_s is checked by validators.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_s", "max_s"],
+      "properties": {
+        "min_s": { "type": "integer", "minimum": 0 },
+        "max_s": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "goal": "Compare three suppliers' quotes and recommend one.",
+  "unit_ids": ["U1", "U2"],
+  "done": [
+    {
+      "unit_id": "U1",
+      "summary": "Extracted quote A into a table.",
+      "artifact_refs": [
+        {
+          "artifact_id": "art_quote_a_table",
+          "version": 1
+        }
+      ]
+    }
+  ],
+  "in_progress": [
+    {
+      "unit_id": "U2",
+      "summary": "Compared A and B per kWh; C not started.",
+      "artifact_refs": [
+        {
+          "artifact_id": "art_comparison",
+          "version": 2
+        }
+      ]
+    }
+  ],
+  "decisions": ["Compare per kWh (owner answered card 01J8Z3K4M5N6P7Q8R9S0T1V2W4)"],
+  "open_questions": ["Does quote C include shipping?"],
+  "next_steps": [],
+  "verification_to_rerun": [
+    {
+      "step": "Recompute the per-kWh price for quote A",
+      "expected": "US$ 212.40 per kWh"
+    }
+  ],
+  "gotchas": ["Quote B lists prices excluding tax"]
+}

@@ -1,0 +1,151 @@
+"""PRD 6.4 Model provider layer (ticket P0-02 sections 1 and 2:
+providers.schema.json plus example config/models.yaml and config/prices.yaml).
+
+Ticket's rule test: "providers config rejects an unknown capability." PRD 6.4
+lists the closed capability set: json, tools, vision, audio, thinking,
+computer_use, grounding, code_execution.
+
+Also covers the ticket's config deliverables: both files parse as YAML and
+validate against the contract, `config/models.yaml` is marked as an example
+with `example: true`, and `config/prices.yaml` never invents a price (status
+unset, prices null) -- "the loader will refuse live metering until set."
+
+`providers.schema.json` may hold "two top-level definitions in one file" (as
+`$defs.models` / `$defs.prices`) "or split into models and prices
+sub-schemas referenced from it" (ticket section 1) -- both shapes are tried
+before failing, since the split is the builder's choice.
+"""
+
+from __future__ import annotations
+
+import copy
+
+import pytest
+import yaml
+from _lib import SCHEMA_ID_TEMPLATE, contracts_dir, errors_for, load_json, load_schema
+
+PROVIDERS_ID = SCHEMA_ID_TEMPLATE.format(name="providers")
+KNOWN_CAPS = {"json", "tools", "vision", "audio", "thinking", "computer_use", "grounding", "code_execution"}
+
+
+def _sub_schema_candidates(repo_root, part: str) -> list[dict]:
+    """Every schema this repo currently offers that could describe `part`
+    ("models" or "prices"): a `$defs.<part>` inside providers.schema.json, or
+    a standalone contracts/**/*<part>*.schema.json file.
+    """
+    candidates: list[dict] = []
+    try:
+        providers_schema = load_schema(repo_root, "providers")
+    except FileNotFoundError:
+        providers_schema = {}
+    if part in providers_schema.get("$defs", {}):
+        candidates.append({"$ref": f"{PROVIDERS_ID}#/$defs/{part}"})
+    for path in sorted(contracts_dir(repo_root).glob(f"**/*{part}*.schema.json")):
+        candidates.append(load_json(path))
+    return candidates
+
+
+def _validates_against_any(repo_root, registry, part: str, instance) -> tuple[bool, list[str]]:
+    candidates = _sub_schema_candidates(repo_root, part)
+    if not candidates:
+        return False, [
+            f"no schema found for {part!r}: no providers.schema.json $defs.{part} and no "
+            f"contracts/**/*{part}*.schema.json file"
+        ]
+    messages: list[str] = []
+    for schema in candidates:
+        errors = errors_for(schema, instance, registry)
+        if not errors:
+            return True, []
+        messages.append(f"{schema.get('$id', schema)}: {[e.message for e in errors]}")
+    return False, messages
+
+
+@pytest.fixture()
+def models_yaml(repo_root):
+    path = repo_root / "config" / "models.yaml"
+    assert path.is_file(), "PRD 6.4: config/models.yaml must exist (ticket P0-02 section 2)"
+    return path, yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+@pytest.fixture()
+def prices_yaml(repo_root):
+    path = repo_root / "config" / "prices.yaml"
+    assert path.is_file(), "PRD 6.4: config/prices.yaml must exist (ticket P0-02 section 2)"
+    return path, yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def test_PRD_6_4_models_yaml_validates_against_providers_contract(repo_root, registry, models_yaml):
+    path, data = models_yaml
+    ok, messages = _validates_against_any(repo_root, registry, "models", data)
+    assert ok, f"PRD 6.4: {path.relative_to(repo_root)} must validate against the providers contract: {messages}"
+
+
+def test_PRD_6_4_prices_yaml_validates_against_providers_contract(repo_root, registry, prices_yaml):
+    path, data = prices_yaml
+    ok, messages = _validates_against_any(repo_root, registry, "prices", data)
+    assert ok, f"PRD 6.4: {path.relative_to(repo_root)} must validate against the providers contract: {messages}"
+
+
+def test_PRD_6_4_models_yaml_is_marked_as_an_example(repo_root, models_yaml):
+    path, data = models_yaml
+    assert data.get("example") is True, (
+        'PRD 6.4: config/models.yaml must set "example: true" -- these are example profiles, the '
+        "user chooses final models (ticket P0-02 section 2)"
+    )
+    header = path.read_text(encoding="utf-8").splitlines()[:10]
+    assert any("#" in line and "example" in line.lower() for line in header), (
+        "PRD 6.4: config/models.yaml must open with a header comment saying these are examples"
+    )
+
+
+def test_PRD_6_4_prices_yaml_status_is_unset(repo_root, prices_yaml):
+    _, data = prices_yaml
+    assert data.get("status") in (None, "unset"), (
+        'PRD 6.4: config/prices.yaml must have status unset ("never invent prices; the loader will '
+        'refuse live metering until set")'
+    )
+
+
+def test_PRD_6_4_prices_yaml_has_no_invented_prices(repo_root, prices_yaml):
+    _, data = prices_yaml
+
+    def _all_price_leaves(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in ("input", "output") and not isinstance(value, dict | list):
+                    yield value
+                else:
+                    yield from _all_price_leaves(value)
+        elif isinstance(node, list):
+            for item in node:
+                yield from _all_price_leaves(item)
+
+    leaves = list(_all_price_leaves(data.get("profiles", data)))
+    assert leaves, "PRD 6.4: config/prices.yaml must have at least one per-profile input/output price field"
+    assert all(v is None for v in leaves), (
+        f"PRD 6.4: config/prices.yaml must never invent a price -- every input/output price must be "
+        f"null while status is unset, got: {leaves}"
+    )
+
+
+def test_PRD_6_4_providers_config_rejects_unknown_capability(repo_root, registry, models_yaml):
+    # config/models.yaml mirrors the PRD 6.4 example directly: a "profiles"
+    # mapping of profile id -> {provider, model, context, caps: [...]}.
+    _, data = models_yaml
+    profiles = data.get("profiles")
+    assert isinstance(profiles, dict) and profiles, (
+        "PRD 6.4: config/models.yaml must have a non-empty top-level 'profiles' mapping"
+    )
+    first_profile = next(iter(profiles.values()))
+    assert "caps" in first_profile, "PRD 6.4: each models.yaml profile must list 'caps'"
+
+    mutated = copy.deepcopy(data)
+    first_key = next(iter(mutated["profiles"]))
+    mutated["profiles"][first_key]["caps"] = list(mutated["profiles"][first_key]["caps"]) + ["telepathy"]
+
+    ok, messages = _validates_against_any(repo_root, registry, "models", mutated)
+    assert not ok, (
+        "PRD 6.4: a models config with an unknown capability ('telepathy', not one of "
+        f"{sorted(KNOWN_CAPS)}) must be rejected, but it validated: {messages}"
+    )

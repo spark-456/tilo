@@ -1,0 +1,81 @@
+{
+  "v": "1.0",
+  "world_id": "w_01",
+  "tier": "village",
+  "theme": "metropolis",
+  "semantic": {
+    "levels": [
+      {
+        "id": "L1",
+        "name": "Inbox",
+        "districts": [
+          {
+            "id": "D1",
+            "name": "Triage",
+            "icon": "inbox",
+            "lead": "A_l1",
+            "buildings": [
+              {
+                "id": "B1",
+                "name": "Mail Room",
+                "kind": "common",
+                "common_type": "mail_room",
+                "plan_units": ["U1"]
+              },
+              {
+                "id": "B2",
+                "name": "Reply Desk",
+                "kind": "kit",
+                "kit": {
+                  "icon": "reply",
+                  "parts": ["desk_small", "roof_flat"]
+                },
+                "plan_units": ["U2"]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "islands": [
+      {
+        "id": "I1",
+        "name": "Gmail",
+        "conn": "api",
+        "bridge": "road",
+        "state": "connected"
+      },
+      {
+        "id": "I2",
+        "name": "WhatsApp",
+        "conn": "channel",
+        "bridge": "pier",
+        "state": "connected"
+      }
+    ],
+    "gates": [
+      {
+        "id": "G1",
+        "guards": "send_email",
+        "between": ["B2", "I1"],
+        "policy_ref": "pol_autopilot_l2"
+      }
+    ],
+    "agents": [
+      {
+        "id": "A_dir",
+        "rank": "director"
+      },
+      {
+        "id": "A_l1",
+        "rank": "lead",
+        "team_lead": "tl_ops"
+      },
+      {
+        "id": "A_s1",
+        "rank": "manager"
+      }
+    ]
+  },
+  "geometry": null
+}

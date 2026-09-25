@@ -1,0 +1,54 @@
+{
+  "id": "gmail",
+  "name": "Gmail",
+  "icon": "mail",
+  "auth": "oauth2",
+  "scopes": {
+    "read": ["https://www.googleapis.com/auth/gmail.readonly"],
+    "search": ["https://www.googleapis.com/auth/gmail.readonly"],
+    "write": ["https://www.googleapis.com/auth/gmail.compose"],
+    "send": ["https://www.googleapis.com/auth/gmail.send"]
+  },
+  "capabilities": ["read", "search", "write", "send"],
+  "actions": [
+    {
+      "id": "read_email",
+      "capability": "read",
+      "description": "Read a thread the task needs.",
+      "risk_tier": "T1",
+      "irreversible": false
+    },
+    {
+      "id": "search_email",
+      "capability": "search",
+      "description": "Search the mailbox.",
+      "risk_tier": "T1",
+      "gate_type": "none",
+      "irreversible": false
+    },
+    {
+      "id": "create_draft",
+      "capability": "write",
+      "description": "Save a reply as a draft.",
+      "risk_tier": "T1",
+      "gate_type": "approval",
+      "irreversible": false
+    },
+    {
+      "id": "send_email",
+      "capability": "send",
+      "description": "Send a reply in an existing thread.",
+      "risk_tier": "T2",
+      "gate_type": "approval",
+      "irreversible": true
+    }
+  ],
+  "limits": {
+    "per_minute": 60,
+    "batch_size": 50
+  },
+  "data_class": {
+    "returns": ["personal", "business"],
+    "redact": ["body_signature", "phone_numbers"]
+  }
+}

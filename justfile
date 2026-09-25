@@ -17,7 +17,17 @@ dev:
     uv run --package tilo-api uvicorn tilo_api:app --reload --port 8080
 
 # Format check + lint + typecheck + all tests (the full gate; matches PRD 20.4 "make check").
-check: fmt-check lint typecheck test
+# contracts-check runs first so CI fails on contract drift (FR-WLD-02).
+check: contracts-check fmt-check lint typecheck test
+
+# Regenerate Python (packages/contracts-py) and TypeScript (packages/contracts-ts) types
+# from contracts/*.schema.json (ADR-0002).
+contracts-gen:
+    uv run python scripts/contracts_codegen.py gen
+
+# Validate every schema and fixture, regenerate into a temp dir, fail on any difference.
+contracts-check:
+    uv run python scripts/contracts_codegen.py check
 
 # Fast subset for .claude/hooks/stop_check.py: format + lint + tests, meant to
 # finish in well under 2 minutes by only touching what pytest/pnpm can see
@@ -49,7 +59,7 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api packages/providers
+    uv run mypy services/api packages/providers packages/contracts-py
     pnpm -r exec tsc --noEmit
 
 # Run the eval harness (not built yet — ticket P3).

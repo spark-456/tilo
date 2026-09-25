@@ -1,0 +1,36 @@
+{
+  "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W3",
+  "world_id": "w_01",
+  "run_id": "r_01J8Z3K4M5",
+  "header": {
+    "building": "B1",
+    "agent": "A_dir"
+  },
+  "add_context": true,
+  "created_at": "2026-09-29T09:30:00.000Z",
+  "timeout": 3600,
+  "gate": null,
+  "consent": null,
+  "kind": "meeting",
+  "rung": "meeting",
+  "what_happened": "Research and Finance disagree on the budget split.",
+  "why_it_matters": "The decision changes which suppliers get a deep review.",
+  "options": [
+    {
+      "id": "research",
+      "label": "More for research",
+      "suggested": false,
+      "irreversible": true
+    },
+    {
+      "id": "even",
+      "label": "Split evenly",
+      "suggested": true,
+      "reason": "Both leads can finish on time.",
+      "irreversible": false
+    }
+  ],
+  "actions": ["show_me", "snooze", "delegate"],
+  "answer_channels": ["web", "whatsapp"],
+  "safe_default": "even"
+}
