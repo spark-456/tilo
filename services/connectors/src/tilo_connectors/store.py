@@ -78,7 +78,7 @@ class InMemoryOutboxStore:
             entry["state"] = to_state  # + pending transfer, same write (PI-17)
             _release(self._send_leases, outbox_id, holder)
             if transfer is not None:
-                self._pending_transfers.setdefault(outbox_id, (entry["world_id"], transfer))
+                self._pending_transfers.setdefault(outbox_id, (entry["world_id"], deepcopy(transfer)))
             return deepcopy(entry)
 
     def _release_lease(self, kind: str, outbox_id: str, holder: str) -> None:  # kind: "send"/"transfer"

@@ -23,12 +23,12 @@ _LIVE_GRANTS: set[int] = set()  # ids of Grants a send is currently authorised f
 def _transfer_event(entry: dict) -> dict:  # PI-16/17: "out", this id, authz and item unchanged
     return {
         "type": "data.transfer",
-        "authz": entry["authz"],
+        "authz": deepcopy(entry["authz"]),
         "data": {
             "connector": entry["connector"],
             "action_type": entry["action_type"],
             "direction": "out",
-            "artifact": entry["item"],
+            "artifact": deepcopy(entry["item"]),  # independent of entry from the moment it's built
             "outbox_id": entry["id"],
             "risk_tier": entry["risk_tier"],
         },
@@ -119,9 +119,13 @@ class Outbox:
             return self._store._finalize_claim(outbox_id, holder, "failed")
         grant = Grant(world_id=claimed["world_id"], idempotency_key=claimed["idempotency_key"])
         _LIVE_GRANTS.add(id(grant))
-        try:
+        try:  # copies: a mutating adapter never touches what _transfer_event reads back below
             adapter.send_reply(
-                claimed["destination"], claimed["item"], claimed["recipients"], claimed["idempotency_key"], grant
+                claimed["destination"],
+                deepcopy(claimed["item"]),
+                deepcopy(claimed["recipients"]),
+                claimed["idempotency_key"],
+                grant,
             )
         except BaseException as exc:  # ambiguous: release the lease; swallow only a plain Exception
             self._store._release_lease("send", outbox_id, holder)
