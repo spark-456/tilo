@@ -448,3 +448,43 @@ def test_FR_HIL_04_PI_07_check_entry_with_the_table_rejects_a_self_declared_lowe
     case["authorised_by"]["data"]["action_type"] = "delete_file"
     case["policy"]["action_type"] = "delete_file"
     assert tilo_policy.check_entry(case, table=table) is not None
+
+
+# --- review round 4 --------------------------------------------------------------------------
+
+
+def _l3_b():
+    return _l3(id_="pol_b")
+
+
+def test_FR_HIL_07_PI_13_a_revocation_after_now_gates_even_with_another_covering_policy(risk_table_path):
+    """Any of the owner's policies for this action type stamped after `now` means the clock is
+    behind the record: the whole decision gates, it never falls to the next policy."""
+    history = [
+        {"by": OWNER, "at": "2026-09-29T09:30:00.000Z", "change": "Created", "level": "L3"},
+        {"by": OWNER, "at": "2026-09-29T10:20:00.500Z", "change": "revoked", "level": "L1"},
+    ]
+    revoked_a = _l3(id_="pol_a", level="L1", history=history)
+    for order in ([revoked_a, _l3_b()], [_l3_b(), revoked_a]):
+        assert _decide(_table(risk_table_path), _status_proposal(), order).outcome == "gate"
+
+
+def test_FR_HIL_03_PI_13_a_new_l0_policy_after_now_gates_even_with_another_covering_policy(risk_table_path):
+    new_l0 = _l3(
+        id_="pol_a",
+        level="L0",
+        created_at="2026-09-29T10:20:00.500Z",
+        history=[{"by": OWNER, "at": "2026-09-29T10:20:00.500Z", "change": "Created", "level": "L0"}],
+    )
+    assert _decide(_table(risk_table_path), _status_proposal(), [new_l0, _l3_b()]).outcome == "gate"
+
+
+def test_FR_HIL_04_PI_07_check_entry_with_the_table_enforces_max_level(l3_case, risk_table_path):
+    """With a table whose T2 ceiling is L2, the L3 status-update case is over its ceiling: decide
+    gates it, and check_entry must agree (PI-07)."""
+    good = _table(risk_table_path)
+    capped = tilo_policy.RiskTable(
+        actions=dict(good.actions), modifiers=tuple(good.modifiers), max_level={**good.max_level, "T2": "L2"}
+    )
+    assert tilo_policy.check_entry(l3_case, table=good) is None
+    assert tilo_policy.check_entry(l3_case, table=capped) is not None
