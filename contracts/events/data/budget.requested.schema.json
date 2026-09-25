@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/budget.requested.schema.json",
+  "x-version": "1.0.0",
+  "title": "BudgetRequestedData",
+  "description": "data of budget.requested (PRD 9.5). Raised at 80% of the approved budget (PRD 14.1, FR-MTR-03).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requested", "spent", "cap"],
+  "properties": {
+    "requested": { "$ref": "../../common.schema.json#/$defs/credits" },
+    "spent": { "$ref": "../../common.schema.json#/$defs/credits" },
+    "cap": { "$ref": "../../common.schema.json#/$defs/credits" }
+  }
+}

@@ -19,7 +19,10 @@ Updated: 2026-09-25 · Phase 0 (Foundations) · next gate **CP0 on 29 Sep** · C
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0-01 Scaffold | PRD 20.3, 20.4, 17.6; SEC-13 (CI scan skeleton) | reach-builder → opus (escalated) | **Merged to `main`** (user approved 2026-09-25) | 32 tests | PASS r2 | PASS r4 (FAIL r1–r3) | PASS r1 | n/a | n/a |
 | P0-02 Core contracts + codegen + drift CI | FR-WLD-02; PRD 15.2 (brief, plan, layout, card, policy, handoff, envelope, skill, connector, providers) | architect (opus) | **Merged to `main`** (user delegated decisions 2026-09-25) | 11 schemas' tests | PASS r2 | PASS r5 (FAIL r1–r4) | n/a | n/a | n/a |
-| P0-03 Event contract + registry (+ outbox entry, consent-card ids) | FR-WLD-03 (registry, data schemas, fixtures); PRD 9.3, 9.5 | architect (opus) | Option A (user delegated): closing #21 and #28 policy-path gaps, then freeze and merge; residual findings go to P4 invariants | 31 tests | PASS r1 | FAIL r1–r5 | n/a | n/a | n/a | | | | n/a | n/a | n/a |
+| P0-03 Event contract + registry (+ outbox entry, consent-card ids) | FR-WLD-03 (registry, data schemas, fixtures); PRD 9.3, 9.5 | architect (opus) | **Merged to `main`** (option A). #28 L2 action gap continues as P0-03b | 31 tests | PASS r1 | PASS (after 11 rounds across 4 runs) | n/a | n/a | n/a | | | | n/a | n/a | n/a |
+| CC-SH Contract requests from SH (#3, #4, #5) | FR-AGT-01, FR-AGT-06, FR-AGT-07, FR-MEM-07, FR-MEM-08 | architect (opus) | **Merged to `main`** (1036 tests green) | done | PASS r2 | PASS r3 | n/a | n/a | n/a |
+| CC-SE Contract requests from SE (#7–#12) | FR-MTR-02..09, EFF-06, EFF-07 | architect (opus) | In progress | | | | | n/a | n/a |
+| P0-03b L2 instruction records the action asked for; fail closed (#28) | FR-HIL-05 | architect (opus) | Queued after CC-SE | | | | n/a | n/a | n/a |
 | P0-04 Provider layer A: interfaces, config loaders, denylist, model-id lint | PL-01, PL-04 (skeleton), PL-06, PL-07, NFR-25 | intelligence-builder → opus (escalated) | **Merged to `main`** | 33 tests | PASS r3 | n/a | PASS r1 | n/a | n/a | | | | | | n/a |
 | P0-02b Providers contract: base_url and api_key_env for openai_compat; NIM key pattern | PL-02 | architect (opus) | **Merged to `main`** | 16 tests | PASS r1 | PASS r1 | n/a | n/a | n/a |
 | P0-05 Provider layer B: google, OpenAI-compatible + NVIDIA NIM profiles, record-and-replay, fake | PL-02, EFF-01 | intelligence-builder → opus (escalated) | **Merged to `main`** (security failed early rounds on key redaction, fixed; size exception logged) | 34 tests + 4 added | PASS (after 11 rounds across 4 runs) | PASS | PASS | n/a | n/a |
@@ -64,7 +67,7 @@ Updated: 2026-09-25 · Phase 0 (Foundations) · next gate **CP0 on 29 Sep** · C
 | 2026-09-25 | intelligence-builder | sonnet → opus (saved setting) | Escalated for reasoning/logic failures on P0-04, P0-05 and P0-06 (3 tickets in a week, self-tuning rule). Reviewers paired with it run on opus (balance rule). |
 
 ## Contract backlog (from parallel sessions)
-- Running one architect ticket at a time: P0-03 (+ #1, #21, #28) → CC-SH (#3, #4, #5) → CC-SE (#7–#12). Issues are closed when their branch lands in `phase0-stack`.
+- P0-03 (+ #1, #21) and CC-SH (#3, #4, #5) landed; CC-SE (#7–#12) then P0-03b (#28) are running. Issues are closed when their branch lands.
 - Questions BQ-40 to BQ-51 folded; BQ-41 to BQ-49 decided on their defaults under the user's delegation.
 - Merge split agreed with the monitoring session: it merges `needs-user-approval` PRs into `phase0-stack` once the latest round is all PASS with CI and `just check` green; S0 keeps contracts, P0-06, `main` and this file.
 - Open PR #24 (SH, FR-AGT-04) is `stuck`: not merged until every reviewer passes.

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/level.created.schema.json",
+  "x-version": "1.0.0",
+  "title": "LevelCreatedData",
+  "description": "data of level.created (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "index"],
+  "properties": {
+    "name": { "$ref": "../../common.schema.json#/$defs/plain_name" },
+    "index": { "type": "integer", "minimum": 0 }
+  }
+}

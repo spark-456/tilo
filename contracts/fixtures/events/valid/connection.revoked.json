@@ -1,0 +1,32 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000130",
+  "seq": 130,
+  "ts": "2026-09-29T09:42:10.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "connection.revoked",
+  "actor": "u_owner",
+  "target": "I3",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "fyi",
+  "credits": 0,
+  "summary": "You removed Tilo's access to Google Drive.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "connector": "google_drive"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/memory.hit.schema.json",
+  "x-version": "1.0.0",
+  "title": "MemoryHitData",
+  "description": "data of memory.hit (PRD 9.5). A cached result passed the fit check and the Verifier (FR-MEM-02); saved equals origin_cost minus lookup_cost (PRD 14.3, FR-MTR-06, EV-09).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["origin_cost", "lookup_cost", "saved"],
+  "properties": {
+    "origin_cost": { "$ref": "../../common.schema.json#/$defs/credits" },
+    "lookup_cost": { "$ref": "../../common.schema.json#/$defs/credits" },
+    "saved": { "$ref": "../../common.schema.json#/$defs/credits" }
+  }
+}

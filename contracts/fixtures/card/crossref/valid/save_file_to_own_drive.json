@@ -27,7 +27,12 @@
   ],
   "held": {
     "recipients": [],
-    "modifiers": []
+    "modifiers": [],
+    "item": {
+      "artifact_id": "art_quote_summary",
+      "version": 1
+    },
+    "destination": "folder-tilo"
   },
   "card_gate": {
     "id": "G2",
@@ -39,7 +44,8 @@
         "artifact_id": "art_quote_summary",
         "version": 1,
         "label": "Quote summary"
-      }
+      },
+      "destination": "folder-tilo"
     },
     "recipients": [],
     "irreversible": false,

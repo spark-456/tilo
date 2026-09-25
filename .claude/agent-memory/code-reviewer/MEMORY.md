@@ -1,6 +1,9 @@
-- [Contracts review patterns](contracts-review-patterns.md) — probe cross-reference rules, rules.md numbering, drift-check probe technique
+- [Contracts review patterns](contracts-review-patterns.md) — probe cross-reference rules, rules.md numbering, drift-check probe technique, valid fixture for new event-data branches
 - [Test vs API-doc conflicts](test-vs-api-doc-conflicts.md) — tests contradicting their API_*.md push builders into silent "repair" writes
 - [SE size overruns](se-session-size-overruns.md) — P8 tickets exceed 400 lines, ship unused helpers, undeclared package deps
 - [ProviderError base class escapes](provider-error-base-class.md) — adapters raise bare ProviderError; routers catching 4 subtypes leak it
 - [Router per-profile checks](router-per-profile-checks.md) — cap/tokenizer checked once for first candidate; fallbacks sent over cap
 - [Idempotency resubmit probe](idempotency-resubmit-probe.md) — id-keyed stores overwrite on duplicate submit and reopen resolved gates
+- [Router real-factory probe](router-real-factory-path-probe.md) — router tests mock providers; replay stubs (embed) escape raw
+- [Router count_tokens escape](router-count-tokens-escape.md) — probe every provider method a router calls (count_tokens is live on Google), not only generate
+- [Timeout then late commit](timeout-then-late-commit-probe.md) — abandoned deadline-bounded writes commit late: duplicate on flush, seq out of order

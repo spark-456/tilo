@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/manifest.schema.json",
+  "x-version": "1.0.0",
+  "title": "Manifest",
+  "description": "Provenance manifest of one artifact version (PRD 13.3, 15.2; FR-MEM-06, FR-MEM-07): the agent, skill version and model profile that produced it, its version parents, inputs and sources, the claims it makes with their sources, the events that caused it and who authorised it. Stored with the version and carried by exports, so the trail survives outside Tilo. 'Why is this here?' resolves a claim to its sources and to the first event in events. Rules the schema cannot express are MF-01 to MF-06 in manifest.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "artifact",
+    "content_sha256",
+    "parents",
+    "produced_by",
+    "inputs",
+    "sources",
+    "claims",
+    "events",
+    "authz"
+  ],
+  "properties": {
+    "v": { "const": "1.0" },
+    "artifact": { "$ref": "common.schema.json#/$defs/artifact_ref" },
+    "content_sha256": {
+      "description": "SHA-256 of the version's stored bytes, lower-case hex (PRD 13.2: content hashes).",
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "parents": {
+      "description": "Earlier versions this version was made from (FR-MEM-06); empty for a first version.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/artifact_ref" }
+    },
+    "produced_by": { "$ref": "#/$defs/producer" },
+    "inputs": {
+      "description": "Other artifact versions the producer read.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/artifact_ref" }
+    },
+    "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } },
+    "claims": { "type": "array", "items": { "$ref": "#/$defs/claim" } },
+    "events": {
+      "description": "Ids of the events that caused this version, oldest first.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/ulid" }
+    },
+    "authz": {
+      "description": "The person, policy or Team Lead that authorised the side effect this version went out with (BQ-01); null when it never left Tilo.",
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/authz" }, { "type": "null" }]
+    }
+  },
+  "$defs": {
+    "producer": {
+      "description": "Who produced the version: the agent and its role, the pinned skill version (null without a skill), and the model role and profile from config/models.yaml (null when no model was called), never a model id.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "role", "skill", "model_role", "profile"],
+      "properties": {
+        "agent_id": { "$ref": "common.schema.json#/$defs/agent_id" },
+        "role": { "$ref": "common.schema.json#/$defs/agent_role" },
+        "skill": { "anyOf": [{ "$ref": "#/$defs/skill_version" }, { "type": "null" }] },
+        "model_role": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/slug" }, { "type": "null" }]
+        },
+        "profile": {
+          "anyOf": [{ "$ref": "providers.schema.json#/$defs/profile_id" }, { "type": "null" }]
+        }
+      }
+    },
+    "skill_version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/skill_id" },
+        "version": { "$ref": "common.schema.json#/$defs/semver" }
+      }
+    },
+    "source": {
+      "description": "Where material came from. ref is the URL for web, the file name for file, <connector_id>:<item id> for connector, <artifact_id>@<version>#<cell> for cell and <artifact_id>@<version> for artifact. Every ref is one of four closed shapes, so none carries user info or a query, fragment or parameter token (PRD 16.1 rule 4, 16.2; MF-03): an http or https URL of host, optional port and path only (no user info, query, fragment, ; or =); an artifact ref with an optional cell after # of letters, digits and . _ ~ ! : $ - only; a connector ref whose item id has only letters, digits and . _ ~ -; or a file name with no / \\ : ? # @ % or control character and no space at either end. A bare token can still look like a file name or an item id, so the secret redactor checks every manifest before it is written or exported (MF-06). fingerprint is the SHA-256 of the fetched content, the result cache key part (PRD 13.1).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "ref", "fingerprint", "fetched_at"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/slug" },
+        "kind": { "type": "string", "enum": ["web", "file", "connector", "cell", "artifact"] },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^(?:https?://[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~!$&'()*+,:@%/-]*)?|art_[0-9A-Za-z_]{1,48}@[1-9][0-9]{0,8}(?:#[A-Za-z0-9._~!:$-]{1,128})?|[a-z][a-z0-9_]{1,31}:[A-Za-z0-9._~-]{1,512}|[^\\s\\x00-\\x1f\\x7f/\\\\:?#@%](?:[^\\x00-\\x1f\\x7f/\\\\:?#@%]{0,253}[^\\s\\x00-\\x1f\\x7f/\\\\:?#@%])?)$",
+          "not": { "pattern": "\n" }
+        },
+        "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "maxLength": 71 },
+        "fetched_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      }
+    },
+    "claim": {
+      "description": "A statement, number or cell in the artifact (PRD 13.3 claims ledger). location is its path in the artifact, e.g. slide3/cell:B2. A verified claim names at least one source.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "location", "text", "source_ids", "verified"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/slug" },
+        "location": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 280 },
+        "source_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/slug" }
+        },
+        "verified": { "type": "boolean" }
+      },
+      "if": { "properties": { "verified": { "const": true } }, "required": ["verified"] },
+      "then": { "properties": { "source_ids": { "minItems": 1 } } }
+    }
+  }
+}

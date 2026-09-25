@@ -21,6 +21,7 @@
   "undo_window_s": 60,
   "expiry": "2026-12-31T23:59:59.000Z",
   "notify_channel": "sms",
+  "team_lead_domains": [],
   "created_by": {
     "by": "u_owner",
     "at": "2026-09-29T09:30:00.000Z"

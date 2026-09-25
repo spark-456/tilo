@@ -16,6 +16,7 @@
     "autonomy_level": { "$ref": "#/$defs/autonomy_level" },
     "authz": { "$ref": "#/$defs/authz" },
     "artifact_ref": { "$ref": "#/$defs/artifact_ref" },
+    "destination": { "$ref": "#/$defs/destination" },
     "tier": { "$ref": "#/$defs/tier" },
     "world_id": { "$ref": "#/$defs/world_id" },
     "run_id": { "$ref": "#/$defs/run_id" },
@@ -118,6 +119,11 @@
         "version": { "type": "integer", "minimum": 1 },
         "label": { "type": "string", "minLength": 1, "maxLength": 80 }
       }
+    },
+    "destination": {
+      "description": "Where a side effect lands, by the connector's own opaque id: the thread a reply goes into (PRD 11.4, FR-CHN-13) or the folder a file is saved in, in the person's connected account. Letters, digits, underscore and hyphen only, so it is never a URL, a domain, an address or a path. Tilo does not parse it; the connector resolves it within the connection.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$"
     },
     "tier": {
       "description": "World size by agent count (PRD 9.1): outpost 1-2, village 3-6, town 7-15, city 16+.",

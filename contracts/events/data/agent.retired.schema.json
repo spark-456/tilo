@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.retired.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentRetiredData",
+  "description": "data of agent.retired (PRD 9.5). actor (a Lead or the Director) retired target.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {}
+}

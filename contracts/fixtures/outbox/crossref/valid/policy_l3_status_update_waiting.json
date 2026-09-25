@@ -1,0 +1,109 @@
+{
+  "rule": null,
+  "note": "An L3 standing rule sends a status update to a named teammate within its daily limit: no instruction is needed and none is named.",
+  "entry": {
+    "id": "01JB5VQ0000000000000009007",
+    "idempotency_key": "r_village_basic_1:U3:post_status_update:1",
+    "world_id": "w_village_basic",
+    "run_id": "r_village_basic_1",
+    "action_type": "post_status_update",
+    "connector": "gmail",
+    "recipients": ["teammate@example.org"],
+    "attachments": [],
+    "item": {
+      "artifact_id": "art_status_update",
+      "version": 1
+    },
+    "destination": null,
+    "modifiers": [],
+    "risk_tier": "T2",
+    "authz": {
+      "by": "policy",
+      "ref": "pol_status_updates",
+      "at": "2026-09-29T10:20:00.000Z"
+    },
+    "undo_window_s": 60,
+    "scheduled_at": "2026-09-29T10:21:00.000Z",
+    "state": "scheduled",
+    "created_at": "2026-09-29T10:20:00.000Z"
+  },
+  "reserved_by": null,
+  "authorised_by": {
+    "type": "policy.applied",
+    "authz": {
+      "by": "policy",
+      "ref": "pol_status_updates",
+      "at": "2026-09-29T10:20:00.000Z"
+    },
+    "data": {
+      "policy_id": "pol_status_updates",
+      "gate_id": "G2",
+      "outbox_id": "01JB5VQ0000000000000009007",
+      "action_type": "post_status_update",
+      "connector": "gmail",
+      "destination": null,
+      "district": "D1",
+      "risk_tier": "T2",
+      "level": "L3",
+      "instruction_id": null,
+      "undo_window_s": 60,
+      "item": {
+        "artifact_id": "art_status_update",
+        "version": 1
+      },
+      "credits": 2
+    }
+  },
+  "policy": {
+    "id": "pol_status_updates",
+    "owner": "u_owner",
+    "action_type": "post_status_update",
+    "scope": {
+      "connectors": ["gmail"],
+      "recipients": ["teammate@example.org"],
+      "domains": [],
+      "districts": []
+    },
+    "limits": {
+      "per_day": 5,
+      "credits": null
+    },
+    "conditions": {
+      "no_attachments": true,
+      "no_new_recipients": true,
+      "no_safety_flags": true
+    },
+    "level": "L3",
+    "undo_window_s": 60,
+    "expiry": null,
+    "notify_channel": "email",
+    "team_lead_domains": [],
+    "created_by": {
+      "by": "u_owner",
+      "at": "2026-09-29T09:30:00.000Z"
+    },
+    "changed_by": {
+      "by": "u_owner",
+      "at": "2026-09-29T10:15:00.000Z"
+    },
+    "history": [
+      {
+        "by": "u_owner",
+        "at": "2026-09-29T09:30:00.000Z",
+        "change": "Created at L2 for replies to example.com",
+        "level": "L2"
+      },
+      {
+        "by": "u_owner",
+        "at": "2026-09-29T10:15:00.000Z",
+        "change": "Raised to L3 with a limit of 5 a day",
+        "level": "L3"
+      }
+    ]
+  },
+  "team_lead": null,
+  "world_owner": "u_owner",
+  "instruction": null,
+  "earlier_applied": [],
+  "transfer": null
+}

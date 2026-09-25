@@ -1,0 +1,33 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000118",
+  "seq": 118,
+  "ts": "2026-09-29T09:41:58.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "question.routed",
+  "actor": "A_l1",
+  "target": "u_owner",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "needs_you",
+  "credits": 0,
+  "summary": "The Lead asked you whether to cc finance.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "card_id": "01JB5VQ0000000000000009003",
+    "domain": null
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

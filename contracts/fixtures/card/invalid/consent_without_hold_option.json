@@ -21,7 +21,7 @@
   "options": [
     {
       "id": "connect",
-      "label": "Connect Drive",
+      "label": "Connect",
       "suggested": true,
       "reason": "Only the Tilo folder is requested.",
       "irreversible": false

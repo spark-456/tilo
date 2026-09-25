@@ -1,0 +1,37 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000150",
+  "seq": 150,
+  "ts": "2026-09-29T10:15:00.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "question.answered",
+  "actor": "A_dir",
+  "target": "A_l1",
+  "level": "L1",
+  "district": "D1",
+  "item": {
+    "kind": "note",
+    "artifact_id": null,
+    "label": "Your earlier decision"
+  },
+  "severity": "info",
+  "credits": 0,
+  "summary": "Answered from your earlier decision: reply out of hours only to suppliers already in the CRM.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "answered_by": "decision",
+    "decision_id": "01J8Z3K4M5N6P7Q8R9S0T1V2W5"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}
