@@ -31,6 +31,17 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | --- | --- | --- |
 | pydantic | MIT | https://pypi.org/project/pydantic/ |
 
+## Python (`services/harness`)
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| google-adk | Apache-2.0 | https://pypi.org/project/google-adk/ |
+| google-cloud-firestore | Apache-2.0 | https://pypi.org/project/google-cloud-firestore/ |
+
+`services/harness` also uses `pyyaml`, `jsonschema` and `referencing` (already listed under the
+root dev dependency group), declared as its own direct dependencies since its code imports them
+directly rather than relying only on the shared dev group.
+
 ## Python (`packages/providers`)
 
 No new dependency was added for ticket P0-04 (`packages/providers/pyproject.toml` still
@@ -44,6 +55,7 @@ shared `uv` workspace venv by `uv sync --all-packages`.
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | @biomejs/biome | MIT | https://www.npmjs.com/package/@biomejs/biome |
+| firebase-tools (runs the Firestore emulator for `services/harness`, P0-09) | MIT | https://www.npmjs.com/package/firebase-tools |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
 
 ## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)
@@ -75,6 +87,7 @@ Third-party code run in CI (`.github/workflows/ci.yml`) or on developer machines
 | astral-sh/setup-uv | v4 | MIT | https://github.com/astral-sh/setup-uv |
 | actions/setup-node | v4 | MIT | https://github.com/actions/setup-node |
 | extractions/setup-just | v2 | MIT | https://github.com/extractions/setup-just |
+| actions/setup-java (Firestore emulator's JRE, P0-09) | v4 | MIT | https://github.com/actions/setup-java |
 | pre-commit/pre-commit-hooks | v5.0.0 | MIT | https://github.com/pre-commit/pre-commit-hooks |
 
 ## Fonts, icons and design assets

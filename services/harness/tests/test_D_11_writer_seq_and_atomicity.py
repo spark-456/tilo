@@ -139,7 +139,7 @@ def test_D_11_append_accepts_seq_exactly_last_plus_one(writer_and_store) -> None
     assert [first["seq"], second["seq"]] == [1, 2]
 
 
-@pytest.mark.parametrize("bad_seq", [3, 1, 2], ids=["gap", "duplicate-of-first", "restart-not-plus-one"])
+@pytest.mark.parametrize("bad_seq", [3, 1, 0], ids=["gap", "duplicate-of-first", "restart-not-plus-one"])
 def test_D_11_append_rejects_seq_other_than_last_plus_one(writer_and_store, bad_seq: int) -> None:
     writer, store = writer_and_store
     writer.append(_built_event(1, "01JB5VQ0000000000000000201"))

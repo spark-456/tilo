@@ -25,11 +25,28 @@ LEASE_S = 3.0
 STEP_DELAY_S = 0.3
 
 
+def _wait_for_events(store: object, org_id: str, world_id: str, *, min_count: int, timeout_s: float) -> list[dict]:
+    """Polls the store until at least `min_count` events land (or `timeout_s` elapses), rather
+    than guessing a sleep: a cold subprocess pays google-cloud-firestore's and google-adk's own
+    import cost (several seconds each, observed) before its first write, and that cost varies a
+    lot run to run, so a fixed sleep is either too short (flaky) or too long (risks the run
+    finishing before the kill)."""
+    deadline = time.monotonic() + timeout_s
+    events: list[dict] = []
+    while time.monotonic() < deadline:
+        events = store.read_events(org_id, world_id)  # type: ignore[attr-defined]
+        if len(events) >= min_count:
+            return events
+        time.sleep(0.2)
+    return events
+
+
 def test_D_11_kill_mid_run_leaves_a_valid_dense_prefix_whose_views_agree(emulator_host: str, repo_root) -> None:
     from tilo_harness.store import FirestoreStore
     from tilo_harness.validator import EventValidator
 
     org_id, world_id, run_id = "org_demo", "w_kill_mid_run_1", "r_kill_mid_run_1"
+    store = FirestoreStore(project_id="demo-tilo")
     proc = subprocess.Popen(
         [
             sys.executable,
@@ -52,12 +69,13 @@ def test_D_11_kill_mid_run_leaves_a_valid_dense_prefix_whose_views_agree(emulato
         stderr=subprocess.PIPE,
     )
     try:
-        time.sleep(STEP_DELAY_S * 4)  # let a handful of steps land before killing it
+        # Wait for at least 2 of the run's 8 events to land -- proof the process is genuinely
+        # mid-run, not just started -- then kill it well before it can finish on its own.
+        _wait_for_events(store, org_id, world_id, min_count=2, timeout_s=45.0)
     finally:
         proc.kill()
         proc.wait(timeout=15)
 
-    store = FirestoreStore(project_id="demo-tilo")
     stream = store.read_events(org_id, world_id)
     assert stream, "at least one event must have been written before the kill"
     assert [e["seq"] for e in stream] == list(range(1, len(stream) + 1)), (

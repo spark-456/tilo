@@ -221,6 +221,16 @@ class NetworkBlocked(RuntimeError):
     pass
 
 
+@pytest.fixture(scope="session")
+def emulator_host() -> Iterator[str]:
+    """Starts (or reuses) the Firestore emulator once for the whole session, via
+    `tilo_harness.emulator.running_emulator()`, for every `@pytest.mark.emulator` test."""
+    from tilo_harness.emulator import running_emulator
+
+    with running_emulator() as host:
+        yield host
+
+
 @pytest.fixture
 def block_network(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Makes any real TCP connect() other than to loopback raise, so a test that accidentally

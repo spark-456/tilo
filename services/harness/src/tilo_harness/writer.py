@@ -1,0 +1,193 @@
+"""`WorldWriter`: the single writer per world (D-11, PRD 9.3, 15.3, 22.2). Every event is
+checked against `EventValidator` before it is written; a rejected event raises `EventRejected`
+and writes nothing. `WorldWriter` holds a lease on the world (writer id + expiry, from an
+injectable clock); a second writer is refused while the lease is live (`WriterBusy`), every
+write re-checks the lease inside the same store transaction so a superseded writer cannot write
+any more, and after a crash a new writer takes over once the lease expires and continues at
+`last_seq + 1` read from the store, never overwriting an existing event.
+"""
+
+from __future__ import annotations
+
+import secrets
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from tilo_harness.validator import EventValidator, WorldState
+from tilo_harness.views import redact, scopes_for
+
+_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+_NULL_TRACE: dict[str, Any] = {
+    "model_role": None,
+    "profile": None,
+    "tokens_in": None,
+    "tokens_out": None,
+    "tool": None,
+    "latency_ms": None,
+    "archive_ref": None,
+}
+
+
+class EventRejected(Exception):
+    """Raised by `emit`/`append` when an event fails the validator; nothing is written."""
+
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__("; ".join(problems) or "event rejected")
+        self.problems = problems
+
+
+class WriterBusy(Exception):
+    """Raised when the world's lease is held by another writer."""
+
+
+def _new_ulid(now: datetime) -> str:
+    ms = int(now.timestamp() * 1000) & 0xFFFFFFFFFFFF
+    value = (ms << 80) | int.from_bytes(secrets.token_bytes(10), "big")
+    return "".join(_CROCKFORD[(value >> (i * 5)) & 0x1F] for i in range(25, -1, -1))
+
+
+def _format_ts(now: datetime) -> str:
+    return now.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
+
+
+class WorldWriter:
+    def __init__(
+        self,
+        store: Any,
+        *,
+        org_id: str,
+        world_id: str,
+        run_id: str,
+        layout: dict[str, Any],
+        writer_id: str,
+        lease_s: float = 30.0,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
+        self._store = store
+        self._org_id = org_id
+        self._world_id = world_id
+        self._run_id = run_id
+        self._layout = layout
+        self.writer_id = writer_id
+        self._lease_s = lease_s
+        self._clock = clock or (lambda: datetime.now(UTC))
+        self._validator = EventValidator.from_repo()
+        self._scopes = scopes_for(layout)
+        self._state = WorldState(layout)
+        self._view_ids: dict[str, set[str]] = {}
+        self._view_seq: dict[str, int] = {}
+
+    def open(self) -> None:
+        """Acquires the world's lease and loads the head: last seq, and every event id already
+        in the full stream and each view, so a takeover continues at `last_seq + 1` and never
+        re-derives `cause` visibility from scratch."""
+        now = self._clock()
+
+        def _acquire(head: dict[str, Any]) -> tuple[dict[str, Any], None, list[Any]]:
+            lease = head["lease"]
+            if lease is not None and lease["writer_id"] != self.writer_id and lease["expires_at"] > now:
+                raise WriterBusy(f"world {self._world_id!r} is leased to {lease['writer_id']!r}")
+            new_head = dict(head)
+            new_head["lease"] = {"writer_id": self.writer_id, "expires_at": now + timedelta(seconds=self._lease_s)}
+            return new_head, None, []
+
+        self._store.transact(self._org_id, self._world_id, _acquire)
+
+        self._state = WorldState(self._layout)
+        for event in self._store.read_events(self._org_id, self._world_id):
+            self._state.observe(event)
+        self._view_ids = {
+            scope: {e["id"] for e in self._store.read_view(self._org_id, self._world_id, scope)}
+            for scope in self._scopes
+        }
+        self._view_seq = {scope: len(ids) for scope, ids in self._view_ids.items()}
+
+    def close(self) -> None:
+        """Releases the lease, if it is still this writer's."""
+
+        def _release(head: dict[str, Any]) -> tuple[dict[str, Any], None, list[Any]]:
+            lease = head["lease"]
+            if lease is not None and lease["writer_id"] == self.writer_id:
+                return dict(head, lease=None), None, []
+            return head, None, []
+
+        self._store.transact(self._org_id, self._world_id, _release)
+
+    def emit(
+        self,
+        *,
+        type: str,
+        actor: str,
+        target: str,
+        summary: str,
+        data: dict[str, Any],
+        level: str | None = None,
+        district: str | None = None,
+        item: dict[str, Any] | None = None,
+        severity: str | None = None,
+        credits: float = 0,
+        cause: str | None = None,
+        vis: str | list[str] = "all",
+        authz: dict[str, Any] | None = None,
+        trace: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        now = self._clock()
+        entry = self._validator.registry_types.get(type)
+        event = {
+            "v": "1.0",
+            "id": _new_ulid(now),
+            "seq": self._state.last_seq + 1,
+            "ts": _format_ts(now),
+            "world_id": self._world_id,
+            "run_id": self._run_id,
+            "type": type,
+            "actor": actor,
+            "target": target,
+            "level": level,
+            "district": district,
+            "item": item,
+            "severity": severity if severity is not None else (entry["default_severity"] if entry else "info"),
+            "credits": credits,
+            "summary": summary,
+            "cause": cause,
+            "vis": vis,
+            "authz": authz,
+            "data": data,
+            "trace": trace if trace is not None else dict(_NULL_TRACE),
+        }
+        return self._write(event)
+
+    def append(self, event: dict[str, Any]) -> dict[str, Any]:
+        """Writes a pre-built event unchanged (the replay path): `seq` must be exactly
+        `last_seq + 1`, `id` must be unused, `cause` must be null or an earlier event of this
+        world -- EventValidator's EV-10/EV-11 catch each case."""
+        return self._write(dict(event))
+
+    def _write(self, event: dict[str, Any]) -> dict[str, Any]:
+        problems = self._validator.problems(event, self._state)
+        if problems:
+            raise EventRejected(problems)
+
+        view_writes: list[tuple[str, dict[str, Any]]] = []
+        new_view_seq = dict(self._view_seq)
+        for scope in self._scopes:
+            vseq = self._view_seq.get(scope, 0) + 1
+            copy = redact(event, scope, vseq, self._view_ids.get(scope, set()))
+            if copy is not None:
+                view_writes.append((scope, copy))
+                new_view_seq[scope] = vseq
+
+        def _commit(head: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], list[tuple[str, dict[str, Any]]]]:
+            lease = head["lease"]
+            if lease is None or lease["writer_id"] != self.writer_id:
+                raise WriterBusy(f"world {self._world_id!r} is no longer leased to {self.writer_id!r}")
+            new_head = dict(head, last_seq=event["seq"], view_seq=new_view_seq)
+            return new_head, event, view_writes
+
+        self._store.transact(self._org_id, self._world_id, _commit)
+        self._state.observe(event)
+        self._view_seq = new_view_seq
+        for scope, doc in view_writes:
+            self._view_ids.setdefault(scope, set()).add(doc["id"])
+        return event
