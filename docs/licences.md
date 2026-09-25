@@ -45,6 +45,12 @@ shared `uv` workspace venv by `uv sync --all-packages`.
 P4-01); all three are already listed above under the root dev dependency group (MIT). No new
 licence.
 
+## Python (`services/connectors`)
+
+`tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
+FR-AGT-11), both already listed above (MIT); and the in-workspace `tilo-policy` (not external).
+No new licence.
+
 ## JavaScript / TypeScript (root `package.json` devDependencies, `pnpm`-managed)
 
 | Dependency | Licence | Source |

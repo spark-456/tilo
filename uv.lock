@@ -6,6 +6,7 @@ requires-python = "==3.12.*"
 members = [
     "tilo",
     "tilo-api",
+    "tilo-connectors",
     "tilo-contracts",
     "tilo-policy",
     "tilo-providers",
@@ -817,6 +818,23 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
+]
+
+[[package]]
+name = "tilo-connectors"
+version = "0.1.0"
+source = { editable = "services/connectors" }
+dependencies = [
+    { name = "jsonschema" },
+    { name = "referencing" },
+    { name = "tilo-policy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jsonschema", specifier = ">=4.18" },
+    { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-policy", editable = "packages/policy" },
 ]
 
 [[package]]
