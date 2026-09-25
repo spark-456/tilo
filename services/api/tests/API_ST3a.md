@@ -1,4 +1,4 @@
-# `tilo_api` — public shape ticket ST-3a pins (round 4, post code/security/qa review)
+# `tilo_api` — public shape ticket ST-3a pins (round 5, after round 4 failed code/security/qa review)
 
 Ticket ST-3a (session ST). Requirements FR-HIL-07 (kill switches), FR-HIL-09 and SEC-07 (roles
 and redaction). Invariants PI-13 and PI-18 of `docs/security/p4-policy-invariants.md` apply. This
@@ -164,6 +164,141 @@ security and qa review on:
    revoke route above): the level change always lands, the event never raises past the route, and a
    writer failure leaves the part pending in the policy's mapped world, to be flushed by a later
    mutating call that touches that world.
+
+## What changed since round 4 (why the sections below moved again)
+
+Round 4's own fixes above are unchanged and still pinned. Round 4 itself then failed code,
+security and qa review on:
+
+1. **Scoped views must drop a hidden-district event, never null one of its fields (security,
+   biggest).** Round 4's redaction nulled `district`, `target`, `actor` and any district-shaped
+   leaf inside `data` when they named a district outside `principal.districts`, but still *kept*
+   the event — the round-3/round-4 "allowlist, don't copy" fix. That is no longer good enough: a
+   scoped viewer who receives an event at all — even one with every district-shaped field blanked
+   — still learns *something happened* in a district it cannot see (a count, a `summary`, a `ts`,
+   an `authz`), which is exactly what SEC-07 "scoped users never receive hidden names **or
+   counts**" rules out. **A kept event, for anyone but the owner, is now dropped entirely — not
+   returned with fields nulled — whenever any of the following names a district outside
+   `principal.districts`:** the event's own `district` field, `target` or `actor` when either is
+   district-shaped (matches `district_id`'s pattern), or any district-id-shaped string appearing
+   anywhere inside `data` — a leaf value at any depth, **or a dict key at any depth** (see finding
+   6 below) — regardless of what `vis` says. This check runs *in addition to*, not instead of, the
+   existing `vis`-based filter: an event is kept for a non-owner only when it passes **both** — its
+   `vis` makes it visible at all, **and** nothing district-shaped inside it names a district outside
+   `principal.districts`. An event that names no district anywhere (or names only districts the
+   caller can see) is unaffected and still kept, redacted exactly as round 4 already pinned (view
+   `seq`/`id`, `cause` remap, `vis` intersection, `message_ref`/`archive_ref` nulling, ULID remap).
+   The owner is unaffected (owner sees everything, PRD 10.1; this whole check is skipped for the
+   owner). Every "target/actor/district field is nulled" wording elsewhere in this document
+   (unchanged text below, kept for the parts that still apply to a *visible* district-shaped value)
+   is superseded for the *hidden* case: nulling was round 3/4's mechanism, dropping the whole event
+   is round 5's.
+2. **The kill switch must never hold a world's lock across writer I/O, and every writer attempt
+   gets a deadline (qa biggest, security).** Round 4 did move writer calls onto a thread pool
+   (`_write_parts`'s `ThreadPoolExecutor.map`), but that call is still made **while the route's own
+   `_locked(touched)` context is held** — `pool.map` blocks the calling thread until every
+   submitted writer call returns (or raises), so a writer that never returns at all (the harness
+   process wedged, not merely slow or down) hangs the request forever, and a second call against
+   the *same* world — even one with nothing left to change — cannot acquire that world's lock until
+   the stuck call's writer phase eventually gives up, which round 4 never bounds either. Fixed:
+   **the level/history/`changed_by`/`paused`-flag mutation happens under the touched worlds' locks,
+   with no I/O of any kind inside that block; the lock(s) are released before any `writer.append`
+   call is attempted**, for both the flush-pending step and the newly-built-parts step. Every
+   individual `writer.append` attempt additionally carries its own bounded deadline (the exact
+   value is this ticket's own implementation detail, not pinned here beyond "small enough that even
+   a full 200-policy Stop-all's worth of missed deadlines cannot itself blow the 5 s budget," per
+   the open question logged below); an attempt that does not return within its deadline is treated
+   exactly like a raising `append` call — the part is left/queued in `store.pending_events` and
+   counted in `"pending"` — **without the request waiting for that attempt to actually finish**. A
+   writer call that eventually does complete after its deadline was already given up on is not
+   itself an error (the response has already moved on); nothing in this ticket requires cancelling
+   the underlying attempt, only not waiting on it. Consequences pinned by this round's tests:
+   Stop-all and Pause-all both return well within 5 s even against a writer whose `append` never
+   returns at all; a second Stop-all issued against the *same* world while the first is still stuck
+   in its (already lock-released) writer phase also returns within 5 s, because by the time the
+   second call runs, the level change is already durably applied and there is nothing left for it
+   to do under the lock; and a Stop-all issued by a *different* owner against a *different* world
+   that merely happens to be a target of the first owner's policy mapping is not held up either,
+   for the same reason — that world's lock was released before the first call's writer phase began.
+3. **Writes to one world must be sequential and ordered; only different worlds run in parallel
+   (code biggest, qa).** Round 4's `_write_parts` submitted every part for a call — across every
+   touched world at once — to one shared thread pool with no ordering guarantee at all, so the
+   order parts actually land in `store.events` (and therefore the `seq` the writer assigns them)
+   could diverge from the order they were built or queued, *within a single world*. Two
+   consequences this round's tests pin directly: (a) `store.pending_events[w]`'s parts, which are
+   already invariantly oldest-first (round 3), must be flushed to the writer **in that same
+   oldest-first order**, and only once flushing is under way may this call's own newly-built parts
+   for that world follow, also in their own build order — a **100**-part pending backlog for one
+   world must land in `store.events[w]` in exactly its queued order; (b) within **the same call**,
+   Pause-all's `policy.changed` parts (built first, one per lowered policy) must land before its
+   own `world.paused` part (built last) in `store.events[world_id]`, never interleaved out of that
+   order by concurrent completion. Parallel dispatch *within* one world's writer calls is still
+   permitted for latency (finding 2's per-part deadline still needs every part to actually be
+   attempted, not queued one full deadline apart), **but the order parts are committed to
+   `store.events` must match the order they were queued/built for that world, regardless of which
+   attempt happens to finish first on the wire** — i.e. an implementation may fire a world's writer
+   calls concurrently, but must commit their results to the store in queue order (an in-order
+   buffer/barrier), never in raw completion order. Parallelism *across different worlds* is
+   unaffected and still required (finding 2, and the unchanged round-4 cross-world latency test
+   below).
+4. **Revoke must flush its own target world's whole pending backlog first, oldest first, under
+   that world's lock — not only its own part (code/qa/security, supersedes round-4 ambiguity 12).**
+   Round 4 deliberately scoped revoke's flush duty to "only its own policy's part," reasoning that
+   clearing a whole world's backlog was a bulk (`stop`/`pause`-shaped) responsibility a
+   single-policy revoke should not inherit. Review round 4 rejected that: a world whose owner never
+   happens to call `stop` or `pause` again (for example one where autopilot was never turned back
+   on) could carry a stuck backlog indefinitely even though every one of its owner's revokes keeps
+   touching that same world, each one skipping past the very backlog sitting right there — the
+   "next mutating call that touches a world" flush trigger (ambiguity 9) is defined at the level of
+   *any* mutating route touching a world, not just `stop`/`pause`, and revoke's own text singling
+   itself out was the bug, not a feature. **Ambiguity 12 (round 4) is superseded:** revoke now
+   flushes `store.pending_events.get(mapped_world_id, [])` in full, oldest first, exactly like
+   `stop`/`pause` flush every world they touch, before building and writing its own new part; the
+   flush and the policy's own level/history mutation both happen with `mapped_world_id`'s lock
+   held (the level mutation itself gains lock protection it never had before — round 4's revoke
+   mutated `store.policies` with no lock at all — so a concurrent `stop`/`pause`/`revoke` against
+   the same world can never interleave with revoke's own flush-then-write sequence and
+   double-write a stale pending part). A policy with no `policy_worlds` mapping still has no world
+   to flush or lock (ambiguity 7, unchanged): revoke of such a policy touches no lock and no
+   pending queue at all.
+5. **`data` nested far past any realistic depth must never turn into a 500, for anyone (qa,
+   security).** Round 4's recursive `_redact_value`/`_data_hides_district`-style walk has no depth
+   guard at all; a `data` payload nested a few hundred levels deep (500 is this round's own test
+   depth) risks `RecursionError` once the walk's own stack frames stack on top of whatever the
+   ASGI/FastAPI/pydantic call chain already used, which FastAPI turns into an unhandled-exception
+   500 — a crash triggered by a single event's shape, taking the whole response down with it,
+   including every well-formed sibling event in the same call. **Resolved default (this ticket may
+   only touch `services/api/tests`, so this is pinned here rather than `docs/open-questions.md`):
+   the scoped (non-owner) redaction walk fails closed past a bounded depth and the event carrying
+   that `data` is dropped entirely — the same "cannot be safely/honestly processed, so it is not
+   shown to that viewer" treatment already given to a malformed event.** The owner's own response
+   never walks `data` at all — `_owner_event_view` (and any replacement for it) copies the stored
+   `data` value forward unchanged, so there is nothing for the owner's path to recurse over and
+   depth cannot 500 it; the owner therefore still receives the deeply nested event, `data`
+   byte-for-byte as stored, same as any other field. (The exact bound the scoped walk fails closed
+   at is this ticket's own implementation detail — this round's test only requires that 500 levels
+   of nesting never 500s and is dropped for a non-owner; it does not pin the bound's precise value.)
+6. **A `data` dict key that is itself a district id or an event ULID must get the same treatment a
+   value in that position would (security).** Round 4's redaction walk (`_redact_value` and
+   friends) only ever inspected dict *values*; a key was copied into the rebuilt dict verbatim,
+   unexamined — so `data: {"D9": "..."}` or `data: {<hidden event's real ulid>: "..."}` put a
+   hidden district id or a real store event id directly into the JSON response as a **key**,
+   identical in effect to it appearing as a value, which finding 1 and round 3/4's own ULID-remap
+   rule already forbid. **A district-id-shaped key is treated exactly like a district-id leaf value
+   under finding 1 above: if it names a district outside `principal.districts`, the whole event is
+   dropped** (a hidden district id is a hidden district id, whether Python/JSON happens to store it
+   as a dict key or a dict value — both render as the same string in the response body). **A
+   ULID-shaped key naming an event is treated like a ULID-shaped *value* naming one (the existing
+   `cause`/data-value remap rule) with one necessary difference: a JSON object key cannot be set to
+   `null`, so where a hidden/unknown-event value would be nulled, a hidden/unknown-event key is
+   instead dropped — that key and its value are removed from the rebuilt dict entirely — and where
+   a visible event's value would be remapped to that event's view-local id, a visible event's key is
+   likewise renamed to that view-local id, its value redacted the same as any other value at that
+   position.** A district-id-shaped key that names a *visible* district, or any other string key, is
+   left exactly as stored. This is a value-level transformation within an already-kept event (it
+   never triggers a whole-event drop by itself for the ULID case — only a *district-id* key or value
+   does, per finding 1); it composes with finding 1's whole-event-drop check, which still runs
+   first, over keys and values alike, before any surviving event's `data` is rebuilt.
 
 ## `tilo_api.deps` (new module; does not exist yet — every test here fails on this import until
 the builder adds it)
@@ -412,10 +547,17 @@ new status code invented for it).
   already required this per-call, but round-4 makes explicit that "flush what's pending" is itself
   bounded by the same budget, not an unbounded per-part retry loop that could itself take
   `n * writer_latency`.
-- Locking (round-4 finding, qa biggest): every targeted policy's level, history and `changed_by`
-  are updated to L1 in `store.policies` **before** this call attempts any writer call for that
-  policy's part — the level change is what "instant" means for a kill switch (PRD 10.4), the event
-  is only its audit trail. Whatever serializes two concurrent calls against the *same* world (so
+- Locking (round-4 finding, qa biggest; deadline and same-world/cross-owner clarifications new in
+  round 5, "What changed since round 4" finding 2): every targeted policy's level, history and
+  `changed_by` are updated to L1 in `store.policies` **before** this call attempts any writer call
+  for that policy's part — the level change is what "instant" means for a kill switch (PRD 10.4),
+  the event is only its audit trail. **The lock(s) for every touched world are held only for that
+  mutation (and the decision of what to flush) — never across any `writer.append` call, flush or
+  new-part alike; every writer call happens strictly outside the locked section, and each attempt
+  carries its own bounded deadline** (round-5 finding 2), so an attempt whose writer never returns
+  at all does not hold the request open past that deadline (it is queued pending instead, like any
+  other failed attempt) and does not hold any lock open at all (the lock was already released
+  before the attempt began). Whatever serializes two concurrent calls against the *same* world (so
   they do not each independently read the pre-change state and double-apply, round-3's concurrency
   finding) must not also serialize calls against *different* worlds behind writer I/O: writer calls
   happen outside that serialization, or through a flush bounded well under the 5 s budget
@@ -423,6 +565,16 @@ new status code invented for it).
   switch pressed against world A never waits on world B's writer latency, and vice versa. A
   one-policy Stop-all against a different, otherwise-idle world, issued while a 200-policy Stop-all
   against a slow-and-failing writer is still in flight for another world, finishes in under 1 s.
+  Two further cases this round's tests pin, both following from "no lock is ever held across writer
+  I/O": **a second Stop-all against the *same* world, issued while the first is still stuck waiting
+  on (or past the deadline of) a writer call that never returns, itself returns within 5 s** — by
+  the time it runs, the first call's level-change section has already released that world's lock,
+  so the second call finds every policy already at L1 (`already_l1`, nothing new to do) and returns
+  almost immediately; and **a Stop-all issued by a *different* owner against a *different* world
+  that the first owner's own Stop-all merely happens to also touch (via `policy_worlds`) is not held
+  up by the first owner's stuck writer call either** — that shared world's lock was likewise
+  released before the first call's writer phase began, so the second owner's own, direct Stop-all
+  against their own world acquires it immediately.
 
 ### Pending writes and flush (round-3 qa/security finding, applies to stop and pause)
 
@@ -472,6 +624,32 @@ Picking "every world this call touches" over "every world in the store" keeps a 
 world with nothing mapped elsewhere from ever having to scan unrelated worlds' pending queues, and
 keeps the per-call cost proportional to the same owned-policy scan PI-18 already requires, not to
 the size of the whole store.
+
+### Order within a world (round-5 code/qa finding, "What changed since round 4" finding 3)
+
+Whatever order a world's writer calls are *dispatched* in (concurrently is fine, finding 2's
+per-part deadline needs every part actually attempted rather than queued one deadline apart), the
+order their results are **committed to `store.events[w]`** — and therefore the `seq` the writer
+assigns each one — must match the order the parts were queued or built for that world, never the
+order the underlying writer calls happen to finish on the wire. Concretely, for a single call
+against a single world `w`:
+
+1. Every part already sitting in `store.pending_events[w]` is flushed **first, in that list's own
+   oldest-first order** (unchanged invariant, round 3) — before any part this call newly builds for
+   `w` is attempted at all.
+2. This call's own newly-built parts for `w` follow, in the order the route built them (its own
+   "build order" — for `stop`/`revoke` this is plan order, i.e. `store.policies`' iteration order
+   filtered to this call's owner; for `pause` this is every lowered policy's `policy.changed` part,
+   in that same plan order, **then** the one `world.paused` part last, since `pause`'s own handler
+   builds it only after the stop-all-style plan is built).
+
+Parallelism across *different* worlds is unaffected and still required (finding 2): world `w1`'s
+writes and world `w2`'s writes may proceed fully concurrently with each other: only the ordering
+*within* a single world's own stream is constrained. This round's tests pin two concrete cases: a
+world with **100** parts already pending (from an earlier failed call) lands in `store.events[w]`
+in exactly that queued order once flushed; and, within one `pause` call, every `policy.changed` part
+it builds lands in `store.events[world_id]` before that same call's own `world.paused` part, never
+interleaved out of order by which writer call happens to return first.
 
 ### `POST /worlds/{world_id}/pause` — FR-HIL-07 ("Pause all stops the agents too", PRD 10.4)
 
@@ -525,24 +703,30 @@ the size of the whole store.
   cases.
 - 200 otherwise, **never 500 even when the writer is down** (round-4 qa/security finding, follow-up
   to round 3's stop/pause fix: revoke must fail exactly as safe as the bulk kill switches do).
-  Appends one history entry `{"by": owner, "at": now, "change": "revoked", "level": "L1"}` (always
-  appended, even if already L1 — revoke is a distinct, explicit act unlike the bulk Stop-all, so no
-  idempotency skip here; a missing or non-list `history` is replaced the same fail-safe way
-  stop-all does), sets `level = "L1"`, `changed_by = {"by": owner, "at": now}` — **this part never
-  depends on the writer and is never rolled back, whatever the writer does next** — and builds one
-  `policy.changed` part (`data.change == "revoked"`, `data.level == "L1"`, `vis` by the same
-  target-world-scope-intersection rule as stop-all, computed against the policy's mapped world's
-  own districts) for the policy's mapped world, `store.policy_worlds[policy_id]`, handed to the
-  writer per the same "Pending writes and flush" rule stop-all and pause use: a writer failure
-  keeps the part in `store.pending_events.setdefault(mapped_world_id, [])` instead of raising or
-  being lost, to be flushed by a later mutating call that touches that world (revoke's own flush
-  duty is limited to its own one part before doing its own new work — see "Which worlds a call
-  touches" above; revoke does not proactively flush a *different* policy's pending parts, only its
-  own policy's, since revoking policy X has no reason to also attempt policy Y's stuck write). A
-  policy with no world mapping (policies live at org level, PRD 15.3) is still revoked (history
-  entry, L1), but no event (pending or otherwise) is handed to any world: revoke has no world of
-  its own, and an event is never filed under a world that does not exist (PRD 9.4 honesty). The
-  history entry is the audit record either way.
+  When `policy_id` maps to a world (`store.policy_worlds.get(policy_id)` is not `None`), **that
+  world's lock is acquired first, before anything else this route does** (round-5 code/qa/security
+  finding, supersedes round-4 ambiguity 12 — see "What changed since round 4," finding 4): under
+  that lock, revoke first flushes `store.pending_events.get(mapped_world_id, [])` **in full,
+  oldest first** (not only a part revoke's own earlier attempt might have left there — any other
+  policy's stuck part sitting in that world's queue too, exactly as `stop`/`pause` flush every
+  world they touch), then appends one history entry
+  `{"by": owner, "at": now, "change": "revoked", "level": "L1"}` (always appended, even if already
+  L1 — revoke is a distinct, explicit act unlike the bulk Stop-all, so no idempotency skip here; a
+  missing or non-list `history` is replaced the same fail-safe way stop-all does), sets
+  `level = "L1"`, `changed_by = {"by": owner, "at": now}` — **this part never depends on the writer
+  and is never rolled back, whatever the writer does next** — and builds one `policy.changed` part
+  (`data.change == "revoked"`, `data.level == "L1"`, `vis` by the same target-world-scope-
+  intersection rule as stop-all, computed against the policy's mapped world's own districts) for
+  the policy's mapped world, handed to the writer per the same "Pending writes and flush" rule
+  stop-all and pause use, still under the same lock's mutation (never during writer I/O, finding 2):
+  a writer failure or a missed deadline keeps the part in
+  `store.pending_events.setdefault(mapped_world_id, [])` instead of raising or being lost, to be
+  flushed by a later mutating call that touches that world — which may again be another revoke, per
+  this same rule. A policy with no world mapping (policies live at org level, PRD 15.3) is still
+  revoked (history entry, L1), no lock is acquired and nothing is flushed (there is no world to flush
+  or lock), and no event (pending or otherwise) is handed to any world: revoke has no world of its
+  own, and an event is never filed under a world that does not exist (PRD 9.4 honesty). The history
+  entry is the audit record either way.
 - Response 200 body: `{"policy_id": policy_id, "level": "L1"}` (unchanged from round 2 and round 3
   — revoke is a single-policy, single-event act, not a bulk operation, so its response carries no
   `"pending"` field of its own; a caller that needs to know whether revoke's own event is still
@@ -571,6 +755,22 @@ the size of the whole store.
   - dropped otherwise — removed from the list entirely, so nothing about a hidden event (its
     `summary`, `data`, or any other field) appears in the response.
 
+  **Hidden-district filter (round-5 security finding, biggest — runs in addition to, never instead
+  of, the visibility filter above; owner exempt, same as the visibility filter):** even after the
+  visibility filter above keeps an event, it is dropped anyway — entirely, not with fields nulled —
+  for any non-owner principal whenever a district-shaped value (matching
+  `common.schema.json#/$defs/district_id`'s pattern, `^D[0-9]{1,4}$`) naming a district outside
+  `principal.districts` appears anywhere in it: the event's own `district` field; `target` or
+  `actor` when either is district-shaped; or any district-id-shaped string found while walking
+  `data` recursively — a leaf **value** at any depth, or a dict **key** at any depth (round-5
+  finding 6, "data dict keys," below). This supersedes round 3/4's "null the offending field, keep
+  the event" treatment for the *hidden* case (SEC-07 "never receive hidden names or counts" reads
+  as: not even a stripped-down record of the event itself may reach a scoped viewer) — the
+  `target`/`actor`/`district` rows of the allowlist table below now only ever apply to a value that
+  is *not* hidden (either not district-shaped at all, or naming a district `principal.districts`
+  does include), since the hidden case never reaches the allowlisting step at all. An event naming
+  no district anywhere, or naming only districts `principal` can see, is unaffected.
+
   **Owner vs. everyone else, at the top level:** PRD 15.3 gives the owner the **full stream**
   (`orgs/{org}/worlds/{world}/events/{seq}`) and gives every other role a **redacted view**
   (`orgs/{org}/worlds/{world}/views/{scope}/events/{seq}`) — two different collections, not one
@@ -590,11 +790,11 @@ the size of the whole store.
   | `seq` | the stored event's real `seq`, unchanged | the view's own dense position, `1, 2, 3, ...` in survival order (round-1/round-2 fix: the store's real `seq` is never returned to a scoped principal, so it cannot count the gaps where hidden events were dropped) |
   | `id` | the stored event's real `id`, unchanged | the view-local id `f"v{seq}"`, built from *this event's own view `seq`* above (round-3 finding: the real store `id`'s ULID ordering would itself hint at how much else happened in the run, so a scoped principal never receives it, even for an event it can see) |
   | `ts`, `type`, `level`, `severity`, `credits`, `summary`, `authz` | unchanged from the stored event | unchanged from the stored event |
-  | `target`, `actor` | unchanged from the stored event | the stored value when it does **not** match `common.schema.json#/$defs/district_id`'s pattern (`^D[0-9]{1,4}$`), or when it does and that district is visible to this principal (one of `principal.districts`); **`null` when it matches the district_id pattern and names a district outside `principal.districts`** (round-4 security finding: `target`/`actor` may legally be a district id per `event.schema.json#/$defs/target`'s own `anyOf`, so either field can leak a hidden district's id exactly like the dedicated `district` field below, and must fail closed the same way) |
-  | `district` | the stored event's real `district` | the stored `district` when it is `None`, or is one of `principal.districts`; **`null` when it names a district outside `principal.districts`**, even if the event itself is kept via `vis: "all"` (round-3 finding: an event's own visibility does not make every field on it safe to show) |
-  | `cause` | unchanged | the *view-local id* (same `f"v{seq}"` scheme, using the **causing event's own view `seq` in this same response**) of the causing event, when that event survived filtering; `null` when it names an event that was dropped or never existed (round-1 rule, now expressed via the view-local id instead of the real one, since the real one is never returned to a scoped principal) |
+  | `target`, `actor` | unchanged from the stored event | the stored value unchanged — by the time an event reaches this table it has already passed the hidden-district filter above, so a district-shaped `target`/`actor` here is guaranteed to name a district `principal.districts` includes (or not be district-shaped at all); a hidden one means the whole event was already dropped, never reaching this row (round-5: supersedes round 4's "null the field, keep the event") |
+  | `district` | the stored event's real `district` | the stored `district` unchanged — same reasoning as `target`/`actor` above: a hidden `district` value means the whole event was already dropped by the hidden-district filter, so this row only ever sees `None` or a visible district id (round-5: supersedes round 3's "null the field, keep the event") |
+  | `cause` | unchanged | the *view-local id* (same `f"v{seq}"` scheme, using the **causing event's own view `seq` in this same response**) of the causing event, when that event survived filtering; `null` when it names an event that was dropped or never existed (round-1 rule, now expressed via the view-local id instead of the real one, since the real one is never returned to a scoped principal) — unaffected by round 5: a `cause` names an *event*, not a district, so it is never itself a reason to drop the whole event, only to be remapped or nulled |
   | `vis` | unchanged | `"all"` stays `"all"` (nothing to filter); **a district list is filtered to its intersection with `principal.districts`** before being returned — never the stored event's full, unfiltered list (round-4 security finding: the event is kept whenever `vis` intersects `principal.districts` at all, but the *full* stored list can name additional districts the caller cannot see at all, and returning it unfiltered tells that caller "someone else can see this too, and here is exactly which other district" — a leak of a hidden district's *id* through a field that was previously assumed safe because "it is never itself sensitive." The kept intersection is always non-empty, since the event would not have survived filtering otherwise, so this never turns a visible event invisible) |
-  | `data` | unchanged | rebuilt by walking the stored `data` value **recursively** (round-4 finding, extending round 3's top-level-only pass: a dict's values, and every item of a list, at any depth) applying, to every string leaf found: (1) if the key it is stored under is `"message_ref"` (at any depth, not only top-level), always `null` for a non-owner, regardless of shape, per the `trace.archive_ref` rule below; (2) else if it matches the ULID pattern, the same cause-style remap — the view-local id of the event it names, if that event survived filtering, else `null` (for example `policy.applied.data.instruction_id`, or the same value nested inside a list or a sub-object); (3) else if it matches the district_id pattern (`^D[0-9]{1,4}$`) — including but not limited to a value stored under the key `"district"` (`data.district` gets exactly the same treatment as the event's own top-level `district` field above, since a data payload can carry its own district reference independent of the event's) — the value unchanged when that district is visible to this principal, else `null`; every other value (a non-string, or a string matching none of the above) is left exactly as stored. The dict/list *shape* of `data` is always preserved; only leaf string values are ever rewritten. |
+  | `data` | unchanged | rebuilt by walking the stored `data` value **recursively** (round-4: a dict's values, and every item of a list, at any depth; round-5 extends this to dict **keys** too, and adds a depth guard — see "Depth and dict keys" below) applying, to every string leaf found: (1) if the key it is stored under is `"message_ref"` (at any depth, not only top-level), always `null` for a non-owner, regardless of shape, per the `trace.archive_ref` rule below; (2) else if it matches the ULID pattern, the same cause-style remap — the view-local id of the event it names, if that event survived filtering, else `null` (for example `policy.applied.data.instruction_id`, or the same value nested inside a list or a sub-object); (3) else if it matches the district_id pattern (`^D[0-9]{1,4}$`) — by round 5 this case can only be reached for a *visible* district (a hidden one already dropped the whole event via the hidden-district filter above) — left unchanged; every other value (a non-string, or a string matching none of the above) is left exactly as stored. **Dict keys** get the equivalent treatment (round-5 finding 6): a district-id-shaped key naming a hidden district already dropped the whole event (same filter, keys included); a district-id-shaped key naming a visible district is left unchanged; a ULID-shaped key naming an event that survived filtering is renamed to that event's own view-local id (its value redacted normally); a ULID-shaped key naming a hidden or unknown event is dropped — the key *and* its value are removed from the rebuilt dict, since a JSON key cannot itself be set to `null` the way a value can (ambiguity 17). The dict/list *shape* of `data` is otherwise always preserved; only leaf string values, and the specific keys named above, are ever rewritten or removed. |
   | `trace` | unchanged | every field unchanged **except `archive_ref`, which is always `null`** (round-3 finding: `archive_ref`/`message_ref` name a position in the run-wide raw archive — PRD 13.2 — a counter unrelated to district visibility that would let a scoped viewer infer how many raw records exist between two events it can see, so it is stripped outright rather than filtered by visibility) |
 
   A kept event's real store `id` and `trace.archive_ref` therefore never appear anywhere in a
@@ -611,6 +811,23 @@ principal including the owner (resolved default, this ticket may only write
 `services/api/tests`: the same "cannot be safely read, cannot be honestly shown to anyone" rule
 round 2 already applies to a malformed `WorldRecord.districts` entry). It never raises (never a
 500) and never blocks its well-formed siblings in the same response.
+
+### Depth and dict keys (round-5 finding, qa/security — "What changed since round 4," findings 5-6)
+
+`data` is not schema-bounded in depth; a payload nested arbitrarily deep (this ticket's own test
+uses 500 levels) must never turn into a 500. **The owner's response never walks `data` at all** —
+the stored value is copied forward unchanged into the response, exactly like every other
+unredacted owner field, so depth cannot 500 the owner's path and the owner still receives the
+event, `data` included, however deeply nested (ambiguity 15). **The non-owner (scoped) redaction
+walk fails closed past a bounded depth: the event is dropped entirely** — the same treatment a
+malformed event already gets, on the reasoning that `data` too deep to safely walk cannot be
+honestly redacted, and cannot therefore be honestly shown to a scoped viewer either. The exact
+depth the scoped walk's own bound sits at is this ticket's own implementation choice (ambiguity
+16-adjacent; not pinned beyond "500 levels must not 500 and must be dropped for a non-owner").
+Dict **keys** within `data` are walked and redacted using the same rules as dict **values** at the
+same position (round-5 finding 6): see the `data` row of the allowlist table above for the exact
+per-key treatment (district-id key: hidden drops the whole event, visible is left unchanged;
+ULID key: visible is renamed to the named event's view-local id, hidden/unknown drops the key).
 
 ### `GET /worlds/{world_id}` — FR-HIL-09, SEC-07 (layout/summary)
 
@@ -731,13 +948,15 @@ consume once resolved, and every test constructs `Principal` directly and instal
 
 ## Ambiguities resolved this round (round 4)
 
-12. **Revoke's own flush scope.** Revoke now uses pending-on-failure for its own one part
+12. **Revoke's own flush scope.** ~~Revoke now uses pending-on-failure for its own one part
     (ambiguity 9, superseded), but does not proactively flush any *other* policy's pending part for
     the same world when it runs — only its own. Flushing a whole world's backlog on a
     single-policy revoke would make one policy's revoke responsible for clearing another,
     unrelated policy's stuck write, which is a `stop`/`pause`-shaped bulk responsibility, not a
     revoke-shaped one; a world's other pending parts are still flushed the next time `stop` or
-    `pause` touches that world, per "Which worlds a call touches" above.
+    `pause` touches that world, per "Which worlds a call touches" above.~~ **superseded, round 5:
+    revoke now flushes its target world's whole pending backlog, oldest first, under that world's
+    lock, exactly like `stop`/`pause` — see "What changed since round 4," finding 4.**
 13. **`paused`'s scope.** `WorldRecord.paused` is write-only from every route this ticket adds — no
     GET response exposes it, and no route ever clears it back to `False` (nothing in FR-HIL-07 asks
     for an "unpause" or "resume" route yet; PRD 10.4 only requires the pause to happen and be
@@ -749,3 +968,25 @@ consume once resolved, and every test constructs `Principal` directly and instal
    change" inference that caused finding 1 above (Pause's dedupe bug) — a call that changes nothing
    new (everything already `L1`) must still flush whatever an earlier failed call left pending in
    every world its owned policies map to, not just the worlds it happens to write to this time.
+
+## Ambiguities resolved this round (round 5)
+
+15. **Owner's response for depth-500 `data`.** The owner's view returns the stored event, `data`
+    included, unmodified — never redacted, never dropped — regardless of nesting depth, because the
+    owner's response path never recurses over `data` at all ("What changed since round 4," finding
+    5). This was a real choice, not the only defensible one (an alternative would drop *every*
+    viewer's copy of an absurdly deep event, owner included, for uniformity) — resolved toward
+    "owner sees everything" (PRD 10.1) since deep-but-well-formed `data` is not itself a malformed
+    record the way a missing `id` or a non-string `cause` is (ambiguity 11), and the owner's code
+    path has no reason to ever inspect `data`'s shape at all.
+16. **The exact per-writer-attempt deadline value (finding 2).** Left as this ticket's own
+    implementation choice, not pinned to a specific number of milliseconds here: this round's tests
+    only require that the request-level 5 s budget holds against a writer whose `append` call never
+    returns at all (an unbounded block), which is true for *any* finite per-attempt deadline
+    meaningfully smaller than 5 s, so pinning an exact figure would constrain the implementation
+    without the tests needing it to prove the property FR-HIL-07/PI-18 actually cares about.
+17. **ULID-shaped `data` key naming a hidden or unknown event (finding 6).** Dropped (key and value
+    both removed from the rebuilt dict) rather than kept with some placeholder key, since a JSON key
+    cannot be null and inventing a synthetic placeholder key (e.g. `"_hidden"`) would itself be new
+    information not present in the original shape and could collide with a real key already in the
+    same dict.

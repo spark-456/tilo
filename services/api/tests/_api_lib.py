@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -420,6 +421,82 @@ class SlowFlakyEventWriter(FakeEventWriter):
     def append(self, world_id: str, part: dict) -> dict:
         time.sleep(self.delay_s)
         raise RuntimeError("event writer unreachable and slow (test double)")
+
+
+class BlockingEventWriter(FakeEventWriter):
+    """Every `append` call blocks on an internal `threading.Event` until `release()` is called --
+    proves the round-5 qa/security finding that a world's lock is never held across writer I/O, and
+    that every writer attempt carries its own bounded deadline: a kill switch call must still
+    return within its 5s budget (with the un-writable part left pending) even against a writer
+    whose `append` never returns *at all*, not merely a slow or a raising one. `entered` is set the
+    moment the first call starts blocking, so a test can wait for that before issuing a second,
+    concurrent request. A test using this MUST call `release()` (a `finally` block) so no thread is
+    left blocked past the test; any call still in flight when released completes normally
+    afterwards (a harmless, unobserved write to a store object the test is done with)."""
+
+    def __init__(self, store: deps.Store) -> None:
+        super().__init__(store)
+        self._gate = threading.Event()
+        self.entered = threading.Event()
+
+    def append(self, world_id: str, part: dict) -> dict:
+        self.entered.set()
+        self._gate.wait()
+        return super().append(world_id, part)
+
+    def release(self) -> None:
+        self._gate.set()
+
+
+class ReversedDelayEventWriter(FakeEventWriter):
+    """Sleeps a little less on each successive call (the *first* call to arrive sleeps the
+    longest, the last sleeps almost none) -- built to make a round-5 "order within a world"
+    violation observable. If a world's writer calls are dispatched and *committed* strictly in
+    submission order (sequentially, or concurrently with an in-order commit barrier -- API_ST3a.md
+    "Order within a world"), the order calls complete in `store.events`/`writer.calls` always
+    matches submission order regardless of each call's own delay, since call N+1's *effect* can
+    never be recorded before call N's is. If calls are instead committed in raw completion order,
+    the short-delay latecomers finish first and jump the queue, which this writer is built to
+    surface: the first-submitted call sleeps longest, so it visibly finishes last unless order is
+    enforced by something other than arrival timing."""
+
+    def __init__(self, store: deps.Store, *, base_delay_s: float = 0.05, step_s: float = 0.0006) -> None:
+        super().__init__(store)
+        self._lock = threading.Lock()
+        self._n = 0
+        self.base_delay_s = base_delay_s
+        self.step_s = step_s
+
+    def append(self, world_id: str, part: dict) -> dict:
+        with self._lock:
+            i = self._n
+            self._n += 1
+        delay = max(0.0, self.base_delay_s - i * self.step_s)
+        time.sleep(delay)
+        return super().append(world_id, part)
+
+
+def make_pending_part(
+    *, policy_id: str, change: str = "stop_all", level: str = "L1", summary: str | None = None
+) -> dict:
+    """A minimal, already-built event *part* (API_ST3a.md's EventWriter.append shape) for seeding
+    Store.pending_events directly in a test, standing in for a part an earlier failed call would
+    have built. Pure data, no business logic -- the same convention base_event/base_policy follow."""
+    return {
+        "type": "policy.changed",
+        "actor": OWNER,
+        "target": None,
+        "level": None,
+        "district": None,
+        "item": None,
+        "severity": "info",
+        "credits": 0,
+        "summary": summary or f"pending part for {policy_id}",
+        "cause": None,
+        "vis": "all",
+        "authz": {"by": "person", "ref": OWNER, "at": "2026-09-29T09:00:00.000Z"},
+        "data": {"policy_id": policy_id, "change": change, "level": level},
+    }
 
 
 def assert_part_carries_no_stamped_fields(part: dict) -> None:
