@@ -614,3 +614,45 @@ def test_FR_HIL_08_PI_16_check_entry_rejects_a_trailing_newline_in_the_entry(l3_
     case = copy.deepcopy(l3_case)
     case["entry"]["connector"] = case["entry"]["connector"] + "\n"
     assert tilo_policy.check_entry(case) is not None
+
+
+# --- P4-01b delta review: the whole instruction is checked against its schema -----------------
+
+
+def _gate_card_answer_without_kind(repo_root):
+    path = repo_root / "contracts/fixtures/outbox/crossref/invalid/ob01_l2_instruction_typed_on_a_gate_card.json"
+    case = json.loads(path.read_text(encoding="utf-8"))
+    assert case["instruction"]["data"].get("card_id"), "the fixture answers a card"
+    case["instruction"]["data"]["card_kind"] = None  # contract-invalid: a set card_id needs card_kind
+    return case
+
+
+def test_FR_HIL_05_PI_08_check_entry_rejects_a_card_answer_with_its_kind_blanked(repo_root):
+    """channel.message_in's if/then: card_id set means card_kind is set. An instruction that breaks
+    its schema is never the owner's typed words (ADR-0007, BQ-56)."""
+    assert tilo_policy.check_entry(_gate_card_answer_without_kind(repo_root)) is not None
+
+
+def test_FR_HIL_05_PI_08_decide_gates_on_a_card_answer_with_its_kind_blanked(repo_root, risk_table_path):
+    instruction = _gate_card_answer_without_kind(repo_root)["instruction"]
+    proposal = tilo_policy.Proposal(
+        world_id=instruction["world_id"],
+        action_type="send_email",
+        connector="gmail",
+        district="D1",
+        destination=instruction["data"]["destination"],
+        facts=tilo_policy.SideEffectFacts(**base_facts()),
+        item={"artifact_id": "art_reply", "version": 1},
+        credits=0,
+        instruction=instruction,
+    )
+    policy = base_policy(level="L2", owner=instruction["actor"])
+    decision = tilo_policy.decide(
+        proposal,
+        table=_table(risk_table_path),
+        policies=[policy],
+        world_owner=instruction["actor"],
+        applied=[],
+        now=NOW,
+    )
+    assert decision.outcome == "gate"
