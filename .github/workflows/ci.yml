@@ -41,11 +41,21 @@ jobs:
         with:
           just-version: "1.36.0"
 
+      # Firestore emulator binary (services/harness, P0-09) needs a JRE.
+      - name: Set up Java (Firestore emulator, P0-09)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: just setup
         run: just setup
 
       - name: just check
         run: just check
+
+      - name: Harness emulator tests (P0-09)
+        run: uv run pytest services/harness/tests -m emulator
 
       - name: Secret scan (staged-file patterns, over the full tree in CI)
         run: uv run python scripts/secret_scan.py --all-tracked
