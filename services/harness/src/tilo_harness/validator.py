@@ -64,9 +64,46 @@ _StrictIntValidator = jsonschema.validators.extend(
 )
 
 
-def _segment(key: object) -> str:
+def _segment(key: str) -> str:
     """A problem-path segment that is always valid UTF-8, so a message never carries the bad text it reports."""
-    return str(key).encode("utf-8", "backslashreplace").decode("utf-8")
+    return key.encode("utf-8", "backslashreplace").decode("utf-8")
+
+
+_MAX_DEPTH = 64
+_MAX_VALUES = 100_000
+_JSON_SCALARS = (str, int, float, bool, type(None))
+
+
+def _json_tree_problems(event: Any) -> list[str]:
+    """The event must be a JSON tree -- dict with str keys, list, str, int, float, bool or None,
+    by exact type -- at most _MAX_DEPTH deep and _MAX_VALUES values. Checked iteratively before
+    anything formats a value, so a Python-built event (tuple, Decimal, int key, cycle, very deep
+    nesting, an object whose __str__ raises) is rejected instead of crashing the walkers below."""
+    if type(event) is not dict:
+        return ["schema: (root): an event is a JSON object"]
+    stack: list[tuple[Any, str, int]] = [(event, "", 0)]
+    count = 0
+    while stack:
+        value, path, depth = stack.pop()
+        count += 1
+        label = path or "(root)"
+        if count > _MAX_VALUES:
+            return [f"schema: (root): more than {_MAX_VALUES} values"]
+        if depth > _MAX_DEPTH:
+            return [f"schema: {label}: nested deeper than {_MAX_DEPTH} levels"]
+        kind = type(value)
+        if kind is dict:
+            for key, child in value.items():
+                if type(key) is not str:
+                    return [f"schema: {label}: a key is not a string"]
+                stack.append((child, f"{path}/{_segment(key)}" if path else _segment(key), depth + 1))
+        elif kind is list:
+            stack.extend(
+                (child, f"{path}/{index}" if path else str(index), depth + 1) for index, child in enumerate(value)
+            )
+        elif kind not in _JSON_SCALARS:
+            return [f"schema: {label}: not a JSON value"]
+    return []
 
 
 def _finiteness_problems(value: Any, path: str = "") -> list[str]:
@@ -266,6 +303,15 @@ class EventValidator:
         ]
 
     def problems(self, event: dict[str, Any], state: WorldState | None = None) -> list[str]:
+        tree_problems = _json_tree_problems(event)
+        if tree_problems:
+            return tree_problems
+        try:
+            return self._problems(event, state)
+        except Exception as error:  # fail closed: a validator crash rejects the event, it never escapes
+            return [f"schema: (root): the event could not be validated ({type(error).__name__})"]
+
+    def _problems(self, event: dict[str, Any], state: WorldState | None) -> list[str]:
         finiteness_problems = _finiteness_problems(event)
         if finiteness_problems:
             return finiteness_problems

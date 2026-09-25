@@ -195,7 +195,7 @@ class WorldWriter:
         """Writes a pre-built event unchanged (the replay path): `seq` must be exactly
         `last_seq + 1`, `id` must be unused, `cause` must be null or an earlier event of this
         world -- EventValidator's EV-10/EV-11 catch each case."""
-        return self._write(dict(event))
+        return self._write(dict(event) if type(event) is dict else event)
 
     def _write(self, event: dict[str, Any]) -> dict[str, Any]:
         problems = self._validator.problems(event, self._state)

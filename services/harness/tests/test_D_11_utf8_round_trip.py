@@ -366,3 +366,78 @@ def test_D_11_huge_int_is_rejected_with_a_printable_problem(validator, village_b
         writer.append(event)
     str(excinfo.value).encode("utf-8")
     assert store.read_events("org_demo", "w_village_basic") == []
+
+
+class _BadStr:
+    def __str__(self) -> str:
+        raise RuntimeError("no str")
+
+    __repr__ = __str__
+
+
+def _cyclic() -> dict:
+    loop: dict = {}
+    loop["self"] = loop
+    return loop
+
+
+def _deep_list(depth: int) -> list:
+    value: list = []
+    for _ in range(depth):
+        value = [value]
+    return value
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(lambda e: e["data"].__setitem__(10**5000, "x"), id="huge_int_key"),
+        pytest.param(lambda e: e["data"].__setitem__(7, "x"), id="int_key"),
+        pytest.param(lambda e: e["data"].__setitem__("title", (10**5000,)), id="huge_int_in_tuple"),
+        pytest.param(lambda e: e.__setitem__("type", frozenset({1})), id="set_value"),
+        pytest.param(lambda e: e.__setitem__("credits", complex(1, 1)), id="complex"),
+        pytest.param(lambda e: e.__setitem__("credits", __import__("decimal").Decimal("NaN")), id="decimal_nan"),
+        pytest.param(lambda e: e["data"].__setitem__("title", _BadStr()), id="bad_str_value"),
+        pytest.param(lambda e: e["data"].__setitem__(_BadStr(), "x"), id="bad_str_key"),
+        pytest.param(lambda e: e["data"].__setitem__("title", _deep_list(3000)), id="deep_list_3000"),
+        pytest.param(lambda e: e["data"].__setitem__("title", _cyclic()), id="cycle"),
+        pytest.param(lambda e: e["data"].__setitem__("title", b"bytes"), id="bytes"),
+    ],
+)
+def test_D_11_non_json_python_values_are_rejected_not_raised(validator, village_basic_layout: dict, mutate) -> None:
+    """A Python-built event can hold values JSON never produces; each is rejected with a printable
+    'schema' problem, never a raw exception, and nothing is stored."""
+    from tilo_harness.writer import EventRejected
+
+    event = _full_event()
+    event["data"] = dict(event["data"])
+    mutate(event)
+
+    problems = validator.problems(event)
+    assert problems and all(p.startswith("schema") for p in problems), problems
+    "; ".join(problems).encode("utf-8")
+
+    writer, store = make_memory_writer(village_basic_layout, world_id="w_village_basic")
+    with pytest.raises(EventRejected) as excinfo:
+        writer.append(event)
+    str(excinfo.value).encode("utf-8")
+    assert store.read_events("org_demo", "w_village_basic") == []
+
+
+@pytest.mark.parametrize("event", [["not", "an", "event"], "text", None, 5], ids=["list", "str", "none", "int"])
+def test_D_11_an_event_that_is_not_an_object_is_rejected(validator, village_basic_layout: dict, event) -> None:
+    from tilo_harness.writer import EventRejected
+
+    assert validator.problems(event) == ["schema: (root): an event is a JSON object"]
+    writer, store = make_memory_writer(village_basic_layout, world_id="w_village_basic")
+    with pytest.raises(EventRejected):
+        writer.append(event)
+    assert store.read_events("org_demo", "w_village_basic") == []
+
+
+def test_D_11_json_parsed_nesting_within_the_cap_still_validates_normally(validator) -> None:
+    """The depth cap sits above anything a real event nests; a 60-deep title is a normal schema problem."""
+    event = _full_event()
+    event["data"] = {**event["data"], "title": _deep_list(60)}
+    problems = validator.problems(event)
+    assert problems and not any("nested deeper" in p for p in problems), problems
