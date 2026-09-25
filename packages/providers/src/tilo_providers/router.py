@@ -1,25 +1,24 @@
-"""tilo_providers.router — role -> ModelProvider router (PL-03, EFF-02, EFF-03; PRD 6.4, 6.6).
-Business code calls `Router.generate(role, request, budget=...)` (also `stream`, `embed`), never
-a model. Error policy and stream rules: packages/providers/CLAUDE.md. Every attempt is recorded
-(PRD 9.3 trace material)."""
+"""tilo_providers.router — role -> ModelProvider router (PL-03, EFF-02, EFF-03; PRD 6.4, 6.6). Business code
+calls `Router.generate(role, request, budget=...)` (also `stream`, `embed`), never a model; every attempt is
+recorded for the PRD 9.3 trace. Error policy and stream rules: packages/providers/CLAUDE.md."""
 
 from __future__ import annotations
 
 import json
 import time
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 import jsonschema
 
 from tilo_providers.config import ProvidersConfig
 from tilo_providers.errors import ProviderError, QuotaError, RequestError, RetryableError, SafetyError
+from tilo_providers.factory import build_provider
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider
 from tilo_providers.prompts import load_prompt
 
-_MARKER = "[truncated]"
-_ERROR_CHARS = 300  # a validation error fed back in a repair prompt is capped at this length
+ProviderFor = Callable[[str], ModelProvider]
 
 
 class RouterError(Exception):
@@ -30,20 +29,24 @@ class RouterError(Exception):
         self.attempts = list(attempts or [])
 
 
-class BudgetExceededError(RouterError):
-    """PL-03: the next call's estimated cost exceeds the remaining budget; never sent."""
+class BudgetExceededError(RouterError): ...  # PL-03: the next call costs more than the budget left; never sent
 
 
-class TokenCapExceededError(RouterError):
-    """EFF-03: over max_input_tokens and cannot be compacted enough to fit."""
+class TokenCapExceededError(RouterError): ...  # EFF-03: over max_input_tokens even after compacting
 
 
-class RouterExhaustedError(RouterError):
-    """Every candidate profile failed, or none had the required capability."""
+class RouterExhaustedError(RouterError): ...  # every candidate failed, or none has the required capability
 
 
-class StreamInterruptedError(ProviderError):
-    """PL-03: a stream failed after output started; no fallback, so answers are never spliced."""
+# PL-03, no fallback: a request rejected as such, a stream or embed blocked on safety grounds, a stream that
+# failed after its first chunk (answers are never spliced). The adapter's own error is kept as `__cause__`.
+class RouterRequestError(RouterError, RequestError): ...
+
+
+class RouterSafetyError(RouterError, SafetyError): ...
+
+
+class StreamInterruptedError(RouterError, ProviderError): ...
 
 
 @dataclass
@@ -60,21 +63,16 @@ class RouterAttempt:
 
 @dataclass
 class RouterResult:
-    role_id: str
-    outcome: Literal["ok", "safety_blocked"]
-    response: GenerateResponse | None
-    attempts: list[RouterAttempt] = field(default_factory=list)
-
-
-@dataclass
-class RouterStream:
-    """One router call's working state. Iterating it streams chunks; `attempts` fills in as it runs."""
+    """One router call. `attempts` fill in as it runs; generate() sets `outcome` and `response`, a stream()
+    result is iterated for its chunks. `request` is the request as sent, `budget` what is left of it."""
 
     role_id: str
     request: GenerateRequest
     candidates: list[str]
     budget: float | None
     attempts: list[RouterAttempt] = field(default_factory=list)
+    outcome: Literal["ok", "safety_blocked"] = "ok"
+    response: GenerateResponse | None = None
     chunks: Iterator[GenerateResponse] = field(default_factory=lambda: iter(()))
 
     def __iter__(self) -> Iterator[GenerateResponse]:
@@ -87,12 +85,8 @@ def schema_error(response: GenerateResponse, schema: dict[str, Any]) -> str | No
         jsonschema.validate(json.loads(response.text or ""), schema)
     except (ValueError, jsonschema.ValidationError) as error:
         message = error.message if isinstance(error, jsonschema.ValidationError) else f"not valid JSON ({error})"
-        return message[:_ERROR_CHARS]
+        return message[:300]  # a validation error fed back in a repair prompt is capped
     return None
-
-
-def validate_json_schema(response: GenerateResponse, schema: dict[str, Any]) -> bool:
-    return schema_error(response, schema) is None
 
 
 def _finish(attempt: RouterAttempt, start: float, response: Any = None, error: Exception | None = None) -> None:
@@ -104,38 +98,41 @@ def _finish(attempt: RouterAttempt, start: float, response: Any = None, error: E
         attempt.error_type = type(error).__name__
 
 
+def _fall_back(run: RouterResult, attempt: RouterAttempt, start: float, error: ProviderError, chunks: int = 0) -> str:
+    """Records a failed call; returns the fallback reason or raises a RouterError carrying every attempt."""
+    _finish(attempt, start, error=error)
+    where = f"PL-03: role {run.role_id!r} profile {attempt.profile_id!r}"
+    if isinstance(error, RequestError):  # the request itself is bad: no fallback
+        raise RouterRequestError(f"{where} rejected the request: {error}", run.attempts) from error
+    if isinstance(error, SafetyError):  # stream only: generate returns a safety_blocked result
+        raise RouterSafetyError(f"{where} blocked on safety grounds: {error}", run.attempts) from error
+    if chunks:
+        raise StreamInterruptedError(f"{where} failed after {chunks} chunk(s); output started", run.attempts) from error
+    return f"fallback after {attempt.error_type}"
+
+
 def _compact(role_id: str, cap: int | None, prompt: str, outputs: list[str], count: Callable[[str], int]) -> str:
     """EFF-03: drop the oldest tool outputs, then truncate the one left with a marker, or refuse."""
-
-    def fold() -> str:
-        return "\n\n".join([prompt, *outputs])
-
+    parts, join = [prompt, *outputs], "\n\n".join
     if cap is None:
-        return fold()
-    while len(outputs) > 1 and count(fold()) > cap:
-        outputs.pop(0)
-    if outputs and count(fold()) > cap:
-        words, low, high = outputs[0].split(), 0, len(outputs[0].split())
+        return join(parts)
+    while len(parts) > 2 and count(join(parts)) > cap:
+        parts.pop(1)
+    if len(parts) > 1 and count(join(parts)) > cap:
+        words, low, high = parts[1].split(), 0, len(parts[1].split())
         while low < high:  # longest word prefix (plus marker) that fits
             mid = (low + high + 1) // 2
-            outputs[0] = " ".join([*words[:mid], _MARKER])
-            low, high = (mid, high) if count(fold()) <= cap else (low, mid - 1)
-        outputs[0] = " ".join([*words[:low], _MARKER])
-    if count(fold()) > cap:
+            parts[1] = " ".join([*words[:mid], "[truncated]"])
+            low, high = (mid, high) if count(join(parts)) <= cap else (low, mid - 1)
+        parts[1] = " ".join([*words[:low], "[truncated]"])
+    if count(join(parts)) > cap:
         raise TokenCapExceededError(f"EFF-03: role {role_id!r} input is over its max_input_tokens cap of {cap}")
-    return fold()
+    return join(parts)
 
 
 class Router:
-    """`provider_for_profile` (profile_id -> ModelProvider) is the test/production seam; without
-    it, providers come from `factory.provider_for_role_profile` (replay unless `LIVE=1`)."""
-
     def __init__(
-        self,
-        config: ProvidersConfig,
-        *,
-        provider_for_profile: Callable[[str], ModelProvider] | None = None,
-        fixtures_dir: Any = None,
+        self, config: ProvidersConfig, *, provider_for_profile: ProviderFor | None = None, fixtures_dir: Any = None
     ) -> None:
         if provider_for_profile is None and fixtures_dir is None:
             raise RouterError("Router needs either provider_for_profile or fixtures_dir")
@@ -144,9 +141,7 @@ class Router:
     def _provider(self, role_id: str, profile_id: str) -> ModelProvider:
         if self._provider_for_profile is not None:
             return self._provider_for_profile(profile_id)
-        from tilo_providers.factory import provider_for_role_profile  # noqa: PLC0415
-
-        return provider_for_role_profile(role_id, profile_id, self._config, fixtures_dir=self._fixtures_dir)
+        return build_provider(role_id, self._config, fixtures_dir=self._fixtures_dir, profile_id=profile_id)
 
     def _candidates(self, role_id: str, capability: Capability | None) -> list[str]:
         role = self._config.roles[role_id]
@@ -156,28 +151,20 @@ class Router:
             raise RouterExhaustedError(f"PL-03: role {role_id!r} has no candidate with capability {capability!r}")
         return ids
 
-    def _start(self, role_id: str, req: GenerateRequest, outs: list[str] | None, cap: Any, budget: Any) -> RouterStream:
+    def _start(self, role_id: str, req: GenerateRequest, outs: list[str] | None, cap: Any, budget: Any) -> RouterResult:
         role, candidates = self._config.roles[role_id], self._candidates(role_id, cap)
         count = self._provider(role_id, candidates[0]).count_tokens
         prompt = _compact(role_id, role.max_input_tokens, req.prompt, list(outs or []), count)
-        limits = (req.max_output_tokens, role.max_output_tokens, 1024)  # 1024: neither sets one (BQ-54)
-        max_output = next(limit for limit in limits if limit is not None)
+        max_output = next(n for n in (req.max_output_tokens, role.max_output_tokens, 1024) if n is not None)  # BQ-54
         req = req.model_copy(update={"prompt": prompt, "max_output_tokens": max_output})
-        return RouterStream(role_id, req, candidates, budget)
+        return RouterResult(role_id, req, candidates, budget)
 
-    def _repair(self, role_id: str, request: GenerateRequest, error: str, count: Callable[[str], int]) -> Any:
-        """EFF-02 repair: the request plus its validation error, or None if that would exceed the cap."""
-        prompt = load_prompt("router", "schema_repair.md", {"prompt": request.prompt, "error": error})
-        cap = self._config.roles[role_id].max_input_tokens
-        return None if cap is not None and count(prompt) > cap else request.model_copy(update={"prompt": prompt})
-
-    def _attempt(
-        self, run: RouterStream, profile_id: str, provider: ModelProvider, reason: str | None, request: Any = None
-    ) -> RouterAttempt:
+    def _attempt(self, run: RouterResult, profile_id: str, reason: str | None, request: Any = None) -> RouterAttempt:
         """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-52)."""
         if run.budget is not None:
             quote, request = self._config.price(profile_id), request or run.request
-            usd = provider.count_tokens(request.prompt) * quote.input + (request.max_output_tokens or 0) * quote.output
+            count = self._provider(run.role_id, profile_id).count_tokens
+            usd = count(request.prompt) * quote.input + (request.max_output_tokens or 0) * quote.output
             credits = self._config.credits(usd / 1_000_000)
             if credits > run.budget:
                 message = f"PL-03: a call on {profile_id!r} costs ~{credits:.4f} credits, over {run.budget} left"
@@ -200,26 +187,25 @@ class Router:
     ) -> RouterResult:
         run = self._start(role_id, request, tool_outputs, required_capability, budget)
         threshold, schema, reason = confidence_threshold or 0.0, run.request.response_schema, None
+        cap = self._config.roles[role_id].max_input_tokens  # EFF-02 repair prompts must fit it too
         for profile_id in run.candidates:  # EFF-02: cheapest first
             provider, request = self._provider(role_id, profile_id), run.request
             for is_repair in (False, True):
-                attempt, start = self._attempt(run, profile_id, provider, reason, request), time.perf_counter()
+                attempt, start = self._attempt(run, profile_id, reason, request), time.perf_counter()
                 try:
                     response = provider.generate(request)
-                except (RequestError, SafetyError, QuotaError, RetryableError, ProviderError) as error:
+                except SafetyError as error:  # a safety outcome, never a silent fallback
                     _finish(attempt, start, error=error)
-                    if isinstance(error, RequestError):
-                        raise  # the request itself is bad: no fallback
-                    if isinstance(error, SafetyError):
-                        return RouterResult(role_id, "safety_blocked", None, run.attempts)
-                    reason = f"fallback after {attempt.error_type}"
+                    return replace(run, outcome="safety_blocked")
+                except (RequestError, QuotaError, RetryableError, ProviderError) as error:
+                    reason = _fall_back(run, attempt, start, error)
                     break
                 _finish(attempt, start, response)
                 if schema is not None and (problem := schema_error(response, schema)) is not None:
                     attempt.outcome, reason = "schema_invalid", "escalated after schema validation failed"
-                    if not is_repair and (
-                        request := self._repair(role_id, run.request, problem, provider.count_tokens)
-                    ):
+                    prompt = load_prompt("router", "schema_repair.md", {"prompt": run.request.prompt, "error": problem})
+                    if not is_repair and (cap is None or provider.count_tokens(prompt) <= cap):  # one repair
+                        request = run.request.model_copy(update={"prompt": prompt})
                         reason = "repair attempt after schema validation failed"
                         continue
                 elif verify is not None and not verify(response):
@@ -228,7 +214,7 @@ class Router:
                     attempt.outcome = "low_confidence"
                     reason = f"escalated after confidence {score:.2f} below threshold {threshold:.2f}"
                 else:
-                    return RouterResult(role_id, "ok", response, run.attempts)
+                    return replace(run, response=response)
                 break
         raise RouterExhaustedError(f"PL-03: role {role_id!r} exhausted every candidate", run.attempts)
 
@@ -240,17 +226,16 @@ class Router:
         budget: float | None = None,
         required_capability: Capability | None = None,
         tool_outputs: list[str] | None = None,
-    ) -> RouterStream:
-        """No EFF-02 escalation (it needs a whole response); fallback only before the first chunk."""
+    ) -> RouterResult:  # no EFF-02 escalation (it needs a whole response); fallback only before the first chunk
         run = self._start(role_id, request, tool_outputs, required_capability, budget)
         run.chunks = self._stream_chunks(run)
         return run
 
-    def _stream_chunks(self, run: RouterStream) -> Iterator[GenerateResponse]:
+    def _stream_chunks(self, run: RouterResult) -> Iterator[GenerateResponse]:
         reason: str | None = None
         for profile_id in run.candidates:
             provider = self._provider(run.role_id, profile_id)
-            attempt, start, chunks = self._attempt(run, profile_id, provider, reason), time.perf_counter(), 0
+            attempt, start, chunks = self._attempt(run, profile_id, reason), time.perf_counter(), 0
             try:
                 for chunk in provider.stream(run.request):
                     chunks += 1
@@ -259,13 +244,7 @@ class Router:
                 _finish(attempt, start)
                 return
             except (RequestError, SafetyError, QuotaError, RetryableError, ProviderError) as error:
-                _finish(attempt, start, error=error)
-                if isinstance(error, (RequestError, SafetyError)):
-                    raise
-                if chunks:
-                    message = f"PL-03: {profile_id!r} failed after {chunks} chunk(s); no fallback once output started"
-                    raise StreamInterruptedError(message) from error
-                reason = f"fallback after {attempt.error_type}"
+                reason = _fall_back(run, attempt, start, error, chunks)
         raise RouterExhaustedError(f"PL-03: role {run.role_id!r} exhausted every candidate", run.attempts)
 
     def embed(self, role_id: str, request: Any, *, required_capability: Capability | None = None) -> Any:
@@ -273,8 +252,9 @@ class Router:
         for profile_id in self._candidates(role_id, required_capability):
             try:
                 return self._provider(role_id, profile_id).embed(request)
-            except (RequestError, SafetyError):
-                raise
+            except (RequestError, SafetyError) as error:
+                wrap = RouterRequestError if isinstance(error, RequestError) else RouterSafetyError
+                raise wrap(f"PL-03: role {role_id!r} embed on {profile_id!r} failed: {error}") from error
             except (QuotaError, RetryableError, ProviderError) as error:
                 last_error = error
         raise RouterExhaustedError(f"PL-03: role {role_id!r} embed exhausted every candidate") from last_error

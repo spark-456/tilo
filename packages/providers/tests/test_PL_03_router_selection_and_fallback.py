@@ -230,3 +230,44 @@ def test_PL_03_non_provider_error_from_an_adapter_is_not_swallowed(providers_con
         router.generate("director", GenerateRequest(prompt="Summarise the quarter."))
 
     assert fallback.calls == []
+
+
+def test_PL_03_request_error_after_a_fallback_carries_every_attempt(providers_config):
+    """Review follow-up: the primary fails with QuotaError, the fallback rejects the request. Both
+    calls were made, so the raised error still is a RequestError (no further fallback) but also a
+    router error carrying both attempts for the PRD 9.3 trace, with the adapter's error as cause."""
+    from tilo_providers.router import RouterError  # noqa: PLC0415
+
+    rejected = RequestError("400 bad request")
+    primary = ScriptedModelProvider("large", [ScriptedCall(outcome="error", error=QuotaError("rate limited"))])
+    fallback = ScriptedModelProvider("medium", [ScriptedCall(outcome="error", error=rejected)])
+    router = _router(providers_config, {"large": primary, "medium": fallback})
+
+    with pytest.raises(RequestError) as excinfo:
+        router.generate("director", GenerateRequest(prompt="Summarise the quarter."))
+
+    assert isinstance(excinfo.value, RouterError)
+    assert excinfo.value.__cause__ is rejected
+    assert [(a.profile_id, a.outcome, a.error_type) for a in excinfo.value.attempts] == [
+        ("large", "error", "QuotaError"),
+        ("medium", "error", "RequestError"),
+    ]
+
+
+@pytest.mark.parametrize("error_cls", [RequestError, SafetyError])
+def test_PL_03_stream_request_or_safety_error_carries_every_attempt(providers_config, error_cls):
+    from tilo_providers.router import RouterError  # noqa: PLC0415
+
+    original = error_cls("refused")
+    primary = ScriptedModelProvider("large", [ScriptedCall(outcome="error", error=QuotaError("rate limited"))])
+    fallback = ScriptedModelProvider("medium", [ScriptedCall(outcome="error", error=original)])
+    stream = _router(providers_config, {"large": primary, "medium": fallback}).stream(
+        "director", GenerateRequest(prompt="Summarise the quarter.")
+    )
+
+    with pytest.raises(error_cls) as excinfo:
+        list(stream)
+
+    assert isinstance(excinfo.value, RouterError)
+    assert excinfo.value.__cause__ is original
+    assert [a.profile_id for a in excinfo.value.attempts] == ["large", "medium"]

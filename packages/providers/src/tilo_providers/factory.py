@@ -4,7 +4,7 @@ always returns `FakeModelProvider` directly; every other profile returns a
 `RecordReplayProvider`, whose real adapter is built lazily inside the
 `live_factory` closure only when a call actually goes live (`LIVE=1`).
 Nothing here imports an adapter module or builds a network client for a
-plain replay hit. The router builds any profile via `provider_for_role_profile`."""
+plain replay hit."""
 
 from __future__ import annotations
 
@@ -17,9 +17,10 @@ from tilo_providers.config import ProviderConfigError, ProvidersConfig
 from tilo_providers.interfaces import Capability, ModelProvider
 
 
-def provider_for_role_profile(
-    role_id: str, profile_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str
+def build_provider(
+    role_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str, profile_id: str | None = None
 ) -> ModelProvider:
+    profile_id = profile_id or config.roles[role_id].primary  # the router passes any cascade profile
     profile = config.profiles[profile_id]
 
     if profile.provider == "fake":
@@ -39,10 +40,6 @@ def provider_for_role_profile(
         fixtures_dir=Path(fixtures_dir),
         capabilities={Capability(c) for c in profile.caps},
     )
-
-
-def build_provider(role_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str) -> ModelProvider:
-    return provider_for_role_profile(role_id, config.roles[role_id].primary, config, fixtures_dir=fixtures_dir)
 
 
 def _build_live_provider(profile: ProvidersProfile, profile_id: str) -> ModelProvider:

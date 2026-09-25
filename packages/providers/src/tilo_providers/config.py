@@ -4,8 +4,7 @@ validates each against tilo_contracts, and fails loudly with
 ProviderConfigError: denied model id (PL-07); a role naming an unknown
 profile; a role with no fallback profile (NFR-25); a profile with no price entry; a status "set" prices
 file with a null price, effective_date or source. price() never invents a
-price: an unset status, or any null price field, raises (PL-06). An optional
-`conformance_dir` gates roles on PL-05 results (BQ-55)."""
+price: an unset status, or any null price field, raises (PL-06)."""
 
 from __future__ import annotations
 
@@ -176,15 +175,13 @@ def _validate_conformance(models: ProvidersModels, conformance_dir: Path) -> Non
         for profile_id in sorted(profiles_used_by(role)):
             path = conformance_dir / f"{profile_id}.json"
             where = f"PL-05: role {role_id!r} profile {profile_id!r} conformance result {path}"
-            if not path.is_file():
-                if os.environ.get("TILO_REQUIRE_CONFORMANCE") == "1":
-                    raise ProviderConfigError(f"{where} is missing (TILO_REQUIRE_CONFORMANCE=1)")
+            if not path.is_file() and os.environ.get("TILO_REQUIRE_CONFORMANCE") != "1":
                 warnings.warn(f"{where} is missing -- allowed in dev", stacklevel=2)
                 continue
-            try:
+            try:  # a missing file here means TILO_REQUIRE_CONFORMANCE=1
                 passed = json.loads(path.read_text(encoding="utf-8")).get("result") == "pass"
             except (OSError, ValueError, AttributeError) as error:
-                raise ProviderConfigError(f"{where} is unreadable: {error}") from error
+                raise ProviderConfigError(f"{where} is missing or unreadable: {error}") from error
             if not passed:
                 raise ProviderConfigError(f"{where} is failing")
 
