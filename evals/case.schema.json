@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evals.tilo.example/case.schema.json",
+  "title": "EvalCase",
+  "description": "One eval case (PRD 19.2). Local schema, not under contracts/ (issue #8): evals/cases/<group>/<id>.yaml, validated and loaded by tilo_evals.load_cases (EFF-07).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "group",
+    "title",
+    "measures",
+    "status",
+    "deploy_gate",
+    "inputs",
+    "scripted_answers",
+    "ground_truth",
+    "checks",
+    "recording"
+  ],
+  "properties": {
+    "id": { "type": "string", "pattern": "^E-(PLAN|RES|DOC|MAIL|CHN|ROUTE|HAND|RED)-\\d{2}$" },
+    "group": {
+      "type": "string",
+      "enum": ["E-PLAN", "E-RES", "E-DOC", "E-MAIL", "E-CHN", "E-ROUTE", "E-HAND", "E-RED"]
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "measures": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+    "status": { "type": "string", "enum": ["skeleton", "ready"] },
+    "deploy_gate": { "type": "boolean" },
+    "inputs": { "type": "object" },
+    "scripted_answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["match", "answer"],
+        "properties": { "match": { "type": "string" }, "answer": { "type": "string" } }
+      }
+    },
+    "ground_truth": { "type": ["object", "null"] },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check", "args"],
+        "properties": {
+          "check": { "type": "string", "minLength": 1 },
+          "args": { "type": "object" }
+        }
+      }
+    },
+    "recording": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "ready" } }, "required": ["status"] },
+      "then": { "properties": { "ground_truth": { "not": { "type": "null" } } } }
+    }
+  ]
+}
