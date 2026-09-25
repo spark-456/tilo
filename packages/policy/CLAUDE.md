@@ -23,8 +23,13 @@ Lead's approve; checking an outbox entry against what was authorised (OB-01, OB-
 ## Local rules
 - No model, provider, network, randomness or clock read under `src/` (AST test). `now` and
   event `at`/`ts` fields are the only time sources.
-- Fail closed: unknown action type is T3; a malformed policy, history, instruction or `applied`
-  covers nothing; any exception gates. Only `open_gate` with a human approve opens a gate.
+- Every input is validated against `contracts/*.schema.json` (`schemas.py`) before use: a
+  policy that fails covers nothing, an event part or entry that fails opens nothing, and
+  `check_entry` returns "OB-01". Facts of the wrong type are T3. Timestamps are ASCII digits.
+- Fail closed: unknown action type is T3; any exception gates. Only `open_gate` with a human
+  approve opens a gate.
+- `applied` must hold the owner's `policy.applied` parts across every world (each with its
+  `credits`), not just this world's, or a daily cap multiplies by the number of worlds.
 - `coverage.py` is the one copy of the coverage, stamping and answerer predicates.
 - A tier's `max_level` caps a covering policy's level. An L2 cap hit reuses the `l3_*_cap_reached`
   reason codes (API.md has no L2 cap code).

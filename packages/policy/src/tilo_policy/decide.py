@@ -8,7 +8,7 @@ import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from .coverage import Target, covering_level, fail_closed, instruction_counts, ts
+from .coverage import Target, applied_ok, covering_level, fail_closed, instruction_counts, ts
 from .tiers import RiskTable, SideEffectFacts
 
 
@@ -45,17 +45,21 @@ def gate(tier: str, modifiers: tuple[str, ...], level: str, policy_id: str | Non
 
 @fail_closed("l3_daily_cap_reached")
 def over_limit(policy: dict, applied: list[dict], credits: float, now: str) -> str | None:
-    """PI-11: today's actions under this policy, this one included, within per_day and credits."""
+    """PI-11: today's actions under this policy, this one included, within per_day and credits.
+    `applied` holds the owner's policy.applied parts in every world, so caps never multiply."""
+    if not applied_ok(applied):
+        raise ValueError("malformed policy.applied part")
     per_day, most_credits = policy["limits"]["per_day"], policy["limits"]["credits"]
-    if per_day is None and most_credits is None:
-        return None
-    mine = [a for a in applied if a["data"]["policy_id"] == policy["id"] and ts(a["authz"]["at"])[:10] == now[:10]]
-    if per_day is not None and len(mine) + 1 > per_day:
+    day = ts(now)[:10]
+    mine = [a for a in applied if a["data"]["policy_id"] == policy["id"] and ts(a["authz"]["at"])[:10] == day]
+    if per_day is None or len(mine) + 1 > per_day:  # L2 and L3 always have a daily limit (schema)
         return "l3_daily_cap_reached"
+    if most_credits is None:
+        return None
     spent = [float(a["credits"]) for a in mine] + [float(credits)]
     if any(not c >= 0 for c in spent):  # negative or NaN credits never lower the total
         raise ValueError("credits must be non-negative")
-    return "l3_credits_cap_reached" if most_credits is not None and math.fsum(spent) > most_credits else None
+    return "l3_credits_cap_reached" if math.fsum(spent) > most_credits else None
 
 
 def decide(

@@ -1,11 +1,20 @@
 """tilo_policy.crossref — does an outbox entry send exactly what was authorised? (OB-01, OB-05,
-contracts/outbox.rules.md). Uses the same predicates as `decide` and `open_gate`."""
+contracts/outbox.rules.md). Uses the same predicates as `decide` and `open_gate`; every part is
+checked against its contract first, and a case that fails is rejected ("OB-01")."""
 
 from __future__ import annotations
 
 from typing import Any
 
 from .coverage import Target, covering_level, instruction_counts, opens_gate
+from .decide import over_limit
+from .schemas import conforms, event_ok
+
+SLOTS = {
+    "reserved_by": ("approval.requested",),
+    "authorised_by": ("approval.resolved", "policy.applied"),
+    "transfer": ("data.transfer",),
+}
 
 
 def _pinned(item: dict | None) -> tuple[Any, Any] | None:
@@ -15,7 +24,13 @@ def _pinned(item: dict | None) -> tuple[Any, Any] | None:
 def _policy_opened(case: dict, applied: dict) -> bool:
     """OB-01 policy path: the named policy covers the entry at authz.at, at the applied level."""
     entry, policy, instruction = case["entry"], case["policy"], case["instruction"]
-    at = entry["authz"]["at"]
+    at, authz = entry["authz"]["at"], entry["authz"]
+    if entry["risk_tier"] == "T3" or entry["modifiers"] or entry["attachments"]:
+        return False  # a policy never authorises T3 (PI-07)
+    if (authz["by"], authz["ref"]) != ("policy", applied["policy_id"]):
+        return False  # PI-16: a policy send is stamped by that policy
+    if over_limit(policy, case["earlier_applied"], 0, at) is not None:
+        return False  # PI-11; the entry carries no credits, so only earlier sends count them
     target = Target(applied["action_type"], applied["connector"], applied["district"], entry["recipients"])
     level = covering_level(policy, target, case["world_owner"], at)
     named = (policy["id"], level, policy["undo_window_s"])
@@ -62,10 +77,19 @@ def _breaks_ob05(case: dict) -> bool:
     )
 
 
+def _parts_ok(case: dict) -> bool:
+    return (
+        conforms("outbox.schema.json", case["entry"])
+        and conforms("common.schema.json#/$defs/user_id", case["world_owner"])
+        and all(case[slot] is None or event_ok(case[slot], types) for slot, types in SLOTS.items())
+        and all(case[k] is None or conforms(f"{k}.schema.json", case[k]) for k in ("policy", "team_lead"))
+    )
+
+
 def check_entry(case: dict) -> str | None:
     """None when the entry sends what was authorised, else "OB-01" or "OB-05". A case too
     malformed to read is never valid (fail closed: "OB-01")."""
     try:
-        return "OB-01" if _breaks_ob01(case) else ("OB-05" if _breaks_ob05(case) else None)
+        return "OB-01" if not _parts_ok(case) or _breaks_ob01(case) else ("OB-05" if _breaks_ob05(case) else None)
     except Exception:
         return "OB-01"
