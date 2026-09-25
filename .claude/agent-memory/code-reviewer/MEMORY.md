@@ -19,3 +19,6 @@
 - [Router budget selection](router-budget-selection-probe.md) — budget between candidate prices refused outright; chaos test skips tight budgets
 - [Router cap ignores system/tools](router-cap-ignores-system-tools.md) — EFF-03 cap/price count only prompt; probe every request field
 - [Router failed-call charge](router-budget-failed-call-charge.md) — estimate deducted before send, never refunded on 429; fallback refused
+- [Harness single-writer probe](harness-single-writer-probe.md) — race two writers with the same writer_id; commit must CAS head.last_seq
+- [Flaky timing tests](flaky-timing-tests.md) — run suite 2-3x; tight wall-clock bounds in linear-time tests flake under load
+- [Skill checker probes](skill-checker-probes.md) — FR-AGT-04 check.py: mutate example outputs; refs checked for existence, not value/row match

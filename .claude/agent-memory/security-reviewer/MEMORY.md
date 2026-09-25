@@ -19,3 +19,6 @@
 - [Cards API ST-3b](cards-api-st3b.md): r1 FAIL (ea775d2); answer route takes actor/channel/pin from body, open_gate trusts it
 - [Decision and manifest CC-SH](decision-manifest-cc-sh.md): r3 PASS (b34fb86); open: teams.yaml assigned_by self-declared, MF-06 redactor sole token guard
 - [Provider secret handling](provider-secret-handling.md): P0-05 r11 PASS (7a0d1be); residual for P0-06: malformed 200 body raises raw pydantic error (echoed key truncated)
+- [Harness writer gaps](harness-writer-gaps.md): P0-09 r6 PASS: head moved to _head/state (rules must deny it); open: ids `$` \n, emulator lock-timeout flake
+- [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r5 FAIL: PEM private key body left in clear (header-only redaction); card probes closed
+- [Skill checker gaps](skill-checker-gaps.md): FR-AGT-04 r5 FAIL: _EMAIL_RE ReDoS (50k chars 69 s), role header lost IGNORECASE; recall/commitment gaps persist
