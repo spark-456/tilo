@@ -1,0 +1,48 @@
+# Fixture seed for the P8-07 Sandbox Web (SC-01 competitor pricing, PRD 4.3).
+# Fictional company; invented name, no resemblance to any real brand
+# intended. Domain is *.example per SE ticket rule 0.15.
+slug: beacontrack
+name: Beacontrack
+kind: pricing
+domain: beacontrack.example
+pages:
+  pricing:
+    title: "Beacontrack pricing"
+    plans:
+      - name: Basic
+        monthly: 15
+        annual: 150
+        seats: 3
+        features: ["Ticket inbox", "Basic analytics"]
+      - name: Pro
+        monthly: 45
+        annual: 450
+        seats: 15
+        features: ["Advanced analytics", "SLA tracking", "Integrations"]
+      - name: Enterprise
+        monthly: 99
+        annual: 990
+        seats: 50
+        features: ["Custom SLAs", "Dedicated CSM", "SSO"]
+  product:
+    title: "Beacontrack product"
+    summary: "Support ticket analytics for customer success teams."
+  changelog:
+    title: "Beacontrack changelog"
+    entries:
+      - date: "2026-05-20"
+        note: "Basic plan price increased from 12 to 15 per seat-month."
+      - date: "2026-02-10"
+        note: "Enterprise plan price increased from 89 to 99 per seat-month."
+  old-pricing:
+    title: "Beacontrack archived pricing (2026-05-19)"
+    plans:
+      - name: Basic
+        monthly: 12
+        annual: 120
+      - name: Pro
+        monthly: 45
+        annual: 450
+      - name: Enterprise
+        monthly: 89
+        annual: 890

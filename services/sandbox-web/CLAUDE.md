@@ -5,7 +5,8 @@ Cloud Run service (PRD 6.2): fictional sites used by scenarios and evals, so `ti
 has safe, deterministic targets instead of the live internet.
 
 ## Commands
-- Package and dev/test commands land with the sandbox-web code (ticket P6+/evals).
+- `uv run pytest "services/sandbox-web/tests" -q` — acceptance tests (P8-07; failing until
+  `tilo_sandbox_web` and its `services/sandbox-web/pyproject.toml` land on `feat/P8-07-sandbox-web`).
 - `just check` — full gate from the repo root.
 
 ## Contracts
