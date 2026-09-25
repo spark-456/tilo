@@ -55,6 +55,6 @@ def test_FR_INT_03_brief_missing_required_field_is_invalid(repo_root, registry, 
 def test_FR_INT_03_brief_with_every_required_field_is_valid(repo_root, registry, a_valid_brief):
     schema = load_schema(repo_root, "brief")
     errors = errors_for(schema, a_valid_brief, registry)
-    assert (
-        not errors
-    ), f"FR-INT-03: a brief with every required field present should validate, got: {[e.message for e in errors]}"
+    assert not errors, (
+        f"FR-INT-03: a brief with every required field present should validate, got: {[e.message for e in errors]}"
+    )

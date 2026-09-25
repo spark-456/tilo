@@ -94,9 +94,9 @@ def test_PRD_6_4_models_yaml_is_marked_as_an_example(repo_root, models_yaml):
         "user chooses final models (ticket P0-02 section 2)"
     )
     header = path.read_text(encoding="utf-8").splitlines()[:10]
-    assert any(
-        "#" in line and "example" in line.lower() for line in header
-    ), "PRD 6.4: config/models.yaml must open with a header comment saying these are examples"
+    assert any("#" in line and "example" in line.lower() for line in header), (
+        "PRD 6.4: config/models.yaml must open with a header comment saying these are examples"
+    )
 
 
 def test_PRD_6_4_prices_yaml_status_is_unset(repo_root, prices_yaml):
@@ -134,9 +134,9 @@ def test_PRD_6_4_providers_config_rejects_unknown_capability(repo_root, registry
     # mapping of profile id -> {provider, model, context, caps: [...]}.
     _, data = models_yaml
     profiles = data.get("profiles")
-    assert (
-        isinstance(profiles, dict) and profiles
-    ), "PRD 6.4: config/models.yaml must have a non-empty top-level 'profiles' mapping"
+    assert isinstance(profiles, dict) and profiles, (
+        "PRD 6.4: config/models.yaml must have a non-empty top-level 'profiles' mapping"
+    )
     first_profile = next(iter(profiles.values()))
     assert "caps" in first_profile, "PRD 6.4: each models.yaml profile must list 'caps'"
 

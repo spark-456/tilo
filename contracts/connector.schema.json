@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/connector.schema.json",
+  "x-version": "1.0.0",
+  "title": "Connector",
+  "description": "Connector declaration (PRD 12.1), one entry of config/connectors.yaml. Every action declares a risk tier and a gate type (FR-CON-06); write, send, share and delete actions are gated and deletes are always T3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "icon",
+    "auth",
+    "scopes",
+    "capabilities",
+    "actions",
+    "limits",
+    "data_class"
+  ],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/connector_id" },
+    "name": {
+      "description": "Island name in the world.",
+      "$ref": "common.schema.json#/$defs/plain_name"
+    },
+    "icon": { "$ref": "common.schema.json#/$defs/icon_name" },
+    "auth": {
+      "description": "oauth2: the user's own sign-in with PKCE; platform: a team-owned key; none.",
+      "type": "string",
+      "enum": ["oauth2", "platform", "none"]
+    },
+    "scopes": { "$ref": "#/$defs/scopes" },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "limits": { "$ref": "#/$defs/limits" },
+    "data_class": { "$ref": "#/$defs/data_class" }
+  },
+  "$defs": {
+    "capability": {
+      "type": "string",
+      "enum": ["read", "list", "search", "write", "send", "share", "delete"]
+    },
+    "scope_list": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+    },
+    "scopes": {
+      "description": "Least-privilege scopes per capability, requested only when a task needs that capability.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "read": { "$ref": "#/$defs/scope_list" },
+        "list": { "$ref": "#/$defs/scope_list" },
+        "search": { "$ref": "#/$defs/scope_list" },
+        "write": { "$ref": "#/$defs/scope_list" },
+        "send": { "$ref": "#/$defs/scope_list" },
+        "share": { "$ref": "#/$defs/scope_list" },
+        "delete": { "$ref": "#/$defs/scope_list" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "capability", "description", "risk_tier", "gate_type", "irreversible"],
+      "properties": {
+        "id": {
+          "description": "The action type, the key of the risk-tier table.",
+          "$ref": "common.schema.json#/$defs/action_type"
+        },
+        "capability": { "$ref": "#/$defs/capability" },
+        "description": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "risk_tier": {
+          "description": "Base tier; context modifiers can raise it to T3 at run time.",
+          "$ref": "common.schema.json#/$defs/risk_tier"
+        },
+        "gate_type": {
+          "description": "none: no side effect, no gate; approval: a gate that a person, or a matching policy below T3, opens.",
+          "type": "string",
+          "enum": ["none", "approval"]
+        },
+        "irreversible": { "type": "boolean" }
+      },
+      "if": {
+        "properties": { "capability": { "enum": ["write", "send", "share", "delete"] } },
+        "required": ["capability"]
+      },
+      "then": {
+        "properties": { "gate_type": { "const": "approval" } },
+        "if": { "properties": { "capability": { "const": "delete" } } },
+        "then": { "properties": { "risk_tier": { "const": "T3" } } }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["per_minute", "batch_size"],
+      "properties": {
+        "per_minute": { "type": ["integer", "null"], "minimum": 1 },
+        "batch_size": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "data_class": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["returns", "redact"],
+      "properties": {
+        "returns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/data_class" }
+        },
+        "redact": {
+          "description": "Fields redacted before data reaches logs, the Trace or the raw archive.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 100 }
+        }
+      }
+    }
+  }
+}

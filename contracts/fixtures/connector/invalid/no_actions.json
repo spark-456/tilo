@@ -1,0 +1,22 @@
+{
+  "id": "gmail",
+  "name": "Gmail",
+  "icon": "mail",
+  "auth": "oauth2",
+  "scopes": {
+    "read": ["https://www.googleapis.com/auth/gmail.readonly"],
+    "search": ["https://www.googleapis.com/auth/gmail.readonly"],
+    "write": ["https://www.googleapis.com/auth/gmail.compose"],
+    "send": ["https://www.googleapis.com/auth/gmail.send"]
+  },
+  "capabilities": ["read", "search", "write", "send"],
+  "actions": [],
+  "limits": {
+    "per_minute": 60,
+    "batch_size": 50
+  },
+  "data_class": {
+    "returns": ["personal", "business"],
+    "redact": ["body_signature", "phone_numbers"]
+  }
+}

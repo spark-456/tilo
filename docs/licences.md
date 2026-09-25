@@ -14,6 +14,9 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | pre-commit | MIT | https://pypi.org/project/pre-commit/ |
 | pyyaml | MIT | https://pypi.org/project/PyYAML/ |
 | httpx | BSD-3-Clause | https://pypi.org/project/httpx/ |
+| jsonschema | MIT | https://pypi.org/project/jsonschema/ |
+| referencing | MIT | https://pypi.org/project/referencing/ |
+| datamodel-code-generator (generates `packages/contracts-py`) | MIT | https://pypi.org/project/datamodel-code-generator/ |
 
 ## Python (`services/api`)
 
@@ -21,6 +24,12 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | --- | --- | --- |
 | fastapi | MIT | https://pypi.org/project/fastapi/ |
 | uvicorn | BSD-3-Clause | https://pypi.org/project/uvicorn/ |
+
+## Python (`packages/contracts-py`)
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| pydantic | MIT | https://pypi.org/project/pydantic/ |
 
 ## Python (`packages/providers`)
 
@@ -31,6 +40,13 @@ No third-party runtime dependencies yet (empty scaffold; code lands in ticket P0
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | @biomejs/biome | MIT | https://www.npmjs.com/package/@biomejs/biome |
+| typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
+
+## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| json-schema-to-typescript (generates `packages/contracts-ts`) | MIT | https://www.npmjs.com/package/json-schema-to-typescript |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
 
 ## Tools
@@ -56,7 +72,6 @@ Third-party code run in CI (`.github/workflows/ci.yml`) or on developer machines
 | actions/setup-node | v4 | MIT | https://github.com/actions/setup-node |
 | extractions/setup-just | v2 | MIT | https://github.com/extractions/setup-just |
 | pre-commit/pre-commit-hooks | v5.0.0 | MIT | https://github.com/pre-commit/pre-commit-hooks |
-| astral-sh/ruff-pre-commit | v0.7.4 | MIT | https://github.com/astral-sh/ruff-pre-commit |
 
 ## Fonts, icons and design assets
 

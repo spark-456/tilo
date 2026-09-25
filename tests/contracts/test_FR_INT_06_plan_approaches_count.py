@@ -22,9 +22,9 @@ def a_valid_plan(repo_root):
     fixtures = list_fixtures(repo_root, "plan", "valid")
     assert fixtures, "FR-INT-06: need at least one contracts/fixtures/plan/valid/*.json to mutate"
     instance = load_json(fixtures[0])
-    assert (
-        "approaches" in instance
-    ), f"FR-INT-06: the valid plan fixture {fixtures[0].name} has no top-level 'approaches' array"
+    assert "approaches" in instance, (
+        f"FR-INT-06: the valid plan fixture {fixtures[0].name} has no top-level 'approaches' array"
+    )
     assert 2 <= len(instance["approaches"]) <= 3, (
         f"FR-INT-06: the valid plan fixture {fixtures[0].name} itself must offer 2 to 3 approaches, "
         f"got {len(instance['approaches'])}"

@@ -1,0 +1,51 @@
+{
+  "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W3",
+  "world_id": "w_01",
+  "run_id": "r_01J8Z3K4M5",
+  "header": {
+    "building": "B2",
+    "agent": "A_s1"
+  },
+  "add_context": true,
+  "created_at": "2026-09-29T09:30:00.000Z",
+  "timeout": 3600,
+  "gate": {
+    "id": "G1",
+    "action": {
+      "type": "send_email",
+      "connector": "gmail",
+      "exact": "Send the drafted reply in the thread 'Quote for 500 packs' to orders@example.com.",
+      "item": {
+        "artifact_id": "art_reply_draft",
+        "version": 2,
+        "label": "Reply draft"
+      }
+    },
+    "recipients": ["orders@example.com"],
+    "irreversible": true,
+    "risk_tier": "T3"
+  },
+  "consent": null,
+  "kind": "gate",
+  "rung": "gate",
+  "what_happened": "The reply to the supplier is drafted and ready to send.",
+  "why_it_matters": "It confirms the order of 500 packs at the quoted price.",
+  "options": [
+    {
+      "id": "send",
+      "label": "Send it",
+      "suggested": false,
+      "irreversible": true
+    },
+    {
+      "id": "edit",
+      "label": "Edit first",
+      "suggested": true,
+      "reason": "It is a new recipient, so check it once.",
+      "irreversible": false
+    }
+  ],
+  "actions": ["show_me", "snooze"],
+  "answer_channels": ["web", "mobile_web", "whatsapp"],
+  "safe_default": "hold"
+}

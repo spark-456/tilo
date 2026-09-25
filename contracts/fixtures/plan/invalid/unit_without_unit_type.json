@@ -1,0 +1,104 @@
+{
+  "approaches": [
+    {
+      "id": "quick",
+      "label": "Quick scan",
+      "summary": "Quick scan: overview research over 3 sources.",
+      "dimensions": {
+        "depth": "overview",
+        "sources": 3,
+        "parallelism": 3,
+        "verification": "basic",
+        "output_format": "pdf"
+      },
+      "time": {
+        "min_s": 180,
+        "max_s": 300
+      },
+      "credits": {
+        "min": 30,
+        "max": 45
+      },
+      "risks": ["A supplier may not have published prices"],
+      "skips": ["Warranty terms"]
+    },
+    {
+      "id": "thorough",
+      "label": "Thorough review",
+      "summary": "Thorough review: deep research over 8 sources.",
+      "dimensions": {
+        "depth": "deep",
+        "sources": 8,
+        "parallelism": 4,
+        "verification": "thorough",
+        "output_format": "pptx"
+      },
+      "time": {
+        "min_s": 600,
+        "max_s": 900
+      },
+      "credits": {
+        "min": 90,
+        "max": 130
+      },
+      "risks": ["A supplier may not have published prices"],
+      "skips": []
+    }
+  ],
+  "chosen_approach": "quick",
+  "units": [
+    {
+      "id": "U1",
+      "title": "Extract quote A",
+      "role": "specialist",
+      "district": "D1",
+      "skills": ["table-extraction"],
+      "connectors": [],
+      "actions": [],
+      "depends_on": []
+    },
+    {
+      "id": "U2",
+      "unit_type": "quote_compared",
+      "title": "Compare quotes",
+      "role": "specialist",
+      "district": "D1",
+      "skills": ["quote-comparison"],
+      "connectors": [],
+      "actions": [],
+      "depends_on": ["U1"]
+    },
+    {
+      "id": "U3",
+      "unit_type": "summary_written",
+      "title": "Write the comparison",
+      "role": "writer",
+      "district": "D2",
+      "skills": ["executive-summary"],
+      "connectors": [],
+      "actions": [],
+      "depends_on": ["U2"]
+    },
+    {
+      "id": "U4",
+      "unit_type": "reply_handled",
+      "title": "Send the summary to finance",
+      "role": "specialist",
+      "district": "D2",
+      "skills": ["email-reply-drafting"],
+      "connectors": ["gmail"],
+      "actions": ["send_email"],
+      "depends_on": ["U3"]
+    }
+  ],
+  "gates": [
+    {
+      "id": "G1",
+      "action_type": "send_email",
+      "risk_tier": "T3",
+      "guards": ["U4"],
+      "policy_ref": null
+    }
+  ],
+  "budget_cap": 60
+}

@@ -36,9 +36,9 @@ def _valid_gate_card(repo_root):
 @pytest.fixture()
 def a_valid_card(repo_root):
     instance, _ = _any_valid_card(repo_root)
-    assert "options" in instance and isinstance(
-        instance["options"], list
-    ), "PRD 10.3: a valid card fixture must have an 'options' array"
+    assert "options" in instance and isinstance(instance["options"], list), (
+        "PRD 10.3: a valid card fixture must have an 'options' array"
+    )
     return instance
 
 
@@ -76,18 +76,18 @@ def test_PRD_10_3_card_with_no_suggested_option_is_invalid(repo_root, registry, 
     mutated = copy.deepcopy(a_valid_card)
     for option in mutated["options"]:
         option["suggested"] = False
-    assert _card_errors(
-        repo_root, registry, mutated
-    ), "PRD 10.3: a card with zero options marked suggested must be invalid (exactly one required)"
+    assert _card_errors(repo_root, registry, mutated), (
+        "PRD 10.3: a card with zero options marked suggested must be invalid (exactly one required)"
+    )
 
 
 def test_PRD_10_3_card_with_two_suggested_options_is_invalid(repo_root, registry, a_valid_card):
     mutated = copy.deepcopy(a_valid_card)
     for option in mutated["options"]:
         option["suggested"] = True
-    assert _card_errors(
-        repo_root, registry, mutated
-    ), "PRD 10.3: a card with more than one option marked suggested must be invalid (exactly one required)"
+    assert _card_errors(repo_root, registry, mutated), (
+        "PRD 10.3: a card with more than one option marked suggested must be invalid (exactly one required)"
+    )
 
 
 def test_PRD_10_3_card_missing_timeout_is_invalid(repo_root, registry, a_valid_card):
@@ -105,9 +105,9 @@ def test_PRD_10_3_card_missing_safe_default_is_invalid(repo_root, registry, a_va
 
 
 def test_PRD_10_3_gate_card_safe_default_must_be_hold(repo_root, registry, a_valid_gate_card):
-    assert (
-        a_valid_gate_card.get("safe_default") == "hold"
-    ), 'PRD 10.3: the valid gate-card fixture must itself have "safe_default": "hold"'
+    assert a_valid_gate_card.get("safe_default") == "hold", (
+        'PRD 10.3: the valid gate-card fixture must itself have "safe_default": "hold"'
+    )
     mutated = copy.deepcopy(a_valid_gate_card)
     mutated["safe_default"] = "go"
     assert _card_errors(repo_root, registry, mutated), (

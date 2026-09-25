@@ -73,9 +73,9 @@ def test_FR_WLD_02_check_recipe_depends_on_contracts_check(repo_root):
     # The `check:` recipe line lists its dependencies, e.g. "check: fmt-check lint typecheck test".
     for line in text.splitlines():
         if line.strip().startswith("check:") and not line.strip().startswith("check-fast:"):
-            assert (
-                "contracts-check" in line
-            ), f"FR-WLD-02: `check` must depend on `contracts-check` so CI fails on drift, got: {line!r}"
+            assert "contracts-check" in line, (
+                f"FR-WLD-02: `check` must depend on `contracts-check` so CI fails on drift, got: {line!r}"
+            )
             return
     pytest.fail("FR-WLD-02: justfile has no `check:` recipe to wire contracts-check into")
 

@@ -46,9 +46,9 @@ def test_PRD_15_2_plan_rules_md_exists_with_gate_and_depends_on_rules(repo_root)
     )
     text = _text(path).lower()
     assert "gate" in text, "PRD 15.2: contracts/plan.rules.md must state the every-irreversible-action-has-a-gate rule"
-    assert (
-        "depends_on" in text
-    ), "PRD 15.2: contracts/plan.rules.md must state the depends_on-refers-to-existing-units rule"
+    assert "depends_on" in text, (
+        "PRD 15.2: contracts/plan.rules.md must state the depends_on-refers-to-existing-units rule"
+    )
 
 
 def test_PRD_15_2_layout_rules_md_exists_as_we_series_with_bq_02_note(repo_root):

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/envelope.schema.json",
+  "x-version": "1.0.0",
+  "title": "Envelope",
+  "description": "Agent-to-agent handoff envelope (PRD 8.4). Agents never message each other in free text; every exchange is one envelope, sent through the harness and recorded as an event.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["from", "to", "artifact_refs", "summary", "acceptance_criteria", "provenance_ids"],
+  "properties": {
+    "from": { "$ref": "common.schema.json#/$defs/agent_id" },
+    "to": { "$ref": "common.schema.json#/$defs/agent_id" },
+    "artifact_refs": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/artifact_ref" }
+    },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+    },
+    "provenance_ids": {
+      "description": "ULIDs of the events and raw-archive records the content rests on (PRD 13.3).",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/ulid" }
+    }
+  }
+}

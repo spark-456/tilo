@@ -1,0 +1,54 @@
+{
+  "ulid": "01J8Z3K4M5N6P7Q8R9S0T1V2W3",
+  "timestamp": "2026-09-29T09:30:00.000Z",
+  "calendar_date": "2026-10-09",
+  "credits": 42.5,
+  "severity": "needs_you",
+  "risk_tier": "T2",
+  "autonomy_level": "L2",
+  "authz": {
+    "by": "policy",
+    "ref": "pol_autopilot_l2",
+    "at": "2026-09-29T09:30:00.000Z"
+  },
+  "artifact_ref": {
+    "artifact_id": "art_supplier_summary",
+    "version": 3,
+    "label": "Supplier summary"
+  },
+  "tier": "village",
+  "world_id": "w_01",
+  "run_id": "r_01J8Z3K4M5",
+  "user_id": "u_owner",
+  "org_id": "org_example",
+  "agent_id": "A_dir",
+  "district_id": "D1",
+  "level_id": "L1",
+  "building_id": "B1",
+  "unit_id": "U1",
+  "gate_id": "G1",
+  "island_id": "I1",
+  "policy_id": "pol_autopilot_l2",
+  "team_lead_id": "tl_ops",
+  "artifact_id": "art_supplier_summary",
+  "connector_id": "gmail",
+  "skill_id": "web-research-citations",
+  "action_type": "send_email",
+  "email_address": "supplier@example.com",
+  "slug": "reply_handled",
+  "semver": "1.2.0",
+  "plain_name": "Mail Room",
+  "icon_name": "inbox",
+  "agent_role": "specialist",
+  "channel": "whatsapp",
+  "data_class": "business",
+  "deliverable_format": "pdf",
+  "credit_range": {
+    "min": 40,
+    "max": 60
+  },
+  "time_range": {
+    "min_s": 240,
+    "max_s": 420
+  }
+}

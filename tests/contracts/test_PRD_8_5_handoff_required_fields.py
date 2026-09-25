@@ -51,6 +51,6 @@ def test_PRD_8_5_handoff_missing_required_field_is_invalid(repo_root, registry, 
 def test_PRD_8_5_handoff_with_every_required_field_is_valid(repo_root, registry, a_valid_handoff):
     schema = load_schema(repo_root, "handoff")
     errors = errors_for(schema, a_valid_handoff, registry)
-    assert (
-        not errors
-    ), f"PRD 8.5: a handoff note with every required field present should validate, got: {[e.message for e in errors]}"
+    assert not errors, (
+        f"PRD 8.5: a handoff note with every required field present should validate, got: {[e.message for e in errors]}"
+    )

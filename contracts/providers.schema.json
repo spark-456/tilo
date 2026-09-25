@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/providers.schema.json",
+  "x-version": "1.0.0",
+  "title": "Providers",
+  "description": "Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry. Model ids appear only in config/ and packages/providers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["models", "prices"],
+  "properties": {
+    "models": { "$ref": "#/$defs/models" },
+    "prices": { "$ref": "#/$defs/prices" }
+  },
+  "$defs": {
+    "profile_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+    "capability": {
+      "description": "structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution.",
+      "type": "string",
+      "enum": [
+        "json",
+        "tools",
+        "vision",
+        "audio",
+        "thinking",
+        "computer_use",
+        "grounding",
+        "code_execution"
+      ]
+    },
+    "models": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["example", "profiles", "roles", "rules"],
+      "properties": {
+        "example": {
+          "description": "true while the profiles are the PRD's examples; the user chooses final models.",
+          "type": "boolean"
+        },
+        "profiles": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/profile_id" },
+          "additionalProperties": { "$ref": "#/$defs/profile" }
+        },
+        "roles": {
+          "description": "Business code asks for a role, never a model (PL-01).",
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "common.schema.json#/$defs/slug" },
+          "additionalProperties": { "$ref": "#/$defs/role" }
+        },
+        "rules": { "$ref": "#/$defs/rules" }
+      }
+    },
+    "profile": {
+      "description": "One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model", "context", "caps"],
+      "properties": {
+        "provider": {
+          "description": "Adapter name in packages/providers, e.g. google.",
+          "$ref": "common.schema.json#/$defs/slug"
+        },
+        "model": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "context": { "description": "Context window in tokens.", "type": "integer", "minimum": 1 },
+        "caps": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/capability" }
+        }
+      }
+    },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary"],
+      "properties": {
+        "primary": { "$ref": "#/$defs/profile_id" },
+        "fallback": { "$ref": "#/$defs/profile_id" },
+        "cascade": {
+          "description": "Profiles tried cheapest first; escalate only on schema failure, Verifier rejection or low confidence (PRD 6.6).",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/profile_id" }
+        },
+        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+        "max_input_tokens": { "type": "integer", "minimum": 1 },
+        "max_output_tokens": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deny"],
+      "properties": {
+        "deny": {
+          "description": "Glob patterns of model ids that must never load (PL-07).",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        }
+      }
+    },
+    "prices": {
+      "description": "Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "effective_date", "source", "currency", "credit_usd", "profiles"],
+      "properties": {
+        "status": { "type": "string", "enum": ["unset", "set"] },
+        "effective_date": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/calendar_date" }, { "type": "null" }]
+        },
+        "source": { "type": ["string", "null"], "minLength": 1, "maxLength": 500 },
+        "currency": { "const": "USD" },
+        "credit_usd": { "description": "PRD 14.1: 1 credit = US$0.005.", "const": 0.005 },
+        "profiles": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/profile_id" },
+          "additionalProperties": { "$ref": "#/$defs/price" }
+        }
+      },
+      "if": { "properties": { "status": { "const": "set" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "effective_date": { "type": "string" },
+          "source": { "type": "string" },
+          "profiles": {
+            "additionalProperties": {
+              "properties": { "input": { "type": "number" }, "output": { "type": "number" } }
+            }
+          }
+        }
+      }
+    },
+    "price": {
+      "description": "Standard list price in US dollars per million tokens.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "output"],
+      "properties": {
+        "input": { "type": ["number", "null"], "minimum": 0 },
+        "output": { "type": ["number", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

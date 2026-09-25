@@ -43,6 +43,6 @@ def test_FR_CON_06_connector_action_without_risk_tier_is_invalid(repo_root, regi
 def test_FR_CON_06_connector_with_every_action_tiered_is_valid(repo_root, registry, a_valid_connector):
     schema = load_schema(repo_root, "connector")
     errors = errors_for(schema, a_valid_connector, registry)
-    assert (
-        not errors
-    ), f"FR-CON-06: a connector whose every action has a risk_tier should validate, got: {[e.message for e in errors]}"
+    assert not errors, (
+        f"FR-CON-06: a connector whose every action has a risk_tier should validate, got: {[e.message for e in errors]}"
+    )

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/skill.schema.json",
+  "x-version": "1.0.0",
+  "title": "Skill",
+  "description": "skill.yaml in skills/<domain>/<skill-id>/ (PRD 8.2). The planner sees only id and the one-line description; the executing agent loads the full skill.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "domain",
+    "author",
+    "reviewer",
+    "tools_allowed",
+    "inputs",
+    "outputs",
+    "description"
+  ],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/skill_id" },
+    "version": { "$ref": "common.schema.json#/$defs/semver" },
+    "domain": { "$ref": "common.schema.json#/$defs/slug" },
+    "author": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "reviewer": {
+      "description": "The domain expert who signed the skill off.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "tools_allowed": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/action_type" }
+    },
+    "inputs": { "$ref": "#/$defs/embedded_schema" },
+    "outputs": { "$ref": "#/$defs/embedded_schema" },
+    "description": {
+      "description": "One line, shown to the planner.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[^\\r\\n]+$"
+    }
+  },
+  "$defs": {
+    "embedded_schema": {
+      "description": "A JSON Schema (2020-12) for the skill's inputs or outputs. Deliberately open: the skill loader checks it against the 2020-12 meta-schema.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": { "type": { "const": "object" } }
+    }
+  }
+}

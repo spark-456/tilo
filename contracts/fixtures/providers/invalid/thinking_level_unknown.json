@@ -1,0 +1,66 @@
+{
+  "models": {
+    "example": true,
+    "profiles": {
+      "large": {
+        "provider": "fake",
+        "model": "example-large",
+        "context": 1000000,
+        "caps": ["json", "tools", "vision", "thinking"]
+      },
+      "medium": {
+        "provider": "fake",
+        "model": "example-medium",
+        "context": 1000000,
+        "caps": ["json", "tools", "thinking"]
+      },
+      "small": {
+        "provider": "fake",
+        "model": "example-small",
+        "context": 128000,
+        "caps": ["json", "tools"]
+      }
+    },
+    "roles": {
+      "director": {
+        "primary": "large",
+        "fallback": "medium",
+        "thinking": "max"
+      },
+      "specialist": {
+        "primary": "medium",
+        "fallback": "small",
+        "cascade": ["small", "medium"],
+        "max_input_tokens": 200000,
+        "max_output_tokens": 8000
+      },
+      "narrator": {
+        "primary": "small"
+      }
+    },
+    "rules": {
+      "deny": ["example-legacy-*", "*-preview*"]
+    }
+  },
+  "prices": {
+    "status": "unset",
+    "effective_date": null,
+    "source": null,
+    "currency": "USD",
+    "credit_usd": 0.005,
+    "profiles": {
+      "large": {
+        "input": null,
+        "output": null
+      },
+      "medium": {
+        "input": null,
+        "output": null
+      },
+      "small": {
+        "input": null,
+        "output": null
+      }
+    }
+  }
+}
