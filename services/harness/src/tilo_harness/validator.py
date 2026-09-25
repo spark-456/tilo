@@ -4,13 +4,14 @@ implementation that agrees with scripts/contracts_events.py on every fixture in 
 a reuse of it.
 
 `EventValidator.problems(event, state=None)` runs the checks that need only the event itself:
-schema, EV-01 (registered type), EV-02 (data schema), EV-04, EV-05, EV-06, EV-08, EV-09, the
-state-independent half of EV-13 (an event whose own district is not in its own vis list) and
-the state-independent half of EV-14 (a delivery that left Tilo with no cause at all). The
-stream- and layout-dependent rules -- EV-10 (seq/id, and the stream's world_id), EV-11 (cause
-resolves), EV-12 (layout ids), the layout half of EV-13 (vis names a real district) and the
-stream half of EV-14 (an email delivery's cause must be the matching `data.transfer` out, same
-outbox_id and artifact, mirroring scripts/contracts_events.py's `_is_send_of`) -- need a
+finiteness and int64 range, D-11 UTF-8 round-trip (every string value and dict key, at any
+nesting depth), schema, EV-01 (registered type), EV-02 (data schema), EV-04, EV-05, EV-06,
+EV-08, EV-09, the state-independent half of EV-13 (an event whose own district is not in its own
+vis list) and the state-independent half of EV-14 (a delivery that left Tilo with no cause at
+all). The stream- and layout-dependent rules -- EV-10 (seq/id, and the stream's world_id), EV-11
+(cause resolves), EV-12 (layout ids), the layout half of EV-13 (vis names a real district) and
+the stream half of EV-14 (an email delivery's cause must be the matching `data.transfer` out,
+same outbox_id and artifact, mirroring scripts/contracts_events.py's `_is_send_of`) -- need a
 `WorldState` and are run in addition when one is passed; `WorldWriter` is what builds and
 updates it.
 """
@@ -37,9 +38,9 @@ _INT64_MAX = 2**63 - 1
 
 
 def _is_strict_python_int(_checker: Any, instance: Any) -> bool:
-    """qa-breaker, P0-09 round 4: JSON Schema's "integer" type is defined over JSON numbers ("a
-    JSON number with a zero fractional part"), so `jsonschema`'s stock Draft 2020-12 type
-    checker deliberately accepts a `float` such as `2.0` for `type: "integer"`
+    """JSON Schema's "integer" type is defined over JSON numbers ("a JSON number with a zero
+    fractional part"), so `jsonschema`'s stock Draft 2020-12 type checker deliberately accepts a
+    `float` such as `2.0` for `type: "integer"`
     (`is_integer(checker, instance) or isinstance(instance, float) and instance.is_integer()`
     in `jsonschema._types`) -- that is spec-correct for JSON Schema in general, but wrong for
     this harness: `seq` (and every other "integer" field: `trace.tokens_in`, `.tokens_out`,
@@ -64,8 +65,8 @@ _StrictIntValidator = jsonschema.validators.extend(
 
 
 def _finiteness_problems(value: Any, path: str = "") -> list[str]:
-    """qa-breaker, P0-09 round 2: `jsonschema`'s `minimum`/`maximum` checks use Python `<`/`>`,
-    which are False for both operands of any comparison against NaN, and JSON Schema's `number`
+    """`jsonschema`'s `minimum`/`maximum` checks use Python `<`/`>`, which are False for both
+    operands of any comparison against NaN, and JSON Schema's `number`
     type has no finiteness or range constraint of its own -- so `event.schema.json`'s
     `minimum: 0` on `credits` (and every other bare `number`/`integer` in the event) never
     rejects `float("nan")`, `float("inf")` or an integer outside what every store and every JSON
@@ -88,6 +89,40 @@ def _finiteness_problems(value: Any, path: str = "") -> list[str]:
     elif isinstance(value, list):
         for index, child in enumerate(value):
             problems += _finiteness_problems(child, f"{path}/{index}" if path else str(index))
+    return problems
+
+
+def _utf8_problems(value: Any, path: str = "") -> list[str]:
+    """D-11: a string that cannot round-trip through UTF-8 -- e.g. a lone UTF-16 surrogate such
+    as `json.loads('"a\\ud800"')` produces -- must never reach a store. JSON Schema's `string`
+    type has no such constraint (jsonschema validates against the already-parsed Python object,
+    not the wire bytes), so a lone surrogate sails through every "string"/"pattern"/"maxLength"
+    check and would only fail later, differently, in each store (`MemoryStore` keeps it as-is;
+    `FirestoreStore` raises a raw encoding error from the gRPC layer instead of `EventRejected`).
+    This walks the whole event -- values and dict keys, at any nesting depth -- and rejects any
+    string that does not survive `.encode("utf-8").decode("utf-8")`, reported with the same
+    "schema: ..." prefix a `jsonschema` failure gets, so a caller filtering on that prefix sees
+    every case (summary, a data string value, a data key, a nested item.label, ...) alike. A
+    valid non-ASCII string (accented Latin, CJK, emoji) round-trips cleanly and is unaffected."""
+    problems: list[str] = []
+    label = path or "(root)"
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8").decode("utf-8")
+        except UnicodeError:
+            problems.append(f"schema: {label}: string is not valid, UTF-8-round-trippable text")
+    elif isinstance(value, dict):
+        for key, child in value.items():
+            child_path = f"{path}/{key}" if path else str(key)
+            if isinstance(key, str):
+                try:
+                    key.encode("utf-8").decode("utf-8")
+                except UnicodeError:
+                    problems.append(f"schema: {child_path}: key is not valid, UTF-8-round-trippable text")
+            problems += _utf8_problems(child, child_path)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            problems += _utf8_problems(child, f"{path}/{index}" if path else str(index))
     return problems
 
 
@@ -198,8 +233,8 @@ class EventValidator:
         return cls(schemas, registry_data)
 
     def _schema_errors(self, name: str, instance: object) -> list[str]:
-        # qa-breaker, P0-09 round 4: this must NOT be `_StrictIntValidator({"$ref": uri}, ...)`.
-        # `jsonschema`'s `$ref`/`descend` handling re-derives the validator class for whatever
+        # This must NOT be `_StrictIntValidator({"$ref": uri}, ...)`. `jsonschema`'s
+        # `$ref`/`descend` handling re-derives the validator class for whatever
         # the ref resolves to via `validators.validator_for(schema, default=cls)`, which reads
         # that schema's *own* `$schema` keyword and only falls back to `cls` (our strict
         # `_StrictIntValidator`) when the target has none. `event.schema.json` and every
@@ -228,6 +263,10 @@ class EventValidator:
         finiteness_problems = _finiteness_problems(event)
         if finiteness_problems:
             return finiteness_problems
+
+        utf8_problems = _utf8_problems(event)
+        if utf8_problems:
+            return utf8_problems
 
         problems = [f"schema: {message}" for message in self._schema_errors("event", event)]
         if problems:

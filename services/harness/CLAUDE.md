@@ -28,12 +28,13 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 ## Local rules
 - Never calls a model directly — always through `packages/providers`, by role (PL-01); the
   P0-09 fixture plan makes zero model calls (deterministic ADK `BaseAgent`s, no `LlmAgent`).
-- Risk tiers from action type and context; a model never decides authorisation.
+  Risk tiers come from action type and context; a model never decides authorisation.
 - `WorldWriter` is the only writer per world: every event is checked against `EventValidator`
-  first; a rejected event writes nothing. A lease on `orgs/{org}/worlds/{world}` enforces one
-  writer, re-checked inside the same store transaction on every write.
-- `FirestoreStore` refuses to start without `FIRESTORE_EMULATOR_HOST` and a `demo-` project id
-  (ADR-0003: emulator only, no cloud credentials, never a real project).
+  first; a rejected event writes nothing. A lease on `orgs/{org}/worlds/{world}/_head/state`
+  enforces one writer, re-checked inside the same store transaction on every write.
+- `FirestoreStore` refuses to start without `FIRESTORE_EMULATOR_HOST` and a `demo-` project id (ADR-0003: emulator only, no cloud credentials, never a real project).
 - `@pytest.mark.emulator` tests are excluded from `just check`'s default run; they run as their
   own CI step and via `uv run pytest services/harness/tests -m emulator`.
 - No scenario-specific code; a scenario that needs code becomes a pillar requirement first.
+- `_head/state` under a world is not a PRD 15.3 client path (`events`/`views/{scope}`/`cards`/
+  `checkpoints` are); once a rules file exists (none yet), `_head/**` must deny every client, or a reading Owner/Team Lead sees every scope's view_seq, a hidden district's count included (PRD 10.1/SEC-07).

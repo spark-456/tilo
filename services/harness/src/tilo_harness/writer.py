@@ -80,10 +80,10 @@ class WorldWriter:
         lease_s: float = 30.0,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
-        # Security-reviewer, P0-09 round 2: reject any org_id/world_id/run_id that does not
-        # match common.schema.json's pattern *before* any store call (open() builds Firestore
-        # paths from these ids). Each pattern excludes "/", so a world_id such as
-        # "w_victim/events/00000001" can never reach a path-building f-string -- see ids.py.
+        # Reject any org_id/world_id/run_id that does not match common.schema.json's pattern
+        # *before* any store call (open() builds Firestore paths from these ids). Each pattern
+        # excludes "/", so a world_id such as "w_victim/events/00000001" can never reach a
+        # path-building f-string -- see ids.py.
         check_id(org_id, ORG_ID, label="org_id")
         check_id(world_id, WORLD_ID, label="world_id")
         check_id(run_id, RUN_ID, label="run_id")
@@ -216,12 +216,12 @@ class WorldWriter:
             lease = head["lease"]
             if lease is None or lease["token"] != self._instance_token:
                 raise WriterBusy(f"world {self._world_id!r} is no longer leased to {self.writer_id!r}")
-            # qa-breaker P0-09 round 3: the token check above is necessary but not sufficient --
-            # a writer's lease can expire (another writer has not taken over yet, but is now free
-            # to) while this instance's token is still the one recorded on the head. Without this
-            # check, a writer whose lease has lapsed keeps writing past its own TTL. Re-derive
-            # "now" from the injectable clock at commit time (not from `open()`'s stale reading),
-            # since a long-running writer emits many events after a single `open()`.
+            # The token check above is necessary but not sufficient -- a writer's lease can
+            # expire (another writer has not taken over yet, but is now free to) while this
+            # instance's token is still the one recorded on the head. Without this check, a
+            # writer whose lease has lapsed keeps writing past its own TTL. Re-derive "now" from
+            # the injectable clock at commit time (not from `open()`'s stale reading), since a
+            # long-running writer emits many events after a single `open()`.
             if lease["expires_at"] <= now:
                 raise WriterBusy(
                     f"world {self._world_id!r} lease for {self.writer_id!r} expired at "

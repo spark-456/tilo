@@ -75,7 +75,13 @@ class FirestoreStore:
     """Firestore Store against the Firestore emulator only (ADR-0003: local-first, no cloud
     credentials, never a real project). Full stream: orgs/{org}/worlds/{world}/events/{seq:08d}.
     Views: orgs/{org}/worlds/{world}/views/{scope}/events/{vseq:08d}. The world head (lease,
-    last_seq, each view's vseq) is orgs/{org}/worlds/{world} itself (PRD 15.3)."""
+    last_seq, each view's vseq) is orgs/{org}/worlds/{world}/_head/state, not the world document
+    itself: PRD 15.3 names no head document, and `orgs/{org}/worlds/{world}` is a path an Owner
+    or Team Lead client can read (PRD 10.1), so a head kept there would leak every scope's
+    view_seq -- including a hidden district's count, which PRD 10.1/SEC-07 forbids. `_head/state`
+    is not one of PRD 15.3's named client-readable paths (events, views/{scope}, cards,
+    checkpoints) and is meant to be denied to every client by Firestore security rules
+    (services/harness/CLAUDE.md); nothing else is written to the world document by this store."""
 
     def __init__(self, project_id: str = "demo-tilo") -> None:
         host = os.environ.get("FIRESTORE_EMULATOR_HOST")
@@ -93,9 +99,9 @@ class FirestoreStore:
         self._client = firestore.Client(project=project_id)
 
     def _check_org_world(self, org_id: str, world_id: str) -> None:
-        # Security-reviewer, P0-09 round 2: every path built from org_id/world_id is guarded
-        # here too, independent of WorldWriter's constructor check, since this is the code that
-        # actually turns these ids into a Firestore path -- see ids.py.
+        # Every path built from org_id/world_id is guarded here too, independent of
+        # WorldWriter's constructor check, since this is the code that actually turns these ids
+        # into a Firestore path -- see ids.py.
         check_id(org_id, ORG_ID, label="org_id")
         check_id(world_id, WORLD_ID, label="world_id")
 
@@ -111,7 +117,7 @@ class FirestoreStore:
 
     def _head(self, org_id: str, world_id: str):
         self._check_org_world(org_id, world_id)
-        return self._client.document(f"orgs/{org_id}/worlds/{world_id}")
+        return self._client.document(f"orgs/{org_id}/worlds/{world_id}/_head/state")
 
     def read_events(self, org_id: str, world_id: str) -> list[dict[str, Any]]:
         return [doc.to_dict() for doc in self._events(org_id, world_id).order_by("seq").stream()]

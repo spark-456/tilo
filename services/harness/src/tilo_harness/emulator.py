@@ -6,12 +6,12 @@ which `tilo-api`'s dev server uses -- waits until it answers, sets `FIRESTORE_EM
 yields the host, and stops it on exit. Java, needed by the emulator binary itself, is assumed
 already installed (root CLAUDE.md).
 
-qa-breaker P0-09 round 3: `_stop()` cleanly kills the whole node+java tree on a graceful exit
-(`finally`), but a *hard* kill of the Python process that owns the emulator (`python -m
-tilo_harness.skeleton` run with no `FIRESTORE_EMULATOR_HOST` already set, i.e. exactly `just
-harness-skeleton`, killed with e.g. `taskkill /F` or a SIGKILL-equivalent) never runs that
-`finally` block at all, so `_stop()` never runs and the java emulator (and the websocket port it
-holds) leaks. On win32 this is closed with a Job Object carrying
+`_stop()` cleanly kills the whole node+java tree on a graceful exit (`finally`), but a *hard*
+kill of the Python process that owns the emulator (`python -m tilo_harness.skeleton` run with no
+`FIRESTORE_EMULATOR_HOST` already set, i.e. exactly `just harness-skeleton`, killed with e.g.
+`taskkill /F` or a SIGKILL-equivalent) never runs that `finally` block at all, so `_stop()` never
+runs and the java emulator (and the websocket port it holds) leaks. On win32 this is closed with
+a Job Object carrying
 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`: the node process (and, transitively, the java process it
 spawns as a child -- child processes join their parent's job by default) is assigned to that job
 right after it is started, and the OS itself terminates every process still in the job the

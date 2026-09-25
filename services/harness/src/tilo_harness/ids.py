@@ -3,12 +3,12 @@
 (`contracts/` is read-only: this is a fresh, hand-kept copy for path safety, not an import of the
 schema or of `scripts/`).
 
-Security-reviewer, P0-09 round 2: nothing that becomes an `f"orgs/{org_id}/worlds/{world_id}/..."`
-Firestore path may be accepted without first matching one of these patterns, because every one of
-them excludes "/" -- a `world_id` such as `"w_victim/events/00000001"` can therefore never reach a
-path-building f-string. `WorldWriter.__init__` checks `org_id`/`world_id`/`run_id` against these
-before any store call; `FirestoreStore` checks them again (plus `scope`, via `is_scope`) at every
-path it builds, so the guard holds even for a caller that bypasses `WorldWriter`.
+Nothing that becomes an `f"orgs/{org_id}/worlds/{world_id}/..."` Firestore path may be accepted
+without first matching one of these patterns, because every one of them excludes "/" -- a
+`world_id` such as `"w_victim/events/00000001"` can therefore never reach a path-building
+f-string. `WorldWriter.__init__` checks `org_id`/`world_id`/`run_id` against these before any
+store call; `FirestoreStore` checks them again (plus `scope`, via `is_scope`) at every path it
+builds, so the guard holds even for a caller that bypasses `WorldWriter`.
 """
 
 from __future__ import annotations
