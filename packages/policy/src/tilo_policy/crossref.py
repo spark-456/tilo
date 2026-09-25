@@ -30,8 +30,8 @@ def _policy_opened(case: dict, applied: dict) -> bool:
         return False  # a policy never authorises T3 (PI-07)
     if (authz["by"], authz["ref"]) != ("policy", applied["policy_id"]):
         return False  # PI-16: a policy send is stamped by that policy
-    if over_limit(policy, case["earlier_applied"], 0, at) is not None:
-        return False  # PI-11; the entry carries no credits, so only earlier sends count them
+    if over_limit(policy, case["earlier_applied"], applied["credits"], at) is not None:
+        return False  # PI-11: across the owner's worlds on the UTC day of authz.at
     target = Target(applied["action_type"], applied["connector"], applied["district"], entry["recipients"])
     level = covering_level(policy, target, case["world_owner"], at)
     named = (policy["id"], level, policy["undo_window_s"])

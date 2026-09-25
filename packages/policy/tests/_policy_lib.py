@@ -100,7 +100,9 @@ def base_instruction(
         "actor": actor,
         "ts": ts,
         "world_id": world_id,
-        "data": {"channel": channel, "destination": destination},
+        # ADR-0007: a channel.message_in instruction is typed words answering no card.
+        "data": {"channel": channel, "destination": destination}
+        | ({"card_kind": None, "option": None} if type_ == "channel.message_in" else {}),
     }
 
 
@@ -130,8 +132,8 @@ def applied_entry(
             "instruction_id": instruction_id,
             "undo_window_s": 60,
             "item": None,
+            "credits": credits,
         },
-        "credits": credits,
     }
 
 
