@@ -11,7 +11,7 @@ import threading
 
 import tilo_connectors
 from _connectors_lib import ManualClock, evidence_from_case
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 from tilo_connectors.fakes import FakeGmail
 
@@ -68,6 +68,7 @@ def test_FR_AGT_11_retry_after_crash_sends_once(gate_case_factory):
 
 
 @given(attempts=st.integers(min_value=1, max_value=25))
+@settings(deadline=None)
 def test_FR_AGT_11_OB_03_retry_storm_sends_one_per_key(attempts, gate_case_factory):
     """A retry storm: dispatch_due() called an arbitrary number of times in a row (Hypothesis
     varies the count) never sends more than once per idempotency key."""

@@ -208,3 +208,13 @@ due (it may sit in `sending`) and the next `dispatch_due()` retries it; the adap
 once the send is confirmed. Only a connector with no adapter lands the entry in `failed`, a final
 state. `dispatch_due()` never stops a batch on one entry's error. A `data.transfer` whose `emit`
 raised is retried by the next `dispatch_due()`, and exactly one is ever emitted per entry.
+
+## Several instances, restarts (review round 2)
+
+Many tilo-connectors instances share one store. Claiming an entry for sending is a compare-and-set
+that also records a lease (holder and expiry); another instance may take over a `sending` entry
+only after its lease expires, so an in-flight send is never claimed twice. A `data.transfer` not
+yet emitted is kept in the store, not in one instance's memory, so any instance emits it later,
+exactly once, in send order. An emit error never stops a batch. Two enqueues racing on one
+(world_id, idempotency_key) store one entry. enqueue stores its own copy of the entry, so the
+caller changing its dict afterwards changes nothing. A schedule out of range is `OutboxRefused`.
