@@ -16,9 +16,7 @@ AT = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
 def test_FR_MTR_02_reservation_reserves_estimate_plus_15_percent(tmp_path):
     treasury, _flags = build_treasury(tmp_path, run_credits=1000)
     treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=1000)
-
     reservation = treasury.reserve("r1", "s1", estimate=100.0, at=AT)
-
     assert isinstance(reservation, Reservation)
     run = treasury.run("r1")
     assert run.reserved == pytest.approx(115.0)
@@ -28,9 +26,7 @@ def test_FR_MTR_02_reservation_reserves_estimate_plus_15_percent(tmp_path):
 def test_FR_MTR_02_reservation_that_does_not_fit_returns_wait_and_changes_nothing(tmp_path):
     treasury, _flags = build_treasury(tmp_path, run_credits=1000)
     treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=50.0)
-
     result = treasury.reserve("r1", "s1", estimate=100.0, at=AT)  # 115 > 50
-
     assert isinstance(result, Wait)
     assert result.reason
     run = treasury.run("r1")
@@ -42,9 +38,7 @@ def test_FR_MTR_02_commit_frees_the_reservation_and_records_actual(tmp_path):
     treasury, _flags = build_treasury(tmp_path, run_credits=1000)
     treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=1000)
     reservation = treasury.reserve("r1", "s1", estimate=100.0, at=AT)
-
     result = treasury.commit(reservation, actual=80.0, at=AT)
-
     run = treasury.run("r1")
     assert run.reserved == pytest.approx(0.0), "commit must free the reservation"
     assert run.spent == pytest.approx(80.0)
@@ -56,9 +50,7 @@ def test_FR_MTR_02_release_frees_the_reservation_with_nothing_spent(tmp_path):
     treasury, _flags = build_treasury(tmp_path, run_credits=1000)
     treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=1000)
     reservation = treasury.reserve("r1", "s1", estimate=100.0, at=AT)
-
     treasury.release(reservation)
-
     run = treasury.run("r1")
     assert run.reserved == pytest.approx(0.0)
     assert run.spent == pytest.approx(0.0)
@@ -68,13 +60,11 @@ def test_FR_MTR_02_grant_raises_the_runs_cap(tmp_path):
     treasury, _flags = build_treasury(tmp_path, run_credits=1000)
     treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=100.0)
     cap_before = treasury.run("r1").cap
-
     treasury.grant("r1", 20.0)
-
     assert treasury.run("r1").cap == pytest.approx(cap_before + 20.0)
 
 
-# --- 100-run soak property test: reserve/commit/release/grant interleaved across runs, users, orgs.
+# --- 100-run soak: reserve/commit/release/grant interleaved across runs, users, orgs.
 
 RUN_COUNT = 100
 USERS = tuple(f"u_soak{i:02d}" for i in range(5))
@@ -88,19 +78,19 @@ def _floats(lo: float, hi: float):
 
 @st.composite
 def _soak_plan(draw):
-    """One (run, user, org, approved, steps) per simulated run. Each step is (estimate,
-    resolution, commit_fraction); actual = reserved_amount * commit_fraction always stays
-    <= the reservation."""
+    """One (run, user, org, approved, steps) per run; a step is (estimate, resolution,
+    commit_fraction) with actual = reserved_amount * commit_fraction, always <= the reservation."""
     step = st.tuples(_floats(1.0, 30.0), st.sampled_from(("commit", "release")), _floats(0.0, 1.0))
+    ids = (f"r_soak{i:03d}" for i in range(RUN_COUNT))
     return [
         (
-            f"r_soak{i:03d}",
+            r,
             draw(st.sampled_from(USERS)),
             draw(st.sampled_from(ORGS)),
             draw(_floats(20.0, 200.0)),
             draw(st.lists(step, min_size=1, max_size=3)),
         )
-        for i in range(RUN_COUNT)
+        for r in ids
     ]
 
 
@@ -152,7 +142,6 @@ def test_FR_MTR_02_soak_100_runs_never_exceed_budgets(tmp_path_factory, plan):
             committed_by_run[run_id] += actual
         else:
             treasury.release(result)
-
         run_state = treasury.run(run_id)
         assert run_state.spent + run_state.reserved <= run_state.cap + 1e-6
         assert run_state.spent == pytest.approx(committed_by_run[run_id], abs=1e-6)
@@ -162,7 +151,6 @@ def test_FR_MTR_02_soak_100_runs_never_exceed_budgets(tmp_path_factory, plan):
         assert _day_total(treasury, day=day, user=user_id) <= USER_DAY_CAP + 1e-6
     for org_id in ORGS:
         assert _day_total(treasury, day=day, org=org_id) <= ORG_DAY_CAP + 1e-6
-
     total_committed = sum(committed_by_run.values())
     ledger_commits = sum(e.credits for e in treasury.ledger if e.kind == "commit" and e.credits is not None)
     assert ledger_commits == pytest.approx(total_committed, abs=1e-6), "the ledger must lose nothing"

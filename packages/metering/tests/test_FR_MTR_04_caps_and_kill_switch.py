@@ -17,9 +17,7 @@ def test_FR_MTR_04_run_cap_blocks_a_reservation(tmp_path):
     treasury, _flags = build_treasury(tmp_path, run_credits=50)
     treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=1000)
     assert treasury.run("r1").cap == pytest.approx(50.0)
-
     result = treasury.reserve("r1", "s1", estimate=60.0, at=AT)  # 60*1.15 = 69 > 50
-
     assert isinstance(result, Wait)
     run = treasury.run("r1")
     assert run.reserved == pytest.approx(0.0)
@@ -31,13 +29,10 @@ def test_FR_MTR_04_user_day_cap_blocks_a_reservation_across_runs(tmp_path):
     treasury, _flags = build_treasury(tmp_path, run_credits=1000, user_day_credits=100, org_day_credits=None)
     treasury.open_run("rA", user_id="u_capped", org_id="org_a", approved=1000)
     treasury.open_run("rB", user_id="u_capped", org_id="org_b", approved=1000)
-
     first = treasury.reserve("rA", "s1", estimate=50.0, at=AT)  # 57.5 reserved
     assert not isinstance(first, Wait)
     treasury.commit(first, actual=57.5, at=AT)
-
     second = treasury.reserve("rB", "s1", estimate=50.0, at=AT)  # 57.5 + 57.5 = 115 > 100
-
     assert isinstance(second, Wait)
     run_b = treasury.run("rB")
     assert run_b.reserved == pytest.approx(0.0)
@@ -49,13 +44,10 @@ def test_FR_MTR_04_org_day_cap_blocks_a_reservation_across_runs(tmp_path):
     treasury, _flags = build_treasury(tmp_path, run_credits=1000, user_day_credits=None, org_day_credits=100)
     treasury.open_run("rA", user_id="u_a", org_id="org_capped", approved=1000)
     treasury.open_run("rB", user_id="u_b", org_id="org_capped", approved=1000)
-
     first = treasury.reserve("rA", "s1", estimate=50.0, at=AT)
     assert not isinstance(first, Wait)
     treasury.commit(first, actual=57.5, at=AT)
-
     second = treasury.reserve("rB", "s1", estimate=50.0, at=AT)
-
     assert isinstance(second, Wait)
     run_b = treasury.run("rB")
     assert run_b.reserved == pytest.approx(0.0)

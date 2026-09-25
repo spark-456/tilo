@@ -2,7 +2,6 @@
 actual after, append-only ledger. Daily USD spend caps, alerts and kill-switch flipping are P8-01c."""
 
 import threading
-from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from uuid import uuid4
@@ -13,7 +12,6 @@ from .flags import FlagStore
 from .prices import PriceBook, Usage
 
 _EPS = 1e-9
-_Bucket = tuple[object, ...]  # ("run", run_id) | ("user", user_id, day) | ("org", org_id, day)
 
 
 @dataclass(frozen=True)
@@ -22,6 +20,9 @@ class Reservation:
     run_id: str
     step_id: str
     amount: float
+    user: str
+    org: str
+    day: date
 
 
 @dataclass(frozen=True)
@@ -50,12 +51,12 @@ class LedgerEntry:
     run: str
     user: str
     org: str
-    step: str | None
-    credits: float | None
-    usage: Usage | None
-    price_effective_date: str | None
-    price_source: str | None
     at: datetime
+    step: str | None = None
+    credits: float | None = None
+    usage: Usage | None = None
+    price_effective_date: str | None = None
+    price_source: str | None = None
 
 
 @dataclass
@@ -64,16 +65,6 @@ class _Run:
     user_id: str
     org_id: str
     halted: bool = False
-
-
-@dataclass(frozen=True)
-class _Active:
-    run_id: str
-    step_id: str
-    amount: float
-    user_id: str
-    org_id: str
-    day: date
 
 
 def _amount(value: object, name: str) -> float:
@@ -96,15 +87,13 @@ def _aware(value: object) -> datetime:
 
 
 class Treasury:
-    """Thread-safe. `run(id)` and `.ledger` read the same state `reserve`/`commit`/... mutate."""
+    """Thread-safe. Totals are summed from the ledger and the outstanding reservations, not cached."""
 
     def __init__(self, config: MeteringConfig, prices: PriceBook, flags: FlagStore) -> None:
         self._config, self._prices, self._flags = config, prices, flags
         self._lock = threading.Lock()
         self._runs: dict[str, _Run] = {}
-        self._reserved: dict[_Bucket, float] = defaultdict(float)
-        self._committed: dict[_Bucket, float] = defaultdict(float)
-        self._active: dict[str, _Active] = {}
+        self._active: dict[str, Reservation] = {}
         self._ledger: list[LedgerEntry] = []
 
     def open_run(self, run_id: str, *, user_id: str, org_id: str, approved: float) -> RunBudget:
@@ -124,28 +113,27 @@ class Treasury:
         amount = estimate * (1 + self._config.treasury.reserve_margin)
         day = at.date()
         with self._lock:
-            run = self._runs.get(run_id)
-            if run is None:
-                raise ValueError(f"run {run_id!r} is not open")
+            run = self._runs[run_id]  # KeyError if the run was never opened
             if self._flags.get("replay_only"):
                 return Wait("replay_only")
             if run.halted:
                 return Wait("halted")
+            if self._committed_run(run_id) + self._reserved_run(run_id) + amount > run.cap + _EPS:
+                return Wait("run_cap")
             caps = self._config.caps
-            checks: list[tuple[str, _Bucket, float]] = [("run_cap", ("run", run_id), run.cap)]
-            if caps.user_day_credits is not None:
-                checks.append(("user_day_cap", ("user", run.user_id, day), caps.user_day_credits))
-            if caps.org_day_credits is not None:
-                checks.append(("org_day_cap", ("org", run.org_id, day), caps.org_day_credits))
-            for reason, bucket, cap in checks:
-                if self._committed[bucket] + self._reserved[bucket] + amount > cap + _EPS:
+            for reason, field, ident, cap in (
+                ("user_day_cap", "user", run.user_id, caps.user_day_credits),
+                ("org_day_cap", "org", run.org_id, caps.org_day_credits),
+            ):
+                if cap is not None and self._day_total(field, ident, day) + amount > cap + _EPS:
                     return Wait(reason)
             res_id = uuid4().hex
-            for _, bucket, _ in checks:
-                self._reserved[bucket] += amount
-            self._active[res_id] = _Active(run_id, step_id, amount, run.user_id, run.org_id, day)
-            self._append("reserve", run_id, run.user_id, run.org_id, step_id, amount, None, None, None, at)
-        return Reservation(res_id, run_id, step_id, amount)
+            reservation = Reservation(res_id, run_id, step_id, amount, run.user_id, run.org_id, day)
+            self._active[res_id] = reservation
+            self._ledger.append(
+                LedgerEntry("reserve", run_id, run.user_id, run.org_id, at, step=step_id, credits=amount)
+            )
+        return reservation
 
     def commit(
         self, reservation: Reservation, actual: float, *, at: datetime, usage: Usage | None = None
@@ -165,83 +153,53 @@ class Treasury:
 
     def _commit(self, reservation, actual, at, usage, price_date, price_source) -> CommitResult:
         with self._lock:
-            active = self._active.pop(reservation.id, None)
-            if active is None:
-                raise ValueError(f"unknown or already-resolved reservation {reservation.id!r}")
-            for bucket in (
-                ("run", active.run_id),
-                ("user", active.user_id, active.day),
-                ("org", active.org_id, active.day),
-            ):
-                self._reserved[bucket] -= active.amount
-            day = at.date()
-            for bucket in (("run", active.run_id), ("user", active.user_id, day), ("org", active.org_id, day)):
-                self._committed[bucket] += actual
-            self._append(
-                "commit",
-                active.run_id,
-                active.user_id,
-                active.org_id,
-                active.step_id,
-                actual,
-                usage,
-                price_date,
-                price_source,
-                at,
+            active = self._active.pop(reservation.id)  # KeyError if already committed or released
+            self._ledger.append(
+                LedgerEntry(
+                    "commit",
+                    active.run_id,
+                    active.user,
+                    active.org,
+                    at,
+                    step=active.step_id,
+                    credits=actual,
+                    usage=usage,
+                    price_effective_date=price_date,
+                    price_source=price_source,
+                )
             )
             run = self._runs[active.run_id]
-            overrun = self._committed[("run", active.run_id)] > run.cap + _EPS
+            overrun = self._committed_run(active.run_id) > run.cap + _EPS
             run.halted = run.halted or overrun
         return CommitResult(overrun=overrun)
 
     def release(self, reservation: Reservation) -> None:
         with self._lock:
-            active = self._active.pop(reservation.id, None)
-            if active is None:
-                raise ValueError(f"unknown or already-resolved reservation {reservation.id!r}")
-            for bucket in (
-                ("run", active.run_id),
-                ("user", active.user_id, active.day),
-                ("org", active.org_id, active.day),
-            ):
-                self._reserved[bucket] -= active.amount
-            self._append(
-                "release",
-                active.run_id,
-                active.user_id,
-                active.org_id,
-                active.step_id,
-                None,
-                None,
-                None,
-                None,
-                datetime.now(tz=UTC),
+            active = self._active.pop(reservation.id)
+            entry = LedgerEntry(
+                "release", active.run_id, active.user, active.org, datetime.now(tz=UTC), step=active.step_id
             )
+            self._ledger.append(entry)
 
     def grant(self, run_id: str, credits: float) -> None:
         run_id, amount = _ident(run_id, "run_id"), _amount(credits, "credits")
         with self._lock:
-            run = self._runs.get(run_id)
-            if run is None:
-                raise ValueError(f"run {run_id!r} is not open")
+            run = self._runs[run_id]
             run.cap += amount
-            self._append("grant", run_id, run.user_id, run.org_id, None, amount, None, None, None, datetime.now(tz=UTC))
+            entry = LedgerEntry("grant", run_id, run.user_id, run.org_id, datetime.now(tz=UTC), credits=amount)
+            self._ledger.append(entry)
 
     def record_usage(self, run_id: str, usage: Usage, *, at: datetime) -> None:
         """Meters recorded usage only: always works, even with unset prices; credits stays None."""
         run_id, at = _ident(run_id, "run_id"), _aware(at)
         with self._lock:
-            run = self._runs.get(run_id)
-            if run is None:
-                raise ValueError(f"run {run_id!r} is not open")
-            self._append("usage", run_id, run.user_id, run.org_id, None, None, usage, None, None, at)
+            run = self._runs[run_id]
+            self._ledger.append(LedgerEntry("usage", run_id, run.user_id, run.org_id, at, usage=usage))
 
     def run(self, run_id: str) -> RunBudget:
         with self._lock:
-            run = self._runs.get(run_id)
-            if run is None:
-                raise ValueError(f"run {run_id!r} is not open")
-            spent, reserved = self._committed[("run", run_id)], self._reserved[("run", run_id)]
+            run = self._runs[run_id]
+            spent, reserved = self._committed_run(run_id), self._reserved_run(run_id)
         return RunBudget(run_id, run.cap, spent, reserved, run.cap - spent - reserved, run.halted)
 
     @property
@@ -249,5 +207,18 @@ class Treasury:
         with self._lock:
             return tuple(self._ledger)
 
-    def _append(self, kind, run, user, org, step, credits, usage, price_date, price_source, at) -> None:
-        self._ledger.append(LedgerEntry(kind, run, user, org, step, credits, usage, price_date, price_source, at))
+    def _committed_run(self, run_id: str) -> float:
+        return sum(e.credits for e in self._ledger if e.kind == "commit" and e.run == run_id and e.credits is not None)
+
+    def _reserved_run(self, run_id: str) -> float:
+        return sum(a.amount for a in self._active.values() if a.run_id == run_id)
+
+    def _day_total(self, field: str, value: str, day: date) -> float:
+        """Committed (from the ledger) plus reserved (from outstanding reservations) for that day."""
+        committed = sum(
+            e.credits
+            for e in self._ledger
+            if e.kind == "commit" and e.credits is not None and getattr(e, field) == value and e.at.date() == day
+        )
+        reserved = sum(a.amount for a in self._active.values() if getattr(a, field) == value and a.day == day)
+        return committed + reserved

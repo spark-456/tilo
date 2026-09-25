@@ -55,20 +55,19 @@ def test_FR_MTR_01_repo_prices_yaml_loads_and_refuses_every_profile():
 
 
 def test_FR_MTR_01_committed_entries_keep_their_price_effective_date_and_source(tmp_path):
-    """An entry is never re-priced after it is written: two runs, each committed under a different
-    price version, keep the date and source that priced them, not the book's latest version."""
+    """An entry is never re-priced: two runs committed under different price versions each keep
+    the date and source that priced them, not the book's latest version."""
     book = _book(tmp_path, PRICES_V1, PRICES_V2)
-    config = MeteringConfig.load(write_yaml(tmp_path, "metering.yaml", metering_config()))
-    treasury = Treasury(config=config, prices=book, flags=InMemoryFlagStore())
+    treasury = Treasury(
+        config=MeteringConfig.load(write_yaml(tmp_path, "m.yaml", metering_config())),
+        prices=book,
+        flags=InMemoryFlagStore(),
+    )
     treasury.open_run("r_early", user_id="u", org_id="org", approved=1000)
     treasury.open_run("r_late", user_id="u", org_id="org", approved=1000)
     usage = Usage(profile="widget", tokens_in=1_000_000, tokens_out=0)
-
-    early = treasury.reserve("r_early", "s1", estimate=1.0, at=_MAR)
-    treasury.commit_usage(early, usage, at=_MAR)
-    late = treasury.reserve("r_late", "s1", estimate=3.0, at=_SEP)
-    treasury.commit_usage(late, usage, at=_SEP)
-
+    treasury.commit_usage(treasury.reserve("r_early", "s1", estimate=1.0, at=_MAR), usage, at=_MAR)
+    treasury.commit_usage(treasury.reserve("r_late", "s1", estimate=3.0, at=_SEP), usage, at=_SEP)
     commits = {e.run: e for e in treasury.ledger if e.kind == "commit"}
     assert commits["r_early"].price_effective_date == "2026-01-01"
     assert commits["r_early"].price_source == PRICES_V1["source"]
@@ -77,18 +76,15 @@ def test_FR_MTR_01_committed_entries_keep_their_price_effective_date_and_source(
 
 
 def test_FR_MTR_01_unset_status_refuses_to_price_but_record_usage_still_records(tmp_path):
-    """record_usage meters recorded usage only: it always works, even with unset prices, and
-    appends a usage entry with credits=None."""
+    """record_usage meters recorded usage only: it always works, even unset, and appends a usage
+    entry with credits=None."""
     unset = _prices(None, None, None, None, status="unset")
-    book = PriceBook.load(write_yaml(tmp_path, "unset.yaml", unset))
     usage = Usage(profile="widget", tokens_in=100, tokens_out=100)
     with pytest.raises(UnpricedError):
-        book.credits(usage, at=_MAR)
-
+        PriceBook.load(write_yaml(tmp_path, "unset.yaml", unset)).credits(usage, at=_MAR)
     treasury, _flags = build_treasury(tmp_path, prices=unset)
     treasury.open_run("r_unset", user_id="u", org_id="org", approved=100)
     treasury.record_usage("r_unset", usage, at=_MAR)
-
     entries = [e for e in treasury.ledger if e.kind == "usage" and e.run == "r_unset"]
     assert len(entries) == 1
     assert entries[0].credits is None
