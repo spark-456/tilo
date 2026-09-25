@@ -67,9 +67,7 @@ typecheck:
 eval:
     python -c "print('eval harness not built yet (ticket P3); nothing to run')"
 
-# PL-05 conformance suite: every profile a role's primary/fallback/cascade
-# names, checked and written to config/conformance/<profile>.json. Replay by
-# default (a miss is recorded as a fail, not a crash); LIVE=1 for real calls.
+# PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
 conformance:
     uv run python -m tilo_providers.conformance
 

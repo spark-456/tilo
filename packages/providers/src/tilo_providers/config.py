@@ -1,13 +1,11 @@
 """tilo_providers.config — provider-layer config loader (PRD 6.4, 6.6 EFF-03,
-17.2 NFR-25, 14.1 Credits, PL-05 conformance). Loads config/models.yaml +
-config/prices.yaml, validates each against tilo_contracts, and fails loudly
-with ProviderConfigError: denied model id (PL-07); a role naming an unknown
+17.2 NFR-25, 14.1 Credits). Loads config/models.yaml + config/prices.yaml,
+validates each against tilo_contracts, and fails loudly with
+ProviderConfigError: denied model id (PL-07); a role naming an unknown
 profile; a role with no fallback profile (NFR-25); a profile with no price entry; a status "set" prices
 file with a null price, effective_date or source. price() never invents a
 price: an unset status, or any null price field, raises (PL-06). An optional
-`conformance_dir` (PL-05) refuses a role whose primary, fallback or cascade
-profile has a *failing* result; a *missing* one only warns unless
-`TILO_REQUIRE_CONFORMANCE=1` (docs/open-questions.md BQ-55)."""
+`conformance_dir` gates roles on PL-05 results (BQ-55)."""
 
 from __future__ import annotations
 
@@ -168,48 +166,34 @@ def _validate_price_fields_when_set(prices: ProvidersPrices, prices_path: Path) 
             )
 
 
-def _profiles_used_by(role: ProvidersRole) -> set[str]:
-    profile_ids = {role.primary}
-    if role.fallback:
-        profile_ids.add(role.fallback)
-    profile_ids.update(role.cascade or ())
-    return profile_ids
+def profiles_used_by(role: ProvidersRole) -> set[str]:
+    return {role.primary, *([role.fallback] if role.fallback else []), *(role.cascade or ())}
 
 
 def _validate_conformance(models: ProvidersModels, conformance_dir: Path) -> None:
-    """PL-05: "a failing profile cannot be assigned to a role". A missing
-    result file is a warning in dev (nothing has run the suite yet) and a
-    hard refusal only when `TILO_REQUIRE_CONFORMANCE=1` (a deploy gate)."""
-    require_conformance = os.environ.get("TILO_REQUIRE_CONFORMANCE") == "1"
+    """PL-05: a failing profile cannot serve a role; a missing result warns (refused if required)."""
     for role_id, role in models.roles.items():
-        for profile_id in sorted(_profiles_used_by(role)):
-            result_path = conformance_dir / f"{profile_id}.json"
-            if not result_path.is_file():
-                message = (
-                    f"PL-05: role {role_id!r} profile {profile_id!r} has no conformance result at "
-                    f"{result_path} -- allowed in dev, refused when TILO_REQUIRE_CONFORMANCE=1"
-                )
-                if require_conformance:
-                    raise ProviderConfigError(message)
-                warnings.warn(message, stacklevel=2)
+        for profile_id in sorted(profiles_used_by(role)):
+            path = conformance_dir / f"{profile_id}.json"
+            where = f"PL-05: role {role_id!r} profile {profile_id!r} conformance result {path}"
+            if not path.is_file():
+                if os.environ.get("TILO_REQUIRE_CONFORMANCE") == "1":
+                    raise ProviderConfigError(f"{where} is missing (TILO_REQUIRE_CONFORMANCE=1)")
+                warnings.warn(f"{where} is missing -- allowed in dev", stacklevel=2)
                 continue
             try:
-                payload = json.loads(result_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as error:
-                raise ProviderConfigError(f"PL-05: {result_path} is not valid JSON: {error}") from error
-            if payload.get("result") != "pass":
-                raise ProviderConfigError(
-                    f"PL-05: role {role_id!r} profile {profile_id!r} has a failing conformance result at {result_path}"
-                )
+                passed = json.loads(path.read_text(encoding="utf-8")).get("result") == "pass"
+            except (OSError, ValueError, AttributeError) as error:
+                raise ProviderConfigError(f"{where} is unreadable: {error}") from error
+            if not passed:
+                raise ProviderConfigError(f"{where} is failing")
 
 
 def load_providers_config(
     models_path: Path | str, prices_path: Path | str, conformance_dir: Path | str | None = None
 ) -> ProvidersConfig:
     """Loads, validates and start-up-checks the two config files; raises
-    ProviderConfigError loudly rather than starting on a bad config.
-    `conformance_dir` (PL-05) is optional and defaults to skipping that
-    gate, so every P0-04 call site predating this ticket is unaffected."""
+    ProviderConfigError loudly rather than starting on a bad config."""
     models_path, prices_path = Path(models_path), Path(prices_path)
     raw_models = _load_yaml_mapping(models_path)
     raw_prices = _load_yaml_mapping(prices_path)

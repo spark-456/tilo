@@ -1,12 +1,10 @@
 """tilo_providers.factory — role -> `ModelProvider` factory (EFF-01, PRD
-6.6). `build_provider` resolves a role's primary profile via
-`provider_for_role_profile`: `provider: fake` always returns
-`FakeModelProvider` directly; every other profile returns a
+6.6). `build_provider` resolves a role's primary profile: `provider: fake`
+always returns `FakeModelProvider` directly; every other profile returns a
 `RecordReplayProvider`, whose real adapter is built lazily inside the
 `live_factory` closure only when a call actually goes live (`LIVE=1`).
 Nothing here imports an adapter module or builds a network client for a
-plain replay hit. The router (P0-06) calls `provider_for_role_profile`
-directly per candidate profile in a cascade or fallback."""
+plain replay hit. The router builds any profile via `provider_for_role_profile`."""
 
 from __future__ import annotations
 
@@ -44,8 +42,7 @@ def provider_for_role_profile(
 
 
 def build_provider(role_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str) -> ModelProvider:
-    role = config.roles[role_id]
-    return provider_for_role_profile(role_id, role.primary, config, fixtures_dir=fixtures_dir)
+    return provider_for_role_profile(role_id, config.roles[role_id].primary, config, fixtures_dir=fixtures_dir)
 
 
 def _build_live_provider(profile: ProvidersProfile, profile_id: str) -> ModelProvider:
