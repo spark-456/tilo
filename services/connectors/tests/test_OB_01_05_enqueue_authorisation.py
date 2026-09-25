@@ -44,10 +44,20 @@ def test_OB_01_enqueue_accepts_every_authorised_entry(crossref_valid_cases):
         assert stored == case["entry"], name
 
 
+# These two cases break PI-16 / PI-17 only in the data.transfer a sent entry emitted; the entry
+# itself is authorised. enqueue() never receives a transfer (the outbox emits it, deriving it from
+# the entry in dispatch_due()), so they are covered by test_PI_14_16_17_data_transfer_emission.py.
+TRANSFER_ONLY_CASES = {"ob01_transfer_stamped_other_than_entry.json", "ob05_transfer_sent_other_version.json"}
+
+
 def test_OB_01_enqueue_refuses_every_unauthorised_entry(crossref_invalid_cases):
-    """Every contracts/fixtures/outbox/crossref/invalid/ case (OB-01 or OB-05 broken): enqueue
-    raises OutboxRefused and writes nothing (proven by dispatch_due() sending nothing after)."""
+    """Every contracts/fixtures/outbox/crossref/invalid/ case (OB-01 or OB-05 broken) except the
+    transfer-only ones: enqueue raises OutboxRefused and writes nothing (proven by dispatch_due()
+    sending nothing after)."""
+    assert TRANSFER_ONLY_CASES <= {name for name, _ in crossref_invalid_cases}
     for name, case in crossref_invalid_cases:
+        if name in TRANSFER_ONLY_CASES:
+            continue
         emitted: list[dict] = []
         outbox, _gmail = make_outbox(emitted)
         with pytest.raises(tilo_connectors.OutboxRefused):
