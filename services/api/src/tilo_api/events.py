@@ -18,12 +18,9 @@ def now() -> str:
 
 
 def policy_vis(policy: dict, world_districts: dict[str, Any] | None) -> Any:
-    """EV-13 (round-3 finding): a policy's policy.changed announces to the *intersection* of its
-    own scope.districts with the target world's own layout (a policy carries no world_id of its
-    own, PRD 15.3, so its scope may name a district foreign to the world an event is filed
-    under). Missing/malformed scope/scope.districts, no world layout to intersect against, or an
-    intersection that comes out empty, all fall back to "all" (unrestricted event; the contract
-    has no owner-only vis to fall back to instead, API_ST3a.md open question)."""
+    """EV-13: the intersection of scope.districts with the *target* world's own layout (a policy
+    carries no world_id of its own, so its scope may name a foreign district). Missing/malformed
+    scope, no layout to intersect against, or an empty intersection all fall back to "all"."""
     if not world_districts:
         return "all"
     scope = policy.get("scope")

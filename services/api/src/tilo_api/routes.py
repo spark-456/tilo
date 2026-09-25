@@ -1,19 +1,20 @@
-"""Kill switches (FR-HIL-07, PI-13, PI-18) and roles/redaction (FR-HIL-09, SEC-07) routes, per
-the exact shape pinned in services/api/tests/API_ST3a.md (round 3). Only the policy owner stops,
-pauses or revokes; a non-member or a non-owner gets exactly the same 404/response as an unknown
-world or policy (no membership or ownership oracle). Stop-all and Pause-all validate every
-policy's plan before mutating anything (never half-apply, never 500), keep lowering autonomy even
-when the event writer is down (the part is kept pending and flushed on the next mutating call
-against that world), and serialize under one lock so two concurrent calls never double-write.
-The two GET routes rebuild every kept event by allowlisting exactly the fields API_ST3a.md names,
-never by copying the stored event forward: a hidden event, a hidden district, a real store id, an
-archive/message ref and a dangling cause-or-data reference never reach a non-owner response.
+"""Kill switches (FR-HIL-07, PI-13, PI-18) and roles/redaction (FR-HIL-09, SEC-07), per the exact
+shape in services/api/tests/API_ST3a.md (round 4). Only the policy owner stops, pauses or
+revokes; a non-member/non-owner gets the same 404 as unknown (no oracle). Stop-all/Pause-all
+lower every targeted policy before any writer call, keep lowering autonomy when the writer is
+down (a failed part is queued in Store.pending_events and flushed, per touched world, by the
+next mutating call), and use per-world locks so concurrent calls never double-write and one
+world's writer latency never blocks another's. The two GET routes rebuild every kept event by
+allowlisting -- never copying the stored event forward -- redacting `data` recursively at any
+depth.
 """
 
 from __future__ import annotations
 
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -25,13 +26,8 @@ from tilo_api.events import now, policy_changed_part, policy_vis, world_paused_p
 
 router = APIRouter()
 
-# One lock for every Stop-all/Pause-all mutation (round-3 qa finding): simple and correct for an
-# in-memory single-process store -- two concurrent calls against the same or different worlds
-# serialize, so the second always sees the first's completed state and never double-applies.
-_MUTATE_LOCK = threading.Lock()
-
 _ULID_RE = re.compile(r"^[0-7][0-9A-HJKMNP-TV-Z]{25}$")
-
+_DISTRICT_RE = re.compile(r"^D[0-9]{1,4}$")
 _REQUIRED_EVENT_KEYS = (
     "v",
     "id",
@@ -54,16 +50,28 @@ _REQUIRED_EVENT_KEYS = (
     "data",
     "trace",
 )
-
 _EMPTY_TRACE = {
-    "model_role": None,
-    "profile": None,
-    "tokens_in": None,
-    "tokens_out": None,
-    "tool": None,
-    "latency_ms": None,
-    "archive_ref": None,
+    k: None for k in ("model_role", "profile", "tokens_in", "tokens_out", "tool", "latency_ms", "archive_ref")
 }
+
+# Round-4 fix (qa, biggest): per-world locks, not one global lock, so a Stop-all against world A
+# never waits on world B's writer latency. `_locks_guard` only ever protects the dict lookup
+# itself, never held during a route's own work.
+_locks_guard = threading.Lock()
+_world_locks: dict[str, threading.Lock] = {}
+
+
+def _lock_for(world_id: str) -> threading.Lock:
+    with _locks_guard:
+        return _world_locks.setdefault(world_id, threading.Lock())
+
+
+def _locked(world_ids: list[str]) -> ExitStack:
+    """Acquires every touched world's lock, sorted, so two calls sharing worlds never deadlock."""
+    stack = ExitStack()
+    for w in sorted(set(world_ids)):
+        stack.enter_context(_lock_for(w))
+    return stack
 
 
 def _is_owner(principal: Principal, owner: str) -> bool:
@@ -71,9 +79,7 @@ def _is_owner(principal: Principal, owner: str) -> bool:
 
 
 def _require_member_world(principal: Principal, store: Store, world_id: str) -> WorldRecord:
-    """Membership check applied first on every world route: a mismatch (wrong world, or no
-    membership) is identical to an unknown world_id -- same 404, so a caller cannot tell "no
-    such world" from "you are not a member of it" (round-2 security finding)."""
+    """A membership mismatch (wrong world or none) gets the same 404 as an unknown world_id."""
     if principal.world_id != world_id:
         raise HTTPException(status_code=404)
     world = store.worlds.get(world_id)
@@ -83,22 +89,15 @@ def _require_member_world(principal: Principal, store: Store, world_id: str) -> 
 
 
 def _safe_districts(value: Any) -> tuple[str, ...]:
-    """Round-3 security finding: Principal.districts is typed tuple[str, ...], but a caller that
-    (by a bug elsewhere) ends up with a bare str or any other non-list/tuple/set must never have
-    it iterated char-by-char or substring-matched against a district id -- treated as no
-    districts at all."""
+    """A Principal.districts that is not a list/tuple/set (e.g. a bare str) is never substring
+    matched -- treated as no districts."""
     if isinstance(value, (list, tuple, set, frozenset)):
         return tuple(d for d in value if isinstance(d, str))
     return ()
 
 
 def _visible(is_owner: bool, vis: Any, safe_districts: tuple[str, ...]) -> bool:
-    """Server-side redaction (PRD 10.1, EV-13): the owner sees everything; "all" is visible to
-    anyone; a district list is visible only when it intersects the caller's own districts. Fail
-    closed -- anything else is not visible."""
-    if is_owner:
-        return True
-    if vis == "all":
+    if is_owner or vis == "all":
         return True
     if isinstance(vis, list):
         return any(d in safe_districts for d in vis)
@@ -106,135 +105,119 @@ def _visible(is_owner: bool, vis: Any, safe_districts: tuple[str, ...]) -> bool:
 
 
 def _district_fields(record: Any) -> tuple[str, str] | None:
-    """None or unusable (round-2 finding): a malformed district record is treated as hidden,
-    never raises, whoever is asking."""
-    name = getattr(record, "name", None)
-    summary = getattr(record, "summary", None)
-    if isinstance(name, str) and isinstance(summary, str):
-        return name, summary
-    return None
+    name, summary = getattr(record, "name", None), getattr(record, "summary", None)
+    return (name, summary) if isinstance(name, str) and isinstance(summary, str) else None
 
 
 def _is_malformed_event(event: Any) -> bool:
-    """Round-3 finding: an event missing id (or id not a string), a cause that is not a string or
-    None, or missing any other key event.schema.json requires is dropped for everyone, owner
-    included -- a value tilo-api cannot safely read cannot be honestly shown to anyone."""
-    if not isinstance(event, dict):
+    if not isinstance(event, dict) or any(k not in event for k in _REQUIRED_EVENT_KEYS):
         return True
-    for key in _REQUIRED_EVENT_KEYS:
-        if key not in event:
-            return True
     if not isinstance(event["id"], str):
         return True
     cause = event["cause"]
     return cause is not None and not isinstance(cause, str)
 
 
-def _redact_data(data: Any, id_map: dict[str, str]) -> Any:
-    """A ULID-shaped data value naming another event is remapped to that event's view-local id
-    when it survived filtering, else nulled -- the same treatment as `cause`. `message_ref`
-    (archive-position-shaped, not ULID-shaped) is always null for a scoped viewer regardless."""
-    if not isinstance(data, dict):
-        return data
-    redacted: dict[str, Any] = {}
-    for key, value in data.items():
+def _redact_district(value: Any, safe_districts: tuple[str, ...]) -> Any:
+    if isinstance(value, str) and _DISTRICT_RE.match(value):
+        return value if value in safe_districts else None
+    return value
+
+
+def _redact_value(value: Any, key: str | None, id_map: dict[str, str], safe_districts: tuple[str, ...]) -> Any:
+    """Walks `data` recursively (any dict/list depth): message_ref always null, a ULID-shaped
+    leaf remapped-or-nulled like `cause`, a district-shaped leaf nulled when hidden."""
+    if isinstance(value, dict):
+        return {k: _redact_value(v, k, id_map, safe_districts) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_redact_value(v, None, id_map, safe_districts) for v in value]
+    if isinstance(value, str):
         if key == "message_ref":
-            redacted[key] = None
-        elif isinstance(value, str) and _ULID_RE.match(value):
-            redacted[key] = id_map.get(value)
-        else:
-            redacted[key] = value
-    return redacted
+            return None
+        if _ULID_RE.match(value):
+            return id_map.get(value)
+        return _redact_district(value, safe_districts)
+    return value
 
 
 def _owner_event_view(event: dict) -> dict:
-    """The owner's full stream (PRD 15.3): every allowlisted field, unchanged."""
-    return {
-        "seq": event["seq"],
-        "id": event["id"],
-        "ts": event["ts"],
-        "type": event["type"],
-        "actor": event["actor"],
-        "target": event["target"],
-        "level": event["level"],
-        "severity": event["severity"],
-        "credits": event["credits"],
-        "summary": event["summary"],
-        "authz": event["authz"],
-        "district": event["district"],
-        "cause": event["cause"],
-        "vis": event["vis"],
-        "data": event["data"],
-        "trace": event["trace"],
+    return {k: event[k] for k in _REQUIRED_EVENT_KEYS if k not in ("v", "world_id", "run_id", "item", "trace")} | {
+        "trace": event["trace"]
     }
 
 
 def _scoped_event_view(event: dict, seq: int, id_map: dict[str, str], safe_districts: tuple[str, ...]) -> dict:
-    """A redacted view (PRD 15.3): view-local seq/id, a hidden district nulled even on a vis:
-    "all" event, cause remapped-or-nulled, ULID-shaped data remapped-or-nulled, archive_ref
-    stripped outright."""
-    district = event["district"]
-    if district is not None and district not in safe_districts:
-        district = None
-    cause = event["cause"]
-    cause = id_map.get(cause) if cause is not None else None
     trace_value = event.get("trace")
     trace = dict(trace_value) if isinstance(trace_value, dict) else dict(_EMPTY_TRACE)
     trace["archive_ref"] = None
+    cause = event["cause"]
+    vis = event["vis"]
     return {
         "seq": seq,
         "id": f"v{seq}",
         "ts": event["ts"],
         "type": event["type"],
-        "actor": event["actor"],
-        "target": event["target"],
+        "actor": _redact_district(event["actor"], safe_districts),
+        "target": _redact_district(event["target"], safe_districts),
         "level": event["level"],
         "severity": event["severity"],
         "credits": event["credits"],
         "summary": event["summary"],
         "authz": event["authz"],
-        "district": district,
-        "cause": cause,
-        "vis": event["vis"],
-        "data": _redact_data(event["data"], id_map),
+        "district": _redact_district(event["district"], safe_districts),
+        "cause": id_map.get(cause) if cause is not None else None,
+        "vis": [d for d in vis if d in safe_districts] if isinstance(vis, list) else vis,
+        "data": _redact_value(event["data"], None, id_map, safe_districts),
         "trace": trace,
     }
 
 
-def _write_or_pend(store: Store, writer: EventWriter, world_id: str, part: dict) -> None:
-    """The writer being down must never stop the kill switch (round-3 qa/security finding): a
-    part that fails to write is kept pending rather than lost or allowed to raise out of the
-    route; the level change it records already happened and is never rolled back."""
-    try:
-        writer.append(world_id, part)
-    except Exception:
-        store.pending_events.setdefault(world_id, []).append(part)
-
-
-def _flush_pending(store: Store, writer: EventWriter, world_id: str) -> None:
-    """Attempt every part still pending for this world, oldest first, before this call's own new
-    work. A part is removed from pending_events only once `append` returns for it, so it is
-    written exactly once, never twice, never silently dropped."""
-    pending = store.pending_events.get(world_id)
-    if not pending:
+def _write_parts(store: Store, writer: EventWriter, items: list[tuple[str, dict]]) -> None:
+    """Attempts every (world_id, part) concurrently, not sequentially, so N writer calls take
+    ~O(latency) not O(N * latency) (round-4 qa: the 5s budget must hold against a slow writer
+    too). A part whose write raises is queued pending; a success already landed via the writer."""
+    if not items:
         return
-    store.pending_events[world_id] = []
-    for part in pending:
-        _write_or_pend(store, writer, world_id, part)
+
+    def attempt(item: tuple[str, dict]) -> None:
+        world_id, part = item
+        try:
+            writer.append(world_id, part)
+        except Exception:
+            store.pending_events.setdefault(world_id, []).append(part)
+
+    with ThreadPoolExecutor(max_workers=min(64, len(items))) as pool:
+        list(pool.map(attempt, items))
+
+
+def _touched_worlds(store: Store, world_id: str, owner: str) -> list[str]:
+    """The request's own world plus every owned policy's mapped world (round-4: pending/flush
+    must count and reach every world a call's own policies could route an event to)."""
+    touched = {world_id}
+    for policy_id, policy in store.policies.items():
+        if isinstance(policy, dict) and policy.get("owner") == owner:
+            touched.add(store.policy_worlds.get(policy_id, world_id))
+    return list(touched)
+
+
+def _flush_touched(store: Store, writer: EventWriter, touched: list[str]) -> None:
+    items: list[tuple[str, dict]] = []
+    for w in touched:
+        pending = store.pending_events.get(w)
+        if pending:
+            items.extend((w, part) for part in pending)
+            store.pending_events[w] = []
+    _write_parts(store, writer, items)
 
 
 def _stop_all_owner_policies(
-    store: Store, writer: EventWriter, owner: str, world: WorldRecord, requested_world_id: str, change: str, at: str
-) -> tuple[int, int]:
-    """PI-13/PI-18: validate every owned policy's plan first, then apply -- never half-applies,
-    never 500s. L0 stays untouched, not counted. A policy is skipped as an idempotent repeat
-    (already_l1, no new history entry, no event) only when it is *provably* already consistent:
-    level == "L1" and its own history[-1]["level"] == "L1" too (round-3 code-review finding, "no
-    silent history repair" -- a level that merely reads L1 while history disagrees or is
-    unreadable is an inconsistent record, not a proven repeat, and goes through the exact same
-    normal lowering path as any other policy). Anything else -- including a missing/malformed
-    level, fail safe -- gets exactly one history entry and one policy.changed, routed to its
-    mapped world or, absent one, to the world the request was made against (never a KeyError)."""
+    store: Store, owner: str, requested_world_id: str, change: str, at: str
+) -> tuple[int, int, list[tuple[str, dict]]]:
+    """PI-13/PI-18: plan every owned policy first, then apply -- never half-applies, never 500s.
+    L0 stays untouched. A policy is skipped as already_l1 only when *provably* consistent (level
+    == "L1" and its own history agrees too, round-3 "no silent history repair"); anything else
+    (including a missing/malformed level, or an L1 whose history disagrees) is lowered with one
+    history entry and one policy.changed, vis computed against its own target world (round-4)."""
     plan: list[tuple[str, dict, str]] = []
     already_l1 = 0
     for policy_id, policy in store.policies.items():
@@ -256,6 +239,7 @@ def _stop_all_owner_policies(
             continue
         plan.append((policy_id, policy, store.policy_worlds.get(policy_id, requested_world_id)))
 
+    new_parts: list[tuple[str, dict]] = []
     for policy_id, policy, target_world_id in plan:
         history = policy.get("history")
         history = history if isinstance(history, list) else []
@@ -263,11 +247,13 @@ def _stop_all_owner_policies(
         policy["history"] = history
         policy["level"] = "L1"
         policy["changed_by"] = {"by": owner, "at": at}
-        vis = policy_vis(policy, world.districts)
-        part = policy_changed_part(policy_id=policy_id, change=change, owner=owner, at=at, vis=vis)
-        _write_or_pend(store, writer, target_world_id, part)
+        target_world = store.worlds.get(target_world_id)
+        vis = policy_vis(policy, target_world.districts if target_world else None)
+        new_parts.append(
+            (target_world_id, policy_changed_part(policy_id=policy_id, change=change, owner=owner, at=at, vis=vis))
+        )
 
-    return len(plan), already_l1
+    return len(plan), already_l1, new_parts
 
 
 class PauseRequest(BaseModel):
@@ -286,10 +272,12 @@ def stop_autopilot(
         raise HTTPException(status_code=403)
 
     at = now()
-    with _MUTATE_LOCK:
-        _flush_pending(store, writer, world_id)
-        stopped, already_l1 = _stop_all_owner_policies(store, writer, world.owner, world, world_id, "stop_all", at)
-        pending = len(store.pending_events.get(world_id, []))
+    touched = _touched_worlds(store, world_id, world.owner)
+    with _locked(touched):
+        _flush_touched(store, writer, touched)
+        stopped, already_l1, new_parts = _stop_all_owner_policies(store, world.owner, world_id, "stop_all", at)
+        _write_parts(store, writer, new_parts)
+        pending = sum(len(store.pending_events.get(w, [])) for w in touched)
 
     result = {
         "stopped": stopped,
@@ -313,16 +301,15 @@ def pause_world(
         raise HTTPException(status_code=403)
 
     at = now()
-    with _MUTATE_LOCK:
-        _flush_pending(store, writer, world_id)
-        stopped, already_l1 = _stop_all_owner_policies(store, writer, world.owner, world, world_id, "stop_all", at)
-        # Only a call that actually lowered something this round is a new pause action (also
-        # what keeps two concurrent Pause-alls, serialized by the lock above, from each filing
-        # their own world.paused once the first has already lowered every owned policy).
-        if stopped > 0:
-            part = world_paused_part(world_id=world_id, owner=world.owner, channel=body.channel)
-            _write_or_pend(store, writer, world_id, part)
-        pending = len(store.pending_events.get(world_id, []))
+    touched = _touched_worlds(store, world_id, world.owner)
+    with _locked(touched):
+        _flush_touched(store, writer, touched)
+        stopped, already_l1, new_parts = _stop_all_owner_policies(store, world.owner, world_id, "stop_all", at)
+        if not world.paused:
+            world.paused = True
+            new_parts.append((world_id, world_paused_part(world_id=world_id, owner=world.owner, channel=body.channel)))
+        _write_parts(store, writer, new_parts)
+        pending = sum(len(store.pending_events.get(w, [])) for w in touched)
 
     result = {"stopped": stopped, "already_l1": already_l1, "paused": True, "pending": pending}
     return JSONResponse(content=result, status_code=202 if pending else 200)
@@ -337,8 +324,7 @@ def revoke_policy(
 ) -> dict:
     policy = store.policies.get(policy_id)
     if not isinstance(policy, dict) or principal.user_id != policy.get("owner"):
-        # Same 404 for "no such policy" and "not yours" -- no ownership oracle (round-2 finding).
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404)  # same 404 for unknown and not-yours -- no oracle
 
     owner = policy["owner"]
     at = now()
@@ -351,11 +337,11 @@ def revoke_policy(
 
     target_world_id = store.policy_worlds.get(policy_id)
     if target_world_id is not None:
-        target_world = store.worlds.get(target_world_id)
-        world_districts = target_world.districts if target_world is not None else None
-        vis = policy_vis(policy, world_districts)
-        part = policy_changed_part(policy_id=policy_id, change="revoked", owner=owner, at=at, vis=vis)
-        writer.append(target_world_id, part)
+        with _locked([target_world_id]):
+            target_world = store.worlds.get(target_world_id)
+            vis = policy_vis(policy, target_world.districts if target_world else None)
+            part = policy_changed_part(policy_id=policy_id, change="revoked", owner=owner, at=at, vis=vis)
+            _write_parts(store, writer, [(target_world_id, part)])
 
     return {"policy_id": policy_id, "level": "L1"}
 
