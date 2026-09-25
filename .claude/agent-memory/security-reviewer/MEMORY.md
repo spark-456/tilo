@@ -3,6 +3,7 @@
 - [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r4 FAIL: card in >25-digit run unredacted; prefix-first window leaks; logs/JWT closed
 - [Skill checker gaps](skill-checker-gaps.md): FR-AGT-04 r5 FAIL: _EMAIL_RE ReDoS (50k chars 69 s), role header lost IGNORECASE; recall/commitment gaps persist
 - [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r2 FAIL; archive_ref/instruction_id leak hidden counts/ids; writer failure half-applies Stop all
-- [Policy engine P4-01](policy-engine-p4-01.md): r8 FAIL (75a46e5): `$` fix lost on $ref to a file root (evolve picks stock validator via `$schema`)
-- [Outbox ST-2](outbox-st2.md): r4 FAIL (db4f24a); emit lease steal: discard needs holder, so dup transfer or global permanent transfer block
+- [Policy engine P4-01](policy-engine-p4-01.md): r9 PASS (c7569a9); open: FEFF in scope email, level!=history drop (5d), invisible BOM in regex
+- [Outbox ST-2](outbox-st2.md): r5 PASS (2ff085b); open: writer must ack dup transfer, durable adapter dedupe, store authz/server time
+- [Cards API ST-3b](cards-api-st3b.md): r1 FAIL (ea775d2); answer route takes actor/channel/pin from body, open_gate trusts it
 - [Provider secret handling](provider-secret-handling.md): P0-05 r11 PASS (7a0d1be); residual for P0-06: malformed 200 body raises raw pydantic error (echoed key truncated)
