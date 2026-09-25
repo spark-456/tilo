@@ -1,0 +1,46 @@
+{
+  "input": {
+    "table": {
+      "columns": ["item"],
+      "rows": [
+        [
+          {
+            "ref": "A2",
+            "value": "Widget"
+          }
+        ],
+        [
+          {
+            "ref": "A3",
+            "value": "Gadget"
+          }
+        ]
+      ]
+    }
+  },
+  "output": {
+    "records": [
+      {
+        "row_ref": "A2",
+        "fields": {
+          "item": {
+            "value": "Widget",
+            "source_ref": "A2"
+          }
+        }
+      },
+      {
+        "row_ref": "A2",
+        "fields": {
+          "item": {
+            "value": "Widget",
+            "source_ref": "A2"
+          }
+        }
+      }
+    ]
+  },
+  "expect": {
+    "fail": "row-reused"
+  }
+}

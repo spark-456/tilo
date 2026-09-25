@@ -17,8 +17,10 @@ Use this skill to compare several supplied offers for the same item and recommen
 ## Quality bar
 
 - `unit-price-mismatch`: every unit price must exactly recompute from the offer's price, currency, rate and unit count, and cite the offer's own source id and the target currency.
+- `unit-price-missing`: every offer with a usable, computable price must have its own row in unit_prices; leaving a row out is not the same as reporting it wrong, and both fail the quality bar.
 - `pick-meets-requirements`: the picked offer must satisfy every stated requirement.
-- `pick-is-cheapest-qualifying`: the pick must be the cheapest offer that qualifies; if none qualify, pick must be null.
+- `pick-source-mismatch`: the pick's source_id must match the picked offer's own source_id, not a fabricated one.
+- `pick-is-cheapest-qualifying`: the pick must be the cheapest offer that qualifies, judged from the offers and rates actually supplied — never from only the unit_prices rows the output chose to include; if none qualify, pick must be null.
 - `input-malformed`: an offer's price or unit_count that cannot be used as a bounded, finite number (the input schema allows any JSON number, including an absurd one) fails closed instead of being computed with.
 - `output-malformed`: the output must be an object with a unit_prices array and a pick; malformed shapes fail closed.
 
@@ -26,8 +28,10 @@ Use this skill to compare several supplied offers for the same item and recommen
 
 - [ ] Every unit price recomputes exactly from the supplied price, rate and unit count.
 - [ ] Every unit price cites the offer's own source id.
+- [ ] Every supplied offer with a usable price has its own unit_prices row — none left out.
 - [ ] The pick, if any, passes every stated requirement.
-- [ ] The pick is the cheapest offer that passes, not just the cheapest offer.
+- [ ] The pick's source_id is the picked offer's own source id, not a made-up one.
+- [ ] The pick is the cheapest offer that passes, not just the cheapest offer, and not just the cheapest of whatever unit_prices happened to report.
 - [ ] Pick is null when nothing qualifies, never a disqualified cheap offer.
 
 ## Pitfalls
@@ -36,4 +40,6 @@ Use this skill to compare several supplied offers for the same item and recommen
 - Silently dropping a requirement the cheapest offer fails, instead of disqualifying it.
 - Using a rate not present in `inputs.rates`, or converting in the wrong direction.
 - Returning a pick with no qualifying offer instead of null.
+- Leaving a cheap qualifying offer's row out of `unit_prices` entirely — an omitted row is not the same as an honest one, and it can make a dearer offer look like the cheapest one reported.
+- Inventing a `source_id` on `pick` instead of copying the picked offer's own source id.
 - Passing through a wildly out-of-range price or unit_count unquestioned — a schema-valid number can still be absurd; treat it as unusable input, not as a real value to compute with.

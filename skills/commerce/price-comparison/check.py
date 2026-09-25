@@ -94,7 +94,25 @@ def check(inputs: dict, output: dict) -> list[dict]:
                     }
                 )
 
-    computed: dict[str, Decimal] = {}
+    # Expected unit price for every offer, computed from the inputs alone —
+    # never from the output (fix round 3, qa-breaker): the cheapest
+    # qualifying offer and the pick must be judged against what the offers
+    # actually cost, not against whichever unit_prices rows the output chose
+    # to report. An output that omits a cheap offer's row entirely must not
+    # be able to make a dearer offer look cheapest just because its row is
+    # the only one present.
+    expected_by_offer: dict[str, Decimal] = {}
+    for offer_id, offer in offers_by_id.items():
+        price_dec = _dec(offer.get("price"))
+        rate_dec = _dec(rates.get(offer.get("currency"))) if isinstance(offer.get("currency"), str) else None
+        unit_count_dec = _dec(offer.get("unit_count"))
+        if price_dec is not None and rate_dec is not None and unit_count_dec:
+            try:
+                expected_by_offer[offer_id] = (price_dec * rate_dec) / unit_count_dec
+            except (InvalidOperation, ArithmeticError):
+                pass
+
+    unit_price_rows_by_offer: dict[str, dict] = {}
     for i, up in enumerate(unit_prices):
         if not isinstance(up, dict):
             findings.append({"check": "output-malformed", "detail": f"unit_prices[{i}] is not an object"})
@@ -105,6 +123,7 @@ def check(inputs: dict, output: dict) -> list[dict]:
         if not isinstance(offer_id, str):
             findings.append({"check": "output-malformed", "detail": f"unit_prices[{i}].offer_id must be a string"})
             continue
+        unit_price_rows_by_offer[offer_id] = up
         offer = offers_by_id.get(offer_id)
         source_ok = (
             offer is not None
@@ -112,17 +131,7 @@ def check(inputs: dict, output: dict) -> list[dict]:
             and up.get("currency") == target_currency
         )
 
-        expected: Decimal | None = None
-        if offer is not None:
-            price_dec = _dec(offer.get("price"))
-            rate_dec = _dec(rates.get(offer.get("currency"))) if isinstance(offer.get("currency"), str) else None
-            unit_count_dec = _dec(offer.get("unit_count"))
-            if price_dec is not None and rate_dec is not None and unit_count_dec:
-                try:
-                    expected = (price_dec * rate_dec) / unit_count_dec
-                except (InvalidOperation, ArithmeticError):
-                    expected = None
-
+        expected = expected_by_offer.get(offer_id)
         declared_dec = _dec(up.get("unit_price"))
         value_ok = False
         if expected is not None and declared_dec is not None:
@@ -137,11 +146,16 @@ def check(inputs: dict, output: dict) -> list[dict]:
                     "detail": f"unit_prices[{i}] for offer {offer_id!r} does not recompute from the offer and rates",
                 }
             )
-        elif offer is not None and declared_dec is not None:
-            computed[offer_id] = declared_dec
+
+    # Every offer whose price is usable and computable must get its own
+    # unit_prices row. unit-price-mismatch alone cannot catch a row that is
+    # simply missing, only a row whose declared value is wrong.
+    for offer_id in expected_by_offer:
+        if offer_id not in unit_price_rows_by_offer:
+            findings.append({"check": "unit-price-missing", "detail": f"offer {offer_id!r} has no unit_prices row"})
 
     qualifying = [oid for oid, offer in offers_by_id.items() if _meets_requirements(offer, requirements)]
-    priced_qualifying = [(oid, computed[oid]) for oid in qualifying if oid in computed]
+    priced_qualifying = [(oid, expected_by_offer[oid]) for oid in qualifying if oid in expected_by_offer]
     cheapest_id = min(priced_qualifying, key=lambda pair: pair[1])[0] if priced_qualifying else None
 
     pick = output.get("pick")
@@ -164,11 +178,22 @@ def check(inputs: dict, output: dict) -> list[dict]:
                     "detail": f"picked offer {pick.get('offer_id')!r} fails a stated requirement or is unknown",
                 }
             )
-        elif cheapest_id is not None and pick.get("offer_id") != cheapest_id:
-            findings.append(
-                {
-                    "check": "pick-is-cheapest-qualifying",
-                    "detail": f"the cheapest qualifying offer is {cheapest_id!r}, not {pick.get('offer_id')!r}",
-                }
-            )
+        else:
+            if not isinstance(pick.get("source_id"), str) or pick.get("source_id") != pick_offer.get("source_id"):
+                findings.append(
+                    {
+                        "check": "pick-source-mismatch",
+                        "detail": (
+                            f"pick.source_id {pick.get('source_id')!r} does not match offer "
+                            f"{pick.get('offer_id')!r}'s own source_id {pick_offer.get('source_id')!r}"
+                        ),
+                    }
+                )
+            if cheapest_id is not None and pick.get("offer_id") != cheapest_id:
+                findings.append(
+                    {
+                        "check": "pick-is-cheapest-qualifying",
+                        "detail": f"the cheapest qualifying offer is {cheapest_id!r}, not {pick.get('offer_id')!r}",
+                    }
+                )
     return findings

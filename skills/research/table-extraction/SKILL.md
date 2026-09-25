@@ -18,20 +18,27 @@ Use this skill when a plan needs structured, typed records out of a table that h
 ## Quality bar
 
 - `no-invented-rows`: the number of output records must never exceed the number of input rows.
+- `row-reused`: each input row may produce at most one record; a row_ref repeated across records (for example a record duplicated in place of a dropped row) fails this even when the total record count looks right.
 - `source-ref-known`: every field's source_ref must be an actual cell reference from the supplied table.
+- `source-ref-in-row`: every field's source_ref must name a cell that is actually in the row identified by the record's own row_ref, not a cell borrowed from a different row.
+- `text-matches-cell`: a non-numeric field's value must equal its cited cell's text exactly, or that text trimmed of surrounding whitespace — never a different word.
 - `number-parses-exactly`: a field parsed from numeric-looking cell text must equal that number exactly, with no rounding or truncation drift.
-- `output-malformed`: the output must be an object with a records array of row_ref/fields objects; malformed shapes fail closed.
+- `output-malformed`: the output must be an object with a records array of row_ref/fields objects, each row_ref a known cell reference and each field value a string, number, boolean or null; malformed shapes fail closed.
 
 ## Checklist
 
-- [ ] Record count does not exceed the input row count.
-- [ ] Every field's source_ref names a real, supplied cell.
+- [ ] Record count does not exceed the input row count, and no row produced more than one record.
+- [ ] Every field's source_ref names a real, supplied cell that is inside the record's own row.
 - [ ] Every numeric field matches its source cell's text exactly when reparsed.
+- [ ] Every non-numeric field's value matches its source cell's text exactly (or trimmed).
 - [ ] No field or row was invented that the table did not contain.
 
 ## Pitfalls
 
 - Rounding a parsed number "for readability" — this breaks exact-match provenance and fails the quality bar.
 - Reusing a cell reference for a field it did not actually produce, just because the row looks right.
+- Citing a cell from a different row than the one the record's row_ref names (for example a quantity taken from the next row's cell) — every field must cite a cell inside its own row.
+- Duplicating one record in place of a row that was dropped — the record count can look right while one row still never got a record and another got two.
+- Writing a value that does not match the cited cell's text at all (for example "Sprocket" citing a cell that actually reads "Widget") — a non-numeric field's value must equal the cell text it cites.
 - Treating a merged or repeated header cell as if it were a data row, inflating the record count past the true row count.
 - Coercing a non-numeric cell (for example a currency symbol plus text) into a number instead of keeping it as text.

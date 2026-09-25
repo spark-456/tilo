@@ -108,7 +108,11 @@ def check(inputs: dict, output: dict) -> list[dict]:
             continue
         status = match.get("status")
         reason = match.get("reason_code")
-        if status != "matched" and not reason:
+        # A reason_code of [1], {} or NaN is truthy in Python (`not reason`
+        # is False) but is not a real, usable reason — only a non-empty
+        # string counts (fix round 3, qa-breaker).
+        reason_valid = isinstance(reason, str) and reason.strip() != ""
+        if status != "matched" and not reason_valid:
             findings.append(
                 {"check": "mismatch-missing-reason", "detail": f"matches[{i}] status {status!r} has no reason_code"}
             )

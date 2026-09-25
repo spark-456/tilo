@@ -122,4 +122,11 @@ def check(inputs: dict, output: dict) -> list[dict]:
                         "detail": f"slides[{i}].chart_ref carries drawing data instead of a plain data reference",
                     }
                 )
+            elif "chart_type" in chart_ref and not isinstance(chart_ref.get("chart_type"), str):
+                findings.append(
+                    {
+                        "check": "output-malformed",
+                        "detail": f"slides[{i}].chart_ref.chart_type must be a string when present",
+                    }
+                )
     return findings

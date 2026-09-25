@@ -1,0 +1,31 @@
+{
+  "input": {
+    "table": {
+      "columns": ["item"],
+      "rows": [
+        [
+          {
+            "ref": "A2",
+            "value": "Widget"
+          }
+        ]
+      ]
+    }
+  },
+  "output": {
+    "records": [
+      {
+        "row_ref": "A2",
+        "fields": {
+          "item": {
+            "value": "Sprocket",
+            "source_ref": "A2"
+          }
+        }
+      }
+    ]
+  },
+  "expect": {
+    "fail": "text-matches-cell"
+  }
+}

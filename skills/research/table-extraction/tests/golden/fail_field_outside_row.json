@@ -1,0 +1,49 @@
+{
+  "input": {
+    "table": {
+      "columns": ["item", "quantity"],
+      "rows": [
+        [
+          {
+            "ref": "A2",
+            "value": "Widget"
+          },
+          {
+            "ref": "B2",
+            "value": "12"
+          }
+        ],
+        [
+          {
+            "ref": "A3",
+            "value": "Gadget"
+          },
+          {
+            "ref": "B3",
+            "value": "4"
+          }
+        ]
+      ]
+    }
+  },
+  "output": {
+    "records": [
+      {
+        "row_ref": "A2",
+        "fields": {
+          "item": {
+            "value": "Widget",
+            "source_ref": "A2"
+          },
+          "quantity": {
+            "value": 4,
+            "source_ref": "B3"
+          }
+        }
+      }
+    ]
+  },
+  "expect": {
+    "fail": "source-ref-in-row"
+  }
+}
