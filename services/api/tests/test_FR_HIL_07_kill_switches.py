@@ -291,7 +291,8 @@ def test_FR_HIL_07_PI_13_decide_gates_after_stop_all(client, store):
 
 def test_FR_HIL_07_pause_all_emits_world_paused_and_sets_l1(client, store):
     ids = _world_with_policies(store, 3, level="L3")
-    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+    # ST-3a-2: the channel comes from the principal's session, never the request body.
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD, channel="whatsapp"))
 
     resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "whatsapp"})
 
@@ -1692,11 +1693,12 @@ def test_FR_HIL_07_malformed_scope_pause_all_never_loses_a_pending_part_when_the
     assert resp.status_code == 202, resp.text
     assert store.policies["pol_malformed"]["level"] == "L1"
     still_pending = store.pending_events.get(WORLD, [])
-    assert len(still_pending) == 1, (
-        "a part already sitting in store.pending_events before this call must be put back if "
-        f"anything raises inside the locked block, never lost -- got {len(still_pending)} parts pending"
+    types = [p["type"] for p in still_pending]
+    # The stale world.paused is never lost, and pol_malformed's own policy.changed is queued too
+    # (with the writer down, dropping it would lose that event for good, PI-13), oldest first.
+    assert types == ["world.paused", "policy.changed"], (
+        f"expected the stale part put back plus this call's own part, oldest first -- got {types}"
     )
-    assert still_pending[0]["type"] == "world.paused"
 
 
 def test_FR_HIL_07_malformed_scope_revoke_never_500s_and_reaches_l1(client, store, writer):
