@@ -2,9 +2,12 @@
 writes only a new entry: schema-valid (OB-05), "queued" or "scheduled" to match undo_window_s
 (OB-02), never overwriting a stored id, and authorised by tilo_policy.check_entry (OB-01/OB-05);
 a retry with the same world_id + idempotency_key is a no-op (OB-03). Outbox.dispatch_due() sends
-every entry currently due — including one stuck "sending" from a process death — minting a
-single-use Grant no caller outside this module can construct, so a connector adapter's
-side-effect method can only run from here (SEC-03). Public surface: tests/API.md.
+every entry currently due, minting a single-use Grant no caller outside this module can
+construct, so a connector adapter's side-effect method can only run from here (SEC-03). An
+adapter Exception is ambiguous (the side effect may have happened) so the entry just stays
+"sending" — still due, retried by the next dispatch_due(), the batch going on regardless — and
+only a missing adapter for the connector is a final "failed" (tests/API.md "Failures"). Public
+surface: tests/API.md.
 """
 
 from __future__ import annotations
@@ -21,9 +24,10 @@ from ._time import add_seconds
 from .errors import MissingGrant, OutboxRefused
 from .store import InMemoryOutboxStore
 
-# States dispatch_due() treats as due: "queued" and a stuck "sending" (a process death mid-send,
-# picked up again — the adapter's own key dedupe keeps it at one send) are always due;
-# "scheduled" waits out its undo window; "sent", "cancelled" and "failed" are terminal.
+# States dispatch_due() treats as due: "queued" and "sending" (left there by a process death or
+# an adapter Exception — either way ambiguous, so it stays retryable; the adapter's own key
+# dedupe keeps it at one send) are always due; "scheduled" waits out its undo window; "sent",
+# "cancelled" and "failed" (only a missing adapter, a definite non-send) are terminal.
 _ALWAYS_DUE_STATES = ("queued", "sending")
 _CLAIMABLE_STATES = ("queued", "scheduled", "sending")
 
@@ -166,7 +170,11 @@ class Outbox:
                 claimed["destination"], claimed["item"], claimed["recipients"], claimed["idempotency_key"], grant
             )
         except Exception:
-            return self._store._compare_and_set_state(outbox_id, ("sending",), "failed")
+            # Ambiguous: the side effect may already have happened. Marking it failed here could
+            # hide a real send with no event for it (PRD 9.4), so the entry just stays "sending"
+            # — still due — and the next dispatch_due() retries it; the adapter's own
+            # (world_id, idempotency_key) dedupe keeps it to one send. The batch goes on.
+            return None
         finally:
             _LIVE_GRANTS.discard(id(grant))
 
