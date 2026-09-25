@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -207,12 +208,18 @@ def make_store(
     policies: dict[str, dict] | None = None,
     policy_worlds: dict[str, str] | None = None,
     events: dict[str, list[dict]] | None = None,
+    pending_events: dict[str, list[dict]] | None = None,
 ) -> deps.Store:
+    """pending_events (round-3 addition, API_ST3a.md "Pending writes"): world_id -> event parts
+    Stop-all or Pause-all built but could not hand to EventWriter.append yet (the writer raised).
+    Defaults to {} like every other collection here; a test that never exercises writer failure
+    never needs to pass it."""
     return deps.Store(
         worlds=worlds or {},
         policies=policies or {},
         policy_worlds=policy_worlds or {},
         events=events or {},
+        pending_events=pending_events or {},
     )
 
 
@@ -233,6 +240,15 @@ def make_principal(
 
 def as_principal(principal: deps.Principal):
     app.dependency_overrides[deps.get_current_principal] = lambda: principal
+
+
+def as_writer(writer) -> None:
+    """Overrides get_event_writer mid-test with something other than the `writer` fixture's plain
+    FakeEventWriter -- a FlakyEventWriter or SlowEventWriter below, for the round-3 pending-write
+    and concurrency findings. The `client` fixture's own override runs first at TestClient
+    creation; FastAPI resolves dependency_overrides per request, so re-assigning the key here
+    before a test's client.post/get calls takes effect on every following request in that test."""
+    app.dependency_overrides[deps.get_event_writer] = lambda: writer
 
 
 # ---------------------------------------------------------------------------
@@ -323,6 +339,43 @@ class FakeEventWriter:
 
 def make_writer(store: deps.Store) -> FakeEventWriter:
     return FakeEventWriter(store)
+
+
+class FlakyEventWriter(FakeEventWriter):
+    """A stand-in for "the harness is down" (round-3 qa/security finding: FR-HIL-07's kill switch
+    must still lower every targeted policy to L1 even when EventWriter.append raises, and the
+    parts that could not be written must be kept as pending parts, not lost). While `failing` is
+    True (or while the call count is within `fail_first_n`) every `append` raises before touching
+    `self.calls` or the store, exactly like an unreachable harness process. Flip `failing` back to
+    False, or let `fail_first_n` run out, to prove a later call flushes whatever is pending,
+    exactly once each -- never zero times, never twice."""
+
+    def __init__(self, store: deps.Store, *, failing: bool = True, fail_first_n: int | None = None) -> None:
+        super().__init__(store)
+        self.failing = failing
+        self.fail_first_n = fail_first_n
+        self._attempts = 0
+
+    def append(self, world_id: str, part: dict) -> dict:
+        self._attempts += 1
+        should_fail = self.failing if self.fail_first_n is None else self._attempts <= self.fail_first_n
+        if should_fail:
+            raise RuntimeError("event writer unreachable (test double)")
+        return super().append(world_id, part)
+
+
+class SlowEventWriter(FakeEventWriter):
+    """Sleeps `delay_s` before every append, widening the race window for the round-3 qa
+    concurrency finding: two concurrent kill-switch calls (threads) against a slow writer must
+    still leave exactly one policy.changed (or world.paused) per policy/world, not two."""
+
+    def __init__(self, store: deps.Store, *, delay_s: float = 0.05) -> None:
+        super().__init__(store)
+        self.delay_s = delay_s
+
+    def append(self, world_id: str, part: dict) -> dict:
+        time.sleep(self.delay_s)
+        return super().append(world_id, part)
 
 
 def assert_part_carries_no_stamped_fields(part: dict) -> None:
