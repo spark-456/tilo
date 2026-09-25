@@ -96,6 +96,23 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
     return raw
 
 
+def _validate_profile_endpoint_fields(models: ProvidersModels) -> None:
+    """contracts/providers.schema.json's profile if/else (`$defs.profile`,
+    1.1.0) forbids `base_url`/`api_key_env` on any profile whose `provider`
+    is not `openai_compat`. The generated pydantic `ProvidersProfile` does
+    not enforce a JSON Schema if/else (same gap P0-04 handled for prices'
+    if/then in `_validate_price_fields_when_set`) — a `google` or `fake`
+    profile carrying either field validates against the model fine and
+    would only be caught here, at load time."""
+    for profile_id, profile in models.profiles.items():
+        if profile.provider != "openai_compat" and (profile.base_url is not None or profile.api_key_env is not None):
+            raise ProviderConfigError(
+                f"PL-02: profile {profile_id!r} has provider {profile.provider!r} but declares "
+                "base_url/api_key_env -- only an openai_compat profile may (contracts/providers.schema.json "
+                "$defs.profile)"
+            )
+
+
 def _validate_startup_rules(models: ProvidersModels, prices: ProvidersPrices) -> None:
     for profile_id, profile in models.profiles.items():
         for deny_glob in models.rules.deny:
@@ -163,6 +180,7 @@ def load_providers_config(models_path: Path | str, prices_path: Path | str) -> P
         raise ProviderConfigError(f"{prices_path} failed schema validation: {error}") from error
 
     _validate_price_fields_when_set(prices, prices_path)
+    _validate_profile_endpoint_fields(models)
 
     _validate_startup_rules(models, prices)
 

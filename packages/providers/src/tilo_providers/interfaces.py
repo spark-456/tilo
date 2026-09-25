@@ -64,6 +64,16 @@ class ModelProvider(ABC):  # PRD 6.4: generate, stream, embed, count_tokens, cap
     @abstractmethod
     def price(self) -> PriceQuote: ...
 
+    def redact(self, text: str) -> str:
+        """Scrubs this provider's own secret material (an API key value, an
+        Authorization header) out of `text` before it leaves the process --
+        e.g. a record-and-replay recording (PRD 16.1 rule 4). Defence in
+        depth for the case a live endpoint echoes a secret back into
+        ordinary model output, which never reaches `GenerateResponse`'s own
+        fields but could still land in `text`. Default: no-op; a provider
+        holding a raw secret (`openai_compat_adapter`) overrides it."""
+        return text
+
 
 class SearchProvider(ABC):  # PRD 6.1: grounded search
     @abstractmethod

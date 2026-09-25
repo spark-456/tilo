@@ -8,17 +8,36 @@ record. `LIVE=1` sends every call to the injected live provider; adding
 `ModelProvider`-level request/response ever reaches the file, never a
 header, API key or env value (PRD 16.1 rule 4). `live_factory` is a
 zero-argument callable so nothing here imports an adapter module or builds a
-network client unless a call actually goes live."""
+network client unless a call actually goes live.
+
+Redaction before every write is two layers deep: the live provider's own
+`ModelProvider.redact()` (an adapter that holds a raw secret, e.g.
+`openai_compat_adapter`, scrubs its own key value out of any text) runs
+first, then `_scrub_authorization_like` strips any remaining
+`Authorization: ...`/`Bearer ...`-shaped text as a provider-agnostic
+backstop — covering the case a recorded model *output* happens to echo a
+secret back, not only headers/env values that never reached
+`GenerateResponse` in the first place."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import re
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
+
+# Backstop scrub for anything written to a recording, whatever provider
+# produced it: an "Authorization: ..." header rendered as text, or a bare
+# "Bearer <token>" credential.
+_AUTHORIZATION_LIKE_RE = re.compile(r"(?i)(authorization\s*[:=]\s*(?:bearer\s+)?\S+|\bBearer\s+\S+)")
+
+
+def _scrub_authorization_like(text: str) -> str:
+    return _AUTHORIZATION_LIKE_RE.sub("[redacted]", text)
 
 
 def recording_key(role: str, profile_id: str, request: GenerateRequest) -> str:
@@ -136,4 +155,11 @@ class RecordReplayProvider(ModelProvider):
             "key": key,
             "response": response.model_dump(exclude_none=True),
         }
-        path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        text = json.dumps(payload, indent=2, sort_keys=True)
+        # PRD 16.1 rule 4: scrub before writing, not only before returning to
+        # the caller -- a live provider's own secret (redact()) first, then
+        # a provider-agnostic Authorization/Bearer backstop.
+        if self._live_provider is not None:
+            text = self._live_provider.redact(text)
+        text = _scrub_authorization_like(text)
+        path.write_text(text + "\n", encoding="utf-8")

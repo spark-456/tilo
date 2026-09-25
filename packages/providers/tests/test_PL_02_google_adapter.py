@@ -165,6 +165,21 @@ def test_PL_02_google_adapter_count_tokens(fake_genai_sdk):
     }
 
 
+def test_PL_02_google_adapter_refuses_a_real_client_without_live(fake_genai_sdk, monkeypatch):
+    """EFF-01: the LIVE=1 gate cannot live only in
+    `tilo_providers.replay.RecordReplayProvider` -- direct construction with
+    no injected `client` and `LIVE` unset must refuse before any real
+    `genai.Client` exists."""
+    from tilo_providers.errors import ProviderError
+    from tilo_providers.google_adapter import GoogleModelProvider
+
+    monkeypatch.delenv("LIVE", raising=False)
+
+    with pytest.raises(ProviderError) as excinfo:
+        GoogleModelProvider(profile=_profile(), profile_id="flash-38", project=PROJECT, location=LOCATION)
+    assert "LIVE" in str(excinfo.value)
+
+
 def test_PL_02_google_adapter_capabilities_match_the_profile(fake_genai_sdk):
     provider = _provider(FakeModelsAPI(), profile=_profile(caps=["json", "tools", "vision"]))
 

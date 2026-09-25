@@ -2,17 +2,22 @@
 (PL-02, PRD 6.4). Works against any endpoint that speaks the OpenAI chat
 completions / embeddings shape, including NVIDIA NIM
 (https://integrate.api.nvidia.com/v1, ADR-0003). `base_url` and
-`api_key_env` are constructor arguments today, not profile fields:
-`contracts/providers.schema.json` `$defs.profile` has `additionalProperties:
-false` and no such fields — see `config/models.nim.yaml`'s header comment
-(needs contract change, not edited here per root CLAUDE.md).
+`api_key_env` are `contracts/providers.schema.json` `$defs.profile` fields
+(1.1.0, ADR-0002/ADR-0003) for `provider: openai_compat` profiles; the
+factory (`tilo_providers.factory`) reads them off the profile, but they stay
+constructor arguments here too so a caller can build the adapter directly.
 
 Built on `httpx` (BSD-3-Clause, `docs/licences.md`); `transport` is injected
 by tests (`httpx.MockTransport`) so no real socket ever opens in dev/CI
-(EFF-01). The API key is read once from the named environment variable at
-construction time and sent only as the `Authorization` header — never
-logged, never written into a recording (`tilo_providers.replay`, PRD 16.1
-rule 4).
+(EFF-01). Without an injected `transport`, construction refuses to build a
+real `httpx.Client` unless `LIVE=1` (EFF-01: the LIVE gate must hold at
+every direct-construction path, not only inside
+`tilo_providers.replay.RecordReplayProvider`). The API key is read once from
+the named environment variable at construction time and sent only as the
+`Authorization` header — never logged, never written into a recording
+(`tilo_providers.replay`, PRD 16.1 rule 4); `redact()` scrubs the key value
+out of any text handed to it, so a recording still comes out clean even if
+a misbehaving endpoint echoes the key back inside ordinary model output.
 
 Secret hygiene (PRD 16.1 rule 4): the env value is checked at construction
 time for stray whitespace/control characters (e.g. a trailing CR from
@@ -76,6 +81,15 @@ class OpenAICompatModelProvider(ModelProvider):
                 "(no whitespace or control characters)"
             )
 
+        # EFF-01: a test injects `transport`; anything else building a real
+        # `httpx.Client` must say LIVE=1 first -- the gate cannot live only
+        # in RecordReplayProvider, since this constructor is reachable
+        # directly (the factory's live_factory, or a caller's own code).
+        if transport is None and os.environ.get("LIVE") != "1":
+            raise ProviderError(
+                "PL-02/EFF-01: refusing to build a real network client without LIVE=1 (inject transport= for tests)"
+            )
+
         self._api_key = api_key
         self._client = httpx.Client(
             base_url=base_url, transport=transport, headers={"Authorization": f"Bearer {api_key}"}
@@ -100,10 +114,14 @@ class OpenAICompatModelProvider(ModelProvider):
         except httpx.HTTPError:
             raise map_http_status(503, "PL-02: request to the provider endpoint failed") from None
 
+    def redact(self, text: str) -> str:
+        # Replace every occurrence of the raw key, whole, before any caller
+        # truncates -- a truncate-then-scrub order lets a key straddling the
+        # cut survive as an unmatched prefix (PRD 16.1 rule 4).
+        return text.replace(self._api_key, "***")
+
     def _scrub(self, message: str) -> str:
-        # Replace the full key in the complete text *before* truncating, so a
-        # key straddling the cut can never survive as an unmatched prefix.
-        return message.replace(self._api_key, "***")[:_MAX_ERROR_MESSAGE_LEN]
+        return self.redact(message)[:_MAX_ERROR_MESSAGE_LEN]
 
     def _raise_for_status(self, response: httpx.Response) -> None:
         if response.status_code < 400:

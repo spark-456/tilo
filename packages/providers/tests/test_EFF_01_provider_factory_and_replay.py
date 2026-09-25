@@ -223,6 +223,76 @@ def test_EFF_01_written_recording_never_contains_the_api_key_env_value(tmp_path,
         assert "authorization" not in content.lower(), f"{recording_file} must not contain a header block"
 
 
+def test_EFF_01_written_recording_scrubs_a_key_echoed_in_the_model_output(tmp_path, monkeypatch):
+    """Security review fix (P0-05, ticket item 5): the previous test proves
+    a secret that never reaches `GenerateResponse` cannot leak. This proves
+    the harder case -- a live provider whose *output itself* happens to
+    contain its own secret (e.g. a misbehaving endpoint echoing the
+    Authorization header back into model text) still must not end up in the
+    written recording. `RecordReplayProvider` calls the live provider's own
+    `ModelProvider.redact()` on everything before writing, not just its
+    structured fields."""
+    from tilo_providers.replay import RecordReplayProvider  # noqa: PLC0415
+
+    fake_secret = "fake-nim-key-" + "".join(str(n) for n in range(20))  # assembled at runtime, not a real key
+    monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("TILO_RECORD", "1")
+
+    class _EchoingLiveProvider(_CountingLiveProvider):
+        def generate(self, request: GenerateRequest) -> GenerateResponse:
+            self._calls.append(request)
+            return GenerateResponse(text=f"echo: Bearer {fake_secret}", profile_id="large")
+
+        def redact(self, text: str) -> str:
+            return text.replace(fake_secret, "***")
+
+    calls: list[GenerateRequest] = []
+    provider = RecordReplayProvider(
+        role="director", profile_id="large", live_factory=lambda: _EchoingLiveProvider(calls), fixtures_dir=tmp_path
+    )
+    response = provider.generate(GenerateRequest(prompt="hello"))
+    assert fake_secret in response.text, "test setup: the live provider must actually echo the secret"
+
+    recording_files = list(tmp_path.rglob("*.json"))
+    assert recording_files, "record mode must write a recording file"
+    for recording_file in recording_files:
+        content = recording_file.read_text(encoding="utf-8")
+        assert fake_secret not in content, (
+            f"16.1 rule 4: {recording_file} must not contain a secret echoed in the model's own output"
+        )
+
+
+def test_EFF_01_written_recording_scrubs_an_authorization_like_string_regardless_of_provider(tmp_path, monkeypatch):
+    """Backstop layer: even a live provider that does not override
+    `redact()` at all must not have a raw `Authorization:`/`Bearer` string
+    written into a recording."""
+    from tilo_providers.replay import RecordReplayProvider  # noqa: PLC0415
+
+    calls: list[GenerateRequest] = []
+    monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("TILO_RECORD", "1")
+
+    class _NonRedactingLiveProvider(_CountingLiveProvider):
+        def generate(self, request: GenerateRequest) -> GenerateResponse:
+            self._calls.append(request)
+            return GenerateResponse(text="Authorization: Bearer literal-secret-value", profile_id="large")
+
+    provider = RecordReplayProvider(
+        role="director",
+        profile_id="large",
+        live_factory=lambda: _NonRedactingLiveProvider(calls),
+        fixtures_dir=tmp_path,
+    )
+    provider.generate(GenerateRequest(prompt="hello"))
+
+    recording_files = list(tmp_path.rglob("*.json"))
+    assert recording_files
+    for recording_file in recording_files:
+        content = recording_file.read_text(encoding="utf-8")
+        assert "literal-secret-value" not in content
+        assert "authorization" not in content.lower()
+
+
 def _unexpected_live_factory() -> ModelProvider:
     raise AssertionError("replay mode must not construct a live provider")
 

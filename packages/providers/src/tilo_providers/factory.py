@@ -20,7 +20,7 @@ from pathlib import Path
 
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.config import ProvidersConfig
+from tilo_providers.config import ProviderConfigError, ProvidersConfig
 from tilo_providers.interfaces import Capability, ModelProvider
 
 
@@ -57,16 +57,15 @@ def _build_live_provider(profile: ProvidersProfile, profile_id: str) -> ModelPro
         return GoogleModelProvider(profile=profile, profile_id=profile_id, project=project, location=location)
 
     if profile.provider == "openai_compat":
-        # base_url/api_key_env are not yet fields on ProvidersProfile
-        # (needs contract change: contracts/providers.schema.json
-        # $defs.profile — see config/models.nim.yaml's header comment).
-        # Until they land, build tilo_providers.openai_compat_adapter.
-        # OpenAICompatModelProvider directly with the values from your own
-        # config, rather than through this factory.
-        raise NotImplementedError(
-            "PL-02: live routing for provider 'openai_compat' needs base_url/api_key_env on the profile "
-            "(needs contract change: contracts/providers.schema.json $defs.profile) — not wired into the "
-            "factory yet"
+        from tilo_providers.openai_compat_adapter import OpenAICompatModelProvider  # noqa: PLC0415
+
+        if profile.base_url is None or profile.api_key_env is None:
+            raise ProviderConfigError(
+                f"PL-02: profile {profile_id!r} is provider 'openai_compat' but has no base_url/api_key_env "
+                "(contracts/providers.schema.json $defs.profile)"
+            )
+        return OpenAICompatModelProvider(
+            profile=profile, profile_id=profile_id, base_url=profile.base_url, api_key_env=profile.api_key_env
         )
 
     raise ValueError(f"PL-02: unknown provider {profile.provider!r} for profile {profile_id!r}")

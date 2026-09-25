@@ -315,6 +315,42 @@ def test_PL_02_openai_compat_adapter_scrubs_a_key_straddling_the_error_truncatio
         assert FAKE_KEY[:length] not in text, f"key prefix of {length} chars leaked at offset {offset}"
 
 
+def test_PL_02_openai_compat_adapter_rejects_a_non_loopback_http_base_url(monkeypatch):
+    """PL-02/PRD 16.1 rule 4: plain `http://` is only ever allowed for a
+    loopback test server (`localhost`/`127.0.0.1`) -- any other host must be
+    rejected at construction, before a client carrying the bearer key in
+    cleartext could ever be built."""
+    from tilo_providers.errors import ProviderError
+    from tilo_providers.openai_compat_adapter import OpenAICompatModelProvider
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+
+    with pytest.raises(ProviderError) as excinfo:
+        OpenAICompatModelProvider(
+            profile=_profile(),
+            profile_id="compat-1",
+            base_url="http://integrate.api.nvidia.com/v1",
+            api_key_env=API_KEY_ENV,
+        )
+    assert "https" in str(excinfo.value).lower()
+
+
+def test_PL_02_openai_compat_adapter_refuses_a_real_client_without_live(monkeypatch):
+    """EFF-01: the LIVE=1 gate cannot live only in
+    `tilo_providers.replay.RecordReplayProvider` -- direct construction with
+    no injected `transport` and `LIVE` unset must refuse before any
+    `httpx.Client` (real network client) exists."""
+    from tilo_providers.errors import ProviderError
+    from tilo_providers.openai_compat_adapter import OpenAICompatModelProvider
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+    monkeypatch.delenv("LIVE", raising=False)
+
+    with pytest.raises(ProviderError) as excinfo:
+        OpenAICompatModelProvider(profile=_profile(), profile_id="compat-1", base_url=BASE_URL, api_key_env=API_KEY_ENV)
+    assert "LIVE" in str(excinfo.value)
+
+
 def test_PL_02_openai_compat_adapter_rejects_a_dirty_api_key_naming_only_the_variable(monkeypatch):
     """Ticket P0-05 review fix (security): an env value with a stray
     control/whitespace character (e.g. a trailing CR pasted on Windows)
@@ -340,12 +376,17 @@ def test_PL_02_openai_compat_adapter_post_exception_never_leaks_the_api_key(monk
     the wire regardless, `_post`'s own exception handling must still not
     surface it. `httpx.MockTransport` never reaches h11 (the review's own
     finding), so this needs a real transport talking to a real loopback
-    listener -- allowed by conftest.py's `block_non_local_sockets`."""
+    listener -- allowed by conftest.py's `block_non_local_sockets`. This is
+    the one test in this file that builds a real (if loopback-only)
+    `httpx.Client` rather than injecting `transport=`, so it must say
+    `LIVE=1` itself (EFF-01: the adapter refuses to build a real client
+    without it)."""
     import socket
     import threading
     import traceback
 
     monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+    monkeypatch.setenv("LIVE", "1")
     dirty_key = f"{FAKE_KEY}\r"
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

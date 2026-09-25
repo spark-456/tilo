@@ -8,18 +8,13 @@ NVIDIA_API_KEY... Provide a way to select NIM routing without editing code:
 e.g. a second example file config/models.nim.yaml selected by an env var
 such as TILO_MODELS_FILE, validated by the same loader and denylist."
 
-CONTRACT BLOCKER (see report, "needs contract change"): `ProvidersProfile`
-(`contracts/providers.schema.json` `$defs.profile`) is `additionalProperties:
-false` with only `provider`, `model`, `context`, `caps` -- no `base_url` or
-`api_key_env`. A NIM profile cannot pass `tilo_providers.config.
-load_providers_config` (PL-06/PL-07/NFR-25 start-up checks) until the
-contract owner adds two optional fields, applicable when `provider ==
-"openai_compat"`: `base_url` (string, `format: uri`) and `api_key_env`
-(string). Not editing `contracts/` here per root CLAUDE.md.
-`test_PL_02_nim_profiles_load_through_the_same_loader_and_denylist` is
-expected to stay red until that lands, even once `config/models.nim.yaml`
-exists -- every other test in this file checks the example file directly
-(raw YAML) and does not depend on the contract change.
+Contract note (resolved, P0-02b/ADR-0002 1.1.0): `ProvidersProfile`
+(`contracts/providers.schema.json` `$defs.profile`) now carries optional
+`base_url`/`api_key_env`, allowed only when `provider == "openai_compat"`.
+`test_PL_02_nim_profiles_load_through_the_same_loader_and_denylist` loads
+`config/models.nim.yaml` through the real start-up checks (PL-06/PL-07/
+NFR-25); every other test in this file checks the example file directly
+(raw YAML) and never depended on the contract change.
 """
 
 from __future__ import annotations
@@ -107,8 +102,6 @@ def test_PL_02_nim_profiles_selectable_by_env_var_without_editing_code(monkeypat
 
 
 def test_PL_02_nim_profiles_load_through_the_same_loader_and_denylist(nim_models_path, repo_root):
-    """Expected red until the contract change in this file's module
-    docstring lands -- see CONTRACT BLOCKER above."""
     from tilo_providers.config import load_providers_config  # noqa: PLC0415
 
     config = load_providers_config(nim_models_path, repo_root / "config" / "prices.yaml")

@@ -17,17 +17,22 @@ genai` would additionally require the fake to register itself as an
 attribute of the real `google` namespace package, which it deliberately does
 not do. No adapter test ever builds a real `genai.Client`; `client` is
 always injected (EFF-01: "tested with mocked transport or recorded
-responses only")."""
+responses only"). Without an injected `client`, construction refuses to
+build a real one unless `LIVE=1` — the same EFF-01 gate as
+`openai_compat_adapter`, so a direct construction of either adapter (not
+only a call through `RecordReplayProvider`) can never open a real
+client/transport in dev or CI."""
 
 from __future__ import annotations
 
 import importlib
+import os
 from collections.abc import Iterator
 from typing import Any
 
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.errors import SafetyError, map_http_status
+from tilo_providers.errors import ProviderError, SafetyError, map_http_status
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
 
 
@@ -51,6 +56,14 @@ class GoogleModelProvider(ModelProvider):
         self._location = location
         self._price = price
         if client is None:
+            # EFF-01: the LIVE gate cannot live only in RecordReplayProvider
+            # -- this constructor is directly reachable (the factory's
+            # live_factory, or a caller's own code), so it refuses to build
+            # a real client itself.
+            if os.environ.get("LIVE") != "1":
+                raise ProviderError(
+                    "PL-02/EFF-01: refusing to build a real network client without LIVE=1 (inject client= for tests)"
+                )
             genai = _genai_module("google.genai")
             client = genai.Client(vertexai=True, project=project, location=location)
         self._client = client
