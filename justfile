@@ -60,12 +60,12 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api packages/providers packages/contracts-py
+    uv run mypy services/api packages/providers packages/contracts-py evals/src
     pnpm -r exec tsc --noEmit
 
-# Run the eval harness (not built yet — ticket P3).
+# Run the eval harness's smoke pass. Replay only (EFF-01), so CI stays free.
 eval:
-    python -c "print('eval harness not built yet (ticket P3); nothing to run')"
+    uv run python -m tilo_evals run --pass smoke
 
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated

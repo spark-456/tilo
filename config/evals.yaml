@@ -1,0 +1,8 @@
+# Eval-harness settings (EFF-06, EFF-07, PRD 19.1-19.5, 6.6 "Lean evals").
+# Shape proposed in contract-change issue #8; validated by tilo_evals.EvalsConfig
+# (a local stub) until it is a contracts/ schema. Cap values per the SE spec
+# section 0 default; the orchestrator may renumber via contract-change #8.
+credit_cap: { full: 2000, smoke: 200, gate: 1000 }
+deploy_gate_repeats: 3
+cost_regression_threshold: 0.20
+groups: { E-PLAN: 10, E-RES: 10, E-DOC: 6, E-MAIL: 50, E-CHN: 30, E-ROUTE: 20, E-HAND: 20, E-RED: 14 }
