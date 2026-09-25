@@ -1,24 +1,7 @@
-"""FR-MTR-01 (PRD 14.5): "Credit unit and prices from config with date and
-source" -- acceptance test: "Price change needs a pull request; ledger uses
-the new price from its effective date." PRD 14.1: "1 credit = US$0.005 at
-standard (non-promotional) list prices from config/prices.yaml ... The unit
-stays stable when providers run promotions." PRD 6.4 PL-06: "Prices come
-from config/prices.yaml with a date and source" -- "Ledger reconciliation
-... uses the same file." PRD 3.1 PR-9: "Deterministic where it must be":
-pricing is a file change, never a runtime mutation.
-
-se-spec.md "## P8-01" fixes the acceptance tests verbatim:
-- two prices files at different effective dates (temporary files, fake
-  prices): a step before the second date is priced at the old price, one
-  on or after it at the new one;
-- config/prices.yaml loads and refuses to price every profile;
-- there is no mutation API.
-
-P8-01a builds only PriceBook, PriceQuote, Usage and UnpricedError (no
-Treasury): the two acceptance tests that need a Treasury (committed entries
-keep their price date/source; status: unset still lets record_usage
-record) stay on tests/P8-01 for P8-01b/c to bring back unchanged.
-"""
+"""FR-MTR-01 (PRD 14.5, 14.1, 6.4 PL-06): 1 credit = US$0.005 at standard
+prices, with a date and source; a price change is a file change, never a
+runtime mutation. P8-01a builds only PriceBook/PriceQuote/Usage/UnpricedError;
+the Treasury-needing tests stay on tests/P8-01 for P8-01b/c."""
 
 from __future__ import annotations
 
@@ -35,8 +18,7 @@ def _at(year: int, month: int, day: int) -> datetime:
 
 
 def test_FR_MTR_01_two_price_versions_priced_by_effective_date(tmp_path):
-    """A step before the second version's effective_date is priced at the
-    old rate; one on or after it (inclusive) at the new rate."""
+    """Before the second version's effective_date: old rate. On or after it: new rate."""
     v1_path = write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1)
     v2_path = write_prices_file(tmp_path, "prices_v2.yaml", PRICES_V2)
     book = PriceBook.load(v1_path, v2_path)
@@ -58,8 +40,7 @@ def test_FR_MTR_01_two_price_versions_priced_by_effective_date(tmp_path):
 
 
 def test_FR_MTR_01_quote_before_any_version_effective_refuses(tmp_path):
-    """PriceBook.quote raises UnpricedError when 'no version is effective
-    yet' -- refuse, never guess."""
+    """Refuse, never guess: no version effective yet."""
     v1_path = write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1)
     book = PriceBook.load(v1_path)
 
@@ -76,8 +57,7 @@ def test_FR_MTR_01_quote_unknown_profile_refuses(tmp_path):
 
 
 def test_FR_MTR_01_credits_uses_versioned_price_and_credit_usd(tmp_path):
-    """PRD 14.1: 1 credit = US$0.005. credits = (tokens_in*input +
-    tokens_out*output) / 1e6 / credit_usd."""
+    """credits = (tokens_in*input + tokens_out*output) / 1e6 / credit_usd."""
     v1_path = write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1)
     book = PriceBook.load(v1_path)
     usage = Usage(profile="widget", tokens_in=1_000_000, tokens_out=1_000_000)
@@ -90,9 +70,8 @@ def test_FR_MTR_01_credits_uses_versioned_price_and_credit_usd(tmp_path):
 
 
 def test_FR_MTR_01_repo_prices_yaml_loads_and_refuses_every_profile():
-    """ "Prices are never invented": the real config/prices.yaml stays
-    status: unset (se-spec.md #13) until the user pastes real list prices
-    in, so PriceBook must refuse to price every profile it lists."""
+    """Prices are never invented: config/prices.yaml stays status: unset,
+    so PriceBook must refuse to price every profile it lists."""
     prices_path = REPO_ROOT / "config" / "prices.yaml"
     raw = yaml.safe_load(prices_path.read_text(encoding="utf-8"))
     assert raw["status"] == "unset", "config/prices.yaml must stay unset until real prices are pasted in"
@@ -107,9 +86,7 @@ def test_FR_MTR_01_repo_prices_yaml_loads_and_refuses_every_profile():
 
 
 def test_FR_MTR_01_pricebook_has_no_mutation_api(tmp_path):
-    """ "It is immutable: no setters, no environment overrides, no runtime
-    API that changes a price. A price change is a file change, which means
-    a pull request." There is no mutation API."""
+    """Immutable: no setters, no environment overrides, no mutation API."""
     v1_path = write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1)
     book = PriceBook.load(v1_path)
 
