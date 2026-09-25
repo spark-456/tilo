@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/approval.requested.schema.json",
+  "x-version": "1.0.0",
+  "title": "ApprovalRequestedData",
+  "description": "data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases, and item pins the draft or file the gate holds to its version (null when there is none); the entry's item and the gate card's gate.action.item equal it (card rule CR-12, outbox rule OB-05). Nothing is written to the outbox before the gate opens, and this event never authorises (authz null): only an approval.resolved answering approve on the same gate does (OB-01). It also records who besides the world's owner may answer (PRD 10.1), set by the harness from the owner's own records, never by a model: approver is the owner's assignment of this gate to an Approver (null when none): the Approver's user id and assigned_by, the owner's stamp with its time, copied from the owner's own assignment or share link (FR-HIL-12), like a Team Lead's domain (team_lead.schema.json), and team_lead names the expert domain whose Team Lead may answer and the owner's policy that allows it (null when no Team Lead may). Anyone else, a Viewer included, opens nothing (OB-01).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "gate_id",
+    "card_id",
+    "outbox_id",
+    "action_type",
+    "risk_tier",
+    "irreversible",
+    "item",
+    "approver",
+    "team_lead"
+  ],
+  "properties": {
+    "gate_id": { "$ref": "../../common.schema.json#/$defs/gate_id" },
+    "card_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "outbox_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "action_type": { "$ref": "../../common.schema.json#/$defs/action_type" },
+    "risk_tier": { "$ref": "../../common.schema.json#/$defs/risk_tier" },
+    "irreversible": { "type": "boolean" },
+    "item": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/artifact_ref" }, { "type": "null" }]
+    },
+    "approver": {
+      "anyOf": [{ "$ref": "#/$defs/approver_assignment" }, { "type": "null" }]
+    },
+    "team_lead": {
+      "anyOf": [{ "$ref": "#/$defs/team_lead_allowance" }, { "type": "null" }]
+    }
+  },
+  "$defs": {
+    "approver_assignment": {
+      "description": "The owner assigned this gate to an Approver (PRD 10.1 'assigned gates', FR-HIL-12). user is the Approver; assigned_by records who assigned it and when. An Approver opens the gate only when assigned_by.by is the world's owner and assigned_by.at is no later than the answer's authz.at (OB-01), so an assignment anyone else made, a Team Lead naming themself included, or one made after the answer opens nothing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user", "assigned_by"],
+      "properties": {
+        "user": { "$ref": "../../common.schema.json#/$defs/user_id" },
+        "assigned_by": { "$ref": "../../team_lead.schema.json#/$defs/assignment" }
+      }
+    },
+    "team_lead_allowance": {
+      "description": "A Team Lead may answer this gate: one whose owner-assigned domain (team_lead.schema.json) is domain, while policy_id names the owner's policy for this action type that lists domain in team_lead_domains (PRD 10.1: 'in their domain, if the policy allows'; OB-01).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "policy_id"],
+      "properties": {
+        "domain": { "$ref": "../../common.schema.json#/$defs/slug" },
+        "policy_id": { "$ref": "../../common.schema.json#/$defs/policy_id" }
+      }
+    }
+  }
+}

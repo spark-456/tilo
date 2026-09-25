@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/decision.schema.json",
+  "x-version": "1.0.0",
+  "title": "Decision",
+  "description": "A person's or Team Lead's answer to a card, kept so a repeat question is answered from it (PRD 8.3, 13.1, 15.1; FR-AGT-07, FR-MEM-08). Stored at orgs/{org}/decisions/{decision}, append-only. tilo-api writes it when the answer is recorded; the harness reads it and cites id as question.answered data.decision_id. Only questions are answered from a decision: a gate is opened only by approval.resolved, which never cites one. Rules the schema cannot express are DC-01 to DC-04 in decision.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "org_id",
+    "question",
+    "domain",
+    "answer",
+    "option_id",
+    "answered_by",
+    "source",
+    "scope",
+    "created_at",
+    "expires_at"
+  ],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/ulid" },
+    "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+    "question": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "domain": {
+      "description": "Team Lead domain the question was routed by (question.routed data.domain); null for the owner fallback. A Team Lead's decision always names their domain.",
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/slug" }, { "type": "null" }]
+    },
+    "answer": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "option_id": {
+      "description": "The card option chosen; null for a typed answer.",
+      "anyOf": [{ "$ref": "card.schema.json#/$defs/option_id" }, { "type": "null" }]
+    },
+    "answered_by": { "$ref": "#/$defs/answerer" },
+    "source": { "$ref": "#/$defs/source" },
+    "scope": { "$ref": "#/$defs/scope" },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "expires_at": {
+      "description": "After this time the decision answers nothing; null means it does not expire.",
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+    }
+  },
+  "if": {
+    "properties": {
+      "answered_by": { "properties": { "by": { "const": "team_lead" } }, "required": ["by"] }
+    },
+    "required": ["answered_by"]
+  },
+  "then": { "properties": { "domain": { "$ref": "common.schema.json#/$defs/slug" } } },
+  "$defs": {
+    "answerer": {
+      "description": "The authz shape (BQ-01) narrowed to who answers a question: the owner of the source world (ref is their user id; an Approver's answer makes no Decision, DC-01) or a Team Lead (ref is the Team Lead id and user the person who held it and answered, DC-02). A policy never answers a question and a model never does. DC-04 checks the answerer again in the world of each repeat question, and a Team Lead's Decision answers only while the same person holds that Team Lead id.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "ref", "at"],
+      "properties": {
+        "by": { "type": "string", "enum": ["person", "team_lead"] },
+        "ref": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "user": { "$ref": "common.schema.json#/$defs/user_id" },
+        "at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      },
+      "if": { "properties": { "by": { "const": "person" } }, "required": ["by"] },
+      "then": {
+        "properties": { "ref": { "$ref": "common.schema.json#/$defs/user_id" } },
+        "not": { "required": ["user"] }
+      },
+      "else": {
+        "properties": { "ref": { "$ref": "common.schema.json#/$defs/team_lead_id" } },
+        "required": ["user"]
+      }
+    },
+    "source": {
+      "description": "The card whose answer this records (PRD 15.1: a card records a decision).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world_id", "run_id", "card_id"],
+      "properties": {
+        "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+        "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+        "card_id": { "$ref": "common.schema.json#/$defs/ulid" }
+      }
+    },
+    "scope": {
+      "description": "Where the decision may answer a repeat question: all worlds of the org the answerer may answer in (worlds the person owns, or worlds of the owner who assigned the Team Lead; DC-01, DC-02) or the listed ones among them, and in them all districts or the listed district ids (BQ-60).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["worlds", "districts"],
+      "properties": {
+        "worlds": { "anyOf": [{ "const": "all" }, { "$ref": "#/$defs/world_list" }] },
+        "districts": { "anyOf": [{ "const": "all" }, { "$ref": "#/$defs/district_list" }] }
+      }
+    },
+    "world_list": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/world_id" }
+    },
+    "district_list": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/district_id" }
+    }
+  }
+}

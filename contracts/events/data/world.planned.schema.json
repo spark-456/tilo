@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/world.planned.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorldPlannedData",
+  "description": "data of world.planned (PRD 9.5). The chosen approach compiled to a validated PlanGraph (FR-INT-09); credits is its estimate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tier", "approach", "unit_count", "credits"],
+  "properties": {
+    "tier": { "$ref": "../../common.schema.json#/$defs/tier" },
+    "approach": { "$ref": "../../common.schema.json#/$defs/slug" },
+    "unit_count": { "type": "integer", "minimum": 1 },
+    "credits": { "$ref": "../../common.schema.json#/$defs/credit_range" }
+  }
+}

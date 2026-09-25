@@ -1,0 +1,119 @@
+{
+  "rule": "OB-01",
+  "note": "The Operations Team Lead approved a Drive save, but a colleague, not the world's owner, assigned them the operations domain (PRD 16.2: domain assignment by the owner).",
+  "entry": {
+    "id": "01JB5VQ0000000000000009011",
+    "idempotency_key": "r_village_basic_1:U4:save_file:1",
+    "world_id": "w_village_basic",
+    "run_id": "r_village_basic_1",
+    "action_type": "save_file",
+    "connector": "google_drive",
+    "recipients": [],
+    "attachments": [],
+    "item": {
+      "artifact_id": "art_quote_summary",
+      "version": 1,
+      "label": "Quote summary"
+    },
+    "destination": "folder-tilo",
+    "modifiers": [],
+    "risk_tier": "T1",
+    "authz": {
+      "by": "team_lead",
+      "ref": "tl_ops",
+      "at": "2026-09-29T09:55:00.000Z"
+    },
+    "undo_window_s": 0,
+    "scheduled_at": "2026-09-29T09:55:00.000Z",
+    "state": "queued",
+    "created_at": "2026-09-29T09:55:00.000Z"
+  },
+  "reserved_by": {
+    "type": "approval.requested",
+    "authz": null,
+    "data": {
+      "gate_id": "G2",
+      "card_id": "01JB5VQ0000000000000009012",
+      "outbox_id": "01JB5VQ0000000000000009011",
+      "action_type": "save_file",
+      "risk_tier": "T1",
+      "irreversible": false,
+      "item": {
+        "artifact_id": "art_quote_summary",
+        "version": 1
+      },
+      "approver": null,
+      "team_lead": {
+        "domain": "operations",
+        "policy_id": "pol_drive_saves"
+      }
+    }
+  },
+  "authorised_by": {
+    "type": "approval.resolved",
+    "authz": {
+      "by": "team_lead",
+      "ref": "tl_ops",
+      "at": "2026-09-29T09:55:00.000Z"
+    },
+    "data": {
+      "gate_id": "G2",
+      "card_id": "01JB5VQ0000000000000009012",
+      "outbox_id": "01JB5VQ0000000000000009011",
+      "option": "approve",
+      "channel": "web",
+      "pin_verified": false
+    }
+  },
+  "policy": {
+    "id": "pol_drive_saves",
+    "owner": "u_owner",
+    "action_type": "save_file",
+    "scope": {
+      "connectors": ["google_drive"],
+      "recipients": [],
+      "domains": [],
+      "districts": []
+    },
+    "limits": {
+      "per_day": null,
+      "credits": null
+    },
+    "conditions": {
+      "no_attachments": true,
+      "no_new_recipients": true,
+      "no_safety_flags": true
+    },
+    "level": "L1",
+    "undo_window_s": 0,
+    "expiry": null,
+    "notify_channel": "web",
+    "team_lead_domains": ["operations"],
+    "created_by": {
+      "by": "u_owner",
+      "at": "2026-09-29T09:00:00.000Z"
+    },
+    "changed_by": null,
+    "history": [
+      {
+        "by": "u_owner",
+        "at": "2026-09-29T09:00:00.000Z",
+        "change": "Created at L1; the Operations Team Lead may approve Drive saves",
+        "level": "L1"
+      }
+    ]
+  },
+  "team_lead": {
+    "id": "tl_ops",
+    "user": "u_ops_lead",
+    "domain": "operations",
+    "assigned_by": {
+      "by": "u_teammate",
+      "at": "2026-09-29T09:00:00.000Z"
+    }
+  },
+  "world_owner": "u_owner",
+  "instruction": null,
+  "earlier_applied": null,
+  "transfer": null
+}

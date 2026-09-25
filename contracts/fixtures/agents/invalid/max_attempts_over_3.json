@@ -1,0 +1,22 @@
+{
+  "limits": {
+    "directors_per_world": 1,
+    "leads_per_district": 1,
+    "max_specialists": 6,
+    "max_depth": 3
+  },
+  "context": {
+    "compact_at": 0.6,
+    "handoff_at": 0.7
+  },
+  "liveness": {
+    "heartbeat_s": 15,
+    "silent_after_s": 90
+  },
+  "retries": {
+    "max_attempts": 4
+  },
+  "questions": {
+    "hourly_cap_per_person": 6
+  }
+}

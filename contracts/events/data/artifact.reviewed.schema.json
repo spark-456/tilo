@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/artifact.reviewed.schema.json",
+  "x-version": "1.0.0",
+  "title": "ArtifactReviewedData",
+  "description": "data of artifact.reviewed (PRD 9.5). The independent Verifier's result (FR-AGT-12); unverified units count as zero time saved (PRD 14.2).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact", "result"],
+  "properties": {
+    "artifact": { "$ref": "../../common.schema.json#/$defs/artifact_ref" },
+    "result": { "type": "string", "enum": ["passed", "failed", "unverified"] }
+  }
+}

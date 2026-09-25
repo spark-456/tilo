@@ -1,0 +1,48 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000022",
+  "seq": 22,
+  "ts": "2026-09-29T09:30:54.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "data.transfer",
+  "actor": "A_s1",
+  "target": "I1",
+  "level": "L1",
+  "district": "D1",
+  "item": {
+    "kind": "crate",
+    "artifact_id": "art_inbox_batch",
+    "label": "12 new emails"
+  },
+  "severity": "info",
+  "credits": 0,
+  "summary": "12 new emails came over from Gmail.",
+  "cause": "01JB5VQ0000000000000000021",
+  "vis": "all",
+  "authz": {
+    "by": "person",
+    "ref": "u_owner",
+    "at": "2026-09-20T08:00:00.000Z"
+  },
+  "data": {
+    "connector": "gmail",
+    "action_type": "read_email",
+    "direction": "in",
+    "artifact": {
+      "artifact_id": "art_inbox_batch",
+      "version": 1
+    },
+    "outbox_id": null,
+    "risk_tier": "T1"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": "read_email",
+    "latency_ms": 820,
+    "archive_ref": "r_village_basic_1/15"
+  }
+}
