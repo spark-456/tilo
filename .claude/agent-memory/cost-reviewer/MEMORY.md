@@ -1,0 +1,1 @@
+- [P0-04 provider config pattern](p0-04-provider-config.md) — config-only slice (no adapters/network) is the right shape for PL-07/PL-06/NFR-25 tickets; good reference for future provider-layer reviews.

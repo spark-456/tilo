@@ -1,1 +1,1 @@
-- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS alias/tuple quirks, invalid fixtures must fail schema, pin safety lists, BQ id clashes
+- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS alias/tuple quirks, invalid fixtures must fail schema, pin safety lists, policy path needs card-rule twin, L2 needs instruction link, BQ id clashes
