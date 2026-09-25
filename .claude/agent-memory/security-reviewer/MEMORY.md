@@ -1,2 +1,5 @@
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r9 FAIL (approval.requested.approver has no owner assignment stamp); open: recipients [] scope
-- [Provider secret handling](provider-secret-handling.md): P0-05 r4-r8 red only on contract-blocked test (r5-r8 same head ca3157b; merge P0-02b first); P0-02b PASS (nvapi pattern added); loader must hand-enforce openai_compat-only fields
+- [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r2 FAIL; archive_ref/instruction_id leak hidden counts/ids; writer failure half-applies Stop all
+- [Policy engine P4-01](policy-engine-p4-01.md): r4 FAIL; future-stamped policy dropped lets overlapping policy run past a revocation
+- [Outbox ST-2](outbox-st2.md): r2 FAIL; `sending` re-claimable with no lease, concurrent dispatch double-sends; pending transfers per instance
+- [Provider secret handling](provider-secret-handling.md): P0-05 r11 PASS (7a0d1be); residual for P0-06: malformed 200 body raises raw pydantic error (echoed key truncated)
