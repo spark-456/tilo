@@ -9,7 +9,7 @@ kept: >= 1 s, scheduled_at = created_at (here `now`) + undo_window_s).
 from __future__ import annotations
 
 import tilo_policy
-from conftest import OWNER, WORLD, applied_entry, base_facts, base_instruction, base_policy
+from _policy_lib import OWNER, WORLD, applied_entry, base_facts, base_instruction, base_policy
 
 NOW = "2026-09-29T09:42:16.000Z"
 
@@ -35,7 +35,7 @@ def _proposal(instruction=None, **overrides):
 
 
 def _l2_policy(**overrides):
-    return base_policy(id_="pol_autopilot_l2", level="L2", undo_window_s=60, **overrides)
+    return base_policy(**{"id_": "pol_autopilot_l2", "level": "L2", "undo_window_s": 60, **overrides})
 
 
 def test_FR_HIL_05_PI_08_PI_12_whatsapp_instruction_runs_after_undo_window_default_60s(risk_table_path):

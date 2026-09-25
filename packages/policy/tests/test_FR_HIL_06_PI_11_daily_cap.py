@@ -11,7 +11,7 @@ credits=null), the same shape conftest.py's applied_entry() factory follows.
 from __future__ import annotations
 
 import tilo_policy
-from conftest import OWNER, WORLD, applied_entry, base_facts, base_policy
+from _policy_lib import OWNER, WORLD, applied_entry, base_facts, base_instruction, base_policy
 
 NOW = "2026-09-29T10:20:00.000Z"
 POLICY_ID = "pol_status_updates"
@@ -143,8 +143,6 @@ def test_FR_HIL_06_PI_11_no_daily_cap_when_per_day_is_null(risk_table_path):
 def test_FR_HIL_06_PI_11_l2_policy_also_has_a_daily_cap(risk_table_path):
     """PI-11 applies to L2 as well as L3. An L2 policy at its per_day limit gates even with a
     valid, unused instruction."""
-    from conftest import base_instruction
-
     table = _table(risk_table_path)
     instruction = base_instruction(destination="thread-status-1")
     policy = base_policy(
@@ -153,6 +151,7 @@ def test_FR_HIL_06_PI_11_l2_policy_also_has_a_daily_cap(risk_table_path):
         level="L2",
         connectors=("gmail",),
         recipients=("teammate@example.org",),
+        domains=("example.org",),
         per_day=2,
         credits=None,
     )

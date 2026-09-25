@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 import tilo_policy
-from conftest import base_facts
+from _policy_lib import base_facts
 
 
 def test_FR_HIL_04_PI_07_valid_risk_table_loads(risk_table_path):

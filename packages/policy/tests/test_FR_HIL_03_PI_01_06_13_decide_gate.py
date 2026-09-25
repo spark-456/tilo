@@ -7,7 +7,7 @@ PI-13 (level in force at decision time; several covering policies, lowest level 
 from __future__ import annotations
 
 import tilo_policy
-from conftest import OWNER, WORLD, base_facts, base_instruction, base_policy
+from _policy_lib import OWNER, WORLD, base_facts, base_instruction, base_policy
 
 NOW = "2026-09-29T09:42:16.000Z"
 

@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import tilo_policy
-from conftest import OWNER, WORLD, base_facts, base_instruction, base_policy
+from _policy_lib import OWNER, WORLD, base_facts, base_instruction, base_policy
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
