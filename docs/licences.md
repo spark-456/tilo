@@ -34,10 +34,21 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 ## Python (`packages/providers`)
 
 No new dependency was added for ticket P0-04 (`packages/providers/pyproject.toml` still
-declares none of its own): `tilo_providers.config` uses `pydantic` (already listed under
+declared none of its own): `tilo_providers.config` uses `pydantic` (already listed under
 `packages/contracts-py`, via the `tilo-contracts` workspace member it imports) and `pyyaml`
 (already listed under the root dev dependency group); both are already installed into the
 shared `uv` workspace venv by `uv sync --all-packages`.
+
+Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject.toml`):
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| google-genai (`tilo_providers.google_adapter`, PRD 6.4/6.5) | Apache-2.0 | https://pypi.org/project/google-genai/ |
+| httpx (`tilo_providers.openai_compat_adapter`, PL-02; already a root dev dependency, above) | BSD-3-Clause | https://pypi.org/project/httpx/ |
+
+`google.genai.Client(vertexai=True, ...)` is only ever constructed under `LIVE=1`
+(`tilo_providers.factory`); dev/CI tests fake the `google.genai` import path at the
+`sys.modules` boundary and never install real credentials (EFF-01).
 
 ## JavaScript / TypeScript (root `package.json` devDependencies, `pnpm`-managed)
 

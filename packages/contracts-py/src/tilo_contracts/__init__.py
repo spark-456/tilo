@@ -83,7 +83,7 @@
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
-# providers.schema.json 1.0.0 sha256:2795c1640ddad594
+# providers.schema.json 1.1.0 sha256:ece7537b584e69f8
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
 # team_lead.schema.json 1.0.0 sha256:7408b4fbe4f45f78
 # events/registry.yaml 1.0.0 sha256:82aaca6089b684c1
@@ -1486,7 +1486,7 @@ structured output (json), tool calling, vision, audio input, thinking levels, co
 
 class ProvidersProfile(BaseModel):
     """
-    One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here.
+    One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003).
     """
 
     model_config = ConfigDict(
@@ -1502,6 +1502,20 @@ class ProvidersProfile(BaseModel):
     Context window in tokens.
     """
     caps: list[ProvidersCapability]
+    base_url: Annotated[
+        str | None,
+        Field(
+            max_length=512,
+            pattern="^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~%/-]*)?$",
+        ),
+    ] = None
+    """
+    openai_compat endpoint. https only, with no user info, query or fragment, so no credential can sit in the URL (PRD 16.1 rule 4). The not-pattern rejects a final line break, which a Python validator's $ lets through.
+    """
+    api_key_env: Annotated[str | None, Field(pattern="^[A-Z][A-Z0-9_]{2,63}$")] = None
+    """
+    Name of the environment variable that holds the key, never the key itself. The not-pattern rejects a final line break, which a Python validator's $ lets through.
+    """
 
 
 class ProvidersRole(BaseModel):

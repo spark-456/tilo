@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/providers.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "Providers",
   "description": "Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry. Model ids appear only in config/ and packages/providers.",
   "type": "object",
@@ -53,7 +53,7 @@
       }
     },
     "profile": {
-      "description": "One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here.",
+      "description": "One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003).",
       "type": "object",
       "additionalProperties": false,
       "required": ["provider", "model", "context", "caps"],
@@ -68,7 +68,25 @@
           "type": "array",
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/capability" }
+        },
+        "base_url": {
+          "description": "openai_compat endpoint. https only, with no user info, query or fragment, so no credential can sit in the URL (PRD 16.1 rule 4). The not-pattern rejects a final line break, which a Python validator's $ lets through.",
+          "type": "string",
+          "format": "uri",
+          "maxLength": 512,
+          "pattern": "^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~%/-]*)?$",
+          "not": { "pattern": "\n" }
+        },
+        "api_key_env": {
+          "description": "Name of the environment variable that holds the key, never the key itself. The not-pattern rejects a final line break, which a Python validator's $ lets through.",
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$",
+          "not": { "pattern": "\n" }
         }
+      },
+      "if": { "properties": { "provider": { "const": "openai_compat" } } },
+      "else": {
+        "not": { "anyOf": [{ "required": ["base_url"] }, { "required": ["api_key_env"] }] }
       }
     },
     "role": {
