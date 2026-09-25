@@ -58,6 +58,7 @@
       "channel": "whatsapp"
     }
   },
+  "policy": null,
   "transfer": {
     "type": "data.transfer",
     "authz": {

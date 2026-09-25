@@ -126,7 +126,11 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     `data.transfer`'s artifact to equal it. OB-01 requires the entry's `authz`, and its outgoing
     `data.transfer`'s, to equal the `authz` of the `approval.resolved` that answered `approve`
     on its gate or of the `policy.applied` that opened it, so a gate nobody approved writes
-    nothing and a policy action is never stamped as a person's (HR-7). A `destination` is an
+    nothing and a policy action is never stamped as a person's (HR-7). A policy send has no gate
+    card, so `policy.applied` records the connector, destination and district the engine
+    checked, besides tier, undo window and item; the entry equals them, the named policy's scope
+    covers its connector, recipients and district, and an L2 window is at least 1 s (OB-01,
+    OB-05). A `destination` is an
     opaque connector id of letters, digits, `_` and `-`, never a URL, domain or path. A redraft is a new version and so a new proposal;
     it never goes out under an earlier authorisation (BQ-27). The modifier names moved to
     `policy.schema.json#/$defs/tier_condition` so that the risk-tier table and the outbox share

@@ -40,6 +40,9 @@
       "gate_id": "G1",
       "outbox_id": "01JB5VQ0000000000000009006",
       "action_type": "send_email",
+      "connector": "gmail",
+      "destination": "thread-supplier-1",
+      "district": "D1",
       "risk_tier": "T2",
       "level": "L2",
       "undo_window_s": 60,
@@ -48,6 +51,43 @@
         "version": 1
       }
     }
+  },
+  "policy": {
+    "id": "pol_autopilot_l2",
+    "owner": "u_owner",
+    "action_type": "send_email",
+    "scope": {
+      "connectors": ["gmail"],
+      "recipients": [],
+      "domains": ["example.com"],
+      "districts": ["D1"]
+    },
+    "limits": {
+      "per_day": 20,
+      "credits": 50
+    },
+    "conditions": {
+      "no_attachments": true,
+      "no_new_recipients": true,
+      "no_safety_flags": true
+    },
+    "level": "L2",
+    "undo_window_s": 60,
+    "expiry": "2026-12-31T23:59:59.000Z",
+    "notify_channel": "whatsapp",
+    "created_by": {
+      "by": "u_owner",
+      "at": "2026-09-29T09:30:00.000Z"
+    },
+    "changed_by": null,
+    "history": [
+      {
+        "by": "u_owner",
+        "at": "2026-09-29T09:30:00.000Z",
+        "change": "Created at L2 for replies to example.com",
+        "level": "L2"
+      }
+    ]
   },
   "transfer": {
     "type": "data.transfer",

@@ -45,7 +45,9 @@ messages point at the redacted raw-archive record (`archive_ref`, `<run id>/<rec
 sends name their outbox entry (`outbox_id`), which holds the recipients and the destination
 (`outbox.schema.json`). `approval.requested`, `policy.applied` and an outgoing `data.transfer`
 carry the pinned item (artifact id and version) the entry sends, so the Trace shows which
-version was approved and sent (outbox rule OB-05).
+version was approved and sent (outbox rule OB-05). With no gate card on the policy path, `policy.applied` also names
+the connector, the destination (an opaque id) and the district the engine checked against the
+policy's scope, and the entry equals them (OB-01, OB-05).
 
 ## Fixtures
 

@@ -3,13 +3,15 @@ the authorisation that was given.
 
 OB-01 and OB-05 (contracts/outbox.rules.md; harness validator, P0-09). OB-01: the entry's id is
 the outbox_id reserved for it; on a gate it was opened by an approval.resolved answering approve
-on that gate, otherwise by a policy.applied; the entry's authz equals that event's authz, and the
-data.transfer it emitted carries the same authz. OB-05: its pinned item (artifact id and version)
-equals the item that approval.requested reserved or policy.applied assessed; a sent entry emits
-one data.transfer out whose artifact is that item. `broken` below is the reference check. Each
-file in contracts/fixtures/outbox/crossref/ is shape-valid (each event part also passes EV-04 to
-EV-06), and each invalid one breaks exactly the rule its `rule` field and name state. The P0-09
-validator's tests must run the same files.
+on that gate, otherwise by a policy.applied under a policy that covers it (action type, level,
+undo window, not expired, connector, recipients and district in scope); the entry's authz equals
+that event's authz, and the data.transfer it emitted carries the same authz. OB-05: its action
+type, tier and pinned item (artifact id and version) equal those approval.requested reserved or
+policy.applied assessed, and on the policy path also its connector, destination and undo window;
+a sent entry emits one data.transfer out whose artifact is that item. `broken` below is the
+reference check. Each file in contracts/fixtures/outbox/crossref/ is shape-valid (each event part
+also passes EV-04 to EV-06), and each invalid one breaks exactly the rule its `rule` field and
+name state. The P0-09 validator's tests must run the same files.
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ from _lib import contracts_dir, errors_for, load_json
 
 BASE = "https://contracts.tilo.example/"
 RULES = ("OB-01", "OB-05")
-CASE_KEYS = {"rule", "note", "entry", "reserved_by", "authorised_by", "transfer"}
+CASE_KEYS = {"rule", "note", "entry", "reserved_by", "authorised_by", "policy", "transfer"}
 EVENT_KEYS = {"type", "authz", "data"}
 SLOT_TYPES = {
     "reserved_by": ("approval.requested",),
@@ -54,6 +56,28 @@ def _opened(entry, reserved, auth) -> bool:
     )
 
 
+def _within(allowed, value) -> bool:
+    """Policy scope: an empty list does not restrict that dimension (policy.schema.json)."""
+    return not allowed or value in allowed
+
+
+def _policy_covers(entry, applied, policy) -> bool:
+    """OB-01, policy path: the policy named by policy_id covers this entry within its scope."""
+    scope = policy["scope"]
+    return (
+        policy["id"] == applied["policy_id"]
+        and (policy["action_type"], policy["level"], policy["undo_window_s"])
+        == (applied["action_type"], applied["level"], applied["undo_window_s"])
+        and (policy["expiry"] is None or entry["authz"]["at"] < policy["expiry"])
+        and applied["connector"] in scope["connectors"]
+        and _within(scope["districts"], applied["district"])
+        and all(
+            _within(scope["recipients"], r) and _within(scope["domains"], r.rsplit("@", 1)[1].lower())
+            for r in entry["recipients"]
+        )
+    )
+
+
 def broken(case) -> set[str]:
     entry, reserved, auth, transfer = case["entry"], case["reserved_by"], case["authorised_by"], case["transfer"]
     rules = set()
@@ -61,11 +85,16 @@ def broken(case) -> set[str]:
         rules.add("OB-01")
     if transfer is not None and transfer["authz"] != entry["authz"]:
         rules.add("OB-01")
+    by_policy = auth is not None and auth["type"] == "policy.applied"
+    if by_policy and not _policy_covers(entry, auth["data"], case["policy"]):
+        rules.add("OB-01")
     pinned_by = reserved if reserved is not None else auth
     if pinned_by is not None and (
-        pinned_by["data"]["action_type"] != entry["action_type"]
+        (pinned_by["data"]["action_type"], pinned_by["data"]["risk_tier"]) != (entry["action_type"], entry["risk_tier"])
         or _pinned(pinned_by["data"]["item"]) != _pinned(entry["item"])
     ):
+        rules.add("OB-05")
+    if by_policy and any(auth["data"][f] != entry[f] for f in ("connector", "destination", "undo_window_s")):
         rules.add("OB-05")
     if (transfer is not None) != (entry["state"] == "sent"):
         rules.add("OB-05")
@@ -112,6 +141,11 @@ def test_FR_WLD_03_OB_05_outbox_crossref_cases_are_shape_valid(repo_root, regist
         for slot in SLOT_TYPES:
             if case[slot] is not None:
                 found += _event_part_problems(slot, case[slot], types, registry)
+        by_policy = case["authorised_by"] is not None and case["authorised_by"]["type"] == "policy.applied"
+        if (case["policy"] is not None) != by_policy:
+            found.append("policy is the policy record that policy.applied names, and null on a gate path")
+        elif by_policy:
+            found += [e.message for e in errors_for({"$ref": BASE + "policy.schema.json"}, case["policy"], registry)]
         assert not found, f"{path.name}: every part must be shape-valid, got {found[:3]}"
 
 
@@ -145,6 +179,22 @@ def test_FR_WLD_03_OB_01_every_authorisation_path_has_an_invalid_case(repo_root)
         "ob01_transfer_stamped_other_than_entry",
     }
     assert required <= names, f"missing OB-01 cases {sorted(required - names)}"
+
+
+def test_FR_WLD_03_OB_01_OB_05_policy_path_has_an_invalid_case_per_binding(repo_root):
+    """With no gate card, a policy send is bound to its policy's scope and to policy.applied (PRD 10.4)."""
+    names = {path.stem for path in _cases(repo_root, "invalid")}
+    required = {
+        "ob01_policy_recipient_out_of_scope",
+        "ob01_policy_connector_out_of_scope",
+        "ob01_policy_district_out_of_scope",
+        "ob01_policy_expired",
+        "ob05_policy_undo_window_dropped",
+        "ob05_policy_risk_tier_differs",
+        "ob05_policy_thread_reply_sent_as_new_email",
+        "ob05_policy_entry_on_another_connector",
+    }
+    assert required <= names, f"missing policy-path cases {sorted(required - names)}"
 
 
 def test_FR_WLD_03_OB_05_save_file_entry_names_its_file(repo_root):

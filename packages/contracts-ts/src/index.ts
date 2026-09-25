@@ -66,7 +66,7 @@
  * events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
  * events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
  * events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
- * events/data/policy.applied.schema.json 1.0.0 sha256:9a8e4d9784413f35
+ * events/data/policy.applied.schema.json 1.0.0 sha256:2f0fef2fde994d8a
  * events/data/policy.changed.schema.json 1.0.0 sha256:59660440803c39ed
  * events/data/question.answered.schema.json 1.0.0 sha256:908aeadfaca479ab
  * events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
@@ -1571,7 +1571,7 @@ export interface PlanQuestionsAskedData {
   question_count: number;
 }
 /**
- * data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). item pins the draft or file the engine assessed to its version (null when there is none); the outbox entry's item equals it (OB-05), so a redraft is a new proposal.
+ * data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). There is no gate card on this path, so this event records what the engine assessed against the policy's scope: the connector, the destination (an opaque id, never an address), the district of the step, the tier, the undo window, and item pinned to its version (null when there is none). The outbox entry equals it on each (OB-05) and the policy's scope covers it (OB-01), so a redraft, another thread or another connector is a new proposal. At L2 the undo window is at least 1 s (PRD 10.4: L2 acts with an undo window). Recipients stay in the outbox entry, never in an event.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PolicyAppliedData".
@@ -1581,6 +1581,9 @@ export interface PolicyAppliedData {
   gate_id: GateId;
   outbox_id: Ulid;
   action_type: ActionType;
+  connector: ConnectorId;
+  destination: Destination | null;
+  district: DistrictId;
   risk_tier: "T1" | "T2";
   level: "L2" | "L3";
   undo_window_s: number;
