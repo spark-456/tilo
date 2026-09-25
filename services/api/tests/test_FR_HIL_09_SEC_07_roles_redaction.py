@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from conftest import OWNER, WORLD, as_principal, base_event, make_district, make_principal, make_world
+from _api_lib import OWNER, WORLD, as_principal, base_event, make_district, make_principal, make_world
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 

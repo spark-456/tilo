@@ -9,7 +9,7 @@ from __future__ import annotations
 import pathlib
 import time
 
-from conftest import OWNER, WORLD, as_principal, base_policy, make_principal, make_world, validate_event
+from _api_lib import OWNER, WORLD, as_principal, base_policy, make_principal, make_world, validate_event
 
 OTHER_OWNER = "u_other_owner"
 
