@@ -73,6 +73,10 @@ harness-skeleton:
 eval:
     python -c "print('eval harness not built yet (ticket P3); nothing to run')"
 
+# PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
+conformance:
+    uv run python -m tilo_providers.conformance
+
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated
 # as success so the recipe still passes with zero skills present.
