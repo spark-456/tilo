@@ -28,8 +28,8 @@
 # events/data/app.refreshed.schema.json 1.0.0 sha256:051bafbff4096d1c
 # events/data/app.spec.schema.json 1.0.0 sha256:49e9b3906027a4c3
 # events/data/app.tested.schema.json 1.0.0 sha256:7cc150abdade1ee3
-# events/data/approval.requested.schema.json 1.0.0 sha256:bb3b03a374e5b613
-# events/data/approval.resolved.schema.json 1.0.0 sha256:d17f761eacfc2064
+# events/data/approval.requested.schema.json 1.0.0 sha256:0102907a6a0e1a5f
+# events/data/approval.resolved.schema.json 1.0.0 sha256:4335b27e04f1db2a
 # events/data/artifact.created.schema.json 1.0.0 sha256:1e70d4b7f7bc11a7
 # events/data/artifact.delivered.schema.json 1.0.0 sha256:a0e7a46e56965c1d
 # events/data/artifact.reviewed.schema.json 1.0.0 sha256:fee51f5f590c73c4
@@ -82,9 +82,10 @@
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
-# policy.schema.json 1.0.0 sha256:b184096e2b7037d2
+# policy.schema.json 1.0.0 sha256:307bca25f6efc07e
 # providers.schema.json 1.0.0 sha256:2795c1640ddad594
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
+# team_lead.schema.json 1.0.0 sha256:7408b4fbe4f45f78
 # events/registry.yaml 1.0.0 sha256:82aaca6089b684c1
 
 from __future__ import annotations
@@ -639,9 +640,21 @@ class AlertResolvedData(BaseModel):
     alert_id: Ulid
 
 
+class ApprovalRequestedDataTeamLeadAllowance(BaseModel):
+    """
+    A Team Lead may answer this gate: one whose owner-assigned domain (team_lead.schema.json) is domain, while policy_id names the owner's policy for this action type that lists domain in team_lead_domains (PRD 10.1: 'in their domain, if the policy allows'; OB-01).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    domain: Slug
+    policy_id: PolicyId
+
+
 class ApprovalResolvedData(BaseModel):
     """
-    data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Only approve authorises: the outbox entry is written with exactly this authz, and its outgoing data.transfer carries it too (OB-01); edit and hold write nothing. Gates never time out to go, so a timeout emits no approval.resolved.
+    data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Only approve authorises, and only when authz.ref is the world's owner, the Approver approval.requested named, or a Team Lead it allows (OB-01): the outbox entry is written with exactly this authz, and its outgoing data.transfer carries it too; edit and hold write nothing. pin_verified is true when tilo-channels checked the person's PIN before accepting the answer (SEC-06); a T3 gate answered on WhatsApp opens only with it (OB-01), and a wrong or missing PIN emits no approval.resolved. Gates never time out to go, so a timeout emits no approval.resolved.
     """
 
     model_config = ConfigDict(
@@ -652,6 +665,7 @@ class ApprovalResolvedData(BaseModel):
     outbox_id: Ulid
     option: Literal["approve", "edit", "hold"]
     channel: Literal["web", "mobile_web", "whatsapp"]
+    pin_verified: bool
 
 
 class BudgetGrantedData(BaseModel):
@@ -1541,6 +1555,18 @@ class SkillEmbeddedSchema(BaseModel):
     type: Literal["object"]
 
 
+class TeamLeadAssignment(BaseModel):
+    """
+    Who assigned the domain and when: only the owner assigns domains (PRD 16.2).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    by: UserId
+    at: Timestamp
+
+
 class BriefDeliverable(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -1787,7 +1813,7 @@ class AppTestedData(BaseModel):
 
 class ApprovalRequestedData(BaseModel):
     """
-    data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases, and item pins the draft or file the gate holds to its version (null when there is none); the entry's item and the gate card's gate.action.item equal it (card rule CR-12, outbox rule OB-05). Nothing is written to the outbox before the gate opens, and this event never authorises (authz null): only an approval.resolved answering approve on the same gate does (OB-01).
+    data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases, and item pins the draft or file the gate holds to its version (null when there is none); the entry's item and the gate card's gate.action.item equal it (card rule CR-12, outbox rule OB-05). Nothing is written to the outbox before the gate opens, and this event never authorises (authz null): only an approval.resolved answering approve on the same gate does (OB-01). It also records who besides the world's owner may answer (PRD 10.1), set by the harness from the owner's own records, never by a model: approver is the Approver the owner assigned this gate to (null when none), and team_lead names the expert domain whose Team Lead may answer and the owner's policy that allows it (null when no Team Lead may). Anyone else, a Viewer included, opens nothing (OB-01).
     """
 
     model_config = ConfigDict(
@@ -1800,6 +1826,8 @@ class ApprovalRequestedData(BaseModel):
     risk_tier: RiskTier
     irreversible: bool
     item: ArtifactRef | None
+    approver: UserId | None
+    team_lead: ApprovalRequestedDataTeamLeadAllowance | None
 
 
 class ArtifactCreatedData(BaseModel):
@@ -2090,6 +2118,10 @@ class Policy(BaseModel):
     When the policy stops applying, or null for no expiry.
     """
     notify_channel: Channel
+    team_lead_domains: list[Slug]
+    """
+    Expert domains (PRD 8.3, for example security or finance; not email domains, which are scope.domains) whose Team Leads may open this action type's gates in the owner's worlds (PRD 10.1: 'in their domain, if the policy allows'). Empty lets no Team Lead open them. The owner, and an Approver the gate names, need no policy. Like scope, read from the current record (outbox OB-01).
+    """
     created_by: PolicyStamp
     changed_by: PolicyStamp | None
     history: Annotated[list[PolicyHistoryEntry], Field(min_length=1)]
@@ -2166,6 +2198,20 @@ class Skill(BaseModel):
     """
     One line, shown to the planner.
     """
+
+
+class TeamLead(BaseModel):
+    """
+    A Team Lead assignment (PRD 8.3, 10.1, 16.2): the person (user) who acts as Team Lead id, and the one expert domain the owner assigned them. The shape of each entry of config/teams.yaml and of a Team Lead set in the Team Lead console. authz.ref of a Team Lead's answer is id. A Team Lead opens a gate only when the gate names this domain and the owner's policy it names lists the domain in team_lead_domains, and only when the world's owner made this assignment before the answer (outbox OB-01). Removing a Team Lead deletes the record, so a removed Team Lead answers nothing.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: TeamLeadId
+    user: UserId
+    domain: Slug
+    assigned_by: TeamLeadAssignment
 
 
 class BriefAppliedPreference(BaseModel):

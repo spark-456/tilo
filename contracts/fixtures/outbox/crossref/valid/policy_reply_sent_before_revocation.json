@@ -76,6 +76,7 @@
     "undo_window_s": 60,
     "expiry": "2026-12-31T23:59:59.000Z",
     "notify_channel": "whatsapp",
+    "team_lead_domains": [],
     "created_by": {
       "by": "u_owner",
       "at": "2026-09-29T09:30:00.000Z"
@@ -99,6 +100,7 @@
       }
     ]
   },
+  "team_lead": null,
   "world_owner": "u_owner",
   "instruction": {
     "v": "1.0",

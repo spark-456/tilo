@@ -31,7 +31,9 @@
     "item": {
       "artifact_id": "art_reply_draft",
       "version": 1
-    }
+    },
+    "approver": null,
+    "team_lead": null
   },
   "trace": {
     "model_role": null,

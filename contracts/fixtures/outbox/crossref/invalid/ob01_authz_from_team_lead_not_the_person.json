@@ -40,7 +40,9 @@
       "item": {
         "artifact_id": "art_reply_draft",
         "version": 1
-      }
+      },
+      "approver": null,
+      "team_lead": null
     }
   },
   "authorised_by": {
@@ -55,11 +57,13 @@
       "card_id": "01JB5VQ0000000000000009001",
       "outbox_id": "01JB5VQ0000000000000009002",
       "option": "approve",
-      "channel": "whatsapp"
+      "channel": "whatsapp",
+      "pin_verified": false
     }
   },
   "policy": null,
-  "world_owner": null,
+  "team_lead": null,
+  "world_owner": "u_owner",
   "instruction": null,
   "earlier_applied": null,
   "transfer": {

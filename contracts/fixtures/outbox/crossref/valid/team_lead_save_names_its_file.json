@@ -1,6 +1,6 @@
 {
   "rule": null,
-  "note": "A T1 save the Team Lead approved names the file and version it saves and the folder it goes into, and carries the Team Lead's authz.",
+  "note": "A T1 save the Operations Team Lead approved names the file and version it saves and the folder it goes into, and carries the Team Lead's authz. The gate names the operations domain and the owner's policy that lets its Team Lead open Drive saves; the owner assigned that domain before the answer.",
   "entry": {
     "id": "01JB5VQ0000000000000009011",
     "idempotency_key": "r_village_basic_1:U4:save_file:1",
@@ -41,6 +41,11 @@
       "item": {
         "artifact_id": "art_quote_summary",
         "version": 1
+      },
+      "approver": null,
+      "team_lead": {
+        "domain": "operations",
+        "policy_id": "pol_drive_saves"
       }
     }
   },
@@ -56,11 +61,58 @@
       "card_id": "01JB5VQ0000000000000009012",
       "outbox_id": "01JB5VQ0000000000000009011",
       "option": "approve",
-      "channel": "web"
+      "channel": "web",
+      "pin_verified": false
     }
   },
-  "policy": null,
-  "world_owner": null,
+  "policy": {
+    "id": "pol_drive_saves",
+    "owner": "u_owner",
+    "action_type": "save_file",
+    "scope": {
+      "connectors": ["google_drive"],
+      "recipients": [],
+      "domains": [],
+      "districts": []
+    },
+    "limits": {
+      "per_day": null,
+      "credits": null
+    },
+    "conditions": {
+      "no_attachments": true,
+      "no_new_recipients": true,
+      "no_safety_flags": true
+    },
+    "level": "L1",
+    "undo_window_s": 0,
+    "expiry": null,
+    "notify_channel": "web",
+    "team_lead_domains": ["operations"],
+    "created_by": {
+      "by": "u_owner",
+      "at": "2026-09-29T09:00:00.000Z"
+    },
+    "changed_by": null,
+    "history": [
+      {
+        "by": "u_owner",
+        "at": "2026-09-29T09:00:00.000Z",
+        "change": "Created at L1; the Operations Team Lead may approve Drive saves",
+        "level": "L1"
+      }
+    ]
+  },
+  "team_lead": {
+    "id": "tl_ops",
+    "user": "u_ops_lead",
+    "domain": "operations",
+    "assigned_by": {
+      "by": "u_owner",
+      "at": "2026-09-29T09:00:00.000Z"
+    }
+  },
+  "world_owner": "u_owner",
   "instruction": null,
   "earlier_applied": null,
   "transfer": null

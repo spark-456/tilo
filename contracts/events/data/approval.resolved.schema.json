@@ -3,15 +3,16 @@
   "$id": "https://contracts.tilo.example/events/data/approval.resolved.schema.json",
   "x-version": "1.0.0",
   "title": "ApprovalResolvedData",
-  "description": "data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Only approve authorises: the outbox entry is written with exactly this authz, and its outgoing data.transfer carries it too (OB-01); edit and hold write nothing. Gates never time out to go, so a timeout emits no approval.resolved.",
+  "description": "data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Only approve authorises, and only when authz.ref is the world's owner, the Approver approval.requested named, or a Team Lead it allows (OB-01): the outbox entry is written with exactly this authz, and its outgoing data.transfer carries it too; edit and hold write nothing. pin_verified is true when tilo-channels checked the person's PIN before accepting the answer (SEC-06); a T3 gate answered on WhatsApp opens only with it (OB-01), and a wrong or missing PIN emits no approval.resolved. Gates never time out to go, so a timeout emits no approval.resolved.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["gate_id", "card_id", "outbox_id", "option", "channel"],
+  "required": ["gate_id", "card_id", "outbox_id", "option", "channel", "pin_verified"],
   "properties": {
     "gate_id": { "$ref": "../../common.schema.json#/$defs/gate_id" },
     "card_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
     "outbox_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
     "option": { "type": "string", "enum": ["approve", "edit", "hold"] },
-    "channel": { "type": "string", "enum": ["web", "mobile_web", "whatsapp"] }
+    "channel": { "type": "string", "enum": ["web", "mobile_web", "whatsapp"] },
+    "pin_verified": { "type": "boolean" }
   }
 }

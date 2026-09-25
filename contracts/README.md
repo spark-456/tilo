@@ -16,6 +16,7 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `outbox.schema.json` | An authorised side effect waiting to run exactly once; rules in `outbox.rules.md` | 1.0.0 |
 | `card.schema.json` | Needs-you, gate, consent and meeting cards; safe-default rules in `card.rules.md` | 1.0.0 |
 | `policy.schema.json` | Autonomy policies and the risk-tier table shape | 1.0.0 |
+| `team_lead.schema.json` | A Team Lead's owner-assigned domain (`config/teams.yaml` entries); who may open a gate is outbox OB-01 | 1.0.0 |
 | `handoff.schema.json` | Context handoff note | 1.0.0 |
 | `envelope.schema.json` | Agent-to-agent handoff envelope | 1.0.0 |
 | `skill.schema.json` | `skill.yaml` | 1.0.0 |

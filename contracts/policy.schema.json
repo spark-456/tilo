@@ -17,6 +17,7 @@
     "undo_window_s",
     "expiry",
     "notify_channel",
+    "team_lead_domains",
     "created_by",
     "changed_by",
     "history"
@@ -41,6 +42,12 @@
       "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
     },
     "notify_channel": { "$ref": "common.schema.json#/$defs/channel" },
+    "team_lead_domains": {
+      "description": "Expert domains (PRD 8.3, for example security or finance; not email domains, which are scope.domains) whose Team Leads may open this action type's gates in the owner's worlds (PRD 10.1: 'in their domain, if the policy allows'). Empty lets no Team Lead open them. The owner, and an Approver the gate names, need no policy. Like scope, read from the current record (outbox OB-01).",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/slug" }
+    },
     "created_by": { "$ref": "#/$defs/stamp" },
     "changed_by": { "anyOf": [{ "$ref": "#/$defs/stamp" }, { "type": "null" }] },
     "history": {

@@ -40,12 +40,15 @@
       "item": {
         "artifact_id": "art_reply_draft",
         "version": 1
-      }
+      },
+      "approver": null,
+      "team_lead": null
     }
   },
   "authorised_by": null,
   "policy": null,
-  "world_owner": null,
+  "team_lead": null,
+  "world_owner": "u_owner",
   "instruction": null,
   "earlier_applied": null,
   "transfer": null

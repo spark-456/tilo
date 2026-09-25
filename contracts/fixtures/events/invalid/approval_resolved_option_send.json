@@ -26,7 +26,8 @@
     "card_id": "01JB5VQ0000000000000009001",
     "outbox_id": "01JB5VQ0000000000000009002",
     "option": "send",
-    "channel": "whatsapp"
+    "channel": "whatsapp",
+    "pin_verified": false
   },
   "trace": {
     "model_role": null,

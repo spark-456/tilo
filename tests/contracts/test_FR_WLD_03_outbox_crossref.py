@@ -3,7 +3,10 @@ the authorisation that was given.
 
 OB-01 and OB-05 (contracts/outbox.rules.md; harness validator, P0-09). OB-01: the entry's id is
 the outbox_id reserved for it; on a gate it was opened by an approval.resolved answering approve
-on that gate, otherwise by a policy.applied under a policy that covers it (action type and
+on that gate from someone who may open it (PRD 10.1: the world's owner, the Approver the gate
+names, or a Team Lead whose owner-assigned domain is the gate's while the owner's policy the gate
+names allows that domain; a T3 gate answered on WhatsApp also needs its PIN checked, SEC-06),
+otherwise by a policy.applied under a policy that covers it (action type and
 undo window, created before and not expired, at the applied level when the send was authorised
 (its last history entry at or before authz.at, so not after a revocation or Stop all autopilot),
 owned by the world's owner and created and changed only by that owner (every history entry
@@ -38,6 +41,7 @@ CASE_KEYS = {
     "reserved_by",
     "authorised_by",
     "policy",
+    "team_lead",
     "world_owner",
     "instruction",
     "earlier_applied",
@@ -107,6 +111,35 @@ def _made_by_owner(policy) -> bool:
     return all(stamp["by"] == policy["owner"] for stamp in stamps if stamp is not None)
 
 
+def _may_answer(gate, answer, owner, lead, policy) -> bool:
+    """OB-01, gate path (PRD 10.1): the world's owner, the Approver the gate names, or a Team Lead
+    whose domain the owner assigned before the answer (PRD 16.2), when the gate names that domain
+    and the owner's policy it names (same action type, in force) lists it. A Viewer, anyone else
+    or a Team Lead of another domain opens nothing. A T3 gate answered on WhatsApp also needs its
+    PIN checked (SEC-06)."""
+    authz, allowed = answer["authz"], gate["data"]["team_lead"]
+    if gate["data"]["risk_tier"] == "T3" and answer["data"]["channel"] == "whatsapp":
+        if not answer["data"]["pin_verified"]:
+            return False
+    if authz["by"] == "person":
+        return authz["ref"] in (owner, gate["data"]["approver"])
+    return (
+        allowed is not None
+        and lead is not None
+        and policy is not None
+        and (lead["id"], lead["domain"]) == (authz["ref"], allowed["domain"])
+        and lead["assigned_by"]["by"] == owner
+        and lead["assigned_by"]["at"] <= authz["at"]
+        and policy["id"] == allowed["policy_id"]
+        and policy["owner"] == owner
+        and _made_by_owner(policy)
+        and policy["action_type"] == gate["data"]["action_type"]
+        and allowed["domain"] in policy["team_lead_domains"]
+        and policy["created_by"]["at"] <= authz["at"]
+        and (policy["expiry"] is None or authz["at"] < policy["expiry"])
+    )
+
+
 def _instructed(entry, applied, level, policy, instruction, earlier) -> bool:
     """OB-01, L2: the policy owner's own earlier instruction in this world, from a signed-in session
     or the owner's bound WhatsApp number (never email), asked for this send, and no earlier
@@ -155,6 +188,9 @@ def broken(case) -> set[str]:
     if not _opened(entry, reserved, auth):
         rules.add("OB-01")
     if transfer is not None and transfer["authz"] != entry["authz"]:
+        rules.add("OB-01")
+    answered = reserved is not None and auth is not None and auth["type"] == "approval.resolved"
+    if answered and not _may_answer(reserved, auth, case["world_owner"], case["team_lead"], case["policy"]):
         rules.add("OB-01")
     by_policy = auth is not None and auth["type"] == "policy.applied"
     if by_policy and not _policy_covers(
@@ -215,13 +251,18 @@ def test_FR_WLD_03_OB_05_outbox_crossref_cases_are_shape_valid(repo_root, regist
             if case[slot] is not None:
                 found += _event_part_problems(slot, case[slot], types, registry)
         by_policy = case["authorised_by"] is not None and case["authorised_by"]["type"] == "policy.applied"
-        policy_parts = (case["policy"], case["world_owner"], case["earlier_applied"])
-        if any((part is not None) != by_policy for part in policy_parts):
-            found.append("policy, world_owner and earlier_applied are set on the policy path only")
+        owner = {"$ref": BASE + "common.schema.json#/$defs/user_id"}
+        found += [e.message for e in errors_for(owner, case["world_owner"], registry)]
+        if by_policy and (case["policy"] is None or case["team_lead"] is not None):
+            found.append("the policy path has a policy and no team_lead")
+        if not by_policy and (case["policy"] is not None) != (case["team_lead"] is not None):
+            found.append("on the gate path, policy and team_lead are both set (a Team Lead answered) or both null")
+        for part, schema in ((case["policy"], "policy"), (case["team_lead"], "team_lead")):
+            if part is not None:
+                found += [e.message for e in errors_for({"$ref": f"{BASE}{schema}.schema.json"}, part, registry)]
+        if (case["earlier_applied"] is not None) != by_policy:
+            found.append("earlier_applied is set on the policy path only")
         elif by_policy:
-            found += [e.message for e in errors_for({"$ref": BASE + "policy.schema.json"}, case["policy"], registry)]
-            owner = {"$ref": BASE + "common.schema.json#/$defs/user_id"}
-            found += [e.message for e in errors_for(owner, case["world_owner"], registry)]
             for used in case["earlier_applied"]:
                 found += _event_part_problems("authorised_by", used, types, registry)
                 found += [] if used["type"] == "policy.applied" else ["earlier_applied holds policy.applied parts"]
@@ -253,13 +294,19 @@ def test_FR_WLD_03_OB_05_each_invalid_entry_breaks_only_its_rule(repo_root):
 
 
 def test_FR_WLD_03_OB_01_every_authorisation_path_has_an_invalid_case(repo_root):
-    """A gate nobody approved and a send stamped with the wrong authority each fail OB-01 (HR-7)."""
+    """A gate nobody approved, a gate approved by someone who may not open it (PRD 10.1, 16.2,
+    SEC-06) and a send stamped with the wrong authority each fail OB-01 (HR-7)."""
     names = {path.stem for path in _cases(repo_root, "invalid")}
     required = {
         "ob01_gate_answered_hold",
         "ob01_gate_never_answered",
         "ob01_authz_from_another_person",
         "ob01_authz_from_team_lead_not_the_person",
+        "ob01_gate_approved_by_viewer",
+        "ob01_gate_approved_by_team_lead_outside_domain",
+        "ob01_gate_approved_by_team_lead_policy_does_not_allow",
+        "ob01_gate_approved_by_team_lead_assigned_by_someone_else",
+        "ob01_t3_whatsapp_without_pin",
         "ob01_policy_send_stamped_as_person",
         "ob01_person_approved_send_stamped_as_policy",
         "ob01_transfer_stamped_other_than_entry",
