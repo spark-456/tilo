@@ -57,9 +57,13 @@ class RunArchive:
     instance over the same store/org/run) continues the chain from the head."""
 
     def __init__(self, store: Store, *, org_id: str, run_id: str, clock: Callable[[], datetime] | None = None):
-        if not ORG_ID_RE.match(org_id):
+        # fullmatch (not match): with a trailing "$", .match() alone would
+        # accept a string with an extra trailing "\n" -- $ matches just
+        # before a final newline, but .match() never checks that the whole
+        # string was consumed. fullmatch does.
+        if not ORG_ID_RE.fullmatch(org_id):
             raise ValueError(f"invalid org_id: {org_id!r}")
-        if not RUN_ID_RE.match(run_id):
+        if not RUN_ID_RE.fullmatch(run_id):
             raise ValueError(f"invalid run_id: {run_id!r}")
         self._store = store
         self._org_id = org_id

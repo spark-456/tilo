@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
+import traceback
 from typing import Any
 
 MAX_SCAN_CHARS = 1_000_000
@@ -44,12 +45,22 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bEAA[A-Za-z0-9]{60,}"), "meta_whatsapp_token"),
     (re.compile(r"\bnvapi-[A-Za-z0-9_\-]{20,}"), "nvidia_nim_key"),
     (re.compile(r"\"type\"\s*:\s*\"service_account\""), "service_account_key"),
-    (re.compile(r"Authorization:\s*Bearer\s+[A-Za-z0-9\-_.=]+", re.IGNORECASE), "bearer_token"),
-    (re.compile(r"\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"), "jwt"),
+    # Optional quotes around the header name and the value cover both a raw
+    # "Authorization: Bearer x" header line and a JSON-quoted
+    # "Authorization": "Bearer x" field. Charset includes RFC 6750's token68
+    # set (+ / ~ alongside - . _ and = padding).
+    (re.compile(r'Authorization"?\s*:\s*"?Bearer\s+[A-Za-z0-9\-_.~+/=]+', re.IGNORECASE), "bearer_token"),
+    # Anchored to the real JWT shape (header JSON always starts "{" -> "eyJ"
+    # once base64-encoded) with possessive quantifiers, so a non-JWT string
+    # with many word boundaries (e.g. "a-" repeated) cannot make the engine
+    # backtrack: it fails at the literal "eyJ" prefix check in linear time.
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{5,}+\.[A-Za-z0-9_-]{5,}+\.[A-Za-z0-9_-]{5,}+\b"), "jwt"),
 ]
 
-# 13-19 digits, spaces/dashes allowed; Luhn checked separately before redacting.
-_CARD_RE = re.compile(r"(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)")
+# 13-25 raw digits (spaces/dashes allowed as separators): wide enough to also
+# sweep in a trailing CVV/expiry or a leading stray digit, which _card_span
+# then trims back to the actual 13-19 digit Luhn-valid card.
+_CARD_RE = re.compile(r"(?<!\d)\d(?:[ -]?\d){12,24}(?!\d)")
 
 
 def _is_secret_key(key: Any) -> bool:
@@ -71,13 +82,36 @@ def _luhn_valid(digits: str) -> bool:
     return total % 10 == 0
 
 
+def _card_span(raw: str) -> tuple[int, int, str] | None:
+    """Locates a contiguous Luhn-valid 13-19 digit card inside `raw`, which
+    may carry extra digits swept in by the outer `_CARD_RE` match: a
+    trailing CVV/expiry (try the longest prefix window first) or a leading
+    stray digit (fall back to the longest suffix window). Returns the
+    (start, end) character span of just the card digits within `raw`, and
+    the card's own digit string -- or None if no window is Luhn-valid."""
+    positions = [i for i, ch in enumerate(raw) if ch.isdigit()]
+    n = len(positions)
+    if n < 13:
+        return None
+    for length in range(min(19, n), 12, -1):
+        digits = "".join(raw[p] for p in positions[:length])
+        if _luhn_valid(digits):
+            return positions[0], positions[length - 1] + 1, digits
+    for length in range(min(19, n), 12, -1):
+        digits = "".join(raw[p] for p in positions[n - length :])
+        if _luhn_valid(digits):
+            return positions[n - length], positions[-1] + 1, digits
+    return None
+
+
 def _redact_cards(text: str) -> str:
     def _replace(match: re.Match[str]) -> str:
         raw = match.group(0)
-        digits = re.sub(r"[ -]", "", raw)
-        if not (13 <= len(digits) <= 19) or not _luhn_valid(digits):
+        span = _card_span(raw)
+        if span is None:
             return raw
-        return f"[REDACTED:card ****{digits[-4:]}]"
+        start, end, digits = span
+        return raw[:start] + f"[REDACTED:card ****{digits[-4:]}]" + raw[end:]
 
     return _CARD_RE.sub(_replace, text)
 
@@ -94,11 +128,18 @@ def _redact_value(value: Any, depth: int) -> Any:
     if depth > _MAX_DEPTH:
         return "[REDACTED:too_deep]"
     if isinstance(value, dict):
-        return {
-            k: ("[REDACTED:secret_field]" if _is_secret_key(k) else _redact_value(v, depth + 1))
-            for k, v in value.items()
-        }
-    if isinstance(value, list):
+        result: dict[Any, Any] = {}
+        for k, v in value.items():
+            # The key text itself is scanned too (not just checked against the
+            # secret-name markers): a credential pattern can turn up as a map
+            # key, not only as a value.
+            new_key = _redact_string(k) if isinstance(k, str) else k
+            result[new_key] = "[REDACTED:secret_field]" if _is_secret_key(k) else _redact_value(v, depth + 1)
+        return result
+    if isinstance(value, (list, tuple)):
+        # A tuple is redacted the same as a list: canonical_json's
+        # json.dumps would otherwise serialise it as a JSON array verbatim,
+        # unredacted, since only dict/list were walked here.
         return [_redact_value(v, depth + 1) for v in value]
     if isinstance(value, str):
         return _redact_string(value)
@@ -114,12 +155,15 @@ def redact(value: Any) -> Any:
 
 def find_secrets(text: str) -> list[str]:
     """Kinds of secret found in `text` (possibly with duplicates), or []."""
-    if not isinstance(text, str) or len(text) > MAX_SCAN_CHARS:
+    if not isinstance(text, str):
         return []
+    if len(text) > MAX_SCAN_CHARS:
+        # Fail closed: oversize text is never scanned piecemeal, so it is
+        # reported as a finding rather than silently coming back clean.
+        return ["oversize"]
     found = [kind for pattern, kind in _PATTERNS if pattern.search(text)]
     for match in _CARD_RE.finditer(text):
-        digits = re.sub(r"[ -]", "", match.group(0))
-        if 13 <= len(digits) <= 19 and _luhn_valid(digits):
+        if _card_span(match.group(0)) is not None:
             found.append("card")
             break
     return found
@@ -131,14 +175,28 @@ def redact_prompt(text: str) -> str:
 
 
 class RedactingFilter(logging.Filter):
-    """Redacts a log record's `msg` and `args` in place; never drops it."""
+    """Redacts a log record's `msg`, `args` and any exception traceback in
+    place; never drops the record."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.msg, str):
             record.msg = _redact_string(record.msg)
         if record.args:
+            # The full structural `redact()` (not just string args): a dict
+            # or list arg needs its secret-named keys and nested values
+            # redacted too, the same as an archive payload would.
             if isinstance(record.args, dict):
-                record.args = {k: (_redact_string(v) if isinstance(v, str) else v) for k, v in record.args.items()}
+                record.args = redact(record.args)
             else:
-                record.args = tuple(_redact_string(a) if isinstance(a, str) else a for a in record.args)
+                record.args = tuple(redact(a) for a in record.args)
+        if isinstance(record.exc_info, tuple) and len(record.exc_info) == 3:
+            try:
+                formatted = "".join(traceback.format_exception(*record.exc_info))
+            except Exception:
+                formatted = "[unformattable traceback]"
+            # Replace the raw traceback everywhere a formatter could read it
+            # from: pre-render exc_text redacted, and drop exc_info so
+            # nothing downstream re-renders the unredacted original.
+            record.exc_text = _redact_string(formatted)
+            record.exc_info = None
         return True

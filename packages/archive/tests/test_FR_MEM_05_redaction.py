@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+import sys
 import time
 
 import pytest
@@ -372,3 +373,171 @@ def test_FR_MEM_05_SEC_14_archive_append_redacts_every_secret_kind(tmp_path):
 
     findings = SECRET_SCAN.scan_file(str(jsonl_path))
     assert findings == []
+
+
+# ---------------------------------------------------------------------------
+# Fix-round-1 regression pins (code-reviewer, security-reviewer, qa-breaker).
+# ---------------------------------------------------------------------------
+
+
+def test_FR_MEM_05_tuple_payload_value_is_redacted(tmp_path):
+    # code-reviewer: _redact_value walked only dict and list, so a tuple went
+    # back unchanged and json.dumps serialised it as a JSON array in clear
+    # text -- FR-MEM-05 / SEC-14. A tuple must be redacted the same as list.
+    token = "ghp_" + rand_token(RNG, 36)
+    header, bearer_token = fake_bearer_header(RNG)
+    payload = {"t": (token, header)}
+
+    store = LocalDirStore(tmp_path)
+    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    archive.append("tool_call", payload)
+
+    jsonl_path = tmp_path / ORG_ID / f"{RUN_ID}.jsonl"
+    stored_line = jsonl_path.read_text(encoding="utf-8")
+
+    assert token not in stored_line
+    assert bearer_token not in stored_line
+    assert "[REDACTED:" in stored_line
+    stored = json.loads(stored_line)
+    assert stored["payload"]["t"] == ["[REDACTED:github_token]", "[REDACTED:bearer_token]"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "a-" * 500_000,
+        "a." * 500_000,
+        "".join(
+            random.Random(1).choice("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._")
+            for _ in range(1_000_000)
+        ),
+    ],
+    ids=["hyphen-boundary", "dot-boundary", "mixed-1mb"],
+)
+def test_FR_MEM_05_jwt_pattern_is_linear_time_on_boundary_dense_input(text):
+    # security-reviewer / qa-breaker: the old JWT pattern backtracked
+    # quadratically on text with a word boundary at nearly every position.
+    start = time.perf_counter()
+    redact_mod.redact({"m": text})
+    elapsed = time.perf_counter() - start
+    assert elapsed < 1.0, f"redact() took {elapsed:.2f}s on a boundary-dense string"
+
+
+def test_FR_MEM_05_dict_key_text_is_scanned_for_secret_patterns():
+    # security-reviewer: dict keys were never scanned, only checked against
+    # the secret-name markers -- a credential pattern embedded in a key with
+    # no marker substring in its name (e.g. a trace id built from a leaked
+    # JWT) survived untouched.
+    jwt = fake_jwt(RNG)
+    key = f"trace-{jwt}"
+    assert not any(marker in key.lower() for marker in ("password", "secret", "token", "cookie", "pin"))
+    payload = {key: "fine"}
+
+    redacted = redact_mod.redact(payload)
+    text = json.dumps(redacted)
+
+    assert jwt not in text
+    assert key not in redacted
+    assert any("[REDACTED:" in str(k) for k in redacted)
+
+
+def test_FR_MEM_05_redacting_filter_redacts_dict_arg_secret_keys():
+    # security-reviewer: RedactingFilter only redacted str args; a dict arg's
+    # secret-named keys (and nested values) leaked untouched. (A LogRecord
+    # constructed with a single mapping arg stores it as `record.args`
+    # directly, not wrapped in a tuple -- stdlib logging's %-dict support.)
+    secret = rand_token(RNG, 24)
+    record = logging.LogRecord(
+        name="tilo.test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="calling provider with %(api_key)s",
+        args={"api_key": secret, "nested": {"password": secret}},
+        exc_info=None,
+    )
+    assert isinstance(record.args, dict)  # confirms the stdlib collapsing above
+
+    redact_mod.RedactingFilter().filter(record)
+
+    assert record.args["api_key"] != secret
+    assert record.args["nested"]["password"] != secret
+
+
+def test_FR_MEM_05_redacting_filter_redacts_exc_info_traceback():
+    # security-reviewer: RedactingFilter never looked at exc_info, so a
+    # secret in an exception message survived in the rendered traceback.
+    secret = "sk-" + rand_token(RNG, 24)
+    try:
+        raise ValueError(f"provider call failed, token={secret}")
+    except ValueError:
+        record = logging.LogRecord(
+            name="tilo.test",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="provider error",
+            args=(),
+            exc_info=sys.exc_info(),
+        )
+
+    redact_mod.RedactingFilter().filter(record)
+
+    formatter = logging.Formatter()
+    rendered = formatter.format(record)
+    assert secret not in rendered
+    assert record.exc_info is None
+
+
+@pytest.mark.parametrize(
+    "build_text",
+    [
+        lambda card: f"{with_separator(card, ' ')} 123",  # trailing CVV
+        lambda card: f"{with_separator(card, ' ')} 12/28",  # trailing expiry
+        lambda card: f"2 {with_separator(card, ' ')}",  # leading stray digit
+    ],
+    ids=["trailing-cvv", "trailing-expiry", "leading-stray-digit"],
+)
+def test_FR_MEM_05_card_redacted_despite_adjacent_noise_digits(build_text):
+    # security-reviewer / qa-breaker: the card regex greedily joined
+    # adjacent digit groups, so a real card followed by a CVV/expiry, or
+    # preceded by a stray digit, was left whole (Luhn failed on the joined
+    # digit string) instead of being found and redacted.
+    card = fake_luhn_card(RNG, length=16)
+    text = build_text(card)
+
+    redacted = redact_mod.redact({"note": text})["note"]
+
+    assert card not in redacted
+    assert f"[REDACTED:card ****{card[-4:]}]" in redacted
+
+
+def test_FR_MEM_05_bearer_token_matches_json_quoted_header():
+    # security-reviewer: a JSON-quoted "Authorization": "Bearer x" field was
+    # not matched by a pattern anchored to the literal "Authorization:" form.
+    token = rand_token(RNG, 40, _URLSAFE)
+    payload = {"raw_request": f'{{"Authorization": "Bearer {token}"}}'}
+
+    redacted = redact_mod.redact(payload)
+
+    assert token not in json.dumps(redacted)
+    assert "[REDACTED:bearer_token]" in redacted["raw_request"]
+
+
+def test_FR_MEM_05_bearer_token_charset_includes_rfc6750_extras():
+    # security-reviewer: the bearer charset omitted RFC 6750's + / ~, so part
+    # of a token using them stayed in clear text.
+    token = rand_token(RNG, 30, _URLSAFE) + "+/~" + rand_token(RNG, 10, _URLSAFE)
+    header = f"Authorization: Bearer {token}"
+
+    redacted = redact_mod.redact_prompt(header)
+
+    assert token not in redacted
+    assert "[REDACTED:bearer_token]" in redacted
+
+
+def test_FR_MEM_05_find_secrets_fails_closed_on_oversize_text():
+    # security-reviewer: find_secrets returned [] for oversize input, the
+    # opposite of fail-closed (an empty list reads as "nothing found").
+    kinds = redact_mod.find_secrets("a" * (redact_mod.MAX_SCAN_CHARS + 1))
+    assert kinds == ["oversize"]

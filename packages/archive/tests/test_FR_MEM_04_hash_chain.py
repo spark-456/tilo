@@ -277,6 +277,19 @@ def test_FR_MEM_04_bad_org_id_raises_and_writes_nothing(store, bad_org_id):
         arch.append("model_call", {"x": 1})
 
 
+@pytest.mark.parametrize("suffix_id", ["org_test01\n", "r_test01\n"])
+def test_FR_MEM_04_id_with_trailing_newline_raises(store, suffix_id):
+    # security-reviewer: ORG_ID_RE / RUN_ID_RE used "$", which (without
+    # re.MULTILINE) matches just before a trailing "\n" rather than strictly
+    # at end-of-string, so ".match()" accepted an id with a trailing
+    # newline. fullmatch() must reject it.
+    org_id = suffix_id if suffix_id.startswith("org_") else ORG_ID
+    run_id = suffix_id if suffix_id.startswith("r_") else RUN_ID
+    with pytest.raises(ValueError):
+        arch = RunArchive(store, org_id=org_id, run_id=run_id, clock=FakeClock())
+        arch.append("model_call", {"x": 1})
+
+
 def test_FR_MEM_04_non_json_payload_raises_and_writes_nothing(archive):
     class NotJSONSerialisable:
         pass
