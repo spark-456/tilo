@@ -1,0 +1,19 @@
+id: exec_summary
+version: 2.1.0
+domain: writing
+author: "Ada Example <ada@example.com>"
+reviewer: "Grace Example <grace@example.com>"
+tools_allowed: [draft_document]
+inputs:
+  type: object
+  additionalProperties: false
+  required: [findings]
+  properties:
+    findings: { type: array }
+outputs:
+  type: object
+  additionalProperties: false
+  required: [summary]
+  properties:
+    summary: { type: string }
+description: "Turns verified findings into a one-page executive summary."

@@ -1,0 +1,15 @@
+# Invalid on purpose (services/harness/tests, FR-AGT-03): "id" here is "mismatched_id", but the
+# folder is skills_invalid/wrong_folder/bad_id_folder/ -- id must equal the folder's own name
+# (skill.schema.json description: "skills/<domain>/<skill-id>/"; SkillRegistry must report this
+# folder as invalid and never load it).
+id: mismatched_id
+version: 1.0.0
+domain: wrong_folder
+author: "Ada Example <ada@example.com>"
+reviewer: "Grace Example <grace@example.com>"
+tools_allowed: []
+inputs:
+  type: object
+outputs:
+  type: object
+description: "A skill whose id does not match its own folder name."
