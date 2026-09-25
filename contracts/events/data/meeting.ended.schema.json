@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/meeting.ended.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingEndedData",
+  "description": "data of meeting.ended (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {}
+}

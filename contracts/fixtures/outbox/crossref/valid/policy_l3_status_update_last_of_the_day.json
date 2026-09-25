@@ -1,0 +1,283 @@
+{
+  "rule": null,
+  "note": "The last send the L3 standing rule may make this UTC day: four earlier sends today (in this and another world of the owner) plus this one make 5, its per_day, and 8 plus 2 credits make 10, its credit limit. Yesterday's two sends and a send under another policy do not count.",
+  "entry": {
+    "id": "01JB5VQ0000000000000009007",
+    "idempotency_key": "r_village_basic_1:U3:post_status_update:1",
+    "world_id": "w_village_basic",
+    "run_id": "r_village_basic_1",
+    "action_type": "post_status_update",
+    "connector": "gmail",
+    "recipients": ["teammate@example.org"],
+    "attachments": [],
+    "item": {
+      "artifact_id": "art_status_update",
+      "version": 1
+    },
+    "destination": null,
+    "modifiers": [],
+    "risk_tier": "T2",
+    "authz": {
+      "by": "policy",
+      "ref": "pol_status_updates",
+      "at": "2026-09-29T10:20:00.000Z"
+    },
+    "undo_window_s": 60,
+    "scheduled_at": "2026-09-29T10:21:00.000Z",
+    "state": "scheduled",
+    "created_at": "2026-09-29T10:20:00.000Z"
+  },
+  "reserved_by": null,
+  "authorised_by": {
+    "type": "policy.applied",
+    "authz": {
+      "by": "policy",
+      "ref": "pol_status_updates",
+      "at": "2026-09-29T10:20:00.000Z"
+    },
+    "data": {
+      "policy_id": "pol_status_updates",
+      "gate_id": "G2",
+      "outbox_id": "01JB5VQ0000000000000009007",
+      "action_type": "post_status_update",
+      "connector": "gmail",
+      "destination": null,
+      "district": "D1",
+      "risk_tier": "T2",
+      "level": "L3",
+      "instruction_id": null,
+      "undo_window_s": 60,
+      "item": {
+        "artifact_id": "art_status_update",
+        "version": 1
+      },
+      "credits": 2
+    }
+  },
+  "policy": {
+    "id": "pol_status_updates",
+    "owner": "u_owner",
+    "action_type": "post_status_update",
+    "scope": {
+      "connectors": ["gmail"],
+      "recipients": ["teammate@example.org"],
+      "domains": [],
+      "districts": []
+    },
+    "limits": {
+      "per_day": 5,
+      "credits": 10
+    },
+    "conditions": {
+      "no_attachments": true,
+      "no_new_recipients": true,
+      "no_safety_flags": true
+    },
+    "level": "L3",
+    "undo_window_s": 60,
+    "expiry": null,
+    "notify_channel": "email",
+    "team_lead_domains": [],
+    "created_by": {
+      "by": "u_owner",
+      "at": "2026-09-28T08:00:00.000Z"
+    },
+    "changed_by": null,
+    "history": [
+      {
+        "by": "u_owner",
+        "at": "2026-09-28T08:00:00.000Z",
+        "change": "Created at L3 with a limit of 5 a day and 10 credits",
+        "level": "L3"
+      }
+    ]
+  },
+  "team_lead": null,
+  "world_owner": "u_owner",
+  "instruction": null,
+  "earlier_applied": [
+    {
+      "type": "policy.applied",
+      "authz": {
+        "by": "policy",
+        "ref": "pol_status_updates",
+        "at": "2026-09-28T23:00:00.000Z"
+      },
+      "data": {
+        "policy_id": "pol_status_updates",
+        "gate_id": "G2",
+        "outbox_id": "01JB5VQ0000000000000009121",
+        "action_type": "post_status_update",
+        "connector": "gmail",
+        "destination": null,
+        "district": "D1",
+        "risk_tier": "T2",
+        "level": "L3",
+        "instruction_id": null,
+        "undo_window_s": 60,
+        "item": {
+          "artifact_id": "art_status_update",
+          "version": 1
+        },
+        "credits": 5
+      }
+    },
+    {
+      "type": "policy.applied",
+      "authz": {
+        "by": "policy",
+        "ref": "pol_status_updates",
+        "at": "2026-09-28T23:59:59.999Z"
+      },
+      "data": {
+        "policy_id": "pol_status_updates",
+        "gate_id": "G2",
+        "outbox_id": "01JB5VQ0000000000000009122",
+        "action_type": "post_status_update",
+        "connector": "gmail",
+        "destination": null,
+        "district": "D1",
+        "risk_tier": "T2",
+        "level": "L3",
+        "instruction_id": null,
+        "undo_window_s": 60,
+        "item": {
+          "artifact_id": "art_status_update",
+          "version": 1
+        },
+        "credits": 5
+      }
+    },
+    {
+      "type": "policy.applied",
+      "authz": {
+        "by": "policy",
+        "ref": "pol_status_updates",
+        "at": "2026-09-29T00:00:00.000Z"
+      },
+      "data": {
+        "policy_id": "pol_status_updates",
+        "gate_id": "G2",
+        "outbox_id": "01JB5VQ0000000000000009123",
+        "action_type": "post_status_update",
+        "connector": "gmail",
+        "destination": null,
+        "district": "D1",
+        "risk_tier": "T2",
+        "level": "L3",
+        "instruction_id": null,
+        "undo_window_s": 60,
+        "item": {
+          "artifact_id": "art_status_update",
+          "version": 1
+        },
+        "credits": 2
+      }
+    },
+    {
+      "type": "policy.applied",
+      "authz": {
+        "by": "policy",
+        "ref": "pol_status_updates",
+        "at": "2026-09-29T08:30:00.000Z"
+      },
+      "data": {
+        "policy_id": "pol_status_updates",
+        "gate_id": "G2",
+        "outbox_id": "01JB5VQ0000000000000009124",
+        "action_type": "post_status_update",
+        "connector": "gmail",
+        "destination": null,
+        "district": "D1",
+        "risk_tier": "T2",
+        "level": "L3",
+        "instruction_id": null,
+        "undo_window_s": 60,
+        "item": {
+          "artifact_id": "art_status_update",
+          "version": 1
+        },
+        "credits": 2
+      }
+    },
+    {
+      "type": "policy.applied",
+      "authz": {
+        "by": "policy",
+        "ref": "pol_status_updates",
+        "at": "2026-09-29T09:00:00.000Z"
+      },
+      "data": {
+        "policy_id": "pol_status_updates",
+        "gate_id": "G2",
+        "outbox_id": "01JB5VQ0000000000000009125",
+        "action_type": "post_status_update",
+        "connector": "gmail",
+        "destination": null,
+        "district": "D1",
+        "risk_tier": "T2",
+        "level": "L3",
+        "instruction_id": null,
+        "undo_window_s": 60,
+        "item": {
+          "artifact_id": "art_status_update",
+          "version": 1
+        },
+        "credits": 2
+      }
+    },
+    {
+      "type": "policy.applied",
+      "authz": {
+        "by": "policy",
+        "ref": "pol_other_updates",
+        "at": "2026-09-29T09:45:00.000Z"
+      },
+      "data": {
+        "policy_id": "pol_other_updates",
+        "gate_id": "G2",
+        "outbox_id": "01JB5VQ0000000000000009126",
+        "action_type": "post_status_update",
+        "connector": "gmail",
+        "destination": null,
+        "district": "D1",
+        "risk_tier": "T2",
+        "level": "L3",
+        "instruction_id": null,
+        "undo_window_s": 60,
+        "item": {
+          "artifact_id": "art_status_update",
+          "version": 1
+        },
+        "credits": 9
+      }
+    },
+    {
+      "type": "policy.applied",
+      "authz": {
+        "by": "policy",
+        "ref": "pol_status_updates",
+        "at": "2026-09-29T10:00:00.000Z"
+      },
+      "data": {
+        "policy_id": "pol_status_updates",
+        "gate_id": "G2",
+        "outbox_id": "01JB5VQ0000000000000009127",
+        "action_type": "post_status_update",
+        "connector": "gmail",
+        "destination": null,
+        "district": "D1",
+        "risk_tier": "T2",
+        "level": "L3",
+        "instruction_id": null,
+        "undo_window_s": 60,
+        "item": {
+          "artifact_id": "art_status_update",
+          "version": 1
+        },
+        "credits": 2
+      }
+    }
+  ],
+  "transfer": null
+}

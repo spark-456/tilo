@@ -1,0 +1,53 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000034",
+  "seq": 34,
+  "ts": "2026-09-29T09:31:25.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "approval.requested",
+  "actor": "A_s2",
+  "target": "G1",
+  "level": "L1",
+  "district": "D1",
+  "item": {
+    "kind": "document",
+    "artifact_id": "art_reply_draft",
+    "label": "Reply draft"
+  },
+  "severity": "gate",
+  "credits": 0,
+  "summary": "The reply is ready. Sending it needs your approval.",
+  "cause": "01JB5VQ0000000000000000033",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "gate_id": "G1",
+    "card_id": "01JB5VQ0000000000000009001",
+    "outbox_id": "01JB5VQ0000000000000009002",
+    "action_type": "send_email",
+    "risk_tier": "T2",
+    "irreversible": true,
+    "item": {
+      "artifact_id": "art_reply_draft",
+      "version": 1
+    },
+    "approver": {
+      "user": "tl_ops",
+      "assigned_by": {
+        "by": "u_owner",
+        "at": "2026-09-29T09:00:00.000Z"
+      }
+    },
+    "team_lead": null
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

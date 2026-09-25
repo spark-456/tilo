@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/building.scaled.schema.json",
+  "x-version": "1.0.0",
+  "title": "BuildingScaledData",
+  "description": "data of building.scaled (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["floors"],
+  "properties": { "floors": { "type": "integer", "minimum": 1, "maximum": 4 } }
+}

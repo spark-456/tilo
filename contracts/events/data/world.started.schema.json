@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/world.started.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorldStartedData",
+  "description": "data of world.started (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["budget_cap"],
+  "properties": { "budget_cap": { "$ref": "../../common.schema.json#/$defs/credits" } }
+}

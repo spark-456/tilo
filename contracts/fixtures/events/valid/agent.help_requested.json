@@ -1,0 +1,32 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000109",
+  "seq": 109,
+  "ts": "2026-09-29T09:41:49.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "agent.help_requested",
+  "actor": "A_s2",
+  "target": "A_l1",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "fyi",
+  "credits": 0,
+  "summary": "The Specialist asked the Lead which thread to reply in.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "unit": "U2"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

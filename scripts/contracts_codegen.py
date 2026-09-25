@@ -1,18 +1,21 @@
-"""Contract code generation and drift check (ticket P0-02, FR-WLD-02, ADR-0002).
+"""Contract code generation and drift check (tickets P0-02 and P0-03, FR-WLD-02, FR-WLD-03, ADR-0002).
 
     uv run python scripts/contracts_codegen.py gen     # `just contracts-gen`
     uv run python scripts/contracts_codegen.py check   # `just contracts-check`
 
-Both commands validate every schema (2020-12, $id, x-version, title) and every fixture:
-contracts/fixtures/<name>/ against the schema root, contracts/fixtures/<name>.<def>/ against
-$defs.<def>; valid fixtures must also round-trip through the generated pydantic models. The
-config/ files listed in CONFIG_SHAPES must validate against the contract that owns their shape.
-Generation bundles contracts/*.schema.json into one schema whose $defs names cannot collide
+Both commands validate every schema under contracts/ (2020-12, $id, x-version, title) and every
+fixture: contracts/fixtures/<name>/ against the schema root, contracts/fixtures/<name>.<def>/
+against $defs.<def>; valid fixtures must also round-trip through the generated pydantic models.
+The event registry, event fixtures and fixture streams are checked by scripts/contracts_events.py
+(rules EV-01 to EV-14, contracts/event.rules.md). The config/ files listed in CONFIG_SHAPES must
+validate against the contract that owns their shape.
+Generation bundles contracts/**/*.schema.json into one schema whose $defs names cannot collide
 (common defs keep their name, e.g. RiskTier; other defs get their contract as prefix, e.g.
-PlanGate; each contract root is its own name, e.g. Plan), then writes pydantic v2 models with
-datamodel-code-generator and TypeScript types with json-schema-to-typescript. gen writes them
-into the packages; check regenerates into memory and fails on any difference. Python and Node
-only, so it runs the same on Windows and Linux CI.
+PlanGate; each contract root is its own name, e.g. Plan; an event data schema is <Type>Data, e.g.
+BuildingCompletedData), writes pydantic v2 models with datamodel-code-generator and TypeScript
+types with json-schema-to-typescript, and appends the registry constants. gen writes them into
+the packages; check regenerates into memory and fails on any difference. Python and Node only, so
+it runs the same on Windows and Linux CI.
 """
 
 from __future__ import annotations
@@ -28,7 +31,9 @@ import sys
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
+from urllib.parse import urljoin
 
+import contracts_events as events
 import jsonschema
 import yaml
 from referencing import Registry, Resource
@@ -44,12 +49,12 @@ BASE_URI = "https://contracts.tilo.example/"
 CONFIG_SHAPES = {
     "config/models.yaml": ("providers", "models"),
     "config/prices.yaml": ("providers", "prices"),
+    "config/autonomy.yaml": ("policy", "risk_tier_table"),
 }
+# Fixture folders with their own layout, checked by contracts_events.
+EVENT_FIXTURES = {"events", "streams"}
 SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
-REF = re.compile(
-    r"^(?:(?:https://contracts\.tilo\.example/)?(?P<file>[a-z_]+)\.schema\.json)?"
-    r"(?:#(?:/\$defs/(?P<key>[a-z0-9_]+))?)?$"
-)
+DEF_POINTER = re.compile(r"^/\$defs/(?P<key>[a-z0-9_]+)$")
 DATAMODEL_ARGS = [
     "--input-file-type=jsonschema",
     "--output-model-type=pydantic_v2.BaseModel",
@@ -75,18 +80,34 @@ DATAMODEL_ARGS = [
 
 
 def pascal(snake: str) -> str:
-    return "".join(part[:1].upper() + part[1:] for part in snake.split("_"))
+    return "".join(part[:1].upper() + part[1:] for part in re.split(r"[_.]", snake))
 
 
-def type_name(file: str, key: str | None = None) -> str:
-    """Generated name of a contract root (key None) or of one of its $defs."""
-    return pascal(file) if key is None else pascal(key) if file == "common" else pascal(file) + pascal(key)
+def root_name(key: str) -> str:
+    """Generated name of a contract root: Plan, EventRegistry, BuildingCompletedData."""
+    if key.startswith("events/data/"):
+        return pascal(key.removeprefix("events/data/")) + "Data"
+    return "EventRegistry" if key == "events/registry" else pascal(key)
+
+
+def type_name(key: str, definition: str | None = None) -> str:
+    """Generated name of a contract root (definition None) or of one of its $defs."""
+    if definition is None:
+        return root_name(key)
+    return pascal(definition) if key == "common" else root_name(key) + pascal(definition)
+
+
+def data_model(type_: str) -> str:
+    return root_name(f"events/data/{type_}")
 
 
 def load_schemas() -> dict[str, dict]:
+    """Every contracts/**/*.schema.json, keyed by its path under contracts/ without the suffix."""
+    paths = sorted(CONTRACTS.glob("**/*.schema.json"), key=lambda p: p.relative_to(CONTRACTS).as_posix())
     return {
-        path.name.removesuffix(".schema.json"): json.loads(path.read_text(encoding="utf-8"))
-        for path in sorted(CONTRACTS.glob("*.schema.json"))
+        p.relative_to(CONTRACTS).as_posix().removesuffix(".schema.json"): json.loads(p.read_text(encoding="utf-8"))
+        for p in paths
+        if "fixtures" not in p.relative_to(CONTRACTS).parts
     }
 
 
@@ -101,14 +122,14 @@ def check_schemas(schemas: dict[str, dict]) -> list[str]:
             errors.append(f"{name}.schema.json: $id must be {BASE_URI}{name}.schema.json")
         if not SEMVER.match(str(schema.get("x-version", ""))):
             errors.append(f"{name}.schema.json: x-version must be a semantic version")
-        if schema.get("title") != pascal(name):
-            errors.append(f"{name}.schema.json: title must be {pascal(name)}")
+        if schema.get("title") != root_name(name):
+            errors.append(f"{name}.schema.json: title must be {root_name(name)}")
     return errors
 
 
 def fixtures(schemas: dict[str, dict]) -> Iterator[tuple[str, str, str, Path]]:
-    """(schema name, $defs key or "", "valid" | "invalid", path) for every fixture file."""
-    for folder in sorted(p for p in (CONTRACTS / "fixtures").iterdir() if p.is_dir()):
+    """(schema name, $defs key or "", "valid" | "invalid", path) for every schema fixture file."""
+    for folder in sorted(p for p in (CONTRACTS / "fixtures").iterdir() if p.is_dir() and p.name not in EVENT_FIXTURES):
         name, _, key = folder.name.partition(".")
         if name not in schemas or (key and key not in schemas[name].get("$defs", {})):
             raise SystemExit(f"contracts: fixtures/{folder.name} names no schema or $defs entry")
@@ -119,20 +140,32 @@ def fixtures(schemas: dict[str, dict]) -> Iterator[tuple[str, str, str, Path]]:
             yield from ((name, key, kind, path) for path in files)
 
 
-def validate(schemas: dict[str, dict], name: str, key: str, instance: object) -> list[str]:
-    """Error messages for instance against contract `name` (its $defs.<key> when key is set)."""
+def validator(schemas: dict[str, dict]) -> events.Validate:
+    """validate(name, instance) -> error messages against contracts/<name>.schema.json (or
+    "<name>#<def>" for one $defs entry). Validators are built once per schema."""
     registry = Registry().with_resources(
         (schema["$id"], Resource.from_contents(schema, default_specification=DRAFT202012))
         for schema in schemas.values()
     )
-    target = {"$ref": f"{BASE_URI}{name}.schema.json" + (f"#/$defs/{key}" if key else "")}
-    return [e.message for e in jsonschema.Draft202012Validator(target, registry=registry).iter_errors(instance)]
+    cache: dict[str, jsonschema.protocols.Validator] = {}
+
+    def validate(name: str, instance: object) -> list[str]:
+        file, _, key = name.partition("#")
+        uri = f"{BASE_URI}{file}.schema.json" + (f"#/$defs/{key}" if key else "")
+        if uri not in cache:
+            cache[uri] = jsonschema.Draft202012Validator({"$ref": uri}, registry=registry)
+        return [
+            f"{'/'.join(map(str, error.absolute_path)) or '(root)'}: {error.message}"
+            for error in cache[uri].iter_errors(instance)
+        ]
+
+    return validate
 
 
-def check_fixtures(schemas: dict[str, dict]) -> list[str]:
+def check_fixtures(schemas: dict[str, dict], validate: events.Validate) -> list[str]:
     errors = []
     for name, key, kind, path in fixtures(schemas):
-        found = validate(schemas, name, key, load(path))
+        found = validate(f"{name}#{key}" if key else name, load(path))
         if kind == "valid" and found:
             errors.append(f"{path.relative_to(CONTRACTS).as_posix()} fails: {found[:3]}")
         if kind == "invalid" and not found:
@@ -140,19 +173,18 @@ def check_fixtures(schemas: dict[str, dict]) -> list[str]:
     return errors
 
 
-def check_config(schemas: dict[str, dict]) -> list[str]:
+def check_config(validate: events.Validate) -> list[str]:
     """config/ files whose shape a contract owns must validate against it (when present; the
-    loaders in packages/providers require them)."""
+    loaders in packages/providers and the policy engine require them)."""
     errors = []
     for relative, (name, key) in CONFIG_SHAPES.items():
         path = ROOT / relative
-        if path.is_file() and (found := validate(schemas, name, key, yaml.safe_load(path.read_text(encoding="utf-8")))):
+        if path.is_file() and (found := validate(f"{name}#{key}", yaml.safe_load(path.read_text(encoding="utf-8")))):
             errors.append(f"{relative} fails {name}.schema.json $defs.{key}: {found[:3]}")
     return errors
 
 
-def check_models(schemas: dict[str, dict], python: str) -> list[str]:
-    """Valid fixtures must load into the generated pydantic models and dump back unchanged."""
+def load_module(python: str) -> object:
     with tempfile.TemporaryDirectory() as work:
         path = Path(work) / "tilo_contracts_fresh.py"
         path.write_text(python, encoding="utf-8")
@@ -160,6 +192,11 @@ def check_models(schemas: dict[str, dict], python: str) -> list[str]:
         assert spec and spec.loader
         module = sys.modules["tilo_contracts_fresh"] = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
+    return module
+
+
+def check_models(schemas: dict[str, dict], module: object) -> list[str]:
+    """Valid fixtures must load into the generated pydantic models and dump back unchanged."""
     errors = []
     for name, key, kind, path in fixtures(schemas):
         if kind == "valid":
@@ -180,17 +217,19 @@ def load(path: Path) -> object:
 def bundle(schemas: dict[str, dict]) -> dict:
     """One schema holding every contract root and $def under a collision-free name."""
 
-    def rewrite(node: object, file: str) -> object:
+    def rewrite(node: object, name: str) -> object:
         if isinstance(node, list):
-            return [rewrite(item, file) for item in node]
+            return [rewrite(item, name) for item in node]
         if not isinstance(node, dict):
             return node
-        out = {k: rewrite(v, file) for k, v in node.items()}
+        out = {k: rewrite(v, name) for k, v in node.items()}
         if isinstance(node.get("$ref"), str):
-            match = REF.match(node["$ref"])
-            if not match or not node["$ref"]:
-                raise SystemExit(f"contracts: {file}.schema.json has an unsupported $ref {node['$ref']!r}")
-            out["$ref"] = "#/$defs/" + type_name(match["file"] or file, match["key"])
+            uri, _, fragment = urljoin(schemas[name]["$id"], node["$ref"]).partition("#")
+            file = uri.removeprefix(BASE_URI).removesuffix(".schema.json")
+            pointer = DEF_POINTER.match(fragment)
+            if file not in schemas or not uri.startswith(BASE_URI) or (fragment and not pointer):
+                raise SystemExit(f"contracts: {name}.schema.json has an unsupported $ref {node['$ref']!r}")
+            out["$ref"] = "#/$defs/" + type_name(file, pointer["key"] if pointer else None)
         return out
 
     defs: dict[str, object] = {}
@@ -213,14 +252,18 @@ def bundle(schemas: dict[str, dict]) -> dict:
     }
 
 
-def header(schemas: dict[str, dict]) -> list[str]:
+def digest(value: object) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16]
+
+
+def header(schemas: dict[str, dict], registry: dict) -> list[str]:
     lines = [
-        "GENERATED by scripts/contracts_codegen.py from contracts/*.schema.json. Do not edit.",
-        "Regenerate with `just contracts-gen`; `just contracts-check` fails CI on drift (FR-WLD-02).",
+        "GENERATED by scripts/contracts_codegen.py from the JSON Schemas under contracts/ and",
+        "contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;",
+        "`just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).",
     ]
-    for name, schema in schemas.items():
-        digest = hashlib.sha256(json.dumps(schema, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        lines.append(f"{name}.schema.json {schema['x-version']} sha256:{digest[:16]}")
+    lines += [f"{name}.schema.json {schema['x-version']} sha256:{digest(schema)}" for name, schema in schemas.items()]
+    lines.append(f"events/registry.yaml {registry['version']} sha256:{digest(registry)}")
     return lines
 
 
@@ -285,17 +328,20 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 2
     schemas = load_schemas()
-    if problems := check_schemas(schemas) + check_fixtures(schemas) + check_config(schemas):
+    if problems := check_schemas(schemas):
         return report(problems)
-    bundled, head = bundle(schemas), header(schemas)
-    python = generate_python(bundled, head)
-    if problems := check_models(schemas, python):
+    validate, registry = validator(schemas), events.load_registry(CONTRACTS)
+    problems = check_fixtures(schemas, validate) + check_config(validate)
+    if problems := problems + events.check_registry(CONTRACTS, schemas, registry, validate):
         return report(problems)
-    fresh = {
-        PY_OUT / "__init__.py": python,
-        PY_OUT / "py.typed": "",
-        TS_OUT / "index.ts": generate_typescript(bundled, head),
-    }
+    bundled, head = bundle(schemas), header(schemas, registry)
+    python = generate_python(bundled, head) + events.python_constants(registry, data_model)
+    module = load_module(python)
+    problems = check_models(schemas, module)
+    if problems := problems + events.check_event_fixtures(CONTRACTS, registry, validate, module, data_model):
+        return report(problems)
+    typescript = generate_typescript(bundled, head) + events.typescript_constants(registry, data_model)
+    fresh = {PY_OUT / "__init__.py": python, PY_OUT / "py.typed": "", TS_OUT / "index.ts": typescript}
     current = committed()
     if argv == ["gen"]:
         for stale in set(current) - set(fresh):
@@ -314,7 +360,7 @@ def main(argv: list[str]) -> int:
             f"contracts: generated types drifted from contracts/ in {drift}; run `just contracts-gen`", file=sys.stderr
         )
         return 1
-    print(f"contracts: {len(schemas)} schemas, their fixtures and the generated types are in sync")
+    print(f"contracts: {len(schemas)} schemas, the event registry, their fixtures and the generated types are in sync")
     return 0
 
 

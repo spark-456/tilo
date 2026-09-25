@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/world.completed.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorldCompletedData",
+  "description": "data of world.completed (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["credits_used", "deliverable_count"],
+  "properties": {
+    "credits_used": { "$ref": "../../common.schema.json#/$defs/credits" },
+    "deliverable_count": { "type": "integer", "minimum": 0 }
+  }
+}
