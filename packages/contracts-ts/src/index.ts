@@ -10,7 +10,7 @@
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
  * policy.schema.json 1.0.0 sha256:1b75580649b24b70
- * providers.schema.json 1.0.0 sha256:2795c1640ddad594
+ * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
  */
 
@@ -1312,7 +1312,7 @@ export interface ProvidersModels {
   rules: ProvidersRules;
 }
 /**
- * One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here.
+ * One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersProfile".
@@ -1328,6 +1328,14 @@ export interface ProvidersProfile {
    */
   context: number;
   caps: ProvidersCapability[];
+  /**
+   * openai_compat endpoint. https only, with no user info, query or fragment, so no credential can sit in the URL (PRD 16.1 rule 4). The not-pattern rejects a final line break, which a Python validator's $ lets through.
+   */
+  base_url?: string;
+  /**
+   * Name of the environment variable that holds the key, never the key itself. The not-pattern rejects a final line break, which a Python validator's $ lets through.
+   */
+  api_key_env?: string;
 }
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
