@@ -36,7 +36,7 @@ from typing import Any
 import httpx
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.errors import ProviderError, map_http_status, map_transport_error
+from tilo_providers.errors import ProviderError, SafetyError, map_http_status, map_transport_error
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
 
 _CLEAN_TOKEN_RE = re.compile(r"^[\x21-\x7e]+$")  # printable ASCII, no whitespace or control characters
@@ -141,7 +141,15 @@ class OpenAICompatModelProvider(ModelProvider):
         # it back (PRD 16.1 rule 4).
         raise map_http_status(response.status_code, self._scrub(message))
 
-    def _map_message(self, message: dict[str, Any], usage_raw: dict[str, Any] | None) -> GenerateResponse:
+    def _map_message(
+        self, message: dict[str, Any], usage_raw: dict[str, Any] | None, finish_reason: str | None = None
+    ) -> GenerateResponse:
+        if finish_reason == "content_filter":
+            # Honesty rule, same mapping as the google adapter's
+            # prompt_feedback.block_reason check: a blocked completion
+            # surfaces as SafetyError, never as ordinary (possibly empty)
+            # text -- the router (P0-06) must see this, not a silent None.
+            raise SafetyError(f"PL-02: blocked by content filter (finish_reason={finish_reason!r})")
         tool_calls: list[dict[str, Any]] | None = None
         raw_tool_calls = message.get("tool_calls")
         if raw_tool_calls:
@@ -185,7 +193,7 @@ class OpenAICompatModelProvider(ModelProvider):
         self._raise_for_status(response)
         data = response.json()
         choice = data["choices"][0]
-        return self._map_message(choice["message"], data.get("usage"))
+        return self._map_message(choice["message"], data.get("usage"), choice.get("finish_reason"))
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
         body: dict[str, Any] = {"model": self._profile.model, "messages": self._messages(request), "stream": True}
@@ -197,29 +205,51 @@ class OpenAICompatModelProvider(ModelProvider):
         if response_format is not None:
             body["response_format"] = response_format
 
-        response = self._post("/chat/completions", body)
-        self._raise_for_status(response)
-        # Tool-call deltas arrive fragmented by `index` (name in the first
-        # fragment, `arguments` accumulated in later ones); collected here
-        # and yielded once complete, as one chunk, mirroring `generate()`'s
-        # shape (PL-02 tool calling).
+        # Review fix: a plain `client.post()` (as `_post` uses for generate())
+        # reads the whole response body before returning, so nothing would
+        # be yielded until the SSE stream had already finished -- `stream=True`
+        # over `client.stream()` keeps the connection open and hands lines to
+        # `iter_lines()` as they arrive, so a caller sees each chunk as soon
+        # as the server sends it, not all at once at the end.
         buffers: dict[int, dict[str, Any]] = {}
-        for line in response.text.splitlines():
-            line = line.strip()
-            if not line.startswith("data:"):
-                continue
-            payload = line[len("data:") :].strip()
-            if payload == "[DONE]":
-                break
-            delta = json.loads(payload)["choices"][0].get("delta", {})
-            content = delta.get("content")
-            if content:
-                yield GenerateResponse(text=content, profile_id=self._profile_id)
-            for raw_call in delta.get("tool_calls") or []:
-                buffer = buffers.setdefault(raw_call.get("index", 0), {"name": None, "args": ""})
-                function = raw_call.get("function") or {}
-                buffer["name"] = function.get("name") or buffer["name"]
-                buffer["args"] += function.get("arguments") or ""
+        try:
+            with self._client.stream("POST", "/chat/completions", json=body) as response:
+                if response.status_code >= 400:
+                    response.read()  # a streamed response must be read before .json()/.text is usable
+                    self._raise_for_status(response)
+                # Tool-call deltas arrive fragmented by `index` (name in the
+                # first fragment, `arguments` accumulated in later ones);
+                # collected here and yielded once complete, as one chunk,
+                # mirroring `generate()`'s shape (PL-02 tool calling).
+                for line in response.iter_lines():
+                    line = line.strip()
+                    if not line.startswith("data:"):
+                        continue
+                    payload = line[len("data:") :].strip()
+                    if payload == "[DONE]":
+                        break
+                    choice = json.loads(payload)["choices"][0]
+                    finish_reason = choice.get("finish_reason")
+                    if finish_reason == "content_filter":
+                        # Same mapping as generate()/the google adapter: a
+                        # blocked stream must raise, not silently end with
+                        # partial/no text.
+                        raise SafetyError(f"PL-02: blocked by content filter (finish_reason={finish_reason!r})")
+                    delta = choice.get("delta", {})
+                    content = delta.get("content")
+                    if content:
+                        yield GenerateResponse(text=content, profile_id=self._profile_id)
+                    for raw_call in delta.get("tool_calls") or []:
+                        buffer = buffers.setdefault(raw_call.get("index", 0), {"name": None, "args": ""})
+                        function = raw_call.get("function") or {}
+                        buffer["name"] = function.get("name") or buffer["name"]
+                        buffer["args"] += function.get("arguments") or ""
+        except httpx.HTTPError as error:
+            # Same mapping as `_post`: never fold a raw httpx/h11 exception's
+            # str() into our message (PRD 16.1 rule 4).
+            mapped = map_transport_error(error)
+            assert mapped is not None  # httpx.HTTPError always maps
+            raise mapped from None
         if buffers:
             tool_calls = [
                 {"name": buf["name"], "args": json.loads(buf["args"]) if buf["args"] else {}}

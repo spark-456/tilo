@@ -349,8 +349,124 @@ def test_EFF_01_written_recording_scrubs_a_secret_containing_quote_and_backslash
     assert recording_files, "record mode must write a recording file"
     for recording_file in recording_files:
         content = recording_file.read_text(encoding="utf-8")
-        assert tricky_secret not in content, (
-            f"16.1 rule 4: {recording_file} must not contain a secret with '\"'/'\\\\' in clear text"
+        json.loads(content)
+    # Review fix: `json.dumps` already escapes the raw secret's own '"'/'\\'
+    # characters, so a bare `tricky_secret not in content` check on the
+    # serialised text passes whether or not redaction ran at all -- the
+    # escaped form of the un-redacted secret never matches the raw string
+    # either. Replaying is the only check that actually exercises whether
+    # the *value* written was redacted before serialising.
+    monkeypatch.delenv("LIVE", raising=False)
+    monkeypatch.delenv("TILO_RECORD", raising=False)
+    replayer = RecordReplayProvider(
+        role="director", profile_id="large", live_factory=_unexpected_live_factory, fixtures_dir=tmp_path
+    )
+    replayed_text = replayer.generate(GenerateRequest(prompt="hello")).text
+    assert tricky_secret not in replayed_text, (
+        "16.1 rule 4: a secret with '\"'/'\\\\' must not survive into the replayed response"
+    )
+    assert "echo:" in replayed_text
+
+
+def test_EFF_01_record_then_replay_round_trips_a_tool_call_only_and_a_usage_only_turn(tmp_path, monkeypatch):
+    """Review fix (security): `GenerateResponse.text` had no default, so
+    `_write_recording`'s `model_dump(exclude_none=True)` dropped the key
+    entirely for a `text=None` turn (tool calls only, no text content) --
+    replaying it then raised a pydantic ValidationError ("text: Field
+    required"), so no tool-calling turn from either adapter could ever be
+    replayed in dev or CI (EFF-01). A response carrying only `usage` (no
+    tool_calls, and text present) round-trips through the same code path
+    and is checked here too."""
+    from tilo_providers.replay import RecordReplayProvider  # noqa: PLC0415
+
+    monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("TILO_RECORD", "1")
+
+    tool_call_request = GenerateRequest(prompt="what's the weather?")
+    tool_call_response = GenerateResponse(
+        text=None,
+        profile_id="large",
+        tool_calls=[{"name": "get_weather", "args": {"location": "Boston"}}],
+    )
+
+    usage_only_request = GenerateRequest(prompt="hello")
+    usage_only_response = GenerateResponse(
+        text="hi", profile_id="large", usage={"input_tokens": 3, "output_tokens": 1, "total_tokens": 4}
+    )
+
+    class _ScriptedLiveProvider(_CountingLiveProvider):
+        def __init__(self):
+            super().__init__(calls=[])
+            self._responses = {
+                "what's the weather?": tool_call_response,
+                "hello": usage_only_response,
+            }
+
+        def generate(self, request: GenerateRequest) -> GenerateResponse:
+            self._calls.append(request)
+            return self._responses[request.prompt]
+
+    recorder = RecordReplayProvider(
+        role="director", profile_id="large", live_factory=_ScriptedLiveProvider, fixtures_dir=tmp_path
+    )
+    recorded_tool_call = recorder.generate(tool_call_request)
+    recorder.generate(usage_only_request)
+    assert recorded_tool_call.text is None, "test setup: a tool-call-only turn has no text"
+
+    monkeypatch.delenv("LIVE", raising=False)
+    monkeypatch.delenv("TILO_RECORD", raising=False)
+    replayer = RecordReplayProvider(
+        role="director", profile_id="large", live_factory=_unexpected_live_factory, fixtures_dir=tmp_path
+    )
+
+    replayed_tool_call = replayer.generate(tool_call_request)
+    assert replayed_tool_call.text is None
+    assert replayed_tool_call.tool_calls == tool_call_response.tool_calls
+
+    replayed_usage_only = replayer.generate(usage_only_request)
+    assert replayed_usage_only.text == "hi"
+    assert replayed_usage_only.usage == usage_only_response.usage
+
+
+def test_EFF_01_written_recording_scrubs_a_secret_echoed_as_a_dict_key(tmp_path, monkeypatch):
+    """Review fix (security): `_redact_strings` walked dict *values* but not
+    dict *keys* -- a secret echoed back as an object key (e.g. a tool-call
+    argument name) was written to the fixture verbatim. Tool-call args are a
+    `dict[str, Any]` (`GenerateResponse.tool_calls`), so a key is exactly as
+    reachable as a value here."""
+    from tilo_providers.replay import RecordReplayProvider  # noqa: PLC0415
+
+    fake_secret = "fake-nim-key-" + "".join(str(n) for n in range(20))  # assembled at runtime, not a real key
+    monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("TILO_RECORD", "1")
+
+    class _KeyEchoingLiveProvider(_CountingLiveProvider):
+        def generate(self, request: GenerateRequest) -> GenerateResponse:
+            self._calls.append(request)
+            return GenerateResponse(
+                text=None,
+                profile_id="large",
+                tool_calls=[{"name": "lookup", "args": {fake_secret: "value"}}],
+            )
+
+        def redact(self, text: str) -> str:
+            return text.replace(fake_secret, "***")
+
+    calls: list[GenerateRequest] = []
+    provider = RecordReplayProvider(
+        role="director",
+        profile_id="large",
+        live_factory=lambda: _KeyEchoingLiveProvider(calls),
+        fixtures_dir=tmp_path,
+    )
+    provider.generate(GenerateRequest(prompt="hello"))
+
+    recording_files = list(tmp_path.rglob("*.json"))
+    assert recording_files, "record mode must write a recording file"
+    for recording_file in recording_files:
+        content = recording_file.read_text(encoding="utf-8")
+        assert fake_secret not in content, (
+            f"16.1 rule 4: {recording_file} must not contain a secret echoed back as a dict key"
         )
         json.loads(content)
 

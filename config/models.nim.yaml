@@ -14,13 +14,11 @@
 #   - https://build.nvidia.com/google/gemma-3-27b-it
 # API base URL from the same catalog pages: https://integrate.api.nvidia.com/v1.
 #
-# CONTRACT BLOCKER (see report, "needs contract change"): base_url and api_key_env below are
-# not yet fields on contracts/providers.schema.json $defs.profile (additionalProperties:
-# false, only provider/model/context/caps today), so this file cannot load through
-# tilo_providers.config.load_providers_config until the contract owner adds them, applicable
-# when provider == "openai_compat". Not editing contracts/ here per root CLAUDE.md. Every
-# other NIM acceptance test in packages/providers/tests reads this file's raw YAML directly
-# and does not depend on the contract change.
+# Contract note (resolved, P0-02b/ADR-0002 1.1.0): base_url and api_key_env are fields on
+# contracts/providers.schema.json $defs.profile (allowed only when provider == "openai_compat"),
+# so this file loads through tilo_providers.config.load_providers_config like any other example
+# config. Most NIM acceptance tests in packages/providers/tests still read this file's raw YAML
+# directly, independent of the loader.
 example: true
 
 profiles:

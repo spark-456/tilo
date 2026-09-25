@@ -58,7 +58,13 @@ def _redact_strings(value: Any, live_provider: ModelProvider | None) -> Any:
             value = live_provider.redact(value)
         return _scrub_authorization_like(value)
     if isinstance(value, dict):
-        return {key: _redact_strings(item, live_provider) for key, item in value.items()}
+        # A tool-call argument name (or any other dict key) can echo a
+        # secret back just as readily as a value -- e.g. a misbehaving
+        # endpoint reflecting the Authorization header into an object key
+        # -- so keys are redacted the same way values are, not left raw.
+        return {
+            _redact_strings(key, live_provider): _redact_strings(item, live_provider) for key, item in value.items()
+        }
     if isinstance(value, list):
         return [_redact_strings(item, live_provider) for item in value]
     return value

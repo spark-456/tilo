@@ -38,7 +38,7 @@ class GenerateRequest(BaseModel):  # one ModelProvider.generate() / .stream() ca
 
 class GenerateResponse(BaseModel):  # one generate() result, or one stream() chunk
     model_config = ConfigDict(extra="forbid")
-    text: str | None  # None for a tool-call-only turn with no text content (PL-02, ticket P0-05)
+    text: str | None = None  # None for a tool-call-only turn with no text content (PL-02, ticket P0-05)
     profile_id: str
     tool_calls: list[dict[str, Any]] | None = None  # PL-02 tool calling: [{"name": ..., "args": {...}}]
     usage: dict[str, int] | None = None  # PL-02 usage tokens: {"input_tokens", "output_tokens", "total_tokens"}

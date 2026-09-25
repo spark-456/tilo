@@ -188,6 +188,44 @@ def test_PL_02_openai_compat_adapter_generate_maps_a_tool_call(monkeypatch):
     assert response.tool_calls == [{"name": "get_weather", "args": {"location": "Boston"}}]
 
 
+def test_PL_02_openai_compat_adapter_maps_content_filter_to_safety_error(monkeypatch):
+    """Review fix (correctness): errors.py claims "every adapter maps ...
+    onto these four types", and the google adapter already raises
+    SafetyError on a `prompt_feedback.block_reason` block. This adapter must
+    map the OpenAI-compatible equivalent -- a `finish_reason: "content_filter"`
+    completion -- the same way, in both generate() and stream(), instead of
+    returning it as an ordinary (possibly empty/partial) GenerateResponse
+    that a caller (the P0-06 router) would otherwise treat as a normal,
+    successful, empty answer (honesty rule: never invent output the model
+    did not produce)."""
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+
+    def generate_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"role": "assistant", "content": None}, "finish_reason": "content_filter"}]},
+        )
+
+    provider = _provider(generate_handler)
+    with pytest.raises(provider_errors.SafetyError):
+        provider.generate(GenerateRequest(prompt="something unsafe"))
+
+    sse_body = (
+        'data: {"choices": [{"delta": {"content": "par"}}]}\n\n'
+        'data: {"choices": [{"delta": {}, "finish_reason": "content_filter"}]}\n\n'
+        "data: [DONE]\n\n"
+    )
+
+    def stream_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=sse_body)
+
+    stream_provider = _provider(stream_handler)
+    with pytest.raises(provider_errors.SafetyError):
+        list(stream_provider.stream(GenerateRequest(prompt="something unsafe")))
+
+
 def test_PL_02_openai_compat_adapter_stream_sse_concatenates_to_the_full_text(monkeypatch):
     monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
     sse_body = (
