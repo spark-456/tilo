@@ -2,8 +2,6 @@
 - [Provider secret handling](provider-secret-handling.md): P0-05 r4-r8 red only on contract-blocked test (r5-r8 same head ca3157b; merge P0-02b first); P0-02b PASS (nvapi pattern added); loader must hand-enforce openai_compat-only fields
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); open: two tier sources
 - [Harness writer gaps](harness-writer-gaps.md): P0-09 r3 PASS, flagged: head counts + lease on client-facing world doc (10.1); ids `$` accepts trailing \n
-- [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r5 FAIL: PEM private key body left in clear (header-only redaction); card probes closed
-- [Skill checker gaps](skill-checker-gaps.md): FR-AGT-04 r5 FAIL: _EMAIL_RE ReDoS (50k chars 69 s), role header lost IGNORECASE; recall/commitment gaps persist
 - [API authz and redaction](api-authz-redaction.md): ST-3a r1 FAIL: no world-membership check on reads, Stop all aborts mid-loop, unvalidated pause channel
 - [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r3 FAIL; Pause all gated on stopped>0 records nothing; vis/target/data.district leak hidden D ids
 - [Policy engine P4-01](policy-engine-p4-01.md): r4 FAIL; future-stamped policy dropped lets overlapping policy run past a revocation
@@ -11,8 +9,8 @@
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 passed r10 (dd3d4b9); open for P4: recipients [] scope, credits self-declared
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); P0-03 passed r10 (dd3d4b9); open: two tier sources; open for P4: recipients [] scope, credits self-declared
 - [Harness writer gaps](harness-writer-gaps.md): P0-09 r3 PASS, flagged: head counts + lease on client-facing world doc (10.1); ids `$` accepts trailing \n
-- [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r4 FAIL: card in >25-digit run unredacted; prefix-first window leaks; logs/JWT closed
 - [Skill checker gaps](skill-checker-gaps.md): FR-AGT-04 re-scope r3 FAIL (586aad1): number_tokens [:MAX_STR] truncation via joined claims; flags/recipients now solid
+- [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r6 PASS (ae17c83) whole-PEM + "\n"-only reads; open: quoted private_key_id, PGP/list-split PEM
 - [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r5 FAIL (7a3051c); malformed scope 500s Stop all after pending pop, pause lost; dup parts on timeout
 - [Policy engine P4-01](policy-engine-p4-01.md): r9 PASS; P4-01b r10 FAIL, r11 PASS (dab6d8c, whole data validated); 5d open (#27)
 - [Outbox ST-2](outbox-st2.md): r5 PASS (2ff085b); open: writer must ack dup transfer, durable adapter dedupe, store authz/server time
@@ -20,5 +18,3 @@
 - [Decision and manifest CC-SH](decision-manifest-cc-sh.md): r3 PASS (b34fb86); open: teams.yaml assigned_by self-declared, MF-06 redactor sole token guard
 - [Provider secret handling](provider-secret-handling.md): P0-05 r11 PASS (7a0d1be); residual for P0-06: malformed 200 body raises raw pydantic error (echoed key truncated)
 - [Harness writer gaps](harness-writer-gaps.md): P0-09 r6 PASS: head moved to _head/state (rules must deny it); open: ids `$` \n, emulator lock-timeout flake
-- [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r5 FAIL: PEM private key body left in clear (header-only redaction); card probes closed
-- [Skill checker gaps](skill-checker-gaps.md): FR-AGT-04 r5 FAIL: _EMAIL_RE ReDoS (50k chars 69 s), role header lost IGNORECASE; recall/commitment gaps persist
