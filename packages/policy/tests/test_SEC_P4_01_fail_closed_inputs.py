@@ -562,3 +562,25 @@ def test_FR_HIL_03_PI_06_a_policy_with_an_unreadable_action_or_owner_gates(field
     a[field] = value
     for order in ([a, _l3_b()], [_l3_b(), a]):
         assert _decide(_table(risk_table_path), _status_proposal(), order).outcome == "gate"
+
+
+TRAILING_NEWLINE = {
+    "connector": lambda a: a["scope"].update(connectors=["gmail\n"]),
+    "district": lambda a: a["scope"].update(districts=["D1\n"]),
+    "domain": lambda a: a["scope"].update(domains=["example.org\n"]),
+    "recipient": lambda a: a["scope"].update(recipients=["teammate@example.org\n"]),
+    "action_type": lambda a: a.update(action_type="post_status_update\n"),
+    "owner": lambda a: a.update(owner=OWNER + "\n"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(TRAILING_NEWLINE))
+def test_FR_HIL_03_PI_06_a_trailing_newline_never_passes_a_contract_pattern(name, risk_table_path):
+    """JSON Schema patterns do not let `$` match before a final newline (Python's re does), so a
+    value with one breaks the contract: the broken L0 policy A may cover the send, and the
+    decision gates whatever else covers it."""
+    a = _l0_a()
+    a["history"] = []  # also schema-invalid, so only the pattern check stands between A and B
+    TRAILING_NEWLINE[name](a)
+    for order in ([a, _l3_b()], [_l3_b(), a]):
+        assert _decide(_table(risk_table_path), _status_proposal(), order).outcome != "run", name
