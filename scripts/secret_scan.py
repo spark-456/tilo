@@ -17,6 +17,7 @@ import sys
 SECRET_PATTERNS = [
     (r"-----BEGIN [A-Z ]*PRIVATE KEY-----", "a private key"),
     (r"AIza[0-9A-Za-z_\-]{35}", "a Google API key"),
+    (r"\bAQ\.[0-9A-Za-z_\-]{40,}", "a Google API key (AQ. format)"),
     (r"ya29\.[0-9A-Za-z_\-]{20,}", "a Google OAuth access token"),
     (r"1//0[0-9A-Za-z_\-]{30,}", "a Google OAuth refresh token"),
     (r"\bsk-[A-Za-z0-9_\-]{20,}", "an API secret key"),
