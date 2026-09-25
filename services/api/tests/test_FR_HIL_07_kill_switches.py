@@ -79,6 +79,23 @@ def test_FR_HIL_07_stop_all_is_idempotent_no_duplicate_l1_entries(client, store)
     assert events_after_second == events_after_first
 
 
+def test_FR_HIL_07_stop_all_never_raises_an_l0_policy(client, store):
+    """A kill switch only ever lowers autonomy. An L0 policy (observe: nothing leaves Tilo) is
+    already below L1, so Stop all leaves it at L0 with no history entry and no event."""
+    ids = _world_with_policies(store, 2, level="L0")
+    before = {pid: len(store.policies[pid]["history"]) for pid in ids}
+    as_principal(make_principal(user_id=OWNER, role="owner"))
+
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+
+    assert resp.status_code == 200
+    assert resp.json()["stopped"] == 0
+    for pid in ids:
+        assert store.policies[pid]["level"] == "L0"
+        assert len(store.policies[pid]["history"]) == before[pid]
+    assert not [e for e in store.events.get(WORLD, []) if e["type"] == "policy.changed"]
+
+
 def test_FR_HIL_07_stop_all_confirms_on_every_enabled_channel(client, store):
     store.worlds[WORLD] = make_world(owner=OWNER, owner_channels=("web", "whatsapp", "email"))
     as_principal(make_principal(user_id=OWNER, role="owner"))
