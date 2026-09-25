@@ -44,7 +44,7 @@
     "created_by": { "$ref": "#/$defs/stamp" },
     "changed_by": { "anyOf": [{ "$ref": "#/$defs/stamp" }, { "type": "null" }] },
     "history": {
-      "description": "Every change, oldest first, starting with the creation, so never empty: each entry's at is no earlier than the one before, and the record's level equals the last entry's level (validator, outbox OB-01). The level in force at a time is the level of the last entry at or before it; a revocation or Stop all autopilot is an entry at L1 (policy.changed).",
+      "description": "Every change, oldest first, starting with the creation, so never empty: each entry's at is no earlier than the one before, and the record's level equals the last entry's level (validator, outbox OB-01). The level in force at a time is the level of the last entry at or before it; a revocation or Stop all autopilot is an entry at L1 (policy.changed). Only the owner creates and changes a policy (PRD 10.1; a Team Lead only proposes), so every entry's by, like created_by.by and changed_by.by, equals owner; a record that breaks this covers nothing (validator, outbox OB-01).",
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/history_entry" }

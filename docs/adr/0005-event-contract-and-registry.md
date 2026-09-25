@@ -58,7 +58,7 @@ silent the defaults below apply; each is logged as a BQ in `docs/open-questions.
    up, so Undo is never followed by a redraft sent under the same words. L2 and L3 policies need a daily limit
    (BQ-29, BQ-30). Revoking a policy and Stop all autopilot both set it to L1 (`policy.changed`
    schema), recorded as a `history` entry; a policy send is checked against the level in force at
-   `authz.at` (the last entry at or before it), never the record's current level (BQ-31). `artifact.delivered` is a notice, not a side effect: a format that leaves
+   `authz.at` (the last entry at or before it), never the record's current level (BQ-31). Only the policy's owner creates and changes it (PRD 10.1): `policy.changed`'s `authz.ref` is the owner (EV-04), and a record whose creation, last change or any history entry is by someone else covers nothing (OB-01). `artifact.delivered` is a notice, not a side effect: a format that leaves
    Tilo (email, Google Docs, Sheets or Slides) names its outbox entry and is caused by that
    entry's `data.transfer` out, which carries the `authz` (EV-14). A `vis` list includes the
    event's own district (EV-13, BQ-28).

@@ -6,7 +6,8 @@ the outbox_id reserved for it; on a gate it was opened by an approval.resolved a
 on that gate, otherwise by a policy.applied under a policy that covers it (action type and
 undo window, created before and not expired, at the applied level when the send was authorised
 (its last history entry at or before authz.at, so not after a revocation or Stop all autopilot),
-owned by the world's owner, connector, recipients and district in scope; at L2 also the owner's
+owned by the world's owner and created and changed only by that owner (every history entry
+included, PRD 10.1), connector, recipients and district in scope; at L2 also the owner's
 own earlier instruction in this world about the same destination, PRD 10.4 "instruction is
 approval", given where Tilo knows who sent it: signed in on the web or mobile web, or from the
 owner's bound WhatsApp number, never by email, PRD 10.3 and 11.1; and no earlier policy.applied
@@ -97,6 +98,15 @@ def _level_at(policy, at):
     return earlier[-1] if earlier else None
 
 
+def _made_by_owner(policy) -> bool:
+    """OB-01, PI-13: only the owner creates and changes a policy (PRD 10.1; a Team Lead only
+    proposes, an Approver or Viewer has no say), so its creation, last change and every history
+    entry are the owner's. A record anyone else made or changed covers nothing, whatever `owner`
+    says, so a raise after a revocation by someone else never counts."""
+    stamps = [policy["created_by"], policy["changed_by"], *policy["history"]]
+    return all(stamp["by"] == policy["owner"] for stamp in stamps if stamp is not None)
+
+
 def _instructed(entry, applied, level, policy, instruction, earlier) -> bool:
     """OB-01, L2: the policy owner's own earlier instruction in this world, from a signed-in session
     or the owner's bound WhatsApp number (never email), asked for this send, and no earlier
@@ -124,6 +134,7 @@ def _policy_covers(entry, applied, policy, world_owner, instruction, earlier) ->
     return (
         policy["id"] == applied["policy_id"]
         and policy["owner"] == world_owner
+        and _made_by_owner(policy)
         and (policy["action_type"], level, policy["undo_window_s"])
         == (applied["action_type"], applied["level"], applied["undo_window_s"])
         and policy["created_by"]["at"] <= at
@@ -266,6 +277,8 @@ def test_FR_WLD_03_OB_01_OB_05_policy_path_has_an_invalid_case_per_binding(repo_
         "ob01_policy_expired",
         "ob01_policy_created_after_send",
         "ob01_policy_owned_by_someone_else",
+        "ob01_policy_created_by_someone_else",
+        "ob01_policy_raised_by_someone_else",
         "ob01_policy_revoked_before_send",
         "ob01_policy_stopped_before_send",
         "ob01_policy_level_not_its_last_history_level",

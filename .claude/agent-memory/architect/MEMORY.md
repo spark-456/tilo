@@ -1,1 +1,1 @@
-- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS quirks, invalid fixtures fail schema, safety lists, authz chain, single-use consent, grants in force at authz.at, id clashes
+- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS alias/tuple quirks, invalid fixtures must fail schema, pin safety lists, bind author stamps to owner, BQ id clashes
