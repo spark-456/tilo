@@ -107,6 +107,7 @@ export function runWorld(opts: RunWorldOptions): () => void {
   }
 
   function applyOne(event: Event, receivedAtMs: number) {
+    if (event.seq <= state.seq) return; // duplicate or out of order: the reducer ignores it
     state = applyEvent(state, event, layout);
     const frame = frameOf(layout, state);
     lastFrame = frame;

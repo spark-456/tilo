@@ -21,6 +21,7 @@ export function createWorldStore(layout: Layout): WorldStore {
 
   return {
     apply(event) {
+      if (event.seq <= this.currentSeq()) return; // duplicate or out of order: ignored
       events.push(event);
       if (event.seq % SNAPSHOT_EVERY === 0) {
         snapshots.push(this.stateAt(event.seq));

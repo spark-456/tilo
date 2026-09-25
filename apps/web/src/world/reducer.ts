@@ -159,6 +159,9 @@ function applyKnown(state: WorldState, event: Event): WorldState {
 }
 
 export function applyEvent(state: WorldState, event: Event, _layout: Layout): WorldState {
+  // A duplicate or out-of-order event (seq <= the highest applied) is ignored: seq never goes
+  // down and each seq gets at most one Trace row.
+  if (event.seq <= state.seq) return state;
   const withSeqAndTrace: WorldState = {
     ...state,
     seq: event.seq,
