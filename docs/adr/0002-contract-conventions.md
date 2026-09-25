@@ -191,9 +191,11 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     12, what the PRD states as a rule is `const`, with a float `const` repeated as `minimum` and
     `maximum`: the 15% reserve and the budget request at 80% (14.1), the reconciliation tolerance of
     10% (14.4), the 20% cost-regression threshold (EFF-06) and three deploy-gate repeats (19.2).
-    What the PRD calls a default or leaves to config is bounded only by sign: credit caps above
-    zero or null for no cap, every scope's key required (per-org cap null, BQ-42), daily spend
-    caps above zero (MT-01 keeps hard at least soft), eval pass caps above zero (BQ-43), and case
+    What the PRD calls a default or leaves to config is bounded only by sign: the per-run and
+    per-user daily credit caps are required numbers above zero and never null, because PRD 14.1
+    and FR-MTR-04 require both from config; only the per-org daily cap is above zero or null for
+    none (BQ-42), its key still required. This keeps the PRD shape where issue #7 and SE's
+    stand-in allowed every cap to be null. Daily spend caps are above zero (MT-01 keeps hard at least soft), eval pass caps above zero (BQ-43), and case
     counts for exactly the eight PRD 19.2 groups, whose rows sum to 160 although the heading says
     170 (BQ-67). `meter.schema.json` is the HUD meter's state for one run: `last_seq` lets a client
     drop a stale state, time saved may be negative and is never clamped, `steering_measured` says

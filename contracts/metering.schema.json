@@ -25,18 +25,23 @@
       }
     },
     "caps": {
-      "description": "Credit caps per run, per user per day and per org per day, all from config (PRD 14.1). Demo defaults: 300 credits per public run (17.3); 1,500 credits per pilot tester per day (17.3); no separate org cap (BQ-42). null means no cap at that scope, and every key is still required so that no scope is left out by accident. A day is the UTC calendar day (BQ-44).",
+      "description": "Credit caps per run, per user per day and per org per day, all from config (PRD 14.1). Demo defaults: 300 credits per public run (17.3); 1,500 credits per pilot tester per day (17.3); no separate org cap (BQ-42). The per-run and per-user daily caps are always set (FR-MTR-04); only the per-org daily cap may be null, meaning no separate org cap, and its key is still required so that the scope is not left out by accident. A day is the UTC calendar day (BQ-44).",
       "type": "object",
       "additionalProperties": false,
       "required": ["run_credits", "user_day_credits", "org_day_credits"],
       "properties": {
         "run_credits": { "$ref": "#/$defs/cap" },
         "user_day_credits": { "$ref": "#/$defs/cap" },
-        "org_day_credits": { "$ref": "#/$defs/cap" }
+        "org_day_credits": { "$ref": "#/$defs/org_cap" }
       }
     },
     "cap": {
-      "description": "Credits above zero, or null for no cap at that scope.",
+      "description": "Credits above zero. Never null: the per-run and per-user daily caps are required (PRD 14.1, FR-MTR-04).",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "org_cap": {
+      "description": "Credits above zero, or null for no separate per-org daily cap (BQ-42); the daily spend caps still apply to every org.",
       "type": ["number", "null"],
       "exclusiveMinimum": 0
     },

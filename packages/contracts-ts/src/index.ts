@@ -87,7 +87,7 @@
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
  * meter.schema.json 1.0.0 sha256:f01aaa0abd04c157
- * metering.schema.json 1.0.0 sha256:321bf776d019239b
+ * metering.schema.json 1.0.0 sha256:91358a776e6c033a
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
@@ -513,12 +513,19 @@ export type LayoutCommonType =
  */
 export type MeterMethodUrl = string;
 /**
- * Credits above zero, or null for no cap at that scope.
+ * Credits above zero. Never null: the per-run and per-user daily caps are required (PRD 14.1, FR-MTR-04).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeteringCap".
  */
-export type MeteringCap = number | null;
+export type MeteringCap = number;
+/**
+ * Credits above zero, or null for no separate per-org daily cap (BQ-42); the daily spend caps still apply to every org.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeteringOrgCap".
+ */
+export type MeteringOrgCap = number | null;
 /**
  * A service name as the billing export writes it: letters, digits, spaces and . _ ( ) -, starting with a letter or digit.
  *
@@ -2504,7 +2511,7 @@ export interface MeteringTreasury {
   request_at: 0.8;
 }
 /**
- * Credit caps per run, per user per day and per org per day, all from config (PRD 14.1). Demo defaults: 300 credits per public run (17.3); 1,500 credits per pilot tester per day (17.3); no separate org cap (BQ-42). null means no cap at that scope, and every key is still required so that no scope is left out by accident. A day is the UTC calendar day (BQ-44).
+ * Credit caps per run, per user per day and per org per day, all from config (PRD 14.1). Demo defaults: 300 credits per public run (17.3); 1,500 credits per pilot tester per day (17.3); no separate org cap (BQ-42). The per-run and per-user daily caps are always set (FR-MTR-04); only the per-org daily cap may be null, meaning no separate org cap, and its key is still required so that the scope is not left out by accident. A day is the UTC calendar day (BQ-44).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeteringCaps".
@@ -2512,7 +2519,7 @@ export interface MeteringTreasury {
 export interface MeteringCaps {
   run_credits: MeteringCap;
   user_day_credits: MeteringCap;
-  org_day_credits: MeteringCap;
+  org_day_credits: MeteringOrgCap;
 }
 /**
  * US dollars of model spend per day for the deployment (PRD 14.1, 17.3; demo defaults US$15 soft, US$25 hard on tilo-demo). The soft cap raises an alert; the hard cap flips the kill switch, so the public link turns replay-only (NFR-24, FR-MTR-04). daily_usd_hard is at least daily_usd_soft (MT-01).

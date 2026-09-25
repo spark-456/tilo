@@ -86,7 +86,7 @@
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
 # meter.schema.json 1.0.0 sha256:f01aaa0abd04c157
-# metering.schema.json 1.0.0 sha256:321bf776d019239b
+# metering.schema.json 1.0.0 sha256:91358a776e6c033a
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
@@ -1546,9 +1546,15 @@ class MeteringTreasury(BaseModel):
     request_at: Annotated[float, Field(ge=0.8, le=0.8)]
 
 
-type MeteringCap = Annotated[float | None, Field(gt=0.0)]
+type MeteringCap = Annotated[float, Field(gt=0.0)]
 """
-Credits above zero, or null for no cap at that scope.
+Credits above zero. Never null: the per-run and per-user daily caps are required (PRD 14.1, FR-MTR-04).
+"""
+
+
+type MeteringOrgCap = Annotated[float | None, Field(gt=0.0)]
+"""
+Credits above zero, or null for no separate per-org daily cap (BQ-42); the daily spend caps still apply to every org.
 """
 
 
@@ -2473,7 +2479,7 @@ class MeterTimeSaved(BaseModel):
 
 class MeteringCaps(BaseModel):
     """
-    Credit caps per run, per user per day and per org per day, all from config (PRD 14.1). Demo defaults: 300 credits per public run (17.3); 1,500 credits per pilot tester per day (17.3); no separate org cap (BQ-42). null means no cap at that scope, and every key is still required so that no scope is left out by accident. A day is the UTC calendar day (BQ-44).
+    Credit caps per run, per user per day and per org per day, all from config (PRD 14.1). Demo defaults: 300 credits per public run (17.3); 1,500 credits per pilot tester per day (17.3); no separate org cap (BQ-42). The per-run and per-user daily caps are always set (FR-MTR-04); only the per-org daily cap may be null, meaning no separate org cap, and its key is still required so that the scope is not left out by accident. A day is the UTC calendar day (BQ-44).
     """
 
     model_config = ConfigDict(
@@ -2481,7 +2487,7 @@ class MeteringCaps(BaseModel):
     )
     run_credits: MeteringCap
     user_day_credits: MeteringCap
-    org_day_credits: MeteringCap
+    org_day_credits: MeteringOrgCap
 
 
 class MeteringReconciliation(BaseModel):

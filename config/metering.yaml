@@ -6,7 +6,7 @@ treasury:
   reserve_margin: 0.15 # PRD 14.1: a step reserves its estimate plus 15% (fixed by the PRD)
   request_at: 0.80 # PRD 14.1: budget.requested at 80% of the approved budget (fixed by the PRD)
 
-caps: # credits; null means no cap at that scope; a day is the UTC calendar day (BQ-44)
+caps: # credits above zero; run and user caps always set (FR-MTR-04), only the org cap may be null; a day is the UTC calendar day (BQ-44)
   run_credits: 300 # PRD 14.1, 17.3: 300 credits per public run
   user_day_credits: 1500 # PRD 17.3: pilot, at most 1,500 credits per tester per day
   org_day_credits: null # BQ-42: no separate org cap; the daily spend caps below apply

@@ -30,22 +30,25 @@ def test_FR_MTR_04_run_credits_cap_is_300(repo_root, registry):
     assert not errors, f"FR-MTR-04: caps.run_credits=300 should validate, got: {[e.message for e in errors][:5]}"
 
 
-@pytest.mark.parametrize("value", [0, -5])
-def test_FR_MTR_04_run_credits_cap_must_be_positive_or_null(repo_root, registry, value):
+@pytest.mark.parametrize("value", [0, -5, None])
+def test_FR_MTR_04_run_credits_cap_must_be_positive(repo_root, registry, value):
+    """PRD 14.1 requires a per-run cap from config, so null (no cap) is invalid too."""
     schema = load_schema(repo_root, "metering")
     instance = sample_metering_config()
     instance["caps"]["run_credits"] = value
     errors = errors_for(schema, instance, registry)
-    assert errors, f"FR-MTR-04: caps.run_credits={value} must be invalid (issue #7: number > 0 | null)"
+    assert errors, f"FR-MTR-04: caps.run_credits={value} must be invalid (PRD 14.1: number > 0)"
 
 
-def test_FR_MTR_04_user_day_cap_null_is_no_cap_but_must_be_declared(repo_root, registry):
-    """Issue #7: 'null means no cap at that scope' -- but the key itself is still required."""
+@pytest.mark.parametrize("value", [0, -5, None])
+def test_FR_MTR_04_user_day_cap_must_be_positive(repo_root, registry, value):
+    """PRD 14.1 requires a per-user daily cap from config; only the per-org cap may be null
+    (BQ-42). Issue #7 asked for null here, but the PRD shape wins (ADR-0002 decision 13)."""
     schema = load_schema(repo_root, "metering")
     instance = sample_metering_config()
-    instance["caps"]["user_day_credits"] = None
+    instance["caps"]["user_day_credits"] = value
     errors = errors_for(schema, instance, registry)
-    assert not errors, f"FR-MTR-04: caps.user_day_credits=null should validate, got: {[e.message for e in errors][:5]}"
+    assert errors, f"FR-MTR-04: caps.user_day_credits={value} must be invalid (PRD 14.1: number > 0)"
 
 
 def test_FR_MTR_04_org_day_cap_is_null_per_BQ_42(repo_root, registry):
