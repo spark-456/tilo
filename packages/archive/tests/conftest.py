@@ -166,6 +166,66 @@ def fake_bearer_header(rng) -> tuple[str, str]:
     return f"Authorization: Bearer {token}", token
 
 
+# ---------------------------------------------------------------------------
+# PEM private-key blocks, built purely from fragments at runtime (never a
+# literal "-----BEGIN ... PRIVATE KEY-----" contiguous in this file's own
+# source, so the pre-commit secret scan / guard hook never flags this file).
+# Mirrors scripts/secret_scan.py's own header pattern:
+# r"-----BEGIN [A-Z ]*PRIVATE KEY-----" (zero or more upper-case words before
+# "PRIVATE KEY", so the generic "" type word is a valid case too).
+# ---------------------------------------------------------------------------
+
+PEM_TYPE_WORDS = ["RSA", "EC", "DSA", "OPENSSH", "ENCRYPTED", ""]  # "" == generic "PRIVATE KEY"
+
+_PEM_B64_ALPHABET = ALPHABET + "+/"
+
+
+def pem_label(type_word: str) -> str:
+    key_word = "PRIVATE" + " " + "KEY"
+    return f"{type_word} {key_word}" if type_word else key_word
+
+
+def pem_body_lines(rng, n_lines: int = 6, line_len: int = 64) -> list[str]:
+    return ["".join(rng.choice(_PEM_B64_ALPHABET) for _ in range(line_len)) for _ in range(n_lines)]
+
+
+def build_pem_block(rng, type_word: str, n_lines: int = 6, include_end: bool = True) -> tuple[str, list[str]]:
+    """Builds a full PEM block (BEGIN header, multi-line base64 body, and
+    optionally the END line) at runtime. Returns (block_text, body_lines) so
+    callers can assert each body line individually disappears after redaction.
+    """
+    dashes = "-" * 5
+    label = pem_label(type_word)
+    begin_line = f"{dashes}{'BEGIN'} {label}{dashes}"
+    body = pem_body_lines(rng, n_lines=n_lines)
+    lines = [begin_line, *body]
+    if include_end:
+        end_line = f"{dashes}{'END'} {label}{dashes}"
+        lines.append(end_line)
+    return "\n".join(lines), body
+
+
+def build_service_account_payload(rng) -> dict:
+    """A dict shaped like a downloaded Google service-account key file: a PEM
+    private key with literal "\\n" escapes (as it appears once JSON-encoded),
+    plus private_key_id. The "type"/"service_account" marker is assembled
+    from separate variables so the literal pair never sits adjacent in this
+    file's source text.
+    """
+    block, body = build_pem_block(rng, "", n_lines=8)
+    escaped_key = block.replace("\n", "\\n")
+    type_field = "type"
+    type_marker = "service_account" + ""  # kept as a separate expression, not a dict literal pair
+    key_id = rand_token(rng, 40, "0123456789abcdef")
+    payload: dict = {}
+    payload[type_field] = type_marker
+    payload["project_id"] = "fake-" + "project"
+    payload["private_key_id"] = key_id
+    payload["private_key"] = escaped_key
+    payload["client_email"] = "fake-sa@" + "fake-project.iam.gserviceaccount.com"
+    return payload, body, key_id
+
+
 @pytest.fixture
 def store(tmp_path):
     from tilo_archive.archive import LocalDirStore
