@@ -218,3 +218,11 @@ yet emitted is kept in the store, not in one instance's memory, so any instance 
 exactly once, in send order. An emit error never stops a batch. Two enqueues racing on one
 (world_id, idempotency_key) store one entry. enqueue stores its own copy of the entry, so the
 caller changing its dict afterwards changes nothing. A schedule out of range is `OutboxRefused`.
+
+## One transfer per entry (review round 3)
+
+Marking an entry `sent` and recording its pending `data.transfer` are one atomic store write, so a
+crash between them cannot leave a sent entry without its transfer. Emitting is a single path: an
+instance claims the oldest pending transfer in the store (compare-and-set with a lease) before it
+calls `emit`, and removes it after; only one instance ever emits a given transfer, and transfers
+are emitted in send order (a later one waits while an earlier one is pending).
