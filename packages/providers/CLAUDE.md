@@ -37,4 +37,4 @@ other service calls instead of naming a model. Business code asks for a **role**
   written; `RecordReplayProvider` calls it, plus an `Authorization`/`Bearer` backstop.
 - `Router`: Quota/Retryable/base `ProviderError` fall back; `RequestError` -> `RouterRequestError`; stream/embed
   `SafetyError` -> `RouterSafetyError` (generate: `safety_blocked`); stream failing mid-output -> `StreamInterruptedError`.
-  Each keeps `.attempts` and the adapter error as `__cause__`; calls are priced first; over-cap input compacted or refused.
+  Each keeps `.attempts`/`__cause__`; cap/budget/pricing recheck every candidate moved to with its own `count_tokens`.

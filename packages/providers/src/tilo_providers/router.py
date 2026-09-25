@@ -64,12 +64,17 @@ class RouterAttempt:
 @dataclass
 class RouterResult:
     """One router call. `attempts` fill in as it runs; generate() sets `outcome` and `response`, a stream()
-    result is iterated for its chunks. `request` is the request as sent, `budget` what is left of it."""
+    result is iterated for its chunks. `request` is the request as sent, `budget` what is left of it.
+    `raw_prompt`/`tool_outputs` are the pre-compaction inputs (EFF-03): each candidate the router moves
+    to recompacts them with its own `count_tokens`, since `request.prompt` was only ever compacted for
+    the first candidate's tokenizer."""
 
     role_id: str
     request: GenerateRequest
     candidates: list[str]
     budget: float | None
+    raw_prompt: str = ""
+    tool_outputs: list[str] = field(default_factory=list)
     attempts: list[RouterAttempt] = field(default_factory=list)
     outcome: Literal["ok", "safety_blocked"] = "ok"
     response: GenerateResponse | None = None
@@ -153,11 +158,37 @@ class Router:
 
     def _start(self, role_id: str, req: GenerateRequest, outs: list[str] | None, cap: Any, budget: Any) -> RouterResult:
         role, candidates = self._config.roles[role_id], self._candidates(role_id, cap)
+        tool_outputs = list(outs or [])
         count = self._provider(role_id, candidates[0]).count_tokens
-        prompt = _compact(role_id, role.max_input_tokens, req.prompt, list(outs or []), count)
+        prompt = _compact(role_id, role.max_input_tokens, req.prompt, tool_outputs, count)
         max_output = next(n for n in (req.max_output_tokens, role.max_output_tokens, 1024) if n is not None)  # BQ-54
-        req = req.model_copy(update={"prompt": prompt, "max_output_tokens": max_output})
-        return RouterResult(role_id, req, candidates, budget)
+        compacted = req.model_copy(update={"prompt": prompt, "max_output_tokens": max_output})
+        return RouterResult(role_id, compacted, candidates, budget, raw_prompt=req.prompt, tool_outputs=tool_outputs)
+
+    def _fit_cap(self, run: RouterResult, provider: ModelProvider, cap: int | None) -> GenerateRequest:
+        """EFF-03: `run.request.prompt` was only ever compacted for one candidate's tokenizer. Before this
+        candidate is actually called, recheck it with `provider`'s own `count_tokens` and, if it no longer
+        fits, recompact from the original prompt/tool_outputs (or raise `TokenCapExceededError` if nothing
+        is left to compact) -- never send a candidate a prompt over its own count of the cap."""
+        if cap is None or provider.count_tokens(run.request.prompt) <= cap:
+            return run.request
+        prompt = _compact(run.role_id, cap, run.raw_prompt, run.tool_outputs, provider.count_tokens)
+        return run.request.model_copy(update={"prompt": prompt})
+
+    def _cap_miss(self, run: RouterResult, profile_id: str) -> str:
+        """Records a per-candidate EFF-03 refusal (the call is never sent) and returns the fallback
+        reason, so the router moves on to try the next candidate exactly as it does for a provider error."""
+        provider_name = self._config.profiles[profile_id].provider
+        run.attempts.append(
+            RouterAttempt(
+                profile_id,
+                provider_name,
+                "error",
+                error_type="TokenCapExceededError",
+                reason="EFF-03: over the role's max_input_tokens cap for this profile's own tokenizer",
+            )
+        )
+        return "fallback after TokenCapExceededError"
 
     def _attempt(self, run: RouterResult, profile_id: str, reason: str | None, request: Any = None) -> RouterAttempt:
         """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-52)."""
@@ -189,7 +220,12 @@ class Router:
         threshold, schema, reason = confidence_threshold or 0.0, run.request.response_schema, None
         cap = self._config.roles[role_id].max_input_tokens  # EFF-02 repair prompts must fit it too
         for profile_id in run.candidates:  # EFF-02: cheapest first
-            provider, request = self._provider(role_id, profile_id), run.request
+            provider = self._provider(role_id, profile_id)
+            try:  # EFF-03: this candidate's own tokenizer may not fit what an earlier one compacted to
+                request = self._fit_cap(run, provider, cap)
+            except TokenCapExceededError:
+                reason = self._cap_miss(run, profile_id)
+                continue
             for is_repair in (False, True):
                 attempt, start = self._attempt(run, profile_id, reason, request), time.perf_counter()
                 try:
@@ -233,11 +269,17 @@ class Router:
 
     def _stream_chunks(self, run: RouterResult) -> Iterator[GenerateResponse]:
         reason: str | None = None
+        cap = self._config.roles[run.role_id].max_input_tokens
         for profile_id in run.candidates:
             provider = self._provider(run.role_id, profile_id)
-            attempt, start, chunks = self._attempt(run, profile_id, reason), time.perf_counter(), 0
+            try:  # EFF-03: same per-candidate recheck as generate() -- only before the first chunk
+                request = self._fit_cap(run, provider, cap)
+            except TokenCapExceededError:
+                reason = self._cap_miss(run, profile_id)
+                continue
+            attempt, start, chunks = self._attempt(run, profile_id, reason, request), time.perf_counter(), 0
             try:
-                for chunk in provider.stream(run.request):
+                for chunk in provider.stream(request):
                     chunks += 1
                     _finish(attempt, start, chunk)
                     yield chunk

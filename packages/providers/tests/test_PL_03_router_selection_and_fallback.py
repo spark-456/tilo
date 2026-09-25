@@ -217,6 +217,41 @@ def test_PL_03_embed_falls_back_on_base_provider_error(providers_config):
     assert len(fallback.embed_calls) == 1
 
 
+def test_PL_03_embed_missing_capability_goes_straight_to_capable_profile(tmp_path):
+    """Review follow-up (ticket P0-06 audit): the same capability filter that keeps `generate()`/
+    `stream()` from ever calling a candidate lacking `required_capability` applies to `embed()` too --
+    proven directly on `embed()`'s own path, not assumed from the generate() test above."""
+    from tilo_providers.config import load_providers_config  # noqa: PLC0415
+    from tilo_providers.router import Router  # noqa: PLC0415
+
+    models_path, prices_path = write_providers_config(
+        tmp_path,
+        capability_models_config(),
+        prices_config_for({"text-only": (0.1, 0.2), "vision-capable": (0.5, 1.0)}),
+    )
+    config = load_providers_config(models_path, prices_path)
+
+    class _EmbedProvider(ScriptedModelProvider):
+        def __init__(self, profile_id: str, *, vectors: list[list[float]] | None = None):
+            super().__init__(profile_id, [])
+            self._vectors = vectors
+            self.embed_calls: list[Any] = []
+
+        def embed(self, request: Any) -> Any:
+            self.embed_calls.append(request)
+            return {"vectors": self._vectors}
+
+    primary = _EmbedProvider("text-only", vectors=[[9.9]])
+    capable = _EmbedProvider("vision-capable", vectors=[[0.1, 0.2]])
+    router = Router(config, provider_for_profile={"text-only": primary, "vision-capable": capable}.__getitem__)
+
+    result = router.embed("seer", {"input": ["describe this image"]}, required_capability=Capability.VISION)
+
+    assert result == {"vectors": [[0.1, 0.2]]}
+    assert primary.embed_calls == [], "the primary lacks Capability.VISION and must never be called"
+    assert len(capable.embed_calls) == 1
+
+
 def test_PL_03_non_provider_error_from_an_adapter_is_not_swallowed(providers_config):
     """Security hand-over from P0-05: the router treats every ProviderError
     subtype explicitly. A bug that makes an adapter raise something that is

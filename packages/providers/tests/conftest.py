@@ -264,6 +264,35 @@ def token_cap_models_config() -> dict:
     }
 
 
+def token_cap_tiered_models_config() -> dict:
+    """Two *distinct* profiles under one role, "tiered" -- unlike `token_cap_models_config`'s single
+    "capped" profile playing both primary and fallback, these are separate ids so a test can give each
+    its own `count_tokens` (a different tokenizer) and prove a fallback/escalation candidate gets
+    recompacted for its own tokenizer, not sent whatever the first candidate's tokenizer compacted to
+    (EFF-03, ticket P0-06 review follow-up)."""
+    return {
+        "example": True,
+        "profiles": {
+            "primary-cap": {"provider": "fake", "model": "fake-primary-1", "context": 1_000, "caps": ["json", "tools"]},
+            "fallback-cap": {
+                "provider": "fake",
+                "model": "fake-fallback-1",
+                "context": 1_000,
+                "caps": ["json", "tools"],
+            },
+        },
+        "roles": {
+            "tiered": {
+                "primary": "primary-cap",
+                "fallback": "fallback-cap",
+                "max_input_tokens": 10,
+                "max_output_tokens": 50,
+            },
+        },
+        "rules": {"deny": []},
+    }
+
+
 @dataclass
 class ScriptedCall:
     """One scripted outcome for `ScriptedModelProvider.generate()`: either a
