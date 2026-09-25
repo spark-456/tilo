@@ -1,1 +1,1 @@
-- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS alias/tuple/allOf/comment quirks, invalid fixtures must fail schema, safety lists, event rules, BQ/ADR id clashes
+- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS alias/tuple/allOf/comment quirks, invalid fixtures must fail schema, safety lists, event rules, authz chain, BQ/ADR id clashes

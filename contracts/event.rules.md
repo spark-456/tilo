@@ -21,6 +21,8 @@ stable; a failing check names its rule.
 | EV-10 | One writer per world: `seq` strictly increases per world and event ids are unique. A stream fixture holds one world. | validator | 9.3, FR-WLD-04 |
 | EV-11 | `cause` is null or the id of an earlier event of the same world. | validator | 9.3, 9.6 |
 | EV-12 | `level`, `district`, and an `actor` or `target` that is an agent, level, district, building, gate or island id, exist in the world's layout. | validator | 9.2, 9.5 |
+| EV-13 | `vis` is tied to where the event renders: when `district` is set and `vis` lists districts, the list includes `district`, so that district's viewers see what happens in it; every district `vis` lists exists in the world's layout (BQ-28). | validator | 9.3, 10.1, FR-HIL-09 |
+| EV-14 | An `artifact.delivered` in a format that leaves Tilo (`email`, `google_docs`, `google_sheets`, `google_slides`) went through the outbox: its `data.outbox_id` names the entry (schema), and its `cause` is that entry's `data.transfer` out with the same `artifact`, which carries the `authz` (validator). A format kept in Tilo has `outbox_id` null (schema). `artifact.delivered` itself is the notice, not the side effect, and carries no `authz`. | schema; validator | 10.4, 12.4, HR-7 |
 
 ## Registry checks (contracts-check)
 
@@ -54,6 +56,6 @@ version was approved and sent (outbox rule OB-05).
 - `fixtures/events/registry/invalid/evNN_*.json`: each passes both schemas and breaks only rule
   EV-NN, the rules only the validator can check.
 - `fixtures/streams/village-basic.jsonl`: an ordered Village-tier run of one world, one event
-  per line, matching `fixtures/layout/valid/village_basic.json` (EV-10 to EV-12). It is the
+  per line, matching `fixtures/layout/valid/village_basic.json` (EV-10 to EV-14). It is the
   renderer fixture player's (P0-08b) and the harness skeleton's (P0-09) input. It is fixture
   data, never shown as a replay of a real run.

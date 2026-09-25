@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/outbox.schema.json",
   "x-version": "1.0.0",
   "title": "Outbox",
-  "description": "One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set; a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.",
+  "description": "One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set, equal to the authz of the approval.resolved that answered approve on its gate or of the policy.applied that opened it, never of approval.requested, and the data.transfer it emits carries the same authz (OB-01, HR-7); a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [

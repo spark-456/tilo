@@ -26,7 +26,8 @@
       "artifact_id": "art_triage_list",
       "version": 1
     },
-    "format": "in_app"
+    "format": "in_app",
+    "outbox_id": null
   },
   "trace": {
     "model_role": null,

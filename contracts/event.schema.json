@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/event.schema.json",
   "x-version": "1.0.0",
   "title": "Event",
-  "description": "TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-12 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.",
+  "description": "TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-14 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -155,7 +155,7 @@
       "enum": ["document", "crate", "scroll", "parcel", "blueprint", "note", "decision", "backpack"]
     },
     "vis": {
-      "description": "Server-side redaction scope (PRD 10.1): all, or the districts whose viewers may see it.",
+      "description": "Server-side redaction scope (PRD 10.1): all, or the districts whose viewers may see it; a list includes the event's own district (EV-13).",
       "anyOf": [{ "const": "all" }, { "$ref": "#/$defs/district_list" }]
     },
     "district_list": {

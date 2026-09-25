@@ -43,12 +43,18 @@ silent the defaults below apply; each is logged as a BQ in `docs/open-questions.
    lists differ. A policy never authorises T3 (EV-07, schema); `authz.by` is limited per type
    and a policy's `authz.ref` equals the `policy_id` it acted under (EV-04, EV-06). HR-7's link
    is `authz` plus the `gate_id`, `card_id` and `outbox_id` that `approval.requested`,
-   `approval.resolved`, `policy.applied` and `data.transfer` share (BQ-23).
+   `approval.resolved`, `policy.applied` and `data.transfer` share (BQ-23). An outbox entry and
+   its outgoing `data.transfer` carry exactly the `authz` of the `approval.resolved` that
+   answered `approve` or of the `policy.applied` that opened the gate, never a stamp of their own
+   (outbox rule OB-01). `artifact.delivered` is a notice, not a side effect: a format that leaves
+   Tilo (email, Google Docs, Sheets or Slides) names its outbox entry and is caused by that
+   entry's `data.transfer` out, which carries the `authz` (EV-14). A `vis` list includes the
+   event's own district (EV-13, BQ-28).
 5. **Ids.** `actor` is a user, agent, Team Lead or policy id, or `system` for the platform
    itself; `target` is a world, level, district, building, plan unit, gate, island, agent,
    artifact, user, Team Lead or policy id (BQ-20). `item.kind` is one of the carried items the
    PRD 9.5 world effects name (BQ-21).
-6. **Rules and checks.** Rules the schema cannot express are EV-01 to EV-12 in
+6. **Rules and checks.** Rules the schema cannot express are EV-01 to EV-14 in
    `contracts/event.rules.md`. `just contracts-check` applies them to every event fixture and
    stream; the harness validator applies them before each write. Fixture streams must match a
    layout fixture with the same `world_id` (EV-12).

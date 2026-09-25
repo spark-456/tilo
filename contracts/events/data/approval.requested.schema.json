@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/events/data/approval.requested.schema.json",
   "x-version": "1.0.0",
   "title": "ApprovalRequestedData",
-  "description": "data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases, and item pins the draft or file the gate holds to its version (null when there is none); the entry's item and the gate card's gate.action.item equal it (card rule CR-12, outbox rule OB-05). Nothing is written to the outbox before the gate opens.",
+  "description": "data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases, and item pins the draft or file the gate holds to its version (null when there is none); the entry's item and the gate card's gate.action.item equal it (card rule CR-12, outbox rule OB-05). Nothing is written to the outbox before the gate opens, and this event never authorises (authz null): only an approval.resolved answering approve on the same gate does (OB-01).",
   "type": "object",
   "additionalProperties": false,
   "required": [

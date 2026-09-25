@@ -3,12 +3,23 @@
   "$id": "https://contracts.tilo.example/events/data/artifact.delivered.schema.json",
   "x-version": "1.0.0",
   "title": "ArtifactDeliveredData",
-  "description": "data of artifact.delivered (PRD 9.5).",
+  "description": "data of artifact.delivered (PRD 9.5): a deliverable reached the Delivery Dock. This event is the notice, not the side effect, so it carries no authz. A format that leaves Tilo (email, or google_docs, google_sheets or google_slides through the Drive connector, PRD 12.4) went through the outbox: outbox_id names the entry that sent it, and the event's cause is that entry's data.transfer out, which carries the authorisation (EV-14, HR-7). A format kept in Tilo (a file to download, or in_app) has outbox_id null.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["artifact", "format"],
+  "required": ["artifact", "format", "outbox_id"],
   "properties": {
     "artifact": { "$ref": "../../common.schema.json#/$defs/artifact_ref" },
-    "format": { "$ref": "../../common.schema.json#/$defs/deliverable_format" }
-  }
+    "format": { "$ref": "../../common.schema.json#/$defs/deliverable_format" },
+    "outbox_id": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/ulid" }, { "type": "null" }]
+    }
+  },
+  "if": {
+    "properties": {
+      "format": { "enum": ["email", "google_docs", "google_sheets", "google_slides"] }
+    },
+    "required": ["format"]
+  },
+  "then": { "properties": { "outbox_id": { "$ref": "../../common.schema.json#/$defs/ulid" } } },
+  "else": { "properties": { "outbox_id": { "type": "null" } } }
 }

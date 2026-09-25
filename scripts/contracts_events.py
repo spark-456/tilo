@@ -1,6 +1,6 @@
 """Event contract checks for `just contracts-check` (ticket P0-03, FR-WLD-03).
 
-Registry-driven rules EV-01 to EV-12 from contracts/event.rules.md, applied to the event fixtures,
+Registry-driven rules EV-01 to EV-14 from contracts/event.rules.md, applied to the event fixtures,
 the fixture streams and contracts/events/registry.yaml itself. The harness validator (P0-09) runs
 the same rules on every event before it is written. `validate(key, instance)` returns JSON Schema
 error messages for contracts/<key>.schema.json.
@@ -86,6 +86,10 @@ def event_problems(event: Any, registry: dict[str, Any], validate: Validate) -> 
         data["saved"], data["origin_cost"] - data["lookup_cost"], abs_tol=1e-9
     ):
         problems.append("EV-09: saved must equal origin_cost minus lookup_cost")
+    if isinstance(event["vis"], list) and event["district"] is not None and event["district"] not in event["vis"]:
+        problems.append("EV-13: vis must include the district the event renders in")
+    if event["type"] == "artifact.delivered" and data.get("outbox_id") is not None and event["cause"] is None:
+        problems.append("EV-14: a delivery that left Tilo is caused by its data.transfer out")
     return problems
 
 
@@ -101,12 +105,27 @@ def layout_ids(layout: dict[str, Any]) -> set[str]:
     return ids
 
 
+def _is_send_of(cause: dict[str, Any] | None, delivered: dict[str, Any]) -> bool:
+    """EV-14: cause is the data.transfer out of the outbox entry the delivery names, same artifact."""
+    if cause is None or cause["type"] != "data.transfer":
+        return False
+    sent, data = cause["data"], delivered["data"]
+    pinned = (data["artifact"]["artifact_id"], data["artifact"]["version"])
+    artifact = sent["artifact"]
+    return (
+        sent["direction"] == "out"
+        and sent["outbox_id"] == data["outbox_id"]
+        and artifact is not None
+        and (artifact["artifact_id"], artifact["version"]) == pinned
+    )
+
+
 def stream_problems(events: list[dict[str, Any]], known: set[str]) -> list[str]:
-    """EV-10 to EV-12 over one stream that already passed event_problems."""
+    """EV-10 to EV-14 over one stream that already passed event_problems."""
     problems = []
     if len({event["world_id"] for event in events}) != 1:
         problems.append("EV-10: a stream holds one world")
-    seen: set[str] = set()
+    seen: dict[str, dict[str, Any]] = {}
     for previous, event in zip([None, *events], events, strict=False):
         where = f"seq {event['seq']}"
         if previous is not None and event["seq"] <= previous["seq"]:
@@ -115,11 +134,19 @@ def stream_problems(events: list[dict[str, Any]], known: set[str]) -> list[str]:
             problems.append(f"EV-10: {where} repeats id {event['id']}")
         if event["cause"] is not None and event["cause"] not in seen:
             problems.append(f"EV-11: {where} cause is not an earlier event of this world")
-        seen.add(event["id"])
+        seen[event["id"]] = event
         for field in ("level", "district", "actor", "target"):
             value = event[field]
             if isinstance(value, str) and LAYOUT_ID.match(value) and value not in known:
                 problems.append(f"EV-12: {where} {field} {value} is not in the world's layout")
+        if isinstance(event["vis"], list) and not set(event["vis"]) <= known:
+            problems.append(f"EV-13: {where} vis names a district that is not in the world's layout")
+        if (
+            event["type"] == "artifact.delivered"
+            and event["data"]["outbox_id"] is not None
+            and not _is_send_of(seen.get(event["cause"] or ""), event)
+        ):
+            problems.append(f"EV-14: {where} cause is not the data.transfer out of outbox {event['data']['outbox_id']}")
     return problems
 
 

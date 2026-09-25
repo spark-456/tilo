@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/events/data/approval.resolved.schema.json",
   "x-version": "1.0.0",
   "title": "ApprovalResolvedData",
-  "description": "data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Gates never time out to go, so a timeout emits no approval.resolved.",
+  "description": "data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Only approve authorises: the outbox entry is written with exactly this authz, and its outgoing data.transfer carries it too (OB-01); edit and hold write nothing. Gates never time out to go, so a timeout emits no approval.resolved.",
   "type": "object",
   "additionalProperties": false,
   "required": ["gate_id", "card_id", "outbox_id", "option", "channel"],

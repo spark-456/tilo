@@ -736,7 +736,7 @@ types:
     world_effect: "A parcel rolls to the Delivery Dock."
     hud_effect: "A delivered toast with an Open button."
     story_template: "{target} was delivered as {data.format}."
-    trace_row: "format={data.format}"
+    trace_row: "format={data.format} outbox={data.outbox_id}"
     data_schema: events/data/artifact.delivered.schema.json
     fixture: fixtures/events/valid/artifact.delivered.json
   artifact.versioned:

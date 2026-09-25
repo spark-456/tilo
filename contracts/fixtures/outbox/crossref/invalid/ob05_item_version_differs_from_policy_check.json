@@ -27,8 +27,14 @@
     "state": "scheduled",
     "created_at": "2026-09-29T09:42:16.000Z"
   },
+  "reserved_by": null,
   "authorised_by": {
     "type": "policy.applied",
+    "authz": {
+      "by": "policy",
+      "ref": "pol_autopilot_l2",
+      "at": "2026-09-29T09:42:16.000Z"
+    },
     "data": {
       "policy_id": "pol_autopilot_l2",
       "gate_id": "G1",

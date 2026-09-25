@@ -7,7 +7,7 @@ Both commands validate every schema under contracts/ (2020-12, $id, x-version, t
 fixture: contracts/fixtures/<name>/ against the schema root, contracts/fixtures/<name>.<def>/
 against $defs.<def>; valid fixtures must also round-trip through the generated pydantic models.
 The event registry, event fixtures and fixture streams are checked by scripts/contracts_events.py
-(rules EV-01 to EV-12, contracts/event.rules.md). The config/ files listed in CONFIG_SHAPES must
+(rules EV-01 to EV-14, contracts/event.rules.md). The config/ files listed in CONFIG_SHAPES must
 validate against the contract that owns their shape.
 Generation bundles contracts/**/*.schema.json into one schema whose $defs names cannot collide
 (common defs keep their name, e.g. RiskTier; other defs get their contract as prefix, e.g.

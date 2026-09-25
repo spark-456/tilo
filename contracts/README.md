@@ -10,7 +10,7 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `brief.schema.json` | Structured brief from intake (FR-INT-03 to 05) | 1.0.0 |
 | `plan.schema.json` | `PlanGraph`: approaches, units, dependencies, gates, budget cap; rules in `plan.rules.md` | 1.0.0 |
 | `layout.schema.json` | `WorldLayout` v1: semantic part and solver geometry; rules in `layout.rules.md` | 1.0.0 |
-| `event.schema.json` | `TiloEvent` v1; rules EV-01 to EV-12 in `event.rules.md` | 1.0.0 |
+| `event.schema.json` | `TiloEvent` v1; rules EV-01 to EV-14 in `event.rules.md` | 1.0.0 |
 | `events/registry.yaml` + `events/registry.schema.json` | Every registered event type (PRD 9.5): world, HUD, Story and Trace effects, data schema, fixture, pillar | 1.0.0 |
 | `events/data/<type>.schema.json` | The `data` payload of each registered type (70 files) | 1.0.0 |
 | `outbox.schema.json` | An authorised side effect waiting to run exactly once; rules in `outbox.rules.md` | 1.0.0 |

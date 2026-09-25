@@ -73,7 +73,7 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
    `contracts/events/registry.yaml`, appends the registry constants to both packages
    (`EVENT_TYPES`, `SIDE_EFFECT_EVENT_TYPES`, `EVENT_DATA_MODELS`, `EVENT_REGISTRY`; in TypeScript
    also `EventDataByType` and `RegisteredEvent`, a union discriminated on `type`), and checks
-   the registry, the event fixtures and the fixture streams against rules EV-01 to EV-12
+   the registry, the event fixtures and the fixture streams against rules EV-01 to EV-14
    (`scripts/contracts_events.py`, `contracts/event.rules.md`). Conditionals stay in one root
    `if`/`then`/`else`, because json-schema-to-typescript turns a root `allOf` into an open
    intersection type.
@@ -123,7 +123,11 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     never takes content from outside the contract. Card rule CR-12 requires the gate card's
     recipients, item and destination to equal the entry's, and OB-05 requires the entry's item
     to equal the one `approval.requested` reserved or `policy.applied` assessed, and an outgoing
-    `data.transfer`'s artifact to equal it. A redraft is a new version and so a new proposal;
+    `data.transfer`'s artifact to equal it. OB-01 requires the entry's `authz`, and its outgoing
+    `data.transfer`'s, to equal the `authz` of the `approval.resolved` that answered `approve`
+    on its gate or of the `policy.applied` that opened it, so a gate nobody approved writes
+    nothing and a policy action is never stamped as a person's (HR-7). A `destination` is an
+    opaque connector id of letters, digits, `_` and `-`, never a URL, domain or path. A redraft is a new version and so a new proposal;
     it never goes out under an earlier authorisation (BQ-27). The modifier names moved to
     `policy.schema.json#/$defs/tier_condition` so that the risk-tier table and the outbox share
     one list. Consent cards get closed option ids `connect` and `hold` with fixed labels, like

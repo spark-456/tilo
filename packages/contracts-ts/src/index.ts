@@ -4,10 +4,10 @@
  * `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
  * card.schema.json 1.0.0 sha256:e258a50bbe417029
- * common.schema.json 1.0.0 sha256:9a5541185b2512d9
+ * common.schema.json 1.0.0 sha256:cdb1a1ceeeebb299
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
- * event.schema.json 1.0.0 sha256:55532c56cda5bf56
+ * event.schema.json 1.0.0 sha256:06d09566f16c4dfc
  * events/data/agent.assigned.schema.json 1.0.0 sha256:f7672c62780b8b4b
  * events/data/agent.blocked.schema.json 1.0.0 sha256:a4b1f97998b1d554
  * events/data/agent.cloned.schema.json 1.0.0 sha256:99567a48c7c65f6f
@@ -29,10 +29,10 @@
  * events/data/app.refreshed.schema.json 1.0.0 sha256:051bafbff4096d1c
  * events/data/app.spec.schema.json 1.0.0 sha256:49e9b3906027a4c3
  * events/data/app.tested.schema.json 1.0.0 sha256:7cc150abdade1ee3
- * events/data/approval.requested.schema.json 1.0.0 sha256:eeb480efac7aadd7
- * events/data/approval.resolved.schema.json 1.0.0 sha256:f7fe075f8cb062dd
+ * events/data/approval.requested.schema.json 1.0.0 sha256:bb3b03a374e5b613
+ * events/data/approval.resolved.schema.json 1.0.0 sha256:d17f761eacfc2064
  * events/data/artifact.created.schema.json 1.0.0 sha256:1e70d4b7f7bc11a7
- * events/data/artifact.delivered.schema.json 1.0.0 sha256:7bb019fcf8da4802
+ * events/data/artifact.delivered.schema.json 1.0.0 sha256:a0e7a46e56965c1d
  * events/data/artifact.reviewed.schema.json 1.0.0 sha256:fee51f5f590c73c4
  * events/data/artifact.rolled_back.schema.json 1.0.0 sha256:4c4dac77a4b5c873
  * events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
@@ -66,7 +66,7 @@
  * events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
  * events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
  * events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
- * events/data/policy.applied.schema.json 1.0.0 sha256:0236a7fda1151937
+ * events/data/policy.applied.schema.json 1.0.0 sha256:9a8e4d9784413f35
  * events/data/policy.changed.schema.json 1.0.0 sha256:59660440803c39ed
  * events/data/question.answered.schema.json 1.0.0 sha256:908aeadfaca479ab
  * events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
@@ -81,12 +81,12 @@
  * events/registry.schema.json 1.0.0 sha256:42c04358933101ef
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
- * outbox.schema.json 1.0.0 sha256:a44a7a060fc7b061
+ * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
  * policy.schema.json 1.0.0 sha256:775a2f36ba5a3a0b
  * providers.schema.json 1.0.0 sha256:2795c1640ddad594
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
- * events/registry.yaml 1.0.0 sha256:5c45f85545f76eeb
+ * events/registry.yaml 1.0.0 sha256:f470bfed9305606d
  */
 
 /**
@@ -195,7 +195,7 @@ export type ConnectorId = string;
  */
 export type ArtifactId = string;
 /**
- * Where a side effect lands, by the connector's own id: the thread a reply goes into (PRD 11.4, FR-CHN-13) or the folder a file is saved in. Tilo does not parse it; the connector resolves it.
+ * Where a side effect lands, by the connector's own opaque id: the thread a reply goes into (PRD 11.4, FR-CHN-13) or the folder a file is saved in, in the person's connected account. Letters, digits, underscore and hyphen only, so it is never a URL, a domain, an address or a path. Tilo does not parse it; the connector resolves it within the connection.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Destination".
@@ -383,7 +383,7 @@ export type EventTarget =
 export type EventItemKind =
   "document" | "crate" | "scroll" | "parcel" | "blueprint" | "note" | "decision" | "backpack";
 /**
- * Server-side redaction scope (PRD 10.1): all, or the districts whose viewers may see it.
+ * Server-side redaction scope (PRD 10.1): all, or the districts whose viewers may see it; a list includes the event's own district (EV-13).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "EventVis".
@@ -930,7 +930,7 @@ export interface Envelope {
   provenance_ids: Ulid[];
 }
 /**
- * TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-12 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.
+ * TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-14 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Event".
@@ -1198,7 +1198,7 @@ export interface AppTestedData {
   passed: boolean;
 }
 /**
- * data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases, and item pins the draft or file the gate holds to its version (null when there is none); the entry's item and the gate card's gate.action.item equal it (card rule CR-12, outbox rule OB-05). Nothing is written to the outbox before the gate opens.
+ * data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases, and item pins the draft or file the gate holds to its version (null when there is none); the entry's item and the gate card's gate.action.item equal it (card rule CR-12, outbox rule OB-05). Nothing is written to the outbox before the gate opens, and this event never authorises (authz null): only an approval.resolved answering approve on the same gate does (OB-01).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ApprovalRequestedData".
@@ -1213,7 +1213,7 @@ export interface ApprovalRequestedData {
   item: ArtifactRef | null;
 }
 /**
- * data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Gates never time out to go, so a timeout emits no approval.resolved.
+ * data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Only approve authorises: the outbox entry is written with exactly this authz, and its outgoing data.transfer carries it too (OB-01); edit and hold write nothing. Gates never time out to go, so a timeout emits no approval.resolved.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ApprovalResolvedData".
@@ -1235,7 +1235,7 @@ export interface ArtifactCreatedData {
   artifact: ArtifactRef;
 }
 /**
- * data of artifact.delivered (PRD 9.5).
+ * data of artifact.delivered (PRD 9.5): a deliverable reached the Delivery Dock. This event is the notice, not the side effect, so it carries no authz. A format that leaves Tilo (email, or google_docs, google_sheets or google_slides through the Drive connector, PRD 12.4) went through the outbox: outbox_id names the entry that sent it, and the event's cause is that entry's data.transfer out, which carries the authorisation (EV-14, HR-7). A format kept in Tilo (a file to download, or in_app) has outbox_id null.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactDeliveredData".
@@ -1243,6 +1243,7 @@ export interface ArtifactCreatedData {
 export interface ArtifactDeliveredData {
   artifact: ArtifactRef;
   format: DeliverableFormat;
+  outbox_id: Ulid | null;
 }
 /**
  * data of artifact.reviewed (PRD 9.5). The independent Verifier's result (FR-AGT-12); unverified units count as zero time saved (PRD 14.2).
@@ -1570,7 +1571,7 @@ export interface PlanQuestionsAskedData {
   question_count: number;
 }
 /**
- * data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7). item pins the draft or file the engine assessed to its version (null when there is none); the outbox entry's item equals it (OB-05), so a redraft is a new proposal.
+ * data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). item pins the draft or file the engine assessed to its version (null when there is none); the outbox entry's item equals it (OB-05), so a redraft is a new proposal.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PolicyAppliedData".
@@ -2049,7 +2050,7 @@ export interface LayoutGateGeometry {
   cell: LayoutPoint;
 }
 /**
- * One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set; a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.
+ * One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set, equal to the authz of the approval.resolved that answered approve on its gate or of the policy.applied that opened it, never of approval.requested, and the data.transfer it emits carries the same authz (OB-01, HR-7); a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Outbox".
@@ -3440,7 +3441,7 @@ export const EVENT_REGISTRY: EventRegistry & {
       "world_effect": "A parcel rolls to the Delivery Dock.",
       "hud_effect": "A delivered toast with an Open button.",
       "story_template": "{target} was delivered as {data.format}.",
-      "trace_row": "format={data.format}",
+      "trace_row": "format={data.format} outbox={data.outbox_id}",
       "data_schema": "events/data/artifact.delivered.schema.json",
       "fixture": "fixtures/events/valid/artifact.delivered.json"
     },
