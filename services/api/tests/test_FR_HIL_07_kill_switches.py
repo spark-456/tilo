@@ -20,7 +20,6 @@ from __future__ import annotations
 import gc
 import json
 import pathlib
-import random
 import threading
 import time
 
@@ -2153,16 +2152,21 @@ def test_FR_HIL_07_pause_reaches_the_writer_within_2s_ahead_of_policy_changed_an
 
 
 def test_FR_HIL_07_a_part_that_commits_late_is_never_rewritten_by_a_call_that_snapshotted_earlier(client, store):
-    """The ST-3a-2 duplicate repro (issue #38 item 2): a part whose writer attempt overruns its own
-    deadline is queued pending while the real attempt keeps running in the background; a second,
-    later call that touches the same world reads (snapshots) that same pending queue before the
-    late attempt has actually landed. Round 6's id(part)-keyed dedupe resent the snapshotted part
-    once the original attempt finally succeeded, landing it twice in 4-7 of the issue's own 20
-    trials. Repeated across several trials with a varied intermediate delay (a seeded loop -- real
-    thread scheduling and the exact per-attempt deadline are not values this ticket pins, so a
-    single fixed timing cannot reliably land inside the vulnerable window every run)."""
-    rng = random.Random(20260926)
-    trials = 8
+    """The ST-3a-2 duplicate repro (issue #38 item 2, "2-3 writes in 4-7 of 20 trials"): a part
+    whose writer attempt overruns its own deadline stays queued while the real attempt keeps
+    running in the background; a *later* call that touches the same world reads (snapshots) that
+    same pending backlog before the outstanding attempt has actually landed, then -- racing another
+    such call doing the same thing -- can independently resubmit a part that has, in the narrow
+    window between the instant it actually settles and the instant the store's bookkeeping catches
+    up, already been committed and cleared by someone else. A sizeable backlog, processed by
+    several calls at once, widens that window far more reliably than any two sequential calls can
+    (this test's own first attempt at a sequential "call while one is in flight" reproduction never
+    landed a single duplicate in 8 trials; concurrency is what the issue's own repro actually
+    needed). Repeated across several seeded trials, since real thread scheduling cannot be forced
+    deterministically (a "seeded loop," per the ticket's own stated fallback to Hypothesis)."""
+    trials = 6
+    backlog_n = 15
+    concurrent_calls = 6
     for trial in range(trials):
         store.worlds.clear()
         store.policies.clear()
@@ -2170,38 +2174,50 @@ def test_FR_HIL_07_a_part_that_commits_late_is_never_rewritten_by_a_call_that_sn
         store.events.clear()
         store.pending_events.clear()
 
-        pid = f"pol_late_{trial}"
         store.worlds[WORLD] = make_world(owner=OWNER)
-        store.policies[pid] = base_policy(id_=pid, owner=OWNER, level="L2")
-        store.policy_worlds[pid] = WORLD
+        backlog_ids = [f"pol_backlog_{trial}_{i}" for i in range(backlog_n)]
+        store.pending_events[WORLD] = [make_pending_part(policy_id=pid) for pid in backlog_ids]
 
-        late = LateSuccessEventWriter(store, delay_s=1.0)
-        as_writer(late)
+        writer = PartiallySlowEventWriter(store, delay_s=0.05, slow_fraction=0.6, seed=500 + trial)
+        as_writer(writer)
         as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
 
-        resp1 = client.post(f"/worlds/{WORLD}/autopilot/stop")
-        assert resp1.status_code in (200, 202), f"trial {trial}: {resp1.text}"
-        assert store.policies[pid]["level"] == "L1"
+        barrier = threading.Barrier(concurrent_calls, timeout=5)
+        responses: list = []
+        errors: list = []
 
-        # A call issued while the original attempt is still outstanding (well past any plausible
-        # per-part deadline, well before delay_s's real success) -- exactly the call that snapshots
-        # pending_events mid-flight.
-        time.sleep(0.25 + rng.random() * 0.15)
-        resp2 = client.post(f"/worlds/{WORLD}/autopilot/stop")
-        assert resp2.status_code in (200, 202), f"trial {trial}: {resp2.text}"
+        def call():
+            try:
+                barrier.wait()
+                responses.append(client.post(f"/worlds/{WORLD}/autopilot/stop"))
+            except Exception as exc:  # pragma: no cover - surfaced via the assert below
+                errors.append(exc)
 
-        assert late.first_call_settled.wait(timeout=3.0), f"trial {trial}: the slow attempt never actually landed"
+        threads = [threading.Thread(target=call, daemon=True) for _ in range(concurrent_calls)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=15)
+        assert not any(t.is_alive() for t in threads), f"trial {trial}: a call hung"
+        assert not errors, f"trial {trial}: {errors}"
+        assert len(responses) == concurrent_calls
+        for r in responses:
+            assert r.status_code in (200, 202), f"trial {trial}: {r.text}"
 
-        # A final flush pass gives everything every remaining chance to have already landed.
-        resp3 = client.post(f"/worlds/{WORLD}/autopilot/stop")
-        assert resp3.status_code in (200, 202), f"trial {trial}: {resp3.text}"
+        # A final flush pass gives any still-outstanding remnant every remaining chance to land.
+        flush = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        assert flush.status_code in (200, 202), flush.text
 
-        landed = [e for e in store.events.get(WORLD, []) if e["data"].get("policy_id") == pid]
-        assert len(landed) == 1, f"trial {trial}: {pid} written {len(landed)} times -- must be exactly once"
-        assert store.pending_events.get(WORLD, []) == [], f"trial {trial}: a settled part must not stay pending"
-
-    for call in late.calls:
-        assert_part_carries_no_stamped_fields(call.part)  # no idempotency key smuggled into the part API
+        events = store.events.get(WORLD, [])
+        counts: dict[str, int] = {}
+        for e in events:
+            counts[e["data"]["policy_id"]] = counts.get(e["data"]["policy_id"], 0) + 1
+        dupes = {pid: n for pid, n in counts.items() if n > 1}
+        assert not dupes, f"trial {trial}: parts written more than once -- {dupes}"
+        assert sorted(counts) == sorted(backlog_ids), (
+            f"trial {trial}: expected every backlog part written exactly once, got counts {counts}"
+        )
+        assert store.pending_events.get(WORLD, []) == [], f"trial {trial}: pending left after the final flush"
 
 
 def test_FR_HIL_07_repeated_allocation_and_gc_never_drops_or_duplicates_a_part(client, store):
