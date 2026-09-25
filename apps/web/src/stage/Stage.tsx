@@ -88,10 +88,21 @@ export function Stage() {
       target.prepend(app.canvas);
       app.stage.addChild(grid);
       app.ticker.add(sync); // the ticker runs only while the camera moves
+      // Stop only once no transition runs, after one last sync+render of the settled transform
+      // (a late timer after a long task or in a hidden tab must not freeze a mid-pan frame).
+      const settle = () => {
+        if (cameraRef.current?.getAnimations().length) {
+          timer = window.setTimeout(settle, 50);
+          return;
+        }
+        app.ticker.stop();
+        sync();
+        app.render();
+      };
       followRef.current = (duration) => {
         app.ticker.start();
         clearTimeout(timer);
-        timer = window.setTimeout(() => app.ticker.stop(), duration + 50);
+        timer = window.setTimeout(settle, duration + 50);
       };
       const box = "devicePixelContentBoxSize" in ResizeObserverEntry.prototype;
       observer.observe(target, box ? { box: "device-pixel-content-box" } : {});
