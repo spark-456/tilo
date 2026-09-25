@@ -22,6 +22,8 @@ respected; the role's value only fills in when the caller left it unset.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from conftest import (
     ScriptedCall,
@@ -271,3 +273,133 @@ def test_EFF_03_stream_fallback_is_recompacted_for_its_own_tokenizer(tmp_path):
     sent = fallback.calls[0]
     assert fallback.count_tokens(sent.prompt) <= 10
     assert "BRAVO" not in sent.prompt
+
+
+# --- Review follow-up (ticket P0-06): the cap and the price cover everything sent -- system, prompt, tool
+# outputs and the serialised tool definitions and response schema -- not only the prompt and tool outputs.
+
+_SYSTEM_6 = "you are a terse careful summariser"  # 6 words
+_TOOLS_12 = [{"name": "lookup", "description": " ".join(["word"] * 12)}]  # well over 10 words once serialised
+
+
+def _sent_words(request: GenerateRequest) -> int:
+    """Every word of what the provider was sent: system, prompt, tool definitions, response schema."""
+    texts = [request.system or "", request.prompt]
+    texts += [json.dumps(part) for part in (request.tools, request.response_schema) if part is not None]
+    return sum(len(text.split()) for text in texts)
+
+
+def test_EFF_03_system_counts_toward_the_cap_and_forces_compaction(tmp_path):
+    config = _config(tmp_path)
+    provider = ScriptedModelProvider("capped", [ScriptedCall(text="summary")])
+    router = _router(config, provider)
+
+    # prompt+outputs alone are 3+2+3=8 words (under 10); with the 6-word system they are 14 (over).
+    router.generate(
+        "summariser",
+        GenerateRequest(prompt="summarize the following", system=_SYSTEM_6),
+        tool_outputs=["BRAVO BRAVO", "CHARLIE CHARLIE CHARLIE"],
+    )
+
+    sent = provider.calls[0]
+    assert sent.system == _SYSTEM_6, "the system prompt is sent as given, never compacted"
+    assert _sent_words(sent) <= 10, "system + prompt + tool outputs must fit the cap together"
+    assert "BRAVO" not in sent.prompt
+
+
+def test_EFF_03_tools_count_toward_the_cap_and_force_compaction(tmp_path):
+    config = _config(tmp_path)
+    provider = ScriptedModelProvider("capped", [ScriptedCall(text="summary")])
+    router = _router(config, provider)
+    tools = [{"name": "lookup", "description": "find it"}]  # a few words once serialised
+
+    router.generate(
+        "summariser",
+        GenerateRequest(prompt="summarize the following", tools=tools),
+        tool_outputs=["BRAVO BRAVO", "CHARLIE CHARLIE CHARLIE"],
+    )
+
+    sent = provider.calls[0]
+    assert sent.tools == tools
+    assert _sent_words(sent) <= 10, "tool definitions + prompt + tool outputs must fit the cap together"
+    assert "BRAVO" not in sent.prompt
+
+
+def test_EFF_03_large_system_over_one_candidates_cap_is_refused_recorded_and_falls_back(tmp_path):
+    config = _tiered_config(tmp_path)
+    primary = _MultiplierTokenizer("primary-cap", [ScriptedCall(text="must never be reached")], multiplier=2)
+    fallback = ScriptedModelProvider("fallback-cap", [ScriptedCall(text="ok from fallback")])
+    router = _tiered_router(config, {"primary-cap": primary, "fallback-cap": fallback})
+
+    # primary counts the 6-word system alone as 12 tokens (over 10): nothing to compact, so it is refused.
+    result = router.generate("tiered", GenerateRequest(prompt="summarize the following", system=_SYSTEM_6))
+
+    assert primary.calls == [], "a candidate whose fixed parts alone are over the cap is never sent"
+    assert [a.profile_id for a in result.attempts] == ["primary-cap", "fallback-cap"]
+    assert result.attempts[0].error_type == "TokenCapExceededError"
+    assert result.response is not None and result.response.text == "ok from fallback"
+    assert _sent_words(fallback.calls[0]) <= 10
+
+
+def test_EFF_03_large_system_over_every_candidates_cap_is_refused(tmp_path):
+    from tilo_providers.router import TokenCapExceededError  # noqa: PLC0415
+
+    config = _config(tmp_path)
+    provider = ScriptedModelProvider("capped", [ScriptedCall(text="must never be reached")])
+    router = _router(config, provider)
+
+    with pytest.raises(TokenCapExceededError) as excinfo:
+        router.generate("summariser", GenerateRequest(prompt="hi", system=" ".join(["rule"] * 12)))
+
+    assert provider.calls == []
+    assert {a.error_type for a in excinfo.value.attempts} == {"TokenCapExceededError"}
+
+
+def test_EFF_03_large_tools_over_the_cap_are_refused(tmp_path):
+    from tilo_providers.router import TokenCapExceededError  # noqa: PLC0415
+
+    config = _config(tmp_path)
+    provider = ScriptedModelProvider("capped", [ScriptedCall(text="must never be reached")])
+    router = _router(config, provider)
+
+    with pytest.raises(TokenCapExceededError):
+        router.generate("summariser", GenerateRequest(prompt="hi", tools=_TOOLS_12), tool_outputs=["ALPHA"])
+
+    assert provider.calls == [], "tool definitions over the cap on their own are never sent"
+
+
+def test_EFF_03_large_response_schema_over_the_cap_is_refused(tmp_path):
+    from tilo_providers.router import TokenCapExceededError  # noqa: PLC0415
+
+    config = _config(tmp_path)
+    provider = ScriptedModelProvider("capped", [ScriptedCall(text="must never be reached")])
+    router = _router(config, provider)
+    schema = {"type": "object", "properties": {f"field_{i}": {"type": "string"} for i in range(6)}}
+
+    with pytest.raises(TokenCapExceededError):
+        router.generate("summariser", GenerateRequest(prompt="hi", response_schema=schema))
+
+    assert provider.calls == [], "a response schema is sent too, so it counts toward the cap"
+
+
+def test_EFF_03_price_covers_system_and_tools_not_only_the_prompt(tmp_path):
+    from tilo_providers.router import BudgetExceededError  # noqa: PLC0415
+
+    config = _config(tmp_path)
+    quote = config.price("capped")
+
+    def cost(tokens_in: int) -> float:
+        return config.credits((tokens_in * quote.input + 50 * quote.output) / 1e6)  # role max_output_tokens=50
+
+    request = GenerateRequest(prompt="summarize", system="be brief", tools=[{"name": "lookup"}])
+    provider = ScriptedModelProvider("capped", [ScriptedCall(text="ok")])
+    run = _router(config, provider).generate("summariser", request, budget=1.0)
+    assert run.budget == pytest.approx(1.0 - cost(_sent_words(provider.calls[0])))
+    assert _sent_words(provider.calls[0]) > len(request.prompt.split())
+
+    # a budget that covers the prompt alone but not system + tools is refused before anything is sent
+    refused = ScriptedModelProvider("capped", [ScriptedCall(text="must never be reached")])
+    budget = (cost(1) + cost(_sent_words(provider.calls[0]))) / 2
+    with pytest.raises(BudgetExceededError):
+        _router(config, refused).generate("summariser", request, budget=budget)
+    assert refused.calls == []

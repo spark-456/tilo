@@ -4,10 +4,12 @@ raises a `RouterError`; it records one attempt for every candidate it actually t
 never falls back after a `RequestError`, a safety block, or a stream chunk that already reached the
 caller. Ticket P0-06 review: every provider interaction goes through one choke point, the budget check
 included -- budgets fall between the candidates' prices, so a candidate the budget cannot cover is recorded,
-never sent, and the next one tried; BudgetExceededError only when none left fits."""
+never sent, and the next one tried; BudgetExceededError only when none left fits. Requests are drawn with
+and without `system` and `tools` (some over the cap on their own): the cap and the price cover all of it."""
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -85,12 +87,21 @@ def _cost(config, profile_id: str, tokens_in: int, tokens_out: int) -> float:
     return config.credits((tokens_in * quote.input + tokens_out * quote.output) / 1_000_000)
 
 
-def _unit_cost(config) -> float:
-    """What one call on p0 costs: the 3-word prompt plus the default 1024 output tokens (BQ-61)."""
-    return _cost(config, "p0", 3, 1024)
+def _input_words(request: GenerateRequest) -> int:
+    """Every word the router sends: system, prompt and serialised tool definitions (EFF-03, PL-03)."""
+    texts = [request.system or "", request.prompt, json.dumps(request.tools) if request.tools is not None else ""]
+    return sum(len(text.split()) for text in texts)
+
+
+def _unit_cost(config, tokens_in: int) -> float:
+    """What one call on p0 costs: the whole input plus the default 1024 output tokens (BQ-61)."""
+    return _cost(config, "p0", tokens_in, 1024)
 
 
 plans = st.fixed_dictionaries({m: st.sampled_from(ERRORS) for m in METHODS})
+_TOOL = {"name": "lookup", "description": "find a figure in the ledger"}
+systems = st.sampled_from([None, "you are terse", " ".join(["rule"] * 1_200)])  # the last is over the cap alone
+tools = st.sampled_from([None, [_TOOL], [{**_TOOL, "description": " ".join(["word"] * 1_200)}]])
 
 
 @given(
@@ -98,18 +109,21 @@ plans = st.fixed_dictionaries({m: st.sampled_from(ERRORS) for m in METHODS})
     plan_by_profile=st.fixed_dictionaries({p: plans for p in PROFILES}),
     operation=st.sampled_from(["generate", "stream", "embed"]),
     budget_in_p0_calls=st.one_of(st.none(), st.sampled_from([0.0, 0.5, 1.5, 5.0, 15.0, 50.0, 150.0, 500.0, 1e12])),
+    system=systems,
+    tool_defs=tools,
 )
 @settings(max_examples=300, deadline=None)
 def test_PL_03_router_only_returns_a_result_or_raises_a_router_error_under_chaos(
-    candidates, plan_by_profile, operation, budget_in_p0_calls
+    candidates, plan_by_profile, operation, budget_in_p0_calls, system, tool_defs
 ):
     from tilo_providers.router import BudgetExceededError, Router, RouterError, RouterResult  # noqa: PLC0415
 
     providers = {p: ChaosProvider(p, plan_by_profile[p]) for p in PROFILES}
     config = _config(candidates)
-    budget = None if budget_in_p0_calls is None else budget_in_p0_calls * _unit_cost(config)
+    request = GenerateRequest(prompt="summarise the quarter", system=system, tools=tool_defs)
+    tokens_in = 3 if operation == "embed" else _input_words(request)  # embed sends only its input
+    budget = None if budget_in_p0_calls is None else budget_in_p0_calls * _unit_cost(config, tokens_in)
     router = Router(config, provider_for_profile=providers.__getitem__)
-    request = GenerateRequest(prompt="summarise the quarter")
 
     received: list[GenerateResponse] = []
     raised = False
@@ -128,6 +142,10 @@ def test_PL_03_router_only_returns_a_result_or_raises_a_router_error_under_chaos
         attempts, raised = error.attempts, True
         if isinstance(error, BudgetExceededError):  # only when the budget ended the run
             assert attempts and attempts[-1].error_type == "BudgetExceededError"
+
+    # EFF-03: a request whose system/tools alone are over the cap is refused on every candidate, never sent.
+    if tokens_in > 1_000:
+        assert not any(providers[p].sent for p in candidates)
 
     # One attempt per candidate actually touched, in candidate order, and the touched ones are a prefix.
     touched = [p for p in candidates if providers[p].touched]
@@ -159,5 +177,5 @@ def test_PL_03_router_only_returns_a_result_or_raises_a_router_error_under_chaos
         # Only calls that came back are charged (at their estimate: chaos calls report no usage), so a
         # failed candidate never eats into the budget its fallback needs.
         out = 0 if operation == "embed" else 1024
-        spent = sum(_cost(config, p, 3, out) for p in candidates if providers[p].returned)
+        spent = sum(_cost(config, p, tokens_in, out) for p in candidates if providers[p].returned)
         assert run.budget == pytest.approx(budget - spent)

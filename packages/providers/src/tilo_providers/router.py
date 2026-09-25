@@ -135,21 +135,33 @@ def _embed_inputs(request: Any) -> list[str]:
     return [raw] if isinstance(raw, str) else list(raw)
 
 
-def _compact(role_id: str, cap: int | None, prompt: str, outputs: list[str], count: Callable[[str], int]) -> str:
-    """EFF-03: drop the oldest tool outputs, then truncate the one left with a marker, or refuse."""
+def _input_text(request: GenerateRequest, prompt: str) -> str:
+    """EFF-03/PL-03: every input field an adapter serialises for `request` sent with `prompt` -- system,
+    prompt, tool definitions and response schema -- as the one text a candidate's `count_tokens` measures
+    for its cap and its price. `max_output_tokens` is priced as output; `json_mode` is a flag, not text."""
+    parts = [request.system, prompt]
+    parts += [json.dumps(part, sort_keys=True) for part in (request.tools, request.response_schema) if part is not None]
+    return "\n\n".join(part for part in parts if part)
+
+
+def _compact(role_id: str, cap: int | None, prompt: str, outputs: list[str], measure: Callable[[str], int]) -> str:
+    """EFF-03: drop the oldest tool outputs, then truncate the one left with a marker, or refuse.
+    `measure(prompt)` counts the whole request as it would be sent with that prompt (system, tools, ...)."""
     parts, join = [prompt, *outputs], "\n\n".join
     if cap is None:
         return join(parts)
-    while len(parts) > 2 and count(join(parts)) > cap:
+    if measure("") > cap:  # the fixed parts alone: nothing to compact
+        raise TokenCapExceededError(f"EFF-03: role {role_id!r} system/tools/schema alone are over its cap of {cap}")
+    while len(parts) > 2 and measure(join(parts)) > cap:
         parts.pop(1)
-    if len(parts) > 1 and count(join(parts)) > cap:
+    if len(parts) > 1 and measure(join(parts)) > cap:
         words, low, high = parts[1].split(), 0, len(parts[1].split())
         while low < high:  # longest word prefix (plus marker) that fits
             mid = (low + high + 1) // 2
             parts[1] = " ".join([*words[:mid], "[truncated]"])
-            low, high = (mid, high) if count(join(parts)) <= cap else (low, mid - 1)
+            low, high = (mid, high) if measure(join(parts)) <= cap else (low, mid - 1)
         parts[1] = " ".join([*words[:low], "[truncated]"])
-    if count(join(parts)) > cap:
+    if measure(join(parts)) > cap:
         raise TokenCapExceededError(f"EFF-03: role {role_id!r} input is over its max_input_tokens cap of {cap}")
     return join(parts)
 
@@ -203,15 +215,17 @@ class Router:
     def _prepare(
         self, run: RouterResult, profile_id: str, provider: ModelProvider, prompt: str | None = None
     ) -> tuple[GenerateRequest, float]:
-        """EFF-03 with this candidate's own `count_tokens`: compact the role's input to max_input_tokens (or
-        refuse a repair `prompt` over it), then price the call (PL-03). Never sends anything over the cap."""
+        """EFF-03 with this candidate's own `count_tokens`, on everything sent (`_input_text`): compact the
+        role's input to max_input_tokens (or refuse a repair `prompt` over it), then price the call (PL-03).
+        Never sends anything over the cap."""
         cap = self._config.roles[run.role_id].max_input_tokens
+        measure = lambda text: provider.count_tokens(_input_text(run.request, text))  # noqa: E731
         if prompt is None:
-            prompt = _compact(run.role_id, cap, run.raw_prompt, run.tool_outputs, provider.count_tokens)
-        elif cap is not None and provider.count_tokens(prompt) > cap:
+            prompt = _compact(run.role_id, cap, run.raw_prompt, run.tool_outputs, measure)
+        elif cap is not None and measure(prompt) > cap:
             raise TokenCapExceededError(f"EFF-03: role {run.role_id!r} repair prompt is over its cap of {cap}")
-        estimate = self._quote(run, profile_id, provider, prompt, run.request.max_output_tokens or 0)
-        return run.request.model_copy(update={"prompt": prompt}), estimate
+        sent = run.request.model_copy(update={"prompt": prompt})
+        return sent, self._quote(run, profile_id, provider, _input_text(sent, prompt), sent.max_output_tokens or 0)
 
     def _cost(self, profile_id: str, tokens_in: int, tokens_out: int) -> float:
         quote = self._config.price(profile_id)
