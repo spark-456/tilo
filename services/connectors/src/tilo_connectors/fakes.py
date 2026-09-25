@@ -1,5 +1,4 @@
-"""tilo_connectors.fakes — in-process connector adapters for dev/CI (EFF-01): no network, no
-real Google API, no real email ever. Public surface: tests/API.md."""
+"""tilo_connectors.fakes — in-process connector adapters for dev/CI (EFF-01). tests/API.md."""
 
 from __future__ import annotations
 
@@ -9,12 +8,7 @@ from .errors import MissingGrant
 from .outbox import Grant
 
 
-class FakeGmail:
-    """Threads every reply into the given thread_id (destination) — a thread reply never
-    becomes a new email (FR-CHN-13). Dedupes by (world, idempotency_key): OB-03 keys are unique
-    per world only, not across worlds. The check-and-record is itself atomic (a lock), so two
-    concurrent calls for the same key never both record a send."""
-
+class FakeGmail:  # FR-CHN-13, OB-03: threads the reply, dedupes by (world, key), atomically
     def __init__(self) -> None:
         self.sent: list[dict] = []
         self._by_key: dict[tuple[str, str], dict] = {}
@@ -28,9 +22,8 @@ class FakeGmail:
         grant.verify(idempotency_key)
         key = (grant.world_id, idempotency_key)
         with self._lock:
-            existing = self._by_key.get(key)
-            if existing is not None:
-                return existing  # OB-03: a key already recorded (in this world) is not sent again
+            if (existing := self._by_key.get(key)) is not None:
+                return existing
             record = {
                 "thread_id": thread_id,
                 "item": item,

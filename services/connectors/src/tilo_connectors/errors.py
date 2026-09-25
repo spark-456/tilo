@@ -4,11 +4,8 @@ from __future__ import annotations
 
 
 class OutboxRefused(Exception):
-    """Raised by Outbox.enqueue when `entry` fails outbox.schema.json, fails the OB-02
-    state/scheduled_at check, or tilo_policy.check_entry says it is not authorised. Also raised
-    by Outbox.cancel when the named entry is not currently "scheduled"."""
+    """Enqueue/cancel refusals — tests/API.md "Errors"."""
 
 
 class MissingGrant(Exception):
-    """Raised by a connector adapter's side-effect method when `grant` is not a valid Grant
-    minted by Outbox.dispatch_due() for this exact send (SEC-03 runtime check)."""
+    """SEC-03: no valid Grant for this send — tests/API.md "Errors"."""

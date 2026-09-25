@@ -24,17 +24,15 @@ outbox for every side effect. The only service that can decrypt user OAuth token
 ## Local rules
 - Connector side-effect methods are callable only from the outbox (SEC-03); every side-effect
   event carries `authz` (SEC-11). `side_effects.SIDE_EFFECT_METHOD_NAMES` names them (currently
-  `send_reply`), `scan_for_side_effect_calls` is the static AST check, and `outbox.py` is the one
-  file allowed to call one; its `Grant` is minted only by `Outbox.dispatch_due()`.
+  `send_reply`); `outbox.py` is the one file allowed to call one, and its `Grant` is minted only
+  by `Outbox.dispatch_due()`, live only for the one send it names.
 - OAuth only, least privilege, incremental scopes; Tilo never sees, types or stores passwords.
-- Every side effect goes through the outbox exactly once: `Outbox.enqueue` is a no-op on a
-  world_id + idempotency_key already stored (OB-03), and a connector adapter (`fakes.FakeGmail`
-  today) dedupes its own send by `idempotency_key` too, so a crash between the adapter call and
-  `dispatch_due()` recording "sent", followed by a retry, still sends once.
-- `InMemoryOutboxStore` is dev/test-only; a Firestore-backed store ships with a later ticket.
-- Trust boundary: `InMemoryOutboxStore._insert_if_absent` / `_compare_and_set_state` are the only
-  mutators and are underscored — only `Outbox` (specifically `enqueue`, `cancel`,
-  `dispatch_due`) calls them, never overwriting a stored id and always moving state by
-  compare-and-set, so two `Outbox` instances sharing one store (a cancel racing a dispatch)
-  never both win. In production, IAM makes `tilo-connectors` the only writer to the real
-  (Firestore-backed) store the same way.
+- Exactly-once send, at-least-once delivery: `enqueue` is a no-op on a world_id + idempotency_key
+  already stored (OB-03), and the adapter dedupes its own send too, so a crash or retry never
+  sends twice. `Outbox` may hand the same `data.transfer` to `emit` more than once (a lease
+  expiring mid-emit, a restart); the harness event writer (PI-18) keeps exactly one per
+  `outbox_id`. Send order holds per `world_id` only: a rejected transfer blocks later ones of
+  its own world, never another's.
+- Trust boundary: `InMemoryOutboxStore`'s mutators are underscored and the only writers, each a
+  lock-guarded compare-and-set or lease, so several `tilo-connectors` instances sharing one store
+  never both win a write. IAM makes it the only writer to the real store in production.

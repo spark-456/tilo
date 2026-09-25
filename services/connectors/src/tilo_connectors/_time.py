@@ -1,6 +1,4 @@
-"""tilo_connectors._time — RFC 3339 (common.schema.json#/$defs/timestamp) helpers, millisecond
-precision, always "...Z" (so plain string comparison already sorts chronologically; only OB-02's
-created_at + undo_window_s == scheduled_at check needs real arithmetic)."""
+"""tilo_connectors._time — RFC 3339 timestamp helpers (common.schema.json#/$defs/timestamp)."""
 
 from __future__ import annotations
 

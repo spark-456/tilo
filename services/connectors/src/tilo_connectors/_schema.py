@@ -1,6 +1,4 @@
-"""tilo_connectors._schema — a cached jsonschema validator for contracts/outbox.schema.json and
-its cross-file $refs (OB-05), mirroring tests/conftest.py's registry-building. Reads contracts/
-only; writes nothing."""
+"""tilo_connectors._schema — a cached validator for contracts/outbox.schema.json (OB-05)."""
 
 from __future__ import annotations
 
@@ -13,8 +11,7 @@ import jsonschema
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
-# services/connectors/src/tilo_connectors/_schema.py -> repo root is four parents up.
-_CONTRACTS_DIR = pathlib.Path(__file__).resolve().parents[4] / "contracts"
+_CONTRACTS_DIR = pathlib.Path(__file__).resolve().parents[4] / "contracts"  # repo root, four parents up
 
 
 def _load_json(path: pathlib.Path) -> Any:

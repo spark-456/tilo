@@ -1,5 +1,4 @@
-"""tilo_connectors — the outbox: the only path to a side effect (SEC-03, PRD 12.1). Public API:
-services/connectors/tests/API.md."""
+"""tilo_connectors — the outbox: the only path to a side effect (SEC-03). tests/API.md."""
 
 from .errors import MissingGrant as MissingGrant
 from .errors import OutboxRefused as OutboxRefused
