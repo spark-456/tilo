@@ -29,8 +29,9 @@ def check_bounds(value: object) -> list[dict]:
             findings.append(finding("bounds-string", f"a string exceeds {MAX_STR} characters"))
         elif isinstance(node, (dict, list, tuple)):
             items = list(node.values()) if isinstance(node, dict) else list(node)
-            if len(items) > MAX_ITEMS:
-                findings.append(finding("bounds-size", f"a container exceeds {MAX_ITEMS} entries"))
+            bad_key = isinstance(node, dict) and any(len(k) > MAX_STR for k in node if isinstance(k, str))
+            if len(items) > MAX_ITEMS or bad_key:
+                findings.append(finding("bounds-size", "too many entries, or a key too long"))
             stack += [(v, depth + 1) for v in items[:MAX_ITEMS]]
     return findings
 
@@ -103,10 +104,23 @@ def gather_material(inputs: dict) -> tuple[set, set]:
     return tokens, ids
 
 
+# SafetyProvider items (PRD 16.3 point 2): safety_flags must be a list of
+# non-empty strings, empty means clean; missing/None/any other shape is
+# malformed and must not silently read as clean (fail-open otherwise).
+def flags_malformed(items: object) -> list[dict]:
+    out: list[dict] = []
+    for it in items if isinstance(items, list) else []:
+        f = it.get("safety_flags") if isinstance(it, dict) else None
+        valid = f == [] or (isinstance(f, list) and f and all(isinstance(x, str) and x for x in f[:MAX_ITEMS]))
+        out += [finding("safety-flags-malformed", f"not a list of non-empty strings: {f!r}")] if not valid else []
+    return out
+
+
 def fail_closed(fn):
     def wrapper(inputs, output):
+        bounds = check_bounds(inputs) + check_bounds(output)
         try:
-            result = fn(inputs, output)
+            result = bounds or fn(inputs, output)
         except Exception as exc:  # noqa: BLE001 - the point is to never raise
             return [finding("checker-error", f"{type(exc).__name__}: {exc}")]
         return result if isinstance(result, list) else [finding("checker-error", "check() returned a non-list")]

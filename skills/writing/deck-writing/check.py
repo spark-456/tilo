@@ -2,6 +2,7 @@
 from skills._lib import guard
 
 _TITLE_MAX = 60
+_REF_KEYS = ("source_id", "material_id")
 
 
 @guard.fail_closed
@@ -20,8 +21,7 @@ def check(inputs: dict, output: dict) -> list[dict]:
         title = slide.get("title")
         too_long = isinstance(title, str) and len(title) > _TITLE_MAX
         findings += [guard.finding("title-too-long", f"{title!r} exceeds {_TITLE_MAX} chars")] if too_long else []
-        refs_field = slide.get("source_refs")
-        refs = {r for r in refs_field if isinstance(r, str)} if isinstance(refs_field, list) else set()
+        refs = {r for r in rf if isinstance(r, str)} if isinstance(rf := slide.get("source_refs"), list) else set()
         bullets = slide.get("bullets") if isinstance(slide.get("bullets"), list) else []
         parts = [title if isinstance(title, str) else ""]
         for b in bullets:
@@ -32,10 +32,11 @@ def check(inputs: dict, output: dict) -> list[dict]:
         if not isinstance(charts, list):
             charts = [slide["chart_ref"]] if isinstance(slide.get("chart_ref"), dict) else []
         for c in charts:
-            if isinstance(c, dict):
-                refs |= {r for r in (c.get("source_id"), c.get("material_id")) if isinstance(r, str)}
-        bad_charts = [c for c in charts if not isinstance(c, dict)]
-        findings += [guard.finding("source-ref-unknown", "chart must be a data reference") for _ in bad_charts]
+            ref = next((c[k] for k in _REF_KEYS if isinstance(c, dict) and isinstance(c.get(k), str)), None)
+            if ref:
+                refs.add(ref)
+            else:
+                findings.append(guard.finding("source-ref-unknown", "chart must reference a material id"))
 
         invented = guard.number_tokens(" ".join(parts)) - tokens
         findings += [guard.finding("number-not-in-material", f"invented: {sorted(invented)}")] if invented else []

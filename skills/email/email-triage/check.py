@@ -8,9 +8,9 @@ _CATEGORIES = {"needs_reply", "needs_action", "fyi", "newsletter_promotion", "su
 @guard.fail_closed
 def check(inputs: dict, output: dict) -> list[dict]:
     messages = inputs.get("messages", [])
-    triage = output.get("triage")
-    findings = guard.ids_exactly_once(guard.str_ids(messages, "id"), triage, "message_id")
+    findings = guard.ids_exactly_once(guard.str_ids(messages, "id"), (triage := output.get("triage")), "message_id")
     flagged = guard.str_ids([m for m in messages if isinstance(m, dict) and m.get("safety_flags")], "id")
+    findings += guard.flags_malformed(messages)
 
     for row in triage if isinstance(triage, list) else []:
         if not isinstance(row, dict):

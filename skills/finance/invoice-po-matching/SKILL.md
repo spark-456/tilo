@@ -19,6 +19,7 @@ Use this skill to match invoice lines to purchase-order lines and recompute both
 - `status-invalid`: status must be exactly one of matched, mismatched, unmatched.
 - `reason-code-invalid`: a mismatched row must give a reason_code of amount_mismatch or description_mismatch.
 - `totals-mismatch`: invoice_total and po_total must recompute exactly from the supplied lines.
+- `amount-unparseable`: every invoice and PO line's amount must parse as a plain, bounded number; an amount that fails to parse (an exponent form, NaN, an over-length digit string) is never dropped from the total as if it were zero.
 
 ## Checklist
 
@@ -26,6 +27,7 @@ Use this skill to match invoice lines to purchase-order lines and recompute both
 - [ ] Status is exactly one of the three allowed values.
 - [ ] Every mismatched row gives a reason code.
 - [ ] Both totals recompute exactly from the supplied lines.
+- [ ] Every line amount parsed cleanly; none was silently treated as zero.
 
 ## Pitfalls
 
@@ -33,3 +35,4 @@ Use this skill to match invoice lines to purchase-order lines and recompute both
 - Marking a pair `matched` when the amounts actually differ, because they were "close enough".
 - Reporting a total that "looks right" instead of summing the lines exactly.
 - Approving or acting on a match from within this skill — matching is a read-only report, not an approval.
+- Letting an amount that fails to parse cleanly drop out of a total as if it were zero, instead of failing the match.

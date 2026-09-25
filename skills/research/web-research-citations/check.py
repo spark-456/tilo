@@ -5,13 +5,11 @@ from skills._lib import guard
 
 @guard.fail_closed
 def check(inputs: dict, output: dict) -> list[dict]:
-    sources = inputs.get("sources", [])
-    source_ids = guard.str_ids(sources, "id")
+    source_ids = guard.str_ids((sources := inputs.get("sources", [])), "id")
     flagged_expected = guard.str_ids([s for s in sources if isinstance(s, dict) and s.get("safety_flags")], "id")
 
-    claims = output.get("claims")
-    findings: list[dict] = []
-    for i, c in enumerate(claims):
+    findings: list[dict] = guard.flags_malformed(sources)
+    for i, c in enumerate(output.get("claims")):
         cited = c.get("source_ids") if isinstance(c, dict) else None
         if not isinstance(cited, list) or not cited:
             findings.append(guard.finding("claim-no-citation", f"claims[{i}] cites nothing"))

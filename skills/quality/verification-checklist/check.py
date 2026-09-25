@@ -6,12 +6,10 @@ _VERDICTS = {"verified", "unverified", "false"}
 
 @guard.fail_closed
 def check(inputs: dict, output: dict) -> list[dict]:
-    claims = inputs.get("deliverable_claims", [])
-    claim_ids = [c.get("claim_id") for c in claims if isinstance(c, dict)]
+    claim_ids = [c.get("claim_id") for c in inputs.get("deliverable_claims", []) if isinstance(c, dict)]
     evidence_ids = guard.str_ids(inputs.get("evidence"), "source_id")
 
-    verdicts = output.get("verdicts")
-    findings = guard.ids_exactly_once(claim_ids, verdicts, "claim_id")
+    findings = guard.ids_exactly_once(claim_ids, (verdicts := output.get("verdicts")), "claim_id")
 
     for v in verdicts if isinstance(verdicts, list) else []:
         if not isinstance(v, dict):

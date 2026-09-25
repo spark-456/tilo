@@ -6,8 +6,7 @@ from skills._lib import guard
 
 @guard.fail_closed
 def check(inputs: dict, output: dict) -> list[dict]:
-    thread = inputs.get("thread", {})
-    msgs = [m for m in thread.get("messages", []) if isinstance(m, dict)]
+    msgs = [m for m in inputs.get("thread", {}).get("messages", []) if isinstance(m, dict)]
     reply_to = inputs.get("reply_to_sender")
     reply_all = inputs.get("reply_all") is True
     owner = inputs.get("mailbox_owner")
@@ -15,6 +14,8 @@ def check(inputs: dict, output: dict) -> list[dict]:
     to, cc = output.get("to", []), output.get("cc", [])
 
     findings = [guard.finding("attachments-present", "must not attach")] if output.get("attachments") else []
+    leaked = [k for k in ("bcc", "forward_to") if output.get(k) not in (None, [])]
+    findings += [guard.finding("recipient-mismatch", f"{k} must be empty") for k in leaked]
 
     if reply_all:
         seed = {reply_to} if isinstance(reply_to, str) else set()
@@ -31,6 +32,7 @@ def check(inputs: dict, output: dict) -> list[dict]:
     findings += [guard.finding("recipient-mismatch", detail)] if bad else []
 
     flagged = any(m.get("safety_flags") for m in msgs)
+    findings += guard.flags_malformed(msgs)
     got_flag = output.get("injection_flagged")
     mismatch = f"injection_flagged={got_flag!r} but thread flagged={flagged}"
     findings += [guard.finding("injection-flag-mismatch", mismatch)] if got_flag is not flagged else []

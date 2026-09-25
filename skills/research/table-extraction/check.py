@@ -7,8 +7,7 @@ def check(inputs: dict, output: dict) -> list[dict]:
     rows_by_id = guard.index_by(inputs.get("table", {}).get("rows"), "row_ref")
     rows_by_ref = {k: v.get("cells", {}) for k, v in rows_by_id.items()}
 
-    records = output.get("records")
-    if not isinstance(records, list):
+    if not isinstance(records := output.get("records"), list):
         return [guard.finding("row-ref-invalid", "output.records must be a list")]
 
     findings: list[dict] = []
@@ -34,7 +33,8 @@ def check(inputs: dict, output: dict) -> list[dict]:
                 bad = cell_str is None or value != cell_str.strip()
                 findings += [guard.finding("text-value-mismatch", f"records[{i}].{fname} != cell text")] if bad else []
             elif isinstance(value, (int, float)) and not isinstance(value, bool):
-                bad = guard.parse_decimal(cell_str) != guard.parse_decimal(value)
+                cell_dec, val_dec = guard.parse_decimal(cell_str), guard.parse_decimal(value)
+                bad = cell_dec is None or val_dec is None or cell_dec != val_dec
                 findings += [guard.finding("number-value-mismatch", f"records[{i}].{fname} bad num")] if bad else []
             else:
                 findings.append(guard.finding("field-outside-row", f"records[{i}].{fname} value type invalid"))
