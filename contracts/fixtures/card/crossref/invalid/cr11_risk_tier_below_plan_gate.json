@@ -35,7 +35,12 @@
   ],
   "held": {
     "recipients": ["orders@example.com"],
-    "modifiers": []
+    "modifiers": [],
+    "item": {
+      "artifact_id": "art_reply_draft",
+      "version": 2
+    },
+    "destination": "thread-quote-500-packs"
   },
   "card_gate": {
     "id": "G1",
@@ -47,7 +52,8 @@
         "artifact_id": "art_reply_draft",
         "version": 2,
         "label": "Reply draft"
-      }
+      },
+      "destination": "thread-quote-500-packs"
     },
     "recipients": ["orders@example.com"],
     "irreversible": true,

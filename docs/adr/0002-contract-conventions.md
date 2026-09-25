@@ -117,8 +117,14 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     boundary is a contract, and an outbox entry crosses from the harness to `tilo-connectors`,
     so `outbox.schema.json` joins the CP0 set although PRD 15.2's table does not list it. An
     entry exists only once authorised, so `authz` is required; T3 needs a person; any modifier
-    means T3 (rules OB-01 to OB-05 in `contracts/outbox.rules.md`). Card rule CR-12 compares a
-    gate card's recipients with the entry the gate releases. The modifier names moved to
+    means T3 (rules OB-01 to OB-05 in `contracts/outbox.rules.md`). The entry names everything
+    it sends: the draft or file as a pinned `item` (artifact id and version) and the
+    `destination` (the thread a reply goes into, the folder a file is saved in), so a connector
+    never takes content from outside the contract. Card rule CR-12 requires the gate card's
+    recipients, item and destination to equal the entry's, and OB-05 requires the entry's item
+    to equal the one `approval.requested` reserved or `policy.applied` assessed, and an outgoing
+    `data.transfer`'s artifact to equal it. A redraft is a new version and so a new proposal;
+    it never goes out under an earlier authorisation (BQ-27). The modifier names moved to
     `policy.schema.json#/$defs/tier_condition` so that the risk-tier table and the outbox share
     one list. Consent cards get closed option ids `connect` and `hold` with fixed labels, like
     gates (CR-13). Changes made before the CP0 freeze keep version 1.0.0. The event contract's

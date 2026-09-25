@@ -20,11 +20,11 @@ card is never shown and never times out. Each rule id is stable; a failing valid
 | CR-09 | `gate.id` names a gate of the run's PlanGraph, and `gate.action.type` equals that plan gate's `action_type`. | validator | 10.4, FR-INT-09 |
 | CR-10 | `gate.action.connector` names a connector in `config/connectors.yaml` that declares an action whose `id` is `gate.action.type` with `gate_type: approval`, and `gate.irreversible` equals that action's `irreversible`. | validator | 10.4, 12.1 |
 | CR-11 | `gate.risk_tier` equals the plan gate's `risk_tier` (PG-06), raised to T3 when any risk-tier modifier (`policy.schema.json#/$defs/tier_condition`) applies to the held side effect, for example a new recipient. Never lower. | validator | 10.4, FR-HIL-04 |
-| CR-12 | `gate.recipients` equals, as a set, the `recipients` of the outbox entry the gate releases (`outbox.schema.json`; its id is the `outbox_id` that `approval.requested` reserved): no one added, no one left out. The entry is written only when the gate opens, with exactly these recipients (outbox rules OB-01, OB-05). | validator | 10.3, 10.4 |
+| CR-12 | The gate card shows exactly what the gate releases, the outbox entry whose id is the `outbox_id` that `approval.requested` reserved (`outbox.schema.json`). `gate.recipients` equals the entry's `recipients` as a set: no one added, no one left out. `gate.action.item` names the same `artifact_id` and `version` as the entry's `item` and the `item` that `approval.requested` reserved, and `gate.action.destination` equals the entry's `destination`. The entry is written only when the gate opens, with exactly these values; a redraft is a new proposal with a new card (outbox rules OB-01, OB-05). | validator | 10.3, 10.4, 11.4 |
 | CR-13 | A consent card's option ids are the closed set `connect` and `hold`, each exactly once, with fixed labels: `connect` is "Connect", `hold` is "Hold". The person taps the label (and a consent tap is an authorisation), so no one writes a consent label. Only `connect` grants the connection (`connection.consented`); `hold` leaves it waiting. | schema (ids, counts, labels); connector token broker (only `connect` grants) | 10.2, 10.3, 10.4 |
 
 **Who writes a gate card.** The deterministic card builder (P1) writes every field of `gate`
-(including `action.exact` and `action.item`) and the gate options, copying them from the plan
+(including `action.exact`, `action.item` and `action.destination`) and the gate options, copying them from the plan
 gate, the connector declaration and the proposed side effect (the outbox entry the gate will
 release). A model writes none of them; it may write `what_happened` and `why_it_matters`. The
 card validator checks CR-09 to CR-12 before a gate card is posted, so a card that shows a send
@@ -32,8 +32,8 @@ as a reversible T1 draft is never shown. The same builder writes a consent card'
 
 Cross-reference cases for CR-09 to CR-12 are in `fixtures/card/crossref/{valid,invalid}/`. Each
 file holds `rule` (null when valid), `note`, `plan_gates`, `connectors` (id and declared
-actions), `held` (the `recipients` and `modifiers` of the outbox entry the gate releases) and
-`card_gate`. Every part is shape-valid; each invalid file breaks only the rule its name starts
+actions), `held` (the `recipients`, `modifiers`, `item` and `destination` of the outbox entry
+the gate releases) and `card_gate`. Every part is shape-valid; each invalid file breaks only the rule its name starts
 with.
 `tests/contracts/test_PRD_10_3_gate_card_labels_and_crossref.py` holds the reference check; the
 P1 card validator's tests must run the same files.

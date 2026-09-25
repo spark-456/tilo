@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/outbox.schema.json",
   "x-version": "1.0.0",
   "title": "Outbox",
-  "description": "One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set; a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). Rules OB-01 to OB-05 are in contracts/outbox.rules.md.",
+  "description": "One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set; a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,6 +15,8 @@
     "connector",
     "recipients",
     "attachments",
+    "item",
+    "destination",
     "modifiers",
     "risk_tier",
     "authz",
@@ -45,6 +47,14 @@
       "type": "array",
       "uniqueItems": true,
       "items": { "$ref": "common.schema.json#/$defs/artifact_ref" }
+    },
+    "item": {
+      "description": "The draft or file this entry sends, saves or shares, pinned to the version the policy engine assessed and the gate card showed; the connector sends exactly this version (OB-05). null only when the action moves no content, such as a delete.",
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/artifact_ref" }, { "type": "null" }]
+    },
+    "destination": {
+      "description": "The thread a reply goes into or the folder a file is saved in, as the gate card showed it (OB-05); null when there is none, such as a new email.",
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/destination" }, { "type": "null" }]
     },
     "modifiers": {
       "description": "The PRD 10.4 conditions that apply to this side effect; any one makes it T3.",

@@ -7,6 +7,12 @@
   "connector": "google_drive",
   "recipients": [],
   "attachments": [],
+  "item": {
+    "artifact_id": "art_quote_summary",
+    "version": 1,
+    "label": "Quote summary"
+  },
+  "destination": "folder-tilo",
   "modifiers": [],
   "risk_tier": "T1",
   "authz": {

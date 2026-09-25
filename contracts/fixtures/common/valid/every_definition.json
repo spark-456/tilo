@@ -16,6 +16,7 @@
     "version": 3,
     "label": "Supplier summary"
   },
+  "destination": "thread-supplier-1",
   "tier": "village",
   "world_id": "w_01",
   "run_id": "r_01J8Z3K4M5",

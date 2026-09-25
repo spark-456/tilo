@@ -1,0 +1,56 @@
+{
+  "rule": null,
+  "note": "The village-basic reply: the gate reserved version 1 of the draft, and the entry and the send carry version 1.",
+  "entry": {
+    "id": "01JB5VQ0000000000000009002",
+    "idempotency_key": "r_village_basic_1:U2:send_email:1",
+    "world_id": "w_village_basic",
+    "run_id": "r_village_basic_1",
+    "action_type": "send_email",
+    "connector": "gmail",
+    "recipients": ["riya@example.com"],
+    "attachments": [],
+    "item": {
+      "artifact_id": "art_reply_draft",
+      "version": 1
+    },
+    "destination": "thread-supplier-1",
+    "modifiers": [],
+    "risk_tier": "T2",
+    "authz": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-09-29T09:32:09.500Z"
+    },
+    "undo_window_s": 0,
+    "scheduled_at": "2026-09-29T09:32:09.500Z",
+    "state": "sent",
+    "created_at": "2026-09-29T09:32:09.500Z"
+  },
+  "authorised_by": {
+    "type": "approval.requested",
+    "data": {
+      "gate_id": "G1",
+      "card_id": "01JB5VQ0000000000000009001",
+      "outbox_id": "01JB5VQ0000000000000009002",
+      "action_type": "send_email",
+      "risk_tier": "T2",
+      "irreversible": true,
+      "item": {
+        "artifact_id": "art_reply_draft",
+        "version": 1
+      }
+    }
+  },
+  "transfer": {
+    "connector": "gmail",
+    "action_type": "send_email",
+    "direction": "out",
+    "artifact": {
+      "artifact_id": "art_reply_draft",
+      "version": 1
+    },
+    "outbox_id": "01JB5VQ0000000000000009002",
+    "risk_tier": "T2"
+  }
+}

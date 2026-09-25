@@ -2,8 +2,8 @@
 # contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
-# card.schema.json 1.0.0 sha256:dc780948c906a78a
-# common.schema.json 1.0.0 sha256:120ccc66b1f0795a
+# card.schema.json 1.0.0 sha256:e258a50bbe417029
+# common.schema.json 1.0.0 sha256:9a5541185b2512d9
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
 # event.schema.json 1.0.0 sha256:55532c56cda5bf56
@@ -28,7 +28,7 @@
 # events/data/app.refreshed.schema.json 1.0.0 sha256:051bafbff4096d1c
 # events/data/app.spec.schema.json 1.0.0 sha256:49e9b3906027a4c3
 # events/data/app.tested.schema.json 1.0.0 sha256:7cc150abdade1ee3
-# events/data/approval.requested.schema.json 1.0.0 sha256:d5649bfe57348959
+# events/data/approval.requested.schema.json 1.0.0 sha256:eeb480efac7aadd7
 # events/data/approval.resolved.schema.json 1.0.0 sha256:f7fe075f8cb062dd
 # events/data/artifact.created.schema.json 1.0.0 sha256:1e70d4b7f7bc11a7
 # events/data/artifact.delivered.schema.json 1.0.0 sha256:7bb019fcf8da4802
@@ -52,7 +52,7 @@
 # events/data/connection.rate_limited.schema.json 1.0.0 sha256:83470b2649767fdb
 # events/data/connection.requested.schema.json 1.0.0 sha256:f68c3c5dfee7a691
 # events/data/connection.revoked.schema.json 1.0.0 sha256:f2696da8c3f32ac0
-# events/data/data.transfer.schema.json 1.0.0 sha256:bd4340a19e8ed46d
+# events/data/data.transfer.schema.json 1.0.0 sha256:18d6fed4359341a6
 # events/data/district.completed.schema.json 1.0.0 sha256:cc8c8eea92dbd3e5
 # events/data/district.created.schema.json 1.0.0 sha256:1b25e3de1fa3e1fb
 # events/data/level.completed.schema.json 1.0.0 sha256:b99d3220a8e24536
@@ -65,7 +65,7 @@
 # events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
 # events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
 # events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
-# events/data/policy.applied.schema.json 1.0.0 sha256:1e61d5a280dd4e20
+# events/data/policy.applied.schema.json 1.0.0 sha256:0236a7fda1151937
 # events/data/policy.changed.schema.json 1.0.0 sha256:59660440803c39ed
 # events/data/question.answered.schema.json 1.0.0 sha256:908aeadfaca479ab
 # events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
@@ -80,7 +80,7 @@
 # events/registry.schema.json 1.0.0 sha256:42c04358933101ef
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
-# outbox.schema.json 1.0.0 sha256:6962c5b2b4a11700
+# outbox.schema.json 1.0.0 sha256:a44a7a060fc7b061
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
 # policy.schema.json 1.0.0 sha256:775a2f36ba5a3a0b
 # providers.schema.json 1.0.0 sha256:2795c1640ddad594
@@ -207,6 +207,12 @@ class Authz(BaseModel):
     Id of the authority: a user id for a person, a policy id, or a Team Lead id.
     """
     at: Timestamp
+
+
+type Destination = Annotated[str, Field(pattern="^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$")]
+"""
+Where a side effect lands, by the connector's own id: the thread a reply goes into (PRD 11.4, FR-CHN-13) or the folder a file is saved in. Tilo does not parse it; the connector resolves it.
+"""
 
 
 type Tier = Literal["outpost", "village", "town", "city"]
@@ -633,22 +639,6 @@ class AlertResolvedData(BaseModel):
     alert_id: Ulid
 
 
-class ApprovalRequestedData(BaseModel):
-    """
-    data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases (card rule CR-12); nothing is written to the outbox before the gate opens.
-    """
-
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    gate_id: GateId
-    card_id: Ulid
-    outbox_id: Ulid
-    action_type: ActionType
-    risk_tier: RiskTier
-    irreversible: bool
-
-
 class ApprovalResolvedData(BaseModel):
     """
     data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Gates never time out to go, so a timeout emits no approval.resolved.
@@ -996,23 +986,6 @@ class PlanQuestionsAskedData(BaseModel):
         extra="forbid",
     )
     question_count: Annotated[int, Field(ge=1, le=3)]
-
-
-class PolicyAppliedData(BaseModel):
-    """
-    data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7).
-    """
-
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    policy_id: PolicyId
-    gate_id: GateId
-    outbox_id: Ulid
-    action_type: ActionType
-    risk_tier: Literal["T1", "T2"]
-    level: Literal["L2", "L3"]
-    undo_window_s: Annotated[int, Field(ge=0)]
 
 
 class PolicyChangedData(BaseModel):
@@ -1810,6 +1783,23 @@ class AppTestedData(BaseModel):
     passed: bool
 
 
+class ApprovalRequestedData(BaseModel):
+    """
+    data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases, and item pins the draft or file the gate holds to its version (null when there is none); the entry's item and the gate card's gate.action.item equal it (card rule CR-12, outbox rule OB-05). Nothing is written to the outbox before the gate opens.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    gate_id: GateId
+    card_id: Ulid
+    outbox_id: Ulid
+    action_type: ActionType
+    risk_tier: RiskTier
+    irreversible: bool
+    item: ArtifactRef | None
+
+
 class ArtifactCreatedData(BaseModel):
     """
     data of artifact.created (PRD 9.5).
@@ -1871,7 +1861,7 @@ class ArtifactVersionedData(BaseModel):
 
 class DataTransferData(BaseModel):
     """
-    data of data.transfer (PRD 9.5). Data crossed the bridge of connector: artifact is the item that crossed, pinned to its version (null when nothing is stored, such as a delete), and the event's item is what the world draws. out is a side effect released by the outbox, so outbox_id names that entry; in is a read under the connection the person consented to. Either way the event carries authz (for in, the person's consent). No recipients or message bodies.
+    data of data.transfer (PRD 9.5). Data crossed the bridge of connector: artifact is the item that crossed, pinned to its version (null when nothing is stored, such as a delete), and the event's item is what the world draws. out is a side effect released by the outbox, so outbox_id names that entry and artifact equals the entry's pinned item (OB-05); in is a read under the connection the person consented to. Either way the event carries authz (for in, the person's consent). No recipients or message bodies.
     """
 
     model_config = ConfigDict(
@@ -1883,6 +1873,24 @@ class DataTransferData(BaseModel):
     artifact: ArtifactRef | None
     outbox_id: Ulid | None
     risk_tier: RiskTier
+
+
+class PolicyAppliedData(BaseModel):
+    """
+    data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7). item pins the draft or file the engine assessed to its version (null when there is none); the outbox entry's item equals it (OB-05), so a redraft is a new proposal.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    policy_id: PolicyId
+    gate_id: GateId
+    outbox_id: Ulid
+    action_type: ActionType
+    risk_tier: Literal["T1", "T2"]
+    level: Literal["L2", "L3"]
+    undo_window_s: Annotated[int, Field(ge=0)]
+    item: ArtifactRef | None
 
 
 class EventRegistryEntry(BaseModel):
@@ -1983,7 +1991,7 @@ class LayoutGeometry(BaseModel):
 
 class Outbox(BaseModel):
     """
-    One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set; a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). Rules OB-01 to OB-05 are in contracts/outbox.rules.md.
+    One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set; a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.
     """
 
     model_config = ConfigDict(
@@ -2005,6 +2013,14 @@ class Outbox(BaseModel):
     Everyone the side effect reaches; equals the recipients the gate card showed (card rule CR-12).
     """
     attachments: list[ArtifactRef]
+    item: ArtifactRef | None
+    """
+    The draft or file this entry sends, saves or shares, pinned to the version the policy engine assessed and the gate card showed; the connector sends exactly this version (OB-05). null only when the action moves no content, such as a delete.
+    """
+    destination: Destination | None
+    """
+    The thread a reply goes into or the folder a file is saved in, as the gate card showed it (OB-05); null when there is none, such as a new email.
+    """
     modifiers: list[PolicyTierCondition]
     """
     The PRD 10.4 conditions that apply to this side effect; any one makes it T3.
@@ -2166,7 +2182,11 @@ class CardGateAction(BaseModel):
     """
     item: ArtifactRef | None
     """
-    The draft or file that will be sent or shared, if any.
+    The draft or file that will be sent or shared, pinned to its version, if any; the outbox entry the gate releases sends exactly this version (CR-12).
+    """
+    destination: Destination | None
+    """
+    The thread the reply goes into or the folder the file is saved in, if any (CR-12).
     """
 
 
@@ -2187,6 +2207,7 @@ class Common(BaseModel):
     autonomy_level: AutonomyLevel | None = None
     authz: Authz | None = None
     artifact_ref: ArtifactRef | None = None
+    destination: Destination | None = None
     tier: Tier | None = None
     world_id: WorldId | None = None
     run_id: RunId | None = None

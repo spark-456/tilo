@@ -273,7 +273,7 @@
     "gate_action": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "connector", "exact", "item"],
+      "required": ["type", "connector", "exact", "item", "destination"],
       "properties": {
         "type": { "$ref": "common.schema.json#/$defs/action_type" },
         "connector": { "$ref": "common.schema.json#/$defs/connector_id" },
@@ -284,8 +284,12 @@
           "maxLength": 500
         },
         "item": {
-          "description": "The draft or file that will be sent or shared, if any.",
+          "description": "The draft or file that will be sent or shared, pinned to its version, if any; the outbox entry the gate releases sends exactly this version (CR-12).",
           "anyOf": [{ "$ref": "common.schema.json#/$defs/artifact_ref" }, { "type": "null" }]
+        },
+        "destination": {
+          "description": "The thread the reply goes into or the folder the file is saved in, if any (CR-12).",
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/destination" }, { "type": "null" }]
         }
       }
     },

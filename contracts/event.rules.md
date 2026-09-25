@@ -40,7 +40,10 @@ stable; a failing check names its rule.
 data schema's description says which is which where it is not obvious; the fixtures show one
 example per type. Payloads never carry message bodies, recipients or credentials: channel
 messages point at the redacted raw-archive record (`archive_ref`, `<run id>/<record seq>`), and
-sends name their outbox entry (`outbox_id`), which holds the recipients (`outbox.schema.json`).
+sends name their outbox entry (`outbox_id`), which holds the recipients and the destination
+(`outbox.schema.json`). `approval.requested`, `policy.applied` and an outgoing `data.transfer`
+carry the pinned item (artifact id and version) the entry sends, so the Trace shows which
+version was approved and sent (outbox rule OB-05).
 
 ## Fixtures
 

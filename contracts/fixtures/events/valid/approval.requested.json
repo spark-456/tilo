@@ -27,7 +27,11 @@
     "outbox_id": "01JB5VQ0000000000000009002",
     "action_type": "send_email",
     "risk_tier": "T2",
-    "irreversible": true
+    "irreversible": true,
+    "item": {
+      "artifact_id": "art_reply_draft",
+      "version": 1
+    }
   },
   "trace": {
     "model_role": null,

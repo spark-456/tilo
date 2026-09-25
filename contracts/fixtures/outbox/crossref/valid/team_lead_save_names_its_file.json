@@ -1,0 +1,47 @@
+{
+  "rule": null,
+  "note": "A T1 save the Team Lead approved names the file and version it saves and the folder it goes into.",
+  "entry": {
+    "id": "01JB5VQ0000000000000009011",
+    "idempotency_key": "r_village_basic_1:U4:save_file:1",
+    "world_id": "w_village_basic",
+    "run_id": "r_village_basic_1",
+    "action_type": "save_file",
+    "connector": "google_drive",
+    "recipients": [],
+    "attachments": [],
+    "item": {
+      "artifact_id": "art_quote_summary",
+      "version": 1,
+      "label": "Quote summary"
+    },
+    "destination": "folder-tilo",
+    "modifiers": [],
+    "risk_tier": "T1",
+    "authz": {
+      "by": "team_lead",
+      "ref": "tl_ops",
+      "at": "2026-09-29T09:55:00.000Z"
+    },
+    "undo_window_s": 0,
+    "scheduled_at": "2026-09-29T09:55:00.000Z",
+    "state": "queued",
+    "created_at": "2026-09-29T09:55:00.000Z"
+  },
+  "authorised_by": {
+    "type": "approval.requested",
+    "data": {
+      "gate_id": "G2",
+      "card_id": "01JB5VQ0000000000000009012",
+      "outbox_id": "01JB5VQ0000000000000009011",
+      "action_type": "save_file",
+      "risk_tier": "T1",
+      "irreversible": false,
+      "item": {
+        "artifact_id": "art_quote_summary",
+        "version": 1
+      }
+    }
+  },
+  "transfer": null
+}

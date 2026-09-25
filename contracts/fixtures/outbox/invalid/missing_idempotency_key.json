@@ -6,6 +6,11 @@
   "connector": "gmail",
   "recipients": ["riya@example.com"],
   "attachments": [],
+  "item": {
+    "artifact_id": "art_followup_reply",
+    "version": 1
+  },
+  "destination": "thread-supplier-1",
   "modifiers": [],
   "risk_tier": "T2",
   "authz": {

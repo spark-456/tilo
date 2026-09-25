@@ -12,6 +12,11 @@
       "version": 1
     }
   ],
+  "item": {
+    "artifact_id": "art_reply_draft",
+    "version": 2
+  },
+  "destination": "thread-supplier-1",
   "modifiers": ["new_recipients"],
   "risk_tier": "T3",
   "authz": {

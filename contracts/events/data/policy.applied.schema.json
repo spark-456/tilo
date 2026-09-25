@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/events/data/policy.applied.schema.json",
   "x-version": "1.0.0",
   "title": "PolicyAppliedData",
-  "description": "data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7).",
+  "description": "data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7). item pins the draft or file the engine assessed to its version (null when there is none); the outbox entry's item equals it (OB-05), so a redraft is a new proposal.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -13,7 +13,8 @@
     "action_type",
     "risk_tier",
     "level",
-    "undo_window_s"
+    "undo_window_s",
+    "item"
   ],
   "properties": {
     "policy_id": { "$ref": "../../common.schema.json#/$defs/policy_id" },
@@ -22,6 +23,9 @@
     "action_type": { "$ref": "../../common.schema.json#/$defs/action_type" },
     "risk_tier": { "type": "string", "enum": ["T1", "T2"] },
     "level": { "type": "string", "enum": ["L2", "L3"] },
-    "undo_window_s": { "type": "integer", "minimum": 0 }
+    "undo_window_s": { "type": "integer", "minimum": 0 },
+    "item": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/artifact_ref" }, { "type": "null" }]
+    }
   }
 }

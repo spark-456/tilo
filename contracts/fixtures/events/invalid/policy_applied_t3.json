@@ -28,7 +28,11 @@
     "action_type": "send_email",
     "risk_tier": "T3",
     "level": "L2",
-    "undo_window_s": 60
+    "undo_window_s": 60,
+    "item": {
+      "artifact_id": "art_followup_reply",
+      "version": 1
+    }
   },
   "trace": {
     "model_role": null,
