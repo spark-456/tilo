@@ -74,13 +74,16 @@ class ReplayExecutor:
         outputs: dict[str, Any] = {}
         credits = 0.0
 
-        text = recording_path.read_text(encoding="utf-8")
+        try:
+            text = recording_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ExecutorError(f"case {case.id}: cannot read recording: {exc}") from exc
         for line in text.splitlines():
             if not line.strip():
                 continue
             try:
                 record = json.loads(line)
-            except json.JSONDecodeError as exc:
+            except (ValueError, RecursionError) as exc:  # includes JSONDecodeError, int-digit limit
                 raise ExecutorError(f"case {case.id}: malformed JSON line in recording: {exc}") from exc
             if not isinstance(record, dict):
                 raise ExecutorError(

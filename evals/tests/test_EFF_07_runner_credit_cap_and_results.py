@@ -365,3 +365,34 @@ def test_EFF_07_bad_event_line_is_not_runnable_and_report_is_written(fake_repo, 
     assert data["not_runnable"] == ["E-RED-01"]
     assert data["ran"] == ["E-RED-02"]
     assert "E-RED-01" in (fake_repo / "evals" / "results.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [b"\xff\xfe\x00garbage\n", b"[" * 100_000 + b"\n", b'{"outputs":{},"credits":' + b"9" * 5000 + b"}\n"],
+    ids=["utf16_bytes", "deep_nesting", "huge_int_credits"],
+)
+def test_EFF_07_unreadable_recording_is_not_runnable_and_report_is_written(fake_repo, raw):
+    """qa review round 3: a recording that cannot be decoded or parsed is not runnable; the pass goes on."""
+    cases_root = fake_repo / "evals" / "cases"
+    write_evals_config(fake_repo / "config", credit_cap={"full": 100, "smoke": 100, "gate": 100})
+    bad = fake_repo / "evals" / "recordings" / "E-RED-01.jsonl"
+    bad.parent.mkdir(parents=True, exist_ok=True)
+    bad.write_bytes(raw)
+    good = write_recording(fake_repo / "evals" / "recordings" / "E-RED-02.jsonl", [], outputs={}, credits=1)
+    for case_id, recording in (("E-RED-01", bad), ("E-RED-02", good)):
+        write_case(
+            cases_root,
+            case_id=case_id,
+            group="E-RED",
+            ground_truth={"ok": True},
+            checks=[{"check": "flagged_or_blocked", "args": {}}],
+            recording=_recording_relpath(fake_repo, recording),
+        )
+
+    main(["run", "--pass", "full", "--results-json", "results.json"])
+
+    data = json.loads((fake_repo / "results.json").read_text(encoding="utf-8"))
+    assert data["not_runnable"] == ["E-RED-01"]
+    assert data["ran"] == ["E-RED-02"]
+    assert "E-RED-01" in (fake_repo / "evals" / "results.md").read_text(encoding="utf-8")
