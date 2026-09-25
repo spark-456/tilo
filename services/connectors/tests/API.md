@@ -226,3 +226,11 @@ crash between them cannot leave a sent entry without its transfer. Emitting is a
 instance claims the oldest pending transfer in the store (compare-and-set with a lease) before it
 calls `emit`, and removes it after; only one instance ever emits a given transfer, and transfers
 are emitted in send order (a later one waits while an earlier one is pending).
+
+## Delivery (review round 4)
+
+The outbox delivers each `data.transfer` at least once; the event writer (the harness, PI-18)
+keeps exactly one per `outbox_id` (PI-17), so the stream holds exactly one. An instance whose
+emit returned always removes that pending transfer, even if its lease expired and another
+instance holds it now. Send order is kept per `world_id`: a transfer the writer keeps rejecting
+holds back only later transfers of its own world, never another world's.
