@@ -31,8 +31,12 @@ def main(argv: list[str]) -> int:
     if len(argv) != 1:
         print(json.dumps({"ok": False, "records": 0, "problems": ["usage: python -m tilo_archive.verify <path>"]}))
         return 1
-    with open(argv[0], encoding="utf-8") as handle:
-        lines = [line for line in handle.read().splitlines() if line.strip()]
+    try:
+        with open(argv[0], encoding="utf-8") as handle:
+            lines = [line for line in handle.read().splitlines() if line.strip()]
+    except UnicodeDecodeError as exc:
+        print(json.dumps({"ok": False, "records": 0, "problems": [f"file is not valid UTF-8: {exc}"]}))
+        return 1
     records, parse_problems = _parse_lines(lines)
     problems = parse_problems + verify_chain(records)
     print(json.dumps({"ok": not problems, "records": len(records), "problems": problems}))

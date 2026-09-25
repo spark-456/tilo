@@ -57,14 +57,21 @@ def _parse_records(lines: list[str]) -> list[dict]:
     the first unparseable line -- typically a truncated tail left by a
     process that died mid-append -- instead of letting a bare
     JSONDecodeError propagate or silently dropping/partially loading a
-    corrupted run. Nothing is returned on failure: the caller's constructor
-    never completes, so no records are appended on top of a broken chain."""
+    corrupted run. Also raises ValueError (not some other exception) when a
+    line parses to valid JSON that is not an object (e.g. a line rewritten
+    to `null` or `[1,2]`): that is exactly the tampering case this format
+    exists to catch, and it must fail the same clean way, so nothing is
+    appended on top of a broken chain. Nothing is returned on failure: the
+    caller's constructor never completes."""
     records: list[dict] = []
     for i, line in enumerate(lines, start=1):
         try:
-            records.append(json.loads(line))
+            parsed = json.loads(line)
         except json.JSONDecodeError as exc:
             raise ValueError(f"unparseable or truncated record at line {i}: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError(f"record at line {i} is not a JSON object: {parsed!r}")
+        records.append(parsed)
     return records
 
 
@@ -132,22 +139,30 @@ class RunArchive:
 
 
 def verify_chain(records: list[dict], expected_head: tuple[int, str] | None = None) -> list[str]:
-    """Problems with `records` as a hash chain, each naming the seq that
-    broke it: a hash mismatch, a broken prev_hash link, a gap, a duplicate
-    or reordered seq, a foreign-run record, or (given `expected_head`) a
-    truncated/extended tail."""
+    """Problems with `records` as a hash chain, each naming the seq (or, for
+    a record too malformed to have one, its position) that broke it: a hash
+    mismatch, a broken prev_hash link, a gap, a duplicate or reordered seq,
+    a foreign-run record, a non-object record, or (given `expected_head`) a
+    truncated/extended tail. Never raises: a stored line rewritten to valid
+    JSON that is not an object (`null`, `[1,2]`, a bare number) or that has
+    an unhashable "seq" (e.g. a list) is exactly the tampering this exists
+    to catch, so it is reported like any other broken link, not a crash."""
     problems: list[str] = []
     if not records:
         if expected_head is not None and expected_head != (0, ZERO_HASH):
             problems.append(f"empty chain does not match expected head {expected_head}")
         return problems
 
-    run_id = records[0].get("run_id")
+    run_id = next((rec.get("run_id") for rec in records if isinstance(rec, dict)), None)
     seen_seqs: set = set()
     prev_hash = ZERO_HASH
     expected_seq = 1
 
-    for rec in records:
+    for position, rec in enumerate(records, start=1):
+        if not isinstance(rec, dict):
+            problems.append(f"seq {position}: record is not a JSON object")
+            continue
+
         seq = rec.get("seq")
         rid = rec.get("run_id")
 
@@ -163,9 +178,14 @@ def verify_chain(records: list[dict], expected_head: tuple[int, str] | None = No
         if recomputed != rec.get("hash"):
             problems.append(f"seq {seq}: hash mismatch, record content changed")
 
-        if seq in seen_seqs:
-            problems.append(f"seq {seq}: duplicate seq")
-        seen_seqs.add(seq)
+        try:
+            is_duplicate = seq in seen_seqs
+        except TypeError:
+            problems.append(f"seq {seq}: seq is not a hashable value")
+        else:
+            if is_duplicate:
+                problems.append(f"seq {seq}: duplicate seq")
+            seen_seqs.add(seq)
 
         if seq != expected_seq:
             problems.append(f"seq {seq}: expected seq {expected_seq} (gap, reorder or missing record)")
@@ -177,7 +197,8 @@ def verify_chain(records: list[dict], expected_head: tuple[int, str] | None = No
         expected_seq = (seq + 1) if isinstance(seq, int) else expected_seq + 1
 
     if expected_head is not None:
-        actual_head = (records[-1].get("seq"), records[-1].get("hash"))
+        last = records[-1]
+        actual_head = (last.get("seq"), last.get("hash")) if isinstance(last, dict) else (None, None)
         if actual_head != expected_head:
             problems.append(f"seq {expected_head[0]}: tail does not match expected head (got seq {actual_head[0]})")
 

@@ -572,3 +572,135 @@ def test_FR_MEM_05_jwt_pattern_is_linear_time_on_eyJ_prefix_runs(text):
     # quadratically" (the old pattern took roughly 12 minutes here on a 1 MB
     # string), not a tight perf target, so it does not flake under CI load.
     assert elapsed < 8.0, f"redact() took {elapsed:.2f}s on a 1 MB run of 'eyJ' prefixes"
+
+
+# ---------------------------------------------------------------------------
+# Fix-round-3 regression pins (code-reviewer, security-reviewer, qa-breaker).
+# ---------------------------------------------------------------------------
+
+
+def _fake_long_jwt(rng, payload_len: int) -> str:
+    """A real-shaped JWT whose payload segment is longer than round-2's
+    1024-character-per-segment cap (e.g. many claims/groups, as Keycloak or
+    Azure AD tokens carry)."""
+    import base64
+
+    def b64(obj: dict) -> str:
+        raw = json.dumps(obj, sort_keys=True).encode("utf-8")
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+    header = b64({"alg": "HS256", "typ": "JWT"})
+    payload = b64({"sub": "fake-user", "groups": [rand_token(rng, 40) for _ in range(payload_len // 45)]})
+    signature = rand_token(rng, 200, _URLSAFE)
+    assert len(payload) > 1024, "must actually exceed round-2's per-segment cap"
+    return f"{header}.{payload}.{signature}"
+
+
+def test_FR_MEM_05_jwt_with_long_segment_is_redacted():
+    # security-reviewer: round-2's per-segment cap ({5,1024}+) kept the
+    # regex linear-time but then silently stopped matching any real JWT
+    # whose header or payload segment ran longer than 1024 characters.
+    jwt = _fake_long_jwt(RNG, 3000)
+    redacted = redact_mod.redact({"note": jwt})["note"]
+
+    assert jwt not in redacted
+    assert redacted == "[REDACTED:jwt]"
+
+
+def test_FR_MEM_05_jwt_with_long_segment_is_linear_time():
+    jwt = _fake_long_jwt(RNG, 20_000)
+    start = time.perf_counter()
+    redact_mod.redact({"note": jwt})
+    elapsed = time.perf_counter() - start
+    assert elapsed < 1.0, f"redact() took {elapsed:.2f}s on one long-segment JWT"
+
+
+def test_FR_MEM_05_redacting_filter_redacts_bearer_split_across_msg_and_arg():
+    # security-reviewer: `log.info("Authorization: Bearer %s", token)` --
+    # neither the msg ("Authorization: Bearer %s") nor the bare token arg
+    # alone matches the bearer pattern, so the assembled line leaked in
+    # clear text.
+    token = rand_token(RNG, 40, _URLSAFE)
+    record = logging.LogRecord(
+        name="tilo.test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="Authorization: Bearer %s",
+        args=(token,),
+        exc_info=None,
+    )
+
+    redact_mod.RedactingFilter().filter(record)
+    message = record.getMessage()
+
+    assert token not in message
+    assert "[REDACTED:" in message
+
+
+def test_FR_MEM_05_redacting_filter_redacts_dict_msg_secret_key():
+    # security-reviewer: `log.info({"password": ...})` passes a dict as the
+    # whole `msg` (not a string), so `RedactingFilter` skipped it entirely.
+    secret = rand_token(RNG, 24)
+    record = logging.LogRecord(
+        name="tilo.test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg={"password": secret},
+        args=(),
+        exc_info=None,
+    )
+
+    redact_mod.RedactingFilter().filter(record)
+    message = record.getMessage()
+
+    assert secret not in message
+    assert "[REDACTED:" in message
+
+
+def test_FR_MEM_05_redacting_filter_redacts_secret_in_exception_str_arg():
+    # security-reviewer: `log.info("err %s", exc)` -- the exception object
+    # itself has no secret-named field, but its str() (rendered only once
+    # msg and args are combined) does.
+    secret = "sk-" + rand_token(RNG, 24)
+    try:
+        raise ValueError(f"provider call failed, token={secret}")
+    except ValueError as exc:
+        record = logging.LogRecord(
+            name="tilo.test",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="err %s",
+            args=(exc,),
+            exc_info=None,
+        )
+
+    redact_mod.RedactingFilter().filter(record)
+    message = record.getMessage()
+
+    assert secret not in message
+    assert "[REDACTED:" in message
+
+
+def test_FR_MEM_05_card_never_leaks_in_cleartext_across_many_cards_and_noise_shapes():
+    # security-reviewer: _card_span could return a window that left part of
+    # the real card outside the redacted span when a stray digit or
+    # trailing CVV/expiry digits were swept into the same `_CARD_RE` match --
+    # the round-2 test only passed because its one fixed seed happened not
+    # to hit it. Sweep many independent cards/seeds instead of one.
+    noise_shapes = [
+        lambda card: f"{with_separator(card, ' ')} 123",  # trailing CVV
+        lambda card: f"{with_separator(card, ' ')} 12/28",  # trailing expiry
+        lambda card: f"2 {with_separator(card, ' ')}",  # leading stray digit
+    ]
+    failures = []
+    for seed in range(300):
+        rng = random.Random(seed)
+        card = fake_luhn_card(rng, length=16)
+        text = noise_shapes[seed % len(noise_shapes)](card)
+        redacted = redact_mod.redact({"note": text})["note"]
+        if card in redacted:
+            failures.append((seed, text))
+    assert not failures, f"real card leaked in cleartext for seeds: {failures[:5]}"

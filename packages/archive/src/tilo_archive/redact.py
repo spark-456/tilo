@@ -8,6 +8,7 @@ a package must not import from `scripts/`) plus bearer tokens and JWTs, and
 
 from __future__ import annotations
 
+import bisect
 import logging
 import re
 import traceback
@@ -50,25 +51,16 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # "Authorization": "Bearer x" field. Charset includes RFC 6750's token68
     # set (+ / ~ alongside - . _ and = padding).
     (re.compile(r'Authorization"?\s*:\s*"?Bearer\s+[A-Za-z0-9\-_.~+/=]+', re.IGNORECASE), "bearer_token"),
-    # Anchored to the real JWT shape (header JSON always starts "{" -> "eyJ"
-    # once base64-encoded). "\b" alone is not enough to keep this linear:
-    # since "-" is itself in the segment class below, "\b" still matches at
-    # every "eyJ" that immediately follows a "-", so on adversarial input
-    # like "eyJ-" repeated many times a new match attempt restarts at every
-    # occurrence; even with possessive quantifiers (no backtracking within
-    # one attempt), each attempt was unbounded ("{5,}+") and so scanned all
-    # the way to the end of the remaining text before failing -- O(attempts
-    # x remaining length), i.e. quadratic. Bounding each segment to a
-    # generous but finite width (1024 -- past the longest signature a real
-    # JWT produces, RS512's ~683 base64 chars, with headroom) caps the work
-    # of *every* attempt, matched or not, to O(1024) regardless of how much
-    # text follows: total cost is O(text length), not O(text length^2). A
-    # tighter start anchor (e.g. rejecting "eyJ" preceded by another
-    # class character) was considered instead, but it would also reject a
-    # genuine JWT glued directly onto an identifier (e.g. "trace-eyJ..."),
-    # which this redactor must still catch.
-    (re.compile(r"\beyJ[A-Za-z0-9_-]{5,1024}+\.[A-Za-z0-9_-]{5,1024}+\.[A-Za-z0-9_-]{5,1024}+\b"), "jwt"),
 ]
+
+# JWTs are found by `_find_jwt_spans` below, not a regex in `_PATTERNS`: see
+# its docstring for why (round-2's length-capped regex, `\beyJ...{5,1024}+`,
+# stayed linear-time but then silently stopped matching any real JWT with a
+# segment over 1024 characters, e.g. a Keycloak/Azure token with many
+# claims).
+_JWT_SEGMENT_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+_JWT_MIN_SEGMENT_LEN = 5
+_EYJ_START_RE = re.compile(r"\beyJ")
 
 # 13-25 raw digits (spaces/dashes allowed as separators): wide enough to also
 # sweep in a trailing CVV/expiry or a leading stray digit, which _card_span
@@ -81,6 +73,75 @@ def _is_secret_key(key: Any) -> bool:
         return False
     lowered = key.lower()
     return any(marker in lowered for marker in _SECRET_KEY_MARKERS)
+
+
+def _jwt_run_ends(text: str) -> list[int]:
+    """`run_ends[i]` is the index of the first character at or after `i`
+    that is not a JWT-segment character (`len(text)` if none) -- the end of
+    the maximal base64url run starting at `i`. One linear backward pass."""
+    n = len(text)
+    run_ends = [n] * (n + 1)
+    for i in range(n - 1, -1, -1):
+        run_ends[i] = run_ends[i + 1] if text[i] in _JWT_SEGMENT_CHARS else i
+    return run_ends
+
+
+def _find_jwt_spans(text: str) -> list[tuple[int, int]]:
+    """Locates non-overlapping JWT spans (start, end) in `text`.
+
+    A single `\\beyJ...\\....\\...` regex is quadratic on adversarial text
+    made entirely of JWT-segment characters with no dots: every "eyJ" is a
+    fresh candidate, and each one scans forward before failing to find a
+    ".". Capping the scan per candidate (round 2's fix) keeps it linear but
+    then silently stops matching real JWTs whose header or payload segment
+    is longer than the cap.
+
+    This instead finds every "." and the end of every base64url run once,
+    up front (two linear passes), then checks each "eyJ" candidate in O(1)
+    by comparing those precomputed positions -- no re-scanning, so there is
+    no segment-length cap to get wrong."""
+    if "eyJ" not in text:
+        return []
+    dots = [i for i, ch in enumerate(text) if ch == "."]
+    run_ends = _jwt_run_ends(text)
+    spans: list[tuple[int, int]] = []
+    last_end = 0
+    for m in _EYJ_START_RE.finditer(text):
+        start = m.start()
+        if start < last_end:
+            continue
+        idx1 = bisect.bisect_left(dots, start)
+        if idx1 >= len(dots):
+            continue
+        dot1 = dots[idx1]
+        if dot1 - start < _JWT_MIN_SEGMENT_LEN or run_ends[start] != dot1:
+            continue
+        idx2 = idx1 + 1
+        if idx2 >= len(dots):
+            continue
+        dot2 = dots[idx2]
+        if dot2 - (dot1 + 1) < _JWT_MIN_SEGMENT_LEN or run_ends[dot1 + 1] != dot2:
+            continue
+        end = run_ends[dot2 + 1]
+        if end - (dot2 + 1) < _JWT_MIN_SEGMENT_LEN:
+            continue
+        spans.append((start, end))
+        last_end = end
+    return spans
+
+
+def _redact_jwts(text: str) -> str:
+    spans = _find_jwt_spans(text)
+    if not spans:
+        return text
+    parts = []
+    pos = 0
+    for start, end in spans:
+        parts.append(text[pos:start])
+        parts.append("[REDACTED:jwt]")
+        pos = end
+    parts.append(text[pos:])
+    return "".join(parts)
 
 
 def _luhn_valid(digits: str) -> bool:
@@ -98,22 +159,47 @@ def _luhn_valid(digits: str) -> bool:
 def _card_span(raw: str) -> tuple[int, int, str] | None:
     """Locates a contiguous Luhn-valid 13-19 digit card inside `raw`, which
     may carry extra digits swept in by the outer `_CARD_RE` match: a
-    trailing CVV/expiry (try the longest prefix window first) or a leading
-    stray digit (fall back to the longest suffix window). Returns the
-    (start, end) character span of just the card digits within `raw`, and
-    the card's own digit string -- or None if no window is Luhn-valid."""
+    trailing CVV/expiry (a prefix window, dropping trailing digits) or a
+    leading stray digit (a suffix window, dropping leading digits).
+
+    At each candidate length (longest to shortest) both windows are tried
+    before moving to a shorter length, so a short coincidental Luhn match in
+    one direction can never pre-empt the correct, longer match in the other
+    -- trying every prefix length before any suffix length (the previous
+    order) let exactly that happen. A window is only accepted when both of
+    its edges land on a real boundary: the edge of `raw`, or a space/dash
+    separator. Genuine noise digits sit next to the card via a separator,
+    never glued onto it mid-run, so this also rejects a Luhn "hit" that
+    would otherwise land inside the middle of a formatted `nnnn nnnn` group
+    -- random digits are Luhn-valid roughly one time in ten, so without this
+    check a run with a few extra candidate lengths to try finds one often
+    enough that "the test passes" is not the same as "the algorithm is
+    right" (round-2's fixed-seed test happened to avoid it).
+
+    Returns the (start, end) character span of just the card digits within
+    `raw`, and the card's own digit string -- or None if no window is both
+    boundary-aligned and Luhn-valid."""
+
+    def _boundary_ok(start: int, end: int) -> bool:
+        left_ok = start == 0 or raw[start - 1] in " -"
+        right_ok = end == len(raw) or raw[end] in " -"
+        return left_ok and right_ok
+
     positions = [i for i, ch in enumerate(raw) if ch.isdigit()]
     n = len(positions)
     if n < 13:
         return None
     for length in range(min(19, n), 12, -1):
-        digits = "".join(raw[p] for p in positions[:length])
-        if _luhn_valid(digits):
-            return positions[0], positions[length - 1] + 1, digits
-    for length in range(min(19, n), 12, -1):
-        digits = "".join(raw[p] for p in positions[n - length :])
-        if _luhn_valid(digits):
-            return positions[n - length], positions[-1] + 1, digits
+        start, end = positions[0], positions[length - 1] + 1
+        if _boundary_ok(start, end):
+            digits = "".join(raw[p] for p in positions[:length])
+            if _luhn_valid(digits):
+                return start, end, digits
+        start, end = positions[n - length], positions[-1] + 1
+        if _boundary_ok(start, end):
+            digits = "".join(raw[p] for p in positions[n - length :])
+            if _luhn_valid(digits):
+                return start, end, digits
     return None
 
 
@@ -134,6 +220,7 @@ def _redact_string(text: str) -> str:
         return "[REDACTED:oversize]"
     for pattern, kind in _PATTERNS:
         text = pattern.sub(f"[REDACTED:{kind}]", text)
+    text = _redact_jwts(text)
     return _redact_cards(text)
 
 
@@ -175,6 +262,8 @@ def find_secrets(text: str) -> list[str]:
         # reported as a finding rather than silently coming back clean.
         return ["oversize"]
     found = [kind for pattern, kind in _PATTERNS if pattern.search(text)]
+    if _find_jwt_spans(text):
+        found.append("jwt")
     for match in _CARD_RE.finditer(text):
         if _card_span(match.group(0)) is not None:
             found.append("card")
@@ -192,8 +281,12 @@ class RedactingFilter(logging.Filter):
     place; never drops the record."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if isinstance(record.msg, str):
-            record.msg = _redact_string(record.msg)
+        # Structural redact() first: a non-str msg (e.g. a dict passed as
+        # the whole log message) and dict/mapping or positional args get
+        # their secret-named keys and nested values redacted before
+        # %-formatting assembles the final line.
+        if not isinstance(record.msg, str):
+            record.msg = redact(record.msg)
         if record.args:
             # The full structural `redact()` (not just string args): a dict
             # or list arg needs its secret-named keys and nested values
@@ -202,6 +295,28 @@ class RedactingFilter(logging.Filter):
                 record.args = redact(record.args)
             else:
                 record.args = tuple(redact(a) for a in record.args)
+
+        # A secret can still only become visible once msg and args are
+        # combined -- e.g. `log.info("Authorization: Bearer %s", token)`,
+        # where neither the msg nor the bare token alone matches the bearer
+        # pattern -- or hide inside an object's own __str__, e.g.
+        # `log.info("err %s", exc)` with a secret in the exception message.
+        # Render once with the stdlib's own getMessage() (which applies
+        # %-formatting, or just str()s a non-str msg), scan *that* for every
+        # pattern, and only when it still finds something, replace msg with
+        # the fully redacted line and clear args so nothing downstream
+        # re-renders the unredacted original. When the structural pass above
+        # already made the composed line clean, msg/args are left as they
+        # are -- e.g. a mapping arg's individual entries stay inspectable.
+        try:
+            composed = record.getMessage()
+        except Exception:
+            composed = str(record.msg)
+        scanned = _redact_string(composed)
+        if scanned != composed:
+            record.msg = scanned
+            record.args = ()
+
         if isinstance(record.exc_info, tuple) and len(record.exc_info) == 3:
             try:
                 formatted = "".join(traceback.format_exception(*record.exc_info))

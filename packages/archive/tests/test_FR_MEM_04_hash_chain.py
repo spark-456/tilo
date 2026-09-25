@@ -443,3 +443,88 @@ def test_FR_MEM_04_reopen_raises_value_error_naming_truncated_line(tmp_path):
 
     with pytest.raises(ValueError, match="line 4"):
         RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())
+
+
+# ---------------------------------------------------------------------------
+# Fix-round-3 regression pins (code-reviewer, qa-breaker): a stored line
+# rewritten to valid JSON that is not an object (null, a list, a bare
+# number) is exactly the tampering case this format exists to catch, and it
+# must be reported like any other broken link, never crash verify_chain, a
+# reopen, or the CLI.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad_record", [None, [1, 2], 5, "x"], ids=["null", "list", "number", "string"])
+def test_FR_MEM_04_verify_chain_reports_non_dict_record_instead_of_crashing(bad_record):
+    problems = verify_chain([{"seq": 1}, bad_record, {"seq": 3}])
+    assert problems  # never raises; the non-object record is itself a problem
+    assert mentions_seq(problems, 2)
+
+
+def test_FR_MEM_04_verify_chain_reports_unhashable_seq_instead_of_crashing():
+    # qa-breaker: a "seq" that is itself a list is unhashable, so adding it
+    # to the seen-seqs set raised TypeError instead of being reported.
+    problems = verify_chain([{"seq": 1}, {"seq": [2]}])
+    assert problems
+
+
+def test_FR_MEM_04_verify_chain_empty_records_list_still_returns_list():
+    # Never raises even for the degenerate mix of only non-dict records.
+    assert verify_chain([None, [1, 2], "x"]) != []
+
+
+@pytest.mark.parametrize("bad_line", ["null", "[1, 2]", "5"], ids=["null", "list", "number"])
+def test_FR_MEM_04_reopen_raises_value_error_for_non_object_record(tmp_path, bad_line):
+    # code-reviewer: reopening over a rewritten non-object line raised
+    # AttributeError/TypeError from `self._records[-1]["seq"]`, not the
+    # ValueError every other malformed-record case raises.
+    store = LocalDirStore(tmp_path)
+    arch = RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())
+    for i in range(3):
+        arch.append("model_call", {"i": i})
+    jsonl_path = tmp_path / "org_a" / "r_1.jsonl"
+    lines = jsonl_path.read_text(encoding="utf-8").splitlines()
+    lines[1] = bad_line
+    jsonl_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="line 2"):
+        RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())
+
+
+@pytest.mark.parametrize("bad_line", ["null", "[1, 2]"], ids=["null", "list"])
+def test_FR_MEM_04_cli_reports_non_object_record_instead_of_crashing(archive, tmp_path, bad_line):
+    # code-reviewer / qa-breaker: `python -m tilo_archive.verify` crashed
+    # with an uncaught AttributeError/TypeError traceback and printed no
+    # JSON line at all when a stored line was rewritten to valid JSON that
+    # is not an object. Repro, done twice (null and a list).
+    for i in range(3):
+        archive.append("model_call", {"i": i})
+    jsonl_path = tmp_path / ORG_ID / f"{RUN_ID}.jsonl"
+    lines = jsonl_path.read_text(encoding="utf-8").splitlines()
+    lines[1] = bad_line
+    jsonl_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    result = _run_cli(jsonl_path)
+
+    assert result.returncode == 1, result.stderr
+    assert "Traceback" not in result.stderr
+    out = json.loads(result.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["records"] == 3
+    assert out["problems"]
+    assert mentions_seq(out["problems"], 2)
+
+
+def test_FR_MEM_04_cli_reports_invalid_utf8_instead_of_crashing(tmp_path):
+    # qa-breaker: reading a run file with invalid UTF-8 bytes raised an
+    # uncaught UnicodeDecodeError, breaking the CLI's own output contract.
+    bad_path = tmp_path / "bad_utf8.jsonl"
+    bad_path.write_bytes(b'{"v":"1.0"}\n\xff\xfe not valid utf-8\n')
+
+    result = _run_cli(bad_path)
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    out = json.loads(result.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["problems"]
