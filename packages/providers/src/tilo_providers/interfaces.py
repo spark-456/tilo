@@ -32,6 +32,8 @@ class GenerateRequest(BaseModel):  # one ModelProvider.generate() / .stream() ca
     system: str | None = None
     max_output_tokens: int | None = None
     tools: list[dict[str, Any]] | None = None
+    json_mode: bool = False  # PL-02 structured output: force JSON-only output, no schema
+    response_schema: dict[str, Any] | None = None  # PL-02 structured output: JSON output validated against this schema
 
 
 class GenerateResponse(BaseModel):  # one generate() result, or one stream() chunk

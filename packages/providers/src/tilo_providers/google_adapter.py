@@ -1,9 +1,12 @@
 """tilo_providers.google_adapter — Google Gen AI SDK adapter (PL-02, PRD 6.4,
 6.5). Wraps `google.genai.Client` against Agent Platform / Vertex, through
 the global endpoint (PRD 6.5), behind `ModelProvider`: `generate`, `stream`,
-`embed`, `count_tokens`, `capabilities`, `price`. Structured output and tool
-calling pass straight through the SDK's own request/response shapes; SDK
-errors map onto `tilo_providers.errors` (quota/retryable/request/safety).
+`embed`, `count_tokens`, `capabilities`, `price`. Tool calling passes
+straight through the SDK's own request/response shapes; structured output
+(`GenerateRequest.json_mode`/`.response_schema`) maps onto
+`GenerateContentConfig(response_mime_type="application/json",
+response_schema=...)`. SDK errors map onto `tilo_providers.errors`
+(quota/retryable/request/safety).
 
 Imports `google.genai`/`.types`/`.errors` through `importlib.import_module`
 rather than `from google import genai`, so the module works whether that
@@ -60,6 +63,12 @@ class GoogleModelProvider(ModelProvider):
             kwargs["tools"] = request.tools
         if request.max_output_tokens is not None:
             kwargs["max_output_tokens"] = request.max_output_tokens
+        if request.response_schema is not None:
+            # PL-02 structured output: a schema implies JSON output.
+            kwargs["response_mime_type"] = "application/json"
+            kwargs["response_schema"] = request.response_schema
+        elif request.json_mode:
+            kwargs["response_mime_type"] = "application/json"
         if not kwargs:
             return None
         types_mod = _genai_module("google.genai.types")

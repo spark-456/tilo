@@ -12,12 +12,24 @@ by tests (`httpx.MockTransport`) so no real socket ever opens in dev/CI
 (EFF-01). The API key is read once from the named environment variable at
 construction time and sent only as the `Authorization` header — never
 logged, never written into a recording (`tilo_providers.replay`, PRD 16.1
-rule 4)."""
+rule 4).
+
+Secret hygiene (PRD 16.1 rule 4): the env value is checked at construction
+time for stray whitespace/control characters (e.g. a trailing CR from
+pasting a key on Windows) and rejected by naming only the variable, never
+the value — an unchecked CR/LF in a header value makes h11 raise "Illegal
+header value" *with the value inlined in its own message*, which would
+otherwise surface the key through `_post`'s exception. `_post` and
+`_raise_for_status` also never fold a raw `httpx` exception's `str()` or an
+unbounded/verbatim response body into a raised error, as a second layer:
+fixed messages plus the status code, or the server's own JSON error message
+truncated and with the key scrubbed out."""
 
 from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Iterator
 from typing import Any
 
@@ -26,6 +38,9 @@ from tilo_contracts import ProvidersProfile
 
 from tilo_providers.errors import ProviderError, map_http_status
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
+
+_CLEAN_TOKEN_RE = re.compile(r"^[\x21-\x7e]+$")  # printable ASCII, no whitespace or control characters
+_MAX_ERROR_MESSAGE_LEN = 500
 
 
 class OpenAICompatModelProvider(ModelProvider):
@@ -45,7 +60,16 @@ class OpenAICompatModelProvider(ModelProvider):
         api_key = os.environ.get(api_key_env)
         if not api_key:
             raise ProviderError(f"PL-02: environment variable {api_key_env!r} (api_key_env) is not set")
+        if not _CLEAN_TOKEN_RE.fullmatch(api_key):
+            # Never include the value: it may be exactly the malformed
+            # content (whitespace/control characters) this check exists to
+            # catch before it reaches an HTTP header.
+            raise ProviderError(
+                f"PL-02: environment variable {api_key_env!r} (api_key_env) is not a clean ASCII token "
+                "(no whitespace or control characters)"
+            )
 
+        self._api_key = api_key
         self._client = httpx.Client(
             base_url=base_url, transport=transport, headers={"Authorization": f"Bearer {api_key}"}
         )
@@ -58,21 +82,43 @@ class OpenAICompatModelProvider(ModelProvider):
         return messages
 
     def _post(self, path: str, body: dict[str, Any]) -> httpx.Response:
+        # A raw httpx/h11 exception's own str() can inline a malformed
+        # header value verbatim (e.g. a CR-suffixed API key), so it is never
+        # folded into our message, and `from None` keeps it out of the
+        # formatted traceback's chained-cause section too (PRD 16.1 rule 4).
         try:
             return self._client.post(path, json=body)
-        except httpx.TimeoutException as error:
-            raise map_http_status(504, str(error)) from error  # 504-shaped: mapped to RetryableError below
-        except httpx.HTTPError as error:
-            raise map_http_status(503, str(error)) from error
+        except httpx.TimeoutException:
+            raise map_http_status(504, "PL-02: request to the provider endpoint timed out") from None
+        except httpx.HTTPError:
+            raise map_http_status(503, "PL-02: request to the provider endpoint failed") from None
+
+    def _scrub(self, message: str) -> str:
+        message = message[:_MAX_ERROR_MESSAGE_LEN]
+        return message.replace(self._api_key, "***") if self._api_key in message else message
 
     def _raise_for_status(self, response: httpx.Response) -> None:
         if response.status_code < 400:
             return
+        message = f"PL-02: provider returned HTTP {response.status_code}"
         try:
-            message = response.json().get("error", {}).get("message", response.text)
+            data = response.json()
         except (json.JSONDecodeError, ValueError):
-            message = response.text
-        raise map_http_status(response.status_code, message)
+            data = None
+        if isinstance(data, dict):
+            error = data.get("error")
+            if isinstance(error, dict):
+                candidate = error.get("message")
+            elif isinstance(error, str):
+                candidate = error
+            else:
+                candidate = None
+            if isinstance(candidate, str) and candidate:
+                message = candidate
+        # Never copy an unbounded or verbatim body into the exception: bound
+        # it and scrub the key in case a misbehaving/echoing proxy reflected
+        # it back (PRD 16.1 rule 4).
+        raise map_http_status(response.status_code, self._scrub(message))
 
     def _map_message(self, message: dict[str, Any], usage_raw: dict[str, Any] | None) -> GenerateResponse:
         tool_calls: list[dict[str, Any]] | None = None
@@ -93,12 +139,26 @@ class OpenAICompatModelProvider(ModelProvider):
             text=message.get("content"), profile_id=self._profile_id, tool_calls=tool_calls, usage=usage
         )
 
+    def _response_format(self, request: GenerateRequest) -> dict[str, Any] | None:
+        # PL-02 structured output / JSON mode.
+        if request.response_schema is not None:
+            return {
+                "type": "json_schema",
+                "json_schema": {"name": "response", "schema": request.response_schema, "strict": True},
+            }
+        if request.json_mode:
+            return {"type": "json_object"}
+        return None
+
     def generate(self, request: GenerateRequest) -> GenerateResponse:
         body: dict[str, Any] = {"model": self._profile.model, "messages": self._messages(request)}
         if request.tools is not None:
             body["tools"] = request.tools
         if request.max_output_tokens is not None:
             body["max_tokens"] = request.max_output_tokens
+        response_format = self._response_format(request)
+        if response_format is not None:
+            body["response_format"] = response_format
 
         response = self._post("/chat/completions", body)
         self._raise_for_status(response)
@@ -110,6 +170,9 @@ class OpenAICompatModelProvider(ModelProvider):
         body: dict[str, Any] = {"model": self._profile.model, "messages": self._messages(request), "stream": True}
         if request.tools is not None:
             body["tools"] = request.tools
+        response_format = self._response_format(request)
+        if response_format is not None:
+            body["response_format"] = response_format
 
         response = self._post("/chat/completions", body)
         self._raise_for_status(response)

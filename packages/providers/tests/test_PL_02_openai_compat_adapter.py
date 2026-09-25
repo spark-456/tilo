@@ -104,19 +104,50 @@ def test_PL_02_openai_compat_adapter_generate_chat_completion(monkeypatch):
 
 
 def test_PL_02_openai_compat_adapter_generate_json_mode_round_trips_valid_json(monkeypatch):
+    """PL-02 JSON mode: `GenerateRequest.json_mode` must reach the API call
+    as `response_format: {"type": "json_object"}` -- not merely pass
+    unmodified JSON text through, which a caller with no way to ask for JSON
+    at all would also satisfy."""
     monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
     payload = '{"ok": true, "count": 3}'
+    seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
         return httpx.Response(
             200, json={"choices": [{"message": {"role": "assistant", "content": payload}, "finish_reason": "stop"}]}
         )
 
     provider = _provider(handler, profile=_profile(caps=["json"]))
-    response = provider.generate(GenerateRequest(prompt="Reply with JSON."))
+    response = provider.generate(GenerateRequest(prompt="Reply with JSON.", json_mode=True))
 
     assert response.text == payload
     assert json.loads(response.text) == {"ok": True, "count": 3}
+    body = json.loads(seen[0].content)
+    assert body["response_format"] == {"type": "json_object"}
+
+
+def test_PL_02_openai_compat_adapter_generate_structured_output_sends_a_json_schema(monkeypatch):
+    """PL-02 structured output: `GenerateRequest.response_schema` must reach
+    the API call as a `response_format: {"type": "json_schema", ...}` whose
+    `json_schema.schema` is the caller's schema."""
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+    schema = {"type": "object", "properties": {"ok": {"type": "boolean"}}}
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"role": "assistant", "content": '{"ok": true}'}, "finish_reason": "stop"}]},
+        )
+
+    provider = _provider(handler, profile=_profile(caps=["json"]))
+    provider.generate(GenerateRequest(prompt="Reply with JSON.", response_schema=schema))
+
+    body = json.loads(seen[0].content)
+    assert body["response_format"]["type"] == "json_schema"
+    assert body["response_format"]["json_schema"]["schema"] == schema
 
 
 def test_PL_02_openai_compat_adapter_generate_maps_a_tool_call(monkeypatch):
@@ -228,3 +259,109 @@ def test_PL_02_openai_compat_adapter_maps_timeout_to_retryable_error(monkeypatch
     provider = _provider(handler)
     with pytest.raises(provider_errors.RetryableError):
         provider.generate(GenerateRequest(prompt="hi"))
+
+
+def test_PL_02_openai_compat_adapter_maps_a_string_error_field(monkeypatch):
+    """Regression: `{"error": "<string>"}` (a valid, if informal, error
+    shape) must not raise an unmapped AttributeError from calling `.get` on
+    a string."""
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": "bad request"})
+
+    provider = _provider(handler)
+    with pytest.raises(provider_errors.RequestError) as excinfo:
+        provider.generate(GenerateRequest(prompt="hi"))
+    assert "bad request" in str(excinfo.value)
+
+
+def test_PL_02_openai_compat_adapter_scrubs_the_api_key_from_error_bodies(monkeypatch):
+    """A misbehaving/echoing proxy that reflects the Authorization header
+    back in its error body must not leak the key into the raised error
+    (PRD 16.1 rule 4)."""
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": {"message": f"rejected header 'Bearer {FAKE_KEY}'"}})
+
+    provider = _provider(handler)
+    with pytest.raises(provider_errors.RequestError) as excinfo:
+        provider.generate(GenerateRequest(prompt="hi"))
+    assert FAKE_KEY not in str(excinfo.value)
+    assert "***" in str(excinfo.value)
+
+
+def test_PL_02_openai_compat_adapter_rejects_a_dirty_api_key_naming_only_the_variable(monkeypatch):
+    """Ticket P0-05 review fix (security): an env value with a stray
+    control/whitespace character (e.g. a trailing CR pasted on Windows)
+    must be rejected at construction time, before it can ever reach an HTTP
+    header -- and the error must name only the variable, never the value."""
+    from tilo_providers.errors import ProviderError
+    from tilo_providers.openai_compat_adapter import OpenAICompatModelProvider
+
+    dirty_key = f"{FAKE_KEY}\r"
+    monkeypatch.setenv(API_KEY_ENV, dirty_key)
+
+    with pytest.raises(ProviderError) as excinfo:
+        OpenAICompatModelProvider(profile=_profile(), profile_id="compat-1", base_url=BASE_URL, api_key_env=API_KEY_ENV)
+
+    assert API_KEY_ENV in str(excinfo.value)
+    assert FAKE_KEY not in str(excinfo.value)
+    assert dirty_key not in str(excinfo.value)
+
+
+def test_PL_02_openai_compat_adapter_post_exception_never_leaks_the_api_key(monkeypatch):
+    """Defense in depth for the same failure (see the construction-time
+    check above): if a header value that breaks HTTP framing ever reached
+    the wire regardless, `_post`'s own exception handling must still not
+    surface it. `httpx.MockTransport` never reaches h11 (the review's own
+    finding), so this needs a real transport talking to a real loopback
+    listener -- allowed by conftest.py's `block_non_local_sockets`."""
+    import socket
+    import threading
+    import traceback
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+    dirty_key = f"{FAKE_KEY}\r"
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    port = server.getsockname()[1]
+
+    def _accept_loop() -> None:
+        try:
+            while True:
+                conn, _ = server.accept()
+                conn.close()
+        except OSError:
+            pass
+
+    thread = threading.Thread(target=_accept_loop, daemon=True)
+    thread.start()
+    try:
+        from tilo_providers.openai_compat_adapter import OpenAICompatModelProvider
+
+        provider = OpenAICompatModelProvider(
+            profile=_profile(), profile_id="compat-1", base_url=f"http://127.0.0.1:{port}/v1", api_key_env=API_KEY_ENV
+        )
+        # Simulate a bad value reaching the wire despite the constructor's
+        # own check above -- exactly the h11 "Illegal header value" failure
+        # the review reported, exercised against a real transport.
+        provider._client.headers["authorization"] = f"Bearer {dirty_key}"  # noqa: SLF001
+
+        from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+        with pytest.raises(provider_errors.ProviderError) as excinfo:
+            provider.generate(GenerateRequest(prompt="hi"))
+
+        formatted = "".join(traceback.format_exception(type(excinfo.value), excinfo.value, excinfo.value.__traceback__))
+        assert FAKE_KEY not in str(excinfo.value)
+        assert FAKE_KEY not in formatted
+    finally:
+        server.close()

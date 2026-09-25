@@ -81,20 +81,44 @@ def test_PL_02_google_adapter_conforms_to_model_provider(fake_genai_sdk):
 
 
 def test_PL_02_google_adapter_generate_returns_structured_json_output(fake_genai_sdk):
-    """PL-02 "structured output": the profile declares Capability.JSON and
-    the model's JSON text comes back through `GenerateResponse.text`
-    unmodified -- valid, parseable JSON, not corrupted by the adapter."""
+    """PL-02 "structured output": `GenerateRequest.response_schema` must
+    reach the SDK as `GenerateContentConfig(response_mime_type=
+    "application/json", response_schema=...)` -- not merely pass unmodified
+    JSON text through, which a caller with no way to ask for JSON at all
+    would also satisfy."""
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "population": {"type": "integer"}},
+    }
     payload = '{"name": "Singapore", "population": 5700000}'
     models_api = FakeModelsAPI(generate_content_result=FakeGenerateContentResponse(text=payload))
     provider = _provider(models_api, profile=_profile(caps=["json"]))
 
-    response = provider.generate(GenerateRequest(prompt="Describe Singapore as JSON."))
+    response = provider.generate(GenerateRequest(prompt="Describe Singapore as JSON.", response_schema=schema))
 
     assert response.text == payload
     assert json.loads(response.text) == {"name": "Singapore", "population": 5700000}
     assert response.profile_id == "flash-38"
     call = models_api.calls[0]
     assert call["model"] == "gemini-3.8-flash", "PL-01: the profile's model id, never hardcoded"
+    config = call["config"]
+    assert config is not None, "PL-02: structured output must reach the SDK's GenerateContentConfig"
+    assert config.response_mime_type == "application/json"
+    assert config.response_schema == schema
+
+
+def test_PL_02_google_adapter_generate_json_mode_without_a_schema(fake_genai_sdk):
+    """PL-02 JSON mode with no schema (`json_mode=True`, no
+    `response_schema`) still sets `response_mime_type` on the SDK config."""
+    models_api = FakeModelsAPI(generate_content_result=FakeGenerateContentResponse(text="{}"))
+    provider = _provider(models_api, profile=_profile(caps=["json"]))
+
+    provider.generate(GenerateRequest(prompt="Reply with JSON.", json_mode=True))
+
+    config = models_api.calls[0]["config"]
+    assert config is not None
+    assert config.response_mime_type == "application/json"
+    assert not hasattr(config, "response_schema")
 
 
 def test_PL_02_google_adapter_generate_maps_a_tool_call(fake_genai_sdk):
