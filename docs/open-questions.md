@@ -20,8 +20,8 @@ Questions found while building. Each has the default we build on until the user 
 
 | ID | Answer | Date |
 | --- | --- | --- |
-| BQ-05 | Google Cloud billing is temporarily unavailable. Build local-first on emulators; live model tests may use NVIDIA NIM through the OpenAI-compatible adapter; apply `infra/` later (ADR-0003). | 2026-09-26 |
-| BQ-06 | Yes: Tilo's own design prototypes may be ported; `support.js` never (ADR-0003). | 2026-09-26 |
-| BQ-10 | PRD 18.2 values win (user go-ahead on the default). | 2026-09-26 |
-| BQ-11 | Colours taken from the exports' own palette: `policy` #0E8A87 (lip #0A6664), `signal.gate` #5A5768, `ink.3` #66717A. User may override (ADR-0003). | 2026-09-26 |
-| Repo | Private GitHub repository `spark-456/tilo`; not public for now. | 2026-09-26 |
+| BQ-05 | Google Cloud billing is temporarily unavailable. Build local-first on emulators; live model tests may use NVIDIA NIM through the OpenAI-compatible adapter; apply `infra/` later (ADR-0003). | 2026-09-25 |
+| BQ-06 | Yes: Tilo's own design prototypes may be ported; `support.js` never (ADR-0003). | 2026-09-25 |
+| BQ-10 | PRD 18.2 values win (user go-ahead on the default). | 2026-09-25 |
+| BQ-11 | Colours taken from the exports' own palette: `policy` #0E8A87 (lip #0A6664), `signal.gate` #5A5768, `ink.3` #66717A. User may override (ADR-0003). | 2026-09-25 |
+| Repo | Private GitHub repository `spark-456/tilo`; not public for now. | 2026-09-25 |

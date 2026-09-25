@@ -1,6 +1,6 @@
 # ADR-0003: Local-first build, NVIDIA NIM for live tests, private repo, design-code porting
 
-- Status: Accepted (2026-09-26, user decisions)
+- Status: Accepted (2026-09-25, user decisions)
 - Deciders: product owner, orchestrator
 
 ## Context
