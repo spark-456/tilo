@@ -1,34 +1,25 @@
 # packages/metering — `tilo_metering`
 
 ## Purpose
-Credits and the Treasury (PRD 14.1, 14.5): a versioned, immutable price book, the metering
-config, and the flag store the kill switch (NFR-24) and claims-freeze (P8-04) use. P8-01a
-builds the package skeleton only — `MeteringConfig`, `PriceBook`, `PriceQuote`, `Usage`,
-`FlagStore`/`InMemoryFlagStore` and the two error types. The `Treasury` (reserve/commit/
-release/grant, the ledger, the caps and the kill switch) is P8-01b/c.
+Credits and the Treasury (PRD 14.1, 14.5). P8-01a builds the skeleton only: `MeteringConfig`, `PriceBook`,
+`PriceQuote`, `Usage`, `FlagStore`/`InMemoryFlagStore` and the two errors. The `Treasury` is P8-01b/c.
 
 ## Commands
-- `uv run --package tilo-metering pytest` — tests (`packages/metering/tests`)
-- `just check` — full gate (fmt, lint, typecheck, tests) from the repo root
+- `uv run --package tilo-metering pytest` — tests; `just check` — full gate from the repo root
 
-## Contracts
-- Reads: `contracts/providers.schema.json` `$defs.prices`, via `tilo_contracts.ProvidersPrices`
-  (`PriceBook.load` validates every prices file against it). No event contract dependency.
-
-## Config
-- `config/prices.yaml` (PL-06; owned by S0, already lands with `status: unset`).
-- `config/metering.yaml` does not exist yet (contract-change issue #7, S0's batch CC-SE):
-  `MeteringConfig.load` takes an explicit path and is a **local stub** until then. Tests use
-  `packages/metering/tests/data/metering.stub.yaml` (PRD 14.1/14.5 demo defaults) in place of
-  the repo path.
+## Contracts and config
+- Reads `contracts/providers.schema.json` `$defs.prices` via `tilo_contracts.ProvidersPrices` (strict). No events.
+- `config/prices.yaml` (PL-06, owned by S0) stays `status: unset`.
+- `config/metering.yaml` does not exist yet (contract change #7, batch CC-SE): `MeteringConfig.load` is a local
+  stub; tests use `tests/data/metering.stub.yaml` (PRD 14.1/14.5 demo defaults).
 
 ## Requirement IDs
-- FR-MTR-01 (this ticket, part a): credit unit, prices from config with date and source,
-  refuse rather than guess, no mutation API.
+- FR-MTR-01 (part a): credit unit, dated and sourced prices from config, refuse rather than guess, no mutation API.
 
 ## Local rules
 - No model id, prompt text or secret here (PL-01). No dependency on `tilo-providers`.
-- `PriceBook` is immutable: frozen dataclasses only, no setters, no environment overrides.
-- `PriceBook.quote`/`credits` raise `UnpricedError` rather than falling back to a guess.
-- `MeteringConfig.load` raises `MeteringConfigError` on a missing file, an unknown key, an
-  out-of-range value, or `daily_usd_hard < daily_usd_soft`; it never invents a default.
+- `PriceBook` is immutable: frozen dataclasses, no setters, no environment overrides.
+- `quote`/`credits` use the latest version effective at the date, whatever its status, and raise
+  `UnpricedError` if it is unset or the price is null; they never fall back to an older price.
+- Every price, cap, limit and ratio goes through `errors.number` (int or float, not bool or string, finite).
+- Both loaders turn any unreadable, malformed or invalid file into `MeteringConfigError` naming the path.

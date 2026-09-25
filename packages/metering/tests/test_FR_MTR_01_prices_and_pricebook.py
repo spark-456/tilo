@@ -1,70 +1,42 @@
-"""FR-MTR-01 (PRD 14.5, 14.1, 6.4 PL-06): 1 credit = US$0.005 at standard prices,
-with a date and source; refuse rather than guess. Treasury tests stay on tests/P8-01 for P8-01b/c."""
-
-from __future__ import annotations
+"""FR-MTR-01 (PRD 14.5, 14.1, 6.4 PL-06): 1 credit = US$0.005 with a price date and source; refuse, never guess."""
 
 from datetime import UTC, datetime
 
 import pytest
 import yaml
-from _metering_testlib import PRICES_V1, PRICES_V2, REPO_ROOT, write_prices_file
-from tilo_metering import MeteringConfig, MeteringConfigError, PriceBook, UnpricedError, Usage
+from _metering_testlib import PRICES_V1, PRICES_V2, REPO_ROOT, metering_config, write_yaml
+from tilo_metering import InMemoryFlagStore, MeteringConfig, MeteringConfigError, PriceBook, UnpricedError
+from tilo_metering.prices import PriceQuote, Usage
+
+_MAR, _JUN, _SEP = (datetime(2026, month, 1, 12, tzinfo=UTC) for month in (3, 6, 9))
 
 
-def _at(year: int, month: int, day: int) -> datetime:
-    return datetime(year, month, day, 12, 0, tzinfo=UTC)
+def _book(tmp_path, *docs: dict) -> PriceBook:
+    return PriceBook.load(*(write_yaml(tmp_path, f"prices_{i}.yaml", doc) for i, doc in enumerate(docs)))
 
 
 def test_FR_MTR_01_two_price_versions_priced_by_effective_date(tmp_path):
     """Before the second version's effective_date: old rate. On or after it: new rate."""
-    v1_path = write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1)
-    v2_path = write_prices_file(tmp_path, "prices_v2.yaml", PRICES_V2)
-    book = PriceBook.load(v1_path, v2_path)
-    before = book.quote("widget", at=_at(2026, 3, 1))
-    on_boundary = book.quote("widget", at=_at(2026, 6, 1))
-    after = book.quote("widget", at=_at(2026, 9, 1))
-    assert before.input == pytest.approx(1.0)
-    assert before.output == pytest.approx(2.0)
-    assert before.effective_date == "2026-01-01"
-    assert before.source == PRICES_V1["source"]
-
-    for quote in (on_boundary, after):
-        assert quote.input == pytest.approx(3.0)
-        assert quote.output == pytest.approx(6.0)
-        assert quote.effective_date == "2026-06-01"
-        assert quote.source == PRICES_V2["source"]
+    book = _book(tmp_path, PRICES_V1, PRICES_V2)
+    assert book.quote("widget", at=_MAR) == PriceQuote("widget", 1.0, 2.0, "2026-01-01", PRICES_V1["source"])
+    for at in (_JUN, _SEP):
+        assert book.quote("widget", at=at) == PriceQuote("widget", 3.0, 6.0, "2026-06-01", PRICES_V2["source"])
 
 
-def test_FR_MTR_01_newest_unset_version_refuses(tmp_path):
-    """Greatest effective_date <= at wins even if unset: refuse, don't fall back to a stale price."""
-    v1_path = write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1)
-    v2_path = write_prices_file(tmp_path, "prices_v2.yaml", {**PRICES_V2, "status": "unset", "source": None})
-    book = PriceBook.load(v1_path, v2_path)
-    with pytest.raises(UnpricedError):
-        book.quote("widget", at=_at(2026, 9, 1))
-
-
-def test_FR_MTR_01_quote_before_any_version_effective_refuses(tmp_path):
-    """Refuse, never guess: no version effective yet."""
-    v1_path = write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1)
-    book = PriceBook.load(v1_path)
-    with pytest.raises(UnpricedError):
-        book.quote("widget", at=_at(2025, 1, 1))
-
-
-def test_FR_MTR_01_quote_unknown_profile_refuses(tmp_path):
-    v1_path = write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1)
-    book = PriceBook.load(v1_path)
-    with pytest.raises(UnpricedError):
-        book.quote("ghost-profile", at=_at(2026, 3, 1))
+def test_FR_MTR_01_refuses_rather_than_guesses(tmp_path):
+    """A set v1 then an unset v2 with a date: from v2's date refuse, never fall back to v1's price.
+    Also refuse before any version is effective, and for an unknown profile."""
+    book = _book(tmp_path, PRICES_V1, {**PRICES_V2, "status": "unset", "source": None})
+    assert book.quote("widget", at=_MAR).input == pytest.approx(1.0)
+    for profile, at in (("widget", _JUN), ("widget", _SEP), ("widget", datetime(2025, 1, 1)), ("ghost", _MAR)):
+        with pytest.raises(UnpricedError):
+            book.quote(profile, at=at)
 
 
 def test_FR_MTR_01_credits_uses_versioned_price_and_credit_usd(tmp_path):
     """credits = (tokens_in*input + tokens_out*output) / 1e6 / credit_usd."""
-    v1_path = write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1)
-    book = PriceBook.load(v1_path)
-    usage = Usage(profile="widget", tokens_in=1_000_000, tokens_out=1_000_000)
-    credits = book.credits(usage, at=_at(2026, 3, 1))
+    book = _book(tmp_path, PRICES_V1)
+    credits = book.credits(Usage(profile="widget", tokens_in=1_000_000, tokens_out=1_000_000), at=_MAR)
     assert credits == pytest.approx(600.0)  # (1e6*1.0 + 1e6*2.0) / 1e6 / 0.005
     assert book.credit_usd == pytest.approx(0.005)
 
@@ -77,20 +49,21 @@ def test_FR_MTR_01_repo_prices_yaml_loads_and_refuses_every_profile():
     assert raw["credit_usd"] == pytest.approx(0.005)  # PRD 14.1
     book = PriceBook.load(prices_path)
     assert book.credit_usd == pytest.approx(0.005)
-    now = datetime.now(tz=UTC)
     for profile in raw["profiles"]:
         with pytest.raises(UnpricedError):
-            book.quote(profile, at=now)
+            book.quote(profile, at=datetime.now(tz=UTC))
 
 
-def test_FR_MTR_01_pricebook_has_no_mutation_api(tmp_path):
-    """Immutable: no setters, no environment overrides, no mutation API."""
-    v1_path = write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1)
-    book = PriceBook.load(v1_path)
+def test_FR_MTR_01_pricebook_is_deeply_immutable(tmp_path):
+    """No setters, no environment overrides, no mutation API, no mutable price table."""
+    book = _book(tmp_path, PRICES_V1)
     for blocked_name in ("set", "set_price", "update", "override", "mutate", "set_env_override", "save"):
         assert not hasattr(book, blocked_name), f"PriceBook must expose no mutation API, found `{blocked_name}`"
     with pytest.raises(AttributeError):
-        book.credit_usd = 0.01
+        book.credit_usd = 0.01  # type: ignore[misc]
+    with pytest.raises(TypeError):
+        book.versions[0].profiles["widget"] = (0.0, 0.0)  # type: ignore[index]
+    assert book.quote("widget", at=_MAR).input == pytest.approx(1.0)
 
 
 _BAD = [{"credit_usd": 0.05}, {"credit_usd": 0}, {"credit_usd": "0.005"}, {"effective_date": None}, {"source": None}]
@@ -100,43 +73,46 @@ _NULL_PRICE = {"profiles": {"widget": {"input": None, "output": 2.0}}}
 @pytest.mark.parametrize("override", [*_BAD, _NULL_PRICE])
 def test_FR_MTR_01_load_rejects_files_the_schema_rejects(tmp_path, override):
     with pytest.raises(MeteringConfigError):
-        PriceBook.load(write_prices_file(tmp_path, "bad.yaml", {**PRICES_V1, **override}))
+        _book(tmp_path, {**PRICES_V1, **override})
 
 
 def test_FR_MTR_01_load_rejects_duplicate_effective_dates(tmp_path):
-    other = {**PRICES_V2, "effective_date": PRICES_V1["effective_date"]}
     with pytest.raises(MeteringConfigError):
-        PriceBook.load(write_prices_file(tmp_path, "a.yaml", PRICES_V1), write_prices_file(tmp_path, "b.yaml", other))
+        _book(tmp_path, PRICES_V1, {**PRICES_V2, "effective_date": PRICES_V1["effective_date"]})
 
 
-def test_FR_MTR_01_loaded_prices_are_deeply_immutable(tmp_path):
-    book = PriceBook.load(write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1))
-    with pytest.raises(TypeError):
-        book.versions[0].profiles["widget"] = (0.0, 0.0)  # type: ignore[index]
-    assert book.quote("widget", at=_at(2026, 3, 1)).input == pytest.approx(1.0)
+_BROKEN = {"malformed": b"a: [\n", "not-utf8": b"treasury: caf\xe9\n", "deep": b"a: " + b"[" * 2000 + b"]" * 2000}
+_NUMBERS = {"400-digits": "1" + "0" * 399, "inf": ".inf", "nan": ".nan", "bool": "true", "string": "'1.5'"}
+_LOADERS: dict = {"prices": (PriceBook.load, PRICES_V1, "input: 1.0")}
+_LOADERS["metering"] = (MeteringConfig.load, metering_config(daily_usd_soft=15, daily_usd_hard=25), "run_credits: 300")
 
 
-def test_FR_MTR_01_usage_rejects_negative_token_counts():
-    for tokens_in, tokens_out in ((-1, 0), (0, -1)):
+@pytest.mark.parametrize("loader", _LOADERS)
+@pytest.mark.parametrize("case", [*_BROKEN, *_NUMBERS, "missing", "directory", "null-in-path"])
+def test_FR_MTR_01_loaders_refuse_bad_files(tmp_path, loader, case):
+    load, doc, field = _LOADERS[loader]
+    load(write_yaml(tmp_path, "ok.yaml", doc))  # the unbroken document loads
+    path = {"directory": tmp_path, "null-in-path": tmp_path / "a\0b.yaml"}.get(case, tmp_path / "bad.yaml")
+    if case in _BROKEN:
+        path.write_bytes(_BROKEN[case])
+    elif case in _NUMBERS:
+        assert field in (valid := yaml.safe_dump(doc, sort_keys=False))
+        path.write_text(valid.replace(field, f"{field.split(':')[0]}: {_NUMBERS[case]}"), encoding="utf-8")
+    with pytest.raises(MeteringConfigError):
+        load(path)
+
+
+def test_FR_MTR_01_flag_store_and_usage_reject_bad_values():
+    flags = InMemoryFlagStore()
+    for bad in (1, "true", None):
+        with pytest.raises(TypeError):
+            flags.set("replay_only", bad, reason="test")  # type: ignore[arg-type]
+    assert flags.get("replay_only") is False
+    flags.set("replay_only", True, reason="test")
+    assert flags.get("replay_only") is True and [c[0] for c in flags.history("replay_only")] == [True]
+    for tokens in (True, 1.0, "1", None):
+        with pytest.raises(TypeError):
+            Usage("widget", tokens, 0)  # type: ignore[arg-type]
+    for tokens_in, tokens_out in ((-1, 0), (0, -1), (0, 10**400)):
         with pytest.raises(ValueError):
             Usage("widget", tokens_in, tokens_out)
-
-
-@pytest.mark.parametrize("load", [PriceBook.load, MeteringConfig.load])
-def test_FR_MTR_01_loaders_refuse_malformed_yaml(tmp_path, load):
-    (bad := tmp_path / "bad.yaml").write_text("a: [\n", encoding="utf-8")
-    with pytest.raises(MeteringConfigError):
-        load(bad)
-
-
-@pytest.mark.parametrize("load", [PriceBook.load, MeteringConfig.load])
-def test_FR_MTR_01_loaders_refuse_non_utf8_file(tmp_path, load):
-    (bad := tmp_path / "m.yaml").write_bytes(b"treasury: caf\xe9\n")
-    with pytest.raises(MeteringConfigError):
-        load(bad)
-
-
-@pytest.mark.parametrize("name", ["nope.yaml", "."])
-def test_FR_MTR_01_pricebook_refuses_missing_prices_file(tmp_path, name):
-    with pytest.raises(MeteringConfigError):
-        PriceBook.load(tmp_path / name)

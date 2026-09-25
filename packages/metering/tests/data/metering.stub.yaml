@@ -1,6 +1,4 @@
-# Stub for config/metering.yaml (contract-change #7, S0 lands the real file
-# in batch CC-SE): the PRD 14.1 / 14.5 demo defaults, se-spec.md "Config
-# files (new)" shape.
+# Stub for config/metering.yaml (contract change #7, batch CC-SE): the PRD 14.1 / 14.5 demo defaults.
 treasury: { reserve_margin: 0.15, request_at: 0.80 }
 caps: { run_credits: 300, user_day_credits: 1500, org_day_credits: null }
 spend: { daily_usd_soft: 15, daily_usd_hard: 25 }

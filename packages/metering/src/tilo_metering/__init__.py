@@ -5,13 +5,5 @@ from .errors import MeteringConfigError, UnpricedError
 from .flags import FlagStore, InMemoryFlagStore
 from .prices import PriceBook, PriceQuote, Usage
 
-__all__ = [
-    "FlagStore",
-    "InMemoryFlagStore",
-    "MeteringConfig",
-    "MeteringConfigError",
-    "PriceBook",
-    "PriceQuote",
-    "UnpricedError",
-    "Usage",
-]
+__all__ = ["FlagStore", "InMemoryFlagStore", "MeteringConfig", "MeteringConfigError"]
+__all__ += ["PriceBook", "PriceQuote", "UnpricedError", "Usage"]
