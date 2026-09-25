@@ -1618,7 +1618,11 @@ def _stale_world_paused_part() -> dict:
 
 
 def test_FR_HIL_07_malformed_scope_stop_all_never_500s_and_reaches_l1(client, store):
-    store.worlds[WORLD] = make_world(owner=OWNER)
+    # A world with at least one real district: policy_vis's `if not world_districts: return "all"`
+    # short-circuits on an empty layout *before* ever reaching the intersection line that raises on
+    # a non-string scope.districts entry -- an empty-districts world would never actually exercise
+    # the bug this test exists to pin.
+    store.worlds[WORLD] = make_world(owner=OWNER, districts={"D9": make_district("Ops", "test district")})
     store.policies["pol_malformed"] = _policy_with_malformed_scope(id_="pol_malformed")
     store.policy_worlds["pol_malformed"] = WORLD
     ok_ids = []
@@ -1649,7 +1653,9 @@ def test_FR_HIL_07_malformed_scope_pause_all_writes_a_pending_world_paused_exact
     """A world.paused an earlier call already built and left pending must still be written exactly
     once even when this call's own owned-policy scan also includes a policy with a malformed
     scope."""
-    store.worlds[WORLD] = make_world(owner=OWNER, paused=True)  # the earlier call already flipped this
+    store.worlds[WORLD] = make_world(  # the earlier call already flipped `paused`
+        owner=OWNER, paused=True, districts={"D9": make_district("Ops", "test district")}
+    )
     store.policies["pol_malformed"] = _policy_with_malformed_scope(id_="pol_malformed")
     store.policy_worlds["pol_malformed"] = WORLD
     store.pending_events[WORLD] = [_stale_world_paused_part()]
@@ -1672,7 +1678,7 @@ def test_FR_HIL_07_malformed_scope_pause_all_never_loses_a_pending_part_when_the
     """Same setup, but the writer cannot accept anything this call either: the pre-existing pending
     part must be put back (still pending, not lost) rather than vanishing because a malformed
     policy raised after it had already been popped from store.pending_events."""
-    store.worlds[WORLD] = make_world(owner=OWNER, paused=True)
+    store.worlds[WORLD] = make_world(owner=OWNER, paused=True, districts={"D9": make_district("Ops", "test district")})
     store.policies["pol_malformed"] = _policy_with_malformed_scope(id_="pol_malformed")
     store.policy_worlds["pol_malformed"] = WORLD
     store.pending_events[WORLD] = [_stale_world_paused_part()]
@@ -1694,7 +1700,7 @@ def test_FR_HIL_07_malformed_scope_pause_all_never_loses_a_pending_part_when_the
 
 
 def test_FR_HIL_07_malformed_scope_revoke_never_500s_and_reaches_l1(client, store, writer):
-    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.worlds[WORLD] = make_world(owner=OWNER, districts={"D9": make_district("Ops", "test district")})
     store.policies["pol_malformed"] = _policy_with_malformed_scope(id_="pol_malformed")
     store.policy_worlds["pol_malformed"] = WORLD
     as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))

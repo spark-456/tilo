@@ -237,21 +237,26 @@ def make_principal(
     role: str = "owner",
     world_id: str | None = WORLD,
     domain: str | None = None,
-    channel: str = "web",
+    channel: str | None = None,
     districts: tuple[str, ...] = (),
 ) -> deps.Principal:
     """world_id defaults to WORLD (this file's one fixture world) so every existing-owner-ish
     test is a member of the world it acts on without saying so; a test proving the round-1
     membership-oracle finding (ST-3a round 2) passes world_id=None or a different world's id
     explicitly. channel (round-6/ST-3a-2, API_ST3a.md "What changed since round 5" item 5, issue
-    #38 item 5) is the principal's own resolved session channel; it defaults to "web" like every
-    other channel default in this ticket. deps.Principal does not carry this field yet -- every
-    test that passes a non-default channel (or relies on this default at all, since it is passed
-    through unconditionally) fails with TypeError until the builder adds it, the same failure mode
-    ambiguity 4's WorldRecord.paused went through in round 4."""
-    return deps.Principal(
-        user_id=user_id, role=role, world_id=world_id, domain=domain, channel=channel, districts=districts
-    )
+    #38 item 5) is the principal's own resolved session channel; deps.Principal does not carry
+    this field yet. Left un-forwarded (None) by default on purpose, unlike every other keyword
+    here: every pre-existing call site knows nothing about channel and must keep building a
+    Principal exactly as it always has, undisturbed by a contract addition it has no reason to
+    care about -- forwarding a hard-coded default unconditionally would fail every single test in
+    this directory with the same TypeError, for the wrong reason, the moment this field is added
+    to this factory. Only a test that explicitly passes channel=... exercises (and, until the
+    builder adds the field, fails on) it; a test proving the *default* value (deps.Principal's
+    own "web") passes no channel here either, and instead asserts on the route's own output."""
+    kwargs: dict[str, Any] = dict(user_id=user_id, role=role, world_id=world_id, domain=domain, districts=districts)
+    if channel is not None:
+        kwargs["channel"] = channel
+    return deps.Principal(**kwargs)
 
 
 def as_principal(principal: deps.Principal):
@@ -538,7 +543,14 @@ class SlowHistoryPolicy(dict):
                 self._barrier.wait()
             except threading.BrokenBarrierError:
                 pass
+            # Capture the value *before* sleeping, then delay the return: whichever caller reads
+            # first captures the still-stale value and only then sleeps (releasing the GIL), giving
+            # the other caller its own chance to read that same stale value before either has
+            # written anything back -- delaying the *return* instead would let a caller's read
+            # happen only after the other has already written, hiding the race entirely.
+            value = super().get(key, default)
             time.sleep(self._delay_s)
+            return value
         return super().get(key, default)
 
 
