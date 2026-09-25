@@ -1,0 +1,19 @@
+---
+name: skill-checker-attacks
+description: FR-AGT-04 skill check.py fuzzing - input-side crashes, overflow, weak injection/commitment regexes; fuzz recipe
+metadata:
+  type: project
+---
+
+FR-AGT-04 round 1 (2026-09-25) FAILED: 9 of 10 skills/*/*/check.py raised TypeError when an id/category field was a list or dict, and email-triage's injection regex missed "ignore the previous instructions".
+
+Round 2 (2026-09-25) FAILED: output-side fixed, but builders only hardened `output`, not `inputs`. Still raising: unhashable input ids (price/quote/invoice/verification/deck), NaN in deck material text, and invoice-po-matching OverflowError on a schema-valid 400-digit quantity (float division at check.py ~107). Semantic misses: triage regex misses singular "instruction", "you are now", "System: new instructions"; reply-drafting commitment regex misses "5,000 dollars", "3 March", "tomorrow"; `to: []`, `subject: None`, `flags: [1]` pass.
+
+Round 3 (2026-09-25) FAILED: no raises left (fuzz.py leaf fuzzer clean), but semantic pass-garbage: price-comparison computes cheapest only from output-declared unit_prices, so omitting the cheap offer's row lets a dearer pick pass (check.py:143-145). Also pass: pick.source_id unchecked, invoice reason_code any type, table-extraction value/row_ref garbage, web-research claim None.
+
+Round 4 (2026-09-25) FAILED: leaf fuzzer (16 bad values x every leaf, inputs+outputs) found no raises. Still pass-garbage: email-reply-drafting `to: []` (or sender moved to cc) passes; checker only rejects unknown addresses, never requires to == [reply_to_sender] (check.py ~157). Also schema-valid omissions pass: quote-comparison missing totals rows, table-extraction dropped records/fields, exec-summary dropped claims.
+
+Round 5 (2026-09-25) FAILED: reply-drafting `to` fixed; fuzz.py (scratchpad) no raises. table-extraction check.py only compares value when it is numeric-cell or str-vs-str, so text cell "Widget" -> 42/False/null, "$3.50" -> 999999 all pass; float() parse also makes exact big ints fail. Also omissions: dropped records/claims/slides still pass.
+
+**Why:** Verifier (FR-AGT-12) runs these checkers; they must fail closed, never raise.
+**How to apply:** Fuzz BOTH inputs and outputs leaf by leaf (list/dict/None/NaN/10**400/huge strings); prove schema-validity with jsonschema + skill.yaml so the crash is not dismissable; paraphrase injection and commitment text. Then try OMISSION attacks: drop rows from output arrays (unit_prices, totals, records) and see if pick/recommendation checks still pass.

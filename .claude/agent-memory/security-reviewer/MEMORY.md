@@ -1,1 +1,4 @@
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); open: two tier sources
+- [Harness writer gaps](harness-writer-gaps.md): P0-09 r3 PASS, flagged: head counts + lease on client-facing world doc (10.1); ids `$` accepts trailing \n
+- [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r4 FAIL: card in >25-digit run unredacted; prefix-first window leaks; logs/JWT closed
+- [Skill checker gaps](skill-checker-gaps.md): FR-AGT-04 r5 FAIL: _EMAIL_RE ReDoS (50k chars 69 s), role header lost IGNORECASE; recall/commitment gaps persist
