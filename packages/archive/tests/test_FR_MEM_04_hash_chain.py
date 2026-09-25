@@ -379,3 +379,67 @@ def test_FR_MEM_04_cli_exits_1_and_names_problem_on_tampered_chain(archive, tmp_
     assert out["ok"] is False
     assert out["records"] == 3
     assert out["problems"]
+
+
+# ---------------------------------------------------------------------------
+# Fix-round-2 regression pins (code-reviewer, security-reviewer, qa-breaker).
+# ---------------------------------------------------------------------------
+
+
+def test_FR_MEM_04_int_keyed_payload_hash_stable_across_reopen(store):
+    # code-reviewer: the hash was computed over the in-memory payload before
+    # it went through canonical JSON, so a dict with non-str (e.g. int) keys
+    # hashed fine in memory (sort_keys compares 9 < 10 as ints) but, after a
+    # reopen, json.loads had turned those keys into the strings "9"/"10",
+    # which sort the other way -- a spurious "hash mismatch" on a record
+    # nobody tampered with, and a different head after reopening.
+    arch = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    arch.append("tool_call", {"rows": {10: "x", 9: "y"}})
+    head = arch.head()
+
+    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    assert reopened.head() == head
+
+    records = reopened.records()
+    assert verify_chain(records, expected_head=head) == []
+
+
+def _truncate_mid_append(jsonl_path) -> None:
+    # Simulates a process that died mid-`append`: a partial JSON object with
+    # no closing brace and no trailing newline, the same shape as the brief's
+    # repro ('{"v":"1.0","run_id":"r_1","se').
+    with jsonl_path.open("a", encoding="utf-8") as handle:
+        handle.write('{"v":"1.0","run_id":"r_1","se')
+
+
+def test_FR_MEM_04_cli_reports_truncated_tail_instead_of_crashing(tmp_path):
+    # qa-breaker: a run file whose last line was cut off mid-append crashed
+    # the CLI with an uncaught JSONDecodeError and no JSON output at all,
+    # breaking its own output contract.
+    store = LocalDirStore(tmp_path)
+    arch = RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())
+    for i in range(3):
+        arch.append("model_call", {"i": i})
+    jsonl_path = tmp_path / "org_a" / "r_1.jsonl"
+    _truncate_mid_append(jsonl_path)
+
+    result = _run_cli(jsonl_path)
+
+    assert result.returncode == 1
+    out = json.loads(result.stdout.strip().splitlines()[-1])
+    assert out == {"ok": False, "records": 3, "problems": ["seq 4 (line 4): unparseable or truncated record"]}
+
+
+def test_FR_MEM_04_reopen_raises_value_error_naming_truncated_line(tmp_path):
+    # qa-breaker: reopening a run with a truncated tail line raised a bare
+    # JSONDecodeError that did not name the record, instead of a ValueError
+    # naming the truncated tail line and appending nothing.
+    store = LocalDirStore(tmp_path)
+    arch = RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())
+    for i in range(3):
+        arch.append("model_call", {"i": i})
+    jsonl_path = tmp_path / "org_a" / "r_1.jsonl"
+    _truncate_mid_append(jsonl_path)
+
+    with pytest.raises(ValueError, match="line 4"):
+        RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())

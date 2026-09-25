@@ -51,10 +51,23 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # set (+ / ~ alongside - . _ and = padding).
     (re.compile(r'Authorization"?\s*:\s*"?Bearer\s+[A-Za-z0-9\-_.~+/=]+', re.IGNORECASE), "bearer_token"),
     # Anchored to the real JWT shape (header JSON always starts "{" -> "eyJ"
-    # once base64-encoded) with possessive quantifiers, so a non-JWT string
-    # with many word boundaries (e.g. "a-" repeated) cannot make the engine
-    # backtrack: it fails at the literal "eyJ" prefix check in linear time.
-    (re.compile(r"\beyJ[A-Za-z0-9_-]{5,}+\.[A-Za-z0-9_-]{5,}+\.[A-Za-z0-9_-]{5,}+\b"), "jwt"),
+    # once base64-encoded). "\b" alone is not enough to keep this linear:
+    # since "-" is itself in the segment class below, "\b" still matches at
+    # every "eyJ" that immediately follows a "-", so on adversarial input
+    # like "eyJ-" repeated many times a new match attempt restarts at every
+    # occurrence; even with possessive quantifiers (no backtracking within
+    # one attempt), each attempt was unbounded ("{5,}+") and so scanned all
+    # the way to the end of the remaining text before failing -- O(attempts
+    # x remaining length), i.e. quadratic. Bounding each segment to a
+    # generous but finite width (1024 -- past the longest signature a real
+    # JWT produces, RS512's ~683 base64 chars, with headroom) caps the work
+    # of *every* attempt, matched or not, to O(1024) regardless of how much
+    # text follows: total cost is O(text length), not O(text length^2). A
+    # tighter start anchor (e.g. rejecting "eyJ" preceded by another
+    # class character) was considered instead, but it would also reject a
+    # genuine JWT glued directly onto an identifier (e.g. "trace-eyJ..."),
+    # which this redactor must still catch.
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{5,1024}+\.[A-Za-z0-9_-]{5,1024}+\.[A-Za-z0-9_-]{5,1024}+\b"), "jwt"),
 ]
 
 # 13-25 raw digits (spaces/dashes allowed as separators): wide enough to also

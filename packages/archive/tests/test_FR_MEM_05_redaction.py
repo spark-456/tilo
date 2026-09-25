@@ -541,3 +541,34 @@ def test_FR_MEM_05_find_secrets_fails_closed_on_oversize_text():
     # opposite of fail-closed (an empty list reads as "nothing found").
     kinds = redact_mod.find_secrets("a" * (redact_mod.MAX_SCAN_CHARS + 1))
     assert kinds == ["oversize"]
+
+
+# ---------------------------------------------------------------------------
+# Fix-round-2: the JWT pattern was still quadratic despite the round-1 "\b"
+# anchor, because "-" is itself in the possessive class that follows "eyJ",
+# so "\b" still matched at every "eyJ" preceded by a "-" -- a new match
+# attempt restarted at each one and re-scanned the long tail. Text at or
+# under MAX_SCAN_CHARS (so it is actually scanned, not short-circuited by
+# the oversize guard) stays linear-time.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "eyJ-" * 250_000,  # exactly 1,000,000 chars: prefix + hyphen separator
+        "eyJ_" * 250_000,  # "_" is also in the possessive class
+    ],
+    ids=["eyJ-dash-separator", "eyJ-underscore-separator"],
+)
+def test_FR_MEM_05_jwt_pattern_is_linear_time_on_eyJ_prefix_runs(text):
+    assert len(text) <= redact_mod.MAX_SCAN_CHARS, "must stay scannable, not hit the oversize short-circuit"
+
+    start = time.perf_counter()
+    redact_mod.redact({"m": text})
+    elapsed = time.perf_counter() - start
+
+    # Generous, slack-padded bound: this pins "does not blow up
+    # quadratically" (the old pattern took roughly 12 minutes here on a 1 MB
+    # string), not a tight perf target, so it does not flake under CI load.
+    assert elapsed < 8.0, f"redact() took {elapsed:.2f}s on a 1 MB run of 'eyJ' prefixes"

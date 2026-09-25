@@ -52,6 +52,22 @@ class LocalDirStore:
             return [line for line in handle.read().splitlines() if line.strip()]
 
 
+def _parse_records(lines: list[str]) -> list[dict]:
+    """Parses each stored line as JSON, in order. Raises ValueError naming
+    the first unparseable line -- typically a truncated tail left by a
+    process that died mid-append -- instead of letting a bare
+    JSONDecodeError propagate or silently dropping/partially loading a
+    corrupted run. Nothing is returned on failure: the caller's constructor
+    never completes, so no records are appended on top of a broken chain."""
+    records: list[dict] = []
+    for i, line in enumerate(lines, start=1):
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"unparseable or truncated record at line {i}: {exc}") from exc
+    return records
+
+
 class RunArchive:
     """Appends redacted, hash-chained records for one run. Reopening (a new
     instance over the same store/org/run) continues the chain from the head."""
@@ -69,7 +85,7 @@ class RunArchive:
         self._org_id = org_id
         self._run_id = run_id
         self._clock = clock or (lambda: datetime.now(UTC))
-        self._records: list[dict] = [json.loads(line) for line in store.read_lines(org_id, run_id)]
+        self._records: list[dict] = _parse_records(store.read_lines(org_id, run_id))
 
     def append(self, kind: str, payload: object) -> str:
         if kind not in VALID_KINDS:
@@ -86,6 +102,17 @@ class RunArchive:
             "prev_hash": prev_hash,
         }
         try:
+            # Round-trip the payload through the same canonical-JSON form it
+            # will be stored and re-read as (e.g. a dict's non-str keys, such
+            # as ints, become JSON object string keys) *before* hashing, so
+            # the bytes that get hashed here are identical to the bytes a
+            # later reopen/verify will re-derive from the stored line. Without
+            # this, a payload like {"rows": {10: "x", 9: "y"}} hashes fine in
+            # memory (sort_keys compares 9 < 10 as ints) but, after a reopen,
+            # json.loads has turned those keys into the strings "10" and "9",
+            # which sort the other way -- a spurious hash mismatch on a
+            # record nobody tampered with.
+            record["payload"] = json.loads(canonical_json(record["payload"]))
             record["hash"] = record_hash(record)
             line = canonical_json(record)
         except (TypeError, ValueError) as exc:
