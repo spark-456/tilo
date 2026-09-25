@@ -23,6 +23,9 @@ class Principal:
     world_id: str | None = None  # the one world this principal is a member of; a mismatch with
     # the path's world_id gets the same 404 as an unknown world (no membership oracle)
     domain: str | None = None  # team_lead's PRD 8.3 expert domain
+    channel: str = "web"  # common.schema.json#/$defs/channel: the caller's own resolved session
+    # channel (round 6). world.paused.data.channel is taken from here, never the request body,
+    # so a caller cannot claim a confirmation channel it is not actually on.
     districts: tuple[str, ...] = ()  # visible beyond vis: "all"; ignored for role == "owner"
 
 

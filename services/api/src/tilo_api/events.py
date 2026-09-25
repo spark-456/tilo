@@ -20,7 +20,10 @@ def now() -> str:
 def policy_vis(policy: dict, world_districts: dict[str, Any] | None) -> Any:
     """EV-13: the intersection of scope.districts with the *target* world's own layout (a policy
     carries no world_id of its own, so its scope may name a foreign district). Missing/malformed
-    scope, no layout to intersect against, or an empty intersection all fall back to "all"."""
+    scope, no layout to intersect against, or an empty intersection all fall back to "all". A
+    non-string entry in scope.districts (round 6: a malformed stored record, not just a foreign
+    id) is skipped, never raises -- `d in world_districts` on an unhashable value would otherwise
+    abort the whole kill switch."""
     if not world_districts:
         return "all"
     scope = policy.get("scope")
@@ -29,7 +32,7 @@ def policy_vis(policy: dict, world_districts: dict[str, Any] | None) -> Any:
     districts = scope.get("districts")
     if not isinstance(districts, list) or not districts:
         return "all"
-    intersection = [d for d in districts if d in world_districts]
+    intersection = [d for d in districts if isinstance(d, str) and d in world_districts]
     return intersection if intersection else "all"
 
 
