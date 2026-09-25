@@ -31,7 +31,7 @@ SECRET_PATTERNS = [
 ]
 
 SHELL_RULES = [
-    (r"\bgit\s+push\b.*(\s--force\b|\s-f\b|\s--force-with-lease\b|\s\+\S)", "force pushes are never allowed; ask the user"),
+    (r"\bgit\s+push\b[^;&|\r\n]*(\s--force\b|\s-f\b|\s--force-with-lease\b|\s\+\S)", "force pushes are never allowed; ask the user"),
     (r"\bgh\s+repo\s+(create|edit)\b.*(--public\b|--visibility[= ]public\b)",
      "the repository stays private until the user says otherwise"),
     (r"\bgh\s+repo\s+delete\b", "deleting the repository needs the user"),
