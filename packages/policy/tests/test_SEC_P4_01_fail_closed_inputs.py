@@ -519,3 +519,46 @@ def test_FR_HIL_03_PI_06_an_invalid_owner_policy_scoped_elsewhere_does_not_block
     elsewhere = _l3(id_="pol_a", connectors=("slack",))
     elsewhere["limits"]["per_day"] = None
     assert _decide(table, _status_proposal(), [elsewhere, _l3_b()]).outcome == "run"
+
+
+def _l0_a():
+    return _l3(
+        id_="pol_a", level="L0", history=[{"by": OWNER, "at": "2026-09-29T09:30:00.000Z", "change": "c", "level": "L0"}]
+    )
+
+
+BAD_SCOPE_VALUES = {
+    "mixed_case_domain": ("domains", ["Example.ORG"]),
+    "lowercase_district": ("districts", ["d1"]),
+    "capital_connector": ("connectors", ["Gmail"]),
+    "padded_connector": ("connectors", ["gmail "]),
+    "empty_connectors": ("connectors", []),
+    "dict_in_list": ("recipients", [{"email": "teammate@example.org"}]),
+}
+
+
+@pytest.mark.parametrize("name", sorted(BAD_SCOPE_VALUES))
+def test_FR_HIL_03_PI_06_a_scope_with_one_bad_value_never_clearly_misses(name, risk_table_path):
+    """Only a scope that conforms to policy.schema.json#/$defs/scope can 'clearly miss' a send; an
+    L0 policy with one bad scope value plus a valid L3 policy never runs."""
+    field, value = BAD_SCOPE_VALUES[name]
+    a = _l0_a()
+    a["scope"][field] = value
+    for order in ([a, _l3_b()], [_l3_b(), a]):
+        assert _decide(_table(risk_table_path), _status_proposal(), order).outcome != "run", name
+
+
+def test_FR_HIL_03_PI_06_an_extra_scope_key_never_clearly_misses(risk_table_path):
+    a = _l0_a()
+    a["scope"]["except_connectors"] = ["gmail"]
+    assert _decide(_table(risk_table_path), _status_proposal(), [a, _l3_b()]).outcome != "run"
+
+
+@pytest.mark.parametrize("field,value", [("action_type", None), ("action_type", 7), ("owner", None), ("owner", "")])
+def test_FR_HIL_03_PI_06_a_policy_with_an_unreadable_action_or_owner_gates(field, value, risk_table_path):
+    """A record whose action type or owner cannot be read might be this owner's policy for this
+    action, so it cannot be ruled out: the decision gates."""
+    a = _l0_a()
+    a[field] = value
+    for order in ([a, _l3_b()], [_l3_b(), a]):
+        assert _decide(_table(risk_table_path), _status_proposal(), order).outcome == "gate"
