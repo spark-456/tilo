@@ -66,3 +66,12 @@ def evidence_from_case(case: dict) -> dict:
     """A crossref fixture case (or a hand-built equivalent) minus the keys Outbox.enqueue
     supplies itself (API.md: `{**evidence, "entry": entry, "transfer": None, "rule": None}`)."""
     return {k: v for k, v in case.items() if k not in ("rule", "note", "entry", "transfer")}
+
+
+def fresh_entry(entry: dict) -> dict:
+    """The entry as the harness writes it, before anything happens to it: a crossref fixture may
+    record an entry later in its life (sent, cancelled), but enqueue only ever takes a new one,
+    queued with no undo window or scheduled with one (OB-02)."""
+    fresh = copy.deepcopy(entry)
+    fresh["state"] = "scheduled" if fresh["undo_window_s"] > 0 else "queued"
+    return fresh
