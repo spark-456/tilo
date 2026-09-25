@@ -1,10 +1,13 @@
 """tilo_providers.factory — role -> `ModelProvider` factory (EFF-01, PRD
-6.6). `build_provider` resolves a role's primary profile: `provider: fake`
-always returns `FakeModelProvider` directly; every other profile returns a
+6.6). `build_provider` resolves a role's primary profile via
+`provider_for_role_profile`: `provider: fake` always returns
+`FakeModelProvider` directly; every other profile returns a
 `RecordReplayProvider`, whose real adapter is built lazily inside the
 `live_factory` closure only when a call actually goes live (`LIVE=1`).
 Nothing here imports an adapter module or builds a network client for a
-plain replay hit."""
+plain replay hit. The router (P0-06) calls `provider_for_role_profile`
+directly for every candidate profile in a cascade or fallback, keyed by
+(role, profile) so recordings stay grouped by role as before."""
 
 from __future__ import annotations
 
@@ -17,9 +20,9 @@ from tilo_providers.config import ProviderConfigError, ProvidersConfig
 from tilo_providers.interfaces import Capability, ModelProvider
 
 
-def build_provider(role_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str) -> ModelProvider:
-    role = config.roles[role_id]
-    profile_id = role.primary
+def provider_for_role_profile(
+    role_id: str, profile_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str
+) -> ModelProvider:
     profile = config.profiles[profile_id]
 
     if profile.provider == "fake":
@@ -39,6 +42,11 @@ def build_provider(role_id: str, config: ProvidersConfig, *, fixtures_dir: Path 
         fixtures_dir=Path(fixtures_dir),
         capabilities={Capability(c) for c in profile.caps},
     )
+
+
+def build_provider(role_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str) -> ModelProvider:
+    role = config.roles[role_id]
+    return provider_for_role_profile(role_id, role.primary, config, fixtures_dir=fixtures_dir)
 
 
 def _build_live_provider(profile: ProvidersProfile, profile_id: str) -> ModelProvider:
