@@ -28,13 +28,39 @@ import yaml
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
-BASE_URI = "https://contracts.tilo.example/"
 LAYOUT_ID = re.compile(r"^(A_[0-9A-Za-z_]+|[LDBGI][0-9]{1,4})$")
 
 # int64 range (Firestore's integer type, and every JSON consumer's safe integer ceiling for a
 # whole number): anything outside this is rejected below, same as a non-finite float.
 _INT64_MIN = -(2**63)
 _INT64_MAX = 2**63 - 1
+
+
+def _is_strict_python_int(_checker: Any, instance: Any) -> bool:
+    """qa-breaker, P0-09 round 4: JSON Schema's "integer" type is defined over JSON numbers ("a
+    JSON number with a zero fractional part"), so `jsonschema`'s stock Draft 2020-12 type
+    checker deliberately accepts a `float` such as `2.0` for `type: "integer"`
+    (`is_integer(checker, instance) or isinstance(instance, float) and instance.is_integer()`
+    in `jsonschema._types`) -- that is spec-correct for JSON Schema in general, but wrong for
+    this harness: `seq` (and every other "integer" field: `trace.tokens_in`, `.tokens_out`,
+    `.latency_ms`, and the "integer" fields inside `events/data/*.schema.json`) round-trips
+    through `MemoryStore` (which keeps the Python object as-is: seq 2.0 stored and compared with
+    `==`, silently equal to 2) and `FirestoreStore` (`f"{event['seq']:08d}"`, which raises a raw
+    `ValueError` for a float instead of the intended `EventRejected`) with different behaviour
+    per store. This narrows "integer" to a real Python `int` -- excluding `bool`, which is an
+    `int` subclass but never a legitimate value for any "integer"-typed field here -- so a float
+    seq (or any other float given where an "integer" is declared) fails schema validation with a
+    "schema: ..." problem and never reaches either store."""
+    return isinstance(instance, int) and not isinstance(instance, bool)
+
+
+# Same Draft 2020-12 validator class `jsonschema.Draft202012Validator` builds against, but with
+# "integer" redefined by `_is_strict_python_int` above instead of the spec's JSON-number-based
+# check -- built once at import time since a `TypeChecker`/validator class is immutable data.
+_StrictIntValidator = jsonschema.validators.extend(
+    jsonschema.Draft202012Validator,
+    type_checker=jsonschema.Draft202012Validator.TYPE_CHECKER.redefine("integer", _is_strict_python_int),
+)
 
 
 def _finiteness_problems(value: Any, path: str = "") -> list[str]:
@@ -113,6 +139,17 @@ def _is_send_of(cause: dict[str, Any] | None, delivered: dict[str, Any]) -> bool
     )
 
 
+class EventRejected(Exception):
+    """Raised by `WorldWriter.emit`/`.append` when an event fails `EventValidator.problems`;
+    nothing is written to any store. Public per the ticket brief at `tilo_harness.validator`
+    (re-exported from `tilo_harness.writer`, where it also lives, for callers written against
+    that path)."""
+
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__("; ".join(problems) or "event rejected")
+        self.problems = problems
+
+
 class WorldState:
     """What the stream- and layout-dependent rules (EV-10..EV-14) need: the world's layout ids
     (EV-12, EV-13) plus, as events are observed, the last seq written and every earlier event of
@@ -161,11 +198,27 @@ class EventValidator:
         return cls(schemas, registry_data)
 
     def _schema_errors(self, name: str, instance: object) -> list[str]:
-        uri = f"{BASE_URI}{name}.schema.json"
-        validator = self._validator_cache.get(uri)
+        # qa-breaker, P0-09 round 4: this must NOT be `_StrictIntValidator({"$ref": uri}, ...)`.
+        # `jsonschema`'s `$ref`/`descend` handling re-derives the validator class for whatever
+        # the ref resolves to via `validators.validator_for(schema, default=cls)`, which reads
+        # that schema's *own* `$schema` keyword and only falls back to `cls` (our strict
+        # `_StrictIntValidator`) when the target has none. `event.schema.json` and every
+        # `events/data/*.schema.json` declare their own top-level `$schema`
+        # (`https://json-schema.org/draft/2020-12/schema`), so a `{"$ref": uri}` wrapper
+        # resolving straight to one of those roots silently evolves back to the plain
+        # `jsonschema.Draft202012Validator` -- our redefined "integer" type checker never runs,
+        # and a float `seq` like `2.0` passes. Fragment refs *within* a schema (this harness's
+        # only other use of `$ref`, e.g. `common.schema.json#/$defs/ulid`) resolve to a bare
+        # subschema with no `$schema` of its own, so those keep the strict checker -- only a
+        # ref straight to another schema *file's root* loses it. Instantiating the validator
+        # directly on the already-loaded schema object (no `$ref` indirection for the entry
+        # point) sidesteps this evolve() entirely, while `registry=` still resolves every
+        # fragment ref inside it against the same shared schema set.
+        schema = self._schemas[name]
+        validator = self._validator_cache.get(name)
         if validator is None:
-            validator = jsonschema.Draft202012Validator({"$ref": uri}, registry=self._jsonschema_registry)
-            self._validator_cache[uri] = validator
+            validator = _StrictIntValidator(schema, registry=self._jsonschema_registry)
+            self._validator_cache[name] = validator
         return [
             f"{'/'.join(map(str, error.absolute_path)) or '(root)'}: {error.message}"
             for error in validator.iter_errors(instance)

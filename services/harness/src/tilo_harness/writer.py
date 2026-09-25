@@ -32,8 +32,14 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from tilo_harness.ids import ORG_ID, RUN_ID, WORLD_ID, check_id
-from tilo_harness.validator import EventValidator, WorldState
+from tilo_harness.validator import EventRejected, EventValidator, WorldState
 from tilo_harness.views import redact, scopes_for
+
+# Re-exported for callers written against `tilo_harness.writer.EventRejected` (this module's own
+# docstring and the tests predate the ticket brief's public API, which places it at
+# `tilo_harness.validator` instead -- see that module). Same class object either way, so
+# `isinstance`/`pytest.raises` checks against either import path agree.
+__all__ = ["EventRejected", "WorldWriter", "WriterBusy"]
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _NULL_TRACE: dict[str, Any] = {
@@ -45,14 +51,6 @@ _NULL_TRACE: dict[str, Any] = {
     "latency_ms": None,
     "archive_ref": None,
 }
-
-
-class EventRejected(Exception):
-    """Raised by `emit`/`append` when an event fails the validator; nothing is written."""
-
-    def __init__(self, problems: list[str]) -> None:
-        super().__init__("; ".join(problems) or "event rejected")
-        self.problems = problems
 
 
 class WriterBusy(Exception):
