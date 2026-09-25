@@ -11,5 +11,7 @@ Round 3 (2026-09-25): the schema checks were fixed, but malformed YAML still esc
 
 Round 4: read_yaml catches OSError and YAMLError, but a non-UTF-8 file raises UnicodeDecodeError (a ValueError). PriceBook happened to wrap it; MeteringConfig.load did not. Also still open: .inf prices and caps, lax bools and strings in MeteringConfig, and a truthy "false" string in InMemoryFlagStore.
 
+Round 5 (b7408f5): loader wrapping and the shared number() check held against every input class. Left open (non-blocking): the token cap alone cannot stop credits() overflowing, because a price near float max (1.0e+308) still makes credits() return inf. The loaders also accept a Feb 31 effective_date (the pattern-only calendar_date), YAML 1.1 hex and sexagesimal ints (0x10, 1:30=90), and MeteringConfig.reconciliation.billing_services is a mutable list inside a frozen model.
+
 **Why:** builders fix only the exact repro. Each round left a sibling input class open.
 **How to apply:** for any config loader, try missing file, directory, non-UTF-8 bytes, malformed YAML, empty, list-root, const violations, string-typed numbers, NaN/inf, unquoted YAML dates, duplicate versions and mutation of the returned object. Related: [[eval-harness-recording-validation]].
