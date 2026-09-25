@@ -1,0 +1,20 @@
+# Treasury settings (PRD 14.1, 14.4, 17.3; FR-MTR-02, -03, -04, -08).
+# Shape: contracts/metering.schema.json. Rules: contracts/metering.rules.md.
+# Credits are Tilo credits (1 credit = US$0.005, config/prices.yaml).
+
+treasury:
+  reserve_margin: 0.15 # PRD 14.1: a step reserves its estimate plus 15% (fixed by the PRD)
+  request_at: 0.80 # PRD 14.1: budget.requested at 80% of the approved budget (fixed by the PRD)
+
+caps: # credits; null means no cap at that scope; a day is the UTC calendar day (BQ-44)
+  run_credits: 300 # PRD 14.1, 17.3: 300 credits per public run
+  user_day_credits: 1500 # PRD 17.3: pilot, at most 1,500 credits per tester per day
+  org_day_credits: null # BQ-42: no separate org cap; the daily spend caps below apply
+
+spend: # US dollars of model spend per day (PRD 14.1, 17.3)
+  daily_usd_soft: 15 # raises an alert
+  daily_usd_hard: 25 # flips the kill switch: the public link turns replay-only (NFR-24)
+
+reconciliation: # PRD 14.4, FR-MTR-08
+  tolerance: 0.10 # ledger credits x US$0.005 vs billed model spend, +/-10% (fixed by the PRD)
+  billing_services: [] # billing-export services counted as model spend; none named yet

@@ -3,7 +3,7 @@
 PRD 6.6: "Lean evals. Full passes run each case once; only deploy-gate cases run three times;
 passes stop at a credit cap in `config/evals.yaml`." EFF-07's acceptance test: "A pass hitting the
 cap stops and reports partial results." PRD 19.2: "A full pass runs every case once, and
-deploy-gate cases three times" over a 170-case set across eight groups. This needs
+deploy-gate cases three times" over an eval set of eight groups (heading "170 cases", rows 160; BQ-67). This needs
 `contracts/evals.schema.json` (issue #8) and `config/evals.yaml`, which
 `evals/src/tilo_evals/config.py`'s `EvalsConfig` (already merged, ticket P8-06a) currently loads
 from a local stub with the same shape.
@@ -109,9 +109,11 @@ def test_EFF_07_groups_requires_exactly_the_eight_prd_19_2_groups(repo_root, reg
     assert errors, "EFF-07: groups missing a PRD 19.2 group (E-RED) must be invalid"
 
 
-def test_EFF_07_prd_19_2_groups_sum_to_170():
-    """PRD 19.2's own heading: 'Eval set (170 cases).'"""
-    assert sum(PRD_19_2_GROUPS.values()) == 170, "EFF-07: the PRD 19.2 group table must sum to 170 cases"
+def test_EFF_07_prd_19_2_group_table_sums_to_160():
+    """PRD 19.2's heading says 'Eval set (170 cases)', but its eight rows sum to 160
+    (10+10+6+50+30+20+20+14). The per-group counts are what the harness checks the case set
+    against, so the rows win until the user answers BQ-67 (docs/open-questions.md)."""
+    assert sum(PRD_19_2_GROUPS.values()) == 160, "EFF-07: the PRD 19.2 group rows must sum to 160 cases (BQ-67)"
 
 
 def test_EFF_07_evals_fixtures_directory_has_valid_and_invalid_files(repo_root):

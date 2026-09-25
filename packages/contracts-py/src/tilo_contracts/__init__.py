@@ -2,12 +2,14 @@
 # contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
+# attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
 # common.schema.json 1.0.0 sha256:cdb1a1ceeeebb299
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
+# evals.schema.json 1.0.0 sha256:ac8bab7830371705
 # event.schema.json 1.0.0 sha256:06d09566f16c4dfc
 # events/data/agent.assigned.schema.json 1.0.0 sha256:f7672c62780b8b4b
 # events/data/agent.blocked.schema.json 1.0.0 sha256:a4b1f97998b1d554
@@ -38,7 +40,7 @@
 # events/data/artifact.rolled_back.schema.json 1.0.0 sha256:4c4dac77a4b5c873
 # events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
 # events/data/budget.granted.schema.json 1.0.0 sha256:34e26044aeb0114d
-# events/data/budget.requested.schema.json 1.0.0 sha256:500f50b3b3a0dcf0
+# events/data/budget.requested.schema.json 1.1.0 sha256:abda889558ab1c91
 # events/data/building.archived.schema.json 1.0.0 sha256:638f47ef89001f58
 # events/data/building.completed.schema.json 1.0.0 sha256:2ceb90113efc5121
 # events/data/building.constructing.schema.json 1.0.0 sha256:c607aedfb2cc3c08
@@ -83,7 +85,10 @@
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
+# meter.schema.json 1.0.0 sha256:f01aaa0abd04c157
+# metering.schema.json 1.0.0 sha256:321bf776d019239b
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
+# pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
 # providers.schema.json 1.1.0 sha256:ece7537b584e69f8
@@ -554,6 +559,37 @@ type DecisionDistrictList = Annotated[list[DistrictId], Field(min_length=1)]
 type AcceptanceCriterion = Annotated[str, Field(max_length=300, min_length=1)]
 
 
+class EvalsCreditCap(BaseModel):
+    """
+    Credits one pass may spend before it stops and reports partial results (PRD 6.6, EFF-07): a full pass, the nightly smoke pass and the deploy-gate pass (gate cases three times each). Values are the BQ-43 placeholders until the user sets them; they only bite on live passes, since dev and CI replay recordings (EFF-01).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    full: Annotated[float, Field(gt=0.0)]
+    smoke: Annotated[float, Field(gt=0.0)]
+    gate: Annotated[float, Field(gt=0.0)]
+
+
+class EvalsGroups(BaseModel):
+    """
+    Expected case count for each of the eight PRD 19.2 groups. The PRD rows sum to 160 although its heading says 170 cases; the rows are the default (BQ-67). The harness checks the case set in evals/cases/<group>/ against it (MT-10). Exactly these eight groups.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    E_PLAN: Annotated[int, Field(alias="E-PLAN", ge=1)]
+    E_RES: Annotated[int, Field(alias="E-RES", ge=1)]
+    E_DOC: Annotated[int, Field(alias="E-DOC", ge=1)]
+    E_MAIL: Annotated[int, Field(alias="E-MAIL", ge=1)]
+    E_CHN: Annotated[int, Field(alias="E-CHN", ge=1)]
+    E_ROUTE: Annotated[int, Field(alias="E-ROUTE", ge=1)]
+    E_HAND: Annotated[int, Field(alias="E-HAND", ge=1)]
+    E_RED: Annotated[int, Field(alias="E-RED", ge=1)]
+
+
 type EventFamilyVerb = Annotated[
     str, Field(pattern="^[a-z]+(_[a-z]+)*\\.[a-z]+(_[a-z]+)*$")
 ]
@@ -789,17 +825,16 @@ class BudgetGrantedData(BaseModel):
     cap: Credits
 
 
-class BudgetRequestedData(BaseModel):
+class BudgetRequestedDataRemainingUnit(BaseModel):
     """
-    data of budget.requested (PRD 9.5). Raised at 80% of the approved budget (PRD 14.1, FR-MTR-03).
+    A plan unit not finished yet, with its plan title.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    requested: Credits
-    spent: Credits
-    cap: Credits
+    unit_id: UnitId
+    title: Annotated[str, Field(max_length=80, min_length=1)]
 
 
 class BuildingArchivedData(BaseModel):
@@ -1474,6 +1509,138 @@ class ManifestClaim(BaseModel):
     verified: bool
 
 
+type MeterMethodUrl = Annotated[
+    str,
+    Field(
+        max_length=300,
+        pattern="^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~/-]*)?$",
+    ),
+]
+"""
+An https URL of host, optional port and path, with no user info, query or fragment. The not-pattern rejects a final line break, which a Python validator's $ lets through.
+"""
+
+
+class MeterBudget(BaseModel):
+    """
+    The run's Treasury state (PRD 14.1): the approved cap, credits committed and credits reserved by running steps. spent plus reserved never exceeds cap (MT-03, MT-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    cap: Credits
+    spent: Credits
+    reserved: Credits
+
+
+class MeteringTreasury(BaseModel):
+    """
+    Reserve, then commit (PRD 14.1). Each step reserves its estimate times (1 + reserve_margin) before running and commits the actual cost after; a step that cannot reserve waits (FR-MTR-02). At request_at of the approved budget the Director raises budget.requested (FR-MTR-03). Both are fixed by the PRD; minimum and maximum repeat each const so generated Python checks it too.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    reserve_margin: Annotated[float, Field(ge=0.15, le=0.15)]
+    request_at: Annotated[float, Field(ge=0.8, le=0.8)]
+
+
+type MeteringCap = Annotated[float | None, Field(gt=0.0)]
+"""
+Credits above zero, or null for no cap at that scope.
+"""
+
+
+class MeteringSpend(BaseModel):
+    """
+    US dollars of model spend per day for the deployment (PRD 14.1, 17.3; demo defaults US$15 soft, US$25 hard on tilo-demo). The soft cap raises an alert; the hard cap flips the kill switch, so the public link turns replay-only (NFR-24, FR-MTR-04). daily_usd_hard is at least daily_usd_soft (MT-01).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    daily_usd_soft: Annotated[float, Field(gt=0.0)]
+    daily_usd_hard: Annotated[float, Field(gt=0.0)]
+
+
+type MeteringBillingService = Annotated[
+    str,
+    Field(max_length=100, min_length=1, pattern="^[A-Za-z0-9][A-Za-z0-9 ._()-]{0,99}$"),
+]
+"""
+A service name as the billing export writes it: letters, digits, spaces and . _ ( ) -, starting with a letter or digit.
+"""
+
+
+type PilotTesterId = Annotated[str, Field(pattern="^t_[a-z0-9]{6,32}$")]
+"""
+Pseudonymous tester id: t_ and 6 to 32 lower-case letters or digits, assigned by Tilo. Never an email address, a name or a Tilo user id (PRD 16.5). The not-pattern rejects a final line break, which a Python validator's $ lets through.
+"""
+
+
+class PilotConsent(BaseModel):
+    """
+    A tester's written consent to the EV-G3 pilot rules (PRD 2.4): no confidential employer or client data, test Google accounts or personal accounts only. The tester's records are deleted on delete_after, 30 days after the study, unless keep_data is true; withdrawing consent deletes them at once (PRD 16.5, MT-12).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    tester_id: PilotTesterId
+    study: Literal["EV-G3"]
+    consented_at: Timestamp
+    keep_data: bool
+    delete_after: CalendarDate
+
+
+class PilotTag(BaseModel):
+    """
+    Tags a run (run id) or a card (card ULID) with the tester who used it (PRD 14.4: pilot accounts tag every run and card). Which id goes with which kind is MT-13.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    tester_id: PilotTesterId
+    kind: Literal["run", "card"]
+    ref: RunId | Ulid
+
+
+class PilotDiaryEntry(BaseModel):
+    """
+    The 5-minute daily diary (PRD 2.4) for one of the three pilot days: minutes the tester thinks Tilo saved, a trust score from 1 to 5 and, in at most 280 characters, what they did with the time saved.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    tester_id: PilotTesterId
+    date: CalendarDate
+    day: Annotated[int, Field(ge=1, le=3)]
+    minutes_saved_self: Annotated[int, Field(ge=0)]
+    trust: Annotated[int, Field(ge=1, le=5)]
+    reinvested: Annotated[str, Field(max_length=280)]
+    submitted_at: Timestamp
+
+
+class PilotSurveyResponse(BaseModel):
+    """
+    The exit survey (PRD 2.4): trust score, the share of saved time reinvested and how, and an optional quote. A quote is kept only with the tester's consent to quote it, so quote is null whenever quote_consent is false (BQ-66).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    tester_id: PilotTesterId
+    submitted_at: Timestamp
+    trust: Annotated[int, Field(ge=1, le=5)]
+    reinvested_share: Annotated[float, Field(ge=0.0, le=1.0)]
+    reinvested_how: Annotated[str, Field(max_length=500)]
+    quote: Annotated[str | None, Field(max_length=280, min_length=1)]
+    quote_consent: bool
+
+
 type PlanApproachId = Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,31}$")]
 
 
@@ -1753,6 +1920,27 @@ class AgentsConfig(BaseModel):
     questions: AgentsConfigQuestions
 
 
+class Attention(BaseModel):
+    """
+    One measured span of a person's attention on a run (PRD 14.2, FR-MTR-05): steering (intake, a question, a card, a take-over) or review (a deliverable open before approval). apps/web measures it, as do the channel handlers for WhatsApp and email answers; tilo-api writes it, and packages/metering subtracts the minutes from time saved. Event timestamps cannot give this, because the gap between a question and its answer is waiting time, not attention. A span holds ids and times only, never content (PRD 16.5). Rules MT-07 and MT-08 in contracts/metering.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Ulid
+    world_id: WorldId
+    run_id: RunId
+    user: UserId
+    kind: Literal["intake", "question", "card", "take_over", "review"]
+    started_at: Timestamp
+    ended_at: Timestamp
+    ref: Ulid | ArtifactId | None
+    """
+    What the attention was spent on: a card id (ULID) for a question or card span, the artifact open for review (art_ id) for a review span, and null for intake or a take-over with no card (BQ-65).
+    """
+
+
 class BriefDeliverable(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -1870,6 +2058,26 @@ class Envelope(BaseModel):
     """
     ULIDs of the events and raw-archive records the content rests on (PRD 13.3).
     """
+
+
+class Evals(BaseModel):
+    """
+    config/evals.yaml: eval pass settings (PRD 6.6 'Lean evals', 19.2; EFF-06, EFF-07). A full pass runs every case once and deploy-gate cases three times, and stops at its credit cap with partial results. What the PRD states as a rule is const (three repeats, the 20% cost-regression threshold); the credit caps are config. Rules MT-09 to MT-11 in contracts/metering.rules.md. The eval case file shape stays in evals/case.schema.json, because only the harness reads it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    credit_cap: EvalsCreditCap
+    deploy_gate_repeats: Literal[3]
+    """
+    Runs of each deploy-gate case in a pass (PRD 6.6, 19.2: three times); every other case runs once.
+    """
+    cost_regression_threshold: Annotated[float, Field(ge=0.2, le=0.2)]
+    """
+    A cost per task or per role more than this share above the baseline fails the nightly job (EFF-06: 20%). Minimum and maximum repeat the const so generated Python checks it too.
+    """
+    groups: EvalsGroups
 
 
 class EventItem(BaseModel):
@@ -2081,6 +2289,23 @@ class ArtifactVersionedData(BaseModel):
     previous_version: Annotated[int, Field(ge=1)]
 
 
+class BudgetRequestedData(BaseModel):
+    """
+    data of budget.requested (PRD 9.5). Raised at 80% of the approved budget with the remaining plan and a new estimate (PRD 14.1, FR-MTR-03). remaining_units are the plan units not finished yet, in plan order; estimate is the new estimate of the run's total credits, spent plus the remaining units (added in 1.1.0; rule MT-04 in contracts/metering.rules.md).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    requested: Credits
+    spent: Credits
+    cap: Credits
+    remaining_units: Annotated[
+        list[BudgetRequestedDataRemainingUnit], Field(max_length=200)
+    ]
+    estimate: CreditRange
+
+
 class DataTransferData(BaseModel):
     """
     data of data.transfer (PRD 9.5). Data crossed the bridge of connector: artifact is the item that crossed, pinned to its version (null when nothing is stored, such as a delete), and the event's item is what the world draws. out is a side effect released by the outbox, so outbox_id names that entry and artifact equals the entry's pinned item (OB-05); in is a read under the connection the person consented to. Either way the event carries authz (for in, the person's consent). No recipients or message bodies.
@@ -2231,6 +2456,46 @@ class ManifestProducer(BaseModel):
     profile: ProvidersProfileId | None
 
 
+class MeterTimeSaved(BaseModel):
+    """
+    Time saved in minutes (PRD 14.2, FR-MTR-05): finished, verified units times the EV-G2 median minutes per unit, minus measured steering and review minutes. low and high use the EV-G2 25th and 75th percentiles. It can be negative when steering took longer than the baseline and is shown as it is, never clamped. steering_measured is false when the run has no measured attention spans; the meter then says that steering time was not measured instead of subtracting zero. method_url links to the method page; the meter always shows it as an estimate with its range.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    minutes: float
+    low: float
+    high: float
+    steering_measured: bool
+    method_url: MeterMethodUrl
+
+
+class MeteringCaps(BaseModel):
+    """
+    Credit caps per run, per user per day and per org per day, all from config (PRD 14.1). Demo defaults: 300 credits per public run (17.3); 1,500 credits per pilot tester per day (17.3); no separate org cap (BQ-42). null means no cap at that scope, and every key is still required so that no scope is left out by accident. A day is the UTC calendar day (BQ-44).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    run_credits: MeteringCap
+    user_day_credits: MeteringCap
+    org_day_credits: MeteringCap
+
+
+class MeteringReconciliation(BaseModel):
+    """
+    Daily reconciliation (PRD 14.4, FR-MTR-08): ledger credits times US$0.005 must match billed model spend within the tolerance, fixed at 10% by the PRD; larger drift raises an alert and freezes new claims in the deck until explained (MT-02). billing_services names the billing-export services counted as model spend; empty until one is named.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    tolerance: Annotated[float, Field(ge=0.1, le=0.1)]
+    billing_services: Annotated[list[MeteringBillingService], Field(max_length=20)]
+
+
 class Outbox(BaseModel):
     """
     One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set, equal to the authz of the approval.resolved that answered approve on its gate or of the policy.applied that opened it, never of approval.requested, and the data.transfer it emits carries the same authz (OB-01, HR-7); a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.
@@ -2282,6 +2547,21 @@ class Outbox(BaseModel):
     queued (ready, no undo window), scheduled (waiting out its undo window), sending, sent, cancelled (undone before sending) or failed.
     """
     created_at: Timestamp
+
+
+class Pilot(BaseModel):
+    """
+    Records of the EV-G3 pilot (PRD 2.4, 14.4 'Pilot instrumentation', FR-MTR-09): consent, run and card tags, daily diary entries and exit-survey responses, each keyed by a pseudonymous tester id. S-24 and tilo-api write them; packages/metering reads them for the pilot report, which shows aggregates only. They hold the tester id, numbers and the tester's own short answers, never a name, an email address or task content (PRD 16.5). Each record is written on its own, so the root is a sampler with one optional property per definition, like common's; nothing sends a Pilot document. Rules MT-12 to MT-14 in contracts/metering.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    tester_id: PilotTesterId | None = None
+    consent: PilotConsent | None = None
+    tag: PilotTag | None = None
+    diary_entry: PilotDiaryEntry | None = None
+    survey_response: PilotSurveyResponse | None = None
 
 
 class PlanApproach(BaseModel):
@@ -2684,6 +2964,39 @@ class Manifest(BaseModel):
     """
     The person, policy or Team Lead that authorised the side effect this version went out with (BQ-01); null when it never left Tilo.
     """
+
+
+class Meter(BaseModel):
+    """
+    The HUD meter's state for one run (PRD 14.4, FR-MTR-07): credits used (the sum of the run's event credits), credits saved (origin cost minus lookup cost over accepted reuses, PRD 14.3), time saved (estimate) and the run's budget. packages/metering computes it from the run's events up to last_seq, and apps/web renders it. Rules MT-05 and MT-06 in contracts/metering.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    run_id: RunId
+    last_seq: Annotated[int, Field(ge=0)]
+    """
+    seq of the last event this state includes. A client shows a state only if its last_seq is higher than the one on screen (MT-06).
+    """
+    credits_used: Credits
+    credits_saved: Credits
+    time_saved: MeterTimeSaved
+    budget: MeterBudget
+
+
+class Metering(BaseModel):
+    """
+    config/metering.yaml: the Treasury's settings (PRD 14.1, 14.4, 17.3; FR-MTR-02, -03, -04, -08). What the PRD states as a rule is const: the 15% reserve, the budget request at 80% and the reconciliation tolerance of 10%. Caps and daily spend limits are config with the PRD demo defaults. The credit unit (US$0.005) stays in config/prices.yaml. Rules a schema cannot express are MT-01.. in contracts/metering.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    treasury: MeteringTreasury
+    caps: MeteringCaps
+    spend: MeteringSpend
+    reconciliation: MeteringReconciliation
 
 
 class Plan(BaseModel):

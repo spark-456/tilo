@@ -1,0 +1,20 @@
+# Eval pass settings (PRD 6.6 "Lean evals", 19.2; EFF-06, EFF-07).
+# Shape: contracts/evals.schema.json. Rules: contracts/metering.rules.md (MT-09 to MT-11).
+
+credit_cap: # credits per pass; a pass stops at its cap and reports partial results (EFF-07)
+  full: 2000 # BQ-43 placeholder (US$10)
+  smoke: 200 # BQ-43 placeholder (US$1)
+  gate: 1000 # BQ-43 placeholder (US$5): deploy-gate cases, each run 3 times
+
+deploy_gate_repeats: 3 # PRD 19.2: deploy-gate cases run three times (fixed by the PRD)
+cost_regression_threshold: 0.20 # EFF-06: a cost regression over 20% fails the nightly job (fixed by the PRD)
+
+groups: # expected case count per PRD 19.2 group; the rows sum to 160, the heading says 170 (BQ-67)
+  E-PLAN: 10
+  E-RES: 10
+  E-DOC: 6
+  E-MAIL: 50
+  E-CHN: 30
+  E-ROUTE: 20
+  E-HAND: 20
+  E-RED: 14

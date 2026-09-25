@@ -106,7 +106,8 @@ def sample_metering_config(**overrides: Any) -> dict[str, Any]:
 # config/evals.yaml (issue #8, EFF-06, EFF-07)
 # ---------------------------------------------------------------------------
 
-# PRD 19.2's eval set table: group -> case count, summing to 170.
+# PRD 19.2's eval set table: group -> case count. The rows sum to 160 although the heading says
+# 170 cases (BQ-67); the rows are what the harness checks against.
 PRD_19_2_GROUPS: dict[str, int] = {
     "E-PLAN": 10,
     "E-RES": 10,
