@@ -54,8 +54,15 @@ def check(inputs: dict, output: dict) -> list[dict]:
             numbers = _NUMBER_RE.findall(text)
             if numbers:
                 source_id = bullet.get("source_id")
-                source_text = material_by_id.get(source_id)
-                if source_id not in material_by_id or source_text is None or not all(n in source_text for n in numbers):
+                # source_id could be any JSON type (e.g. a list), which is
+                # unhashable and would raise on a dict lookup or `in` a dict.
+                source_text = material_by_id.get(source_id) if isinstance(source_id, str) else None
+                if (
+                    not isinstance(source_id, str)
+                    or source_id not in material_by_id
+                    or source_text is None
+                    or not all(n in source_text for n in numbers)
+                ):
                     findings.append(
                         {
                             "check": "number-has-source",
@@ -65,7 +72,12 @@ def check(inputs: dict, output: dict) -> list[dict]:
 
         chart_ref = slide.get("chart_ref")
         if chart_ref is not None:
-            if not isinstance(chart_ref, dict) or chart_ref.get("source_id") not in material_by_id:
+            chart_source_id = chart_ref.get("source_id") if isinstance(chart_ref, dict) else None
+            if (
+                not isinstance(chart_ref, dict)
+                or not isinstance(chart_source_id, str)
+                or chart_source_id not in material_by_id
+            ):
                 findings.append(
                     {"check": "chart-not-drawn", "detail": f"slides[{i}].chart_ref must cite a supplied source_id"}
                 )

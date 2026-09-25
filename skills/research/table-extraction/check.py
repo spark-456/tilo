@@ -50,11 +50,16 @@ def check(inputs: dict, output: dict) -> list[dict]:
             findings.append({"check": "output-malformed", "detail": f"records[{i}].fields must be an object"})
             continue
         for name, field in fields.items():
-            if not isinstance(field, dict) or "value" not in field or "source_ref" not in field:
+            if (
+                not isinstance(field, dict)
+                or "value" not in field
+                or "source_ref" not in field
+                or not isinstance(field.get("source_ref"), str)
+            ):
                 findings.append(
                     {
                         "check": "output-malformed",
-                        "detail": f"records[{i}].fields[{name!r}] must have value and source_ref",
+                        "detail": f"records[{i}].fields[{name!r}] must have value and a string source_ref",
                     }
                 )
                 continue

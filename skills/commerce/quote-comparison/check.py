@@ -50,7 +50,19 @@ def check(inputs: dict, output: dict) -> list[dict]:
         if not isinstance(row, dict):
             findings.append({"check": "output-malformed", "detail": f"coverage_matrix[{i}] is not an object"})
             continue
-        key = (row.get("quote_id"), row.get("requirement_id"))
+        row_quote_id = row.get("quote_id")
+        row_requirement_id = row.get("requirement_id")
+        # Both must be strings before they can be used as a dict/tuple key:
+        # an unhashable value (e.g. a list) would otherwise raise here.
+        if not isinstance(row_quote_id, str) or not isinstance(row_requirement_id, str):
+            findings.append(
+                {
+                    "check": "output-malformed",
+                    "detail": f"coverage_matrix[{i}] quote_id and requirement_id must be strings",
+                }
+            )
+            continue
+        key = (row_quote_id, row_requirement_id)
         seen_pairs[key] = row.get("status")
         if key in expected_pairs and row.get("status") != expected_pairs[key]:
             findings.append(

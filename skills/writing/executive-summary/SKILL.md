@@ -18,7 +18,7 @@ Use this skill to write a short, sourced executive summary that answers a specif
 
 - `answer-first-missing`: answer_first must be non-empty and must lead with the answer.
 - `claim-missing-source`: every claim must cite a source id present in the supplied material.
-- `number-not-traceable`: every number in a claim must appear, verbatim, in the material passage it cites.
+- `number-not-traceable`: every number in a claim must appear, verbatim, in the material passage it cites; every number in `answer_first` must appear somewhere in the supplied material.
 - `word-count-over-limit`: the total word count across answer_first and every claim must not exceed max_words.
 - `output-malformed`: the output must be an object with a string answer_first and a claims array; malformed shapes fail closed.
 
@@ -34,5 +34,6 @@ Use this skill to write a short, sourced executive summary that answers a specif
 
 - Opening with background or caveats instead of the answer.
 - Adding a plausible-sounding claim with no real source to pad the summary.
+- Putting a made-up or rounded figure in `answer_first` itself, reasoning that only the claims need sourcing.
 - Recomputing or rounding a figure from the material "for clarity", which breaks the exact source trace.
 - Going over the word limit by counting only the claims and forgetting answer_first.

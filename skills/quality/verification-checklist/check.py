@@ -29,10 +29,16 @@ def check(inputs: dict, output: dict) -> list[dict]:
         if not isinstance(verdict_row, dict):
             findings.append({"check": "output-malformed", "detail": f"verdicts[{i}] is not an object"})
             continue
-        claim_id = verdict_row.get("claim_id")
+        raw_claim_id = verdict_row.get("claim_id")
         verdict = verdict_row.get("verdict")
         evidence_source_ids = verdict_row.get("evidence_source_ids")
-        if verdict not in _VALID_VERDICTS:
+        # claim_id and verdict could be any JSON type (e.g. a list), which is
+        # unhashable and would raise on a dict key or `in` a set — check the
+        # type before either use.
+        claim_id = raw_claim_id if isinstance(raw_claim_id, str) else None
+        if claim_id is None:
+            findings.append({"check": "output-malformed", "detail": f"verdicts[{i}].claim_id must be a string"})
+        if not isinstance(verdict, str) or verdict not in _VALID_VERDICTS:
             findings.append(
                 {
                     "check": "verdict-invalid",
@@ -44,9 +50,10 @@ def check(inputs: dict, output: dict) -> list[dict]:
                 {"check": "output-malformed", "detail": f"verdicts[{i}].evidence_source_ids must be an array"}
             )
             evidence_source_ids = []
-        seen[claim_id] = seen.get(claim_id, 0) + 1
+        if claim_id is not None:
+            seen[claim_id] = seen.get(claim_id, 0) + 1
         if verdict == "verified":
-            unknown = [e for e in evidence_source_ids if e not in evidence_ids]
+            unknown = [e for e in evidence_source_ids if not isinstance(e, str) or e not in evidence_ids]
             if not evidence_source_ids or unknown:
                 findings.append(
                     {

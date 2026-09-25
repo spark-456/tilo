@@ -1,0 +1,27 @@
+{
+  "input": {
+    "instruction": "Confirm the deposit is $500.",
+    "thread": {
+      "subject": "Deposit amount",
+      "messages": [
+        {
+          "from": "riya@example.com",
+          "to": ["assistant@example.com"],
+          "body": "What is the deposit amount?"
+        }
+      ]
+    },
+    "reply_to_sender": "riya@example.com"
+  },
+  "output": {
+    "to": ["riya@example.com"],
+    "cc": [],
+    "subject": "Re: Deposit amount",
+    "body": "Confirming the deposit is $50.",
+    "attachments": [],
+    "flags": []
+  },
+  "expect": {
+    "fail": "new-commitment-not-in-instruction"
+  }
+}

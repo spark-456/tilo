@@ -120,6 +120,33 @@ def test_FR_AGT_04_verification_checklist_verified_claim_needs_evidence_in_input
     )
 
 
+def test_FR_AGT_04_executive_summary_check_does_not_raise_on_non_string_material_text():
+    """FR-AGT-04 fix round 1 (qa-breaker): check() must never raise, even when a
+    caller hands it inputs that do not conform to the skill's own input schema
+    (a schema-valid golden fixture cannot express this, since skill.yaml requires
+    material[].text to be a string). Previously a non-string material text made
+    ``n not in source_text`` raise TypeError while checking a claim's numbers."""
+    module = import_check_module("writing", "executive-summary")
+
+    inputs = {
+        "question": "Did revenue grow?",
+        "material": [
+            {"source_id": "src-1", "text": 4200000},  # malformed: not a string
+        ],
+        "max_words": 40,
+    }
+    output = {
+        "answer_first": "Yes, revenue grew.",
+        "claims": [
+            {"text": "Revenue reached 4200000.", "source_id": "src-1"},
+        ],
+    }
+
+    findings = module.check(inputs, output)
+    assert isinstance(findings, list)
+    assert findings, "a claim citing a source whose text is not a string must fail closed, not be silently trusted"
+
+
 def test_FR_AGT_04_price_comparison_picking_offer_that_misses_requirement_fails():
     """Ticket brief (commerce/price-comparison): 'the pick is the cheapest offer
     that meets every stated requirement.' Picking a cheaper offer that fails a

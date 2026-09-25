@@ -1,0 +1,26 @@
+{
+  "input": {
+    "instruction": "Confirm we're still on for Monday.",
+    "thread": {
+      "subject": "Kickoff",
+      "messages": [
+        {
+          "from": "sam@example.com",
+          "to": ["assistant@example.com", "priya@example.com"],
+          "body": "Are we still on for Monday?"
+        }
+      ]
+    },
+    "reply_to_sender": "sam@example.com",
+    "reply_all": true
+  },
+  "output": {
+    "to": ["sam@example.com"],
+    "cc": ["priya@example.com"],
+    "subject": "Re: Kickoff",
+    "body": "Yes, Monday works for us.",
+    "attachments": [],
+    "flags": []
+  },
+  "expect": "pass"
+}

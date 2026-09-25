@@ -62,6 +62,11 @@ def check(inputs: dict, output: dict) -> list[dict]:
             findings.append({"check": "output-malformed", "detail": f"unit_prices[{i}] is not an object"})
             continue
         offer_id = up.get("offer_id")
+        # offer_id could be any JSON type (e.g. a list), which is unhashable
+        # and would raise on a dict lookup — check the type before it.
+        if not isinstance(offer_id, str):
+            findings.append({"check": "output-malformed", "detail": f"unit_prices[{i}].offer_id must be a string"})
+            continue
         offer = offers_by_id.get(offer_id)
         source_ok = (
             offer is not None

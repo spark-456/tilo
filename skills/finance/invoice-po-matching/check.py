@@ -51,6 +51,9 @@ def check(inputs: dict, output: dict) -> list[dict]:
         tolerance_pct if isinstance(tolerance_pct, (int, float)) and not isinstance(tolerance_pct, bool) else 0
     )
 
+    inv_line_id_counts: dict[str, int] = {}
+    po_line_id_counts: dict[str, int] = {}
+
     for i, match in enumerate(matches):
         if not isinstance(match, dict):
             findings.append({"check": "output-malformed", "detail": f"matches[{i}] is not an object"})
@@ -62,8 +65,24 @@ def check(inputs: dict, output: dict) -> list[dict]:
                 {"check": "mismatch-missing-reason", "detail": f"matches[{i}] status {status!r} has no reason_code"}
             )
 
-        inv_line = inv_lines.get(match.get("invoice_line_id"))
-        po_line = po_lines.get(match.get("po_line_id")) if match.get("po_line_id") else None
+        raw_invoice_line_id = match.get("invoice_line_id")
+        invoice_line_id = raw_invoice_line_id if isinstance(raw_invoice_line_id, str) else None
+        if invoice_line_id is None:
+            findings.append({"check": "output-malformed", "detail": f"matches[{i}].invoice_line_id must be a string"})
+        else:
+            inv_line_id_counts[invoice_line_id] = inv_line_id_counts.get(invoice_line_id, 0) + 1
+
+        raw_po_line_id = match.get("po_line_id")
+        po_line_id = raw_po_line_id if isinstance(raw_po_line_id, str) else None
+        if raw_po_line_id is not None and po_line_id is None:
+            findings.append(
+                {"check": "output-malformed", "detail": f"matches[{i}].po_line_id must be a string or null"}
+            )
+        elif po_line_id is not None:
+            po_line_id_counts[po_line_id] = po_line_id_counts.get(po_line_id, 0) + 1
+
+        inv_line = inv_lines.get(invoice_line_id) if invoice_line_id is not None else None
+        po_line = po_lines.get(po_line_id) if po_line_id is not None else None
         if status == "matched":
             if inv_line is None or po_line is None:
                 findings.append(
@@ -96,6 +115,25 @@ def check(inputs: dict, output: dict) -> list[dict]:
                             ),
                         }
                     )
+
+    for line_id in inv_lines:
+        count = inv_line_id_counts.get(line_id, 0)
+        if count != 1:
+            findings.append(
+                {
+                    "check": "line-not-covered",
+                    "detail": f"invoice line {line_id!r} appears in {count} match row(s), expected exactly 1",
+                }
+            )
+    for line_id in po_lines:
+        count = po_line_id_counts.get(line_id, 0)
+        if count != 1:
+            findings.append(
+                {
+                    "check": "line-not-covered",
+                    "detail": f"PO line {line_id!r} appears in {count} match row(s), expected exactly 1",
+                }
+            )
 
     inv_sum = sum(
         (_dec(line.get("quantity")) or Decimal(0)) * (_dec(line.get("unit_price")) or Decimal(0))

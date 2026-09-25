@@ -42,7 +42,9 @@ def check(inputs: dict, output: dict) -> list[dict]:
                     {"check": "citation-required", "detail": f"findings[{i}] is answered but cites no source"}
                 )
             for source_id in source_ids:
-                if source_id not in known_ids:
+                # source_id could be any JSON type (e.g. a list), which is
+                # unhashable and would raise on `in` against a set.
+                if not isinstance(source_id, str) or source_id not in known_ids:
                     findings.append(
                         {
                             "check": "citation-known-source",

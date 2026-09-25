@@ -1,0 +1,19 @@
+{
+  "input": {
+    "message": {
+      "id": "msg-42",
+      "from": "riya@example.com",
+      "subject": "Does Thursday 3pm work?",
+      "body": "Hi, can we meet Thursday at 3pm to go over the proposal? Let me know by Friday."
+    },
+    "vip_senders": ["riya@example.com"]
+  },
+  "output": {
+    "category": [],
+    "priority": 50,
+    "signals": ["asks a direct question"]
+  },
+  "expect": {
+    "fail": "category-invalid"
+  }
+}

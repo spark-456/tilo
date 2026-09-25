@@ -17,6 +17,7 @@ Use this skill to match an invoice's lines against a purchase order's lines by i
 
 ## Quality bar
 
+- `line-not-covered`: every invoice line and every PO line must appear in exactly one match row; a dropped or duplicated line fails this, even if the totals are otherwise correct.
 - `mismatch-missing-reason`: every match that is not "matched" must carry a reason_code.
 - `item-mismatch-not-flagged`: a pair marked matched must actually have the same item on both sides.
 - `quantity-outside-tolerance-not-flagged`: a pair marked matched must be within the stated quantity tolerance.
@@ -26,6 +27,7 @@ Use this skill to match an invoice's lines against a purchase order's lines by i
 
 ## Checklist
 
+- [ ] Every invoice line and every PO line appears in exactly one match row (nothing dropped, nothing duplicated).
 - [ ] Every non-matched line has a reason code.
 - [ ] Every matched pair has the same item on both sides.
 - [ ] Every matched pair's quantities are within the stated tolerance.
@@ -34,6 +36,7 @@ Use this skill to match an invoice's lines against a purchase order's lines by i
 
 ## Pitfalls
 
+- Returning `"matches": []` (or otherwise omitting a line) while still reporting correct-looking totals — every input line must show up in a match row, or a billed line that is not on the PO can be dropped silently.
 - Trusting a total printed on the invoice or PO instead of recomputing it from the lines.
 - Marking two lines matched because the amounts look close, without actually comparing items or checking the tolerance.
 - Rounding the recomputed total for a "cleaner" number, which breaks exact-match totals.

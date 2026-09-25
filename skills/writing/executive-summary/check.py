@@ -27,12 +27,29 @@ def check(inputs: dict, output: dict) -> list[dict]:
     inputs = inputs if isinstance(inputs, dict) else {}
     material = inputs.get("material") if isinstance(inputs.get("material"), list) else []
     max_words = inputs.get("max_words")
-    material_by_id = {m.get("source_id"): m.get("text", "") for m in material if isinstance(m, dict)}
+    # Only keep entries whose source_id and text are actually strings: a
+    # malformed material item (e.g. text as an int) must never be trusted as
+    # a source, and must never reach a string operation that could raise.
+    material_by_id: dict[str, str] = {
+        m["source_id"]: m["text"]
+        for m in material
+        if isinstance(m, dict) and isinstance(m.get("source_id"), str) and isinstance(m.get("text"), str)
+    }
+    all_material_text = " ".join(material_by_id.values())
 
     findings: list[dict] = []
     if not answer_first.strip():
         findings.append(
             {"check": "answer-first-missing", "detail": "answer_first must lead with the answer, not be empty"}
+        )
+
+    answer_first_numbers = _NUMBER_RE.findall(answer_first)
+    if any(n not in all_material_text for n in answer_first_numbers):
+        findings.append(
+            {
+                "check": "number-not-traceable",
+                "detail": "answer_first has a number not present in any supplied material",
+            }
         )
 
     total_words = _word_count(answer_first)
