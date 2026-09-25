@@ -1,6 +1,5 @@
-"""Shared fixtures for packages/metering acceptance tests (P8-01a; FR-MTR-01).
-Named _metering_testlib.py, not conftest.py, per se-spec.md section 0:
-pytest's prepend import mode needs unique helper-module basenames."""
+"""Shared fixtures for packages/metering tests (P8-01a; FR-MTR-01). Named
+_metering_testlib.py, not conftest.py: prepend import mode needs unique basenames."""
 
 from __future__ import annotations
 
@@ -29,7 +28,6 @@ def _prices(effective_date: str, source: str, input_: float, output: float) -> d
     }
 
 
-# Two versions of the "widget" profile at different effective dates.
 PRICES_V1 = _prices("2026-01-01", "Fake price sheet v1 for tests.", 1.0, 2.0)
 PRICES_V2 = _prices("2026-06-01", "Fake price sheet v2 for tests.", 3.0, 6.0)
 

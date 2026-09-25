@@ -1,5 +1,4 @@
-"""Flag store (NFR-24 kill switch, P8-04 claims_frozen). In-memory only;
-a Firestore-backed store comes later."""
+"""Flag store (NFR-24 kill switch, P8-04 claims_frozen). In-memory only; a Firestore store comes later."""
 
 from __future__ import annotations
 
@@ -8,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Protocol
 
-FlagChange = namedtuple("FlagChange", "value reason at")  # one recorded change to a flag's value
+FlagChange = namedtuple("FlagChange", "value reason at")
 
 
 class FlagStore(Protocol):

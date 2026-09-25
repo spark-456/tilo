@@ -1,5 +1,4 @@
-"""tilo_metering: price book, metering config and flag store (PRD 14.1,
-14.5, FR-MTR-01). Part a of P8-01 -- no Treasury yet (parts b and c)."""
+"""tilo_metering: price book, metering config and flag store (PRD 14.1, 14.5, FR-MTR-01). No Treasury yet (P8-01b/c)."""
 
 from .config import MeteringConfig
 from .errors import MeteringConfigError, UnpricedError

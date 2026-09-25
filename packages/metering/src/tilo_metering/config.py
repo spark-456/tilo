@@ -10,38 +10,35 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from .errors import MeteringConfigError
 
-_STRICT = ConfigDict(extra="forbid", frozen=True)
+
+class _Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class TreasurySettings(BaseModel):
-    model_config = _STRICT
+class TreasurySettings(_Strict):
     reserve_margin: float = Field(ge=0, le=5)
     request_at: float = Field(ge=0, le=1)
 
 
-class Caps(BaseModel):
-    model_config = _STRICT
+class Caps(_Strict):
     run_credits: float | None = Field(ge=0)
     user_day_credits: float | None = Field(ge=0)
     org_day_credits: float | None = Field(ge=0)
 
 
-class SpendCaps(BaseModel):
-    model_config = _STRICT
+class SpendCaps(_Strict):
     daily_usd_soft: float = Field(ge=0)
     daily_usd_hard: float = Field(ge=0)
 
 
-class Reconciliation(BaseModel):
-    model_config = _STRICT
+class Reconciliation(_Strict):
     tolerance: float = Field(ge=0, le=1)
     billing_services: list[str]
 
 
-class MeteringConfig(BaseModel):
+class MeteringConfig(_Strict):
     """Rejects unknown/out-of-range keys and daily_usd_hard < daily_usd_soft."""
 
-    model_config = _STRICT
     treasury: TreasurySettings
     caps: Caps
     spend: SpendCaps

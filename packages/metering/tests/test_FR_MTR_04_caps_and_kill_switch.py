@@ -1,7 +1,5 @@
-"""FR-MTR-04 (PRD 14.5, 14.1): caps and demo spend defaults, all from
-config. P8-01a keeps only the two tests needing no Treasury. Undone:
-config/metering.yaml doesn't exist yet (S0 owns config/, CC-SE #7), so the
-demo-defaults test loads the local stub data/metering.stub.yaml instead."""
+"""FR-MTR-04 (PRD 14.5, 14.1): caps and demo spend defaults, all from config. config/metering.yaml
+doesn't exist yet (S0 owns config/, CC-SE #7), so the demo-defaults test loads the local stub."""
 
 from __future__ import annotations
 
