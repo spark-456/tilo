@@ -1,8 +1,12 @@
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { Stage } from "./stage/Stage";
 
+// The World screen is the only one that exists yet (PRD 5.5), so it is always
+// the current one — hence the permanent `aria-current="page"` (PRD 17.5) and
+// the selected-pill styling (design exports show the active nav item this
+// way, not centred and unmarked).
 const NavButton = () => (
-  <button type="button" className="nav-btn">
+  <button type="button" className="nav-btn nav-btn--active" aria-current="page">
     World
   </button>
 );
@@ -15,8 +19,15 @@ export function App() {
 
   return (
     <div className="app-shell">
+      {/* Visually hidden: gives the page a single top-level heading (axe
+          "page-has-heading-one") without adding a header bar the design
+          exports don't cover. */}
+      <h1 className="visually-hidden">Tilo — World</h1>
       {!isMobile && (
         <nav className="left-rail" data-testid="left-rail" aria-label="Primary">
+          <span className="brand-mark" aria-hidden="true">
+            T
+          </span>
           <NavButton />
         </nav>
       )}

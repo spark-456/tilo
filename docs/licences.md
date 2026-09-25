@@ -46,6 +46,7 @@ No third-party runtime dependencies yet (empty scaffold; code lands in ticket P0
 | @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
 | @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT (package); fonts themselves OFL-1.1, see "Fonts" below | https://www.npmjs.com/package/@fontsource/nunito |
 | @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/package/@types/node |
+| jsdom | MIT | https://www.npmjs.com/package/jsdom |
 
 ## Fonts (self-hosted via `@fontsource/*`, PRD 18.2 "Type")
 
