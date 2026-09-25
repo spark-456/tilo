@@ -79,6 +79,33 @@ def test_EFF_07_pass_stops_at_credit_cap_lists_rest_and_exits_3(fake_repo):
     assert "E-PLAN-03" in results_md, "the report must list the case that was not run"
 
 
+def test_EFF_07_summary_less_recording_costs_its_event_credits_and_stops_at_cap(fake_repo):
+    cases_root = fake_repo / "evals" / "cases"
+    write_evals_config(fake_repo / "config", credit_cap={"full": 2000, "smoke": 100, "gate": 100})
+
+    for n in (1, 2, 3):
+        case_id = f"E-RED-0{n}"
+        recording = fake_repo / "evals" / "recordings" / f"{case_id}.jsonl"
+        event = make_event(seq=1, type="alert.raised", credits=1500.0, trace={"model_role": "worker"})
+        write_recording(recording, [event])  # no summary line
+        write_case(
+            cases_root,
+            case_id=case_id,
+            group="E-RED",
+            ground_truth={"ok": True},
+            checks=[{"check": "flagged_or_blocked", "args": {}}],
+            recording=_recording_relpath(fake_repo, recording),
+        )
+
+    exit_code = main(["run", "--pass", "full", "--results-json", "results.json"])
+
+    assert exit_code == 3, "EFF-07: event credits count toward the cap when no summary line is present"
+    data = json.loads((fake_repo / "results.json").read_text(encoding="utf-8"))
+    assert data["stopped_at_cap"] is True
+    assert data["ran"] == ["E-RED-01"] and set(data["not_run"]) == {"E-RED-02", "E-RED-03"}
+    assert data["spent"] == 1500.0
+
+
 def test_EFF_07_skeleton_and_missing_recording_cases_are_not_runnable(fake_repo):
     """P8-06 spec: "A case with status: skeleton or no recording is not
     runnable; it is listed and never counted as passed or failed."

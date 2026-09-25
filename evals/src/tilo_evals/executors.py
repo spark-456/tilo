@@ -61,7 +61,8 @@ def _validated_event(case: Any, event: dict[str, Any]) -> dict[str, Any]:
 class ReplayExecutor:
     """Replays a recorded case. A recording line with a "type" key is a
     TiloEvent; the one line without one (if present) is the final
-    {"outputs": {...}, "credits": n} summary."""
+    {"outputs": {...}, "credits": n} summary. Without a summary line the
+    case's cost is the sum of its event credits."""
 
     def run(self, case: Any) -> Outcome:
         if not case.recording:
@@ -72,7 +73,7 @@ class ReplayExecutor:
 
         events: list[dict[str, Any]] = []
         outputs: dict[str, Any] = {}
-        credits = 0.0
+        summary_credits: float | None = None
 
         try:
             text = recording_path.read_text(encoding="utf-8")
@@ -93,6 +94,8 @@ class ReplayExecutor:
                 events.append(_validated_event(case, record))
             else:
                 outputs = record.get("outputs") or {}
-                credits = _validated_credits(case, record.get("credits"))
+                summary_credits = _validated_credits(case, record.get("credits"))
 
+        # No summary line: the case costs what its events cost (qa review round 4).
+        credits = summary_credits if summary_credits is not None else sum(e["credits"] for e in events)
         return Outcome(events=tuple(events), outputs=outputs, credits=credits)
