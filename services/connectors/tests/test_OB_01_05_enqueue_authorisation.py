@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 import tilo_connectors
-from _connectors_lib import ManualClock, evidence_from_case
+from _connectors_lib import ManualClock, evidence_from_case, fresh_entry
 from tilo_connectors.fakes import FakeGmail
 
 
@@ -40,8 +40,9 @@ def test_OB_01_enqueue_accepts_every_authorised_entry(crossref_valid_cases):
     and raises nothing."""
     for name, case in crossref_valid_cases:
         outbox, _gmail = make_outbox([])
-        stored = outbox.enqueue(case["entry"], evidence_from_case(case))
-        assert stored == case["entry"], name
+        entry = fresh_entry(case["entry"])
+        stored = outbox.enqueue(entry, evidence_from_case(case))
+        assert stored == entry, name
 
 
 # These two cases break PI-16 / PI-17 only in the data.transfer a sent entry emitted; the entry
@@ -61,7 +62,7 @@ def test_OB_01_enqueue_refuses_every_unauthorised_entry(crossref_invalid_cases):
         emitted: list[dict] = []
         outbox, _gmail = make_outbox(emitted)
         with pytest.raises(tilo_connectors.OutboxRefused):
-            outbox.enqueue(case["entry"], evidence_from_case(case))
+            outbox.enqueue(fresh_entry(case["entry"]), evidence_from_case(case))
         # Nothing unauthorised is written (SEC-03): a later dispatch_due() has nothing to send.
         assert outbox.dispatch_due() == [], f"{name}: a refused entry must not be dispatchable"
         assert emitted == [], f"{name}: a refused entry must emit nothing"
@@ -88,7 +89,7 @@ def test_OB_01_named_valid_case_is_accepted(crossref_valid_cases, name):
     assert name in by_name, f"{name} is missing from contracts/fixtures/outbox/crossref/valid/"
     case = by_name[name]
     outbox, _gmail = make_outbox([])
-    stored = outbox.enqueue(case["entry"], evidence_from_case(case))
+    stored = outbox.enqueue(fresh_entry(case["entry"]), evidence_from_case(case))
     assert stored["id"] == case["entry"]["id"]
 
 
