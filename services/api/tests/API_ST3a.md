@@ -259,12 +259,10 @@ new status code invented for it).
   a missing or non-list `history` is replaced the same fail-safe way stop-all does), sets
   `level = "L1"`, `changed_by = {"by": owner, "at": now}`, and hands the writer one `policy.changed`
   part (`data.change == "revoked"`, `data.level == "L1"`, `vis` by the same scope.districts rule
-  as stop-all) for `store.policy_worlds.get(policy_id, "w_unmapped_policies")` -- **note:** revoke
-  has no world_id of its own request to fall back to (unlike stop-all and pause, which fall back
-  to the world the request was made against), so a policy with no world mapping falls back to the
-  fixed sentinel world id `"w_unmapped_policies"` (a `common.schema.json#/$defs/world_id`-shaped
-  literal, so the resulting event still validates against `event.schema.json` even though that
-  world is never registered in `store.worlds`) rather than raising `KeyError`.
+  as stop-all) for the policy's mapped world, `store.policy_worlds[policy_id]`. A policy with no
+  world mapping (policies live at org level, PRD 15.3) is still revoked (history entry, L1), but
+  no event is handed to any world: revoke has no world of its own, and an event is never filed
+  under a world that does not exist (PRD 9.4 honesty). The history entry is the audit record.
 - Response 200 body: `{"policy_id": policy_id, "level": "L1"}`.
 
 ### `GET /worlds/{world_id}/events` — FR-HIL-09, SEC-07
@@ -355,8 +353,5 @@ consume once resolved, and every test constructs `Principal` directly and instal
    at a time; a person who owns or belongs to several worlds in the product's real data model is
    later work (the real sign-in/session resolver, PRD 15.3), out of scope for this in-memory test
    double.
-7. **Revoke's no-mapping fallback world id** (new): the fixed sentinel `"w_unmapped_policies"`,
-   not the policy id itself (which does not fit `world_id`'s pattern and would make the resulting
-   `policy.changed` fail schema validation) -- it needs no collision property beyond "a
-   `world_id`-shaped literal the writer accepts", and no test relies on that world being one a
-   principal can ever read events from.
+7. **Revoke of a policy with no world mapping** (new): revoked (history entry, L1), no event
+   handed to the writer; never a made-up world id.
