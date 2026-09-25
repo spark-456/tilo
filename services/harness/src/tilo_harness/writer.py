@@ -15,6 +15,13 @@ is exactly the D-11 violation this ticket's fix round is closing. `_commit` also
 store's head inside the transaction and refuses the write unless `head.last_seq == event.seq -
 1` and every view's `vseq` matches the head, so a writer acting on stale local state can never
 overwrite or skip a seq even if it still (wrongly) believed it held the lease.
+
+`_commit` also re-checks `lease.expires_at` against the clock on every write (not just at
+`open()`), and every successful commit renews it to `now + lease_s`: a writer that emits faster
+than `lease_s` keeps its lease indefinitely, and a writer that stalls past `lease_s` loses the
+right to write as soon as the next commit is attempted, even before a second writer takes over.
+Without this, a writer whose lease has lapsed keeps writing past its own TTL, and a healthy
+writer that simply runs longer than `lease_s` loses its world out from under it.
 """
 
 from __future__ import annotations
@@ -207,9 +214,21 @@ class WorldWriter:
                 new_view_seq[scope] = vseq
 
         def _commit(head: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], list[tuple[str, dict[str, Any]]]]:
+            now = self._clock()
             lease = head["lease"]
             if lease is None or lease["token"] != self._instance_token:
                 raise WriterBusy(f"world {self._world_id!r} is no longer leased to {self.writer_id!r}")
+            # qa-breaker P0-09 round 3: the token check above is necessary but not sufficient --
+            # a writer's lease can expire (another writer has not taken over yet, but is now free
+            # to) while this instance's token is still the one recorded on the head. Without this
+            # check, a writer whose lease has lapsed keeps writing past its own TTL. Re-derive
+            # "now" from the injectable clock at commit time (not from `open()`'s stale reading),
+            # since a long-running writer emits many events after a single `open()`.
+            if lease["expires_at"] <= now:
+                raise WriterBusy(
+                    f"world {self._world_id!r} lease for {self.writer_id!r} expired at "
+                    f"{lease['expires_at']!r} (now {now!r})"
+                )
             # Belt-and-suspenders on top of the lease check: even if this instance still (wrongly)
             # believes it holds the lease, refuse to write unless the store's actual head is still
             # exactly where this writer's local state thinks it is, so a write can never overwrite
@@ -226,7 +245,12 @@ class WorldWriter:
                         f"world {self._world_id!r} view {scope!r} head has moved to "
                         f"vseq={head_view_seq.get(scope, 0)!r}, expected {doc['seq'] - 1!r}"
                     )
-            new_head = dict(head, last_seq=event["seq"], view_seq=new_view_seq)
+            # Every successful commit renews the lease from *this* commit's "now", not from
+            # `open()`'s: a writer that keeps emitting faster than `lease_s` must never lose its
+            # own lease out from under itself, and a writer that stalls past `lease_s` must be
+            # the one that loses it (checked above, and by the next writer's `open()`).
+            renewed_lease = dict(lease, expires_at=now + timedelta(seconds=self._lease_s))
+            new_head = dict(head, last_seq=event["seq"], view_seq=new_view_seq, lease=renewed_lease)
             return new_head, event, view_writes
 
         self._store.transact(self._org_id, self._world_id, _commit)
