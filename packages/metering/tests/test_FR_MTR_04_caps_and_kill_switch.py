@@ -1,11 +1,11 @@
 """FR-MTR-04 (PRD 14.5, 14.1): run/user-day/org-day caps and demo spend defaults, from config
 (local stub, CC-SE #7). Daily USD caps and the kill switch are P8-01c."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from _metering_testlib import METERING_STUB, build_treasury, metering_config, write_yaml
-from tilo_metering import MeteringConfig, MeteringConfigError, Wait
+from tilo_metering import MeteringConfig, MeteringConfigError, Reservation, Wait
 
 AT = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
 
@@ -16,9 +16,7 @@ def test_FR_MTR_04_run_cap_blocks_a_reservation(tmp_path):
     assert treasury.run("r1").cap == pytest.approx(50.0)  # min(approved, caps.run_credits)
     result = treasury.reserve("r1", "s1", estimate=60.0, at=AT)  # 60*1.15 = 69 > 50
     assert isinstance(result, Wait)
-    run = treasury.run("r1")
-    assert run.reserved == pytest.approx(0.0)
-    assert run.spent == pytest.approx(0.0)
+    assert treasury.run("r1").reserved == treasury.run("r1").spent == 0
 
 
 @pytest.mark.parametrize(
@@ -35,9 +33,19 @@ def test_FR_MTR_04_day_cap_blocks_a_reservation_across_runs(tmp_path, cap_kwarg,
     treasury.commit(first, actual=57.5, at=AT)
     second = treasury.reserve("rB", "s1", estimate=50.0, at=AT)  # 57.5 + 57.5 = 115 > 100
     assert isinstance(second, Wait)
-    run_b = treasury.run("rB")
-    assert run_b.reserved == pytest.approx(0.0)
-    assert run_b.spent == pytest.approx(0.0)
+    assert treasury.run("rB").reserved == treasury.run("rB").spent == 0
+
+
+def test_FR_MTR_04_day_caps_count_a_commit_on_its_reservations_utc_day_across_midnight(tmp_path):
+    treasury, _flags = build_treasury(tmp_path, run_credits=1000, user_day_credits=100)
+    for run_id in ("a", "b", "c"):
+        treasury.open_run(run_id, user_id="u", org_id="o", approved=1000)
+    midnight = datetime(2026, 9, 26, tzinfo=UTC)
+    before = (midnight - timedelta(minutes=1)).astimezone(timezone(timedelta(hours=8)))  # 07:59+08:00 = UTC 25th
+    first = treasury.reserve("a", "s1", estimate=80 / 1.15, at=before)
+    treasury.commit(first, actual=80.0, at=midnight + timedelta(seconds=40))  # counts on the 25th, not the 26th
+    assert isinstance(treasury.reserve("b", "s1", estimate=80 / 1.15, at=midnight + timedelta(seconds=50)), Reservation)
+    assert treasury.reserve("c", "s1", estimate=30 / 1.15, at=midnight - timedelta(seconds=30)) == Wait("user_day_cap")
 
 
 def test_FR_MTR_04_repo_config_metering_yaml_has_the_demo_defaults():

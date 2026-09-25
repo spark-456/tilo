@@ -56,9 +56,7 @@ def test_FR_MTR_02_replay_only_flag_refuses_to_reserve(tmp_path):
     treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=1000)
     flags.set("replay_only", True, reason="test")
     assert treasury.reserve("r1", "s1", estimate=10.0, at=AT) == Wait("replay_only")
-    run = treasury.run("r1")
-    assert run.reserved == pytest.approx(0.0)
-    assert run.spent == pytest.approx(0.0)
+    assert treasury.run("r1").reserved == treasury.run("r1").spent == 0
 
 
 def test_FR_MTR_02_grant_raises_the_runs_cap(tmp_path):

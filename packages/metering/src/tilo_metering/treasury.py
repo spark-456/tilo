@@ -1,5 +1,5 @@
 """Treasury (PRD 14.1, 14.5, FR-MTR-02, FR-MTR-04): reserve estimate+15% before a step, commit the
-actual after, append-only ledger. Days are UTC dates of `at`. Daily USD caps/alerts/kill-switch: P8-01c."""
+actual after, append-only ledger. Commits count on their reservation's UTC day. Daily USD caps: P8-01c."""
 
 import threading
 from dataclasses import dataclass
@@ -57,6 +57,7 @@ class LedgerEntry:
     usage: Usage | None = None
     price_effective_date: str | None = None
     price_source: str | None = None
+    day: date | None = None  # commit: the reservation's UTC day
 
 
 @dataclass
@@ -142,7 +143,7 @@ class Treasury:
         # actual is recorded in full; overrun = actual > the reservation, and it halts the run
         with self._lock:
             active = self._active.pop(reservation.id)  # KeyError if already committed or released
-            fields = dict(usage=usage, price_effective_date=price_date, price_source=price_source)
+            fields = dict(usage=usage, price_effective_date=price_date, price_source=price_source, day=active.day)
             entry = LedgerEntry("commit", active.run_id, active.user, active.org, at, active.step_id, actual, **fields)
             self._ledger.append(entry)
             overrun = actual > active.amount + _EPS
@@ -188,14 +189,7 @@ class Treasury:
         return sum(a.amount for a in self._active.values() if a.run_id == run_id)
 
     def _day_total(self, field: str, value: str, day: date) -> float:
-        """Committed (from the ledger, UTC date of `at`) plus reserved (outstanding reservations) for that day."""
-        committed = sum(
-            e.credits
-            for e in self._ledger
-            if e.kind == "commit"
-            and e.credits is not None
-            and getattr(e, field) == value
-            and e.at.astimezone(UTC).date() == day
-        )
-        reserved = sum(a.amount for a in self._active.values() if getattr(a, field) == value and a.day == day)
-        return committed + reserved
+        """Committed plus outstanding credits of that user or org on that UTC day (the reservation's day)."""
+        rows: list[tuple[LedgerEntry | Reservation, float]] = [(a, a.amount) for a in self._active.values()]
+        rows += [(e, e.credits or 0.0) for e in self._ledger if e.kind == "commit"]
+        return sum(n for r, n in rows if r.day == day and getattr(r, field) == value)
