@@ -103,7 +103,7 @@ def test_FR_HIL_06_PI_11_per_day_only_counts_the_same_calendar_day(risk_table_pa
 
 def test_FR_HIL_06_PI_11_credits_within_limit_runs(risk_table_path):
     table = _table(risk_table_path)
-    policy = _l3_policy(per_day=None, credits=100)
+    policy = _l3_policy(per_day=10, credits=100)
     decision = tilo_policy.decide(
         _proposal(credits=20),
         table=table,
@@ -119,7 +119,7 @@ def test_FR_HIL_06_PI_11_credits_exceeded_gates(risk_table_path):
     """limits.credits=100; 4 earlier sends at 20 credits (80) plus this 25-credit send (105)
     goes over, so it waits at a gate — the credits twin of the daily-limit case."""
     table = _table(risk_table_path)
-    policy = _l3_policy(per_day=None, credits=100)
+    policy = _l3_policy(per_day=10, credits=100)
     decision = tilo_policy.decide(
         _proposal(credits=25),
         table=table,
@@ -129,6 +129,7 @@ def test_FR_HIL_06_PI_11_credits_exceeded_gates(risk_table_path):
         now=NOW,
     )
     assert decision.outcome == "gate"
+    assert decision.reason == "l3_credits_cap_reached"
 
 
 def test_FR_HIL_06_PI_11_l3_policy_without_a_daily_limit_covers_nothing(risk_table_path):
