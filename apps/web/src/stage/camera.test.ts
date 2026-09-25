@@ -167,6 +167,15 @@ test("P0-08b camera C4 PRD-9.7 wheel: ctrlKey (trackpad pinch) always zooms and 
   }
 });
 
+test("P0-08b camera C3 C4 PRD-9.7 wheel: a mouse Ctrl + 100px notch (ctrl + wheel) zooms exactly one ZOOM_STEP, never more", () => {
+  const w = (deltaY: number, deltaMode = 0) =>
+    normalizeWheel({ deltaX: 0, deltaY, deltaMode, ctrlKey: true, shiftKey: false }).zoomDelta;
+  expect(w(100)).toBe(-0.1);
+  expect(w(-100)).toBeCloseTo(ZOOM_STEP, 9);
+  expect(w(3, 1)).toBeCloseTo(-ZOOM_STEP, 9);
+  expect(Math.abs(w(-100000))).toBeLessThanOrEqual(ZOOM_STEP + 1e-9);
+});
+
 test("P0-08b camera C5 PRD-9.7 wheel: horizontal intent (deltaX, or Shift + vertical) always pans and never zooms", () => {
   for (let i = 0; i < N; i++) {
     const d = between(-300, 300);

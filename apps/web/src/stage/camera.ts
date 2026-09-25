@@ -7,9 +7,9 @@ export const PAN_STEP_PX = 48;
 export const ZOOM_STEP = 0.1;
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 2;
-/** Trackpad pinch (ctrl + wheel) zoom per px of deltaY: Chromium reports a pinch to scale s
- * as deltaY ~ -100 ln s, so this tracks the fingers near zoom 1. */
-export const PINCH_ZOOM_PER_PX = 0.01;
+/** Trackpad pinch (ctrl + wheel) zoom per px of deltaY. Windows also sends a mouse
+ * Ctrl + notch as ctrl + wheel, so a 100 px event is one ZOOM_STEP and never more (C3). */
+export const PINCH_ZOOM_PER_PX = ZOOM_STEP / 100;
 
 /** x, y: screen-px offset of the world origin from the stage centre; zoom: world scale. */
 export type CameraState = { x: number; y: number; zoom: number };
@@ -49,14 +49,15 @@ export type WheelInput = {
 export type WheelNormalized = { panDx: number; panDy: number; zoomDelta: number };
 
 /** deltaMode 0/1/2 (px/line/page) scale to px by 1/40/800. ctrl + wheel (trackpad pinch)
- * zooms in proportion to deltaY and never pans. Horizontal intent (deltaX, or Shift + a
- * vertical wheel) pans and never zooms. A plain vertical wheel zooms one ZOOM_STEP per
+ * zooms in proportion to deltaY, at most one ZOOM_STEP per event, and never pans. Horizontal
+ * intent (deltaX, or Shift + a vertical wheel) pans and never zooms. A plain vertical wheel zooms one ZOOM_STEP per
  * 100 px notch, proportionally less for smaller deltas, never more than a step per event. */
 export function normalizeWheel(e: WheelInput): WheelNormalized {
   const k = [1, 40, 800][e.deltaMode] ?? 1;
   const dx = e.deltaX * k;
   const dy = e.deltaY * k;
-  if (e.ctrlKey) return { panDx: 0, panDy: 0, zoomDelta: (0 - dy) * PINCH_ZOOM_PER_PX };
+  const capStep = (z: number) => Math.min(ZOOM_STEP, Math.max(-ZOOM_STEP, z));
+  if (e.ctrlKey) return { panDx: 0, panDy: 0, zoomDelta: capStep((0 - dy) * PINCH_ZOOM_PER_PX) };
   if (dx !== 0) return { panDx: 0 - dx, panDy: 0 - dy, zoomDelta: 0 };
   if (e.shiftKey) return { panDx: 0 - dy, panDy: 0, zoomDelta: 0 };
   const steps = Math.min(1, Math.max(-1, (0 - dy) / 100));
