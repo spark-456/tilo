@@ -84,6 +84,25 @@ def level_at(policy: dict, at: str) -> str | None:
     return earlier[-1] if earlier and earlier[-1] in LEVELS else None
 
 
+def level_since(policy: dict, at: str) -> str:
+    """When the level in force at `at` began: the first entry of the last run at that level."""
+    since, current = "", None
+    for entry in policy["history"]:
+        if ts(entry["at"]) > ts(at):
+            break
+        if entry["level"] != current:
+            since, current = entry["at"], entry["level"]
+    return ts(since)
+
+
+@fail_closed(False)
+def stamped_by(policy: dict, now: str) -> bool:
+    """A live decision reads the record as it is: every stamp is dated at or before `now`, so a
+    Stop all or revocation already in the record is never read away (FR-HIL-07, PI-13)."""
+    stamps = [policy["created_by"], policy["changed_by"], *policy["history"]]
+    return all(ts(stamp["at"]) <= ts(now) for stamp in stamps if stamp is not None)
+
+
 @fail_closed(False)
 def in_force(policy: dict, owner: str, at: str) -> bool:
     """PI-06, PI-13: the world owner's policy, made and changed only by the owner, created by
@@ -100,6 +119,8 @@ def in_force(policy: dict, owner: str, at: str) -> bool:
 @fail_closed(None)
 def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | None:
     """PI-06: the level at which a contract-valid `policy` covers `target` at `at`, or None."""
+    if (policy["action_type"], policy["owner"]) != (target.action_type, owner):
+        return None  # cheap filter before the schema check
     if not conforms("policy.schema.json", policy):
         return None
     scope, limits = policy["scope"], policy["limits"].values()
@@ -124,17 +145,18 @@ def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | N
 
 @fail_closed(False)
 def instruction_counts(
-    instruction: dict | None, world_id: str, owner: str, destination: str | None, before: str, applied: list[dict]
+    instruction: dict | None, world_id: str, policy: dict, destination: str | None, before: str, applied: list[dict]
 ) -> bool:
-    """PI-08..PI-10: the owner's own earlier instruction in this world about this destination,
-    signed in or from the bound WhatsApp number (never email), not used by an earlier send."""
+    """PI-08..PI-10: the policy owner's own instruction in this world about this destination,
+    signed in or from the bound WhatsApp number (never email), given while the L2 level in force
+    at `before` was (no earlier than the entry that set it) and not used by an earlier send."""
     return (
         instruction is not None
         and instruction["data"]["channel"] in INSTRUCTION_CHANNELS.get(instruction["type"], ())
         and conforms("event.schema.json", instruction, "id", "type", "actor", "ts", "world_id")
         and conforms(f"events/data/{instruction['type']}.schema.json", instruction["data"], "channel", "destination")
-        and (instruction["world_id"], instruction["actor"]) == (world_id, owner)
-        and ts(instruction["ts"]) < ts(before)
+        and (instruction["world_id"], instruction["actor"]) == (world_id, policy["owner"])
+        and level_since(policy, before) <= ts(instruction["ts"]) < ts(before)
         and destination is not None
         and instruction["data"]["destination"] == destination
         and all(used["data"]["instruction_id"] != instruction["id"] for used in applied)

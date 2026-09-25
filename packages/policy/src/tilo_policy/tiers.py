@@ -5,6 +5,7 @@ the wrong type, are T3."""
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -71,15 +72,17 @@ class RiskTable:
         if not isinstance(self.modifiers, tuple) or not conforms(TABLE_REF, raw):
             raise PolicyConfigError(f"risk table fails contracts/{TABLE_REF}")
 
+    def tier_of(self, action_type: str, modifiers: Iterable[str]) -> str:
+        """Any modifier makes it T3 (even one the table lacks); else the base tier; unknown is T3."""
+        tier = "T3" if list(modifiers) else self.actions.get(action_type, "T3")
+        return tier if tier in ("T1", "T2") else "T3"
+
     def assess(self, action_type: str, facts: SideEffectFacts) -> Assessment:
         try:
             active = facts.active_modifiers()
         except Exception:
             return Assessment("T3", ())
-        if active:  # T3 even if the table somehow lacks the modifier
-            return Assessment("T3", tuple(m for m in self.modifiers if m in active))
-        tier = self.actions.get(action_type, "T3")
-        return Assessment(tier if tier in ("T1", "T2") else "T3", ())
+        return Assessment(self.tier_of(action_type, active), tuple(m for m in self.modifiers if m in active))
 
 
 def load_risk_table(path: str | os.PathLike[str] | None = None) -> RiskTable:

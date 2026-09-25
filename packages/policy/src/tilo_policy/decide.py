@@ -7,7 +7,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from .coverage import Target, add_seconds, covering_level, fail_closed, instruction_counts, ts
+from .coverage import Target, add_seconds, covering_level, fail_closed, instruction_counts, stamped_by, ts
 from .schemas import event_ok
 from .tiers import RiskTable, SideEffectFacts
 
@@ -76,13 +76,14 @@ def _decide(p: Proposal, table: RiskTable, policies: list[dict], owner: str, app
     tier, modifiers = (a := table.assess(p.action_type, p.facts)).tier, a.modifiers
     if tier == "T3":
         return gate(tier, modifiers, "L1", None, "t3_always_gates")
+    ids = [pol["id"] for pol in policies if isinstance(pol, dict) and "id" in pol]
+    if len(set(ids)) != len(ids):  # two records share an id: ambiguous, fail closed (PI-13)
+        return gate(tier, modifiers, "L1", None, "no_covering_policy")
     target = Target(p.action_type, p.connector, p.district, p.facts.recipients)
-    levels = [(lv, pol) for pol in policies if (lv := covering_level(pol, target, owner, now))]
+    levels = [(lv, pol) for pol in policies if (lv := covering_level(pol, target, owner, now)) and stamped_by(pol, now)]
     # A tier's max_level caps every policy; the lowest level in force wins, ties by id (PI-13).
     covering = [(min(lv, table.max_level.get(tier, "L1")), pol["id"], pol) for lv, pol in levels]
     if not covering:
-        return gate(tier, modifiers, "L1", None, "no_covering_policy")
-    if len({c[1] for c in covering}) != len(covering):  # duplicate ids: ambiguous, fail closed
         return gate(tier, modifiers, "L1", None, "no_covering_policy")
     level, policy_id, policy = min(covering, key=lambda c: (c[0], c[1]))
     if level == "L0":
@@ -93,7 +94,7 @@ def _decide(p: Proposal, table: RiskTable, policies: list[dict], owner: str, app
     if level == "L2" and not (  # PI-12: an L2 send never loses its undo window
         isinstance(window, int)
         and window >= 1
-        and instruction_counts(p.instruction, p.world_id, owner, p.destination, now, applied)
+        and instruction_counts(p.instruction, p.world_id, policy, p.destination, now, applied)
     ):
         return gate(tier, modifiers, level, policy_id, "l2_instruction_required")
     capped = over_limit(policy, applied, p.credits, now)

@@ -9,6 +9,7 @@ from typing import Any
 from .coverage import Target, add_seconds, covering_level, instruction_counts, opens_gate
 from .decide import over_limit
 from .schemas import conforms, event_ok
+from .tiers import RiskTable
 
 SLOTS = {
     "reserved_by": ("approval.requested",),
@@ -43,7 +44,7 @@ def _policy_opened(case: dict, applied: dict) -> bool:
         and instruction is not None
         and instruction["id"] == applied["instruction_id"]
         and instruction_counts(
-            instruction, entry["world_id"], policy["owner"], applied["destination"], at, case["earlier_applied"]
+            instruction, entry["world_id"], policy, applied["destination"], at, case["earlier_applied"]
         )
     )
 
@@ -59,8 +60,10 @@ def _breaks_ob01(case: dict) -> bool:
     return auth["type"] != "policy.applied" or not _policy_opened(case, auth["data"])
 
 
-def _breaks_ob05(case: dict) -> bool:
+def _breaks_ob05(case: dict, table: RiskTable | None) -> bool:
     entry, reserved, auth, transfer = case["entry"], case["reserved_by"], case["authorised_by"], case["transfer"]
+    if table is not None and entry["risk_tier"] != table.tier_of(entry["action_type"], entry["modifiers"]):
+        return True  # the tier is the table's, never self-declared (PI-07, PI-14)
     fields = (entry["action_type"], entry["risk_tier"], _pinned(entry["item"]))
     by = (reserved or auth or {}).get("data")
     if by is not None and (by["action_type"], by["risk_tier"], _pinned(by["item"])) != fields:
@@ -91,10 +94,12 @@ def _parts_ok(case: dict) -> bool:
     )
 
 
-def check_entry(case: dict) -> str | None:
+def check_entry(case: dict, table: RiskTable | None = None) -> str | None:
     """None when the entry sends what was authorised, else "OB-01" or "OB-05". A case too
     malformed to read is never valid (fail closed: "OB-01")."""
     try:
-        return "OB-01" if not _parts_ok(case) or _breaks_ob01(case) else ("OB-05" if _breaks_ob05(case) else None)
+        return (
+            "OB-01" if not _parts_ok(case) or _breaks_ob01(case) else ("OB-05" if _breaks_ob05(case, table) else None)
+        )
     except Exception:
         return "OB-01"
