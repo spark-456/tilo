@@ -1,8 +1,12 @@
 - [Skill checker attacks](skill-checker-attacks.md) — FR-AGT-04 check.py crash on unhashable ids; weak injection regex
 - [Web stage attack patterns](web-stage-attack-patterns.md) — passive wheel error; canvas edges; modifier keys; timer-stopped ticker leaves stale grid
+- [Policy engine attack patterns](policy-engine-attack-patterns.md) — tier normalise/check drift, unicode \d timestamps, NaN caps
+- [API route attack patterns](api-route-attack-patterns.md) — kill-switch partial commit on unmapped policy, vis list leaks hidden ids, O(n) seq
 - [Archive redaction attacks](archive-redaction-attacks.md) — FR-MEM-04 quadratic JWT regex, log arg leaks, CLI crash on partial line
 - [Harness writer lease attacks](harness-writer-lease-attacks.md) — P0-09 same writer_id double lease overwrites Firestore events
 - [Eval harness recording validation](eval-harness-recording-validation.md) — fixes cover the repro only; fuzz every event field the runner reads
+- [Outbox attack patterns](outbox-attack-patterns.md) — unclaimed pending flush double-emits; lease expiry mid-send; foreign-config fails entries
+- [API kill-switch attack patterns](api-kill-switch-attack-patterns.md) — slow-failing writer blows 5 s under lock; revoke unguarded; shallow data redaction
 - [Outbox attack patterns](outbox-attack-patterns.md) — restart loses pending; foreign config; lease expiry mid-emit double emits; poison head-of-line
 - [API kill-switch attack patterns](api-kill-switch-attack-patterns.md) — raising/slow EventWriter breaks stop-all; str districts substring leak
 - [Metering loader attack patterns](metering-loader-attack-patterns.md) — generated models drop const/if-then; YAML parse and missing-file errors escape
