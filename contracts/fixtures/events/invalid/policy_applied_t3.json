@@ -1,0 +1,51 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000133",
+  "seq": 133,
+  "ts": "2026-09-29T09:42:13.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "policy.applied",
+  "actor": "pol_autopilot_l2",
+  "target": "G1",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "Your Autopilot policy opened the gate; the reply sends in 60 s unless you cancel.",
+  "cause": null,
+  "vis": "all",
+  "authz": {
+    "by": "policy",
+    "ref": "pol_autopilot_l2",
+    "at": "2026-09-29T09:42:16.000Z"
+  },
+  "data": {
+    "policy_id": "pol_autopilot_l2",
+    "gate_id": "G1",
+    "outbox_id": "01JB5VQ0000000000000009006",
+    "action_type": "send_email",
+    "connector": "gmail",
+    "destination": "thread-supplier-1",
+    "district": "D1",
+    "risk_tier": "T3",
+    "level": "L2",
+    "instruction_id": "01JB5VQ0000000000000000131",
+    "undo_window_s": 60,
+    "item": {
+      "artifact_id": "art_followup_reply",
+      "version": 1
+    },
+    "credits": 2
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

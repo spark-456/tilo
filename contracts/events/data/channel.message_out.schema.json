@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/channel.message_out.schema.json",
+  "x-version": "1.0.0",
+  "title": "ChannelMessageOutData",
+  "description": "data of channel.message_out (PRD 9.5). A message from Tilo to a person. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message carries a card.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["channel", "message_ref", "card_id"],
+  "properties": {
+    "channel": { "type": "string", "enum": ["whatsapp", "email"] },
+    "message_ref": { "$ref": "../../event.schema.json#/$defs/archive_ref" },
+    "card_id": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/ulid" }, { "type": "null" }]
+    }
+  }
+}

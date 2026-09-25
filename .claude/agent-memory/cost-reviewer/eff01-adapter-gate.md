@@ -1,18 +1,18 @@
 ---
 name: eff01-adapter-gate
-description: EFF-01 gate must live in the adapters, not only the factory/replay wrapper; P0-05 adapters built real clients with LIVE unset
+description: EFF-01 gate must live in the adapters, not only the factory/replay wrapper; P0-05 adapters built real clients with LIVE unset until d838fe6
 metadata:
   type: project
 ---
 
-P0-05 review (2026-09-25): LIVE=1 was checked only in `RecordReplayProvider`. `GoogleModelProvider(client=None)` and `OpenAICompatModelProvider(transport=None)` built real network clients with LIVE unset. The factory even told callers to construct openai_compat directly. A probe reached integrate.api.nvidia.com and got HTTP 404.
+P0-05 review (2026-09-25): at first, LIVE=1 was checked only in `RecordReplayProvider`. `GoogleModelProvider(client=None)` and `OpenAICompatModelProvider(transport=None)` built real network clients with LIVE unset. A probe reached integrate.api.nvidia.com.
 
-Re-review at ca3157b: three fix commits later the gap was still there. The fixes addressed secret scrubbing and https only, not the LIVE gate. Name the gate fix explicitly in the verdict, because builders fix the other findings and leave this one.
+The fix took four reviews: builders fixed the other findings (secret scrubbing, https-only) and left the gate. Name the gate fix explicitly in any verdict. It was fixed at d838fe6, where both constructors raise ProviderError before building a client, and that review passed.
 
 **Why:** a gate only in the wrapper is bypassed by any direct adapter construction. EFF-01 says no code path, so this counts.
 
-**How to apply:** in any provider, search, safety or speech adapter review, run a probe that constructs the adapter directly with LIVE unset and no injected transport. Expect a refusal before a client exists. Also check that a CI hosts-file block covers every endpoint host.
-
-Third review at ca3157b (same head, 2026-09-25): gate still missing in both adapters; also `test_PL_02_nim_profiles_load_through_the_same_loader_and_denylist` fails (base_url/api_key_env rejected as extra fields by ProvidersModels), so the NIM profile shape likely needs a contract change.
-
-Fourth review (still ca3157b, 2026-09-25): no new commits; same two defects. If the head is unchanged, check the HEAD sha first and re-verify quickly instead of a full re-review.
+**How to apply:** in any provider, search, safety or speech adapter review:
+- Run a scratchpad probe that constructs the adapter directly with LIVE unset and no injected transport. Expect a refusal before a client exists.
+- Check that TILO_RECORD=1 without LIVE still hits ReplayMissError and builds no live provider.
+- Check that the CI hosts-file block covers every endpoint host.
+- If the HEAD sha is unchanged since the last review, re-verify quickly instead of doing a full review.

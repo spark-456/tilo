@@ -13,8 +13,14 @@ import pathlib
 
 import pytest
 from _lib import build_registry, contracts_dir
+from hypothesis import settings
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+# Timing is not a contract property. Under load (parallel sessions, CI) the 200 ms default
+# deadline made regex-driven property tests flaky; the properties themselves are unchanged.
+settings.register_profile("contracts", deadline=None)
+settings.load_profile("contracts")
 
 
 @pytest.fixture(scope="session")

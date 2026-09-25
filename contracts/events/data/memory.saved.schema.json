@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/memory.saved.schema.json",
+  "x-version": "1.0.0",
+  "title": "MemorySavedData",
+  "description": "data of memory.saved (PRD 9.5). layer is a PRD 13.1 memory layer that a run writes to.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["layer", "item_count"],
+  "properties": {
+    "layer": {
+      "type": "string",
+      "enum": ["result_cache", "artifact_memory", "decisions", "preferences"]
+    },
+    "item_count": { "type": "integer", "minimum": 1 }
+  }
+}

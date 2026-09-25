@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.context_handoff_completed.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentContextHandoffCompletedData",
+  "description": "data of agent.context_handoff_completed (PRD 9.5). The successor re-ran the note's verification step before continuing (PRD 8.5, FR-AGT-09).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["predecessor", "note", "verification_passed"],
+  "properties": {
+    "predecessor": { "$ref": "../../common.schema.json#/$defs/agent_id" },
+    "note": { "$ref": "../../common.schema.json#/$defs/artifact_ref" },
+    "verification_passed": { "type": "boolean" }
+  }
+}

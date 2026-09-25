@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/connection.rate_limited.schema.json",
+  "x-version": "1.0.0",
+  "title": "ConnectionRateLimitedData",
+  "description": "data of connection.rate_limited (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["connector", "retry_after_s"],
+  "properties": {
+    "connector": { "$ref": "../../common.schema.json#/$defs/connector_id" },
+    "retry_after_s": { "type": "integer", "minimum": 0 }
+  }
+}

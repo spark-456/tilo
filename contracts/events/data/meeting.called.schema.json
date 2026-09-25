@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/meeting.called.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingCalledData",
+  "description": "data of meeting.called (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["card_id", "attendees"],
+  "properties": {
+    "card_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "attendees": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "anyOf": [
+          { "$ref": "../../common.schema.json#/$defs/agent_id" },
+          { "$ref": "../../common.schema.json#/$defs/user_id" },
+          { "$ref": "../../common.schema.json#/$defs/team_lead_id" }
+        ]
+      }
+    }
+  }
+}

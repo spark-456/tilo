@@ -1,0 +1,22 @@
+# Risk tiers (PRD 10.4). Shape: contracts/policy.schema.json#/$defs/risk_tier_table.
+# The deterministic policy engine (P4) loads this table; `just contracts-check` validates it.
+# An action type not listed here is T3 (BQ-44). A modifier raises any action to T3, and all six
+# are required by the schema, so none can be dropped. T3 runs at L1 only: a person decides.
+actions:
+  create_draft: T1
+  save_file: T1
+  send_email: T2
+  post_status_update: T2
+  share_file: T3
+  delete_file: T3
+modifiers:
+  - {condition: new_recipients, raises_to: T3}
+  - {condition: attachments, raises_to: T3}
+  - {condition: external_sharing, raises_to: T3}
+  - {condition: deletion, raises_to: T3}
+  - {condition: money_or_legal, raises_to: T3}
+  - {condition: safety_flag, raises_to: T3}
+max_level:
+  T1: L3
+  T2: L3
+  T3: L1

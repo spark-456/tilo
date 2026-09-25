@@ -1,0 +1,9 @@
+{
+  "id": "tl_finance",
+  "user": "u_finance_lead",
+  "domain": "finance",
+  "assigned_by": {
+    "by": "u_owner",
+    "at": "2026-09-29T09:00:00.000Z"
+  }
+}

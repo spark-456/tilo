@@ -17,6 +17,7 @@
     "undo_window_s",
     "expiry",
     "notify_channel",
+    "team_lead_domains",
     "created_by",
     "changed_by",
     "history"
@@ -41,13 +42,24 @@
       "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
     },
     "notify_channel": { "$ref": "common.schema.json#/$defs/channel" },
+    "team_lead_domains": {
+      "description": "Expert domains (PRD 8.3, for example security or finance; not email domains, which are scope.domains) whose Team Leads may open this action type's gates in the owner's worlds (PRD 10.1: 'in their domain, if the policy allows'). Empty lets no Team Lead open them. The owner, and an Approver the gate names, need no policy. Like scope, read from the current record (outbox OB-01).",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/slug" }
+    },
     "created_by": { "$ref": "#/$defs/stamp" },
     "changed_by": { "anyOf": [{ "$ref": "#/$defs/stamp" }, { "type": "null" }] },
-    "history": { "type": "array", "items": { "$ref": "#/$defs/history_entry" } }
+    "history": {
+      "description": "Every change, oldest first, starting with the creation, so never empty: each entry's at is no earlier than the one before, and the record's level equals the last entry's level (validator, outbox OB-01). The level in force at a time is the level of the last entry at or before it; a revocation or Stop all autopilot is an entry at L1 (policy.changed). Only the owner creates and changes a policy (PRD 10.1; a Team Lead only proposes), so every entry's by, like created_by.by and changed_by.by, equals owner; a record that breaks this covers nothing (validator, outbox OB-01).",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/history_entry" }
+    }
   },
-  "if": { "properties": { "level": { "const": "L3" } }, "required": ["level"] },
+  "if": { "properties": { "level": { "enum": ["L2", "L3"] } }, "required": ["level"] },
   "then": {
-    "description": "L3 standing rules need a daily limit (FR-HIL-06).",
+    "description": "A policy that acts without a person at the gate needs a daily limit: L3 standing rules (FR-HIL-06) and L2 (BQ-30).",
     "properties": { "limits": { "properties": { "per_day": { "type": "integer" } } } }
   },
   "$defs": {
@@ -158,19 +170,21 @@
       "additionalProperties": false,
       "required": ["condition", "raises_to"],
       "properties": {
-        "condition": {
-          "type": "string",
-          "enum": [
-            "new_recipients",
-            "attachments",
-            "external_sharing",
-            "deletion",
-            "money_or_legal",
-            "safety_flag"
-          ]
-        },
+        "condition": { "$ref": "#/$defs/tier_condition" },
         "raises_to": { "const": "T3" }
       }
+    },
+    "tier_condition": {
+      "description": "A PRD 10.4 context condition that raises any action to T3; also listed on the outbox entry it applies to (outbox.schema.json modifiers).",
+      "type": "string",
+      "enum": [
+        "new_recipients",
+        "attachments",
+        "external_sharing",
+        "deletion",
+        "money_or_legal",
+        "safety_flag"
+      ]
     },
     "max_level": {
       "description": "Highest autonomy level per tier; T3 is always L1 (a person).",
