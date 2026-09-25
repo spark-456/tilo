@@ -21,14 +21,6 @@ def _load_one(tmp_path, **kwargs):
     return case
 
 
-def _expect_error(tmp_path, needle: str | None, **kwargs) -> None:
-    write_case(tmp_path / "cases", **kwargs)
-    with pytest.raises(CaseError) as excinfo:
-        load_cases(root=str(tmp_path / "cases"))
-    if needle:
-        assert needle in str(excinfo.value)
-
-
 def test_EFF_07_load_cases_loads_a_well_formed_case(tmp_path):
     rec = "evals/recordings/E-PLAN-01.jsonl"
     case = _load_one(tmp_path, case_id="E-PLAN-01", group="E-PLAN", ground_truth={"ok": True}, recording=rec)
@@ -61,7 +53,9 @@ def test_EFF_07_load_cases_allows_a_skeleton_with_null_truth_notes_and_an_autora
     ids="bad-id group-diff name-diff bad-check need-truth need-check rec-up rec-drive rec-abs rec-nl measure".split(),
 )
 def test_EFF_07_load_cases_rejects_malformed_cases(tmp_path, needle, kwargs):
-    _expect_error(tmp_path, needle, ground_truth=kwargs.pop("ground_truth", {"ok": True}), **kwargs)
+    write_case(tmp_path / "cases", ground_truth=kwargs.pop("ground_truth", {"ok": True}), **kwargs)
+    with pytest.raises(CaseError, match=needle):
+        load_cases(root=str(tmp_path / "cases"))
 
 
 def test_EFF_07_load_cases_rejects_a_duplicate_id(tmp_path):
@@ -72,8 +66,13 @@ def test_EFF_07_load_cases_rejects_a_duplicate_id(tmp_path):
         load_cases(root=str(tmp_path / "cases"))
 
 
+_DEEP = b"[" * 5000 + b"]" * 5000  # nesting past the recursion limit
+
+
 @pytest.mark.parametrize(
-    "name,data", [("x.yaml", b"id: [unclosed"), ("x.yaml", b"\xff\xfe id: x"), ("E-PLAN-01.yml", b"")]
+    "name,data",
+    [("x.yaml", b"id: [unclosed"), ("x.yaml", b"\xff\xfe id: x"), ("E-PLAN-01.yml", b""), ("x.yaml", _DEEP)],
+    ids="unclosed utf8 yml deep".split(),
 )
 def test_EFF_07_load_cases_raises_case_error_naming_an_unreadable_or_yml_file(tmp_path, name, data):
     path = write_case(tmp_path / "cases", case_id="E-PLAN-01", group="E-PLAN", ground_truth={}, filename=name)
@@ -83,14 +82,21 @@ def test_EFF_07_load_cases_raises_case_error_naming_an_unreadable_or_yml_file(tm
 
 
 _CONFIG = {"credit_cap": {"full": 2000}, "deploy_gate_repeats": 3, "cost_regression_threshold": 0.2, "groups": {}}
-_BAD = "cost_regression_threshold: a|cost_regression_threshold: ~|credit_cap: {a: -5}|deploy_gate_repeats: -3|groups: x"
+_PATCHES = "cost_regression_threshold: a|cost_regression_threshold: ~|credit_cap: {a: -5}|deploy_gate_repeats: -3|"
+_PATCHES += "groups: x|deploy_gate_repeats: 0|groups: {a: true}|credit_cap: {a: 1.5}"
+_BAD = [b"groups: [unclosed", b"\xff\xfe groups: {}", b"groups: " + _DEEP, {"deploy_gate_repeats": 10**400}]
+_BAD += [{"cost_regression_threshold": float("inf")}, {"cost_regression_threshold": float("nan")}]
 
 
-@pytest.mark.parametrize("patch", ["", *_BAD.split("|")])
-def test_EFF_07_evals_config_loads_an_explicit_path_and_rejects_bad_values(tmp_path, patch):
-    (path := tmp_path / "evals.yaml").write_text(yaml.safe_dump({**_CONFIG, **yaml.safe_load("{" + patch + "}")}))
-    if not patch:
+@pytest.mark.parametrize(
+    "bad", [None, *_BAD, *(yaml.safe_load("{" + p + "}") for p in _PATCHES.split("|"))], ids=lambda b: repr(b)[:40]
+)
+def test_EFF_07_evals_config_loads_an_explicit_path_and_rejects_bad_files_and_values(tmp_path, bad):
+    body = bad if isinstance(bad, bytes) else yaml.safe_dump({**_CONFIG, **(bad or {})}).encode("utf-8")
+    (path := tmp_path / "evals.yaml").write_bytes(body)
+    if bad is None:
         assert EvalsConfig.load(str(path)) == EvalsConfig(**_CONFIG)
-    else:
-        with pytest.raises(EvalsConfigError, match=patch.split(":")[0]):
+    else:  # names the file and, for a bad value, the key
+        key = "" if isinstance(bad, bytes) else next(iter(bad))
+        with pytest.raises(EvalsConfigError, match=f"evals[.]yaml(?s:.*){key}"):
             EvalsConfig.load(str(path))

@@ -8,17 +8,9 @@ from tilo_evals import checks as checks_registry
 from tilo_evals.checks import CheckResult
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-_DEFAULTS = {
-    "title": "Fixture case",
-    "measures": ["EFF-07"],
-    "status": "ready",
-    "deploy_gate": False,
-    "inputs": {},
-    "scripted_answers": [],
-    "ground_truth": None,
-    "recording": None,
-    "checks": [{"check": "no_side_effects", "args": {}}],
-}
+_DEFAULTS = {"title": "Fixture case", "measures": ["EFF-07"], "status": "ready", "deploy_gate": False}
+_DEFAULTS |= {"inputs": {}, "scripted_answers": [], "ground_truth": None, "recording": None}
+_DEFAULTS["checks"] = [{"check": "no_side_effects", "args": {}}]
 
 
 @checks_registry.register("no_side_effects")

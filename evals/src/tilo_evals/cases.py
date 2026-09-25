@@ -7,12 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import jsonschema
-import yaml
 
 from . import checks as checks_registry
+from .config import read_yaml
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-CASE_SCHEMA_PATH = REPO_ROOT / "evals" / "case.schema.json"
+CASE_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "evals" / "case.schema.json"
 
 
 class CaseError(Exception):
@@ -44,13 +43,9 @@ def load_cases(root: str = "evals/cases") -> list[Case]:
     seen: dict[str, Path] = {}
     cases: list[Case] = []
     for case_path in sorted(p for p in root_path.rglob("*") if p.suffix.lower() in (".yaml", ".yml")):
-        try:
-            raw: Any = yaml.safe_load(case_path.read_text(encoding="utf-8")) or {}
-        except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
-            raise CaseError(f"{case_path}: not a readable UTF-8 YAML file: {exc}") from exc
+        raw = read_yaml(case_path, CaseError)
         case_id = raw.get("id", "<missing id>") if isinstance(raw, dict) else "<not a mapping>"
-        errors = sorted(validator.iter_errors(raw), key=lambda e: list(e.path))
-        if errors:
+        if errors := sorted(validator.iter_errors(raw), key=lambda e: list(e.path)):
             raise CaseError(
                 f"{case_path}: {case_id!r} failed case.schema.json: " + "; ".join(e.message for e in errors)
             )
@@ -66,6 +61,5 @@ def load_cases(root: str = "evals/cases") -> list[Case]:
             raise CaseError(f"duplicate case id {case_id!r}: {seen[case_id]} and {case_path}")
         seen[case_id] = case_path
         kwargs = dict(raw, measures=tuple(raw["measures"]), scripted_answers=tuple(raw["scripted_answers"]))
-        kwargs.setdefault("notes", None)
         cases.append(Case(path=case_path, **kwargs))
     return cases
