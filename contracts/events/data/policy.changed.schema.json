@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/events/data/policy.changed.schema.json",
   "x-version": "1.0.0",
   "title": "PolicyChangedData",
-  "description": "data of policy.changed (PRD 9.5). The owner created, edited or revoked a policy, or used Stop all autopilot, which sets every policy to L1 (one event per policy). Only the owner changes policies (PRD 10.1), so authz is by person.",
+  "description": "data of policy.changed (PRD 9.5). The owner created, edited or revoked a policy, or used Stop all autopilot, which sets every policy to L1 (one event per policy). Revoking also sets the policy to L1, as if it did not exist: it authorises nothing and its next send waits at a gate (FR-HIL-03). level is the level after the change and is appended to the policy's history, so a send after a revocation or Stop all is never covered, even if the owner raises the level again later (outbox OB-01, BQ-31). Only the owner changes policies (PRD 10.1), so authz is by person.",
   "type": "object",
   "additionalProperties": false,
   "required": ["policy_id", "change", "level"],
@@ -12,6 +12,6 @@
     "change": { "type": "string", "enum": ["created", "edited", "revoked", "stop_all"] },
     "level": { "$ref": "../../common.schema.json#/$defs/autonomy_level" }
   },
-  "if": { "properties": { "change": { "const": "stop_all" } }, "required": ["change"] },
+  "if": { "properties": { "change": { "enum": ["revoked", "stop_all"] } }, "required": ["change"] },
   "then": { "properties": { "level": { "const": "L1" } } }
 }

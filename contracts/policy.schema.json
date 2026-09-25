@@ -43,7 +43,12 @@
     "notify_channel": { "$ref": "common.schema.json#/$defs/channel" },
     "created_by": { "$ref": "#/$defs/stamp" },
     "changed_by": { "anyOf": [{ "$ref": "#/$defs/stamp" }, { "type": "null" }] },
-    "history": { "type": "array", "items": { "$ref": "#/$defs/history_entry" } }
+    "history": {
+      "description": "Every change, oldest first, starting with the creation, so never empty: each entry's at is no earlier than the one before, and the record's level equals the last entry's level (validator, outbox OB-01). The level in force at a time is the level of the last entry at or before it; a revocation or Stop all autopilot is an entry at L1 (policy.changed).",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/history_entry" }
+    }
   },
   "if": { "properties": { "level": { "enum": ["L2", "L3"] } }, "required": ["level"] },
   "then": {

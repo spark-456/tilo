@@ -3,13 +3,14 @@ the authorisation that was given.
 
 OB-01 and OB-05 (contracts/outbox.rules.md; harness validator, P0-09). OB-01: the entry's id is
 the outbox_id reserved for it; on a gate it was opened by an approval.resolved answering approve
-on that gate, otherwise by a policy.applied under a policy that covers it (action type, level,
-undo window, created before and not expired, owned by the world's owner, connector, recipients
-and district in scope; at L2 also the owner's own earlier instruction in this world about the
-same destination, PRD 10.4 "instruction is approval", given where Tilo knows who sent it: signed
-in on the web or mobile web, or from the owner's bound WhatsApp number, never by email, PRD 10.3
-and 11.1; and no earlier policy.applied used that instruction, even if its entry was cancelled);
-the entry's authz equals
+on that gate, otherwise by a policy.applied under a policy that covers it (action type and
+undo window, created before and not expired, at the applied level when the send was authorised
+(its last history entry at or before authz.at, so not after a revocation or Stop all autopilot),
+owned by the world's owner, connector, recipients and district in scope; at L2 also the owner's
+own earlier instruction in this world about the same destination, PRD 10.4 "instruction is
+approval", given where Tilo knows who sent it: signed in on the web or mobile web, or from the
+owner's bound WhatsApp number, never by email, PRD 10.3 and 11.1; and no earlier policy.applied
+used that instruction, even if its entry was cancelled); the entry's authz equals
 that event's authz, and the data.transfer it emitted carries the same authz. OB-05: its action
 type, tier and pinned item (artifact id and version) equal those approval.requested reserved or
 policy.applied assessed, and on the policy path also its connector, destination and undo window;
@@ -20,6 +21,8 @@ name state. The P0-09 validator's tests must run the same files.
 """
 
 from __future__ import annotations
+
+from itertools import pairwise
 
 import pytest
 from _events_lib import load_registry_raw, registry_entries
@@ -80,11 +83,25 @@ def _within(allowed, value) -> bool:
     return not allowed or value in allowed
 
 
-def _instructed(entry, applied, policy, instruction, earlier) -> bool:
+def _level_at(policy, at):
+    """OB-01: the policy's level in force at `at`, the level of its last history entry at or before
+    `at` (history is oldest first), or None before the first entry. A record that is out of time
+    order, or whose level is not its last entry's, covers nothing. So a revocation or Stop all
+    autopilot (an entry at L1) before the send is never skipped, even if the owner raised the level
+    again later (PRD 10.4, FR-HIL-03, FR-HIL-07)."""
+    history = policy["history"]
+    in_order = all(a["at"] <= b["at"] for a, b in pairwise(history))
+    if not history or not in_order or history[-1]["level"] != policy["level"]:
+        return None
+    earlier = [h["level"] for h in history if h["at"] <= at]
+    return earlier[-1] if earlier else None
+
+
+def _instructed(entry, applied, level, policy, instruction, earlier) -> bool:
     """OB-01, L2: the policy owner's own earlier instruction in this world, from a signed-in session
     or the owner's bound WhatsApp number (never email), asked for this send, and no earlier
     policy.applied used it up (whatever became of that entry, cancelled included)."""
-    if policy["level"] != "L2":
+    if level != "L2":
         return applied["instruction_id"] is None and instruction is None
     return (
         instruction is not None
@@ -103,14 +120,15 @@ def _policy_covers(entry, applied, policy, world_owner, instruction, earlier) ->
     """OB-01, policy path: the policy named by policy_id covers this entry within its scope."""
     scope = policy["scope"]
     at = entry["authz"]["at"]
+    level = _level_at(policy, at)
     return (
         policy["id"] == applied["policy_id"]
         and policy["owner"] == world_owner
-        and (policy["action_type"], policy["level"], policy["undo_window_s"])
+        and (policy["action_type"], level, policy["undo_window_s"])
         == (applied["action_type"], applied["level"], applied["undo_window_s"])
         and policy["created_by"]["at"] <= at
         and (policy["expiry"] is None or at < policy["expiry"])
-        and _instructed(entry, applied, policy, instruction, earlier)
+        and _instructed(entry, applied, level, policy, instruction, earlier)
         and applied["connector"] in scope["connectors"]
         and _within(scope["districts"], applied["district"])
         and all(
@@ -248,6 +266,9 @@ def test_FR_WLD_03_OB_01_OB_05_policy_path_has_an_invalid_case_per_binding(repo_
         "ob01_policy_expired",
         "ob01_policy_created_after_send",
         "ob01_policy_owned_by_someone_else",
+        "ob01_policy_revoked_before_send",
+        "ob01_policy_stopped_before_send",
+        "ob01_policy_level_not_its_last_history_level",
         "ob01_l2_policy_without_instruction",
         "ob01_l2_instruction_from_someone_else",
         "ob01_l2_instruction_on_another_thread",

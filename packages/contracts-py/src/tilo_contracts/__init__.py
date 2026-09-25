@@ -66,7 +66,7 @@
 # events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
 # events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
 # events/data/policy.applied.schema.json 1.0.0 sha256:c9475618991d6823
-# events/data/policy.changed.schema.json 1.0.0 sha256:59660440803c39ed
+# events/data/policy.changed.schema.json 1.0.0 sha256:7aa9fefcb660918f
 # events/data/question.answered.schema.json 1.0.0 sha256:908aeadfaca479ab
 # events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
 # events/data/skill.loaded.schema.json 1.0.0 sha256:acddc05d7bde55d2
@@ -82,7 +82,7 @@
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
-# policy.schema.json 1.0.0 sha256:fa0ae3091f381ed4
+# policy.schema.json 1.0.0 sha256:66c81e391f5b6d3b
 # providers.schema.json 1.0.0 sha256:2795c1640ddad594
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
 # events/registry.yaml 1.0.0 sha256:82aaca6089b684c1
@@ -991,7 +991,7 @@ class PlanQuestionsAskedData(BaseModel):
 
 class PolicyChangedData(BaseModel):
     """
-    data of policy.changed (PRD 9.5). The owner created, edited or revoked a policy, or used Stop all autopilot, which sets every policy to L1 (one event per policy). Only the owner changes policies (PRD 10.1), so authz is by person.
+    data of policy.changed (PRD 9.5). The owner created, edited or revoked a policy, or used Stop all autopilot, which sets every policy to L1 (one event per policy). Revoking also sets the policy to L1, as if it did not exist: it authorises nothing and its next send waits at a gate (FR-HIL-03). level is the level after the change and is appended to the policy's history, so a send after a revocation or Stop all is never covered, even if the owner raises the level again later (outbox OB-01, BQ-31). Only the owner changes policies (PRD 10.1), so authz is by person.
     """
 
     model_config = ConfigDict(
@@ -2092,7 +2092,10 @@ class Policy(BaseModel):
     notify_channel: Channel
     created_by: PolicyStamp
     changed_by: PolicyStamp | None
-    history: list[PolicyHistoryEntry]
+    history: Annotated[list[PolicyHistoryEntry], Field(min_length=1)]
+    """
+    Every change, oldest first, starting with the creation, so never empty: each entry's at is no earlier than the one before, and the record's level equals the last entry's level (validator, outbox OB-01). The level in force at a time is the level of the last entry at or before it; a revocation or Stop all autopilot is an entry at L1 (policy.changed).
+    """
 
 
 class PolicyTierModifier(BaseModel):
