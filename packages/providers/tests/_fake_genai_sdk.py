@@ -25,7 +25,8 @@ importable here to verify field names against, so this fakes the minimal,
 best-effort shape documented in the SDK's README (`response.text`,
 `errors.APIError.code`/`.message`) plus the fields the google adapter needs
 for PL-02's conformance set (`function_calls`, `usage_metadata`,
-`total_tokens`, `prompt_feedback.block_reason`). If the real SDK's field
+`total_tokens`, `prompt_feedback.block_reason`, `candidates[0].
+finish_reason`). If the real SDK's field
 names differ, the builder reconciles this fake with the real one when
 implementing the adapter -- the acceptance test itself (call `generate`,
 assert the mapped `GenerateResponse`) does not change.
@@ -71,11 +72,22 @@ class FakePromptFeedback:
 
 
 @dataclass
+class FakeCandidate:
+    """Stands in for a `genai.types.Candidate` (SDK README section 5): the
+    generated-response counterpart to `FakePromptFeedback` -- a candidate
+    can be blocked by `finish_reason` (SAFETY, PROHIBITED_CONTENT, etc)
+    with no `prompt_feedback.block_reason` set at all."""
+
+    finish_reason: str | None = None
+
+
+@dataclass
 class FakeGenerateContentResponse:
     text: str | None = None
     function_calls: list[FakeFunctionCall] = field(default_factory=list)
     usage_metadata: FakeUsageMetadata | None = None
     prompt_feedback: FakePromptFeedback | None = None
+    candidates: list[FakeCandidate] = field(default_factory=list)
 
 
 @dataclass

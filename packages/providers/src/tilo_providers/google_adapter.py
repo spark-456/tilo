@@ -28,6 +28,13 @@ def _genai_module(name: str) -> Any:
     return importlib.import_module(name)
 
 
+# Finish reasons the SDK uses to mark a *generated* response as blocked
+# (distinct from `prompt_feedback.block_reason`, which blocks the prompt
+# before generation starts). Mirrors openai_compat_adapter's
+# `finish_reason == "content_filter"` handling.
+_SAFETY_FINISH_REASONS = frozenset({"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION"})
+
+
 class GoogleModelProvider(ModelProvider):
     def __init__(
         self,
@@ -87,6 +94,15 @@ class GoogleModelProvider(ModelProvider):
         if block_reason:
             # Honesty rule: a blocked response surfaces as SafetyError, not text.
             raise SafetyError(f"blocked by safety filter: {block_reason}")
+
+        candidates = getattr(response, "candidates", None) or []
+        finish_reason = getattr(candidates[0], "finish_reason", None) if candidates else None
+        if finish_reason in _SAFETY_FINISH_REASONS:
+            # Honesty rule: Gemini usually blocks a *generated* response this
+            # way (response.text is None with no prompt_feedback.block_reason
+            # at all) -- without this check that would surface as an empty
+            # success instead of a safety block.
+            raise SafetyError(f"blocked by safety filter: finish_reason={finish_reason!r}")
 
         tool_calls: list[dict[str, Any]] | None = None
         function_calls = getattr(response, "function_calls", None)

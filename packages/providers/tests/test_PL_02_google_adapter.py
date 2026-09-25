@@ -37,6 +37,7 @@ import json
 import pytest
 from _fake_genai_sdk import (
     FakeAPIError,
+    FakeCandidate,
     FakeClient,
     FakeCountTokensResponse,
     FakeFunctionCall,
@@ -232,6 +233,36 @@ def test_PL_02_google_adapter_maps_a_safety_block_to_safety_error(fake_genai_sdk
 
     with pytest.raises(provider_errors.SafetyError):
         provider.generate(GenerateRequest(prompt="something unsafe"))
+
+
+def test_PL_02_google_adapter_maps_a_candidate_safety_finish_to_safety_error(fake_genai_sdk):
+    """Review fix: Gemini usually blocks a *generated* response through
+    `candidates[0].finish_reason` (e.g. "SAFETY"), not through
+    `prompt_feedback.block_reason` -- `response.text` is `None` with no
+    prompt-level block at all. Without mapping this, the adapter would
+    return an empty success instead of raising SafetyError."""
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    blocked = FakeGenerateContentResponse(text=None, candidates=[FakeCandidate(finish_reason="SAFETY")])
+    models_api = FakeModelsAPI(generate_content_result=blocked)
+    provider = _provider(models_api)
+
+    with pytest.raises(provider_errors.SafetyError):
+        provider.generate(GenerateRequest(prompt="something unsafe"))
+
+
+def test_PL_02_google_adapter_stream_maps_a_candidate_safety_finish_to_safety_error(fake_genai_sdk):
+    """Same as above, through a streamed chunk -- `_map_response` is shared
+    between `generate` and `stream`, so a blocked chunk must also raise
+    instead of being yielded as an ordinary (empty) `GenerateResponse`."""
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    chunks = [FakeGenerateContentResponse(text=None, candidates=[FakeCandidate(finish_reason="PROHIBITED_CONTENT")])]
+    models_api = FakeModelsAPI(generate_content_stream_result=chunks)
+    provider = _provider(models_api)
+
+    with pytest.raises(provider_errors.SafetyError):
+        list(provider.stream(GenerateRequest(prompt="something unsafe")))
 
 
 class _RealEmbedModelsAPI:
