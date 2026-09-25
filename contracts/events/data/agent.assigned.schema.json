@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.assigned.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentAssignedData",
+  "description": "data of agent.assigned (PRD 9.5). actor (a Lead or the Director) assigned target, an agent, to a plan unit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["unit"],
+  "properties": { "unit": { "$ref": "../../common.schema.json#/$defs/unit_id" } }
+}

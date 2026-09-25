@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/world.failed.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorldFailedData",
+  "description": "data of world.failed (PRD 9.5). The run stopped for good; unit is the plan unit that failed, if one did.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reason", "unit"],
+  "properties": {
+    "reason": { "type": "string", "minLength": 1, "maxLength": 140 },
+    "unit": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/unit_id" }, { "type": "null" }]
+    }
+  }
+}

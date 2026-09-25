@@ -19,7 +19,8 @@
         "artifact_id": "art_reply_draft",
         "version": 2,
         "label": "Reply draft"
-      }
+      },
+      "destination": "thread-quote-500-packs"
     },
     "recipients": ["the supplier"],
     "irreversible": true,

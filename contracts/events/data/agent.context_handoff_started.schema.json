@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.context_handoff_started.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentContextHandoffStartedData",
+  "description": "data of agent.context_handoff_started (PRD 9.5). Context handoff (PRD 8.5): note is the stored handoff note (handoff.schema.json).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["note", "context_pct"],
+  "properties": {
+    "note": { "$ref": "../../common.schema.json#/$defs/artifact_ref" },
+    "context_pct": { "type": "integer", "minimum": 0, "maximum": 100 }
+  }
+}

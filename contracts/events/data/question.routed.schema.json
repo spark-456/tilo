@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/question.routed.schema.json",
+  "x-version": "1.0.0",
+  "title": "QuestionRoutedData",
+  "description": "data of question.routed (PRD 9.5). target is the person or Team Lead the question went to; domain is the Team Lead domain it matched, null for the owner fallback (FR-AGT-06).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["card_id", "domain"],
+  "properties": {
+    "card_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "domain": { "anyOf": [{ "$ref": "../../common.schema.json#/$defs/slug" }, { "type": "null" }] }
+  }
+}

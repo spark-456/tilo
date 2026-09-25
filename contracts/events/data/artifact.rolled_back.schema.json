@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/artifact.rolled_back.schema.json",
+  "x-version": "1.0.0",
+  "title": "ArtifactRolledBackData",
+  "description": "data of artifact.rolled_back (PRD 9.5). A restore is a new version, never a deletion (PRD 13.4, FR-MEM-06): artifact is the new version, restored_version the one copied.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact", "restored_version"],
+  "properties": {
+    "artifact": { "$ref": "../../common.schema.json#/$defs/artifact_ref" },
+    "restored_version": { "type": "integer", "minimum": 1 }
+  }
+}

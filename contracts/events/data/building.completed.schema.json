@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/building.completed.schema.json",
+  "x-version": "1.0.0",
+  "title": "BuildingCompletedData",
+  "description": "data of building.completed (PRD 9.5). Units of work finished, the input of the time-saved method (PRD 14.2, BQ-03): unit_type is the plan unit type, for example reply_handled or mail_triaged for Email Autopilot.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["unit_type", "unit_count"],
+  "properties": {
+    "unit_type": { "$ref": "../../common.schema.json#/$defs/slug" },
+    "unit_count": { "type": "integer", "minimum": 0 }
+  }
+}

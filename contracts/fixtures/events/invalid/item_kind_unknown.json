@@ -1,0 +1,46 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000019",
+  "seq": 19,
+  "ts": "2026-09-29T09:30:48.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "agent.handoff",
+  "actor": "A_l1",
+  "target": "A_s1",
+  "level": "L1",
+  "district": "D1",
+  "item": {
+    "kind": "box",
+    "artifact_id": null,
+    "label": "Triage brief"
+  },
+  "severity": "info",
+  "credits": 0,
+  "summary": "The Lead handed the triage brief to the Specialist.",
+  "cause": "01JB5VQ0000000000000000018",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "envelope": {
+      "from": "A_l1",
+      "to": "A_s1",
+      "artifact_refs": [],
+      "summary": "Triage the emails that arrived since yesterday into the five categories.",
+      "acceptance_criteria": [
+        "Every email has exactly one category",
+        "Suspicious emails are flagged, not opened"
+      ],
+      "provenance_ids": ["01JB5VQ0000000000000000017"]
+    }
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

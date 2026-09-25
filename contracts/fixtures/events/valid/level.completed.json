@@ -1,0 +1,30 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000043",
+  "seq": 43,
+  "ts": "2026-09-29T09:32:21.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "level.completed",
+  "actor": "A_dir",
+  "target": "L1",
+  "level": "L1",
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "Level Inbox is complete.",
+  "cause": "01JB5VQ0000000000000000042",
+  "vis": "all",
+  "authz": null,
+  "data": {},
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

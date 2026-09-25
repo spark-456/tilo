@@ -1,0 +1,33 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000039",
+  "seq": 39,
+  "ts": "2026-09-29T09:32:13.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "building.completed",
+  "actor": "A_s2",
+  "target": "B2",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The Reply Desk finished 1 reply.",
+  "cause": "01JB5VQ0000000000000000038",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "unit_type": "reply_handled",
+    "unit_count": -1
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}
