@@ -48,8 +48,10 @@ carry the pinned item (artifact id and version) the entry sends, so the Trace sh
 version was approved and sent (outbox rule OB-05). With no gate card on the policy path, `policy.applied` also names
 the connector, the destination (an opaque id) and the district the engine checked against the
 policy's scope, and the entry equals them (OB-01, OB-05). At L2 it also names the owner's
-instruction (`instruction_id`: an earlier `world.requested` or `channel.message_in` with the same
-`destination`), which the Trace and HR-7's link show beside the policy (OB-01).
+instruction (`instruction_id`: an earlier `world.requested` from the web or mobile web or a
+`channel.message_in` from the owner's bound WhatsApp number, never an email, with the same
+`destination`, used by no other `policy.applied`), which the Trace and HR-7's link show beside
+the policy (OB-01).
 
 ## Fixtures
 

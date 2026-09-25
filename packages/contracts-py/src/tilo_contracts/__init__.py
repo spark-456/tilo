@@ -43,7 +43,7 @@
 # events/data/building.operational.schema.json 1.0.0 sha256:9fcf73cb4c895c6f
 # events/data/building.planned.schema.json 1.0.0 sha256:b44f9bbe889e72d7
 # events/data/building.scaled.schema.json 1.0.0 sha256:6acdd4fb4e291cd1
-# events/data/channel.message_in.schema.json 1.0.0 sha256:bac66c9564255d16
+# events/data/channel.message_in.schema.json 1.0.0 sha256:bbf6598f915733f0
 # events/data/channel.message_out.schema.json 1.0.0 sha256:dd42d2db8385a110
 # events/data/connection.consented.schema.json 1.0.0 sha256:6664b8f2558850bd
 # events/data/connection.established.schema.json 1.0.0 sha256:b595213ce8aae265
@@ -65,7 +65,7 @@
 # events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
 # events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
 # events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
-# events/data/policy.applied.schema.json 1.0.0 sha256:40754d7f30dec48f
+# events/data/policy.applied.schema.json 1.0.0 sha256:c9475618991d6823
 # events/data/policy.changed.schema.json 1.0.0 sha256:59660440803c39ed
 # events/data/question.answered.schema.json 1.0.0 sha256:908aeadfaca479ab
 # events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
@@ -74,7 +74,7 @@
 # events/data/world.failed.schema.json 1.0.0 sha256:17a50a9c70ba8ae1
 # events/data/world.paused.schema.json 1.0.0 sha256:1b190f91f08a918c
 # events/data/world.planned.schema.json 1.0.0 sha256:eb423b257e5fc838
-# events/data/world.requested.schema.json 1.0.0 sha256:920b9efa525ad9e2
+# events/data/world.requested.schema.json 1.0.0 sha256:d59a584d7d9b0cf8
 # events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
 # events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
 # events/registry.schema.json 1.0.0 sha256:42c04358933101ef
@@ -747,7 +747,7 @@ class BuildingScaledData(BaseModel):
 
 class ChannelMessageInData(BaseModel):
     """
-    data of channel.message_in (PRD 9.5). A message from a bound WhatsApp number or to Tilo's email address. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message answers a card. destination is the thread or folder the message was sent about (an email thread forwarded to Tilo, or the one the card it answers showed), as an opaque id set by the channel, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01).
+    data of channel.message_in (PRD 9.5). A message from a bound WhatsApp number or to Tilo's email address. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message answers a card. destination is the thread or folder the message was sent about (an email thread forwarded to Tilo, or the one the card it answers showed), as an opaque id set by the channel, never read out of the text by a model; null otherwise (BQ-29). For whatsapp, actor is the user whose number is bound and confirmed (FR-CHN-03), looked up after the webhook signature check. An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is whatsapp; an email's sender is not authenticated, so an email is never an instruction, whoever its actor is.
     """
 
     model_config = ConfigDict(
@@ -1089,7 +1089,7 @@ class WorldPlannedData(BaseModel):
 
 class WorldRequestedData(BaseModel):
     """
-    data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world. destination is the thread or folder the request was made from (an email thread forwarded to Tilo, or one the request was started from), as an opaque id set from where it was sent, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01).
+    data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world. destination is the thread or folder the request was made from (an email thread forwarded to Tilo, or one the request was started from), as an opaque id set from where it was sent, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is web or mobile_web, where the owner is signed in; a request by email has an unauthenticated sender and is never an instruction.
     """
 
     model_config = ConfigDict(
@@ -1880,7 +1880,7 @@ class DataTransferData(BaseModel):
 
 class PolicyAppliedData(BaseModel):
     """
-    data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). There is no gate card on this path, so this event records what the engine assessed against the policy's scope: the connector, the destination (an opaque id, never an address), the district of the step, the tier, the undo window, and item pinned to its version (null when there is none). The outbox entry equals it on each (OB-05) and the policy's scope covers it (OB-01), so a redraft, another thread or another connector is a new proposal. L2 is 'instruction is approval' (PRD 10.4, FR-HIL-05): instruction_id is the id of the earlier world.requested or channel.message_in in this world in which the policy's owner asked for this action on this destination, and HR-7 links it beside the policy (OB-01); at L2 the destination is set and the undo window is at least 1 s. At L3 (a standing rule within its limits) instruction_id is null. Recipients stay in the outbox entry, never in an event.
+    data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). There is no gate card on this path, so this event records what the engine assessed against the policy's scope: the connector, the destination (an opaque id, never an address), the district of the step, the tier, the undo window, and item pinned to its version (null when there is none). The outbox entry equals it on each (OB-05) and the policy's scope covers it (OB-01), so a redraft, another thread or another connector is a new proposal. L2 is 'instruction is approval' (PRD 10.4, FR-HIL-05): instruction_id is the id of the earlier world.requested (web or mobile_web) or channel.message_in (whatsapp, from the owner's bound number) in this world in which the policy's owner asked for this action on this destination, never an email, and HR-7 links it beside the policy; each instruction is named by at most one policy.applied, so a cancelled send uses it up (OB-01); at L2 the destination is set and the undo window is at least 1 s. At L3 (a standing rule within its limits) instruction_id is null. Recipients stay in the outbox entry, never in an event.
     """
 
     model_config = ConfigDict(

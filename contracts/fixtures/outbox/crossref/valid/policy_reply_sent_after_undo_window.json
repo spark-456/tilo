@@ -106,14 +106,14 @@
     "item": null,
     "severity": "info",
     "credits": 0,
-    "summary": "You forwarded the supplier thread to Tilo and asked it to reply.",
+    "summary": "Your WhatsApp answer arrived: reply yes on the supplier thread.",
     "cause": null,
     "vis": "all",
     "authz": null,
     "data": {
-      "channel": "email",
+      "channel": "whatsapp",
       "message_ref": "r_village_basic_1/118",
-      "card_id": null,
+      "card_id": "01JB5VQ0000000000000000129",
       "destination": "thread-supplier-1"
     },
     "trace": {
@@ -126,6 +126,7 @@
       "archive_ref": null
     }
   },
+  "earlier_applied": [],
   "transfer": {
     "type": "data.transfer",
     "authz": {

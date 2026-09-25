@@ -101,5 +101,6 @@
   },
   "world_owner": "u_owner",
   "instruction": null,
+  "earlier_applied": [],
   "transfer": null
 }

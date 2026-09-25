@@ -1,6 +1,6 @@
 {
   "rule": null,
-  "note": "An L2 reply the Autopilot policy opened: the entry carries the policy's authz and the version the engine assessed, and has not been sent yet.",
+  "note": "An L2 reply the Autopilot policy opened after the owner answered Tilo's question on WhatsApp from their bound number: the entry carries the policy's authz and the version the engine assessed, and has not been sent yet.",
   "entry": {
     "id": "01JB5VQ0000000000000009006",
     "idempotency_key": "r_village_basic_1:U2:send_email:1",
@@ -106,14 +106,14 @@
     "item": null,
     "severity": "info",
     "credits": 0,
-    "summary": "You forwarded the supplier thread to Tilo and asked it to reply.",
+    "summary": "Your WhatsApp answer arrived: reply yes on the supplier thread.",
     "cause": null,
     "vis": "all",
     "authz": null,
     "data": {
-      "channel": "email",
+      "channel": "whatsapp",
       "message_ref": "r_village_basic_1/118",
-      "card_id": null,
+      "card_id": "01JB5VQ0000000000000000129",
       "destination": "thread-supplier-1"
     },
     "trace": {
@@ -126,5 +126,6 @@
       "archive_ref": null
     }
   },
+  "earlier_applied": [],
   "transfer": null
 }

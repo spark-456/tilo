@@ -50,7 +50,12 @@ silent the defaults below apply; each is logged as a BQ in `docs/open-questions.
    PRD 10.4) `policy.applied` names in `instruction_id` the policy owner's own earlier
    `world.requested` or `channel.message_in` in the same world, about the same destination
    (both events carry `destination`, set from where the message came, never by a model), and
-   HR-7 links it beside the policy; at L3 it is null. L2 and L3 policies need a daily limit
+   HR-7 links it beside the policy; at L3 it is null. Only a channel where Tilo knows the
+   sender is the owner carries an instruction: a `world.requested` from the web or mobile web
+   (signed in) or a `channel.message_in` from the owner's bound WhatsApp number. Email is
+   never one, since its sender is not authenticated (PRD 10.3: email answers questions only).
+   Each instruction opens at most one entry, and a send cancelled in its undo window uses it
+   up, so Undo is never followed by a redraft sent under the same words. L2 and L3 policies need a daily limit
    (BQ-29, BQ-30). `artifact.delivered` is a notice, not a side effect: a format that leaves
    Tilo (email, Google Docs, Sheets or Slides) names its outbox entry and is caused by that
    entry's `data.transfer` out, which carries the `authz` (EV-14). A `vis` list includes the

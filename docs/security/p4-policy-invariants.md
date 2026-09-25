@@ -1,0 +1,65 @@
+# P4 policy-engine invariants
+
+What the contract rules require of the deterministic policy engine (P4) and the harness
+validator (P0-09). Each row is an acceptance test that a P4 or P0-09 ticket inherits: the test
+name carries the requirement id in the last column plus the invariant id (for example
+`test_FR_HIL_05_PI_09_email_instruction_opens_nothing`), and it runs the fixtures listed, so
+the engine and the reference checks in `tests/contracts/` agree case by case. The rules
+themselves stay in `contracts/*.rules.md` and the schemas; this page only collects them. If
+a rule changes, change it there first and update this page in the same commit.
+
+Fixture paths are short: `oc/` is `contracts/fixtures/outbox/crossref/`, `cc/` is
+`contracts/fixtures/card/crossref/`, `ev/` is `contracts/fixtures/events/`, `ob/` is
+`contracts/fixtures/outbox/`, `pol/` is `contracts/fixtures/policy/`, `tier/` is
+`contracts/fixtures/policy.risk_tier_table/`, `card/` and `plan/` are
+`contracts/fixtures/card/` and `contracts/fixtures/plan/`. A crossref file (`oc/`, `cc/`) is a
+whole case: the engine or validator gets the parts and must reach the file's verdict (valid, or
+exactly the rule its name starts with). Reference checks:
+`tests/contracts/test_FR_WLD_03_outbox_crossref.py` (OB-01, OB-05) and
+`tests/contracts/test_PRD_10_3_gate_card_labels_and_crossref.py` (CR-09 to CR-12).
+
+## Opening a gate
+
+| Id | Invariant | Rule | Enforced by | Fixtures | Req |
+| --- | --- | --- | --- | --- | --- |
+| PI-01 | Nothing reaches a connector except through an outbox entry, and an entry is written only after authorisation. `approval.requested` reserves the entry's id and never authorises (`authz` null); nothing waiting at a gate is in the outbox. | OB-01, EV-05 | engine; validator | `oc/invalid/ob01_entry_id_not_reserved`, `oc/invalid/ob01_gate_never_answered`, `ev/registry/invalid/ev05_authz_on_a_non_side_effect_type` | SEC-03, FR-HIL-03 |
+| PI-02 | On a gate, only an `approval.resolved` answering `approve` on the same `gate_id`, `card_id` and `outbox_id` opens it; `edit` and `hold` write nothing. The entry's `authz` is that event's, the person or Team Lead who tapped. | OB-01, CR-07 | engine | `oc/invalid/ob01_gate_answered_hold`, `oc/invalid/ob01_approval_answers_another_gate`, `oc/invalid/ob01_authz_from_another_person`, `oc/invalid/ob01_authz_from_team_lead_not_the_person`; valid `oc/valid/gate_reply_sent_in_village_basic`, `oc/valid/team_lead_save_names_its_file` | FR-HIL-03, HR-7 |
+| PI-03 | A gate never times out to go: a timeout applies `hold`, emits no `approval.resolved`, and a default answer is posted as a Nudge. A gate or consent card is never delegated to the Director. | CR-04, CR-06, EV-08 | engine; validator | `card/invalid/gate_safe_default_go`, `card/invalid/consent_safe_default_connect`, `card/invalid/gate_delegated_to_director`, `card/invalid/consent_delegated_to_director`, `ev/registry/invalid/ev08_default_answer_not_a_nudge`, `ev/invalid/question_answered_by_the_director` | FR-HIL-02 |
+| PI-04 | A gate is answered only where the person is known: web or mobile web signed in, or the bound WhatsApp number; never email. A consent card is answered on the web only. | card schema (`answer_channels`) | engine; channels | `card/invalid/gate_answered_by_email`, `card/invalid/consent_answered_on_whatsapp` | SEC-06 |
+| PI-05 | Only `connect` on a consent card grants a connection, and only a person grants one (`connection.consented`, `authz` by person). | CR-13, EV-04 | engine; token broker | `card/invalid/consent_option_id_outside_closed_set`, `card/invalid/consent_hold_option_labelled_not_now`, `card/invalid/consent_connect_option_labelled_allow_access` | FR-HIL-08 |
+
+## Policy path (no person at the gate)
+
+| Id | Invariant | Rule | Enforced by | Fixtures | Req |
+| --- | --- | --- | --- | --- | --- |
+| PI-06 | The policy named by `policy.applied.policy_id` covers the entry: same `action_type`, `level` and `undo_window_s`; `created_by.at <= authz.at`; not expired at `authz.at`; owned by the world's owner; `connector`, `district`, every recipient and its domain within scope (exact match; an empty list does not restrict). Otherwise the send waits at a gate. | OB-01, PG-10 | engine; validator | `oc/invalid/ob01_policy_recipient_out_of_scope`, `oc/invalid/ob01_policy_connector_out_of_scope`, `oc/invalid/ob01_policy_district_out_of_scope`, `oc/invalid/ob01_policy_expired`, `oc/invalid/ob01_policy_created_after_send`, `oc/invalid/ob01_policy_owned_by_someone_else`; valid `oc/valid/policy_l3_status_update_waiting` | FR-HIL-03, FR-HIL-05 |
+| PI-07 | A policy never authorises T3 and never runs below L2 through `policy.applied`; any risk-tier modifier (attachments, new recipients, safety flag and the other three) makes the action T3, which runs at L1 only. Policy conditions are fixed `true` and the six modifiers cannot be dropped from the table. | OB-04, EV-07, PG-06, policy schema | engine; schema | `ob/invalid/t3_authorised_by_policy`, `ob/invalid/attachment_without_modifier`, `ob/invalid/modifier_below_t3`, `ev/invalid/policy_applied_t3`, `ev/invalid/policy_authorises_t3_transfer`, `ev/invalid/policy_applied_at_l1`, `plan/invalid/t3_gate_opened_by_policy`, `pol/invalid/condition_allows_new_recipients`, `pol/invalid/condition_allows_safety_flags`, `tier/invalid/t3_allows_l2`, `tier/invalid/modifiers_empty`, `tier/invalid/new_recipients_modifier_missing`, `tier/invalid/safety_flag_modifier_missing` | FR-HIL-04 |
+| PI-08 | L2 needs the owner's own instruction: `policy.applied.instruction_id` names a `world.requested` or `channel.message_in` of the same world, earlier than `authz.at`, whose `actor` is the policy's owner and whose `destination` equals the send's (never null at L2). At L3 it is null. | OB-01 | engine; validator | `oc/invalid/ob01_l2_policy_without_instruction`, `oc/invalid/ob01_l2_instruction_from_someone_else`, `oc/invalid/ob01_l2_instruction_on_another_thread`, `oc/invalid/ob01_l2_instruction_after_send`, `ev/invalid/policy_applied_l2_without_instruction`, `ev/invalid/policy_applied_l2_without_destination`, `ev/invalid/policy_applied_l3_with_instruction`; valid `oc/valid/policy_reply_waiting_out_undo_window` | FR-HIL-05 |
+| PI-09 | An instruction counts only from a channel with a known sender: a `world.requested` with channel `web` or `mobile_web` (signed in) or a `channel.message_in` with channel `whatsapp`, whose `actor` the channels service sets from the bound, confirmed number. Email is never an instruction, whoever its `actor` is. | OB-01 | engine; channels; validator | `oc/invalid/ob01_l2_instruction_by_email`, `oc/invalid/ob01_l2_world_requested_by_email`; valid `oc/valid/policy_reply_waiting_out_undo_window` (WhatsApp), `oc/valid/policy_reply_instructed_on_the_web` (web) | FR-HIL-05, SEC-06 |
+| PI-10 | Each instruction opens at most one entry: no two `policy.applied` of a world name the same `instruction_id`, whatever became of the first entry. A send cancelled in its undo window uses up its instruction, so a redraft after Undo needs a new instruction or a gate. | OB-01 | engine; validator | `oc/invalid/ob01_l2_instruction_reused` | FR-HIL-05 |
+| PI-11 | L2 and L3 policies have a daily cap (`limits.per_day`); the engine opens a send only while that day's actions under the policy, this one included, stay within `per_day` and their credits within `limits.credits`, otherwise the send waits at a gate. | OB-01, policy schema | engine | `pol/invalid/l2_without_daily_limit`, `pol/invalid/l3_without_daily_limit`. No crossref case yet: the P4 ticket adds `oc/invalid/ob01_policy_daily_limit_reached` and a credits twin | FR-HIL-06 |
+| PI-12 | An L2 send keeps its undo window: `undo_window_s` is at least 1 s at L2 and equals the policy's and `policy.applied`'s; the entry waits `scheduled` until `scheduled_at = created_at + undo_window_s` and may move to `cancelled` until sending starts. | OB-02, OB-05, policy.applied schema | engine; validator | `oc/invalid/ob05_policy_undo_window_dropped`, `ev/invalid/policy_applied_l2_without_undo_window`, `ob/invalid/undo_window_negative`; valid `oc/valid/policy_reply_waiting_out_undo_window`, `oc/valid/policy_reply_sent_after_undo_window` | FR-HIL-05 |
+| PI-13 | Stop all autopilot sets every policy to L1 (one `policy.changed` per policy); only the owner changes a policy (`authz` by person). | EV-04, policy.changed schema | engine | `ev/invalid/policy_stop_all_not_l1` | FR-HIL-07 |
+
+## What is sent, and how it is stamped
+
+| Id | Invariant | Rule | Enforced by | Fixtures | Req |
+| --- | --- | --- | --- | --- | --- |
+| PI-14 | The entry is exactly what was authorised: `action_type`, `risk_tier` and `item` (artifact id and version) equal the reserving `approval.requested` or the opening `policy.applied`; on the policy path also `connector` and `destination`. No field but `state` changes after writing; a redraft is a new proposal with a new gate, also during an undo window. | OB-05 | engine; validator | `oc/invalid/ob05_item_version_differs_from_gate_reservation`, `oc/invalid/ob05_item_version_differs_from_policy_check`, `oc/invalid/ob05_policy_risk_tier_differs`, `oc/invalid/ob05_policy_entry_on_another_connector`, `oc/invalid/ob05_policy_thread_reply_sent_as_new_email`, `ob/invalid/item_not_pinned` | FR-HIL-03, FR-HIL-04 |
+| PI-15 | On a gate, the entry equals the gate card: recipients as a set, item and destination; the card's tier is the plan gate's, raised to T3 by any modifier, never lower. | CR-11, CR-12, PG-06 | engine; card validator (P1) | `cc/invalid/cr11_risk_tier_below_plan_gate`, `cc/invalid/cr11_risk_tier_not_raised_for_new_recipient`, `cc/invalid/cr12_item_version_differs_from_held`, `cc/invalid/cr12_recipient_added`, `cc/invalid/cr12_recipient_left_out`; valid `cc/valid/send_reply_to_new_recipient`, `cc/valid/save_file_to_own_drive` | FR-HIL-04 |
+| PI-16 | Every side-effect event carries `authz`, its `by` is one the registry allows for the type, and a policy's `authz.ref` equals its `policy_id`. The entry and its outgoing `data.transfer` carry exactly the opening event's `authz`, so a policy action is never drawn as a person's approval or the reverse. | OB-01, EV-03, EV-04, EV-06 | validator | `oc/invalid/ob01_policy_send_stamped_as_person`, `oc/invalid/ob01_person_approved_send_stamped_as_policy`, `oc/invalid/ob01_transfer_stamped_other_than_entry`, `ev/invalid/side_effect_without_authz`, `ev/invalid/authz_by_model`, `ob/invalid/authz_null`, `ob/invalid/authz_by_model`, `ev/registry/invalid/ev04_approval_resolved_authorised_by_policy`, `ev/registry/invalid/ev06_policy_applied_ref_differs_from_policy_id` | FR-HIL-08, HR-7 |
+| PI-17 | Each sent entry emits one `data.transfer` out with its `outbox_id`, connector, action type and `artifact` equal to the entry's `item`; an `artifact.delivered` that leaves Tilo names that entry and is caused by that transfer. | OB-05, EV-14 | validator | `oc/invalid/ob05_transfer_sent_other_version`, `ev/registry/invalid/ev14_delivered_by_email_without_cause`, `ev/invalid/artifact_delivered_email_without_outbox_id`, `ev/invalid/data_transfer_out_without_outbox_id` | FR-HIL-08 |
+| PI-18 | One writer per world: `seq` strictly increases and `cause` names an earlier event of the same world, so "earlier than the send" (PI-08) and "no other `policy.applied`" (PI-10) are decided on one ordered stream. | EV-10, EV-11 | validator | `ev/invalid/seq_negative`, `ev/invalid/cause_not_an_event_id`; valid stream `contracts/fixtures/streams/village-basic.jsonl` | FR-WLD-04 |
+
+## Relied on, enforced by the P1 validators
+
+The engine trusts these checks on plans and cards; the P1 plan and card validators own them,
+and their tests run the same fixtures.
+
+| Id | Invariant | Rule | Fixtures |
+| --- | --- | --- | --- |
+| PI-19 | Every irreversible action maps to a gate that guards its unit, and a unit lists only side effects declared with `gate_type: approval`. | PG-04, PG-05, PG-11 | `plan/invalid/gate_guards_nothing`, `plan/invalid/unit_without_actions`; no crossref cases yet (P1 plan validator adds them) |
+| PI-20 | A gate card names a gate of the run's plan with the same action type, on a declared connector action whose `irreversible` it copies. | CR-09, CR-10 | `cc/invalid/cr09_action_type_differs_from_plan_gate`, `cc/invalid/cr09_gate_id_not_in_plan`, `cc/invalid/cr10_connector_not_declared`, `cc/invalid/cr10_irreversible_differs_from_connector_action` |
+
+Out of scope here: exactly-once delivery by idempotency key (OB-03) belongs to
+`tilo-connectors`.
