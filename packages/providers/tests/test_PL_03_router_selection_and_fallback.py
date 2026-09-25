@@ -31,6 +31,7 @@ adapter escapes the router"):
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -38,6 +39,8 @@ from conftest import (
     ScriptedCall,
     ScriptedModelProvider,
     capability_models_config,
+    models_config,
+    prices_config,
     prices_config_for,
     write_providers_config,
 )
@@ -262,6 +265,54 @@ def test_PL_03_embed_missing_capability_goes_straight_to_capable_profile(tmp_pat
     assert [attempt.profile_id for attempt in result.attempts] == ["vision-capable"]
     assert primary.embed_calls == [], "the primary lacks Capability.VISION and must never be called"
     assert len(capable.embed_calls) == 1
+
+
+def test_PL_03_embed_through_the_real_factory_path_records_and_replays(tmp_path, monkeypatch):
+    """Review follow-up (ticket P0-06): every `embed()` test above builds its providers through a
+    scripted `provider_for_profile` double, so none of them ever go through `Router`'s *real* factory
+    path -- `Router(config, fixtures_dir=...)`, which resolves a profile with `tilo_providers.factory.
+    build_provider`. For any profile that is not `provider: fake`, that wraps the adapter in a
+    `RecordReplayProvider` (`tilo_providers.replay`), and its `embed()` used to be a bare
+    `NotImplementedError` -- not one of the `ProviderError` subtypes `Router.embed`'s except clause
+    catches, so the real exception would have escaped the router unhandled, leaving the first attempt
+    recorded as "ok" and no fallback/RouterError. This drives that exact path: a role whose primary
+    profile is `provider: google` (never installed in this environment -- see test_EFF_01's module
+    docstring), replayed from a recording seeded on disk in the exact shape `RecordReplayProvider`
+    itself writes (`embed_recording_key`-keyed), with `LIVE` unset (as dev/CI always run) -- and
+    `GOOGLE_CLOUD_PROJECT` deliberately absent, so a mistaken live attempt fails loudly with a KeyError
+    instead of silently succeeding (a `sys.modules` check on the adapter module would be unreliable here:
+    another test file in the same session may have imported it already; `models_config`/`prices_config`
+    are imported at module level, alongside this file's other `conftest` imports, for the same reason)."""
+    from tilo_providers.config import load_providers_config  # noqa: PLC0415
+    from tilo_providers.replay import embed_recording_key  # noqa: PLC0415
+    from tilo_providers.router import Router  # noqa: PLC0415
+
+    monkeypatch.delenv("LIVE", raising=False)
+    monkeypatch.delenv("TILO_RECORD", raising=False)
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+
+    models = models_config()  # BASE_MODELS profiles are all `provider: fake`; "director" primary is "large"
+    models["profiles"]["large"]["provider"] = "google"
+    models_path, prices_path = write_providers_config(tmp_path, models, prices_config())
+    config = load_providers_config(models_path, prices_path)
+
+    fixtures_dir = tmp_path / "fixtures"
+    embed_request = {"input": ["hello"]}
+    key = embed_recording_key("director", "large", embed_request)
+    recording_dir = fixtures_dir / "model-recordings" / "director"
+    recording_dir.mkdir(parents=True)
+    (recording_dir / f"embed-{key}.json").write_text(
+        json.dumps({"role": "director", "profile": "large", "key": key, "embedding": {"vectors": [[0.5, 0.25]]}}),
+        encoding="utf-8",
+    )
+
+    router = Router(config, fixtures_dir=fixtures_dir)
+    result = router.embed("director", embed_request)
+
+    assert result.embedding == {"vectors": [[0.5, 0.25]]}
+    # A single "ok" attempt on the primary -- no NotImplementedError, no fallback, no RouterError.
+    assert [attempt.profile_id for attempt in result.attempts] == ["large"]
+    assert result.attempts[0].outcome == "ok"
 
 
 def test_PL_03_non_provider_error_from_an_adapter_is_not_swallowed(providers_config):
