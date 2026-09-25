@@ -36,13 +36,19 @@ body {
   touch-action: none;
   flex: 1;
   overflow: hidden;
+  isolation: isolate;
 }
 .stage-frame > * {
   position: absolute;
   inset: 0;
 }
-.stage-camera {
-  transition: transform ease-out;
+.stage-frame > canvas {
+  z-index: -1; /* under the frame's own inset focus ring */
+}
+/* Inset, so the viewport edges can never clip it. No focus role exists yet: brand.primary. */
+.stage-frame:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: -3px;
 }
 .stage-fallback {
   padding: 40vh 24px 0;

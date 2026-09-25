@@ -20,6 +20,15 @@ Trace lenses, cards and settings. P0-08a shipped the shell: tokens, layout frame
 ## Requirement IDs
 - UX-1 through UX-9 (section 18.1); FR-WLD-* (world rendering); owned starting P0-08.
 
+## Stage (`src/stage/`)
+- `camera.ts` holds the pure camera maths (pan, `zoomAt`, `normalizeWheel`, easing); unit-tested.
+- `Stage.tsx`: the camera is the transform of a Pixi world container (position = stage centre
+  + (x, y), scale = zoom); the iso grid is redrawn in world coordinates for the visible rect.
+  No CSS transform on the canvas and no always-on ticker: one render per camera change, eased
+  keyboard moves timed by `performance.now()`, and a render on resize, DPR change and
+  visibility change (HR-2). Every drawn frame writes `data-camera-x/y/zoom` on the stage frame.
+- World content plugs in through the `onWorld(world, requestRender)` prop (`WorldSeam`).
+
 ## Local rules
 - Nothing animates without a recorded event (honesty rules HR-1–HR-7, PRD 9.4).
 - One primary filled button per screen (UX-1); no streaks, hearts or fake urgency (UX-7).

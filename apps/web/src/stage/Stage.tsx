@@ -1,4 +1,4 @@
-import { Application, Graphics } from "pixi.js";
+import { Application, Container, Graphics } from "pixi.js";
 import { useEffect, useRef, useState } from "react";
 import tokens from "../design/tokens";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -7,7 +7,8 @@ import * as cam from "./camera";
 const { tileWidth: TW, tileHeight: TH } = tokens.stage;
 const PIXI = { autoDensity: true, autoStart: false, preserveDrawingBuffer: true } as const;
 
-// Iso lattice: lines of slope +-TH/TW, TH apart, through (0, -TH/2), across the visible rect.
+// Iso lattice in world coordinates: lines of slope +-TH/TW, TH apart, through (0, -TH/2),
+// across the visible world rect (so the grid is anchored to the world, never to the screen).
 function drawIsoGrid(g: Graphics, x0: number, y0: number, x1: number, y1: number) {
   g.clear();
   for (const m of [TH / TW, -TH / TW]) {
@@ -20,124 +21,197 @@ function drawIsoGrid(g: Graphics, x0: number, y0: number, x1: number, y1: number
   g.stroke({ width: 1, color: tokens.color.ink["2"], alpha: 0.35, pixelLine: true });
 }
 
-const { PAN_STEP_PX: P, ZOOM_STEP: Z, panCamera: pan, zoomCamera: zoom } = cam;
+const { PAN_STEP_PX: P, ZOOM_STEP: Z, panCamera: pan, zoomAt } = cam;
+// Keyboard moves start from the previous move's target, so rapid presses never drift.
 const KEYS: Record<string, (c: cam.CameraState) => cam.CameraState> = {
   ArrowLeft: (c) => pan(c, P, 0),
   ArrowRight: (c) => pan(c, -P, 0),
   ArrowUp: (c) => pan(c, 0, P),
   ArrowDown: (c) => pan(c, 0, -P),
-  "+": (c) => zoom(c, Z),
-  "=": (c) => zoom(c, Z),
-  "-": (c) => zoom(c, -Z),
+  "+": (c) => zoomAt(c, Z, 0, 0),
+  "=": (c) => zoomAt(c, Z, 0, 0),
+  "-": (c) => zoomAt(c, -Z, 0, 0),
 };
 
-/** PRD 18.3 S-04 stage: Pixi mirrors the camera layer's eased CSS transform only while it moves. */
-export function Stage() {
+/**
+ * World content seam: called once the renderer is ready with the Pixi world container (the
+ * camera's transform; the iso grid is its first child) and `requestRender`, which draws one
+ * frame on demand (there is no always-on ticker, HR-2). May return a cleanup function.
+ */
+export type WorldSeam = (world: Container, requestRender: () => void) => (() => void) | undefined;
+
+/** PRD 18.3 S-04 stage. The camera is the Pixi world container's transform (PRD 9.7); a frame
+ * is drawn only on input, an eased keyboard move, resize or visibility change. */
+export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
   const frameRef = useRef<HTMLElement>(null);
-  const cameraRef = useRef<HTMLDivElement>(null);
-  const followRef = useRef<((ms: number) => void) | null>(null);
   const [supported] = useState(() => !!document.createElement("canvas").getContext("webgl2"));
-  const [camera, setCamera] = useState(cam.INITIAL_CAMERA);
-  const ms = cam.getCameraPanDurationMs(useMediaQuery("(prefers-reduced-motion: reduce)"));
+  const msRef = useRef(0);
+  msRef.current = cam.getCameraPanDurationMs(useMediaQuery("(prefers-reduced-motion: reduce)"));
+  const seamRef = useRef(onWorld);
+  seamRef.current = onWorld;
 
   useEffect(() => {
     const target = frameRef.current;
     if (!supported || !target) return;
-    // Ctrl/Cmd/Alt shortcuts stay the browser's; element `onwheel` is not passive.
-    let last: [number, number] = [0, 0];
-    target.onkeydown = (e) => {
-      const move = KEYS[e.key];
-      if (!move || e.ctrlKey || e.metaKey || e.altKey) return;
-      e.preventDefault();
-      setCamera(move);
+    const app = new Application();
+    const world = new Container();
+    const grid = new Graphics();
+    world.addChild(grid);
+    let ready = false;
+    let cur = cam.INITIAL_CAMERA; // the camera drawn now
+    let goal = cur; // where keyboard moves are heading
+    let ease: { from: cam.CameraState; t0: number } | null = null;
+    let raf = 0;
+
+    const draw = () => {
+      const { clientWidth: w, clientHeight: h } = target;
+      if (!ready || !w || !h) return;
+      const { x, y, zoom: z } = cur;
+      world.position.set(w / 2 + x, h / 2 + y);
+      world.scale.set(z);
+      drawIsoGrid(grid, (-w / 2 - x) / z, (-h / 2 - y) / z, (w / 2 - x) / z, (h / 2 - y) / z);
+      app.render();
+      target.dataset.cameraX = String(x);
+      target.dataset.cameraY = String(y);
+      target.dataset.cameraZoom = String(z);
     };
-    target.onpointerdown = (e) => {
-      last = [e.clientX, e.clientY];
+    // Eased moves are timed by performance.now(), so a long task or a frozen page lands on
+    // the target at the next frame, and the last frame is always exactly the target.
+    const frame = () => {
+      raf = 0;
+      if (ease) {
+        const t = (performance.now() - ease.t0) / msRef.current;
+        cur = cam.easeCamera(ease.from, goal, t);
+        if (t >= 1) ease = null;
+        else raf = requestAnimationFrame(frame);
+      }
+      draw();
     };
-    target.onpointermove = (e) => {
-      const [dx, dy] = [e.clientX - last[0], e.clientY - last[1]];
-      last = [e.clientX, e.clientY];
-      if (e.buttons === 1) setCamera((c) => pan(c, dx, dy));
+    const requestRender = () => {
+      if (!raf) raf = requestAnimationFrame(frame);
     };
-    target.onwheel = (e) => {
-      e.preventDefault();
-      if (e.deltaY) setCamera((c) => zoom(c, cam.wheelZoomDelta(e.deltaY, e.deltaMode)));
+    // Direct manipulation follows the input with no easing.
+    const jump = (next: cam.CameraState) => {
+      ease = null;
+      cur = goal = next;
+      draw();
+    };
+    const glide = (next: cam.CameraState) => {
+      if (!msRef.current) return jump(next);
+      ease = { from: cur, t0: performance.now() };
+      goal = next;
+      requestRender();
     };
 
-    const app = new Application();
-    const grid = new Graphics();
-    let cancelled = false;
-    let timer = 0;
-    const sync = () => {
-      const { clientWidth: w, clientHeight: h } = target;
-      if (!w || !h || !cameraRef.current) return;
-      const { a, e, f } = new DOMMatrix(getComputedStyle(cameraRef.current).transform);
-      grid.position.set(w / 2 + e, h / 2 + f);
-      grid.scale = a;
-      drawIsoGrid(grid, (-w / 2 - e) / a, (-h / 2 - f) / a, (w / 2 - e) / a, (h / 2 - f) / a);
+    const on = new AbortController();
+    const listen = <K extends keyof HTMLElementEventMap>(
+      type: K,
+      fn: (e: HTMLElementEventMap[K]) => void,
+      opts: AddEventListenerOptions = {},
+    ) => target.addEventListener(type, fn, { ...opts, signal: on.signal });
+    const fromCentre = (cx: number, cy: number): [number, number] => {
+      const r = target.getBoundingClientRect();
+      return [cx - r.left - r.width / 2, cy - r.top - r.height / 2];
     };
+
+    // Pointers by pointerId: one pans by its own movement; two pinch about their midpoint.
+    // Each gesture is measured from an anchor taken whenever the set of pointers changes,
+    // so a finger landing or lifting never jumps and zoom clamping never accumulates.
+    const pts = new Map<number, { x: number; y: number }>();
+    const spread = () => {
+      const [a, b] = [...pts.values()];
+      if (!a) return { mx: 0, my: 0, d: 0 };
+      if (!b) return { mx: a.x, my: a.y, d: 0 };
+      return { mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) };
+    };
+    let anchor = { cam: cur, ...spread() };
+    const reanchor = () => {
+      anchor = { cam: cur, ...spread() };
+    };
+    listen("pointerdown", (e) => {
+      if (e.button !== 0 || pts.size >= 2) return; // right and middle buttons never pan
+      ease = null; // direct manipulation takes over from an eased keyboard move
+      goal = cur;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      target.setPointerCapture?.(e.pointerId);
+      reanchor();
+    });
+    listen("pointermove", (e) => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const { mx, my, d } = spread();
+      const a = anchor.cam;
+      const zoom = anchor.d > 0 ? (a.zoom * d) / anchor.d : a.zoom;
+      const moved = pan(a, mx - anchor.mx, my - anchor.my);
+      jump(zoomAt(moved, zoom - a.zoom, ...fromCentre(mx, my)));
+    });
+    const lift = (e: PointerEvent) => {
+      if (pts.delete(e.pointerId)) reanchor();
+    };
+    listen("pointerup", lift);
+    listen("pointercancel", lift);
+
+    listen("keydown", (e) => {
+      const move = KEYS[e.key];
+      if (!move || e.ctrlKey || e.metaKey || e.altKey) return; // browser shortcuts pass
+      e.preventDefault();
+      if (!pts.size) glide(move(goal)); // a drag or pinch in progress owns the camera
+    });
+    // Native and non-passive, so preventDefault() works without a console error.
+    listen(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const n = cam.normalizeWheel(e);
+        if (n.zoomDelta) jump(zoomAt(cur, n.zoomDelta, ...fromCentre(e.clientX, e.clientY)));
+        else if (n.panDx || n.panDy) jump(pan(cur, n.panDx, n.panDy));
+        reanchor();
+      },
+      { passive: false },
+    );
+
     // The device-pixel box also reports devicePixelRatio changes, keeping the canvas sharp.
     const observer = new ResizeObserver(() => {
       app.renderer.resize(target.clientWidth || 1, target.clientHeight || 1, devicePixelRatio);
-      sync();
-      app.render();
+      draw();
     });
-    const ready = app.init({ ...PIXI, background: tokens.color.surface["0"] });
-    ready.then(() => {
-      if (cancelled) return;
+    const onVisible = () => document.visibilityState === "visible" && draw();
+    document.addEventListener("visibilitychange", onVisible, { signal: on.signal });
+
+    let unplug: (() => void) | undefined;
+    const init = app.init({ ...PIXI, background: tokens.color.surface["0"] });
+    init.then(() => {
+      if (on.signal.aborted) return;
+      ready = true;
       target.prepend(app.canvas);
-      app.stage.addChild(grid);
-      app.ticker.add(sync); // the ticker runs only while the camera moves
-      // Stop only once no transition runs, after one last sync+render of the settled transform
-      // (a late timer after a long task or in a hidden tab must not freeze a mid-pan frame).
-      const settle = () => {
-        if (cameraRef.current?.getAnimations().length) {
-          timer = window.setTimeout(settle, 50);
-          return;
-        }
-        app.ticker.stop();
-        sync();
-        app.render();
-      };
-      followRef.current = (duration) => {
-        app.ticker.start();
-        clearTimeout(timer);
-        timer = window.setTimeout(settle, duration + 50);
-      };
+      app.stage.addChild(world);
+      unplug = seamRef.current?.(world, requestRender);
       const box = "devicePixelContentBoxSize" in ResizeObserverEntry.prototype;
       observer.observe(target, box ? { box: "device-pixel-content-box" } : {});
     });
     return () => {
-      cancelled = true;
-      followRef.current = null;
+      on.abort();
       observer.disconnect();
-      clearTimeout(timer);
+      cancelAnimationFrame(raf);
+      unplug?.();
       // Pixi's destroy() throws before init() resolves, so it always waits for init.
-      ready.then(() => app.destroy({ removeView: true }, { children: true }));
+      init.then(() => app.destroy({ removeView: true }, { children: true }));
     };
   }, [supported]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a camera change is the trigger.
-  useEffect(() => followRef.current?.(ms), [camera, ms]);
 
   return (
     <main
       className="stage-frame"
       data-testid="stage-frame"
+      data-camera-x={cam.INITIAL_CAMERA.x}
+      data-camera-y={cam.INITIAL_CAMERA.y}
+      data-camera-zoom={cam.INITIAL_CAMERA.zoom}
       aria-label="World stage"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard pan and zoom (PRD 9.7).
       tabIndex={0}
       ref={frameRef}
     >
-      {supported ? (
-        <div
-          ref={cameraRef}
-          data-testid="camera"
-          className="stage-camera"
-          aria-hidden="true"
-          style={{ transform: cam.cameraTransform(camera), transitionDuration: `${ms}ms` }}
-        />
-      ) : (
+      {!supported && (
         <p className="stage-fallback" data-testid="stage-fallback">
           This browser can't render the isometric World. The Story lens will show the run instead.
         </p>
