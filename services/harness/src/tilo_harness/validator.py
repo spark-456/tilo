@@ -31,6 +31,39 @@ from referencing.jsonschema import DRAFT202012
 BASE_URI = "https://contracts.tilo.example/"
 LAYOUT_ID = re.compile(r"^(A_[0-9A-Za-z_]+|[LDBGI][0-9]{1,4})$")
 
+# int64 range (Firestore's integer type, and every JSON consumer's safe integer ceiling for a
+# whole number): anything outside this is rejected below, same as a non-finite float.
+_INT64_MIN = -(2**63)
+_INT64_MAX = 2**63 - 1
+
+
+def _finiteness_problems(value: Any, path: str = "") -> list[str]:
+    """qa-breaker, P0-09 round 2: `jsonschema`'s `minimum`/`maximum` checks use Python `<`/`>`,
+    which are False for both operands of any comparison against NaN, and JSON Schema's `number`
+    type has no finiteness or range constraint of its own -- so `event.schema.json`'s
+    `minimum: 0` on `credits` (and every other bare `number`/`integer` in the event) never
+    rejects `float("nan")`, `float("inf")` or an integer outside what every store and every JSON
+    consumer can round-trip. This walks the whole event (data included) and rejects any
+    non-finite float or out-of-int64-range integer, reported with the same "schema: ..." prefix
+    a `jsonschema` failure gets, so a caller filtering on that prefix sees both."""
+    problems: list[str] = []
+    label = path or "(root)"
+    if isinstance(value, bool):
+        return problems
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            problems.append(f"schema: {label}: {value!r} is not a finite JSON number")
+    elif isinstance(value, int):
+        if not (_INT64_MIN <= value <= _INT64_MAX):
+            problems.append(f"schema: {label}: {value!r} is outside the int64 range")
+    elif isinstance(value, dict):
+        for key, child in value.items():
+            problems += _finiteness_problems(child, f"{path}/{key}" if path else str(key))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            problems += _finiteness_problems(child, f"{path}/{index}" if path else str(index))
+    return problems
+
 
 def _repo_root_from_here() -> Path:
     # services/harness/src/tilo_harness/validator.py -> repo root is 4 parents up.
@@ -139,6 +172,10 @@ class EventValidator:
         ]
 
     def problems(self, event: dict[str, Any], state: WorldState | None = None) -> list[str]:
+        finiteness_problems = _finiteness_problems(event)
+        if finiteness_problems:
+            return finiteness_problems
+
         problems = [f"schema: {message}" for message in self._schema_errors("event", event)]
         if problems:
             return problems

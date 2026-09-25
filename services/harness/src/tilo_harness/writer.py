@@ -24,6 +24,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from tilo_harness.ids import ORG_ID, RUN_ID, WORLD_ID, check_id
 from tilo_harness.validator import EventValidator, WorldState
 from tilo_harness.views import redact, scopes_for
 
@@ -74,6 +75,14 @@ class WorldWriter:
         lease_s: float = 30.0,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
+        # Security-reviewer, P0-09 round 2: reject any org_id/world_id/run_id that does not
+        # match common.schema.json's pattern *before* any store call (open() builds Firestore
+        # paths from these ids). Each pattern excludes "/", so a world_id such as
+        # "w_victim/events/00000001" can never reach a path-building f-string -- see ids.py.
+        check_id(org_id, ORG_ID, label="org_id")
+        check_id(world_id, WORLD_ID, label="world_id")
+        check_id(run_id, RUN_ID, label="run_id")
+
         self._store = store
         self._org_id = org_id
         self._world_id = world_id

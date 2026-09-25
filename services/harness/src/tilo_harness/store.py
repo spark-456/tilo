@@ -21,6 +21,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from tilo_harness.ids import ORG_ID, WORLD_ID, check_id, is_scope
+
 # transact()'s callback: head -> (new_head, event_to_append_or_None, [(scope, view_doc), ...]).
 # Raising (WriterBusy, EventRejected, ...) leaves the store untouched.
 TransactFn = Callable[[dict[str, Any]], tuple[dict[str, Any], dict[str, Any] | None, list[tuple[str, dict[str, Any]]]]]
@@ -90,13 +92,25 @@ class FirestoreStore:
         self.project_id = project_id
         self._client = firestore.Client(project=project_id)
 
+    def _check_org_world(self, org_id: str, world_id: str) -> None:
+        # Security-reviewer, P0-09 round 2: every path built from org_id/world_id is guarded
+        # here too, independent of WorldWriter's constructor check, since this is the code that
+        # actually turns these ids into a Firestore path -- see ids.py.
+        check_id(org_id, ORG_ID, label="org_id")
+        check_id(world_id, WORLD_ID, label="world_id")
+
     def _events(self, org_id: str, world_id: str):
+        self._check_org_world(org_id, world_id)
         return self._client.collection(f"orgs/{org_id}/worlds/{world_id}/events")
 
     def _views(self, org_id: str, world_id: str, scope: str):
+        self._check_org_world(org_id, world_id)
+        if not is_scope(scope):
+            raise ValueError(f'scope {scope!r} is not "shared" or a district id')
         return self._client.collection(f"orgs/{org_id}/worlds/{world_id}/views/{scope}/events")
 
     def _head(self, org_id: str, world_id: str):
+        self._check_org_world(org_id, world_id)
         return self._client.document(f"orgs/{org_id}/worlds/{world_id}")
 
     def read_events(self, org_id: str, world_id: str) -> list[dict[str, Any]]:
