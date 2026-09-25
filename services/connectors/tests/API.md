@@ -199,3 +199,12 @@ any `tests/` directory and files named `test_*.py` before calling
 `scan_for_side_effect_calls`; `scan_for_side_effect_calls` itself stays general (it has no
 opinion about tests/ or git — see above), so a future non-test lint entry point can reuse it
 unchanged. Logged for `docs/open-questions.md` by whichever builder ships this.
+
+## Failures (review round 1)
+
+An adapter that raises is ambiguous: the side effect may or may not have happened. The entry stays
+due (it may sit in `sending`) and the next `dispatch_due()` retries it; the adapter's
+(world_id, idempotency_key) dedupe keeps it to one send, and the one `data.transfer` is emitted
+once the send is confirmed. Only a connector with no adapter lands the entry in `failed`, a final
+state. `dispatch_due()` never stops a batch on one entry's error. A `data.transfer` whose `emit`
+raised is retried by the next `dispatch_due()`, and exactly one is ever emitted per entry.
