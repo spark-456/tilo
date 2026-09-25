@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+from dataclasses import dataclass
 from typing import Any
 
 import jsonschema
@@ -186,13 +187,18 @@ def make_district(name: str, summary: str) -> deps.DistrictRecord:
     return deps.DistrictRecord(name=name, summary=summary)
 
 
+RUN_ID = "r_village_basic_1"  # matches base_event's own default run_id, so a fixture built from
+# base_event() and one stamped by FakeEventWriter for the same world compare equal on run_id.
+
+
 def make_world(
     *,
     owner: str = OWNER,
     owner_channels: tuple[str, ...] = ("web", "whatsapp", "email"),
-    districts: dict[str, deps.DistrictRecord] | None = None,
+    districts: dict[str, deps.DistrictRecord | None] | None = None,
+    run_id: str = RUN_ID,
 ) -> deps.WorldRecord:
-    return deps.WorldRecord(owner=owner, owner_channels=owner_channels, districts=districts or {})
+    return deps.WorldRecord(owner=owner, owner_channels=owner_channels, districts=districts or {}, run_id=run_id)
 
 
 def make_store(
@@ -214,11 +220,115 @@ def make_principal(
     *,
     user_id: str = OWNER,
     role: str = "owner",
+    world_id: str | None = WORLD,
     domain: str | None = None,
     districts: tuple[str, ...] = (),
 ) -> deps.Principal:
-    return deps.Principal(user_id=user_id, role=role, domain=domain, districts=districts)
+    """world_id defaults to WORLD (this file's one fixture world) so every existing-owner-ish
+    test is a member of the world it acts on without saying so; a test proving the round-1
+    membership-oracle finding (ST-3a round 2) passes world_id=None or a different world's id
+    explicitly."""
+    return deps.Principal(user_id=user_id, role=role, world_id=world_id, domain=domain, districts=districts)
 
 
 def as_principal(principal: deps.Principal):
     app.dependency_overrides[deps.get_current_principal] = lambda: principal
+
+
+# ---------------------------------------------------------------------------
+# FakeEventWriter: the in-memory stand-in for "the harness is the only writer of events" (PRD
+# 15.3), installed in every test via the `writer` fixture (conftest.py). It is the one place
+# id/seq/ts/run_id are stamped, on purpose (PI-18): tilo-api hands it an unstamped *part* and this
+# double is what proves, by recording every call, that tilo-api never computed those fields
+# itself (round-1 finding: tilo-api invented run_id = f"r_{world_id}" and rescanned
+# store.events[world_id] for the next seq on every single event, O(n) per call inside an O(n)
+# loop). A per-world counter here is O(1) per call instead.
+
+_EVENT_PART_KEYS = (
+    "type",
+    "actor",
+    "target",
+    "level",
+    "district",
+    "item",
+    "severity",
+    "credits",
+    "summary",
+    "cause",
+    "vis",
+    "authz",
+    "data",
+)
+
+_STAMPED_ONLY_KEYS = ("id", "seq", "ts", "run_id")
+
+_ALLOWED_PART_KEYS = frozenset(_EVENT_PART_KEYS) | {"trace"}
+
+
+@dataclass
+class RecordedWrite:
+    world_id: str
+    part: dict  # exactly what tilo-api passed, before this double stamped anything
+
+
+class FakeEventWriter:
+    def __init__(self, store: deps.Store) -> None:
+        self.store = store
+        self.calls: list[RecordedWrite] = []
+        self._counters: dict[str, int] = {}
+
+    def append(self, world_id: str, part: dict) -> dict:
+        self.calls.append(RecordedWrite(world_id=world_id, part=dict(part)))
+        seq = self._counters.get(world_id, 0) + 1
+        self._counters[world_id] = seq
+        world = self.store.worlds.get(world_id)
+        run_id = world.run_id if world is not None else f"r_{world_id[:44]}"
+        trace = part.get(
+            "trace",
+            {
+                "model_role": None,
+                "profile": None,
+                "tokens_in": None,
+                "tokens_out": None,
+                "tool": None,
+                "latency_ms": None,
+                "archive_ref": None,
+            },
+        )
+        event = {
+            "v": "1.0",
+            "id": ulid(seq),
+            "seq": seq,
+            "ts": part.get("ts") or "2026-09-29T09:30:00.000Z",
+            "world_id": world_id,
+            "run_id": run_id,
+            "type": part["type"],
+            "actor": part.get("actor", "system"),
+            "target": part.get("target", world_id),
+            "level": part.get("level"),
+            "district": part.get("district"),
+            "item": part.get("item"),
+            "severity": part.get("severity", "info"),
+            "credits": part.get("credits", 0),
+            "summary": (part.get("summary") or "")[:140] or "test event",
+            "cause": part.get("cause"),
+            "vis": part.get("vis", "all"),
+            "authz": part.get("authz"),
+            "data": part.get("data", {}),
+            "trace": trace,
+        }
+        self.store.events.setdefault(world_id, []).append(event)
+        return event
+
+
+def make_writer(store: deps.Store) -> FakeEventWriter:
+    return FakeEventWriter(store)
+
+
+def assert_part_carries_no_stamped_fields(part: dict) -> None:
+    """PI-18: the event part tilo-api hands to EventWriter.append carries none of the four fields
+    only a writer may set, and no key outside the part shape API_ST3a.md pins."""
+    for key in _STAMPED_ONLY_KEYS:
+        assert key not in part, f"tilo-api must not stamp {key!r} itself; found it in the part it built"
+    unexpected = set(part) - _ALLOWED_PART_KEYS
+    assert not unexpected, f"event part carries unexpected keys: {unexpected}"
