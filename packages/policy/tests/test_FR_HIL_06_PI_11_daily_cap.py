@@ -131,13 +131,15 @@ def test_FR_HIL_06_PI_11_credits_exceeded_gates(risk_table_path):
     assert decision.outcome == "gate"
 
 
-def test_FR_HIL_06_PI_11_no_daily_cap_when_per_day_is_null(risk_table_path):
+def test_FR_HIL_06_PI_11_l3_policy_without_a_daily_limit_covers_nothing(risk_table_path):
+    """policy.schema.json requires per_day at L2 and L3 (fixture policy/invalid/l3_without_daily_limit):
+    a record without one is invalid, so it covers nothing and the send waits at a gate."""
     table = _table(risk_table_path)
     policy = _l3_policy(per_day=None, credits=None)
     decision = tilo_policy.decide(
         _proposal(), table=table, policies=[policy], world_owner=OWNER, applied=_earlier_today(500), now=NOW
     )
-    assert decision.outcome == "run"
+    assert decision.outcome == "gate"
 
 
 def test_FR_HIL_06_PI_11_l2_policy_also_has_a_daily_cap(risk_table_path):
