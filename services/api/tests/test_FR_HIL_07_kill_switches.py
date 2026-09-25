@@ -1306,13 +1306,23 @@ def test_FR_HIL_07_second_stop_all_on_the_same_world_is_not_blocked_by_the_first
     past the deadline of) a writer call that never returns, must itself return within 5s: by the
     time it runs, the first call's level-change section has already released the world lock (it
     never held it across writer I/O), so the second call finds every policy already at L1 and has
-    nothing left to do."""
+    nothing left to do.
+
+    Both calls run in their own bounded background thread (never a raw, unbounded `client.post` on
+    the main test thread): if the implementation under test still holds the world lock across
+    writer I/O (the round-4 bug this test targets), the *second* call would itself block forever
+    waiting for a lock the first call cannot release until its writer call returns -- which it
+    never does until `blocking.release()` runs. A raw synchronous second call would then deadlock
+    the whole test (release() is only reached after it returns); routing it through its own
+    daemon thread with a join timeout instead turns that failure mode into a normal, bounded
+    assertion failure."""
     ids = _world_with_policies(store, 3, level="L2")
     blocking = BlockingEventWriter(store)
     as_writer(blocking)
     as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
 
     first_result: dict = {}
+    second_result: dict = {}
 
     def call_first():
         started = time.monotonic()
@@ -1320,19 +1330,30 @@ def test_FR_HIL_07_second_stop_all_on_the_same_world_is_not_blocked_by_the_first
         first_result["resp"] = resp
         first_result["elapsed"] = time.monotonic() - started
 
+    def call_second():
+        started = time.monotonic()
+        resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        second_result["resp"] = resp
+        second_result["elapsed"] = time.monotonic() - started
+
     t1 = threading.Thread(target=call_first, daemon=True)
     t1.start()
     try:
         assert blocking.entered.wait(timeout=5), "the first call never reached the (blocking) writer"
         time.sleep(0.05)  # let the first call's level-change section fully settle
 
-        started_2 = time.monotonic()
-        second_resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
-        second_elapsed = time.monotonic() - started_2
-
+        t2 = threading.Thread(target=call_second, daemon=True)
+        t2.start()
+        t2.join(timeout=8.0)
+        assert not t2.is_alive(), (
+            "the second stop-all on the same world never returned while the first was still stuck "
+            "on the writer -- the world lock is held across writer I/O"
+        )
+        assert "resp" in second_result
+        second_resp = second_result["resp"]
         assert second_resp.status_code in (200, 202), second_resp.text
-        assert second_elapsed <= 5.0, (
-            f"second stop-all took {second_elapsed:.2f}s while the first was still stuck on the writer"
+        assert second_result["elapsed"] <= 5.0, (
+            f"second stop-all took {second_result['elapsed']:.2f}s while the first was still stuck on the writer"
         )
         for pid in ids:
             assert store.policies[pid]["level"] == "L1"
@@ -1351,7 +1372,11 @@ def test_FR_HIL_07_stop_all_from_another_owner_mapped_to_the_same_target_world_i
     """round-5 qa/security finding: an owner's Stop-all can touch a world it does not own at all
     (via store.policy_worlds), and that world's own lock must never be held across writer I/O --
     otherwise that world's own rightful owner, calling Stop-all on their own world directly and
-    concurrently, would be stalled behind a stranger's stuck write."""
+    concurrently, would be stalled behind a stranger's stuck write. Owner B's call runs in its own
+    bounded background thread for the same deadlock-avoidance reason as the same-world test above:
+    a still-buggy implementation would otherwise block it forever on world B's lock, which owner
+    A's call cannot release until the (never-arriving) `blocking.release()` -- which this test only
+    calls after observing owner B's call's own outcome."""
     store.worlds[WORLD] = make_world(owner=OWNER)
     store.worlds[OTHER_WORLD] = make_world(owner=OTHER_OWNER)
     store.policies["pol_a_mapped_to_b"] = base_policy(id_="pol_a_mapped_to_b", owner=OWNER, level="L2")
@@ -1369,6 +1394,7 @@ def test_FR_HIL_07_stop_all_from_another_owner_mapped_to_the_same_target_world_i
     )
 
     a_result: dict = {}
+    b_result: dict = {}
 
     def call_a():
         started = time.monotonic()
@@ -1376,20 +1402,30 @@ def test_FR_HIL_07_stop_all_from_another_owner_mapped_to_the_same_target_world_i
         a_result["resp"] = resp
         a_result["elapsed"] = time.monotonic() - started
 
+    def call_b():
+        started = time.monotonic()
+        resp = client.post(f"/worlds/{OTHER_WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "b"})
+        b_result["resp"] = resp
+        b_result["elapsed"] = time.monotonic() - started
+
     ta = threading.Thread(target=call_a, daemon=True)
     ta.start()
     try:
         assert blocking.entered.wait(timeout=5), "owner A's call never reached the (blocking) writer"
         time.sleep(0.05)
 
-        started_b = time.monotonic()
-        b_resp = client.post(f"/worlds/{OTHER_WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "b"})
-        b_elapsed = time.monotonic() - started_b
-
+        tb = threading.Thread(target=call_b, daemon=True)
+        tb.start()
+        tb.join(timeout=5.0)
+        assert not tb.is_alive(), (
+            "owner B's own Stop-all on world B never returned while owner A's call was still stuck "
+            "on the writer -- world B's lock is being held across owner A's writer I/O"
+        )
+        b_resp = b_result["resp"]
         assert b_resp.status_code in (200, 202), b_resp.text
-        assert b_elapsed < 1.0, (
-            f"owner B's own Stop-all on world B took {b_elapsed:.2f}s -- it must not be blocked by "
-            "owner A's still-in-flight write for a policy merely mapped into B"
+        assert b_result["elapsed"] < 1.0, (
+            f"owner B's own Stop-all on world B took {b_result['elapsed']:.2f}s -- it must not be "
+            "blocked by owner A's still-in-flight write for a policy merely mapped into B"
         )
         assert store.policies["pol_b_own"]["level"] == "L1"
     finally:
