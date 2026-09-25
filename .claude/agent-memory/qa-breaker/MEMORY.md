@@ -1,1 +1,2 @@
 - [Web stage attack patterns](web-stage-attack-patterns.md) — passive wheel error; canvas edges; modifier keys; timer-stopped ticker leaves stale grid
+- [Policy engine attack patterns](policy-engine-attack-patterns.md) — tilo_policy P4-01 fail-open inputs rounds 1-3; per-policy schema validation cost

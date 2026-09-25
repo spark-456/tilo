@@ -1,1 +1,1 @@
-- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); open: two tier sources
+- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL; P4-01 r3 FAIL (stale `now` beats Stop all; dup-id check only among covering); open: two tier sources
