@@ -5,8 +5,8 @@ Cloud Run service (PRD 6.2): fictional sites used by scenarios and evals, so `ti
 has safe, deterministic targets instead of the live internet.
 
 ## Commands
-- `uv run pytest "services/sandbox-web/tests" -q` — acceptance tests (P8-07; failing until
-  `tilo_sandbox_web` and its `services/sandbox-web/pyproject.toml` land on `feat/P8-07-sandbox-web`).
+- `uv run pytest "services/sandbox-web/tests" -q` — acceptance tests (P8-07).
+- `uv run --package tilo-sandbox-web uvicorn tilo_sandbox_web:app --port 8090` — run the service locally.
 - `just check` — full gate from the repo root.
 
 ## Contracts
