@@ -13,6 +13,7 @@ import yaml
 
 from .schemas import CONTRACTS, conforms
 
+TABLE_REF = "policy.schema.json#/$defs/risk_tier_table"
 DEFAULT_TABLE = CONTRACTS.parent / "config" / "autonomy.yaml"  # not in the repo yet (spark-456/tilo#1)
 
 
@@ -60,6 +61,16 @@ class RiskTable:
     modifiers: tuple[str, ...]
     max_level: dict[str, str]
 
+    def __post_init__(self) -> None:
+        """A hand-built table must meet the same contract as a loaded one."""
+        raw = {
+            "actions": self.actions,
+            "modifiers": [{"condition": m, "raises_to": "T3"} for m in self.modifiers],
+            "max_level": self.max_level,
+        }
+        if not isinstance(self.modifiers, tuple) or not conforms(TABLE_REF, raw):
+            raise PolicyConfigError(f"risk table fails contracts/{TABLE_REF}")
+
     def assess(self, action_type: str, facts: SideEffectFacts) -> Assessment:
         try:
             active = facts.active_modifiers()
@@ -77,7 +88,7 @@ def load_risk_table(path: str | os.PathLike[str] | None = None) -> RiskTable:
         raw = yaml.safe_load(target.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
         raise PolicyConfigError(f"risk table {target}: {exc}") from exc
-    if not conforms("policy.schema.json#/$defs/risk_tier_table", raw):
-        raise PolicyConfigError(f"risk table {target} fails contracts/policy.schema.json#/$defs/risk_tier_table")
+    if not conforms(TABLE_REF, raw):
+        raise PolicyConfigError(f"risk table {target} fails contracts/{TABLE_REF}")
     modifiers = tuple(m["condition"] for m in raw["modifiers"])
     return RiskTable(actions=dict(raw["actions"]), modifiers=modifiers, max_level=dict(raw["max_level"]))

@@ -8,6 +8,7 @@ import functools
 import math
 import re
 from collections.abc import Callable
+from datetime import datetime, timedelta
 from typing import Any, NamedTuple, ParamSpec, TypeVar
 
 from .schemas import conforms, event_ok
@@ -18,6 +19,7 @@ LEVELS = ("L0", "L1", "L2", "L3")
 INSTRUCTION_CHANNELS = {"world.requested": ("web", "mobile_web"), "channel.message_in": ("whatsapp",)}
 # The policy fields open_gate reads when a Team Lead answers (PRD 10.1).
 LEAD_POLICY_KEYS = ("id", "owner", "action_type", "team_lead_domains", "created_by", "changed_by", "expiry", "history")
+_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")  # common.schema.json email_address, fully matched
 _TIMESTAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z")
 
 
@@ -47,10 +49,23 @@ def fail_closed(default: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
 
 
 def ts(value: Any) -> str:
-    """A common.schema.json timestamp (UTC, milliseconds, Z), so string order is time order."""
+    """A common.schema.json timestamp (UTC, milliseconds, Z) that is a real calendar instant, so
+    string order is time order. Anything else raises ValueError."""
     if isinstance(value, str) and _TIMESTAMP.fullmatch(value):
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%fZ")  # month 19 or 30 February raise
         return value
     raise ValueError(f"not a UTC millisecond timestamp: {value!r}")
+
+
+def add_seconds(at: str, seconds: int) -> str:
+    moved = datetime.strptime(ts(at), "%Y-%m-%dT%H:%M:%S.%fZ") + timedelta(seconds=seconds)
+    return moved.strftime("%Y-%m-%dT%H:%M:%S.") + f"{moved.microsecond // 1000:03d}Z"
+
+
+def _domain(address: str) -> str:
+    """The text after "@", lower-cased only when ASCII: no Unicode folding (a Kelvin sign is not k)."""
+    domain = address.rsplit("@", 1)[1]
+    return domain.lower() if domain.isascii() else domain
 
 
 def _within(allowed: list, value: Any) -> bool:
@@ -82,11 +97,6 @@ def in_force(policy: dict, owner: str, at: str) -> bool:
     )
 
 
-def applied_ok(applied: list[dict]) -> bool:
-    """Every earlier part is a contract-valid policy.applied (the `credits` key is this engine's)."""
-    return isinstance(applied, list) and all(event_ok(a, ("policy.applied",)) for a in applied)
-
-
 @fail_closed(None)
 def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | None:
     """PI-06: the level at which a contract-valid `policy` covers `target` at `at`, or None."""
@@ -99,10 +109,13 @@ def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | N
         and in_force(policy, owner, at)
         and target.connector in scope["connectors"]
         and _within(scope["districts"], target.district)
+        and (bool(target.recipients) or not (scope["recipients"] or scope["domains"]))
         and all(
-            conforms("common.schema.json#/$defs/email_address", r)
+            isinstance(r, str)
+            and _EMAIL.fullmatch(r) is not None
+            and conforms("common.schema.json#/$defs/email_address", r)
             and _within(scope["recipients"], r)
-            and _within(scope["domains"], r.rsplit("@", 1)[1].lower())
+            and _within(scope["domains"], _domain(r))
             for r in target.recipients
         )
     )
@@ -124,7 +137,6 @@ def instruction_counts(
         and ts(instruction["ts"]) < ts(before)
         and destination is not None
         and instruction["data"]["destination"] == destination
-        and applied_ok(applied)
         and all(used["data"]["instruction_id"] != instruction["id"] for used in applied)
     )
 

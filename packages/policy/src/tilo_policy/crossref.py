@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .coverage import Target, covering_level, instruction_counts, opens_gate
+from .coverage import Target, add_seconds, covering_level, instruction_counts, opens_gate
 from .decide import over_limit
 from .schemas import conforms, event_ok
 
@@ -69,6 +69,11 @@ def _breaks_ob05(case: dict) -> bool:
         if any(auth["data"][f] != entry[f] for f in ("connector", "destination", "undo_window_s")):
             return True
     if (transfer is not None) != (entry["state"] == "sent"):
+        return True
+    window, waiting = entry["undo_window_s"], ("scheduled" if entry["undo_window_s"] > 0 else "queued")
+    if entry["scheduled_at"] != add_seconds(entry["created_at"], window):
+        return True  # OB-02: the undo window is kept
+    if entry["state"] in ("queued", "scheduled") and entry["state"] != waiting:
         return True
     sent = (transfer or {}).get("data")
     return sent is not None and (
