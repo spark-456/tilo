@@ -4,14 +4,16 @@ The engine reads policies, events, facts and crossref cases that other services 
 that breaks its contract (contracts/*.schema.json) covers nothing, an event part that breaks its
 schema opens nothing, and an entry the engine cannot fully check is rejected (PRD 10.4 "the
 engine is deterministic code", docs/security/p4-policy-invariants.md PI-06, PI-07, PI-11, PI-16,
-SEC-06). Each case below was a probe that returned "run" or a valid verdict in review round 1.
+SEC-06). Each case below was a probe that returned "run" or a valid verdict in review round 1 or 2.
 """
 
 from __future__ import annotations
 
 import copy
+import itertools
 import json
 import pathlib
+import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -189,7 +191,9 @@ def test_FR_HIL_04_PI_07_attachments_none_is_not_no_attachments(risk_table_path)
     assert decision.outcome == "gate"
 
 
-@pytest.mark.parametrize("recipient", ["a@evil.com@example.org", "teammate@example.org.", "", "no-at-sign"])
+@pytest.mark.parametrize(
+    "recipient", ["a@evil.com@example.org", "teammate@example.org.", "", "no-at-sign", "teammate@example.org\n"]
+)
 def test_FR_HIL_03_PI_06_malformed_recipient_is_never_in_scope(recipient, risk_table_path):
     policy = _l3(recipients=(), domains=("example.org",))
     decision = _decide(_table(risk_table_path), _status_proposal(recipients=(recipient,)), [policy])
@@ -276,3 +280,108 @@ def test_FR_HIL_06_PI_11_policy_path_over_its_daily_cap_is_rejected(l3_case):
     earlier = {"type": "policy.applied", "authz": authz, "data": case["authorised_by"]["data"]}
     case["earlier_applied"] = [copy.deepcopy(earlier) for _ in range(per_day)]
     assert tilo_policy.check_entry(case) is not None
+
+
+# --- review round 2 --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("now", ["2026-19-39T10:20:00.000Z", "2026-09-29T25:20:00.000Z", "2026-02-30T10:20:00.000Z"])
+def test_FR_HIL_06_PI_11_impossible_now_never_resets_the_daily_cap(now, risk_table_path):
+    policy = _l3(per_day=1)
+    earlier = [applied_entry(policy_id="pol_status", at="2026-09-29T10:00:00.000Z")]
+    assert _decide(_table(risk_table_path), _status_proposal(), [policy], earlier, now=now).outcome == "gate"
+
+
+def test_FR_HIL_04_PI_07_hand_built_table_with_an_unknown_level_never_runs(risk_table_path):
+    """RiskTable is public: one built without load_risk_table is refused at construction or
+    makes every decision gate. Only a policy at L2 ever yields run_after_undo."""
+    good = _table(risk_table_path)
+    try:
+        bad = tilo_policy.RiskTable(
+            actions=dict(good.actions),
+            modifiers=tuple(good.modifiers),
+            max_level={"T1": "L3", "T2": "L", "T3": "L1"},
+        )
+    except tilo_policy.PolicyConfigError:
+        return
+    proposal = tilo_policy.Proposal(
+        world_id=WORLD,
+        action_type="send_email",
+        connector="gmail",
+        district="D1",
+        destination="thread-supplier-1",
+        facts=tilo_policy.SideEffectFacts(**base_facts()),
+        item={"artifact_id": "art_reply", "version": 1},
+        credits=0,
+        instruction=None,
+    )
+    decision = tilo_policy.decide(
+        proposal, table=bad, policies=[base_policy(level="L2")], world_owner=OWNER, applied=[], now=NOW
+    )
+    assert decision.outcome == "gate"
+
+
+def test_FR_HIL_03_PI_13_duplicate_policy_ids_fail_closed_whatever_the_order(risk_table_path):
+    table = _table(risk_table_path)
+    capped, loose = _l3(per_day=1), _l3(per_day=20)
+    earlier = [applied_entry(policy_id="pol_status", at="2026-09-29T10:00:00.000Z")]
+    for order in ([capped, loose], [loose, capped]):
+        assert _decide(table, _status_proposal(), order, earlier).outcome == "gate"
+
+
+def test_FR_HIL_03_decision_does_not_depend_on_the_order_of_policies(risk_table_path):
+    table = _table(risk_table_path)
+    policies = [
+        _l3(id_="pol_a", per_day=5),
+        _l3(id_="pol_b", per_day=1),
+        _l3(
+            id_="pol_c",
+            level="L2",
+            history=[{"by": OWNER, "at": "2026-09-29T09:30:00.000Z", "change": "c", "level": "L2"}],
+        ),
+    ]
+    earlier = [applied_entry(policy_id="pol_b", at="2026-09-29T10:00:00.000Z")]
+    decisions = [_decide(table, _status_proposal(), list(order), earlier) for order in itertools.permutations(policies)]
+    assert all(d == decisions[0] for d in decisions)
+
+
+def test_FR_HIL_03_PI_06_unicode_lookalike_domain_is_not_in_scope(risk_table_path):
+    policy = _l3(recipients=(), domains=("kpmg.com",))
+    decision = _decide(_table(risk_table_path), _status_proposal(recipients=("a@Kpmg.com",)), [policy])
+    assert decision.outcome == "gate"
+
+
+@pytest.mark.parametrize(
+    "scope", [{"recipients": (), "domains": ("example.org",)}, {"recipients": ("teammate@example.org",), "domains": ()}]
+)
+def test_FR_HIL_03_PI_06_no_recipients_is_not_within_a_restricted_scope(scope, risk_table_path):
+    """A policy that restricts recipients or domains covers only sends whose recipients it can
+    check; a send with no recipients cannot show it stays in scope."""
+    policy = _l3(**scope)
+    assert _decide(_table(risk_table_path), _status_proposal(recipients=()), [policy]).outcome == "gate"
+
+
+def test_FR_HIL_05_PI_12_check_entry_rejects_an_l2_entry_without_its_undo_wait(repo_root):
+    path = repo_root / "contracts/fixtures/outbox/crossref/valid/policy_reply_waiting_out_undo_window.json"
+    case = json.loads(path.read_text(encoding="utf-8"))
+    assert tilo_policy.check_entry(case) is None
+    case["entry"]["state"] = "queued"
+    case["entry"]["scheduled_at"] = case["entry"]["created_at"]
+    assert tilo_policy.check_entry(case) is not None
+
+
+def test_FR_HIL_06_PI_11_decide_stays_fast_with_a_long_history(risk_table_path):
+    """The owner's whole policy.applied history is passed every time (API.md): 5000 earlier
+    parts, a handful of them today, decide in well under the 2 s budget."""
+    table = _table(risk_table_path)
+    older = [
+        applied_entry(
+            policy_id="pol_status", at=f"2026-08-{1 + i % 28:02d}T10:00:00.000Z", outbox_id=f"01JB5VQ{i:019d}"
+        )
+        for i in range(5000)
+    ]
+    start = time.perf_counter()
+    decision = _decide(table, _status_proposal(), [_l3()], older)
+    elapsed = time.perf_counter() - start
+    assert decision.outcome == "run"
+    assert elapsed < 2.0, f"decide took {elapsed:.2f} s with 5000 earlier parts"
