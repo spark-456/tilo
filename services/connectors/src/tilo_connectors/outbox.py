@@ -1,17 +1,18 @@
-"""tilo_connectors.outbox — the only path to a side effect (SEC-03, PRD 12.1). Outbox.enqueue
-writes only a new entry: schema-valid (OB-05), "queued" or "scheduled" to match undo_window_s
-(OB-02), never overwriting a stored id, and authorised by tilo_policy.check_entry (OB-01/OB-05);
-a retry with the same world_id + idempotency_key is a no-op (OB-03). Outbox.dispatch_due() sends
-every entry currently due, minting a single-use Grant no caller outside this module can
-construct, so a connector adapter's side-effect method can only run from here (SEC-03). An
-adapter Exception is ambiguous (the side effect may have happened) so the entry just stays
-"sending" — still due, retried by the next dispatch_due(), the batch going on regardless — and
-only a missing adapter for the connector is a final "failed" (tests/API.md "Failures"). Public
-surface: tests/API.md.
+"""tilo_connectors.outbox — the only path to a side effect (SEC-03, PRD 12.1). enqueue() writes
+only a new entry (OB-02, OB-05), authorised by tilo_policy.check_entry (OB-01/OB-05); a retry on
+the same world_id + idempotency_key is a no-op (OB-03). dispatch_due() sends every entry due,
+minting a single-use Grant no caller outside this module can construct (SEC-03). Several
+instances share one store (Cloud Run scales out, tests/API.md "Several instances, restarts"):
+claiming an entry is a leased compare-and-set, so an in-flight send is never claimed twice; an
+adapter Exception is ambiguous (the send may have happened) so the entry gives up its lease and
+stays "sending" — still due, the batch going on regardless — and only a missing adapter is a
+final "failed". A pending data.transfer lives in the store, emitted later by any instance,
+exactly once, in send order; an emit error never stops the batch. Public surface: tests/API.md.
 """
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass
@@ -24,12 +25,12 @@ from ._time import add_seconds
 from .errors import MissingGrant, OutboxRefused
 from .store import InMemoryOutboxStore
 
-# States dispatch_due() treats as due: "queued" and "sending" (left there by a process death or
-# an adapter Exception — either way ambiguous, so it stays retryable; the adapter's own key
-# dedupe keeps it at one send) are always due; "scheduled" waits out its undo window; "sent",
-# "cancelled" and "failed" (only a missing adapter, a definite non-send) are terminal.
+# "queued" and "sending" (a process death, a released lease, or an adapter Exception — all
+# ambiguous, so it stays retryable; the adapter's own key dedupe keeps it at one send) are
+# always worth attempting; "scheduled" waits out its undo window; "sent", "cancelled" and
+# "failed" (only a missing adapter, a definite non-send) are terminal.
 _ALWAYS_DUE_STATES = ("queued", "sending")
-_CLAIMABLE_STATES = ("queued", "scheduled", "sending")
+_LEASE_SECONDS = 30  # generous next to any real adapter call; a dead holder's lease still expires
 
 # Ids of Grant objects currently authorised for the one send Outbox.dispatch_due() minted them
 # for (SEC-03). Private to this module; a Grant built any other way is never a member.
@@ -64,8 +65,10 @@ class Grant:
     world_id: str
     idempotency_key: str
 
-    def verify(self) -> None:
-        if id(self) not in _LIVE_GRANTS:
+    def verify(self, idempotency_key: str) -> None:
+        """Raises unless this exact object is currently live AND names the send it is being
+        used for — a live grant minted for one key never covers a call made with another."""
+        if id(self) not in _LIVE_GRANTS or self.idempotency_key != idempotency_key:
             raise MissingGrant("grant not minted by Outbox.dispatch_due() for this exact send")
 
 
@@ -81,9 +84,6 @@ class Outbox:
         self._connectors = connectors
         self._emit = emit
         self._clock = clock
-        # Transfers a send emitted but were not yet handed to `emit` successfully (PI-14: no
-        # field but state changes on the entry itself, so this bookkeeping lives here instead).
-        self._pending_transfers: dict[str, dict] = {}
 
     # -- enqueue -----------------------------------------------------------------------------
 
@@ -100,30 +100,35 @@ class Outbox:
         if self._store.get(entry["id"]) is not None:
             raise OutboxRefused(f"id {entry['id']!r} is already stored under a different idempotency_key")
 
-        case = {**deepcopy(evidence), "entry": deepcopy(entry), "transfer": None, "rule": None}
+        # Taken before check_entry and stored as-is: the caller changing its own dict afterwards
+        # changes nothing here.
+        snapshot = deepcopy(entry)
+        case = {**deepcopy(evidence), "entry": deepcopy(snapshot), "transfer": None, "rule": None}
         verdict = tilo_policy.check_entry(case)
         if verdict is not None:
             raise OutboxRefused(f"{verdict}: entry is not authorised")
 
-        if not self._store._insert_if_absent(entry):
-            # Lost a race with a concurrent enqueue of the same id: the store never overwrites.
+        if not self._store._insert_if_absent(snapshot):
+            # Lost a race with a concurrent enqueue of the same id or the same (world_id, key):
+            # the store never overwrites.
             existing = self._store.get_by_idempotency_key(entry["world_id"], entry["idempotency_key"])
             if existing is not None:
                 return existing
             raise OutboxRefused(f"id {entry['id']!r} is already stored under a different idempotency_key")
-        return deepcopy(entry)
+        return deepcopy(snapshot)
 
     def _check_fresh_state(self, entry: dict) -> None:
         """OB-02: enqueue only ever introduces a brand-new entry — "queued" with no undo window,
         else "scheduled" with scheduled_at == created_at + undo_window_s. Any other state (a
-        later stage of the entry's life) is refused outright."""
+        later stage of the entry's life) is refused outright, as is a schedule so far out that
+        computing it overflows."""
         undo_window_s = entry["undo_window_s"]
         expected_state = "queued" if undo_window_s == 0 else "scheduled"
         if entry["state"] != expected_state:
             raise OutboxRefused(f"OB-02: a new entry must be {expected_state!r}, got {entry['state']!r}")
         try:
             expected_scheduled_at = add_seconds(entry["created_at"], undo_window_s)
-        except (ValueError, TypeError) as exc:
+        except (ValueError, TypeError, OverflowError) as exc:
             raise OutboxRefused(f"OB-02: cannot compute scheduled_at: {exc}") from exc
         if entry["scheduled_at"] != expected_scheduled_at:
             raise OutboxRefused(
@@ -143,7 +148,7 @@ class Outbox:
     def dispatch_due(self) -> list[dict]:
         now = self._clock()
         due = [entry for entry in self._store.all_entries() if self._is_due(entry, now)]
-        settled = [self._dispatch_one(entry["id"]) for entry in due]
+        settled = [self._dispatch_one(entry["id"], now) for entry in due]
         self._flush_pending_transfers()
         return [entry for entry in settled if entry is not None]
 
@@ -154,14 +159,15 @@ class Outbox:
             return True
         return state == "scheduled" and entry["scheduled_at"] <= now
 
-    def _dispatch_one(self, outbox_id: str) -> dict | None:
-        claimed = self._store._compare_and_set_state(outbox_id, _CLAIMABLE_STATES, "sending")
+    def _dispatch_one(self, outbox_id: str, now: str) -> dict | None:
+        holder = uuid.uuid4().hex
+        claimed = self._store._claim_for_sending(outbox_id, holder, now, _LEASE_SECONDS)
         if claimed is None:
-            return None  # already claimed elsewhere (a racing dispatch, or a cancel just won)
+            return None  # leased to someone else, or not claimable right now
 
         adapter = self._connectors.get(claimed["connector"])
         if adapter is None:
-            return self._store._compare_and_set_state(outbox_id, ("sending",), "failed")
+            return self._store._finalize_claim(outbox_id, holder, "failed")
 
         grant = Grant(outbox_id=claimed["id"], world_id=claimed["world_id"], idempotency_key=claimed["idempotency_key"])
         _LIVE_GRANTS.add(id(grant))
@@ -170,26 +176,36 @@ class Outbox:
                 claimed["destination"], claimed["item"], claimed["recipients"], claimed["idempotency_key"], grant
             )
         except Exception:
-            # Ambiguous: the side effect may already have happened. Marking it failed here could
-            # hide a real send with no event for it (PRD 9.4), so the entry just stays "sending"
-            # — still due — and the next dispatch_due() retries it; the adapter's own
-            # (world_id, idempotency_key) dedupe keeps it to one send. The batch goes on.
+            self._store._release_claim(outbox_id, holder)
             return None
+        except BaseException:
+            # A process death (or a KeyboardInterrupt standing in for one): still ambiguous, so
+            # give up the lease too — the caller is about to lose this process either way, and
+            # an immediate retry (by this or another instance) should not have to wait it out.
+            self._store._release_claim(outbox_id, holder)
+            raise
         finally:
             _LIVE_GRANTS.discard(id(grant))
 
-        sent = self._store._compare_and_set_state(outbox_id, ("sending",), "sent")
+        sent = self._store._finalize_claim(outbox_id, holder, "sent")
         if sent is None:
-            return None  # this Outbox instance's own claim was somehow undone; nothing to emit
-        self._pending_transfers[outbox_id] = _transfer_event(sent)
-        self._emit(self._pending_transfers[outbox_id])  # may raise; retried by _flush_pending_transfers
-        del self._pending_transfers[outbox_id]
+            return None  # lost the lease somehow; nothing to emit
+        transfer = _transfer_event(sent)
+        self._store._add_pending_transfer(outbox_id, transfer)
+        try:
+            self._emit(transfer)
+        except Exception:
+            pass  # stays pending; flushed by this or a later dispatch_due(), on any instance
+        else:
+            self._store._discard_pending_transfer(outbox_id)
         return sent
 
     def _flush_pending_transfers(self) -> None:
-        """A sent entry's data.transfer that `emit` previously raised on (PI-17): exactly one is
-        ever emitted per entry, so a later dispatch_due() keeps retrying only the ones still
-        outstanding."""
-        for outbox_id in list(self._pending_transfers):
-            self._emit(self._pending_transfers[outbox_id])
-            del self._pending_transfers[outbox_id]
+        """Every data.transfer not yet emitted (PI-17), oldest first: an emit error here is
+        caught per entry too, so one still-failing transfer never blocks the rest."""
+        for outbox_id, transfer in self._store._pending_transfers_snapshot():
+            try:
+                self._emit(transfer)
+            except Exception:
+                continue
+            self._store._discard_pending_transfer(outbox_id)
