@@ -25,6 +25,15 @@ from referencing import Registry, Resource
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILLS_DIR = REPO_ROOT / "skills"
 CONTRACTS_DIR = REPO_ROOT / "contracts"
+LIB_DIR = SKILLS_DIR / "_lib"
+
+# Minimal test wiring (ticket FR-AGT-04 re-scope, point 3): check.py may import the
+# shared bounded-guard module as `skills._lib...`. That only resolves if the repo
+# root is on sys.path, so the test harness puts it there once, the same way an
+# installed package would be importable, rather than leaving each test to hack its
+# own sys.path.
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 # The v0 skill library (PRD 8.2 "v0 library (10 skills)", FR-AGT-04): exact
 # (domain, skill_id) pairs from the ticket brief. Folder names must match these.
@@ -145,7 +154,18 @@ def import_check_module(domain: str, skill_id: str) -> ModuleType:
     return module
 
 
-def assert_stdlib_only_imports(path: Path) -> None:
+def _is_allowed_lib_import(dotted: str) -> bool:
+    """Ticket FR-AGT-04 re-scope, point 3: check.py may import the shared guard
+    module, and only it, as an absolute `skills._lib` import (never a relative
+    import, which this function never sees since relative imports are rejected
+    before it is called)."""
+    return dotted == "skills._lib" or dotted.startswith("skills._lib.")
+
+
+def assert_stdlib_or_lib_only_imports(path: Path) -> None:
+    """check.py may import only the standard library and skills/_lib (ticket
+    FR-AGT-04 re-scope, point 3). Anything else, including a relative import,
+    is an offender."""
     require_file(path)
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     offenders: list[str] = []
@@ -153,18 +173,57 @@ def assert_stdlib_only_imports(path: Path) -> None:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 top = alias.name.split(".")[0]
-                if top not in sys.stdlib_module_names:
+                if top not in sys.stdlib_module_names and not _is_allowed_lib_import(alias.name):
                     offenders.append(alias.name)
         elif isinstance(node, ast.ImportFrom):
             if node.level and node.module is None:
                 offenders.append("." * node.level)
                 continue
-            top = (node.module or "").split(".")[0]
-            if top and top not in sys.stdlib_module_names:
-                offenders.append(node.module or "")
+            if node.level:
+                offenders.append("." * node.level + (node.module or ""))
+                continue
+            dotted = node.module or ""
+            top = dotted.split(".")[0]
+            if top and top not in sys.stdlib_module_names and not _is_allowed_lib_import(dotted):
+                offenders.append(dotted)
     if offenders:
         rel = path.relative_to(REPO_ROOT).as_posix()
-        pytest.fail(f"{rel} imports non-stdlib modules: {sorted(set(offenders))}")
+        pytest.fail(f"{rel} imports modules outside stdlib and skills/_lib: {sorted(set(offenders))}")
+
+
+# Backwards-compatible alias kept only in case another suite still imports the old
+# name; the FR-AGT-04 suite itself uses assert_stdlib_or_lib_only_imports.
+assert_stdlib_only_imports = assert_stdlib_or_lib_only_imports
+
+
+COMMENT_LINE_RE = re.compile(r"^\s*#")
+
+
+def code_line_count(path: Path) -> int:
+    """Non-blank, non-comment line count (ticket FR-AGT-04 re-scope, point 4:
+    'Hand-written Python across skills/**/check.py and skills/_lib/*.py stays
+    under 400 non-blank, non-comment lines in total.'). A line counts unless it
+    is empty after stripping, or its first non-space character is '#'; a
+    trailing inline comment does not remove an otherwise-code line."""
+    text = path.read_text(encoding="utf-8")
+    count = 0
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if COMMENT_LINE_RE.match(line):
+            continue
+        count += 1
+    return count
+
+
+def budget_python_files() -> list[Path]:
+    """Every file the FR-AGT-04 re-scope line budget covers: skills/**/check.py
+    and skills/_lib/*.py."""
+    files = sorted(SKILLS_DIR.glob("*/*/check.py"))
+    if LIB_DIR.is_dir():
+        files += sorted(LIB_DIR.glob("*.py"))
+    return files
 
 
 HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
