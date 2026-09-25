@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from types import MappingProxyType
 
 import yaml
 from tilo_contracts import ProvidersPrices
 
-from .errors import UnpricedError
+from .errors import MeteringConfigError, UnpricedError
+
+CREDIT_USD = 0.005  # contracts/providers.schema.json $defs.prices.credit_usd const
 
 
 @dataclass(frozen=True)
@@ -17,6 +21,10 @@ class Usage:
     profile: str
     tokens_in: int
     tokens_out: int
+
+    def __post_init__(self) -> None:
+        if self.tokens_in < 0 or self.tokens_out < 0:
+            raise ValueError(f"token counts must be >= 0: {self}")
 
 
 @dataclass(frozen=True)
@@ -34,24 +42,45 @@ def _utc_date(at: datetime) -> str:
 
 
 @dataclass(frozen=True)
+class _Version:
+    status: str
+    effective_date: str | None
+    source: str | None
+    profiles: Mapping[str, tuple[float | None, float | None]]
+
+
+def _load_version(path: str | Path) -> _Version:
+    try:
+        v = ProvidersPrices(**(yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}))
+    except (ValueError, TypeError) as exc:
+        raise MeteringConfigError(f"{path}: not a valid prices file: {exc}") from exc
+    if v.credit_usd != CREDIT_USD:
+        raise MeteringConfigError(f"{path}: credit_usd must be {CREDIT_USD}, got {v.credit_usd}")
+    prices = {k: (p.input, p.output) for k, p in v.profiles.items()}
+    if v.status == "set" and (v.effective_date is None or v.source is None or None in sum(prices.values(), ())):
+        raise MeteringConfigError(f"{path}: a set prices file needs effective_date, source and every price")
+    return _Version(v.status, v.effective_date, v.source, MappingProxyType(prices))
+
+
+@dataclass(frozen=True)
 class PriceBook:
     """Versions from providers.schema.json $defs.prices files. No setters,
     no environment overrides: a price change is a file change."""
 
     credit_usd: float
-    versions: tuple[ProvidersPrices, ...]
+    versions: tuple[_Version, ...]
 
     @classmethod
     def load(cls, *paths: str | Path) -> PriceBook:
         if not paths:
             raise ValueError("PriceBook.load requires at least one prices file")
-        versions = tuple(ProvidersPrices(**(yaml.safe_load(Path(p).read_text(encoding="utf-8")) or {})) for p in paths)
-        credit_usds = {v.credit_usd for v in versions}
-        if len(credit_usds) > 1:
-            raise ValueError(f"prices files disagree on credit_usd: {sorted(credit_usds)}")
-        return cls(credit_usd=credit_usds.pop(), versions=versions)
+        versions = tuple(_load_version(p) for p in paths)
+        dates = [v.effective_date for v in versions if v.effective_date is not None]
+        if len(dates) != len(set(dates)):
+            raise MeteringConfigError(f"prices files share an effective_date: {sorted(dates)}")
+        return cls(credit_usd=CREDIT_USD, versions=versions)
 
-    def _selected_version(self, at: datetime) -> ProvidersPrices:
+    def _selected_version(self, at: datetime) -> _Version:
         at_date = _utc_date(at)
         candidates = [v for v in self.versions if v.effective_date is not None and v.effective_date <= at_date]
         if not candidates:
@@ -63,12 +92,12 @@ class PriceBook:
 
     def quote(self, profile: str, at: datetime) -> PriceQuote:
         version = self._selected_version(at)
-        price = version.profiles.get(profile)
-        if price is None or price.input is None or price.output is None:
+        price_in, price_out = version.profiles.get(profile, (None, None))
+        if price_in is None or price_out is None:
             raise UnpricedError(f"profile {profile!r} has no price at {_utc_date(at)}")
         effective_date, source = version.effective_date, version.source
         assert effective_date is not None and source is not None
-        return PriceQuote(profile, price.input, price.output, effective_date, source)
+        return PriceQuote(profile, price_in, price_out, effective_date, source)
 
     def credits(self, usage: Usage, at: datetime) -> float:
         quote = self.quote(usage.profile, at)

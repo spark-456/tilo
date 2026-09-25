@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 import pytest
 import yaml
 from _metering_testlib import PRICES_V1, PRICES_V2, REPO_ROOT, write_prices_file
-from tilo_metering import PriceBook, UnpricedError, Usage
+from tilo_metering import MeteringConfigError, PriceBook, UnpricedError, Usage
 
 
 def _at(year: int, month: int, day: int) -> datetime:
@@ -91,3 +91,32 @@ def test_FR_MTR_01_pricebook_has_no_mutation_api(tmp_path):
         assert not hasattr(book, blocked_name), f"PriceBook must expose no mutation API, found `{blocked_name}`"
     with pytest.raises(AttributeError):
         book.credit_usd = 0.01
+
+
+_BAD = [{"credit_usd": 0.05}, {"credit_usd": 0}, {"effective_date": None}, {"source": None}]
+_NULL_PRICE = {"profiles": {"widget": {"input": None, "output": 2.0}}}
+
+
+@pytest.mark.parametrize("override", [*_BAD, _NULL_PRICE])
+def test_FR_MTR_01_load_rejects_files_the_schema_rejects(tmp_path, override):
+    with pytest.raises(MeteringConfigError):
+        PriceBook.load(write_prices_file(tmp_path, "bad.yaml", {**PRICES_V1, **override}))
+
+
+def test_FR_MTR_01_load_rejects_duplicate_effective_dates(tmp_path):
+    other = {**PRICES_V2, "effective_date": PRICES_V1["effective_date"]}
+    with pytest.raises(MeteringConfigError):
+        PriceBook.load(write_prices_file(tmp_path, "a.yaml", PRICES_V1), write_prices_file(tmp_path, "b.yaml", other))
+
+
+def test_FR_MTR_01_loaded_prices_are_deeply_immutable(tmp_path):
+    book = PriceBook.load(write_prices_file(tmp_path, "prices_v1.yaml", PRICES_V1))
+    with pytest.raises(TypeError):
+        book.versions[0].profiles["widget"] = (0.0, 0.0)  # type: ignore[index]
+    assert book.quote("widget", at=_at(2026, 3, 1)).input == pytest.approx(1.0)
+
+
+def test_FR_MTR_01_usage_rejects_negative_token_counts():
+    for tokens_in, tokens_out in ((-1, 0), (0, -1)):
+        with pytest.raises(ValueError):
+            Usage("widget", tokens_in, tokens_out)
