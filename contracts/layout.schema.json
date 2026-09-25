@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/layout.schema.json",
+  "x-version": "1.0.0",
+  "title": "Layout",
+  "description": "WorldLayout v1 (PRD 9.2). A model writes semantic; only the deterministic solver writes geometry (null until solved). Rules WE-01.. that a schema cannot express are in contracts/layout.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "world_id", "tier", "theme", "semantic", "geometry"],
+  "properties": {
+    "v": { "const": "1.0" },
+    "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+    "tier": { "$ref": "common.schema.json#/$defs/tier" },
+    "theme": {
+      "description": "World theme from config/themes/.",
+      "$ref": "common.schema.json#/$defs/slug"
+    },
+    "semantic": { "$ref": "#/$defs/semantic" },
+    "geometry": { "anyOf": [{ "$ref": "#/$defs/geometry" }, { "type": "null" }] }
+  },
+  "$defs": {
+    "semantic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["levels", "islands", "gates", "agents"],
+      "properties": {
+        "levels": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/level" } },
+        "islands": { "type": "array", "items": { "$ref": "#/$defs/island" } },
+        "gates": { "type": "array", "items": { "$ref": "#/$defs/gate" } },
+        "agents": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/agent" } }
+      }
+    },
+    "level": {
+      "description": "A phase of the work; levels stack as plates.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "districts"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/level_id" },
+        "name": { "$ref": "common.schema.json#/$defs/plain_name" },
+        "districts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": { "$ref": "#/$defs/district" }
+        }
+      }
+    },
+    "district": {
+      "description": "A workstream with one Lead.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "icon", "lead", "buildings"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/district_id" },
+        "name": { "$ref": "common.schema.json#/$defs/plain_name" },
+        "icon": { "$ref": "common.schema.json#/$defs/icon_name" },
+        "lead": { "$ref": "common.schema.json#/$defs/agent_id" },
+        "buildings": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/building" }
+        }
+      }
+    },
+    "building": {
+      "description": "A capability or sub-task: a kit building (needs kit parts and at least one plan unit) or one of the 15 common buildings.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "kind", "plan_units"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/building_id" },
+        "name": { "$ref": "common.schema.json#/$defs/plain_name" },
+        "kind": { "type": "string", "enum": ["kit", "common"] },
+        "common_type": { "$ref": "#/$defs/common_type" },
+        "kit": { "$ref": "#/$defs/kit" },
+        "plan_units": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/unit_id" }
+        }
+      },
+      "if": { "properties": { "kind": { "const": "common" } }, "required": ["kind"] },
+      "then": { "required": ["common_type"], "not": { "required": ["kit"] } },
+      "else": {
+        "required": ["kit"],
+        "not": { "required": ["common_type"] },
+        "properties": { "plan_units": { "minItems": 1 } }
+      }
+    },
+    "common_type": {
+      "description": "The 15 common buildings (PRD 9.1).",
+      "type": "string",
+      "enum": [
+        "town_hall",
+        "your_desk",
+        "library",
+        "browser_station",
+        "workshop",
+        "meeting_hall",
+        "connector_post",
+        "memory_vault",
+        "treasury",
+        "watchtower",
+        "delivery_dock",
+        "clock_tower",
+        "agent_foundry",
+        "mail_room",
+        "expert_office"
+      ]
+    },
+    "kit": {
+      "description": "Kit parts and icon for a generated building, from the published lists (WE-08).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["icon", "parts"],
+      "properties": {
+        "icon": { "$ref": "common.schema.json#/$defs/icon_name" },
+        "parts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": { "$ref": "common.schema.json#/$defs/slug" }
+        }
+      }
+    },
+    "island": {
+      "description": "An external system and its connection. conn fixes the bridge: api road, mcp rail, browser footpath, channel pier.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "conn", "bridge", "state"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/island_id" },
+        "name": { "$ref": "common.schema.json#/$defs/plain_name" },
+        "conn": { "type": "string", "enum": ["api", "mcp", "browser", "channel"] },
+        "bridge": { "type": "string", "enum": ["road", "rail", "footpath", "pier"] },
+        "state": {
+          "description": "locked: cloud cover, no access yet; requested: consent pending, bridge under construction; connected; failed: access lost.",
+          "type": "string",
+          "enum": ["locked", "requested", "connected", "failed"]
+        }
+      },
+      "if": { "properties": { "conn": { "const": "api" } } },
+      "then": { "properties": { "bridge": { "const": "road" } } },
+      "else": {
+        "if": { "properties": { "conn": { "const": "mcp" } } },
+        "then": { "properties": { "bridge": { "const": "rail" } } },
+        "else": {
+          "if": { "properties": { "conn": { "const": "browser" } } },
+          "then": { "properties": { "bridge": { "const": "footpath" } } },
+          "else": { "properties": { "bridge": { "const": "pier" } } }
+        }
+      }
+    },
+    "gate": {
+      "description": "Authorisation point on the way from a building to an island.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "guards", "between", "policy_ref"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/gate_id" },
+        "guards": { "$ref": "common.schema.json#/$defs/action_type" },
+        "between": {
+          "description": "[building id, island id], in that order.",
+          "type": "array",
+          "minItems": 2,
+          "prefixItems": [
+            { "$ref": "common.schema.json#/$defs/building_id" },
+            { "$ref": "common.schema.json#/$defs/island_id" }
+          ],
+          "items": false
+        },
+        "policy_ref": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/policy_id" }, { "type": "null" }]
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "rank"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/agent_id" },
+        "rank": { "$ref": "common.schema.json#/$defs/agent_role" },
+        "team_lead": { "$ref": "common.schema.json#/$defs/team_lead_id" }
+      }
+    },
+    "geometry": {
+      "description": "Written only by the deterministic solver, never by a model. Integer grid units on each level plate.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "solver_version",
+        "levels",
+        "districts",
+        "buildings",
+        "islands",
+        "roads",
+        "bridges",
+        "gates"
+      ],
+      "properties": {
+        "solver_version": { "$ref": "common.schema.json#/$defs/semver" },
+        "levels": { "type": "array", "items": { "$ref": "#/$defs/level_geometry" } },
+        "districts": { "type": "array", "items": { "$ref": "#/$defs/district_geometry" } },
+        "buildings": { "type": "array", "items": { "$ref": "#/$defs/building_geometry" } },
+        "islands": { "type": "array", "items": { "$ref": "#/$defs/island_geometry" } },
+        "roads": { "type": "array", "items": { "$ref": "#/$defs/road" } },
+        "bridges": { "type": "array", "items": { "$ref": "#/$defs/bridge_geometry" } },
+        "gates": { "type": "array", "items": { "$ref": "#/$defs/gate_geometry" } }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "w", "d"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "w": { "type": "integer", "minimum": 1 },
+        "d": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "level_geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "index", "plate"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/level_id" },
+        "index": {
+          "description": "Stack order, 0 at the bottom.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "plate": { "$ref": "#/$defs/rect" }
+      }
+    },
+    "district_geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "plot", "tint"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/district_id" },
+        "plot": { "$ref": "#/$defs/rect" },
+        "tint": {
+          "description": "District role colour token; assigned by the solver only (WE-09).",
+          "type": "string",
+          "enum": [
+            "district.1",
+            "district.2",
+            "district.3",
+            "district.4",
+            "district.5",
+            "district.6"
+          ]
+        }
+      }
+    },
+    "building_geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "footprint", "floors"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/building_id" },
+        "footprint": { "$ref": "#/$defs/rect" },
+        "floors": { "type": "integer", "minimum": 1, "maximum": 4 }
+      }
+    },
+    "island_geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "level", "plot"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/island_id" },
+        "level": { "$ref": "common.schema.json#/$defs/level_id" },
+        "plot": { "$ref": "#/$defs/rect" }
+      }
+    },
+    "road": {
+      "description": "One edge per plan dependency between the buildings of two units (WE-05).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "path"],
+      "properties": {
+        "from": { "$ref": "common.schema.json#/$defs/building_id" },
+        "to": { "$ref": "common.schema.json#/$defs/building_id" },
+        "path": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/point" } }
+      }
+    },
+    "bridge_geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["island", "from", "path"],
+      "properties": {
+        "island": { "$ref": "common.schema.json#/$defs/island_id" },
+        "from": { "$ref": "common.schema.json#/$defs/building_id" },
+        "path": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/point" } }
+      }
+    },
+    "gate_geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "cell"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/gate_id" },
+        "cell": { "$ref": "#/$defs/point" }
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000038",
+  "seq": 38,
+  "ts": "2026-09-29T09:32:11.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "data.transfer",
+  "actor": "A_s2",
+  "target": "I1",
+  "level": "L1",
+  "district": "D1",
+  "item": {
+    "kind": "scroll",
+    "artifact_id": "art_reply_draft",
+    "label": "Reply to supplier"
+  },
+  "severity": "info",
+  "credits": 0,
+  "summary": "The reply went to the supplier in the same thread.",
+  "cause": "01JB5VQ0000000000000000037",
+  "vis": "all",
+  "authz": {
+    "by": "person",
+    "ref": "u_owner",
+    "at": "2026-09-29T09:32:09.500Z"
+  },
+  "data": {
+    "connector": "gmail",
+    "action_type": "send_email",
+    "direction": "out",
+    "artifact": {
+      "artifact_id": "art_reply_draft",
+      "version": 1
+    },
+    "outbox_id": null,
+    "risk_tier": "T2"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": "send_email",
+    "latency_ms": 640,
+    "archive_ref": "r_village_basic_1/31"
+  }
+}

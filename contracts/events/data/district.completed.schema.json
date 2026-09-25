@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/district.completed.schema.json",
+  "x-version": "1.0.0",
+  "title": "DistrictCompletedData",
+  "description": "data of district.completed (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {}
+}

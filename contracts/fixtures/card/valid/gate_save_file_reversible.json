@@ -1,0 +1,52 @@
+{
+  "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W3",
+  "world_id": "w_01",
+  "run_id": "r_01J8Z3K4M5",
+  "header": {
+    "building": "B2",
+    "agent": "A_s1"
+  },
+  "add_context": true,
+  "created_at": "2026-09-29T09:30:00.000Z",
+  "timeout": 3600,
+  "gate": {
+    "id": "G2",
+    "action": {
+      "type": "save_file",
+      "connector": "google_drive",
+      "exact": "Save the quote summary as a new file in the Tilo folder of your Drive.",
+      "item": {
+        "artifact_id": "art_quote_summary",
+        "version": 1,
+        "label": "Quote summary"
+      },
+      "destination": "folder-tilo"
+    },
+    "recipients": [],
+    "irreversible": false,
+    "risk_tier": "T1"
+  },
+  "consent": null,
+  "kind": "gate",
+  "rung": "gate",
+  "what_happened": "The quote summary is ready to save to your Drive.",
+  "why_it_matters": "Your policy asks each time before Tilo saves files.",
+  "options": [
+    {
+      "id": "approve",
+      "label": "Approve",
+      "suggested": true,
+      "reason": "It only adds a new file, and you can delete it.",
+      "irreversible": false
+    },
+    {
+      "id": "hold",
+      "label": "Hold",
+      "suggested": false,
+      "irreversible": false
+    }
+  ],
+  "actions": ["show_me", "snooze"],
+  "answer_channels": ["web", "mobile_web", "whatsapp"],
+  "safe_default": "hold"
+}

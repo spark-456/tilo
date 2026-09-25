@@ -1,0 +1,62 @@
+{
+  "rule": "CR-12",
+  "note": "The card lists a recipient the held email does not have.",
+  "plan_gates": [
+    {
+      "id": "G1",
+      "action_type": "send_email",
+      "risk_tier": "T2",
+      "guards": ["U3"],
+      "policy_ref": null
+    }
+  ],
+  "connectors": [
+    {
+      "id": "gmail",
+      "actions": [
+        {
+          "id": "create_draft",
+          "capability": "write",
+          "description": "Create a draft in the connected mailbox.",
+          "risk_tier": "T1",
+          "gate_type": "approval",
+          "irreversible": false
+        },
+        {
+          "id": "send_email",
+          "capability": "send",
+          "description": "Send an email from the connected mailbox.",
+          "risk_tier": "T2",
+          "gate_type": "approval",
+          "irreversible": true
+        }
+      ]
+    }
+  ],
+  "held": {
+    "recipients": ["orders@example.com"],
+    "modifiers": ["new_recipients"],
+    "item": {
+      "artifact_id": "art_reply_draft",
+      "version": 2
+    },
+    "destination": "thread-quote-500-packs"
+  },
+  "card_gate": {
+    "id": "G1",
+    "action": {
+      "type": "send_email",
+      "connector": "gmail",
+      "exact": "Send the drafted reply in the thread 'Quote for 500 packs' to orders@example.com.",
+      "item": {
+        "artifact_id": "art_reply_draft",
+        "version": 2,
+        "label": "Reply draft"
+      },
+      "destination": "thread-quote-500-packs"
+    },
+    "recipients": ["orders@example.com", "sales@example.org"],
+    "irreversible": true,
+    "risk_tier": "T3"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000004",
+  "seq": 4,
+  "ts": "2026-09-29T09:30:26.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "world.planned",
+  "actor": "A_dir",
+  "target": "w_village_basic",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 1,
+  "summary": "The Director planned 2 units: triage the inbox, then reply to the supplier.",
+  "cause": "01JB5VQ0000000000000000003",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "tier": "village",
+    "approach": "quick",
+    "unit_count": 2,
+    "credits": {
+      "min": 20,
+      "max": 35
+    }
+  },
+  "trace": {
+    "model_role": "director",
+    "profile": "large",
+    "tokens_in": 2400,
+    "tokens_out": 900,
+    "tool": null,
+    "latency_ms": 3800,
+    "archive_ref": "r_village_basic_1/4"
+  }
+}

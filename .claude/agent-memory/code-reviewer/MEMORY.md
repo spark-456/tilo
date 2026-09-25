@@ -1,0 +1,1 @@
+- [Contracts review patterns](contracts-review-patterns.md) — probe cross-reference rules, rules.md numbering, drift-check probe technique

@@ -1,0 +1,36 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000033",
+  "seq": 33,
+  "ts": "2026-09-29T09:31:23.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "artifact.reviewed",
+  "actor": "A_v1",
+  "target": "art_reply_draft",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 2,
+  "summary": "The Verifier checked the reply draft: passed.",
+  "cause": "01JB5VQ0000000000000000032",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "artifact": {
+      "artifact_id": "art_reply_draft",
+      "version": 1
+    },
+    "result": "passed"
+  },
+  "trace": {
+    "model_role": "verifier",
+    "profile": "large",
+    "tokens_in": 3300,
+    "tokens_out": 240,
+    "tool": null,
+    "latency_ms": 3000,
+    "archive_ref": "r_village_basic_1/26"
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "rule": "OB-01",
+  "note": "The Approver approved a T3 reply on WhatsApp, but no PIN was checked (SEC-06: PIN for T3 approvals over WhatsApp), so the answer opens nothing.",
+  "entry": {
+    "id": "01JB5VQ0000000000000009010",
+    "idempotency_key": "r_village_basic_1:U3:send_email:1",
+    "world_id": "w_village_basic",
+    "run_id": "r_village_basic_1",
+    "action_type": "send_email",
+    "connector": "gmail",
+    "recipients": ["riya@example.com", "finance@example.org"],
+    "attachments": [
+      {
+        "artifact_id": "art_rate_sheet",
+        "version": 1
+      }
+    ],
+    "item": {
+      "artifact_id": "art_reply_draft",
+      "version": 2
+    },
+    "destination": "thread-supplier-1",
+    "modifiers": ["new_recipients", "attachments"],
+    "risk_tier": "T3",
+    "authz": {
+      "by": "person",
+      "ref": "u_approver",
+      "at": "2026-09-29T09:50:00.000Z"
+    },
+    "undo_window_s": 0,
+    "scheduled_at": "2026-09-29T09:50:00.000Z",
+    "state": "sent",
+    "created_at": "2026-09-29T09:50:00.000Z"
+  },
+  "reserved_by": {
+    "type": "approval.requested",
+    "authz": null,
+    "data": {
+      "gate_id": "G3",
+      "card_id": "01JB5VQ0000000000000009021",
+      "outbox_id": "01JB5VQ0000000000000009010",
+      "action_type": "send_email",
+      "risk_tier": "T3",
+      "irreversible": true,
+      "item": {
+        "artifact_id": "art_reply_draft",
+        "version": 2
+      },
+      "approver": "u_approver",
+      "team_lead": null
+    }
+  },
+  "authorised_by": {
+    "type": "approval.resolved",
+    "authz": {
+      "by": "person",
+      "ref": "u_approver",
+      "at": "2026-09-29T09:50:00.000Z"
+    },
+    "data": {
+      "gate_id": "G3",
+      "card_id": "01JB5VQ0000000000000009021",
+      "outbox_id": "01JB5VQ0000000000000009010",
+      "option": "approve",
+      "channel": "whatsapp",
+      "pin_verified": false
+    }
+  },
+  "policy": null,
+  "team_lead": null,
+  "world_owner": "u_owner",
+  "instruction": null,
+  "earlier_applied": null,
+  "transfer": {
+    "type": "data.transfer",
+    "authz": {
+      "by": "person",
+      "ref": "u_approver",
+      "at": "2026-09-29T09:50:00.000Z"
+    },
+    "data": {
+      "connector": "gmail",
+      "action_type": "send_email",
+      "direction": "out",
+      "artifact": {
+        "artifact_id": "art_reply_draft",
+        "version": 2
+      },
+      "outbox_id": "01JB5VQ0000000000000009010",
+      "risk_tier": "T3"
+    }
+  }
+}

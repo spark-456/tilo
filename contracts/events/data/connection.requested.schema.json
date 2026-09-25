@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/connection.requested.schema.json",
+  "x-version": "1.0.0",
+  "title": "ConnectionRequestedData",
+  "description": "data of connection.requested (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["connector", "card_id"],
+  "properties": {
+    "connector": { "$ref": "../../common.schema.json#/$defs/connector_id" },
+    "card_id": { "$ref": "../../common.schema.json#/$defs/ulid" }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/handoff.schema.json",
+  "x-version": "1.0.0",
+  "title": "Handoff",
+  "description": "Context handoff note (PRD 8.5) written by an agent at 70% context and validated by its Lead before the successor starts. Every field is required; lists may be empty except unit_ids, next_steps and verification_to_rerun.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "goal",
+    "unit_ids",
+    "done",
+    "in_progress",
+    "decisions",
+    "open_questions",
+    "next_steps",
+    "verification_to_rerun",
+    "gotchas"
+  ],
+  "properties": {
+    "goal": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "unit_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/unit_id" }
+    },
+    "done": { "type": "array", "items": { "$ref": "#/$defs/progress" } },
+    "in_progress": { "type": "array", "items": { "$ref": "#/$defs/progress" } },
+    "decisions": { "$ref": "#/$defs/notes" },
+    "open_questions": { "$ref": "#/$defs/notes" },
+    "next_steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+    },
+    "verification_to_rerun": {
+      "description": "Checks the successor re-runs to prove it understood the state before continuing.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "gotchas": { "$ref": "#/$defs/notes" }
+  },
+  "$defs": {
+    "notes": {
+      "type": "array",
+      "maxItems": 50,
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit_id", "summary", "artifact_refs"],
+      "properties": {
+        "unit_id": { "$ref": "common.schema.json#/$defs/unit_id" },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "artifact_refs": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/artifact_ref" }
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "expected"],
+      "properties": {
+        "step": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "expected": { "type": "string", "minLength": 1, "maxLength": 300 }
+      }
+    }
+  }
+}

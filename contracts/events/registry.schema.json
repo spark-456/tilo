@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/registry.schema.json",
+  "x-version": "1.0.0",
+  "title": "EventRegistry",
+  "description": "Shape of contracts/events/registry.yaml (PRD 9.5): every registered event type with exactly one world effect, one HUD effect, one Story line template and one Trace row, its data schema, its fixture and the pillar that emits it. unknown_types is fixed to trace_only (HR-5). contracts-check also checks the paths, the placeholders and the side-effect list (contracts/event.rules.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "unknown_types", "types"],
+  "properties": {
+    "version": { "$ref": "../common.schema.json#/$defs/semver" },
+    "unknown_types": {
+      "description": "HR-5: a type not in this registry renders in the Trace only; the world and the HUD never animate it.",
+      "const": "trace_only"
+    },
+    "types": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "../event.schema.json#/$defs/family_verb" },
+      "additionalProperties": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "description": "One registered type. Templates fill {actor} and {target} with display names from the layout (the id when there is none) and {data.<field>} from a required field of the type's data schema.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "verb",
+        "priority",
+        "pillar",
+        "default_severity",
+        "side_effect",
+        "world_effect",
+        "hud_effect",
+        "story_template",
+        "trace_row",
+        "data_schema",
+        "fixture"
+      ],
+      "properties": {
+        "family": { "$ref": "#/$defs/family" },
+        "verb": { "type": "string", "pattern": "^[a-z]+(_[a-z]+)*$" },
+        "priority": {
+          "description": "PRD 9.8 priority of the feature that emits it; app.* is could.",
+          "type": "string",
+          "enum": ["must", "should", "could"]
+        },
+        "pillar": {
+          "description": "The pillar whose logic emits it (PRD 3.2); the harness writes every event.",
+          "type": "string",
+          "enum": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]
+        },
+        "default_severity": { "$ref": "../common.schema.json#/$defs/severity" },
+        "side_effect": {
+          "description": "true when the event records a side effect or the decision that authorises one (PRD 10.4 Audit, HR-7); such an event carries authz.",
+          "type": "boolean"
+        },
+        "authz_by": {
+          "description": "Side-effect types only: the authorities that may appear in authz.by (EV-04).",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["person", "policy", "team_lead"] }
+        },
+        "world_effect": { "$ref": "#/$defs/line" },
+        "hud_effect": { "$ref": "#/$defs/line" },
+        "story_template": {
+          "description": "Plain-language Story line; at most 140 characters once filled, like summary.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "trace_row": {
+          "description": "Template of the type-specific Detail column; the other Trace columns (seq, ts, type, actor, target, severity, credits, authz, trace, cause) are the same for every type.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "data_schema": {
+          "description": "Path under contracts/.",
+          "type": "string",
+          "pattern": "^events/data/[a-z_]+\\.[a-z_]+\\.schema\\.json$"
+        },
+        "fixture": {
+          "description": "Valid fixture path under contracts/.",
+          "type": "string",
+          "pattern": "^fixtures/events/valid/[a-z_]+\\.[a-z_]+\\.json$"
+        }
+      },
+      "if": { "properties": { "side_effect": { "const": true } }, "required": ["side_effect"] },
+      "then": { "required": ["authz_by"] },
+      "else": {
+        "not": { "required": ["authz_by"] },
+        "if": { "properties": { "family": { "const": "app" } }, "required": ["family"] },
+        "then": { "properties": { "priority": { "const": "could" } } }
+      }
+    },
+    "family": {
+      "description": "Event families of PRD 9.5.",
+      "type": "string",
+      "enum": [
+        "world",
+        "plan",
+        "budget",
+        "level",
+        "district",
+        "building",
+        "agent",
+        "skill",
+        "question",
+        "meeting",
+        "connection",
+        "data",
+        "channel",
+        "artifact",
+        "approval",
+        "policy",
+        "alert",
+        "memory",
+        "app"
+      ]
+    },
+    "line": {
+      "description": "One plain-language effect.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    }
+  }
+}

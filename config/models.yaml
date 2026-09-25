@@ -1,0 +1,35 @@
+# EXAMPLE model profiles, copied from PRD 6.4 so the provider layer has something to load.
+# These are examples only: the user chooses the final models at setup under the efficiency
+# rules in PRD 6.6, and changes go through a pull request. Shape: contracts/providers.schema.json
+# $defs.models. Model ids appear only in config/ and packages/providers (PL-01).
+# Profiles are ranked by cost from config/prices.yaml, which stays unset until the user sets it.
+example: true
+
+profiles:
+  flash-38:
+    provider: google
+    model: gemini-3.8-flash
+    context: 1000000
+    caps: [json, tools, vision, audio, thinking, computer_use, grounding]
+  flash-37:
+    provider: google
+    model: gemini-3.7-flash
+    context: 1000000
+    caps: [json, tools, vision, audio, thinking]
+  lite-31:
+    provider: google
+    model: gemini-3.1-flash-lite
+    context: 1000000
+    caps: [json, tools]
+
+roles:
+  director: { primary: flash-38, fallback: flash-37, thinking: high }
+  lead: { primary: flash-38, fallback: flash-37, thinking: medium }
+  specialist: { primary: flash-37, fallback: lite-31 }
+  verifier: { primary: flash-38, fallback: flash-37, thinking: high }
+  writer: { primary: flash-38, fallback: flash-37 }
+  narrator: { primary: lite-31, fallback: flash-37 } # fallback added for NFR-25 (BQ-18)
+  autopilot: { primary: flash-37, fallback: lite-31 }
+
+rules:
+  deny: ["gemini-2.5-*", "*-preview*"]

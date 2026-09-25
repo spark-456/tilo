@@ -1,0 +1,36 @@
+{
+  "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W4",
+  "world_id": "w_01",
+  "run_id": "r_01J8Z3K4M5",
+  "header": {
+    "building": "B2",
+    "agent": "A_s1"
+  },
+  "add_context": true,
+  "created_at": "2026-09-29T09:30:00.000Z",
+  "timeout": 3600,
+  "gate": null,
+  "consent": null,
+  "kind": "needs_you",
+  "rung": "needs_you",
+  "what_happened": "Two quotes use different pack sizes.",
+  "why_it_matters": "Comparing them per pack would favour the larger pack.",
+  "options": [
+    {
+      "id": "per_kwh",
+      "label": "Compare them per kilowatt-hour",
+      "suggested": true,
+      "reason": "It is fair across pack sizes.",
+      "irreversible": false
+    },
+    {
+      "id": "per_pack",
+      "label": "Compare per pack",
+      "suggested": false,
+      "irreversible": false
+    }
+  ],
+  "actions": ["show_me", "snooze", "delegate"],
+  "answer_channels": ["web", "mobile_web", "whatsapp", "email"],
+  "safe_default": "per_kwh"
+}

@@ -1,0 +1,16 @@
+{
+  "from": "A_s1",
+  "to": "A_v1",
+  "artifact_refs": [
+    {
+      "artifact_id": "art_comparison",
+      "version": 3,
+      "label": "Comparison table"
+    }
+  ],
+  "summary": "Comparison of quotes A, B and C per kWh, with shipping included.",
+  "acceptance_criteria": [
+    "Every price cites its quote",
+    "Per-kWh values recompute from the source tables"
+  ]
+}

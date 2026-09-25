@@ -1,0 +1,154 @@
+"""tilo_providers.config — provider-layer config loader (PRD 6.4, 6.6 EFF-03,
+17.2 NFR-25, 14.1 Credits). Loads config/models.yaml + config/prices.yaml,
+validates each against tilo_contracts, and fails loudly with
+ProviderConfigError: denied model id (PL-07); a role naming an unknown
+profile; a role with no fallback profile (NFR-25); a profile with no price entry; a status "set" prices
+file with a null price, effective_date or source. price() never invents a
+price: an unset status, or any null price field, raises (PL-06)."""
+
+from __future__ import annotations
+
+import fnmatch
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import yaml
+from pydantic import ValidationError
+from tilo_contracts import ProvidersModels, ProvidersPrices, ProvidersProfile, ProvidersRole
+
+
+class ProviderConfigError(Exception):
+    """Config failed to parse/validate, or failed a start-up check (PL-06, PL-07, NFR-25)."""
+
+
+@dataclass(frozen=True)
+class ProfilePriceQuote:  # one profile's price plus the file's date and source (PL-06)
+    input: float
+    output: float
+    effective_date: str
+    source: str
+
+
+@dataclass(frozen=True)
+class ProvidersConfig:  # the loaded, validated provider-layer config (PRD 6.4)
+    models: ProvidersModels
+    prices: ProvidersPrices
+
+    @property
+    def roles(self) -> dict[str, ProvidersRole]:
+        return self.models.roles
+
+    @property
+    def profiles(self) -> dict[str, ProvidersProfile]:
+        return self.models.profiles
+
+    def price(self, profile_id: str) -> ProfilePriceQuote:
+        if profile_id not in self.prices.profiles:
+            raise ProviderConfigError(f"PL-06: no price entry for profile {profile_id!r} in config/prices.yaml")
+        if self.prices.status != "set":
+            raise ProviderConfigError(
+                f"PL-06: cannot price profile {profile_id!r}: status is 'unset' — prices are never invented"
+            )
+        quote = self.prices.profiles[profile_id]
+        if (
+            quote.input is None
+            or quote.output is None
+            or self.prices.effective_date is None
+            or self.prices.source is None
+        ):
+            # load_providers_config's _validate_price_fields_when_set already
+            # rejects this shape at start-up; this only guards a
+            # ProvidersConfig assembled without going through that loader.
+            raise ProviderConfigError(
+                f"PL-06: profile {profile_id!r} has status 'set' but a null price field -- prices are never invented"
+            )
+        return ProfilePriceQuote(quote.input, quote.output, self.prices.effective_date, self.prices.source)
+
+    def credits(self, usd: float) -> float:  # PRD 14.1: 1 credit = US$0.005
+        return usd / self.prices.credit_usd
+
+
+def _load_yaml_mapping(path: Path) -> dict[str, Any]:
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ProviderConfigError(f"could not read {path}: {error}") from error
+    except yaml.YAMLError as error:
+        raise ProviderConfigError(f"{path} is not valid YAML: {error}") from error
+    if not isinstance(raw, dict):
+        raise ProviderConfigError(f"{path} must contain a YAML mapping at the top level")
+    return raw
+
+
+def _validate_startup_rules(models: ProvidersModels, prices: ProvidersPrices) -> None:
+    for profile_id, profile in models.profiles.items():
+        for deny_glob in models.rules.deny:
+            if fnmatch.fnmatchcase(profile.model, deny_glob):
+                raise ProviderConfigError(
+                    f"PL-07: profile {profile_id!r} names denied model id {profile.model!r} "
+                    f"(matches deny rule {deny_glob!r})"
+                )
+        if profile_id not in prices.profiles:
+            raise ProviderConfigError(f"PL-06: profile {profile_id!r} has no price entry in config/prices.yaml")
+
+    for role_id, role in models.roles.items():
+        if role.primary not in models.profiles:
+            raise ProviderConfigError(f"NFR-25: role {role_id!r} 'primary' names unknown profile {role.primary!r}")
+        if role.fallback is not None and role.fallback not in models.profiles:
+            raise ProviderConfigError(f"NFR-25: role {role_id!r} 'fallback' names unknown profile {role.fallback!r}")
+        for cascade_id in role.cascade or ():
+            if cascade_id not in models.profiles:
+                raise ProviderConfigError(f"NFR-25: role {role_id!r} 'cascade' names unknown profile {cascade_id!r}")
+        if role.fallback is None:
+            raise ProviderConfigError(f"NFR-25: role {role_id!r} has no fallback profile")
+
+
+def _validate_price_fields_when_set(prices: ProvidersPrices, prices_path: Path) -> None:
+    """contracts/providers.schema.json's prices if/then (line ~125) requires
+    that once status is "set", every profile's input/output plus the file's
+    effective_date/source are non-null. The generated ProvidersPrices
+    pydantic model does not enforce a JSON Schema if/then, so a status:
+    "set" file with null prices validates fine and would otherwise only be
+    caught by an assert inside price() -- which a bare `assert` skips
+    entirely under `python -O`, silently returning None fields (PL-06 is
+    "price() refuses to meter rather than returning nothing"). Checked here,
+    at load time, instead."""
+    if prices.status != "set":
+        return
+    if prices.effective_date is None:
+        raise ProviderConfigError(f"PL-06: {prices_path} has status 'set' but effective_date is null")
+    if prices.source is None:
+        raise ProviderConfigError(f"PL-06: {prices_path} has status 'set' but source is null")
+    for profile_id, quote in prices.profiles.items():
+        if quote.input is None:
+            raise ProviderConfigError(
+                f"PL-06: {prices_path} has status 'set' but profile {profile_id!r} has a null input price"
+            )
+        if quote.output is None:
+            raise ProviderConfigError(
+                f"PL-06: {prices_path} has status 'set' but profile {profile_id!r} has a null output price"
+            )
+
+
+def load_providers_config(models_path: Path | str, prices_path: Path | str) -> ProvidersConfig:
+    """Loads, validates and start-up-checks the two config files; raises
+    ProviderConfigError loudly rather than starting on a bad config."""
+    models_path, prices_path = Path(models_path), Path(prices_path)
+    raw_models = _load_yaml_mapping(models_path)
+    raw_prices = _load_yaml_mapping(prices_path)
+
+    try:
+        models = ProvidersModels.model_validate(raw_models)
+    except ValidationError as error:
+        raise ProviderConfigError(f"{models_path} failed schema validation: {error}") from error
+    try:
+        prices = ProvidersPrices.model_validate(raw_prices)
+    except ValidationError as error:
+        raise ProviderConfigError(f"{prices_path} failed schema validation: {error}") from error
+
+    _validate_price_fields_when_set(prices, prices_path)
+
+    _validate_startup_rules(models, prices)
+
+    return ProvidersConfig(models=models, prices=prices)

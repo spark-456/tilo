@@ -1,0 +1,36 @@
+{
+  "actions": {
+    "send email": "T2"
+  },
+  "modifiers": [
+    {
+      "condition": "new_recipients",
+      "raises_to": "T3"
+    },
+    {
+      "condition": "attachments",
+      "raises_to": "T3"
+    },
+    {
+      "condition": "external_sharing",
+      "raises_to": "T3"
+    },
+    {
+      "condition": "deletion",
+      "raises_to": "T3"
+    },
+    {
+      "condition": "money_or_legal",
+      "raises_to": "T3"
+    },
+    {
+      "condition": "safety_flag",
+      "raises_to": "T3"
+    }
+  ],
+  "max_level": {
+    "T1": "L3",
+    "T2": "L3",
+    "T3": "L1"
+  }
+}

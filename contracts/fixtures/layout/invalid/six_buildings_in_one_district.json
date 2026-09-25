@@ -1,0 +1,124 @@
+{
+  "v": "1.0",
+  "world_id": "w_01",
+  "tier": "village",
+  "theme": "metropolis",
+  "semantic": {
+    "levels": [
+      {
+        "id": "L1",
+        "name": "Inbox",
+        "districts": [
+          {
+            "id": "D1",
+            "name": "Triage",
+            "icon": "inbox",
+            "lead": "A_l1",
+            "buildings": [
+              {
+                "id": "B1",
+                "name": "Desk 1",
+                "kind": "kit",
+                "kit": {
+                  "icon": "desk",
+                  "parts": ["desk_small"]
+                },
+                "plan_units": ["U1"]
+              },
+              {
+                "id": "B2",
+                "name": "Desk 2",
+                "kind": "kit",
+                "kit": {
+                  "icon": "desk",
+                  "parts": ["desk_small"]
+                },
+                "plan_units": ["U2"]
+              },
+              {
+                "id": "B3",
+                "name": "Desk 3",
+                "kind": "kit",
+                "kit": {
+                  "icon": "desk",
+                  "parts": ["desk_small"]
+                },
+                "plan_units": ["U3"]
+              },
+              {
+                "id": "B4",
+                "name": "Desk 4",
+                "kind": "kit",
+                "kit": {
+                  "icon": "desk",
+                  "parts": ["desk_small"]
+                },
+                "plan_units": ["U4"]
+              },
+              {
+                "id": "B5",
+                "name": "Desk 5",
+                "kind": "kit",
+                "kit": {
+                  "icon": "desk",
+                  "parts": ["desk_small"]
+                },
+                "plan_units": ["U5"]
+              },
+              {
+                "id": "B6",
+                "name": "Desk 6",
+                "kind": "kit",
+                "kit": {
+                  "icon": "desk",
+                  "parts": ["desk_small"]
+                },
+                "plan_units": ["U6"]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "islands": [
+      {
+        "id": "I1",
+        "name": "Gmail",
+        "conn": "api",
+        "bridge": "road",
+        "state": "connected"
+      },
+      {
+        "id": "I2",
+        "name": "WhatsApp",
+        "conn": "channel",
+        "bridge": "pier",
+        "state": "connected"
+      }
+    ],
+    "gates": [
+      {
+        "id": "G1",
+        "guards": "send_email",
+        "between": ["B2", "I1"],
+        "policy_ref": "pol_autopilot_l2"
+      }
+    ],
+    "agents": [
+      {
+        "id": "A_dir",
+        "rank": "director"
+      },
+      {
+        "id": "A_l1",
+        "rank": "lead",
+        "team_lead": "tl_ops"
+      },
+      {
+        "id": "A_s1",
+        "rank": "specialist"
+      }
+    ]
+  },
+  "geometry": null
+}

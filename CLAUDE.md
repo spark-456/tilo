@@ -17,8 +17,9 @@ Ambiguity: apply the PRD's stated default, log it in `docs/open-questions.md`, k
 - Nothing animates without a recorded event (honesty rules HR-1 to HR-7, PRD 9.4).
 - No scenario-specific code. A scenario that needs code becomes a pillar requirement first.
 - No secrets in code, prompts, logs or fixtures. Fake secrets for tests are assembled at runtime. Tilo never handles passwords.
-- Fresh code only: nothing copied from other projects (including `design/source/support.js`, Claude Design's runtime). Record every dependency's licence in `docs/licences.md`.
+- Fresh code only: nothing copied from other projects. Tilo's own design prototypes `design/source/tilo-kit.js`, `tilo-world.js`, `tilo-player.js` and `worlds/k1-generator.js` may be ported (user approval 2026-09-25, ADR-0003); `design/source/support.js` (Claude Design's runtime) never. Record every dependency's licence in `docs/licences.md`.
 - Deploy on Cloud Run and Firebase, region `asia-southeast1`. English everywhere.
+- Local-first until Google Cloud billing is available (ADR-0003): Firestore and Pub/Sub emulators with a `demo-` project id, no cloud credentials. Live model tests may use NVIDIA NIM through the OpenAI-compatible adapter; Google adapters stay built and tested against mocks and recordings.
 
 ## Environment (native Windows, see ADR-0001)
 - The repo path contains spaces: always quote paths. Use forward slashes in code and scripts.
@@ -48,7 +49,7 @@ EVIDENCE: <commands you ran and what they showed, at most 5 lines>
 Save recurring defects, codebase patterns and PRD rules that keep being missed to your project memory.
 
 ## Ask the user before
-Changing a frozen contract (ADR first); applying infrastructure or spending money; sending any real email or WhatsApp message; merging anything security-reviewer flagged; deploying to `tilo-demo`; the first push to any remote.
+Changing a frozen contract (ADR first); applying infrastructure or spending money; sending any real email or WhatsApp message; merging anything security-reviewer flagged; deploying to `tilo-demo`; making the repository public (it stays private on GitHub as `spark-456/tilo`); force pushes.
 
 ## Layout (PRD 20.3)
 `docs/prd` `docs/adr` `contracts/` `config/` `prompts/` `skills/` `templates/` `packages/providers` `packages/contracts-py` `packages/contracts-ts` `apps/web` `services/{api,harness,channels,connectors,browser,render,sandbox-web}` `evals/` `infra/` `.github/workflows/` `design/`. Each service has its own `CLAUDE.md`.

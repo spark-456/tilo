@@ -1,0 +1,15 @@
+# Standard list prices per model profile, in US dollars per million tokens (PL-06, FR-MTR-01,
+# PRD 14.1: 1 credit = US$0.005). Shape: contracts/providers.schema.json $defs.prices.
+# Prices are never invented: status stays unset and every price, the date and the source stay
+# null until the user copies them from the provider's price page. The loader refuses live
+# metering while status is unset; setting status to set requires every value below.
+status: unset
+effective_date: null
+source: null
+currency: USD
+credit_usd: 0.005
+
+profiles:
+  flash-38: { input: null, output: null }
+  flash-37: { input: null, output: null }
+  lite-31: { input: null, output: null }

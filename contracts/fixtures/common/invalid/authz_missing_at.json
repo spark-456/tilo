@@ -1,0 +1,6 @@
+{
+  "authz": {
+    "by": "person",
+    "ref": "u_owner"
+  }
+}

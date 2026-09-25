@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/plan.approaches_proposed.schema.json",
+  "x-version": "1.0.0",
+  "title": "PlanApproachesProposedData",
+  "description": "data of plan.approaches_proposed (PRD 9.5). Two or three priced approaches (FR-INT-06); the approaches themselves are in the PlanGraph.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approach_count"],
+  "properties": { "approach_count": { "type": "integer", "minimum": 2, "maximum": 3 } }
+}

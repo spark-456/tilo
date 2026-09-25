@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/card.schema.json",
+  "x-version": "1.0.0",
+  "title": "Card",
+  "description": "One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout; it names one of the options and that option is reversible (contracts/card.rules.md CR-01 to CR-03). A gate's or consent card's is always hold, so a gate never times out to go and a consent card never times out to a grant; every hold option is reversible, only a gate may offer an irreversible option, and neither a gate nor a consent card is delegated to the Director. A gate's option ids are the closed set approve, edit, hold, each with a fixed label (Approve, Edit first, Hold); only approve opens the gate, and its irreversible flag equals the gate's (CR-07, CR-08). A consent card's option ids are the closed set connect, hold with fixed labels Connect, Hold; only connect grants (CR-13). The deterministic card builder writes a gate card's gate details and options, never a model, and the card validator checks them against the plan gate, the connector action and the outbox entry the gate releases (CR-09 to CR-12).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "world_id",
+    "run_id",
+    "kind",
+    "rung",
+    "header",
+    "what_happened",
+    "why_it_matters",
+    "options",
+    "add_context",
+    "actions",
+    "answer_channels",
+    "created_at",
+    "timeout",
+    "safe_default",
+    "gate",
+    "consent"
+  ],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/ulid" },
+    "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+    "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+    "kind": { "type": "string", "enum": ["needs_you", "gate", "consent", "meeting"] },
+    "rung": {
+      "description": "Escalation ladder rung (PRD 10.2); needs_you cards may be blocked.",
+      "type": "string",
+      "enum": ["needs_you", "blocked", "meeting", "gate", "consent"]
+    },
+    "header": { "$ref": "#/$defs/header" },
+    "what_happened": { "type": "string", "minLength": 1, "maxLength": 140 },
+    "why_it_matters": { "type": "string", "minLength": 1, "maxLength": 280 },
+    "options": { "$ref": "#/$defs/options" },
+    "add_context": {
+      "description": "Whether the card offers the add-context field.",
+      "type": "boolean"
+    },
+    "actions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["show_me", "snooze", "delegate"] }
+    },
+    "answer_channels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/channel" }
+    },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "timeout": {
+      "description": "Seconds after created_at when the safe default applies and the Director posts a Nudge.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "safe_default": { "$ref": "#/$defs/option_id" },
+    "gate": {
+      "description": "Set on gate cards only.",
+      "anyOf": [{ "$ref": "#/$defs/gate" }, { "type": "null" }]
+    },
+    "consent": {
+      "description": "Set on consent cards only.",
+      "anyOf": [{ "$ref": "#/$defs/consent" }, { "type": "null" }]
+    }
+  },
+  "if": { "properties": { "kind": { "const": "gate" } }, "required": ["kind"] },
+  "then": {
+    "description": "A gate's options come from a closed set, each at most once: approve (the only option that opens the gate, CR-07), edit and hold, which never open it and are reversible. approve and hold are required. Each id has a fixed label (Approve, Edit first, Hold), because the person taps the label and that tap is the authorisation. approve's irreversible equals gate.irreversible (CR-08), so on an irreversible gate approve is never suggested (CR-05). A gate holds by default, is never delegated to the Director and is never answered by email.",
+    "properties": {
+      "rung": { "const": "gate" },
+      "options": {
+        "items": {
+          "properties": { "id": { "enum": ["approve", "edit", "hold"] } },
+          "allOf": [
+            {
+              "if": { "properties": { "id": { "const": "approve" } }, "required": ["id"] },
+              "then": { "properties": { "label": { "const": "Approve" } } }
+            },
+            {
+              "if": { "properties": { "id": { "const": "edit" } }, "required": ["id"] },
+              "then": {
+                "properties": {
+                  "label": { "const": "Edit first" },
+                  "irreversible": { "const": false }
+                }
+              }
+            },
+            {
+              "if": { "properties": { "id": { "const": "hold" } }, "required": ["id"] },
+              "then": {
+                "properties": { "label": { "const": "Hold" }, "irreversible": { "const": false } }
+              }
+            }
+          ]
+        },
+        "allOf": [
+          {
+            "contains": { "properties": { "id": { "const": "approve" } }, "required": ["id"] },
+            "minContains": 1,
+            "maxContains": 1
+          },
+          {
+            "contains": { "properties": { "id": { "const": "hold" } }, "required": ["id"] },
+            "minContains": 1,
+            "maxContains": 1
+          },
+          {
+            "contains": { "properties": { "id": { "const": "edit" } }, "required": ["id"] },
+            "minContains": 0,
+            "maxContains": 1
+          }
+        ]
+      },
+      "safe_default": { "const": "hold" },
+      "actions": { "items": { "enum": ["show_me", "snooze"] } },
+      "answer_channels": { "items": { "enum": ["web", "mobile_web", "whatsapp"] } },
+      "gate": { "type": "object" },
+      "consent": { "type": "null" }
+    },
+    "if": {
+      "properties": {
+        "gate": {
+          "type": "object",
+          "properties": { "irreversible": { "const": true } },
+          "required": ["irreversible"]
+        }
+      },
+      "required": ["gate"]
+    },
+    "then": {
+      "properties": {
+        "options": {
+          "items": {
+            "if": { "properties": { "id": { "const": "approve" } }, "required": ["id"] },
+            "then": { "properties": { "irreversible": { "const": true } } }
+          }
+        }
+      }
+    },
+    "else": {
+      "properties": {
+        "options": {
+          "items": {
+            "if": { "properties": { "id": { "const": "approve" } }, "required": ["id"] },
+            "then": { "properties": { "irreversible": { "const": false } } }
+          }
+        }
+      }
+    }
+  },
+  "else": {
+    "description": "Only a gate may offer an irreversible option (every irreversible action maps to a gate, plan.rules.md PG-04), so a non-gate card never times out to one.",
+    "properties": {
+      "gate": { "type": "null" },
+      "options": { "items": { "properties": { "irreversible": { "const": false } } } }
+    },
+    "if": { "properties": { "kind": { "const": "consent" } }, "required": ["kind"] },
+    "then": {
+      "description": "Granting a connection is an authorisation: a consent card holds by default so a timeout never grants it, and is never delegated to the Director. Its options are the closed set connect and hold, each exactly once, with fixed labels Connect and Hold, because the person taps the label; only connect grants the connection (CR-13).",
+      "properties": {
+        "rung": { "const": "consent" },
+        "options": {
+          "items": {
+            "properties": { "id": { "enum": ["connect", "hold"] } },
+            "allOf": [
+              {
+                "if": { "properties": { "id": { "const": "connect" } }, "required": ["id"] },
+                "then": { "properties": { "label": { "const": "Connect" } } }
+              },
+              {
+                "if": { "properties": { "id": { "const": "hold" } }, "required": ["id"] },
+                "then": { "properties": { "label": { "const": "Hold" } } }
+              }
+            ]
+          },
+          "allOf": [
+            {
+              "contains": { "properties": { "id": { "const": "connect" } }, "required": ["id"] },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": { "properties": { "id": { "const": "hold" } }, "required": ["id"] },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
+        },
+        "safe_default": { "const": "hold" },
+        "actions": { "items": { "enum": ["show_me", "snooze"] } },
+        "answer_channels": { "items": { "enum": ["web", "mobile_web"] } },
+        "consent": { "type": "object" }
+      }
+    },
+    "else": {
+      "properties": { "consent": { "type": "null" } },
+      "if": { "properties": { "kind": { "const": "meeting" } }, "required": ["kind"] },
+      "then": {
+        "properties": {
+          "rung": { "const": "meeting" },
+          "answer_channels": { "items": { "enum": ["web", "mobile_web", "whatsapp"] } }
+        }
+      },
+      "else": { "properties": { "rung": { "enum": ["needs_you", "blocked"] } } }
+    }
+  },
+  "$defs": {
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["building", "agent"],
+      "properties": {
+        "building": { "$ref": "common.schema.json#/$defs/building_id" },
+        "agent": { "$ref": "common.schema.json#/$defs/agent_id" }
+      }
+    },
+    "option_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+    "options": {
+      "description": "2-3 options, exactly one suggested.",
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/option" },
+      "contains": { "properties": { "suggested": { "const": true } }, "required": ["suggested"] },
+      "minContains": 1,
+      "maxContains": 1
+    },
+    "option": {
+      "description": "The suggested option carries a reason and is never irreversible.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "suggested", "irreversible"],
+      "properties": {
+        "id": { "$ref": "#/$defs/option_id" },
+        "label": {
+          "description": "At most 20 characters so it fits a WhatsApp reply button.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "suggested": { "type": "boolean" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "irreversible": { "type": "boolean" }
+      },
+      "if": { "properties": { "suggested": { "const": true } }, "required": ["suggested"] },
+      "then": { "required": ["reason"], "properties": { "irreversible": { "const": false } } }
+    },
+    "gate": {
+      "description": "The exact action a gate card holds. The deterministic card builder copies it from the plan gate, the connector action and the proposed side effect (the outbox entry the gate releases); the card validator rejects any mismatch (card.rules.md CR-09 to CR-12).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "action", "recipients", "irreversible", "risk_tier"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/gate_id" },
+        "action": { "$ref": "#/$defs/gate_action" },
+        "recipients": {
+          "type": "array",
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/email_address" }
+        },
+        "irreversible": { "type": "boolean" },
+        "risk_tier": { "$ref": "common.schema.json#/$defs/risk_tier" }
+      }
+    },
+    "gate_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "connector", "exact", "item", "destination"],
+      "properties": {
+        "type": { "$ref": "common.schema.json#/$defs/action_type" },
+        "connector": { "$ref": "common.schema.json#/$defs/connector_id" },
+        "exact": {
+          "description": "Plain words for exactly what will happen.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "item": {
+          "description": "The draft or file that will be sent or shared, pinned to its version, if any; the outbox entry the gate releases sends exactly this version (CR-12).",
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/artifact_ref" }, { "type": "null" }]
+        },
+        "destination": {
+          "description": "The thread the reply goes into or the folder the file is saved in, if any (CR-12).",
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/destination" }, { "type": "null" }]
+        }
+      }
+    },
+    "consent": {
+      "description": "The connection a consent card asks for.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["connector", "scopes"],
+      "properties": {
+        "connector": { "$ref": "common.schema.json#/$defs/connector_id" },
+        "scopes": {
+          "description": "Scopes requested, as listed in plain words on the consent sheet.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+        }
+      }
+    }
+  }
+}

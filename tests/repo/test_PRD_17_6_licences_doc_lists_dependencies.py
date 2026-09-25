@@ -10,16 +10,20 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import subprocess
 import tomllib
 
 import yaml  # noqa: F401  (pyyaml is an allowed test dependency; imported to confirm availability)
 
 
 def _iter_project_files(repo_root: pathlib.Path, filename: str):
-    for path in repo_root.rglob(filename):
-        if any(part in {"node_modules", ".venv", "venv", ".git"} for part in path.parts):
-            continue
-        yield path
+    # Only tracked manifests count: untracked worktrees under .claude/worktrees hold other tickets' work.
+    tracked = subprocess.run(
+        ["git", "ls-files", "--", f"*{filename}"], cwd=repo_root, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    for rel in tracked:
+        if pathlib.PurePosixPath(rel).name == filename:
+            yield repo_root / rel
 
 
 def _python_dependency_names(pyproject_path: pathlib.Path) -> set[str]:

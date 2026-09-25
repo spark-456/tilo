@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/meeting.decision.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingDecisionData",
+  "description": "data of meeting.decision (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decided_by", "option"],
+  "properties": {
+    "decided_by": { "$ref": "../../event.schema.json#/$defs/answer_source" },
+    "option": { "$ref": "../../card.schema.json#/$defs/option_id" }
+  }
+}

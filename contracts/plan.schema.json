@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/plan.schema.json",
+  "x-version": "1.0.0",
+  "title": "Plan",
+  "description": "PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approaches", "chosen_approach", "units", "gates", "budget_cap"],
+  "properties": {
+    "approaches": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/approach" }
+    },
+    "chosen_approach": {
+      "description": "id of the approach the user picked (PG-07).",
+      "$ref": "#/$defs/approach_id"
+    },
+    "units": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/unit" }
+    },
+    "gates": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/gate" }
+    },
+    "budget_cap": {
+      "description": "Budget cap in credits the user confirmed (FR-INT-08).",
+      "type": "number",
+      "exclusiveMinimum": 0
+    }
+  },
+  "$defs": {
+    "approach_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+    "approach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "summary", "dimensions", "time", "credits", "risks", "skips"],
+      "properties": {
+        "id": { "$ref": "#/$defs/approach_id" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "dimensions": { "$ref": "#/$defs/dimensions" },
+        "time": { "$ref": "common.schema.json#/$defs/time_range" },
+        "credits": { "$ref": "common.schema.json#/$defs/credit_range" },
+        "risks": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+        },
+        "skips": {
+          "description": "What this approach leaves out.",
+          "type": "array",
+          "maxItems": 5,
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+        }
+      }
+    },
+    "dimensions": {
+      "description": "The five dimensions approaches must differ on (at least two, PG-08).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["depth", "sources", "parallelism", "verification", "output_format"],
+      "properties": {
+        "depth": { "type": "string", "enum": ["overview", "standard", "deep"] },
+        "sources": {
+          "description": "Number of sources the approach plans to use.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "parallelism": {
+          "description": "Most Specialists running at once (PRD 8.1 caps this at 6 per world).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "verification": { "type": "string", "enum": ["basic", "standard", "thorough"] },
+        "output_format": { "$ref": "common.schema.json#/$defs/deliverable_format" }
+      }
+    },
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "unit_type",
+        "title",
+        "role",
+        "district",
+        "skills",
+        "connectors",
+        "actions",
+        "depends_on"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/unit_id" },
+        "unit_type": {
+          "description": "Unit type for cost history and time saved (FR-INT-07, PRD 14.2).",
+          "$ref": "common.schema.json#/$defs/slug"
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "role": { "$ref": "common.schema.json#/$defs/agent_role" },
+        "district": { "$ref": "common.schema.json#/$defs/district_id" },
+        "skills": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 10,
+          "items": { "$ref": "common.schema.json#/$defs/skill_id" }
+        },
+        "connectors": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 10,
+          "items": { "$ref": "common.schema.json#/$defs/connector_id" }
+        },
+        "actions": {
+          "description": "Side-effect action types this unit performs; each must be guarded by a gate (PG-04).",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 10,
+          "items": { "$ref": "common.schema.json#/$defs/action_type" }
+        },
+        "depends_on": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 50,
+          "items": { "$ref": "common.schema.json#/$defs/unit_id" }
+        }
+      }
+    },
+    "gate": {
+      "description": "Authorisation point before a side effect. A T3 gate has no policy: T3 always needs a person.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "action_type", "risk_tier", "guards", "policy_ref"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/gate_id" },
+        "action_type": { "$ref": "common.schema.json#/$defs/action_type" },
+        "risk_tier": { "$ref": "common.schema.json#/$defs/risk_tier" },
+        "guards": {
+          "description": "Units whose action this gate holds.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/unit_id" }
+        },
+        "policy_ref": {
+          "description": "Policy that may open this gate, or null when only a person can.",
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/policy_id" }, { "type": "null" }]
+        }
+      },
+      "if": { "properties": { "risk_tier": { "const": "T3" } }, "required": ["risk_tier"] },
+      "then": { "properties": { "policy_ref": { "type": "null" } } }
+    }
+  }
+}

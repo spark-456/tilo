@@ -1,0 +1,1 @@
+- [Web stage attack patterns](web-stage-attack-patterns.md) — passive wheel error; canvas edges; modifier keys; timer-stopped ticker leaves stale grid
