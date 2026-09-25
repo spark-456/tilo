@@ -80,7 +80,14 @@ def _decide(p: Proposal, table: RiskTable, policies: list[dict], owner: str, app
     if len(set(ids)) != len(ids):  # two records share an id: ambiguous, fail closed (PI-13)
         return gate(tier, modifiers, "L1", None, "no_covering_policy")
     target = Target(p.action_type, p.connector, p.district, p.facts.recipients)
-    levels = [(lv, pol) for pol in policies if (lv := covering_level(pol, target, owner, now)) and stamped_by(pol, now)]
+    mine = [
+        pol
+        for pol in policies
+        if isinstance(pol, dict) and (pol.get("action_type"), pol.get("owner")) == (p.action_type, owner)
+    ]
+    if not all(stamped_by(pol, now) for pol in mine):  # the clock is behind the record: the whole decision gates
+        return gate(tier, modifiers, "L1", None, "no_covering_policy")
+    levels = [(lv, pol) for pol in mine if (lv := covering_level(pol, target, owner, now))]
     # A tier's max_level caps every policy; the lowest level in force wins, ties by id (PI-13).
     covering = [(min(lv, table.max_level.get(tier, "L1")), pol["id"], pol) for lv, pol in levels]
     if not covering:

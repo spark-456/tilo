@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .coverage import Target, add_seconds, covering_level, instruction_counts, opens_gate
+from .coverage import LEVELS, Target, add_seconds, covering_level, instruction_counts, opens_gate
 from .decide import over_limit
 from .schemas import conforms, event_ok
 from .tiers import RiskTable
@@ -62,8 +62,13 @@ def _breaks_ob01(case: dict) -> bool:
 
 def _breaks_ob05(case: dict, table: RiskTable | None) -> bool:
     entry, reserved, auth, transfer = case["entry"], case["reserved_by"], case["authorised_by"], case["transfer"]
-    if table is not None and entry["risk_tier"] != table.tier_of(entry["action_type"], entry["modifiers"]):
-        return True  # the tier is the table's, never self-declared (PI-07, PI-14)
+    if table is not None:
+        tier = table.tier_of(entry["action_type"], entry["modifiers"])
+        if entry["risk_tier"] != tier:
+            return True  # the tier is the table's, never self-declared (PI-07, PI-14)
+        ceiling = LEVELS[: LEVELS.index(table.max_level[tier]) + 1]
+        if auth is not None and auth["type"] == "policy.applied" and auth["data"]["level"] not in ceiling:
+            return True  # a policy never runs above its tier's max_level, as in decide
     fields = (entry["action_type"], entry["risk_tier"], _pinned(entry["item"]))
     by = (reserved or auth or {}).get("data")
     if by is not None and (by["action_type"], by["risk_tier"], _pinned(by["item"])) != fields:
