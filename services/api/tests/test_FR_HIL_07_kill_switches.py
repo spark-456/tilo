@@ -17,8 +17,10 @@ history repair, and pending-on-failure for stop/pause) are unchanged here and st
 
 from __future__ import annotations
 
+import gc
 import json
 import pathlib
+import random
 import threading
 import time
 
@@ -27,20 +29,24 @@ from _api_lib import (
     PRINCIPAL_HEADER,
     WORLD,
     BlockingEventWriter,
+    FakeEventWriter,
     FlakyEventWriter,
     LateSuccessEventWriter,
+    PartiallySlowEventWriter,
     ReversedDelayEventWriter,
     SlowEventWriter,
     SlowFlakyEventWriter,
     SlowHistoryPolicy,
     as_principal,
     as_principal_by_header,
+    as_store_and_writer_by_header,
     as_writer,
     assert_part_carries_no_stamped_fields,
     base_policy,
     make_district,
     make_pending_part,
     make_principal,
+    make_store,
     make_world,
     validate_event,
 )
@@ -1469,10 +1475,16 @@ def test_FR_HIL_07_100_pending_parts_are_flushed_in_their_queued_order(client, s
     assert landed == [f"pol_{i:03d}" for i in range(n)], "pending parts must land in exactly their queued order"
 
 
-def test_FR_HIL_07_pause_writes_policy_changed_before_world_paused_in_the_same_call(client, store):
-    """Within one Pause-all call, every policy.changed part it builds must land in store.events
-    before that same call's own world.paused part, never interleaved out of order by which
-    underlying writer call happens to finish first on the wire (round-5 finding 3)."""
+def test_FR_HIL_07_pause_writes_world_paused_before_policy_changed_in_the_same_call(client, store):
+    """ST-3a-3 supersedes round-5's "world.paused lands last" rule (API_ST3a.md "What changed
+    since round 6 (ST-3a-2) -- ST-3a-3"): FR-WLD-07/NFR-07's 2s pause-confirmation budget means
+    world.paused must now be the *first* part committed for its world, ahead of every
+    policy.changed this same Pause-all call builds -- never interleaved out of that order by which
+    underlying writer call happens to finish first on the wire. ReversedDelayEventWriter sleeps
+    less on each successive call (the first-submitted call sleeps longest); since world.paused is
+    now submitted first, a completion-order-based (rather than queue-order-based) implementation
+    would visibly let it finish *last* despite that -- a correctly order-preserving one still
+    commits it first, regardless of its own longer delay."""
     ids = _world_with_policies(store, 5, level="L2")
     writer = ReversedDelayEventWriter(store, base_delay_s=0.15, step_s=0.02)
     as_writer(writer)
@@ -1486,9 +1498,9 @@ def test_FR_HIL_07_pause_writes_policy_changed_before_world_paused_in_the_same_c
     assert types_in_order.count("policy.changed") == len(ids)
     assert types_in_order.count("world.paused") == 1
     paused_index = types_in_order.index("world.paused")
-    assert paused_index == len(types_in_order) - 1, (
-        f"world.paused landed at index {paused_index} of {types_in_order} -- every policy.changed "
-        "must land before it, never interleaved by completion timing"
+    assert paused_index == 0, (
+        f"world.paused landed at index {paused_index} of {types_in_order} -- it must be enqueued "
+        "ahead of every policy.changed this call builds (ST-3a-3, FR-WLD-07/NFR-07), never after"
     )
 
 
@@ -1898,3 +1910,443 @@ def test_FR_HIL_07_revoke_of_an_unmapped_policy_is_locked_against_a_concurrent_r
     assert [h["change"] for h in history] == ["revoked", "revoked"]
 
     assert store.policies["pol_other"]["level"] == "L1", "an unrelated Stop-all must not be blocked or corrupted"
+
+
+# ---------------------------------------------------------------------------
+# ST-3a-3 (PR #39, issue #38's last comment): round 6's `_WorldChannel` (an 8-worker pool, a
+# per-call pending snapshot, `_in_flight` keyed by id(part)) reproduced, under real concurrency,
+# duplicate writes, out-of-build-order commits, a world permanently stuck behind a hung writer
+# (queued futures stay bound to the writer instance captured at submit time, so a healthy writer
+# swapped in afterward gets zero calls), and id(part) reuse after GC silently dropping an unrelated
+# part. The resolved design (API_ST3a.md "What changed since round 6 (ST-3a-2) -- ST-3a-3"): one
+# consumer per world, owning a queue that lives on the Store instance itself; a route only enqueues
+# under the world lock then waits up to budget; the head of a world's queue is never passed until
+# it settles; dedupe on a stable id carried alongside the part, never id(part); a hung attempt frees
+# its worker so the backlog can drain against whatever writer is current once the head settles, no
+# restart needed; and world.paused now jumps to the front of its world's queue, ahead of any audit
+# part (this call's own policy.changed, or an older pending backlog), so FR-WLD-07/NFR-07's 2s
+# pause-confirmation budget holds even against a slow writer working through unrelated backlog.
+
+
+def test_FR_HIL_07_three_concurrent_stop_alls_plus_revokes_against_a_partially_slow_writer(client, store):
+    """Three concurrent Stop-alls (the owner double- and triple-tapping the kill switch, or app +
+    WhatsApp + a retry racing) against ten owned policies, plus two concurrent revokes of two other
+    policies in the same world (a different owner, so Stop-all's own owned-policy scan never also
+    targets them -- keeping each policy's expected event count unambiguous), against a writer that
+    is slow on roughly half its calls: every part is written exactly once, and the parts one call
+    builds together under one lock hold commit to store.events in that same build (plan) order,
+    whichever underlying writer call happens to finish first on the wire.
+
+    Real thread scheduling cannot be forced deterministically, and Hypothesis shrinking a
+    concurrency bug would just re-run the same non-deterministic race rather than find a smaller
+    one -- so this repeats the race across several seeded trials instead (root CLAUDE.md: "seeded
+    loop" is the ticket's own stated fallback when Hypothesis is not a good fit)."""
+    n_stop_policies = 10
+    trials = 5
+    for trial in range(trials):
+        store.worlds.clear()
+        store.policies.clear()
+        store.policy_worlds.clear()
+        store.events.clear()
+        store.pending_events.clear()
+
+        store.worlds[WORLD] = make_world(owner=OWNER)
+        stop_ids = []
+        for i in range(n_stop_policies):
+            pid = f"pol_stop_{i}"
+            store.policies[pid] = base_policy(id_=pid, owner=OWNER, level="L2")
+            store.policy_worlds[pid] = WORLD
+            stop_ids.append(pid)
+        revoke_ids = []
+        for i in range(2):
+            pid = f"pol_revoke_{i}"
+            store.policies[pid] = base_policy(id_=pid, owner=OTHER_OWNER, level="L3")
+            store.policy_worlds[pid] = WORLD
+            revoke_ids.append(pid)
+
+        writer = PartiallySlowEventWriter(store, delay_s=0.04, slow_fraction=0.5, seed=1000 + trial)
+        as_writer(writer)
+        as_principal_by_header(
+            {
+                "stopper": make_principal(user_id=OWNER, role="owner", world_id=WORLD),
+                "revoker": make_principal(user_id=OTHER_OWNER, role="owner", world_id=None),
+            }
+        )
+
+        responses: list = []
+        errors: list = []
+        barrier = threading.Barrier(5, timeout=5)
+
+        def call_stop():
+            try:
+                barrier.wait()
+                responses.append(
+                    ("stop", client.post(f"/worlds/{WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "stopper"}))
+                )
+            except Exception as exc:  # pragma: no cover - surfaced via the assert below
+                errors.append(exc)
+
+        def call_revoke(pid: str):
+            try:
+                barrier.wait()
+                responses.append(
+                    ("revoke", client.post(f"/policies/{pid}/revoke", headers={PRINCIPAL_HEADER: "revoker"}))
+                )
+            except Exception as exc:  # pragma: no cover - surfaced via the assert below
+                errors.append(exc)
+
+        threads = [threading.Thread(target=call_stop, daemon=True) for _ in range(3)]
+        threads += [threading.Thread(target=call_revoke, args=(pid,), daemon=True) for pid in revoke_ids]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10)
+        assert not any(t.is_alive() for t in threads), f"trial {trial}: a call hung"
+        assert not errors, f"trial {trial}: {errors}"
+        assert len(responses) == 5
+        for _, r in responses:
+            assert r.status_code in (200, 202), f"trial {trial}: {r.text}"
+
+        # Give any part that missed its deadline this call every chance to have landed.
+        flush = client.post(f"/worlds/{WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "stopper"})
+        assert flush.status_code in (200, 202), flush.text
+
+        events = store.events.get(WORLD, [])
+        stop_all_events = [e for e in events if e["type"] == "policy.changed" and e["data"]["change"] == "stop_all"]
+        revoked_events = [e for e in events if e["type"] == "policy.changed" and e["data"]["change"] == "revoked"]
+
+        stop_seen = [e["data"]["policy_id"] for e in stop_all_events]
+        assert stop_seen == stop_ids, (
+            f"trial {trial}: stop_all parts must be exactly {stop_ids} in build (plan) order, got {stop_seen} "
+            "-- either a duplicate/missing write, or a build-order violation"
+        )
+
+        revoked_seen = [e["data"]["policy_id"] for e in revoked_events]
+        assert sorted(revoked_seen) == sorted(revoke_ids), f"trial {trial}: {revoked_seen} vs {revoke_ids}"
+        assert len(revoked_seen) == len(set(revoked_seen)), f"trial {trial}: a revoked part was written more than once"
+
+        for pid in stop_ids + revoke_ids:
+            assert store.policies[pid]["level"] == "L1", f"trial {trial}: {pid}"
+        assert store.pending_events.get(WORLD, []) == [], f"trial {trial}: pending left after the final flush"
+
+
+def test_FR_HIL_07_nine_hung_writer_calls_recover_via_a_swapped_in_healthy_writer(client, store):
+    """issue #38 items 2-3: a hung writer attempt must free its own worker rather than pin a
+    thread per stuck part forever, and once a healthy writer is swapped in, the whole backlog --
+    world.paused included -- is still delivered exactly once and in its build order, with no
+    server restart and no thread-count blowup."""
+    n = 9
+    ids = _world_with_policies(store, n, level="L2")
+    hung = BlockingEventWriter(store)
+    as_writer(hung)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    baseline = threading.active_count()
+    result: dict = {}
+
+    def call_pause():
+        result["resp"] = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+
+    t = threading.Thread(target=call_pause, daemon=True)
+    t.start()
+    try:
+        assert hung.entered.wait(timeout=5), "pause never reached the (hung) writer at all"
+        time.sleep(0.3)  # let the implementation attempt (and give up waiting on) whatever it will
+
+        stuck_growth = threading.active_count() - baseline
+        assert stuck_growth <= 15, (
+            f"thread count grew by {stuck_growth} while stuck against a writer that never returns "
+            f"for a {n}-part backlog -- expected a small, bounded constant, not roughly one thread "
+            "per part"
+        )
+
+        t.join(timeout=8.0)
+        assert not t.is_alive(), "pause never returned even though the level change is lock/I-O independent"
+        assert "resp" in result
+        assert result["resp"].status_code in (200, 202), result["resp"].text
+        for pid in ids:
+            assert store.policies[pid]["level"] == "L1"
+        assert store.worlds[WORLD].paused is True
+
+        healthy = FakeEventWriter(store)
+        as_writer(healthy)
+
+        # The resolved flush trigger stays "the next mutating call that touches this world"
+        # (API_ST3a.md ambiguity 9, reaffirmed unchanged by ambiguity 21) -- a further call is what
+        # gives the long-lived, per-world consumer a fresh, healthy writer to retry the still-stuck
+        # head against; nothing in this ticket adds a background retry loop.
+        recover = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        assert recover.status_code in (200, 202), recover.text
+
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            if len(store.events.get(WORLD, [])) >= n + 1 and not store.pending_events.get(WORLD, []):
+                break
+            time.sleep(0.02)
+
+        events = store.events.get(WORLD, [])
+        assert store.pending_events.get(WORLD, []) == [], (
+            f"backlog never fully flushed after swapping in a healthy writer: {store.pending_events.get(WORLD, [])}"
+        )
+        types = [e["type"] for e in events]
+        assert types.count("world.paused") == 1
+        assert types.count("policy.changed") == n
+        assert types[0] == "world.paused", (
+            "world.paused was enqueued ahead of this call's own policy.changed parts and must still "
+            f"land first once recovery happens, got order {types}"
+        )
+        landed_pids = [e["data"]["policy_id"] for e in events if e["type"] == "policy.changed"]
+        assert sorted(landed_pids) == sorted(ids)
+        assert len(landed_pids) == len(set(landed_pids)), "no policy.changed was written twice"
+
+        grown_after = threading.active_count() - baseline
+        assert grown_after <= 15, f"thread count grew by {grown_after} after recovery -- expected a small bound"
+    finally:
+        hung.release()
+        t.join(timeout=5.0)
+
+
+def test_FR_HIL_07_pause_reaches_the_writer_within_2s_ahead_of_policy_changed_and_backlog(client, store):
+    """FR-WLD-07 / NFR-07: world.paused must reach the writer within 2s of a Pause-all call, even
+    against a slow writer and even when this call's own policy.changed parts, and an older pending
+    backlog for the same world, would otherwise sit ahead of it in a plain oldest-first queue.
+    ST-3a-3's rule: world.paused jumps to the front of its world's queue, ahead of any audit part
+    (this call's own policy.changed, or anything already pending), so a confirmation that "Pause
+    all stopped the agents" is never delayed behind an unrelated backlog."""
+    ids = _world_with_policies(store, 10, level="L2")
+    store.pending_events[WORLD] = [make_pending_part(policy_id=f"pol_backlog_{i}") for i in range(5)]
+    slow = SlowEventWriter(store, delay_s=0.25)
+    as_writer(slow)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    result: dict = {}
+
+    def call():
+        result["resp"] = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+
+    started = time.monotonic()
+    t = threading.Thread(target=call, daemon=True)
+    t.start()
+    try:
+        paused_at = None
+        deadline = started + 4.0
+        while time.monotonic() < deadline:
+            types = [e["type"] for e in store.events.get(WORLD, [])]
+            if "world.paused" in types:
+                paused_at = time.monotonic() - started
+                assert types.index("world.paused") == 0, (
+                    f"world.paused must be the first event committed for this world, got order {types}"
+                )
+                break
+            time.sleep(0.01)
+
+        assert paused_at is not None, "world.paused never reached the writer"
+        assert paused_at <= 2.0, (
+            f"world.paused reached the writer after {paused_at:.2f}s -- FR-WLD-07/NFR-07 require <= 2s"
+        )
+    finally:
+        t.join(timeout=15.0)
+    assert "resp" in result
+    assert result["resp"].status_code in (200, 202), result["resp"].text
+    for pid in ids:
+        assert store.policies[pid]["level"] == "L1"
+
+
+def test_FR_HIL_07_a_part_that_commits_late_is_never_rewritten_by_a_call_that_snapshotted_earlier(client, store):
+    """The ST-3a-2 duplicate repro (issue #38 item 2): a part whose writer attempt overruns its own
+    deadline is queued pending while the real attempt keeps running in the background; a second,
+    later call that touches the same world reads (snapshots) that same pending queue before the
+    late attempt has actually landed. Round 6's id(part)-keyed dedupe resent the snapshotted part
+    once the original attempt finally succeeded, landing it twice in 4-7 of the issue's own 20
+    trials. Repeated across several trials with a varied intermediate delay (a seeded loop -- real
+    thread scheduling and the exact per-attempt deadline are not values this ticket pins, so a
+    single fixed timing cannot reliably land inside the vulnerable window every run)."""
+    rng = random.Random(20260926)
+    trials = 8
+    for trial in range(trials):
+        store.worlds.clear()
+        store.policies.clear()
+        store.policy_worlds.clear()
+        store.events.clear()
+        store.pending_events.clear()
+
+        pid = f"pol_late_{trial}"
+        store.worlds[WORLD] = make_world(owner=OWNER)
+        store.policies[pid] = base_policy(id_=pid, owner=OWNER, level="L2")
+        store.policy_worlds[pid] = WORLD
+
+        late = LateSuccessEventWriter(store, delay_s=1.0)
+        as_writer(late)
+        as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+        resp1 = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        assert resp1.status_code in (200, 202), f"trial {trial}: {resp1.text}"
+        assert store.policies[pid]["level"] == "L1"
+
+        # A call issued while the original attempt is still outstanding (well past any plausible
+        # per-part deadline, well before delay_s's real success) -- exactly the call that snapshots
+        # pending_events mid-flight.
+        time.sleep(0.25 + rng.random() * 0.15)
+        resp2 = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        assert resp2.status_code in (200, 202), f"trial {trial}: {resp2.text}"
+
+        assert late.first_call_settled.wait(timeout=3.0), f"trial {trial}: the slow attempt never actually landed"
+
+        # A final flush pass gives everything every remaining chance to have already landed.
+        resp3 = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        assert resp3.status_code in (200, 202), f"trial {trial}: {resp3.text}"
+
+        landed = [e for e in store.events.get(WORLD, []) if e["data"].get("policy_id") == pid]
+        assert len(landed) == 1, f"trial {trial}: {pid} written {len(landed)} times -- must be exactly once"
+        assert store.pending_events.get(WORLD, []) == [], f"trial {trial}: a settled part must not stay pending"
+
+    for call in late.calls:
+        assert_part_carries_no_stamped_fields(call.part)  # no idempotency key smuggled into the part API
+
+
+def test_FR_HIL_07_repeated_allocation_and_gc_never_drops_or_duplicates_a_part(client, store):
+    """issue #38 item 4: dedup keyed on id(part) can silently treat a brand-new part as an
+    already-seen one once CPython's allocator reuses a freed part dict's address (3 of 20 trials in
+    the issue's own repro). Built by creating and dropping many short-lived part dicts in a tight
+    loop -- one small Stop-all per fresh, otherwise-untouched policy, with gc.collect() nudging the
+    allocator to actually reuse those freed addresses -- then asserting every single one is still
+    written, exactly once, never silently dropped and never doubled."""
+    n = 150
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    slow = SlowEventWriter(store, delay_s=0.01)
+    as_writer(slow)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    pids = []
+    for i in range(n):
+        pid = f"pol_churn_{i}"
+        store.policies[pid] = base_policy(id_=pid, owner=OWNER, level="L2")
+        store.policy_worlds[pid] = WORLD
+        pids.append(pid)
+
+        resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        assert resp.status_code in (200, 202), f"{pid}: {resp.text}"
+        if i % 10 == 0:
+            gc.collect()  # encourage the allocator to reuse just-freed part-dict addresses
+
+    final = client.post(f"/worlds/{WORLD}/autopilot/stop")  # flush anything left from the tail of the loop
+    assert final.status_code in (200, 202), final.text
+
+    for pid in pids:
+        assert store.policies[pid]["level"] == "L1", pid
+        landed = [e for e in store.events.get(WORLD, []) if e["data"].get("policy_id") == pid]
+        assert len(landed) == 1, f"{pid} written {len(landed)} times -- id() reuse must never drop or duplicate a part"
+    assert store.pending_events.get(WORLD, []) == []
+
+
+def test_FR_HIL_07_stable_ids_survive_a_pending_queue_rebuilt_mid_flight(client, store):
+    """A persisted queue (Firestore, a later ticket) round-trips a part through brand-new Python
+    objects with identical content but a different id() on every load. Dedupe keyed on id(part)
+    (round 6's bug) loses track of an in-flight attempt the instant the queue is rebuilt this way,
+    and can resubmit it once the original attempt eventually settles. ST-3a-3's fix is a stable id
+    carried alongside the part, never id() -- this proves it survives exactly that kind of
+    rebuild."""
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.pending_events[WORLD] = [make_pending_part(policy_id="pol_persisted")]
+
+    late = LateSuccessEventWriter(store, delay_s=0.8)
+    as_writer(late)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    result: dict = {}
+
+    def call_first():
+        result["resp1"] = client.post(f"/worlds/{WORLD}/autopilot/stop")
+
+    t = threading.Thread(target=call_first, daemon=True)
+    t.start()
+
+    time.sleep(0.2)  # the flush attempt for pol_persisted is now in flight: its own deadline has
+    # long passed, real success is still ~0.6s away
+    still_pending = store.pending_events.get(WORLD, [])
+    assert still_pending, "expected pol_persisted's part still sitting in pending_events while its attempt is in flight"
+    # Simulate a reload from persistence: brand-new dict objects, identical content, different id().
+    store.pending_events[WORLD] = [dict(p) for p in still_pending]
+
+    resp2 = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert resp2.status_code in (200, 202), resp2.text
+
+    t.join(timeout=5.0)
+    assert not t.is_alive(), "the first call never returned"
+    assert "resp1" in result
+    assert result["resp1"].status_code in (200, 202), result["resp1"].text
+
+    assert late.first_call_settled.wait(timeout=2.0), "the original in-flight attempt never actually landed"
+    resp3 = client.post(f"/worlds/{WORLD}/autopilot/stop")  # a final flush pass
+    assert resp3.status_code in (200, 202), resp3.text
+
+    landed = [e for e in store.events.get(WORLD, []) if e["data"].get("policy_id") == "pol_persisted"]
+    assert len(landed) == 1, f"pol_persisted written {len(landed)} times after its pending queue was rebuilt mid-flight"
+    assert store.pending_events.get(WORLD, []) == []
+
+
+def test_FR_HIL_07_two_store_instances_for_the_same_world_id_share_no_queue_or_dedupe_state(client):
+    """API_ST3a.md "What changed since round 6 (ST-3a-2) -- ST-3a-3": the per-world consumer's
+    queue and dedupe state must live on the Store instance itself, never a module-level dict keyed
+    only by world_id -- two unrelated Store instances (two tests, two tenants) that merely happen
+    to use the same world_id string must never share write-ordering, lock or dedupe state. Store
+    A's writer never returns; Store B, a completely separate Store using the exact same world_id,
+    must still be served promptly by its own healthy writer and must never see any of Store A's
+    pending state, or vice versa."""
+    store_a = make_store()
+    store_b = make_store()
+    store_a.worlds[WORLD] = make_world(owner=OWNER)
+    store_b.worlds[WORLD] = make_world(owner=OWNER)
+    store_a.policies["pol_a"] = base_policy(id_="pol_a", owner=OWNER, level="L2")
+    store_a.policy_worlds["pol_a"] = WORLD
+    store_b.policies["pol_b"] = base_policy(id_="pol_b", owner=OWNER, level="L2")
+    store_b.policy_worlds["pol_b"] = WORLD
+
+    blocking_a = BlockingEventWriter(store_a)
+    writer_b = FakeEventWriter(store_b)
+
+    as_store_and_writer_by_header({"a": (store_a, blocking_a), "b": (store_b, writer_b)})
+    as_principal_by_header(
+        {
+            "a": make_principal(user_id=OWNER, role="owner", world_id=WORLD),
+            "b": make_principal(user_id=OWNER, role="owner", world_id=WORLD),
+        }
+    )
+
+    result: dict = {}
+
+    def call_a():
+        result["a"] = client.post(f"/worlds/{WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "a"})
+
+    t = threading.Thread(target=call_a, daemon=True)
+    t.start()
+    try:
+        assert blocking_a.entered.wait(timeout=5), "store A's call never reached its (blocking) writer"
+        time.sleep(0.05)  # let store A's level-change section fully settle
+
+        started = time.monotonic()
+        resp_b = client.post(f"/worlds/{WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "b"})
+        elapsed_b = time.monotonic() - started
+
+        assert resp_b.status_code == 200, resp_b.text
+        assert elapsed_b <= 2.0, (
+            f"store B's call against its own healthy writer took {elapsed_b:.2f}s -- it must never "
+            "wait on store A's stuck writer just because both happen to use the same world_id string"
+        )
+        assert store_b.policies["pol_b"]["level"] == "L1"
+        landed_b = [e for e in store_b.events.get(WORLD, []) if e["data"].get("policy_id") == "pol_b"]
+        assert len(landed_b) == 1
+        assert store_b.pending_events.get(WORLD, []) == []
+
+        assert store_a.policies["pol_a"]["level"] == "L1", "the level change itself is lock/I-O independent"
+        assert not any(e["data"].get("policy_id") == "pol_b" for e in store_a.events.get(WORLD, [])), (
+            "store B's event must never land in store A's event log"
+        )
+        assert not [e for e in store_a.events.get(WORLD, []) if e["data"].get("policy_id") == "pol_a"], (
+            "store A's own part is still stuck behind its own blocking writer"
+        )
+    finally:
+        blocking_a.release()
+        t.join(timeout=5.0)
+    assert "a" in result
+    assert result["a"].status_code in (200, 202), result["a"].text

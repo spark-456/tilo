@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import random
 import threading
 import time
 from dataclasses import dataclass
@@ -282,6 +283,26 @@ def as_principal_by_header(mapping: dict[str, deps.Principal]) -> None:
     app.dependency_overrides[deps.get_current_principal] = _resolve
 
 
+def as_store_and_writer_by_header(mapping: dict[str, tuple[deps.Store, FakeEventWriter]]) -> None:
+    """Overrides get_store and get_event_writer together, keyed by the same PRINCIPAL_HEADER
+    convention as_principal_by_header uses (round-6/ST-3a-3 addition: proving that channel/lock
+    state belongs to the Store instance, never a module-level dict keyed by world_id alone, needs
+    two live Store instances that happen to share a world_id string -- something the single global
+    `store`/`writer` fixture overrides in conftest.py cannot express). `mapping` is built once,
+    before any thread starts; each caller selects its own (store, writer) pair by sending
+    PRINCIPAL_HEADER with the matching key, exactly like as_principal_by_header does for the
+    principal."""
+
+    def _resolve_store(request: Request) -> deps.Store:
+        return mapping[request.headers.get(PRINCIPAL_HEADER)][0]
+
+    def _resolve_writer(request: Request):
+        return mapping[request.headers.get(PRINCIPAL_HEADER)][1]
+
+    app.dependency_overrides[deps.get_store] = _resolve_store
+    app.dependency_overrides[deps.get_event_writer] = _resolve_writer
+
+
 def as_writer(writer) -> None:
     """Overrides get_event_writer mid-test with something other than the `writer` fixture's plain
     FakeEventWriter -- a FlakyEventWriter or SlowEventWriter below, for the round-3 pending-write
@@ -415,6 +436,30 @@ class SlowEventWriter(FakeEventWriter):
 
     def append(self, world_id: str, part: dict) -> dict:
         time.sleep(self.delay_s)
+        return super().append(world_id, part)
+
+
+class PartiallySlowEventWriter(FakeEventWriter):
+    """Sleeps `delay_s` before roughly `slow_fraction` of `append` calls (decided by a seeded RNG
+    shared across every call, protected by its own lock so concurrent callers never race the RNG
+    itself) and returns immediately for the rest -- built for ST-3a-3's concurrent-race test
+    (issue #38: three concurrent Stop-alls plus concurrent revokes against a writer that is slow on
+    *some* calls, not uniformly slow like SlowEventWriter), so some attempts settle almost
+    instantly while others widen the race window, closer to how a real harness under load answers
+    some requests fast and others slow."""
+
+    def __init__(self, store: deps.Store, *, delay_s: float = 0.05, slow_fraction: float = 0.5, seed: int = 0) -> None:
+        super().__init__(store)
+        self.delay_s = delay_s
+        self.slow_fraction = slow_fraction
+        self._rng = random.Random(seed)
+        self._rng_lock = threading.Lock()
+
+    def append(self, world_id: str, part: dict) -> dict:
+        with self._rng_lock:
+            slow = self._rng.random() < self.slow_fraction
+        if slow:
+            time.sleep(self.delay_s)
         return super().append(world_id, part)
 
 

@@ -428,6 +428,80 @@ What round 5's implementation still gets wrong, in the issue's own priority orde
     the requesting world's own lock, so this fix cannot introduce a new way for an unrelated Stop-all
     to block on a revoke of an unrelated, unmapped policy.
 
+## What changed since round 6 (ST-3a-2) -- ST-3a-3
+
+Round 6 (immediately above) passed items 1, 4 and 5 of issue #38 but its own writer design failed
+all three reviewers again (issue #38's last comment, PR #39 stuck at the round cap): `dispatch.py`'s
+`_WorldChannel` -- an 8-worker pool, a per-call pending snapshot, and an `_in_flight` map keyed by
+`id(part)` -- reproduced, under real concurrency:
+
+1. **Duplicate writes** (2-3 writes in 4-7 of 20 trials): a call that snapshotted
+   `store.pending_events` before an in-flight attempt had actually landed could resend a part
+   another call had already committed and cleared.
+2. **Out-of-build-order commits**: a part whose attempt missed its own deadline was skipped
+   (`continue`), so later parts committed first, both within one call and across concurrent calls
+   on the same world.
+3. **A world getting permanently stuck**: after 8 writer calls that never return, the bounded pool
+   is exhausted, and every already-submitted (but not yet started) future is still bound to the
+   *writer instance closed over when it was submitted* -- a healthy writer swapped in afterward
+   gets zero calls, and `world.paused` never reaches it even though the response already says
+   `"paused": true`.
+4. **`id(part)` reuse**: once a committed part's dict is garbage-collected, a later, unrelated part
+   can be allocated at the same address; a dedupe keyed on `id()` then treats the new part as
+   already-seen and drops it unwritten (3 of 20 trials).
+
+**Resolved design (this ticket, ST-3a-3, may only touch `services/api/tests`; a later
+`feat/FR-HIL-07-*` round implements it):**
+
+- **One consumer per world**, owning an ordered queue that lives on the `Store` instance itself --
+  never a module-level dict keyed by `world_id` alone. Two `Store` instances that happen to share a
+  `world_id` string (two tests, or two tenants) must never share queue, lock or dedupe state (see
+  the store-scope test below).
+- **A mutating route only enqueues**, under the touched world's lock (the existing per-world lock
+  registry, unchanged), then waits up to the call's shared budget for its own part(s) to settle --
+  the lock is still released before any writer I/O, unchanged from round 4/5.
+- **The head of a world's queue is never passed until it settles.** No later part for that world is
+  ever committed to `store.events` ahead of it, whatever order the underlying writer calls finish
+  on the wire (unchanged invariant, now held by construction rather than by a "skip a timed-out
+  head" fallback -- round 6's `continue` violated exactly this).
+- **A committed part is never re-sent.** Dedupe is keyed on a stable id carried *alongside* the
+  part in the world's own queue record (assigned once, when the part is enqueued -- ambiguity 20
+  below), never on `id(part)`, and that id is never added as a field of the part
+  `EventWriter.append` itself receives -- `_api_lib.assert_part_carries_no_stamped_fields` still
+  applies unchanged to every part a test inspects via `writer.calls`.
+- **A hung writer attempt frees its worker.** Once an attempt's own bounded deadline passes without
+  it returning, the world's single consumer stops waiting on it and becomes available to retry the
+  same (still-head) part, using whichever writer the *most recently arrived* mutating call for that
+  world supplied. Parts behind the head are never attempted early just because the head is stuck
+  (see above); the backlog is unblocked by the head's own eventual settlement -- a real success, or
+  a fresh attempt against a newly-healthy writer -- never by skipping it. This is what recovers
+  **without a restart**: swapping in a healthy writer (or letting a truly-hung one eventually
+  return) is enough for the same long-lived, per-world consumer to drain everything queued behind
+  it, in order.
+- **`world.paused` is enqueued ahead of every audit part for its world** -- this call's own
+  `policy.changed` parts *and* anything already sitting in that world's pending backlog from an
+  earlier call -- the moment Pause-all decides to build it (supersedes round 5's "Order within a
+  world" finding 3, annotated above, which put it last). This is what makes FR-WLD-07/NFR-07's
+  "pause reflected within 2s" hold even against a slow writer working through a large, unrelated
+  backlog: the confirmation that autonomy actually stopped must never queue behind the audit trail
+  of *why*.
+
+### Ambiguities resolved this round (ST-3a-3)
+
+20. **The stable part id's exact form.** Left as this ticket's own implementation choice (a
+    monotonic per-`Store` counter, a uuid4, a ULID) -- this round's tests only require that the id
+    is *not* `id(part)`, is carried outside the part shape `EventWriter.append` receives, and
+    survives a part being copied into a fresh dict with identical content (the "persisted queue"
+    test below), not that it take any particular form.
+21. **Whether "the next mutating call that touches a world" (ambiguity 9, unchanged) is still the
+    resolved flush/retry trigger, now that a per-world consumer is long-lived.** Yes, unchanged:
+    nothing in ST-3a-3's own priority list (issue #38's writer-soundness findings) asks for a
+    background retry loop, and FR-HIL-07 does not require one either. A world nobody ever issues
+    another `stop`/`pause`/`revoke` against after a writer failure simply keeps its backlog queued,
+    same as every round before this one -- the *consumer* is long-lived (one per world, not rebuilt
+    per call), but it only gets a fresh chance to retry a stuck head when a call supplies one,
+    exactly as the pending/flush trigger has always worked.
+
 ## `tilo_api.deps` (module; `Principal.channel` is new this round -- every test that constructs one
 via `make_principal(channel=...)` fails on that keyword until the builder adds the field)
 
@@ -773,16 +847,21 @@ against a single world `w`:
 2. This call's own newly-built parts for `w` follow, in the order the route built them (its own
    "build order" — for `stop`/`revoke` this is plan order, i.e. `store.policies`' iteration order
    filtered to this call's owner; for `pause` this is every lowered policy's `policy.changed` part,
-   in that same plan order, **then** the one `world.paused` part last, since `pause`'s own handler
-   builds it only after the stop-all-style plan is built).
+   in that same plan order, ~~**then** the one `world.paused` part last, since `pause`'s own
+   handler builds it only after the stop-all-style plan is built~~ **superseded by ST-3a-3** (see
+   "What changed since round 6 (ST-3a-2) — ST-3a-3" below): `world.paused` is now enqueued
+   *ahead* of this call's own `policy.changed` parts, not after them, and ahead of anything already
+   pending for `w` too — item 1 above no longer applies to a *new* `world.paused` part this call
+   builds, only to parts that were already pending before this call started).
 
 Parallelism across *different* worlds is unaffected and still required (finding 2): world `w1`'s
 writes and world `w2`'s writes may proceed fully concurrently with each other: only the ordering
 *within* a single world's own stream is constrained. This round's tests pin two concrete cases: a
 world with **100** parts already pending (from an earlier failed call) lands in `store.events[w]`
-in exactly that queued order once flushed; and, within one `pause` call, every `policy.changed` part
-it builds lands in `store.events[world_id]` before that same call's own `world.paused` part, never
-interleaved out of order by which writer call happens to return first.
+in exactly that queued order once flushed; and, within one `pause` call, ~~every `policy.changed`
+part it builds lands in `store.events[world_id]` before that same call's own `world.paused`
+part~~ **superseded by ST-3a-3: `world.paused` now lands before every `policy.changed` part this
+same call builds** — never interleaved out of order by which writer call happens to return first.
 
 ### `POST /worlds/{world_id}/pause` — FR-HIL-07 ("Pause all stops the agents too", PRD 10.4)
 
