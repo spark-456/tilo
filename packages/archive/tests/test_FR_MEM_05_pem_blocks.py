@@ -351,7 +351,7 @@ def test_FR_MEM_05_pem_stored_as_a_list_of_lines_leaves_no_body(tmp_path, type_w
     for line in body_lines:
         assert line not in raw_text
     assert ("-" * 5 + "END") not in raw_text
-    assert "before the key" in raw_text and "after the key" in raw_text
+    assert "[REDACTED:private_key]" in raw_text  # a split key withholds the whole payload
 
 
 def test_FR_MEM_05_pem_list_with_no_end_line_redacts_every_later_string():
@@ -368,3 +368,65 @@ def test_FR_MEM_05_pem_begin_line_as_a_key_redacts_its_value():
     text = json.dumps(redact_mod.redact({header: "\n".join([*middle, end_line])}))
     for line in body_lines:
         assert line not in text
+
+
+# A key split across values in any arrangement: the whole value (or log line) is withheld.
+SPLIT_SHAPES = {
+    "reversed_list": lambda h, b, e: [b, e, h],
+    "nested_lists": lambda h, b, e: [[h], [b], [e]],
+    "list_in_the_middle": lambda h, b, e: [h, [b], e],
+    "dict_in_the_middle": lambda h, b, e: [h, {"b": b}, e],
+    "dict_siblings": lambda h, b, e: {"k": h, "v": b},
+    "split_across_keys": lambda h, b, e: {"lines": [h], "more": [b, e]},
+    "end_then_new_block": lambda h, b, e: [h, b, e + "\n" + h, b, e],
+    "body_and_end_only": lambda h, b, e: {"a": "unrelated", "tail": b + "\n" + e},
+}
+
+
+@pytest.mark.parametrize("shape", sorted(SPLIT_SHAPES))
+def test_FR_MEM_05_a_key_split_across_values_leaves_no_body(shape):
+    header, middle, end_line, body_lines = _split_block("RSA")
+    value = SPLIT_SHAPES[shape](header, "\n".join(middle), end_line)
+    text = json.dumps(redact_mod.redact(value))
+    for line in body_lines:
+        assert line not in text
+    assert ("-" * 5 + "END") not in text
+
+
+def test_FR_MEM_05_a_lone_end_line_redacts_from_the_start_of_its_value():
+    header, middle, end_line, body_lines = _split_block("EC")
+    text = redact_mod.redact_prompt("\n".join([*middle, end_line]) + " after")
+    for line in body_lines:
+        assert line not in text
+    assert text.endswith(" after")
+
+
+@pytest.mark.parametrize("order", ["body_end_header", "end_header_body"])
+def test_FR_MEM_05_log_args_in_any_order_leave_no_body(order):
+    header, middle, end_line, body_lines = _split_block("RSA")
+    body = "\n".join(middle)
+    args = (body, end_line, header) if order == "body_end_header" else (end_line, header, body)
+    message = _log_line("%s %s %s", *args)
+    for line in body_lines:
+        assert line not in message
+
+
+def test_FR_MEM_05_log_record_that_cannot_compose_keeps_no_raw_arg(capsys):
+    block, body_lines = build_pem_block(RNG, "RSA", n_lines=4, include_end=True)
+    api_key = "sk-" + rand_token(RNG, 30)
+    logger = logging.getLogger("tilo.test.compose")
+    logger.propagate = False  # pytest's own capture handler re-raises formatting errors
+    handler = logging.StreamHandler()
+    handler.addFilter(redact_mod.RedactingFilter())
+    logger.addHandler(handler)
+    try:
+        logger.error("loaded config", block)  # an unused arg: getMessage() raises
+        logger.error("user %d", api_key)  # a bad %-conversion
+    finally:
+        logger.removeHandler(handler)
+        logger.propagate = True
+    err = capsys.readouterr().err
+    assert "[REDACTED:" in err  # the handler did print the failed record, redacted
+    for line in body_lines:
+        assert line not in err
+    assert api_key not in err
