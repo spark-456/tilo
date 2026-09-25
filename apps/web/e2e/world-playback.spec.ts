@@ -13,7 +13,7 @@ import { canvasSnapshot, fixtureUrl, speedBadge, stageCanvas, stageSeq } from ".
 test.use({ viewport: DESKTOP });
 
 async function waitForSeq(page: import("@playwright/test").Page, seq: number, timeout = 15_000) {
-  await expect.poll(() => stageSeq(page), { timeout }).toBe(seq);
+  await expect.poll(() => stageSeq(page), { timeout, intervals: [25] }).toBe(seq);
 }
 
 test("HR-6 playback: at 1x (default), seq 1 -> seq 2 takes about the recorded 2s gap", async ({

@@ -20,6 +20,8 @@ export interface Choreographer {
   advance(nowMs: number): void;
   isAnimating(actor: string): boolean;
   activeSeq(actor: string): number | null;
+  /** The in-flight move's seq and its scheduled start..finish window, for interpolation. */
+  active(actor: string): { seq: number; start: number; finish: number } | null;
   completed(actor: string): number[];
 }
 
@@ -90,6 +92,10 @@ export function createChoreographer(opts: { reducedMotion?: boolean } = {}): Cho
     },
     activeSeq(actor) {
       return current(actor)?.move.seq ?? null;
+    },
+    active(actor) {
+      const c = current(actor);
+      return c ? { seq: c.move.seq, start: c.start, finish: c.finish } : null;
     },
     completed(actor) {
       return actors.get(actor)?.completedSeqs ?? [];

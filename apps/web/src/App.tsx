@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { Stage } from "./stage/Stage";
 import { useWorldFixture } from "./world/useWorldFixture";
@@ -10,6 +11,12 @@ const Nav = ({ id }: { id: string }) => (
     </button>
   </nav>
 );
+// Memoised so each applied event adds one row instead of re-rendering the whole list.
+const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
+  <li data-testid="trace-row" data-seq={seq} data-event-type={type}>
+    {seq} {type}
+  </li>
+));
 const stageMode = new URLSearchParams(window.location.search).get("display") === "stage";
 
 /** PRD 18.3 layout frame: desktop rails either side of the stage; mobile bottom tabs. */
@@ -48,14 +55,7 @@ export function App() {
               <h2>Trace</h2>
               <ul className="trace-list" data-testid="trace-list">
                 {world.trace.map((row) => (
-                  <li
-                    key={row.seq}
-                    data-testid="trace-row"
-                    data-seq={row.seq}
-                    data-event-type={row.type}
-                  >
-                    {row.seq} {row.type}
-                  </li>
+                  <TraceRow key={row.seq} seq={row.seq} type={row.type} />
                 ))}
               </ul>
             </>
