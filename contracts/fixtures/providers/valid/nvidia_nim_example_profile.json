@@ -4,7 +4,7 @@
     "profiles": {
       "nim-gemma": {
         "provider": "openai_compat",
-        "model": "google/gemma-2-27b-it",
+        "model": "example-org/example-nim-model",
         "context": 8192,
         "caps": ["json", "tools"],
         "base_url": "https://integrate.api.nvidia.com/v1",

@@ -69,6 +69,8 @@ DATAMODEL_ARGS = [
     "--disable-timestamp",
     "--ignore-pyproject",
     "--no-allow-remote-refs",
+    # A uri stays a str so its pattern and maxLength survive (ADR-0002 decision 8).
+    "--type-mappings=string+uri=string",
 ]
 
 

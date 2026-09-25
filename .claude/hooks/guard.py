@@ -27,6 +27,7 @@ SECRET_PATTERNS = [
     (r"\bsk-[A-Za-z0-9_\-]{20,}", "an API secret key"),
     (r"\bgh[pousr]_[A-Za-z0-9]{36}\b", "a GitHub token"),
     (r"\bEAA[A-Za-z0-9]{60,}", "a Meta / WhatsApp access token"),
+    (r"\bnvapi-[A-Za-z0-9_\-]{20,}", "an NVIDIA NIM API key"),
     (r"\"type\"\s*:\s*\"service_account\"", "a service account key"),
 ]
 
