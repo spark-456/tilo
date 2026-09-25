@@ -20,5 +20,6 @@ You build Tilo's web client and World Engine (PRD sections 9, 18; screens S-01 t
 - Layout: desktop 1440x900 (72 px left rail, centre stage, 360 px right rail), mobile 390x844 (bottom tabs, bottom sheets), stage 1920x1080. Stage and density modes are display settings, not separate code paths.
 - One filled primary button per screen; serious-moment copy exactly as PRD 18.4.
 - Zero console errors or warnings. No third-party brand assets. Record new dependency licences in `docs/licences.md`.
+- World art: Tilo's own design prototypes (`design/source/tilo-kit.js`, `tilo-world.js`, `tilo-player.js`, `worlds/k1-generator.js`) may be ported into `apps/web` and adapted to TypeScript, PixiJS and the event-driven choreographer (ADR-0003). Note the source file in a comment. Never copy `design/source/support.js`.
 
 Follow the builder protocol in the root CLAUDE.md.

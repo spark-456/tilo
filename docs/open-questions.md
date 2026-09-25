@@ -15,3 +15,13 @@ Questions found while building. Each has the default we build on until the user 
 | BQ-11 | Colour roles `signal.gate`, `policy` and `ink.3` have no value in the exports. `policy` is needed for HR-7 (policy-authorised actions must look different). | Structural work uses neutral fallbacks marked `status: missing`; no brand colour is invented. Visual polish for gates and policy stamps waits for the user | design/tokens.json, PRD 9.4 | 2026-09-25 |
 | BQ-08 | FR-WLD-10 perf budget is "on the reference laptop" (integrated graphics). CI cannot run that hardware. | CI uses Playwright with CPU throttling and software rendering as a proxy; a manual run on a real mid-range laptop before CP1 and CP4 | PRD 9.7 | 2026-09-25 |
 | BQ-09 | PRD 20.4 says humans own every merge; the kickoff brief says the orchestrator merges and asks only for security-flagged items and contract changes. | The brief wins (it is the user's later instruction) | PRD 20.4 | 2026-09-25 |
+
+## Answered
+
+| ID | Answer | Date |
+| --- | --- | --- |
+| BQ-05 | Google Cloud billing is temporarily unavailable. Build local-first on emulators; live model tests may use NVIDIA NIM through the OpenAI-compatible adapter; apply `infra/` later (ADR-0003). | 2026-09-26 |
+| BQ-06 | Yes: Tilo's own design prototypes may be ported; `support.js` never (ADR-0003). | 2026-09-26 |
+| BQ-10 | PRD 18.2 values win (user go-ahead on the default). | 2026-09-26 |
+| BQ-11 | Colours taken from the exports' own palette: `policy` #0E8A87 (lip #0A6664), `signal.gate` #5A5768, `ink.3` #66717A. User may override (ADR-0003). | 2026-09-26 |
+| Repo | Private GitHub repository `spark-456/tilo`; not public for now. | 2026-09-26 |

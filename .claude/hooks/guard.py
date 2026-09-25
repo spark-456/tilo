@@ -3,8 +3,9 @@
 Blocks the tool call (exit 2, reason on stderr) when it would:
 - edit a read-only source: docs/prd/, design/source/ (except INDEX.md), design/archive/
 - write a .env file, or content that looks like a real secret
-- run a shell command that needs the user's sign-off: git push, terraform apply/destroy,
-  anything deploying to tilo-demo, LIVE=1 (paid model calls), billing or project creation
+- run a shell command that needs the user's sign-off: force pushes, making or deleting the
+  (private) GitHub repository public, terraform apply/destroy, anything deploying to tilo-demo,
+  LIVE=1 (paid model calls), billing or project creation
 
 Fake secrets for tests must be assembled at runtime, never written as literals.
 """
@@ -30,7 +31,10 @@ SECRET_PATTERNS = [
 ]
 
 SHELL_RULES = [
-    (r"\bgit\s+push\b", "git push needs the user's go-ahead (public-repo decision is pending)"),
+    (r"\bgit\s+push\b.*(\s--force\b|\s-f\b|\s--force-with-lease\b|\s\+\S)", "force pushes are never allowed; ask the user"),
+    (r"\bgh\s+repo\s+(create|edit)\b.*(--public\b|--visibility[= ]public\b)",
+     "the repository stays private until the user says otherwise"),
+    (r"\bgh\s+repo\s+delete\b", "deleting the repository needs the user"),
     (r"\bterraform\s+(apply|destroy|import)\b", "the user applies infrastructure; produce the plan and commands instead"),
     (r"(?=.*\btilo-demo\b)(?=.*\b(deploy|apply|firebase\s+use|config\s+set\s+project)\b)",
      "anything targeting tilo-demo needs the user's approval"),

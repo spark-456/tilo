@@ -61,6 +61,11 @@ Updated: 2026-09-25 night · Phase 0 (Foundations) · next gate **CP0 on 29 Sep*
 | 2026-09-25 | cost-reviewer | added `memory: project` | Brief: reviewers keep recurring defects in project memory |
 | 2026-09-26 | reach-builder (P0-01, P0-07 only) | sonnet → opus for the ticket | Each ticket failed review twice for reasoning or logic errors (self-tuning rule) |
 
+## Decisions on 2026-09-26 (ADR-0003)
+- User approved merging P0-01 and P0-07 to `main`, porting Tilo's own design prototypes, PRD values over export values, and export-palette colours for the three missing roles.
+- Google Cloud billing is on hold: the build is local-first on emulators; CP0's deploy criterion stays NOT MET until billing works. Live model tests may use NVIDIA NIM (user adds `NVIDIA_API_KEY` to `.env` and runs with `LIVE=1`).
+- Repository: private on GitHub (`spark-456/tilo`).
+
 ## Integration branch
 Tickets that security-reviewer flagged cannot reach `main` without the user. Approved work stacks on `phase0-stack`; new tickets branch from it. When the user approves the flags, `main` fast-forwards to `phase0-stack`.
 
