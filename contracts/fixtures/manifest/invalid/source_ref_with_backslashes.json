@@ -1,0 +1,61 @@
+{
+  "v": "1.0",
+  "artifact": {
+    "artifact_id": "art_eval_deck",
+    "version": 2
+  },
+  "content_sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+  "parents": [
+    {
+      "artifact_id": "art_eval_deck",
+      "version": 1
+    }
+  ],
+  "produced_by": {
+    "agent_id": "A_writer1",
+    "role": "writer",
+    "skill": {
+      "id": "deck-writing",
+      "version": "0.1.0"
+    },
+    "model_role": "writer",
+    "profile": "flash-37"
+  },
+  "inputs": [
+    {
+      "artifact_id": "art_research_table",
+      "version": 1
+    }
+  ],
+  "sources": [
+    {
+      "id": "src_report",
+      "kind": "web",
+      "ref": "https:\\\\reader@example.com\\report",
+      "fingerprint": "sha256:b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+      "fetched_at": "2026-09-29T09:00:00.000Z"
+    },
+    {
+      "id": "src_cell",
+      "kind": "cell",
+      "ref": "art_research_table@1#Sheet1!B2",
+      "fingerprint": "sha256:c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+      "fetched_at": "2026-09-29T09:05:00.000Z"
+    }
+  ],
+  "claims": [
+    {
+      "id": "cl_growth",
+      "location": "slide3/cell:B2",
+      "text": "Revenue grew 12% quarter over quarter.",
+      "source_ids": ["src_cell", "src_report"],
+      "verified": true
+    }
+  ],
+  "events": ["01JB5VQ0000000000000000120", "01JB5VQ0000000000000000121"],
+  "authz": {
+    "by": "person",
+    "ref": "u_owner",
+    "at": "2026-09-29T09:40:00.000Z"
+  }
+}

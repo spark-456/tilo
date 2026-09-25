@@ -684,7 +684,7 @@ types:
     world_effect: "A boat docks at the pier by Your Desk."
     hud_effect: "none"
     story_template: "A {data.channel} message arrived."
-    trace_row: "channel={data.channel} message={data.message_ref} card={data.card_id} destination={data.destination}"
+    trace_row: "channel={data.channel} message={data.message_ref} card={data.card_id} kind={data.card_kind} option={data.option} destination={data.destination}"
     data_schema: events/data/channel.message_in.schema.json
     fixture: fixtures/events/valid/channel.message_in.json
   channel.message_out:

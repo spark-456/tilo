@@ -50,7 +50,8 @@
       "item": {
         "artifact_id": "art_followup_reply",
         "version": 1
-      }
+      },
+      "credits": 2
     }
   },
   "policy": {
@@ -116,6 +117,8 @@
       "channel": "email",
       "message_ref": "r_village_basic_1/118",
       "card_id": null,
+      "card_kind": null,
+      "option": null,
       "destination": "thread-supplier-1"
     },
     "trace": {

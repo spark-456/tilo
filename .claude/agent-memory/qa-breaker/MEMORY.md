@@ -4,3 +4,7 @@
 - [Eval harness recording validation](eval-harness-recording-validation.md) — fixes cover the repro only; fuzz every event field the runner reads
 - [Outbox attack patterns](outbox-attack-patterns.md) — unclaimed pending flush double-emits; lease expiry mid-send; foreign-config fails entries
 - [API kill-switch attack patterns](api-kill-switch-attack-patterns.md) — slow-failing writer blows 5 s under lock; revoke unguarded; shallow data redaction
+- [Outbox attack patterns](outbox-attack-patterns.md) — restart loses pending; foreign config; lease expiry mid-emit double emits; poison head-of-line
+- [API kill-switch attack patterns](api-kill-switch-attack-patterns.md) — raising/slow EventWriter breaks stop-all; str districts substring leak
+- [Metering loader attack patterns](metering-loader-attack-patterns.md) — generated models drop const/if-then; YAML parse and missing-file errors escape
+- [Cards store attack patterns](cards-store-attack-patterns.md) — same-id resubmit reopens approved gate; actor->authz invalid; Feb 31 / huge timeout crash

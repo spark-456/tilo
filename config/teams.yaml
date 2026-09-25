@@ -1,0 +1,11 @@
+# EXAMPLE Team Lead assignments (PRD 8.3, FR-AGT-06): placeholder people only. The owner
+# replaces them here or in the Team Lead console. Each entry has the shape of
+# contracts/team_lead.schema.json; `just contracts-check` validates them. An empty list is
+# valid: with no Team Lead for a domain, questions go to the owner.
+# A Team Lead id is unique and leads one domain; assigned_by must be the world's owner (OB-01).
+- id: tl_security
+  user: u_security_lead
+  domain: security
+  assigned_by:
+    by: u_owner
+    at: "2026-09-29T09:00:00.000Z"

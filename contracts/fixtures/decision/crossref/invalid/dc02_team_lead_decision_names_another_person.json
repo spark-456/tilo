@@ -1,0 +1,45 @@
+{
+  "rule": "DC-02",
+  "note": "The Decision names u_other_reader as the person who answered as tl_security, but u_security_lead held that Team Lead id at the answer.",
+  "decision": {
+    "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W6",
+    "org_id": "org_acme",
+    "question": "Can a supplier portal link be opened from an inbound email?",
+    "domain": "security",
+    "answer": "Only links to domains on the approved supplier list; flag the rest.",
+    "option_id": null,
+    "answered_by": {
+      "by": "team_lead",
+      "ref": "tl_security",
+      "user": "u_other_reader",
+      "at": "2026-09-29T10:00:00.000Z"
+    },
+    "source": {
+      "world_id": "w_village_basic",
+      "run_id": "r_village_basic_1",
+      "card_id": "01J8Z3K4M5N6P7Q8R9S0T1V2W2"
+    },
+    "scope": {
+      "worlds": ["w_village_basic"],
+      "districts": ["D1"]
+    },
+    "created_at": "2026-09-29T10:00:01.000Z",
+    "expires_at": "2026-12-29T10:00:00.000Z"
+  },
+  "worlds": {
+    "w_village_basic": {
+      "org_id": "org_acme",
+      "owner": "u_owner"
+    }
+  },
+  "team_lead_at_answer": {
+    "id": "tl_security",
+    "user": "u_security_lead",
+    "domain": "security",
+    "assigned_by": {
+      "by": "u_owner",
+      "at": "2026-09-29T09:00:00.000Z"
+    }
+  },
+  "reuse": null
+}
