@@ -50,18 +50,25 @@
   "then": { "properties": { "domain": { "$ref": "common.schema.json#/$defs/slug" } } },
   "$defs": {
     "answerer": {
-      "description": "The authz shape (BQ-01) narrowed to who answers a question: the owner of the source world (a user id; an Approver's answer makes no Decision, DC-01) or a Team Lead (a Team Lead id, DC-02). A policy never answers a question and a model never does. DC-04 checks the answerer again in the world of each repeat question.",
+      "description": "The authz shape (BQ-01) narrowed to who answers a question: the owner of the source world (ref is their user id; an Approver's answer makes no Decision, DC-01) or a Team Lead (ref is the Team Lead id and user the person who held it and answered, DC-02). A policy never answers a question and a model never does. DC-04 checks the answerer again in the world of each repeat question, and a Team Lead's Decision answers only while the same person holds that Team Lead id.",
       "type": "object",
       "additionalProperties": false,
       "required": ["by", "ref", "at"],
       "properties": {
         "by": { "type": "string", "enum": ["person", "team_lead"] },
         "ref": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "user": { "$ref": "common.schema.json#/$defs/user_id" },
         "at": { "$ref": "common.schema.json#/$defs/timestamp" }
       },
       "if": { "properties": { "by": { "const": "person" } }, "required": ["by"] },
-      "then": { "properties": { "ref": { "$ref": "common.schema.json#/$defs/user_id" } } },
-      "else": { "properties": { "ref": { "$ref": "common.schema.json#/$defs/team_lead_id" } } }
+      "then": {
+        "properties": { "ref": { "$ref": "common.schema.json#/$defs/user_id" } },
+        "not": { "required": ["user"] }
+      },
+      "else": {
+        "properties": { "ref": { "$ref": "common.schema.json#/$defs/team_lead_id" } },
+        "required": ["user"]
+      }
     },
     "source": {
       "description": "The card whose answer this records (PRD 15.1: a card records a decision).",

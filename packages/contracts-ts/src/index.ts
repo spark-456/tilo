@@ -7,7 +7,7 @@
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
  * common.schema.json 1.0.0 sha256:cdb1a1ceeeebb299
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
- * decision.schema.json 1.0.0 sha256:d39fb93c8944b156
+ * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
  * event.schema.json 1.0.0 sha256:06d09566f16c4dfc
  * events/data/agent.assigned.schema.json 1.0.0 sha256:f7672c62780b8b4b
@@ -83,7 +83,7 @@
  * events/registry.schema.json 1.0.0 sha256:42c04358933101ef
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
- * manifest.schema.json 1.0.0 sha256:8f355d6d19a8e629
+ * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
@@ -1033,7 +1033,7 @@ export interface Decision {
   expires_at: Timestamp | null;
 }
 /**
- * The authz shape (BQ-01) narrowed to who answers a question: the owner of the source world (a user id; an Approver's answer makes no Decision, DC-01) or a Team Lead (a Team Lead id, DC-02). A policy never answers a question and a model never does. DC-04 checks the answerer again in the world of each repeat question.
+ * The authz shape (BQ-01) narrowed to who answers a question: the owner of the source world (ref is their user id; an Approver's answer makes no Decision, DC-01) or a Team Lead (ref is the Team Lead id and user the person who held it and answered, DC-02). A policy never answers a question and a model never does. DC-04 checks the answerer again in the world of each repeat question, and a Team Lead's Decision answers only while the same person holds that Team Lead id.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "DecisionAnswerer".
@@ -1041,6 +1041,7 @@ export interface Decision {
 export interface DecisionAnswerer {
   by: "person" | "team_lead";
   ref: string;
+  user?: UserId;
   at: Timestamp;
 }
 /**
@@ -2248,7 +2249,7 @@ export interface LayoutGateGeometry {
   cell: LayoutPoint;
 }
 /**
- * Provenance manifest of one artifact version (PRD 13.3, 15.2; FR-MEM-06, FR-MEM-07): the agent, skill version and model profile that produced it, its version parents, inputs and sources, the claims it makes with their sources, the events that caused it and who authorised it. Stored with the version and carried by exports, so the trail survives outside Tilo. 'Why is this here?' resolves a claim to its sources and to the first event in events. Rules the schema cannot express are MF-01 to MF-05 in manifest.rules.md.
+ * Provenance manifest of one artifact version (PRD 13.3, 15.2; FR-MEM-06, FR-MEM-07): the agent, skill version and model profile that produced it, its version parents, inputs and sources, the claims it makes with their sources, the events that caused it and who authorised it. Stored with the version and carried by exports, so the trail survives outside Tilo. 'Why is this here?' resolves a claim to its sources and to the first event in events. Rules the schema cannot express are MF-01 to MF-06 in manifest.rules.md.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Manifest".
@@ -2302,7 +2303,7 @@ export interface ManifestSkillVersion {
   version: Semver;
 }
 /**
- * Where material came from. ref is the URL for web, the file name for file, <connector_id>:<item id> for connector, <artifact_id>@<version>#<cell> for cell and <artifact_id>@<version> for artifact. Every ref is one of four closed shapes, so none carries a credential or a query-string token (PRD 16.1 rule 4, 16.2; MF-03): an http or https URL of host, optional port and path only (no user info, query or fragment); an artifact ref with an optional cell after #; a connector ref whose item id has only letters, digits and . _ ~ -; or a file name with no / \ : ? # @ % or control character and no space at either end. fingerprint is the SHA-256 of the fetched content, the result cache key part (PRD 13.1).
+ * Where material came from. ref is the URL for web, the file name for file, <connector_id>:<item id> for connector, <artifact_id>@<version>#<cell> for cell and <artifact_id>@<version> for artifact. Every ref is one of four closed shapes, so none carries user info or a query, fragment or parameter token (PRD 16.1 rule 4, 16.2; MF-03): an http or https URL of host, optional port and path only (no user info, query, fragment, ; or =); an artifact ref with an optional cell after # of letters, digits and . _ ~ ! : $ - only; a connector ref whose item id has only letters, digits and . _ ~ -; or a file name with no / \ : ? # @ % or control character and no space at either end. A bare token can still look like a file name or an item id, so the secret redactor checks every manifest before it is written or exported (MF-06). fingerprint is the SHA-256 of the fetched content, the result cache key part (PRD 13.1).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ManifestSource".

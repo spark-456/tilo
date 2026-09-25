@@ -8,6 +8,7 @@
   "answered_by": {
     "by": "team_lead",
     "ref": "u_owner",
+    "user": "u_security_lead",
     "at": "2026-09-29T10:00:00.000Z"
   },
   "source": {

@@ -157,19 +157,27 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     `handoff_at` repeats its `const` as `minimum` and `maximum` because the Python generator drops
     a float `const`. `max_attempts` includes the first attempt and is at most 3 (BQ-58).
     `decision.schema.json` is the PRD 15.1 Decision; `answered_by` is `authz` narrowed to a person
-    or a Team Lead, and a Team Lead's Decision names its domain. Reuse rules DC-01 to DC-04; a
+    or a Team Lead, and a Team Lead's Decision names its domain. A Team Lead's `answered_by` also
+    carries `user`, the person who held the Team Lead id and answered (required for a Team Lead,
+    absent for a person, whose `ref` is already the user), because a `tl_` id is a mutable
+    indirection: the owner can put another person behind it without a new assignment stamp.
+    Reuse rules DC-01 to DC-04; a
     gate is never opened from a Decision (BQ-60). Only the source world's owner or a Team Lead
     gives a Decision (PRD 13.1; an Approver's answer makes none), a Decision's scope stays within
     the worlds where its answerer has that authority, and reuse checks the answerer again in the
     reusing world at the event's time, as OB-01 does for gates: the person is that world's owner,
-    or the Team Lead's record still exists with the same domain, assigned by that world's owner no
-    later than the answer. Cases are in `fixtures/decision/crossref/` with the reference check in
-    `test_FR_AGT_07_decision_crossref.py`. `manifest.schema.json` is the PRD 13.3 manifest:
-    lower-case SHA-256 hashes, a verified claim has a source; rules MF-01 to MF-05 (BQ-59). A
-    source `ref` is an allowlist of four closed shapes (an http or https URL of host, port and
-    path; an artifact or cell ref; a connector ref; a plain file name), because a denylist of
-    user-info spellings missed `//u@host`, `https:\u@host`, a leading space and query-string
-    tokens (PRD 16.1 rule 4, 16.2); a web `ref` therefore carries no query or fragment.
+    or the Team Lead's record still exists with the same domain and the same `user`, assigned by
+    that world's owner no later than the answer. Cases are in `fixtures/decision/crossref/` with
+    the reference check in `test_FR_AGT_07_decision_crossref.py`. `manifest.schema.json` is the
+    PRD 13.3 manifest: lower-case SHA-256 hashes, a verified claim has a source; rules MF-01 to
+    MF-06 (BQ-59). A source `ref` is an allowlist of four closed shapes (an http or https URL of
+    host, port and a path without `;` or `=`; an artifact ref with a cell of letters, digits and
+    `. _ ~ ! : $ -`; a connector ref; a plain file name), because a denylist of user-info
+    spellings missed `//u@host`, `https:\u@host`, a leading space and query-string tokens (PRD
+    16.1 rule 4, 16.2); a web `ref` therefore carries no query, fragment or path parameters. A
+    bare token still fits a file name or an item id, so shapes are not the guarantee: the secret
+    redactor that guards the raw archive checks every manifest before it is written and before it
+    is exported, and a manifest it would change is refused (MF-06).
     `question.answered` data 1.1.0 adds `decision_id`, set exactly when `answered_by` is
     `decision`. A further valid case of an event type may sit next to the registry fixture as
     `fixtures/events/valid/<type>--<case>.json` (`question.answered--from_decision.json` cites a

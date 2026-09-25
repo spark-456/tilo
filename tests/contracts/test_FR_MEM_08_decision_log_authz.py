@@ -48,10 +48,14 @@ def test_FR_MEM_08_decision_answered_by_carries_by_ref_and_at(repo_root, registr
         assert errors, f"FR-MEM-08: decision.answered_by missing {field!r} must be invalid"
 
 
-@pytest.mark.parametrize("by,ref", [("person", "u_owner"), ("team_lead", "tl_security")])
-def test_FR_MEM_08_decision_answered_by_accepts_person_and_team_lead(repo_root, registry, by, ref):
+@pytest.mark.parametrize(
+    "by,ref,person",
+    # A Team Lead's answer also names the person who held the Team Lead id (DC-02, DC-04).
+    [("person", "u_owner", {}), ("team_lead", "tl_security", {"user": "u_security_lead"})],
+)
+def test_FR_MEM_08_decision_answered_by_accepts_person_and_team_lead(repo_root, registry, by, ref, person):
     schema = load_schema(repo_root, "decision")
-    instance = sample_decision(answered_by=sample_authz(by=by, ref=ref))
+    instance = sample_decision(answered_by=sample_authz(by=by, ref=ref, **person))
     errors = errors_for(schema, instance, registry)
     assert not errors, (
         f"FR-MEM-08: decision.answered_by by={by!r} should validate, got: {[e.message for e in errors][:5]}"

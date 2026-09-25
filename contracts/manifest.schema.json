@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/manifest.schema.json",
   "x-version": "1.0.0",
   "title": "Manifest",
-  "description": "Provenance manifest of one artifact version (PRD 13.3, 15.2; FR-MEM-06, FR-MEM-07): the agent, skill version and model profile that produced it, its version parents, inputs and sources, the claims it makes with their sources, the events that caused it and who authorised it. Stored with the version and carried by exports, so the trail survives outside Tilo. 'Why is this here?' resolves a claim to its sources and to the first event in events. Rules the schema cannot express are MF-01 to MF-05 in manifest.rules.md.",
+  "description": "Provenance manifest of one artifact version (PRD 13.3, 15.2; FR-MEM-06, FR-MEM-07): the agent, skill version and model profile that produced it, its version parents, inputs and sources, the claims it makes with their sources, the events that caused it and who authorised it. Stored with the version and carried by exports, so the trail survives outside Tilo. 'Why is this here?' resolves a claim to its sources and to the first event in events. Rules the schema cannot express are MF-01 to MF-06 in manifest.rules.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -82,7 +82,7 @@
       }
     },
     "source": {
-      "description": "Where material came from. ref is the URL for web, the file name for file, <connector_id>:<item id> for connector, <artifact_id>@<version>#<cell> for cell and <artifact_id>@<version> for artifact. Every ref is one of four closed shapes, so none carries a credential or a query-string token (PRD 16.1 rule 4, 16.2; MF-03): an http or https URL of host, optional port and path only (no user info, query or fragment); an artifact ref with an optional cell after #; a connector ref whose item id has only letters, digits and . _ ~ -; or a file name with no / \\ : ? # @ % or control character and no space at either end. fingerprint is the SHA-256 of the fetched content, the result cache key part (PRD 13.1).",
+      "description": "Where material came from. ref is the URL for web, the file name for file, <connector_id>:<item id> for connector, <artifact_id>@<version>#<cell> for cell and <artifact_id>@<version> for artifact. Every ref is one of four closed shapes, so none carries user info or a query, fragment or parameter token (PRD 16.1 rule 4, 16.2; MF-03): an http or https URL of host, optional port and path only (no user info, query, fragment, ; or =); an artifact ref with an optional cell after # of letters, digits and . _ ~ ! : $ - only; a connector ref whose item id has only letters, digits and . _ ~ -; or a file name with no / \\ : ? # @ % or control character and no space at either end. A bare token can still look like a file name or an item id, so the secret redactor checks every manifest before it is written or exported (MF-06). fingerprint is the SHA-256 of the fetched content, the result cache key part (PRD 13.1).",
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "kind", "ref", "fingerprint", "fetched_at"],
@@ -93,7 +93,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 2048,
-          "pattern": "^(?:https?://[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?|art_[0-9A-Za-z_]{1,48}@[1-9][0-9]{0,8}(?:#[^\\x00-\\x1f\\x7f\\\\/?#@%]{1,128})?|[a-z][a-z0-9_]{1,31}:[A-Za-z0-9._~-]{1,512}|[^\\s\\x00-\\x1f\\x7f/\\\\:?#@%](?:[^\\x00-\\x1f\\x7f/\\\\:?#@%]{0,253}[^\\s\\x00-\\x1f\\x7f/\\\\:?#@%])?)$",
+          "pattern": "^(?:https?://[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~!$&'()*+,:@%/-]*)?|art_[0-9A-Za-z_]{1,48}@[1-9][0-9]{0,8}(?:#[A-Za-z0-9._~!:$-]{1,128})?|[a-z][a-z0-9_]{1,31}:[A-Za-z0-9._~-]{1,512}|[^\\s\\x00-\\x1f\\x7f/\\\\:?#@%](?:[^\\x00-\\x1f\\x7f/\\\\:?#@%]{0,253}[^\\s\\x00-\\x1f\\x7f/\\\\:?#@%])?)$",
           "not": { "pattern": "\n" }
         },
         "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "maxLength": 71 },

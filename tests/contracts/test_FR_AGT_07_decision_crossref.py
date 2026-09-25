@@ -4,11 +4,12 @@ inside the authority, scope and time of the answer it records.
 DC-01 to DC-04 (contracts/decision.rules.md; tilo-api and harness validators, P7). DC-01: only
 the source world's owner or a Team Lead gives a Decision (an Approver's answer makes none), and a
 person's Decision covers only worlds that person owns. DC-02: a Team Lead's Decision names the
-record's domain, the source world's owner assigned the Team Lead no later than the answer, and
-the Decision covers only that owner's worlds. DC-03: time order. DC-04: the cited Decision is of
-the world's org, created before and unexpired at the event, in scope for its world and district,
-and its answerer can still answer in that world at that time: a person is the world's owner; a
-Team Lead's record still exists with the same domain, assigned by that world's owner no later
+record's domain and the person who held the record, the source world's owner assigned the Team
+Lead no later than the answer, and the Decision covers only that owner's worlds. DC-03: time
+order. DC-04: the cited Decision is of the world's org, created before and unexpired at the
+event, in scope for its world and district, and its answerer can still answer in that world at
+that time: a person is the world's owner; a Team Lead's record still exists with the same domain
+and the same person (`user`) as the Decision records, assigned by that world's owner no later
 than the answer, and the question was routed with that domain. `broken` below is the reference
 check. Each file in contracts/fixtures/decision/crossref/ is shape-valid, and each invalid one
 breaks exactly the rule its `rule` field and name state. The P7 validator's tests must run the
@@ -62,6 +63,7 @@ def _written_by_whom_may(case) -> set[str]:
     lead = case["team_lead_at_answer"]
     ok = (
         lead["id"] == by["ref"]
+        and lead["user"] == by["user"]
         and lead["domain"] == decision["domain"]
         and _assigned_by(lead, source["owner"], by["at"])
         and _scope_within(case, source["owner"])
@@ -71,7 +73,8 @@ def _written_by_whom_may(case) -> set[str]:
 
 def _reusable(case) -> bool:
     """DC-04: the Decision answers this repeat question, its answerer checked again in this world
-    at this time (PRD 10.1, 16.2), as outbox OB-01 checks an answer to a gate."""
+    at this time (PRD 10.1, 16.2), as outbox OB-01 checks an answer to a gate. A Team Lead id is
+    only an indirection to a person: the record must still name the person who answered."""
     decision, reuse = case["decision"], case["reuse"]
     answered, lead = reuse["answered"], reuse["team_lead"]
     world, ts, scope = case["worlds"][answered["world_id"]], answered["ts"], decision["scope"]
@@ -92,6 +95,7 @@ def _reusable(case) -> bool:
     return (
         lead is not None
         and lead["id"] == by["ref"]
+        and lead["user"] == by["user"]
         and lead["domain"] == decision["domain"]
         and _assigned_by(lead, world["owner"], by["at"])
         and reuse["routed"]["data"]["domain"] == decision["domain"]
@@ -186,17 +190,20 @@ def test_FR_AGT_07_each_invalid_decision_case_breaks_only_its_rule(repo_root):
 
 
 def test_FR_AGT_07_answerer_authority_is_checked_where_a_decision_is_reused(repo_root):
-    """A removed Team Lead, another owner's world and an Approver answer nothing through a
-    Decision (PRD 10.1, 13.1, 16.2; team_lead.schema.json: a removed Team Lead answers nothing)."""
+    """A removed Team Lead, a person no longer behind the Team Lead id, another owner's world
+    and an Approver answer nothing through a Decision (PRD 10.1, 13.1, 16.2; team_lead.schema.json:
+    a removed Team Lead answers nothing)."""
     names = {path.stem for path in _cases(repo_root, "invalid")}
     required = {
         "dc01_approver_answer_kept_as_decision",
         "dc01_owner_decision_scoped_to_another_owners_world",
         "dc02_team_lead_assigned_by_another_owner",
         "dc02_team_lead_decision_scoped_to_another_owners_world",
+        "dc02_team_lead_decision_names_another_person",
         "dc04_team_lead_removed",
         "dc04_team_lead_removed_and_assigned_again",
         "dc04_team_lead_domain_changed",
+        "dc04_team_lead_person_replaced",
         "dc04_team_lead_decision_in_another_owners_world",
         "dc04_owner_decision_in_another_owners_world",
         "dc04_approver_decision_reused_where_they_only_approve",
