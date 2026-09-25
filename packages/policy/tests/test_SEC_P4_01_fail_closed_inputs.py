@@ -584,3 +584,33 @@ def test_FR_HIL_03_PI_06_a_trailing_newline_never_passes_a_contract_pattern(name
     TRAILING_NEWLINE[name](a)
     for order in ([a, _l3_b()], [_l3_b(), a]):
         assert _decide(_table(risk_table_path), _status_proposal(), order).outcome != "run", name
+
+
+@pytest.mark.parametrize("name", sorted(TRAILING_NEWLINE))
+def test_FR_HIL_03_PI_06_a_trailing_newline_alone_breaks_the_whole_policy_record(name, risk_table_path):
+    """Same as above with the trailing newline as the ONLY defect (history intact), so the check
+    runs against the whole policy.schema.json, not a $defs fragment."""
+    a = _l0_a()
+    TRAILING_NEWLINE[name](a)
+    for order in ([a, _l3_b()], [_l3_b(), a]):
+        assert _decide(_table(risk_table_path), _status_proposal(), order).outcome != "run", name
+
+
+def test_FR_HIL_03_PI_06_a_trailing_newline_in_a_history_stamp_breaks_the_record(risk_table_path):
+    a = _l0_a()
+    a["history"][0]["by"] = OWNER + "\n"
+    for order in ([a, _l3_b()], [_l3_b(), a]):
+        assert _decide(_table(risk_table_path), _status_proposal(), order).outcome != "run"
+
+
+def test_FR_HIL_03_PI_02_a_trailing_newline_never_opens_a_gate():
+    reserved = _reserved("T2")
+    resolved = _resolved(channel="web", pin_verified=True)
+    resolved["authz"]["ref"] = OWNER + "\n"
+    assert tilo_policy.open_gate(reserved, resolved, world_owner=OWNER).outcome == "gate"
+
+
+def test_FR_HIL_08_PI_16_check_entry_rejects_a_trailing_newline_in_the_entry(l3_case):
+    case = copy.deepcopy(l3_case)
+    case["entry"]["connector"] = case["entry"]["connector"] + "\n"
+    assert tilo_policy.check_entry(case) is not None
