@@ -1,0 +1,54 @@
+{
+  "v": "1.0",
+  "world_id": "w_two_district_test",
+  "tier": "village",
+  "theme": "metropolis",
+  "semantic": {
+    "levels": [
+      {
+        "id": "L1",
+        "name": "Level One",
+        "districts": [
+          {
+            "id": "D1",
+            "name": "Alpha",
+            "icon": "inbox",
+            "lead": "A_l1",
+            "buildings": [
+              {
+                "id": "B1",
+                "name": "Alpha Desk",
+                "kind": "common",
+                "common_type": "your_desk",
+                "plan_units": []
+              }
+            ]
+          },
+          {
+            "id": "D2",
+            "name": "Beta",
+            "icon": "inbox",
+            "lead": "A_l2",
+            "buildings": [
+              {
+                "id": "B2",
+                "name": "Beta Desk",
+                "kind": "common",
+                "common_type": "your_desk",
+                "plan_units": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "islands": [],
+    "gates": [],
+    "agents": [
+      { "id": "A_dir", "rank": "director" },
+      { "id": "A_l1", "rank": "lead" },
+      { "id": "A_l2", "rank": "lead" }
+    ]
+  },
+  "geometry": null
+}

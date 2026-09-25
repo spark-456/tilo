@@ -1,0 +1,39 @@
+{
+  "v": "1.0",
+  "world_id": "w_three_agent_skel",
+  "tier": "village",
+  "theme": "metropolis",
+  "semantic": {
+    "levels": [
+      {
+        "id": "L1",
+        "name": "Level One",
+        "districts": [
+          {
+            "id": "D1",
+            "name": "Ops",
+            "icon": "inbox",
+            "lead": "A_lead",
+            "buildings": [
+              {
+                "id": "B1",
+                "name": "Workshop",
+                "kind": "common",
+                "common_type": "workshop",
+                "plan_units": ["U1"]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "islands": [],
+    "gates": [],
+    "agents": [
+      { "id": "A_dir", "rank": "director" },
+      { "id": "A_lead", "rank": "lead" },
+      { "id": "A_spec", "rank": "specialist" }
+    ]
+  },
+  "geometry": null
+}
