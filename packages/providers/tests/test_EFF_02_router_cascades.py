@@ -162,3 +162,26 @@ def test_EFF_02_share_of_calls_finished_on_lowest_tier_is_computable_from_call_r
     assert finished_on_lowest_tier == 4
     share = finished_on_lowest_tier / len(results)
     assert share == 4 / 6
+
+
+def test_EFF_02_repair_attempt_carries_the_validation_error_back_to_the_model(tmp_path):
+    config = _config(tmp_path)
+    cheap = ScriptedModelProvider(
+        "cheap", [ScriptedCall(text='{"wrong": 1}'), ScriptedCall(text='{"answer": "fixed"}')]
+    )
+    router = _router(
+        config, {"cheap": cheap, "mid": ScriptedModelProvider("mid", []), "rich": ScriptedModelProvider("rich", [])}
+    )
+
+    result = router.generate(
+        "analyst",
+        GenerateRequest(prompt="Extract the answer.", json_mode=True, response_schema=_SCHEMA),
+    )
+
+    assert result.outcome == "ok"
+    assert [attempt.profile_id for attempt in result.attempts] == ["cheap", "cheap"]
+    first, repair = cheap.calls
+    assert repair.prompt != first.prompt, "a repair is not a blind resend of the identical request"
+    assert first.prompt in repair.prompt
+    assert "'answer' is a required property" in repair.prompt
+    assert repair.response_schema == first.response_schema

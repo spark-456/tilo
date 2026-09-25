@@ -16,8 +16,10 @@ import jsonschema
 from tilo_providers.config import ProvidersConfig
 from tilo_providers.errors import ProviderError, QuotaError, RequestError, RetryableError, SafetyError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider
+from tilo_providers.prompts import load_prompt
 
 _MARKER = "[truncated]"
+_ERROR_CHARS = 300  # a validation error fed back in a repair prompt is capped at this length
 
 
 class RouterError(Exception):
@@ -79,12 +81,18 @@ class RouterStream:
         return self.chunks
 
 
-def validate_json_schema(response: GenerateResponse, schema: dict[str, Any]) -> bool:
+def schema_error(response: GenerateResponse, schema: dict[str, Any]) -> str | None:
+    """The validation error for `response` against `schema` (capped length), or None if it is valid."""
     try:
         jsonschema.validate(json.loads(response.text or ""), schema)
-    except (ValueError, jsonschema.ValidationError):
-        return False
-    return True
+    except (ValueError, jsonschema.ValidationError) as error:
+        message = error.message if isinstance(error, jsonschema.ValidationError) else f"not valid JSON ({error})"
+        return message[:_ERROR_CHARS]
+    return None
+
+
+def validate_json_schema(response: GenerateResponse, schema: dict[str, Any]) -> bool:
+    return schema_error(response, schema) is None
 
 
 def _finish(attempt: RouterAttempt, start: float, response: Any = None, error: Exception | None = None) -> None:
@@ -157,12 +165,18 @@ class Router:
         req = req.model_copy(update={"prompt": prompt, "max_output_tokens": max_output})
         return RouterStream(role_id, req, candidates, budget)
 
+    def _repair(self, role_id: str, request: GenerateRequest, error: str, count: Callable[[str], int]) -> Any:
+        """EFF-02 repair: the request plus its validation error, or None if that would exceed the cap."""
+        prompt = load_prompt("router", "schema_repair.md", {"prompt": request.prompt, "error": error})
+        cap = self._config.roles[role_id].max_input_tokens
+        return None if cap is not None and count(prompt) > cap else request.model_copy(update={"prompt": prompt})
+
     def _attempt(
-        self, run: RouterStream, profile_id: str, provider: ModelProvider, reason: str | None
+        self, run: RouterStream, profile_id: str, provider: ModelProvider, reason: str | None, request: Any = None
     ) -> RouterAttempt:
         """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-52)."""
         if run.budget is not None:
-            quote, request = self._config.price(profile_id), run.request
+            quote, request = self._config.price(profile_id), request or run.request
             usd = provider.count_tokens(request.prompt) * quote.input + (request.max_output_tokens or 0) * quote.output
             credits = self._config.credits(usd / 1_000_000)
             if credits > run.budget:
@@ -187,11 +201,11 @@ class Router:
         run = self._start(role_id, request, tool_outputs, required_capability, budget)
         threshold, schema, reason = confidence_threshold or 0.0, run.request.response_schema, None
         for profile_id in run.candidates:  # EFF-02: cheapest first
-            provider = self._provider(role_id, profile_id)
+            provider, request = self._provider(role_id, profile_id), run.request
             for is_repair in (False, True):
-                attempt, start = self._attempt(run, profile_id, provider, reason), time.perf_counter()
+                attempt, start = self._attempt(run, profile_id, provider, reason, request), time.perf_counter()
                 try:
-                    response = provider.generate(run.request)
+                    response = provider.generate(request)
                 except (RequestError, SafetyError, QuotaError, RetryableError, ProviderError) as error:
                     _finish(attempt, start, error=error)
                     if isinstance(error, RequestError):
@@ -201,9 +215,11 @@ class Router:
                     reason = f"fallback after {attempt.error_type}"
                     break
                 _finish(attempt, start, response)
-                if schema is not None and not validate_json_schema(response, schema):
+                if schema is not None and (problem := schema_error(response, schema)) is not None:
                     attempt.outcome, reason = "schema_invalid", "escalated after schema validation failed"
-                    if not is_repair:
+                    if not is_repair and (
+                        request := self._repair(role_id, run.request, problem, provider.count_tokens)
+                    ):
                         reason = "repair attempt after schema validation failed"
                         continue
                 elif verify is not None and not verify(response):

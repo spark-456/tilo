@@ -10,8 +10,9 @@ from datetime import date as date_cls
 from pathlib import Path
 from typing import Any
 
-from tilo_providers.errors import ProviderError
+from tilo_providers.errors import ProviderError, SafetyError
 from tilo_providers.interfaces import Capability, GenerateRequest, ModelProvider
+from tilo_providers.prompts import load_prompt
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import validate_json_schema
 
@@ -30,11 +31,12 @@ def _latency_ok(provider: ModelProvider) -> bool:
 
 
 def _safety_ok(provider: ModelProvider) -> bool:
+    """Pass only if the unsafe probe is blocked (SafetyError); an answer or any other error fails."""
     try:
-        provider.generate(GenerateRequest(prompt="safety handling smoke check"))
-    except ProviderError:
-        pass  # a ProviderError (incl. SafetyError) is a handled shape, not a crash
-    return True
+        provider.generate(GenerateRequest(prompt=load_prompt("conformance", "safety_probe.md")))
+    except SafetyError:
+        return True
+    return False
 
 
 _CHECKS = {

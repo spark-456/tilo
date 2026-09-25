@@ -36,4 +36,5 @@ code asks `router.Router` for a **role** (PL-01) — never a model or profile id
   `RequestError` and bugs propagate; `SafetyError` is `safety_blocked` (generate) or re-raised.
   `stream()` (a `RouterStream` with `.attempts`) falls back only before its first chunk, then
   raises `StreamInterruptedError`. Budget is priced before every call; escalations log a
-  `reason`; over-cap input is compacted or refused (`TokenCapExceededError`).
+  `reason`; over-cap input is compacted or refused. Repairs add the validation error
+  (`prompts/router/`); `safety_handling` passes only on `SafetyError` (`prompts/conformance/`).

@@ -104,3 +104,44 @@ def test_PL_05_missing_conformance_result_refused_when_require_env_set(tmp_path,
 
     with pytest.raises(ProviderConfigError):
         load_providers_config(models_path, prices_path, conformance_dir=conformance_dir)
+
+
+def _probe_provider(error: Exception | None):
+    """A fake that answers every prompt normally, except the safety probe, where it raises `error`
+    (or, with `error=None`, answers the unsafe probe normally too)."""
+    from tilo_providers.fake import FakeModelProvider  # noqa: PLC0415
+    from tilo_providers.prompts import load_prompt  # noqa: PLC0415
+
+    probe = load_prompt("conformance", "safety_probe.md")
+
+    class ProbeProvider(FakeModelProvider):
+        def generate(self, request):
+            if error is not None and request.prompt == probe:
+                raise error
+            return super().generate(request)
+
+    return ProbeProvider(profile_id="small", caps={Capability.JSON, Capability.TOOLS})
+
+
+@pytest.mark.parametrize("error", [None, "request_error"], ids=["answers_unsafe_prompt", "raises_request_error"])
+def test_PL_05_safety_handling_fails_unless_the_unsafe_prompt_is_blocked(error):
+    from tilo_providers.conformance import run_conformance_suite  # noqa: PLC0415
+    from tilo_providers.errors import RequestError  # noqa: PLC0415
+
+    provider = _probe_provider(RequestError("400 bad request") if error else None)
+
+    result = run_conformance_suite("small", provider, build="test-build-1", today=date(2026, 9, 25))
+
+    assert result["checks"]["safety_handling"] == "fail"
+    assert result["result"] == "fail"
+
+
+def test_PL_05_safety_handling_passes_when_the_unsafe_prompt_raises_safety_error():
+    from tilo_providers.conformance import run_conformance_suite  # noqa: PLC0415
+    from tilo_providers.errors import SafetyError  # noqa: PLC0415
+
+    provider = _probe_provider(SafetyError("blocked on safety grounds"))
+
+    result = run_conformance_suite("small", provider, build="test-build-1", today=date(2026, 9, 25))
+
+    assert result["checks"]["safety_handling"] == "pass"
