@@ -1,8 +1,9 @@
 """PriceBook (PRD 14.1, 14.5, FR-MTR-01): 1 credit = US$0.005, versioned by effective_date. Refuse, never guess."""
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from types import MappingProxyType
 from typing import Self
@@ -58,6 +59,11 @@ def _load_version(path: str | Path) -> _Version:
         raise MeteringConfigError(f"{path}: credit_usd must be {CREDIT_USD}, got {v.credit_usd}")
     if v.status == "set" and None in (v.effective_date, v.source, *flat):
         raise MeteringConfigError(f"{path}: a set prices file needs effective_date, source and every price")
+    if v.effective_date is not None:
+        try:
+            date.fromisoformat(v.effective_date)  # the schema's regex accepts calendar-impossible dates
+        except ValueError as exc:
+            raise MeteringConfigError(f"{path}: effective_date {v.effective_date!r} is not a real date: {exc}") from exc
     return _Version(v.status, v.effective_date, v.source, MappingProxyType(prices))
 
 
@@ -93,4 +99,7 @@ class PriceBook:
 
     def credits(self, usage: Usage, at: datetime) -> float:
         quote = self.quote(usage.profile, at)
-        return (usage.tokens_in * quote.input + usage.tokens_out * quote.output) / 1_000_000 / self.credit_usd
+        value = (usage.tokens_in * quote.input + usage.tokens_out * quote.output) / 1_000_000 / self.credit_usd
+        if not math.isfinite(value):
+            raise UnpricedError(f"non-finite credits result for profile {usage.profile!r}")
+        return value

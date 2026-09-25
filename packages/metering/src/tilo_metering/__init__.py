@@ -1,9 +1,12 @@
-"""tilo_metering: price book, metering config and flag store (PRD 14.1, 14.5, FR-MTR-01). No Treasury yet (P8-01b/c)."""
+"""tilo_metering: price book, metering config, flag store and Treasury (PRD 14.1, 14.5, FR-MTR-01,
+FR-MTR-02, FR-MTR-04). Daily USD spend caps, alerts and kill-switch flipping are P8-01c."""
 
 from .config import MeteringConfig
 from .errors import MeteringConfigError, UnpricedError
 from .flags import FlagStore, InMemoryFlagStore
 from .prices import PriceBook, PriceQuote, Usage
+from .treasury import CommitResult, LedgerEntry, Reservation, RunBudget, Treasury, Wait
 
-__all__ = ["FlagStore", "InMemoryFlagStore", "MeteringConfig", "MeteringConfigError"]
-__all__ += ["PriceBook", "PriceQuote", "UnpricedError", "Usage"]
+__all__ = ["CommitResult", "FlagStore", "InMemoryFlagStore", "LedgerEntry", "MeteringConfig"]
+__all__ += ["MeteringConfigError", "PriceBook", "PriceQuote", "Reservation", "RunBudget"]
+__all__ += ["Treasury", "UnpricedError", "Usage", "Wait"]

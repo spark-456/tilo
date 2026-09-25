@@ -1,8 +1,11 @@
 # packages/metering — `tilo_metering`
 
 ## Purpose
-Credits and the Treasury (PRD 14.1, 14.5). P8-01a builds the skeleton only: `MeteringConfig`, `PriceBook`,
-`PriceQuote`, `Usage`, `FlagStore`/`InMemoryFlagStore` and the two errors. The `Treasury` is P8-01b/c.
+Credits and the Treasury (PRD 14.1, 14.5). P8-01a built `MeteringConfig`, `PriceBook`, `PriceQuote`,
+`Usage`, `FlagStore`/`InMemoryFlagStore` and the two errors. P8-01b adds `Treasury`: open_run, reserve
+(estimate + 15%, run/user-day/org-day caps, replay_only and halted-run refusal), commit, commit_usage,
+release, grant, record_usage, run(), an append-only ledger. Daily USD spend caps, alerts and
+kill-switch flipping are P8-01c.
 
 ## Commands
 - `uv run --package tilo-metering pytest` — tests; `just check` — full gate from the repo root
@@ -15,6 +18,8 @@ Credits and the Treasury (PRD 14.1, 14.5). P8-01a builds the skeleton only: `Met
 
 ## Requirement IDs
 - FR-MTR-01 (part a): credit unit, dated and sourced prices from config, refuse rather than guess, no mutation API.
+- FR-MTR-02, FR-MTR-04 (part b): reserve-then-commit with a 15% margin; run, user-day and org-day
+  caps; append-only ledger. No daily USD spend caps, alerts or kill-switch flipping (part c).
 
 ## Local rules
 - No model id, prompt text or secret here (PL-01). No dependency on `tilo-providers`.
@@ -23,3 +28,6 @@ Credits and the Treasury (PRD 14.1, 14.5). P8-01a builds the skeleton only: `Met
   `UnpricedError` if it is unset or the price is null; they never fall back to an older price.
 - Every price, cap, limit and ratio goes through `errors.number` (int or float, not bool or string, finite).
 - Both loaders turn any unreadable, malformed or invalid file into `MeteringConfigError` naming the path.
+- `Treasury` validates its own inputs with the same `errors.number` rule: estimates and actuals are
+  finite non-negative numbers, ids are non-empty strings, `at` is timezone-aware. It is thread-safe
+  (one lock); the ledger is append-only and an entry is never re-priced after it is written.

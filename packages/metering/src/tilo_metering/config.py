@@ -32,7 +32,7 @@ class SpendCaps(_Strict):
 
 class Reconciliation(_Strict):
     tolerance: Num = Field(ge=0, le=1)
-    billing_services: list[str]
+    billing_services: tuple[str, ...]
 
 
 class MeteringConfig(_Strict):
