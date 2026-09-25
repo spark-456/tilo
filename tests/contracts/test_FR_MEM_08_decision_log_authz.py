@@ -70,7 +70,7 @@ def test_FR_MEM_08_decision_answered_by_rejects_policy(repo_root, registry):
 
 def test_FR_MEM_08_decision_answered_by_rejects_a_model(repo_root, registry):
     schema = load_schema(repo_root, "decision")
-    instance = sample_decision(answered_by=sample_authz(by="the_model_itself", ref="gemini-flash"))
+    instance = sample_decision(answered_by=sample_authz(by="the_model_itself", ref="fake-model-1"))
     errors = errors_for(schema, instance, registry)
     assert errors, (
         "FR-MEM-08: decision.answered_by.by must reject a model (root CLAUDE.md: 'A model never decides authorisation')"
