@@ -32,17 +32,19 @@ export function useWorldFixture(): WorldFixtureState {
   const [seq, setSeq] = useState(0);
   const [trace, setTrace] = useState<ReadonlyArray<{ seq: number; type: string }>>([]);
   const stopRef = useRef<(() => void) | undefined>(undefined);
-  // Fetches as soon as the fixture name is known, not gated behind the Pixi world container
-  // becoming ready (WorldSeam fires once WebGL init resolves), so the network round trip and
-  // the renderer's own init overlap instead of running one after the other (HR-2's "nothing
-  // moves before the first event" still holds: runWorld only starts once this resolves AND the
-  // seam has fired). Idempotent across React StrictMode's dev-only double render.
+  // P7/HR-2 ("nothing moves before the first event"): the fetch starts only once Stage's Pixi
+  // world container is ready and this seam fires (Stage.tsx calls it from inside its own
+  // `app.init().then(...)`, after the page itself has loaded) — never eagerly during React's
+  // render. Starting it at render time races ahead of the page's own load, so by the time a
+  // caller can observe "still loading" (a slow connection, or a test's page.route delay) most of
+  // that window has already elapsed and the fixture is done loading. Idempotent across React
+  // StrictMode's dev-only double effect invocation, which can call this seam twice.
   const dataRef = useRef<Promise<import("./fixtureLoader").LoadedFixture> | null>(null);
-  if (fixture && !dataRef.current) dataRef.current = loadFixture(fixture);
 
   const onWorld = useCallback<WorldSeam>(
     (world, requestRender) => {
-      if (!fixture || !dataRef.current) return undefined;
+      if (!fixture) return undefined;
+      if (!dataRef.current) dataRef.current = loadFixture(fixture);
       let cancelled = false;
       dataRef.current
         .then(({ layout, events }) => {

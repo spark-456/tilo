@@ -35,8 +35,18 @@ test("HR-2 honesty: nothing moves before the first event lands — the world is 
   // before the first event can possibly be applied. Matches both this ticket's file-naming
   // conventions (village_basic.json from contracts/, village-basic.jsonl) without pinning down
   // the exact endpoint the builder wires up.
+  //
+  // The delay and the two sampling offsets below are deliberately generous (not the tightest
+  // values that would technically prove the point): several worktrees run dev servers and
+  // Playwright/browser processes on this machine at once (docs/adr — parallel builder sessions),
+  // and `page.waitForTimeout` is a real timer that queues behind whatever else the event loop is
+  // doing, so a tight budget (observed directly: 800ms delay vs. ~600ms of sampling) is flaky
+  // under that load even though the underlying fix is correct — the sampling can end up taking
+  // several times its nominal duration. A 5s delay against a ~1s sampling budget leaves headroom
+  // for that.
+  const DELAY_MS = 5_000;
   await page.route(/village[-_]basic/i, async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
     await route.continue();
   });
 
@@ -45,10 +55,10 @@ test("HR-2 honesty: nothing moves before the first event lands — the world is 
   await expect(canvas).toBeVisible();
 
   // Sample twice while the (delayed) fixture data is still in flight.
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(300);
   const seqDuringLoad1 = await stageSeq(page);
   const snapshot1 = await canvasSnapshot(page);
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(700);
   const seqDuringLoad2 = await stageSeq(page);
   const snapshot2 = await canvasSnapshot(page);
 
@@ -61,5 +71,5 @@ test("HR-2 honesty: nothing moves before the first event lands — the world is 
 
   // Sanity: once the delayed data does arrive, playback does start (proves the delay above was
   // real and this was not just an already-finished page).
-  await expect.poll(() => stageSeq(page), { timeout: 10_000 }).toBeGreaterThan(0);
+  await expect.poll(() => stageSeq(page), { timeout: 20_000 }).toBeGreaterThan(0);
 });

@@ -93,18 +93,26 @@ export function runWorld(opts: RunWorldOptions): () => void {
 
     for (const a of frame.agents) {
       const already = agentPos.has(a.id);
-      if (event.type === "agent.moved" && event.actor === a.id && already) {
-        pendingTo.set(event.seq, { x: a.cx, y: a.cy });
-        choreo.enqueue({
-          actor: a.id,
-          seq: event.seq,
-          receivedAtMs,
-          durationMs: Math.min(MOVE_DURATION_MS, MAX_DURATION_MS),
-        });
-        ensureAnimating();
-      } else if (!already || event.actor === a.id) {
-        agentPos.set(a.id, { x: a.cx, y: a.cy }); // first reveal, or a non-walk relocation: snap
+      if (!already) {
+        agentPos.set(a.id, { x: a.cx, y: a.cy }); // first reveal: appear instantly, no walk
+        continue;
       }
+      if (event.actor !== a.id) continue; // this event doesn't relocate this actor
+      // HR-3: every location change for an already-visible actor — a walk (`agent.moved`) or
+      // any other event that resolves to a new position — goes through that actor's
+      // choreographer queue in seq order, never straight into agentPos. The choreographer
+      // chains each actor's entries by finish time, so an event applied here while an earlier
+      // move for the same actor is still in flight lands *after* it completes instead of racing
+      // it: tickAnim only ever advances agentPos to the *latest* completed entry's pendingTo, in
+      // seq order, so the settled canvas can never regress to a stale, already-superseded spot.
+      pendingTo.set(event.seq, { x: a.cx, y: a.cy });
+      choreo.enqueue({
+        actor: a.id,
+        seq: event.seq,
+        receivedAtMs,
+        durationMs: event.type === "agent.moved" ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS) : 0,
+      });
+      ensureAnimating();
     }
     renderAgents(layer, frame, agentPos);
     onSeq(state.seq);
