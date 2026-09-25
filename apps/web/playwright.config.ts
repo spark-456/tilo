@@ -12,6 +12,12 @@ import { defineConfig, devices } from "@playwright/test";
 // reuseExistingServer would silently test another worktree's code.
 const PORT = Number(process.env.TILO_WEB_PORT ?? 5173);
 const ORIGIN = `http://127.0.0.1:${PORT}`;
+const BROWSER = { ...devices["Desktop Chrome"], channel: process.env.CI ? undefined : "msedge" };
+const TIMING_SPECS = [
+  "**/world-perf.spec.ts",
+  "**/world-reduced-motion-toggle.spec.ts",
+  "**/stage-camera-freeze.spec.ts",
+];
 
 export default defineConfig({
   testDir: "./e2e",
@@ -29,10 +35,17 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: {
-        ...devices["Desktop Chrome"],
-        channel: process.env.CI ? undefined : "msedge",
-      },
+      testIgnore: TIMING_SPECS,
+      use: BROWSER,
+    },
+    {
+      // Frame-rate and frame-timing measurements run one at a time after everything else, so
+      // the parallel suite's own CPU load is not what they measure.
+      name: "timing",
+      testMatch: TIMING_SPECS,
+      dependencies: ["chromium"],
+      workers: 1,
+      use: BROWSER,
     },
   ],
   webServer: {

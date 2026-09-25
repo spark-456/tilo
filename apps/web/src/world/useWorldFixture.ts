@@ -28,7 +28,8 @@ function parseParams(search: string) {
 
 export function useWorldFixture(): WorldFixtureState {
   const { fixture, seqParam, speed } = useMemo(() => parseParams(window.location.search), []);
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reducedMotionRef = useRef(false);
+  reducedMotionRef.current = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [seq, setSeq] = useState(0);
   const [trace, setTrace] = useState<ReadonlyArray<{ seq: number; type: string }>>([]);
   const stopRef = useRef<(() => void) | undefined>(undefined);
@@ -56,7 +57,7 @@ export function useWorldFixture(): WorldFixtureState {
             events,
             seqParam,
             speed,
-            reducedMotion,
+            reducedMotion: () => reducedMotionRef.current,
             onSeq: (n) => !cancelled && setSeq(n),
             onTrace: (t) => !cancelled && setTrace(t),
           });
@@ -70,7 +71,7 @@ export function useWorldFixture(): WorldFixtureState {
         stopRef.current = undefined;
       };
     },
-    [fixture, seqParam, speed, reducedMotion],
+    [fixture, seqParam, speed],
   );
 
   return {

@@ -1,6 +1,6 @@
 // Draws a Frame (frame.ts) as placeholder shapes into the Pixi world container Stage.tsx owns:
 // buildings/districts as flat iso diamonds, agents as dots. Art port is ticket P0-08c.
-import { type Container, Graphics } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 import tokens from "../design/tokens";
 import type { Frame, FrameRect } from "./frame";
 
@@ -9,17 +9,20 @@ const AGENT_RADIUS = 6;
 
 export interface WorldLayer {
   readonly buildings: Graphics;
-  readonly agents: Graphics;
+  readonly agents: Container;
+  /** One persistent dot per agent id, filled once; each frame only moves it (no clear/refill). */
+  readonly dots: Map<string, { g: Graphics; color: string }>;
+  staticKey: string;
 }
 
 /** Appends this ticket's own two Graphics layers to `world` (after the camera's iso grid, which
  * is already `world`'s first child) — never touches the grid or the container's transform. */
 export function createLayer(world: Container): WorldLayer {
   const buildings = new Graphics();
-  const agents = new Graphics();
+  const agents = new Container();
   world.addChild(buildings);
   world.addChild(agents);
-  return { buildings, agents };
+  return { buildings, agents, dots: new Map(), staticKey: "" };
 }
 
 function diamond(g: Graphics, cx: number, cy: number, gw: number, gd: number, color: string) {
@@ -35,6 +38,9 @@ function drawRects(g: Graphics, rects: readonly FrameRect[]) {
 /** Static layer: districts and buildings, at their authoritative frame positions. Redrawn only
  * when the applied event actually changed something (not every animation tick). */
 export function renderStatic(layer: WorldLayer, frame: Frame) {
+  const key = JSON.stringify([frame.districts, frame.buildings]);
+  if (key === layer.staticKey) return;
+  layer.staticKey = key;
   layer.buildings.clear();
   drawRects(layer.buildings, frame.districts);
   drawRects(layer.buildings, frame.buildings);
@@ -48,10 +54,31 @@ export function renderAgents(
   frame: Frame,
   positions: ReadonlyMap<string, { x: number; y: number }>,
 ) {
-  layer.agents.clear();
+  const shown = new Set<string>();
+  let added = false;
   for (const agent of frame.agents) {
     const p = positions.get(agent.id);
     if (!p) continue;
-    layer.agents.circle(p.x, p.y, AGENT_RADIUS).fill({ color: agent.color });
+    let dot = layer.dots.get(agent.id);
+    if (!dot || dot.color !== agent.color) {
+      dot?.g.destroy();
+      const g = new Graphics().circle(0, 0, AGENT_RADIUS).fill({ color: agent.color });
+      layer.agents.addChild(g);
+      added = true;
+      dot = { g, color: agent.color };
+      layer.dots.set(agent.id, dot);
+    }
+    dot.g.position.set(p.x, p.y);
+    dot.g.visible = true;
+    shown.add(agent.id);
+  }
+  for (const [id, dot] of layer.dots) if (!shown.has(id)) dot.g.visible = false;
+  // Keep draw order = frame order however the dots were revealed, so overlaps match ?seq=N.
+  if (added) {
+    let i = 0;
+    for (const agent of frame.agents) {
+      const dot = layer.dots.get(agent.id);
+      if (dot) layer.agents.setChildIndex(dot.g, i++);
+    }
   }
 }

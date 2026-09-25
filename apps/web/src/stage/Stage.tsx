@@ -64,6 +64,7 @@ export function Stage({ onWorld, seq }: { onWorld?: WorldSeam; seq?: number }) {
     let goal = cur; // where keyboard moves are heading
     let ease: { from: cam.CameraState; t0: number } | null = null;
     let raf = 0;
+    let gridKey = ""; // the view the grid was last built for: world-content frames skip rebuilding it
 
     const draw = () => {
       const { clientWidth: w, clientHeight: h } = target;
@@ -71,7 +72,11 @@ export function Stage({ onWorld, seq }: { onWorld?: WorldSeam; seq?: number }) {
       const { x, y, zoom: z } = cur;
       world.position.set(w / 2 + x, h / 2 + y);
       world.scale.set(z);
-      drawIsoGrid(grid, (-w / 2 - x) / z, (-h / 2 - y) / z, (w / 2 - x) / z, (h / 2 - y) / z);
+      const key = `${x},${y},${z},${w},${h}`;
+      if (key !== gridKey) {
+        gridKey = key;
+        drawIsoGrid(grid, (-w / 2 - x) / z, (-h / 2 - y) / z, (w / 2 - x) / z, (h / 2 - y) / z);
+      }
       app.render();
       target.dataset.cameraX = String(x);
       target.dataset.cameraY = String(y);

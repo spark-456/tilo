@@ -21,7 +21,8 @@ export interface RunWorldOptions {
   readonly events: readonly Event[];
   readonly seqParam: number | null;
   readonly speed: number;
-  readonly reducedMotion: boolean;
+  /** Read live (not captured once): a prefers-reduced-motion change applies mid-playback. */
+  readonly reducedMotion: () => boolean;
   readonly onSeq: (seq: number) => void;
   readonly onTrace: (trace: ReadonlyArray<{ seq: number; type: string }>) => void;
 }
@@ -87,7 +88,8 @@ export function runWorld(opts: RunWorldOptions): () => void {
         walkFrom.set(id, walk);
       }
       const span = act.finish - act.start;
-      const t = span > 0 ? Math.min(1, Math.max(0, (now - act.start) / span)) : 1;
+      const t =
+        span > 0 && !reducedMotion() ? Math.min(1, Math.max(0, (now - act.start) / span)) : 1;
       display.set(id, {
         x: walk.from.x + (to.x - walk.from.x) * t,
         y: walk.from.y + (to.y - walk.from.y) * t,
