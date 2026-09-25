@@ -7,9 +7,12 @@ a reuse of it.
 schema, EV-01 (registered type), EV-02 (data schema), EV-04, EV-05, EV-06, EV-08, EV-09, the
 state-independent half of EV-13 (an event whose own district is not in its own vis list) and
 the state-independent half of EV-14 (a delivery that left Tilo with no cause at all). The
-stream- and layout-dependent rules -- EV-10 (seq/id), EV-11 (cause resolves), EV-12 (layout
-ids) and the layout half of EV-13 (vis names a real district) -- need a `WorldState` and are
-run in addition when one is passed; `WorldWriter` is what builds and updates it.
+stream- and layout-dependent rules -- EV-10 (seq/id, and the stream's world_id), EV-11 (cause
+resolves), EV-12 (layout ids), the layout half of EV-13 (vis names a real district) and the
+stream half of EV-14 (an email delivery's cause must be the matching `data.transfer` out, same
+outbox_id and artifact, mirroring scripts/contracts_events.py's `_is_send_of`) -- need a
+`WorldState` and are run in addition when one is passed; `WorldWriter` is what builds and
+updates it.
 """
 
 from __future__ import annotations
@@ -59,21 +62,47 @@ def _layout_ids(layout: dict[str, Any]) -> set[str]:
     return ids
 
 
+def _is_send_of(cause: dict[str, Any] | None, delivered: dict[str, Any]) -> bool:
+    """EV-14 (stream half): `cause` is the `data.transfer` out of the outbox entry `delivered`
+    names, same artifact -- a fresh implementation, agreeing with
+    scripts/contracts_events.py's `_is_send_of` on every fixture, not a reuse of it (root
+    CLAUDE.md: a service must not import from scripts/)."""
+    if cause is None or cause["type"] != "data.transfer":
+        return False
+    sent, data = cause["data"], delivered["data"]
+    pinned = (data["artifact"]["artifact_id"], data["artifact"]["version"])
+    artifact = sent["artifact"]
+    return (
+        sent["direction"] == "out"
+        and sent["outbox_id"] == data["outbox_id"]
+        and artifact is not None
+        and (artifact["artifact_id"], artifact["version"]) == pinned
+    )
+
+
 class WorldState:
-    """What the stream- and layout-dependent rules (EV-10..EV-13) need: the world's layout ids
-    (EV-12, EV-13) plus, as events are observed, the last seq written and every event id seen so
-    far (EV-10 duplicates, EV-11 cause). `WorldWriter` is the only code that observes events into
-    this; its update method is not part of this ticket's public surface."""
+    """What the stream- and layout-dependent rules (EV-10..EV-14) need: the world's layout ids
+    (EV-12, EV-13) plus, as events are observed, the last seq written and every earlier event of
+    this world seen so far, keyed by id (EV-10 duplicates, EV-11 cause, EV-14's cause lookup).
+    `world_id` is optional and set by `WorldWriter` (not a constructor argument -- only
+    `WorldState(layout: dict)` is public, see the ticket brief); when set, EV-10 also checks that
+    every event observed or checked belongs to this world. `WorldWriter` is the only code that
+    observes events into this; its update method is not part of this ticket's public surface."""
 
     def __init__(self, layout: dict[str, Any]) -> None:
         self.layout = layout
         self.layout_ids = _layout_ids(layout)
         self.last_seq = 0
-        self.seen_ids: set[str] = set()
+        self.world_id: str | None = None
+        self.seen: dict[str, dict[str, Any]] = {}
+
+    @property
+    def seen_ids(self) -> set[str]:
+        return set(self.seen)
 
     def observe(self, event: dict[str, Any]) -> None:
         self.last_seq = event["seq"]
-        self.seen_ids.add(event["id"])
+        self.seen[event["id"]] = event
 
 
 class EventValidator:
@@ -145,11 +174,13 @@ class EventValidator:
 
     def _stream_problems(self, event: dict[str, Any], state: WorldState) -> list[str]:
         problems = []
+        if state.world_id is not None and event["world_id"] != state.world_id:
+            problems.append(f"EV-10: world_id {event['world_id']} does not belong to this world ({state.world_id})")
         if event["seq"] != state.last_seq + 1:
             problems.append(f"EV-10: seq {event['seq']} is not last_seq+1 ({state.last_seq + 1})")
-        if event["id"] in state.seen_ids:
+        if event["id"] in state.seen:
             problems.append(f"EV-10: id {event['id']} repeats an earlier event of this world")
-        if event["cause"] is not None and event["cause"] not in state.seen_ids:
+        if event["cause"] is not None and event["cause"] not in state.seen:
             problems.append(f"EV-11: cause {event['cause']} is not an earlier event of this world")
         for field in ("level", "district", "actor", "target"):
             value = event[field]
@@ -157,4 +188,8 @@ class EventValidator:
                 problems.append(f"EV-12: {field} {value} is not in the world's layout")
         if isinstance(event["vis"], list) and not set(event["vis"]) <= state.layout_ids:
             problems.append("EV-13: vis names a district that is not in the world's layout")
+        if event["type"] == "artifact.delivered" and event["data"].get("outbox_id") is not None:
+            cause = state.seen.get(event["cause"] or "")
+            if not _is_send_of(cause, event):
+                problems.append(f"EV-14: cause is not the data.transfer out of outbox {event['data']['outbox_id']}")
         return problems

@@ -97,7 +97,10 @@ def _run(
         "world_id": world_id,
         "run_id": run_id,
         "layout": layout,
-        "writer_id": f"skeleton_{run_id}",
+        # Unique per process, not just per --run: two concurrent CLI invocations of the same
+        # --run must not share a writer_id (WorldWriter's lease is keyed on a per-instance token
+        # regardless, but a distinct label here also makes WriterBusy's message tell them apart).
+        "writer_id": f"skeleton_{run_id}_{uuid.uuid4().hex[:8]}",
         "lease_s": lease_s,
     }
     if clock is not None:

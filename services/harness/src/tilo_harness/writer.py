@@ -5,6 +5,16 @@ injectable clock); a second writer is refused while the lease is live (`WriterBu
 write re-checks the lease inside the same store transaction so a superseded writer cannot write
 any more, and after a crash a new writer takes over once the lease expires and continues at
 `last_seq + 1` read from the store, never overwriting an existing event.
+
+The lease is keyed on a token generated fresh per `WorldWriter` *instance* (`secrets.token_hex`),
+never on the caller-supplied `writer_id` alone: `writer_id` is only a human-readable label, and
+two instances can be constructed with the same one (two processes deriving it from the same
+`--run`, or a test constructing two writers with the same string). Comparing lease ownership by
+that label alone would let a second live instance slip past `open()` with no `WriterBusy`, which
+is exactly the D-11 violation this ticket's fix round is closing. `_commit` also re-reads the
+store's head inside the transaction and refuses the write unless `head.last_seq == event.seq -
+1` and every view's `vseq` matches the head, so a writer acting on stale local state can never
+overwrite or skip a seq even if it still (wrongly) believed it held the lease.
 """
 
 from __future__ import annotations
@@ -72,9 +82,13 @@ class WorldWriter:
         self.writer_id = writer_id
         self._lease_s = lease_s
         self._clock = clock or (lambda: datetime.now(UTC))
+        # Unique per WorldWriter instance, independent of the caller-supplied `writer_id` label
+        # (see the module docstring): this is what lease ownership is actually checked against.
+        self._instance_token = secrets.token_hex(16)
         self._validator = EventValidator.from_repo()
         self._scopes = scopes_for(layout)
         self._state = WorldState(layout)
+        self._state.world_id = world_id
         self._view_ids: dict[str, set[str]] = {}
         self._view_seq: dict[str, int] = {}
 
@@ -86,15 +100,20 @@ class WorldWriter:
 
         def _acquire(head: dict[str, Any]) -> tuple[dict[str, Any], None, list[Any]]:
             lease = head["lease"]
-            if lease is not None and lease["writer_id"] != self.writer_id and lease["expires_at"] > now:
+            if lease is not None and lease["token"] != self._instance_token and lease["expires_at"] > now:
                 raise WriterBusy(f"world {self._world_id!r} is leased to {lease['writer_id']!r}")
             new_head = dict(head)
-            new_head["lease"] = {"writer_id": self.writer_id, "expires_at": now + timedelta(seconds=self._lease_s)}
+            new_head["lease"] = {
+                "writer_id": self.writer_id,
+                "token": self._instance_token,
+                "expires_at": now + timedelta(seconds=self._lease_s),
+            }
             return new_head, None, []
 
         self._store.transact(self._org_id, self._world_id, _acquire)
 
         self._state = WorldState(self._layout)
+        self._state.world_id = self._world_id
         for event in self._store.read_events(self._org_id, self._world_id):
             self._state.observe(event)
         self._view_ids = {
@@ -108,7 +127,7 @@ class WorldWriter:
 
         def _release(head: dict[str, Any]) -> tuple[dict[str, Any], None, list[Any]]:
             lease = head["lease"]
-            if lease is not None and lease["writer_id"] == self.writer_id:
+            if lease is not None and lease["token"] == self._instance_token:
                 return dict(head, lease=None), None, []
             return head, None, []
 
@@ -180,8 +199,24 @@ class WorldWriter:
 
         def _commit(head: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], list[tuple[str, dict[str, Any]]]]:
             lease = head["lease"]
-            if lease is None or lease["writer_id"] != self.writer_id:
+            if lease is None or lease["token"] != self._instance_token:
                 raise WriterBusy(f"world {self._world_id!r} is no longer leased to {self.writer_id!r}")
+            # Belt-and-suspenders on top of the lease check: even if this instance still (wrongly)
+            # believes it holds the lease, refuse to write unless the store's actual head is still
+            # exactly where this writer's local state thinks it is, so a write can never overwrite
+            # or skip a seq/vseq that another writer already committed.
+            if head["last_seq"] != event["seq"] - 1:
+                raise WriterBusy(
+                    f"world {self._world_id!r} head has moved to last_seq={head['last_seq']!r}, "
+                    f"expected {event['seq'] - 1!r} before writing seq {event['seq']!r}"
+                )
+            head_view_seq = head["view_seq"]
+            for scope, doc in view_writes:
+                if doc["seq"] != head_view_seq.get(scope, 0) + 1:
+                    raise WriterBusy(
+                        f"world {self._world_id!r} view {scope!r} head has moved to "
+                        f"vseq={head_view_seq.get(scope, 0)!r}, expected {doc['seq'] - 1!r}"
+                    )
             new_head = dict(head, last_seq=event["seq"], view_seq=new_view_seq)
             return new_head, event, view_writes
 

@@ -4,6 +4,13 @@ and `FirestoreStore` share the same read semantics; `WorldWriter` is the only co
 copies atomically -- a single Python call for `MemoryStore` (nothing else can interleave inside
 it), a single Firestore transaction for `FirestoreStore`, so a kill never leaves a partial
 write and a superseded writer's write never lands (ticket brief items 6-8).
+
+`FirestoreStore.transact` writes event and view documents with `transaction.create`, never
+`transaction.set`: an existing `events/{seq:08d}` or `views/{scope}/events/{vseq:08d}` document
+can therefore never be silently overwritten by a second writer, even one that (wrongly) still
+believes it holds the world's lease -- `create` raises instead. `MemoryStore.transact` only ever
+appends, for the same reason. Only the head document (lease + counters) uses `set`, since it is
+the one document every writer legitimately updates in place.
 """
 
 from __future__ import annotations
@@ -119,9 +126,9 @@ class FirestoreStore:
             new_head, event, views = fn(head)
             transaction.set(head_ref, new_head)
             if event is not None:
-                transaction.set(self._events(org_id, world_id).document(f"{event['seq']:08d}"), event)
+                transaction.create(self._events(org_id, world_id).document(f"{event['seq']:08d}"), event)
             for scope, doc in views:
-                transaction.set(self._views(org_id, world_id, scope).document(f"{doc['seq']:08d}"), doc)
+                transaction.create(self._views(org_id, world_id, scope).document(f"{doc['seq']:08d}"), doc)
             return new_head
 
         return _run(self._client.transaction())
