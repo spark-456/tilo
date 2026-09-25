@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/team_lead.schema.json",
+  "x-version": "1.0.0",
+  "title": "TeamLead",
+  "description": "A Team Lead assignment (PRD 8.3, 10.1, 16.2): the person (user) who acts as Team Lead id, and the one expert domain the owner assigned them. The shape of each entry of config/teams.yaml and of a Team Lead set in the Team Lead console. authz.ref of a Team Lead's answer is id. A Team Lead opens a gate only when the gate names this domain and the owner's policy it names lists the domain in team_lead_domains, and only when the world's owner made this assignment before the answer (outbox OB-01). Removing a Team Lead deletes the record, so a removed Team Lead answers nothing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "user", "domain", "assigned_by"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/team_lead_id" },
+    "user": { "$ref": "common.schema.json#/$defs/user_id" },
+    "domain": { "$ref": "common.schema.json#/$defs/slug" },
+    "assigned_by": { "$ref": "#/$defs/assignment" }
+  },
+  "$defs": {
+    "assignment": {
+      "description": "Who assigned the domain and when: only the owner assigns domains (PRD 16.2).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "at"],
+      "properties": {
+        "by": { "$ref": "common.schema.json#/$defs/user_id" },
+        "at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      }
+    }
+  }
+}

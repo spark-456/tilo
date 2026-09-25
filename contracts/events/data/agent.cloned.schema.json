@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.cloned.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentClonedData",
+  "description": "data of agent.cloned (PRD 9.5). actor split; target is the new agent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {}
+}

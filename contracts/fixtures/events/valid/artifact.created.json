@@ -1,0 +1,39 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000025",
+  "seq": 25,
+  "ts": "2026-09-29T09:31:04.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "artifact.created",
+  "actor": "A_s1",
+  "target": "art_triage_list",
+  "level": "L1",
+  "district": "D1",
+  "item": {
+    "kind": "document",
+    "artifact_id": "art_triage_list",
+    "label": "Triage list"
+  },
+  "severity": "info",
+  "credits": 0.5,
+  "summary": "The Specialist made the triage list: 1 needs a reply, 11 are FYI or newsletters.",
+  "cause": "01JB5VQ0000000000000000024",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "artifact": {
+      "artifact_id": "art_triage_list",
+      "version": 1
+    }
+  },
+  "trace": {
+    "model_role": "specialist",
+    "profile": "medium",
+    "tokens_in": 1400,
+    "tokens_out": 700,
+    "tool": null,
+    "latency_ms": 1900,
+    "archive_ref": "r_village_basic_1/17"
+  }
+}

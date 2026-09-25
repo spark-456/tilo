@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/skill.loaded.schema.json",
+  "x-version": "1.0.0",
+  "title": "SkillLoadedData",
+  "description": "data of skill.loaded (PRD 9.5). The run pins skill versions and the Trace lists them (FR-AGT-03).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["skill", "version"],
+  "properties": {
+    "skill": { "$ref": "../../common.schema.json#/$defs/skill_id" },
+    "version": { "$ref": "../../common.schema.json#/$defs/semver" }
+  }
+}

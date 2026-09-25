@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/connection.expired.schema.json",
+  "x-version": "1.0.0",
+  "title": "ConnectionExpiredData",
+  "description": "data of connection.expired (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["connector"],
+  "properties": { "connector": { "$ref": "../../common.schema.json#/$defs/connector_id" } }
+}

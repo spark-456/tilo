@@ -1,0 +1,38 @@
+{
+  "id": "pol_drive_saves",
+  "owner": "u_owner",
+  "action_type": "save_file",
+  "scope": {
+    "connectors": ["google_drive"],
+    "recipients": [],
+    "domains": [],
+    "districts": []
+  },
+  "limits": {
+    "per_day": null,
+    "credits": null
+  },
+  "conditions": {
+    "no_attachments": true,
+    "no_new_recipients": true,
+    "no_safety_flags": true
+  },
+  "level": "L1",
+  "undo_window_s": 0,
+  "expiry": null,
+  "notify_channel": "web",
+  "team_lead_domains": ["operations"],
+  "created_by": {
+    "by": "u_owner",
+    "at": "2026-09-29T09:00:00.000Z"
+  },
+  "changed_by": null,
+  "history": [
+    {
+      "by": "u_owner",
+      "at": "2026-09-29T09:00:00.000Z",
+      "change": "Created at L1; the Operations Team Lead may approve Drive saves",
+      "level": "L1"
+    }
+  ]
+}

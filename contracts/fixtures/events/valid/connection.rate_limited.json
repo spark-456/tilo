@@ -1,0 +1,33 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000127",
+  "seq": 127,
+  "ts": "2026-09-29T09:42:07.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "connection.rate_limited",
+  "actor": "system",
+  "target": "I1",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "fyi",
+  "credits": 0,
+  "summary": "Gmail asked Tilo to slow down for 30 s.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "connector": "gmail",
+    "retry_after_s": 30
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/app.refreshed.schema.json",
+  "x-version": "1.0.0",
+  "title": "AppRefreshedData",
+  "description": "data of app.refreshed (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spec"],
+  "properties": { "spec": { "$ref": "../../common.schema.json#/$defs/artifact_ref" } }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.recovered.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentRecoveredData",
+  "description": "data of agent.recovered (PRD 9.5). A retry with a changed method succeeded (FR-AGT-13: up to 3 attempts, then escalate).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["unit", "attempt"],
+  "properties": {
+    "unit": { "$ref": "../../common.schema.json#/$defs/unit_id" },
+    "attempt": { "type": "integer", "minimum": 1, "maximum": 3 }
+  }
+}

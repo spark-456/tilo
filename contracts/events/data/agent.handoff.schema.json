@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.handoff.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentHandoffData",
+  "description": "data of agent.handoff (PRD 9.5). Agents never message each other in free text: every exchange is one typed envelope, recorded here (PRD 8.4, FR-AGT-08).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["envelope"],
+  "properties": { "envelope": { "$ref": "../../envelope.schema.json" } }
+}
