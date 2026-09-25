@@ -1,5 +1,4 @@
-"""Check registry (EFF-07; PRD 19.2, 19.3). Part a of P8-06: `@register` and lookup only;
-the five deterministic checks land in part b, none registered here."""
+"""Check registry (EFF-07; PRD 19.2, 19.3). Part a: `@register` and `is_registered`; the checks land in part b."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -23,12 +22,6 @@ def register(name: str) -> Callable[[CheckFn], CheckFn]:
         return fn
 
     return decorator
-
-
-def get(name: str) -> CheckFn:
-    if name not in _REGISTRY:
-        raise KeyError(f"tilo_evals.checks: unregistered check {name!r}")
-    return _REGISTRY[name]
 
 
 def is_registered(name: str) -> bool:

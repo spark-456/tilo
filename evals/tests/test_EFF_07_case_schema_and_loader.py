@@ -1,6 +1,7 @@
 """Case schema and loader tests (EFF-07; PRD 19.2). Run: uv run pytest evals/tests -q."""
 
 import json
+import time
 
 import jsonschema
 import pytest
@@ -29,7 +30,6 @@ def test_EFF_07_load_cases_loads_a_well_formed_case(tmp_path):
 
 
 def test_EFF_07_load_cases_allows_a_skeleton_with_null_truth_notes_and_an_autorater_check(tmp_path):
-    """P8-08 skeletons carry `notes`; E-RES declares `kind: autorater` checks not looked up in the registry."""
     checks = [{"check": "no_side_effects", "args": {}}, {"check": "groundedness", "args": {}, "kind": "autorater"}]
     case = _load_one(tmp_path, case_id="E-RES-01", group="E-RES", status="skeleton", notes="n", checks=checks)
     assert case.ground_truth is None and case.notes == "n" and case.checks == checks
@@ -59,7 +59,7 @@ def test_EFF_07_load_cases_rejects_malformed_cases(tmp_path, needle, kwargs):
 
 
 def test_EFF_07_load_cases_rejects_a_duplicate_id(tmp_path):
-    """Both copies match filename and dir (one nested under E-PLAN), so only the duplicate check fires."""
+    """Both copies match filename and dir, so only the duplicate check fires."""
     for name in ("E-PLAN-01.yaml", "dup/E-PLAN/E-PLAN-01.yaml"):
         write_case(tmp_path / "cases", case_id="E-PLAN-01", group="E-PLAN", ground_truth={}, filename=name)
     with pytest.raises(CaseError, match="duplicate case id 'E-PLAN-01'"):
@@ -67,6 +67,7 @@ def test_EFF_07_load_cases_rejects_a_duplicate_id(tmp_path):
 
 
 _DEEP = b"[" * 5000 + b"]" * 5000  # nesting past the recursion limit
+_BOMB = "".join(f"{n}: &{n} [{','.join([f'*{p}' if p else 'x'] * 10)}]\n" for p, n in zip(["", *"abcdef"], "abcdefg"))
 
 
 @pytest.mark.parametrize(
@@ -81,10 +82,19 @@ def test_EFF_07_load_cases_raises_case_error_naming_an_unreadable_or_yml_file(tm
         load_cases(root=str(tmp_path / "cases"))
 
 
+@pytest.mark.parametrize("data", [f"{_BOMB}id: *g".encode(), b"id: " + b"x" * 9999], ids=["alias-bomb", "long-id"])
+def test_EFF_07_load_cases_caps_the_error_message_at_500_characters(tmp_path, data):
+    write_case(tmp_path / "cases", case_id="E-PLAN-01", group="E-PLAN", ground_truth={}).write_bytes(data)
+    start = time.monotonic()
+    with pytest.raises(CaseError) as info:
+        load_cases(root=str(tmp_path / "cases"))
+    assert len(str(info.value)) <= 500 and time.monotonic() - start < 2
+
+
 _CONFIG = {"credit_cap": {"full": 2000}, "deploy_gate_repeats": 3, "cost_regression_threshold": 0.2, "groups": {}}
 _PATCHES = "cost_regression_threshold: a|cost_regression_threshold: ~|credit_cap: {a: -5}|deploy_gate_repeats: -3|"
 _PATCHES += "groups: x|deploy_gate_repeats: 0|groups: {a: true}|credit_cap: {a: 1.5}"
-_BAD = [b"groups: [unclosed", b"\xff\xfe groups: {}", b"groups: " + _DEEP, {"deploy_gate_repeats": 10**400}]
+_BAD = [b"1: 2\n", b"groups: [unclosed", b"\xff\xfe groups: {}", b"groups: " + _DEEP, {"deploy_gate_repeats": 10**400}]
 _BAD += [{"cost_regression_threshold": float("inf")}, {"cost_regression_threshold": float("nan")}]
 
 

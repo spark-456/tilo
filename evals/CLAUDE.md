@@ -17,4 +17,4 @@ The eval harness (PRD 19, EFF-06, EFF-07). Part a of P8-06: case schema/loader, 
 
 ## Local rules
 - No paid calls: this part has no executor yet.
-- `load_cases` rejects an unregistered check (a `kind: autorater` check is skipped, not looked up); `checks.register`/`get`/`is_registered` are the only entry points until part b. Fake cases live under `tmp_path`, never `evals/cases`.
+- `load_cases` rejects an unregistered check (a `kind: autorater` check is skipped, not looked up); `checks.register`/`is_registered` are the only entry points until part b (which adds lookup). Fake cases live under `tmp_path`, never `evals/cases`.

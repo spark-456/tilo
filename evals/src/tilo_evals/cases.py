@@ -1,5 +1,4 @@
-"""Case schema and loader (EFF-07; PRD 19.2): validates evals/cases/<group>/<id>.yaml against
-case.schema.json, then checks what the schema can't: id/group/dir/filename, unique ids, registered checks."""
+"""Case loader (EFF-07; PRD 19.2): case.schema.json, then id/group/dir/filename, unique ids, registered checks."""
 
 import json
 from dataclasses import dataclass
@@ -9,12 +8,12 @@ from typing import Any
 import jsonschema
 
 from . import checks as checks_registry
-from .config import read_yaml
+from .config import CappedError, read_yaml
 
 CASE_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "evals" / "case.schema.json"
 
 
-class CaseError(Exception):
+class CaseError(CappedError):
     """Case fails case.schema.json, or a loader rule: id/group/dir/filename, duplicate id, unregistered check."""
 
 
@@ -46,14 +45,10 @@ def load_cases(root: str = "evals/cases") -> list[Case]:
         raw = read_yaml(case_path, CaseError)
         case_id = raw.get("id", "<missing id>") if isinstance(raw, dict) else "<not a mapping>"
         if errors := sorted(validator.iter_errors(raw), key=lambda e: list(e.path)):
-            raise CaseError(
-                f"{case_path}: {case_id!r} failed case.schema.json: " + "; ".join(e.message for e in errors)
-            )
+            raise CaseError(f"{case_path}: {case_id!r} failed the case schema: " + "; ".join(e.message for e in errors))
         group, dir_name = raw["group"], case_path.parent.name
-        if dir_name != group or not case_id.startswith(f"{group}-"):
-            raise CaseError(f"{case_path}: {case_id!r} group/dir mismatch (group={group!r}, dir={dir_name!r})")
-        if case_path.name != f"{case_id}.yaml":
-            raise CaseError(f"{case_path}: filename {case_path.name!r} must be {case_id + '.yaml'!r}")
+        if dir_name != group or not case_id.startswith(f"{group}-") or case_path.name != f"{case_id}.yaml":
+            raise CaseError(f"{case_path}: {case_id!r} must be at <group>/<id>.yaml with id prefix {group!r}")
         for entry in raw["checks"]:  # kind: autorater is declared, not run in replay; skip the lookup
             if entry.get("kind") != "autorater" and not checks_registry.is_registered(entry.get("check")):
                 raise CaseError(f"{case_path}: {case_id!r} uses an unregistered check {entry.get('check')!r}")

@@ -1,7 +1,6 @@
-"""EvalsConfig: the eval harness's own settings (EFF-07; PRD 19.1, 6.6). Local stub for issue #8:
-rejects a missing or unreadable file, an unknown/missing key or a bad value, never invents a value."""
+"""EvalsConfig: the eval harness's own settings (EFF-07; PRD 19.1, 6.6). Local stub for issue #8."""
 
-import math
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,20 +9,28 @@ from typing import Any
 import yaml
 
 
+class CappedError(Exception):
+    def __init__(self, msg: str) -> None:  # capped at 500 characters, so no input builds a huge message
+        super().__init__(msg if len(msg) <= 500 else msg[:485] + " ...[truncated]")
+
+
+class _NoAliasLoader(yaml.SafeLoader):  # no aliases: ~300 bytes of chained ones expand to 10**7 nodes
+    def compose_node(self, parent: Any, index: Any) -> Any:
+        if self.check_event(yaml.AliasEvent):
+            raise yaml.YAMLError("YAML aliases are not allowed")
+        return super().compose_node(parent, index)
+
+
 def read_yaml(path: Path, error: type[Exception]) -> Any:
-    """Parse a UTF-8 YAML file; any read, decode, parse or nesting failure becomes `error` naming the path."""
+    """Parse a UTF-8 YAML file; any read, decode, parse, alias or nesting failure becomes `error` naming the path."""
     try:
-        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        return yaml.load(path.read_text(encoding="utf-8"), Loader=_NoAliasLoader) or {}
     except (OSError, UnicodeDecodeError, yaml.YAMLError, RecursionError, ValueError) as exc:
         raise error(f"{path}: not a readable UTF-8 YAML file: {exc}") from exc
 
 
-def is_number(v: Any, kind: Any = int, low: float = 0) -> bool:
-    """A finite `kind` (never a bool) that converts to float without overflow and is >= low."""
-    try:
-        return not isinstance(v, bool) and isinstance(v, kind) and math.isfinite(float(v)) and v >= low
-    except OverflowError:
-        return False
+def is_number(v: Any, kind: Any = int, low: float = 0) -> bool:  # never a bool; a finite float, no overflow
+    return not isinstance(v, bool) and isinstance(v, kind) and low <= v <= sys.float_info.max
 
 
 _VALID: dict[str, Callable[[Any], bool]] = {
@@ -34,7 +41,7 @@ _VALID: dict[str, Callable[[Any], bool]] = {
 }
 
 
-class EvalsConfigError(Exception):
+class EvalsConfigError(CappedError):
     """Missing or unreadable file, an unknown/missing top-level key, or a bad value."""
 
 
@@ -47,14 +54,11 @@ class EvalsConfig:
 
     @staticmethod
     def load(path: str = "config/evals.yaml") -> "EvalsConfig":
-        p = Path(path)
-        if not p.is_file():
-            raise EvalsConfigError(f"missing eval config: {p}")
-        if not isinstance(raw := read_yaml(p, EvalsConfigError), dict):
-            raise EvalsConfigError(f"{p}: must be a mapping")
+        if not isinstance(raw := read_yaml(Path(path), EvalsConfigError), dict):
+            raise EvalsConfigError(f"{path}: must be a mapping")
         if odd := set(raw) ^ set(_VALID):
-            raise EvalsConfigError(f"{p}: unknown or missing key(s) {sorted(odd)}")
+            raise EvalsConfigError(f"{path}: unknown or missing key(s) {sorted(odd, key=str)}")
         if bad := [k for k, ok in _VALID.items() if not ok(raw[k])]:
-            raise EvalsConfigError(f"{p}: {bad} must be finite: integers >= 0 (repeats >= 1), threshold a number >= 0")
+            raise EvalsConfigError(f"{path}: {bad} must be finite: ints >= 0 (repeats >= 1), threshold a number >= 0")
         raw["cost_regression_threshold"] = float(raw["cost_regression_threshold"])
         return EvalsConfig(**raw)  # keys == _VALID == EvalsConfig's field names
