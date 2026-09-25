@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/card.schema.json",
   "x-version": "1.0.0",
   "title": "Card",
-  "description": "One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout; it names one of the options and that option is reversible (contracts/card.rules.md CR-01 to CR-03). A gate's is always hold, so a gate never times out to go, and only a gate may offer an irreversible option.",
+  "description": "One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout; it names one of the options and that option is reversible (contracts/card.rules.md CR-01 to CR-03). A gate's or consent card's is always hold, so a gate never times out to go and a consent card never times out to a grant; every hold option is reversible, only a gate may offer an irreversible option, and neither a gate nor a consent card is delegated to the Director.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -79,6 +79,10 @@
         "contains": {
           "properties": { "id": { "const": "hold" }, "irreversible": { "const": false } },
           "required": ["id", "irreversible"]
+        },
+        "items": {
+          "if": { "properties": { "id": { "const": "hold" } }, "required": ["id"] },
+          "then": { "properties": { "irreversible": { "const": false } } }
         }
       },
       "safe_default": { "const": "hold" },
@@ -96,8 +100,14 @@
     },
     "if": { "properties": { "kind": { "const": "consent" } }, "required": ["kind"] },
     "then": {
+      "description": "Granting a connection is an authorisation: a consent card offers a hold option, holds by default so a timeout never grants it, and is never delegated to the Director.",
       "properties": {
         "rung": { "const": "consent" },
+        "options": {
+          "contains": { "properties": { "id": { "const": "hold" } }, "required": ["id"] }
+        },
+        "safe_default": { "const": "hold" },
+        "actions": { "items": { "enum": ["show_me", "snooze"] } },
         "answer_channels": { "items": { "enum": ["web", "mobile_web"] } },
         "consent": { "type": "object" }
       }

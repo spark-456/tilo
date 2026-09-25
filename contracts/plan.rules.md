@@ -16,7 +16,7 @@ stable; a failing validation names the rule id. "Schema" marks rules the schema 
 | PG-08 | Approaches are distinct: every pair differs on at least 2 of the 5 `dimensions` (two values differ when they are not equal). | FR-INT-06 |
 | PG-09 | Ranges are ordered: `time.min_s <= time.max_s` and `credits.min <= credits.max`. | FR-INT-06 |
 | PG-10 | A non-null `policy_ref` names an existing, unexpired policy for the same action type at L2 or L3 whose scope covers the guarded units' connectors and districts. | 10.4, FR-INT-08 |
-| PG-11 | Every skill id resolves in the skill registry, every connector id in `config/connectors.yaml`, and every action type in a unit's `actions` is declared by one of that unit's connectors with `gate_type: approval`. A unit's `actions` lists side effects only; read-only actions (`gate_type: none`) are not listed and need no gate. | FR-AGT-03, FR-CON-01 |
+| PG-11 | Every skill id resolves in the skill registry, every connector id in `config/connectors.yaml`, and every action type in a unit's `actions` is declared by one of that unit's connectors with `gate_type: approval`. A unit's `actions` lists side effects only; read-only actions (`gate_type: none`, which `connector.schema.json` allows only at T1 or T2 and reversible) are not listed and need no gate. | FR-AGT-03, FR-CON-01 |
 | PG-12 | 2 to 3 approaches, at least one unit, a positive budget cap (schema). | FR-INT-06, FR-INT-08 |
 
 The world layout built from the plan has its own rules (`layout.rules.md`, WE-02, WE-05, WE-06).

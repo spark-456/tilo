@@ -1,0 +1,39 @@
+{
+  "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W5",
+  "world_id": "w_01",
+  "run_id": "r_01J8Z3K4M5",
+  "header": {
+    "building": "B1",
+    "agent": "A_dir"
+  },
+  "add_context": false,
+  "created_at": "2026-09-29T09:30:00.000Z",
+  "timeout": 3600,
+  "gate": null,
+  "consent": {
+    "connector": "google_drive",
+    "scopes": ["Create and edit files in the Tilo folder only"]
+  },
+  "kind": "consent",
+  "rung": "consent",
+  "what_happened": "Saving the report needs access to one Drive folder.",
+  "why_it_matters": "Without it the report stays in Tilo only.",
+  "options": [
+    {
+      "id": "connect",
+      "label": "Connect Drive",
+      "suggested": true,
+      "reason": "Only the Tilo folder is requested.",
+      "irreversible": false
+    },
+    {
+      "id": "hold",
+      "label": "Not now",
+      "suggested": false,
+      "irreversible": false
+    }
+  ],
+  "actions": ["show_me", "snooze"],
+  "answer_channels": ["web", "mobile_web"],
+  "safe_default": "connect"
+}

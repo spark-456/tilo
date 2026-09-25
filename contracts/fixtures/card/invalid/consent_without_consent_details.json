@@ -24,13 +24,13 @@
       "irreversible": false
     },
     {
-      "id": "skip",
-      "label": "Keep it in Tilo",
+      "id": "hold",
+      "label": "Not now",
       "suggested": false,
       "irreversible": false
     }
   ],
   "actions": ["show_me", "snooze"],
   "answer_channels": ["web", "mobile_web"],
-  "safe_default": "skip"
+  "safe_default": "hold"
 }

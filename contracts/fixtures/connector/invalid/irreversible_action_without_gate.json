@@ -1,0 +1,26 @@
+{
+  "id": "web_search",
+  "name": "Web search",
+  "icon": "search",
+  "auth": "platform",
+  "scopes": {},
+  "capabilities": ["search"],
+  "actions": [
+    {
+      "id": "web_search",
+      "capability": "search",
+      "description": "Grounded web search.",
+      "risk_tier": "T1",
+      "gate_type": "none",
+      "irreversible": true
+    }
+  ],
+  "limits": {
+    "per_minute": null,
+    "batch_size": null
+  },
+  "data_class": {
+    "returns": ["public"],
+    "redact": []
+  }
+}

@@ -66,7 +66,9 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
 9. **Defaults where the PRD is silent** (logged in `docs/open-questions.md`):
    - brief `sensitivity` uses the PRD 12.1 data classes `personal | business | public` (BQ-12);
    - connector `gate_type` is `none` (no side effect) or `approval` (a person, or a matching
-     policy below T3, opens it), and write, send, share and delete actions must be `approval` (BQ-13);
+     policy below T3, opens it), and write, send, share and delete actions must be `approval`;
+     a `none` action is T1 or T2 and reversible, so a T3 or irreversible action is always gated
+     and reaches a person (BQ-13);
    - policy `limits.credits` caps credits per day spent under the policy (BQ-14);
    - policy `conditions` are each fixed `true`, and the risk-tier table must list all six PRD
      10.4 T3 modifiers exactly once, so neither a policy nor `config/autonomy.yaml` can drop new
@@ -77,7 +79,10 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
      CR-05, BQ-15);
    - card answer channels per kind: email answers questions (needs-you) only; gates and
      meetings are answered on web, mobile web or WhatsApp; consent only on the web; gates have
-     no "Delegate to Director" action because a model never authorises;
+     no "Delegate to Director" action because a model never authorises, and neither do consent
+     cards, since granting a connection is also an authorisation. A consent card, like a gate,
+     offers a `hold` option and defaults to `hold` ("That connection waits", PRD 10.2), so a
+     timeout never grants a connection; every `hold` option is reversible (BQ-15);
    - WorldLayout geometry is integer grid units: level plates, district plots with tints
      `district.1`-`district.6`, building footprints, island plots, roads as building-to-building
      edges with paths, bridges and gate cells, stamped with the solver version;

@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/connector.schema.json",
   "x-version": "1.0.0",
   "title": "Connector",
-  "description": "Connector declaration (PRD 12.1), one entry of config/connectors.yaml. Every action declares a risk tier and a gate type (FR-CON-06); write, send, share and delete actions are gated and deletes are always T3.",
+  "description": "Connector declaration (PRD 12.1), one entry of config/connectors.yaml. Every action declares a risk tier and a gate type (FR-CON-06); write, send, share and delete actions are gated and deletes are always T3; an action with gate_type none is never T3 or irreversible.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -98,6 +98,16 @@
         "properties": { "gate_type": { "const": "approval" } },
         "if": { "properties": { "capability": { "const": "delete" } } },
         "then": { "properties": { "risk_tier": { "const": "T3" } } }
+      },
+      "else": {
+        "description": "An ungated action is never T3 or irreversible, so T3 and irreversible actions always reach a person (PRD 10.4, plan.rules.md PG-04 and PG-11).",
+        "if": { "properties": { "gate_type": { "const": "none" } }, "required": ["gate_type"] },
+        "then": {
+          "properties": {
+            "risk_tier": { "enum": ["T1", "T2"] },
+            "irreversible": { "const": false }
+          }
+        }
       }
     },
     "limits": {
