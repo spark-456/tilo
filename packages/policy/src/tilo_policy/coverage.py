@@ -117,11 +117,8 @@ def in_force(policy: dict, owner: str, at: str) -> bool:
 
 
 def _scope_matches(policy: dict, target: Target) -> bool:
-    """PI-06: connector, district, every recipient and its domain in scope. Raises when the scope
-    cannot be read (not four lists)."""
+    """PI-06: connector, district, every recipient and its domain in scope (a conforming scope)."""
     scope = policy["scope"]
-    if not all(isinstance(scope[k], list) for k in ("connectors", "recipients", "domains", "districts")):
-        raise ValueError("unreadable scope")
     return (
         target.connector in scope["connectors"]
         and _within(scope["districts"], target.district)
@@ -137,7 +134,23 @@ def _scope_matches(policy: dict, target: Target) -> bool:
     )
 
 
-may_cover = fail_closed(True)(_scope_matches)  # for an invalid record: an unreadable scope may cover anything
+@fail_closed(True)
+def may_cover(policy: dict, target: Target) -> bool:
+    """For an invalid record: only a scope that conforms to its contract can clearly miss a send."""
+    return not conforms("policy.schema.json#/$defs/scope", policy["scope"]) or _scope_matches(policy, target)
+
+
+@functools.lru_cache(maxsize=4096)
+def _names_ok(action_type: Any, owner: Any) -> bool:
+    return conforms("common.schema.json#/$defs/action_type", action_type) and conforms(
+        "common.schema.json#/$defs/user_id", owner
+    )
+
+
+@fail_closed(False)
+def readable(policy: Any) -> bool:
+    """Its action type and owner are valid, so the record can be ruled in or out (PI-06)."""
+    return _names_ok(policy["action_type"], policy["owner"])
 
 
 @fail_closed(None)

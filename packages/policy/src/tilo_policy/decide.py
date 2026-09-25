@@ -7,7 +7,17 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from .coverage import Target, add_seconds, covering_level, fail_closed, instruction_counts, may_cover, stamped_by, ts
+from .coverage import (
+    Target,
+    add_seconds,
+    covering_level,
+    fail_closed,
+    instruction_counts,
+    may_cover,
+    readable,
+    stamped_by,
+    ts,
+)
 from .schemas import conforms, event_ok
 from .tiers import RiskTable, SideEffectFacts
 
@@ -78,6 +88,8 @@ def _decide(p: Proposal, table: RiskTable, policies: list[dict], owner: str, app
         return gate(tier, modifiers, "L1", None, "t3_always_gates")
     ids = [pol["id"] for pol in policies if isinstance(pol, dict) and "id" in pol]
     if len(set(ids)) != len(ids):  # two records share an id: ambiguous, fail closed (PI-13)
+        return gate(tier, modifiers, "L1", None, "no_covering_policy")
+    if not all(readable(pol) for pol in policies):  # might be this owner's policy for this action
         return gate(tier, modifiers, "L1", None, "no_covering_policy")
     target = Target(p.action_type, p.connector, p.district, p.facts.recipients)
     mine = [
