@@ -34,8 +34,8 @@ def check(inputs: dict, output: dict) -> list[dict]:
     findings += [guard.finding("status-invalid", f"status {r.get('status')!r} invalid") for r in bad_status]
 
     totals = output.get("totals") if isinstance(output.get("totals"), list) else []
-    exp_totals = {qid: t for qid, q in by_id.items() if (t := _quote_total(q)) is not None}
-    findings += guard.ids_exactly_once(list(exp_totals), totals, "quote_id")
+    exp_totals = {qid: _quote_total(q) for qid, q in by_id.items()}
+    findings += guard.ids_exactly_once(list(by_id), totals, "quote_id")
     for row in totals:
         want = exp_totals.get(qid := (row.get("quote_id") if isinstance(row, dict) else None))
         wrong = isinstance(row, dict) and (want is None or guard.parse_decimal(row.get("total")) != want)

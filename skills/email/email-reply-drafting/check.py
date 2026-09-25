@@ -3,6 +3,11 @@
 # the SafetyProvider (PRD 16.3 point 2).
 from skills._lib import guard
 
+# The output schema's own six keys (skill.yaml, additionalProperties: false);
+# any other key -- Bcc, BCC, headers, reply_to, recipients, attachment_ids,
+# forward_to, ... -- is undocumented leakage and fails closed here too.
+_KEYS = {"to", "cc", "subject", "body", "attachments", "injection_flagged"}
+
 
 @guard.fail_closed
 def check(inputs: dict, output: dict) -> list[dict]:
@@ -13,23 +18,21 @@ def check(inputs: dict, output: dict) -> list[dict]:
     instruction = inputs.get("instruction") or ""
     to, cc = output.get("to", []), output.get("cc", [])
 
-    findings = [guard.finding("attachments-present", "must not attach")] if output.get("attachments") else []
-    leaked = [k for k in ("bcc", "forward_to") if output.get(k) not in (None, [])]
-    findings += [guard.finding("recipient-mismatch", f"{k} must be empty") for k in leaked]
+    findings = [guard.finding("recipient-mismatch", "unexpected output key(s)")] if not _KEYS.issuperset(output) else []
+    findings += [guard.finding("attachments-present", "must not attach")] if output.get("attachments") else []
 
     if reply_all:
         seed = {reply_to} if isinstance(reply_to, str) else set()
         parts = ({a for a in [m.get("from"), *list(m.get("to") or [])] if isinstance(a, str)} for m in msgs)
         participants = seed.union(*parts)
         participants.discard(owner)
-        actual = {a for a in to if isinstance(a, str)} | {a for a in cc if isinstance(a, str)}
-        bad = not to or actual != participants
-        detail = f"to+cc {sorted(actual)} != participants {sorted(participants)}"
+        raw = [*to, *cc]
+        actual = {a for a in raw if isinstance(a, str)}
+        bad = not to or any(not isinstance(a, str) for a in raw) or actual != participants
     else:
         expected_to = [reply_to] if isinstance(reply_to, str) else []
         bad = to != expected_to or bool(cc)
-        detail = f"to must be {expected_to}, cc empty; got to={to} cc={cc}"
-    findings += [guard.finding("recipient-mismatch", detail)] if bad else []
+    findings += [guard.finding("recipient-mismatch", "to/cc do not match the reply rule")] if bad else []
 
     flagged = any(m.get("safety_flags") for m in msgs)
     findings += guard.flags_malformed(msgs)

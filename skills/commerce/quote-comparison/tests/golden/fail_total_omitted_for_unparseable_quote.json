@@ -1,0 +1,20 @@
+{
+  "input": {
+    "requirements": [
+      { "requirement_id": "req-1", "text": "Must include installation", "must_have": false }
+    ],
+    "quotes": [
+      {
+        "quote_id": "q1",
+        "source_id": "src-q1",
+        "line_items": [{ "description": "Delivery only", "quantity": 1e50, "unit_price": 300.0 }]
+      }
+    ]
+  },
+  "output": {
+    "coverage": [{ "quote_id": "q1", "requirement_id": "req-1", "status": "partial" }],
+    "totals": [],
+    "recommendation": null
+  },
+  "expect": { "fail": "ids-missing" }
+}

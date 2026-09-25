@@ -1,0 +1,23 @@
+{
+  "input": {
+    "invoice_lines": [
+      { "line_id": "i1", "amount": 10000000000000000000000000000, "description": "Widgets" },
+      { "line_id": "i2", "amount": 1, "description": "Freight" }
+    ],
+    "po_lines": [
+      { "line_id": "p1", "amount": 10000000000000000000000000000, "description": "Widgets" },
+      { "line_id": "p2", "amount": 1, "description": "Freight" }
+    ]
+  },
+  "output": {
+    "matches": [
+      { "invoice_line_id": "i1", "po_line_id": "p1", "status": "matched", "reason_code": null },
+      { "invoice_line_id": "i2", "po_line_id": "p2", "status": "matched", "reason_code": null }
+    ],
+    "totals": {
+      "invoice_total": 10000000000000000000000000000,
+      "po_total": 10000000000000000000000000000
+    }
+  },
+  "expect": { "fail": "totals-mismatch" }
+}

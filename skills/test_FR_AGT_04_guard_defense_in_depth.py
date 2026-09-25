@@ -128,3 +128,141 @@ def test_FR_AGT_04_web_research_malformed_safety_flags_fails_closed():
     output = {"claims": [{"text": "Some text.", "source_ids": ["s1"]}], "flagged_sources": []}
     findings = module.check(inputs, output)
     _assert_bounds_finding(findings, "safety_flags={} is not a list of non-empty strings, must fail")
+
+
+# ---------------------------------------------------------------------------
+# FR-AGT-04 fix round 2 (security-reviewer): email-reply-drafting recipient
+# exactness must hold for the whole output, not just the lower-case "bcc"/
+# "forward_to" keys, and must not silently drop a non-string to/cc entry
+# before comparing sets. Each case below is schema-valid input shaped like a
+# real thread; only the drafted output is adversarial.
+# ---------------------------------------------------------------------------
+
+_REPLY_ALL_INPUTS = {
+    "instruction": "Reply to everyone and confirm Thursday.",
+    "thread": {
+        "subject": "Thursday plan",
+        "messages": [
+            {
+                "from": "riya@example.com",
+                "to": ["assistant@example.com", "bob@example.com"],
+                "body": "Does Thursday work for the team?",
+                "safety_flags": [],
+            }
+        ],
+    },
+    "reply_to_sender": "riya@example.com",
+    "reply_all": True,
+    "mailbox_owner": "assistant@example.com",
+}
+_REPLY_ALL_CLEAN_OUTPUT = {
+    "to": ["riya@example.com"],
+    "cc": ["bob@example.com"],
+    "subject": "Re: Thursday plan",
+    "body": "Thursday works for the team.",
+    "attachments": [],
+    "injection_flagged": False,
+}
+
+
+def test_FR_AGT_04_email_reply_drafting_clean_reply_all_passes():
+    module = import_check_module("email", "email-reply-drafting")
+    findings = module.check(_REPLY_ALL_INPUTS, _REPLY_ALL_CLEAN_OUTPUT)
+    assert findings == [], f"a correct reply-all draft must not fail, got {findings}"
+
+
+def test_FR_AGT_04_email_reply_drafting_capitalized_bcc_key_fails_closed():
+    module = import_check_module("email", "email-reply-drafting")
+    output = {**_REPLY_ALL_CLEAN_OUTPUT, "Bcc": ["evil@attacker.test"]}
+    findings = module.check(_REPLY_ALL_INPUTS, output)
+    _assert_bounds_finding(findings, "an output key outside the schema's six (here 'Bcc') must fail, not be ignored")
+
+
+def test_FR_AGT_04_email_reply_drafting_nested_bcc_header_fails_closed():
+    module = import_check_module("email", "email-reply-drafting")
+    output = {**_REPLY_ALL_CLEAN_OUTPUT, "headers": {"Bcc": "evil@attacker.test"}}
+    findings = module.check(_REPLY_ALL_INPUTS, output)
+    _assert_bounds_finding(findings, "a bcc smuggled in an extra 'headers' key must fail, not be ignored")
+
+
+def test_FR_AGT_04_email_reply_drafting_non_string_cc_dict_entry_fails_closed():
+    module = import_check_module("email", "email-reply-drafting")
+    output = {**_REPLY_ALL_CLEAN_OUTPUT, "cc": ["bob@example.com", {"address": "evil@attacker.test"}]}
+    findings = module.check(_REPLY_ALL_INPUTS, output)
+    _assert_bounds_finding(findings, "a non-string cc entry must not be silently dropped before comparing sets")
+
+
+def test_FR_AGT_04_email_reply_drafting_non_string_cc_nested_list_entry_fails_closed():
+    module = import_check_module("email", "email-reply-drafting")
+    output = {**_REPLY_ALL_CLEAN_OUTPUT, "cc": [["evil@attacker.test"]]}
+    findings = module.check(_REPLY_ALL_INPUTS, output)
+    _assert_bounds_finding(findings, "a nested-list cc entry must not be silently dropped before comparing sets")
+
+
+def test_FR_AGT_04_email_reply_drafting_none_entry_in_to_fails_closed():
+    module = import_check_module("email", "email-reply-drafting")
+    output = {**_REPLY_ALL_CLEAN_OUTPUT, "to": [None]}
+    findings = module.check(_REPLY_ALL_INPUTS, output)
+    _assert_bounds_finding(findings, "a None entry in 'to' must fail, not be silently dropped")
+
+
+# ---------------------------------------------------------------------------
+# FR-AGT-04 fix round 2 (code-reviewer): a `pick` that is neither an object
+# nor null (a bare string or int) must itself yield a finding, not silently
+# pass through both the dict and the None branch.
+# ---------------------------------------------------------------------------
+
+
+def test_FR_AGT_04_price_comparison_non_dict_non_null_pick_fails_closed():
+    module = import_check_module("commerce", "price-comparison")
+    inputs = {
+        "item": "20L backpack",
+        "requirements": [{"field": "waterproof", "op": "eq", "value": True}],
+        "currency": "USD",
+        "rates": {"USD": 1.0},
+        "offers": [
+            {"offer_id": "o1", "source_id": "src-1", "price": 29.0, "currency": "USD", "unit_count": 1},
+        ],
+    }
+    output = {
+        "unit_prices": [{"offer_id": "o1", "unit_price": 29.0, "currency": "USD", "source_id": "src-1"}],
+        "pick": "o1",
+    }
+    findings = module.check(inputs, output)
+    _assert_bounds_finding(findings, "pick='o1' (a bare string, not an object or null) must fail, not pass")
+
+    findings_int = module.check(inputs, {**output, "pick": 42})
+    _assert_bounds_finding(findings_int, "pick=42 (a bare int, not an object or null) must fail, not pass")
+
+
+# ---------------------------------------------------------------------------
+# FR-AGT-04 fix round 2 (qa-breaker): totals must recompute under a Decimal
+# context wide enough for the parse_decimal digit caps, not the default
+# 28-digit context, which would silently round a large exact sum and let a
+# wrong total pass.
+# ---------------------------------------------------------------------------
+
+
+def test_FR_AGT_04_invoice_po_matching_wrong_total_beyond_default_precision_fails_closed():
+    module = import_check_module("finance", "invoice-po-matching")
+    big = 10**28
+    inputs = {
+        "invoice_lines": [
+            {"line_id": "i1", "amount": big, "description": "Widgets"},
+            {"line_id": "i2", "amount": 1, "description": "Freight"},
+        ],
+        "po_lines": [
+            {"line_id": "p1", "amount": big, "description": "Widgets"},
+            {"line_id": "p2", "amount": 1, "description": "Freight"},
+        ],
+    }
+    matches = [
+        {"invoice_line_id": "i1", "po_line_id": "p1", "status": "matched", "reason_code": None},
+        {"invoice_line_id": "i2", "po_line_id": "p2", "status": "matched", "reason_code": None},
+    ]
+    wrong = {"matches": matches, "totals": {"invoice_total": big, "po_total": big}}
+    right = {"matches": matches, "totals": {"invoice_total": big + 1, "po_total": big + 1}}
+
+    findings_wrong = module.check(inputs, wrong)
+    _assert_bounds_finding(findings_wrong, f"total {big} (dropping the +1 line) must fail, not pass by rounding")
+    assert module.check(inputs, right) == [], "the exactly-correct total must still pass"

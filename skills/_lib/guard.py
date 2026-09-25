@@ -3,7 +3,7 @@
 # check.py may import only this module and the standard library.
 
 import re
-from decimal import Decimal
+from decimal import Context, Decimal, localcontext
 
 MAX_STR = 20_000
 MAX_ITEMS = 2_000
@@ -120,7 +120,15 @@ def fail_closed(fn):
     def wrapper(inputs, output):
         bounds = check_bounds(inputs) + check_bounds(output)
         try:
-            result = bounds or fn(inputs, output)
+            # A sum, product or quotient of Decimals each within the
+            # parse_decimal digit caps (40 integer + 40 fractional digits)
+            # never needs more than a few hundred significant digits to stay
+            # exact; this precision has ample headroom over those caps so a
+            # check.py's own +, *, / never rounds -- unlike the default
+            # 28-digit context, which would round a large exact sum silently
+            # instead of raising, letting a wrong total pass.
+            with localcontext(Context(prec=400)):
+                result = bounds or fn(inputs, output)
         except Exception as exc:  # noqa: BLE001 - the point is to never raise
             return [finding("checker-error", f"{type(exc).__name__}: {exc}")]
         return result if isinstance(result, list) else [finding("checker-error", "check() returned a non-list")]

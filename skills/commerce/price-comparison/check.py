@@ -49,4 +49,6 @@ def check(inputs: dict, output: dict) -> list[dict]:
             findings.append(guard.finding("pick-requirement-fail", f"source_id mismatch for {pick_id!r}"))
         elif cheapest is not None and pick_id != cheapest:
             findings.append(guard.finding("pick-not-cheapest", f"cheapest is {cheapest!r}, not {pick_id!r}"))
+    else:
+        findings.append(guard.finding("pick-requirement-fail", f"pick is not an object or null: {pick!r}"))
     return findings

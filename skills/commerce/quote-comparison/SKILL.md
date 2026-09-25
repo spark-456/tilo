@@ -16,6 +16,7 @@ Use this skill to compare supplier quotes against a fixed set of requirements, w
 ## Quality bar
 
 - `ids-unknown`: every coverage row's quote_id and requirement_id must be among the supplied quotes and requirements; a coverage row for an unknown quote or requirement fails, as does a missing pair.
+- `ids-missing`: a required (quote, requirement) coverage pair, or a quote's row in the totals list, that the output leaves out fails the same way -- a quote whose total cannot be recomputed still needs a totals row, so the checker can flag it, not be silently excused from the requirement.
 - `status-invalid`: coverage status must be exactly one of met, partial, missing.
 - `totals-mismatch`: each quote's total must recompute exactly from its line items (or its own supplied total).
 - `recommendation-invalid`: the recommendation must be a quote that meets every must-have requirement, or null when none does.
