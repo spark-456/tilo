@@ -9,7 +9,7 @@ a build; the config loader refuses a role whose primary or fallback profile
 has a *failing* result; a *missing* result is allowed in dev with a warning,
 and refused when `TILO_REQUIRE_CONFORMANCE=1`.
 
-Ambiguity (docs/open-questions.md BQ-55): `load_providers_config` gains an
+Ambiguity (docs/open-questions.md BQ-64): `load_providers_config` gains an
 optional `conformance_dir` keyword. When omitted (as every P0-04 test that
 predates this ticket already calls it), the conformance gate is skipped
 entirely, so this ticket adds no new failure mode for config the loader

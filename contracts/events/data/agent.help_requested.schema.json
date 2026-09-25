@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.help_requested.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentHelpRequestedData",
+  "description": "data of agent.help_requested (PRD 9.5). actor asked its supervisor, target, for help (PRD 8.3).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["unit"],
+  "properties": {
+    "unit": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/unit_id" }, { "type": "null" }]
+    }
+  }
+}

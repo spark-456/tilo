@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/district.created.schema.json",
+  "x-version": "1.0.0",
+  "title": "DistrictCreatedData",
+  "description": "data of district.created (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "lead"],
+  "properties": {
+    "name": { "$ref": "../../common.schema.json#/$defs/plain_name" },
+    "lead": { "$ref": "../../common.schema.json#/$defs/agent_id" }
+  }
+}

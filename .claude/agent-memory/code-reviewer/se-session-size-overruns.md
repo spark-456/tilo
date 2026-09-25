@@ -11,5 +11,7 @@ ST-2 outbox (FR-AGT-11, round 4, 2026-09-25): 543 source lines of which only ~33
 
 P0-06 router (PL-03, 2026-09-25): 448 non-test lines (router.py 280). Ranked below a logic defect: bare `raise` of RequestError dropped the attempt list (call record) after a paid fallback. Probe: primary Quota, fallback RequestError, then check `e.attempts`.
 
+P8-01a (2026-09-25): the orchestrator's size count excludes the package CLAUDE.md, pyproject and test data fixtures (394 by that count, 443 with them). State both numbers in evidence.
+
 **Why:** root CLAUDE.md caps diffs at 400 hand-written lines; tests count (only generated, fixtures, lockfiles excluded).
 **How to apply:** run `git diff --stat` first; count code vs docstring lines (ast-based count); grep each new public name for uses outside its definition; check the package pyproject declares what it imports. Review-round fixes tend to append prose to module headers — look there first for cuts.

@@ -1,0 +1,34 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000105",
+  "seq": 105,
+  "ts": "2026-09-29T09:41:45.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "budget.requested",
+  "actor": "A_dir",
+  "target": "w_village_basic",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "needs_you",
+  "credits": 0,
+  "summary": "The Director asks for 20 more credits; 32 of 40 are spent.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "requested": 20,
+    "spent": 32,
+    "cap": 40
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

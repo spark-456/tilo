@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/event.schema.json",
+  "x-version": "1.0.0",
+  "title": "Event",
+  "description": "TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-14 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "id",
+    "seq",
+    "ts",
+    "world_id",
+    "run_id",
+    "type",
+    "actor",
+    "target",
+    "level",
+    "district",
+    "item",
+    "severity",
+    "credits",
+    "summary",
+    "cause",
+    "vis",
+    "authz",
+    "data",
+    "trace"
+  ],
+  "properties": {
+    "v": { "const": "1.0" },
+    "id": { "$ref": "common.schema.json#/$defs/ulid" },
+    "seq": {
+      "description": "Strictly increasing per world; the harness is the one writer per world.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "ts": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+    "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+    "type": { "$ref": "#/$defs/family_verb" },
+    "actor": { "$ref": "#/$defs/actor" },
+    "target": { "$ref": "#/$defs/target" },
+    "level": { "anyOf": [{ "$ref": "common.schema.json#/$defs/level_id" }, { "type": "null" }] },
+    "district": {
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/district_id" }, { "type": "null" }]
+    },
+    "item": { "anyOf": [{ "$ref": "#/$defs/item" }, { "type": "null" }] },
+    "severity": { "$ref": "common.schema.json#/$defs/severity" },
+    "credits": { "$ref": "common.schema.json#/$defs/credits" },
+    "summary": {
+      "description": "Plain-language line for the Story lens and tooltips.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 140
+    },
+    "cause": {
+      "description": "Id of the event that caused this one, for the Trace causation chain.",
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/ulid" }, { "type": "null" }]
+    },
+    "vis": { "$ref": "#/$defs/vis" },
+    "authz": {
+      "description": "Who authorised it (BQ-01). Required on side-effect types; null otherwise.",
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/authz" }, { "type": "null" }]
+    },
+    "data": {
+      "description": "Type-specific payload; its schema is contracts/events/data/<type>.schema.json.",
+      "type": "object"
+    },
+    "trace": { "$ref": "#/$defs/trace" }
+  },
+  "if": {
+    "description": "EV-03: every side-effect type carries authz (PRD 10.4 Audit, FR-HIL-08). This list equals the types registry.yaml marks side_effect: true.",
+    "properties": {
+      "type": {
+        "enum": [
+          "approval.resolved",
+          "budget.granted",
+          "connection.consented",
+          "data.transfer",
+          "policy.applied",
+          "policy.changed"
+        ]
+      }
+    },
+    "required": ["type"]
+  },
+  "then": {
+    "properties": { "authz": { "$ref": "common.schema.json#/$defs/authz" } },
+    "if": {
+      "description": "EV-07: T3 always needs a person (PRD 10.4), so an event authorised by a policy never carries a T3 risk tier in its data. Only side-effect types carry authz (EV-05).",
+      "properties": {
+        "authz": {
+          "type": "object",
+          "properties": { "by": { "const": "policy" } },
+          "required": ["by"]
+        }
+      },
+      "required": ["authz"]
+    },
+    "then": {
+      "properties": { "data": { "properties": { "risk_tier": { "enum": ["T1", "T2"] } } } }
+    }
+  },
+  "$defs": {
+    "family_verb": {
+      "description": "family.verb in lower case, e.g. agent.context_handoff_started.",
+      "type": "string",
+      "pattern": "^[a-z]+(_[a-z]+)*\\.[a-z]+(_[a-z]+)*$"
+    },
+    "actor": {
+      "description": "Who caused it: a person, an agent, a Team Lead, a policy, or system for the platform itself (scheduler, sweeper, connector monitor).",
+      "anyOf": [
+        { "$ref": "common.schema.json#/$defs/user_id" },
+        { "$ref": "common.schema.json#/$defs/agent_id" },
+        { "$ref": "common.schema.json#/$defs/team_lead_id" },
+        { "$ref": "common.schema.json#/$defs/policy_id" },
+        { "const": "system" }
+      ]
+    },
+    "target": {
+      "description": "What it affected: a world, level, district, building, plan unit, gate, island, agent, artifact, person, Team Lead or policy.",
+      "anyOf": [
+        { "$ref": "common.schema.json#/$defs/world_id" },
+        { "$ref": "common.schema.json#/$defs/level_id" },
+        { "$ref": "common.schema.json#/$defs/district_id" },
+        { "$ref": "common.schema.json#/$defs/building_id" },
+        { "$ref": "common.schema.json#/$defs/unit_id" },
+        { "$ref": "common.schema.json#/$defs/gate_id" },
+        { "$ref": "common.schema.json#/$defs/island_id" },
+        { "$ref": "common.schema.json#/$defs/agent_id" },
+        { "$ref": "common.schema.json#/$defs/artifact_id" },
+        { "$ref": "common.schema.json#/$defs/user_id" },
+        { "$ref": "common.schema.json#/$defs/team_lead_id" },
+        { "$ref": "common.schema.json#/$defs/policy_id" }
+      ]
+    },
+    "item": {
+      "description": "A carried item the world draws (PRD 9.3).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "artifact_id", "label"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/item_kind" },
+        "artifact_id": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/artifact_id" }, { "type": "null" }]
+        },
+        "label": { "type": "string", "minLength": 1, "maxLength": 80 }
+      }
+    },
+    "item_kind": {
+      "description": "What the world draws, from the PRD 9.5 world effects: document (a work item an agent carries), crate and scroll (data over a bridge), parcel (a deliverable), blueprint (an approach), note (an answer), decision (a meeting decision card), backpack (a context handoff note).",
+      "type": "string",
+      "enum": ["document", "crate", "scroll", "parcel", "blueprint", "note", "decision", "backpack"]
+    },
+    "vis": {
+      "description": "Server-side redaction scope (PRD 10.1): all, or the districts whose viewers may see it; a list includes the event's own district (EV-13).",
+      "anyOf": [{ "const": "all" }, { "$ref": "#/$defs/district_list" }]
+    },
+    "district_list": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/district_id" }
+    },
+    "trace": {
+      "description": "Trace lens columns (PRD 9.6). Each field is null when the event made no model or tool call.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_role",
+        "profile",
+        "tokens_in",
+        "tokens_out",
+        "tool",
+        "latency_ms",
+        "archive_ref"
+      ],
+      "properties": {
+        "model_role": {
+          "description": "Role name from config/models.yaml, never a model id.",
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/slug" }, { "type": "null" }]
+        },
+        "profile": {
+          "description": "Profile name from config/models.yaml, never a model id.",
+          "anyOf": [{ "$ref": "providers.schema.json#/$defs/profile_id" }, { "type": "null" }]
+        },
+        "tokens_in": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "tokens_out": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "tool": {
+          "description": "Tool or connector action called, e.g. send_email.",
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/slug" }, { "type": "null" }]
+        },
+        "latency_ms": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "archive_ref": { "anyOf": [{ "$ref": "#/$defs/archive_ref" }, { "type": "null" }] }
+      }
+    },
+    "archive_ref": {
+      "description": "Raw archive record (PRD 13.2): <run id>/<record seq in that run's archive>.",
+      "type": "string",
+      "pattern": "^r_[0-9A-Za-z_]{1,48}/[0-9]{1,9}$"
+    },
+    "answer_source": {
+      "description": "Who answered a question or meeting (BQ-04): a person, a Team Lead, the card's safe default applied at timeout, or an earlier decision (FR-AGT-07). Never a model's own choice.",
+      "type": "string",
+      "enum": ["person", "team_lead", "default", "decision"]
+    }
+  }
+}

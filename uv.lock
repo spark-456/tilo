@@ -7,6 +7,8 @@ members = [
     "tilo",
     "tilo-api",
     "tilo-contracts",
+    "tilo-evals",
+    "tilo-metering",
     "tilo-providers",
 ]
 
@@ -1040,6 +1042,36 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "pydantic", specifier = ">=2.11" }]
+
+[[package]]
+name = "tilo-evals"
+version = "0.1.0"
+source = { editable = "evals" }
+dependencies = [
+    { name = "jsonschema" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jsonschema", specifier = ">=4.18" },
+    { name = "pyyaml", specifier = ">=6.0" },
+]
+
+[[package]]
+name = "tilo-metering"
+version = "0.1.0"
+source = { editable = "packages/metering" }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "tilo-contracts" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
+]
 
 [[package]]
 name = "tilo-providers"

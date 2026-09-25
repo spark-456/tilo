@@ -30,7 +30,7 @@ class RouterError(Exception):
         self.attempts = list(attempts or [])
 
 
-class BudgetExceededError(RouterError): ...  # PL-03: the next call costs more than the budget left; never sent
+class BudgetExceededError(RouterError): ...  # PL-03: no candidate left fits the budget; nothing over it is sent
 
 
 class TokenCapExceededError(RouterError): ...  # EFF-03: over max_input_tokens even after compacting
@@ -118,6 +118,9 @@ def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output
 
 
 def _exhausted(run: RouterResult) -> RouterError:
+    if run.attempts and run.attempts[-1].error_type == "BudgetExceededError":  # the budget ended the run
+        message = f"PL-03: role {run.role_id!r} has no candidate left that fits the remaining budget"
+        return BudgetExceededError(message, run.attempts)
     if run.attempts and all(a.error_type == "TokenCapExceededError" for a in run.attempts):
         message = f"EFF-03: role {run.role_id!r} is over max_input_tokens for every candidate"
         return TokenCapExceededError(message, run.attempts)
@@ -126,7 +129,7 @@ def _exhausted(run: RouterResult) -> RouterError:
 
 def _embed_inputs(request: Any) -> list[str]:
     """The texts an embed request carries, in the same shape the adapters themselves read (PL-02: `{"input":
-    [...]}` or the raw list/string) -- used only to price the call (BQ-52); the request goes to the adapter
+    [...]}` or the raw list/string) -- used only to price the call (BQ-61); the request goes to the adapter
     unchanged."""
     raw = request["input"] if isinstance(request, dict) else request
     return [raw] if isinstance(raw, str) else list(raw)
@@ -177,14 +180,12 @@ class Router:
         """PL-03 choke point: EVERY touch of a candidate (building it, `count_tokens` for its cap and price,
         generate, stream up to its first chunk, embed) runs inside this block. It records exactly one
         attempt and hands any exception to `_fail`: a fallback-worthy one is suppressed (the attempt's
-        `error_type` is set and the caller moves on), anything else leaves as a RouterError. A
-        BudgetExceededError (PL-03: the call is never sent) passes through unrecorded."""
+        `error_type` is set and the caller moves on), anything else leaves as a RouterError. A candidate the
+        budget cannot cover is recorded like that too (BudgetExceededError, never sent) and the next one tried."""
         attempt = RouterAttempt(profile_id, self._config.profiles[profile_id].provider, "ok", reason=reason)
         start = time.perf_counter()
         try:
             yield attempt
-        except BudgetExceededError:
-            raise
         except Exception as error:
             run.attempts.append(attempt)
             _fail(run, attempt, error)
@@ -195,7 +196,7 @@ class Router:
 
     def _start(self, role_id: str, req: GenerateRequest, outs: list[str] | None, cap: Any, budget: Any) -> RouterResult:
         role, candidates = self._config.roles[role_id], self._candidates(role_id, cap)
-        max_output = next(n for n in (req.max_output_tokens, role.max_output_tokens, 1024) if n is not None)  # BQ-54
+        max_output = next(n for n in (req.max_output_tokens, role.max_output_tokens, 1024) if n is not None)  # BQ-63
         request = req.model_copy(update={"max_output_tokens": max_output})
         return RouterResult(role_id, request, candidates, budget, raw_prompt=req.prompt, tool_outputs=list(outs or []))
 
@@ -211,7 +212,7 @@ class Router:
         return run.request.model_copy(update={"prompt": prompt})
 
     def _charge(self, run: RouterResult, profile_id: str, provider: ModelProvider, text: str, out: int) -> None:
-        """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-52)."""
+        """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-61)."""
         if run.budget is not None:
             quote = self._config.price(profile_id)
             credits = self._config.credits((provider.count_tokens(text) * quote.input + out * quote.output) / 1e6)
@@ -315,7 +316,7 @@ class Router:
         for profile_id in run.candidates:  # EFF-02: cheapest first
             with self._candidate(run, profile_id, reason) as attempt:
                 provider = self._provider(role_id, profile_id)
-                # priced like a generate() call with no output tokens (BQ-52), with each candidate's tokenizer
+                # priced like a generate() call with no output tokens (BQ-61), with each candidate's tokenizer
                 self._charge(run, profile_id, provider, "\n\n".join(_embed_inputs(request)), 0)
                 embedding = provider.embed(request)
             if not attempt.error_type:

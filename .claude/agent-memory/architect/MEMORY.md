@@ -1,1 +1,1 @@
-- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS quirks, invalid fixtures, pin safety lists, policy/L2/gate-answerer binding, CRLF, BQ clashes
+- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS quirks, invalid fixtures, pin safety lists, bind author stamps, gate-answerer roles, CRLF, BQ clashes

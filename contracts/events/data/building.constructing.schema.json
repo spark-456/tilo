@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/building.constructing.schema.json",
+  "x-version": "1.0.0",
+  "title": "BuildingConstructingData",
+  "description": "data of building.constructing (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["unit"],
+  "properties": { "unit": { "$ref": "../../common.schema.json#/$defs/unit_id" } }
+}

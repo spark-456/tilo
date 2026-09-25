@@ -1,0 +1,24 @@
+{
+  "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W5",
+  "org_id": "org_acme",
+  "question": "May Tilo reply to suppliers outside business hours?",
+  "domain": null,
+  "answer": "Yes, for suppliers already in the CRM; ask me about anyone new.",
+  "option_id": "yes_known_only",
+  "answered_by": {
+    "by": "person",
+    "ref": "u_owner",
+    "at": "2026-09-29T09:30:00.000Z"
+  },
+  "source": {
+    "world_id": "w_village_basic",
+    "run_id": "r_village_basic_1",
+    "card_id": "01J8Z3K4M5N6P7Q8R9S0T1V2W1"
+  },
+  "scope": {
+    "worlds": "all",
+    "districts": "all"
+  },
+  "created_at": "2026-09-29T09:30:01.000Z",
+  "expires_at": null
+}

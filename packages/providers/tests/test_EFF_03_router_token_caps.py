@@ -8,14 +8,14 @@ outputs first, then truncate the longest tool output with a marker) or
 refuse with a clear error; never send over the cap; always pass
 `max_output_tokens`.
 
-Ambiguity (docs/open-questions.md BQ-53): `GenerateRequest` (frozen in
+Ambiguity (docs/open-questions.md BQ-62): `GenerateRequest` (frozen in
 ticket P0-05, `extra="forbid"`) has no field for prior tool call outputs, so
 these are passed to `Router.generate(..., tool_outputs=[...])` (oldest
 first) and folded into the final prompt the router sends the provider,
 after compaction. `ScriptedModelProvider.count_tokens` counts words (like
 `FakeModelProvider`), so these tests use word counts as the token cap.
 
-Ambiguity (docs/open-questions.md BQ-54): when both the caller and the
+Ambiguity (docs/open-questions.md BQ-63): when both the caller and the
 role's config set `max_output_tokens`, the caller's explicit value is
 respected; the role's value only fills in when the caller left it unset.
 """

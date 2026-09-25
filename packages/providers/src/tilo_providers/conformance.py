@@ -1,5 +1,5 @@
 """tilo_providers.conformance — PL-05 checks per profile on a recording or fake in CI (live only with `LIVE=1`);
-writes `config/conformance/<profile_id>.json` (BQ-55). Run via `just conformance`."""
+writes `config/conformance/<profile_id>.json` (BQ-64). Run via `just conformance`."""
 
 from __future__ import annotations
 

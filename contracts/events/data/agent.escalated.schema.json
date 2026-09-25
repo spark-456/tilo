@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.escalated.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentEscalatedData",
+  "description": "data of agent.escalated (PRD 9.5). A must-ask rule fired (PRD 8.3): an ambiguous brief, a trade-off outside policy, a step touching money, personal data, legal terms or outside communication, or a unit that failed 3 times.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reason"],
+  "properties": {
+    "reason": {
+      "type": "string",
+      "enum": ["ambiguous_brief", "trade_off", "sensitive_step", "repeated_failure"]
+    }
+  }
+}

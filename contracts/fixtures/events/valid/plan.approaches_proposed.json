@@ -1,0 +1,32 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000002",
+  "seq": 2,
+  "ts": "2026-09-29T09:30:04.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "plan.approaches_proposed",
+  "actor": "A_dir",
+  "target": "w_village_basic",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "needs_you",
+  "credits": 1.5,
+  "summary": "The Director proposed two approaches: quick or careful.",
+  "cause": "01JB5VQ0000000000000000001",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "approach_count": 2
+  },
+  "trace": {
+    "model_role": "director",
+    "profile": "large",
+    "tokens_in": 3100,
+    "tokens_out": 620,
+    "tool": null,
+    "latency_ms": 4200,
+    "archive_ref": "r_village_basic_1/2"
+  }
+}

@@ -84,4 +84,27 @@ def test_PL_03_budget_is_checked_before_a_fallback_call_too(providers_config):
 
     assert len(primary.calls) == 1
     assert fallback.calls == [], "the fallback call would exceed the remaining budget"
-    assert [a.profile_id for a in excinfo.value.attempts] == ["large"]
+    attempts = [(a.profile_id, a.error_type) for a in excinfo.value.attempts]
+    assert attempts == [("large", "QuotaError"), ("medium", "BudgetExceededError")]
+
+
+def test_PL_03_router_picks_the_candidate_the_budget_can_cover(providers_config):
+    """PL-03 "picks by role, capability and budget": director is large (2.0/8.0) then medium (0.5/2.0).
+    A budget between their prices skips large without sending anything and completes on medium."""
+    primary = ScriptedModelProvider("large", [ScriptedCall(text="must never be reached")])
+    fallback = ScriptedModelProvider("medium", [ScriptedCall(text="ok from medium")])
+    request = GenerateRequest(prompt="Summarise the quarter.")
+    tokens = primary.count_tokens(request.prompt)
+    large_cost = providers_config.credits((tokens * 2.0 + 1024 * 8.0) / 1_000_000)
+    medium_cost = providers_config.credits((tokens * 0.5 + 1024 * 2.0) / 1_000_000)
+    assert medium_cost < 1.0 < large_cost
+
+    result = _router(providers_config, {"large": primary, "medium": fallback}).generate("director", request, budget=1.0)
+
+    assert (result.outcome, result.response.text) == ("ok", "ok from medium")
+    assert primary.calls == [], "a candidate the budget cannot cover is never sent"
+    skipped, used = result.attempts
+    assert (skipped.profile_id, skipped.outcome, skipped.error_type) == ("large", "error", "BudgetExceededError")
+    assert (used.profile_id, used.outcome) == ("medium", "ok")
+    assert "BudgetExceededError" in (used.reason or ""), "the Trace must say why the fallback happened"
+    assert result.budget == pytest.approx(1.0 - medium_cost)

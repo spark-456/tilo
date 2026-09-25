@@ -1,0 +1,30 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000115",
+  "seq": 115,
+  "ts": "2026-09-29T09:41:55.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "agent.retired",
+  "actor": "A_l1",
+  "target": "A_s1",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The triage Specialist finished and retired.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {},
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

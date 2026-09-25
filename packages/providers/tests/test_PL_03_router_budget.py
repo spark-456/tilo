@@ -3,7 +3,7 @@ scope: "a request over the role's remaining budget is refused before any
 call". Public interface: `tilo_providers.router.Router.generate(...,
 budget=...)`.
 
-Ambiguity (docs/open-questions.md BQ-52): the PRD does not give an exact
+Ambiguity (docs/open-questions.md BQ-61): the PRD does not give an exact
 cost-estimate formula for "remaining budget" -- only PL-06 (`config.price`)
 and PRD 14.1 (`config.credits`) exist to build one from. These tests do not
 assume a specific formula: they only exercise the two directions PL-03 must
