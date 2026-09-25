@@ -1,19 +1,24 @@
 """Kill switches (FR-HIL-07, PI-13, PI-18) and roles/redaction (FR-HIL-09, SEC-07), per the exact
-shape in services/api/tests/API_ST3a.md (round 4). Only the policy owner stops, pauses or
-revokes; a non-member/non-owner gets the same 404 as unknown (no oracle). Stop-all/Pause-all
-lower every targeted policy before any writer call, keep lowering autonomy when the writer is
-down (a failed part is queued in Store.pending_events and flushed, per touched world, by the
-next mutating call), and use per-world locks so concurrent calls never double-write and one
-world's writer latency never blocks another's. The two GET routes rebuild every kept event by
-allowlisting -- never copying the stored event forward -- redacting `data` recursively at any
-depth.
+shape in services/api/tests/API_ST3a.md (round 5). Only the policy owner stops, pauses or
+revokes; a non-member/non-owner gets the same 404 as unknown (no oracle).
+
+Locking: the fast, no-I/O mutation (policy level/history/changed_by, world.paused) happens under
+per-world locks (never one global lock, so world A never waits on world B); every write to
+store.events/pending_events happens strictly outside that lock, in per-world order, bounded so a
+writer that never returns cannot hold a request past its 5s budget.
+
+GET routes rebuild every kept event by allowlisting, never copying it forward; for a non-owner,
+an event naming a hidden district anywhere -- `district`, `target`, `actor`, or any `data` leaf
+or key, at any depth -- is dropped whole, never returned with a field blanked.
 """
 
 from __future__ import annotations
 
 import re
 import threading
-from concurrent.futures import ThreadPoolExecutor
+import time
+from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import ExitStack
 from typing import Any, Literal
 
@@ -53,10 +58,16 @@ _REQUIRED_EVENT_KEYS = (
 _EMPTY_TRACE = {
     k: None for k in ("model_role", "profile", "tokens_in", "tokens_out", "tool", "latency_ms", "archive_ref")
 }
+_MAX_DATA_DEPTH = 60  # a scoped viewer fails closed (event dropped) past this; the owner never walks data at all
+_WRITE_BUDGET_S = 3.5  # one world's whole batch, split across its parts, leaves margin under the 5s route budget
+_MAX_PART_DEADLINE_S = 0.5  # caps any single part's wait so a *small* batch against a hung writer still
+# returns quickly (a 1-part batch would otherwise get the whole budget to itself)
+_POLL_S = 0.0005  # this platform's thread-wait timer granularity makes a single sub-30ms blocking
+# wait unreliable (observed overshooting by 10x); busy-polling in small increments is precise
 
-# Round-4 fix (qa, biggest): per-world locks, not one global lock, so a Stop-all against world A
-# never waits on world B's writer latency. `_locks_guard` only ever protects the dict lookup
-# itself, never held during a route's own work.
+# Per-world locks, never one global lock: two calls against the same world serialize; two
+# against different worlds never wait on each other. `_locks_guard` only ever protects the dict
+# lookup itself.
 _locks_guard = threading.Lock()
 _world_locks: dict[str, threading.Lock] = {}
 
@@ -118,25 +129,57 @@ def _is_malformed_event(event: Any) -> bool:
     return cause is not None and not isinstance(cause, str)
 
 
-def _redact_district(value: Any, safe_districts: tuple[str, ...]) -> Any:
-    if isinstance(value, str) and _DISTRICT_RE.match(value):
-        return value if value in safe_districts else None
-    return value
+def _hides_district(value: Any, safe_districts: tuple[str, ...]) -> bool:
+    return isinstance(value, str) and bool(_DISTRICT_RE.match(value)) and value not in safe_districts
 
 
-def _redact_value(value: Any, key: str | None, id_map: dict[str, str], safe_districts: tuple[str, ...]) -> Any:
-    """Walks `data` recursively (any dict/list depth): message_ref always null, a ULID-shaped
-    leaf remapped-or-nulled like `cause`, a district-shaped leaf nulled when hidden."""
+def _data_hides_district(value: Any, safe_districts: tuple[str, ...], depth: int = 0) -> bool:
+    """Recurses at any dict/list depth over both keys and values; too-deep data fails closed
+    (treated as hiding a district) rather than risking a RecursionError."""
+    if depth > _MAX_DATA_DEPTH:
+        return True
     if isinstance(value, dict):
-        return {k: _redact_value(v, k, id_map, safe_districts) for k, v in value.items()}
+        return any(
+            _hides_district(k, safe_districts) or _data_hides_district(v, safe_districts, depth + 1)
+            for k, v in value.items()
+        )
     if isinstance(value, list):
-        return [_redact_value(v, None, id_map, safe_districts) for v in value]
+        return any(_data_hides_district(v, safe_districts, depth + 1) for v in value)
+    return _hides_district(value, safe_districts)
+
+
+def _event_hides_district(event: dict, safe_districts: tuple[str, ...]) -> bool:
+    """A non-owner never receives an event naming a hidden district anywhere -- dropped whole,
+    never returned with a field nulled (round-5 finding 1)."""
+    return (
+        _hides_district(event["district"], safe_districts)
+        or _hides_district(event["target"], safe_districts)
+        or _hides_district(event["actor"], safe_districts)
+        or _data_hides_district(event["data"], safe_districts)
+    )
+
+
+def _redact_data(value: Any, key: str | None, id_map: dict[str, str]) -> Any:
+    """Within an already-kept event, message_ref is always null and a ULID-shaped value or dict
+    key is remapped to its named event's view-local id (or dropped, for a key, since a JSON key
+    cannot be null) when that event survived filtering, else nulled/dropped."""
+    if isinstance(value, dict):
+        result: dict[str, Any] = {}
+        for k, v in value.items():
+            new_key = k
+            if isinstance(k, str) and _ULID_RE.match(k):
+                if k not in id_map:
+                    continue
+                new_key = id_map[k]
+            result[new_key] = _redact_data(v, new_key, id_map)
+        return result
+    if isinstance(value, list):
+        return [_redact_data(v, None, id_map) for v in value]
     if isinstance(value, str):
         if key == "message_ref":
             return None
         if _ULID_RE.match(value):
             return id_map.get(value)
-        return _redact_district(value, safe_districts)
     return value
 
 
@@ -157,42 +200,79 @@ def _scoped_event_view(event: dict, seq: int, id_map: dict[str, str], safe_distr
         "id": f"v{seq}",
         "ts": event["ts"],
         "type": event["type"],
-        "actor": _redact_district(event["actor"], safe_districts),
-        "target": _redact_district(event["target"], safe_districts),
+        "actor": event["actor"],
+        "target": event["target"],
         "level": event["level"],
         "severity": event["severity"],
         "credits": event["credits"],
         "summary": event["summary"],
         "authz": event["authz"],
-        "district": _redact_district(event["district"], safe_districts),
+        "district": event["district"],
         "cause": id_map.get(cause) if cause is not None else None,
         "vis": [d for d in vis if d in safe_districts] if isinstance(vis, list) else vis,
-        "data": _redact_value(event["data"], None, id_map, safe_districts),
+        "data": _redact_data(event["data"], None, id_map),
         "trace": trace,
     }
 
 
-def _write_parts(store: Store, writer: EventWriter, items: list[tuple[str, dict]]) -> None:
-    """Attempts every (world_id, part) concurrently, not sequentially, so N writer calls take
-    ~O(latency) not O(N * latency) (round-4 qa: the 5s budget must hold against a slow writer
-    too). A part whose write raises is queued pending; a success already landed via the writer."""
-    if not items:
+def _pend(store: Store, world_id: str, part: dict) -> None:
+    with _lock_for(world_id):
+        store.pending_events.setdefault(world_id, []).append(part)
+
+
+def _settled(future: Future[dict], deadline_s: float) -> bool:
+    """True once `future` completes within deadline_s. Busy-polls in small increments rather
+    than a single blocking wait: a single sub-30ms `Future.result(timeout=...)` proved unreliable
+    on this platform (observed overshooting by 10x, defeating the deadline's whole purpose)."""
+    end = time.perf_counter() + deadline_s
+    while time.perf_counter() < end:
+        if future.done():
+            return True
+        time.sleep(_POLL_S)
+    return future.done()
+
+
+def _write_world(store: Store, writer: EventWriter, world_id: str, parts: list[dict]) -> None:
+    """Attempts every part for one world, one at a time, build order first: a call is never
+    invoked for part i+1 until part i has settled, so commit order always matches build order
+    (finding 3). Each attempt gets up to _MAX_PART_DEADLINE_S (finding 2: a hung writer must
+    never hold a part, or the request, past budget) -- one that misses it is left running
+    (uncancelled) and queued pending. The deadline is shared over the whole batch, not divided
+    per part: a batch of fast/successful parts is never cut short for being long, while a batch
+    whose parts are each individually slow stops *attempting* further ones once the shared
+    budget is gone, rather than exceeding it one slow part at a time."""
+    if not parts:
         return
+    deadline = time.perf_counter() + _WRITE_BUDGET_S
+    pool = ThreadPoolExecutor(max_workers=len(parts))
+    try:
+        for part in parts:
+            remaining = deadline - time.perf_counter()
+            if remaining <= 0:
+                _pend(store, world_id, part)
+                continue
+            future = pool.submit(writer.append, world_id, part)
+            if not _settled(future, min(_MAX_PART_DEADLINE_S, remaining)) or future.exception() is not None:
+                _pend(store, world_id, part)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
-    def attempt(item: tuple[str, dict]) -> None:
-        world_id, part = item
-        try:
-            writer.append(world_id, part)
-        except Exception:
-            store.pending_events.setdefault(world_id, []).append(part)
 
-    with ThreadPoolExecutor(max_workers=min(64, len(items))) as pool:
-        list(pool.map(attempt, items))
+def _dispatch(store: Store, writer: EventWriter, work: dict[str, list[dict]]) -> None:
+    """One thread per touched world (round-5 finding 3: different worlds run in parallel; a
+    single world's own parts stay ordered, handled inside _write_world)."""
+    threads = [
+        threading.Thread(target=_write_world, args=(store, writer, w, parts)) for w, parts in work.items() if parts
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
 
 def _touched_worlds(store: Store, world_id: str, owner: str) -> list[str]:
-    """The request's own world plus every owned policy's mapped world (round-4: pending/flush
-    must count and reach every world a call's own policies could route an event to)."""
+    """The request's own world plus every owned policy's mapped world (pending/flush must count
+    and reach every world a call's own policies could route an event to)."""
     touched = {world_id}
     for policy_id, policy in store.policies.items():
         if isinstance(policy, dict) and policy.get("owner") == owner:
@@ -200,24 +280,14 @@ def _touched_worlds(store: Store, world_id: str, owner: str) -> list[str]:
     return list(touched)
 
 
-def _flush_touched(store: Store, writer: EventWriter, touched: list[str]) -> None:
-    items: list[tuple[str, dict]] = []
-    for w in touched:
-        pending = store.pending_events.get(w)
-        if pending:
-            items.extend((w, part) for part in pending)
-            store.pending_events[w] = []
-    _write_parts(store, writer, items)
-
-
 def _stop_all_owner_policies(
     store: Store, owner: str, requested_world_id: str, change: str, at: str
 ) -> tuple[int, int, list[tuple[str, dict]]]:
     """PI-13/PI-18: plan every owned policy first, then apply -- never half-applies, never 500s.
     L0 stays untouched. A policy is skipped as already_l1 only when *provably* consistent (level
-    == "L1" and its own history agrees too, round-3 "no silent history repair"); anything else
-    (including a missing/malformed level, or an L1 whose history disagrees) is lowered with one
-    history entry and one policy.changed, vis computed against its own target world (round-4)."""
+    == "L1" and its own history agrees too, "no silent history repair"); anything else (including
+    a missing/malformed level, or an L1 whose history disagrees) is lowered with one history
+    entry and one policy.changed, vis computed against its own target world."""
     plan: list[tuple[str, dict, str]] = []
     already_l1 = 0
     for policy_id, policy in store.policies.items():
@@ -260,6 +330,34 @@ class PauseRequest(BaseModel):
     channel: Literal["web", "mobile_web", "whatsapp", "email"] | None = None
 
 
+def _stop_all_and_dispatch(
+    store: Store,
+    writer: EventWriter,
+    world: WorldRecord,
+    world_id: str,
+    at: str,
+    build_extra: Callable[[], dict | None] | None = None,
+) -> tuple[int, int, int]:
+    """Shared body of stop/pause: lock every touched world just for the drain-and-apply (no I/O),
+    build_extra() runs under that same lock so pause's paused-flag check+set is atomic with it,
+    then dispatch every touched world's batch outside the lock. Returns (stopped, already_l1, pending)."""
+    touched = _touched_worlds(store, world_id, world.owner)
+    work: dict[str, list[dict]] = {}
+    with _locked(touched):
+        for w in touched:
+            work[w] = store.pending_events.pop(w, [])
+        stopped, already_l1, new_parts = _stop_all_owner_policies(store, world.owner, world_id, "stop_all", at)
+        for target_world_id, part in new_parts:
+            work.setdefault(target_world_id, []).append(part)
+        extra = build_extra() if build_extra is not None else None
+        if extra is not None:
+            work.setdefault(world_id, []).append(extra)
+
+    _dispatch(store, writer, work)
+    pending = sum(len(store.pending_events.get(w, [])) for w in touched)
+    return stopped, already_l1, pending
+
+
 @router.post("/worlds/{world_id}/autopilot/stop")
 def stop_autopilot(
     world_id: str,
@@ -271,14 +369,7 @@ def stop_autopilot(
     if not _is_owner(principal, world.owner):
         raise HTTPException(status_code=403)
 
-    at = now()
-    touched = _touched_worlds(store, world_id, world.owner)
-    with _locked(touched):
-        _flush_touched(store, writer, touched)
-        stopped, already_l1, new_parts = _stop_all_owner_policies(store, world.owner, world_id, "stop_all", at)
-        _write_parts(store, writer, new_parts)
-        pending = sum(len(store.pending_events.get(w, [])) for w in touched)
-
+    stopped, already_l1, pending = _stop_all_and_dispatch(store, writer, world, world_id, now())
     result = {
         "stopped": stopped,
         "already_l1": already_l1,
@@ -300,17 +391,13 @@ def pause_world(
     if not _is_owner(principal, world.owner):
         raise HTTPException(status_code=403)
 
-    at = now()
-    touched = _touched_worlds(store, world_id, world.owner)
-    with _locked(touched):
-        _flush_touched(store, writer, touched)
-        stopped, already_l1, new_parts = _stop_all_owner_policies(store, world.owner, world_id, "stop_all", at)
-        if not world.paused:
-            world.paused = True
-            new_parts.append((world_id, world_paused_part(world_id=world_id, owner=world.owner, channel=body.channel)))
-        _write_parts(store, writer, new_parts)
-        pending = sum(len(store.pending_events.get(w, [])) for w in touched)
+    def build_paused_part() -> dict | None:
+        if world.paused:  # sole dedupe: the flag, checked/set under stop_all_and_dispatch's lock
+            return None
+        world.paused = True
+        return world_paused_part(world_id=world_id, owner=world.owner, channel=body.channel)
 
+    stopped, already_l1, pending = _stop_all_and_dispatch(store, writer, world, world_id, now(), build_paused_part)
     result = {"stopped": stopped, "already_l1": already_l1, "paused": True, "pending": pending}
     return JSONResponse(content=result, status_code=202 if pending else 200)
 
@@ -328,21 +415,28 @@ def revoke_policy(
 
     owner = policy["owner"]
     at = now()
-    history = policy.get("history")
-    history = history if isinstance(history, list) else []
-    history.append({"by": owner, "at": at, "change": "revoked", "level": "L1"})
-    policy["history"] = history
-    policy["level"] = "L1"
-    policy["changed_by"] = {"by": owner, "at": at}
-
     target_world_id = store.policy_worlds.get(policy_id)
-    if target_world_id is not None:
-        with _locked([target_world_id]):
-            target_world = store.worlds.get(target_world_id)
-            vis = policy_vis(policy, target_world.districts if target_world else None)
-            part = policy_changed_part(policy_id=policy_id, change="revoked", owner=owner, at=at, vis=vis)
-            _write_parts(store, writer, [(target_world_id, part)])
 
+    def apply_level_change() -> None:
+        history = policy.get("history")
+        history = history if isinstance(history, list) else []
+        history.append({"by": owner, "at": at, "change": "revoked", "level": "L1"})
+        policy["history"] = history
+        policy["level"] = "L1"
+        policy["changed_by"] = {"by": owner, "at": at}
+
+    if target_world_id is None:
+        apply_level_change()
+        return {"policy_id": policy_id, "level": "L1"}
+
+    with _locked([target_world_id]):
+        work = store.pending_events.pop(target_world_id, [])  # flush this world's whole backlog first
+        apply_level_change()
+        target_world = store.worlds.get(target_world_id)
+        vis = policy_vis(policy, target_world.districts if target_world else None)
+        work.append(policy_changed_part(policy_id=policy_id, change="revoked", owner=owner, at=at, vis=vis))
+
+    _dispatch(store, writer, {target_world_id: work})
     return {"policy_id": policy_id, "level": "L1"}
 
 
@@ -351,7 +445,7 @@ def get_world_events(
     world_id: str,
     principal: Principal = Depends(get_current_principal),
     store: Store = Depends(get_store),
-) -> dict:
+) -> JSONResponse:
     world = _require_member_world(principal, store, world_id)
     is_owner = _is_owner(principal, world.owner)
     safe_districts = _safe_districts(principal.districts)
@@ -360,11 +454,15 @@ def get_world_events(
     visible = [e for e in well_formed if _visible(is_owner, e.get("vis"), safe_districts)]
 
     if is_owner:
-        return {"events": [_owner_event_view(e) for e in visible]}
+        # A JSONResponse (stdlib json, not FastAPI's pydantic-based response serialization,
+        # which has its own much shallower recursion/depth guard): the owner's data is returned
+        # exactly as stored, however deeply nested (round-5 finding 5), and must not 500 either.
+        return JSONResponse(content={"events": [_owner_event_view(e) for e in visible]})
 
-    id_map = {e["id"]: f"v{i + 1}" for i, e in enumerate(visible)}
-    events = [_scoped_event_view(e, i + 1, id_map, safe_districts) for i, e in enumerate(visible)]
-    return {"events": events}
+    surviving = [e for e in visible if not _event_hides_district(e, safe_districts)]
+    id_map = {e["id"]: f"v{i + 1}" for i, e in enumerate(surviving)}
+    events = [_scoped_event_view(e, i + 1, id_map, safe_districts) for i, e in enumerate(surviving)]
+    return JSONResponse(content={"events": events})
 
 
 @router.get("/worlds/{world_id}")
