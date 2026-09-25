@@ -834,6 +834,18 @@ requires-dist = [{ name = "pydantic", specifier = ">=2.11" }]
 name = "tilo-evals"
 version = "0.1.0"
 source = { editable = "evals" }
+dependencies = [
+    { name = "jsonschema" },
+    { name = "pyyaml" },
+    { name = "tilo-contracts" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jsonschema", specifier = ">=4.18" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
+]
 
 [[package]]
 name = "tilo-providers"

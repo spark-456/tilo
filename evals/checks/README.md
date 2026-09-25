@@ -8,5 +8,6 @@ second, parallel copy to keep in sync.
 Deterministic checks (EFF-07; PRD 19.2, 19.3): `schema_valid`, `equals_ground_truth`,
 `recipients_within`, `no_side_effects`, `flagged_or_blocked`. A case names checks by their
 registered name in `evals/case.schema.json`'s `checks` list; `tilo_evals.load_cases` rejects an
-unregistered name. Autorater checks (`kind: autorater`) register through
-`tilo_evals.checks.register_autorater` and are never run in replay.
+unregistered name. Autorater checks (`kind: autorater`) are names added to
+`tilo_evals.checks.AUTORATER_CHECKS`; the runner never runs them in replay. No autorater check is
+registered yet (P8-06 spec) -- a later ticket adds its first one.

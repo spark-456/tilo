@@ -32,9 +32,12 @@ from __future__ import annotations
 import json
 import re
 
+import pytest
 import yaml
 from conftest import make_event, write_case, write_evals_config, write_recording
 from tilo_evals.__main__ import main
+from tilo_evals.config import EvalsConfig
+from tilo_evals.runner import run_pass
 
 # fake_repo is a pytest fixture defined in this directory's conftest.py;
 # pytest discovers it by name from every test function's parameter list
@@ -207,6 +210,113 @@ def test_EFF_07_live_flag_without_LIVE_env_refuses(fake_repo, monkeypatch, capsy
     captured = capsys.readouterr()
     text = (captured.out + captured.err).lower()
     assert "live=1" in text, "the refusal must name LIVE=1"
+
+
+@pytest.mark.parametrize("bad_credits", [-1000, float("nan")], ids=["negative", "nan"])
+def test_EFF_07_bad_recording_credits_do_not_corrupt_the_credit_cap(fake_repo, bad_credits):
+    """qa review (round 1): a recording's credits value must be validated,
+    not trusted -- a negative or NaN value must not let cases past the
+    EFF-07 credit cap. Repro (qa review): 5 cases costing 40 credits each
+    against a cap of 100, the first with bad credits; without the fix all 5
+    ran and `spent` was -840.0 or nan. With the fix the bad case is not
+    runnable, and the remaining 4 (40 credits each, cap 100) stop after 2,
+    exactly like the baseline with no bad values.
+    """
+    cases_root = fake_repo / "evals" / "cases"
+    write_evals_config(fake_repo / "config", credit_cap={"full": 100, "smoke": 100, "gate": 100})
+
+    bad_recording = fake_repo / "evals" / "recordings" / "E-RED-01.jsonl"
+    write_recording(bad_recording, [make_event(seq=1, type="world.started")], outputs={}, credits=bad_credits)
+    write_case(
+        cases_root,
+        case_id="E-RED-01",
+        group="E-RED",
+        ground_truth={"ok": True},
+        checks=[{"check": "no_side_effects", "args": {}}],
+        recording=_recording_relpath(fake_repo, bad_recording),
+    )
+    for n in (2, 3, 4, 5):
+        case_id = f"E-RED-0{n}"
+        recording = fake_repo / "evals" / "recordings" / f"{case_id}.jsonl"
+        write_recording(recording, [make_event(seq=1, type="world.started")], outputs={}, credits=40.0)
+        write_case(
+            cases_root,
+            case_id=case_id,
+            group="E-RED",
+            ground_truth={"ok": True},
+            checks=[{"check": "no_side_effects", "args": {}}],
+            recording=_recording_relpath(fake_repo, recording),
+        )
+
+    result = run_pass(pass_kind="full", config=EvalsConfig.load(str(fake_repo / "config" / "evals.yaml")))
+
+    assert [c.id for c in result.not_runnable] == ["E-RED-01"], "the bad-credits case is not runnable, never counted"
+    assert result.spent == 80.0, "spent must stay a sane, finite total (2 of the 4 good cases at 40 credits each)"
+    assert result.stopped_at_cap is True
+    assert {r.case.id for r in result.ran} == {"E-RED-02", "E-RED-03"}
+    assert {c.id for c in result.not_run} == {"E-RED-04", "E-RED-05"}
+
+
+def test_EFF_07_malformed_recording_line_is_not_runnable_pass_continues(fake_repo):
+    """qa review: a malformed (non-JSON, or non-object) recording line must
+    raise ExecutorError and mark the case not-runnable, never crash the
+    whole pass."""
+    cases_root = fake_repo / "evals" / "cases"
+    write_evals_config(fake_repo / "config", credit_cap={"full": 100, "smoke": 100, "gate": 100})
+
+    bad_recording = fake_repo / "evals" / "recordings" / "E-PLAN-01.jsonl"
+    bad_recording.parent.mkdir(parents=True, exist_ok=True)
+    bad_recording.write_bytes(b"not json at all\n")
+    write_case(
+        cases_root,
+        case_id="E-PLAN-01",
+        group="E-PLAN",
+        ground_truth={"ok": True},
+        checks=[{"check": "no_side_effects", "args": {}}],
+        recording=_recording_relpath(fake_repo, bad_recording),
+    )
+
+    ok_recording = fake_repo / "evals" / "recordings" / "E-PLAN-02.jsonl"
+    write_recording(ok_recording, [make_event(seq=1, type="world.started")], outputs={}, credits=5.0)
+    write_case(
+        cases_root,
+        case_id="E-PLAN-02",
+        group="E-PLAN",
+        ground_truth={"ok": True},
+        checks=[{"check": "no_side_effects", "args": {}}],
+        recording=_recording_relpath(fake_repo, ok_recording),
+    )
+
+    result = run_pass(pass_kind="full", config=EvalsConfig.load(str(fake_repo / "config" / "evals.yaml")))
+
+    assert [c.id for c in result.not_runnable] == ["E-PLAN-01"]
+    assert {r.case.id for r in result.ran} == {"E-PLAN-02"}, "the pass goes on and still runs the good case"
+
+
+def test_EFF_07_check_with_bad_args_fails_the_case_without_crashing_the_pass(fake_repo):
+    """qa review: a check whose args contain an unknown keyword must fail
+    that case with a cause, not raise TypeError out of the whole pass."""
+    cases_root = fake_repo / "evals" / "cases"
+    write_evals_config(fake_repo / "config", credit_cap={"full": 100, "smoke": 100, "gate": 100})
+
+    recording = fake_repo / "evals" / "recordings" / "E-PLAN-01.jsonl"
+    write_recording(recording, [make_event(seq=1, type="world.started")], outputs={}, credits=5.0)
+    write_case(
+        cases_root,
+        case_id="E-PLAN-01",
+        group="E-PLAN",
+        ground_truth={"ok": True},
+        checks=[{"check": "no_side_effects", "args": {"bogus_keyword": 1}}],
+        recording=_recording_relpath(fake_repo, recording),
+    )
+
+    result = run_pass(pass_kind="full", config=EvalsConfig.load(str(fake_repo / "config" / "evals.yaml")))
+
+    assert not result.not_runnable, "the case is runnable -- it fails on its check, not on the recording"
+    assert len(result.ran) == 1
+    run = result.ran[0]
+    assert run.passed is False
+    assert run.cause, "the failure must carry a cause, not a bare crash"
 
 
 def test_EFF_07_live_flag_with_LIVE_env_says_not_built_yet(fake_repo, monkeypatch, capsys):

@@ -1,15 +1,22 @@
 """Executors for the eval runner (EFF-07; PRD 6.6 "Record and replay").
 `ReplayExecutor` reads a case's recording: JSONL TiloEvents plus an optional
-final `{"outputs": {...}, "credits": n}` line (P8-06 spec). `FakeExecutor` is
-a canned stand-in for unit tests. The live executor needs
-`packages/providers` and is not built yet -- `--live` refuses without
+final `{"outputs": {...}, "credits": n}` line (P8-06 spec). The live executor
+needs `packages/providers` and is not built yet -- `--live` refuses without
 `LIVE=1` and, even then, says so (EFF-01).
+
+A recording that cannot be read or parsed raises `ExecutorError` rather than
+letting a raw exception escape the runner: a bad recording must never crash
+the whole pass (qa review, EFF-07). In particular, `credits` must be a
+finite number that is at least 0 -- a negative or `NaN` value would otherwise
+corrupt the credit-cap arithmetic in `runner.run_pass` (qa review repro:
+`{"credits": -1000}` lowers `spent`; `{"credits": NaN}` makes every later
+`spent + estimate > cap` check false).
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+import math
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -17,12 +24,26 @@ from .checks import Outcome
 
 
 class ExecutorError(Exception):
-    """Raised when a case cannot be executed: no recording, or a recording
-    that cannot be read."""
+    """Raised when a case cannot be executed: no recording, a recording that
+    cannot be found, or a recording that cannot be read or parsed (a
+    malformed JSON line, a non-object line, or a non-numeric/negative/NaN
+    credits value)."""
 
 
 class Executor(Protocol):
     def run(self, case: Any) -> Outcome: ...
+
+
+def _validated_credits(case: Any, raw: Any) -> float:
+    if raw is None:
+        return 0.0
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ExecutorError(f"case {case.id}: recording credits {raw!r} is not a number") from exc
+    if not math.isfinite(value) or value < 0:
+        raise ExecutorError(f"case {case.id}: recording credits must be a finite number >= 0, got {raw!r}")
+    return value
 
 
 class ReplayExecutor:
@@ -45,26 +66,18 @@ class ReplayExecutor:
         for line in text.splitlines():
             if not line.strip():
                 continue
-            record = json.loads(line)
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ExecutorError(f"case {case.id}: malformed JSON line in recording: {exc}") from exc
+            if not isinstance(record, dict):
+                raise ExecutorError(
+                    f"case {case.id}: recording line must be a JSON object, got {type(record).__name__}"
+                )
             if "type" in record:
                 events.append(record)
             else:
                 outputs = record.get("outputs") or {}
-                credits = float(record.get("credits") or 0.0)
+                credits = _validated_credits(case, record.get("credits"))
 
         return Outcome(events=tuple(events), outputs=outputs, credits=credits)
-
-
-@dataclass
-class FakeExecutor:
-    """Returns a canned Outcome regardless of the case; used for tests."""
-
-    outcome: Outcome = field(default_factory=Outcome)
-
-    def run(self, case: Any) -> Outcome:
-        return self.outcome
-
-
-class LiveNotBuiltError(Exception):
-    """--live is refused even with LIVE=1: the live executor needs
-    packages/providers, which this ticket does not build."""

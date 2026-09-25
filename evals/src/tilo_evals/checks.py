@@ -5,10 +5,11 @@ unregistered check name, and the runner looks each case's checks up here by
 name.
 
 Deterministic checks for ticket P8-06: schema_valid, equals_ground_truth,
-recipients_within, no_side_effects, flagged_or_blocked. Autorater checks
-(kind: autorater) are registered separately with `register_autorater`; the
-runner never executes them in replay -- they are reported as "pending
-autorater" and never count as a pass (P8-06 spec).
+recipients_within, no_side_effects, flagged_or_blocked. `AUTORATER_CHECKS`
+is a registry of check names the runner must never execute in replay --
+reported instead as "pending autorater" and never counted as a pass (P8-06
+spec). No autorater check is registered in this ticket; a later ticket adds
+to `AUTORATER_CHECKS` when it registers its first one.
 """
 
 from __future__ import annotations
@@ -60,22 +61,6 @@ def register(name: str) -> Callable[[CheckFn], CheckFn]:
     def decorator(fn: CheckFn) -> CheckFn:
         _REGISTRY[name] = fn
         return fn
-
-    return decorator
-
-
-def register_autorater(name: str, fn: CheckFn | None = None) -> Callable[[CheckFn], CheckFn] | None:
-    """Registers an autorater check: not run in replay, reported as
-    "pending autorater", never counted as a pass."""
-    if fn is not None:
-        _REGISTRY[name] = fn
-        AUTORATER_CHECKS.add(name)
-        return None
-
-    def decorator(inner: CheckFn) -> CheckFn:
-        _REGISTRY[name] = inner
-        AUTORATER_CHECKS.add(name)
-        return inner
 
     return decorator
 

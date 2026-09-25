@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .cases import Case, load_cases
-from .checks import AUTORATER_CHECKS
+from .checks import AUTORATER_CHECKS, CheckResult
 from .checks import get as get_check
 from .config import EvalsConfig
 from .executors import ExecutorError, ReplayExecutor
@@ -100,7 +100,10 @@ def _evaluate_case(case: Case, outcome: Any) -> CaseRunResult:
         if name in AUTORATER_CHECKS:
             pending_autoraters.append(name)
             continue
-        result = get_check(name)(case, outcome, **args)
+        try:
+            result = get_check(name)(case, outcome, **args)
+        except Exception as exc:  # noqa: BLE001 -- a bad check/args must fail the case, never crash the pass (qa review)
+            result = CheckResult(passed=False, cause=f"{name}: check raised {exc.__class__.__name__}: {exc}")
         check_results.append({"check": name, "passed": result.passed, "cause": result.cause})
         if not result.passed:
             passed = False
