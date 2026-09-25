@@ -169,11 +169,6 @@ def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | N
     return level_at(policy, at) if covered else None
 
 
-def _used_keys(instruction: dict) -> tuple[str, ...]:
-    extra = ("card_kind", "option") if instruction["type"] == "channel.message_in" else ()
-    return ("channel", "destination", *extra)
-
-
 def _typed_words(instruction: dict) -> bool:
     """ADR-0007, BQ-56: a WhatsApp message counts only as the owner's typed words (no tapped
     option) answering no card or a question card; a gate, consent or meeting answer never does."""
@@ -194,7 +189,8 @@ def instruction_counts(
         instruction is not None
         and instruction["data"]["channel"] in INSTRUCTION_CHANNELS.get(instruction["type"], ())
         and conforms("event.schema.json", instruction, "id", "type", "actor", "ts", "world_id")
-        and conforms(f"events/data/{instruction['type']}.schema.json", instruction["data"], *_used_keys(instruction))
+        # the whole data, so its if/then/else runs (a set card_id needs its card_kind, ADR-0007)
+        and conforms(f"events/data/{instruction['type']}.schema.json", instruction["data"])
         and _typed_words(instruction)
         and (instruction["world_id"], instruction["actor"]) == (world_id, policy["owner"])
         and level_since(policy, before) <= ts(instruction["ts"]) < ts(before)
