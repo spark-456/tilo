@@ -303,3 +303,68 @@ def test_SEC_14_secret_scan_finds_nothing_in_stored_archive_for_each_pem_type(tm
     findings = SECRET_SCAN.scan_file(str(jsonl_path))
 
     assert findings == [], f"secret_scan.py still found something for type={type_word!r}: {findings}"
+
+
+# ---------------------------------------------------------------------------
+# A PEM whose body sits in a different value from its BEGIN line.
+# ---------------------------------------------------------------------------
+
+
+def _log_line(msg: str, *args: object) -> str:
+    record = logging.LogRecord("tilo.test", logging.ERROR, __file__, 1, msg, args, None)
+    assert redact_mod.RedactingFilter().filter(record)
+    return record.getMessage()
+
+
+def _split_block(type_word: str) -> tuple[str, list[str], str, list[str]]:
+    block, body_lines = build_pem_block(RNG, type_word, n_lines=4, include_end=True)
+    lines = block.split("\n")
+    return lines[0], lines[1:-1], lines[-1], body_lines
+
+
+@pytest.mark.parametrize("type_word", PEM_TYPE_WORDS, ids=[w or "generic" for w in PEM_TYPE_WORDS])
+def test_FR_MEM_05_pem_split_across_log_args_leaves_no_body(type_word):
+    header, middle, end_line, body_lines = _split_block(type_word)
+    message = _log_line("%s\n%s\n%s", header, "\n".join(middle), end_line)
+    for line in body_lines:
+        assert line not in message
+    assert ("-" * 5 + "END") not in message
+
+
+def test_FR_MEM_05_pem_header_in_arg_body_in_msg_leaves_no_body():
+    header, middle, end_line, body_lines = _split_block("RSA")
+    message = _log_line("%s\n" + "\n".join(middle) + "\n" + end_line, header)
+    for line in body_lines:
+        assert line not in message
+    assert ("-" * 5 + "END") not in message
+
+
+@pytest.mark.parametrize("type_word", PEM_TYPE_WORDS, ids=[w or "generic" for w in PEM_TYPE_WORDS])
+def test_FR_MEM_05_pem_stored_as_a_list_of_lines_leaves_no_body(tmp_path, type_word):
+    block, body_lines = build_pem_block(RNG, type_word, n_lines=4, include_end=True)
+    payload = {"pem_lines": ["before the key", *block.split("\n"), "after the key"]}
+
+    archive = RunArchive(LocalDirStore(tmp_path), org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    archive.append("tool_call", payload)
+    raw_text = (tmp_path / ORG_ID / f"{RUN_ID}.jsonl").read_text(encoding="utf-8")
+
+    for line in body_lines:
+        assert line not in raw_text
+    assert ("-" * 5 + "END") not in raw_text
+    assert "before the key" in raw_text and "after the key" in raw_text
+
+
+def test_FR_MEM_05_pem_list_with_no_end_line_redacts_every_later_string():
+    block, body_lines = build_pem_block(RNG, "EC", n_lines=4, include_end=False)
+    redacted = redact_mod.redact({"lines": [*block.split("\n"), "trailing text"]})
+    text = json.dumps(redacted)
+    for line in body_lines:
+        assert line not in text
+    assert "trailing text" not in text
+
+
+def test_FR_MEM_05_pem_begin_line_as_a_key_redacts_its_value():
+    header, middle, end_line, body_lines = _split_block("RSA")
+    text = json.dumps(redact_mod.redact({header: "\n".join([*middle, end_line])}))
+    for line in body_lines:
+        assert line not in text

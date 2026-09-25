@@ -89,6 +89,7 @@ _PEM_DASHES = "-" * 5
 _PEM_BEGIN = _PEM_DASHES + "BEGIN "
 _PEM_END = _PEM_DASHES + "END "
 _PEM_KEY_WORDS = "PRIVATE" + " KEY"
+_PEM_REDACTED = "[REDACTED:private_key]"
 # One flat character class, no nesting: the upper-case label run after
 # "BEGIN ". A run stops at the first "-", so runs after different BEGINs
 # never overlap and matching them all is linear in the text.
@@ -96,13 +97,15 @@ _PEM_LABEL_RUN_RE = re.compile(r"[A-Z ]*")
 _SERVICE_ACCOUNT_TYPE = "service" + "_account"
 
 
-def _find_pem_spans(text: str) -> list[tuple[int, int]]:
+def _scan_pem(text: str) -> tuple[list[tuple[int, int]], str | None]:
     """Non-overlapping (start, end) spans of whole PEM private-key blocks:
     from a BEGIN line whose upper-case label ends in the key words, through
     the first END line with the same label -- the base64 body and END line
     included, whatever separates the lines (real newlines, or literal "\\n"
     escapes in a JSON-quoted key). With no matching END line the span runs
-    to the end of `text`: a truncated key fails closed.
+    to the end of `text` (a truncated key fails closed) and the END marker
+    still owed is returned, so a caller can redact following sibling values
+    up to it. Otherwise the second item is None.
 
     Linear: str.find only moves forward, every label run is scanned once,
     and each END search either consumes the text up to the END line (the
@@ -119,13 +122,24 @@ def _find_pem_spans(text: str) -> list[tuple[int, int]]:
             end_at = text.find(end_marker, label_end + len(_PEM_DASHES))
             if end_at == -1:
                 spans.append((pos, len(text)))
-                break
+                return spans, end_marker
             span_end = end_at + len(end_marker)
             spans.append((pos, span_end))
             pos = text.find(_PEM_BEGIN, span_end)
         else:
             pos = text.find(_PEM_BEGIN, max(label_end, pos + 1))
-    return spans
+    return spans, None
+
+
+def _find_pem_spans(text: str) -> list[tuple[int, int]]:
+    return _scan_pem(text)[0]
+
+
+def _open_pem_end(value: Any) -> str | None:
+    """The END marker a string value leaves unclosed, or None."""
+    if not isinstance(value, str) or len(value) > MAX_SCAN_CHARS:
+        return None
+    return _scan_pem(value)[1]
 
 
 def _redact_pem_blocks(text: str) -> str:
@@ -136,7 +150,7 @@ def _redact_pem_blocks(text: str) -> str:
     pos = 0
     for start, end in spans:
         parts.append(text[pos:start])
-        parts.append("[REDACTED:private_key]")
+        parts.append(_PEM_REDACTED)
         pos = end
     parts.append(text[pos:])
     return "".join(parts)
@@ -333,7 +347,13 @@ def _redact_value(value: Any, depth: int) -> Any:
             # secret-name markers): a credential pattern can turn up as a map
             # key, not only as a value.
             new_key = _redact_string(k) if isinstance(k, str) else k
-            result[new_key] = "[REDACTED:secret_field]" if _is_secret_key(k) else _redact_value(v, depth + 1)
+            if _is_secret_key(k):
+                result[new_key] = "[REDACTED:secret_field]"
+            elif _open_pem_end(k) is not None:
+                # A key holding an unterminated BEGIN line: its value is the key body.
+                result[new_key] = _PEM_REDACTED
+            else:
+                result[new_key] = _redact_value(v, depth + 1)
             # A service-account key file's type marker only becomes the
             # scanned key/value text once the dict is serialised, so a
             # string scan of the value alone never sees it.
@@ -344,9 +364,50 @@ def _redact_value(value: Any, depth: int) -> Any:
         # A tuple is redacted the same as a list: canonical_json's
         # json.dumps would otherwise serialise it as a JSON array verbatim,
         # unredacted, since only dict/list were walked here.
-        return [_redact_value(v, depth + 1) for v in value]
+        return _redact_siblings(value, lambda v: _redact_value(v, depth + 1))
     if isinstance(value, str):
         return _redact_string(value)
+    return value
+
+
+def _redact_siblings(values: Any, redact_one: Any) -> list[Any]:
+    """Redacts each element; after a string that opens a PEM block and does not
+    close it (a key stored as a list of lines, or split across log args), the
+    following string elements are redacted whole up to and including the one
+    holding the matching END line, so the body never survives in a sibling."""
+    out: list[Any] = []
+    owed: str | None = None
+    for v in values:
+        if owed is not None and isinstance(v, str):
+            out.append(_PEM_REDACTED)
+            if owed in v:
+                owed = None
+            continue
+        out.append(redact_one(v))
+        owed = _open_pem_end(v) or owed
+    return out
+
+
+def _redact_keys(value: Any, depth: int) -> Any:
+    """Structural pass for log args: secret-named keys, a service-account type
+    marker and PEM continuations only. Text patterns are left to the pass over
+    the composed log line, which sees a secret split across msg and args whole."""
+    if depth > _MAX_DEPTH:
+        return "[REDACTED:too_deep]"
+    if isinstance(value, dict):
+        result: dict[Any, Any] = {}
+        for k, v in value.items():
+            if _is_secret_key(k):
+                result[k] = "[REDACTED:secret_field]"
+            elif _open_pem_end(k) is not None:
+                result[k] = _PEM_REDACTED
+            elif k == "type" and v == _SERVICE_ACCOUNT_TYPE:
+                result[k] = "[REDACTED:service_account_key]"
+            else:
+                result[k] = _redact_keys(v, depth + 1)
+        return result
+    if isinstance(value, (list, tuple)):
+        return _redact_siblings(value, lambda v: _redact_keys(v, depth + 1))
     return value
 
 
@@ -386,20 +447,18 @@ class RedactingFilter(logging.Filter):
     place; never drops the record."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        # Structural redact() first: a non-str msg (e.g. a dict passed as
-        # the whole log message) and dict/mapping or positional args get
-        # their secret-named keys and nested values redacted before
-        # %-formatting assembles the final line.
+        # A non-str msg (e.g. a dict passed as the whole log message) gets the
+        # full structural redact(). Args get only the key-level pass: their
+        # text is left whole so the composed-line scan below sees a secret
+        # split across msg and args (a PEM header in one arg, its body in the
+        # next) as one piece, instead of a half that no longer matches.
         if not isinstance(record.msg, str):
             record.msg = redact(record.msg)
         if record.args:
-            # The full structural `redact()` (not just string args): a dict
-            # or list arg needs its secret-named keys and nested values
-            # redacted too, the same as an archive payload would.
             if isinstance(record.args, dict):
-                record.args = redact(record.args)
+                record.args = _redact_keys(record.args, 0)
             else:
-                record.args = tuple(redact(a) for a in record.args)
+                record.args = tuple(_redact_siblings(record.args, lambda a: _redact_keys(a, 0)))
 
         # A secret can still only become visible once msg and args are
         # combined -- e.g. `log.info("Authorization: Bearer %s", token)`,
