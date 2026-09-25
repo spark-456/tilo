@@ -21,10 +21,13 @@ from conftest import (
     REQUIRED_SKILL_MD_HEADINGS,
     REQUIRED_SKILLS,
     SIDE_EFFECT_TOKENS,
+    SKILLS_DIR,
     UNTRUSTED_READER_CASE_IDS,
     UNTRUSTED_READER_SKILLS,
-    assert_stdlib_only_imports,
+    assert_stdlib_or_lib_only_imports,
     assert_valid_2020_12_schema,
+    budget_python_files,
+    code_line_count,
     example_pairs,
     extract_level2_headings,
     extract_quality_bar_check_ids,
@@ -137,14 +140,16 @@ def test_FR_AGT_04_skill_md_quality_bar_lists_every_check_id(domain, skill_id):
 
 
 # ---------------------------------------------------------------------------
-# 5. check.py: stdlib only, exposes check(), never raises on malformed output.
+# 5. check.py: stdlib (+ skills/_lib) only, exposes check(), never raises on
+#    malformed output (ticket FR-AGT-04 re-scope, point 3: "check.py files may
+#    import only the standard library and skills/_lib").
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("domain,skill_id", REQUIRED_SKILLS, ids=REQUIRED_SKILL_CASE_IDS)
-def test_FR_AGT_04_check_py_is_stdlib_only(domain, skill_id):
+def test_FR_AGT_04_check_py_is_stdlib_or_lib_only(domain, skill_id):
     path = skill_dir(domain, skill_id) / "check.py"
-    assert_stdlib_only_imports(path)
+    assert_stdlib_or_lib_only_imports(path)
 
 
 @pytest.mark.parametrize("domain,skill_id", REQUIRED_SKILLS, ids=REQUIRED_SKILL_CASE_IDS)
@@ -304,4 +309,23 @@ def test_FR_AGT_04_untrusted_reader_skills_have_no_side_effect_tools(domain, ski
     assert not offending, (
         f"{domain}/{skill_id} reads untrusted content and must get no side-effect tools "
         f"(PRD 16.3 privilege separation), but tools_allowed includes {offending}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 9. Line budget (ticket FR-AGT-04 re-scope, point 4): hand-written Python across
+#    skills/**/check.py and skills/_lib/*.py stays under 400 non-blank,
+#    non-comment lines in total. Passes trivially before any of those files
+#    exist; it exists to stop the checkers regrowing to the ~1,786 lines the
+#    regex-based v0 attempt reached.
+# ---------------------------------------------------------------------------
+
+
+def test_FR_AGT_04_check_py_and_lib_line_budget_at_most_400():
+    files = budget_python_files()
+    total = sum(code_line_count(p) for p in files)
+    breakdown = ", ".join(f"{p.relative_to(SKILLS_DIR.parent).as_posix()}={code_line_count(p)}" for p in files)
+    assert total <= 400, (
+        f"skills/**/check.py + skills/_lib/*.py total {total} non-blank, non-comment "
+        f"lines, over the 400-line budget (ticket brief): {breakdown}"
     )
