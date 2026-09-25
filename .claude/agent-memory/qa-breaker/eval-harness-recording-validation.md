@@ -22,6 +22,14 @@ EvalsConfig accepts negative/wrong-typed values (float() ValueError/TypeError es
 P8-06a round 2: filename fix landed; the "other defects" were left unfixed (report them as the headline if
 they matter). case.schema.json leaves `recording` any string (absolute, ../ traversal pass) and `measures`
 any string, though spec says repo-relative path and EV-/FR-/EFF- ids.
+P8-06a round 3: recording regex added, but the `..` lookahead uses `.*`, which stops at a newline, so
+"x\n../../../etc/passwd" passes (normpath escapes the root). Always try an embedded newline against
+JSON-Schema path patterns. The round-1 YAML, UTF-8 and EvalsConfig defects are still unfixed.
+P8-06a round 4: newline fix held (control-char lookahead). Round-1 four defects STILL unfixed after 3 rounds;
+builder fixes only the headline, so list the carried-over defects inside BIGGEST PROBLEM itself.
+P8-06a round 5: all four fixed in cases.py, but EvalsConfig.load got the value checks only: malformed YAML /
+non-UTF-8 config still raise raw ParserError/UnicodeDecodeError, 10**400 threshold -> OverflowError, .inf accepted.
+A fix to one loader's read/parse must be checked against every sibling loader.
 
 **Why:** fixes tend to cover exactly the repro given, not the same class of input elsewhere.
 **How to apply:** when re-reviewing a "bad input crashes the pass" fix, fuzz every field the consumer reads

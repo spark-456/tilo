@@ -23,7 +23,7 @@ Updated: 2026-09-25 · Phase 0 (Foundations) · next gate **CP0 on 29 Sep** · C
 | P0-04 Provider layer A: interfaces, config loaders, denylist, model-id lint | PL-01, PL-04 (skeleton), PL-06, PL-07, NFR-25 | intelligence-builder → opus (escalated) | **Merged to `main`** | 33 tests | PASS r3 | n/a | PASS r1 | n/a | n/a | | | | | | n/a |
 | P0-02b Providers contract: base_url and api_key_env for openai_compat; NIM key pattern | PL-02 | architect (opus) | **Merged to `main`** | 16 tests | PASS r1 | PASS r1 | n/a | n/a | n/a |
 | P0-05 Provider layer B: google, OpenAI-compatible + NVIDIA NIM profiles, record-and-replay, fake | PL-02, EFF-01 | intelligence-builder → opus (escalated) | **Merged to `main`** (security failed early rounds on key redaction, fixed; size exception logged) | 34 tests + 4 added | PASS (after 11 rounds across 4 runs) | PASS | PASS | n/a | n/a |
-| P0-06 Provider layer C: role router, fallback, cascades, token caps, conformance | PL-03, PL-05, EFF-02, EFF-03 | intelligence-builder | In progress: cost PASS; fixing code FAIL (router must catch the base ProviderError) | | | | | | n/a |
+| P0-06 Provider layer C: role router, fallback, cascades, token caps, conformance | PL-03, PL-05, EFF-02, EFF-03 | intelligence-builder | Stuck after 5 code rounds (one per-candidate check gap per round); resumed with a class-wide audit of every fallback path; size exception logged | | | | | | n/a |
 | P0-07 Infrastructure plan for tilo-dev | PRD 6.2, 6.3, 6.5; SEC-02, SEC-12; 16.1 rule 5 | reach-builder → opus (escalated) | **Merged to `main`** (user approved); apply waits for Google Cloud billing | 19 tests (27 plan tests now) | PASS (after 7 rounds incl. resume) | PASS, FLAGGED earlier (WIF accepted git tags; fixed to main-only) | PASS r1 | n/a | n/a |
 | P0-07b Infra hardening follow-ups | SEC-12 | reach-builder | Queued: remove Editor from the default Compute SA that enabling compute creates; give the snapshots bucket its writer | | | | | n/a | n/a |
 | P0-08a Web shell, tokens, layout frame, iso stage | PRD 18.2, 18.3 frame, 9.7 fallback | world-builder → opus (escalated) | Stuck after 5 rounds on camera bugs (CSS-transform camera); not merged. Camera rework becomes the first task of P0-08b on the same branch | Done (tests/P0-08a) | PASS r4 | n/a | n/a | FAIL r1–r5 | PASS r3 |
@@ -61,6 +61,7 @@ Updated: 2026-09-25 · Phase 0 (Foundations) · next gate **CP0 on 29 Sep** · C
 | 2026-09-25 | code-reviewer, design-critic, qa-breaker, checkpoint-auditor | effort high → medium | Budget mode (user asked to save credits). Revert to high when the user says so. |
 | 2026-09-25 | cost-reviewer | added `memory: project` | Brief: reviewers keep recurring defects in project memory |
 | 2026-09-25 | reach-builder (P0-01, P0-07 only) | sonnet → opus for the ticket | Each ticket failed review twice for reasoning or logic errors (self-tuning rule) |
+| 2026-09-25 | intelligence-builder | sonnet → opus (saved setting) | Escalated for reasoning/logic failures on P0-04, P0-05 and P0-06 (3 tickets in a week, self-tuning rule). Reviewers paired with it run on opus (balance rule). |
 
 ## Contract backlog (from parallel sessions)
 - Running one architect ticket at a time: P0-03 (+ #1, #21, #28) → CC-SH (#3, #4, #5) → CC-SE (#7–#12). Issues are closed when their branch lands in `phase0-stack`.
