@@ -3,8 +3,9 @@
 validates each against tilo_contracts, and fails loudly with
 ProviderConfigError: denied model id (PL-07); a role naming an unknown
 profile; a role with no fallback unless its raw mapping has no key besides
-"primary" (NFR-25); a profile with no price entry. price() never invents a
-price: an unset status raises (PL-06)."""
+"primary" (NFR-25); a profile with no price entry; a status "set" prices
+file with a null price, effective_date or source. price() never invents a
+price: an unset status, or any null price field, raises (PL-06)."""
 
 from __future__ import annotations
 
@@ -54,8 +55,18 @@ class ProvidersConfig:  # the loaded, validated provider-layer config (PRD 6.4)
                 f"PL-06: cannot price profile {profile_id!r}: status is 'unset' — prices are never invented"
             )
         quote = self.prices.profiles[profile_id]
-        assert quote.input is not None and quote.output is not None
-        assert self.prices.effective_date is not None and self.prices.source is not None
+        if (
+            quote.input is None
+            or quote.output is None
+            or self.prices.effective_date is None
+            or self.prices.source is None
+        ):
+            # load_providers_config's _validate_price_fields_when_set already
+            # rejects this shape at start-up; this only guards a
+            # ProvidersConfig assembled without going through that loader.
+            raise ProviderConfigError(
+                f"PL-06: profile {profile_id!r} has status 'set' but a null price field -- prices are never invented"
+            )
         return ProfilePriceQuote(quote.input, quote.output, self.prices.effective_date, self.prices.source)
 
     def credits(self, usd: float) -> float:  # PRD 14.1: 1 credit = US$0.005
@@ -102,6 +113,33 @@ def _validate_startup_rules(models: ProvidersModels, prices: ProvidersPrices, ra
             )
 
 
+def _validate_price_fields_when_set(prices: ProvidersPrices, prices_path: Path) -> None:
+    """contracts/providers.schema.json's prices if/then (line ~125) requires
+    that once status is "set", every profile's input/output plus the file's
+    effective_date/source are non-null. The generated ProvidersPrices
+    pydantic model does not enforce a JSON Schema if/then, so a status:
+    "set" file with null prices validates fine and would otherwise only be
+    caught by an assert inside price() -- which a bare `assert` skips
+    entirely under `python -O`, silently returning None fields (PL-06 is
+    "price() refuses to meter rather than returning nothing"). Checked here,
+    at load time, instead."""
+    if prices.status != "set":
+        return
+    if prices.effective_date is None:
+        raise ProviderConfigError(f"PL-06: {prices_path} has status 'set' but effective_date is null")
+    if prices.source is None:
+        raise ProviderConfigError(f"PL-06: {prices_path} has status 'set' but source is null")
+    for profile_id, quote in prices.profiles.items():
+        if quote.input is None:
+            raise ProviderConfigError(
+                f"PL-06: {prices_path} has status 'set' but profile {profile_id!r} has a null input price"
+            )
+        if quote.output is None:
+            raise ProviderConfigError(
+                f"PL-06: {prices_path} has status 'set' but profile {profile_id!r} has a null output price"
+            )
+
+
 def load_providers_config(models_path: Path | str, prices_path: Path | str) -> ProvidersConfig:
     """Loads, validates and start-up-checks the two config files; raises
     ProviderConfigError loudly rather than starting on a bad config."""
@@ -117,6 +155,8 @@ def load_providers_config(models_path: Path | str, prices_path: Path | str) -> P
         prices = ProvidersPrices.model_validate(raw_prices)
     except ValidationError as error:
         raise ProviderConfigError(f"{prices_path} failed schema validation: {error}") from error
+
+    _validate_price_fields_when_set(prices, prices_path)
 
     raw_roles = raw_models.get("roles")
     _validate_startup_rules(models, prices, raw_roles if isinstance(raw_roles, dict) else {})

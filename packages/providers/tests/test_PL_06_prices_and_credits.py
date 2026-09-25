@@ -43,6 +43,24 @@ def test_PL_06_price_set_status_returns_price_with_effective_date_and_source(tmp
     assert quote.source == prices["source"], "PL-06: price must carry source"
 
 
+def test_PL_06_status_set_with_null_price_field_raises_at_load(tmp_path):
+    """contracts/providers.schema.json's prices if/then (status "set" implies
+    non-null input/output/effective_date/source) is not enforced by the
+    generated pydantic model alone -- the loader must check it explicitly
+    and raise ProviderConfigError naming the profile, not load a config that
+    would later make price() invent a price or crash under `python -O`."""
+    prices = prices_config(set_=True)
+    prices["profiles"]["large"]["input"] = None
+    models_path, prices_path = write_providers_config(tmp_path, models_config(), prices)
+
+    with pytest.raises(ProviderConfigError) as excinfo:
+        load_providers_config(models_path, prices_path)
+
+    message = str(excinfo.value).lower()
+    assert "large" in message, f"PL-06: refusal must name the profile, got: {excinfo.value}"
+    assert "set" in message
+
+
 def test_PL_06_price_for_unknown_profile_raises(tmp_path):
     prices = prices_config(set_=True)
     models_path, prices_path = write_providers_config(tmp_path, models_config(), prices)
