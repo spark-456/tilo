@@ -45,9 +45,9 @@
     "changed_by": { "anyOf": [{ "$ref": "#/$defs/stamp" }, { "type": "null" }] },
     "history": { "type": "array", "items": { "$ref": "#/$defs/history_entry" } }
   },
-  "if": { "properties": { "level": { "const": "L3" } }, "required": ["level"] },
+  "if": { "properties": { "level": { "enum": ["L2", "L3"] } }, "required": ["level"] },
   "then": {
-    "description": "L3 standing rules need a daily limit (FR-HIL-06).",
+    "description": "A policy that acts without a person at the gate needs a daily limit: L3 standing rules (FR-HIL-06) and L2 (BQ-30).",
     "properties": { "limits": { "properties": { "per_day": { "type": "integer" } } } }
   },
   "$defs": {

@@ -3,12 +3,15 @@
   "$id": "https://contracts.tilo.example/events/data/world.requested.schema.json",
   "x-version": "1.0.0",
   "title": "WorldRequestedData",
-  "description": "data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world.",
+  "description": "data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world. destination is the thread or folder the request was made from (an email thread forwarded to Tilo, or one the request was started from), as an opaque id set from where it was sent, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["title", "channel"],
+  "required": ["title", "channel", "destination"],
   "properties": {
     "title": { "type": "string", "minLength": 1, "maxLength": 140 },
-    "channel": { "$ref": "../../common.schema.json#/$defs/channel" }
+    "channel": { "$ref": "../../common.schema.json#/$defs/channel" },
+    "destination": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/destination" }, { "type": "null" }]
+    }
   }
 }

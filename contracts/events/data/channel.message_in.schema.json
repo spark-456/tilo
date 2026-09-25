@@ -3,15 +3,18 @@
   "$id": "https://contracts.tilo.example/events/data/channel.message_in.schema.json",
   "x-version": "1.0.0",
   "title": "ChannelMessageInData",
-  "description": "data of channel.message_in (PRD 9.5). A message from a bound WhatsApp number or to Tilo's email address. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message answers a card.",
+  "description": "data of channel.message_in (PRD 9.5). A message from a bound WhatsApp number or to Tilo's email address. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message answers a card. destination is the thread or folder the message was sent about (an email thread forwarded to Tilo, or the one the card it answers showed), as an opaque id set by the channel, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["channel", "message_ref", "card_id"],
+  "required": ["channel", "message_ref", "card_id", "destination"],
   "properties": {
     "channel": { "type": "string", "enum": ["whatsapp", "email"] },
     "message_ref": { "$ref": "../../event.schema.json#/$defs/archive_ref" },
     "card_id": {
       "anyOf": [{ "$ref": "../../common.schema.json#/$defs/ulid" }, { "type": "null" }]
+    },
+    "destination": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/destination" }, { "type": "null" }]
     }
   }
 }

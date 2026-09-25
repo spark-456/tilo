@@ -59,5 +59,7 @@
     }
   },
   "policy": null,
+  "world_owner": null,
+  "instruction": null,
   "transfer": null
 }

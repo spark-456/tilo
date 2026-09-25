@@ -43,7 +43,7 @@
 # events/data/building.operational.schema.json 1.0.0 sha256:9fcf73cb4c895c6f
 # events/data/building.planned.schema.json 1.0.0 sha256:b44f9bbe889e72d7
 # events/data/building.scaled.schema.json 1.0.0 sha256:6acdd4fb4e291cd1
-# events/data/channel.message_in.schema.json 1.0.0 sha256:4494f175fc3dc966
+# events/data/channel.message_in.schema.json 1.0.0 sha256:bac66c9564255d16
 # events/data/channel.message_out.schema.json 1.0.0 sha256:dd42d2db8385a110
 # events/data/connection.consented.schema.json 1.0.0 sha256:6664b8f2558850bd
 # events/data/connection.established.schema.json 1.0.0 sha256:b595213ce8aae265
@@ -65,7 +65,7 @@
 # events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
 # events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
 # events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
-# events/data/policy.applied.schema.json 1.0.0 sha256:2f0fef2fde994d8a
+# events/data/policy.applied.schema.json 1.0.0 sha256:40754d7f30dec48f
 # events/data/policy.changed.schema.json 1.0.0 sha256:59660440803c39ed
 # events/data/question.answered.schema.json 1.0.0 sha256:908aeadfaca479ab
 # events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
@@ -74,7 +74,7 @@
 # events/data/world.failed.schema.json 1.0.0 sha256:17a50a9c70ba8ae1
 # events/data/world.paused.schema.json 1.0.0 sha256:1b190f91f08a918c
 # events/data/world.planned.schema.json 1.0.0 sha256:eb423b257e5fc838
-# events/data/world.requested.schema.json 1.0.0 sha256:cf925ac625455baa
+# events/data/world.requested.schema.json 1.0.0 sha256:920b9efa525ad9e2
 # events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
 # events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
 # events/registry.schema.json 1.0.0 sha256:42c04358933101ef
@@ -82,10 +82,10 @@
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
-# policy.schema.json 1.0.0 sha256:775a2f36ba5a3a0b
+# policy.schema.json 1.0.0 sha256:fa0ae3091f381ed4
 # providers.schema.json 1.0.0 sha256:2795c1640ddad594
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
-# events/registry.yaml 1.0.0 sha256:f470bfed9305606d
+# events/registry.yaml 1.0.0 sha256:82aaca6089b684c1
 
 from __future__ import annotations
 
@@ -747,7 +747,7 @@ class BuildingScaledData(BaseModel):
 
 class ChannelMessageInData(BaseModel):
     """
-    data of channel.message_in (PRD 9.5). A message from a bound WhatsApp number or to Tilo's email address. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message answers a card.
+    data of channel.message_in (PRD 9.5). A message from a bound WhatsApp number or to Tilo's email address. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message answers a card. destination is the thread or folder the message was sent about (an email thread forwarded to Tilo, or the one the card it answers showed), as an opaque id set by the channel, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01).
     """
 
     model_config = ConfigDict(
@@ -756,6 +756,7 @@ class ChannelMessageInData(BaseModel):
     channel: Literal["whatsapp", "email"]
     message_ref: EventArchiveRef
     card_id: Ulid | None
+    destination: Destination | None
 
 
 class ChannelMessageOutData(BaseModel):
@@ -1088,7 +1089,7 @@ class WorldPlannedData(BaseModel):
 
 class WorldRequestedData(BaseModel):
     """
-    data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world.
+    data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world. destination is the thread or folder the request was made from (an email thread forwarded to Tilo, or one the request was started from), as an opaque id set from where it was sent, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01).
     """
 
     model_config = ConfigDict(
@@ -1096,6 +1097,7 @@ class WorldRequestedData(BaseModel):
     )
     title: Annotated[str, Field(max_length=140, min_length=1)]
     channel: Channel
+    destination: Destination | None
 
 
 class WorldResumedData(BaseModel):
@@ -1878,7 +1880,7 @@ class DataTransferData(BaseModel):
 
 class PolicyAppliedData(BaseModel):
     """
-    data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). There is no gate card on this path, so this event records what the engine assessed against the policy's scope: the connector, the destination (an opaque id, never an address), the district of the step, the tier, the undo window, and item pinned to its version (null when there is none). The outbox entry equals it on each (OB-05) and the policy's scope covers it (OB-01), so a redraft, another thread or another connector is a new proposal. At L2 the undo window is at least 1 s (PRD 10.4: L2 acts with an undo window). Recipients stay in the outbox entry, never in an event.
+    data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). There is no gate card on this path, so this event records what the engine assessed against the policy's scope: the connector, the destination (an opaque id, never an address), the district of the step, the tier, the undo window, and item pinned to its version (null when there is none). The outbox entry equals it on each (OB-05) and the policy's scope covers it (OB-01), so a redraft, another thread or another connector is a new proposal. L2 is 'instruction is approval' (PRD 10.4, FR-HIL-05): instruction_id is the id of the earlier world.requested or channel.message_in in this world in which the policy's owner asked for this action on this destination, and HR-7 links it beside the policy (OB-01); at L2 the destination is set and the undo window is at least 1 s. At L3 (a standing rule within its limits) instruction_id is null. Recipients stay in the outbox entry, never in an event.
     """
 
     model_config = ConfigDict(
@@ -1893,6 +1895,7 @@ class PolicyAppliedData(BaseModel):
     district: DistrictId
     risk_tier: Literal["T1", "T2"]
     level: Literal["L2", "L3"]
+    instruction_id: Ulid | None
     undo_window_s: Annotated[int, Field(ge=0)]
     item: ArtifactRef | None
 
@@ -2765,7 +2768,7 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                    'world_effect': 'An island appears for the new world.',
                                    'hud_effect': 'The run header shows the task title.',
                                    'story_template': '{actor} asked for: {data.title}',
-                                   'trace_row': 'channel={data.channel}',
+                                   'trace_row': 'channel={data.channel} destination={data.destination}',
                                    'data_schema': 'events/data/world.requested.schema.json',
                                    'fixture': 'fixtures/events/valid/world.requested.json'},
                'world.planned': {'family': 'world',
@@ -3407,7 +3410,7 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                       'hud_effect': 'none',
                                       'story_template': 'A {data.channel} message arrived.',
                                       'trace_row': 'channel={data.channel} message={data.message_ref} '
-                                                   'card={data.card_id}',
+                                                   'card={data.card_id} destination={data.destination}',
                                       'data_schema': 'events/data/channel.message_in.schema.json',
                                       'fixture': 'fixtures/events/valid/channel.message_in.json'},
                'channel.message_out': {'family': 'channel',
@@ -3526,7 +3529,8 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                                 'Report.',
                                   'story_template': 'A policy opened the gate for {data.action_type}.',
                                   'trace_row': 'policy={data.policy_id} gate={data.gate_id} '
-                                               'level={data.level} undo_window_s={data.undo_window_s}',
+                                               'level={data.level} instruction={data.instruction_id} '
+                                               'undo_window_s={data.undo_window_s}',
                                   'data_schema': 'events/data/policy.applied.schema.json',
                                   'fixture': 'fixtures/events/valid/policy.applied.json'},
                'policy.changed': {'family': 'policy',

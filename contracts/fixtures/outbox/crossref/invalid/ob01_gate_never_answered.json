@@ -45,5 +45,7 @@
   },
   "authorised_by": null,
   "policy": null,
+  "world_owner": null,
+  "instruction": null,
   "transfer": null
 }

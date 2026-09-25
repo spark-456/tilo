@@ -31,6 +31,7 @@
     "district": "D1",
     "risk_tier": "T3",
     "level": "L2",
+    "instruction_id": "01JB5VQ0000000000000000131",
     "undo_window_s": 60,
     "item": {
       "artifact_id": "art_followup_reply",

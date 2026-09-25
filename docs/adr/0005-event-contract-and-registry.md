@@ -46,7 +46,12 @@ silent the defaults below apply; each is logged as a BQ in `docs/open-questions.
    `approval.resolved`, `policy.applied` and `data.transfer` share (BQ-23). An outbox entry and
    its outgoing `data.transfer` carry exactly the `authz` of the `approval.resolved` that
    answered `approve` or of the `policy.applied` that opened the gate, never a stamp of their own
-   (outbox rule OB-01). `artifact.delivered` is a notice, not a side effect: a format that leaves
+   (outbox rule OB-01). A policy is not an instruction: at L2 ("instruction is approval",
+   PRD 10.4) `policy.applied` names in `instruction_id` the policy owner's own earlier
+   `world.requested` or `channel.message_in` in the same world, about the same destination
+   (both events carry `destination`, set from where the message came, never by a model), and
+   HR-7 links it beside the policy; at L3 it is null. L2 and L3 policies need a daily limit
+   (BQ-29, BQ-30). `artifact.delivered` is a notice, not a side effect: a format that leaves
    Tilo (email, Google Docs, Sheets or Slides) names its outbox entry and is caused by that
    entry's `data.transfer` out, which carries the `authz` (EV-14). A `vis` list includes the
    event's own district (EV-13, BQ-28).

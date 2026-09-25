@@ -31,7 +31,7 @@ types:
     world_effect: "An island appears for the new world."
     hud_effect: "The run header shows the task title."
     story_template: "{actor} asked for: {data.title}"
-    trace_row: "channel={data.channel}"
+    trace_row: "channel={data.channel} destination={data.destination}"
     data_schema: events/data/world.requested.schema.json
     fixture: fixtures/events/valid/world.requested.json
   world.planned:
@@ -684,7 +684,7 @@ types:
     world_effect: "A boat docks at the pier by Your Desk."
     hud_effect: "none"
     story_template: "A {data.channel} message arrived."
-    trace_row: "channel={data.channel} message={data.message_ref} card={data.card_id}"
+    trace_row: "channel={data.channel} message={data.message_ref} card={data.card_id} destination={data.destination}"
     data_schema: events/data/channel.message_in.schema.json
     fixture: fixtures/events/valid/channel.message_in.json
   channel.message_out:
@@ -803,7 +803,7 @@ types:
     world_effect: "The gate opens with a policy stamp."
     hud_effect: "The Autonomy log lists the action with Undo and Report."
     story_template: "A policy opened the gate for {data.action_type}."
-    trace_row: "policy={data.policy_id} gate={data.gate_id} level={data.level} undo_window_s={data.undo_window_s}"
+    trace_row: "policy={data.policy_id} gate={data.gate_id} level={data.level} instruction={data.instruction_id} undo_window_s={data.undo_window_s}"
     data_schema: events/data/policy.applied.schema.json
     fixture: fixtures/events/valid/policy.applied.json
   policy.changed:

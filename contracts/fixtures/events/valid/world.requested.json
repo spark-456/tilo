@@ -19,7 +19,8 @@
   "authz": null,
   "data": {
     "title": "Triage my inbox and answer the supplier about Thursday",
-    "channel": "web"
+    "channel": "web",
+    "destination": null
   },
   "trace": {
     "model_role": null,

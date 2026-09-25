@@ -21,7 +21,8 @@
     "channel": "whatsapp",
     "message_ref": "r_village_basic_1/29",
     "card_id": "01JB5VQ0000000000000009001",
-    "body": "Yes, send it."
+    "body": "Yes, send it.",
+    "destination": null
   },
   "trace": {
     "model_role": null,

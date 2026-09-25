@@ -59,6 +59,8 @@
     }
   },
   "policy": null,
+  "world_owner": null,
+  "instruction": null,
   "transfer": {
     "type": "data.transfer",
     "authz": {

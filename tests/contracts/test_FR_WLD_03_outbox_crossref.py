@@ -4,7 +4,9 @@ the authorisation that was given.
 OB-01 and OB-05 (contracts/outbox.rules.md; harness validator, P0-09). OB-01: the entry's id is
 the outbox_id reserved for it; on a gate it was opened by an approval.resolved answering approve
 on that gate, otherwise by a policy.applied under a policy that covers it (action type, level,
-undo window, not expired, connector, recipients and district in scope); the entry's authz equals
+undo window, created before and not expired, owned by the world's owner, connector, recipients
+and district in scope; at L2 also the owner's own earlier instruction in this world about the
+same destination, PRD 10.4 "instruction is approval"); the entry's authz equals
 that event's authz, and the data.transfer it emitted carries the same authz. OB-05: its action
 type, tier and pinned item (artifact id and version) equal those approval.requested reserved or
 policy.applied assessed, and on the policy path also its connector, destination and undo window;
@@ -22,8 +24,19 @@ from _lib import contracts_dir, errors_for, load_json
 
 BASE = "https://contracts.tilo.example/"
 RULES = ("OB-01", "OB-05")
-CASE_KEYS = {"rule", "note", "entry", "reserved_by", "authorised_by", "policy", "transfer"}
+CASE_KEYS = {
+    "rule",
+    "note",
+    "entry",
+    "reserved_by",
+    "authorised_by",
+    "policy",
+    "world_owner",
+    "instruction",
+    "transfer",
+}
 EVENT_KEYS = {"type", "authz", "data"}
+INSTRUCTION_TYPES = ("world.requested", "channel.message_in")
 SLOT_TYPES = {
     "reserved_by": ("approval.requested",),
     "authorised_by": ("approval.resolved", "policy.applied"),
@@ -61,14 +74,33 @@ def _within(allowed, value) -> bool:
     return not allowed or value in allowed
 
 
-def _policy_covers(entry, applied, policy) -> bool:
+def _instructed(entry, applied, policy, instruction) -> bool:
+    """OB-01, L2: the policy owner's own earlier instruction in this world asked for this send."""
+    if policy["level"] != "L2":
+        return applied["instruction_id"] is None and instruction is None
+    return (
+        instruction is not None
+        and instruction["id"] == applied["instruction_id"]
+        and instruction["world_id"] == entry["world_id"]
+        and instruction["ts"] < entry["authz"]["at"]
+        and instruction["actor"] == policy["owner"]
+        and applied["destination"] is not None
+        and instruction["data"]["destination"] == applied["destination"]
+    )
+
+
+def _policy_covers(entry, applied, policy, world_owner, instruction) -> bool:
     """OB-01, policy path: the policy named by policy_id covers this entry within its scope."""
     scope = policy["scope"]
+    at = entry["authz"]["at"]
     return (
         policy["id"] == applied["policy_id"]
+        and policy["owner"] == world_owner
         and (policy["action_type"], policy["level"], policy["undo_window_s"])
         == (applied["action_type"], applied["level"], applied["undo_window_s"])
-        and (policy["expiry"] is None or entry["authz"]["at"] < policy["expiry"])
+        and policy["created_by"]["at"] <= at
+        and (policy["expiry"] is None or at < policy["expiry"])
+        and _instructed(entry, applied, policy, instruction)
         and applied["connector"] in scope["connectors"]
         and _within(scope["districts"], applied["district"])
         and all(
@@ -86,7 +118,7 @@ def broken(case) -> set[str]:
     if transfer is not None and transfer["authz"] != entry["authz"]:
         rules.add("OB-01")
     by_policy = auth is not None and auth["type"] == "policy.applied"
-    if by_policy and not _policy_covers(entry, auth["data"], case["policy"]):
+    if by_policy and not _policy_covers(entry, auth["data"], case["policy"], case["world_owner"], case["instruction"]):
         rules.add("OB-01")
     pinned_by = reserved if reserved is not None else auth
     if pinned_by is not None and (
@@ -142,10 +174,19 @@ def test_FR_WLD_03_OB_05_outbox_crossref_cases_are_shape_valid(repo_root, regist
             if case[slot] is not None:
                 found += _event_part_problems(slot, case[slot], types, registry)
         by_policy = case["authorised_by"] is not None and case["authorised_by"]["type"] == "policy.applied"
-        if (case["policy"] is not None) != by_policy:
-            found.append("policy is the policy record that policy.applied names, and null on a gate path")
+        if (case["policy"] is not None) != by_policy or (case["world_owner"] is not None) != by_policy:
+            found.append("policy and world_owner are set on the policy path only")
         elif by_policy:
             found += [e.message for e in errors_for({"$ref": BASE + "policy.schema.json"}, case["policy"], registry)]
+            owner = {"$ref": BASE + "common.schema.json#/$defs/user_id"}
+            found += [e.message for e in errors_for(owner, case["world_owner"], registry)]
+        instruction = case["instruction"]
+        if instruction is not None and (not by_policy or instruction.get("type") not in INSTRUCTION_TYPES):
+            found.append(f"instruction is a whole {INSTRUCTION_TYPES} event, on the policy path only")
+        elif instruction is not None:
+            found += [e.message for e in errors_for({"$ref": BASE + "event.schema.json"}, instruction, registry)]
+            data_schema = {"$ref": f"{BASE}events/data/{instruction['type']}.schema.json"}
+            found += [e.message for e in errors_for(data_schema, instruction["data"], registry)]
         assert not found, f"{path.name}: every part must be shape-valid, got {found[:3]}"
 
 
@@ -189,6 +230,12 @@ def test_FR_WLD_03_OB_01_OB_05_policy_path_has_an_invalid_case_per_binding(repo_
         "ob01_policy_connector_out_of_scope",
         "ob01_policy_district_out_of_scope",
         "ob01_policy_expired",
+        "ob01_policy_created_after_send",
+        "ob01_policy_owned_by_someone_else",
+        "ob01_l2_policy_without_instruction",
+        "ob01_l2_instruction_from_someone_else",
+        "ob01_l2_instruction_on_another_thread",
+        "ob01_l2_instruction_after_send",
         "ob05_policy_undo_window_dropped",
         "ob05_policy_risk_tier_differs",
         "ob05_policy_thread_reply_sent_as_new_email",
