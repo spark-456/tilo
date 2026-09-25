@@ -20,17 +20,21 @@ class Violation:
     method_name: str
 
 
-def _callee_name(node: ast.expr) -> str | None:
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        return node.attr
-    return None
+def _direct_call_args(node: ast.AST) -> Iterable[ast.expr]:
+    """Every argument expression passed straight to a call (not nested in a literal), so
+    `getattr(x, "send_reply")` and `operator.methodcaller("send_reply")` are seen but
+    `frozenset({"send_reply"})` (the name nested inside a set literal) is not."""
+    if isinstance(node, ast.Call):
+        yield from node.args
+        yield from (kw.value for kw in node.keywords)
 
 
 def scan_for_side_effect_calls(paths: Iterable[Path], *, allowed_path: Path) -> list[Violation]:
     """AST-parses each file in `paths` (skipping any that fail to parse), recording a Violation
-    for every call to a name in SIDE_EFFECT_METHOD_NAMES outside `allowed_path`."""
+    for every reference to a name in SIDE_EFFECT_METHOD_NAMES outside `allowed_path`: a direct
+    call, an attribute access (an alias, functools.partial, `.__call__`, however nested — a
+    reference is a reference whether or not it is immediately called), or the name as a string
+    constant passed straight to a call (getattr, operator.methodcaller)."""
     allowed = allowed_path.resolve()
     violations: list[Violation] = []
     for path in paths:
@@ -42,10 +46,17 @@ def scan_for_side_effect_calls(paths: Iterable[Path], *, allowed_path: Path) -> 
         if resolved == allowed:
             continue
         for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
+            if isinstance(node, ast.Attribute) and node.attr in SIDE_EFFECT_METHOD_NAMES:
+                violations.append(Violation(path=resolved, lineno=node.lineno, method_name=node.attr))
                 continue
-            name = _callee_name(node.func)
-            if name is None or name not in SIDE_EFFECT_METHOD_NAMES:
+            if isinstance(node, ast.Name) and node.id in SIDE_EFFECT_METHOD_NAMES:
+                violations.append(Violation(path=resolved, lineno=node.lineno, method_name=node.id))
                 continue
-            violations.append(Violation(path=resolved, lineno=node.lineno, method_name=name))
+            for arg in _direct_call_args(node):
+                if (
+                    isinstance(arg, ast.Constant)
+                    and isinstance(arg.value, str)
+                    and arg.value in SIDE_EFFECT_METHOD_NAMES
+                ):
+                    violations.append(Violation(path=resolved, lineno=arg.lineno, method_name=arg.value))
     return violations

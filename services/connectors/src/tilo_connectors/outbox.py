@@ -1,14 +1,14 @@
 """tilo_connectors.outbox — the only path to a side effect (SEC-03, PRD 12.1). Outbox.enqueue
-writes an entry only once it is schema-valid (OB-05), its state/scheduled_at correlation holds
-(OB-02), and tilo_policy.check_entry says it is authorised (OB-01/OB-05); a retry with the same
-world_id + idempotency_key is a no-op (OB-03). Outbox.dispatch_due() sends every entry currently
-due, minting a Grant no caller outside this module can construct, so a connector adapter's
+writes only a new entry: schema-valid (OB-05), "queued" or "scheduled" to match undo_window_s
+(OB-02), never overwriting a stored id, and authorised by tilo_policy.check_entry (OB-01/OB-05);
+a retry with the same world_id + idempotency_key is a no-op (OB-03). Outbox.dispatch_due() sends
+every entry currently due — including one stuck "sending" from a process death — minting a
+single-use Grant no caller outside this module can construct, so a connector adapter's
 side-effect method can only run from here (SEC-03). Public surface: tests/API.md.
 """
 
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass
@@ -18,18 +18,23 @@ import tilo_policy
 
 from ._schema import outbox_validator
 from ._time import add_seconds
-from .errors import OutboxRefused
+from .errors import MissingGrant, OutboxRefused
 from .store import InMemoryOutboxStore
 
-_DUE_STATES = ("queued", "scheduled", "failed")
+# States dispatch_due() treats as due: "queued" and a stuck "sending" (a process death mid-send,
+# picked up again — the adapter's own key dedupe keeps it at one send) are always due;
+# "scheduled" waits out its undo window; "sent", "cancelled" and "failed" are terminal.
+_ALWAYS_DUE_STATES = ("queued", "sending")
+_CLAIMABLE_STATES = ("queued", "scheduled", "sending")
+
+# Ids of Grant objects currently authorised for the one send Outbox.dispatch_due() minted them
+# for (SEC-03). Private to this module; a Grant built any other way is never a member.
+_LIVE_GRANTS: set[int] = set()
 
 
 def _transfer_event(entry: dict) -> dict:
     """The one data.transfer a sent entry emits (PI-16/17): direction "out", this entry's id,
-    authz and pinned item, unchanged. Shared by dispatch_due() (the real emission) and
-    enqueue()'s check for an entry that already arrives "sent" (docs/open-questions.md BQ-33:
-    a real caller never presents enqueue() with an already-sent entry, so this only matters for
-    a full-lifecycle fixture reused as enqueue input)."""
+    authz and pinned item, unchanged."""
     return {
         "type": "data.transfer",
         "authz": entry["authz"],
@@ -46,11 +51,18 @@ def _transfer_event(entry: dict) -> dict:
 
 @dataclass(frozen=True)
 class Grant:
-    """SEC-03: the capability a side-effect method requires. Only Outbox.dispatch_due() mints
-    one, so a caller outside this module has no supported way to construct a valid Grant."""
+    """SEC-03: the capability a side-effect method requires, minted only by
+    Outbox.dispatch_due() and live only for the one send it names. A Grant built any other way
+    (its own constructor, object.__new__, a subclass) verifies as invalid: validity is tracked
+    by object identity in this module's own registry, not by field values."""
 
     outbox_id: str
+    world_id: str
     idempotency_key: str
+
+    def verify(self) -> None:
+        if id(self) not in _LIVE_GRANTS:
+            raise MissingGrant("grant not minted by Outbox.dispatch_due() for this exact send")
 
 
 class Outbox:
@@ -65,40 +77,46 @@ class Outbox:
         self._connectors = connectors
         self._emit = emit
         self._clock = clock
-        self._lock = threading.Lock()
+        # Transfers a send emitted but were not yet handed to `emit` successfully (PI-14: no
+        # field but state changes on the entry itself, so this bookkeeping lives here instead).
+        self._pending_transfers: dict[str, dict] = {}
 
     # -- enqueue -----------------------------------------------------------------------------
 
     def enqueue(self, entry: dict, evidence: dict) -> dict:
-        with self._lock:
-            errors = sorted(outbox_validator().iter_errors(entry), key=lambda e: list(e.path))
-            if errors:
-                raise OutboxRefused(f"OB-05: entry fails outbox.schema.json: {errors[0].message}")
+        errors = sorted(outbox_validator().iter_errors(entry), key=lambda e: list(e.path))
+        if errors:
+            raise OutboxRefused(f"OB-05: entry fails outbox.schema.json: {errors[0].message}")
 
-            self._check_state_schedule_correlation(entry)
+        self._check_fresh_state(entry)
 
+        existing = self._store.get_by_idempotency_key(entry["world_id"], entry["idempotency_key"])
+        if existing is not None:
+            return existing
+        if self._store.get(entry["id"]) is not None:
+            raise OutboxRefused(f"id {entry['id']!r} is already stored under a different idempotency_key")
+
+        case = {**deepcopy(evidence), "entry": deepcopy(entry), "transfer": None, "rule": None}
+        verdict = tilo_policy.check_entry(case)
+        if verdict is not None:
+            raise OutboxRefused(f"{verdict}: entry is not authorised")
+
+        if not self._store._insert_if_absent(entry):
+            # Lost a race with a concurrent enqueue of the same id: the store never overwrites.
             existing = self._store.get_by_idempotency_key(entry["world_id"], entry["idempotency_key"])
             if existing is not None:
                 return existing
+            raise OutboxRefused(f"id {entry['id']!r} is already stored under a different idempotency_key")
+        return deepcopy(entry)
 
-            # tests/API.md: transfer is None (nothing sent yet). An entry that already arrives
-            # "sent" is checked against what dispatching it would emit instead, since a bare
-            # None would misread it as never sent (BQ-33).
-            transfer = _transfer_event(entry) if entry["state"] == "sent" else None
-            case = {**deepcopy(evidence), "entry": deepcopy(entry), "transfer": transfer, "rule": None}
-            verdict = tilo_policy.check_entry(case)
-            if verdict is not None:
-                raise OutboxRefused(f"{verdict}: entry is not authorised")
-
-            self._store.put(entry)
-            return deepcopy(entry)
-
-    def _check_state_schedule_correlation(self, entry: dict) -> None:
-        """OB-02: scheduled_at == created_at + undo_window_s, always; while state is "queued" or
-        "scheduled" (the only two enqueue is meant to introduce) it must also match undo_window_s
-        ("queued" for none, else "scheduled"). Neither the schema nor check_entry cover this
-        (tests/API.md "OB-02, resolved"), so enqueue enforces it itself."""
+    def _check_fresh_state(self, entry: dict) -> None:
+        """OB-02: enqueue only ever introduces a brand-new entry — "queued" with no undo window,
+        else "scheduled" with scheduled_at == created_at + undo_window_s. Any other state (a
+        later stage of the entry's life) is refused outright."""
         undo_window_s = entry["undo_window_s"]
+        expected_state = "queued" if undo_window_s == 0 else "scheduled"
+        if entry["state"] != expected_state:
+            raise OutboxRefused(f"OB-02: a new entry must be {expected_state!r}, got {entry['state']!r}")
         try:
             expected_scheduled_at = add_seconds(entry["created_at"], undo_window_s)
         except (ValueError, TypeError) as exc:
@@ -107,55 +125,63 @@ class Outbox:
             raise OutboxRefused(
                 f"OB-02: scheduled_at must equal created_at + undo_window_s (expected {expected_scheduled_at!r})"
             )
-        state = entry["state"]
-        expected_state = "queued" if undo_window_s == 0 else "scheduled"
-        if state in ("queued", "scheduled") and state != expected_state:
-            raise OutboxRefused(f"OB-02: state {state!r} does not match undo_window_s (expected {expected_state!r})")
 
     # -- cancel --------------------------------------------------------------------------------
 
     def cancel(self, outbox_id: str) -> dict:
-        with self._lock:
-            entry = self._store.get(outbox_id)
-            if entry is None or entry["state"] != "scheduled":
-                raise OutboxRefused(f"cannot cancel {outbox_id!r}: only a 'scheduled' entry can be cancelled")
-            entry["state"] = "cancelled"
-            self._store.put(entry)
-            return deepcopy(entry)
+        updated = self._store._compare_and_set_state(outbox_id, ("scheduled",), "cancelled")
+        if updated is None:
+            raise OutboxRefused(f"cannot cancel {outbox_id!r}: only a 'scheduled' entry can be cancelled")
+        return updated
 
     # -- dispatch ------------------------------------------------------------------------------
 
     def dispatch_due(self) -> list[dict]:
-        with self._lock:
-            now = self._clock()
-            due = [entry for entry in self._store.all_entries() if self._is_due(entry, now)]
-            return [self._dispatch_one(entry) for entry in due]
+        now = self._clock()
+        due = [entry for entry in self._store.all_entries() if self._is_due(entry, now)]
+        settled = [self._dispatch_one(entry["id"]) for entry in due]
+        self._flush_pending_transfers()
+        return [entry for entry in settled if entry is not None]
 
     @staticmethod
     def _is_due(entry: dict, now: str) -> bool:
         state = entry["state"]
-        if state not in _DUE_STATES:
-            return False
-        if state == "scheduled":
-            return entry["scheduled_at"] <= now
-        return True  # "queued" is always due; "failed" is retried on every dispatch_due call
+        if state in _ALWAYS_DUE_STATES:
+            return True
+        return state == "scheduled" and entry["scheduled_at"] <= now
 
-    def _dispatch_one(self, entry: dict) -> dict:
-        entry["state"] = "sending"
-        self._store.put(entry)
+    def _dispatch_one(self, outbox_id: str) -> dict | None:
+        claimed = self._store._compare_and_set_state(outbox_id, _CLAIMABLE_STATES, "sending")
+        if claimed is None:
+            return None  # already claimed elsewhere (a racing dispatch, or a cancel just won)
 
-        adapter = self._connectors[entry["connector"]]
-        grant = Grant(outbox_id=entry["id"], idempotency_key=entry["idempotency_key"])
+        adapter = self._connectors.get(claimed["connector"])
+        if adapter is None:
+            return self._store._compare_and_set_state(outbox_id, ("sending",), "failed")
+
+        grant = Grant(outbox_id=claimed["id"], world_id=claimed["world_id"], idempotency_key=claimed["idempotency_key"])
+        _LIVE_GRANTS.add(id(grant))
         try:
             adapter.send_reply(
-                entry["destination"], entry["item"], entry["recipients"], entry["idempotency_key"], grant
+                claimed["destination"], claimed["item"], claimed["recipients"], claimed["idempotency_key"], grant
             )
         except Exception:
-            entry["state"] = "failed"
-            self._store.put(entry)
-            return deepcopy(entry)
+            return self._store._compare_and_set_state(outbox_id, ("sending",), "failed")
+        finally:
+            _LIVE_GRANTS.discard(id(grant))
 
-        entry["state"] = "sent"
-        self._store.put(entry)
-        self._emit(_transfer_event(entry))
-        return deepcopy(entry)
+        sent = self._store._compare_and_set_state(outbox_id, ("sending",), "sent")
+        if sent is None:
+            return None  # this Outbox instance's own claim was somehow undone; nothing to emit
+        self._pending_transfers[outbox_id] = _transfer_event(sent)
+        self._emit(self._pending_transfers[outbox_id])  # may raise; retried by _flush_pending_transfers
+        del self._pending_transfers[outbox_id]
+        return sent
+
+    def _flush_pending_transfers(self) -> None:
+        """A sent entry's data.transfer that `emit` previously raised on (PI-17): exactly one is
+        ever emitted per entry, so a later dispatch_due() keeps retrying only the ones still
+        outstanding."""
+        for outbox_id in list(self._pending_transfers):
+            self._emit(self._pending_transfers[outbox_id])
+            del self._pending_transfers[outbox_id]

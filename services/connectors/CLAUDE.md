@@ -32,3 +32,9 @@ outbox for every side effect. The only service that can decrypt user OAuth token
   today) dedupes its own send by `idempotency_key` too, so a crash between the adapter call and
   `dispatch_due()` recording "sent", followed by a retry, still sends once.
 - `InMemoryOutboxStore` is dev/test-only; a Firestore-backed store ships with a later ticket.
+- Trust boundary: `InMemoryOutboxStore._insert_if_absent` / `_compare_and_set_state` are the only
+  mutators and are underscored — only `Outbox` (specifically `enqueue`, `cancel`,
+  `dispatch_due`) calls them, never overwriting a stored id and always moving state by
+  compare-and-set, so two `Outbox` instances sharing one store (a cancel racing a dispatch)
+  never both win. In production, IAM makes `tilo-connectors` the only writer to the real
+  (Firestore-backed) store the same way.
