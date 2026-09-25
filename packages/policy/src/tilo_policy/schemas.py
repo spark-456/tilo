@@ -30,6 +30,9 @@ _Validator = jsonschema.validators.extend(jsonschema.Draft202012Validator, {"pat
 @functools.cache
 def _registry() -> Registry:
     schemas = [json.loads(p.read_text("utf-8")) for p in sorted(CONTRACTS.glob("**/*.schema.json"))]
+    # Without `$schema`, a `$ref` into any contract keeps the extended validator (its `pattern`)
+    # instead of jsonschema switching back to the stock Draft 2020-12 class; all are 2020-12.
+    schemas = [{k: v for k, v in s.items() if k != "$schema"} for s in schemas]
     resources = [(s["$id"], Resource.from_contents(s, default_specification=DRAFT202012)) for s in schemas]
     return Registry().with_resources(resources)
 

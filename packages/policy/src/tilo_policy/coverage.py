@@ -19,7 +19,8 @@ LEVELS = ("L0", "L1", "L2", "L3")
 INSTRUCTION_CHANNELS = {"world.requested": ("web", "mobile_web"), "channel.message_in": ("whatsapp",)}
 # The policy fields open_gate reads when a Team Lead answers (PRD 10.1).
 LEAD_POLICY_KEYS = ("id", "owner", "action_type", "team_lead_domains", "created_by", "changed_by", "expiry", "history")
-_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")  # common.schema.json email_address, fully matched
+# common.schema.json email_address, fully matched; a BOM / zero-width no-break space counts as space
+_EMAIL = re.compile(r"[^@\s﻿]+@[^@\s﻿]+\.[^@\s﻿]+")
 _TIMESTAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z")
 
 
