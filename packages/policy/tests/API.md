@@ -235,7 +235,7 @@ def open_gate(
 ## Crossref check (reference-equivalent verdict)
 
 ```python
-def check_entry(case: dict) -> str | None:
+def check_entry(case: dict, table: RiskTable | None = None) -> str | None:
     """`case` is one contracts/fixtures/outbox/crossref/{valid,invalid}/*.json file, already
     loaded (keys: rule, note, entry, reserved_by, authorised_by, policy, team_lead, world_owner,
     instruction, earlier_applied, transfer — see contracts/outbox.rules.md). Returns None when
@@ -273,3 +273,14 @@ other than the `policy_id`, and a send over `limits.per_day` / `limits.credits` 
 `applied` must hold the earlier `policy.applied` parts under the owner's policies in every world,
 not just this one, or a policy's daily cap multiplies by the number of worlds; the caller (harness)
 supplies them.
+
+## Live decisions read the record as it is (review round 3)
+
+`decide` is a live decision: a policy whose `created_by`, `changed_by` or any history entry is
+dated after `now` covers nothing (the clock is behind the record: a retry, a replay or skew), so a
+Stop all or revocation already in the record always gates. Reading a policy back to an earlier
+level is `check_entry`'s job alone (a send made before a revocation stays covered, PI-13). Two
+records sharing an id gate, whether or not both cover the send. At L2 the instruction must be
+dated no earlier than the history entry that put the policy at the L2 level in force. With
+`table` given, `check_entry` also rejects an entry whose `risk_tier` is not the tier the table
+assigns to its `action_type` and `modifiers` (PI-07, PI-14).

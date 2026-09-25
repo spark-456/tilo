@@ -385,3 +385,66 @@ def test_FR_HIL_06_PI_11_decide_stays_fast_with_a_long_history(risk_table_path):
     elapsed = time.perf_counter() - start
     assert decision.outcome == "run"
     assert elapsed < 2.0, f"decide took {elapsed:.2f} s with 5000 earlier parts"
+
+
+# --- review round 3 --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("stopped_at", ["2026-09-29T10:20:00.500Z", "2026-09-30T10:20:00.000Z"])
+def test_FR_HIL_07_PI_13_a_stop_dated_after_now_still_stops(stopped_at, risk_table_path):
+    """decide is a live decision on the record as it is now: a Stop all (or revocation) already in
+    the record gates, even when `now` is behind it (a retry, a replay, a skewed clock)."""
+    history = [
+        {"by": OWNER, "at": "2026-09-29T09:30:00.000Z", "change": "Created", "level": "L3"},
+        {"by": OWNER, "at": stopped_at, "change": "stop_all", "level": "L1"},
+    ]
+    policy = _l3(level="L1", history=history)
+    assert _decide(_table(risk_table_path), _status_proposal(), [policy]).outcome == "gate"
+
+
+def test_FR_HIL_03_PI_06_a_stamp_dated_after_now_covers_nothing(risk_table_path):
+    policy = _l3()
+    policy["changed_by"] = {"by": OWNER, "at": "2026-09-29T11:00:00.000Z"}
+    assert _decide(_table(risk_table_path), _status_proposal(), [policy]).outcome == "gate"
+
+
+def test_FR_HIL_03_PI_13_duplicate_ids_gate_even_when_one_copy_does_not_cover(risk_table_path):
+    table = _table(risk_table_path)
+    wide = _l3()
+    narrow = _l3(connectors=("slack",))
+    broken = _l3()
+    broken["limits"]["per_day"] = None
+    for other in (narrow, broken):
+        for order in ([wide, other], [other, wide]):
+            assert _decide(table, _status_proposal(), order).outcome == "gate"
+
+
+def test_FR_HIL_05_PI_08_an_instruction_older_than_the_l2_level_opens_nothing(risk_table_path):
+    """Instruction is approval only while L2 is in force: an owner message sent before the policy
+    reached L2 did not ask under that policy (PRD 10.4 L2)."""
+    policy = base_policy(level="L2")  # created at L2 on 2026-09-29T09:30
+    proposal = tilo_policy.Proposal(
+        world_id=WORLD,
+        action_type="send_email",
+        connector="gmail",
+        district="D1",
+        destination="thread-supplier-1",
+        facts=tilo_policy.SideEffectFacts(**base_facts()),
+        item={"artifact_id": "art_reply", "version": 1},
+        credits=0,
+        instruction=base_instruction(ts="2026-08-01T09:00:00.000Z"),
+    )
+    decision = _decide(_table(risk_table_path), proposal, [policy])
+    assert decision.outcome == "gate"
+
+
+def test_FR_HIL_04_PI_07_check_entry_with_the_table_rejects_a_self_declared_lower_tier(l3_case, risk_table_path):
+    """check_entry(case, table=...) re-assesses the tier: delete_file is T3 in the table, so an
+    entry, policy.applied and policy that call it T2 are rejected (PI-07, PI-14)."""
+    table = _table(risk_table_path)
+    assert tilo_policy.check_entry(l3_case, table=table) is None
+    case = copy.deepcopy(l3_case)
+    case["entry"]["action_type"] = "delete_file"
+    case["authorised_by"]["data"]["action_type"] = "delete_file"
+    case["policy"]["action_type"] = "delete_file"
+    assert tilo_policy.check_entry(case, table=table) is not None
