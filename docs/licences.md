@@ -33,7 +33,11 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 
 ## Python (`packages/providers`)
 
-No third-party runtime dependencies yet (empty scaffold; code lands in ticket P0-04).
+No new dependency was added for ticket P0-04 (`packages/providers/pyproject.toml` still
+declares none of its own): `tilo_providers.config` uses `pydantic` (already listed under
+`packages/contracts-py`, via the `tilo-contracts` workspace member it imports) and `pyyaml`
+(already listed under the root dev dependency group); both are already installed into the
+shared `uv` workspace venv by `uv sync --all-packages`.
 
 ## JavaScript / TypeScript (root `package.json` devDependencies, `pnpm`-managed)
 
