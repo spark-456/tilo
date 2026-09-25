@@ -1,12 +1,9 @@
 """Secret and payment-card redaction (FR-MEM-05, SEC-14, PRD 16.1 rule 4).
 
-Not a general DLP: it covers exactly what the ticket brief scopes -- (1)
-values under secret-named keys, (2) the nine patterns in
-`scripts/secret_scan.py` plus bearer tokens and JWTs, and (3) Luhn-valid
-payment card numbers (13-19 digits). A package must not import from
-`scripts/` (root CLAUDE.md), so the nine patterns are reproduced here by
-hand, independently, the same way `scripts/secret_scan.py` itself says its
-copy is independent of the guard hook's.
+Not a general DLP: covers exactly (1) values under secret-named keys, (2)
+the nine patterns in `scripts/secret_scan.py` (reproduced here by hand --
+a package must not import from `scripts/`) plus bearer tokens and JWTs, and
+(3) Luhn-valid payment card numbers (13-19 digits).
 """
 
 from __future__ import annotations
@@ -18,8 +15,7 @@ from typing import Any
 MAX_SCAN_CHARS = 1_000_000
 _MAX_DEPTH = 64
 
-# Case-insensitive substrings of a dict key that mark its value as secret,
-# regardless of type or content (brief REQUIRED BEHAVIOUR #(1)).
+# Case-insensitive substrings of a dict key that mark its value as secret.
 _SECRET_KEY_MARKERS = (
     "password",
     "passwd",
@@ -36,8 +32,8 @@ _SECRET_KEY_MARKERS = (
     "pin",
 )
 
-# (compiled pattern, kind) -- independent copy of scripts/secret_scan.py's
-# SECRET_PATTERNS, plus bearer tokens and JWTs (brief REQUIRED BEHAVIOUR #(2)).
+# (compiled pattern, kind) -- independent copy of secret_scan.py's patterns,
+# plus bearer tokens and JWTs.
 _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "private_key"),
     (re.compile(r"AIza[0-9A-Za-z_\-]{35}"), "google_api_key"),
@@ -52,8 +48,7 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"), "jwt"),
 ]
 
-# 13-19 digits, spaces or dashes allowed between digits (brief REQUIRED
-# BEHAVIOUR #(3)); Luhn validity is checked separately before redacting.
+# 13-19 digits, spaces/dashes allowed; Luhn checked separately before redacting.
 _CARD_RE = re.compile(r"(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)")
 
 
@@ -111,10 +106,9 @@ def _redact_value(value: Any, depth: int) -> Any:
 
 
 def redact(value: Any) -> Any:
-    """Deep copy of any JSON-like `value` with secrets and card numbers
-    replaced. Never raises: odd input (non-str keys, NaN/Infinity, nesting
-    beyond a cap of 64) is handled, not rejected -- rejection of NaN/Infinity
-    for storage is the archive writer's job, not this function's."""
+    """Deep copy of any JSON-like `value` with secrets/card numbers replaced.
+    Never raises, whatever the shape -- NaN/Infinity rejection is the archive
+    writer's job, not this function's."""
     return _redact_value(value, 0)
 
 
@@ -137,8 +131,7 @@ def redact_prompt(text: str) -> str:
 
 
 class RedactingFilter(logging.Filter):
-    """A `logging.Filter` that redacts a record's `msg` and `args` in place
-    (never drops the record -- CLAUDE.md: "Secrets never reach ... logs")."""
+    """Redacts a log record's `msg` and `args` in place; never drops it."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.msg, str):

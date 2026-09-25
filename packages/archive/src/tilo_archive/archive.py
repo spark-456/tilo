@@ -1,11 +1,7 @@
 """The raw archive: append-only, hash-chained records per run (FR-MEM-04,
-PRD 13.2, 15.1, 22.2 D-09).
-
-Threat model covered here: tampering with a stored record (an edit, an
-insertion, a deletion or a reordering), or a truncated/extended tail when
-the caller supplies the run's expected head, is detected by `verify_chain`.
-Encryption at rest is the Cloud Storage bucket's KMS key (infra, P0-07), not
-this module.
+PRD 13.2, 15.1, 22.2 D-09). `verify_chain` detects any edit, insertion,
+deletion or reordering, and a truncated/extended tail given an expected
+head. Encryption at rest is the bucket's KMS key (infra, P0-07), not here.
 """
 
 from __future__ import annotations
@@ -25,10 +21,8 @@ RUN_ID_RE = re.compile(r"^r_[0-9A-Za-z_]{1,48}$")
 
 
 class Store(Protocol):
-    """What `RunArchive` needs from a backing store: append one JSONL line,
-    never rewriting an existing one, and read every stored line back in
-    order. `LocalDirStore` implements this for dev/test; a `GcsStore` could
-    too (out of scope for this ticket)."""
+    """Append one JSONL line (never rewriting an existing one) and read every
+    stored line back in order. `LocalDirStore` implements this for dev/test."""
 
     def append_line(self, org_id: str, run_id: str, line: str) -> None: ...
 
@@ -36,8 +30,7 @@ class Store(Protocol):
 
 
 class LocalDirStore:
-    """One append-only JSONL file per run at `<root>/<org_id>/<run_id>.jsonl`
-    (brief REQUIRED BEHAVIOUR #5) -- the dev and test store."""
+    """One append-only JSONL file per run at `<root>/<org_id>/<run_id>.jsonl`."""
 
     def __init__(self, root: Path):
         self._root = Path(root)
@@ -60,9 +53,8 @@ class LocalDirStore:
 
 
 class RunArchive:
-    """Appends redacted, hash-chained records for one run and reads them
-    back. Reopening (a new instance over the same store/org/run) continues
-    the chain from the stored head."""
+    """Appends redacted, hash-chained records for one run. Reopening (a new
+    instance over the same store/org/run) continues the chain from the head."""
 
     def __init__(self, store: Store, *, org_id: str, run_id: str, clock: Callable[[], datetime] | None = None):
         if not ORG_ID_RE.match(org_id):
@@ -109,10 +101,10 @@ class RunArchive:
 
 
 def verify_chain(records: list[dict], expected_head: tuple[int, str] | None = None) -> list[str]:
-    """Problems with `records` as a hash chain: a changed field (hash
-    mismatch), a broken prev_hash link, a gap, a duplicate or reordered seq,
-    a record from another run, and -- when `expected_head` is given -- a
-    truncated or extended tail. Each problem names the seq that broke it."""
+    """Problems with `records` as a hash chain, each naming the seq that
+    broke it: a hash mismatch, a broken prev_hash link, a gap, a duplicate
+    or reordered seq, a foreign-run record, or (given `expected_head`) a
+    truncated/extended tail."""
     problems: list[str] = []
     if not records:
         if expected_head is not None and expected_head != (0, ZERO_HASH):

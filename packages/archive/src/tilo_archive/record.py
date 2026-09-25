@@ -8,14 +8,11 @@ from datetime import UTC, datetime
 
 VALID_KINDS = ("model_call", "tool_call", "channel_in", "channel_out")
 ZERO_HASH = "0" * 64
-SCHEMA_VERSION = "1.0"
 
 
 def canonical_json(value: object) -> str:
-    """json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-    allow_nan=False) -- the exact canonical form the brief defines. Raises
-    ValueError on NaN/Infinity and TypeError on a non-JSON-serialisable
-    value; both are the archive writer's rejection signal."""
+    """Canonical form; raises ValueError on NaN/Infinity and TypeError on a
+    non-serialisable value -- both are the archive writer's rejection signal."""
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
