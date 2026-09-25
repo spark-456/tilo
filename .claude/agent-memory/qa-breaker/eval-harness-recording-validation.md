@@ -30,6 +30,14 @@ builder fixes only the headline, so list the carried-over defects inside BIGGEST
 P8-06a round 5: all four fixed in cases.py, but EvalsConfig.load got the value checks only: malformed YAML /
 non-UTF-8 config still raise raw ParserError/UnicodeDecodeError, 10**400 threshold -> OverflowError, .inf accepted.
 A fix to one loader's read/parse must be checked against every sibling loader.
+P8-06a round 6: all fixed via shared read_yaml/is_number, but merging unknown/missing key checks into
+`sorted(set(raw) ^ set(_VALID))` crashes with raw TypeError on a non-string YAML key (`1: 2`, `null: x`)
+plus a missing key. Refactors that "simplify" error paths add new crashes: always try non-str YAML keys.
+Also: CaseError joins jsonschema e.message (repr of instance), so a 434-byte alias bomb as `id` builds a
+100 MB message in 6s (exponential). Try YAML alias bombs against any loader that reprs values in errors.
+P8-06a round 7: PASS. key=str sort, 500-char CappedError, and a no-alias SafeLoader (aliases rejected
+outright, `<<:` with inline map still OK). Leftover non-blocker: cap truncates AFTER the full join, so
+200k bad checks (2.6 MB file) take ~28s building a multi-MB message; ask for an error-count cap next time.
 
 **Why:** fixes tend to cover exactly the repro given, not the same class of input elsewhere.
 **How to apply:** when re-reviewing a "bad input crashes the pass" fix, fuzz every field the consumer reads

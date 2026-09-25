@@ -1,6 +1,6 @@
 {
   "rule": null,
-  "note": "An L2 reply the Autopilot policy opened after the owner answered Tilo's question on WhatsApp from their bound number: the entry carries the policy's authz and the version the engine assessed, and has not been sent yet.",
+  "note": "An L2 reply the Autopilot policy opened after the owner typed an answer to Tilo's question card (\"What should I say?\", PRD 11.2) on WhatsApp from their bound number: the entry carries the policy's authz and the version the engine assessed, and has not been sent yet.",
   "entry": {
     "id": "01JB5VQ0000000000000009006",
     "idempotency_key": "r_village_basic_1:U2:send_email:1",
@@ -50,7 +50,8 @@
       "item": {
         "artifact_id": "art_followup_reply",
         "version": 1
-      }
+      },
+      "credits": 2
     }
   },
   "policy": {
@@ -116,6 +117,8 @@
       "channel": "whatsapp",
       "message_ref": "r_village_basic_1/118",
       "card_id": "01JB5VQ0000000000000000129",
+      "card_kind": "needs_you",
+      "option": null,
       "destination": "thread-supplier-1"
     },
     "trace": {
