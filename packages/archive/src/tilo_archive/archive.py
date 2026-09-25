@@ -41,8 +41,29 @@ class LocalDirStore:
     def append_line(self, org_id: str, run_id: str, line: str) -> None:
         path = self._path(org_id, run_id)
         path.parent.mkdir(parents=True, exist_ok=True)
+        self._heal_missing_trailing_newline(path)
         with path.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(line + "\n")
+
+    @staticmethod
+    def _heal_missing_trailing_newline(path: Path) -> None:
+        """A crash between writing a record's JSON and its trailing "\\n"
+        leaves an otherwise-complete last line with no newline after it.
+        `read_lines` (via `splitlines()`) tolerates that on a plain read, so
+        a reopen after such a crash succeeds -- but opening the file in
+        append mode and writing straight onto it would then glue the next
+        record onto that unterminated line, silently destroying a record
+        that was never actually corrupt. Writing the missing newline back
+        first is a no-op on an already-terminated file, and keeps every
+        append on its own line no matter when the previous write died."""
+        if not path.exists() or path.stat().st_size == 0:
+            return
+        with path.open("rb") as handle:
+            handle.seek(-1, 2)
+            last_byte = handle.read(1)
+        if last_byte != b"\n":
+            with path.open("ab") as handle:
+                handle.write(b"\n")
 
     def read_lines(self, org_id: str, run_id: str) -> list[str]:
         path = self._path(org_id, run_id)

@@ -62,10 +62,17 @@ _JWT_SEGMENT_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
 _JWT_MIN_SEGMENT_LEN = 5
 _EYJ_START_RE = re.compile(r"\beyJ")
 
-# 13-25 raw digits (spaces/dashes allowed as separators): wide enough to also
-# sweep in a trailing CVV/expiry or a leading stray digit, which _card_span
-# then trims back to the actual 13-19 digit Luhn-valid card.
-_CARD_RE = re.compile(r"(?<!\d)\d(?:[ -]?\d){12,24}(?!\d)")
+# A run of digits with single space/dash separators allowed between them, of
+# any length: unbounded, not capped at some maximum digit count. A cap
+# (round 3's `{12,24}`, 13-25 digits) let a card that shares one run with
+# other numbers -- a leading "N " prefix, a trailing date, another card
+# right after -- split across two separate regex matches once the combined
+# run passed the cap, so a window search inside either half alone could
+# never see the whole card and it left the archive unmasked. The run is
+# still bounded overall by MAX_SCAN_CHARS on the text it is found in, and
+# `_card_windows` below does a bounded amount of work per digit in the run,
+# so removing the cap here does not reintroduce unbounded scan cost.
+_CARD_RE = re.compile(r"(?<!\d)\d(?:[ -]?\d)*")
 
 
 def _is_secret_key(key: Any) -> bool:
@@ -156,61 +163,91 @@ def _luhn_valid(digits: str) -> bool:
     return total % 10 == 0
 
 
-def _card_span(raw: str) -> tuple[int, int, str] | None:
-    """Locates a contiguous Luhn-valid 13-19 digit card inside `raw`, which
-    may carry extra digits swept in by the outer `_CARD_RE` match: a
-    trailing CVV/expiry (a prefix window, dropping trailing digits) or a
-    leading stray digit (a suffix window, dropping leading digits).
+_MIN_CARD_DIGITS = 13
+_MAX_CARD_DIGITS = 19
 
-    At each candidate length (longest to shortest) both windows are tried
-    before moving to a shorter length, so a short coincidental Luhn match in
-    one direction can never pre-empt the correct, longer match in the other
-    -- trying every prefix length before any suffix length (the previous
-    order) let exactly that happen. A window is only accepted when both of
-    its edges land on a real boundary: the edge of `raw`, or a space/dash
-    separator. Genuine noise digits sit next to the card via a separator,
-    never glued onto it mid-run, so this also rejects a Luhn "hit" that
-    would otherwise land inside the middle of a formatted `nnnn nnnn` group
-    -- random digits are Luhn-valid roughly one time in ten, so without this
-    check a run with a few extra candidate lengths to try finds one often
-    enough that "the test passes" is not the same as "the algorithm is
-    right" (round-2's fixed-seed test happened to avoid it).
 
-    Returns the (start, end) character span of just the card digits within
-    `raw`, and the card's own digit string -- or None if no window is both
-    boundary-aligned and Luhn-valid."""
+def _group_boundaries(positions: list[int]) -> tuple[list[int], set[int]]:
+    """`positions` are the character offsets of every digit inside a
+    `_CARD_RE` match, in order. A digit's index into `positions` is a *left*
+    boundary when nothing but a single space/dash separates it from the
+    previous digit's edge (or it is the run's first digit); it is a *right*
+    boundary the same way looking forward. Two adjacent digits with no gap
+    at all (part of the same unbroken number) are never a boundary between
+    them, so a window can never start or end mid-number.
 
-    def _boundary_ok(start: int, end: int) -> bool:
-        left_ok = start == 0 or raw[start - 1] in " -"
-        right_ok = end == len(raw) or raw[end] in " -"
-        return left_ok and right_ok
+    Returns the left-boundary indices (ascending) and the set of
+    right-boundary indices, so every whole-group-aligned window --
+    anywhere in the run, not only at its very start or end -- can be
+    enumerated by pairing each left boundary with a right boundary."""
+    n = len(positions)
+    left = [0] if n else []
+    right: set[int] = set()
+    for i in range(n):
+        if i > 0 and positions[i] != positions[i - 1] + 1:
+            left.append(i)
+        if i == n - 1 or positions[i + 1] != positions[i] + 1:
+            right.add(i)
+    return left, right
 
+
+def _card_windows(raw: str) -> list[tuple[int, int]]:
+    """Every Luhn-valid, group-boundary-aligned 13-19 digit card window in
+    `raw`, as (start, end) character spans, longest and earliest first.
+
+    Unlike a single "best" window, this enumerates all of them: `raw` can
+    hold more than one card-shaped number (two real cards back to back, or a
+    card next to an unrelated Luhn-valid-by-chance number), and checking
+    only a window anchored at the very start or end of `raw` -- the
+    previous approach -- missed a card sitting between two other numbers,
+    or let a coincidentally-valid window at one edge pre-empt the real card
+    at the other. Every left/right boundary pair at every length in range
+    is checked, which is only ever `O(boundaries * 7)` work since a window
+    is at most 19 digits.
+    """
     positions = [i for i, ch in enumerate(raw) if ch.isdigit()]
     n = len(positions)
-    if n < 13:
-        return None
-    for length in range(min(19, n), 12, -1):
-        start, end = positions[0], positions[length - 1] + 1
-        if _boundary_ok(start, end):
-            digits = "".join(raw[p] for p in positions[:length])
+    if n < _MIN_CARD_DIGITS:
+        return []
+    left, right = _group_boundaries(positions)
+    windows = []
+    for start_idx in left:
+        max_len = min(_MAX_CARD_DIGITS, n - start_idx)
+        for length in range(_MIN_CARD_DIGITS, max_len + 1):
+            end_idx = start_idx + length - 1
+            if end_idx not in right:
+                continue
+            digits = "".join(raw[p] for p in positions[start_idx : end_idx + 1])
             if _luhn_valid(digits):
-                return start, end, digits
-        start, end = positions[n - length], positions[-1] + 1
-        if _boundary_ok(start, end):
-            digits = "".join(raw[p] for p in positions[n - length :])
-            if _luhn_valid(digits):
-                return start, end, digits
-    return None
+                windows.append((positions[start_idx], positions[end_idx] + 1))
+    return windows
 
 
 def _redact_cards(text: str) -> str:
     def _replace(match: re.Match[str]) -> str:
         raw = match.group(0)
-        span = _card_span(raw)
-        if span is None:
+        windows = _card_windows(raw)
+        if not windows:
             return raw
-        start, end, digits = span
-        return raw[:start] + f"[REDACTED:card ****{digits[-4:]}]" + raw[end:]
+        # Multiple card-shaped windows can overlap only in pathological,
+        # constructed text; merging them into non-overlapping spans before
+        # masking guarantees every digit any valid window covers is hidden,
+        # never just the first one found.
+        spans: list[list[int]] = []
+        for start, end in sorted(windows):
+            if spans and start <= spans[-1][1]:
+                spans[-1][1] = max(spans[-1][1], end)
+            else:
+                spans.append([start, end])
+        parts = []
+        pos = 0
+        for start, end in spans:
+            last4 = "".join(ch for ch in raw[start:end] if ch.isdigit())[-4:]
+            parts.append(raw[pos:start])
+            parts.append(f"[REDACTED:card ****{last4}]")
+            pos = end
+        parts.append(raw[pos:])
+        return "".join(parts)
 
     return _CARD_RE.sub(_replace, text)
 
@@ -265,7 +302,7 @@ def find_secrets(text: str) -> list[str]:
     if _find_jwt_spans(text):
         found.append("jwt")
     for match in _CARD_RE.finditer(text):
-        if _card_span(match.group(0)) is not None:
+        if _card_windows(match.group(0)):
             found.append("card")
             break
     return found

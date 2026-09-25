@@ -24,6 +24,16 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
+from hypothesis import settings
+
+# Timing is not a property under test here -- the property is "seq is
+# strictly increasing" (test_FR_MEM_04_seq_strictly_increasing), not wall-
+# clock speed. Each example does real filesystem I/O (LocalDirStore append,
+# including the round-4 missing-trailing-newline check), so the 200 ms
+# default deadline flaked under load rather than testing anything real --
+# same fix as tests/contracts/conftest.py for PL-02's property tests.
+settings.register_profile("archive", deadline=None)
+settings.load_profile("archive")
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 

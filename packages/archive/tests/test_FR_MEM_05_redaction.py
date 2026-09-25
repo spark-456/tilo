@@ -420,7 +420,13 @@ def test_FR_MEM_05_jwt_pattern_is_linear_time_on_boundary_dense_input(text):
     start = time.perf_counter()
     redact_mod.redact({"m": text})
     elapsed = time.perf_counter() - start
-    assert elapsed < 1.0, f"redact() took {elapsed:.2f}s on a boundary-dense string"
+
+    # Generous, slack-padded bound (same slack as the eyJ-prefix test
+    # below): this pins "does not blow up quadratically", not a tight perf
+    # target, so it does not flake under CI load. code-reviewer: the
+    # original < 1.0s bound left the hyphen-boundary case only ~2x headroom
+    # and it flaked once in four full-suite runs.
+    assert elapsed < 8.0, f"redact() took {elapsed:.2f}s on a boundary-dense string"
 
 
 def test_FR_MEM_05_dict_key_text_is_scanned_for_secret_patterns():
@@ -682,6 +688,99 @@ def test_FR_MEM_05_redacting_filter_redacts_secret_in_exception_str_arg():
 
     assert secret not in message
     assert "[REDACTED:" in message
+
+
+# ---------------------------------------------------------------------------
+# Fix-round-4 regression pins (code-reviewer, security-reviewer, qa-breaker).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "build_text",
+    [
+        lambda card: f"10 20 30 40 50 {with_separator(card, ' ')}",
+        lambda card: f"32 2026-09-20 {with_separator(card, '-')}",
+    ],
+    ids=["five-pairs-prefix", "index-date-prefix"],
+)
+def test_FR_MEM_05_card_redacted_when_run_exceeds_old_25_digit_cap(build_text):
+    # security-reviewer: _CARD_RE used to stop a digit run at 25 digits
+    # ({12,24}). When a card followed other numbers in the same
+    # space/dash-joined run and the combined run was longer than that, the
+    # card was split across two separate regex matches and never masked at
+    # all -- find_secrets() returned []. The run is now unbounded, so the
+    # whole thing is one match and the card inside it is still found.
+    card = fake_luhn_card(RNG, length=16)
+    text = build_text(card)
+
+    redacted = redact_mod.redact({"note": text})["note"]
+
+    assert card not in redacted
+    assert f"[REDACTED:card ****{card[-4:]}]" in redacted
+    assert "card" in redact_mod.find_secrets(text)
+
+
+def _fake_date(rng) -> str:
+    return f"{2020 + rng.randint(0, 9)}-{rng.randint(1, 12):02d}-{rng.randint(1, 28):02d}"
+
+
+# One prefix builder per shape named in the security-reviewer's brief:
+# "N YYYY-MM-DD ", "YYYY " and "10 20 30 40 50 ".
+_CARD_PREFIX_BUILDERS = [
+    lambda rng: f"{rng.randint(0, 99)} {_fake_date(rng)} ",
+    lambda rng: f"{1900 + rng.randint(0, 199)} ",
+    lambda rng: "10 20 30 40 50 ",
+]
+
+
+def test_FR_MEM_05_card_not_split_by_25_digit_cap_across_many_seeds():
+    # security-reviewer repro: "N date card" rows leaked in ~76% of 300
+    # random cases under the old 25-digit cap.
+    failures = []
+    for seed in range(300):
+        rng = random.Random(seed + 100_000)
+        card = fake_luhn_card(rng, length=16)
+        prefix = _CARD_PREFIX_BUILDERS[seed % len(_CARD_PREFIX_BUILDERS)](rng)
+        text = prefix + with_separator(card, " ")
+
+        redacted = redact_mod.redact({"note": text})["note"]
+
+        if card in redacted or f"[REDACTED:card ****{card[-4:]}]" not in redacted:
+            failures.append((seed, text))
+    assert not failures, f"card leaked or unredacted for seeds: {failures[:5]}"
+
+
+def test_FR_MEM_05_card_redacted_when_leading_window_is_coincidentally_luhn_valid():
+    # security-reviewer: _card_span tried the leading (start-of-run-anchored)
+    # window before the trailing (end-of-run-anchored) one at each length.
+    # When a leading window happened to also be Luhn-valid, it pre-empted
+    # the real, trailing card and masked the wrong 16 digits, e.g.
+    # "2026-09-14 4509-8390-9700-5770" ->
+    # "[REDACTED:card ****8390]-9700-5770" (12 real card digits left in
+    # clear text). The new algorithm checks every group-boundary-aligned
+    # window (not just the two run-edge-anchored ones) and masks the union
+    # of every Luhn-valid one, so the real card is always fully covered.
+    failures = []
+    for seed in range(300):
+        rng = random.Random(seed + 200_000)
+        card = fake_luhn_card(rng, length=16)
+        date = f"{2020 + rng.randint(0, 9)}-{rng.randint(1, 12):02d}-{rng.randint(1, 28):02d}"
+        text = f"{date} {with_separator(card, '-')}"
+
+        redacted = redact_mod.redact({"note": text})["note"]
+
+        if card in redacted:
+            failures.append((seed, text, redacted))
+            continue
+        # No 4-digit card group may survive unmasked in clear text next to
+        # the redaction marker -- catches a wrong-window mask the same way
+        # the exact `card not in redacted` check does, but also for a
+        # partial leak of an inner group like "-9700-".
+        for group in with_separator(card, "-").split("-"):
+            if group in redacted and group != card[-4:]:
+                failures.append((seed, text, redacted))
+                break
+    assert not failures, f"wrong window masked for seeds: {failures[:5]}"
 
 
 def test_FR_MEM_05_card_never_leaks_in_cleartext_across_many_cards_and_noise_shapes():

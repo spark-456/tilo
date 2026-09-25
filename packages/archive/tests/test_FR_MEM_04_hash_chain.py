@@ -528,3 +528,46 @@ def test_FR_MEM_04_cli_reports_invalid_utf8_instead_of_crashing(tmp_path):
     out = json.loads(result.stdout.strip().splitlines()[-1])
     assert out["ok"] is False
     assert out["problems"]
+
+
+# ---------------------------------------------------------------------------
+# Fix-round-4 regression pin (qa-breaker).
+# ---------------------------------------------------------------------------
+
+
+def test_FR_MEM_04_append_after_missing_trailing_newline_does_not_corrupt_prior_record(tmp_path):
+    # qa-breaker: a crash right after a record's JSON was written but before
+    # its trailing "\n" left a valid but unterminated last line.
+    # `read_lines` (splitlines()) tolerated that on reopen, but the next
+    # `append` opened the file in plain append mode and wrote straight onto
+    # it, gluing the new record onto the end of the previous, otherwise
+    # intact, one. Repro (run twice): append 2 records, strip only the
+    # final "\n" byte, reopen (succeeds), append a 3rd record -- record 2
+    # must still be its own, unmodified, parseable line, and every later
+    # reopen must see all 3 records with an intact chain.
+    store = LocalDirStore(tmp_path)
+    arch = RunArchive(store, org_id="org_a", run_id="r_x", clock=FakeClock())
+    arch.append("model_call", {"i": 0})
+    arch.append("model_call", {"i": 1})
+    jsonl_path = tmp_path / "org_a" / "r_x.jsonl"
+    original_line_2 = jsonl_path.read_text(encoding="utf-8").splitlines()[1]
+
+    raw = jsonl_path.read_bytes()
+    assert raw.endswith(b"\n")
+    jsonl_path.write_bytes(raw[:-1])  # strip only the final newline byte
+
+    reopened = RunArchive(store, org_id="org_a", run_id="r_x", clock=FakeClock())
+    assert len(reopened.records()) == 2
+
+    ref = reopened.append("tool_call", {"i": 2})
+    assert ref == "r_x/3"
+
+    lines = jsonl_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 3
+    assert lines[1] == original_line_2, "record 2 must not be merged with record 3"
+
+    twice_reopened = RunArchive(store, org_id="org_a", run_id="r_x", clock=FakeClock())
+    records = twice_reopened.records()
+    assert len(records) == 3
+    assert [r["seq"] for r in records] == [1, 2, 3]
+    assert verify_chain(records) == []
