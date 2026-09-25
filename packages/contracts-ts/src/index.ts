@@ -83,7 +83,7 @@
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
- * policy.schema.json 1.0.0 sha256:1b75580649b24b70
+ * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
  * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
  * team_lead.schema.json 1.0.0 sha256:7408b4fbe4f45f78
