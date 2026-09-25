@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/budget.granted.schema.json",
+  "x-version": "1.0.0",
+  "title": "BudgetGrantedData",
+  "description": "data of budget.granted (PRD 9.5). A person, or a policy under its threshold, approved spending (FR-INT-08); spending credits is a T1 side effect (PRD 10.4), so the event carries authz.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["granted", "cap"],
+  "properties": {
+    "granted": { "$ref": "../../common.schema.json#/$defs/credits" },
+    "cap": { "$ref": "../../common.schema.json#/$defs/credits" }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/artifact.created.schema.json",
+  "x-version": "1.0.0",
+  "title": "ArtifactCreatedData",
+  "description": "data of artifact.created (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact"],
+  "properties": { "artifact": { "$ref": "../../common.schema.json#/$defs/artifact_ref" } }
+}

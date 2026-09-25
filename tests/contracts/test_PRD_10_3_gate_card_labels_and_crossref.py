@@ -4,10 +4,11 @@ CR-07 (schema): a gate's options have fixed labels by id (approve "Approve", edi
 hold "Hold"), because the person taps the label and that tap is the authorisation.
 
 CR-09 to CR-12 (card validator, P1): a gate card's gate id, action type, connector, irreversible
-flag, risk tier and recipients match the plan gate, the connector action and the held side
-effect. `mismatches` below is the reference check; each file in contracts/fixtures/card/crossref/
-is shape-valid, and each invalid one breaks exactly the rule its `rule` field and name state. The
-P1 card validator's tests must run the same files.
+flag, risk tier, recipients, pinned item (artifact id and version) and destination match the plan
+gate, the connector action and the held side effect. `mismatches` below is the reference check;
+each file in contracts/fixtures/card/crossref/ is shape-valid, and each invalid one breaks
+exactly the rule its `rule` field and name state. The P1 card validator's tests must run the
+same files.
 """
 
 from __future__ import annotations
@@ -42,9 +43,15 @@ def mismatches(case) -> set[str]:
         broken.add("CR-10")
     if plan_gate is not None and gate["risk_tier"] != ("T3" if held["modifiers"] else plan_gate["risk_tier"]):
         broken.add("CR-11")
-    if set(gate["recipients"]) != set(held["recipients"]):
+    if set(gate["recipients"]) != set(held["recipients"]) or gate["action"]["destination"] != held["destination"]:
+        broken.add("CR-12")
+    if _pinned(gate["action"]["item"]) != _pinned(held["item"]):
         broken.add("CR-12")
     return broken
+
+
+def _pinned(item):
+    return None if item is None else (item["artifact_id"], item["version"])
 
 
 def _gate_card(repo_root):
@@ -95,6 +102,8 @@ def test_PRD_10_3_CR_09_to_12_crossref_fixtures_are_shape_valid(repo_root, regis
         for modifier in case["held"]["modifiers"]:
             tier_modifier = {"condition": modifier, "raises_to": "T3"}
             found += _shape_errors(registry, "policy.schema.json#/$defs/tier_modifier", tier_modifier)
+        for field in ("item", "destination"):
+            found += _shape_errors(registry, f"outbox.schema.json#/properties/{field}", case["held"][field])
         assert not found, f"{path.name}: every part must be shape-valid, got {found[:3]}"
 
 

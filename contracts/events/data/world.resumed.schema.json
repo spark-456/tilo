@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/world.resumed.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorldResumedData",
+  "description": "data of world.resumed (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["paused_for_s"],
+  "properties": { "paused_for_s": { "type": "integer", "minimum": 0 } }
+}

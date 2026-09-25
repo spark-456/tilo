@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/alert.resolved.schema.json",
+  "x-version": "1.0.0",
+  "title": "AlertResolvedData",
+  "description": "data of alert.resolved (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["alert_id"],
+  "properties": { "alert_id": { "$ref": "../../common.schema.json#/$defs/ulid" } }
+}

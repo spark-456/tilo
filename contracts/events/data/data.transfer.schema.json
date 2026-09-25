@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/data.transfer.schema.json",
+  "x-version": "1.0.0",
+  "title": "DataTransferData",
+  "description": "data of data.transfer (PRD 9.5). Data crossed the bridge of connector: artifact is the item that crossed, pinned to its version (null when nothing is stored, such as a delete), and the event's item is what the world draws. out is a side effect released by the outbox, so outbox_id names that entry and artifact equals the entry's pinned item (OB-05); in is a read under the connection the person consented to. Either way the event carries authz (for in, the person's consent). No recipients or message bodies.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["connector", "action_type", "direction", "artifact", "outbox_id", "risk_tier"],
+  "properties": {
+    "connector": { "$ref": "../../common.schema.json#/$defs/connector_id" },
+    "action_type": { "$ref": "../../common.schema.json#/$defs/action_type" },
+    "direction": { "type": "string", "enum": ["in", "out"] },
+    "artifact": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/artifact_ref" }, { "type": "null" }]
+    },
+    "outbox_id": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/ulid" }, { "type": "null" }]
+    },
+    "risk_tier": { "$ref": "../../common.schema.json#/$defs/risk_tier" }
+  },
+  "if": { "properties": { "direction": { "const": "out" } }, "required": ["direction"] },
+  "then": { "properties": { "outbox_id": { "$ref": "../../common.schema.json#/$defs/ulid" } } },
+  "else": { "properties": { "outbox_id": { "type": "null" } } }
+}

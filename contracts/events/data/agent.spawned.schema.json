@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.spawned.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentSpawnedData",
+  "description": "data of agent.spawned (PRD 9.5). actor spawned target, the new agent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["role"],
+  "properties": { "role": { "$ref": "../../common.schema.json#/$defs/agent_role" } }
+}
