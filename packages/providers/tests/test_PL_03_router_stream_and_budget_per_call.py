@@ -69,23 +69,51 @@ def test_PL_03_stream_fallback_before_first_chunk_is_recorded(providers_config):
 
 def test_PL_03_budget_is_checked_before_a_fallback_call_too(providers_config):
     """Director: large (2.0/8.0 USD per M) then medium. A budget that covers exactly one call on
-    large must not also pay for the fallback call on medium after large fails."""
+    large must not also pay for the escalation call on medium after large's (billed) answer is rejected."""
     from tilo_providers.router import BudgetExceededError  # noqa: PLC0415
 
-    primary = ScriptedModelProvider("large", [ScriptedCall(outcome="error", error=QuotaError("rate limited"))])
+    primary = ScriptedModelProvider("large", [ScriptedCall(text="rejected by the verifier")])
     fallback = ScriptedModelProvider("medium", [ScriptedCall(text="must never be reached")])
     request = GenerateRequest(prompt="hello there", max_output_tokens=1000)
     large_cost = providers_config.credits((2 * 2.0 + 1000 * 8.0) / 1_000_000)
 
     with pytest.raises(BudgetExceededError) as excinfo:
         _router(providers_config, {"large": primary, "medium": fallback}).generate(
-            "director", request, budget=large_cost * 1.01
+            "director", request, budget=large_cost * 1.01, verify=lambda response: False
         )
 
     assert len(primary.calls) == 1
     assert fallback.calls == [], "the fallback call would exceed the remaining budget"
-    attempts = [(a.profile_id, a.error_type) for a in excinfo.value.attempts]
-    assert attempts == [("large", "QuotaError"), ("medium", "BudgetExceededError")]
+    attempts = [(a.profile_id, a.outcome, a.error_type) for a in excinfo.value.attempts]
+    assert attempts == [("large", "verifier_rejected", None), ("medium", "error", "BudgetExceededError")]
+
+
+def test_PL_03_quota_killed_primary_is_not_charged_so_the_fallback_completes(providers_config):
+    """PL-03 "kill the primary; the call completes on the fallback", with a budget that covers exactly one
+    call on large: a primary that dies with QuotaError was never billed, so the fallback still fits."""
+    primary = ScriptedModelProvider("large", [ScriptedCall(outcome="error", error=QuotaError("rate limited"))])
+    fallback = ScriptedModelProvider("medium", [ScriptedCall(text="ok from medium")])
+    request = GenerateRequest(prompt="hello there", max_output_tokens=1000)
+    large_cost = providers_config.credits((2 * 2.0 + 1000 * 8.0) / 1_000_000)
+    medium_cost = providers_config.credits((2 * 0.5 + 1000 * 2.0) / 1_000_000)
+
+    result = _router(providers_config, {"large": primary, "medium": fallback}).generate(
+        "director", request, budget=large_cost
+    )
+
+    assert (result.outcome, result.response.text) == ("ok", "ok from medium")
+    assert [(a.profile_id, a.error_type) for a in result.attempts] == [("large", "QuotaError"), ("medium", None)]
+    assert result.budget == pytest.approx(large_cost - medium_cost), "only the call that returned is charged"
+
+
+def test_PL_03_a_returned_call_is_charged_from_its_reported_usage(providers_config):
+    """PL-03: the budget left reports real spend -- a returned call with usage is charged from it."""
+    primary = ScriptedModelProvider("large", [ScriptedCall(text="ok", usage={"input_tokens": 2, "output_tokens": 10})])
+    request = GenerateRequest(prompt="hello there", max_output_tokens=1000)
+
+    result = _router(providers_config, {"large": primary}).generate("director", request, budget=100.0)
+
+    assert result.budget == pytest.approx(100.0 - providers_config.credits((2 * 2.0 + 10 * 8.0) / 1_000_000))
 
 
 def test_PL_03_router_picks_the_candidate_the_budget_can_cover(providers_config):

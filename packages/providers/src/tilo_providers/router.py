@@ -200,7 +200,9 @@ class Router:
         request = req.model_copy(update={"max_output_tokens": max_output})
         return RouterResult(role_id, request, candidates, budget, raw_prompt=req.prompt, tool_outputs=list(outs or []))
 
-    def _prepare(self, run: RouterResult, profile_id: str, provider: ModelProvider, prompt: str | None = None) -> Any:
+    def _prepare(
+        self, run: RouterResult, profile_id: str, provider: ModelProvider, prompt: str | None = None
+    ) -> tuple[GenerateRequest, float]:
         """EFF-03 with this candidate's own `count_tokens`: compact the role's input to max_input_tokens (or
         refuse a repair `prompt` over it), then price the call (PL-03). Never sends anything over the cap."""
         cap = self._config.roles[run.role_id].max_input_tokens
@@ -208,18 +210,33 @@ class Router:
             prompt = _compact(run.role_id, cap, run.raw_prompt, run.tool_outputs, provider.count_tokens)
         elif cap is not None and provider.count_tokens(prompt) > cap:
             raise TokenCapExceededError(f"EFF-03: role {run.role_id!r} repair prompt is over its cap of {cap}")
-        self._charge(run, profile_id, provider, prompt, run.request.max_output_tokens or 0)
-        return run.request.model_copy(update={"prompt": prompt})
+        estimate = self._quote(run, profile_id, provider, prompt, run.request.max_output_tokens or 0)
+        return run.request.model_copy(update={"prompt": prompt}), estimate
 
-    def _charge(self, run: RouterResult, profile_id: str, provider: ModelProvider, text: str, out: int) -> None:
-        """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-61)."""
-        if run.budget is not None:
-            quote = self._config.price(profile_id)
-            credits = self._config.credits((provider.count_tokens(text) * quote.input + out * quote.output) / 1e6)
-            if credits > run.budget:
-                message = f"PL-03: a call on {profile_id!r} costs ~{credits:.4f} credits, over {run.budget} left"
-                raise BudgetExceededError(message, run.attempts)
-            run.budget -= credits
+    def _cost(self, profile_id: str, tokens_in: int, tokens_out: int) -> float:
+        quote = self._config.price(profile_id)
+        return self._config.credits((tokens_in * quote.input + tokens_out * quote.output) / 1e6)
+
+    def _quote(self, run: RouterResult, profile_id: str, provider: ModelProvider, text: str, out: int) -> float:
+        """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-61) and
+        refused if over the budget left. Nothing is taken from the budget until the call returns (`_spend`)."""
+        if run.budget is None:
+            return 0.0
+        credits = self._cost(profile_id, provider.count_tokens(text), out)
+        if credits > run.budget:
+            message = f"PL-03: a call on {profile_id!r} costs ~{credits:.4f} credits, over {run.budget} left"
+            raise BudgetExceededError(message, run.attempts)
+        return credits
+
+    def _spend(self, run: RouterResult, profile_id: str, estimate: float, usage: dict[str, Any] | None) -> None:
+        """PL-03: a call that returned is charged from its reported usage, else its estimate. A call that
+        raised (quota, retryable, ...) is never charged, so it cannot starve the fallback."""
+        if run.budget is None:
+            return
+        tokens_in, tokens_out = (usage or {}).get("input_tokens"), (usage or {}).get("output_tokens")
+        if isinstance(tokens_in, int) and isinstance(tokens_out, int):
+            estimate = self._cost(profile_id, tokens_in, tokens_out)
+        run.budget -= estimate
 
     def generate(
         self,
@@ -241,13 +258,14 @@ class Router:
                 try:
                     with self._candidate(run, profile_id, reason) as attempt:
                         provider = self._provider(role_id, profile_id)
-                        sent = self._prepare(run, profile_id, provider, prompt)
+                        sent, estimate = self._prepare(run, profile_id, provider, prompt)
                         response = provider.generate(sent)
                 except RouterSafetyError:  # a safety outcome, never a silent fallback
                     return replace(run, outcome="safety_blocked")
                 if attempt.error_type:
                     reason = f"fallback after {attempt.error_type}"
                     break
+                self._spend(run, profile_id, estimate, response.usage)
                 _usage(attempt, response)
                 if schema is not None and (problem := schema_error(response, schema)) is not None:
                     attempt.outcome, reason = "schema_invalid", "escalated after schema validation failed"
@@ -284,13 +302,14 @@ class Router:
             start = time.perf_counter()
             with self._candidate(run, profile_id, reason) as attempt:
                 provider = self._provider(run.role_id, profile_id)
-                sent = self._prepare(run, profile_id, provider)
+                sent, estimate = self._prepare(run, profile_id, provider)
                 chunks = iter(provider.stream(sent))
                 chunk = next(chunks, None)
             if attempt.error_type:
                 reason = f"fallback after {attempt.error_type}"
                 continue
             run.request = sent
+            self._spend(run, profile_id, estimate, None)  # output started: billed at its estimate
             try:  # output has started: from here on a failure never falls back
                 while chunk is not None:
                     _usage(attempt, chunk)
@@ -317,9 +336,10 @@ class Router:
             with self._candidate(run, profile_id, reason) as attempt:
                 provider = self._provider(role_id, profile_id)
                 # priced like a generate() call with no output tokens (BQ-61), with each candidate's tokenizer
-                self._charge(run, profile_id, provider, "\n\n".join(_embed_inputs(request)), 0)
+                estimate = self._quote(run, profile_id, provider, "\n\n".join(_embed_inputs(request)), 0)
                 embedding = provider.embed(request)
             if not attempt.error_type:
+                self._spend(run, profile_id, estimate, None)
                 return replace(run, embedding=embedding)
             reason = f"fallback after {attempt.error_type}"
         raise _exhausted(run) from run.last_error

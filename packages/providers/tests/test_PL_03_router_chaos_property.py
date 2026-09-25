@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 from conftest import build_providers_config, prices_config_for
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -34,7 +35,7 @@ NO_FALLBACK = {"RequestError", "SafetyError"}
 class ChaosProvider(ModelProvider):
     def __init__(self, profile_id: str, plan: dict[str, type[Exception] | None]) -> None:
         self.profile_id, self.plan = profile_id, plan
-        self.touched = self.yielded = self.sent = False
+        self.touched = self.yielded = self.sent = self.returned = False  # returned: the call came back (billed)
 
     def _maybe_raise(self, method: str) -> None:
         self.touched = True
@@ -48,16 +49,18 @@ class ChaosProvider(ModelProvider):
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
         self._maybe_raise("generate")
+        self.returned = True
         return GenerateResponse(text="ok", profile_id=self.profile_id)
 
     def stream(self, request: GenerateRequest):
         self._maybe_raise("stream_before")
-        self.yielded = True
+        self.yielded = self.returned = True
         yield GenerateResponse(text="chunk", profile_id=self.profile_id)
         self._maybe_raise("stream_after")
 
     def embed(self, request: Any) -> Any:
         self._maybe_raise("embed")
+        self.returned = True
         return {"vectors": [[0.0]]}
 
     def capabilities(self) -> set[Capability]:
@@ -77,9 +80,14 @@ def _config(candidates: list[str]):
     )
 
 
+def _cost(config, profile_id: str, tokens_in: int, tokens_out: int) -> float:
+    quote = config.price(profile_id)
+    return config.credits((tokens_in * quote.input + tokens_out * quote.output) / 1_000_000)
+
+
 def _unit_cost(config) -> float:
     """What one call on p0 costs: the 3-word prompt plus the default 1024 output tokens (BQ-61)."""
-    return config.credits((3 * 0.1 + 1024 * 0.2) / 1_000_000)
+    return _cost(config, "p0", 3, 1024)
 
 
 plans = st.fixed_dictionaries({m: st.sampled_from(ERRORS) for m in METHODS})
@@ -148,3 +156,8 @@ def test_PL_03_router_only_returns_a_result_or_raises_a_router_error_under_chaos
             assert budget is not None and not providers[attempt.profile_id].sent
     if not raised and budget is not None:
         assert run.budget is not None and run.budget >= 0
+        # Only calls that came back are charged (at their estimate: chaos calls report no usage), so a
+        # failed candidate never eats into the budget its fallback needs.
+        out = 0 if operation == "embed" else 1024
+        spent = sum(_cost(config, p, 3, out) for p in candidates if providers[p].returned)
+        assert run.budget == pytest.approx(budget - spent)
