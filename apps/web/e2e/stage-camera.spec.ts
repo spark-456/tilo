@@ -220,6 +220,18 @@ test("P0-08b camera C4 PRD-9.7 trackpad pinch: zoom is smooth/proportional to de
   expect(big).toBeCloseTo(small * 3, 5); // proportional to deltaY, same 20px unit
 });
 
+test("P0-08b camera C3 C4 PRD-9.7 mouse Ctrl + wheel notch (100px) zooms exactly one ZOOM_STEP, not to the clamp", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const center = await stageCenter(page);
+  await page.mouse.move(center.x, center.y);
+  await page.keyboard.down("Control");
+  await page.mouse.wheel(0, 100);
+  await page.keyboard.up("Control");
+  await expect.poll(async () => (await readCamera(page)).zoom).toBeCloseTo(1 - ZOOM_STEP, 5);
+});
+
 test("P0-08b camera C5 PRD-9.7 wheel: deltaX and Shift+vertical both pan horizontally by the same amount, never zoom", async ({
   page,
 }) => {

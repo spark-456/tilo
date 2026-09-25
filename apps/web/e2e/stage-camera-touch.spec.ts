@@ -31,11 +31,39 @@ async function touchStart(session: Awaited<ReturnType<typeof cdp>>, points: Touc
 async function touchMove(session: Awaited<ReturnType<typeof cdp>>, points: TouchPoint[]) {
   await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: points });
 }
-async function touchEnd(session: Awaited<ReturnType<typeof cdp>>, remaining: TouchPoint[] = []) {
-  await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: remaining });
+// CDP semantics: the touchPoints of a touchEnd are the fingers that LIFT (none = all lift).
+async function touchEnd(session: Awaited<ReturnType<typeof cdp>>, lifted: TouchPoint[] = []) {
+  await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: lifted });
 }
-async function touchCancel(session: Awaited<ReturnType<typeof cdp>>, remaining: TouchPoint[] = []) {
-  await session.send("Input.dispatchTouchEvent", { type: "touchCancel", touchPoints: remaining });
+// CDP cannot cancel a single finger (a touchCancel must carry no points), so a one-finger
+// pointercancel is a synthetic PointerEvent for the pointerId the browser gave that finger.
+async function recordTouchPointerIds(page: Page) {
+  await page.getByTestId("stage-frame").evaluate((el) => {
+    const w = window as unknown as { __touchIds: { id: number; x: number }[] };
+    w.__touchIds = [];
+    el.addEventListener(
+      "pointerdown",
+      (e) =>
+        w.__touchIds.push({ id: (e as PointerEvent).pointerId, x: (e as PointerEvent).clientX }),
+      true,
+    );
+  });
+}
+async function cancelPointerAt(page: Page, x: number) {
+  await page.getByTestId("stage-frame").evaluate((el, x) => {
+    const w = window as unknown as { __touchIds: { id: number; x: number }[] };
+    const hit = w.__touchIds.find((p) => Math.abs(p.x - x) < 1);
+    if (!hit) throw new Error(`no touch pointer went down at x=${x}`);
+    const init = { pointerId: hit.id, pointerType: "touch", bubbles: true, isPrimary: false };
+    el.dispatchEvent(new PointerEvent("pointercancel", init));
+  }, x);
+}
+// data-camera-* is written when a frame is drawn (rAF), so read it after the next frame.
+async function drawnCamera(page: Page) {
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
+  return readCamera(page);
 }
 
 async function stageCenter(page: Page) {
@@ -164,18 +192,18 @@ test("P0-08b camera C6 PRD-9.7 touch: lifting one of two fingers causes no jump,
     { x: c.x - 60, y: c.y, id: 0 },
     { x: c.x + 60, y: c.y, id: 1 },
   ]);
-  const beforeLift = await readCamera(page);
+  const beforeLift = await drawnCamera(page);
 
   // Finger 0 lifts; finger 1 stays put at (c.x+60, c.y) — no movement in this event.
-  await touchEnd(session, [{ x: c.x + 60, y: c.y, id: 1 }]);
-  const afterLift = await readCamera(page);
+  await touchEnd(session, [{ x: c.x - 60, y: c.y, id: 0 }]);
+  const afterLift = await drawnCamera(page);
   expect(Math.abs(afterLift.x - beforeLift.x)).toBeLessThanOrEqual(2);
   expect(Math.abs(afterLift.y - beforeLift.y)).toBeLessThanOrEqual(2);
   expect(Math.abs(afterLift.zoom - beforeLift.zoom)).toBeLessThanOrEqual(0.02);
 
   // Now the lone remaining finger drags; camera must follow only its own delta (35, -20).
   await touchMove(session, [{ x: c.x + 60 + 35, y: c.y - 20, id: 1 }]);
-  const afterSoloMove = await readCamera(page);
+  const afterSoloMove = await drawnCamera(page);
   await touchEnd(session);
   expect(afterSoloMove.x).toBeCloseTo(afterLift.x + 35, 0);
   expect(afterSoloMove.y).toBeCloseTo(afterLift.y - 20, 0);
@@ -187,20 +215,22 @@ test("P0-08b camera C6 PRD-9.7 touch: pointercancel on one finger causes no jump
   await page.goto("/");
   const c = await stageCenter(page);
   const session = await cdp(page);
+  await recordTouchPointerIds(page);
 
   await touchStart(session, [
     { x: c.x - 40, y: c.y, id: 0 },
     { x: c.x + 40, y: c.y, id: 1 },
   ]);
-  const beforeCancel = await readCamera(page);
+  const beforeCancel = await drawnCamera(page);
 
-  await touchCancel(session, [{ x: c.x + 40, y: c.y, id: 1 }]);
-  const afterCancel = await readCamera(page);
+  // Finger 0 is cancelled; finger 1 stays down and then pans alone.
+  await cancelPointerAt(page, c.x - 40);
+  const afterCancel = await drawnCamera(page);
   expect(Math.abs(afterCancel.x - beforeCancel.x)).toBeLessThanOrEqual(2);
   expect(Math.abs(afterCancel.y - beforeCancel.y)).toBeLessThanOrEqual(2);
 
   await touchMove(session, [{ x: c.x + 40 + 25, y: c.y + 10, id: 1 }]);
-  const afterMove = await readCamera(page);
+  const afterMove = await drawnCamera(page);
   await touchEnd(session);
   expect(afterMove.x).toBeCloseTo(afterCancel.x + 25, 0);
   expect(afterMove.y).toBeCloseTo(afterCancel.y + 10, 0);
