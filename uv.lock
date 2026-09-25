@@ -7,6 +7,7 @@ members = [
     "tilo",
     "tilo-api",
     "tilo-contracts",
+    "tilo-metering",
     "tilo-providers",
 ]
 
@@ -1040,6 +1041,21 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "pydantic", specifier = ">=2.11" }]
+
+[[package]]
+name = "tilo-metering"
+version = "0.1.0"
+source = { editable = "packages/metering" }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "tilo-contracts" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
+]
 
 [[package]]
 name = "tilo-providers"
