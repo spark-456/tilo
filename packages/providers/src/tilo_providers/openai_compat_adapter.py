@@ -1,34 +1,29 @@
 """tilo_providers.openai_compat_adapter — generic OpenAI-compatible adapter
-(PL-02, PRD 6.4). Works against any endpoint that speaks the OpenAI chat
-completions / embeddings shape, including NVIDIA NIM
-(https://integrate.api.nvidia.com/v1, ADR-0003). `base_url` and
-`api_key_env` are `contracts/providers.schema.json` `$defs.profile` fields
-(1.1.0, ADR-0002/ADR-0003) for `provider: openai_compat` profiles; the
-factory (`tilo_providers.factory`) reads them off the profile, but they stay
-constructor arguments here too so a caller can build the adapter directly.
+(PL-02, PRD 6.4). Works against any endpoint speaking the OpenAI chat
+completions/embeddings shape, including NVIDIA NIM
+(https://integrate.api.nvidia.com/v1, ADR-0003). `base_url`/`api_key_env`
+are `contracts/providers.schema.json` `$defs.profile` fields (1.1.0,
+ADR-0002/ADR-0003, `provider: openai_compat` only); the factory reads them
+off the profile, but stay constructor args so a caller can build directly.
 
 Built on `httpx` (BSD-3-Clause, `docs/licences.md`); `transport` is injected
-by tests (`httpx.MockTransport`) so no real socket ever opens in dev/CI
-(EFF-01). Without an injected `transport`, construction refuses to build a
-real `httpx.Client` unless `LIVE=1` (EFF-01: the LIVE gate must hold at
-every direct-construction path, not only inside
-`tilo_providers.replay.RecordReplayProvider`). The API key is read once from
-the named environment variable at construction time and sent only as the
-`Authorization` header — never logged, never written into a recording
-(`tilo_providers.replay`, PRD 16.1 rule 4); `redact()` scrubs the key value
-out of any text handed to it, so a recording still comes out clean even if
-a misbehaving endpoint echoes the key back inside ordinary model output.
+by tests so no real socket opens in dev/CI. Without an injected `transport`,
+construction refuses to build a real `httpx.Client` unless `LIVE=1`
+(EFF-01: the gate must hold at every direct-construction path, not only
+inside `RecordReplayProvider`). The API key is read once from the named env
+var and sent only as `Authorization`; `redact()` scrubs it out of any text
+handed to it (`tilo_providers.replay`, PRD 16.1 rule 4), so a recording
+stays clean even if a misbehaving endpoint echoes the key back into output.
 
 Secret hygiene (PRD 16.1 rule 4): the env value is checked at construction
-time for stray whitespace/control characters (e.g. a trailing CR from
-pasting a key on Windows) and rejected by naming only the variable, never
-the value — an unchecked CR/LF in a header value makes h11 raise "Illegal
-header value" *with the value inlined in its own message*, which would
-otherwise surface the key through `_post`'s exception. `_post` and
-`_raise_for_status` also never fold a raw `httpx` exception's `str()` or an
-unbounded/verbatim response body into a raised error, as a second layer:
-fixed messages plus the status code, or the server's own JSON error message
-truncated and with the key scrubbed out."""
+for stray whitespace/control characters (e.g. a trailing CR pasted on
+Windows) and rejected by naming only the variable, never the value — an
+unchecked CR/LF makes h11 raise "Illegal header value" with the value
+inlined in its own message, which would otherwise leak the key through
+`_post`'s exception. `_post`/`_raise_for_status` also never fold a raw
+`httpx` exception's `str()` or an unbounded/verbatim response body into a
+raised error: fixed messages plus the status code, or the server's own
+message truncated and scrubbed."""
 
 from __future__ import annotations
 
@@ -41,7 +36,7 @@ from typing import Any
 import httpx
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.errors import ProviderError, map_http_status
+from tilo_providers.errors import ProviderError, map_http_status, map_transport_error
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
 
 _CLEAN_TOKEN_RE = re.compile(r"^[\x21-\x7e]+$")  # printable ASCII, no whitespace or control characters
@@ -109,10 +104,10 @@ class OpenAICompatModelProvider(ModelProvider):
         # formatted traceback's chained-cause section too (PRD 16.1 rule 4).
         try:
             return self._client.post(path, json=body)
-        except httpx.TimeoutException:
-            raise map_http_status(504, "PL-02: request to the provider endpoint timed out") from None
-        except httpx.HTTPError:
-            raise map_http_status(503, "PL-02: request to the provider endpoint failed") from None
+        except httpx.HTTPError as error:
+            mapped = map_transport_error(error)
+            assert mapped is not None  # httpx.HTTPError always maps
+            raise mapped from None
 
     def redact(self, text: str) -> str:
         # Replace every occurrence of the raw key, whole, before any caller
@@ -196,12 +191,19 @@ class OpenAICompatModelProvider(ModelProvider):
         body: dict[str, Any] = {"model": self._profile.model, "messages": self._messages(request), "stream": True}
         if request.tools is not None:
             body["tools"] = request.tools
+        if request.max_output_tokens is not None:
+            body["max_tokens"] = request.max_output_tokens
         response_format = self._response_format(request)
         if response_format is not None:
             body["response_format"] = response_format
 
         response = self._post("/chat/completions", body)
         self._raise_for_status(response)
+        # Tool-call deltas arrive fragmented by `index` (name in the first
+        # fragment, `arguments` accumulated in later ones); collected here
+        # and yielded once complete, as one chunk, mirroring `generate()`'s
+        # shape (PL-02 tool calling).
+        buffers: dict[int, dict[str, Any]] = {}
         for line in response.text.splitlines():
             line = line.strip()
             if not line.startswith("data:"):
@@ -209,11 +211,21 @@ class OpenAICompatModelProvider(ModelProvider):
             payload = line[len("data:") :].strip()
             if payload == "[DONE]":
                 break
-            chunk = json.loads(payload)
-            delta = chunk["choices"][0].get("delta", {})
+            delta = json.loads(payload)["choices"][0].get("delta", {})
             content = delta.get("content")
             if content:
                 yield GenerateResponse(text=content, profile_id=self._profile_id)
+            for raw_call in delta.get("tool_calls") or []:
+                buffer = buffers.setdefault(raw_call.get("index", 0), {"name": None, "args": ""})
+                function = raw_call.get("function") or {}
+                buffer["name"] = function.get("name") or buffer["name"]
+                buffer["args"] += function.get("arguments") or ""
+        if buffers:
+            tool_calls = [
+                {"name": buf["name"], "args": json.loads(buf["args"]) if buf["args"] else {}}
+                for _, buf in sorted(buffers.items())
+            ]
+            yield GenerateResponse(text=None, profile_id=self._profile_id, tool_calls=tool_calls)
 
     def embed(self, request: Any) -> Any:
         texts = request["input"] if isinstance(request, dict) else request

@@ -4,9 +4,16 @@ Every adapter (google, openai_compat) maps its own SDK/HTTP error shape onto
 these four types, so the router (P0-06) and business code can react the same
 way regardless of which adapter served the call: retry, escalate to a
 fallback profile, or stop. Messages carry only the server's own error text —
-never headers, API keys or other secret material (PRD 16.1 rule 4)."""
+never headers, API keys or other secret material (PRD 16.1 rule 4).
+
+`map_transport_error` is the one mapping shared by every adapter's HTTP
+transport (both `google-genai` and `openai_compat_adapter` send requests
+over `httpx`): a timeout or connection failure always becomes the same
+`RetryableError`, so the two adapters cannot drift apart on this case."""
 
 from __future__ import annotations
+
+import httpx
 
 
 class ProviderError(Exception):
@@ -38,3 +45,15 @@ def map_http_status(status_code: int, message: str) -> ProviderError:
     if status_code >= 500:
         return RetryableError(message)
     return RequestError(message)
+
+
+def map_transport_error(error: Exception) -> ProviderError | None:
+    """Maps an `httpx` transport-level failure to `RetryableError` (timeout
+    -> 504, any other connection/HTTP-framing error -> 503); `None` if
+    `error` is not an `httpx.HTTPError` at all, so a caller can fall through
+    to its own SDK-specific mapping."""
+    if isinstance(error, httpx.TimeoutException):
+        return map_http_status(504, "PL-02: request to the provider endpoint timed out")
+    if isinstance(error, httpx.HTTPError):
+        return map_http_status(503, "PL-02: request to the provider endpoint failed")
+    return None

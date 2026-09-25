@@ -3,25 +3,22 @@
 the global endpoint (PRD 6.5), behind `ModelProvider`: `generate`, `stream`,
 `embed`, `count_tokens`, `capabilities`, `price`. Tool calling passes
 straight through the SDK's own request/response shapes; structured output
-(`GenerateRequest.json_mode`/`.response_schema`) maps onto
-`GenerateContentConfig(response_mime_type="application/json",
-response_schema=...)`. SDK errors map onto `tilo_providers.errors`
-(quota/retryable/request/safety).
+(`.json_mode`/`.response_schema`) maps onto `GenerateContentConfig(
+response_mime_type="application/json", response_schema=...)`. SDK/transport
+errors map onto `tilo_providers.errors` (quota/retryable/request/safety).
 
 Imports `google.genai`/`.types`/`.errors` through `importlib.import_module`
 rather than `from google import genai`, so the module works whether that
-import path resolves to the real installed SDK (a client is constructed) or
-to a fake installed straight into `sys.modules` for tests
-(`packages/providers/tests/_fake_genai_sdk.py`) — `from google import
-genai` would additionally require the fake to register itself as an
-attribute of the real `google` namespace package, which it deliberately does
-not do. No adapter test ever builds a real `genai.Client`; `client` is
-always injected (EFF-01: "tested with mocked transport or recorded
-responses only"). Without an injected `client`, construction refuses to
-build a real one unless `LIVE=1` — the same EFF-01 gate as
-`openai_compat_adapter`, so a direct construction of either adapter (not
-only a call through `RecordReplayProvider`) can never open a real
-client/transport in dev or CI."""
+import path resolves to the real installed SDK or to a fake installed
+straight into `sys.modules` for tests (`tests/_fake_genai_sdk.py`) — `from
+google import genai` would additionally require the fake to register itself
+as an attribute of the real `google` namespace package, which it
+deliberately does not do. No adapter test ever builds a real `genai.Client`;
+`client` is always injected (EFF-01: "tested with mocked transport or
+recorded responses only"). Without an injected `client`, construction
+refuses to build a real one unless `LIVE=1` — the same EFF-01 gate as
+`openai_compat_adapter`, so a direct construction of either adapter can
+never open a real client/transport in dev or CI."""
 
 from __future__ import annotations
 
@@ -32,7 +29,7 @@ from typing import Any
 
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.errors import ProviderError, SafetyError, map_http_status
+from tilo_providers.errors import ProviderError, SafetyError, map_http_status, map_transport_error
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
 
 
@@ -92,7 +89,10 @@ class GoogleModelProvider(ModelProvider):
         if isinstance(error, errors_mod.APIError):
             message = str(getattr(error, "message", error))
             return map_http_status(error.code, message)
-        return error
+        # The SDK's own transport is httpx too, so a timeout/connection
+        # failure maps the same way as openai_compat_adapter's (PL-02:
+        # error mapping must not depend on which adapter served the call).
+        return map_transport_error(error) or error
 
     def _map_response(self, response: Any) -> GenerateResponse:
         prompt_feedback = getattr(response, "prompt_feedback", None)
@@ -143,7 +143,11 @@ class GoogleModelProvider(ModelProvider):
             response = self._client.models.embed_content(model=self._profile.model, contents=contents)
         except Exception as error:
             raise self._map_error(error) from error
-        return {"vectors": [list(item) for item in response.embeddings], "profile_id": self._profile_id}
+        # `response.embeddings` items are `types.ContentEmbedding` (a
+        # pydantic model): `.values` is the float vector -- `list(item)`
+        # would iterate its *fields* instead (`[("values", [...]),
+        # ("statistics", None)]`), not the vector.
+        return {"vectors": [item.values for item in response.embeddings], "profile_id": self._profile_id}
 
     def count_tokens(self, text: str) -> int:
         try:

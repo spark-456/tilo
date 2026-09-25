@@ -45,6 +45,7 @@ from _fake_genai_sdk import (
     FakePromptFeedback,
     FakeUsageMetadata,
 )
+from google.genai import types as real_genai_types  # the real SDK, not _fake_genai_sdk -- see test_..._embed below
 from tilo_contracts import ProvidersProfile
 from tilo_providers.interfaces import Capability, GenerateRequest, ModelProvider
 
@@ -204,6 +205,21 @@ def test_PL_02_google_adapter_maps_api_errors(fake_genai_sdk, status_code, expec
     assert "boom" in str(excinfo.value)
 
 
+def test_PL_02_google_adapter_maps_a_timeout_to_retryable_error(fake_genai_sdk):
+    """Review fix: a non-`APIError` transport failure (timeout, connection
+    error) must map the same way as `openai_compat_adapter`'s, not pass
+    through unmapped -- error mapping must be consistent across adapters."""
+    import httpx
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    timeout = httpx.TimeoutException("timed out", request=httpx.Request("POST", "https://example.invalid"))
+    models_api = FakeModelsAPI(generate_content_error=timeout)
+    provider = _provider(models_api)
+
+    with pytest.raises(provider_errors.RetryableError):
+        provider.generate(GenerateRequest(prompt="hi"))
+
+
 def test_PL_02_google_adapter_maps_a_safety_block_to_safety_error(fake_genai_sdk):
     """PRD 10.4 policy conditions read "no safety flags"; the adapter must
     surface a blocked response as the safety error type, not as ordinary
@@ -216,6 +232,48 @@ def test_PL_02_google_adapter_maps_a_safety_block_to_safety_error(fake_genai_sdk
 
     with pytest.raises(provider_errors.SafetyError):
         provider.generate(GenerateRequest(prompt="something unsafe"))
+
+
+class _RealEmbedModelsAPI:
+    """Fakes only `client.models.embed_content`, using the real SDK's own
+    response shape (`real_genai_types`, imported at module level -- before
+    any test can run, so it is never shadowed by `_fake_genai_sdk`'s
+    `sys.modules` swap, which only ever happens inside a test)."""
+
+    def __init__(self, response: real_genai_types.EmbedContentResponse) -> None:
+        self._response = response
+        self.calls: list[dict[str, object]] = []
+
+    def embed_content(self, *, model: str, contents: object) -> real_genai_types.EmbedContentResponse:
+        self.calls.append({"model": model, "contents": contents})
+        return self._response
+
+
+def test_PL_02_google_adapter_embed():
+    """Review fix: `response.embeddings` items are the real SDK's
+    `types.ContentEmbedding` (a pydantic model). `list(item)` iterates its
+    *fields* (`[("values", [...]), ("statistics", None)]`), not the vector
+    -- so this test builds the real `google.genai.types` shape (the actual
+    installed SDK, not `_fake_genai_sdk`'s minimal fake, which never covered
+    `embed_content`) to catch that regression. No `fake_genai_sdk` fixture:
+    the adapter's `embed` never touches `google.genai.errors`, so nothing
+    needs faking at the `sys.modules` boundary here."""
+    response = real_genai_types.EmbedContentResponse(
+        embeddings=[
+            real_genai_types.ContentEmbedding(values=[0.1, 0.2, 0.3]),
+            real_genai_types.ContentEmbedding(values=[0.4, 0.5, 0.6]),
+        ]
+    )
+    models_api = _RealEmbedModelsAPI(response)
+    provider = _provider(models_api, profile=_profile(caps=["json"]))  # type: ignore[arg-type]
+
+    result = provider.embed({"input": ["hello", "world"]})
+
+    assert result == {
+        "vectors": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
+        "profile_id": "flash-38",
+    }
+    assert models_api.calls[0]["model"] == "gemini-3.8-flash", "PL-01: the profile's model id, never hardcoded"
 
 
 def test_PL_02_google_adapter_stream_yields_chunks_that_concatenate_to_the_full_text(fake_genai_sdk):

@@ -26,6 +26,7 @@ require google-genai or the openai-compatible adapter's runtime deps.
 
 from __future__ import annotations
 
+import json
 import sys
 
 import pytest
@@ -260,6 +261,17 @@ def test_EFF_01_written_recording_scrubs_a_key_echoed_in_the_model_output(tmp_pa
         assert fake_secret not in content, (
             f"16.1 rule 4: {recording_file} must not contain a secret echoed in the model's own output"
         )
+        # Review fix: redaction must not corrupt the recording -- it has to
+        # stay valid JSON, and replaying it must hand back the redacted text.
+        json.loads(content)
+    monkeypatch.delenv("LIVE", raising=False)
+    monkeypatch.delenv("TILO_RECORD", raising=False)
+    replayer = RecordReplayProvider(
+        role="director", profile_id="large", live_factory=_unexpected_live_factory, fixtures_dir=tmp_path
+    )
+    replayed_text = replayer.generate(GenerateRequest(prompt="hello")).text
+    assert fake_secret not in replayed_text
+    assert "echo:" in replayed_text
 
 
 def test_EFF_01_written_recording_scrubs_an_authorization_like_string_regardless_of_provider(tmp_path, monkeypatch):
@@ -291,6 +303,56 @@ def test_EFF_01_written_recording_scrubs_an_authorization_like_string_regardless
         content = recording_file.read_text(encoding="utf-8")
         assert "literal-secret-value" not in content
         assert "authorization" not in content.lower()
+        # Review fix: the backstop regex used to also swallow the JSON
+        # string's closing quote (and whatever followed it), so this text --
+        # ending right where "Bearer <token>" does -- used to corrupt the
+        # file. It must still parse, and still replay.
+        json.loads(content)
+    monkeypatch.delenv("LIVE", raising=False)
+    monkeypatch.delenv("TILO_RECORD", raising=False)
+    replayer = RecordReplayProvider(
+        role="director", profile_id="large", live_factory=_unexpected_live_factory, fixtures_dir=tmp_path
+    )
+    replayed = replayer.generate(GenerateRequest(prompt="hello"))
+    assert "literal-secret-value" not in replayed.text
+    assert "[redacted]" in replayed.text
+
+
+def test_EFF_01_written_recording_scrubs_a_secret_containing_quote_and_backslash_characters(tmp_path, monkeypatch):
+    """Review fix: `json.dumps` escapes a value's own `"`/`\\`, so scrubbing
+    the *serialised* text (as before) misses a secret that itself contains
+    either character -- PL-02's `_CLEAN_TOKEN_RE` allows both in an
+    `api_key_env` value. Redacting before serialising, on the raw value,
+    must still catch it."""
+    from tilo_providers.replay import RecordReplayProvider  # noqa: PLC0415
+
+    tricky_secret = 'fake-key-"with-a-quote\\and-a-backslash'  # PL-02 _CLEAN_TOKEN_RE permits both chars
+    monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("TILO_RECORD", "1")
+
+    class _EchoingLiveProvider(_CountingLiveProvider):
+        def generate(self, request: GenerateRequest) -> GenerateResponse:
+            self._calls.append(request)
+            return GenerateResponse(text=f"echo: {tricky_secret}", profile_id="large")
+
+        def redact(self, text: str) -> str:
+            return text.replace(tricky_secret, "***")
+
+    calls: list[GenerateRequest] = []
+    provider = RecordReplayProvider(
+        role="director", profile_id="large", live_factory=lambda: _EchoingLiveProvider(calls), fixtures_dir=tmp_path
+    )
+    response = provider.generate(GenerateRequest(prompt="hello"))
+    assert tricky_secret in response.text, "test setup: the live provider must actually echo the secret"
+
+    recording_files = list(tmp_path.rglob("*.json"))
+    assert recording_files, "record mode must write a recording file"
+    for recording_file in recording_files:
+        content = recording_file.read_text(encoding="utf-8")
+        assert tricky_secret not in content, (
+            f"16.1 rule 4: {recording_file} must not contain a secret with '\"'/'\\\\' in clear text"
+        )
+        json.loads(content)
 
 
 def _unexpected_live_factory() -> ModelProvider:

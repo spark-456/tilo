@@ -207,6 +207,55 @@ def test_PL_02_openai_compat_adapter_stream_sse_concatenates_to_the_full_text(mo
     assert "".join(chunk.text for chunk in chunks) == "Hello"
 
 
+def test_PL_02_openai_compat_adapter_stream_sends_max_output_tokens(monkeypatch):
+    """Review fix: `stream()` must forward `max_output_tokens` as `max_tokens`
+    on the request body, the same as `generate()` already does."""
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content="data: [DONE]\n\n")
+
+    provider = _provider(handler)
+    list(provider.stream(GenerateRequest(prompt="Say hi", max_output_tokens=64)))
+
+    body = json.loads(seen[0].content)
+    assert body["max_tokens"] == 64
+
+
+def test_PL_02_openai_compat_adapter_stream_accumulates_a_streamed_tool_call(monkeypatch):
+    """Review fix: streamed tool-call deltas (fragmented by `index`, with
+    `arguments` split across chunks) must be accumulated and surfaced, not
+    silently dropped."""
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+    sse_body = (
+        'data: {"choices": [{"delta": {"tool_calls": ['
+        '{"index": 0, "id": "call_1", "function": {"name": "get_weather", "arguments": ""}}'
+        "]}}]}\n\n"
+        'data: {"choices": [{"delta": {"tool_calls": ['
+        '{"index": 0, "function": {"arguments": "{\\"location\\": "}}'
+        "]}}]}\n\n"
+        'data: {"choices": [{"delta": {"tool_calls": ['
+        '{"index": 0, "function": {"arguments": "\\"Boston\\"}"}}'
+        "]}}]}\n\n"
+        "data: [DONE]\n\n"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=sse_body)
+
+    tool_schema = {
+        "type": "function",
+        "function": {"name": "get_weather", "parameters": {"type": "object", "properties": {"location": {}}}},
+    }
+    provider = _provider(handler, profile=_profile(caps=["tools"]))
+    chunks = list(provider.stream(GenerateRequest(prompt="Weather in Boston?", tools=[tool_schema])))
+
+    assert chunks[-1].tool_calls == [{"name": "get_weather", "args": {"location": "Boston"}}]
+    assert all(chunk.text is None for chunk in chunks), "no content deltas in this stream"
+
+
 def test_PL_02_openai_compat_adapter_embeddings(monkeypatch):
     monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
 
