@@ -3,12 +3,12 @@
 recording from `fixtures/model-recordings/<role>/<key>.json`, keyed by a
 stable hash of the role, profile and normalised request; a miss raises
 `ReplayMissError` naming the key, so a failure always says exactly what to
-record. Record mode needs `LIVE=1` *and* `TILO_RECORD=1`: it calls the
-injected live provider exactly once and writes a redacted recording — only
-the `ModelProvider`-level request/response ever reaches the file, never a
+record. `LIVE=1` sends every call to the injected live provider; adding
+`TILO_RECORD=1` also writes a redacted recording — only the
+`ModelProvider`-level request/response ever reaches the file, never a
 header, API key or env value (PRD 16.1 rule 4). `live_factory` is a
 zero-argument callable so nothing here imports an adapter module or builds a
-network client unless a call actually needs to record."""
+network client unless a call actually goes live."""
 
 from __future__ import annotations
 
@@ -47,6 +47,7 @@ class RecordReplayProvider(ModelProvider):
         self._role = role
         self._profile_id = profile_id
         self._live_factory = live_factory
+        self._live_provider: ModelProvider | None = None
         self._recordings_dir = Path(fixtures_dir) / "model-recordings" / role
 
     def _is_live(self) -> bool:
@@ -55,6 +56,12 @@ class RecordReplayProvider(ModelProvider):
     def _is_record(self) -> bool:
         return self._is_live() and os.environ.get("TILO_RECORD") == "1"
 
+    def _live(self) -> ModelProvider:
+        # Built lazily on the first live call, then reused.
+        if self._live_provider is None:
+            self._live_provider = self._live_factory()
+        return self._live_provider
+
     def _path(self, key: str) -> Path:
         return self._recordings_dir / f"{key}.json"
 
@@ -62,10 +69,10 @@ class RecordReplayProvider(ModelProvider):
         key = recording_key(self._role, self._profile_id, request)
         path = self._path(key)
 
-        if self._is_record():
-            live_provider = self._live_factory()
-            response = live_provider.generate(request)
-            self._write_recording(path, key, response)
+        if self._is_live():
+            response = self._live().generate(request)
+            if self._is_record():
+                self._write_recording(path, key, response)
             return response
 
         if path.is_file():

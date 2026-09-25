@@ -132,11 +132,38 @@ def test_EFF_01_recording_is_refused_without_both_live_and_record_flags(tmp_path
         provider.generate(request)
     assert calls == [], "EFF-01: no live call without LIVE=1 and TILO_RECORD=1"
 
-    # LIVE=1 alone is not enough to record.
-    monkeypatch.setenv("LIVE", "1")
+    # TILO_RECORD=1 without LIVE=1 is not enough to go live or record.
+    monkeypatch.setenv("TILO_RECORD", "1")
     with pytest.raises(ReplayMissError):
         provider.generate(request)
-    assert calls == [], "EFF-01: recording needs LIVE=1 *plus* TILO_RECORD=1, not LIVE=1 alone"
+    assert calls == [], "EFF-01: no live call without LIVE=1, even with TILO_RECORD=1"
+    assert list(tmp_path.rglob("*.json")) == []
+
+
+def test_EFF_01_live_without_record_calls_the_live_provider_and_writes_nothing(tmp_path, monkeypatch):
+    """PRD 6.6: "live calls need an explicit LIVE=1". LIVE=1 alone sends the
+    call to the real adapter (built lazily) without writing a recording."""
+    from tilo_providers.replay import RecordReplayProvider  # noqa: PLC0415
+
+    request = GenerateRequest(prompt="hello")
+    calls = []
+    built = []
+
+    def live_factory():
+        built.append(1)
+        return _CountingLiveProvider(calls)
+
+    provider = RecordReplayProvider(
+        role="director", profile_id="large", live_factory=live_factory, fixtures_dir=tmp_path
+    )
+    assert built == [], "the live provider must be built lazily, not at construction"
+
+    monkeypatch.setenv("LIVE", "1")
+    response = provider.generate(request)
+
+    assert response.text == "live: hello"
+    assert len(calls) == 1, "LIVE=1 must make exactly one live call"
+    assert list(tmp_path.rglob("*.json")) == [], "LIVE=1 without TILO_RECORD=1 must not write a recording"
 
 
 def test_EFF_01_record_then_replay_round_trip(tmp_path, monkeypatch):

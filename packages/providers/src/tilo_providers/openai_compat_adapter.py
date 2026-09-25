@@ -94,8 +94,9 @@ class OpenAICompatModelProvider(ModelProvider):
             raise map_http_status(503, "PL-02: request to the provider endpoint failed") from None
 
     def _scrub(self, message: str) -> str:
-        message = message[:_MAX_ERROR_MESSAGE_LEN]
-        return message.replace(self._api_key, "***") if self._api_key in message else message
+        # Replace the full key in the complete text *before* truncating, so a
+        # key straddling the cut can never survive as an unmatched prefix.
+        return message.replace(self._api_key, "***")[:_MAX_ERROR_MESSAGE_LEN]
 
     def _raise_for_status(self, response: httpx.Response) -> None:
         if response.status_code < 400:

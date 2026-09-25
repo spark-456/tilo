@@ -296,6 +296,25 @@ def test_PL_02_openai_compat_adapter_scrubs_the_api_key_from_error_bodies(monkey
     assert "***" in str(excinfo.value)
 
 
+@pytest.mark.parametrize("offset", [440, 460, 480, 490, 499])
+def test_PL_02_openai_compat_adapter_scrubs_a_key_straddling_the_error_truncation(monkeypatch, offset):
+    """Review fix (security): a long echoed body where the key crosses the
+    500-character cut must not leak any prefix of the key (PRD 16.1 rule 4)."""
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": {"message": "x" * offset + FAKE_KEY + "y" * 600}})
+
+    provider = _provider(handler)
+    with pytest.raises(provider_errors.RequestError) as excinfo:
+        provider.generate(GenerateRequest(prompt="hi"))
+    text = str(excinfo.value)
+    for length in range(8, len(FAKE_KEY) + 1):
+        assert FAKE_KEY[:length] not in text, f"key prefix of {length} chars leaked at offset {offset}"
+
+
 def test_PL_02_openai_compat_adapter_rejects_a_dirty_api_key_naming_only_the_variable(monkeypatch):
     """Ticket P0-05 review fix (security): an env value with a stray
     control/whitespace character (e.g. a trailing CR pasted on Windows)

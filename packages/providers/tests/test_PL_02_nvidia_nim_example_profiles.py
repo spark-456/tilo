@@ -106,15 +106,6 @@ def test_PL_02_nim_profiles_selectable_by_env_var_without_editing_code(monkeypat
     assert resolve_models_path(repo_root=repo_root) == repo_root / "config" / "models.yaml"
 
 
-@pytest.mark.xfail(
-    reason=(
-        "needs contract change: contracts/providers.schema.json $defs.profile has no base_url/api_key_env "
-        "(additionalProperties: false); see this file's module docstring (CONTRACT BLOCKER) and "
-        "config/models.nim.yaml's header comment. Stays red -- by design, not weakened -- until the contract "
-        "owner adds the two fields; remove this marker once they land."
-    ),
-    strict=False,
-)
 def test_PL_02_nim_profiles_load_through_the_same_loader_and_denylist(nim_models_path, repo_root):
     """Expected red until the contract change in this file's module
     docstring lands -- see CONTRACT BLOCKER above."""

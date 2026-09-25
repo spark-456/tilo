@@ -13,13 +13,13 @@ other service calls instead of naming a model. Business code asks for a **role**
 ## Contracts
 - Reads: `contracts/providers.schema.json` (`$defs.models`/`$defs.prices`/`$defs.capability`).
 - **Needs contract change:** `$defs.profile` has no `base_url`/`api_key_env`, so an
-  `openai_compat` profile (`config/models.nim.yaml`) fails the loader (test xfails); adapter
+  `openai_compat` profile (`config/models.nim.yaml`) fails the loader (test red); adapter
   takes both as constructor args instead.
 
 ## Config
 - `config/models.yaml` + `config/prices.yaml` (PL-06); `config/models.nim.yaml` (ADR-0003,
   NVIDIA NIM) selected instead via `TILO_MODELS_FILE` (`config.resolve_models_path`).
-- `prompts/<role>/<template>.md` via `tilo_providers.prompts`; `TILO_RECORD=1`+`LIVE=1` records.
+- `prompts/<role>/<template>.md` via `tilo_providers.prompts`; `LIVE=1` goes live; `+TILO_RECORD=1` records.
 
 ## Requirement IDs
 - PL-01–PL-07 (6.4), NFR-25 (17.2), EFF-01 (6.6), FR-CON-13 / PRD 12.5. P0-04: interfaces,
@@ -36,5 +36,5 @@ other service calls instead of naming a model. Business code asks for a **role**
 - `openai_compat_adapter` rejects a dirty API key at construction (names the env var, never
   the value); its errors never carry a raw httpx `str()` or unbounded body — key scrubbed.
 - `factory.build_provider` never imports an adapter or builds a network client unless `LIVE=1`
-  and `TILO_RECORD=1` (EFF-01): dev/CI get `FakeModelProvider`/`RecordReplayProvider`. Tests
+  (EFF-01; `TILO_RECORD=1` also records): dev/CI get `FakeModelProvider`/replay. Tests
   block real sockets; google is tested against a fake at the `google.genai` import path.
