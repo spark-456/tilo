@@ -2,12 +2,15 @@
 only a new entry (OB-02, OB-05), authorised by tilo_policy.check_entry (OB-01/OB-05); a retry on
 the same world_id + idempotency_key is a no-op (OB-03). dispatch_due() sends every entry due,
 minting a single-use Grant no caller outside this module can construct (SEC-03). Several
-instances share one store (Cloud Run scales out, tests/API.md "Several instances, restarts"):
-claiming an entry is a leased compare-and-set, so an in-flight send is never claimed twice; an
-adapter Exception is ambiguous (the send may have happened) so the entry gives up its lease and
-stays "sending" — still due, the batch going on regardless — and only a missing adapter is a
-final "failed". A pending data.transfer lives in the store, emitted later by any instance,
-exactly once, in send order; an emit error never stops the batch. Public surface: tests/API.md.
+instances share one store (tests/API.md "Several instances, restarts", "One transfer per
+entry"): claiming an entry is a leased compare-and-set, a fresh clock reading per claim, so an
+in-flight send is never claimed twice and a later lease in a slow batch is never already
+expired; an adapter Exception is ambiguous (the send may have happened) so the entry gives up
+its lease and stays "sending", still due, the batch going on — only a missing adapter is a final
+"failed". Marking sent and recording the pending data.transfer are one store write (PI-17: never
+a sent entry with no transfer). Only the ordered flush emits, claiming the oldest pending
+transfer under its own lease, so one instance emits a given transfer and a later one waits on an
+earlier one; an emit error there never stops the batch. Public surface: tests/API.md.
 """
 
 from __future__ import annotations
@@ -148,7 +151,7 @@ class Outbox:
     def dispatch_due(self) -> list[dict]:
         now = self._clock()
         due = [entry for entry in self._store.all_entries() if self._is_due(entry, now)]
-        settled = [self._dispatch_one(entry["id"], now) for entry in due]
+        settled = [self._dispatch_one(entry["id"]) for entry in due]
         self._flush_pending_transfers()
         return [entry for entry in settled if entry is not None]
 
@@ -159,9 +162,9 @@ class Outbox:
             return True
         return state == "scheduled" and entry["scheduled_at"] <= now
 
-    def _dispatch_one(self, outbox_id: str, now: str) -> dict | None:
+    def _dispatch_one(self, outbox_id: str) -> dict | None:
         holder = uuid.uuid4().hex
-        claimed = self._store._claim_for_sending(outbox_id, holder, now, _LEASE_SECONDS)
+        claimed = self._store._claim_for_sending(outbox_id, holder, self._clock(), _LEASE_SECONDS)
         if claimed is None:
             return None  # leased to someone else, or not claimable right now
 
@@ -187,25 +190,24 @@ class Outbox:
         finally:
             _LIVE_GRANTS.discard(id(grant))
 
-        sent = self._store._finalize_claim(outbox_id, holder, "sent")
-        if sent is None:
-            return None  # lost the lease somehow; nothing to emit
-        transfer = _transfer_event(sent)
-        self._store._add_pending_transfer(outbox_id, transfer)
-        try:
-            self._emit(transfer)
-        except Exception:
-            pass  # stays pending; flushed by this or a later dispatch_due(), on any instance
-        else:
-            self._store._discard_pending_transfer(outbox_id)
-        return sent
+        # One atomic write: the entry moves to "sent" and its data.transfer becomes pending in
+        # the same store operation (PI-17) — nothing here emits it; the flush below does.
+        return self._store._finalize_claim(outbox_id, holder, "sent", _transfer_event(claimed))
 
     def _flush_pending_transfers(self) -> None:
-        """Every data.transfer not yet emitted (PI-17), oldest first: an emit error here is
-        caught per entry too, so one still-failing transfer never blocks the rest."""
-        for outbox_id, transfer in self._store._pending_transfers_snapshot():
+        """The single emit path (PI-17): claims the oldest pending data.transfer under a fresh
+        lease, emits it, and discards it — one instance at a time, oldest first. Stops as soon
+        as a claim or an emit does not succeed, so a later transfer never jumps ahead of one
+        still outstanding."""
+        while True:
+            holder = uuid.uuid4().hex
+            claim = self._store._claim_oldest_pending_transfer(holder, self._clock(), _LEASE_SECONDS)
+            if claim is None:
+                return
+            outbox_id, transfer = claim
             try:
                 self._emit(transfer)
             except Exception:
-                continue
-            self._store._discard_pending_transfer(outbox_id)
+                self._store._release_pending_transfer_claim(outbox_id, holder)
+                return
+            self._store._discard_pending_transfer(outbox_id, holder)
