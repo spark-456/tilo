@@ -1,0 +1,52 @@
+{
+  "approaches": [
+    {
+      "id": "quick_triage",
+      "label": "Quick triage",
+      "summary": "One Specialist triages the inbox and reports back.",
+      "dimensions": {
+        "depth": "overview",
+        "sources": 1,
+        "parallelism": 1,
+        "verification": "basic",
+        "output_format": "in_app"
+      },
+      "time": { "min_s": 60, "max_s": 300 },
+      "credits": { "min": 1, "max": 5 },
+      "risks": ["May miss edge cases a deeper pass would catch."],
+      "skips": ["No cross-checking against earlier runs."]
+    },
+    {
+      "id": "verified_triage",
+      "label": "Verified triage",
+      "summary": "A Specialist triages the inbox and a Verifier checks the result.",
+      "dimensions": {
+        "depth": "standard",
+        "sources": 1,
+        "parallelism": 1,
+        "verification": "standard",
+        "output_format": "in_app"
+      },
+      "time": { "min_s": 120, "max_s": 600 },
+      "credits": { "min": 2, "max": 10 },
+      "risks": [],
+      "skips": []
+    }
+  ],
+  "chosen_approach": "quick_triage",
+  "units": [
+    {
+      "id": "U1",
+      "unit_type": "triage",
+      "title": "Triage the work",
+      "role": "specialist",
+      "district": "D1",
+      "skills": [],
+      "connectors": [],
+      "actions": [],
+      "depends_on": []
+    }
+  ],
+  "gates": [],
+  "budget_cap": 10
+}
