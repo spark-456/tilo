@@ -57,7 +57,10 @@
         }
       }
     },
-    "recording": { "type": ["string", "null"], "pattern": "^(?!/)(?!(.*/)?\\.\\.(/|$))[^\\\\:]+$" },
+    "recording": {
+      "type": ["string", "null"],
+      "pattern": "^(?!/)(?![\\s\\S]*[\\x00-\\x1f])(?!.*(^|/)\\.\\.(/|$))[^\\\\:]+$"
+    },
     "notes": { "type": "string" }
   },
   "allOf": [

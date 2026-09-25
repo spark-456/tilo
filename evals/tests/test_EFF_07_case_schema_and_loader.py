@@ -70,9 +70,10 @@ def test_EFF_07_load_cases_allows_notes_and_an_autorater_check(tmp_path):
         (None, dict(case_id="E-PLAN-01", group="E-PLAN", recording="evals/../../etc/passwd")),
         (None, dict(case_id="E-PLAN-01", group="E-PLAN", recording="C:/Windows/x.jsonl")),
         (None, dict(case_id="E-PLAN-01", group="E-PLAN", recording="/etc/x.jsonl")),
+        (None, dict(case_id="E-PLAN-01", group="E-PLAN", recording="x\n../../../etc/passwd")),
         (None, dict(case_id="E-PLAN-01", group="E-PLAN", measures=["nope"])),
     ],
-    ids="bad-id group-mismatch name-mismatch bad-check need-truth need-check rec-up rec-drive rec-abs measure".split(),
+    ids="bad-id group-diff name-diff bad-check need-truth need-check rec-up rec-drive rec-abs rec-nl measure".split(),
 )
 def test_EFF_07_load_cases_rejects_malformed_cases(tmp_path, needle, kwargs):
     _expect_error(tmp_path, needle, ground_truth=kwargs.pop("ground_truth", {"ok": True}), **kwargs)
