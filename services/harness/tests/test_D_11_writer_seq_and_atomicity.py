@@ -171,3 +171,31 @@ def test_D_11_append_accepts_a_cause_that_is_an_earlier_event_of_this_world(writ
     first = writer.append(_built_event(1, "01JB5VQ0000000000000000501"))
     second = writer.append(_built_event(2, "01JB5VQ0000000000000000502", cause=first["id"]))
     assert second["cause"] == first["id"]
+
+
+def test_D_11_a_written_event_is_not_shared_with_the_caller(village_basic_layout) -> None:
+    """History cannot change after a write: the store keeps its own copy of what was validated."""
+    import json
+
+    surrogate = json.loads('"a\ud800"')
+    writer, store = make_memory_writer(village_basic_layout, world_id="w_alias")
+
+    data = {"title": "Do some work", "channel": "web", "destination": None}
+    returned = writer.emit(type="world.requested", actor="u_owner", target="w_alias", summary="Asked.", data=data)
+    data["title"] = surrogate
+    returned["data"]["title"] = surrogate
+    store.read_events("org_demo", "w_alias")[0]["data"]["title"] = surrogate
+    store.read_view("org_demo", "w_alias", "shared")[0]["data"]["title"] = surrogate
+
+    assert store.read_events("org_demo", "w_alias")[0]["data"]["title"] == "Do some work"
+    assert store.read_view("org_demo", "w_alias", "shared")[0]["data"]["title"] == "Do some work"
+
+
+def test_D_11_a_non_string_type_is_rejected_not_raised(village_basic_layout) -> None:
+    from tilo_harness.writer import EventRejected
+
+    writer, store = make_memory_writer(village_basic_layout, world_id="w_type")
+    for bad in (["world.requested"], {"t": 1}):
+        with pytest.raises(EventRejected):
+            writer.emit(type=bad, actor="u_owner", target="w_type", summary="Asked.", data={})
+    assert store.read_events("org_demo", "w_type") == []

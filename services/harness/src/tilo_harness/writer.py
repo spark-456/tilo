@@ -26,6 +26,7 @@ writer that simply runs longer than `lease_s` loses its world out from under it.
 
 from __future__ import annotations
 
+import copy
 import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -166,7 +167,7 @@ class WorldWriter:
         trace: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         now = self._clock()
-        entry = self._validator.registry_types.get(type)
+        entry = self._validator.registry_types.get(type) if isinstance(type, str) else None
         event = {
             "v": "1.0",
             "id": _new_ulid(now),
@@ -201,14 +202,18 @@ class WorldWriter:
         problems = self._validator.problems(event, self._state)
         if problems:
             raise EventRejected(problems)
+        # The writer keeps its own copy of what it validated: nothing the caller holds is shared
+        # with the store, the views or WorldState, so a later change to the caller's dicts cannot
+        # rewrite history. Safe to deep-copy: validation bounded the event to a small JSON tree.
+        event = copy.deepcopy(event)
 
         view_writes: list[tuple[str, dict[str, Any]]] = []
         new_view_seq = dict(self._view_seq)
         for scope in self._scopes:
             vseq = self._view_seq.get(scope, 0) + 1
-            copy = redact(event, scope, vseq, self._view_ids.get(scope, set()))
-            if copy is not None:
-                view_writes.append((scope, copy))
+            view_copy = redact(event, scope, vseq, self._view_ids.get(scope, set()))
+            if view_copy is not None:
+                view_writes.append((scope, view_copy))
                 new_view_seq[scope] = vseq
 
         def _commit(head: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], list[tuple[str, dict[str, Any]]]]:
@@ -256,4 +261,4 @@ class WorldWriter:
         self._view_seq = new_view_seq
         for scope, doc in view_writes:
             self._view_ids.setdefault(scope, set()).add(doc["id"])
-        return event
+        return copy.deepcopy(event)

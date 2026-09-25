@@ -15,6 +15,7 @@ the one document every writer legitimately updates in place.
 
 from __future__ import annotations
 
+import copy
 import os
 import re
 from collections.abc import Callable
@@ -40,7 +41,8 @@ class _World:
 
 
 class MemoryStore:
-    """In-memory Store: same read/write semantics as FirestoreStore, for fast tests."""
+    """In-memory Store: same read/write semantics as FirestoreStore, for fast tests. It copies on
+    write and on read, as Firestore's serialisation does, so no caller shares a stored object."""
 
     def __init__(self) -> None:
         self._worlds: dict[tuple[str, str], _World] = {}
@@ -49,10 +51,10 @@ class MemoryStore:
         return self._worlds.setdefault((org_id, world_id), _World())
 
     def read_events(self, org_id: str, world_id: str) -> list[dict[str, Any]]:
-        return list(self._world(org_id, world_id).events)
+        return copy.deepcopy(self._world(org_id, world_id).events)
 
     def read_view(self, org_id: str, world_id: str, scope: str) -> list[dict[str, Any]]:
-        return list(self._world(org_id, world_id).views.get(scope, []))
+        return copy.deepcopy(self._world(org_id, world_id).views.get(scope, []))
 
     def read_head(self, org_id: str, world_id: str) -> dict[str, Any]:
         w = self._world(org_id, world_id)
@@ -65,9 +67,9 @@ class MemoryStore:
         w.lease = new_head["lease"]
         w.view_seq = dict(new_head["view_seq"])
         if event is not None:
-            w.events.append(event)
+            w.events.append(copy.deepcopy(event))
         for scope, doc in views:
-            w.views.setdefault(scope, []).append(doc)
+            w.views.setdefault(scope, []).append(copy.deepcopy(doc))
         return new_head
 
 
