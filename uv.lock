@@ -1324,6 +1324,7 @@ dependencies = [
     { name = "jsonschema" },
     { name = "pyyaml" },
     { name = "referencing" },
+    { name = "tilo-contracts" },
     { name = "tilo-providers" },
 ]
 
@@ -1334,6 +1335,7 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.18" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "tilo-providers", editable = "packages/providers" },
 ]
 
