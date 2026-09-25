@@ -95,7 +95,7 @@ class InMemoryOutboxStore:
                     continue
                 seen_worlds.add(world_id)
                 if _try_claim(self._transfer_leases, outbox_id, holder, now, lease_seconds):
-                    return (outbox_id, world_id, transfer)
+                    return (outbox_id, world_id, deepcopy(transfer))  # a mutating emit never corrupts a retry
             return None
 
     def _discard_pending_transfer(self, outbox_id: str, holder: str) -> None:  # always removed once delivered
