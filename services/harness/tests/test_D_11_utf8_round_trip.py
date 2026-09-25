@@ -308,3 +308,36 @@ def test_D_11_append_rejects_utf8_surrogate_firestore(emulator_host: str, villag
     good_event = _full_event(id="01JB5VQ0000000000000009202", world_id="w_utf8_fs_append", seq=1)
     accepted = writer.append(good_event)
     assert accepted["seq"] == 1, "D-11: a rejected append must not consume seq 1 on FirestoreStore either"
+
+
+# ---------------------------------------------------------------------------
+# The rejection itself must be printable: a problem message never carries the bad text
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "where",
+    ["top_level_key", "data_key", "data_key_with_nan_value"],
+)
+def test_D_11_utf8_problem_messages_round_trip_for_a_bad_key(validator, village_basic_layout: dict, where) -> None:
+    from tilo_harness.writer import EventRejected
+
+    bad_key = "k" + LONE_SURROGATE
+    event = _full_event()
+    if where == "top_level_key":
+        event[bad_key] = "x"
+    elif where == "data_key":
+        event["data"] = {**event["data"], bad_key: "extra"}
+    else:
+        event["data"] = {**event["data"], bad_key: float("nan")}
+
+    problems = validator.problems(event)
+    assert problems and all(p.startswith("schema") for p in problems), problems
+    "; ".join(problems).encode("utf-8")  # raises UnicodeEncodeError if a message carries the raw key
+
+    writer, store = make_memory_writer(village_basic_layout, world_id="w_village_basic")
+    with pytest.raises(EventRejected) as excinfo:
+        writer.append(event)
+    str(excinfo.value).encode("utf-8")
+    "; ".join(excinfo.value.problems).encode("utf-8")
+    assert store.read_events("org_demo", "w_village_basic") == []

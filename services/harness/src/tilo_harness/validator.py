@@ -64,6 +64,11 @@ _StrictIntValidator = jsonschema.validators.extend(
 )
 
 
+def _segment(key: object) -> str:
+    """A problem-path segment that is always valid UTF-8, so a message never carries the bad text it reports."""
+    return str(key).encode("utf-8", "backslashreplace").decode("utf-8")
+
+
 def _finiteness_problems(value: Any, path: str = "") -> list[str]:
     """`jsonschema`'s `minimum`/`maximum` checks use Python `<`/`>`, which are False for both
     operands of any comparison against NaN, and JSON Schema's `number`
@@ -85,7 +90,7 @@ def _finiteness_problems(value: Any, path: str = "") -> list[str]:
             problems.append(f"schema: {label}: {value!r} is outside the int64 range")
     elif isinstance(value, dict):
         for key, child in value.items():
-            problems += _finiteness_problems(child, f"{path}/{key}" if path else str(key))
+            problems += _finiteness_problems(child, f"{path}/{_segment(key)}" if path else _segment(key))
     elif isinstance(value, list):
         for index, child in enumerate(value):
             problems += _finiteness_problems(child, f"{path}/{index}" if path else str(index))
@@ -113,7 +118,7 @@ def _utf8_problems(value: Any, path: str = "") -> list[str]:
             problems.append(f"schema: {label}: string is not valid, UTF-8-round-trippable text")
     elif isinstance(value, dict):
         for key, child in value.items():
-            child_path = f"{path}/{key}" if path else str(key)
+            child_path = f"{path}/{_segment(key)}" if path else _segment(key)
             if isinstance(key, str):
                 try:
                     key.encode("utf-8").decode("utf-8")
