@@ -1,20 +1,12 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
-/** Reactive `window.matchMedia` (used for the mobile breakpoint and
- * `prefers-reduced-motion`) so layout and motion are real display settings,
- * not a separate build/code path (PRD 9.6 "Stage mode ... display settings"). */
-export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+/** Live `matchMedia` result, so breakpoints and reduced motion are display settings (PRD 9.6). */
+export const useMediaQuery = (query: string) =>
+  useSyncExternalStore(
+    (onChange) => {
+      const mql = window.matchMedia(query);
+      mql.addEventListener("change", onChange);
+      return () => mql.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(query).matches,
   );
-
-  useEffect(() => {
-    const mql = window.matchMedia(query);
-    const onChange = () => setMatches(mql.matches);
-    onChange();
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, [query]);
-
-  return matches;
-}

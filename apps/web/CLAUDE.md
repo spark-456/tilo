@@ -2,14 +2,11 @@
 
 ## Purpose
 The Firebase-hosted web client (PRD 6.2): React UI, the PixiJS v8 isometric world, Story and
-Trace lenses, cards and settings. P0-08a (this ticket) ships the shell only: token pipeline,
-layout frame (left/right rail, bottom tabs) and the iso stage — no fixture player yet.
+Trace lenses, cards and settings. P0-08a shipped the shell: tokens, layout frame and iso stage.
 
 ## Commands
-- `just dev` or `pnpm --filter @tilo/web run dev` — dev server
-- `pnpm --filter @tilo/web run build` / `test` / `test:e2e` — build / unit tests / Playwright
-- `just tokens` — regenerate `src/styles/tokens.css` and `src/design/tokens.ts` from
-  `design/tokens.json` (PRD 18.2); commit the result
+- `pnpm --filter @tilo/web run dev` / `build` / `test` / `test:e2e` — dev server / build / Vitest / Playwright
+- `just tokens` — regenerate the committed token files from `design/tokens.json`
 - `just check` — full gate from the repo root
 
 ## Contracts

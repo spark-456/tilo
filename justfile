@@ -12,17 +12,14 @@ setup:
     pnpm install
     uv run pre-commit install
 
-# `just dev` runs apps/web *instead of* the api server (no cross-platform way
-# to background one process and wait on another in a `just` recipe); run
-# `just dev-api` alongside it in a second terminal for the API.
+# Run the web dev server (`just dev-api` in a second terminal runs the API).
 dev:
     pnpm --filter @tilo/web run dev
 
 dev-api:
     uv run --package tilo-api uvicorn tilo_api:app --reload --port 8080
 
-# Regenerate apps/web's design-token CSS/TS from design/tokens.json (PRD 18.2).
-# Commit the result; a drift test fails `just check` if it goes stale.
+# Regenerate apps/web design tokens from design/tokens.json (drift-tested).
 tokens:
     node apps/web/scripts/generate-tokens.mjs
 

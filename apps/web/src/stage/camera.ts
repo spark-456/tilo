@@ -1,23 +1,14 @@
-// PRD 18.2 "Motion" (BQ-10: PRD's 320ms wins over the exports' 650ms). Camera
-// state is plain data driven by pointer/wheel/keyboard input; the CSS
-// `transition` on the camera element does the easing, so nothing redraws on
-// its own (HR-2: no idle animation).
+// PRD 18.2 "Motion": 320 ms camera (BQ-10: PRD wins over the exports' 650 ms).
 export const CAMERA_PAN_MS = 320;
 export const PAN_STEP_PX = 48;
 export const ZOOM_STEP = 0.1;
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 2;
 
-export interface CameraState {
-  x: number;
-  y: number;
-  zoom: number;
-}
-
+export type CameraState = { x: number; y: number; zoom: number };
 export const INITIAL_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 
-/** PRD 18.2 "Motion: ... 320ms camera; ... reduced motion respected." */
-export const getCameraPanDurationMs = (reducedMotion: boolean): number =>
+export const getCameraPanDurationMs = (reducedMotion: boolean) =>
   reducedMotion ? 0 : CAMERA_PAN_MS;
 
 export const panCamera = (s: CameraState, dx: number, dy: number): CameraState => ({
@@ -31,5 +22,11 @@ export const zoomCamera = (s: CameraState, delta: number): CameraState => ({
   zoom: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s.zoom + delta)),
 });
 
-export const cameraTransform = (s: CameraState): string =>
-  `translate(${s.x}px, ${s.y}px) scale(${s.zoom})`;
+/** A 100 px wheel notch zooms one ZOOM_STEP; smaller (trackpad) deltas zoom proportionally
+ * less; one event never exceeds a step. deltaMode 1 is lines, 2 is pages. */
+export const wheelZoomDelta = (deltaY: number, deltaMode = 0) => {
+  const steps = (-deltaY * ([1, 40, 800][deltaMode] ?? 1)) / 100;
+  return Math.min(1, Math.max(-1, steps)) * ZOOM_STEP;
+};
+
+export const cameraTransform = (s: CameraState) => `translate(${s.x}px, ${s.y}px) scale(${s.zoom})`;
