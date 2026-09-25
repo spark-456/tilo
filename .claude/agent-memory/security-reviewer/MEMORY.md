@@ -1,1 +1,1 @@
-- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 round 2 closed the modifier, condition, authz and card gaps. Still open: ungated T3 connector actions, duplicate hold ids, consent delegate
+- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed round 5 (gate labels fixed, CR-09..12); open: consent labels, two tier sources, P1 validator must run crossref
