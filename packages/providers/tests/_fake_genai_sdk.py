@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import sys
 import types as pytypes
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -159,7 +160,7 @@ def install() -> None:
 
 
 @pytest.fixture
-def fake_genai_sdk(monkeypatch: pytest.MonkeyPatch) -> pytypes.ModuleType:
+def fake_genai_sdk(monkeypatch: pytest.MonkeyPatch) -> Iterator[pytypes.ModuleType]:
     """Installs the fake `google.genai` SDK for the duration of one test and
     returns the fake `google.genai` module (for `errors.APIError` etc.)."""
     for name in ("google.genai", "google.genai.types", "google.genai.errors"):

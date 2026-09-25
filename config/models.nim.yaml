@@ -1,0 +1,52 @@
+# EXAMPLE model profiles routing every role to NVIDIA NIM (ADR-0003, PL-02 ticket P0-05
+# item 3): lets the user test the provider layer live without Google Cloud billing.
+# Selected instead of config/models.yaml by setting TILO_MODELS_FILE=config/models.nim.yaml
+# (tilo_providers.config.resolve_models_path) -- no code edit needed. Shape mirrors
+# config/models.yaml: contracts/providers.schema.json $defs.models.
+#
+# NOT the submitted build's default: the submission routes every role to Google models on
+# Google Cloud (PRD 4.4); NIM is for live testing only while billing is unavailable
+# (ADR-0003 decision 2).
+#
+# Model ids verified against NVIDIA's public NIM catalog, retrieved 2026-09-25:
+#   - https://build.nvidia.com/google/gemma-4-31b-it
+#     (container nvcr.io/nim/google/gemma-4-31b-it, catalog.ngc.nvidia.com/orgs/nim/teams/google)
+#   - https://build.nvidia.com/google/gemma-3-27b-it
+# API base URL from the same catalog pages: https://integrate.api.nvidia.com/v1.
+#
+# CONTRACT BLOCKER (see report, "needs contract change"): base_url and api_key_env below are
+# not yet fields on contracts/providers.schema.json $defs.profile (additionalProperties:
+# false, only provider/model/context/caps today), so this file cannot load through
+# tilo_providers.config.load_providers_config until the contract owner adds them, applicable
+# when provider == "openai_compat". Not editing contracts/ here per root CLAUDE.md. Every
+# other NIM acceptance test in packages/providers/tests reads this file's raw YAML directly
+# and does not depend on the contract change.
+example: true
+
+profiles:
+  nim-gemma-4-31b:
+    provider: openai_compat
+    model: google/gemma-4-31b-it
+    base_url: https://integrate.api.nvidia.com/v1
+    api_key_env: NVIDIA_API_KEY
+    context: 128000
+    caps: [json, tools]
+  nim-gemma-3-27b:
+    provider: openai_compat
+    model: google/gemma-3-27b-it
+    base_url: https://integrate.api.nvidia.com/v1
+    api_key_env: NVIDIA_API_KEY
+    context: 128000
+    caps: [json, tools]
+
+roles:
+  director: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high }
+  lead: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: medium }
+  specialist: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
+  verifier: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high }
+  writer: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b }
+  narrator: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
+  autopilot: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
+
+rules:
+  deny: ["gemini-2.5-*", "*-preview*"]
