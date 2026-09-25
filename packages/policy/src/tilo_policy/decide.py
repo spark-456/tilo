@@ -7,8 +7,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from .coverage import Target, add_seconds, covering_level, fail_closed, instruction_counts, stamped_by, ts
-from .schemas import event_ok
+from .coverage import Target, add_seconds, covering_level, fail_closed, instruction_counts, may_cover, stamped_by, ts
+from .schemas import conforms, event_ok
 from .tiers import RiskTable, SideEffectFacts
 
 
@@ -87,6 +87,8 @@ def _decide(p: Proposal, table: RiskTable, policies: list[dict], owner: str, app
     ]
     if not all(stamped_by(pol, now) for pol in mine):  # the clock is behind the record: the whole decision gates
         return gate(tier, modifiers, "L1", None, "no_covering_policy")
+    if any(not conforms("policy.schema.json", pol) and may_cover(pol, target) for pol in mine):
+        return gate(tier, modifiers, "L1", None, "no_covering_policy")  # an invalid record that may cover
     levels = [(lv, pol) for pol in mine if (lv := covering_level(pol, target, owner, now))]
     # A tier's max_level caps every policy; the lowest level in force wins, ties by id (PI-13).
     covering = [(min(lv, table.max_level.get(tier, "L1")), pol["id"], pol) for lv, pol in levels]

@@ -116,19 +116,14 @@ def in_force(policy: dict, owner: str, at: str) -> bool:
     )
 
 
-@fail_closed(None)
-def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | None:
-    """PI-06: the level at which a contract-valid `policy` covers `target` at `at`, or None."""
-    if (policy["action_type"], policy["owner"]) != (target.action_type, owner):
-        return None  # cheap filter before the schema check
-    if not conforms("policy.schema.json", policy):
-        return None
-    scope, limits = policy["scope"], policy["limits"].values()
-    covered = (
-        all(v is None or math.isfinite(v) for v in limits)
-        and policy["action_type"] == target.action_type
-        and in_force(policy, owner, at)
-        and target.connector in scope["connectors"]
+def _scope_matches(policy: dict, target: Target) -> bool:
+    """PI-06: connector, district, every recipient and its domain in scope. Raises when the scope
+    cannot be read (not four lists)."""
+    scope = policy["scope"]
+    if not all(isinstance(scope[k], list) for k in ("connectors", "recipients", "domains", "districts")):
+        raise ValueError("unreadable scope")
+    return (
+        target.connector in scope["connectors"]
         and _within(scope["districts"], target.district)
         and (bool(target.recipients) or not (scope["recipients"] or scope["domains"]))
         and all(
@@ -139,6 +134,23 @@ def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | N
             and _within(scope["domains"], _domain(r))
             for r in target.recipients
         )
+    )
+
+
+may_cover = fail_closed(True)(_scope_matches)  # for an invalid record: an unreadable scope may cover anything
+
+
+@fail_closed(None)
+def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | None:
+    """PI-06: the level at which a contract-valid `policy` covers `target` at `at`, or None."""
+    if (policy["action_type"], policy["owner"]) != (target.action_type, owner):
+        return None  # cheap filter before the schema check
+    if not conforms("policy.schema.json", policy):
+        return None
+    covered = (
+        all(v is None or math.isfinite(v) for v in policy["limits"].values())
+        and in_force(policy, owner, at)
+        and _scope_matches(policy, target)
     )
     return level_at(policy, at) if covered else None
 
