@@ -26,7 +26,7 @@ other service calls instead of naming a model. Business code asks for a **role**
 - No model id, prompt text or connector secret outside this package and `config/`
   (`scripts/lint_model_ids.py` enforces this on tracked source files).
 - Denylisted model ids fail start-up loudly (`ProviderConfigError`, PL-07); so does a role
-  naming an unknown profile or missing a fallback (NFR-25 — a role shaped only
-  `{primary: ...}` is exempt), and a profile with no price entry.
+  naming an unknown profile or missing a fallback (NFR-25, every role, no exemption; BQ-18),
+  and a profile with no price entry.
 - `price()` never invents a price: an `unset` price status raises instead of metering (PL-06).
 - Interfaces are kept thin (`abc.ABC` + pydantic models); no provider-calling logic here yet.

@@ -66,18 +66,11 @@ BASE_MODELS: dict = {
             "max_input_tokens": 200_000,
             "max_output_tokens": 8_000,
         },
-        # Only "primary" -- no fallback, no cascade, no thinking, no token
-        # caps. PRD 17.2 NFR-25 requires "fallback profile per role", but
-        # contracts/providers.schema.json's $defs.role only *requires*
-        # "primary" (fallback is optional), and the shipped
-        # config/models.yaml ships exactly this shape for its own "narrator"
-        # role. Resolved ambiguity (see report): a role dict whose *only*
-        # key is "primary" is what the loader must treat as "marked
-        # single-profile by the schema" and exempt from NFR-25's fallback
-        # requirement; a role that sets anything else (thinking, cascade,
-        # token caps) but still omits fallback is not exempt and must be
-        # rejected loudly at start-up.
-        "narrator": {"primary": "small"},
+        # PRD 17.2 NFR-25: "fallback profile per role" -- every role, with no
+        # exemption. contracts/providers.schema.json's $defs.role only
+        # *requires* "primary", so the loader enforces fallback at start-up
+        # (docs/open-questions.md BQ-18).
+        "narrator": {"primary": "small", "fallback": "medium"},
     },
     "rules": {"deny": ["fake-legacy-*", "*-preview*"]},
 }

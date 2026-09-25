@@ -2,8 +2,7 @@
 17.2 NFR-25, 14.1 Credits). Loads config/models.yaml + config/prices.yaml,
 validates each against tilo_contracts, and fails loudly with
 ProviderConfigError: denied model id (PL-07); a role naming an unknown
-profile; a role with no fallback unless its raw mapping has no key besides
-"primary" (NFR-25); a profile with no price entry; a status "set" prices
+profile; a role with no fallback profile (NFR-25); a profile with no price entry; a status "set" prices
 file with a null price, effective_date or source. price() never invents a
 price: an unset status, or any null price field, raises (PL-06)."""
 
@@ -17,9 +16,6 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 from tilo_contracts import ProvidersModels, ProvidersPrices, ProvidersProfile, ProvidersRole
-
-# A role mapping whose only key is "primary" is exempt from NFR-25's fallback rule.
-_SINGLE_PROFILE_ROLE_KEYS = frozenset({"primary"})
 
 
 class ProviderConfigError(Exception):
@@ -85,7 +81,7 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
     return raw
 
 
-def _validate_startup_rules(models: ProvidersModels, prices: ProvidersPrices, raw_roles: dict[str, Any]) -> None:
+def _validate_startup_rules(models: ProvidersModels, prices: ProvidersPrices) -> None:
     for profile_id, profile in models.profiles.items():
         for deny_glob in models.rules.deny:
             if fnmatch.fnmatchcase(profile.model, deny_glob):
@@ -104,13 +100,8 @@ def _validate_startup_rules(models: ProvidersModels, prices: ProvidersPrices, ra
         for cascade_id in role.cascade or ():
             if cascade_id not in models.profiles:
                 raise ProviderConfigError(f"NFR-25: role {role_id!r} 'cascade' names unknown profile {cascade_id!r}")
-        raw_role = raw_roles.get(role_id)
-        is_single_profile = isinstance(raw_role, dict) and set(raw_role) == _SINGLE_PROFILE_ROLE_KEYS
-        if role.fallback is None and not is_single_profile:
-            raise ProviderConfigError(
-                f"NFR-25: role {role_id!r} has no fallback profile (only a single-profile role — "
-                "whose mapping has no key besides 'primary' — may skip one)"
-            )
+        if role.fallback is None:
+            raise ProviderConfigError(f"NFR-25: role {role_id!r} has no fallback profile")
 
 
 def _validate_price_fields_when_set(prices: ProvidersPrices, prices_path: Path) -> None:
@@ -158,7 +149,6 @@ def load_providers_config(models_path: Path | str, prices_path: Path | str) -> P
 
     _validate_price_fields_when_set(prices, prices_path)
 
-    raw_roles = raw_models.get("roles")
-    _validate_startup_rules(models, prices, raw_roles if isinstance(raw_roles, dict) else {})
+    _validate_startup_rules(models, prices)
 
     return ProvidersConfig(models=models, prices=prices)
