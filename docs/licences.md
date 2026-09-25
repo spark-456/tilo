@@ -49,6 +49,7 @@ shared `uv` workspace venv by `uv sync --all-packages`.
 | @playwright/test | Apache-2.0 | https://www.npmjs.com/package/@playwright/test |
 | @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
 | @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT; fonts Nunito, Nunito Sans, JetBrains Mono are OFL-1.1 | https://fonts.google.com/ |
+| fast-check (property tests, ticket P0-08b-player, FR-WLD-04) | MIT | https://www.npmjs.com/package/fast-check |
 
 ## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)
 

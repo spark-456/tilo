@@ -1,0 +1,286 @@
+{
+  "v": "1.0",
+  "world_id": "w_village_basic",
+  "tier": "village",
+  "theme": "metropolis",
+  "semantic": {
+    "levels": [
+      {
+        "id": "L1",
+        "name": "Inbox",
+        "districts": [
+          {
+            "id": "D1",
+            "name": "Mail",
+            "icon": "inbox",
+            "lead": "A_l1",
+            "buildings": [
+              {
+                "id": "B1",
+                "name": "Mail Room",
+                "kind": "common",
+                "common_type": "mail_room",
+                "plan_units": ["U1"]
+              },
+              {
+                "id": "B2",
+                "name": "Reply Desk",
+                "kind": "kit",
+                "kit": {
+                  "icon": "reply",
+                  "parts": ["desk_small", "roof_flat"]
+                },
+                "plan_units": ["U2"]
+              },
+              {
+                "id": "B3",
+                "name": "Town Hall",
+                "kind": "common",
+                "common_type": "town_hall",
+                "plan_units": []
+              },
+              {
+                "id": "B4",
+                "name": "Delivery Dock",
+                "kind": "common",
+                "common_type": "delivery_dock",
+                "plan_units": []
+              },
+              {
+                "id": "B5",
+                "name": "Agent Foundry",
+                "kind": "common",
+                "common_type": "agent_foundry",
+                "plan_units": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "islands": [
+      {
+        "id": "I1",
+        "name": "Gmail",
+        "conn": "api",
+        "bridge": "road",
+        "state": "connected"
+      },
+      {
+        "id": "I2",
+        "name": "WhatsApp",
+        "conn": "channel",
+        "bridge": "pier",
+        "state": "connected"
+      }
+    ],
+    "gates": [
+      {
+        "id": "G1",
+        "guards": "send_email",
+        "between": ["B2", "I1"],
+        "policy_ref": null
+      }
+    ],
+    "agents": [
+      {
+        "id": "A_dir",
+        "rank": "director"
+      },
+      {
+        "id": "A_l1",
+        "rank": "lead"
+      },
+      {
+        "id": "A_s1",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s2",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_v1",
+        "rank": "verifier"
+      }
+    ]
+  },
+  "geometry": {
+    "solver_version": "1.0.0",
+    "levels": [
+      {
+        "id": "L1",
+        "index": 0,
+        "plate": {
+          "x": 0,
+          "y": 0,
+          "w": 20,
+          "d": 14
+        }
+      }
+    ],
+    "districts": [
+      {
+        "id": "D1",
+        "plot": {
+          "x": 1,
+          "y": 1,
+          "w": 12,
+          "d": 10
+        },
+        "tint": "district.1"
+      }
+    ],
+    "buildings": [
+      {
+        "id": "B1",
+        "footprint": {
+          "x": 2,
+          "y": 2,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 2
+      },
+      {
+        "id": "B2",
+        "footprint": {
+          "x": 6,
+          "y": 2,
+          "w": 2,
+          "d": 1
+        },
+        "floors": 1
+      },
+      {
+        "id": "B3",
+        "footprint": {
+          "x": 2,
+          "y": 6,
+          "w": 3,
+          "d": 3
+        },
+        "floors": 2
+      },
+      {
+        "id": "B4",
+        "footprint": {
+          "x": 9,
+          "y": 6,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B5",
+        "footprint": {
+          "x": 6,
+          "y": 6,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      }
+    ],
+    "islands": [
+      {
+        "id": "I1",
+        "level": "L1",
+        "plot": {
+          "x": 16,
+          "y": 1,
+          "w": 3,
+          "d": 3
+        }
+      },
+      {
+        "id": "I2",
+        "level": "L1",
+        "plot": {
+          "x": 16,
+          "y": 9,
+          "w": 3,
+          "d": 3
+        }
+      }
+    ],
+    "roads": [
+      {
+        "from": "B1",
+        "to": "B2",
+        "path": [
+          {
+            "x": 4,
+            "y": 3
+          },
+          {
+            "x": 6,
+            "y": 3
+          }
+        ]
+      }
+    ],
+    "bridges": [
+      {
+        "island": "I1",
+        "from": "B1",
+        "path": [
+          {
+            "x": 3,
+            "y": 1
+          },
+          {
+            "x": 16,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "island": "I1",
+        "from": "B2",
+        "path": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 16,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "island": "I2",
+        "from": "B3",
+        "path": [
+          {
+            "x": 5,
+            "y": 7
+          },
+          {
+            "x": 14,
+            "y": 7
+          },
+          {
+            "x": 14,
+            "y": 10
+          },
+          {
+            "x": 16,
+            "y": 10
+          }
+        ]
+      }
+    ],
+    "gates": [
+      {
+        "id": "G1",
+        "cell": {
+          "x": 12,
+          "y": 2
+        }
+      }
+    ]
+  }
+}
