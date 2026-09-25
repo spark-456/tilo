@@ -1,0 +1,35 @@
+{
+  "models": {
+    "example": true,
+    "profiles": {
+      "flash": {
+        "provider": "google",
+        "model": "example-flash",
+        "context": 1000000,
+        "caps": ["json", "tools"],
+        "api_key_env": "GOOGLE_API_KEY"
+      }
+    },
+    "roles": {
+      "specialist": {
+        "primary": "flash"
+      }
+    },
+    "rules": {
+      "deny": ["*-preview*"]
+    }
+  },
+  "prices": {
+    "status": "unset",
+    "effective_date": null,
+    "source": null,
+    "currency": "USD",
+    "credit_usd": 0.005,
+    "profiles": {
+      "flash": {
+        "input": null,
+        "output": null
+      }
+    }
+  }
+}

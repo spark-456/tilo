@@ -1,0 +1,36 @@
+{
+  "models": {
+    "example": true,
+    "profiles": {
+      "nim-gemma": {
+        "provider": "openai_compat",
+        "model": "google/gemma-2-27b-it",
+        "context": 8192,
+        "caps": ["json", "tools"],
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "api_key_env": "NVIDIA_API_KEY"
+      }
+    },
+    "roles": {
+      "specialist": {
+        "primary": "nim-gemma"
+      }
+    },
+    "rules": {
+      "deny": ["*-preview*"]
+    }
+  },
+  "prices": {
+    "status": "unset",
+    "effective_date": null,
+    "source": null,
+    "currency": "USD",
+    "credit_usd": 0.005,
+    "profiles": {
+      "nim-gemma": {
+        "input": null,
+        "output": null
+      }
+    }
+  }
+}
