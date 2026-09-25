@@ -19,9 +19,9 @@ Updated: 2026-09-25 · Phase 0 (Foundations) · next gate **CP0 on 29 Sep** · C
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0-01 Scaffold | PRD 20.3, 20.4, 17.6; SEC-13 (CI scan skeleton) | reach-builder → opus (escalated) | **Merged to `main`** (user approved 2026-09-25) | 32 tests | PASS r2 | PASS r4 (FAIL r1–r3) | PASS r1 | n/a | n/a |
 | P0-02 Core contracts + codegen + drift CI | FR-WLD-02; PRD 15.2 (brief, plan, layout, card, policy, handoff, envelope, skill, connector, providers) | architect (opus) | Merged to `phase0-stack`; awaiting user OK for `main` (security flagged T3 gaps r1–r4, fixed) | 11 schemas' tests | PASS r2 | PASS r5 (FAIL r1–r4) | n/a | n/a | n/a |
-| P0-03 Event contract + registry (+ outbox entry, consent-card ids) | FR-WLD-03 (registry, data schemas, fixtures); PRD 9.3, 9.5 | architect | In progress | | | | n/a | n/a | n/a |
-| P0-04 Provider layer A: interfaces, config loaders, denylist, model-id lint | PL-01, PL-04 (skeleton), PL-06, PL-07, NFR-25 | intelligence-builder | In progress | | | | | | n/a |
-| P0-05 Provider layer B: google, OpenAI-compatible (mock), record-and-replay | PL-02, EFF-01 | intelligence-builder | Queued | | | | | | n/a |
+| P0-03 Event contract + registry (+ outbox entry, consent-card ids) | FR-WLD-03 (registry, data schemas, fixtures); PRD 9.3, 9.5 | architect (opus) | Stuck after 5 security rounds (each found a deeper outbox/policy authorisation gap); resumed with the L2-instruction fix, a contract-scope note for security, and P4 invariants written to docs/security | 31 tests | PASS r1 | FAIL r1–r5 | n/a | n/a | n/a | | | | n/a | n/a | n/a |
+| P0-04 Provider layer A: interfaces, config loaders, denylist, model-id lint | PL-01, PL-04 (skeleton), PL-06, PL-07, NFR-25 | intelligence-builder → opus (escalated) | Merged to `phase0-stack` (307 tests green) | 33 tests | PASS r3 | n/a | PASS r1 | n/a | n/a | | | | | | n/a |
+| P0-05 Provider layer B: google, OpenAI-compatible + NVIDIA NIM profiles, record-and-replay, fake | PL-02, EFF-01 | intelligence-builder | In progress | | | | | | n/a |
 | P0-06 Provider layer C: role router, fallback, cascades, token caps, conformance | PL-03, PL-05, EFF-02, EFF-03 | intelligence-builder | Queued | | | | | | n/a |
 | P0-07 Infrastructure plan for tilo-dev | PRD 6.2, 6.3, 6.5; SEC-02, SEC-12; 16.1 rule 5 | reach-builder → opus (escalated) | **Merged to `main`** (user approved); apply waits for Google Cloud billing | 19 tests (27 plan tests now) | PASS (after 7 rounds incl. resume) | PASS, FLAGGED earlier (WIF accepted git tags; fixed to main-only) | PASS r1 | n/a | n/a |
 | P0-07b Infra hardening follow-ups | SEC-12 | reach-builder | Queued: remove Editor from the default Compute SA that enabling compute creates; give the snapshots bucket its writer | | | | | n/a | n/a |
@@ -71,6 +71,7 @@ Tickets that security-reviewer flagged cannot reach `main` without the user. App
 
 ## Usage log
 - Workflow 1 (P0-01, P0-07): 28 agents, about 2.5 M subagent tokens, 45 min. Most spend went to repeated review rounds (security at xhigh on P0-01, code review on P0-07).
+- Workflow 5 (P0-03, P0-04): 20 agents, about 2.6 M subagent tokens, 2.5 h. Running total about 10 M subagent tokens; security review rounds at xhigh are the largest single cost.
 - Workflow 4 (P0-02, P0-08a continued): 29 agents, about 2.8 M subagent tokens, 97 min.
 - Workflows 2 and 3 (P0-02; P0-07 resume + P0-08a) were cut off by a session restart. Test-writers and the P0-07 loop finished; both builders left uncommitted work, which the resumed run continues instead of redoing.
 - From the restart on, workflows use the registered agents in `.claude/agents/` (reviewers now keep project memory).
