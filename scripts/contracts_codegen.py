@@ -49,6 +49,7 @@ BASE_URI = "https://contracts.tilo.example/"
 CONFIG_SHAPES = {
     "config/models.yaml": ("providers", "models"),
     "config/prices.yaml": ("providers", "prices"),
+    "config/autonomy.yaml": ("policy", "risk_tier_table"),
 }
 # Fixture folders with their own layout, checked by contracts_events.
 EVENT_FIXTURES = {"events", "streams"}
@@ -174,7 +175,7 @@ def check_fixtures(schemas: dict[str, dict], validate: events.Validate) -> list[
 
 def check_config(validate: events.Validate) -> list[str]:
     """config/ files whose shape a contract owns must validate against it (when present; the
-    loaders in packages/providers require them)."""
+    loaders in packages/providers and the policy engine require them)."""
     errors = []
     for relative, (name, key) in CONFIG_SHAPES.items():
         path = ROOT / relative

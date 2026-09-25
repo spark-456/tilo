@@ -29,8 +29,8 @@
  * events/data/app.refreshed.schema.json 1.0.0 sha256:051bafbff4096d1c
  * events/data/app.spec.schema.json 1.0.0 sha256:49e9b3906027a4c3
  * events/data/app.tested.schema.json 1.0.0 sha256:7cc150abdade1ee3
- * events/data/approval.requested.schema.json 1.0.0 sha256:0102907a6a0e1a5f
- * events/data/approval.resolved.schema.json 1.0.0 sha256:4335b27e04f1db2a
+ * events/data/approval.requested.schema.json 1.0.0 sha256:fa01c18f73338a6d
+ * events/data/approval.resolved.schema.json 1.0.0 sha256:3c56d4ad96d63941
  * events/data/artifact.created.schema.json 1.0.0 sha256:1e70d4b7f7bc11a7
  * events/data/artifact.delivered.schema.json 1.0.0 sha256:a0e7a46e56965c1d
  * events/data/artifact.reviewed.schema.json 1.0.0 sha256:fee51f5f590c73c4
@@ -66,7 +66,7 @@
  * events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
  * events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
  * events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
- * events/data/policy.applied.schema.json 1.0.0 sha256:c9475618991d6823
+ * events/data/policy.applied.schema.json 1.0.0 sha256:3ca104f308b12dce
  * events/data/policy.changed.schema.json 1.0.0 sha256:e480c2319e07c2a6
  * events/data/question.answered.schema.json 1.0.0 sha256:908aeadfaca479ab
  * events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
@@ -86,7 +86,7 @@
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
  * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
- * team_lead.schema.json 1.0.0 sha256:7408b4fbe4f45f78
+ * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * events/registry.yaml 1.0.0 sha256:82aaca6089b684c1
  */
 
@@ -1199,7 +1199,7 @@ export interface AppTestedData {
   passed: boolean;
 }
 /**
- * data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases, and item pins the draft or file the gate holds to its version (null when there is none); the entry's item and the gate card's gate.action.item equal it (card rule CR-12, outbox rule OB-05). Nothing is written to the outbox before the gate opens, and this event never authorises (authz null): only an approval.resolved answering approve on the same gate does (OB-01). It also records who besides the world's owner may answer (PRD 10.1), set by the harness from the owner's own records, never by a model: approver is the Approver the owner assigned this gate to (null when none), and team_lead names the expert domain whose Team Lead may answer and the owner's policy that allows it (null when no Team Lead may). Anyone else, a Viewer included, opens nothing (OB-01).
+ * data of approval.requested (PRD 9.5). A proposed side effect waits at a gate for a person. outbox_id is reserved for the outbox entry the gate releases, and item pins the draft or file the gate holds to its version (null when there is none); the entry's item and the gate card's gate.action.item equal it (card rule CR-12, outbox rule OB-05). Nothing is written to the outbox before the gate opens, and this event never authorises (authz null): only an approval.resolved answering approve on the same gate does (OB-01). It also records who besides the world's owner may answer (PRD 10.1), set by the harness from the owner's own records, never by a model: approver is the owner's assignment of this gate to an Approver (null when none): the Approver's user id and assigned_by, the owner's stamp with its time, copied from the owner's own assignment or share link (FR-HIL-12), like a Team Lead's domain (team_lead.schema.json), and team_lead names the expert domain whose Team Lead may answer and the owner's policy that allows it (null when no Team Lead may). Anyone else, a Viewer included, opens nothing (OB-01).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ApprovalRequestedData".
@@ -1212,8 +1212,28 @@ export interface ApprovalRequestedData {
   risk_tier: RiskTier;
   irreversible: boolean;
   item: ArtifactRef | null;
-  approver: UserId | null;
+  approver: ApprovalRequestedDataApproverAssignment | null;
   team_lead: ApprovalRequestedDataTeamLeadAllowance | null;
+}
+/**
+ * The owner assigned this gate to an Approver (PRD 10.1 'assigned gates', FR-HIL-12). user is the Approver; assigned_by records who assigned it and when. An Approver opens the gate only when assigned_by.by is the world's owner and assigned_by.at is no later than the answer's authz.at (OB-01), so an assignment anyone else made, a Team Lead naming themself included, or one made after the answer opens nothing.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ApprovalRequestedDataApproverAssignment".
+ */
+export interface ApprovalRequestedDataApproverAssignment {
+  user: UserId;
+  assigned_by: TeamLeadAssignment;
+}
+/**
+ * Who made an assignment and when: only the world's owner assigns a Team Lead's domain (PRD 16.2) or a gate's Approver (PRD 10.1; approval.requested approver). OB-01 requires by to be the owner and at to be no later than the answer.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TeamLeadAssignment".
+ */
+export interface TeamLeadAssignment {
+  by: UserId;
+  at: Timestamp;
 }
 /**
  * A Team Lead may answer this gate: one whose owner-assigned domain (team_lead.schema.json) is domain, while policy_id names the owner's policy for this action type that lists domain in team_lead_domains (PRD 10.1: 'in their domain, if the policy allows'; OB-01).
@@ -1226,7 +1246,7 @@ export interface ApprovalRequestedDataTeamLeadAllowance {
   policy_id: PolicyId;
 }
 /**
- * data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Only approve authorises, and only when authz.ref is the world's owner, the Approver approval.requested named, or a Team Lead it allows (OB-01): the outbox entry is written with exactly this authz, and its outgoing data.transfer carries it too; edit and hold write nothing. pin_verified is true when tilo-channels checked the person's PIN before accepting the answer (SEC-06); a T3 gate answered on WhatsApp opens only with it (OB-01), and a wrong or missing PIN emits no approval.resolved. Gates never time out to go, so a timeout emits no approval.resolved.
+ * data of approval.resolved (PRD 9.5). A person answered a gate card (CR-07: only approve opens it). authz names that person or Team Lead, and gate_id, card_id and outbox_id link the side effect to this authorisation (HR-7). Only approve authorises, and only when authz.ref is the world's owner, the Approver the owner assigned before the answer (approval.requested approver), or a Team Lead it allows (OB-01): the outbox entry is written with exactly this authz, and its outgoing data.transfer carries it too; edit and hold write nothing. pin_verified is true when tilo-channels checked the person's PIN before accepting the answer (SEC-06); a T3 gate answered on WhatsApp opens only with it (OB-01), and a wrong or missing PIN emits no approval.resolved. Gates never time out to go, so a timeout emits no approval.resolved.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ApprovalResolvedData".
@@ -1586,7 +1606,7 @@ export interface PlanQuestionsAskedData {
   question_count: number;
 }
 /**
- * data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). There is no gate card on this path, so this event records what the engine assessed against the policy's scope: the connector, the destination (an opaque id, never an address), the district of the step, the tier, the undo window, and item pinned to its version (null when there is none). The outbox entry equals it on each (OB-05) and the policy's scope covers it (OB-01), so a redraft, another thread or another connector is a new proposal. L2 is 'instruction is approval' (PRD 10.4, FR-HIL-05): instruction_id is the id of the earlier world.requested (web or mobile_web) or channel.message_in (whatsapp, from the owner's bound number) in this world in which the policy's owner asked for this action on this destination, never an email, and HR-7 links it beside the policy; each instruction is named by at most one policy.applied, so a cancelled send uses it up (OB-01); at L2 the destination is set and the undo window is at least 1 s. At L3 (a standing rule within its limits) instruction_id is null. Recipients stay in the outbox entry, never in an event.
+ * data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). There is no gate card on this path, so this event records what the engine assessed against the policy's scope: the connector, the destination (an opaque id, never an address), the district of the step, the tier, the undo window, and item pinned to its version (null when there is none). The outbox entry equals it on each (OB-05) and the policy's scope covers it (OB-01), so a redraft, another thread or another connector is a new proposal. L2 is 'instruction is approval' (PRD 10.4, FR-HIL-05): instruction_id is the id of the earlier world.requested (web or mobile_web) or channel.message_in (whatsapp, from the owner's bound number) in this world in which the policy's owner asked for this action on this destination, never an email, and HR-7 links it beside the policy; each instruction is named by at most one policy.applied, so a cancelled send uses it up (OB-01); at L2 the destination is set and the undo window is at least 1 s. At L3 (a standing rule within its limits) instruction_id is null. credits is what this action counts against the policy's daily credit limit (limits.credits, BQ-14): the metered credits of the step whose side effect it is, as known at authz.at (PRD 14.1); the event's own spend stays in the envelope's credits. The engine opens a send only while the policy's actions that UTC day in every world of its owner, this one included, stay within limits.per_day and their credits within limits.credits (OB-01, BQ-52). Recipients stay in the outbox entry, never in an event.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PolicyAppliedData".
@@ -1604,6 +1624,7 @@ export interface PolicyAppliedData {
   instruction_id: Ulid | null;
   undo_window_s: number;
   item: ArtifactRef | null;
+  credits: Credits;
 }
 /**
  * data of policy.changed (PRD 9.5). The owner created, edited or revoked a policy, or used Stop all autopilot, which sets every policy to L1 (one event per policy). Revoking also sets the policy to L1, as if it did not exist: it authorises nothing and its next send waits at a gate (FR-HIL-03). level is the level after the change and is appended to the policy's history, so a send after a revocation or Stop all is never covered, even if the owner raises the level again later (outbox OB-01, BQ-31). Only the policy's owner creates and changes it (PRD 10.1; a Team Lead only proposes), so authz is by person and authz.ref is the owner of the policy policy_id names (event rule EV-04, validator); the history entry the change appends has that owner as by (outbox OB-01).
@@ -2541,16 +2562,6 @@ export interface TeamLead {
   user: UserId;
   domain: Slug;
   assigned_by: TeamLeadAssignment;
-}
-/**
- * Who assigned the domain and when: only the owner assigns domains (PRD 16.2).
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "TeamLeadAssignment".
- */
-export interface TeamLeadAssignment {
-  by: UserId;
-  at: Timestamp;
 }
 
 /** Event registry constants from contracts/events/registry.yaml (FR-WLD-03). */

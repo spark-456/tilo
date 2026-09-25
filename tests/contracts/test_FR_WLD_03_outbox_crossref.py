@@ -3,10 +3,11 @@ the authorisation that was given.
 
 OB-01 and OB-05 (contracts/outbox.rules.md; harness validator, P0-09). OB-01: the entry's id is
 the outbox_id reserved for it; on a gate it was opened by an approval.resolved answering approve
-on that gate from someone who may open it (PRD 10.1: the world's owner, the Approver the gate
-names, or a Team Lead whose owner-assigned domain is the gate's while the owner's policy the gate
-names allows that domain; a T3 gate answered on WhatsApp also needs its PIN checked, SEC-06),
-otherwise by a policy.applied under a policy that covers it (action type and
+on that gate from someone who may open it (PRD 10.1: the world's owner, the Approver the owner
+assigned the gate to before the answer, or a Team Lead whose owner-assigned domain is the gate's
+while the owner's policy the gate names allows that domain; a T3 gate answered on WhatsApp also
+needs its PIN checked, SEC-06), otherwise by a policy.applied stamped by its policy under a policy
+that covers it (within its daily action and credit limits across the owner's worlds, and action type and
 undo window, created before and not expired, at the applied level when the send was authorised
 (its last history entry at or before authz.at, so not after a revocation or Stop all autopilot),
 owned by the world's owner and created and changed only by that owner (every history entry
@@ -67,16 +68,22 @@ def _pinned(item):
 
 
 def _opened(entry, reserved, auth) -> bool:
-    """OB-01: the event that opened the gate for this entry, and only that, authorised it."""
+    """OB-01: the event that opened the gate for this entry, and only that, authorised it. A
+    policy.applied is stamped by its policy (EV-06) and an approval.resolved by a person or Team
+    Lead (EV-04), checked here too so the reference check is never looser than the engine."""
     if auth is None or auth["authz"] != entry["authz"]:
         return False
     data = auth["data"]
     if data["outbox_id"] != entry["id"]:
         return False
     if reserved is None:
-        return auth["type"] == "policy.applied"
+        return auth["type"] == "policy.applied" and (auth["authz"]["by"], auth["authz"]["ref"]) == (
+            "policy",
+            data["policy_id"],
+        )
     return (
         auth["type"] == "approval.resolved"
+        and auth["authz"]["by"] in ("person", "team_lead")
         and data["option"] == "approve"
         and reserved["data"]["outbox_id"] == entry["id"]
         and (data["gate_id"], data["card_id"]) == (reserved["data"]["gate_id"], reserved["data"]["card_id"])
@@ -111,25 +118,35 @@ def _made_by_owner(policy) -> bool:
     return all(stamp["by"] == policy["owner"] for stamp in stamps if stamp is not None)
 
 
+def _assigned_by_owner(assignment, owner, at) -> bool:
+    """An Approver or a Team Lead's domain counts only as the world's owner assigned it, no later
+    than the answer (PRD 10.1, 16.2)."""
+    return assignment["by"] == owner and assignment["at"] <= at
+
+
 def _may_answer(gate, answer, owner, lead, policy) -> bool:
-    """OB-01, gate path (PRD 10.1): the world's owner, the Approver the gate names, or a Team Lead
-    whose domain the owner assigned before the answer (PRD 16.2), when the gate names that domain
-    and the owner's policy it names (same action type, in force) lists it. A Viewer, anyone else
-    or a Team Lead of another domain opens nothing. A T3 gate answered on WhatsApp also needs its
-    PIN checked (SEC-06)."""
-    authz, allowed = answer["authz"], gate["data"]["team_lead"]
+    """OB-01, gate path (PRD 10.1): the world's owner, the Approver the owner assigned the gate to
+    before the answer, or a Team Lead whose domain the owner assigned before the answer (PRD 16.2),
+    when the gate names that domain and the owner's policy it names (same action type, in force)
+    lists it. A Viewer, anyone else, an Approver someone else named (a Team Lead naming themself
+    included) or a Team Lead of another domain opens nothing. A T3 gate answered on WhatsApp also
+    needs its PIN checked (SEC-06)."""
+    authz, allowed, approver = answer["authz"], gate["data"]["team_lead"], gate["data"]["approver"]
     if gate["data"]["risk_tier"] == "T3" and answer["data"]["channel"] == "whatsapp":
         if not answer["data"]["pin_verified"]:
             return False
     if authz["by"] == "person":
-        return authz["ref"] in (owner, gate["data"]["approver"])
+        return authz["ref"] == owner or (
+            approver is not None
+            and approver["user"] == authz["ref"]
+            and _assigned_by_owner(approver["assigned_by"], owner, authz["at"])
+        )
     return (
         allowed is not None
         and lead is not None
         and policy is not None
         and (lead["id"], lead["domain"]) == (authz["ref"], allowed["domain"])
-        and lead["assigned_by"]["by"] == owner
-        and lead["assigned_by"]["at"] <= authz["at"]
+        and _assigned_by_owner(lead["assigned_by"], owner, authz["at"])
         and policy["id"] == allowed["policy_id"]
         and policy["owner"] == owner
         and _made_by_owner(policy)
@@ -159,6 +176,21 @@ def _instructed(entry, applied, level, policy, instruction, earlier) -> bool:
     )
 
 
+def _within_daily_limits(applied, policy, at, earlier) -> bool:
+    """OB-01, PI-11: the policy's actions on the UTC day of `at`, in every world of its owner,
+    this one included, stay within limits.per_day and their credits within limits.credits (null
+    does not restrict). Every earlier policy.applied under the policy counts, a cancelled one too."""
+    today = [
+        used["data"]
+        for used in earlier
+        if used["data"]["policy_id"] == applied["policy_id"] and used["authz"]["at"][:10] == at[:10]
+    ]
+    per_day, credits = policy["limits"]["per_day"], policy["limits"]["credits"]
+    return (per_day is None or len(today) + 1 <= per_day) and (
+        credits is None or sum(used["credits"] for used in today) + applied["credits"] <= credits
+    )
+
+
 def _policy_covers(entry, applied, policy, world_owner, instruction, earlier) -> bool:
     """OB-01, policy path: the policy named by policy_id covers this entry within its scope."""
     scope = policy["scope"]
@@ -173,6 +205,7 @@ def _policy_covers(entry, applied, policy, world_owner, instruction, earlier) ->
         and policy["created_by"]["at"] <= at
         and (policy["expiry"] is None or at < policy["expiry"])
         and _instructed(entry, applied, level, policy, instruction, earlier)
+        and _within_daily_limits(applied, policy, at, earlier)
         and applied["connector"] in scope["connectors"]
         and _within(scope["districts"], applied["district"])
         and all(
@@ -307,11 +340,28 @@ def test_FR_WLD_03_OB_01_every_authorisation_path_has_an_invalid_case(repo_root)
         "ob01_gate_approved_by_team_lead_policy_does_not_allow",
         "ob01_gate_approved_by_team_lead_assigned_by_someone_else",
         "ob01_t3_whatsapp_without_pin",
+        "ob01_gate_approved_by_approver_assigned_by_someone_else",
+        "ob01_gate_approved_by_approver_assigned_after_answer",
+        "ob01_gate_approved_by_team_lead_via_self_named_approver",
         "ob01_policy_send_stamped_as_person",
+        "ob01_policy_send_stamped_as_team_lead",
         "ob01_person_approved_send_stamped_as_policy",
         "ob01_transfer_stamped_other_than_entry",
     }
     assert required <= names, f"missing OB-01 cases {sorted(required - names)}"
+
+
+@pytest.mark.parametrize("by, ref", [("person", "u_owner"), ("team_lead", "tl_ops")])
+def test_FR_WLD_03_OB_01_policy_send_restamped_on_both_records_opens_nothing(repo_root, by, ref):
+    """Issue #21: a policy send is stamped by its policy (EV-06). Restamping both the entry and the
+    policy.applied as a person or a Team Lead must still fail OB-01 in the reference check itself,
+    not only in the per-event EV checks, so it is never looser than the engine."""
+    path = contracts_dir(repo_root) / "fixtures/outbox/crossref/valid/policy_l3_status_update_waiting.json"
+    case = load_json(path)
+    stamp = {"by": by, "ref": ref, "at": case["entry"]["authz"]["at"]}
+    case["entry"]["authz"] = dict(stamp)
+    case["authorised_by"]["authz"] = dict(stamp)
+    assert broken(case) == {"OB-01"}
 
 
 def test_FR_WLD_03_OB_01_OB_05_policy_path_has_an_invalid_case_per_binding(repo_root):
@@ -336,6 +386,8 @@ def test_FR_WLD_03_OB_01_OB_05_policy_path_has_an_invalid_case_per_binding(repo_
         "ob01_l2_instruction_by_email",
         "ob01_l2_world_requested_by_email",
         "ob01_l2_instruction_reused",
+        "ob01_policy_daily_limit_reached",
+        "ob01_policy_daily_credits_reached",
         "ob05_policy_undo_window_dropped",
         "ob05_policy_risk_tier_differs",
         "ob05_policy_thread_reply_sent_as_new_email",

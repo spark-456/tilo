@@ -56,7 +56,10 @@ silent the defaults below apply; each is logged as a BQ in `docs/open-questions.
    never one, since its sender is not authenticated (PRD 10.3: email answers questions only).
    Each instruction opens at most one entry, and a send cancelled in its undo window uses it
    up, so Undo is never followed by a redraft sent under the same words. L2 and L3 policies need a daily limit
-   (BQ-29, BQ-30). Revoking a policy and Stop all autopilot both set it to L1 (`policy.changed`
+   (BQ-29, BQ-30). `policy.applied` records in `credits` what the action counts against the
+   policy's `limits.credits` (the metered credits of its step); a policy's limits count its
+   actions on the UTC day of `authz.at` in every world of its owner, this one and a cancelled one
+   included (OB-01, BQ-52). Revoking a policy and Stop all autopilot both set it to L1 (`policy.changed`
    schema), recorded as a `history` entry; a policy send is checked against the level in force at
    `authz.at` (the last entry at or before it), never the record's current level (BQ-31). Only the policy's owner creates and changes it (PRD 10.1): `policy.changed`'s `authz.ref` is the owner (EV-04), and a record whose creation, last change or any history entry is by someone else covers nothing (OB-01). `artifact.delivered` is a notice, not a side effect: a format that leaves
    Tilo (email, Google Docs, Sheets or Slides) names its outbox entry and is caused by that

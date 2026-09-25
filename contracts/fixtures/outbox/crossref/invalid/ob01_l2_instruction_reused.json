@@ -50,7 +50,8 @@
       "item": {
         "artifact_id": "art_followup_reply",
         "version": 1
-      }
+      },
+      "credits": 2
     }
   },
   "policy": {
@@ -151,7 +152,8 @@
         "item": {
           "artifact_id": "art_followup_reply",
           "version": 1
-        }
+        },
+        "credits": 2
       }
     }
   ],
