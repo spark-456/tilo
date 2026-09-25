@@ -8,12 +8,13 @@ This ticket (P0-02) owns eleven of those fourteen (the CP0 set except
 event.schema.json). Each one must exist, be a valid JSON Schema 2020-12
 document, and follow the two conventions the ticket fixes for every file:
 `$id https://contracts.tilo.example/<name>.schema.json` and a top-level
-`"x-version": "1.0.0"`.
+`"x-version": "1.0.0"` at CP0, moving to 1.x.y with additive changes (PRD 15.2).
 """
 
 from __future__ import annotations
 
 import json
+import re
 
 import jsonschema
 import pytest
@@ -53,10 +54,12 @@ def test_FR_WLD_02_schema_id_matches_convention(repo_root, name):
 
 
 @pytest.mark.parametrize("name", SCHEMA_NAMES)
-def test_FR_WLD_02_schema_declares_x_version_1_0_0(repo_root, name):
+def test_FR_WLD_02_schema_declares_x_version_major_1(repo_root, name):
+    # PRD 15.2: additive changes are minor, so a frozen v1 schema is any 1.x.y
+    # (P0-02b moved providers to 1.1.0); a new major needs its own ADR and test.
     path = find_schema_path(repo_root, name)
     assert path.is_file(), f"FR-WLD-02: contracts/{name}.schema.json must exist first"
     schema = json.loads(path.read_text(encoding="utf-8"))
-    assert schema.get("x-version") == "1.0.0", (
-        f'FR-WLD-02: {name}.schema.json must declare a top-level "x-version": "1.0.0" (frozen v1, PRD 15.2 versioning)'
+    assert re.fullmatch(r"1\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", str(schema.get("x-version"))), (
+        f'FR-WLD-02: {name}.schema.json must declare a top-level "x-version" 1.x.y (frozen v1, PRD 15.2 versioning)'
     )
