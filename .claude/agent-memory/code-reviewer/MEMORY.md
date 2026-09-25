@@ -1,1 +1,5 @@
+- [API event emit patterns](api-event-emit-patterns.md) — derived run_id/seq in service-built events; max-length id probe
 - [Contracts review patterns](contracts-review-patterns.md) — probe cross-reference rules, rules.md numbering, drift-check probe technique
+- [Test vs API-doc conflicts](test-vs-api-doc-conflicts.md) — tests contradicting their API_*.md push builders into silent "repair" writes
+- [SE size overruns](se-session-size-overruns.md) — P8 tickets exceed 400 lines, ship unused helpers, undeclared package deps
+- [Outbox exactly-once probes](outbox-exactly-once-probes.md) — pending data.transfer unclaimed: reentrant-emit probe shows dup + out-of-order

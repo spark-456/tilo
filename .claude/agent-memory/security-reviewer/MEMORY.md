@@ -1,1 +1,6 @@
-- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); open: two tier sources
+- [API authz and redaction](api-authz-redaction.md): ST-3a r1 FAIL: no world-membership check on reads, Stop all aborts mid-loop, unvalidated pause channel
+- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r9 FAIL (approval.requested.approver has no owner assignment stamp); open: recipients [] scope
+- [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r3 FAIL; Pause all gated on stopped>0 records nothing; vis/target/data.district leak hidden D ids
+- [Policy engine P4-01](policy-engine-p4-01.md): r4 FAIL; future-stamped policy dropped lets overlapping policy run past a revocation
+- [Outbox ST-2](outbox-st2.md): r3 FAIL; pending data.transfer flushed by any instance with no claim (duplicates); sent+pending not one atomic write
+- [Provider secret handling](provider-secret-handling.md): P0-05 r11 PASS (7a0d1be); residual for P0-06: malformed 200 body raises raw pydantic error (echoed key truncated)

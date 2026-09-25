@@ -1,1 +1,6 @@
 - [Web stage attack patterns](web-stage-attack-patterns.md) — passive wheel error; canvas edges; modifier keys; timer-stopped ticker leaves stale grid
+- [Policy engine attack patterns](policy-engine-attack-patterns.md) — tier normalise/check drift, unicode \d timestamps, NaN caps
+- [API route attack patterns](api-route-attack-patterns.md) — kill-switch partial commit on unmapped policy, vis list leaks hidden ids, O(n) seq
+- [Eval harness recording validation](eval-harness-recording-validation.md) — fixes cover the repro only; fuzz every event field the runner reads
+- [Outbox attack patterns](outbox-attack-patterns.md) — unclaimed pending flush double-emits; lease expiry mid-send; foreign-config fails entries
+- [API kill-switch attack patterns](api-kill-switch-attack-patterns.md) — slow-failing writer blows 5 s under lock; revoke unguarded; shallow data redaction
