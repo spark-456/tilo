@@ -1,0 +1,5 @@
+# Stub for config/metering.yaml (contract change #7, batch CC-SE): the PRD 14.1 / 14.5 demo defaults.
+treasury: { reserve_margin: 0.15, request_at: 0.80 }
+caps: { run_credits: 300, user_day_credits: 1500, org_day_credits: null }
+spend: { daily_usd_soft: 15, daily_usd_hard: 25 }
+reconciliation: { tolerance: 0.10, billing_services: [] }
