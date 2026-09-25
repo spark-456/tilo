@@ -8,6 +8,7 @@ those land, so a route can never run unauthenticated, against no store, or write
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
@@ -66,6 +67,12 @@ class Store:
     # writer failure could not land (the level change itself is never rolled back). Flushed
     # oldest-first by the next mutating call that touches that world; a part leaves this dict
     # only once `append` returns for it, so it is written exactly once, never lost.
+    _dispatch_lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+    _dispatch_state: dict[tuple[str, str], object] = field(default_factory=dict, repr=False, compare=False)
+    # round-7 (ST-3a-3): every per-world lock and write consumer (tilo_api.dispatch) lives here,
+    # on the Store instance itself -- never a module-level dict keyed by world_id alone -- so two
+    # Store instances that happen to share a world_id string never share lock, queue or dedupe
+    # state (see test_FR_HIL_07_two_store_instances_for_the_same_world_id_share_no_queue_or_dedupe_state).
 
 
 class EventWriter(Protocol):

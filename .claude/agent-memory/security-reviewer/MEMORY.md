@@ -1,5 +1,5 @@
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); open: two tier sources
-- [ST-3a redaction and kill switch](st3a-redaction-killswitch.md): r4 FAIL (hidden names/counts via vis:"all" fixtures; kill switch locked behind writer I/O)
+- [ST-3a redaction and kill switch](st3a-redaction-killswitch.md): r6 FAIL; per-world writer pool duplicates/reorders parts, wedges after 8 hung writes
 - [API authz and redaction](api-authz-redaction.md): ST-3a r1 FAIL: no world-membership check on reads, Stop all aborts mid-loop, unvalidated pause channel
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r9 FAIL (approval.requested.approver has no owner assignment stamp); open: recipients [] scope
 - [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r3 FAIL; Pause all gated on stopped>0 records nothing; vis/target/data.district leak hidden D ids

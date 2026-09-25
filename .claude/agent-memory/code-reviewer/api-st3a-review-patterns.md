@@ -11,5 +11,7 @@ ST-3a (FR-HIL-07, FR-HIL-09, SEC-07) went 4+ review rounds; spec lives in servic
 - Round 4 spec added "revoke also flushes pending first"; builder did not add it. Always diff the spec's "as of round N" sentences against every route.
 - Source size keeps landing over 400 (routes+deps+events ~533 in round 4) because docstrings narrate review history ("round-4 fix (qa)...").
 
+- Round 6 (ST-3a-2): `_WorldChannel` used an 8-worker pool per world and `continue`d past a timed-out part, so later parts committed ahead of it (probe with LateSuccessEventWriter + 3 policies: committed pol_1, pol_2, pol_0). The late-success test only counted duplicates, never order. Dedupe was keyed by `id(part)` in a module-global dict that outlives Store instances.
+
 **Why:** each fix round targets the last finding and introduces a new invariant break.
 **How to apply:** on a re-review, grep the spec for "round N" and check each route, and check any new concurrency for per-stream ordering.
