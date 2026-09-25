@@ -276,9 +276,10 @@ supplies them.
 
 ## Live decisions read the record as it is (review round 3)
 
-`decide` is a live decision: a policy whose `created_by`, `changed_by` or any history entry is
-dated after `now` covers nothing (the clock is behind the record: a retry, a replay or skew), so a
-Stop all or revocation already in the record always gates. Reading a policy back to an earlier
+`decide` is a live decision: if any of the owner's policies for the action type has a
+`created_by`, `changed_by` or history stamp dated after `now` (or one that cannot be read), the
+whole decision gates (the clock is behind the record: a retry, a replay or skew), so a Stop all or
+revocation already in the record always gates, whatever other policy covers the send. Reading a policy back to an earlier
 level is `check_entry`'s job alone (a send made before a revocation stays covered, PI-13). Two
 records sharing an id gate, whether or not both cover the send. At L2 the instruction must be
 dated no earlier than the history entry that put the policy at the L2 level in force. With
