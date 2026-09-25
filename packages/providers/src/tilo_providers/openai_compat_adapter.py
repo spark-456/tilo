@@ -41,6 +41,7 @@ from tilo_providers.interfaces import Capability, GenerateRequest, GenerateRespo
 
 _CLEAN_TOKEN_RE = re.compile(r"^[\x21-\x7e]+$")  # printable ASCII, no whitespace or control characters
 _MAX_ERROR_MESSAGE_LEN = 500
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1"}
 
 
 class OpenAICompatModelProvider(ModelProvider):
@@ -56,6 +57,12 @@ class OpenAICompatModelProvider(ModelProvider):
         self._profile = profile
         self._profile_id = profile_id
         self._price = price
+
+        # The key rides in a header, so it only ever goes over TLS; plain
+        # http is allowed for loopback test servers only.
+        url = httpx.URL(base_url)
+        if not (url.scheme == "https" or (url.scheme == "http" and url.host in _LOOPBACK_HOSTS)):
+            raise ProviderError("PL-02: base_url must use https (plain http only for localhost/127.0.0.1)")
 
         api_key = os.environ.get(api_key_env)
         if not api_key:

@@ -21,7 +21,7 @@ from pathlib import Path
 from tilo_contracts import ProvidersProfile
 
 from tilo_providers.config import ProvidersConfig
-from tilo_providers.interfaces import ModelProvider
+from tilo_providers.interfaces import Capability, ModelProvider
 
 
 def build_provider(role_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str) -> ModelProvider:
@@ -40,7 +40,11 @@ def build_provider(role_id: str, config: ProvidersConfig, *, fixtures_dir: Path 
     from tilo_providers.replay import RecordReplayProvider  # noqa: PLC0415
 
     return RecordReplayProvider(
-        role=role_id, profile_id=profile_id, live_factory=live_factory, fixtures_dir=Path(fixtures_dir)
+        role=role_id,
+        profile_id=profile_id,
+        live_factory=live_factory,
+        fixtures_dir=Path(fixtures_dir),
+        capabilities={Capability(c) for c in profile.caps},
     )
 
 

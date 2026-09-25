@@ -31,6 +31,17 @@ def recording_key(role: str, profile_id: str, request: GenerateRequest) -> str:
     return hashlib.sha256(normalised.encode("utf-8")).hexdigest()[:16]
 
 
+def _join_chunks(chunks: list[GenerateResponse], profile_id: str) -> GenerateResponse:
+    """One recorded turn from a live stream: text concatenated, tool calls
+    collected, usage from the last chunk that reported it."""
+    texts = [c.text for c in chunks if c.text is not None]
+    tool_calls = [call for c in chunks for call in (c.tool_calls or [])]
+    usage = next((c.usage for c in reversed(chunks) if c.usage), None)
+    return GenerateResponse(
+        text="".join(texts) if texts else None, profile_id=profile_id, tool_calls=tool_calls or None, usage=usage
+    )
+
+
 class ReplayMissError(Exception):
     """No recording exists for a (role, profile, request) key. Record one
     with `LIVE=1 TILO_RECORD=1`, or use `tilo_providers.fake` for UI work."""
@@ -43,7 +54,9 @@ class RecordReplayProvider(ModelProvider):
         profile_id: str,
         live_factory: Callable[[], ModelProvider],
         fixtures_dir: Path | str,
+        capabilities: set[Capability] | None = None,
     ) -> None:
+        self._capabilities = frozenset(capabilities or ())
         self._role = role
         self._profile_id = profile_id
         self._live_factory = live_factory
@@ -85,10 +98,19 @@ class RecordReplayProvider(ModelProvider):
         )
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
-        # Recordings capture one full generate() turn; a streamed replay
-        # yields it as a single chunk rather than the live token-by-token
-        # shape (router ticket P0-06 owns true streamed recordings).
-        yield self.generate(request)
+        if not self._is_live():
+            # Recordings capture one full turn; a replayed stream yields it
+            # as a single chunk (router ticket P0-06 owns chunked recordings).
+            yield self.generate(request)
+            return
+
+        chunks: list[GenerateResponse] = []
+        for chunk in self._live().stream(request):
+            chunks.append(chunk)
+            yield chunk
+        if self._is_record():
+            key = recording_key(self._role, self._profile_id, request)
+            self._write_recording(self._path(key), key, _join_chunks(chunks, self._profile_id))
 
     def embed(self, request: object) -> object:
         raise NotImplementedError("EFF-01: record-and-replay embed lands with the router ticket P0-06")
@@ -97,7 +119,11 @@ class RecordReplayProvider(ModelProvider):
         return len(text.split())
 
     def capabilities(self) -> set[Capability]:
-        return set()
+        # Live: ask the real provider. Replay: the profile's declared caps,
+        # so no network client is built just to answer this.
+        if self._is_live():
+            return self._live().capabilities()
+        return set(self._capabilities)
 
     def price(self) -> PriceQuote:
         raise NotImplementedError("PL-06: price comes from ProvidersConfig.price(profile_id), not a provider")
