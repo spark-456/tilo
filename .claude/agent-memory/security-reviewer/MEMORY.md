@@ -1,7 +1,7 @@
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); P0-03 passed r10 (dd3d4b9); open: two tier sources; open for P4: recipients [] scope, credits self-declared
 - [Harness writer gaps](harness-writer-gaps.md): P0-09 r3 PASS, flagged: head counts + lease on client-facing world doc (10.1); ids `$` accepts trailing \n
-- [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r4 FAIL: card in >25-digit run unredacted; prefix-first window leaks; logs/JWT closed
-- [Skill checker gaps](skill-checker-gaps.md): FR-AGT-04 re-scope r1 FAIL (366f357): guard.check_bounds never wired into checkers; missing safety_flags = clean
+- [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r6 PASS (ae17c83) whole-PEM + "\n"-only reads; open: quoted private_key_id, PGP/list-split PEM
+- [Skill checker gaps](skill-checker-gaps.md): FR-AGT-04 re-scope r2 FAIL (d9aae2d): bounds fixed; reply checker checks only literal bcc/forward_to keys, drops non-str to/cc
 - [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r5 FAIL (7a3051c); malformed scope 500s Stop all after pending pop, pause lost; dup parts on timeout
 - [Policy engine P4-01](policy-engine-p4-01.md): r9 PASS (c7569a9); open: FEFF in scope email, level!=history drop (5d), invisible BOM in regex
 - [Outbox ST-2](outbox-st2.md): r5 PASS (2ff085b); open: writer must ack dup transfer, durable adapter dedupe, store authz/server time
