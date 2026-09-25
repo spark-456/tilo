@@ -1,1 +1,2 @@
-- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); open: two tier sources
+- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r9 FAIL (approval.requested.approver has no owner assignment stamp); open: recipients [] scope
+- [Provider secret handling](provider-secret-handling.md): P0-05 r4-r8 red only on contract-blocked test (r5-r8 same head ca3157b; merge P0-02b first); P0-02b PASS (nvapi pattern added); loader must hand-enforce openai_compat-only fields
