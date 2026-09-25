@@ -12,6 +12,21 @@ import re
 _NUMBER_RE = re.compile(r"\d[\d,]*\.?\d*")
 
 
+def _normalize_number(token: str) -> str:
+    """Strip thousands separators so "1,500" and "1500" compare equal."""
+    return token.replace(",", "").strip()
+
+
+def _numbers(text: str) -> set[str]:
+    """Whole, normalised number tokens found in text.
+
+    Used for set-membership comparison, never substring comparison: a raw
+    substring test ("n in source_text") would let a fabricated "50" pass
+    because it sits inside a genuine "1500" in the source text.
+    """
+    return {_normalize_number(n) for n in _NUMBER_RE.findall(text)}
+
+
 def _word_count(text: str) -> int:
     return len(text.split())
 
@@ -35,7 +50,7 @@ def check(inputs: dict, output: dict) -> list[dict]:
         for m in material
         if isinstance(m, dict) and isinstance(m.get("source_id"), str) and isinstance(m.get("text"), str)
     }
-    all_material_text = " ".join(material_by_id.values())
+    all_material_numbers = _numbers(" ".join(material_by_id.values()))
 
     findings: list[dict] = []
     if not answer_first.strip():
@@ -43,8 +58,7 @@ def check(inputs: dict, output: dict) -> list[dict]:
             {"check": "answer-first-missing", "detail": "answer_first must lead with the answer, not be empty"}
         )
 
-    answer_first_numbers = _NUMBER_RE.findall(answer_first)
-    if any(n not in all_material_text for n in answer_first_numbers):
+    if not _numbers(answer_first) <= all_material_numbers:
         findings.append(
             {
                 "check": "number-not-traceable",
@@ -68,8 +82,7 @@ def check(inputs: dict, output: dict) -> list[dict]:
                 {"check": "claim-missing-source", "detail": f"claims[{i}] cites unknown source {claim['source_id']!r}"}
             )
             continue
-        numbers = _NUMBER_RE.findall(claim["text"])
-        if any(n not in source_text for n in numbers):
+        if not _numbers(claim["text"]) <= _numbers(source_text):
             findings.append(
                 {"check": "number-not-traceable", "detail": f"claims[{i}] has a number not present in its cited source"}
             )

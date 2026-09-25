@@ -61,7 +61,11 @@ UNTRUSTED_READER_CASE_IDS = [skill_case_id(p) for p in UNTRUSTED_READER_SKILLS]
 # action_type substrings counted as a side effect for privilege separation (ticket
 # brief: "no send, share, delete or pay action ... send, share, delete, pay, forward,
 # post, upload"). Matched as a substring of the action_type slug (e.g. "send_email").
-SIDE_EFFECT_TOKENS = ("send", "share", "delete", "pay", "forward", "post", "upload")
+# "draft" is included too (fix round 2, security-reviewer): a drafting tool such as
+# draft_email still writes a record (PRD's canonical risk-tier table lists
+# create_draft as T1), so it is still a side effect an untrusted-content reader must
+# not get, even though it never sends anything.
+SIDE_EFFECT_TOKENS = ("send", "share", "delete", "pay", "forward", "post", "upload", "draft")
 
 # SKILL.md exact level-2 section headings (ticket brief; folder shape PRD 8.2).
 REQUIRED_SKILL_MD_HEADINGS = ["When to use", "Steps", "Quality bar", "Checklist", "Pitfalls"]

@@ -24,7 +24,8 @@
         "status": "unknown",
         "source_ids": ["src-1"]
       }
-    ]
+    ],
+    "flags": []
   },
   "expect": {
     "fail": "unknown-has-no-citation"

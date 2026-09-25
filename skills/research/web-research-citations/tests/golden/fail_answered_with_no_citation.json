@@ -24,7 +24,8 @@
         "status": "answered",
         "source_ids": []
       }
-    ]
+    ],
+    "flags": []
   },
   "expect": {
     "fail": "citation-required"

@@ -39,6 +39,7 @@ outputs:
   additionalProperties: false
   required:
     - findings
+    - flags
   properties:
     findings:
       type: array
@@ -62,4 +63,8 @@ outputs:
             type: array
             items:
               type: string
+    flags:
+      type: array
+      items:
+        type: string
 description: Answer a question from supplied sources, citing every claim and marking unanswerable parts unknown.

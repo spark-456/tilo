@@ -7,6 +7,17 @@ module can return.
 
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
+
+# A bound on any single price, rate or unit_count. The input schema types
+# each as an unbounded JSON `number`, so a schema-valid input can still carry
+# an absurd value (round 2, qa-breaker: the same class of bug as invoice
+# quantities). Plain float arithmetic on such a value can raise OverflowError
+# ("int too large to convert to float"); a value this size is not a real
+# price either way, so it is treated as unusable input rather than silently
+# computed with.
+_MAX_MAGNITUDE = Decimal("1e12")
+
 _OPS = {
     "eq": lambda a, b: a == b,
     "gte": lambda a, b: _both_numeric(a, b) and a >= b,
@@ -26,6 +37,18 @@ def _both_numeric(a: object, b: object) -> bool:
     )
 
 
+def _dec(value: object) -> Decimal | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        dec = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    if not dec.is_finite() or dec.copy_abs() > _MAX_MAGNITUDE:
+        return None
+    return dec
+
+
 def _meets_requirements(offer: object, requirements: list) -> bool:
     if not isinstance(offer, dict):
         return False
@@ -33,8 +56,12 @@ def _meets_requirements(offer: object, requirements: list) -> bool:
         if not isinstance(req, dict):
             return False
         field, op, value = req.get("field"), req.get("op"), req.get("value")
+        # op/field could be any JSON type (e.g. a list), which is unhashable
+        # and would raise on a dict lookup or `in` a dict — check first.
+        if not isinstance(op, str):
+            return False
         fn = _OPS.get(op)
-        if fn is None or field not in offer:
+        if fn is None or not isinstance(field, str) or field not in offer:
             return False
         if not fn(offer.get(field), value):
             return False
@@ -53,10 +80,21 @@ def check(inputs: dict, output: dict) -> list[dict]:
     rates = inputs.get("rates") if isinstance(inputs.get("rates"), dict) else {}
     target_currency = inputs.get("currency")
     requirements = inputs.get("requirements") if isinstance(inputs.get("requirements"), list) else []
-    offers_by_id = {o.get("offer_id"): o for o in offers if isinstance(o, dict)}
+    offers_by_id = {o.get("offer_id"): o for o in offers if isinstance(o, dict) and isinstance(o.get("offer_id"), str)}
 
     findings: list[dict] = []
-    computed: dict[str, float] = {}
+    for offer_id, offer in offers_by_id.items():
+        for field in ("price", "unit_count"):
+            raw = offer.get(field)
+            if raw is not None and _dec(raw) is None:
+                findings.append(
+                    {
+                        "check": "input-malformed",
+                        "detail": f"offer {offer_id!r} {field} {raw!r} is not a usable number",
+                    }
+                )
+
+    computed: dict[str, Decimal] = {}
     for i, up in enumerate(unit_prices):
         if not isinstance(up, dict):
             findings.append({"check": "output-malformed", "detail": f"unit_prices[{i}] is not an object"})
@@ -74,28 +112,24 @@ def check(inputs: dict, output: dict) -> list[dict]:
             and up.get("currency") == target_currency
         )
 
-        expected = None
+        expected: Decimal | None = None
         if offer is not None:
-            price, currency, unit_count = offer.get("price"), offer.get("currency"), offer.get("unit_count")
-            rate = rates.get(currency)
-            if (
-                isinstance(price, (int, float))
-                and not isinstance(price, bool)
-                and isinstance(rate, (int, float))
-                and not isinstance(rate, bool)
-                and isinstance(unit_count, (int, float))
-                and not isinstance(unit_count, bool)
-                and unit_count
-            ):
-                expected = (price * rate) / unit_count
+            price_dec = _dec(offer.get("price"))
+            rate_dec = _dec(rates.get(offer.get("currency"))) if isinstance(offer.get("currency"), str) else None
+            unit_count_dec = _dec(offer.get("unit_count"))
+            if price_dec is not None and rate_dec is not None and unit_count_dec:
+                try:
+                    expected = (price_dec * rate_dec) / unit_count_dec
+                except (InvalidOperation, ArithmeticError):
+                    expected = None
 
-        declared = up.get("unit_price")
-        value_ok = (
-            expected is not None
-            and isinstance(declared, (int, float))
-            and not isinstance(declared, bool)
-            and round(declared, 6) == round(expected, 6)
-        )
+        declared_dec = _dec(up.get("unit_price"))
+        value_ok = False
+        if expected is not None and declared_dec is not None:
+            try:
+                value_ok = abs(declared_dec - expected) <= Decimal("0.000001")
+            except (InvalidOperation, ArithmeticError):
+                value_ok = False
         if not (source_ok and value_ok):
             findings.append(
                 {
@@ -103,8 +137,8 @@ def check(inputs: dict, output: dict) -> list[dict]:
                     "detail": f"unit_prices[{i}] for offer {offer_id!r} does not recompute from the offer and rates",
                 }
             )
-        elif offer is not None:
-            computed[offer_id] = declared
+        elif offer is not None and declared_dec is not None:
+            computed[offer_id] = declared_dec
 
     qualifying = [oid for oid, offer in offers_by_id.items() if _meets_requirements(offer, requirements)]
     priced_qualifying = [(oid, computed[oid]) for oid in qualifying if oid in computed]

@@ -24,7 +24,8 @@
         "status": "answered",
         "source_ids": [["src-1"]]
       }
-    ]
+    ],
+    "flags": []
   },
   "expect": {
     "fail": "citation-known-source"

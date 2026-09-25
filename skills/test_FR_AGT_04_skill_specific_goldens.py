@@ -147,6 +147,111 @@ def test_FR_AGT_04_executive_summary_check_does_not_raise_on_non_string_material
     assert findings, "a claim citing a source whose text is not a string must fail closed, not be silently trusted"
 
 
+def test_FR_AGT_04_price_comparison_check_does_not_raise_on_non_string_requirement_field():
+    """FR-AGT-04 fix round 2 (qa-breaker): check() must never raise, even when a
+    caller hands it inputs that do not conform to the skill's own input schema
+    (requirements[].field/op are typed string in skill.yaml, so a schema-valid
+    golden fixture cannot express this). Previously a non-string field or op
+    could raise TypeError (unhashable) inside `_OPS.get(op)` / `field not in
+    offer`, since only string ids were ever expected there."""
+    module = import_check_module("commerce", "price-comparison")
+
+    inputs = {
+        "item": "20L backpack",
+        "requirements": [{"field": ["waterproof"], "op": ["eq"], "value": True}],  # malformed: not strings
+        "currency": "USD",
+        "rates": {"USD": 1.0},
+        "offers": [
+            {
+                "offer_id": "o1",
+                "source_id": "src-1",
+                "price": 29.0,
+                "currency": "USD",
+                "unit_count": 1,
+                "waterproof": True,
+            }
+        ],
+    }
+    output = {
+        "unit_prices": [
+            {"offer_id": "o1", "unit_price": 29.0, "currency": "USD", "source_id": "src-1"},
+        ],
+        "pick": None,
+    }
+
+    findings = module.check(inputs, output)
+    assert isinstance(findings, list)
+
+
+def test_FR_AGT_04_quote_comparison_check_does_not_raise_on_non_string_requirement_id():
+    """FR-AGT-04 fix round 2 (qa-breaker): check() must never raise on a
+    non-string requirement_id or quote_id in inputs (both typed string in
+    skill.yaml, so unreachable via a schema-valid golden fixture, but a
+    caller that bypasses schema validation must still get a fail-closed
+    result, not a TypeError from an unhashable dict/tuple key)."""
+    module = import_check_module("commerce", "quote-comparison")
+
+    inputs = {
+        "requirements": [{"requirement_id": ["r1"], "must_have": True}],  # malformed: not a string
+        "quotes": [
+            {
+                "quote_id": ["q1"],  # malformed: not a string
+                "source_id": "src-q1",
+                "line_items": [{"description": "widget", "quantity": 1, "unit_price": 1.0}],
+                "meets": {},
+            }
+        ],
+    }
+    output = {"coverage_matrix": [], "totals": [], "recommendation": None}
+
+    findings = module.check(inputs, output)
+    assert isinstance(findings, list)
+
+
+def test_FR_AGT_04_verification_checklist_check_does_not_raise_on_non_string_claim_id():
+    """FR-AGT-04 fix round 2 (qa-breaker): check() must never raise on a
+    non-string claim_id or evidence source_id in inputs (both typed string in
+    skill.yaml, so unreachable via a schema-valid golden fixture)."""
+    module = import_check_module("quality", "verification-checklist")
+
+    inputs = {
+        "deliverable_claims": [{"claim_id": ["c1"], "text": "Revenue grew."}],  # malformed: not a string
+        "evidence": [{"source_id": ["src-1"], "text": "Annual report."}],  # malformed: not a string
+    }
+    output = {"verdicts": []}
+
+    findings = module.check(inputs, output)
+    assert isinstance(findings, list)
+
+
+def test_FR_AGT_04_deck_writing_check_does_not_raise_on_non_string_material_source_id():
+    """FR-AGT-04 fix round 2 (qa-breaker): check() must never raise on a
+    non-string material source_id, or on material text that is not a string
+    (e.g. a NaN float slipping past a caller that bypasses schema
+    validation) — both typed string in skill.yaml, so unreachable via a
+    schema-valid golden fixture."""
+    module = import_check_module("writing", "deck-writing")
+
+    inputs = {
+        "material": [
+            {"source_id": ["src-1"], "text": "Revenue reached 100 units."},  # malformed: id not a string
+            {"source_id": "src-2", "text": float("nan")},  # malformed: text not a string
+        ],
+        "max_slides": 3,
+    }
+    output = {
+        "slides": [
+            {
+                "title": "Overview",
+                "bullets": [{"text": "We sold 100 units.", "source_id": "src-1"}],
+            }
+        ]
+    }
+
+    findings = module.check(inputs, output)
+    assert isinstance(findings, list)
+
+
 def test_FR_AGT_04_price_comparison_picking_offer_that_misses_requirement_fails():
     """Ticket brief (commerce/price-comparison): 'the pick is the cheapest offer
     that meets every stated requirement.' Picking a cheaper offer that fails a

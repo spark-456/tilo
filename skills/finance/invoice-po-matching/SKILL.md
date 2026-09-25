@@ -23,6 +23,7 @@ Use this skill to match an invoice's lines against a purchase order's lines by i
 - `quantity-outside-tolerance-not-flagged`: a pair marked matched must be within the stated quantity tolerance.
 - `total-not-recomputed`: invoice_total and po_total must equal the exact recomputed sum of quantity times unit price.
 - `unexpected-approval-field`: the output must never carry an approval, payment or authorisation field.
+- `input-malformed`: a line's quantity or unit_price that cannot be used as a bounded, finite number (the input schema allows any JSON number, including an absurd one such as a 400-digit quantity) fails closed instead of being computed with.
 - `output-malformed`: the output must be an object with matches, invoice_total and po_total; malformed shapes fail closed.
 
 ## Checklist
@@ -41,3 +42,4 @@ Use this skill to match an invoice's lines against a purchase order's lines by i
 - Marking two lines matched because the amounts look close, without actually comparing items or checking the tolerance.
 - Rounding the recomputed total for a "cleaner" number, which breaks exact-match totals.
 - Adding a convenience "approved" or "ready_to_pay" flag — this skill only matches; it never authorises payment.
+- Passing through a wildly out-of-range quantity or price unquestioned — a schema-valid number can still be absurd (for example a 400-digit quantity); treat it as unusable input, not as a real value to compute with.

@@ -27,16 +27,45 @@ _INJECTION_RE = re.compile(
     re.IGNORECASE,
 )
 
-# A "new commitment" (PRD 11.4: money, date, deliverable) that must trace back
-# to the instruction: times, weekdays, calendar dates and money amounts
-# (symbols and common 3-letter currency codes) in the drafted body.
+# A "new commitment" (PRD 11.4: money, date, deliverable) that must trace
+# back to the instruction. Built per class of phrasing, not per literal
+# example, so a differently-worded but equally concrete commitment is still
+# caught. Money/date/time classes covered (fix round 2, security-reviewer):
+#   - am/pm times ("4pm", "4:30pm") and 24-hour times ("16:00")
+#   - relative dates/times ("tomorrow", "today", "tonight", "noon", "midnight")
+#   - "next <week/month/weekday>" and "this <week/weekend/month>"
+#   - weekday names ("Thursday")
+#   - ISO dates ("2026-10-15") and slash dates ("15/10/2026")
+#   - month-name dates, either order ("15 October", "October 15")
+#   - symbol currencies, including the rupee sign ($, €, £, ¥, ₹)
+#   - 3-letter currency codes, either side of the amount ("500 usd", "usd 500")
+#   - worded currencies ("500 dollars", "5000 rupees", "Rs 5000")
+# A promised deliverable ("I will send the signed contract") is not
+# mechanically detected here — see SKILL.md "Quality bar" for why that class
+# is left to the Verifier's semantic review (FR-AGT-12) instead.
+_MONTHS = r"january|february|march|april|may|june|july|august|september|october|november|december"
+_WEEKDAYS = r"monday|tuesday|wednesday|thursday|friday|saturday|sunday"
+_MONEY_WORD = r"dollars?|rupees?|euros?|pounds?|yen"
+_CCY_CODE = r"usd|eur|gbp|jpy|inr|cad|aud"
 _COMMITMENT_RE = re.compile(
-    r"\b\d{1,2}(?::\d{2})?\s?(?:am|pm)\b"
-    r"|[$€£¥]\s?\d[\d,]*(?:\.\d+)?"
-    r"|\b\d[\d,]*(?:\.\d+)?\s?(?:usd|eur|gbp|jpy|inr|cad|aud)\b"
-    r"|\b(?:usd|eur|gbp|jpy|inr|cad|aud)\s?\d[\d,]*(?:\.\d+)?\b"
-    r"|\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b"
-    r"|\b\d{4}-\d{2}-\d{2}\b",
+    r"\b\d{1,2}(?::\d{2})?\s?(?:am|pm)\b"  # 4pm, 4:30pm
+    r"|\b(?:[01]\d|2[0-3]):[0-5]\d\b"  # 16:00 (24-hour)
+    r"|[$€£¥₹]\s?\d[\d,]*(?:\.\d+)?"  # symbol currency, incl. rupee
+    r"|\b(?:rs\.?|inr)\s?\d[\d,]*(?:\.\d+)?\b"  # Rs 5000
+    r"|\b\d[\d,]*(?:\.\d+)?\s?(?:" + _CCY_CODE + r")\b"
+    r"|\b(?:" + _CCY_CODE + r")\s?\d[\d,]*(?:\.\d+)?\b"
+    r"|\b\d[\d,]*(?:\.\d+)?\s?(?:" + _MONEY_WORD + r")\b"  # 500 dollars
+    r"|\b(?:" + _WEEKDAYS + r")\b"
+    r"|\b\d{4}-\d{2}-\d{2}\b"  # ISO date
+    r"|\b\d{1,2}/\d{1,2}/\d{2,4}\b"  # slash date
+    r"|\b\d{1,2}(?:st|nd|rd|th)?\s+(?:" + _MONTHS + r")\b"  # 15 October
+    r"|\b(?:" + _MONTHS + r")\s+\d{1,2}(?:st|nd|rd|th)?\b"  # October 15
+    r"|\b(?:tomorrow|today|tonight|yesterday|noon|midnight)\b"
+    r"|\bnext\s+(?:" + _WEEKDAYS + r")\b",  # "next Friday" names one specific day;
+    # deliberately not "next/this week/month" — too vague a span to be a
+    # concrete commitment, and "this week" in particular collides with
+    # ordinary subject lines like "Re: Meeting this week?" that carry no
+    # new commitment at all.
     re.IGNORECASE,
 )
 
@@ -129,13 +158,18 @@ def check(inputs: dict, output: dict) -> list[dict]:
 
     instruction = inputs.get("instruction") if isinstance(inputs.get("instruction"), str) else ""
     instruction_tokens = {_normalize_commitment(m.group(0)) for m in _COMMITMENT_RE.finditer(instruction)}
-    for match in _COMMITMENT_RE.finditer(body):
+    drafted_subject = output.get("subject") if isinstance(output.get("subject"), str) else ""
+    # The commitment scan covers the drafted subject as well as the body: a
+    # date or amount slipped into "Re: Meeting - $5,000 agreed" is just as
+    # much a new commitment as one written into the body.
+    drafted_text = f"{drafted_subject} {body}"
+    for match in _COMMITMENT_RE.finditer(drafted_text):
         token = match.group(0)
         if _normalize_commitment(token) not in instruction_tokens:
             findings.append(
                 {
                     "check": "new-commitment-not-in-instruction",
-                    "detail": f"body commits to {token!r} which is not present in the instruction",
+                    "detail": f"draft commits to {token!r} which is not present in the instruction",
                 }
             )
     return findings

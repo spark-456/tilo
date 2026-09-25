@@ -11,14 +11,51 @@ from decimal import Decimal, InvalidOperation
 
 _DISALLOWED_KEYS = {"approved", "approved_for_payment", "payment_status", "paid", "authorization", "authorisation"}
 
+# A bound on any single quantity or unit_price. The input schema types both
+# as an unbounded JSON `number`, so a schema-valid input can still carry an
+# absurd value (round 2, qa-breaker: a 400-digit quantity). Plain float
+# arithmetic on such a value can raise OverflowError ("integer division
+# result too large for a float"); Decimal never raises for magnitude alone,
+# but a value this size is not a real invoice or PO quantity either way, so
+# it is treated as unusable input rather than silently computed with.
+_MAX_MAGNITUDE = Decimal("1e12")
+
 
 def _dec(value: object) -> Decimal | None:
     if isinstance(value, bool):
         return None
     try:
-        return Decimal(str(value))
+        dec = Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
         return None
+    if not dec.is_finite() or dec.copy_abs() > _MAX_MAGNITUDE:
+        return None
+    return dec
+
+
+def _malformed_numeric_findings(lines: object, label: str) -> list[dict]:
+    """input-malformed findings for any present quantity/unit_price that
+    cannot be used as a bounded, finite Decimal — without ever raising."""
+    out: list[dict] = []
+    if not isinstance(lines, list):
+        return out
+    for line in lines:
+        if not isinstance(line, dict):
+            continue
+        raw_line_id = line.get("line_id")
+        line_id = raw_line_id if isinstance(raw_line_id, str) else "?"
+        for field in ("quantity", "unit_price"):
+            raw = line.get(field)
+            if raw is None:
+                continue
+            if _dec(raw) is None:
+                out.append(
+                    {
+                        "check": "input-malformed",
+                        "detail": f"{label} line {line_id!r} {field} {raw!r} is not a usable number",
+                    }
+                )
+    return out
 
 
 def check(inputs: dict, output: dict) -> list[dict]:
@@ -44,12 +81,23 @@ def check(inputs: dict, output: dict) -> list[dict]:
     po = inputs.get("purchase_order") if isinstance(inputs.get("purchase_order"), dict) else {}
     inv_lines_raw = invoice.get("lines") if isinstance(invoice.get("lines"), list) else []
     po_lines_raw = po.get("lines") if isinstance(po.get("lines"), list) else []
-    inv_lines = {line.get("line_id"): line for line in inv_lines_raw if isinstance(line, dict)}
-    po_lines = {line.get("line_id"): line for line in po_lines_raw if isinstance(line, dict)}
-    tolerance_pct = inputs.get("quantity_tolerance_pct")
-    tolerance_pct = (
-        tolerance_pct if isinstance(tolerance_pct, (int, float)) and not isinstance(tolerance_pct, bool) else 0
-    )
+    findings.extend(_malformed_numeric_findings(inv_lines_raw, "invoice"))
+    findings.extend(_malformed_numeric_findings(po_lines_raw, "purchase order"))
+    # line_id could be any JSON type (e.g. a list), which is unhashable and
+    # would raise building this dict — only a string line_id is a usable key.
+    inv_lines = {
+        line.get("line_id"): line
+        for line in inv_lines_raw
+        if isinstance(line, dict) and isinstance(line.get("line_id"), str)
+    }
+    po_lines = {
+        line.get("line_id"): line
+        for line in po_lines_raw
+        if isinstance(line, dict) and isinstance(line.get("line_id"), str)
+    }
+    tolerance_dec = _dec(inputs.get("quantity_tolerance_pct"))
+    if tolerance_dec is None:
+        tolerance_dec = Decimal(0)
 
     inv_line_id_counts: dict[str, int] = {}
     po_line_id_counts: dict[str, int] = {}
@@ -96,25 +144,29 @@ def check(inputs: dict, output: dict) -> list[dict]:
                 findings.append(
                     {"check": "item-mismatch-not-flagged", "detail": f"matches[{i}] items differ but is marked matched"}
                 )
-            inv_qty, po_qty = inv_line.get("quantity"), po_line.get("quantity")
-            if (
-                isinstance(inv_qty, (int, float))
-                and not isinstance(inv_qty, bool)
-                and isinstance(po_qty, (int, float))
-                and not isinstance(po_qty, bool)
-                and po_qty
-            ):
-                diff_pct = abs(inv_qty - po_qty) / abs(po_qty) * 100
-                if diff_pct > tolerance_pct:
+            inv_qty_dec = _dec(inv_line.get("quantity"))
+            po_qty_dec = _dec(po_line.get("quantity"))
+            if inv_qty_dec is not None and po_qty_dec is not None and po_qty_dec != 0:
+                try:
+                    diff_pct = abs(inv_qty_dec - po_qty_dec) / abs(po_qty_dec) * 100
+                except (InvalidOperation, ArithmeticError):
                     findings.append(
                         {
-                            "check": "quantity-outside-tolerance-not-flagged",
-                            "detail": (
-                                f"matches[{i}] quantity differs by {diff_pct:.2f}% beyond the "
-                                f"{tolerance_pct}% tolerance but is marked matched"
-                            ),
+                            "check": "input-malformed",
+                            "detail": f"matches[{i}] quantity values are too extreme to compare exactly",
                         }
                     )
+                else:
+                    if diff_pct > tolerance_dec:
+                        findings.append(
+                            {
+                                "check": "quantity-outside-tolerance-not-flagged",
+                                "detail": (
+                                    f"matches[{i}] quantity differs by {diff_pct:.2f}% beyond the "
+                                    f"{tolerance_dec}% tolerance but is marked matched"
+                                ),
+                            }
+                        )
 
     for line_id in inv_lines:
         count = inv_line_id_counts.get(line_id, 0)

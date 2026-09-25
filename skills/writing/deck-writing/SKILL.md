@@ -19,7 +19,7 @@ Use this skill to turn already-verified material (for example a Verifier-checked
 
 - `slide-count-within-limit`: the number of slides must not exceed the requested max_slides.
 - `title-too-long`: every slide title must be 60 characters or fewer.
-- `number-has-source`: every number in a bullet must appear, verbatim, in the material passage its bullet cites.
+- `number-has-source`: every number in a bullet must appear, as a whole number (not a substring of a larger number), in the material passage its bullet cites; every number in a slide title must appear, as a whole number, somewhere in the supplied material (a title has no source_id of its own, so it is checked against the whole material corpus).
 - `chart-not-drawn`: a chart_ref must cite a supplied source and hold only a data reference, never drawing data (PRD 12.4: charts are rendered from data by code, never drawn by a model).
 - `output-malformed`: the output must be an object with a slides array of title/bullets objects; malformed shapes fail closed.
 
@@ -27,7 +27,7 @@ Use this skill to turn already-verified material (for example a Verifier-checked
 
 - [ ] Slide count is within the requested limit.
 - [ ] Every title is 60 characters or fewer.
-- [ ] Every numbered bullet cites a source that contains that exact number.
+- [ ] Every numbered bullet cites a source that contains that exact number, and every numbered title is traceable to the material (checked as a whole number, never a substring — "50" must never pass just because it sits inside "1500").
 - [ ] Any chart is a data reference only, never a model-drawn image.
 - [ ] Nothing on a slide is unsupported by the material.
 

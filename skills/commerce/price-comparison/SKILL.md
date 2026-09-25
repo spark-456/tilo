@@ -19,6 +19,7 @@ Use this skill to compare several supplied offers for the same item and recommen
 - `unit-price-mismatch`: every unit price must exactly recompute from the offer's price, currency, rate and unit count, and cite the offer's own source id and the target currency.
 - `pick-meets-requirements`: the picked offer must satisfy every stated requirement.
 - `pick-is-cheapest-qualifying`: the pick must be the cheapest offer that qualifies; if none qualify, pick must be null.
+- `input-malformed`: an offer's price or unit_count that cannot be used as a bounded, finite number (the input schema allows any JSON number, including an absurd one) fails closed instead of being computed with.
 - `output-malformed`: the output must be an object with a unit_prices array and a pick; malformed shapes fail closed.
 
 ## Checklist
@@ -35,3 +36,4 @@ Use this skill to compare several supplied offers for the same item and recommen
 - Silently dropping a requirement the cheapest offer fails, instead of disqualifying it.
 - Using a rate not present in `inputs.rates`, or converting in the wrong direction.
 - Returning a pick with no qualifying offer instead of null.
+- Passing through a wildly out-of-range price or unit_count unquestioned — a schema-valid number can still be absurd; treat it as unusable input, not as a real value to compute with.

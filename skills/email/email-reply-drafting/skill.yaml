@@ -5,7 +5,6 @@ author: Tilo build (drafted by Claude Code)
 reviewer: Pending domain expert review
 tools_allowed:
   - read_email
-  - draft_email
 inputs:
   type: object
   additionalProperties: false

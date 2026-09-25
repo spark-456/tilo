@@ -1,0 +1,19 @@
+{
+  "input": {
+    "question": "How many units did we sell?",
+    "material": [
+      {
+        "source_id": "src-1",
+        "text": "Revenue reached 1500 units in Q3."
+      }
+    ],
+    "max_words": 40
+  },
+  "output": {
+    "answer_first": "We sold 50 units this quarter.",
+    "claims": []
+  },
+  "expect": {
+    "fail": "number-not-traceable"
+  }
+}

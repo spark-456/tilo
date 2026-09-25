@@ -20,8 +20,11 @@ def check(inputs: dict, output: dict) -> list[dict]:
     inputs = inputs if isinstance(inputs, dict) else {}
     claims = inputs.get("deliverable_claims") if isinstance(inputs.get("deliverable_claims"), list) else []
     evidence = inputs.get("evidence") if isinstance(inputs.get("evidence"), list) else []
-    claim_ids = {c.get("claim_id") for c in claims if isinstance(c, dict)}
-    evidence_ids = {e.get("source_id") for e in evidence if isinstance(e, dict)}
+    # claim_id/source_id could each be any JSON type (e.g. a list), which is
+    # unhashable and would raise building these sets — only a string id is
+    # usable as a set member here.
+    claim_ids = {c.get("claim_id") for c in claims if isinstance(c, dict) and isinstance(c.get("claim_id"), str)}
+    evidence_ids = {e.get("source_id") for e in evidence if isinstance(e, dict) and isinstance(e.get("source_id"), str)}
 
     findings: list[dict] = []
     seen: dict[object, int] = {}

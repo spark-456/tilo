@@ -30,20 +30,33 @@ def check(inputs: dict, output: dict) -> list[dict]:
     inputs = inputs if isinstance(inputs, dict) else {}
     requirements = inputs.get("requirements") if isinstance(inputs.get("requirements"), list) else []
     quotes = inputs.get("quotes") if isinstance(inputs.get("quotes"), list) else []
-    must_have_ids = {r.get("requirement_id") for r in requirements if isinstance(r, dict) and r.get("must_have")}
-    quotes_by_id = {q.get("quote_id"): q for q in quotes if isinstance(q, dict)}
+    # requirement_id and quote_id could each be any JSON type (e.g. a list),
+    # which is unhashable and would raise in a set/dict comprehension or a
+    # tuple-key assignment — only a string id is usable.
+    must_have_ids = {
+        r.get("requirement_id")
+        for r in requirements
+        if isinstance(r, dict) and r.get("must_have") and isinstance(r.get("requirement_id"), str)
+    }
+    quotes_by_id = {q.get("quote_id"): q for q in quotes if isinstance(q, dict) and isinstance(q.get("quote_id"), str)}
 
     findings: list[dict] = []
     expected_pairs: dict[tuple, str] = {}
     for quote in quotes:
         if not isinstance(quote, dict):
             continue
+        quote_id = quote.get("quote_id")
+        if not isinstance(quote_id, str):
+            continue
         meets = quote.get("meets") if isinstance(quote.get("meets"), dict) else {}
         for req in requirements:
             if not isinstance(req, dict):
                 continue
-            key = (quote.get("quote_id"), req.get("requirement_id"))
-            expected_pairs[key] = meets.get(req.get("requirement_id"), "missing")
+            requirement_id = req.get("requirement_id")
+            if not isinstance(requirement_id, str):
+                continue
+            key = (quote_id, requirement_id)
+            expected_pairs[key] = meets.get(requirement_id, "missing")
 
     seen_pairs: dict[tuple, object] = {}
     for i, row in enumerate(matrix):
@@ -91,6 +104,14 @@ def check(inputs: dict, output: dict) -> list[dict]:
             findings.append({"check": "output-malformed", "detail": f"totals[{i}] is not an object"})
             continue
         quote_id = total.get("quote_id")
+        # quote_id could be any JSON type (e.g. a list), which is unhashable
+        # and would raise on a dict lookup — check the type before it. Unlike
+        # coverage_matrix's ids (checked above), totals[].quote_id here comes
+        # straight from the output, which schema validation does not cover
+        # for a failing case, so this path is reachable, not just defensive.
+        if not isinstance(quote_id, str):
+            findings.append({"check": "output-malformed", "detail": f"totals[{i}].quote_id must be a string"})
+            continue
         quote = quotes_by_id.get(quote_id)
         if quote is None:
             findings.append(
