@@ -35,6 +35,6 @@ other service calls instead of naming a model. Business code asks for a **role**
   — only an injected `client=`/`transport=` (tests) is exempt.
 - `ModelProvider.redact(text)` (default no-op) scrubs a provider's own secret before it is
   written; `RecordReplayProvider` calls it, plus an `Authorization`/`Bearer` backstop.
-- `Router`: Quota/Retryable/base `ProviderError` fall back; `RequestError` -> `RouterRequestError`; stream/embed
-  `SafetyError` -> `RouterSafetyError` (generate: `safety_blocked`); stream failing mid-output -> `StreamInterruptedError`.
-  Each keeps `.attempts`/`__cause__`; cap/budget/pricing recheck every candidate moved to with its own `count_tokens`.
+- `Router._candidate` is the one choke point for every candidate touch (build, count_tokens, calls, first chunk):
+  `RequestError`/stream-embed `SafetyError` raise (generate: `safety_blocked`), mid-stream -> `StreamInterruptedError`,
+  anything else falls back. Only `RouterError`s leave, with `.attempts` and the adapter error as `__cause__`.

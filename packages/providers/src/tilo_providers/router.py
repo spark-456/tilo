@@ -7,13 +7,14 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 import jsonschema
 
 from tilo_providers.config import ProvidersConfig
-from tilo_providers.errors import ProviderError, QuotaError, RequestError, RetryableError, SafetyError
+from tilo_providers.errors import ProviderError, RequestError, SafetyError
 from tilo_providers.factory import build_provider
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider
 from tilo_providers.prompts import load_prompt
@@ -65,9 +66,9 @@ class RouterAttempt:
 class RouterResult:
     """One router call. `attempts` fill in as it runs; generate() sets `outcome` and `response`, a stream()
     result is iterated for its chunks. `request` is the request as sent, `budget` what is left of it.
-    `raw_prompt`/`tool_outputs` are the pre-compaction inputs (EFF-03): each candidate the router moves
-    to recompacts them with its own `count_tokens`, since `request.prompt` was only ever compacted for
-    the first candidate's tokenizer."""
+    `raw_prompt`/`tool_outputs` are the pre-compaction inputs (EFF-03): each candidate compacts them with
+    its own `count_tokens`. `last_error` is the last candidate's own error, the `__cause__` of an
+    exhausted run."""
 
     role_id: str
     request: GenerateRequest
@@ -80,6 +81,7 @@ class RouterResult:
     response: GenerateResponse | None = None
     embedding: Any = None  # embed()'s result (the adapter's raw {"vectors": [...]} shape), attempts alongside it
     chunks: Iterator[GenerateResponse] = field(default_factory=lambda: iter(()))
+    last_error: Exception | None = field(default=None, repr=False)
 
     def __iter__(self) -> Iterator[GenerateResponse]:
         return self.chunks
@@ -95,26 +97,31 @@ def schema_error(response: GenerateResponse, schema: dict[str, Any]) -> str | No
     return None
 
 
-def _finish(attempt: RouterAttempt, start: float, response: Any = None, error: Exception | None = None) -> None:
-    attempt.latency_ms = (time.perf_counter() - start) * 1000
-    if isinstance(response, GenerateResponse) and response.usage:
+def _usage(attempt: RouterAttempt, response: GenerateResponse) -> None:
+    if response.usage:
         attempt.tokens_in, attempt.tokens_out = response.usage.get("input_tokens"), response.usage.get("output_tokens")
-    if error is not None:
-        attempt.outcome = "safety_blocked" if isinstance(error, SafetyError) else "error"
-        attempt.error_type = type(error).__name__
 
 
-def _fall_back(run: RouterResult, attempt: RouterAttempt, start: float, error: ProviderError, chunks: int = 0) -> str:
-    """Records a failed call; returns the fallback reason or raises a RouterError carrying every attempt."""
-    _finish(attempt, start, error=error)
+def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output_started: bool = False) -> None:
+    """Records a failed candidate. Returns (the router falls back) for quota, retryable, base ProviderError,
+    EFF-03 cap refusals and any unexpected exception (NotImplementedError, an adapter bug); raises a
+    RouterError carrying every attempt, the adapter's error as `__cause__`, for everything with no fallback."""
+    attempt.outcome = "safety_blocked" if isinstance(error, SafetyError) else "error"
+    attempt.error_type, run.last_error = type(error).__name__, error
     where = f"PL-03: role {run.role_id!r} profile {attempt.profile_id!r}"
     if isinstance(error, RequestError):  # the request itself is bad: no fallback
         raise RouterRequestError(f"{where} rejected the request: {error}", run.attempts) from error
-    if isinstance(error, SafetyError):  # stream only: generate returns a safety_blocked result
+    if isinstance(error, SafetyError):  # stream/embed; generate() turns this into a safety_blocked result
         raise RouterSafetyError(f"{where} blocked on safety grounds: {error}", run.attempts) from error
-    if chunks:
-        raise StreamInterruptedError(f"{where} failed after {chunks} chunk(s); output started", run.attempts) from error
-    return f"fallback after {attempt.error_type}"
+    if output_started:  # answers are never spliced
+        raise StreamInterruptedError(f"{where} failed after output started", run.attempts) from error
+
+
+def _exhausted(run: RouterResult) -> RouterError:
+    if run.attempts and all(a.error_type == "TokenCapExceededError" for a in run.attempts):
+        message = f"EFF-03: role {run.role_id!r} is over max_input_tokens for every candidate"
+        return TokenCapExceededError(message, run.attempts)
+    return RouterExhaustedError(f"PL-03: role {run.role_id!r} exhausted every candidate", run.attempts)
 
 
 def _embed_inputs(request: Any) -> list[str]:
@@ -165,53 +172,53 @@ class Router:
             raise RouterExhaustedError(f"PL-03: role {role_id!r} has no candidate with capability {capability!r}")
         return ids
 
+    @contextmanager
+    def _candidate(self, run: RouterResult, profile_id: str, reason: str | None) -> Iterator[RouterAttempt]:
+        """PL-03 choke point: EVERY touch of a candidate (building it, `count_tokens` for its cap and price,
+        generate, stream up to its first chunk, embed) runs inside this block. It records exactly one
+        attempt and hands any exception to `_fail`: a fallback-worthy one is suppressed (the attempt's
+        `error_type` is set and the caller moves on), anything else leaves as a RouterError. A
+        BudgetExceededError (PL-03: the call is never sent) passes through unrecorded."""
+        attempt = RouterAttempt(profile_id, self._config.profiles[profile_id].provider, "ok", reason=reason)
+        start = time.perf_counter()
+        try:
+            yield attempt
+        except BudgetExceededError:
+            raise
+        except Exception as error:
+            run.attempts.append(attempt)
+            _fail(run, attempt, error)
+        else:
+            run.attempts.append(attempt)
+        finally:
+            attempt.latency_ms = (time.perf_counter() - start) * 1000
+
     def _start(self, role_id: str, req: GenerateRequest, outs: list[str] | None, cap: Any, budget: Any) -> RouterResult:
         role, candidates = self._config.roles[role_id], self._candidates(role_id, cap)
-        tool_outputs = list(outs or [])
-        count = self._provider(role_id, candidates[0]).count_tokens
-        prompt = _compact(role_id, role.max_input_tokens, req.prompt, tool_outputs, count)
         max_output = next(n for n in (req.max_output_tokens, role.max_output_tokens, 1024) if n is not None)  # BQ-54
-        compacted = req.model_copy(update={"prompt": prompt, "max_output_tokens": max_output})
-        return RouterResult(role_id, compacted, candidates, budget, raw_prompt=req.prompt, tool_outputs=tool_outputs)
+        request = req.model_copy(update={"max_output_tokens": max_output})
+        return RouterResult(role_id, request, candidates, budget, raw_prompt=req.prompt, tool_outputs=list(outs or []))
 
-    def _fit_cap(self, run: RouterResult, provider: ModelProvider, cap: int | None) -> GenerateRequest:
-        """EFF-03: `run.request.prompt` was only ever compacted for one candidate's tokenizer. Before this
-        candidate is actually called, recheck it with `provider`'s own `count_tokens` and, if it no longer
-        fits, recompact from the original prompt/tool_outputs (or raise `TokenCapExceededError` if nothing
-        is left to compact) -- never send a candidate a prompt over its own count of the cap."""
-        if cap is None or provider.count_tokens(run.request.prompt) <= cap:
-            return run.request
-        prompt = _compact(run.role_id, cap, run.raw_prompt, run.tool_outputs, provider.count_tokens)
+    def _prepare(self, run: RouterResult, profile_id: str, provider: ModelProvider, prompt: str | None = None) -> Any:
+        """EFF-03 with this candidate's own `count_tokens`: compact the role's input to max_input_tokens (or
+        refuse a repair `prompt` over it), then price the call (PL-03). Never sends anything over the cap."""
+        cap = self._config.roles[run.role_id].max_input_tokens
+        if prompt is None:
+            prompt = _compact(run.role_id, cap, run.raw_prompt, run.tool_outputs, provider.count_tokens)
+        elif cap is not None and provider.count_tokens(prompt) > cap:
+            raise TokenCapExceededError(f"EFF-03: role {run.role_id!r} repair prompt is over its cap of {cap}")
+        self._charge(run, profile_id, provider, prompt, run.request.max_output_tokens or 0)
         return run.request.model_copy(update={"prompt": prompt})
 
-    def _cap_miss(self, run: RouterResult, profile_id: str) -> str:
-        """Records a per-candidate EFF-03 refusal (the call is never sent) and returns the fallback
-        reason, so the router moves on to try the next candidate exactly as it does for a provider error."""
-        provider_name = self._config.profiles[profile_id].provider
-        run.attempts.append(
-            RouterAttempt(
-                profile_id,
-                provider_name,
-                "error",
-                error_type="TokenCapExceededError",
-                reason="EFF-03: over the role's max_input_tokens cap for this profile's own tokenizer",
-            )
-        )
-        return "fallback after TokenCapExceededError"
-
-    def _attempt(self, run: RouterResult, profile_id: str, reason: str | None, request: Any = None) -> RouterAttempt:
+    def _charge(self, run: RouterResult, profile_id: str, provider: ModelProvider, text: str, out: int) -> None:
         """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-52)."""
         if run.budget is not None:
-            quote, request = self._config.price(profile_id), request or run.request
-            count = self._provider(run.role_id, profile_id).count_tokens
-            usd = count(request.prompt) * quote.input + (request.max_output_tokens or 0) * quote.output
-            credits = self._config.credits(usd / 1_000_000)
+            quote = self._config.price(profile_id)
+            credits = self._config.credits((provider.count_tokens(text) * quote.input + out * quote.output) / 1e6)
             if credits > run.budget:
                 message = f"PL-03: a call on {profile_id!r} costs ~{credits:.4f} credits, over {run.budget} left"
                 raise BudgetExceededError(message, run.attempts)
             run.budget -= credits
-        run.attempts.append(RouterAttempt(profile_id, self._config.profiles[profile_id].provider, "ok", reason=reason))
-        return run.attempts[-1]
 
     def generate(
         self,
@@ -227,30 +234,24 @@ class Router:
     ) -> RouterResult:
         run = self._start(role_id, request, tool_outputs, required_capability, budget)
         threshold, schema, reason = confidence_threshold or 0.0, run.request.response_schema, None
-        cap = self._config.roles[role_id].max_input_tokens  # EFF-02 repair prompts must fit it too
         for profile_id in run.candidates:  # EFF-02: cheapest first
-            provider = self._provider(role_id, profile_id)
-            try:  # EFF-03: this candidate's own tokenizer may not fit what an earlier one compacted to
-                request = self._fit_cap(run, provider, cap)
-            except TokenCapExceededError:
-                reason = self._cap_miss(run, profile_id)
-                continue
+            prompt: str | None = None  # None: the role's own input; else the one schema-repair prompt
             for is_repair in (False, True):
-                attempt, start = self._attempt(run, profile_id, reason, request), time.perf_counter()
                 try:
-                    response = provider.generate(request)
-                except SafetyError as error:  # a safety outcome, never a silent fallback
-                    _finish(attempt, start, error=error)
+                    with self._candidate(run, profile_id, reason) as attempt:
+                        provider = self._provider(role_id, profile_id)
+                        sent = self._prepare(run, profile_id, provider, prompt)
+                        response = provider.generate(sent)
+                except RouterSafetyError:  # a safety outcome, never a silent fallback
                     return replace(run, outcome="safety_blocked")
-                except (RequestError, QuotaError, RetryableError, ProviderError) as error:
-                    reason = _fall_back(run, attempt, start, error)
+                if attempt.error_type:
+                    reason = f"fallback after {attempt.error_type}"
                     break
-                _finish(attempt, start, response)
+                _usage(attempt, response)
                 if schema is not None and (problem := schema_error(response, schema)) is not None:
                     attempt.outcome, reason = "schema_invalid", "escalated after schema validation failed"
-                    prompt = load_prompt("router", "schema_repair.md", {"prompt": run.request.prompt, "error": problem})
-                    if not is_repair and (cap is None or provider.count_tokens(prompt) <= cap):  # one repair
-                        request = run.request.model_copy(update={"prompt": prompt})
+                    if not is_repair:  # one repair, on the same candidate
+                        prompt = load_prompt("router", "schema_repair.md", {"prompt": sent.prompt, "error": problem})
                         reason = "repair attempt after schema validation failed"
                         continue
                 elif verify is not None and not verify(response):
@@ -259,9 +260,9 @@ class Router:
                     attempt.outcome = "low_confidence"
                     reason = f"escalated after confidence {score:.2f} below threshold {threshold:.2f}"
                 else:
-                    return replace(run, response=response)
+                    return replace(run, request=sent, response=response)
                 break
-        raise RouterExhaustedError(f"PL-03: role {role_id!r} exhausted every candidate", run.attempts)
+        raise _exhausted(run) from run.last_error
 
     def stream(
         self,
@@ -278,25 +279,28 @@ class Router:
 
     def _stream_chunks(self, run: RouterResult) -> Iterator[GenerateResponse]:
         reason: str | None = None
-        cap = self._config.roles[run.role_id].max_input_tokens
         for profile_id in run.candidates:
-            provider = self._provider(run.role_id, profile_id)
-            try:  # EFF-03: same per-candidate recheck as generate() -- only before the first chunk
-                request = self._fit_cap(run, provider, cap)
-            except TokenCapExceededError:
-                reason = self._cap_miss(run, profile_id)
+            start = time.perf_counter()
+            with self._candidate(run, profile_id, reason) as attempt:
+                provider = self._provider(run.role_id, profile_id)
+                sent = self._prepare(run, profile_id, provider)
+                chunks = iter(provider.stream(sent))
+                chunk = next(chunks, None)
+            if attempt.error_type:
+                reason = f"fallback after {attempt.error_type}"
                 continue
-            attempt, start, chunks = self._attempt(run, profile_id, reason, request), time.perf_counter(), 0
-            try:
-                for chunk in provider.stream(request):
-                    chunks += 1
-                    _finish(attempt, start, chunk)
+            run.request = sent
+            try:  # output has started: from here on a failure never falls back
+                while chunk is not None:
+                    _usage(attempt, chunk)
                     yield chunk
-                _finish(attempt, start)
-                return
-            except (RequestError, SafetyError, QuotaError, RetryableError, ProviderError) as error:
-                reason = _fall_back(run, attempt, start, error, chunks)
-        raise RouterExhaustedError(f"PL-03: role {run.role_id!r} exhausted every candidate", run.attempts)
+                    chunk = next(chunks, None)
+            except Exception as error:
+                _fail(run, attempt, error, output_started=True)
+            finally:
+                attempt.latency_ms = (time.perf_counter() - start) * 1000
+            return
+        raise _exhausted(run) from run.last_error
 
     def embed(
         self,
@@ -305,21 +309,16 @@ class Router:
         *,
         budget: float | None = None,
         required_capability: Capability | None = None,
-    ) -> RouterResult:  # same _attempt/_finish/_fall_back path as generate/stream, so the trace shows every attempt
-        candidates = self._candidates(role_id, required_capability)
-        run = RouterResult(role_id, request, candidates, budget)
-        pricing_prompt = "\n\n".join(_embed_inputs(request))
+    ) -> RouterResult:  # same choke point as generate/stream, so the trace shows every attempt
+        run = RouterResult(role_id, request, self._candidates(role_id, required_capability), budget)
         reason: str | None = None
         for profile_id in run.candidates:  # EFF-02: cheapest first
-            provider = self._provider(role_id, profile_id)
-            # priced like a generate() call with no output tokens (BQ-52): each candidate's own tokenizer
-            pricing_request = GenerateRequest(prompt=pricing_prompt, max_output_tokens=0)
-            attempt, start = self._attempt(run, profile_id, reason, pricing_request), time.perf_counter()
-            try:
+            with self._candidate(run, profile_id, reason) as attempt:
+                provider = self._provider(role_id, profile_id)
+                # priced like a generate() call with no output tokens (BQ-52), with each candidate's tokenizer
+                self._charge(run, profile_id, provider, "\n\n".join(_embed_inputs(request)), 0)
                 embedding = provider.embed(request)
-            except (RequestError, SafetyError, QuotaError, RetryableError, ProviderError) as error:
-                reason = _fall_back(run, attempt, start, error)  # RequestError/SafetyError raise with run.attempts
-                continue
-            _finish(attempt, start)
-            return replace(run, embedding=embedding)
-        raise RouterExhaustedError(f"PL-03: role {role_id!r} embed exhausted every candidate", run.attempts)
+            if not attempt.error_type:
+                return replace(run, embedding=embedding)
+            reason = f"fallback after {attempt.error_type}"
+        raise _exhausted(run) from run.last_error

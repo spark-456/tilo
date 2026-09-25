@@ -20,8 +20,10 @@ adapter escapes the router"):
 - SafetyError does not fall back either, but it is not raised as a bug: it
   comes back as a normal `RouterResult` with `outcome="safety_blocked"`.
 - A raw, non-`ProviderError` exception from an adapter (a bug) is never
-  silently swallowed or treated as a retryable/fallback-worthy error -- it
-  propagates unchanged, so the bug stays visible.
+  silently swallowed: PL-03 "falls back on errors", so it is recorded as an
+  attempt with its own type (visible in the Trace) and, if every candidate
+  fails, kept as the `__cause__` of the `RouterError` the router raises --
+  no raw adapter exception escapes the router (ticket P0-06 review).
 - An adapter also raises the base `ProviderError` itself (malformed response
   body, bad stream chunk, bad tool-call JSON, missing api_key_env) -- that
   is provider trouble, not caller trouble, so `generate()`, `stream()` and
@@ -316,18 +318,32 @@ def test_PL_03_embed_through_the_real_factory_path_records_and_replays(tmp_path,
 
 
 def test_PL_03_non_provider_error_from_an_adapter_is_not_swallowed(providers_config):
-    """Security hand-over from P0-05: the router treats every ProviderError
-    subtype explicitly. A bug that makes an adapter raise something that is
-    *not* one of the four documented subtypes must not be mistaken for a
-    fallback-worthy error and silently retried -- it has to stay visible."""
-    primary = ScriptedModelProvider("large", [ScriptedCall(outcome="error", error=RuntimeError("adapter bug"))])
-    fallback = ScriptedModelProvider("medium", [ScriptedCall(text="must never be reached")])
-    router = _router(providers_config, {"large": primary, "medium": fallback})
+    """Security hand-over from P0-05, as revised by the P0-06 review: a bug that makes an adapter raise
+    something that is *not* a `ProviderError` must stay visible, but must not escape the router raw
+    either. It is recorded as an attempt under its own type, the router falls back (PL-03: "falls back
+    on errors"), and when every candidate fails the bug is the `__cause__` of the RouterError raised."""
+    from tilo_providers.router import RouterExhaustedError  # noqa: PLC0415
 
-    with pytest.raises(RuntimeError, match="adapter bug"):
-        router.generate("director", GenerateRequest(prompt="Summarise the quarter."))
+    bug = RuntimeError("adapter bug")
+    primary = ScriptedModelProvider("large", [ScriptedCall(outcome="error", error=bug)])
+    fallback = ScriptedModelProvider("medium", [ScriptedCall(text="ok from medium")])
+    result = _router(providers_config, {"large": primary, "medium": fallback}).generate(
+        "director", GenerateRequest(prompt="Summarise the quarter.")
+    )
 
-    assert fallback.calls == []
+    assert [(a.profile_id, a.outcome, a.error_type) for a in result.attempts] == [
+        ("large", "error", "RuntimeError"),
+        ("medium", "ok", None),
+    ]
+    assert "RuntimeError" in (result.attempts[1].reason or ""), "the Trace must say why the fallback happened"
+
+    both_broken = ScriptedModelProvider("large", [ScriptedCall(outcome="error", error=bug)] * 2)
+    with pytest.raises(RouterExhaustedError) as excinfo:
+        _router(providers_config, {"large": both_broken, "medium": both_broken}).generate(
+            "director", GenerateRequest(prompt="Summarise the quarter.")
+        )
+    assert excinfo.value.__cause__ is bug
+    assert [a.error_type for a in excinfo.value.attempts] == ["RuntimeError", "RuntimeError"]
 
 
 def test_PL_03_request_error_after_a_fallback_carries_every_attempt(providers_config):
