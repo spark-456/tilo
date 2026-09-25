@@ -1,9 +1,11 @@
-"""Injected auth, storage and event-writing seams for tilo-api (ticket ST-3a round 2,
+"""Injected auth, storage and event-writing seams for tilo-api (ticket ST-3a round 3,
 services/api/tests/API_ST3a.md). Real sign-in, Firestore and the harness are later tickets
 (PRD 15.3); every route below takes a `Principal`, a `Store` and (where it emits events) an
 `EventWriter` via FastAPI's dependency overrides, and production code raises
 NotImplementedError until those land so a route can never run unauthenticated, against no
-store, or write an event itself (PI-18: the harness is the only writer).
+store, or write an event itself (PI-18: the harness is the only writer). `Store.pending_events`
+(round 3) holds parts a writer failure could not land yet -- the writer being down must never
+stop the kill switch itself from lowering autonomy.
 """
 
 from __future__ import annotations
@@ -76,6 +78,12 @@ class Store:
         default_factory=dict
     )  # world_id -> event.schema.json records, append-only, oldest first (seq strictly
     # increasing, EV-10). Only EventWriter.append appends here; a route handler never does.
+    pending_events: dict[str, list[dict]] = field(
+        default_factory=dict
+    )  # world_id -> event parts a mutating route built but EventWriter.append raised on (the
+    # harness is unreachable): the level change itself is never rolled back for this. Flushed,
+    # oldest first, on the next stop/pause call against the same world_id -- a part is removed
+    # from here only once `append` returns for it, so it is written exactly once, never lost.
 
 
 class EventWriter(Protocol):
