@@ -1,0 +1,9 @@
+# Copy this file to backend.hcl (git-ignored) and fill in your bucket, then:
+#   terraform -chdir=infra/envs/dev init -backend-config=backend.hcl
+#
+# The bucket must already exist -- see infra/README.md "create the state
+# bucket". No bucket name is hard-coded in versions.tf on purpose, so each
+# person picks their own state bucket.
+
+bucket = "REPLACE-WITH-YOUR-tilo-dev-tfstate-BUCKET"
+prefix = "envs/dev"
