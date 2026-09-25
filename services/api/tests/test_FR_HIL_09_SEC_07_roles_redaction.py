@@ -644,7 +644,7 @@ def test_SEC_07_vis_list_in_scoped_view_is_filtered_to_the_callers_own_districts
         districts={D1: make_district("Mail", "Triaging the inbox"), D2: make_district("Finance Ops", "Ledger")},
     )
     store.events[WORLD] = [
-        base_event(seq=1, type_="agent.working", data={}, district=D1, vis=[D1, D2], summary="shared D1 and D2"),
+        base_event(seq=1, type_="agent.working", data={}, district=D1, vis=[D1, D2], summary="shared update"),
     ]
     as_principal(make_principal(user_id="u_viewer", role="viewer", districts=(D1,)))
 

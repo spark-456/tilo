@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import jsonschema
+from fastapi import Request
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
@@ -259,7 +260,6 @@ def as_principal_by_header(mapping: dict[str, deps.Principal]) -> None:
     `mapping` is built once, before any thread starts, and only ever read afterwards, so
     concurrent requests need no lock; each caller sends its own key with every request via the
     PRINCIPAL_HEADER header, e.g. client.post(url, headers={PRINCIPAL_HEADER: "big"})."""
-    from fastapi import Request
 
     def _resolve(request: Request) -> deps.Principal:
         key = request.headers.get(PRINCIPAL_HEADER)
