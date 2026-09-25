@@ -1,0 +1,33 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000112",
+  "seq": 112,
+  "ts": "2026-09-29T09:41:52.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "agent.recovered",
+  "actor": "A_s1",
+  "target": "B1",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The Specialist recovered on attempt 2 with a smaller batch.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "unit": "U1",
+    "attempt": 2
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000141",
+  "seq": 141,
+  "ts": "2026-09-29T09:42:21.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "app.tested",
+  "actor": "A_s1",
+  "target": "B7",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The supplier price board passed its tests.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "spec": {
+      "artifact_id": "art_app_spec",
+      "version": 1
+    },
+    "passed": true
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

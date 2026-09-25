@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.working.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentWorkingData",
+  "description": "data of agent.working (PRD 9.5). actor works at target; unit is null for a Lead or the Director working on the plan itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["unit"],
+  "properties": {
+    "unit": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/unit_id" }, { "type": "null" }]
+    }
+  }
+}

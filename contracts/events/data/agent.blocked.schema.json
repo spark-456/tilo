@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.blocked.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentBlockedData",
+  "description": "data of agent.blocked (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["unit", "reason"],
+  "properties": {
+    "unit": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/unit_id" }, { "type": "null" }]
+    },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 140 }
+  }
+}

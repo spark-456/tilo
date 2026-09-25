@@ -1,0 +1,32 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000104",
+  "seq": 104,
+  "ts": "2026-09-29T09:41:44.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "plan.questions_asked",
+  "actor": "A_dir",
+  "target": "w_village_basic",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "needs_you",
+  "credits": 0.5,
+  "summary": "The Director has 1 question: reply to the supplier only, or cc finance?",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "question_count": 1
+  },
+  "trace": {
+    "model_role": "director",
+    "profile": "large",
+    "tokens_in": 1500,
+    "tokens_out": 200,
+    "tool": null,
+    "latency_ms": 2100,
+    "archive_ref": "r_village_basic_1/3"
+  }
+}

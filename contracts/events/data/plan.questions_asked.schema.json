@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/plan.questions_asked.schema.json",
+  "x-version": "1.0.0",
+  "title": "PlanQuestionsAskedData",
+  "description": "data of plan.questions_asked (PRD 9.5). At most three ranked clarifying questions (FR-INT-04); each is a card.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["question_count"],
+  "properties": { "question_count": { "type": "integer", "minimum": 1, "maximum": 3 } }
+}

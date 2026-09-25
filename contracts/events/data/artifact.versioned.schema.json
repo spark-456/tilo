@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/artifact.versioned.schema.json",
+  "x-version": "1.0.0",
+  "title": "ArtifactVersionedData",
+  "description": "data of artifact.versioned (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact", "previous_version"],
+  "properties": {
+    "artifact": { "$ref": "../../common.schema.json#/$defs/artifact_ref" },
+    "previous_version": { "type": "integer", "minimum": 1 }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/question.answered.schema.json",
+  "x-version": "1.0.0",
+  "title": "QuestionAnsweredData",
+  "description": "data of question.answered (PRD 9.5). answered_by default means the card timed out and the Director applied its safe default; that event has severity nudge (BQ-04, EV-08). Gates never time out to go.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["answered_by"],
+  "properties": { "answered_by": { "$ref": "../../event.schema.json#/$defs/answer_source" } }
+}
