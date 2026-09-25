@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 import pytest
 import yaml
 from _metering_testlib import PRICES_V1, PRICES_V2, REPO_ROOT, write_prices_file
-from tilo_metering import MeteringConfigError, PriceBook, UnpricedError, Usage
+from tilo_metering import MeteringConfig, MeteringConfigError, PriceBook, UnpricedError, Usage
 
 
 def _at(year: int, month: int, day: int) -> datetime:
@@ -93,7 +93,7 @@ def test_FR_MTR_01_pricebook_has_no_mutation_api(tmp_path):
         book.credit_usd = 0.01
 
 
-_BAD = [{"credit_usd": 0.05}, {"credit_usd": 0}, {"effective_date": None}, {"source": None}]
+_BAD = [{"credit_usd": 0.05}, {"credit_usd": 0}, {"credit_usd": "0.005"}, {"effective_date": None}, {"source": None}]
 _NULL_PRICE = {"profiles": {"widget": {"input": None, "output": 2.0}}}
 
 
@@ -120,3 +120,16 @@ def test_FR_MTR_01_usage_rejects_negative_token_counts():
     for tokens_in, tokens_out in ((-1, 0), (0, -1)):
         with pytest.raises(ValueError):
             Usage("widget", tokens_in, tokens_out)
+
+
+@pytest.mark.parametrize("load", [PriceBook.load, MeteringConfig.load])
+def test_FR_MTR_01_loaders_refuse_malformed_yaml(tmp_path, load):
+    (bad := tmp_path / "bad.yaml").write_text("a: [\n", encoding="utf-8")
+    with pytest.raises(MeteringConfigError):
+        load(bad)
+
+
+@pytest.mark.parametrize("name", ["nope.yaml", "."])
+def test_FR_MTR_01_pricebook_refuses_missing_prices_file(tmp_path, name):
+    with pytest.raises(MeteringConfigError):
+        PriceBook.load(tmp_path / name)

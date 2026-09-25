@@ -5,10 +5,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from .errors import MeteringConfigError
+from .errors import MeteringConfigError, read_yaml
 
 
 class _Strict(BaseModel):
@@ -52,10 +51,7 @@ class MeteringConfig(_Strict):
 
     @classmethod
     def load(cls, path: str | Path = "config/metering.yaml") -> MeteringConfig:
-        path = Path(path)
-        if not path.is_file():
-            raise MeteringConfigError(f"metering config not found at {path}")
-        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        raw = read_yaml(path)
         try:
             return cls.model_validate(raw)
         except ValidationError as exc:

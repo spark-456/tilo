@@ -8,10 +8,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
 
-import yaml
 from tilo_contracts import ProvidersPrices
 
-from .errors import MeteringConfigError, UnpricedError
+from .errors import MeteringConfigError, UnpricedError, read_yaml
 
 CREDIT_USD = 0.005  # contracts/providers.schema.json $defs.prices.credit_usd const
 
@@ -51,7 +50,7 @@ class _Version:
 
 def _load_version(path: str | Path) -> _Version:
     try:
-        v = ProvidersPrices(**(yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}))
+        v = ProvidersPrices.model_validate(read_yaml(path), strict=True)
     except (ValueError, TypeError) as exc:
         raise MeteringConfigError(f"{path}: not a valid prices file: {exc}") from exc
     if v.credit_usd != CREDIT_USD:
