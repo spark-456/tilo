@@ -6,7 +6,7 @@
 // controls exactly when "init" resolves relative to unmount, which a real
 // WebGL context (and jsdom, which has none) cannot do deterministically.
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Tells React this environment supports `act()` (jsdom via a custom vitest

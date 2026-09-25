@@ -66,7 +66,8 @@ export const tokens = {
       24,
       32,
       40
-    ]
+    ],
+    "stageModeScale": 1.25
   },
   "stage": {
     "tileWidth": 64,

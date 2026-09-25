@@ -37,4 +37,5 @@
   --font-display: "Nunito", sans-serif;
   --font-ui: "Nunito Sans", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
+  --font-stage-mode-scale: 1.25;
 }

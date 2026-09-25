@@ -18,8 +18,22 @@ import { App } from "./App";
 // on.
 const el = document.getElementById("root");
 if (!el) throw new Error("#root not found");
-createRoot(el).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+const root = el;
+
+// The faces the shell uses load before the first render, so text never swaps
+// fonts after it is laid out (no layout shift). If they are slow,
+// the shell renders anyway after FONT_WAIT_MS.
+const FONT_WAIT_MS = 3000;
+const USED_FACES = ["900 16px Nunito", "400 16px 'Nunito Sans'", "700 16px 'Nunito Sans'"];
+const fontsReady = Promise.all(USED_FACES.map((face) => document.fonts.load(face))).catch(
+  () => undefined,
 );
+const timeout = new Promise((resolve) => setTimeout(resolve, FONT_WAIT_MS));
+
+Promise.race([fontsReady, timeout]).then(() => {
+  createRoot(root).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+});

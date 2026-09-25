@@ -61,6 +61,7 @@ export function buildTokens(raw, colorRoles) {
       ui: raw.font?.family?.ui?.value ?? "Nunito Sans",
       mono: raw.font?.family?.mono?.value ?? "JetBrains Mono",
       scalePx: [12, 14, 16, 20, 24, 32, 40], // PRD 18.2 "Type"
+      stageModeScale: 1.25, // PRD 18.2 "Type": "stage mode × 1.25"
     },
     // No PRD/export value defines an iso tile size; standard 2:1 diamond ratio.
     stage: { tileWidth: 64, tileHeight: 32 },
@@ -92,6 +93,7 @@ export function buildCss(tokens, colorRoles) {
     `  --font-display: "${tokens.font.display}", sans-serif;`,
     `  --font-ui: "${tokens.font.ui}", sans-serif;`,
     `  --font-mono: "${tokens.font.mono}", monospace;`,
+    `  --font-stage-mode-scale: ${tokens.font.stageModeScale};`,
     "}",
     "",
   );

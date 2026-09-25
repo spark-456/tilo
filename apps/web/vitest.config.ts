@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { defineConfig, type Plugin } from "vitest/config";
+import { type Plugin, defineConfig } from "vitest/config";
 
 // vite-node 2.1.x strips a "file://" import id's protocol but never decodes
 // it, so `import(pathToFileURL(absPath).href)` (used by tokens.test.ts to

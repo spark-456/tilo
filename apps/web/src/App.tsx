@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { Stage } from "./stage/Stage";
 
@@ -11,14 +12,23 @@ const NavButton = () => (
   </button>
 );
 
+// PRD 9.6: stage mode is a display setting, not a separate code path. It only
+// sets `data-stage-mode` on the shell, which switches `--ui-scale` in CSS to
+// the PRD 18.2 "stage mode × 1.25" token. Opened with `?display=stage` until
+// the presenter controls of FR-WLD-12 exist.
+const readStageMode = (): boolean =>
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("display") === "stage";
+
 /** PRD 18.3 "Screens": the layout frame. Desktop gets a 72px left rail, centre
  * stage and 360px right rail; mobile gets bottom tabs and no side rails. Ships
  * only navigation for screens that exist (PRD 5.5) — just the World. */
 export function App() {
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const [stageMode] = useState(readStageMode);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-stage-mode={stageMode ? "on" : "off"}>
       {/* Visually hidden: gives the page a single top-level heading (axe
           "page-has-heading-one") without adding a header bar the design
           exports don't cover. */}

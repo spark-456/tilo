@@ -13,7 +13,6 @@ body {
   background: var(--color-surface-0);
   color: var(--color-ink-1);
   font-family: var(--font-ui);
-  font-size: 16px;
 }
 :focus-visible {
   outline: 3px solid var(--color-brand-primary);
@@ -32,11 +31,19 @@ body {
   border: 0;
 }
 
+/* PRD 9.6/18.2: stage mode is a display setting. The one switch is
+   `data-stage-mode` on the shell; every font and target size below is
+   multiplied by --ui-scale. */
 .app-shell {
+  --ui-scale: 1;
+  font-size: calc(16px * var(--ui-scale));
   display: flex;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+}
+.app-shell[data-stage-mode="on"] {
+  --ui-scale: var(--font-stage-mode-scale);
 }
 @media (max-width: 767px) {
   .app-shell {
@@ -64,8 +71,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: calc(32px * var(--ui-scale));
+  height: calc(32px * var(--ui-scale));
   border-radius: var(--radius-pill);
   background: var(--color-brand-primary);
   color: var(--color-surface-1);
@@ -73,7 +80,7 @@ body {
   font-weight: 900;
 }
 .bottom-tabs {
-  flex: 0 0 var(--button-height-mobile);
+  flex: 0 0 calc(var(--button-height-mobile) * var(--ui-scale));
   border-top: 1px solid var(--color-surface-2);
 }
 
@@ -85,19 +92,23 @@ body {
   background: var(--color-surface-2);
 }
 .stage-camera,
-.stage-fallback {
+.stage-fallback,
+.stage-frame > canvas {
   position: absolute;
   inset: 0;
 }
-.stage-camera {
-  transform-origin: center center;
-  transition-property: transform;
-  transition-timing-function: ease-out;
-}
-.stage-camera canvas {
+.stage-frame > canvas {
   display: block;
   width: 100%;
   height: 100%;
+}
+/* Camera layer: carries the eased CSS transform that the Pixi world mirrors
+   each frame (Stage.tsx), and will hold world-anchored DOM overlays. */
+.stage-camera {
+  pointer-events: none;
+  transform-origin: center center;
+  transition-property: transform;
+  transition-timing-function: ease-out;
 }
 .stage-fallback {
   display: flex;
@@ -116,7 +127,7 @@ body {
   overflow-y: auto;
 }
 .right-rail h2 {
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-scale));
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-ink-2);
@@ -128,13 +139,14 @@ body {
 .right-rail-meter,
 .empty {
   color: var(--color-ink-2);
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-scale));
   margin: 0;
 }
 
 .nav-btn {
-  min-height: var(--button-height-desktop);
-  min-width: var(--button-height-desktop);
+  min-height: calc(var(--button-height-desktop) * var(--ui-scale));
+  min-width: calc(var(--button-height-desktop) * var(--ui-scale));
+  font-size: inherit;
   border-radius: var(--radius-controls);
   border: none;
   background: transparent;
@@ -144,8 +156,8 @@ body {
   cursor: pointer;
 }
 .bottom-tabs .nav-btn {
-  min-height: var(--button-height-mobile);
-  min-width: var(--button-height-mobile);
+  min-height: calc(var(--button-height-mobile) * var(--ui-scale));
+  min-width: calc(var(--button-height-mobile) * var(--ui-scale));
 }
 .nav-btn:hover {
   background: var(--color-surface-0);
