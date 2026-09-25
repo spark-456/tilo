@@ -1,130 +1,84 @@
-"""Case-schema and loader tests for the P8-06 eval harness (EFF-07 support;
-PRD 19.2: "Each case lives in evals/cases/<group>/<id>.yaml with inputs,
-scripted answers, ground truth and checks"). Ticket spec (SE orchestrator
-"## P8-06"): "load_cases(root='evals/cases') -> list[Case] validates every
-file against the schema, checks the id against the path, and checks that ids
-are unique and that check names are registered." Acceptance test named in
-the spec: "a bad id, a group mismatch, an unknown check, and a duplicate id
-are each rejected."
-
-Run with `uv run pytest "evals/tests" -q` from the repo root.
-"""
-
-from __future__ import annotations
+"""Case schema and loader tests (EFF-07; PRD 19.2). Run: uv run pytest evals/tests -q."""
 
 import json
 
 import jsonschema
 import pytest
 from conftest import write_case
-from tilo_evals import Case, CaseError, load_cases
+from tilo_evals import CaseError, load_cases
 
 
 def test_EFF_07_case_schema_exists_and_is_draft_2020_12(repo_root):
-    schema_path = repo_root / "evals" / "case.schema.json"
-    assert schema_path.is_file(), "P8-06: evals/case.schema.json must exist (contract-change #8)"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    assert schema.get("$schema", "").endswith("2020-12/schema"), "P8-06: case.schema.json must be JSON Schema 2020-12"
+    schema = json.loads((repo_root / "evals" / "case.schema.json").read_text(encoding="utf-8"))
+    assert schema.get("$schema", "").endswith("2020-12/schema")
     jsonschema.Draft202012Validator.check_schema(schema)
 
 
+def _load_one(tmp_path, **kwargs):
+    write_case(tmp_path / "cases", **kwargs)
+    (case,) = load_cases(root=str(tmp_path / "cases"))
+    return case
+
+
+def _expect_error(tmp_path, needle: str | None, **kwargs) -> None:
+    write_case(tmp_path / "cases", **kwargs)
+    with pytest.raises(CaseError) as excinfo:
+        load_cases(root=str(tmp_path / "cases"))
+    if needle:
+        assert needle in str(excinfo.value)
+
+
 def test_EFF_07_load_cases_loads_a_well_formed_case(tmp_path):
-    cases_root = tmp_path / "cases"
-    write_case(cases_root, case_id="E-PLAN-01", group="E-PLAN", ground_truth={"ok": True})
-
-    cases = load_cases(root=str(cases_root))
-
-    assert len(cases) == 1
-    case = cases[0]
-    assert isinstance(case, Case)
-    assert case.id == "E-PLAN-01"
-    assert case.group == "E-PLAN"
-    assert case.status == "ready"
+    case = _load_one(tmp_path, case_id="E-PLAN-01", group="E-PLAN", ground_truth={"ok": True})
+    assert case.id == "E-PLAN-01" and case.status == "ready"
     assert case.checks == [{"check": "no_side_effects", "args": {}}]
 
 
-def test_EFF_07_load_cases_rejects_an_id_not_matching_the_pattern(tmp_path):
-    """The id pattern is ^E-(PLAN|RES|DOC|MAIL|CHN|ROUTE|HAND|RED)-\\d{2}$."""
-    cases_root = tmp_path / "cases"
-    write_case(
-        cases_root,
-        case_id="not-a-valid-id",
-        group="E-PLAN",
-        ground_truth={"ok": True},
-        filename="not-a-valid-id.yaml",
-    )
-
-    with pytest.raises(CaseError) as excinfo:
-        load_cases(root=str(cases_root))
-    assert "not-a-valid-id" in str(excinfo.value)
-
-
-def test_EFF_07_load_cases_rejects_a_group_that_does_not_match_the_id_prefix(tmp_path):
-    """group must match "the directory and the id prefix" -- here the group
-    field and its directory agree (E-RES) but the id's own family prefix
-    (E-PLAN) does not, which load_cases must still reject.
-    """
-    cases_root = tmp_path / "cases"
-    write_case(cases_root, case_id="E-PLAN-01", group="E-RES", ground_truth={"ok": True})
-
-    with pytest.raises(CaseError) as excinfo:
-        load_cases(root=str(cases_root))
-    assert "E-PLAN-01" in str(excinfo.value)
-
-
-def test_EFF_07_load_cases_rejects_an_unregistered_check_name(tmp_path):
-    cases_root = tmp_path / "cases"
-    write_case(
-        cases_root,
-        case_id="E-PLAN-01",
-        group="E-PLAN",
-        ground_truth={"ok": True},
-        checks=[{"check": "not_a_registered_check", "args": {}}],
-    )
-
-    with pytest.raises(CaseError) as excinfo:
-        load_cases(root=str(cases_root))
-    assert "not_a_registered_check" in str(excinfo.value)
-
-
-def test_EFF_07_load_cases_rejects_a_duplicate_id(tmp_path):
-    cases_root = tmp_path / "cases"
-    write_case(cases_root, case_id="E-PLAN-01", group="E-PLAN", ground_truth={"ok": True}, filename="a.yaml")
-    write_case(cases_root, case_id="E-PLAN-01", group="E-PLAN", ground_truth={"ok": True}, filename="b.yaml")
-
-    with pytest.raises(CaseError) as excinfo:
-        load_cases(root=str(cases_root))
-    assert "E-PLAN-01" in str(excinfo.value)
-
-
-def test_EFF_07_load_cases_requires_ground_truth_when_status_is_ready(tmp_path):
-    """ "ground_truth (object or null; required non-null when status is ready)"."""
-    cases_root = tmp_path / "cases"
-    write_case(cases_root, case_id="E-PLAN-01", group="E-PLAN", status="ready", ground_truth=None)
-
-    with pytest.raises(CaseError):
-        load_cases(root=str(cases_root))
-
-
 def test_EFF_07_load_cases_allows_null_ground_truth_when_status_is_skeleton(tmp_path):
-    cases_root = tmp_path / "cases"
-    write_case(
-        cases_root,
-        case_id="E-PLAN-01",
-        group="E-PLAN",
+    case = _load_one(
+        tmp_path, case_id="E-PLAN-01", group="E-PLAN", status="skeleton", ground_truth=None, recording=None
+    )
+    assert case.status == "skeleton" and case.ground_truth is None
+
+
+def test_EFF_07_load_cases_allows_notes_and_an_autorater_check(tmp_path):
+    """P8-08 skeletons carry `notes`; E-RES declares `kind: autorater` checks not looked up in the registry."""
+    autorater = {"check": "groundedness", "args": {}, "kind": "autorater"}
+    case = _load_one(
+        tmp_path,
+        case_id="E-RES-01",
+        group="E-RES",
         status="skeleton",
         ground_truth=None,
         recording=None,
+        notes="needs a groundedness autorater",
+        checks=[{"check": "no_side_effects", "args": {}}, autorater],
     )
-
-    cases = load_cases(root=str(cases_root))
-    assert cases[0].status == "skeleton"
-    assert cases[0].ground_truth is None
+    assert case.notes == "needs a groundedness autorater" and case.checks[1] == autorater
 
 
-def test_EFF_07_load_cases_requires_at_least_one_check(tmp_path):
-    cases_root = tmp_path / "cases"
-    write_case(cases_root, case_id="E-PLAN-01", group="E-PLAN", ground_truth={"ok": True}, checks=[])
+@pytest.mark.parametrize(
+    "needle,kwargs",
+    [
+        ("not-a-valid-id", dict(case_id="not-a-valid-id", group="E-PLAN", filename="not-a-valid-id.yaml")),
+        ("E-PLAN-01", dict(case_id="E-PLAN-01", group="E-RES")),  # dir/group agree, id's own prefix doesn't
+        ("E-PLAN-01", dict(case_id="E-PLAN-01", group="E-PLAN", filename="E-PLAN-02.yaml")),
+        ("nope", dict(case_id="E-PLAN-01", group="E-PLAN", checks=[{"check": "nope", "args": {}}])),
+        (None, dict(case_id="E-PLAN-01", group="E-PLAN", status="ready", ground_truth=None)),
+        (None, dict(case_id="E-PLAN-01", group="E-PLAN", checks=[])),
+    ],
+    ids=["bad-id", "group-mismatch", "name-mismatch", "bad-check", "need-truth", "need-check"],
+)
+def test_EFF_07_load_cases_rejects_malformed_cases(tmp_path, needle, kwargs):
+    _expect_error(tmp_path, needle, ground_truth=kwargs.pop("ground_truth", {"ok": True}), **kwargs)
 
-    with pytest.raises(CaseError):
-        load_cases(root=str(cases_root))
+
+def test_EFF_07_load_cases_rejects_a_duplicate_id(tmp_path):
+    """Both copies match filename and dir (one nested under E-PLAN), so only the duplicate check fires."""
+    write_case(tmp_path / "cases", case_id="E-PLAN-01", group="E-PLAN", ground_truth={})
+    write_case(
+        tmp_path / "cases", case_id="E-PLAN-01", group="E-PLAN", ground_truth={}, filename="dup/E-PLAN/E-PLAN-01.yaml"
+    )
+    with pytest.raises(CaseError) as excinfo:
+        load_cases(root=str(tmp_path / "cases"))
+    assert "E-PLAN-01" in str(excinfo.value)

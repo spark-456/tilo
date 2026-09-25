@@ -48,11 +48,13 @@
         "required": ["check", "args"],
         "properties": {
           "check": { "type": "string", "minLength": 1 },
-          "args": { "type": "object" }
+          "args": { "type": "object" },
+          "kind": { "type": "string", "enum": ["deterministic", "autorater"] }
         }
       }
     },
-    "recording": { "type": ["string", "null"] }
+    "recording": { "type": ["string", "null"] },
+    "notes": { "type": "string" }
   },
   "allOf": [
     {

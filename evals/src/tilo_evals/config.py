@@ -1,7 +1,5 @@
-"""EvalsConfig: the eval harness's own settings (EFF-07; PRD 19.1, 6.6). Local
-stub for issue #8: rejects a missing file or an unknown/missing key, never
-falls back to an invented value.
-"""
+"""EvalsConfig: the eval harness's own settings (EFF-07; PRD 19.1, 6.6). Local stub for issue #8:
+rejects a missing file or an unknown/missing key, never falls back to an invented value."""
 
 from __future__ import annotations
 

@@ -1,8 +1,5 @@
-"""Check registry (EFF-07; PRD 19.2, 19.3). Part a of P8-06: `@register` and
-lookup only; the five deterministic checks land in part b, none registered here.
-"""
-
-from __future__ import annotations
+"""Check registry (EFF-07; PRD 19.2, 19.3). Part a of P8-06: `@register` and lookup only;
+the five deterministic checks land in part b, none registered here."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -18,7 +15,6 @@ class CheckResult:
 
 CheckFn = Callable[..., CheckResult]
 _REGISTRY: dict[str, CheckFn] = {}
-AUTORATER_CHECKS: set[str] = set()
 
 
 def register(name: str) -> Callable[[CheckFn], CheckFn]:

@@ -1,9 +1,5 @@
-"""Case schema and loader (EFF-07; PRD 19.2). `load_cases` validates each
-evals/cases/<group>/<id>.yaml against evals/case.schema.json, then checks
-what the schema cannot: id vs group vs directory, unique ids, registered checks.
-"""
-
-from __future__ import annotations
+"""Case schema and loader (EFF-07; PRD 19.2): validates evals/cases/<group>/<id>.yaml against
+case.schema.json, then checks what the schema can't: id/group/dir/filename, unique ids, registered checks."""
 
 import json
 import re
@@ -22,7 +18,7 @@ _ID_PATTERN = re.compile(r"^E-(PLAN|RES|DOC|MAIL|CHN|ROUTE|HAND|RED)-\d{2}$")
 
 
 class CaseError(Exception):
-    """Case fails case.schema.json, or a loader rule: id/group/dir mismatch, duplicate id, unregistered check."""
+    """Case fails case.schema.json, or a loader rule: id/group/dir/filename, duplicate id, unregistered check."""
 
 
 @dataclass(frozen=True)
@@ -39,6 +35,7 @@ class Case:
     checks: list[dict[str, Any]]
     recording: str | None
     path: Path
+    notes: str | None = None
 
 
 def load_cases(root: str = "evals/cases") -> list[Case]:
@@ -56,19 +53,19 @@ def load_cases(root: str = "evals/cases") -> list[Case]:
             raise CaseError(
                 f"{case_path}: {case_id!r} failed case.schema.json: " + "; ".join(e.message for e in errors)
             )
-        # additionalProperties: false above means raw now has exactly Case's 11 non-path fields.
-        group = raw["group"]
-        dir_name = case_path.parent.name
+        group, dir_name = raw["group"], case_path.parent.name
         match = _ID_PATTERN.match(case_id)  # schema enforces the pattern; guard against drift
-        expected_group = f"E-{match.group(1)}" if match else None
-        if dir_name != group or expected_group != group:
+        if dir_name != group or (f"E-{match.group(1)}" if match else None) != group:
             raise CaseError(f"{case_path}: {case_id!r} group/dir mismatch (group={group!r}, dir={dir_name!r})")
-        for entry in raw["checks"]:
-            if not checks_registry.is_registered(entry.get("check")):
+        if case_path.stem != case_id:
+            raise CaseError(f"{case_path}: filename {case_path.stem!r} does not match id {case_id!r}")
+        for entry in raw["checks"]:  # kind: autorater is declared, not run in replay; skip the lookup
+            if entry.get("kind") != "autorater" and not checks_registry.is_registered(entry.get("check")):
                 raise CaseError(f"{case_path}: {case_id!r} uses an unregistered check {entry.get('check')!r}")
         if case_id in seen:
             raise CaseError(f"duplicate case id {case_id!r}: {seen[case_id]} and {case_path}")
         seen[case_id] = case_path
         kwargs = dict(raw, measures=tuple(raw["measures"]), scripted_answers=tuple(raw["scripted_answers"]))
+        kwargs.setdefault("notes", None)
         cases.append(Case(path=case_path, **kwargs))
     return cases
