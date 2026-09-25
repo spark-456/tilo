@@ -1,0 +1,73 @@
+{
+  "rule": "DC-04",
+  "note": "A Team Lead u_owner assigned has a Decision with scope all; w_ops_board's owner u_ops never assigned them, so it answers nothing there.",
+  "decision": {
+    "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W7",
+    "org_id": "org_acme",
+    "question": "Can a supplier portal link be opened from an inbound email?",
+    "domain": "security",
+    "answer": "Only links to domains on the approved supplier list; flag the rest.",
+    "option_id": null,
+    "answered_by": {
+      "by": "team_lead",
+      "ref": "tl_security",
+      "at": "2026-09-29T10:00:00.000Z"
+    },
+    "source": {
+      "world_id": "w_village_basic",
+      "run_id": "r_village_basic_1",
+      "card_id": "01J8Z3K4M5N6P7Q8R9S0T1V2W2"
+    },
+    "scope": {
+      "worlds": "all",
+      "districts": "all"
+    },
+    "created_at": "2026-09-29T10:00:01.000Z",
+    "expires_at": null
+  },
+  "worlds": {
+    "w_village_basic": {
+      "org_id": "org_acme",
+      "owner": "u_owner"
+    },
+    "w_ops_board": {
+      "org_id": "org_acme",
+      "owner": "u_ops"
+    }
+  },
+  "team_lead_at_answer": {
+    "id": "tl_security",
+    "user": "u_security_lead",
+    "domain": "security",
+    "assigned_by": {
+      "by": "u_owner",
+      "at": "2026-09-29T09:00:00.000Z"
+    }
+  },
+  "reuse": {
+    "answered": {
+      "ts": "2026-10-05T09:00:00.000Z",
+      "world_id": "w_ops_board",
+      "district": "D1",
+      "data": {
+        "answered_by": "decision",
+        "decision_id": "01J8Z3K4M5N6P7Q8R9S0T1V2W7"
+      }
+    },
+    "routed": {
+      "data": {
+        "card_id": "01JB5VQ0000000000000009101",
+        "domain": "security"
+      }
+    },
+    "team_lead": {
+      "id": "tl_security",
+      "user": "u_security_lead",
+      "domain": "security",
+      "assigned_by": {
+        "by": "u_owner",
+        "at": "2026-09-29T09:00:00.000Z"
+      }
+    }
+  }
+}

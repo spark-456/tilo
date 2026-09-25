@@ -158,12 +158,24 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     a float `const`. `max_attempts` includes the first attempt and is at most 3 (BQ-58).
     `decision.schema.json` is the PRD 15.1 Decision; `answered_by` is `authz` narrowed to a person
     or a Team Lead, and a Team Lead's Decision names its domain. Reuse rules DC-01 to DC-04; a
-    gate is never opened from a Decision (BQ-60). `manifest.schema.json` is the PRD 13.3 manifest:
-    lower-case SHA-256 hashes, no URL user info in a source `ref` (PRD 16.1), a verified claim
-    has a source; rules MF-01 to MF-05 (BQ-59). `question.answered` data 1.1.0 adds
-    `decision_id`, set exactly when `answered_by` is `decision`. `config/teams.yaml` is an example
-    list of `team_lead.schema.json` entries; a trailing `[]` in `CONFIG_SHAPES` marks such a list
-    file, and `just contracts-check` validates both new config files when present.
+    gate is never opened from a Decision (BQ-60). Only the source world's owner or a Team Lead
+    gives a Decision (PRD 13.1; an Approver's answer makes none), a Decision's scope stays within
+    the worlds where its answerer has that authority, and reuse checks the answerer again in the
+    reusing world at the event's time, as OB-01 does for gates: the person is that world's owner,
+    or the Team Lead's record still exists with the same domain, assigned by that world's owner no
+    later than the answer. Cases are in `fixtures/decision/crossref/` with the reference check in
+    `test_FR_AGT_07_decision_crossref.py`. `manifest.schema.json` is the PRD 13.3 manifest:
+    lower-case SHA-256 hashes, a verified claim has a source; rules MF-01 to MF-05 (BQ-59). A
+    source `ref` is an allowlist of four closed shapes (an http or https URL of host, port and
+    path; an artifact or cell ref; a connector ref; a plain file name), because a denylist of
+    user-info spellings missed `//u@host`, `https:\u@host`, a leading space and query-string
+    tokens (PRD 16.1 rule 4, 16.2); a web `ref` therefore carries no query or fragment.
+    `question.answered` data 1.1.0 adds `decision_id`, set exactly when `answered_by` is
+    `decision`. A further valid case of an event type may sit next to the registry fixture as
+    `fixtures/events/valid/<type>--<case>.json` (`question.answered--from_decision.json` cites a
+    Decision fixture). `config/teams.yaml` is an example list of `team_lead.schema.json`
+    entries; a trailing `[]` in `CONFIG_SHAPES` marks such a list file, and
+    `just contracts-check` validates both new config files when present.
 
 ## Consequences
 - Builders import `tilo_contracts` or `@tilo/contracts` and never hand-write these shapes.

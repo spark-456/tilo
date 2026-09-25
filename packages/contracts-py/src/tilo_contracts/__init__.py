@@ -6,7 +6,7 @@
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
 # common.schema.json 1.0.0 sha256:cdb1a1ceeeebb299
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
-# decision.schema.json 1.0.0 sha256:1267fdaae7712c6b
+# decision.schema.json 1.0.0 sha256:d39fb93c8944b156
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
 # event.schema.json 1.0.0 sha256:06d09566f16c4dfc
 # events/data/agent.assigned.schema.json 1.0.0 sha256:f7672c62780b8b4b
@@ -82,7 +82,7 @@
 # events/registry.schema.json 1.0.0 sha256:42c04358933101ef
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
-# manifest.schema.json 1.0.0 sha256:b8ab9c333d92fd71
+# manifest.schema.json 1.0.0 sha256:8f355d6d19a8e629
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
@@ -520,7 +520,7 @@ class ConnectorDataClass(BaseModel):
 
 class DecisionAnswerer(BaseModel):
     """
-    The authz shape (BQ-01) narrowed to who answers a question: a person (a user id) or a Team Lead (a Team Lead id). A policy never answers a question and a model never does.
+    The authz shape (BQ-01) narrowed to who answers a question: the owner of the source world (a user id; an Approver's answer makes no Decision, DC-01) or a Team Lead (a Team Lead id, DC-02). A policy never answers a question and a model never does. DC-04 checks the answerer again in the world of each repeat question.
     """
 
     model_config = ConfigDict(
@@ -1438,7 +1438,7 @@ class ManifestSkillVersion(BaseModel):
 
 class ManifestSource(BaseModel):
     """
-    Where material came from. ref is the URL for web, the file name for file, <connector_id>:<item id> for connector, <artifact_id>@<version>#<cell> for cell and <artifact_id>@<version> for artifact. A URL never carries user info (PRD 16.1 rule 4). fingerprint is the SHA-256 of the fetched content, the result cache key part (PRD 13.1).
+    Where material came from. ref is the URL for web, the file name for file, <connector_id>:<item id> for connector, <artifact_id>@<version>#<cell> for cell and <artifact_id>@<version> for artifact. Every ref is one of four closed shapes, so none carries a credential or a query-string token (PRD 16.1 rule 4, 16.2; MF-03): an http or https URL of host, optional port and path only (no user info, query or fragment); an artifact ref with an optional cell after #; a connector ref whose item id has only letters, digits and . _ ~ -; or a file name with no / \\ : ? # @ % or control character and no space at either end. fingerprint is the SHA-256 of the fetched content, the result cache key part (PRD 13.1).
     """
 
     model_config = ConfigDict(
@@ -1446,7 +1446,14 @@ class ManifestSource(BaseModel):
     )
     id: Slug
     kind: Literal["web", "file", "connector", "cell", "artifact"]
-    ref: Annotated[str, Field(max_length=2048, min_length=1)]
+    ref: Annotated[
+        str,
+        Field(
+            max_length=2048,
+            min_length=1,
+            pattern="^(?:https?://[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?|art_[0-9A-Za-z_]{1,48}@[1-9][0-9]{0,8}(?:#[^\\x00-\\x1f\\x7f\\\\/?#@%]{1,128})?|[a-z][a-z0-9_]{1,31}:[A-Za-z0-9._~-]{1,512}|[^\\s\\x00-\\x1f\\x7f/\\\\:?#@%](?:[^\\x00-\\x1f\\x7f/\\\\:?#@%]{0,253}[^\\s\\x00-\\x1f\\x7f/\\\\:?#@%])?)$",
+        ),
+    ]
     fingerprint: Annotated[str, Field(max_length=71, pattern="^sha256:[0-9a-f]{64}$")]
     fetched_at: Timestamp
 
@@ -1835,7 +1842,7 @@ class Connector(BaseModel):
 
 class DecisionScope(BaseModel):
     """
-    Where the decision may answer a repeat question: all worlds of the org or the listed ones, and in them all districts or the listed district ids (BQ-60).
+    Where the decision may answer a repeat question: all worlds of the org the answerer may answer in (worlds the person owns, or worlds of the owner who assigned the Team Lead; DC-01, DC-02) or the listed ones among them, and in them all districts or the listed district ids (BQ-60).
     """
 
     model_config = ConfigDict(

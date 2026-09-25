@@ -50,7 +50,7 @@
   "then": { "properties": { "domain": { "$ref": "common.schema.json#/$defs/slug" } } },
   "$defs": {
     "answerer": {
-      "description": "The authz shape (BQ-01) narrowed to who answers a question: a person (a user id) or a Team Lead (a Team Lead id). A policy never answers a question and a model never does.",
+      "description": "The authz shape (BQ-01) narrowed to who answers a question: the owner of the source world (a user id; an Approver's answer makes no Decision, DC-01) or a Team Lead (a Team Lead id, DC-02). A policy never answers a question and a model never does. DC-04 checks the answerer again in the world of each repeat question.",
       "type": "object",
       "additionalProperties": false,
       "required": ["by", "ref", "at"],
@@ -75,7 +75,7 @@
       }
     },
     "scope": {
-      "description": "Where the decision may answer a repeat question: all worlds of the org or the listed ones, and in them all districts or the listed district ids (BQ-60).",
+      "description": "Where the decision may answer a repeat question: all worlds of the org the answerer may answer in (worlds the person owns, or worlds of the owner who assigned the Team Lead; DC-01, DC-02) or the listed ones among them, and in them all districts or the listed district ids (BQ-60).",
       "type": "object",
       "additionalProperties": false,
       "required": ["worlds", "districts"],
