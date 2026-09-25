@@ -8,7 +8,7 @@ model, and a policy-authorised Decision's authz.ref equals the covering policy_i
 from __future__ import annotations
 
 import tilo_policy
-from conftest import OWNER, WORLD, base_facts, base_instruction, base_policy
+from _policy_lib import OWNER, WORLD, base_facts, base_instruction, base_policy
 
 NOW = "2026-09-29T09:42:16.000Z"
 
@@ -51,6 +51,7 @@ def test_FR_HIL_08_PI_16_l3_run_carries_authz_by_policy_ref_equal_to_policy_id(r
         action_type="post_status_update",
         level="L3",
         recipients=("teammate@example.org",),
+        domains=("example.org",),
         history=[{"by": OWNER, "at": "2026-09-29T09:30:00.000Z", "change": "Created at L3", "level": "L3"}],
     )
     proposal = tilo_policy.Proposal(

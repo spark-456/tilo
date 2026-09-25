@@ -23,11 +23,12 @@ def load_risk_table(path: str | os.PathLike | None = None) -> RiskTable:
     PolicyConfigError if the file is missing or fails that schema. Never returns a partial
     table."""
 
+
 @dataclass(frozen=True)
 class RiskTable:
-    actions: dict[str, str]          # action_type -> "T1" | "T2" | "T3", from $defs.actions
-    modifiers: tuple[str, ...]       # the six tier_condition names, from $defs.modifiers
-    max_level: dict[str, str]        # {"T1": ..., "T2": ..., "T3": "L1"}, from $defs.max_level
+    actions: dict[str, str]  # action_type -> "T1" | "T2" | "T3", from $defs.actions
+    modifiers: tuple[str, ...]  # the six tier_condition names, from $defs.modifiers
+    max_level: dict[str, str]  # {"T1": ..., "T2": ..., "T3": "L1"}, from $defs.max_level
 
     def assess(self, action_type: str, facts: "SideEffectFacts") -> "Assessment":
         """Deterministic. modifiers = the subset of the six SideEffectFacts flags below that are
@@ -36,9 +37,10 @@ class RiskTable:
         T3 with modifiers=() (unknown action type, PI-07's "fail closed" reading extended to
         assess() itself, not just decide())."""
 
+
 @dataclass(frozen=True)
 class Assessment:
-    tier: str                # "T1" | "T2" | "T3"
+    tier: str  # "T1" | "T2" | "T3"
     modifiers: tuple[str, ...]  # e.g. ("new_recipients", "attachments"); () when none apply
 ```
 
@@ -47,13 +49,13 @@ class Assessment:
 ```python
 @dataclass(frozen=True)
 class SideEffectFacts:
-    recipients: tuple[str, ...] = ()        # every recipient address of the proposed action
+    recipients: tuple[str, ...] = ()  # every recipient address of the proposed action
     known_recipients: tuple[str, ...] = ()  # addresses the thread/contact list already has
-    attachments: tuple[Any, ...] = ()       # non-empty => "attachments" modifier
-    external_share: bool = False            # => "external_sharing" modifier
-    deletion: bool = False                  # => "deletion" modifier
-    money_or_legal: bool = False            # => "money_or_legal" modifier
-    safety_flags: bool = False              # => "safety_flag" modifier
+    attachments: tuple[Any, ...] = ()  # non-empty => "attachments" modifier
+    external_share: bool = False  # => "external_sharing" modifier
+    deletion: bool = False  # => "deletion" modifier
+    money_or_legal: bool = False  # => "money_or_legal" modifier
+    safety_flags: bool = False  # => "safety_flag" modifier
 
     @property
     def new_recipients(self) -> tuple[str, ...]:
@@ -77,33 +79,35 @@ class Proposal:
     district: str
     destination: str | None
     facts: SideEffectFacts
-    item: dict | None       # artifact_ref shape ({"artifact_id": ..., "version": ...}) or None
+    item: dict | None  # artifact_ref shape ({"artifact_id": ..., "version": ...}) or None
     credits: float
     instruction: dict | None  # the whole event dict (type/authz/data) the proposal cites, or None
 
+
 @dataclass(frozen=True)
 class Decision:
-    outcome: str        # "gate" | "run_after_undo" | "run" | "draft_only"
-    tier: str            # "T1" | "T2" | "T3", from RiskTable.assess
+    outcome: str  # "gate" | "run_after_undo" | "run" | "draft_only"
+    tier: str  # "T1" | "T2" | "T3", from RiskTable.assess
     modifiers: tuple[str, ...]
-    level: str            # the autonomy level in force for this decision: "L0".."L3"
-                           # (T3 and "no covering policy" both report "L1", since that is the
-                           # level whose rule — "ask each time" — governs them)
+    level: str  # the autonomy level in force for this decision: "L0".."L3"
+    # (T3 and "no covering policy" both report "L1", since that is the
+    # level whose rule — "ask each time" — governs them)
     policy_id: str | None  # the covering policy's id on the policy path, else None
-    authz: dict | None     # {"by": "policy", "ref": policy_id, "at": now} on a policy run path,
-                           # None on "gate" and "draft_only" (a gate authorises nothing, PI-01)
-    undo_window_s: int | None   # set (>=1) only for "run_after_undo"; else None
-    scheduled_at: str | None    # set only for "run_after_undo": now + undo_window_s; else None
-    reason: str            # a stable short code, see "Reason codes" below
+    authz: dict | None  # {"by": "policy", "ref": policy_id, "at": now} on a policy run path,
+    # None on "gate" and "draft_only" (a gate authorises nothing, PI-01)
+    undo_window_s: int | None  # set (>=1) only for "run_after_undo"; else None
+    scheduled_at: str | None  # set only for "run_after_undo": now + undo_window_s; else None
+    reason: str  # a stable short code, see "Reason codes" below
+
 
 def decide(
     proposal: Proposal,
     *,
     table: RiskTable,
-    policies: list[dict],     # policy.schema.json records (plain dicts)
+    policies: list[dict],  # policy.schema.json records (plain dicts)
     world_owner: str,
-    applied: list[dict],      # earlier policy.applied parts of this world; see "applied shape"
-    now: str,                 # RFC 3339 timestamp, common.schema.json#/$defs/timestamp
+    applied: list[dict],  # earlier policy.applied parts of this world; see "applied shape"
+    now: str,  # RFC 3339 timestamp, common.schema.json#/$defs/timestamp
 ) -> Decision:
     """Deterministic; same arguments always give an equal Decision (dataclass equality).
     A model is never consulted and the clock is never read internally — `now` is the only
@@ -185,14 +189,14 @@ seconds, formatted the same way as `now` (RFC 3339, `...Z`, millisecond precisio
 
 ```python
 def open_gate(
-    reserved: dict,             # the approval.requested event ({"type", "authz": None, "data"})
-    resolved: dict | None,      # the approval.resolved event, or None (never answered)
+    reserved: dict,  # the approval.requested event ({"type", "authz": None, "data"})
+    resolved: dict | None,  # the approval.resolved event, or None (never answered)
     *,
     world_owner: str,
-    team_lead: dict | None = None,   # team_lead.schema.json record, when resolved's authz.by
-                                      # is "team_lead"
-    policy: dict | None = None,      # the policy.schema.json record reserved["data"]["team_lead"]
-                                      # names, when a Team Lead answered
+    team_lead: dict | None = None,  # team_lead.schema.json record, when resolved's authz.by
+    # is "team_lead"
+    policy: dict | None = None,  # the policy.schema.json record reserved["data"]["team_lead"]
+    # names, when a Team Lead answered
 ) -> Decision:
     """PI-02, PI-03: only `resolved["data"]["option"] == "approve"` from someone allowed to open
     THIS gate (same gate_id/card_id/outbox_id as `reserved`) yields outcome "run"; `edit`,

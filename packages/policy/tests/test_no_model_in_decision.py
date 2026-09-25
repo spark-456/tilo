@@ -11,7 +11,7 @@ import ast
 import pathlib
 
 import tilo_policy
-from conftest import OWNER, WORLD, base_facts, base_instruction, base_policy
+from _policy_lib import OWNER, WORLD, base_facts, base_instruction, base_policy
 
 NOW = "2026-09-29T09:42:16.000Z"
 

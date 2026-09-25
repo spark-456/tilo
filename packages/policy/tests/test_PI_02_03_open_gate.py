@@ -6,7 +6,7 @@ Director — open_gate only ever hands authority to a person or a Team Lead (PI-
 from __future__ import annotations
 
 import tilo_policy
-from conftest import OWNER
+from _policy_lib import OWNER
 
 GATE = {"gate_id": "G1", "card_id": "01JB5VQ0000000000000009001", "outbox_id": "01JB5VQ0000000000000009002"}
 
