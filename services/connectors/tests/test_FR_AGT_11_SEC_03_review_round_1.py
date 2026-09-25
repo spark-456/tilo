@@ -292,3 +292,37 @@ def test_FR_AGT_11_OB_05_missing_adapter_fails_the_entry_and_the_batch_goes_on(g
     settled = no_adapters.dispatch_due()
     assert sorted(e["state"] for e in settled) == ["failed", "failed"]
     assert no_adapters.dispatch_due() == []
+
+
+def test_FR_AGT_11_an_adapter_error_is_retried_not_failed_and_the_batch_goes_on(gate_case_factory):
+    """An adapter exception is ambiguous: the side effect may or may not have happened. The entry
+    stays retryable (the adapter's key dedupe keeps it to one send); marking it failed could hide
+    a send that did happen, with no event for it (PRD 9.4). Only a missing adapter is final."""
+
+    class FailsFirstForOneKey(FakeGmail):
+        def __init__(self, key: str) -> None:
+            super().__init__()
+            self.key = key
+            self.failed_once = False
+
+        def send_reply(self, thread_id, item, recipients, idempotency_key, grant):
+            if idempotency_key == self.key and not self.failed_once:
+                self.failed_once = True
+                raise RuntimeError("Gmail 503")
+            return super().send_reply(thread_id, item, recipients, idempotency_key, grant)
+
+    emitted: list[dict] = []
+    flaky = gate_case_factory(outbox_id="01JB5VQ0000000000000009401", idempotency_key="r_village_basic_1:U2:z:1")
+    steady = gate_case_factory(outbox_id="01JB5VQ0000000000000009402", idempotency_key="r_village_basic_1:U2:z:2")
+    gmail = FailsFirstForOneKey(flaky["entry"]["idempotency_key"])
+    outbox = tilo_connectors.Outbox(
+        tilo_connectors.InMemoryOutboxStore(), {"gmail": gmail}, emitted.append, ManualClock(T0)
+    )
+    for case in (flaky, steady):
+        outbox.enqueue(case["entry"], evidence_from_case(case))
+    first = outbox.dispatch_due()
+    assert [e["id"] for e in first if e["state"] == "sent"] == [steady["entry"]["id"]]
+    assert all(e["state"] != "failed" for e in first)
+    outbox.dispatch_due()
+    assert len(gmail.sent) == 2
+    assert len(_transfers(emitted)) == 2
