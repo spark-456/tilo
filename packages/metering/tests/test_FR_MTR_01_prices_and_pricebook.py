@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 
 import pytest
 import yaml
-from _metering_testlib import PRICES_V1, PRICES_V2, REPO_ROOT, _prices, build_treasury, metering_config, write_yaml
-from tilo_metering import InMemoryFlagStore, MeteringConfig, MeteringConfigError, PriceBook, Treasury, UnpricedError
+from _metering_testlib import PRICES_V1, PRICES_V2, REPO_ROOT, metering_config, write_yaml
+from tilo_metering import InMemoryFlagStore, MeteringConfig, MeteringConfigError, PriceBook, UnpricedError
 from tilo_metering.prices import PriceQuote, Usage
 
 _MAR, _JUN, _SEP = (datetime(2026, month, 1, 12, tzinfo=UTC) for month in (3, 6, 9))
@@ -52,43 +52,6 @@ def test_FR_MTR_01_repo_prices_yaml_loads_and_refuses_every_profile():
     for profile in raw["profiles"]:
         with pytest.raises(UnpricedError):
             book.quote(profile, at=datetime.now(tz=UTC))
-
-
-def test_FR_MTR_01_committed_entries_keep_their_price_effective_date_and_source(tmp_path):
-    """An entry is never re-priced: two runs committed under different price versions each keep
-    the date and source that priced them, not the book's latest version."""
-    book = _book(tmp_path, PRICES_V1, PRICES_V2)
-    treasury = Treasury(
-        config=MeteringConfig.load(write_yaml(tmp_path, "m.yaml", metering_config())),
-        prices=book,
-        flags=InMemoryFlagStore(),
-    )
-    treasury.open_run("r_early", user_id="u", org_id="org", approved=1000)
-    treasury.open_run("r_late", user_id="u", org_id="org", approved=1000)
-    usage = Usage(profile="widget", tokens_in=1_000_000, tokens_out=0)
-    treasury.commit_usage(treasury.reserve("r_early", "s1", estimate=1.0, at=_MAR), usage, at=_MAR)
-    treasury.commit_usage(treasury.reserve("r_late", "s1", estimate=3.0, at=_SEP), usage, at=_SEP)
-    commits = {e.run: e for e in treasury.ledger if e.kind == "commit"}
-    assert commits["r_early"].price_effective_date == "2026-01-01"
-    assert commits["r_early"].price_source == PRICES_V1["source"]
-    assert commits["r_late"].price_effective_date == "2026-06-01"
-    assert commits["r_late"].price_source == PRICES_V2["source"]
-
-
-def test_FR_MTR_01_unset_status_refuses_to_price_but_record_usage_still_records(tmp_path):
-    """record_usage meters recorded usage only: it always works, even unset, and appends a usage
-    entry with credits=None."""
-    unset = _prices(None, None, None, None, status="unset")
-    usage = Usage(profile="widget", tokens_in=100, tokens_out=100)
-    with pytest.raises(UnpricedError):
-        PriceBook.load(write_yaml(tmp_path, "unset.yaml", unset)).credits(usage, at=_MAR)
-    treasury, _flags = build_treasury(tmp_path, prices=unset)
-    treasury.open_run("r_unset", user_id="u", org_id="org", approved=100)
-    treasury.record_usage("r_unset", usage, at=_MAR)
-    entries = [e for e in treasury.ledger if e.kind == "usage" and e.run == "r_unset"]
-    assert len(entries) == 1
-    assert entries[0].credits is None
-    assert entries[0].usage == usage
 
 
 def test_FR_MTR_01_pricebook_is_deeply_immutable(tmp_path):

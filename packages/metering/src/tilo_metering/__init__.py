@@ -1,5 +1,4 @@
-"""tilo_metering: price book, metering config, flag store and Treasury (PRD 14.1, 14.5, FR-MTR-01,
-FR-MTR-02, FR-MTR-04). Daily USD spend caps, alerts and kill-switch flipping are P8-01c."""
+"""tilo_metering: price book, config, flags and Treasury (FR-MTR-01/02/04). Daily USD caps/kill-switch: P8-01c."""
 
 from .config import MeteringConfig
 from .errors import MeteringConfigError, UnpricedError
