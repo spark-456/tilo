@@ -60,7 +60,7 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api packages/providers packages/contracts-py packages/metering
+    uv run mypy services/api packages/providers packages/contracts-py packages/metering evals/src
     pnpm -r exec tsc --noEmit
 
 # Run the eval harness (not built yet — ticket P3).
