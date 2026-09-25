@@ -2,17 +2,18 @@
 EFF-03; PRD 6.4, 6.6). Business code calls `Router.generate(role, request,
 budget=...)` (also `stream`, `embed`) and never names a model or profile.
 
-Fallback (PL-03): QuotaError/RetryableError move to the next candidate;
-RequestError and non-ProviderError bugs propagate unchanged; SafetyError
-ends the call as outcome="safety_blocked", not an exception -- every
-ProviderError subtype gets its own explicit branch (P0-05 security
-hand-over). Cascades (EFF-02): role.cascade (cheapest first) is tried in
-order; escalation is logged with a reason on schema failure (one
-same-profile repair attempt), verifier rejection or low confidence. Token
-caps (EFF-03): role.max_input_tokens is enforced by dropping the oldest
-tool_outputs then truncating the one that remains, or refusing -- never
-sent over the cap. Every attempt lands in RouterResult.attempts -- the
-TiloEvent.trace field's material (PRD 9.3)."""
+Fallback (PL-03): every ProviderError subtype gets its own explicit branch
+(P0-05 security hand-over) -- QuotaError/RetryableError, and every other
+adapter-raised ProviderError (malformed response, bad stream chunk, missing
+api_key_env, ...), move to the next candidate; RequestError and
+non-ProviderError bugs propagate unchanged; SafetyError ends the call as
+outcome="safety_blocked" (generate()) or re-raises (stream()/embed()).
+Cascades (EFF-02): role.cascade (cheapest first) is tried in order;
+escalation is logged with a reason on schema failure (one repair attempt),
+verifier rejection or low confidence. Token caps (EFF-03): role.max_input_tokens
+drops the oldest tool_outputs then truncates the one that remains, or
+refuses -- never sent over the cap. Every attempt lands in
+RouterResult.attempts -- the TiloEvent.trace field's material (PRD 9.3)."""
 
 from __future__ import annotations
 
@@ -247,12 +248,14 @@ class Router:
                 reason=incoming_reason,
             )
             return attempt, None, "safety_blocked"
-        except (QuotaError, RetryableError) as error:
+        except (QuotaError, RetryableError, ProviderError) as error:
+            # Every other ProviderError (incl. the base class an adapter raises directly for a
+            # malformed response, bad tool-call JSON, ...) is not the caller's fault -- falls back.
             attempt = RouterAttempt(
                 profile_id, provider_name, "error", _ms(start), error_type=type(error).__name__, reason=incoming_reason
             )
             return attempt, None, "fallback"
-        # Any other exception (a bug, not a documented ProviderError subtype) is not caught here:
+        # Any other exception (a bug, not any ProviderError subtype at all) is not caught here:
         # it propagates unchanged (P0-05 security hand-over).
         tokens_in, tokens_out = _usage(response)
         attempt = RouterAttempt(
@@ -369,8 +372,10 @@ class Router:
                 return
             except RequestError:
                 raise
-            except (QuotaError, RetryableError) as error:
-                last_error = error
+            except SafetyError:
+                raise  # PL-03: no fallback on a safety block, same policy as generate().
+            except (QuotaError, RetryableError, ProviderError) as error:
+                last_error = error  # every other ProviderError falls back, same as generate().
                 continue
         assert last_error is not None  # noqa: S101 -- candidates is never empty
         raise last_error
@@ -385,7 +390,9 @@ class Router:
                 return provider.embed(request)
             except RequestError:
                 raise
-            except (QuotaError, RetryableError) as error:
+            except SafetyError:
+                raise
+            except (QuotaError, RetryableError, ProviderError) as error:
                 last_error = error
                 continue
         assert last_error is not None  # noqa: S101

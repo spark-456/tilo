@@ -22,9 +22,16 @@ adapter escapes the router"):
 - A raw, non-`ProviderError` exception from an adapter (a bug) is never
   silently swallowed or treated as a retryable/fallback-worthy error -- it
   propagates unchanged, so the bug stays visible.
+- An adapter also raises the base `ProviderError` itself (malformed response
+  body, bad stream chunk, bad tool-call JSON, missing api_key_env) -- that
+  is provider trouble, not caller trouble, so `generate()`, `stream()` and
+  `embed()` all give it the same explicit fallback policy as QuotaError/
+  RetryableError, recorded as an attempt rather than escaping unhandled.
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 import pytest
 from conftest import (
@@ -34,7 +41,7 @@ from conftest import (
     prices_config_for,
     write_providers_config,
 )
-from tilo_providers.errors import QuotaError, RequestError, RetryableError, SafetyError
+from tilo_providers.errors import ProviderError, QuotaError, RequestError, RetryableError, SafetyError
 from tilo_providers.interfaces import Capability, GenerateRequest
 
 
@@ -132,6 +139,82 @@ def test_PL_03_safety_block_is_returned_as_a_safety_outcome_not_a_fallback(provi
     assert result.attempts[0].profile_id == "large"
     assert result.attempts[0].error_type == "SafetyError"
     assert fallback.calls == [], "a safety block does not fall back silently"
+
+
+def test_PL_03_malformed_response_provider_error_is_recorded_and_handled(providers_config):
+    """Security hand-over from P0-05: an adapter also raises the base `ProviderError` itself (not
+    only its four named subclasses) for a provider-side malfunction -- a malformed response body,
+    a bad stream chunk, bad tool-call JSON, a missing api_key_env. None of that is the caller's
+    fault, so the router must give it the same explicit policy as QuotaError/RetryableError: record
+    it as an attempt (`error_type` set) and fall back, rather than let it escape unhandled."""
+    primary = ScriptedModelProvider(
+        "large", [ScriptedCall(outcome="error", error=ProviderError("PL-02: malformed response body"))]
+    )
+    fallback = ScriptedModelProvider(
+        "medium", [ScriptedCall(text="ok from medium", usage={"input_tokens": 5, "output_tokens": 3})]
+    )
+    router = _router(providers_config, {"large": primary, "medium": fallback})
+
+    result = router.generate("director", GenerateRequest(prompt="Summarise the quarter."))
+
+    assert result.outcome == "ok"
+    assert result.response is not None
+    assert result.response.text == "ok from medium"
+    assert [attempt.profile_id for attempt in result.attempts] == ["large", "medium"]
+    primary_attempt, fallback_attempt = result.attempts
+    assert primary_attempt.outcome == "error"
+    assert primary_attempt.error_type == "ProviderError"
+    assert fallback_attempt.outcome == "ok"
+    assert len(primary.calls) == 1
+    assert len(fallback.calls) == 1
+
+
+def test_PL_03_stream_falls_back_on_base_provider_error(providers_config):
+    """Same gap, in `stream()`: a base `ProviderError` from the primary must not escape the
+    router -- it falls back to the next candidate, same as `generate()`."""
+    from tilo_providers.router import Router  # noqa: PLC0415
+
+    primary = ScriptedModelProvider(
+        "large", [ScriptedCall(outcome="error", error=ProviderError("PL-02: malformed stream chunk"))]
+    )
+    fallback = ScriptedModelProvider("medium", [ScriptedCall(text="ok from medium")])
+    router = Router(providers_config, provider_for_profile={"large": primary, "medium": fallback}.__getitem__)
+
+    chunks = list(router.stream("director", GenerateRequest(prompt="Summarise the quarter.")))
+
+    assert [chunk.text for chunk in chunks] == ["ok from medium"]
+    assert len(primary.calls) == 1
+    assert len(fallback.calls) == 1
+
+
+def test_PL_03_embed_falls_back_on_base_provider_error(providers_config):
+    """Same gap, in `embed()`."""
+    from tilo_providers.router import Router  # noqa: PLC0415
+
+    class _EmbedProvider(ScriptedModelProvider):
+        def __init__(
+            self, profile_id: str, *, error: Exception | None = None, vectors: list[list[float]] | None = None
+        ):
+            super().__init__(profile_id, [])
+            self._error = error
+            self._vectors = vectors
+            self.embed_calls: list[Any] = []
+
+        def embed(self, request: Any) -> Any:
+            self.embed_calls.append(request)
+            if self._error is not None:
+                raise self._error
+            return {"vectors": self._vectors}
+
+    primary = _EmbedProvider("large", error=ProviderError("PL-02: provider response missing field"))
+    fallback = _EmbedProvider("medium", vectors=[[0.1, 0.2]])
+    router = Router(providers_config, provider_for_profile={"large": primary, "medium": fallback}.__getitem__)
+
+    result = router.embed("director", {"input": ["hello"]})
+
+    assert result == {"vectors": [[0.1, 0.2]]}
+    assert len(primary.embed_calls) == 1
+    assert len(fallback.embed_calls) == 1
 
 
 def test_PL_03_non_provider_error_from_an_adapter_is_not_swallowed(providers_config):

@@ -6,8 +6,7 @@
 `live_factory` closure only when a call actually goes live (`LIVE=1`).
 Nothing here imports an adapter module or builds a network client for a
 plain replay hit. The router (P0-06) calls `provider_for_role_profile`
-directly for every candidate profile in a cascade or fallback, keyed by
-(role, profile) so recordings stay grouped by role as before."""
+directly per candidate profile in a cascade or fallback."""
 
 from __future__ import annotations
 

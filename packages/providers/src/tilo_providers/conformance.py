@@ -1,10 +1,8 @@
-"""tilo_providers.conformance — PL-05 conformance suite: schema adherence,
-tool calling, repair rate, latency budget, safety handling, checked per
-profile against a `ModelProvider` the caller supplies (a recording or the
-fake provider in CI; live only with `LIVE=1`). Results write to
-`config/conformance/<profile_id>.json`; `config.load_providers_config`'s
-`conformance_dir` gate refuses a role whose primary, fallback or cascade
-profile has a failing result. Run via `just conformance`."""
+"""tilo_providers.conformance — PL-05 suite (schema adherence, tool calling,
+repair rate, latency budget, safety handling) per profile against a caller-
+supplied `ModelProvider` (a recording or fake in CI; `LIVE=1` for real).
+Writes `config/conformance/<profile_id>.json`; `config.load_providers_config`'s
+`conformance_dir` gate refuses a failing role. Run via `just conformance`."""
 
 from __future__ import annotations
 
@@ -37,8 +35,7 @@ def _tool_calling(provider: ModelProvider) -> str:
 
 
 def _repair_rate(provider: ModelProvider) -> str:
-    # PRD 6.6 cascades allow one repair attempt: passes if a fresh call
-    # after an initial one still produces schema-valid JSON.
+    # PRD 6.6: passes if a fresh call after an initial one is still schema-valid.
     provider.generate(GenerateRequest(prompt="first attempt", json_mode=True, response_schema=_SCHEMA))
     response = provider.generate(
         GenerateRequest(prompt='Reply as JSON: {"answer": "ok"}', json_mode=True, response_schema=_SCHEMA)

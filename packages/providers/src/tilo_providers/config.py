@@ -5,10 +5,9 @@ with ProviderConfigError: denied model id (PL-07); a role naming an unknown
 profile; a role with no fallback profile (NFR-25); a profile with no price entry; a status "set" prices
 file with a null price, effective_date or source. price() never invents a
 price: an unset status, or any null price field, raises (PL-06). An optional
-`conformance_dir` (PL-05, ticket P0-06) refuses a role whose primary,
-fallback or cascade profile has a *failing* conformance result; a *missing*
-result only warns unless `TILO_REQUIRE_CONFORMANCE=1` (docs/open-questions.md
-BQ-55)."""
+`conformance_dir` (PL-05) refuses a role whose primary, fallback or cascade
+profile has a *failing* result; a *missing* one only warns unless
+`TILO_REQUIRE_CONFORMANCE=1` (docs/open-questions.md BQ-55)."""
 
 from __future__ import annotations
 

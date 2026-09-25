@@ -32,9 +32,9 @@ code asks `router.Router` for a **role** (PL-01) — never a model or profile id
 - No model id, prompt text or connector secret outside this package and `config/`.
 - Denylisted ids fail loudly (PL-07); every role needs a fallback (NFR-25); `price()` never
   invents a price (PL-06); `LIVE=1` gate lives in every adapter, not only `factory`.
-- `router.Router` gives every `ProviderError` subtype its own branch: `QuotaError`/
-  `RetryableError` fall back; `RequestError`/non-`ProviderError` bugs propagate unchanged;
-  `SafetyError` ends as `RouterResult(outcome="safety_blocked")`, not a raise. Escalation
-  (schema failure — one repair attempt, verifier rejection, low confidence) logs a `reason`.
-  Token caps drop oldest `tool_outputs`, truncate the last with `[truncated]`, or raise
+- `router.Router` gives every `ProviderError` subtype its own branch (no raw adapter exception
+  escapes it): `QuotaError`/`RetryableError`/base `ProviderError` fall back; `RequestError`/
+  non-`ProviderError` bugs propagate unchanged; `SafetyError` ends as `outcome="safety_blocked"`
+  in `generate()`, re-raises in `stream()`/`embed()`. Escalation (schema failure, verifier
+  rejection, low confidence) logs a `reason`; token caps drop/truncate `tool_outputs`, or raise
   `TokenCapExceededError`. No `provider_for_profile`? Built via `factory.provider_for_role_profile`.
