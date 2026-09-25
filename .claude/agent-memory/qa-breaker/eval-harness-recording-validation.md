@@ -16,6 +16,13 @@ Round 5 fixed the summary-less case, but a summary line without a `credits` key 
 the event sum (missing credits -> 0.0), so the bypass persists. When suggesting "done", ask for max(summary, events).
 Scratch config/evals.yaml must list all 8 groups or EvalsConfig refuses.
 
+P8-06a split (2026-09-25): load_cases checked group vs dir and id prefix but never id vs filename stem
+(E-PLAN/anything.yaml with id E-PLAN-01 loaded); also malformed YAML leaks raw yaml ParserError, and
+EvalsConfig accepts negative/wrong-typed values (float() ValueError/TypeError escape as non-config errors).
+P8-06a round 2: filename fix landed; the "other defects" were left unfixed (report them as the headline if
+they matter). case.schema.json leaves `recording` any string (absolute, ../ traversal pass) and `measures`
+any string, though spec says repo-relative path and EV-/FR-/EFF- ids.
+
 **Why:** fixes tend to cover exactly the repro given, not the same class of input elsewhere.
 **How to apply:** when re-reviewing a "bad input crashes the pass" fix, fuzz every field the consumer reads
 AND the file read/parse itself (encoding, nesting depth, huge ints). Case fixtures need `args: {}` on every

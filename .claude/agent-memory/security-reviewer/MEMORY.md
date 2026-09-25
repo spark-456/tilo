@@ -1,5 +1,5 @@
-- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r9 FAIL (approval.requested.approver has no owner assignment stamp); open: recipients [] scope
+- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 passed r10 (dd3d4b9); open for P4: recipients [] scope, credits self-declared
 - [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r2 FAIL; archive_ref/instruction_id leak hidden counts/ids; writer failure half-applies Stop all
-- [Policy engine P4-01](policy-engine-p4-01.md): r4 FAIL; future-stamped policy dropped lets overlapping policy run past a revocation
-- [Outbox ST-2](outbox-st2.md): r2 FAIL; `sending` re-claimable with no lease, concurrent dispatch double-sends; pending transfers per instance
+- [Policy engine P4-01](policy-engine-p4-01.md): r8 FAIL (75a46e5): `$` fix lost on $ref to a file root (evolve picks stock validator via `$schema`)
+- [Outbox ST-2](outbox-st2.md): r4 FAIL (db4f24a); emit lease steal: discard needs holder, so dup transfer or global permanent transfer block
 - [Provider secret handling](provider-secret-handling.md): P0-05 r11 PASS (7a0d1be); residual for P0-06: malformed 200 body raises raw pydantic error (echoed key truncated)
