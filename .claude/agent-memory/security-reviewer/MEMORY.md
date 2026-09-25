@@ -1,1 +1,2 @@
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); open: two tier sources
+- [ST-3a redaction and kill switch](st3a-redaction-killswitch.md): r4 FAIL (hidden names/counts via vis:"all" fixtures; kill switch locked behind writer I/O)

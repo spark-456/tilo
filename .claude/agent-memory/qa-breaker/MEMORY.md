@@ -1,1 +1,2 @@
 - [Web stage attack patterns](web-stage-attack-patterns.md) — passive wheel error; canvas edges; modifier keys; timer-stopped ticker leaves stale grid
+- [Kill switch writer attacks](kill-switch-writer-attacks.md) — hanging writer, parallel flush order, revoke flush, deep data (ST-3a)

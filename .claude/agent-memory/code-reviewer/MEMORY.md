@@ -1,1 +1,2 @@
 - [Contracts review patterns](contracts-review-patterns.md) — probe cross-reference rules, rules.md numbering, drift-check probe technique
+- [API ST-3a review patterns](api-st3a-review-patterns.md) — same-world parallel writes break ordering; revoke flush missed; size over 400
