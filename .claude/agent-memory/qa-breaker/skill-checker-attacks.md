@@ -17,3 +17,6 @@ Round 5 (2026-09-25) FAILED: reply-drafting `to` fixed; fuzz.py (scratchpad) no 
 
 **Why:** Verifier (FR-AGT-12) runs these checkers; they must fail closed, never raise.
 **How to apply:** Fuzz BOTH inputs and outputs leaf by leaf (list/dict/None/NaN/10**400/huge strings); prove schema-validity with jsonschema + skill.yaml so the crash is not dismissable; paraphrase injection and commitment text. Then try OMISSION attacks: drop rows from output arrays (unit_prices, totals, records) and see if pick/recommendation checks still pass.
+
+Re-scope round 1 (2026-09-25, skills/_lib/guard.py) FAILED: no raises, but parse_decimal returns None for float repr with exponent (1e16, 1e+300) and for >40-digit ints; table-extraction compares None==None so text cell -> 1e16 passes; invoice sums unparseable amounts as 0. number_tokens truncates at MAX_STR so exec-summary numbers after 20k chars pass; check_bounds is never called by any check.py; bcc never checked (schema bans it).
+How to apply next time: attack "None == None" comparisons and `or Decimal(0)` defaults; try exponent floats and text past the truncation cap.

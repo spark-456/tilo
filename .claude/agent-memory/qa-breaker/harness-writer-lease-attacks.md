@@ -15,5 +15,13 @@ P0-09 round 4: expiry/renewal, orphan kill, steal, twice all clean. New: append(
 
 P0-09 round 5: float seq fixed; kill/takeover, twice, float all clean; 207 green (first full run had 7 transient emulator-fixture errors, gone on rerun). New: a lone surrogate (json.loads('"\ud800"')) in summary passes EventValidator (problems == []), MemoryStore writes it, FirestoreStore raises raw UnicodeEncodeError (atomic, nothing written). Also run_skeleton returns store.read_events (whole world), so the CLI prints written 16 / 9 on a reused emulator or after a takeover, not the 8 events this run wrote. Scratch: p009_r5.py, p009_r5_cli.py.
 
+P0-09 round 7 (after b97947a _segment fix): surrogate keys at every depth, NaN/inf/2**70 + bad key, escaped-text keys, 5000-char keys, tuple/set/bytes keys all reject printably, nothing stored; 220 green. New: an int over 4300 digits (credits=10**5000) makes _finiteness_problems' `{value!r}` (validator.py:90) raise ValueError, so append raises raw ValueError, not EventRejected. Pattern: every message formatter must be total -- check repr of huge ints, not only str keys. Scratch: attack_d11.py.
+
+P0-09 round 8 (6ceabf7 bit_length fix): all 22 attack_d11 cases clean; 223 green. Still raw exceptions, not EventRejected (Python callers only; JSON-parsed depth up to 990 is fine): int key 10**5000 (_segment str(key), validator.py:69), tuple/frozenset holding 10**5000 (jsonschema message repr, :265), depth-3000 nesting or cyclic dict (RecursionError in walkers), object with raising __str__, complex/Decimal NaN. Root cause: no type gate for non-JSON types and no catch-all in problems(). Scratch: attack_d11b.py.
+
+P0-09 round 9 (36ee509 _json_tree_problems + fail-closed problems()): d11/d11b all EventRejected; 71 valid fixtures pass; 239 green. New: MemoryStore.transact appends the caller's event object (append does only a shallow dict()), so mutating ev["data"] after a successful append/emit puts a lone surrogate into the stored stream -- validate-then-alias TOCTOU. Also emit(type=[...]) raises TypeError at registry_types.get(type) before validation. Scratch: attack_d11c.py.
+
+P0-09 round 10 (6cdbca1 deep-copy + str-type guard): all d11/d11b/d11c clean, returned/read/view copies isolated, 241 green -> PASS for D-11 scope.
+
 **Why:** single-writer and "never overwrite" are D-11 invariants; tests only use distinct writer ids.
 **How to apply:** on any harness/writer re-review, first retry: two writers same writer_id; two concurrent CLI runs same --run; check transaction uses create() or a head.last_seq guard. Scratch repro scripts: same_writer.py, twice.py (spawn via running_emulator). Also note run_id must match ^r_... (schema).
