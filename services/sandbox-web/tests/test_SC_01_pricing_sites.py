@@ -1,10 +1,8 @@
-"""SC-01 competitor pricing sites (PRD 4.3 SC-01, 6.2). Generic templates
-render the seed, so these check the rendered numbers against the seed file
-itself -- never a hardcoded, scenario-specific expectation. These numbers
-also double as E-RES ground truth once P8-08 wires up the eval cases.
-"""
+"""SC-01 competitor pricing sites (PRD 4.3 SC-01, 6.2): rendered numbers checked against the seed itself."""
 
 from __future__ import annotations
+
+import re
 
 import pytest
 from _sandbox_web_testlib import SC01_SLUGS, all_scalars, load_seed, visible_text
@@ -21,6 +19,8 @@ def test_SC_01_page_shows_the_seeds_own_numbers(client, slug, page_key):
     text = visible_text(resp.text)
     for scalar in all_scalars(seed["pages"][page_key]):
         assert scalar in text, f"{slug}/{page_key} is missing seed value {scalar!r}"
+    if slug == "ledgerly" and page_key == "pricing":
+        assert re.search(r"monthly[^0-9]{0,20}19", resp.text), "seed values need their key as a label"
 
 
 @pytest.mark.parametrize("slug", SC01_SLUGS)

@@ -3,10 +3,7 @@ name = "tilo-sandbox-web"
 version = "0.1.0"
 description = "tilo_sandbox_web — fictional sandbox sites for scenario/eval browser targets (PRD 6.2)"
 requires-python = "==3.12.*"
-dependencies = [
-    "fastapi>=0.115",
-    "pyyaml>=6.0",
-]
+dependencies = ["fastapi>=0.115", "pyyaml>=6.0"]
 
 [build-system]
 requires = ["hatchling"]

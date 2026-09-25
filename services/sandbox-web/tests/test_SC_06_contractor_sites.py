@@ -1,7 +1,4 @@
-"""SC-06 kitchen-renovation contractor sites (PRD 4.3 SC-06, 6.2). The quote
-endpoint's arithmetic is generic (base + per-unit rates x inputs, from the
-seed's rate_card) and deterministic, and nothing submitted is stored.
-"""
+"""SC-06 kitchen-renovation contractors (PRD 4.3 SC-06, 6.2): quote arithmetic is generic; nothing is stored."""
 
 from __future__ import annotations
 
@@ -35,8 +32,12 @@ def test_SC_06_quote_is_deterministic_generic_arithmetic(client, slug, sqft, cab
     assert set(first.json()) == {"quote"}, "no submitted-data id or timestamp is ever echoed back"
 
 
+_BAD_QUOTE_BODIES = ['{"sqft": -5, "cabinets": 2}', '{"cabinets": 2}', "{}", '{"sqft": NaN, "cabinets": 1}']
+_BAD_QUOTE_BODIES += ['{"sqft": Infinity, "cabinets": 1}', '{"sqft": 1e308, "cabinets": 1e308}']
+
+
 @pytest.mark.parametrize("slug", SC06_SLUGS)
-@pytest.mark.parametrize("body", [{"sqft": -5, "cabinets": 2}, {"cabinets": 2}, {}])
-def test_SC_06_quote_rejects_invalid_input(client, slug, body):
-    resp = client.post(f"/s/{slug}/quote", json=body)
+@pytest.mark.parametrize("raw", _BAD_QUOTE_BODIES)
+def test_SC_06_quote_rejects_invalid_and_non_finite_input(client, slug, raw):
+    resp = client.post(f"/s/{slug}/quote", content=raw, headers={"content-type": "application/json"})
     assert resp.status_code == 422
