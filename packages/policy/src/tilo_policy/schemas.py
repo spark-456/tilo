@@ -13,6 +13,18 @@ from referencing.jsonschema import DRAFT202012
 
 CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
 BASE = "https://contracts.tilo.example/"
+_PATTERN = jsonschema.Draft202012Validator.VALIDATORS["pattern"]
+
+
+def _pattern(validator: Any, pattern: str, instance: Any, schema: dict) -> Any:
+    """JSON Schema's `$` ends the string; Python's also matches before a final newline, so a
+    trailing `$` is checked as end of string (a value ending in a newline never passes)."""
+    if pattern.endswith("$") and not pattern.endswith(r"\$"):
+        pattern = pattern[:-1] + r"\Z"
+    yield from _PATTERN(validator, pattern, instance, schema)
+
+
+_Validator = jsonschema.validators.extend(jsonschema.Draft202012Validator, {"pattern": _pattern})
 
 
 @functools.cache
@@ -23,10 +35,10 @@ def _registry() -> Registry:
 
 
 @functools.cache
-def _validator(ref: str, keys: tuple[str, ...]) -> jsonschema.Draft202012Validator:
+def _validator(ref: str, keys: tuple[str, ...]) -> Any:
     props = {k: {"$ref": f"{ref}#/properties/{k}"} for k in keys}
     schema = {"type": "object", "required": list(keys), "properties": props} if keys else {"$ref": ref}
-    return jsonschema.Draft202012Validator(schema, registry=_registry())
+    return _Validator(schema, registry=_registry())
 
 
 def conforms(name: str, instance: Any, *keys: str) -> bool:
