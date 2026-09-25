@@ -66,6 +66,12 @@ Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject
 (`tilo_providers.factory`); dev/CI tests fake the `google.genai` import path at the
 `sys.modules` boundary and never install real credentials (EFF-01).
 
+## Python (`services/connectors`)
+
+`tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
+FR-AGT-11), both already listed above (MIT); and the in-workspace `tilo-policy` (not external).
+No new licence.
+
 ## JavaScript / TypeScript (root `package.json` devDependencies, `pnpm`-managed)
 
 | Dependency | Licence | Source |
