@@ -26,7 +26,9 @@ from _api_lib import (
     OWNER,
     PRINCIPAL_HEADER,
     WORLD,
+    BlockingEventWriter,
     FlakyEventWriter,
+    ReversedDelayEventWriter,
     SlowEventWriter,
     SlowFlakyEventWriter,
     as_principal,
@@ -35,6 +37,7 @@ from _api_lib import (
     assert_part_carries_no_stamped_fields,
     base_policy,
     make_district,
+    make_pending_part,
     make_principal,
     make_world,
     validate_event,
@@ -1216,3 +1219,358 @@ def test_FR_HIL_07_revoke_with_the_writer_down_lowers_the_policy_and_queues_a_pe
     changed = [e for e in store.events[WORLD] if e["type"] == "policy.changed" and e["data"]["change"] == "revoked"]
     assert len(changed) == 1
     validate_event(changed[0])
+
+
+# ---------------------------------------------------------------------------
+# Round-5 finding 2 (qa biggest, security): a world's lock must never be held across writer I/O,
+# and every writer attempt carries its own bounded deadline. Stop-all and Pause-all must return
+# within 5s even against a writer whose append() never returns at all; a second call against the
+# *same* world, or a *different* owner's call against a world the first call merely also touches,
+# must not be held up by the first call's still-in-flight (or already-abandoned) writer attempt.
+
+
+def test_FR_HIL_07_stop_all_returns_within_5s_against_a_writer_that_never_returns(client, store):
+    ids = _world_with_policies(store, 5, level="L2")
+    blocking = BlockingEventWriter(store)
+    as_writer(blocking)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    result: dict = {}
+
+    def call():
+        started = time.monotonic()
+        resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        result["resp"] = resp
+        result["elapsed"] = time.monotonic() - started
+
+    t = threading.Thread(target=call, daemon=True)
+    t.start()
+    try:
+        assert blocking.entered.wait(timeout=5), "the call never reached the (blocking) writer"
+        t.join(timeout=8.0)
+        assert not t.is_alive(), (
+            "stop-all never returned against a writer whose append() never returns -- the world "
+            "lock (or an unbounded per-writer-call wait) is blocking the whole request past its "
+            "5s budget"
+        )
+        assert "resp" in result
+        resp = result["resp"]
+        assert resp.status_code in (200, 202), resp.text
+        assert result["elapsed"] <= 5.0, f"stop-all took {result['elapsed']:.2f}s against a writer that never returns"
+        body = resp.json()
+        assert body["stopped"] == len(ids)
+        for pid in ids:
+            assert store.policies[pid]["level"] == "L1"
+        assert body["pending"] >= 1, "an attempt that misses its deadline must stay pending, not be lost"
+    finally:
+        blocking.release()
+        t.join(timeout=5.0)
+
+
+def test_FR_HIL_07_pause_all_returns_within_5s_against_a_writer_that_never_returns(client, store):
+    ids = _world_with_policies(store, 3, level="L3")
+    blocking = BlockingEventWriter(store)
+    as_writer(blocking)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    result: dict = {}
+
+    def call():
+        started = time.monotonic()
+        resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+        result["resp"] = resp
+        result["elapsed"] = time.monotonic() - started
+
+    t = threading.Thread(target=call, daemon=True)
+    t.start()
+    try:
+        assert blocking.entered.wait(timeout=5), "the call never reached the (blocking) writer"
+        t.join(timeout=8.0)
+        assert not t.is_alive(), "pause-all never returned against a writer whose append() never returns"
+        resp = result["resp"]
+        assert resp.status_code in (200, 202), resp.text
+        assert result["elapsed"] <= 5.0, f"pause-all took {result['elapsed']:.2f}s against a writer that never returns"
+        body = resp.json()
+        assert body["paused"] is True
+        for pid in ids:
+            assert store.policies[pid]["level"] == "L1"
+        assert store.worlds[WORLD].paused is True
+        assert body["pending"] >= 1
+    finally:
+        blocking.release()
+        t.join(timeout=5.0)
+
+
+def test_FR_HIL_07_second_stop_all_on_the_same_world_is_not_blocked_by_the_first(client, store):
+    """A second Stop-all against the *same* world, issued while the first is still stuck on (or
+    past the deadline of) a writer call that never returns, must itself return within 5s: by the
+    time it runs, the first call's level-change section has already released the world lock (it
+    never held it across writer I/O), so the second call finds every policy already at L1 and has
+    nothing left to do.
+
+    Both calls run in their own bounded background thread (never a raw, unbounded `client.post` on
+    the main test thread): if the implementation under test still holds the world lock across
+    writer I/O (the round-4 bug this test targets), the *second* call would itself block forever
+    waiting for a lock the first call cannot release until its writer call returns -- which it
+    never does until `blocking.release()` runs. A raw synchronous second call would then deadlock
+    the whole test (release() is only reached after it returns); routing it through its own
+    daemon thread with a join timeout instead turns that failure mode into a normal, bounded
+    assertion failure."""
+    ids = _world_with_policies(store, 3, level="L2")
+    blocking = BlockingEventWriter(store)
+    as_writer(blocking)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    first_result: dict = {}
+    second_result: dict = {}
+
+    def call_first():
+        started = time.monotonic()
+        resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        first_result["resp"] = resp
+        first_result["elapsed"] = time.monotonic() - started
+
+    def call_second():
+        started = time.monotonic()
+        resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        second_result["resp"] = resp
+        second_result["elapsed"] = time.monotonic() - started
+
+    t1 = threading.Thread(target=call_first, daemon=True)
+    t1.start()
+    try:
+        assert blocking.entered.wait(timeout=5), "the first call never reached the (blocking) writer"
+        time.sleep(0.05)  # let the first call's level-change section fully settle
+
+        t2 = threading.Thread(target=call_second, daemon=True)
+        t2.start()
+        t2.join(timeout=8.0)
+        assert not t2.is_alive(), (
+            "the second stop-all on the same world never returned while the first was still stuck "
+            "on the writer -- the world lock is held across writer I/O"
+        )
+        assert "resp" in second_result
+        second_resp = second_result["resp"]
+        assert second_resp.status_code in (200, 202), second_resp.text
+        assert second_result["elapsed"] <= 5.0, (
+            f"second stop-all took {second_result['elapsed']:.2f}s while the first was still stuck on the writer"
+        )
+        for pid in ids:
+            assert store.policies[pid]["level"] == "L1"
+        body = second_resp.json()
+        assert body["stopped"] == 0, "every policy was already lowered by the first call's (lock-scoped) mutation"
+        assert body["already_l1"] == len(ids)
+    finally:
+        blocking.release()
+        t1.join(timeout=8.0)
+        assert "resp" in first_result
+        assert first_result["resp"].status_code in (200, 202)
+        assert first_result["elapsed"] <= 5.0
+
+
+def test_FR_HIL_07_stop_all_from_another_owner_mapped_to_the_same_target_world_is_not_blocked(client, store):
+    """round-5 qa/security finding: an owner's Stop-all can touch a world it does not own at all
+    (via store.policy_worlds), and that world's own lock must never be held across writer I/O --
+    otherwise that world's own rightful owner, calling Stop-all on their own world directly and
+    concurrently, would be stalled behind a stranger's stuck write. Owner B's call runs in its own
+    bounded background thread for the same deadlock-avoidance reason as the same-world test above:
+    a still-buggy implementation would otherwise block it forever on world B's lock, which owner
+    A's call cannot release until the (never-arriving) `blocking.release()` -- which this test only
+    calls after observing owner B's call's own outcome."""
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.worlds[OTHER_WORLD] = make_world(owner=OTHER_OWNER)
+    store.policies["pol_a_mapped_to_b"] = base_policy(id_="pol_a_mapped_to_b", owner=OWNER, level="L2")
+    store.policy_worlds["pol_a_mapped_to_b"] = OTHER_WORLD
+    store.policies["pol_b_own"] = base_policy(id_="pol_b_own", owner=OTHER_OWNER, level="L2")
+    store.policy_worlds["pol_b_own"] = OTHER_WORLD
+
+    blocking = BlockingEventWriter(store)
+    as_writer(blocking)
+    as_principal_by_header(
+        {
+            "a": make_principal(user_id=OWNER, role="owner", world_id=WORLD),
+            "b": make_principal(user_id=OTHER_OWNER, role="owner", world_id=OTHER_WORLD),
+        }
+    )
+
+    a_result: dict = {}
+    b_result: dict = {}
+
+    def call_a():
+        started = time.monotonic()
+        resp = client.post(f"/worlds/{WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "a"})
+        a_result["resp"] = resp
+        a_result["elapsed"] = time.monotonic() - started
+
+    def call_b():
+        started = time.monotonic()
+        resp = client.post(f"/worlds/{OTHER_WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "b"})
+        b_result["resp"] = resp
+        b_result["elapsed"] = time.monotonic() - started
+
+    ta = threading.Thread(target=call_a, daemon=True)
+    ta.start()
+    try:
+        assert blocking.entered.wait(timeout=5), "owner A's call never reached the (blocking) writer"
+        time.sleep(0.05)
+
+        tb = threading.Thread(target=call_b, daemon=True)
+        tb.start()
+        tb.join(timeout=5.0)
+        assert not tb.is_alive(), (
+            "owner B's own Stop-all on world B never returned while owner A's call was still stuck "
+            "on the writer -- world B's lock is being held across owner A's writer I/O"
+        )
+        b_resp = b_result["resp"]
+        assert b_resp.status_code in (200, 202), b_resp.text
+        assert b_result["elapsed"] < 1.0, (
+            f"owner B's own Stop-all on world B took {b_result['elapsed']:.2f}s -- it must not be "
+            "blocked by owner A's still-in-flight write for a policy merely mapped into B"
+        )
+        assert store.policies["pol_b_own"]["level"] == "L1"
+    finally:
+        blocking.release()
+        ta.join(timeout=8.0)
+        assert "resp" in a_result
+        assert a_result["resp"].status_code in (200, 202)
+        assert a_result["elapsed"] <= 5.0
+        assert store.policies["pol_a_mapped_to_b"]["level"] == "L1"
+
+
+# ---------------------------------------------------------------------------
+# Round-5 finding 3 (code biggest, qa): writes to one world are sequential -- in build order, and
+# oldest-pending-first -- regardless of how their underlying writer calls are dispatched; only
+# different worlds' writes may run in parallel with each other.
+
+
+def test_FR_HIL_07_100_pending_parts_are_flushed_in_their_queued_order(client, store):
+    """A world's pending backlog is invariantly oldest-first (round 3); this round pins that it is
+    also *committed* to store.events in exactly that order, however the underlying writer calls are
+    dispatched. ReversedDelayEventWriter sleeps less on each successive call (the first submitted
+    call sleeps longest) -- a completion-order-based (rather than queue-order-based) implementation
+    would visibly reorder these 100 parts; a correctly ordered one never does, regardless of timing."""
+    store.worlds[WORLD] = make_world(owner=OWNER)  # no owned policies -- this call only flushes
+    n = 100
+    store.pending_events[WORLD] = [make_pending_part(policy_id=f"pol_{i:03d}") for i in range(n)]
+
+    writer = ReversedDelayEventWriter(store, base_delay_s=0.03, step_s=0.0003)
+    as_writer(writer)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["pending"] == 0
+    assert store.pending_events.get(WORLD, []) == []
+    landed = [e["data"]["policy_id"] for e in store.events.get(WORLD, [])]
+    assert landed == [f"pol_{i:03d}" for i in range(n)], "pending parts must land in exactly their queued order"
+
+
+def test_FR_HIL_07_pause_writes_policy_changed_before_world_paused_in_the_same_call(client, store):
+    """Within one Pause-all call, every policy.changed part it builds must land in store.events
+    before that same call's own world.paused part, never interleaved out of order by which
+    underlying writer call happens to finish first on the wire (round-5 finding 3)."""
+    ids = _world_with_policies(store, 5, level="L2")
+    writer = ReversedDelayEventWriter(store, base_delay_s=0.15, step_s=0.02)
+    as_writer(writer)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+
+    assert resp.status_code == 200, resp.text
+    events = store.events[WORLD]
+    types_in_order = [e["type"] for e in events]
+    assert types_in_order.count("policy.changed") == len(ids)
+    assert types_in_order.count("world.paused") == 1
+    paused_index = types_in_order.index("world.paused")
+    assert paused_index == len(types_in_order) - 1, (
+        f"world.paused landed at index {paused_index} of {types_in_order} -- every policy.changed "
+        "must land before it, never interleaved by completion timing"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Round-5 finding 4 (code/qa/security, supersedes round-4 ambiguity 12): revoke now flushes its
+# target world's whole pending backlog first, oldest first, under that world's lock -- not only a
+# part its own earlier attempt might have left there.
+
+
+def test_FR_HIL_07_revoke_flushes_its_worlds_pending_parts_before_its_own(client, store, writer):
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.policies["pol_to_revoke"] = base_policy(id_="pol_to_revoke", owner=OWNER, level="L2")
+    store.policy_worlds["pol_to_revoke"] = WORLD
+
+    store.pending_events[WORLD] = [make_pending_part(policy_id=f"pol_stale_{i}") for i in range(3)]
+
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+    resp = client.post("/policies/pol_to_revoke/revoke")
+
+    assert resp.status_code == 200, resp.text
+    assert store.pending_events.get(WORLD, []) == [], (
+        "revoke must flush the whole world's pending queue, not only its own part (supersedes round-4 ambiguity 12)"
+    )
+
+    events = store.events[WORLD]
+    stale_ids_in_order = [
+        e["data"]["policy_id"] for e in events if str(e["data"].get("policy_id", "")).startswith("pol_stale_")
+    ]
+    assert stale_ids_in_order == ["pol_stale_0", "pol_stale_1", "pol_stale_2"], "pending parts flush oldest first"
+
+    own = [e for e in events if e["data"].get("policy_id") == "pol_to_revoke"]
+    assert len(own) == 1
+    assert events.index(own[0]) == len(events) - 1, "revoke's own new part lands after the flushed backlog"
+    validate_event(own[0])
+
+
+def test_FR_HIL_07_revoke_and_a_concurrent_stop_all_on_the_same_world_never_double_write_a_pending_part(client, store):
+    """Revoke's own flush of its target world's pending queue and a concurrently-issued Stop-all
+    against that same world must serialize under that world's lock (round-5: revoke's own
+    level/history mutation and flush now run under the lock, where round 4 had neither) -- otherwise
+    both could read the same stale pending backlog and hand the same part to the writer twice."""
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.policies["pol_to_revoke"] = base_policy(id_="pol_to_revoke", owner=OWNER, level="L3")
+    store.policy_worlds["pol_to_revoke"] = WORLD
+    store.policies["pol_other"] = base_policy(id_="pol_other", owner=OWNER, level="L2")
+    store.policy_worlds["pol_other"] = WORLD
+
+    store.pending_events[WORLD] = [make_pending_part(policy_id="pol_stale")]
+
+    slow = SlowEventWriter(store, delay_s=0.08)
+    as_writer(slow)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    barrier = threading.Barrier(2)
+    responses: list = []
+    errors: list = []
+
+    def call_revoke():
+        try:
+            barrier.wait(timeout=5)
+            responses.append(("revoke", client.post("/policies/pol_to_revoke/revoke")))
+        except Exception as exc:  # pragma: no cover - surfaced via the assert below
+            errors.append(exc)
+
+    def call_stop():
+        try:
+            barrier.wait(timeout=5)
+            responses.append(("stop", client.post(f"/worlds/{WORLD}/autopilot/stop")))
+        except Exception as exc:  # pragma: no cover - surfaced via the assert below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=call_revoke), threading.Thread(target=call_stop)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+
+    assert not errors, errors
+    assert len(responses) == 2
+    for _, r in responses:
+        assert r.status_code in (200, 202), r.text
+
+    stale_writes = [e for e in store.events.get(WORLD, []) if e["data"].get("policy_id") == "pol_stale"]
+    assert len(stale_writes) == 1, f"the stale pending part must be written exactly once, got {len(stale_writes)}"
+    assert store.pending_events.get(WORLD, []) == []
+
+    assert store.policies["pol_to_revoke"]["level"] == "L1"
+    assert store.policies["pol_other"]["level"] == "L1"
