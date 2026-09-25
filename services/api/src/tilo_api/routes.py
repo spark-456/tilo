@@ -24,14 +24,19 @@ def _is_owner(principal: Principal, owner: str) -> bool:
 
 def _stop_all_owner_policies(store: Store, owner: str, change: str, at: str) -> tuple[int, int]:
     """PI-13: every one of the owner's policies to L1, one policy.changed per policy actually
-    changed this call; a policy already at L1 is skipped (idempotent repeat, no duplicate event)."""
+    changed this call; a policy already at L1 is skipped (idempotent repeat, no duplicate event).
+    A kill switch only ever lowers autonomy: an L0 policy is already below L1, so it is left at
+    L0 untouched -- no history entry, no event, not counted as stopped or already_l1."""
     stopped = 0
     already_l1 = 0
     for policy_id, policy in store.policies.items():
         if policy.get("owner") != owner:
             continue
-        if policy.get("level") == "L1":
+        level = policy.get("level")
+        if level == "L1":
             already_l1 += 1
+            continue
+        if level == "L0":
             continue
         policy["history"].append({"by": owner, "at": at, "change": change, "level": "L1"})
         policy["level"] = "L1"
