@@ -1,0 +1,26 @@
+{
+  "input": {
+    "deliverable_claims": [
+      {
+        "claim_id": "c1",
+        "text": "The product launches next quarter."
+      }
+    ],
+    "evidence": [
+      {
+        "source_id": "src-1",
+        "text": "The roadmap does not mention a launch date."
+      }
+    ]
+  },
+  "output": {
+    "verdicts": [
+      {
+        "claim_id": "c1",
+        "verdict": "unverified",
+        "evidence_source_ids": []
+      }
+    ]
+  },
+  "expect": "pass"
+}

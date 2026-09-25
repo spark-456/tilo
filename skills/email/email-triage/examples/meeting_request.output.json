@@ -1,0 +1,5 @@
+{
+  "category": "needs_reply",
+  "priority": 85,
+  "signals": ["sender is a VIP", "asks a direct question", "has a reply deadline (Friday)"]
+}

@@ -1,0 +1,30 @@
+{
+  "input": {
+    "question": "Did the onboarding change help support load?",
+    "material": [
+      {
+        "source_id": "src-1",
+        "text": "Support ticket volume dropped 18 percent after the new onboarding flow launched."
+      },
+      {
+        "source_id": "src-2",
+        "text": "Average time to first response is now 2 hours, down from 6 hours."
+      }
+    ],
+    "max_words": 40
+  },
+  "output": {
+    "answer_first": "Yes, the new onboarding flow reduced support load.",
+    "claims": [
+      {
+        "text": "Ticket volume dropped 18 percent after launch.",
+        "source_id": "src-1"
+      },
+      {
+        "text": "Average time to first response fell from 6 hours to 2 hours.",
+        "source_id": "src-2"
+      }
+    ]
+  },
+  "expect": "pass"
+}

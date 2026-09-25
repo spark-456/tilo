@@ -1,0 +1,76 @@
+id: table-extraction
+version: 0.1.0
+domain: research
+author: Tilo build (drafted by Claude Code)
+reviewer: Pending domain expert review
+tools_allowed:
+  - read_file
+  - parse_table
+inputs:
+  type: object
+  additionalProperties: false
+  required:
+    - table
+  properties:
+    table:
+      type: object
+      additionalProperties: false
+      required:
+        - columns
+        - rows
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: array
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - ref
+                - value
+              properties:
+                ref:
+                  type: string
+                  minLength: 1
+                value:
+                  type: string
+outputs:
+  type: object
+  additionalProperties: false
+  required:
+    - records
+  properties:
+    records:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - row_ref
+          - fields
+        properties:
+          row_ref:
+            type: string
+          fields:
+            type: object
+            additionalProperties:
+              type: object
+              additionalProperties: false
+              required:
+                - value
+                - source_ref
+              properties:
+                value:
+                  type:
+                    - string
+                    - number
+                    - boolean
+                    - "null"
+                source_ref:
+                  type: string
+description: Turn a supplied table into typed records, keeping a source cell reference on every value.

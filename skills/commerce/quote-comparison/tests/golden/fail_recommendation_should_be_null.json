@@ -1,0 +1,46 @@
+{
+  "input": {
+    "requirements": [
+      {
+        "requirement_id": "r1",
+        "must_have": true
+      }
+    ],
+    "quotes": [
+      {
+        "quote_id": "q1",
+        "source_id": "src-q1",
+        "line_items": [
+          {
+            "description": "item",
+            "quantity": 1,
+            "unit_price": 10.0
+          }
+        ],
+        "meets": {
+          "r1": "met"
+        }
+      }
+    ]
+  },
+  "output": {
+    "coverage_matrix": [
+      {
+        "quote_id": "q1",
+        "requirement_id": "r1",
+        "status": "met"
+      }
+    ],
+    "totals": [
+      {
+        "quote_id": "q1",
+        "source_id": "src-q1",
+        "total_cost": 10.0
+      }
+    ],
+    "recommendation": null
+  },
+  "expect": {
+    "fail": "recommendation-should-be-null"
+  }
+}

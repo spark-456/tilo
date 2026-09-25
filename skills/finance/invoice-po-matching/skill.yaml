@@ -1,0 +1,116 @@
+id: invoice-po-matching
+version: 0.1.0
+domain: finance
+author: Tilo build (drafted by Claude Code)
+reviewer: Pending domain expert review
+tools_allowed:
+  - read_file
+  - read_invoice
+  - read_purchase_order
+inputs:
+  type: object
+  additionalProperties: false
+  required:
+    - invoice
+    - purchase_order
+    - quantity_tolerance_pct
+  properties:
+    invoice:
+      type: object
+      additionalProperties: false
+      required:
+        - invoice_id
+        - lines
+      properties:
+        invoice_id:
+          type: string
+        lines:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - line_id
+              - item
+              - quantity
+              - unit_price
+            properties:
+              line_id:
+                type: string
+              item:
+                type: string
+              quantity:
+                type: number
+              unit_price:
+                type: number
+    purchase_order:
+      type: object
+      additionalProperties: false
+      required:
+        - po_id
+        - lines
+      properties:
+        po_id:
+          type: string
+        lines:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - line_id
+              - item
+              - quantity
+              - unit_price
+            properties:
+              line_id:
+                type: string
+              item:
+                type: string
+              quantity:
+                type: number
+              unit_price:
+                type: number
+    quantity_tolerance_pct:
+      type: number
+      minimum: 0
+outputs:
+  type: object
+  additionalProperties: false
+  required:
+    - matches
+    - invoice_total
+    - po_total
+  properties:
+    matches:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - invoice_line_id
+          - po_line_id
+          - status
+          - reason_code
+        properties:
+          invoice_line_id:
+            type: string
+          po_line_id:
+            type:
+              - string
+              - "null"
+          status:
+            type: string
+            enum:
+              - matched
+              - mismatched
+              - unmatched
+          reason_code:
+            type:
+              - string
+              - "null"
+    invoice_total:
+      type: number
+    po_total:
+      type: number
+description: Match invoice lines to purchase-order lines within tolerance and recompute totals; matching only, no side effect.

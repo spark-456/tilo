@@ -1,0 +1,72 @@
+{
+  "input": {
+    "item": "20L backpack",
+    "requirements": [
+      {
+        "field": "waterproof",
+        "op": "eq",
+        "value": true
+      }
+    ],
+    "currency": "USD",
+    "rates": {
+      "USD": 1.0,
+      "EUR": 1.08
+    },
+    "offers": [
+      {
+        "offer_id": "o1",
+        "source_id": "src-cheap",
+        "price": 29.0,
+        "currency": "USD",
+        "unit_count": 1,
+        "waterproof": false
+      },
+      {
+        "offer_id": "o2",
+        "source_id": "src-mid",
+        "price": 39.0,
+        "currency": "USD",
+        "unit_count": 1,
+        "waterproof": true
+      },
+      {
+        "offer_id": "o3",
+        "source_id": "src-eu",
+        "price": 45.0,
+        "currency": "EUR",
+        "unit_count": 1,
+        "waterproof": true
+      }
+    ]
+  },
+  "output": {
+    "unit_prices": [
+      {
+        "offer_id": "o1",
+        "unit_price": 29.0,
+        "currency": "USD",
+        "source_id": "src-cheap"
+      },
+      {
+        "offer_id": "o2",
+        "unit_price": 39.0,
+        "currency": "USD",
+        "source_id": "src-mid"
+      },
+      {
+        "offer_id": "o3",
+        "unit_price": 48.6,
+        "currency": "USD",
+        "source_id": "src-eu"
+      }
+    ],
+    "pick": {
+      "offer_id": "o3",
+      "source_id": "src-eu"
+    }
+  },
+  "expect": {
+    "fail": "pick-is-cheapest-qualifying"
+  }
+}

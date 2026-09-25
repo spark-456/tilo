@@ -1,0 +1,38 @@
+{
+  "records": [
+    {
+      "row_ref": "A2",
+      "fields": {
+        "item": {
+          "value": "Widget",
+          "source_ref": "A2"
+        },
+        "quantity": {
+          "value": 12,
+          "source_ref": "B2"
+        },
+        "unit_price": {
+          "value": 3.5,
+          "source_ref": "C2"
+        }
+      }
+    },
+    {
+      "row_ref": "A3",
+      "fields": {
+        "item": {
+          "value": "Gadget",
+          "source_ref": "A3"
+        },
+        "quantity": {
+          "value": 4,
+          "source_ref": "B3"
+        },
+        "unit_price": {
+          "value": 19.99,
+          "source_ref": "C3"
+        }
+      }
+    }
+  ]
+}

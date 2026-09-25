@@ -1,0 +1,37 @@
+{
+  "input": {
+    "table": {
+      "columns": ["name", "active"],
+      "rows": [
+        [
+          {
+            "ref": "A2",
+            "value": "Widget"
+          },
+          {
+            "ref": "B2",
+            "value": "yes"
+          }
+        ]
+      ]
+    }
+  },
+  "output": {
+    "records": [
+      {
+        "row_ref": "A2",
+        "fields": {
+          "name": {
+            "value": "Widget",
+            "source_ref": "A2"
+          },
+          "active": {
+            "value": "yes",
+            "source_ref": "B2"
+          }
+        }
+      }
+    ]
+  },
+  "expect": "pass"
+}

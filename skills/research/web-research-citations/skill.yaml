@@ -1,0 +1,65 @@
+id: web-research-citations
+version: 0.1.0
+domain: research
+author: Tilo build (drafted by Claude Code)
+reviewer: Pending domain expert review
+tools_allowed:
+  - web_search
+  - read_page
+inputs:
+  type: object
+  additionalProperties: false
+  required:
+    - question
+    - sources
+  properties:
+    question:
+      type: string
+      minLength: 1
+    sources:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - source_id
+          - text
+        properties:
+          source_id:
+            type: string
+            minLength: 1
+          text:
+            type: string
+    max_sources:
+      type: integer
+      minimum: 1
+outputs:
+  type: object
+  additionalProperties: false
+  required:
+    - findings
+  properties:
+    findings:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - claim
+          - status
+          - source_ids
+        properties:
+          claim:
+            type: string
+            minLength: 1
+          status:
+            type: string
+            enum:
+              - answered
+              - unknown
+          source_ids:
+            type: array
+            items:
+              type: string
+description: Answer a question from supplied sources, citing every claim and marking unanswerable parts unknown.

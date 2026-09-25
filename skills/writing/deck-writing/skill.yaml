@@ -1,0 +1,73 @@
+id: deck-writing
+version: 0.1.0
+domain: writing
+author: Tilo build (drafted by Claude Code)
+reviewer: Pending domain expert review
+tools_allowed:
+  - read_file
+  - read_artifact
+inputs:
+  type: object
+  additionalProperties: false
+  required:
+    - material
+    - max_slides
+  properties:
+    material:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - source_id
+          - text
+        properties:
+          source_id:
+            type: string
+          text:
+            type: string
+    max_slides:
+      type: integer
+      minimum: 1
+outputs:
+  type: object
+  additionalProperties: false
+  required:
+    - slides
+  properties:
+    slides:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - title
+          - bullets
+        properties:
+          title:
+            type: string
+            maxLength: 60
+          bullets:
+            type: array
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - text
+              properties:
+                text:
+                  type: string
+                source_id:
+                  type: string
+          chart_ref:
+            type: object
+            additionalProperties: false
+            required:
+              - source_id
+            properties:
+              source_id:
+                type: string
+              chart_type:
+                type: string
+description: Outline slides from verified material with sourced numbers and chart references, never model-drawn charts.

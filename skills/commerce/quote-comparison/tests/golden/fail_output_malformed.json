@@ -1,0 +1,52 @@
+{
+  "input": {
+    "requirements": [
+      {
+        "requirement_id": "r1",
+        "description": "Next-day delivery",
+        "must_have": true
+      },
+      {
+        "requirement_id": "r2",
+        "description": "Gift wrapping",
+        "must_have": false
+      }
+    ],
+    "quotes": [
+      {
+        "quote_id": "q1",
+        "source_id": "src-q1",
+        "line_items": [
+          {
+            "description": "10x widget",
+            "quantity": 10,
+            "unit_price": 4.5
+          }
+        ],
+        "meets": {
+          "r1": "met",
+          "r2": "missing"
+        }
+      },
+      {
+        "quote_id": "q2",
+        "source_id": "src-q2",
+        "line_items": [
+          {
+            "description": "10x widget",
+            "quantity": 10,
+            "unit_price": 4.0
+          }
+        ],
+        "meets": {
+          "r1": "missing",
+          "r2": "met"
+        }
+      }
+    ]
+  },
+  "output": {},
+  "expect": {
+    "fail": "output-malformed"
+  }
+}

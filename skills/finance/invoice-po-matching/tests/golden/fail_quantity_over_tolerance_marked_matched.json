@@ -1,0 +1,42 @@
+{
+  "input": {
+    "invoice": {
+      "invoice_id": "INV-103",
+      "lines": [
+        {
+          "line_id": "il1",
+          "item": "Widget",
+          "quantity": 20,
+          "unit_price": 5.0
+        }
+      ]
+    },
+    "purchase_order": {
+      "po_id": "PO-203",
+      "lines": [
+        {
+          "line_id": "pl1",
+          "item": "Widget",
+          "quantity": 10,
+          "unit_price": 5.0
+        }
+      ]
+    },
+    "quantity_tolerance_pct": 5
+  },
+  "output": {
+    "matches": [
+      {
+        "invoice_line_id": "il1",
+        "po_line_id": "pl1",
+        "status": "matched",
+        "reason_code": null
+      }
+    ],
+    "invoice_total": 100.0,
+    "po_total": 50.0
+  },
+  "expect": {
+    "fail": "quantity-outside-tolerance-not-flagged"
+  }
+}

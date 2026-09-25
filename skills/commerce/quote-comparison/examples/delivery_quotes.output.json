@@ -1,0 +1,40 @@
+{
+  "coverage_matrix": [
+    {
+      "quote_id": "q1",
+      "requirement_id": "r1",
+      "status": "met"
+    },
+    {
+      "quote_id": "q1",
+      "requirement_id": "r2",
+      "status": "missing"
+    },
+    {
+      "quote_id": "q2",
+      "requirement_id": "r1",
+      "status": "missing"
+    },
+    {
+      "quote_id": "q2",
+      "requirement_id": "r2",
+      "status": "met"
+    }
+  ],
+  "totals": [
+    {
+      "quote_id": "q1",
+      "source_id": "src-q1",
+      "total_cost": 45.0
+    },
+    {
+      "quote_id": "q2",
+      "source_id": "src-q2",
+      "total_cost": 40.0
+    }
+  ],
+  "recommendation": {
+    "quote_id": "q1",
+    "source_id": "src-q1"
+  }
+}

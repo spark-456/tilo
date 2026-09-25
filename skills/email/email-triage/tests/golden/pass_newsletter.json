@@ -1,0 +1,17 @@
+{
+  "input": {
+    "message": {
+      "id": "msg-7",
+      "from": "news@example-digest.com",
+      "subject": "Your weekly digest",
+      "body": "Here are this week's top stories from around the industry."
+    },
+    "vip_senders": []
+  },
+  "output": {
+    "category": "newsletter_promotion",
+    "priority": 5,
+    "signals": ["bulk sender", "digest subject line"]
+  },
+  "expect": "pass"
+}

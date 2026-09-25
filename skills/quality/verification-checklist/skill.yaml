@@ -1,0 +1,70 @@
+id: verification-checklist
+version: 0.1.0
+domain: quality
+author: Tilo build (drafted by Claude Code)
+reviewer: Pending domain expert review
+tools_allowed:
+  - read_file
+  - read_artifact
+inputs:
+  type: object
+  additionalProperties: false
+  required:
+    - deliverable_claims
+    - evidence
+  properties:
+    deliverable_claims:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - claim_id
+          - text
+        properties:
+          claim_id:
+            type: string
+          text:
+            type: string
+    evidence:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - source_id
+          - text
+        properties:
+          source_id:
+            type: string
+          text:
+            type: string
+outputs:
+  type: object
+  additionalProperties: false
+  required:
+    - verdicts
+  properties:
+    verdicts:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - claim_id
+          - verdict
+          - evidence_source_ids
+        properties:
+          claim_id:
+            type: string
+          verdict:
+            type: string
+            enum:
+              - verified
+              - unverified
+              - "false"
+          evidence_source_ids:
+            type: array
+            items:
+              type: string
+description: Give every claim in a deliverable a verified/unverified/false verdict with evidence ids, dropping nothing.

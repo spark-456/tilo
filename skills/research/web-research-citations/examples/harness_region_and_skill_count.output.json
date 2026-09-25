@@ -1,0 +1,19 @@
+{
+  "findings": [
+    {
+      "claim": "Tilo's harness runs on Cloud Run in asia-southeast1.",
+      "status": "answered",
+      "source_ids": ["src-1"]
+    },
+    {
+      "claim": "Ten expert skills ship in the v0 library.",
+      "status": "answered",
+      "source_ids": ["src-2"]
+    },
+    {
+      "claim": "Whether the harness also runs Pub/Sub in the same region.",
+      "status": "unknown",
+      "source_ids": []
+    }
+  ]
+}

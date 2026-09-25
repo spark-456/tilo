@@ -1,0 +1,21 @@
+{
+  "input": {
+    "question": "Is the flow live?",
+    "material": [
+      {
+        "source_id": "src-1",
+        "text": "Support ticket volume dropped 18 percent after the new onboarding flow launched."
+      },
+      {
+        "source_id": "src-2",
+        "text": "Average time to first response is now 2 hours, down from 6 hours."
+      }
+    ],
+    "max_words": 10
+  },
+  "output": {
+    "answer_first": "Yes, it is live.",
+    "claims": []
+  },
+  "expect": "pass"
+}
