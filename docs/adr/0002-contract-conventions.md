@@ -83,6 +83,11 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
      cards, since granting a connection is also an authorisation. A consent card, like a gate,
      offers a `hold` option and defaults to `hold` ("That connection waits", PRD 10.2), so a
      timeout never grants a connection; every `hold` option is reversible (BQ-15);
+   - a gate card's buttons have fixed labels (Approve, Edit first, Hold), because the person's
+     tap on a label is the authorisation. The deterministic card builder writes the gate details
+     from the plan gate, the connector action and the held outbox entry, never a model, and the
+     card validator rejects a gate id, action type, irreversible flag, risk tier or recipient
+     list that does not match them (CR-07, CR-09 to CR-12, BQ-17);
    - WorldLayout geometry is integer grid units: level plates, district plots with tints
      `district.1`-`district.6`, building footprints, island plots, roads as building-to-building
      edges with paths, bridges and gate cells, stamped with the solver version;

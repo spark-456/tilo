@@ -33,13 +33,13 @@
   "options": [
     {
       "id": "approve",
-      "label": "Send it",
+      "label": "Approve",
       "suggested": false,
       "irreversible": true
     },
     {
       "id": "approve",
-      "label": "Send now",
+      "label": "Approve",
       "suggested": false,
       "irreversible": true
     },

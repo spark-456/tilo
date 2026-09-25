@@ -33,13 +33,13 @@
   "options": [
     {
       "id": "approve",
-      "label": "Send it",
+      "label": "Approve",
       "suggested": false,
       "irreversible": true
     },
     {
       "id": "edit",
-      "label": "Edit and send",
+      "label": "Edit first",
       "suggested": true,
       "reason": "It is a new recipient, so check it once.",
       "irreversible": true

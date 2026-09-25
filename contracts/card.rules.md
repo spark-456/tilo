@@ -15,8 +15,26 @@ card is never shown and never times out. Each rule id is stable; a failing valid
 | CR-04 | A gate's and a consent card's safe default is `hold`: a gate never times out to "go", and a consent card never times out to granting the connection ("That connection waits"). | schema | 10.2, 10.3 |
 | CR-05 | 2 to 3 options, exactly one suggested; the suggested option has a reason and is never irreversible. | schema | 10.3 |
 | CR-06 | Gate and consent cards offer no "Delegate to Director" action: approving a side effect and granting a connection are authorisations, and a model never authorises. | schema | 10.3, 10.4 |
-| CR-07 | A gate's option ids come from a closed set, each at most once: `approve`, `edit`, `hold`. `approve` and `hold` are required. Only `approve` opens the gate. `edit` and `hold` leave it closed and are reversible. The policy engine and the channel handlers read the option id only, never its label, so a mislabelled option cannot open a gate. | schema (the id set and counts); policy engine (only `approve` opens) | 10.3, 10.4 |
+| CR-07 | A gate's option ids come from a closed set, each at most once: `approve`, `edit`, `hold`. `approve` and `hold` are required. Only `approve` opens the gate. `edit` and `hold` leave it closed and are reversible. Each id has a fixed label: `approve` is "Approve", `edit` is "Edit first", `hold` is "Hold". The person reads the label and taps it, and that tap is the authorisation, so no one (model or code) writes a gate label; WhatsApp shows only labels on its buttons. | schema (ids, counts, labels); policy engine (only `approve` opens) | 10.3, 10.4 |
 | CR-08 | `approve.irreversible` equals `gate.irreversible`. With CR-05 this means that on an irreversible gate `approve` is never suggested. On a reversible gate it may be. | schema | 10.3 |
+| CR-09 | `gate.id` names a gate of the run's PlanGraph, and `gate.action.type` equals that plan gate's `action_type`. | validator | 10.4, FR-INT-09 |
+| CR-10 | `gate.action.connector` names a connector in `config/connectors.yaml` that declares an action whose `id` is `gate.action.type` with `gate_type: approval`, and `gate.irreversible` equals that action's `irreversible`. | validator | 10.4, 12.1 |
+| CR-11 | `gate.risk_tier` equals the plan gate's `risk_tier` (PG-06), raised to T3 when any risk-tier modifier (`policy.schema.json#/$defs/tier_modifier`) applies to the held side effect, for example a new recipient. Never lower. | validator | 10.4, FR-HIL-04 |
+| CR-12 | `gate.recipients` equals, as a set, the recipients of the side effect the gate holds (its outbox entry): no one added, no one left out. | validator | 10.3, 10.4 |
+
+**Who writes a gate card.** The deterministic card builder (P1) writes every field of `gate`
+(including `action.exact` and `action.item`) and the gate options, copying them from the plan
+gate, the connector declaration and the held outbox entry. A model writes none of them; it may
+write `what_happened` and `why_it_matters`. The card validator checks CR-09 to CR-12 before a
+gate card is posted, so a card that shows a send as a reversible T1 draft is never shown.
+
+Cross-reference cases for CR-09 to CR-12 are in `fixtures/card/crossref/{valid,invalid}/`. Each
+file holds `rule` (null when valid), `note`, `plan_gates`, `connectors` (id and declared
+actions), `held` (the held side effect's `recipients` and the `modifiers` that apply to it; the
+outbox entry has no contract yet) and `card_gate`. Every part is shape-valid; each invalid file
+breaks only the rule its name starts with.
+`tests/contracts/test_PRD_10_3_gate_card_labels_and_crossref.py` holds the reference check; the
+P1 card validator's tests must run the same files.
 
 Every file in `fixtures/card/invalid/` must fail the schema (FR-WLD-02 tests), so CR-01 and
 CR-02 have no fixture there: a needs-you or meeting card whose default names no option, or a
@@ -25,6 +43,8 @@ both rules, and the policy engine's tests must show that only `approve` opens a 
 `gate_approve_suggested_on_irreversible_gate`, `gate_approve_irreversible_on_reversible_gate`,
 `gate_without_approve_option`, `gate_option_id_outside_closed_set`, `gate_approve_option_twice`,
 `gate_edit_option_irreversible`, `gate_duplicate_hold_option_irreversible`,
+`gate_approve_option_labelled_hold`, `gate_hold_option_labelled_send_it`,
+`gate_edit_option_labelled_keep_draft`,
 `consent_without_hold_option`, `safe_default_irreversible`, `meeting_option_irreversible`,
 `gate_hold_option_irreversible`, `gate_safe_default_go`, `consent_safe_default_connect`,
 `suggested_option_irreversible`, the option-count files, `gate_delegated_to_director` and

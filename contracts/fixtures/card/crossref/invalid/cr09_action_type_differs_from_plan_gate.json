@@ -1,0 +1,56 @@
+{
+  "rule": "CR-09",
+  "note": "Plan gate G1 holds send_email; the card says create_draft.",
+  "plan_gates": [
+    {
+      "id": "G1",
+      "action_type": "send_email",
+      "risk_tier": "T2",
+      "guards": ["U3"],
+      "policy_ref": null
+    }
+  ],
+  "connectors": [
+    {
+      "id": "gmail",
+      "actions": [
+        {
+          "id": "create_draft",
+          "capability": "write",
+          "description": "Create a draft in the connected mailbox.",
+          "risk_tier": "T1",
+          "gate_type": "approval",
+          "irreversible": false
+        },
+        {
+          "id": "send_email",
+          "capability": "send",
+          "description": "Send an email from the connected mailbox.",
+          "risk_tier": "T2",
+          "gate_type": "approval",
+          "irreversible": true
+        }
+      ]
+    }
+  ],
+  "held": {
+    "recipients": ["orders@example.com"],
+    "modifiers": ["new_recipients"]
+  },
+  "card_gate": {
+    "id": "G1",
+    "action": {
+      "type": "create_draft",
+      "connector": "gmail",
+      "exact": "Save the reply as a draft.",
+      "item": {
+        "artifact_id": "art_reply_draft",
+        "version": 2,
+        "label": "Reply draft"
+      }
+    },
+    "recipients": ["orders@example.com"],
+    "irreversible": false,
+    "risk_tier": "T3"
+  }
+}

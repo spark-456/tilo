@@ -33,7 +33,7 @@
   "options": [
     {
       "id": "approve",
-      "label": "Save it",
+      "label": "Approve",
       "suggested": true,
       "reason": "It only adds a new file, and you can delete it.",
       "irreversible": false

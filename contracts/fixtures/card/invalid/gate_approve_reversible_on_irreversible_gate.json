@@ -33,7 +33,7 @@
   "options": [
     {
       "id": "approve",
-      "label": "Send it",
+      "label": "Approve",
       "suggested": false,
       "irreversible": false
     },

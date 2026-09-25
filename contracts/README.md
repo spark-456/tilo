@@ -23,6 +23,7 @@ Still to come: `event.schema.json` and `events/` (ticket P0-03), `manifest` and 
 
 - `fixtures/<name>/valid|invalid/*.json` exercise each schema root; `fixtures/<name>.<def>/`
   exercise one `$defs` entry. Invalid file names say which rule they break.
+  `fixtures/card/crossref/` holds cross-reference cases for the card validator (CR-09 to CR-12).
 - `just contracts-gen` regenerates the Python (`packages/contracts-py`, `tilo_contracts`) and
   TypeScript (`packages/contracts-ts`, `@tilo/contracts`) types.
 - `just contracts-check` validates schemas and fixtures and fails on any drift; `just check`

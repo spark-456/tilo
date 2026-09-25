@@ -1,0 +1,48 @@
+{
+  "rule": null,
+  "note": "A T1 save to the person's own Drive: no recipients, no modifier, reversible.",
+  "plan_gates": [
+    {
+      "id": "G2",
+      "action_type": "save_file",
+      "risk_tier": "T1",
+      "guards": ["U4"],
+      "policy_ref": null
+    }
+  ],
+  "connectors": [
+    {
+      "id": "google_drive",
+      "actions": [
+        {
+          "id": "save_file",
+          "capability": "write",
+          "description": "Save a new file in the Tilo folder.",
+          "risk_tier": "T1",
+          "gate_type": "approval",
+          "irreversible": false
+        }
+      ]
+    }
+  ],
+  "held": {
+    "recipients": [],
+    "modifiers": []
+  },
+  "card_gate": {
+    "id": "G2",
+    "action": {
+      "type": "save_file",
+      "connector": "google_drive",
+      "exact": "Save the quote summary as a new file in the Tilo folder of your Drive.",
+      "item": {
+        "artifact_id": "art_quote_summary",
+        "version": 1,
+        "label": "Quote summary"
+      }
+    },
+    "recipients": [],
+    "irreversible": false,
+    "risk_tier": "T1"
+  }
+}
