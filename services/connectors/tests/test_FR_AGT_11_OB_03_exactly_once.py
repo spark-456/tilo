@@ -10,7 +10,7 @@ from __future__ import annotations
 import threading
 
 import tilo_connectors
-from conftest import ManualClock, evidence_from_case
+from _connectors_lib import ManualClock, evidence_from_case
 from hypothesis import given
 from hypothesis import strategies as st
 from tilo_connectors.fakes import FakeGmail

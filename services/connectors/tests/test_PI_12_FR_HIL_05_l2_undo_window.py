@@ -9,7 +9,7 @@ independent entry from the same shape, advanced the full 60 s, sends exactly onc
 from __future__ import annotations
 
 import tilo_connectors
-from conftest import ManualClock, evidence_from_case
+from _connectors_lib import ManualClock, evidence_from_case
 from tilo_connectors.fakes import FakeGmail
 
 

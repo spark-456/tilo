@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 import tilo_connectors
-from conftest import ManualClock, add_seconds, evidence_from_case
+from _connectors_lib import ManualClock, add_seconds, evidence_from_case
 from tilo_connectors.fakes import FakeGmail
 
 

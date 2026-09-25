@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 import tilo_connectors
-from conftest import ManualClock
+from _connectors_lib import ManualClock
 from tilo_connectors.fakes import FakeGmail
 
 

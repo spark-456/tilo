@@ -13,7 +13,7 @@ import textwrap
 
 import pytest
 import tilo_connectors
-from conftest import ManualClock, evidence_from_case
+from _connectors_lib import ManualClock, evidence_from_case
 from tilo_connectors.fakes import FakeGmail
 from tilo_connectors.side_effects import SIDE_EFFECT_METHOD_NAMES, scan_for_side_effect_calls
 
