@@ -198,8 +198,14 @@ def make_world(
     owner_channels: tuple[str, ...] = ("web", "whatsapp", "email"),
     districts: dict[str, deps.DistrictRecord | None] | None = None,
     run_id: str = RUN_ID,
+    paused: bool = False,
 ) -> deps.WorldRecord:
-    return deps.WorldRecord(owner=owner, owner_channels=owner_channels, districts=districts or {}, run_id=run_id)
+    """paused (round-4 addition, API_ST3a.md's WorldRecord.paused): defaults to False like every
+    fresh world; a test proving the pause dedupe reads the flag, not "did anything change this
+    call," passes paused=True directly to seed an already-paused world."""
+    return deps.WorldRecord(
+        owner=owner, owner_channels=owner_channels, districts=districts or {}, run_id=run_id, paused=paused
+    )
 
 
 def make_store(
@@ -240,6 +246,26 @@ def make_principal(
 
 def as_principal(principal: deps.Principal):
     app.dependency_overrides[deps.get_current_principal] = lambda: principal
+
+
+PRINCIPAL_HEADER = "x-test-principal"
+
+
+def as_principal_by_header(mapping: dict[str, deps.Principal]) -> None:
+    """Installs a get_current_principal override keyed by an HTTP header instead of a single
+    global value (round-4 addition: as_principal's single global lambda races when two threads
+    issue concurrent requests as *different* principals -- e.g. proving a kill switch against one
+    world never blocks on another world's writer latency, which needs each world's own owner.
+    `mapping` is built once, before any thread starts, and only ever read afterwards, so
+    concurrent requests need no lock; each caller sends its own key with every request via the
+    PRINCIPAL_HEADER header, e.g. client.post(url, headers={PRINCIPAL_HEADER: "big"})."""
+    from fastapi import Request
+
+    def _resolve(request: Request) -> deps.Principal:
+        key = request.headers.get(PRINCIPAL_HEADER)
+        return mapping[key]
+
+    app.dependency_overrides[deps.get_current_principal] = _resolve
 
 
 def as_writer(writer) -> None:
@@ -376,6 +402,24 @@ class SlowEventWriter(FakeEventWriter):
     def append(self, world_id: str, part: dict) -> dict:
         time.sleep(self.delay_s)
         return super().append(world_id, part)
+
+
+class SlowFlakyEventWriter(FakeEventWriter):
+    """Sleeps `delay_s` then always raises (round-4 qa finding: "kill switch within 5s even with
+    a slow, failing writer"). Combines SlowEventWriter's latency with FlakyEventWriter's failure
+    so a test can prove that neither the per-part write attempt nor the flush of many pending
+    parts can be allowed to run serially and synchronously inside whatever the route uses to
+    serialize its own mutation -- 200 parts * even a small delay_s would already blow FR-HIL-07's
+    5s budget if attempted that way, so a passing test is itself proof the implementation moved
+    writer I/O out of that critical path (API_ST3a.md's "Locking" section)."""
+
+    def __init__(self, store: deps.Store, *, delay_s: float = 0.03) -> None:
+        super().__init__(store)
+        self.delay_s = delay_s
+
+    def append(self, world_id: str, part: dict) -> dict:
+        time.sleep(self.delay_s)
+        raise RuntimeError("event writer unreachable and slow (test double)")
 
 
 def assert_part_carries_no_stamped_fields(part: dict) -> None:
