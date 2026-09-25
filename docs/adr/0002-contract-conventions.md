@@ -29,15 +29,18 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
    data class and the rest. Its root is a sampler with one optional property per definition so
    that fixtures and generated types cover every definition; nothing sends a `Common` document.
 4. **authz (BQ-01).** `{by: "person" | "policy" | "team_lead", ref: string, at: timestamp}`, all
-   required, from PRD 10.4 "Audit" and the glossary. `ref` is the id of the authority (user,
-   policy or Team Lead id). There is no value for a model: a model never authorises.
+   required, from PRD 10.4 "Audit" and the glossary. `ref` is the id of the authority and the
+   schema binds it to `by`: a `u_` user id for a person, a `pol_` policy id for a policy, a `tl_`
+   Team Lead id for a Team Lead. There is no value for a model: a model never authorises.
 5. **Strictness.** `additionalProperties: false` everywhere except explicitly open shapes
    (a skill's embedded input and output schemas). Enums are closed. Rules one document can
    express use `if`/`then`/`else` and `contains` (a gate card's safe default is `hold`, a T3
-   gate has no policy, deletes are T3, exactly one suggested option). Rules that span documents
-   or need config (every irreversible action has a gate, roads equal dependencies) are numbered
-   in `contracts/plan.rules.md` (PG-01..) and `contracts/layout.rules.md` (WE-01..) for the
-   deterministic validators.
+   gate has no policy, deletes are T3, exactly one suggested option, only a gate offers an
+   irreversible option). Rules that compare values or span documents or need config (every
+   irreversible action has a gate, roads equal dependencies, a card's safe default names one of
+   its options) are numbered in `contracts/plan.rules.md` (PG-01..), `contracts/layout.rules.md`
+   (WE-01..) and `contracts/card.rules.md` (CR-01..) for the deterministic validators; each file
+   marks which rules the schema already enforces.
 6. **One named type per document.** Every object shape is a named `$defs` entry, and the card
    and providers roots are single objects rather than unions, so both generators emit one type
    with the contract's name: a card carries nullable `gate` and `consent` detail objects whose
@@ -65,6 +68,13 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
    - connector `gate_type` is `none` (no side effect) or `approval` (a person, or a matching
      policy below T3, opens it), and write, send, share and delete actions must be `approval` (BQ-13);
    - policy `limits.credits` caps credits per day spent under the policy (BQ-14);
+   - policy `conditions` are each fixed `true`, and the risk-tier table must list all six PRD
+     10.4 T3 modifiers exactly once, so neither a policy nor `config/autonomy.yaml` can drop new
+     recipients, attachments, external sharing, deletion, money or legal terms, or
+     injection-flagged content below T3 (BQ-16);
+   - only a gate card offers an irreversible option; every card's safe default names one of its
+     options and is reversible, because it applies at timeout with no person (card rules CR-01 to
+     CR-05, BQ-15);
    - card answer channels per kind: email answers questions (needs-you) only; gates and
      meetings are answered on web, mobile web or WhatsApp; consent only on the web; gates have
      no "Delegate to Director" action because a model never authorises;

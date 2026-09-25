@@ -83,7 +83,7 @@
       "enum": ["L0", "L1", "L2", "L3"]
     },
     "authz": {
-      "description": "Who authorised a side effect (BQ-01, ADR-0002): a person, a policy or a Team Lead, with the id of that authority and when. A model is never an authority.",
+      "description": "Who authorised a side effect (BQ-01, ADR-0002): a person, a policy or a Team Lead, with the id of that authority and when. A model is never an authority. ref must match by: a user id for a person, a policy id for a policy, a Team Lead id for a Team Lead.",
       "type": "object",
       "additionalProperties": false,
       "required": ["by", "ref", "at"],
@@ -96,6 +96,16 @@
           "maxLength": 128
         },
         "at": { "$ref": "#/$defs/timestamp" }
+      },
+      "if": { "properties": { "by": { "const": "person" } }, "required": ["by"] },
+      "then": { "properties": { "ref": { "$ref": "#/$defs/user_id" } } },
+      "else": {
+        "if": { "properties": { "by": { "const": "policy" } }, "required": ["by"] },
+        "then": { "properties": { "ref": { "$ref": "#/$defs/policy_id" } } },
+        "else": {
+          "if": { "properties": { "by": { "const": "team_lead" } }, "required": ["by"] },
+          "then": { "properties": { "ref": { "$ref": "#/$defs/team_lead_id" } } }
+        }
       }
     },
     "artifact_ref": {

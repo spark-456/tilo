@@ -10,7 +10,7 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `brief.schema.json` | Structured brief from intake (FR-INT-03 to 05) | 1.0.0 |
 | `plan.schema.json` | `PlanGraph`: approaches, units, dependencies, gates, budget cap; rules in `plan.rules.md` | 1.0.0 |
 | `layout.schema.json` | `WorldLayout` v1: semantic part and solver geometry; rules in `layout.rules.md` | 1.0.0 |
-| `card.schema.json` | Needs-you, gate, consent and meeting cards | 1.0.0 |
+| `card.schema.json` | Needs-you, gate, consent and meeting cards; safe-default rules in `card.rules.md` | 1.0.0 |
 | `policy.schema.json` | Autonomy policies and the risk-tier table shape | 1.0.0 |
 | `handoff.schema.json` | Context handoff note | 1.0.0 |
 | `envelope.schema.json` | Agent-to-agent handoff envelope | 1.0.0 |

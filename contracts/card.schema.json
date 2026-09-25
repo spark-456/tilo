@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/card.schema.json",
   "x-version": "1.0.0",
   "title": "Card",
-  "description": "One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout, which must be one of the options; a gate's is always hold, so a gate never times out to go.",
+  "description": "One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout; it names one of the options and that option is reversible (contracts/card.rules.md CR-01 to CR-03). A gate's is always hold, so a gate never times out to go, and only a gate may offer an irreversible option.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -72,11 +72,14 @@
   },
   "if": { "properties": { "kind": { "const": "gate" } }, "required": ["kind"] },
   "then": {
-    "description": "A gate offers hold, holds by default, is never delegated to the Director and is never answered by email.",
+    "description": "A gate offers a reversible hold, holds by default, is never delegated to the Director and is never answered by email.",
     "properties": {
       "rung": { "const": "gate" },
       "options": {
-        "contains": { "properties": { "id": { "const": "hold" } }, "required": ["id"] }
+        "contains": {
+          "properties": { "id": { "const": "hold" }, "irreversible": { "const": false } },
+          "required": ["id", "irreversible"]
+        }
       },
       "safe_default": { "const": "hold" },
       "actions": { "items": { "enum": ["show_me", "snooze"] } },
@@ -86,7 +89,11 @@
     }
   },
   "else": {
-    "properties": { "gate": { "type": "null" } },
+    "description": "Only a gate may offer an irreversible option (every irreversible action maps to a gate, plan.rules.md PG-04), so a non-gate card never times out to one.",
+    "properties": {
+      "gate": { "type": "null" },
+      "options": { "items": { "properties": { "irreversible": { "const": false } } } }
+    },
     "if": { "properties": { "kind": { "const": "consent" } }, "required": ["kind"] },
     "then": {
       "properties": {

@@ -33,10 +33,15 @@ def test_BQ_01_authz_with_all_three_fields_is_valid(repo_root, registry):
     assert not errors, f"BQ-01: a complete authz object should validate, got: {[e.message for e in errors]}"
 
 
+# PRD 10.4 "Audit": the reference names the authority itself, so each `by`
+# gets an id of its own kind (a user, a policy, a Team Lead).
+REF_FOR_BY = {"person": "u_owner", "policy": "pol_autopilot_l2", "team_lead": "tl_ops"}
+
+
 @pytest.mark.parametrize("by_value", ["person", "policy", "team_lead"])
 def test_BQ_01_authz_by_accepts_person_policy_or_team_lead(repo_root, registry, by_value):
     load_schema(repo_root, "common")
-    instance = {**A_VALID_AUTHZ, "by": by_value}
+    instance = {**A_VALID_AUTHZ, "by": by_value, "ref": REF_FOR_BY[by_value]}
     errors = errors_for(AUTHZ_REF, instance, registry)
     assert not errors, f"BQ-01: authz.by must accept {by_value!r}, got: {[e.message for e in errors]}"
 

@@ -97,13 +97,14 @@
       }
     },
     "conditions": {
+      "description": "Always true: attachments, new recipients and safety-flagged content are T3 (PRD 10.4), and T3 never runs above L1, so no policy can pre-authorise them.",
       "type": "object",
       "additionalProperties": false,
       "required": ["no_attachments", "no_new_recipients", "no_safety_flags"],
       "properties": {
-        "no_attachments": { "type": "boolean" },
-        "no_new_recipients": { "type": "boolean" },
-        "no_safety_flags": { "type": "boolean" }
+        "no_attachments": { "const": true },
+        "no_new_recipients": { "const": true },
+        "no_safety_flags": { "const": true }
       }
     },
     "stamp": {
@@ -130,7 +131,7 @@
       }
     },
     "risk_tier_table": {
-      "description": "Risk tiers (PRD 10.4): each action type's base tier, the context modifiers that raise any action to T3, and the highest level each tier allows.",
+      "description": "Risk tiers (PRD 10.4): each action type's base tier, the context modifiers that raise any action to T3, and the highest level each tier allows. A modifier applies whatever the base tier, so a deletion or an external share is T3 even when its action type is listed lower.",
       "type": "object",
       "additionalProperties": false,
       "required": ["actions", "modifiers", "max_level"],
@@ -142,7 +143,10 @@
           "additionalProperties": { "$ref": "common.schema.json#/$defs/risk_tier" }
         },
         "modifiers": {
+          "description": "All six PRD 10.4 T3 conditions, each exactly once: six unique items over a closed six-value enum with a fixed raises_to, so none can be dropped.",
           "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/tier_modifier" }
         },
