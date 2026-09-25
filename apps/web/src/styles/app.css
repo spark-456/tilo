@@ -63,6 +63,44 @@ body {
 .right-rail p {
   color: var(--color-ink-2);
 }
+/* P0-08b-player fixture mode (HR-4/BQ-07, HR-6): fixed so no layout (mobile bottom tabs, stage
+   mode's --ui-scale) can ever cover it or push it off-screen. */
+.fixture-replay-banner {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-1);
+  color: var(--color-surface-1);
+  font: 700 0.8125em var(--font-ui);
+}
+.speed-badge {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-primary);
+  color: var(--color-surface-1);
+  font: 700 0.8125em var(--font-mono);
+}
+.trace-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  font: 400 0.75em var(--font-mono);
+  color: var(--color-ink-2);
+}
+.trace-list li {
+  padding: 2px 0;
+  border-bottom: 1px solid var(--color-surface-2);
+}
 .nav-btn {
   min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
   min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));

@@ -53,7 +53,7 @@ test("FR-WLD-04 reducer: final state.seq is the last applied event's seq; the em
 test("FR-WLD-04 reducer purity: applyEvent does not mutate the state object it is given", () => {
   const before = createInitialState(layout);
   Object.freeze(before);
-  expect(() => applyEvent(before, events[0], layout)).not.toThrow();
+  expect(() => applyEvent(before, events[0] as Event, layout)).not.toThrow();
 });
 
 test("FR-WLD-04 reducer purity: reduce never reads the clock or Math.random (no I/O, no randomness)", () => {

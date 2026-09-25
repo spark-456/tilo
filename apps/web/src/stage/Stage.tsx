@@ -41,8 +41,10 @@ const KEYS: Record<string, (c: cam.CameraState) => cam.CameraState> = {
 export type WorldSeam = (world: Container, requestRender: () => void) => (() => void) | undefined;
 
 /** PRD 18.3 S-04 stage. The camera is the Pixi world container's transform (PRD 9.7); a frame
- * is drawn only on input, an eased keyboard move, resize or visibility change. */
-export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
+ * is drawn only on input, an eased keyboard move, resize or visibility change. `seq` (P0-08b-player,
+ * FR-WLD-04) is purely a display attribute for a world-content consumer's own highest applied
+ * seq; Stage itself never reads or produces it. */
+export function Stage({ onWorld, seq }: { onWorld?: WorldSeam; seq?: number }) {
   const frameRef = useRef<HTMLElement>(null);
   const [supported] = useState(() => !!document.createElement("canvas").getContext("webgl2"));
   const msRef = useRef(0);
@@ -206,6 +208,7 @@ export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
       data-camera-x={cam.INITIAL_CAMERA.x}
       data-camera-y={cam.INITIAL_CAMERA.y}
       data-camera-zoom={cam.INITIAL_CAMERA.zoom}
+      {...(seq !== undefined ? { "data-seq": seq } : {})}
       aria-label="World stage"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard pan and zoom (PRD 9.7).
       tabIndex={0}
