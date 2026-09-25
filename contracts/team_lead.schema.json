@@ -15,7 +15,7 @@
   },
   "$defs": {
     "assignment": {
-      "description": "Who assigned the domain and when: only the owner assigns domains (PRD 16.2).",
+      "description": "Who made an assignment and when: only the world's owner assigns a Team Lead's domain (PRD 16.2) or a gate's Approver (PRD 10.1; approval.requested approver). OB-01 requires by to be the owner and at to be no later than the answer.",
       "type": "object",
       "additionalProperties": false,
       "required": ["by", "at"],

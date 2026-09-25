@@ -46,7 +46,13 @@
         "artifact_id": "art_reply_draft",
         "version": 2
       },
-      "approver": "u_approver",
+      "approver": {
+        "user": "u_approver",
+        "assigned_by": {
+          "by": "u_owner",
+          "at": "2026-09-29T09:31:00.000Z"
+        }
+      },
       "team_lead": null
     }
   },

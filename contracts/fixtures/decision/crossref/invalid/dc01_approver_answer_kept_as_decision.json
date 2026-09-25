@@ -1,0 +1,36 @@
+{
+  "rule": "DC-01",
+  "note": "u_approver answered a card assigned to them in u_owner's world; an Approver's answer settles that card only and makes no Decision (PRD 10.1, 13.1).",
+  "decision": {
+    "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W8",
+    "org_id": "org_acme",
+    "question": "May Tilo cc finance on supplier replies?",
+    "domain": null,
+    "answer": "Yes, cc finance on every supplier reply.",
+    "option_id": "yes_cc_finance",
+    "answered_by": {
+      "by": "person",
+      "ref": "u_approver",
+      "at": "2026-09-28T15:00:00.000Z"
+    },
+    "source": {
+      "world_id": "w_village_basic",
+      "run_id": "r_village_basic_1",
+      "card_id": "01J8Z3K4M5N6P7Q8R9S0T1V2W9"
+    },
+    "scope": {
+      "worlds": ["w_village_basic"],
+      "districts": "all"
+    },
+    "created_at": "2026-09-28T15:00:01.000Z",
+    "expires_at": null
+  },
+  "worlds": {
+    "w_village_basic": {
+      "org_id": "org_acme",
+      "owner": "u_owner"
+    }
+  },
+  "team_lead_at_answer": null,
+  "reuse": null
+}
