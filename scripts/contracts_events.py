@@ -172,8 +172,8 @@ def check_event_fixtures(
         event = json.loads(path.read_text(encoding="utf-8"))
         if problems := event_problems(event, registry, validate):
             errors.append(f"fixtures/events/valid/{path.name} fails: {problems[:3]}")
-        elif path.stem != event["type"]:
-            errors.append(f"fixtures/events/valid/{path.name} must be named after its type {event['type']}")
+        elif path.stem.split("--")[0] != event["type"]:
+            errors.append(f"fixtures/events/valid/{path.name} must be named <type>.json or <type>--<case>.json")
         elif not round_trip(event, module, data_model(event["type"])):
             errors.append(f"fixtures/events/valid/{path.name} does not round-trip through the generated models")
     for path in sorted((folder / "invalid").glob("*.json")):

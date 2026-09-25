@@ -32,7 +32,13 @@
       "artifact_id": "art_reply_draft",
       "version": 1
     },
-    "approver": "tl_ops",
+    "approver": {
+      "user": "tl_ops",
+      "assigned_by": {
+        "by": "u_owner",
+        "at": "2026-09-29T09:00:00.000Z"
+      }
+    },
     "team_lead": null
   },
   "trace": {

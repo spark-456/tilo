@@ -1,0 +1,18 @@
+# Harness role limits and timings (PRD 8.1, 8.3, 8.5; FR-AGT-01, -09, -10, -13).
+# Shape: contracts/agents.schema.json (AgentsConfig); `just contracts-check` validates it.
+# Values fixed by the PRD are const in the schema; the rest may be lowered, never raised past it.
+limits:
+  directors_per_world: 1 # PRD 8.1, fixed
+  leads_per_district: 1 # PRD 8.1, fixed
+  max_specialists: 6 # concurrent Specialists per world, 1..6 (FR-AGT-01)
+  max_depth: 3 # agent levels below the owner, fixed (PRD 8.1)
+context:
+  compact_at: 0.60 # PRD 8.5; must be below handoff_at
+  handoff_at: 0.70 # fixed (D-08, FR-AGT-09)
+liveness:
+  heartbeat_s: 15 # FR-AGT-10, PRD 8.5
+  silent_after_s: 90 # the sweeper restarts an agent this silent from its last checkpoint
+retries:
+  max_attempts: 3 # attempts per unit, then escalate (FR-AGT-13; PRD 8.3 "a unit fails 3 times")
+questions:
+  hourly_cap_per_person: 6 # PRD 8.3 load control; overflow goes into a digest

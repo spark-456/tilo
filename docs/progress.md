@@ -18,11 +18,15 @@ Updated: 2026-09-25 · Phase 0 (Foundations) · next gate **CP0 on 29 Sep** · C
 | Ticket | Requirement IDs | Builder | Status | Test-writer | code | security | cost | qa | design |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0-01 Scaffold | PRD 20.3, 20.4, 17.6; SEC-13 (CI scan skeleton) | reach-builder → opus (escalated) | **Merged to `main`** (user approved 2026-09-25) | 32 tests | PASS r2 | PASS r4 (FAIL r1–r3) | PASS r1 | n/a | n/a |
-| P0-02 Core contracts + codegen + drift CI | FR-WLD-02; PRD 15.2 (brief, plan, layout, card, policy, handoff, envelope, skill, connector, providers) | architect (opus) | Merged to `phase0-stack`; awaiting user OK for `main` (security flagged T3 gaps r1–r4, fixed) | 11 schemas' tests | PASS r2 | PASS r5 (FAIL r1–r4) | n/a | n/a | n/a |
-| P0-03 Event contract + registry (+ outbox entry, consent-card ids) | FR-WLD-03 (registry, data schemas, fixtures); PRD 9.3, 9.5 | architect (opus) | Stuck after 5 security rounds (each found a deeper outbox/policy authorisation gap); resumed with the L2-instruction fix, a contract-scope note for security, and P4 invariants written to docs/security | 31 tests | PASS r1 | FAIL r1–r5 | n/a | n/a | n/a | | | | n/a | n/a | n/a |
-| P0-04 Provider layer A: interfaces, config loaders, denylist, model-id lint | PL-01, PL-04 (skeleton), PL-06, PL-07, NFR-25 | intelligence-builder → opus (escalated) | Merged to `phase0-stack` (307 tests green) | 33 tests | PASS r3 | n/a | PASS r1 | n/a | n/a | | | | | | n/a |
-| P0-05 Provider layer B: google, OpenAI-compatible + NVIDIA NIM profiles, record-and-replay, fake | PL-02, EFF-01 | intelligence-builder | In progress | | | | | | n/a |
-| P0-06 Provider layer C: role router, fallback, cascades, token caps, conformance | PL-03, PL-05, EFF-02, EFF-03 | intelligence-builder | Queued | | | | | | n/a |
+| P0-02 Core contracts + codegen + drift CI | FR-WLD-02; PRD 15.2 (brief, plan, layout, card, policy, handoff, envelope, skill, connector, providers) | architect (opus) | **Merged to `main`** (user delegated decisions 2026-09-25) | 11 schemas' tests | PASS r2 | PASS r5 (FAIL r1–r4) | n/a | n/a | n/a |
+| P0-03 Event contract + registry (+ outbox entry, consent-card ids) | FR-WLD-03 (registry, data schemas, fixtures); PRD 9.3, 9.5 | architect (opus) | **Merged to `main`** (option A). #28 L2 action gap continues as P0-03b | 31 tests | PASS r1 | PASS (after 11 rounds across 4 runs) | n/a | n/a | n/a | | | | n/a | n/a | n/a |
+| CC-SH Contract requests from SH (#3, #4, #5) | FR-AGT-01, FR-AGT-06, FR-AGT-07, FR-MEM-07, FR-MEM-08 | architect (opus) | **Merged to `main`** (1036 tests green) | done | PASS r2 | PASS r3 | n/a | n/a | n/a |
+| CC-SE Contract requests from SE (#7–#12) | FR-MTR-02..09, EFF-06, EFF-07 | architect (opus) | In progress | | | | | n/a | n/a |
+| P0-03b L2 instruction records the action asked for; fail closed (#28) | FR-HIL-05 | architect (opus) | Queued after CC-SE | | | | n/a | n/a | n/a |
+| P0-04 Provider layer A: interfaces, config loaders, denylist, model-id lint | PL-01, PL-04 (skeleton), PL-06, PL-07, NFR-25 | intelligence-builder → opus (escalated) | **Merged to `main`** | 33 tests | PASS r3 | n/a | PASS r1 | n/a | n/a | | | | | | n/a |
+| P0-02b Providers contract: base_url and api_key_env for openai_compat; NIM key pattern | PL-02 | architect (opus) | **Merged to `main`** | 16 tests | PASS r1 | PASS r1 | n/a | n/a | n/a |
+| P0-05 Provider layer B: google, OpenAI-compatible + NVIDIA NIM profiles, record-and-replay, fake | PL-02, EFF-01 | intelligence-builder → opus (escalated) | **Merged to `main`** (security failed early rounds on key redaction, fixed; size exception logged) | 34 tests + 4 added | PASS (after 11 rounds across 4 runs) | PASS | PASS | n/a | n/a |
+| P0-06 Provider layer C: role router, fallback, cascades, token caps, conformance | PL-03, PL-05, EFF-02, EFF-03 | intelligence-builder | Stuck after 5 code rounds (one per-candidate check gap per round); resumed with a class-wide audit of every fallback path; size exception logged | | | | | | n/a |
 | P0-07 Infrastructure plan for tilo-dev | PRD 6.2, 6.3, 6.5; SEC-02, SEC-12; 16.1 rule 5 | reach-builder → opus (escalated) | **Merged to `main`** (user approved); apply waits for Google Cloud billing | 19 tests (27 plan tests now) | PASS (after 7 rounds incl. resume) | PASS, FLAGGED earlier (WIF accepted git tags; fixed to main-only) | PASS r1 | n/a | n/a |
 | P0-07b Infra hardening follow-ups | SEC-12 | reach-builder | Queued: remove Editor from the default Compute SA that enabling compute creates; give the snapshots bucket its writer | | | | | n/a | n/a |
 | P0-08a Web shell, tokens, layout frame, iso stage | PRD 18.2, 18.3 frame, 9.7 fallback | world-builder → opus (escalated) | Stuck after 5 rounds on camera bugs (CSS-transform camera); not merged. Camera rework becomes the first task of P0-08b on the same branch | Done (tests/P0-08a) | PASS r4 | n/a | n/a | FAIL r1–r5 | PASS r3 |
@@ -60,11 +64,21 @@ Updated: 2026-09-25 · Phase 0 (Foundations) · next gate **CP0 on 29 Sep** · C
 | 2026-09-25 | code-reviewer, design-critic, qa-breaker, checkpoint-auditor | effort high → medium | Budget mode (user asked to save credits). Revert to high when the user says so. |
 | 2026-09-25 | cost-reviewer | added `memory: project` | Brief: reviewers keep recurring defects in project memory |
 | 2026-09-25 | reach-builder (P0-01, P0-07 only) | sonnet → opus for the ticket | Each ticket failed review twice for reasoning or logic errors (self-tuning rule) |
+| 2026-09-25 | intelligence-builder | sonnet → opus (saved setting) | Escalated for reasoning/logic failures on P0-04, P0-05 and P0-06 (3 tickets in a week, self-tuning rule). Reviewers paired with it run on opus (balance rule). |
+
+## Contract backlog (from parallel sessions)
+- P0-03 (+ #1, #21) and CC-SH (#3, #4, #5) landed; CC-SE (#7–#12) then P0-03b (#28) are running. Issues are closed when their branch lands.
+- Questions BQ-40 to BQ-51 folded; BQ-41 to BQ-49 decided on their defaults under the user's delegation.
+- Merge split agreed with the monitoring session: it merges `needs-user-approval` PRs into `phase0-stack` once the latest round is all PASS with CI and `just check` green; S0 keeps contracts, P0-06, `main` and this file.
+- Open PR #24 (SH, FR-AGT-04) is `stuck`: not merged until every reviewer passes.
 
 ## Decisions on 2026-09-25 (ADR-0003)
 - User approved merging P0-01 and P0-07 to `main`, porting Tilo's own design prototypes, PRD values over export values, and export-palette colours for the three missing roles.
 - Google Cloud billing is on hold: the build is local-first on emulators; CP0's deploy criterion stays NOT MET until billing works. Live model tests may use NVIDIA NIM (user adds `NVIDIA_API_KEY` to `.env` and runs with `LIVE=1`).
 - Repository: private on GitHub (`spark-456/tilo`).
+
+## Parallel sessions
+Sessions SW, SH, ST, SE and SP (see docs/parallel-sessions.md) own separate paths and integrate by PR into `phase0-stack`; S0 (this session) owns contracts, providers, progress and `main`. GitHub labels: `contract-change`, `question`, `needs-user-approval`, `stuck`.
 
 ## Integration branch
 Tickets that security-reviewer flagged cannot reach `main` without the user. Approved work stacks on `phase0-stack`; new tickets branch from it. When the user approves the flags, `main` fast-forwards to `phase0-stack`.
