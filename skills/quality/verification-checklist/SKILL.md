@@ -18,8 +18,8 @@ Use this skill as the independent Verifier step (FR-AGT-12) before a deliverable
 ## Quality bar
 
 - `verdict-invalid`: verdict must be exactly one of verified, unverified, false.
-- `verified-needs-known-evidence`: a verified verdict must cite at least one evidence source id that is actually present in the inputs.
-- `claim-not-covered`: every claim in deliverable_claims must have exactly one verdict row; nothing dropped, nothing duplicated.
+- `verified-needs-known-evidence`: a verified verdict must cite at least one evidence source id that is actually present in the inputs; a false verdict that cites evidence must cite only ids present in the inputs too.
+- `claim-not-covered`: every claim in deliverable_claims must have exactly one verdict row; nothing dropped, nothing duplicated, and no verdict for a claim_id that was not in the inputs.
 - `output-malformed`: the output must be an object with a verdicts array of claim_id/verdict/evidence_source_ids objects; malformed shapes fail closed.
 
 ## Checklist

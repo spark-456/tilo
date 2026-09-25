@@ -17,7 +17,7 @@ Use this skill to compare several supplier quotes against a stated set of requir
 ## Quality bar
 
 - `coverage-matrix-incomplete`: the coverage matrix must have exactly one row per quote x requirement pair, matching the quote's own meets data.
-- `total-not-recomputed`: every total_cost must equal the exact recomputed sum of quantity times unit price, citing the quote's own source id.
+- `total-not-recomputed`: every total_cost must equal the exact recomputed sum of quantity times unit price, citing the quote's own source id; totals must have exactly one row per input quote — a missing or duplicated row fails too.
 - `recommendation-fails-must-have`: a recommendation must meet every must-have requirement.
 - `recommendation-should-be-null`: recommendation must be null when no quote meets every must-have requirement.
 - `output-malformed`: the output must be an object with coverage_matrix, totals and recommendation; malformed shapes fail closed.

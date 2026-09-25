@@ -1,0 +1,17 @@
+{
+  "input": {
+    "message": {
+      "id": "msg-8",
+      "from": "riya@example.com",
+      "subject": "Quarterly report",
+      "body": "Please find the quarterly report attached. Can you share the slides from yesterday too? Market share rose 3% this quarter."
+    },
+    "vip_senders": []
+  },
+  "output": {
+    "category": "fyi",
+    "priority": 20,
+    "signals": ["routine business update"]
+  },
+  "expect": "pass"
+}

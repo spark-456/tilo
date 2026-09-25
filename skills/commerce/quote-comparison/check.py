@@ -98,7 +98,7 @@ def check(inputs: dict, output: dict) -> list[dict]:
         meets = quote.get("meets") if isinstance(quote.get("meets"), dict) else {}
         quote_qualifies[quote_id] = all(meets.get(req_id) == "met" for req_id in must_have_ids)
 
-    total_by_quote: dict[str, Decimal] = {}
+    totals_seen_count: dict[str, int] = {}
     for i, total in enumerate(totals):
         if not isinstance(total, dict):
             findings.append({"check": "output-malformed", "detail": f"totals[{i}] is not an object"})
@@ -118,6 +118,7 @@ def check(inputs: dict, output: dict) -> list[dict]:
                 {"check": "total-not-recomputed", "detail": f"totals[{i}] references unknown quote {quote_id!r}"}
             )
             continue
+        totals_seen_count[quote_id] = totals_seen_count.get(quote_id, 0) + 1
         line_items = quote.get("line_items") if isinstance(quote.get("line_items"), list) else []
         expected = sum(
             (_dec(li.get("quantity")) or Decimal(0)) * (_dec(li.get("unit_price")) or Decimal(0))
@@ -132,8 +133,18 @@ def check(inputs: dict, output: dict) -> list[dict]:
                     "detail": f"totals[{i}] total_cost does not match the exact recomputed sum",
                 }
             )
-        else:
-            total_by_quote[quote_id] = declared
+
+    # "total cost of each quote recomputed" (ticket FR-AGT-04) means exactly
+    # one totals row per input quote — a short totals array or a duplicated
+    # quote_id must fail just as loudly as a wrong sum.
+    for quote_id in quotes_by_id:
+        count = totals_seen_count.get(quote_id, 0)
+        if count == 0:
+            findings.append({"check": "total-not-recomputed", "detail": f"totals has no row for quote {quote_id!r}"})
+        elif count > 1:
+            findings.append(
+                {"check": "total-not-recomputed", "detail": f"totals has {count} rows for quote {quote_id!r}"}
+            )
 
     recommendation = output.get("recommendation")
     any_qualifies = any(quote_qualifies.values())

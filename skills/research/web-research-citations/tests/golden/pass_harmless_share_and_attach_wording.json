@@ -1,0 +1,22 @@
+{
+  "input": {
+    "question": "What does the vendor page say about its report and social links?",
+    "sources": [
+      {
+        "source_id": "src-1",
+        "text": "The quarterly report is attached below. Share on LinkedIn. Share on Twitter. Market share rose 3% this quarter."
+      }
+    ]
+  },
+  "output": {
+    "findings": [
+      {
+        "claim": "The vendor page includes the quarterly report and social share buttons.",
+        "status": "answered",
+        "source_ids": ["src-1"]
+      }
+    ],
+    "flags": []
+  },
+  "expect": "pass"
+}

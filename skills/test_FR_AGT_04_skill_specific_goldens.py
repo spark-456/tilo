@@ -252,6 +252,48 @@ def test_FR_AGT_04_deck_writing_check_does_not_raise_on_non_string_material_sour
     assert isinstance(findings, list)
 
 
+def test_FR_AGT_04_email_reply_draft_reply_all_string_false_is_not_truthy():
+    """FR-AGT-04 fix round 4 (security-reviewer): reply_all is typed boolean in
+    skill.yaml, so a schema-valid golden fixture cannot express a caller
+    bypassing schema validation and passing the string "false" instead. Python
+    treats any non-empty string as truthy, so `bool(inputs.get("reply_all"))`
+    previously turned the string "false" into an actual reply-all, silently
+    admitting thread participants that were never the reply-to sender. The
+    fixed check must still evaluate reply_all as false here."""
+    module = import_check_module("email", "email-reply-drafting")
+
+    inputs = {
+        "instruction": "Confirm we're on for Monday.",
+        "thread": {
+            "subject": "Kickoff",
+            "messages": [
+                {
+                    "from": "sam@example.com",
+                    "to": ["assistant@example.com", "priya@example.com"],
+                    "body": "Are we still on for Monday?",
+                }
+            ],
+        },
+        "reply_to_sender": "sam@example.com",
+        "reply_all": "false",  # malformed: a truthy string, not the JSON boolean false
+    }
+    output = {
+        "to": ["sam@example.com"],
+        "cc": ["priya@example.com"],  # only valid if reply_all were actually true
+        "subject": "Re: Kickoff",
+        "body": "Yes, Monday works for us.",
+        "attachments": [],
+        "flags": [],
+    }
+
+    findings = module.check(inputs, output)
+    assert isinstance(findings, list)
+    assert findings, (
+        'the string "false" for reply_all must not be treated as truthy; cc\'ing a thread '
+        "participant when reply_all is actually false must fail the quality bar (PRD 11.4)"
+    )
+
+
 def test_FR_AGT_04_price_comparison_picking_offer_that_misses_requirement_fails():
     """Ticket brief (commerce/price-comparison): 'the pick is the cheapest offer
     that meets every stated requirement.' Picking a cheaper offer that fails a

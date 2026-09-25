@@ -55,6 +55,13 @@ def check(inputs: dict, output: dict) -> list[dict]:
             evidence_source_ids = []
         if claim_id is not None:
             seen[claim_id] = seen.get(claim_id, 0) + 1
+            if claim_id not in claim_ids:
+                findings.append(
+                    {
+                        "check": "claim-not-covered",
+                        "detail": f"verdicts[{i}] verdicts claim {claim_id!r} not in inputs.deliverable_claims",
+                    }
+                )
         if verdict == "verified":
             unknown = [e for e in evidence_source_ids if not isinstance(e, str) or e not in evidence_ids]
             if not evidence_source_ids or unknown:
@@ -62,6 +69,18 @@ def check(inputs: dict, output: dict) -> list[dict]:
                     {
                         "check": "verified-needs-known-evidence",
                         "detail": f"verdicts[{i}] is verified but cites {unknown or 'no'} evidence not in the inputs",
+                    }
+                )
+        elif verdict == "false" and evidence_source_ids:
+            # A false verdict need not cite evidence, but if it does, every
+            # cited id must actually be present in the inputs — the same
+            # rule as for verified (round 4, code-reviewer).
+            unknown = [e for e in evidence_source_ids if not isinstance(e, str) or e not in evidence_ids]
+            if unknown:
+                findings.append(
+                    {
+                        "check": "verified-needs-known-evidence",
+                        "detail": f"verdicts[{i}] is false but cites {unknown} evidence not in the inputs",
                     }
                 )
 
