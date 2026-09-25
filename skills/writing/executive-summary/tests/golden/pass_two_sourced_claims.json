@@ -1,29 +1,17 @@
 {
   "input": {
-    "question": "Did the onboarding change help support load?",
+    "question": "Did revenue grow?",
     "material": [
-      {
-        "source_id": "src-1",
-        "text": "Support ticket volume dropped 18 percent after the new onboarding flow launched."
-      },
-      {
-        "source_id": "src-2",
-        "text": "Average time to first response is now 2 hours, down from 6 hours."
-      }
+      { "source_id": "src-1", "text": "Net income rose to 1500 thousand dollars in Q3." },
+      { "source_id": "src-2", "text": "Headcount grew to 42 people." }
     ],
     "max_words": 40
   },
   "output": {
-    "answer_first": "Yes, the new onboarding flow reduced support load.",
+    "answer_first": "Yes, net income rose to 1500 thousand dollars in Q3.",
     "claims": [
-      {
-        "text": "Ticket volume dropped 18 percent after launch.",
-        "source_id": "src-1"
-      },
-      {
-        "text": "Average time to first response fell from 6 hours to 2 hours.",
-        "source_id": "src-2"
-      }
+      { "text": "Net income reached 1500 thousand dollars.", "source_id": "src-1" },
+      { "text": "Headcount grew to 42 people.", "source_id": "src-2" }
     ]
   },
   "expect": "pass"

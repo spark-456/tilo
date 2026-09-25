@@ -16,6 +16,7 @@ inputs:
     requirements:
       type: array
       minItems: 1
+      maxItems: 20
       items:
         type: object
         additionalProperties: false
@@ -25,13 +26,16 @@ inputs:
         properties:
           requirement_id:
             type: string
-          description:
+            maxLength: 64
+          text:
             type: string
+            maxLength: 500
           must_have:
             type: boolean
     quotes:
       type: array
       minItems: 1
+      maxItems: 20
       items:
         type: object
         additionalProperties: false
@@ -39,14 +43,16 @@ inputs:
           - quote_id
           - source_id
           - line_items
-          - meets
         properties:
           quote_id:
             type: string
+            maxLength: 64
           source_id:
             type: string
+            maxLength: 64
           line_items:
             type: array
+            maxItems: 50
             items:
               type: object
               additionalProperties: false
@@ -57,28 +63,25 @@ inputs:
               properties:
                 description:
                   type: string
+                  maxLength: 500
                 quantity:
                   type: number
                 unit_price:
                   type: number
-          meets:
-            type: object
-            additionalProperties:
-              type: string
-              enum:
-                - met
-                - partial
-                - missing
+          total:
+            description: An already-known total, used instead of recomputing from line_items when present.
+            type: number
 outputs:
   type: object
   additionalProperties: false
   required:
-    - coverage_matrix
+    - coverage
     - totals
     - recommendation
   properties:
-    coverage_matrix:
+    coverage:
       type: array
+      maxItems: 400
       items:
         type: object
         additionalProperties: false
@@ -89,8 +92,10 @@ outputs:
         properties:
           quote_id:
             type: string
+            maxLength: 64
           requirement_id:
             type: string
+            maxLength: 64
           status:
             type: string
             enum:
@@ -100,19 +105,18 @@ outputs:
     totals:
       type: array
       minItems: 1
+      maxItems: 20
       items:
         type: object
         additionalProperties: false
         required:
           - quote_id
-          - source_id
-          - total_cost
+          - total
         properties:
           quote_id:
             type: string
-          source_id:
-            type: string
-          total_cost:
+            maxLength: 64
+          total:
             type: number
     recommendation:
       oneOf:
@@ -120,11 +124,9 @@ outputs:
           additionalProperties: false
           required:
             - quote_id
-            - source_id
           properties:
             quote_id:
               type: string
-            source_id:
-              type: string
+              maxLength: 64
         - type: "null"
 description: Compare supplier quotes against requirements with a coverage matrix and recomputed totals; recommend only if a quote covers every must-have.

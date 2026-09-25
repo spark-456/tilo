@@ -1,26 +1,12 @@
 {
   "input": {
     "deliverable_claims": [
-      {
-        "claim_id": "c1",
-        "text": "The product launches next quarter."
-      }
+      { "claim_id": "c1", "text": "The company is headquartered in Singapore." }
     ],
-    "evidence": [
-      {
-        "source_id": "src-1",
-        "text": "The roadmap does not mention a launch date."
-      }
-    ]
+    "evidence": []
   },
   "output": {
-    "verdicts": [
-      {
-        "claim_id": "c1",
-        "verdict": "unverified",
-        "evidence_source_ids": []
-      }
-    ]
+    "verdicts": [{ "claim_id": "c1", "verdict": "unverified", "evidence_source_ids": [] }]
   },
   "expect": "pass"
 }

@@ -1,93 +1,27 @@
-"""Deterministic quality-bar checker for quality/verification-checklist.
+# quality/verification-checklist checker (FR-AGT-04).
+from skills._lib import guard
 
-Pure standard library. Never raises: malformed output always yields at least
-one finding (fail closed). See SKILL.md "Quality bar" for the check ids this
-module can return.
-"""
-
-from __future__ import annotations
-
-_VALID_VERDICTS = {"verified", "unverified", "false"}
+_VERDICTS = {"verified", "unverified", "false"}
 
 
+@guard.fail_closed
 def check(inputs: dict, output: dict) -> list[dict]:
-    if not isinstance(output, dict):
-        return [{"check": "output-malformed", "detail": "output must be an object"}]
+    claims = inputs.get("deliverable_claims", [])
+    claim_ids = [c.get("claim_id") for c in claims if isinstance(c, dict)]
+    evidence_ids = guard.str_ids(inputs.get("evidence"), "source_id")
+
     verdicts = output.get("verdicts")
-    if not isinstance(verdicts, list):
-        return [{"check": "output-malformed", "detail": "output.verdicts must be an array"}]
+    findings = guard.ids_exactly_once(claim_ids, verdicts, "claim_id")
 
-    inputs = inputs if isinstance(inputs, dict) else {}
-    claims = inputs.get("deliverable_claims") if isinstance(inputs.get("deliverable_claims"), list) else []
-    evidence = inputs.get("evidence") if isinstance(inputs.get("evidence"), list) else []
-    # claim_id/source_id could each be any JSON type (e.g. a list), which is
-    # unhashable and would raise building these sets — only a string id is
-    # usable as a set member here.
-    claim_ids = {c.get("claim_id") for c in claims if isinstance(c, dict) and isinstance(c.get("claim_id"), str)}
-    evidence_ids = {e.get("source_id") for e in evidence if isinstance(e, dict) and isinstance(e.get("source_id"), str)}
-
-    findings: list[dict] = []
-    seen: dict[object, int] = {}
-    for i, verdict_row in enumerate(verdicts):
-        if not isinstance(verdict_row, dict):
-            findings.append({"check": "output-malformed", "detail": f"verdicts[{i}] is not an object"})
+    for v in verdicts if isinstance(verdicts, list) else []:
+        if not isinstance(v, dict):
             continue
-        raw_claim_id = verdict_row.get("claim_id")
-        verdict = verdict_row.get("verdict")
-        evidence_source_ids = verdict_row.get("evidence_source_ids")
-        # claim_id and verdict could be any JSON type (e.g. a list), which is
-        # unhashable and would raise on a dict key or `in` a set — check the
-        # type before either use.
-        claim_id = raw_claim_id if isinstance(raw_claim_id, str) else None
-        if claim_id is None:
-            findings.append({"check": "output-malformed", "detail": f"verdicts[{i}].claim_id must be a string"})
-        if not isinstance(verdict, str) or verdict not in _VALID_VERDICTS:
-            findings.append(
-                {
-                    "check": "verdict-invalid",
-                    "detail": f"verdicts[{i}].verdict {verdict!r} must be verified/unverified/false",
-                }
-            )
-        if not isinstance(evidence_source_ids, list):
-            findings.append(
-                {"check": "output-malformed", "detail": f"verdicts[{i}].evidence_source_ids must be an array"}
-            )
-            evidence_source_ids = []
-        if claim_id is not None:
-            seen[claim_id] = seen.get(claim_id, 0) + 1
-            if claim_id not in claim_ids:
-                findings.append(
-                    {
-                        "check": "claim-not-covered",
-                        "detail": f"verdicts[{i}] verdicts claim {claim_id!r} not in inputs.deliverable_claims",
-                    }
-                )
-        if verdict == "verified":
-            unknown = [e for e in evidence_source_ids if not isinstance(e, str) or e not in evidence_ids]
-            if not evidence_source_ids or unknown:
-                findings.append(
-                    {
-                        "check": "verified-needs-known-evidence",
-                        "detail": f"verdicts[{i}] is verified but cites {unknown or 'no'} evidence not in the inputs",
-                    }
-                )
-        elif verdict == "false" and evidence_source_ids:
-            # A false verdict need not cite evidence, but if it does, every
-            # cited id must actually be present in the inputs — the same
-            # rule as for verified (round 4, code-reviewer).
-            unknown = [e for e in evidence_source_ids if not isinstance(e, str) or e not in evidence_ids]
-            if unknown:
-                findings.append(
-                    {
-                        "check": "verified-needs-known-evidence",
-                        "detail": f"verdicts[{i}] is false but cites {unknown} evidence not in the inputs",
-                    }
-                )
-
-    for claim_id in claim_ids:
-        count = seen.get(claim_id, 0)
-        if count == 0:
-            findings.append({"check": "claim-not-covered", "detail": f"claim {claim_id!r} has no verdict"})
-        elif count > 1:
-            findings.append({"check": "claim-not-covered", "detail": f"claim {claim_id!r} has more than one verdict"})
+        cid, verdict = v.get("claim_id"), v.get("verdict")
+        cited = v.get("evidence_source_ids") if isinstance(v.get("evidence_source_ids"), list) else []
+        bad_verdict = verdict not in _VERDICTS
+        findings += [guard.finding("verdict-invalid", f"{cid}: {verdict!r} invalid")] if bad_verdict else []
+        unknown = [e for e in cited if e not in evidence_ids]
+        findings += [guard.finding("evidence-unknown", f"{cid}: {unknown} unknown")] if unknown else []
+        needs_ev = verdict == "verified" and not cited
+        findings += [guard.finding("verified-needs-evidence", f"{cid}: verified, no evidence")] if needs_ev else []
     return findings

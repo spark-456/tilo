@@ -1,26 +1,7 @@
 {
   "unit_prices": [
-    {
-      "offer_id": "o1",
-      "unit_price": 29.0,
-      "currency": "USD",
-      "source_id": "src-cheap"
-    },
-    {
-      "offer_id": "o2",
-      "unit_price": 39.0,
-      "currency": "USD",
-      "source_id": "src-mid"
-    },
-    {
-      "offer_id": "o3",
-      "unit_price": 48.6,
-      "currency": "USD",
-      "source_id": "src-eu"
-    }
+    { "offer_id": "o1", "unit_price": 29.0, "currency": "USD", "source_id": "src-cheap" },
+    { "offer_id": "o2", "unit_price": 39.0, "currency": "USD", "source_id": "src-mid" }
   ],
-  "pick": {
-    "offer_id": "o2",
-    "source_id": "src-mid"
-  }
+  "pick": { "offer_id": "o2", "source_id": "src-mid" }
 }

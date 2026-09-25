@@ -1,21 +1,16 @@
 {
   "input": {
-    "question": "Is the flow live?",
+    "question": "Did the team ship the onboarding flow?",
     "material": [
-      {
-        "source_id": "src-1",
-        "text": "Support ticket volume dropped 18 percent after the new onboarding flow launched."
-      },
-      {
-        "source_id": "src-2",
-        "text": "Average time to first response is now 2 hours, down from 6 hours."
-      }
+      { "source_id": "src-1", "text": "The team shipped the new onboarding flow this week." }
     ],
-    "max_words": 10
+    "max_words": 30
   },
   "output": {
-    "answer_first": "Yes, it is live.",
-    "claims": []
+    "answer_first": "Yes, the team shipped the new onboarding flow this week.",
+    "claims": [
+      { "text": "The team shipped the new onboarding flow this week.", "source_id": "src-1" }
+    ]
   },
   "expect": "pass"
 }

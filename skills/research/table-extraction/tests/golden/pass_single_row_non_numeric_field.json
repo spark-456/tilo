@@ -1,34 +1,16 @@
 {
   "input": {
     "table": {
-      "columns": ["name", "active"],
-      "rows": [
-        [
-          {
-            "ref": "A2",
-            "value": "Widget"
-          },
-          {
-            "ref": "B2",
-            "value": "yes"
-          }
-        ]
-      ]
+      "rows": [{ "row_ref": "r1", "cells": { "name": "  Acme Corp  ", "segment": "Retail" } }]
     }
   },
   "output": {
     "records": [
       {
-        "row_ref": "A2",
+        "row_ref": "r1",
         "fields": {
-          "name": {
-            "value": "Widget",
-            "source_ref": "A2"
-          },
-          "active": {
-            "value": "yes",
-            "source_ref": "B2"
-          }
+          "name": { "cell": "name", "value": "Acme Corp" },
+          "segment": { "cell": "segment", "value": "Retail" }
         }
       }
     ]

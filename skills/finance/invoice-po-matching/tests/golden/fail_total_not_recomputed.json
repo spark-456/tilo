@@ -1,60 +1,13 @@
 {
   "input": {
-    "invoice": {
-      "invoice_id": "INV-100",
-      "lines": [
-        {
-          "line_id": "il1",
-          "item": "Widget",
-          "quantity": 10,
-          "unit_price": 5.0
-        },
-        {
-          "line_id": "il2",
-          "item": "Gadget",
-          "quantity": 3,
-          "unit_price": 20.0
-        }
-      ]
-    },
-    "purchase_order": {
-      "po_id": "PO-200",
-      "lines": [
-        {
-          "line_id": "pl1",
-          "item": "Widget",
-          "quantity": 10,
-          "unit_price": 5.0
-        },
-        {
-          "line_id": "pl2",
-          "item": "Gadget",
-          "quantity": 3,
-          "unit_price": 20.0
-        }
-      ]
-    },
-    "quantity_tolerance_pct": 5
+    "invoice_lines": [{ "line_id": "inv-1", "amount": 100.0, "description": "Widgets" }],
+    "po_lines": [{ "line_id": "po-1", "amount": 100.0, "description": "Widgets" }]
   },
   "output": {
     "matches": [
-      {
-        "invoice_line_id": "il1",
-        "po_line_id": "pl1",
-        "status": "matched",
-        "reason_code": null
-      },
-      {
-        "invoice_line_id": "il2",
-        "po_line_id": "pl2",
-        "status": "matched",
-        "reason_code": null
-      }
+      { "invoice_line_id": "inv-1", "po_line_id": "po-1", "status": "matched", "reason_code": null }
     ],
-    "invoice_total": 999.0,
-    "po_total": 110.0
+    "totals": { "invoice_total": 999.0, "po_total": 100.0 }
   },
-  "expect": {
-    "fail": "total-not-recomputed"
-  }
+  "expect": { "fail": "totals-mismatch" }
 }

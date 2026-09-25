@@ -1,49 +1,13 @@
 {
   "input": {
     "table": {
-      "columns": ["item", "quantity"],
-      "rows": [
-        [
-          {
-            "ref": "A2",
-            "value": "Widget"
-          },
-          {
-            "ref": "B2",
-            "value": "12"
-          }
-        ],
-        [
-          {
-            "ref": "A3",
-            "value": "Gadget"
-          },
-          {
-            "ref": "B3",
-            "value": "4"
-          }
-        ]
-      ]
+      "rows": [{ "row_ref": "r1", "cells": { "name": "Acme Corp" } }]
     }
   },
   "output": {
     "records": [
-      {
-        "row_ref": "A2",
-        "fields": {
-          "item": {
-            "value": "Widget",
-            "source_ref": "A2"
-          },
-          "quantity": {
-            "value": 4,
-            "source_ref": "B3"
-          }
-        }
-      }
+      { "row_ref": "r1", "fields": { "segment": { "cell": "segment", "value": "Retail" } } }
     ]
   },
-  "expect": {
-    "fail": "source-ref-in-row"
-  }
+  "expect": { "fail": "field-outside-row" }
 }

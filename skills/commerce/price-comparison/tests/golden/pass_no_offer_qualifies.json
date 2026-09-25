@@ -1,36 +1,23 @@
 {
   "input": {
-    "item": "tent",
-    "requirements": [
-      {
-        "field": "capacity",
-        "op": "gte",
-        "value": 4
-      }
-    ],
+    "item": "20L backpack",
+    "requirements": [{ "field": "waterproof", "op": "eq", "value": true }],
     "currency": "USD",
-    "rates": {
-      "USD": 1.0
-    },
+    "rates": { "USD": 1.0 },
     "offers": [
       {
-        "offer_id": "t1",
-        "source_id": "src-t1",
-        "price": 50.0,
+        "offer_id": "o1",
+        "source_id": "src-cheap",
+        "price": 29.0,
         "currency": "USD",
         "unit_count": 1,
-        "capacity": 2
+        "waterproof": false
       }
     ]
   },
   "output": {
     "unit_prices": [
-      {
-        "offer_id": "t1",
-        "unit_price": 50.0,
-        "currency": "USD",
-        "source_id": "src-t1"
-      }
+      { "offer_id": "o1", "unit_price": 29.0, "currency": "USD", "source_id": "src-cheap" }
     ],
     "pick": null
   },

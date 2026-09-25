@@ -20,8 +20,10 @@ inputs:
     item:
       type: string
       minLength: 1
+      maxLength: 200
     requirements:
       type: array
+      maxItems: 20
       items:
         type: object
         additionalProperties: false
@@ -32,6 +34,7 @@ inputs:
         properties:
           field:
             type: string
+            maxLength: 64
           op:
             type: string
             enum: [eq, gte, lte, gt, lt, in]
@@ -39,14 +42,18 @@ inputs:
     currency:
       type: string
       minLength: 1
+      maxLength: 8
     rates:
       type: object
+      maxProperties: 20
       additionalProperties:
         type: number
     offers:
       type: array
       minItems: 1
+      maxItems: 50
       items:
+        description: Open beyond the fixed fields below, since requirements[].field names an arbitrary domain attribute (e.g. "waterproof") to match against.
         type: object
         additionalProperties: true
         required:
@@ -58,12 +65,15 @@ inputs:
         properties:
           offer_id:
             type: string
+            maxLength: 64
           source_id:
             type: string
+            maxLength: 64
           price:
             type: number
           currency:
             type: string
+            maxLength: 8
           unit_count:
             type: number
 outputs:
@@ -75,6 +85,7 @@ outputs:
   properties:
     unit_prices:
       type: array
+      maxItems: 50
       items:
         type: object
         additionalProperties: false
@@ -86,12 +97,15 @@ outputs:
         properties:
           offer_id:
             type: string
+            maxLength: 64
           unit_price:
             type: number
           currency:
             type: string
+            maxLength: 8
           source_id:
             type: string
+            maxLength: 64
     pick:
       oneOf:
         - type: object
@@ -102,7 +116,9 @@ outputs:
           properties:
             offer_id:
               type: string
+              maxLength: 64
             source_id:
               type: string
+              maxLength: 64
         - type: "null"
 description: Compare offers for one item, normalise to a unit price, and pick the cheapest that meets every requirement.

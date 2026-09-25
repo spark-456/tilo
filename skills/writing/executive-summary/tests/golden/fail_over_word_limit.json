@@ -1,32 +1,16 @@
 {
   "input": {
-    "question": "Did the onboarding change help support load?",
+    "question": "Did the team ship the onboarding flow?",
     "material": [
-      {
-        "source_id": "src-1",
-        "text": "Support ticket volume dropped 18 percent after the new onboarding flow launched."
-      },
-      {
-        "source_id": "src-2",
-        "text": "Average time to first response is now 2 hours, down from 6 hours."
-      }
+      { "source_id": "src-1", "text": "The team shipped the new onboarding flow this week." }
     ],
     "max_words": 5
   },
   "output": {
-    "answer_first": "Yes, the new onboarding flow reduced support load.",
+    "answer_first": "Yes, the team shipped the new onboarding flow this week.",
     "claims": [
-      {
-        "text": "Ticket volume dropped 18 percent after launch.",
-        "source_id": "src-1"
-      },
-      {
-        "text": "Average time to first response fell from 6 hours to 2 hours.",
-        "source_id": "src-2"
-      }
+      { "text": "The team shipped the new onboarding flow this week.", "source_id": "src-1" }
     ]
   },
-  "expect": {
-    "fail": "word-count-over-limit"
-  }
+  "expect": { "fail": "word-limit-exceeded" }
 }

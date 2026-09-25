@@ -4,42 +4,33 @@ Domain expert review: tracked as GitHub issue spark-456/tilo#6 (no domain expert
 
 ## When to use
 
-Use this skill to compare several supplied offers for the same item and recommend the cheapest one that actually meets every stated requirement. Use it only with offers and exchange rates that were supplied in `inputs`; never fetch a live price or rate inside this skill (fetching is a separate research step feeding `offers`).
+Use this skill to compare offers for one item, normalise each to a common unit price, and pick the cheapest offer that actually meets every stated requirement.
 
 ## Steps
 
-1. Read `inputs.item`, `inputs.requirements`, `inputs.currency`, `inputs.rates` and `inputs.offers`.
-2. For every offer, convert its price into `inputs.currency` using only `inputs.rates` (multiply the offer's price by the rate for its own currency), then divide by `unit_count` to get a true unit price. Never use an outside exchange rate.
-3. Record each offer's unit price in `unit_prices`, citing the offer's `source_id` so the number can be traced back.
-4. Check every offer against every entry in `inputs.requirements` using the stated `op` (`eq`, `gte`, `lte`, `gt`, `lt`, `in`). An offer that fails any one requirement does not qualify, no matter how cheap it is.
-5. Pick the cheapest qualifying offer by unit price. If no offer meets every requirement, `pick` is `null` — never pick a disqualified offer because it is cheap.
+1. Read `inputs.item`, `inputs.requirements` (field/op/value), `inputs.currency`, `inputs.rates` and `inputs.offers`.
+2. For every offer, compute its unit price in the target currency from `price`, the offer's own `rates` entry, and `unit_count` — never from a number typed by hand. Give every supplied offer its own row in `output.unit_prices`.
+3. An offer "meets" the requirements only when every one of `inputs.requirements` is satisfied against that offer's own fields, using the stated `op` exactly (eq/gte/lte/gt/lt/in).
+4. Pick the cheapest offer, by its recomputed unit price, among the offers that meet every requirement. If none meet every requirement, `pick` is null — never pick the cheapest overall offer as a fallback.
+5. `pick.source_id` must be that same offer's own `source_id`, never a different offer's.
 
 ## Quality bar
 
-- `unit-price-mismatch`: every unit price must exactly recompute from the offer's price, currency, rate and unit count, and cite the offer's own source id and the target currency.
-- `unit-price-missing`: every offer with a usable, computable price must have its own row in unit_prices; leaving a row out is not the same as reporting it wrong, and both fail the quality bar.
-- `pick-meets-requirements`: the picked offer must satisfy every stated requirement.
-- `pick-source-mismatch`: the pick's source_id must match the picked offer's own source_id, not a fabricated one.
-- `pick-is-cheapest-qualifying`: the pick must be the cheapest offer that qualifies, judged from the offers and rates actually supplied — never from only the unit_prices rows the output chose to include; if none qualify, pick must be null.
-- `input-malformed`: an offer's price or unit_count that cannot be used as a bounded, finite number (the input schema allows any JSON number, including an absurd one) fails closed instead of being computed with.
-- `output-malformed`: the output must be an object with a unit_prices array and a pick; malformed shapes fail closed.
+- `ids-missing`: every supplied offer must have exactly one row in `output.unit_prices`.
+- `unit-price-mismatch`: a unit_prices row must recompute exactly from that offer's price, currency rate and unit count, to 4 decimal places, and carry that offer's own source_id.
+- `pick-requirement-fail`: the pick must be an offer that meets every stated requirement, and its source_id must match that offer's own.
+- `pick-not-cheapest`: the pick must be the cheapest offer among those that meet every requirement (or null when none do).
 
 ## Checklist
 
-- [ ] Every unit price recomputes exactly from the supplied price, rate and unit count.
-- [ ] Every unit price cites the offer's own source id.
-- [ ] Every supplied offer with a usable price has its own unit_prices row — none left out.
-- [ ] The pick, if any, passes every stated requirement.
-- [ ] The pick's source_id is the picked offer's own source id, not a made-up one.
-- [ ] The pick is the cheapest offer that passes, not just the cheapest offer, and not just the cheapest of whatever unit_prices happened to report.
-- [ ] Pick is null when nothing qualifies, never a disqualified cheap offer.
+- [ ] Every offer has a unit_prices row, recomputed from the offer and rates, never invented.
+- [ ] The pick meets every stated requirement, or is null if none do.
+- [ ] The pick is the cheapest offer among the ones that qualify, not merely cheap.
+- [ ] pick.source_id matches the picked offer's own source_id.
 
 ## Pitfalls
 
-- Picking the lowest raw price instead of the lowest unit price (a bigger pack can look cheaper by sticker price alone).
-- Silently dropping a requirement the cheapest offer fails, instead of disqualifying it.
-- Using a rate not present in `inputs.rates`, or converting in the wrong direction.
-- Returning a pick with no qualifying offer instead of null.
-- Leaving a cheap qualifying offer's row out of `unit_prices` entirely — an omitted row is not the same as an honest one, and it can make a dearer offer look like the cheapest one reported.
-- Inventing a `source_id` on `pick` instead of copying the picked offer's own source id.
-- Passing through a wildly out-of-range price or unit_count unquestioned — a schema-valid number can still be absurd; treat it as unusable input, not as a real value to compute with.
+- Picking the cheapest offer overall without checking it against every stated requirement.
+- Reporting a unit price that "looks about right" instead of recomputing it from price, rate and unit count.
+- Leaving out an offer's unit_prices row because it was clearly not going to be picked.
+- Copying the wrong offer's source_id onto the pick.

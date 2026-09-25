@@ -1,37 +1,19 @@
 {
   "records": [
     {
-      "row_ref": "A2",
+      "row_ref": "r1",
       "fields": {
-        "item": {
-          "value": "Widget",
-          "source_ref": "A2"
-        },
-        "quantity": {
-          "value": 12,
-          "source_ref": "B2"
-        },
-        "unit_price": {
-          "value": 3.5,
-          "source_ref": "C2"
-        }
+        "name": { "cell": "name", "value": "Acme Corp" },
+        "segment": { "cell": "segment", "value": "Retail" },
+        "amount": { "cell": "amount", "value": 1500 }
       }
     },
     {
-      "row_ref": "A3",
+      "row_ref": "r2",
       "fields": {
-        "item": {
-          "value": "Gadget",
-          "source_ref": "A3"
-        },
-        "quantity": {
-          "value": 4,
-          "source_ref": "B3"
-        },
-        "unit_price": {
-          "value": 19.99,
-          "source_ref": "C3"
-        }
+        "name": { "cell": "name", "value": "Globex" },
+        "segment": { "cell": "segment", "value": "Manufacturing" },
+        "amount": { "cell": "amount", "value": 2300 }
       }
     }
   ]

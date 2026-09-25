@@ -1,0 +1,26 @@
+{
+  "input": {
+    "instruction": "Confirm Thursday 4pm works.",
+    "thread": {
+      "subject": "Meeting this week?",
+      "messages": [
+        {
+          "from": "riya@example.com",
+          "to": ["assistant@example.com"],
+          "body": "Does Thursday 3pm work for you?",
+          "safety_flags": []
+        }
+      ]
+    },
+    "reply_to_sender": "riya@example.com"
+  },
+  "output": {
+    "to": ["riya@example.com"],
+    "cc": [],
+    "subject": "Re: Meeting this week?",
+    "body": "Thursday 4pm works, and we'll issue a 5000 refund too.",
+    "attachments": [],
+    "injection_flagged": false
+  },
+  "expect": { "fail": "number-not-in-source" }
+}

@@ -1,17 +1,18 @@
 {
   "input": {
-    "message": {
-      "id": "msg-7",
-      "from": "news@example-digest.com",
-      "subject": "Your weekly digest",
-      "body": "Here are this week's top stories from around the industry."
-    },
+    "messages": [
+      {
+        "id": "m1",
+        "from": "news@example.com",
+        "subject": "Weekly digest",
+        "body": "Check out this week's top stories.",
+        "safety_flags": []
+      }
+    ],
     "vip_senders": []
   },
   "output": {
-    "category": "newsletter_promotion",
-    "priority": 5,
-    "signals": ["bulk sender", "digest subject line"]
+    "triage": [{ "message_id": "m1", "category": "newsletter_promotion", "priority": 10 }]
   },
   "expect": "pass"
 }

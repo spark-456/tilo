@@ -1,91 +1,20 @@
 {
   "input": {
     "requirements": [
-      {
-        "requirement_id": "r1",
-        "description": "Next-day delivery",
-        "must_have": true
-      },
-      {
-        "requirement_id": "r2",
-        "description": "Gift wrapping",
-        "must_have": false
-      }
+      { "requirement_id": "req-1", "text": "Must include installation", "must_have": true }
     ],
     "quotes": [
       {
         "quote_id": "q1",
         "source_id": "src-q1",
-        "line_items": [
-          {
-            "description": "10x widget",
-            "quantity": 10,
-            "unit_price": 4.5
-          }
-        ],
-        "meets": {
-          "r1": "met",
-          "r2": "missing"
-        }
-      },
-      {
-        "quote_id": "q2",
-        "source_id": "src-q2",
-        "line_items": [
-          {
-            "description": "10x widget",
-            "quantity": 10,
-            "unit_price": 4.0
-          }
-        ],
-        "meets": {
-          "r1": "missing",
-          "r2": "met"
-        }
+        "line_items": [{ "description": "Install", "quantity": 2, "unit_price": 250.0 }]
       }
     ]
   },
   "output": {
-    "coverage_matrix": [
-      {
-        "quote_id": "q1",
-        "requirement_id": "r1",
-        "status": "met"
-      },
-      {
-        "quote_id": "q1",
-        "requirement_id": "r2",
-        "status": "missing"
-      },
-      {
-        "quote_id": "q2",
-        "requirement_id": "r1",
-        "status": "missing"
-      },
-      {
-        "quote_id": "q2",
-        "requirement_id": "r2",
-        "status": "met"
-      }
-    ],
-    "totals": [
-      {
-        "quote_id": "q1",
-        "source_id": "src-q1",
-        "total_cost": 999.0
-      },
-      {
-        "quote_id": "q2",
-        "source_id": "src-q2",
-        "total_cost": 40.0
-      }
-    ],
-    "recommendation": {
-      "quote_id": "q1",
-      "source_id": "src-q1"
-    }
+    "coverage": [{ "quote_id": "q1", "requirement_id": "req-1", "status": "met" }],
+    "totals": [{ "quote_id": "q1", "total": 400.0 }],
+    "recommendation": { "quote_id": "q1" }
   },
-  "expect": {
-    "fail": "total-not-recomputed"
-  }
+  "expect": { "fail": "totals-mismatch" }
 }

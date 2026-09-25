@@ -1,13 +1,4 @@
 {
-  "answer_first": "Yes, the new onboarding flow reduced support load.",
-  "claims": [
-    {
-      "text": "Ticket volume dropped 18 percent after launch.",
-      "source_id": "src-1"
-    },
-    {
-      "text": "Average time to first response fell from 6 hours to 2 hours.",
-      "source_id": "src-2"
-    }
-  ]
+  "answer_first": "Yes, net income rose to 1500 thousand dollars in Q3.",
+  "claims": [{ "text": "Up from 1200 thousand in Q2.", "source_id": "src-1" }]
 }

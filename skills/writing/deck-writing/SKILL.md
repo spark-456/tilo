@@ -4,36 +4,33 @@ Domain expert review: tracked as GitHub issue spark-456/tilo#6 (no domain expert
 
 ## When to use
 
-Use this skill to turn already-verified material (for example a Verifier-checked research brief) into a slide outline: titles and bullets, with any chart left as a reference to the underlying data rather than drawn. Do not use it as a first-draft research tool — the material it works from must already be sourced.
+Use this skill to outline slides from verified material, never from memory, with every number and chart traceable to a material id.
 
 ## Steps
 
-1. Read `inputs.material` (an array of sourced passages) and `inputs.max_slides`.
-2. Plan no more slides than `inputs.max_slides`. Fewer is fine; never more.
-3. Write a short slide title, at most 60 characters.
-4. Write bullets from the material. Every bullet that states a number must carry a `source_id` pointing at the passage that contains that exact number — copy the number as written in the source, do not recompute or round it.
-5. If a slide needs a chart, never draw one yourself: add a `chart_ref` object naming only the `source_id` (and optionally a `chart_type`) so the render service builds the chart from data. Never embed pixel, SVG or image data.
-6. Leave anything the material does not support out of the deck rather than filling gaps.
+1. Read `inputs.material` (source_id, text) and `inputs.max_slides`.
+2. Produce at most `max_slides` slides; a title is at most 60 characters.
+3. Every number in a title or bullet — a figure, a percentage, a date — must already appear as a number in the material. Never invent, round, or approximate a number for effect.
+4. Every slide's bullets or `source_refs` must name material ids that were actually supplied.
+5. A chart is a data reference to a material id (`source_id`, optionally `chart_type`) — never an image or drawing produced by a model (PRD 12.4). The render layer draws the chart deterministically from the referenced data.
 
 ## Quality bar
 
-- `slide-count-within-limit`: the number of slides must not exceed the requested max_slides.
-- `title-too-long`: every slide title must be 60 characters or fewer.
-- `number-has-source`: every number in a bullet must appear, as a whole number (not a substring of a larger number), in the material passage its bullet cites; every number in a slide title must appear, as a whole number, somewhere in the supplied material (a title has no source_id of its own, so it is checked against the whole material corpus).
-- `chart-not-drawn`: a chart_ref must cite a supplied source and hold only a data reference, never drawing data (PRD 12.4: charts are rendered from data by code, never drawn by a model).
-- `output-malformed`: the output must be an object with a slides array of title/bullets objects, and a chart_ref's chart_type, if present, must be a string; malformed shapes fail closed.
+- `slide-count-exceeded`: the deck must have at most `max_slides` slides.
+- `title-too-long`: every title must be at most 60 characters.
+- `number-not-in-material`: every number in a title or bullet must be a number token of the material.
+- `source-ref-unknown`: every source reference (bullet, slide-level ref, or chart) must name a supplied material id.
 
 ## Checklist
 
 - [ ] Slide count is within the requested limit.
 - [ ] Every title is 60 characters or fewer.
-- [ ] Every numbered bullet cites a source that contains that exact number, and every numbered title is traceable to the material (checked as a whole number, never a substring — "50" must never pass just because it sits inside "1500").
-- [ ] Any chart is a data reference only, never a model-drawn image.
-- [ ] Nothing on a slide is unsupported by the material.
+- [ ] Every number in the deck traces back to the material, matched as a whole number, not a substring.
+- [ ] Every source reference and chart names a real material id.
 
 ## Pitfalls
 
-- Rounding or reformatting a number for a cleaner-looking bullet — this breaks the exact-match source trace.
-- Drawing a chart as an image or inline SVG "to save a step" instead of leaving it as a data reference for the render service.
-- Splitting one idea across too many slides to dodge the slide limit.
-- Writing a title that only fits by abbreviating past readability, instead of shortening the underlying claim.
+- Rounding a number "for readability" (1500 becomes "about 1.5k") — the whole-token number check will not recognise it as the same figure.
+- Referencing a chart with data the model made up instead of a material id the render layer can look up.
+- Writing a bullet with no source reference when several plausible material ids exist, guessing at one that isn't right.
+- Padding a title past 60 characters to fit in extra context.

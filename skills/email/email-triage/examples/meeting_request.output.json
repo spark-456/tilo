@@ -1,5 +1,9 @@
 {
-  "category": "needs_reply",
-  "priority": 85,
-  "signals": ["sender is a VIP", "asks a direct question", "has a reply deadline (Friday)"]
+  "triage": [
+    {
+      "message_id": "m1",
+      "category": "needs_reply",
+      "priority": 55
+    }
+  ]
 }

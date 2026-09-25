@@ -1,53 +1,11 @@
 {
   "input": {
     "table": {
-      "columns": ["item", "quantity", "unit_price"],
-      "rows": [
-        [
-          {
-            "ref": "A2",
-            "value": "Widget"
-          },
-          {
-            "ref": "B2",
-            "value": "12"
-          },
-          {
-            "ref": "C2",
-            "value": "3.50"
-          }
-        ],
-        [
-          {
-            "ref": "A3",
-            "value": "Gadget"
-          },
-          {
-            "ref": "B3",
-            "value": "4"
-          },
-          {
-            "ref": "C3",
-            "value": "19.99"
-          }
-        ]
-      ]
+      "rows": [{ "row_ref": "r1", "cells": { "amount": "1500" } }]
     }
   },
   "output": {
-    "records": [
-      {
-        "row_ref": "A2",
-        "fields": {
-          "quantity": {
-            "value": 13,
-            "source_ref": "B2"
-          }
-        }
-      }
-    ]
+    "records": [{ "row_ref": "r1", "fields": { "amount": { "cell": "amount", "value": 1499 } } }]
   },
-  "expect": {
-    "fail": "number-parses-exactly"
-  }
+  "expect": { "fail": "number-value-mismatch" }
 }

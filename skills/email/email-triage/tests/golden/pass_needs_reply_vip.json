@@ -1,17 +1,18 @@
 {
   "input": {
-    "message": {
-      "id": "msg-42",
-      "from": "riya@example.com",
-      "subject": "Does Thursday 3pm work?",
-      "body": "Hi, can we meet Thursday at 3pm to go over the proposal? Let me know by Friday."
-    },
-    "vip_senders": ["riya@example.com"]
+    "messages": [
+      {
+        "id": "m1",
+        "from": "boss@example.com",
+        "subject": "Can we sync?",
+        "body": "Are you free tomorrow?",
+        "safety_flags": []
+      }
+    ],
+    "vip_senders": ["boss@example.com"]
   },
   "output": {
-    "category": "needs_reply",
-    "priority": 85,
-    "signals": ["sender is a VIP", "asks a direct question", "has a reply deadline (Friday)"]
+    "triage": [{ "message_id": "m1", "category": "needs_reply", "priority": 90 }]
   },
   "expect": "pass"
 }

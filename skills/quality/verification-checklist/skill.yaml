@@ -15,6 +15,8 @@ inputs:
   properties:
     deliverable_claims:
       type: array
+      minItems: 1
+      maxItems: 100
       items:
         type: object
         additionalProperties: false
@@ -24,10 +26,13 @@ inputs:
         properties:
           claim_id:
             type: string
+            maxLength: 64
           text:
             type: string
+            maxLength: 2000
     evidence:
       type: array
+      maxItems: 100
       items:
         type: object
         additionalProperties: false
@@ -37,8 +42,10 @@ inputs:
         properties:
           source_id:
             type: string
+            maxLength: 64
           text:
             type: string
+            maxLength: 2000
 outputs:
   type: object
   additionalProperties: false
@@ -47,6 +54,7 @@ outputs:
   properties:
     verdicts:
       type: array
+      maxItems: 100
       items:
         type: object
         additionalProperties: false
@@ -57,6 +65,7 @@ outputs:
         properties:
           claim_id:
             type: string
+            maxLength: 64
           verdict:
             type: string
             enum:
@@ -65,6 +74,8 @@ outputs:
               - "false"
           evidence_source_ids:
             type: array
+            maxItems: 20
             items:
               type: string
+              maxLength: 64
 description: Give every claim in a deliverable a verified/unverified/false verdict with evidence ids, dropping nothing.

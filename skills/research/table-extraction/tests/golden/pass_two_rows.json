@@ -1,73 +1,26 @@
 {
   "input": {
     "table": {
-      "columns": ["item", "quantity", "unit_price"],
       "rows": [
-        [
-          {
-            "ref": "A2",
-            "value": "Widget"
-          },
-          {
-            "ref": "B2",
-            "value": "12"
-          },
-          {
-            "ref": "C2",
-            "value": "3.50"
-          }
-        ],
-        [
-          {
-            "ref": "A3",
-            "value": "Gadget"
-          },
-          {
-            "ref": "B3",
-            "value": "4"
-          },
-          {
-            "ref": "C3",
-            "value": "19.99"
-          }
-        ]
+        { "row_ref": "r1", "cells": { "name": "Acme Corp", "amount": "1500" } },
+        { "row_ref": "r2", "cells": { "name": "Globex", "amount": "2300" } }
       ]
     }
   },
   "output": {
     "records": [
       {
-        "row_ref": "A2",
+        "row_ref": "r1",
         "fields": {
-          "item": {
-            "value": "Widget",
-            "source_ref": "A2"
-          },
-          "quantity": {
-            "value": 12,
-            "source_ref": "B2"
-          },
-          "unit_price": {
-            "value": 3.5,
-            "source_ref": "C2"
-          }
+          "name": { "cell": "name", "value": "Acme Corp" },
+          "amount": { "cell": "amount", "value": 1500 }
         }
       },
       {
-        "row_ref": "A3",
+        "row_ref": "r2",
         "fields": {
-          "item": {
-            "value": "Gadget",
-            "source_ref": "A3"
-          },
-          "quantity": {
-            "value": 4,
-            "source_ref": "B3"
-          },
-          "unit_price": {
-            "value": 19.99,
-            "source_ref": "C3"
-          }
+          "name": { "cell": "name", "value": "Globex" },
+          "amount": { "cell": "amount", "value": 2300 }
         }
       }
     ]

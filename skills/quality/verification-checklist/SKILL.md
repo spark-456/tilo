@@ -4,34 +4,32 @@ Domain expert review: tracked as GitHub issue spark-456/tilo#6 (no domain expert
 
 ## When to use
 
-Use this skill as the independent Verifier step (FR-AGT-12) before a deliverable ships: give every claim it makes a verdict, backed by evidence, so "Why is this here?" (PRD 13.3) can always point at a real source. Run it independently of whoever wrote the deliverable — never rubber-stamp claims just because they read plausibly.
+Use this skill to give every claim in a deliverable a verdict against supplied evidence, before the deliverable goes out (PRD 13.3: "Why is this here?" depends on this).
 
 ## Steps
 
-1. Read `inputs.deliverable_claims` (one claim per row) and `inputs.evidence` (the supplied source passages).
-2. For every claim, search the evidence for something that actually supports or contradicts it.
-3. If the evidence directly supports the claim, mark it `verified` and cite every evidence `source_id` that supports it — never an empty list, never an id that was not supplied.
-4. If the evidence contradicts the claim, mark it `false` and cite the contradicting evidence.
-5. If nothing in the evidence settles it either way, mark it `unverified`. Do not guess a verdict to look more thorough than the evidence allows.
-6. Cover every claim exactly once. Never drop a claim from `verdicts`, and never verdict the same claim twice.
+1. Read `inputs.deliverable_claims` (claim_id, text) and `inputs.evidence` (source_id, text).
+2. Give every claim exactly one verdict: `verified` (evidence supports it), `unverified` (no evidence either way), or `false` (evidence contradicts it). Never drop a claim.
+3. Cite evidence only by ids that were actually supplied in `inputs.evidence`; never invent one.
+4. A `verified` verdict must cite at least one evidence id — a bare assertion is not enough.
 
 ## Quality bar
 
+- `ids-missing`: every claim must have exactly one verdict; a duplicate or an unrecognised claim id fails the same underlying check.
 - `verdict-invalid`: verdict must be exactly one of verified, unverified, false.
-- `verified-needs-known-evidence`: a verified verdict must cite at least one evidence source id that is actually present in the inputs; a false verdict that cites evidence must cite only ids present in the inputs too.
-- `claim-not-covered`: every claim in deliverable_claims must have exactly one verdict row; nothing dropped, nothing duplicated, and no verdict for a claim_id that was not in the inputs.
-- `output-malformed`: the output must be an object with a verdicts array of claim_id/verdict/evidence_source_ids objects; malformed shapes fail closed.
+- `evidence-unknown`: every cited evidence id must be one of the supplied evidence entries.
+- `verified-needs-evidence`: a verified verdict must cite at least one evidence id.
 
 ## Checklist
 
-- [ ] Every input claim has exactly one verdict.
-- [ ] Every verified verdict cites evidence that is actually in the inputs.
-- [ ] A claim contradicted by the evidence is marked false, not unverified.
-- [ ] Nothing was verdicted "verified" on a guess or a plausible-sounding match.
+- [ ] Every claim has exactly one verdict.
+- [ ] Verdict is exactly one of the three allowed values.
+- [ ] Every cited evidence id was actually supplied.
+- [ ] Every verified claim cites at least one evidence id.
 
 ## Pitfalls
 
-- Marking a claim verified because it sounds right, without a specific evidence passage that actually says so.
-- Citing an evidence id that looks relevant but was never supplied in the inputs.
-- Dropping a claim that seemed too minor to check, instead of giving it an unverified verdict.
-- Treating "the evidence doesn't mention it" the same as "the evidence confirms it" — that is unverified, not verified.
+- Dropping a claim that was hard to verify instead of marking it unverified.
+- Marking a claim verified on the strength of the claim's own wording rather than the evidence.
+- Citing an evidence id that sounds plausible but was never in `inputs.evidence`.
+- Treating "no evidence found yet" as false rather than unverified.

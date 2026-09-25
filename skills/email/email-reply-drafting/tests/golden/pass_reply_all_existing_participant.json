@@ -7,12 +7,14 @@
         {
           "from": "sam@example.com",
           "to": ["assistant@example.com", "priya@example.com"],
-          "body": "Are we still on for Monday?"
+          "body": "Are we still on for Monday?",
+          "safety_flags": []
         }
       ]
     },
     "reply_to_sender": "sam@example.com",
-    "reply_all": true
+    "reply_all": true,
+    "mailbox_owner": "assistant@example.com"
   },
   "output": {
     "to": ["sam@example.com"],
@@ -20,7 +22,7 @@
     "subject": "Re: Kickoff",
     "body": "Yes, Monday works for us.",
     "attachments": [],
-    "flags": []
+    "injection_flagged": false
   },
   "expect": "pass"
 }

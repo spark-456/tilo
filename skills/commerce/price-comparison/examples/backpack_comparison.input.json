@@ -1,17 +1,8 @@
 {
   "item": "20L backpack",
-  "requirements": [
-    {
-      "field": "waterproof",
-      "op": "eq",
-      "value": true
-    }
-  ],
+  "requirements": [{ "field": "waterproof", "op": "eq", "value": true }],
   "currency": "USD",
-  "rates": {
-    "USD": 1.0,
-    "EUR": 1.08
-  },
+  "rates": { "USD": 1.0, "EUR": 1.08 },
   "offers": [
     {
       "offer_id": "o1",
@@ -26,14 +17,6 @@
       "source_id": "src-mid",
       "price": 39.0,
       "currency": "USD",
-      "unit_count": 1,
-      "waterproof": true
-    },
-    {
-      "offer_id": "o3",
-      "source_id": "src-eu",
-      "price": 45.0,
-      "currency": "EUR",
       "unit_count": 1,
       "waterproof": true
     }

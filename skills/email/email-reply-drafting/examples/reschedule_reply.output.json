@@ -2,7 +2,7 @@
   "to": ["riya@example.com"],
   "cc": [],
   "subject": "Re: Meeting this week?",
-  "body": "Thursday 4pm works. Could you also send the rate sheet?",
+  "body": "Thursday 4pm works.",
   "attachments": [],
-  "flags": []
+  "injection_flagged": false
 }

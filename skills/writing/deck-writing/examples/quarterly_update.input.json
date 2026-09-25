@@ -1,13 +1,6 @@
 {
   "material": [
-    {
-      "source_id": "src-1",
-      "text": "Q3 revenue reached 4.2 million dollars, up from 3.1 million in Q2."
-    },
-    {
-      "source_id": "src-2",
-      "text": "The team shipped 12 features in Q3, compared to 9 in Q2."
-    }
+    { "source_id": "src-1", "text": "Revenue reached 1500 units in Q3, up from 1200 in Q2." }
   ],
   "max_slides": 3
 }

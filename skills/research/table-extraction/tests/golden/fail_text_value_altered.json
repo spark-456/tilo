@@ -1,31 +1,13 @@
 {
   "input": {
     "table": {
-      "columns": ["item"],
-      "rows": [
-        [
-          {
-            "ref": "A2",
-            "value": "Widget"
-          }
-        ]
-      ]
+      "rows": [{ "row_ref": "r1", "cells": { "name": "  Acme Corp  " } }]
     }
   },
   "output": {
     "records": [
-      {
-        "row_ref": "A2",
-        "fields": {
-          "item": {
-            "value": "Sprocket",
-            "source_ref": "A2"
-          }
-        }
-      }
+      { "row_ref": "r1", "fields": { "name": { "cell": "name", "value": "Acme Corporation" } } }
     ]
   },
-  "expect": {
-    "fail": "text-matches-cell"
-  }
+  "expect": { "fail": "text-value-mismatch" }
 }
