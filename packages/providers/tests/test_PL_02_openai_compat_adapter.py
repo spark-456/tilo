@@ -294,6 +294,97 @@ def test_PL_02_openai_compat_adapter_stream_accumulates_a_streamed_tool_call(mon
     assert all(chunk.text is None for chunk in chunks), "no content deltas in this stream"
 
 
+def test_PL_02_openai_compat_adapter_stream_maps_a_mid_stream_error_chunk(monkeypatch):
+    """Review fix: a vLLM/NIM-style server can send `data: {"error": ...}`
+    partway through a stream (e.g. after quota runs out mid-generation).
+    That must surface as a mapped ProviderError (QuotaError here, from the
+    chunk's own `code`), scrubbed the same way an HTTP error body is --
+    never a raw KeyError('choices') from indexing a chunk that has no
+    "choices" at all."""
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+    sse_body = (
+        'data: {"choices": [{"delta": {"content": "par"}}]}\n\n'
+        'data: {"error": {"message": "rate limited ' + FAKE_KEY + '", "code": 429}}\n\n'
+        "data: [DONE]\n\n"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=sse_body)
+
+    provider = _provider(handler)
+    with pytest.raises(provider_errors.QuotaError) as excinfo:
+        list(provider.stream(GenerateRequest(prompt="hi")))
+    assert "rate limited" in str(excinfo.value)
+    assert FAKE_KEY not in str(excinfo.value)
+
+
+def test_PL_02_openai_compat_adapter_stream_maps_a_malformed_chunk(monkeypatch):
+    """Review fix: a non-JSON SSE data line mid-stream must surface as a
+    ProviderError, not a raw JSONDecodeError."""
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+    sse_body = 'data: {"choices": [{"delta": {"content": "par"}}]}\n\ndata: not-json-at-all\n\ndata: [DONE]\n\n'
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=sse_body)
+
+    provider = _provider(handler)
+    with pytest.raises(provider_errors.ProviderError):
+        list(provider.stream(GenerateRequest(prompt="hi")))
+
+
+def test_PL_02_openai_compat_adapter_generate_maps_malformed_tool_call_arguments(monkeypatch):
+    """Review fix: `arguments` that is not valid JSON must surface as a
+    ProviderError, not a raw JSONDecodeError -- generate()'s own
+    (KeyError, IndexError, TypeError) catch does not cover it."""
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [{"function": {"name": "get_weather", "arguments": "{not valid json"}}],
+                        }
+                    }
+                ]
+            },
+        )
+
+    provider = _provider(handler, profile=_profile(caps=["tools"]))
+    with pytest.raises(provider_errors.ProviderError):
+        provider.generate(GenerateRequest(prompt="Weather in Boston?"))
+
+
+def test_PL_02_openai_compat_adapter_stream_maps_malformed_tool_call_arguments(monkeypatch):
+    """Review fix: the same malformed-arguments case as above, but for the
+    accumulated buffer that stream() parses once the deltas finish."""
+    from tilo_providers import errors as provider_errors  # noqa: PLC0415
+
+    monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
+    sse_body = (
+        'data: {"choices": [{"delta": {"tool_calls": ['
+        '{"index": 0, "function": {"name": "get_weather", "arguments": "{not valid json"}}'
+        "]}}]}\n\n"
+        "data: [DONE]\n\n"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=sse_body)
+
+    provider = _provider(handler, profile=_profile(caps=["tools"]))
+    with pytest.raises(provider_errors.ProviderError):
+        list(provider.stream(GenerateRequest(prompt="Weather in Boston?")))
+
+
 def test_PL_02_openai_compat_adapter_embeddings(monkeypatch):
     monkeypatch.setenv(API_KEY_ENV, FAKE_KEY)
 

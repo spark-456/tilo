@@ -111,6 +111,24 @@ class OpenAICompatModelProvider(ModelProvider):
         # Bound and scrub: never copy an unbounded/verbatim body (PRD 16.1 r.4).
         raise map_http_status(response.status_code, self._scrub(message))
 
+    def _stream_error(self, error: Any) -> ProviderError:
+        # A mid-stream `data: {"error": ...}` chunk carries no HTTP status of
+        # its own; a NIM/vLLM-style server reports one in `error.code` when
+        # it has one, so the same 429/5xx/other-4xx mapping as a rejected
+        # HTTP response applies (falling back to a retryable 500).
+        message = "PL-02: provider returned an error chunk"
+        status_code = 500
+        if isinstance(error, dict):
+            candidate = error.get("message")
+            if isinstance(candidate, str) and candidate:
+                message = candidate
+            code = error.get("code")
+            if isinstance(code, int) and 400 <= code < 600:
+                status_code = code
+        elif isinstance(error, str) and error:
+            message = error
+        return map_http_status(status_code, self._scrub(message))
+
     def _parse(self, response: httpx.Response) -> dict[str, Any]:
         # A 2xx body that is not the shape we expect (bad JSON, or a
         # missing/short "choices"/"data") must reach the caller as a
@@ -130,10 +148,15 @@ class OpenAICompatModelProvider(ModelProvider):
         tool_calls: list[dict[str, Any]] | None = None
         raw_tool_calls = message.get("tool_calls")
         if raw_tool_calls:
-            tool_calls = [
-                {"name": call["function"]["name"], "args": json.loads(call["function"]["arguments"])}
-                for call in raw_tool_calls
-            ]
+            try:
+                tool_calls = [
+                    {"name": call["function"]["name"], "args": json.loads(call["function"]["arguments"])}
+                    for call in raw_tool_calls
+                ]
+            except json.JSONDecodeError as error:
+                raise ProviderError(
+                    self._scrub(f"PL-02: provider returned malformed tool-call arguments: {error}")
+                ) from None
         usage: dict[str, int] | None = None
         if usage_raw is not None:
             usage = {
@@ -202,7 +225,18 @@ class OpenAICompatModelProvider(ModelProvider):
                     payload = line[len("data:") :].strip()
                     if payload == "[DONE]":
                         break
-                    choice = json.loads(payload)["choices"][0]
+                    try:
+                        chunk = json.loads(payload)
+                    except (json.JSONDecodeError, ValueError) as error:
+                        raise ProviderError(
+                            self._scrub(f"PL-02: provider returned a malformed stream chunk: {error}")
+                        ) from None
+                    if isinstance(chunk, dict) and "error" in chunk:
+                        raise self._stream_error(chunk["error"])
+                    try:
+                        choice = chunk["choices"][0]
+                    except (KeyError, IndexError, TypeError) as error:
+                        raise ProviderError(self._scrub(f"PL-02: provider stream chunk missing {error}")) from None
                     finish_reason = choice.get("finish_reason")
                     if finish_reason == "content_filter":
                         raise SafetyError(f"PL-02: blocked by content filter (finish_reason={finish_reason!r})")
@@ -220,10 +254,15 @@ class OpenAICompatModelProvider(ModelProvider):
             assert mapped is not None  # httpx.HTTPError always maps
             raise mapped from None
         if buffers:
-            tool_calls = [
-                {"name": buf["name"], "args": json.loads(buf["args"]) if buf["args"] else {}}
-                for _, buf in sorted(buffers.items())
-            ]
+            try:
+                tool_calls = [
+                    {"name": buf["name"], "args": json.loads(buf["args"]) if buf["args"] else {}}
+                    for _, buf in sorted(buffers.items())
+                ]
+            except json.JSONDecodeError as error:
+                raise ProviderError(
+                    self._scrub(f"PL-02: provider returned malformed tool-call arguments: {error}")
+                ) from None
             yield GenerateResponse(text=None, profile_id=self._profile_id, tool_calls=tool_calls)
 
     def embed(self, request: Any) -> Any:
