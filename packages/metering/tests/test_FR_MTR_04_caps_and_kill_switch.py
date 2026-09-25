@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from _metering_testlib import METERING_STUB, build_treasury, metering_config, write_yaml
-from tilo_metering import MeteringConfig, MeteringConfigError, Reservation, Wait
+from tilo_metering import Alert, MeteringConfig, MeteringConfigError, Reservation, Wait
 
 AT = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
 
@@ -64,3 +64,118 @@ def test_FR_MTR_04_config_rejects_hard_cap_below_soft_cap(tmp_path):
     path = write_yaml(tmp_path, "metering.yaml", metering_config(daily_usd_soft=25, daily_usd_hard=15))
     with pytest.raises(MeteringConfigError):
         MeteringConfig.load(path)
+
+
+# --- P8-01c: daily USD spend caps and the replay-only kill switch (brought back from tests/P8-01,
+# unchanged in what they assert; test-writer's resolved ambiguities: none).
+
+
+def test_FR_MTR_04_crossing_the_soft_cap_raises_one_alert_per_day(tmp_path):
+    """Crossing the soft cap raises one alert per day. credit_usd is 0.005, so a $1 daily_usd_soft is
+    a 200-credit threshold."""
+    treasury, flags = build_treasury(
+        tmp_path,
+        run_credits=100_000,
+        user_day_credits=None,
+        org_day_credits=None,
+        daily_usd_soft=1.0,
+        daily_usd_hard=1_000_000.0,
+    )
+    treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=100_000)
+
+    below = treasury.reserve("r1", "s1", estimate=150.0, at=AT)
+    result_below = treasury.commit(below, actual=150.0, at=AT)  # day total 150 < 200
+    assert not any(a.kind == "daily_spend_soft" for a in result_below.alerts)
+
+    crossing = treasury.reserve("r1", "s2", estimate=100.0, at=AT)
+    result_crossing = treasury.commit(crossing, actual=100.0, at=AT)  # day total 250 >= 200
+    soft_alerts = [a for a in result_crossing.alerts if a.kind == "daily_spend_soft"]
+    assert len(soft_alerts) == 1
+    assert isinstance(soft_alerts[0], Alert)
+
+    again = treasury.reserve("r1", "s3", estimate=50.0, at=AT)
+    result_again = treasury.commit(again, actual=50.0, at=AT)  # still above threshold, same day
+    assert not any(a.kind == "daily_spend_soft" for a in result_again.alerts), "at most one alert per day"
+
+    assert flags.get("replay_only") is False
+
+
+def test_FR_MTR_04_crossing_the_hard_cap_sets_replay_only_and_blocks_further_reserves(tmp_path):
+    """Crossing the demo hard cap sets replay_only and returns Wait("replay_only") from then on
+    (verbatim, se-spec.md). credit_usd 0.005 makes a $1 daily_usd_hard a 200-credit threshold.
+
+    P8-01c also checks the hard cap pre-emptively in reserve() (a reservation that would itself cross
+    it is refused before it is made -- see the new test below). So, unlike the original tests/P8-01
+    version, the reservation here is sized to land exactly at the cap (not the 15%-margined estimate
+    that would have been refused at reserve time): a genuine conflict between this ticket's two rules,
+    fixed minimally by changing only this numeric setup, not any assertion (see contract_needs).
+
+    daily_usd_soft is 1.0 here, not the original tests/P8-01 value of 1_000_000.0: MeteringConfig
+    now rejects daily_usd_hard < daily_usd_soft (added after that test was written), so soft can
+    be at most 1.0 too. Soft and hard both fire on this commit; only hard_alerts is asserted."""
+    treasury, flags = build_treasury(
+        tmp_path,
+        run_credits=100_000,
+        user_day_credits=None,
+        org_day_credits=None,
+        daily_usd_soft=1.0,
+        daily_usd_hard=1.0,
+    )
+    treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=100_000)
+    treasury.open_run("r2", user_id="u_02", org_id="org_02", approved=100_000)
+
+    assert flags.get("replay_only") is False
+
+    reservation = treasury.reserve("r1", "s1", estimate=200.0 / 1.15, at=AT)  # 200 reserved credits = $1.00
+    result = treasury.commit(reservation, actual=200.0, at=AT)  # day spend 200 credits = $1.00
+
+    hard_alerts = [a for a in result.alerts if a.kind == "daily_spend_hard"]
+    assert len(hard_alerts) == 1
+    assert flags.get("replay_only") is True
+    assert flags.history("replay_only"), "the flip must be recorded in the flag's history"
+
+    blocked_same_run = treasury.reserve("r1", "s2", estimate=1.0, at=AT)
+    blocked_other_run = treasury.reserve("r2", "s1", estimate=1.0, at=AT)
+
+    assert isinstance(blocked_same_run, Wait)
+    assert blocked_same_run.reason == "replay_only"
+    assert isinstance(blocked_other_run, Wait)
+    assert blocked_other_run.reason == "replay_only"
+
+
+def test_FR_MTR_04_caps_come_from_config_metering_yaml(tmp_path):
+    """A temporary config with a 5-credit run cap must be the binding cap even though approved is much
+    larger, proving the cap is read from the file, not hard-coded."""
+    treasury, _flags = build_treasury(tmp_path, run_credits=5)
+    treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=1000)
+
+    assert treasury.run("r1").cap == pytest.approx(5.0)
+
+
+def test_FR_MTR_04_a_reservation_that_would_cross_the_hard_cap_is_refused_and_flips_replay_only(tmp_path):
+    """New for P8-01c: "hard cap flips replay_only ... on commit and when a reservation would cross
+    it, then every reserve returns Wait('replay_only')." Nothing has been committed yet, so only the
+    reservation's own (margined) amount is being projected against the hard cap."""
+    treasury, flags = build_treasury(
+        tmp_path,
+        run_credits=100_000,
+        user_day_credits=None,
+        org_day_credits=None,
+        daily_usd_soft=1.0,
+        daily_usd_hard=1.0,
+    )
+    treasury.open_run("r1", user_id="u_01", org_id="org_01", approved=100_000)
+    assert flags.get("replay_only") is False
+
+    result = treasury.reserve("r1", "s1", estimate=200.0, at=AT)  # 230 credits reserved = $1.15 > $1.00
+
+    assert isinstance(result, Wait)
+    assert result.reason == "daily_spend_hard"
+    assert flags.get("replay_only") is True
+    assert flags.history("replay_only")
+    run = treasury.run("r1")
+    assert run.reserved == pytest.approx(0.0)
+    assert run.spent == pytest.approx(0.0)
+
+    blocked = treasury.reserve("r1", "s2", estimate=1.0, at=AT)
+    assert blocked == Wait("replay_only")
