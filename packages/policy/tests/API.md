@@ -106,7 +106,7 @@ def decide(
     table: RiskTable,
     policies: list[dict],  # policy.schema.json records (plain dicts)
     world_owner: str,
-    applied: list[dict],  # earlier policy.applied parts of this world; see "applied shape"
+    applied: list[dict],  # earlier policy.applied parts under the owner's policies, every world; see "applied shape"
     now: str,  # RFC 3339 timestamp, common.schema.json#/$defs/timestamp
 ) -> Decision:
     """Deterministic; same arguments always give an equal Decision (dataclass equality).
@@ -178,7 +178,7 @@ def decide(
 - `instruction["ts"] < now` (strictly earlier);
 - `instruction["data"]["destination"] == proposal.destination` and `proposal.destination` is
   not None;
-- no entry in `applied` (whole world) has `data["instruction_id"] == instruction["id"]`
+- no entry in `applied` (every world the caller passes) has `data["instruction_id"] == instruction["id"]`
   already (PI-10: an instruction opens at most one entry, cancelled sends included).
 
 `undo_window_s` at L2 is always `policy["undo_window_s"]`, which the policy schema requires
@@ -235,7 +235,7 @@ def open_gate(
 ## Crossref check (reference-equivalent verdict)
 
 ```python
-def check_entry(case: dict) -> str | None:
+def check_entry(case: dict, table: RiskTable | None = None) -> str | None:
     """`case` is one contracts/fixtures/outbox/crossref/{valid,invalid}/*.json file, already
     loaded (keys: rule, note, entry, reserved_by, authorised_by, policy, team_lead, world_owner,
     instruction, earlier_applied, transfer — see contracts/outbox.rules.md). Returns None when
@@ -260,3 +260,28 @@ library (`requests`, `httpx`, `urllib`, `socket`), or reads the wall clock (`dat
 `datetime.utcnow`, `time.time`, `time.time_ns`) — `decide` and `open_gate` take every time value
 (`now`, event `at`/`ts` fields) as arguments. `packages/policy/tests/test_no_model_in_decision.py`
 enforces this with an `ast` scan over every `.py` file under `packages/policy/src`.
+
+## Inputs are checked against the contracts (review round 1)
+
+`decide`, `open_gate` and `check_entry` validate what they read against `contracts/*.schema.json`
+before using it: each policy (`policy.schema.json`), Team Lead record, event part's `data`
+(`approval.requested`, `approval.resolved`, `policy.applied`, instruction events) and outbox entry.
+A policy that fails covers nothing; an event part or entry that fails opens nothing ("gate") or is
+rejected (`check_entry` returns "OB-01"). Timestamps accept ASCII digits only. On the policy path
+`check_entry` also rejects a T3 entry, any modifier, `authz.by` other than "policy", `authz.ref`
+other than the `policy_id`, and a send over `limits.per_day` / `limits.credits` (PI-07, PI-11, PI-16).
+`applied` must hold the earlier `policy.applied` parts under the owner's policies in every world,
+not just this one, or a policy's daily cap multiplies by the number of worlds; the caller (harness)
+supplies them.
+
+## Live decisions read the record as it is (review round 3)
+
+`decide` is a live decision: if any of the owner's policies for the action type has a
+`created_by`, `changed_by` or history stamp dated after `now` (or one that cannot be read), the
+whole decision gates (the clock is behind the record: a retry, a replay or skew), so a Stop all or
+revocation already in the record always gates, whatever other policy covers the send. Reading a policy back to an earlier
+level is `check_entry`'s job alone (a send made before a revocation stays covered, PI-13). Two
+records sharing an id gate, whether or not both cover the send. At L2 the instruction must be
+dated no earlier than the history entry that put the policy at the L2 level in force. With
+`table` given, `check_entry` also rejects an entry whose `risk_tier` is not the tier the table
+assigns to its `action_type` and `modifiers` (PI-07, PI-14).

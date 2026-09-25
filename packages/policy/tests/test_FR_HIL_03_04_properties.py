@@ -123,10 +123,12 @@ def test_FR_HIL_04_PI_01_open_gate_t3_never_runs_except_by_a_human_authz(ref):
 
 def test_FR_HIL_03_PI_13_revoking_the_covering_policy_gates_the_next_send_but_not_an_earlier_one(risk_table_path):
     """(c): a T2 policy covers a send at NOW; the owner then revokes it (an L1 history entry
-    appended after NOW, PI-13 "revocable in one tap"). Deciding again at LATER, with the same
-    (now-revoked) policy record, gates; deciding at NOW — before the revocation, using only the
-    history up to NOW — still runs, because PI-13 reads the level in force at the decision time,
-    not the record's current level."""
+    appended after NOW, PI-13 "revocable in one tap"). A send decided at NOW, from the record as it
+    stood then, runs. Once the record carries the revocation, every decision gates, at LATER and
+    also at NOW: a live decision never reads a policy back to a level it no longer has, so a retry,
+    a replay or a clock behind the kill switch cannot send after it (FR-HIL-03, FR-HIL-07). The
+    historical reading (a send made before a revocation stays covered) is check_entry's, over the
+    crossref case policy_reply_sent_before_revocation."""
     table = _table(risk_table_path)
     instruction = base_instruction()
     created = {"by": OWNER, "at": "2026-09-29T09:30:00.000Z", "change": "Created at L2", "level": "L2"}
@@ -145,10 +147,16 @@ def test_FR_HIL_03_PI_13_revoking_the_covering_policy_gates_the_next_send_but_no
         instruction=instruction,
     )
 
+    policy_before_revocation = base_policy(id_="pol_autopilot_l2", level="L2", history=[created])
     before = tilo_policy.decide(
+        proposal, table=table, policies=[policy_before_revocation], world_owner=OWNER, applied=[], now=NOW
+    )
+    assert before.outcome == "run_after_undo", "a send decided before the revocation runs (PI-13)"
+
+    replayed = tilo_policy.decide(
         proposal, table=table, policies=[policy_after_revocation], world_owner=OWNER, applied=[], now=NOW
     )
-    assert before.outcome == "run_after_undo", "a send decided before the revocation stays covered (PI-13)"
+    assert replayed.outcome == "gate", "a revoked record never covers a send, whatever now says"
 
     after = tilo_policy.decide(
         proposal, table=table, policies=[policy_after_revocation], world_owner=OWNER, applied=[], now=LATER
