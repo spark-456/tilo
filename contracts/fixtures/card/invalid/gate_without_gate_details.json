@@ -17,7 +17,7 @@
   "why_it_matters": "It confirms the order of 500 packs at the quoted price.",
   "options": [
     {
-      "id": "send",
+      "id": "approve",
       "label": "Send it",
       "suggested": false,
       "irreversible": true

@@ -32,22 +32,22 @@
   "why_it_matters": "It confirms the order of 500 packs at the quoted price.",
   "options": [
     {
-      "id": "hold",
+      "id": "approve",
       "label": "Send it",
       "suggested": false,
       "irreversible": true
     },
     {
-      "id": "edit",
-      "label": "Edit first",
-      "suggested": true,
-      "reason": "It is a new recipient, so check it once.",
-      "irreversible": false
-    },
-    {
       "id": "hold",
       "label": "Hold",
       "suggested": false,
+      "irreversible": true
+    },
+    {
+      "id": "hold",
+      "label": "Hold for now",
+      "suggested": true,
+      "reason": "It is a new recipient, so check it once.",
       "irreversible": false
     }
   ],
