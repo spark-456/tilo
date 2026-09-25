@@ -237,13 +237,21 @@ def make_principal(
     role: str = "owner",
     world_id: str | None = WORLD,
     domain: str | None = None,
+    channel: str = "web",
     districts: tuple[str, ...] = (),
 ) -> deps.Principal:
     """world_id defaults to WORLD (this file's one fixture world) so every existing-owner-ish
     test is a member of the world it acts on without saying so; a test proving the round-1
     membership-oracle finding (ST-3a round 2) passes world_id=None or a different world's id
-    explicitly."""
-    return deps.Principal(user_id=user_id, role=role, world_id=world_id, domain=domain, districts=districts)
+    explicitly. channel (round-6/ST-3a-2, API_ST3a.md "What changed since round 5" item 5, issue
+    #38 item 5) is the principal's own resolved session channel; it defaults to "web" like every
+    other channel default in this ticket. deps.Principal does not carry this field yet -- every
+    test that passes a non-default channel (or relies on this default at all, since it is passed
+    through unconditionally) fails with TypeError until the builder adds it, the same failure mode
+    ambiguity 4's WorldRecord.paused went through in round 4."""
+    return deps.Principal(
+        user_id=user_id, role=role, world_id=world_id, domain=domain, channel=channel, districts=districts
+    )
 
 
 def as_principal(principal: deps.Principal):
@@ -474,6 +482,64 @@ class ReversedDelayEventWriter(FakeEventWriter):
         delay = max(0.0, self.base_delay_s - i * self.step_s)
         time.sleep(delay)
         return super().append(world_id, part)
+
+
+class LateSuccessEventWriter(FakeEventWriter):
+    """The very first call `.append` ever receives sleeps past `_MAX_PART_DEADLINE_S` (round-5's
+    0.5s per-part deadline) before succeeding for real; every later call succeeds immediately.
+    Built for the round-6/ST-3a-2 finding (issue #38 item 2): a part whose attempt misses its
+    deadline is queued pending while the underlying attempt keeps running in the background: if
+    that late attempt is allowed to write for real without ever being cleared from pending, a
+    later flush re-sends the very same part and it lands in store.events twice.
+    `first_call_settled` is set the instant the slow first call's real append has actually landed
+    in the store, so a test can wait for that deterministically instead of guessing a sleep
+    length."""
+
+    def __init__(self, store: deps.Store, *, delay_s: float = 0.7) -> None:
+        super().__init__(store)
+        self.delay_s = delay_s
+        self._first_call_started = False
+        self._lock = threading.Lock()
+        self.first_call_settled = threading.Event()
+
+    def append(self, world_id: str, part: dict) -> dict:
+        with self._lock:
+            is_first = not self._first_call_started
+            self._first_call_started = True
+        if is_first:
+            time.sleep(self.delay_s)
+            result = super().append(world_id, part)
+            self.first_call_settled.set()
+            return result
+        return super().append(world_id, part)
+
+
+class SlowHistoryPolicy(dict):
+    """A policy-record test double (plain data with one instrumented read, not production code)
+    whose `.get("history")` call rendezvous-and-delays via a 2-party barrier before returning --
+    exactly the way BlockingEventWriter widens the race window for a writer call, but for a plain
+    in-memory dict read instead of I/O. Built for the round-6/ST-3a-2 finding (issue #38 item 5,
+    "Revoke of an unmapped policy is done without a lock"): two concurrent revokes of the same
+    unmapped policy each read `history` exactly once; without a lock, both can read the same stale
+    value (seed it with `history=None`, not an already-list value, or a shared list's `.append`
+    would hide the bug) and one's write silently clobbers the other's. Every call rendezvous with
+    the next one, so this only stays correct when exactly two readers ever call `.get("history")`
+    on the same instance -- true for two concurrent revokes of one unmapped policy, which each make
+    exactly one such call."""
+
+    def __init__(self, *args: Any, delay_s: float = 0.1, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._barrier = threading.Barrier(2, timeout=5)
+        self._delay_s = delay_s
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if key == "history":
+            try:
+                self._barrier.wait()
+            except threading.BrokenBarrierError:
+                pass
+            time.sleep(self._delay_s)
+        return super().get(key, default)
 
 
 def make_pending_part(

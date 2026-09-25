@@ -1121,3 +1121,41 @@ def test_FR_HIL_09_SEC_07_contract_fixture_events_naming_a_hidden_district_are_d
     as_principal(make_principal(user_id=OWNER, role="owner"))
     owner_events = client.get(f"/worlds/{WORLD}/events").json()["events"]
     assert {e["type"] for e in owner_events} == {"district.created", "agent.spawned", "world.started"}
+
+
+# ---------------------------------------------------------------------------
+# Round-6 (ST-3a-2, issue #38 item 5, security): a scoped view's `trace` must be rebuilt by
+# allowlisting event.schema.json#/$defs/trace's own seven keys, not copied forward wholesale --
+# today's `_scoped_event_view` does `dict(trace_value)` (every key the stored event happens to
+# carry) and only overwrites `archive_ref` afterward, so an extra, schema-invalid key still reaches
+# a scoped viewer verbatim.
+
+
+def test_SEC_07_scoped_view_allowlists_trace_keys_and_drops_unknown_ones(client, store):
+    store.worlds[WORLD] = make_world(owner=OWNER, districts={D1: make_district("Mail", "Triaging the inbox")})
+    event = base_event(seq=1, type_="agent.working", data={}, district=D1, vis=[D1], summary="Mail agent is working")
+    # trace.additionalProperties is false in the contract -- the stored value should never carry
+    # this key, but a scoped view must not merely trust that; "D2" stands in for a hidden district
+    # id or any other out-of-schema key that must never reach a viewer through an unfiltered copy.
+    event["trace"]["D2"] = "a district id or any other value that must never leak through trace"
+    store.events[WORLD] = [event]
+
+    as_principal(make_principal(user_id="u_viewer", role="viewer", districts=(D1,)))
+    resp = client.get(f"/worlds/{WORLD}/events")
+    assert resp.status_code == 200, resp.text
+    events = resp.json()["events"]
+    assert len(events) == 1
+    assert "D2" not in events[0]["trace"], "an extra, schema-invalid trace key must never reach a scoped viewer"
+    assert set(events[0]["trace"]) == {
+        "model_role",
+        "profile",
+        "tokens_in",
+        "tokens_out",
+        "tool",
+        "latency_ms",
+        "archive_ref",
+    }, "a scoped view's trace must be rebuilt by allowlisting exactly the schema's own seven keys"
+
+    as_principal(make_principal(user_id=OWNER, role="owner"))
+    owner_events = client.get(f"/worlds/{WORLD}/events").json()["events"]
+    assert owner_events[0]["trace"]["D2"] == "a district id or any other value that must never leak through trace"

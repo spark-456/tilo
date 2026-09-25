@@ -28,9 +28,11 @@ from _api_lib import (
     WORLD,
     BlockingEventWriter,
     FlakyEventWriter,
+    LateSuccessEventWriter,
     ReversedDelayEventWriter,
     SlowEventWriter,
     SlowFlakyEventWriter,
+    SlowHistoryPolicy,
     as_principal,
     as_principal_by_header,
     as_writer,
@@ -1574,3 +1576,317 @@ def test_FR_HIL_07_revoke_and_a_concurrent_stop_all_on_the_same_world_never_doub
 
     assert store.policies["pol_to_revoke"]["level"] == "L1"
     assert store.policies["pol_other"]["level"] == "L1"
+
+
+# ---------------------------------------------------------------------------
+# Round-6 (ST-3a-2, issue #38 item 1, security/qa/code, blocking): a malformed stored scope must
+# never abort a kill switch. `policy_vis` (tilo_api.events) intersects scope.districts against a
+# world's own district keys; today a non-string entry (the issue's own example: [["D1"]], but "any
+# non-string entry" per the ticket) raises TypeError, since `d in world_districts` (a dict) tries to
+# hash `d`. That currently happens *inside* the locked block, after a touched world's pending
+# backlog has already been popped into a local variable -- so today's implementation both 500s and
+# silently drops whatever was popped (which can include an already-durably-queued world.paused).
+# Every test below must see neither: a clean 200/202, every targeted policy at L1, and nothing lost.
+
+
+def _policy_with_malformed_scope(*, id_: str, owner: str = OWNER, level: str = "L2") -> dict:
+    policy = base_policy(id_=id_, owner=owner, level=level)
+    # Mixed non-string entries "among others" (this ticket's own wording), plus one real district id
+    # so the fixed intersection logic still has something valid left to consider.
+    policy["scope"]["districts"] = [["D1"], 123, None, {"x": 1}, "D9"]
+    return policy
+
+
+def _stale_world_paused_part() -> dict:
+    """An event *part* (API_ST3a.md's EventWriter.append shape) standing in for a world.paused an
+    earlier (failed) Pause-all already built and left pending."""
+    return {
+        "type": "world.paused",
+        "actor": OWNER,
+        "target": WORLD,
+        "level": None,
+        "district": None,
+        "item": None,
+        "severity": "info",
+        "credits": 0,
+        "summary": "Pause all stopped every agent in this world",
+        "cause": None,
+        "vis": "all",
+        "authz": None,
+        "data": {"reason": "pause_all", "channel": "web"},
+    }
+
+
+def test_FR_HIL_07_malformed_scope_stop_all_never_500s_and_reaches_l1(client, store):
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.policies["pol_malformed"] = _policy_with_malformed_scope(id_="pol_malformed")
+    store.policy_worlds["pol_malformed"] = WORLD
+    ok_ids = []
+    for i in range(3):
+        pid = f"pol_ok_{i}"
+        store.policies[pid] = base_policy(id_=pid, owner=OWNER, level="L2")
+        store.policy_worlds[pid] = WORLD
+        ok_ids.append(pid)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+
+    assert resp.status_code in (200, 202), resp.text
+    for pid in ["pol_malformed", *ok_ids]:
+        assert store.policies[pid]["level"] == "L1", f"{pid} never reached L1"
+        assert store.policies[pid]["history"][-1]["change"] == "stop_all"
+
+    changed = [e for e in store.events.get(WORLD, []) if e["type"] == "policy.changed"]
+    seen = [e["data"]["policy_id"] for e in changed]
+    assert sorted(seen) == sorted(["pol_malformed", *ok_ids]), (
+        "every targeted policy, including the one with a malformed scope, must get exactly one "
+        "policy.changed -- none lost, none duplicated, never a 500"
+    )
+    assert len(seen) == len(set(seen)), "no policy.changed was written twice"
+
+
+def test_FR_HIL_07_malformed_scope_pause_all_writes_a_pending_world_paused_exactly_once(client, store, writer):
+    """A world.paused an earlier call already built and left pending must still be written exactly
+    once even when this call's own owned-policy scan also includes a policy with a malformed
+    scope."""
+    store.worlds[WORLD] = make_world(owner=OWNER, paused=True)  # the earlier call already flipped this
+    store.policies["pol_malformed"] = _policy_with_malformed_scope(id_="pol_malformed")
+    store.policy_worlds["pol_malformed"] = WORLD
+    store.pending_events[WORLD] = [_stale_world_paused_part()]
+
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+
+    assert resp.status_code in (200, 202), resp.text
+    assert store.policies["pol_malformed"]["level"] == "L1"
+
+    paused_events = [e for e in store.events.get(WORLD, []) if e["type"] == "world.paused"]
+    assert len(paused_events) == 1, (
+        f"the already-pending world.paused part must be written exactly once, got {len(paused_events)} "
+        "-- a malformed policy elsewhere in the same call must not lose it"
+    )
+    assert store.pending_events.get(WORLD, []) == []
+
+
+def test_FR_HIL_07_malformed_scope_pause_all_never_loses_a_pending_part_when_the_writer_is_down(client, store):
+    """Same setup, but the writer cannot accept anything this call either: the pre-existing pending
+    part must be put back (still pending, not lost) rather than vanishing because a malformed
+    policy raised after it had already been popped from store.pending_events."""
+    store.worlds[WORLD] = make_world(owner=OWNER, paused=True)
+    store.policies["pol_malformed"] = _policy_with_malformed_scope(id_="pol_malformed")
+    store.policy_worlds["pol_malformed"] = WORLD
+    store.pending_events[WORLD] = [_stale_world_paused_part()]
+
+    flaky = FlakyEventWriter(store, failing=True)
+    as_writer(flaky)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+
+    assert resp.status_code == 202, resp.text
+    assert store.policies["pol_malformed"]["level"] == "L1"
+    still_pending = store.pending_events.get(WORLD, [])
+    assert len(still_pending) == 1, (
+        "a part already sitting in store.pending_events before this call must be put back if "
+        f"anything raises inside the locked block, never lost -- got {len(still_pending)} parts pending"
+    )
+    assert still_pending[0]["type"] == "world.paused"
+
+
+def test_FR_HIL_07_malformed_scope_revoke_never_500s_and_reaches_l1(client, store, writer):
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.policies["pol_malformed"] = _policy_with_malformed_scope(id_="pol_malformed")
+    store.policy_worlds["pol_malformed"] = WORLD
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post("/policies/pol_malformed/revoke")
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"policy_id": "pol_malformed", "level": "L1"}
+    assert store.policies["pol_malformed"]["level"] == "L1"
+    assert store.policies["pol_malformed"]["history"][-1]["change"] == "revoked"
+
+    changed = [e for e in store.events.get(WORLD, []) if e["type"] == "policy.changed"]
+    assert len(changed) == 1
+    assert changed[0]["data"]["policy_id"] == "pol_malformed"
+    assert changed[0]["data"]["change"] == "revoked"
+
+
+# ---------------------------------------------------------------------------
+# Round-6 (ST-3a-2, issue #38 item 2, code/qa, biggest): one ordered writer per world -- a part
+# whose attempt misses its deadline is queued pending while the underlying attempt keeps running;
+# if it later succeeds for real without ever being cleared from pending, a later flush re-sends the
+# same part and it lands in store.events twice.
+
+
+def test_FR_HIL_07_late_writer_success_is_written_at_most_once(client, store):
+    ids = _world_with_policies(store, 2, level="L2")
+    late = LateSuccessEventWriter(store, delay_s=0.7)  # past _MAX_PART_DEADLINE_S (0.5s)
+    as_writer(late)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp1 = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert resp1.status_code in (200, 202), resp1.text
+    body1 = resp1.json()
+    assert body1["stopped"] == len(ids)
+    for pid in ids:
+        assert store.policies[pid]["level"] == "L1"
+
+    assert late.first_call_settled.wait(timeout=2.0), "the slow first writer call never actually completed"
+
+    # A second mutating call against the same world: every policy is already L1 (nothing new to
+    # lower), but "Pending writes and flush" still requires this call to flush what is pending.
+    resp2 = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert resp2.status_code in (200, 202), resp2.text
+    body2 = resp2.json()
+    assert body2["already_l1"] == len(ids), "both policies were already lowered by the first call"
+
+    for pid in ids:
+        landed = [e for e in store.events.get(WORLD, []) if e["data"].get("policy_id") == pid]
+        assert len(landed) == 1, (
+            f"{pid}'s policy.changed part was written {len(landed)} times -- an attempt that misses "
+            "its deadline but later succeeds in the background must never be re-sent once it has "
+            "actually landed"
+        )
+    assert store.pending_events.get(WORLD, []) == [], "a part that has actually succeeded must not stay pending"
+
+    for call in late.calls:
+        assert_part_carries_no_stamped_fields(call.part)  # no idempotency key smuggled into the part API
+
+
+# ---------------------------------------------------------------------------
+# Round-6 (ST-3a-2, issue #38 item 3, qa): bounded threads -- _write_world builds a brand-new
+# ThreadPoolExecutor per call and shuts it down with wait=False, which never waits for (or bounds)
+# a worker thread still blocked inside a hung writer.append; a fresh pool per call leaks roughly one
+# thread per part per call, unboundedly.
+
+
+def test_FR_HIL_07_bounded_threads_against_a_writer_that_never_returns(client, store):
+    ids = _world_with_policies(store, 5, level="L2")
+    blocking = BlockingEventWriter(store)
+    as_writer(blocking)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    baseline = threading.active_count()
+    try:
+        for i in range(20):
+            resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+            assert resp.status_code in (200, 202), f"call {i}: {resp.text}"
+        grown = threading.active_count() - baseline
+        assert grown <= 25, (
+            f"thread count grew by {grown} after 20 Stop-alls (5 policies each) against a writer "
+            "that never returns -- expected a small, bounded constant per world, not roughly one "
+            f"leaked thread per part per call (unbounded growth would be close to {20 * len(ids)})"
+        )
+    finally:
+        blocking.release()
+
+
+# ---------------------------------------------------------------------------
+# Round-6 (ST-3a-2, issue #38 item 5): world.paused.data.channel is derived from the principal's
+# own resolved session channel, never from the request body.
+
+
+def test_FR_HIL_07_pause_channel_is_derived_from_the_principals_session_not_the_body(client, store, writer):
+    _world_with_policies(store, 2, level="L2")
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD, channel="whatsapp"))
+
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "email"})
+
+    assert resp.status_code == 200, resp.text
+    paused_events = [e for e in store.events[WORLD] if e["type"] == "world.paused"]
+    assert len(paused_events) == 1
+    assert paused_events[0]["data"]["channel"] == "whatsapp", (
+        "world.paused.data.channel must be the principal's own session channel, never the body's claim"
+    )
+
+
+def test_FR_HIL_07_pause_channel_defaults_to_web_when_the_principal_carries_none(client, store, writer):
+    _world_with_policies(store, 2, level="L2")
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))  # channel defaults to "web"
+
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "whatsapp"})
+
+    assert resp.status_code == 200, resp.text
+    paused_events = [e for e in store.events[WORLD] if e["type"] == "world.paused"]
+    assert len(paused_events) == 1
+    assert paused_events[0]["data"]["channel"] == "web", (
+        "a body claiming a different channel must be ignored; the default session channel is 'web'"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Round-6 (ST-3a-2, issue #38 item 5): revoke of an unmapped policy is done under a (policy-scoped)
+# lock -- two concurrent revokes of the same unmapped policy must not silently drop one's history
+# entry, and an unrelated, concurrently issued Stop-all against a different owner's world must not
+# be blocked by it.
+
+
+def test_FR_HIL_07_revoke_of_an_unmapped_policy_is_locked_against_a_concurrent_revoke_and_stop(client, store):
+    policy = base_policy(id_="pol_unmapped", owner=OTHER_OWNER, level="L2")
+    policy["history"] = None  # missing/malformed history: both concurrent readers must build their
+    # own fresh list unless a lock serializes them -- a shared, already-list history's .append is
+    # GIL-atomic and would hide the race entirely
+    store.policies["pol_unmapped"] = SlowHistoryPolicy(policy)
+    # deliberately absent from store.policy_worlds -- the no-mapping case (ambiguity 7)
+
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.policies["pol_other"] = base_policy(id_="pol_other", owner=OWNER, level="L2")
+    store.policy_worlds["pol_other"] = WORLD
+
+    as_principal_by_header(
+        {
+            "revoker": make_principal(user_id=OTHER_OWNER, role="owner", world_id=None),
+            "stopper": make_principal(user_id=OWNER, role="owner", world_id=WORLD),
+        }
+    )
+
+    responses: list = []
+    errors: list = []
+    start = threading.Barrier(3, timeout=5)
+
+    def call_revoke() -> None:
+        try:
+            start.wait()
+            responses.append(
+                ("revoke", client.post("/policies/pol_unmapped/revoke", headers={PRINCIPAL_HEADER: "revoker"}))
+            )
+        except Exception as exc:  # pragma: no cover - surfaced via the assert below
+            errors.append(exc)
+
+    def call_stop() -> None:
+        try:
+            start.wait()
+            responses.append(
+                (
+                    "stop",
+                    client.post(f"/worlds/{WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: "stopper"}),
+                )
+            )
+        except Exception as exc:  # pragma: no cover - surfaced via the assert below
+            errors.append(exc)
+
+    threads = [
+        threading.Thread(target=call_revoke),
+        threading.Thread(target=call_revoke),
+        threading.Thread(target=call_stop),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+    assert not any(t.is_alive() for t in threads), "a concurrent revoke and stop deadlocked"
+    assert not errors, errors
+    assert len(responses) == 3
+    for _, r in responses:
+        assert r.status_code in (200, 202), r.text
+
+    assert store.policies["pol_unmapped"]["level"] == "L1"
+    history = store.policies["pol_unmapped"]["history"]
+    assert len(history) == 2, (
+        "two concurrent revokes of the same unmapped policy must both land their own history entry "
+        f"-- an unlocked read-modify-write can silently drop one, got {len(history)} entries"
+    )
+    assert [h["change"] for h in history] == ["revoked", "revoked"]
+
+    assert store.policies["pol_other"]["level"] == "L1", "an unrelated Stop-all must not be blocked or corrupted"

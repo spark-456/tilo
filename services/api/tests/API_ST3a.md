@@ -300,8 +300,136 @@ security and qa review on:
    does, per finding 1); it composes with finding 1's whole-event-drop check, which still runs
    first, over keys and values alike, before any surviving event's `data` is rebuilt.
 
-## `tilo_api.deps` (new module; does not exist yet — every test here fails on this import until
-the builder adds it)
+## What changed since round 5 (ST-3a-2)
+
+Round 5 passed nothing: all three reviewers failed it (issue #38, PR #39 stuck at the 5-round cap
+before this extra fix round was opened). Round 5's own fixes above are unchanged and still pinned.
+What round 5's implementation still gets wrong, in the issue's own priority order:
+
+1. **A malformed stored scope aborts the kill switch instead of being skipped (security, blocking).**
+   `events.py`'s `policy_vis` does `intersection = [d for d in districts if d in world_districts]`;
+   when `scope.districts` holds a non-string entry -- `[["D1"]]` is the issue's own example, but any
+   unhashable value (a list, a dict) has the same effect -- `d in world_districts` (a dict) raises
+   `TypeError: unhashable type`, not a caught, skippable condition. Because `policy_vis` is called
+   from *inside* `_stop_all_owner_policies`'s apply loop, which itself runs inside
+   `_stop_all_and_dispatch`'s `with _locked(touched):` block -- **after** that block has already
+   popped every touched world's pending backlog into a local `work` dict (`work[w] =
+   store.pending_events.pop(w, [])`) -- the raise propagates straight out of the locked block, out of
+   the route, to a bare 500: every policy after the malformed one in iteration order never reaches
+   `L1`, and the popped-but-not-yet-dispatched `work` (which can include an unrelated, already-durably-
+   -pending part such as a queued `world.paused`) is discarded, not restored -- silent data loss on
+   top of the 500. Fixed: a non-string entry in `scope.districts` is skipped (filtered out of the
+   intersection, exactly like a string entry that names a foreign district is already dropped by the
+   intersection today) rather than raising; `vis` for every targeted policy is computed once, in the
+   plan-building phase, before any policy is mutated and before any world's pending backlog is popped;
+   and, as a defence in depth for any other exception this ticket has not anticipated, if anything
+   still raises after pending has been popped for the locked worlds, every popped part is put back
+   into `store.pending_events` before the exception is allowed to propagate (so a request that somehow
+   still 500s never does so by losing data first) -- resolved default per the ticket brief, this
+   ticket may only touch `services/api/tests`.
+2. **A write whose attempt misses its deadline can still land twice (code/qa, biggest).**
+   `_write_world` gives each part's writer call up to `_MAX_PART_DEADLINE_S`; a call that has not
+   settled by then is queued pending and the loop moves on -- but the underlying `writer.append` call
+   is never cancelled and keeps running on its own thread. If it later succeeds for real (the writer
+   was merely slow that once, not actually down), nothing tells `store.pending_events` to drop the
+   part: it stays queued, and the next mutating call that flushes this world re-sends the *same* part
+   to the writer, which appends it *again* -- the same part lands in `store.events[w]` twice, out of
+   its original build order relative to whatever else that later call wrote. Resolved default (not an
+   idempotency key on the part -- `_api_lib.py`'s `_ALLOWED_PART_KEYS`/`assert_part_carries_no_stamped_fields`
+   forbids exactly that, and this ticket's tests keep enforcing it): the writer for one world is now a
+   single ordered channel where a part whose attempt has missed its deadline stays "at the head" --
+   no later part for that same world is committed ahead of it, and once its own attempt does
+   eventually settle (successfully or not), it is removed from `pending_events` before anything else
+   for that world is considered flushed. A part is written at most once across every call and every
+   flush this ticket's routes make, whatever timing the underlying writer calls land in.
+3. **Unbounded thread growth against a hung writer (qa).** `_write_world` builds a brand-new
+   `ThreadPoolExecutor(max_workers=len(parts))` on every call and calls `pool.shutdown(wait=False,
+   cancel_futures=True)` once its own loop finishes -- `cancel_futures` only cancels futures that have
+   not started yet; one already blocked inside a hung `writer.append` keeps its worker thread alive
+   indefinitely, and because a fresh pool is built per call, every call against a hung writer leaks
+   roughly one thread per part, unboundedly, across calls. Fixed: a bounded, per-world executor (a
+   small constant number of worker threads per world, not one per part per call) that is reused
+   rather than rebuilt on every call; a part that cannot be submitted because the executor is
+   saturated is queued pending, never dropped.
+4. **Size (code, mechanical only -- no test below).** `routes.py` (487 lines, ~630 with `deps.py` and
+   `events.py`) is split into a redaction module (the `GET` routes' allowlisting: `_is_malformed_event`,
+   `_hides_district`, `_data_hides_district`, `_event_hides_district`, `_redact_data`,
+   `_owner_event_view`, `_scoped_event_view`, `_district_fields`, `_safe_districts`, `_visible`, and the
+   two `GET` route handlers) and a dispatch module (the locking, pending/flush and writer-call
+   machinery: `_lock_for`, `_locked`, `_pend`, `_settled`/its replacement, `_write_world`, `_dispatch`,
+   `_touched_worlds`, `_stop_all_owner_policies`, `_stop_all_and_dispatch`, and the `stop`/`pause`/
+   `revoke` route handlers) -- a purely mechanical move (same functions, same behaviour, new file
+   boundaries), so no test in this directory pins it beyond continuing to import `tilo_api.app`/
+   `tilo_api.deps` exactly as every existing test already does; whichever module ends up owning each
+   route, the app's route table is unchanged.
+5. **Smaller items (safety, security):**
+   - The owner's `GET /worlds/{world_id}/events` still risks a 500 at extreme `data` nesting (~3000
+     levels, stdlib `json`'s own default recursion limit) even though the owner's path never *walks*
+     `data` -- `JSONResponse`'s underlying `json.dumps` still recurses to serialize it. Out of this
+     round's own test list (500-deep is already pinned, round 5, for the scoped path; the owner path's
+     much-deeper failure point is noted here, not newly tested, since the ticket's priority list marks
+     it a "smaller item" behind 1-3 above).
+   - `trace` is still copied into a scoped view via `dict(trace_value)` (every key the stored event's
+     `trace` happens to carry) with only `archive_ref` overwritten afterward -- an extra key the
+     stored event's `trace` should never have carried (schema-invalid, `trace.additionalProperties:
+     false`) still reaches a scoped viewer verbatim. **Fixed: a scoped view's `trace` is rebuilt by
+     allowlisting exactly `event.schema.json#/$defs/trace`'s seven keys (`model_role`, `profile`,
+     `tokens_in`, `tokens_out`, `tool`, `latency_ms`, `archive_ref`) -- anything else present on the
+     stored value is dropped, never copied forward.**
+   - `PauseRequest.channel` is still taken directly from the request body and written unchanged into
+     `world.paused.data.channel` -- a caller can claim any enabled-looking channel it likes, whether or
+     not it is the channel the confirmation is actually happening on. **Fixed:** `Principal` gains one
+     new field, `channel: Channel = "web"` (`common.schema.json#/$defs/channel`: `"web" | "mobile_web"
+     | "whatsapp" | "email"`) -- the session channel the (still test-double) sign-in layer resolved for
+     this request, exactly the same shape `Principal.world_id`/`Principal.districts` are already
+     resolved the same way. `world.paused.data.channel` is now `principal.channel`, never
+     `body.channel`; the request body's own `channel` field is accepted (still 422 outside the enum)
+     but is no longer read by the pause route at all -- ambiguity 18 below.
+   - Revoke of a policy with **no** `policy_worlds` mapping (the one branch this ticket's own text
+     already calls out as "no lock is acquired and nothing is flushed... there is no world to flush or
+     lock") mutates `store.policies[policy_id]` (history, level, `changed_by`) with no synchronization
+     at all -- unlike every other mutator in this ticket, which is at least serialized by some lock.
+     Two concurrent revokes of the same unmapped policy can each read a stale `history` and silently
+     clobber one another's new entry. **Fixed: revoke of an unmapped policy now takes a lock scoped to
+     that one policy id** (not a world lock -- there is no world to key one by) before reading or
+     mutating `history`/`level`/`changed_by`, so two concurrent revokes of the same unmapped policy
+     never race, and (being a policy-scoped lock, not a world lock) a concurrent Stop-all against an
+     unrelated world is never blocked by it.
+   - A second Stop-all issued while an earlier call's write for the same world is still in flight can
+     report `"pending": 0` even though that earlier write has not actually landed yet (a race in how
+     "pending" is counted, not in the level change itself, which is unaffected). Noted here as a
+     "smaller item" per the issue; not pinned by a dedicated test this round (the existing "second call
+     is not blocked" tests already constrain the level-change and blocking behaviour this counts
+     alongside).
+   - The busy-poll `_settled` helper burns CPU while waiting out a part's deadline. An implementation
+     detail with no externally observable contract this ticket's tests can pin (the 5s budget tests
+     already constrain wall-clock behaviour regardless of how the wait is implemented).
+   - A 200k-event `GET` takes ~4.7s. Out of scope for this round's own priority list (item 6 in the
+     issue, "needs the harness or a contract change," is explicitly out of reach for a
+     `services/api/tests`-only ticket).
+6. **Needs the harness or a contract change (issue #29, out of reach for this ticket):** summary free
+   text still names hidden work; world-level `vis: "all"` totals still count it;
+   per-scope views must eventually be written by the harness itself, not derived per-request the way
+   this ticket's `GET` routes still do. No test below touches these.
+
+### Ambiguities resolved this round (round 6 / ST-3a-2)
+
+18. **`PauseRequest.channel`'s new role.** The request body keeps its `channel` field (still validated
+    against the schema's enum, still 422 outside it) so a caller's request shape does not change, but
+    it is no longer consulted for `world.paused.data.channel` at all -- purely a legacy/compatibility
+    field this round leaves in place rather than removing, since removing a field is a wire-shape
+    change this ticket has no reason to force on every caller in the same round it fixes the trust
+    boundary. `Principal.channel` (default `"web"`, mirroring how `Principal.districts` defaults to
+    `()`) is the one and only source for the event's own `data.channel` from this round on.
+19. **The per-policy lock for an unmapped revoke is not a world lock.** `_lock_for`'s existing registry
+    is keyed by world id; an unmapped policy has no world id to key one by. This round's fix uses a
+    lock keyed by the policy id itself (a disjoint namespace from world locks, e.g. a `"policy:"`-
+    prefixed key sharing the same lock registry, or an entirely separate one) -- deliberately *not*
+    the requesting world's own lock, so this fix cannot introduce a new way for an unrelated Stop-all
+    to block on a revoke of an unrelated, unmapped policy.
+
+## `tilo_api.deps` (module; `Principal.channel` is new this round -- every test that constructs one
+via `make_principal(channel=...)` fails on that keyword until the builder adds the field)
 
 ```python
 from __future__ import annotations
@@ -328,6 +456,11 @@ class Principal:
     # "that world does not exist" from "you are not in it" (ST-3a
     # round 1 security finding).
     domain: str | None = None  # team_lead's PRD 8.3 expert domain; None otherwise
+    channel: str = "web"  # common.schema.json#/$defs/channel ("web" | "mobile_web" | "whatsapp" |
+    # "email"): the session channel the (still test-double) sign-in layer resolved for this
+    # request -- new this round (ST-3a-2, issue #38 item 5). The pause route's world.paused
+    # event now takes its data.channel from here, never from the request body, so a caller
+    # cannot claim a confirmation channel it is not actually on.
     districts: tuple[str, ...] = ()  # districts this principal may see beyond "vis": "all":
     # a team_lead's domain districts, or a viewer's shared
     # scope. Ignored when role == "owner" (owner sees
@@ -667,7 +800,10 @@ interleaved out of order by which writer call happens to return first.
   pending-on-failure handling), **plus**, under the same lock that serializes this route's own
   mutation, checks `store.worlds[world_id].paused`: when it is **not already `True`**, sets it
   `True` and builds and hands the writer exactly one `world.paused` part for `world_id` itself
-  (never `policy_worlds`) with `data == {"reason": "pause_all", "channel": <body.channel>}`,
+  (never `policy_worlds`) with `data == {"reason": "pause_all", "channel": <principal.channel>}`
+  (round-6/ST-3a-2, issue #38 item 5: derived from the caller's own resolved session channel, never
+  from `body.channel` -- the request body's `channel` field is still validated against the schema
+  enum, 422 outside it, but is no longer read for this purpose; see ambiguity 18),
   `authz: null` (`world.paused` is `side_effect: false`, registry `events/registry.yaml`),
   `vis: "all"` — subject to the same pending-on-failure handling as every other part this call
   builds. When `store.worlds[world_id].paused` is **already `True`** when this call reaches that
@@ -723,9 +859,14 @@ interleaved out of order by which writer call happens to return first.
   `store.pending_events.setdefault(mapped_world_id, [])` instead of raising or being lost, to be
   flushed by a later mutating call that touches that world — which may again be another revoke, per
   this same rule. A policy with no world mapping (policies live at org level, PRD 15.3) is still
-  revoked (history entry, L1), no lock is acquired and nothing is flushed (there is no world to flush
-  or lock), and no event (pending or otherwise) is handed to any world: revoke has no world of its
-  own, and an event is never filed under a world that does not exist (PRD 9.4 honesty). The history
+  revoked (history entry, L1); no world lock is acquired and nothing is flushed (there is no world to
+  flush or lock), and no event (pending or otherwise) is handed to any world: revoke has no world of
+  its own, and an event is never filed under a world that does not exist (PRD 9.4 honesty). **Its own
+  history/level/changed_by mutation is nonetheless taken under a lock scoped to that one policy id**
+  (round-6/ST-3a-2, issue #38 item 5 — see "What changed since round 5" and ambiguity 19: a policy-id
+  lock, not a world lock, so two concurrent revokes of the same unmapped policy cannot race and lose
+  one's history entry, and a concurrent Stop-all/Pause-all against an unrelated world is never blocked
+  by it). The history
   entry is the audit record either way.
 - Response 200 body: `{"policy_id": policy_id, "level": "L1"}` (unchanged from round 2 and round 3
   — revoke is a single-policy, single-event act, not a bulk operation, so its response carries no
@@ -795,7 +936,7 @@ interleaved out of order by which writer call happens to return first.
   | `cause` | unchanged | the *view-local id* (same `f"v{seq}"` scheme, using the **causing event's own view `seq` in this same response**) of the causing event, when that event survived filtering; `null` when it names an event that was dropped or never existed (round-1 rule, now expressed via the view-local id instead of the real one, since the real one is never returned to a scoped principal) — unaffected by round 5: a `cause` names an *event*, not a district, so it is never itself a reason to drop the whole event, only to be remapped or nulled |
   | `vis` | unchanged | `"all"` stays `"all"` (nothing to filter); **a district list is filtered to its intersection with `principal.districts`** before being returned — never the stored event's full, unfiltered list (round-4 security finding: the event is kept whenever `vis` intersects `principal.districts` at all, but the *full* stored list can name additional districts the caller cannot see at all, and returning it unfiltered tells that caller "someone else can see this too, and here is exactly which other district" — a leak of a hidden district's *id* through a field that was previously assumed safe because "it is never itself sensitive." The kept intersection is always non-empty, since the event would not have survived filtering otherwise, so this never turns a visible event invisible) |
   | `data` | unchanged | rebuilt by walking the stored `data` value **recursively** (round-4: a dict's values, and every item of a list, at any depth; round-5 extends this to dict **keys** too, and adds a depth guard — see "Depth and dict keys" below) applying, to every string leaf found: (1) if the key it is stored under is `"message_ref"` (at any depth, not only top-level), always `null` for a non-owner, regardless of shape, per the `trace.archive_ref` rule below; (2) else if it matches the ULID pattern, the same cause-style remap — the view-local id of the event it names, if that event survived filtering, else `null` (for example `policy.applied.data.instruction_id`, or the same value nested inside a list or a sub-object); (3) else if it matches the district_id pattern (`^D[0-9]{1,4}$`) — by round 5 this case can only be reached for a *visible* district (a hidden one already dropped the whole event via the hidden-district filter above) — left unchanged; every other value (a non-string, or a string matching none of the above) is left exactly as stored. **Dict keys** get the equivalent treatment (round-5 finding 6): a district-id-shaped key naming a hidden district already dropped the whole event (same filter, keys included); a district-id-shaped key naming a visible district is left unchanged; a ULID-shaped key naming an event that survived filtering is renamed to that event's own view-local id (its value redacted normally); a ULID-shaped key naming a hidden or unknown event is dropped — the key *and* its value are removed from the rebuilt dict, since a JSON key cannot itself be set to `null` the way a value can (ambiguity 17). The dict/list *shape* of `data` is otherwise always preserved; only leaf string values, and the specific keys named above, are ever rewritten or removed. |
-  | `trace` | unchanged | every field unchanged **except `archive_ref`, which is always `null`** (round-3 finding: `archive_ref`/`message_ref` name a position in the run-wide raw archive — PRD 13.2 — a counter unrelated to district visibility that would let a scoped viewer infer how many raw records exist between two events it can see, so it is stripped outright rather than filtered by visibility) |
+  | `trace` | unchanged | **rebuilt by allowlisting exactly `event.schema.json#/$defs/trace`'s seven keys** (`model_role`, `profile`, `tokens_in`, `tokens_out`, `tool`, `latency_ms`, `archive_ref`) with `archive_ref` always `null` (round-3 finding: `archive_ref`/`message_ref` name a position in the run-wide raw archive — PRD 13.2 — a counter unrelated to district visibility that would let a scoped viewer infer how many raw records exist between two events it can see, so it is stripped outright rather than filtered by visibility; round-6/ST-3a-2 finding, issue #38 item 5: a stored `trace` copied forward wholesale can carry an extra, schema-invalid key — the stored value should never have one, `trace.additionalProperties: false`, but a scoped view must not merely trust that — so anything outside those seven keys is dropped rather than copied) |
 
   A kept event's real store `id` and `trace.archive_ref` therefore never appear anywhere in a
   non-owner response — not as that event's own `id`/`archive_ref`, not inside another event's
