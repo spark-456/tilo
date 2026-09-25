@@ -1,1 +1,2 @@
+- [API event emit patterns](api-event-emit-patterns.md) — derived run_id/seq in service-built events; max-length id probe
 - [Contracts review patterns](contracts-review-patterns.md) — probe cross-reference rules, rules.md numbering, drift-check probe technique
