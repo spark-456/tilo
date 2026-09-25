@@ -2,12 +2,14 @@
 
 ## Purpose
 The Firebase-hosted web client (PRD 6.2): React UI, the PixiJS v8 isometric world, Story and
-Trace lenses, cards and settings. No app code yet — ticket P0-08 builds it; this ticket adds
-only this file so the pnpm workspace has a documented member slot.
+Trace lenses, cards and settings. P0-08a (this ticket) ships the shell only: token pipeline,
+layout frame (left/right rail, bottom tabs) and the iso stage — no fixture player yet.
 
 ## Commands
-- `pnpm --filter tilo-web dev` — dev server (once P0-08 adds the app)
-- `pnpm --filter tilo-web build` / `test` — build / test (once P0-08 adds the app)
+- `just dev` or `pnpm --filter @tilo/web run dev` — dev server
+- `pnpm --filter @tilo/web run build` / `test` / `test:e2e` — build / unit tests / Playwright
+- `just tokens` — regenerate `src/styles/tokens.css` and `src/design/tokens.ts` from
+  `design/tokens.json` (PRD 18.2); commit the result
 - `just check` — full gate from the repo root
 
 ## Contracts

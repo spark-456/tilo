@@ -33,6 +33,28 @@ No third-party runtime dependencies yet (empty scaffold; code lands in ticket P0
 | @biomejs/biome | MIT | https://www.npmjs.com/package/@biomejs/biome |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
 
+## JavaScript / TypeScript (`apps/web`)
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| react, react-dom | MIT | https://www.npmjs.com/package/react |
+| pixi.js | MIT | https://www.npmjs.com/package/pixi.js |
+| vite | MIT | https://www.npmjs.com/package/vite |
+| @vitejs/plugin-react | MIT | https://www.npmjs.com/package/@vitejs/plugin-react |
+| vitest | MIT | https://www.npmjs.com/package/vitest |
+| @playwright/test | Apache-2.0 | https://www.npmjs.com/package/@playwright/test |
+| @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
+| @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT (package); fonts themselves OFL-1.1, see "Fonts" below | https://www.npmjs.com/package/@fontsource/nunito |
+| @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/package/@types/node |
+
+## Fonts (self-hosted via `@fontsource/*`, PRD 18.2 "Type")
+
+| Font | Licence | Source |
+| --- | --- | --- |
+| Nunito | OFL-1.1 | https://fonts.google.com/specimen/Nunito |
+| Nunito Sans | OFL-1.1 | https://fonts.google.com/specimen/Nunito+Sans |
+| JetBrains Mono | OFL-1.1 | https://fonts.google.com/specimen/JetBrains+Mono |
+
 ## Tools
 
 | Tool | Licence | Source |

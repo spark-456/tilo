@@ -10,7 +10,14 @@ test("PRD-9.7 stage: with WebGL2 unavailable, the Story-lens fallback panel repl
   // request return null, exactly what PixiJS sees on a real WebGL2-less
   // browser, without needing special launch flags or a different browser.
   await page.addInitScript(() => {
-    const original = HTMLCanvasElement.prototype.getContext;
+    // Typed as a plain rest-param function (not the built-in's overloaded
+    // signature) so `.call(this, type, ...args)` below type-checks: spreading
+    // a non-tuple array into an overloaded call target is a `tsc` error.
+    const original = HTMLCanvasElement.prototype.getContext as (
+      this: HTMLCanvasElement,
+      type: string,
+      ...args: unknown[]
+    ) => unknown;
     // @ts-expect-error overriding the built-in for this test only
     HTMLCanvasElement.prototype.getContext = function (type: string, ...args: unknown[]) {
       if (type === "webgl2") return null;

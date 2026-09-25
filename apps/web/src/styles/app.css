@@ -1,0 +1,124 @@
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font-family: var(--font-ui);
+  font-size: 16px;
+}
+:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+@media (max-width: 767px) {
+  .app-shell {
+    flex-direction: column;
+  }
+}
+
+.left-rail,
+.bottom-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-1);
+}
+.left-rail {
+  flex: 0 0 72px;
+  flex-direction: column;
+  border-right: 1px solid var(--color-surface-2);
+}
+.bottom-tabs {
+  flex: 0 0 var(--button-height-mobile);
+  border-top: 1px solid var(--color-surface-2);
+}
+
+.stage-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-surface-2);
+}
+.stage-camera,
+.stage-fallback {
+  position: absolute;
+  inset: 0;
+}
+.stage-camera {
+  transform-origin: center center;
+  transition-property: transform;
+  transition-timing-function: ease-out;
+}
+.stage-camera canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.stage-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  color: var(--color-ink-2);
+}
+
+.right-rail {
+  flex: 0 0 360px;
+  background: var(--color-surface-1);
+  border-left: 1px solid var(--color-surface-2);
+  padding: 20px;
+  overflow-y: auto;
+}
+.right-rail h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-2);
+  margin: 20px 0 8px;
+}
+.right-rail h2:first-child {
+  margin-top: 0;
+}
+.right-rail-meter,
+.empty {
+  color: var(--color-ink-2);
+  font-size: 14px;
+  margin: 0;
+}
+
+.nav-btn {
+  min-height: var(--button-height-desktop);
+  min-width: var(--button-height-desktop);
+  border-radius: var(--radius-controls);
+  border: none;
+  background: transparent;
+  color: var(--color-ink-1);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  cursor: pointer;
+}
+.bottom-tabs .nav-btn {
+  min-height: var(--button-height-mobile);
+  min-width: var(--button-height-mobile);
+}
+.nav-btn:hover {
+  background: var(--color-surface-0);
+}

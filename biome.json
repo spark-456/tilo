@@ -3,7 +3,15 @@
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": true,
-    "ignore": ["**/dist/**", "**/build/**", "**/node_modules/**", "**/*.md", "design/**"]
+    "ignore": [
+      "**/dist/**",
+      "**/build/**",
+      "**/node_modules/**",
+      "**/*.md",
+      "design/**",
+      "apps/web/src/styles/tokens.css",
+      "apps/web/src/design/tokens.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
