@@ -116,16 +116,13 @@ def test_PI_17_a_cancelled_entry_emits_nothing(l2_undo_window_case_factory):
 
 
 def test_PI_17_a_failed_entry_emits_nothing(gate_case_factory):
-    class AlwaysFailsGmail:
-        def send_reply(self, thread_id, item, recipients, idempotency_key, grant):
-            raise RuntimeError("simulated permanent adapter failure")
+    """A connector with no adapter is the final failure (API.md "Failures"; an adapter that raises
+    is retried instead, since its send may have happened)."""
 
     case = gate_case_factory(undo_window_s=0)
     emitted: list[dict] = []
     store = tilo_connectors.InMemoryOutboxStore()
-    outbox = tilo_connectors.Outbox(
-        store, {"gmail": AlwaysFailsGmail()}, emitted.append, ManualClock("2026-09-29T09:00:00.000Z")
-    )
+    outbox = tilo_connectors.Outbox(store, {}, emitted.append, ManualClock("2026-09-29T09:00:00.000Z"))
     outbox.enqueue(case["entry"], evidence_from_case(case))
 
     sent = outbox.dispatch_due()
