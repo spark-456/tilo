@@ -78,6 +78,7 @@ class RouterResult:
     attempts: list[RouterAttempt] = field(default_factory=list)
     outcome: Literal["ok", "safety_blocked"] = "ok"
     response: GenerateResponse | None = None
+    embedding: Any = None  # embed()'s result (the adapter's raw {"vectors": [...]} shape), attempts alongside it
     chunks: Iterator[GenerateResponse] = field(default_factory=lambda: iter(()))
 
     def __iter__(self) -> Iterator[GenerateResponse]:
@@ -114,6 +115,14 @@ def _fall_back(run: RouterResult, attempt: RouterAttempt, start: float, error: P
     if chunks:
         raise StreamInterruptedError(f"{where} failed after {chunks} chunk(s); output started", run.attempts) from error
     return f"fallback after {attempt.error_type}"
+
+
+def _embed_inputs(request: Any) -> list[str]:
+    """The texts an embed request carries, in the same shape the adapters themselves read (PL-02: `{"input":
+    [...]}` or the raw list/string) -- used only to price the call (BQ-52); the request goes to the adapter
+    unchanged."""
+    raw = request["input"] if isinstance(request, dict) else request
+    return [raw] if isinstance(raw, str) else list(raw)
 
 
 def _compact(role_id: str, cap: int | None, prompt: str, outputs: list[str], count: Callable[[str], int]) -> str:
@@ -289,14 +298,28 @@ class Router:
                 reason = _fall_back(run, attempt, start, error, chunks)
         raise RouterExhaustedError(f"PL-03: role {run.role_id!r} exhausted every candidate", run.attempts)
 
-    def embed(self, role_id: str, request: Any, *, required_capability: Capability | None = None) -> Any:
-        last_error: ProviderError | None = None
-        for profile_id in self._candidates(role_id, required_capability):
+    def embed(
+        self,
+        role_id: str,
+        request: Any,
+        *,
+        budget: float | None = None,
+        required_capability: Capability | None = None,
+    ) -> RouterResult:  # same _attempt/_finish/_fall_back path as generate/stream, so the trace shows every attempt
+        candidates = self._candidates(role_id, required_capability)
+        run = RouterResult(role_id, request, candidates, budget)
+        pricing_prompt = "\n\n".join(_embed_inputs(request))
+        reason: str | None = None
+        for profile_id in run.candidates:  # EFF-02: cheapest first
+            provider = self._provider(role_id, profile_id)
+            # priced like a generate() call with no output tokens (BQ-52): each candidate's own tokenizer
+            pricing_request = GenerateRequest(prompt=pricing_prompt, max_output_tokens=0)
+            attempt, start = self._attempt(run, profile_id, reason, pricing_request), time.perf_counter()
             try:
-                return self._provider(role_id, profile_id).embed(request)
-            except (RequestError, SafetyError) as error:
-                wrap = RouterRequestError if isinstance(error, RequestError) else RouterSafetyError
-                raise wrap(f"PL-03: role {role_id!r} embed on {profile_id!r} failed: {error}") from error
-            except (QuotaError, RetryableError, ProviderError) as error:
-                last_error = error
-        raise RouterExhaustedError(f"PL-03: role {role_id!r} embed exhausted every candidate") from last_error
+                embedding = provider.embed(request)
+            except (RequestError, SafetyError, QuotaError, RetryableError, ProviderError) as error:
+                reason = _fall_back(run, attempt, start, error)  # RequestError/SafetyError raise with run.attempts
+                continue
+            _finish(attempt, start)
+            return replace(run, embedding=embedding)
+        raise RouterExhaustedError(f"PL-03: role {role_id!r} embed exhausted every candidate", run.attempts)

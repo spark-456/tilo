@@ -187,8 +187,11 @@ def test_PL_03_stream_falls_back_on_base_provider_error(providers_config):
     assert len(fallback.calls) == 1
 
 
-def test_PL_03_embed_falls_back_on_base_provider_error(providers_config):
-    """Same gap, in `embed()`."""
+def test_PL_03_embed_falls_back_on_base_provider_error_and_records_both_attempts(providers_config):
+    """Same gap, in `embed()`: a base `ProviderError` from the primary must not escape the router, and
+    (review follow-up, ticket P0-06 audit) `embed()` must go through the same `_attempt`/`_finish`/
+    `_fall_back` path as `generate()`/`stream()` -- the PRD 9.3 trace field needs both attempts, exactly
+    as the "kill the primary" acceptance test already checks for generate()."""
     from tilo_providers.router import Router  # noqa: PLC0415
 
     class _EmbedProvider(ScriptedModelProvider):
@@ -212,9 +215,17 @@ def test_PL_03_embed_falls_back_on_base_provider_error(providers_config):
 
     result = router.embed("director", {"input": ["hello"]})
 
-    assert result == {"vectors": [[0.1, 0.2]]}
+    assert result.embedding == {"vectors": [[0.1, 0.2]]}
     assert len(primary.embed_calls) == 1
     assert len(fallback.embed_calls) == 1
+
+    # PRD 9.3 trace field: both attempts must be on the record, primary as an error, fallback as ok.
+    assert [attempt.profile_id for attempt in result.attempts] == ["large", "medium"]
+    primary_attempt, fallback_attempt = result.attempts
+    assert primary_attempt.outcome == "error"
+    assert primary_attempt.error_type == "ProviderError"
+    assert primary_attempt.latency_ms >= 0
+    assert fallback_attempt.outcome == "ok"
 
 
 def test_PL_03_embed_missing_capability_goes_straight_to_capable_profile(tmp_path):
@@ -247,7 +258,8 @@ def test_PL_03_embed_missing_capability_goes_straight_to_capable_profile(tmp_pat
 
     result = router.embed("seer", {"input": ["describe this image"]}, required_capability=Capability.VISION)
 
-    assert result == {"vectors": [[0.1, 0.2]]}
+    assert result.embedding == {"vectors": [[0.1, 0.2]]}
+    assert [attempt.profile_id for attempt in result.attempts] == ["vision-capable"]
     assert primary.embed_calls == [], "the primary lacks Capability.VISION and must never be called"
     assert len(capable.embed_calls) == 1
 
