@@ -1,0 +1,140 @@
+"""tilo_policy.coverage — the one copy of the predicates `decide`, `open_gate` and `check_entry`
+share (OB-01; PI-02, PI-04, PI-06, PI-08..PI-10, PI-13). Each fails closed: a malformed record
+or event covers nothing, is no instruction and opens no gate."""
+
+from __future__ import annotations
+
+import functools
+import re
+from collections.abc import Callable
+from typing import Any, NamedTuple, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+LEVELS = ("L0", "L1", "L2", "L3")
+CHANNELS = ("web", "mobile_web", "whatsapp")  # a gate is never answered by email (PI-04)
+INSTRUCTION_CHANNELS = {"world.requested": ("web", "mobile_web"), "channel.message_in": ("whatsapp",)}
+_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z")
+
+
+class Target(NamedTuple):
+    """What a policy must cover: the action and where it goes."""
+
+    action_type: str
+    connector: str
+    district: str
+    recipients: tuple[str, ...] | list[str]
+
+
+def fail_closed(default: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Any exception in the wrapped predicate returns `default`, the safe answer."""
+
+    def wrap(fn: Callable[P, R]) -> Callable[P, R]:
+        @functools.wraps(fn)
+        def safe(*args: P.args, **kwargs: P.kwargs) -> R:
+            try:
+                return fn(*args, **kwargs)
+            except Exception:
+                return default
+
+        return safe
+
+    return wrap
+
+
+def ts(value: Any) -> str:
+    """A common.schema.json timestamp (UTC, milliseconds, Z), so string order is time order."""
+    if isinstance(value, str) and _TIMESTAMP.fullmatch(value):
+        return value
+    raise ValueError(f"not a UTC millisecond timestamp: {value!r}")
+
+
+def _within(allowed: list, value: Any) -> bool:
+    return not allowed or value in allowed  # an empty scope list does not restrict
+
+
+@fail_closed(None)
+def level_at(policy: dict, at: str) -> str | None:
+    """PI-13: the level of the last history entry at or before `at`; None when history is empty,
+    out of order, or its last level is not the record's."""
+    history = policy["history"]
+    times = [ts(h["at"]) for h in history]
+    if not history or times != sorted(times) or history[-1]["level"] != policy["level"]:
+        return None
+    earlier = [h["level"] for h, t in zip(history, times, strict=True) if t <= ts(at)]
+    return earlier[-1] if earlier and earlier[-1] in LEVELS else None
+
+
+@fail_closed(False)
+def in_force(policy: dict, owner: str, at: str) -> bool:
+    """PI-06, PI-13: the world owner's policy, made and changed only by the owner, created by
+    `at` and not expired at `at`."""
+    stamps = [policy["created_by"], policy["changed_by"], *policy["history"]]
+    return (
+        policy["owner"] == owner
+        and all(stamp["by"] == owner for stamp in stamps if stamp is not None)
+        and ts(policy["created_by"]["at"]) <= ts(at)
+        and (policy["expiry"] is None or ts(at) < ts(policy["expiry"]))
+    )
+
+
+@fail_closed(None)
+def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | None:
+    """PI-06: the level at which `policy` covers `target` at `at`, or None."""
+    scope = policy["scope"]
+    covered = (
+        policy["action_type"] == target.action_type
+        and in_force(policy, owner, at)
+        and target.connector in scope["connectors"]
+        and _within(scope["districts"], target.district)
+        and all(
+            _within(scope["recipients"], r) and _within(scope["domains"], r.rsplit("@", 1)[1].lower())
+            for r in target.recipients
+        )
+    )
+    return level_at(policy, at) if covered else None
+
+
+@fail_closed(False)
+def instruction_counts(
+    instruction: dict | None, world_id: str, owner: str, destination: str | None, before: str, applied: list[dict]
+) -> bool:
+    """PI-08..PI-10: the owner's own earlier instruction in this world about this destination,
+    signed in or from the bound WhatsApp number (never email), not used by an earlier send."""
+    return (
+        instruction is not None
+        and instruction["data"]["channel"] in INSTRUCTION_CHANNELS.get(instruction["type"], ())
+        and (instruction["world_id"], instruction["actor"]) == (world_id, owner)
+        and ts(instruction["ts"]) < ts(before)
+        and destination is not None
+        and instruction["data"]["destination"] == destination
+        and all(used["data"]["instruction_id"] != instruction["id"] for used in applied)
+    )
+
+
+@fail_closed(False)
+def opens_gate(reserved: dict, resolved: dict, owner: str, lead: dict | None, policy: dict | None) -> bool:
+    """PI-02..PI-04, PRD 10.1, SEC-06: approve on the very gate, card and outbox entry, from the
+    owner, the named Approver or an allowed Team Lead; a T3 gate on WhatsApp needs its PIN."""
+    gate, answer, authz = reserved["data"], resolved["data"], resolved["authz"]
+    at, allowed = ts(authz["at"]), gate["team_lead"]
+    if resolved["type"] != "approval.resolved" or answer["option"] != "approve":
+        return False
+    if any(answer[k] != gate[k] for k in ("gate_id", "card_id", "outbox_id")) or answer["channel"] not in CHANNELS:
+        return False
+    if gate["risk_tier"] == "T3" and answer["channel"] == "whatsapp" and answer["pin_verified"] is not True:
+        return False
+    if authz["by"] == "person":
+        return authz["ref"] == owner or (gate["approver"] is not None and authz["ref"] == gate["approver"])
+    return (
+        authz["by"] == "team_lead"
+        and allowed is not None
+        and lead is not None
+        and policy is not None
+        and (lead["id"], lead["domain"]) == (authz["ref"], allowed["domain"])
+        and lead["assigned_by"]["by"] == owner
+        and ts(lead["assigned_by"]["at"]) <= at
+        and (policy["id"], policy["action_type"]) == (allowed["policy_id"], gate["action_type"])
+        and allowed["domain"] in policy["team_lead_domains"]
+        and in_force(policy, owner, at)
+    )

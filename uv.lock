@@ -7,6 +7,7 @@ members = [
     "tilo",
     "tilo-api",
     "tilo-contracts",
+    "tilo-policy",
     "tilo-providers",
 ]
 
@@ -828,6 +829,23 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "pydantic", specifier = ">=2.11" }]
+
+[[package]]
+name = "tilo-policy"
+version = "0.1.0"
+source = { editable = "packages/policy" }
+dependencies = [
+    { name = "jsonschema" },
+    { name = "pyyaml" },
+    { name = "referencing" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jsonschema", specifier = ">=4.18" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "referencing", specifier = ">=0.30" },
+]
 
 [[package]]
 name = "tilo-providers"

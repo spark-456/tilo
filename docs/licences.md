@@ -39,6 +39,12 @@ declares none of its own): `tilo_providers.config` uses `pydantic` (already list
 (already listed under the root dev dependency group); both are already installed into the
 shared `uv` workspace venv by `uv sync --all-packages`.
 
+## Python (`packages/policy`)
+
+`tilo-policy` declares `pyyaml`, `jsonschema` and `referencing` as runtime dependencies (ticket
+P4-01); all three are already listed above under the root dev dependency group (MIT). No new
+licence.
+
 ## JavaScript / TypeScript (root `package.json` devDependencies, `pnpm`-managed)
 
 | Dependency | Licence | Source |
