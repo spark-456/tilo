@@ -488,3 +488,34 @@ def test_FR_HIL_04_PI_07_check_entry_with_the_table_enforces_max_level(l3_case, 
     )
     assert tilo_policy.check_entry(l3_case, table=good) is None
     assert tilo_policy.check_entry(l3_case, table=capped) is not None
+
+
+# --- follow-up after round 5 -----------------------------------------------------------------
+
+
+def test_FR_HIL_03_PI_06_an_invalid_owner_policy_covering_the_send_gates_the_decision(risk_table_path):
+    """Lowest level wins only if every covering policy counts: an owner policy for this action
+    that breaks its schema but whose scope covers the send gates the whole decision, whatever
+    else covers it (fail closed, never skipped)."""
+    table = _table(risk_table_path)
+    invalid = _l3(id_="pol_a")
+    invalid["limits"]["per_day"] = None  # schema-invalid at L3
+    for order in ([invalid, _l3_b()], [_l3_b(), invalid]):
+        assert _decide(table, _status_proposal(), order).outcome == "gate"
+
+
+def test_FR_HIL_03_PI_06_an_owner_policy_with_an_unreadable_scope_gates_the_decision(risk_table_path):
+    table = _table(risk_table_path)
+    unreadable = _l3(id_="pol_a")
+    unreadable["scope"] = "everything"
+    for order in ([unreadable, _l3_b()], [_l3_b(), unreadable]):
+        assert _decide(table, _status_proposal(), order).outcome == "gate"
+
+
+def test_FR_HIL_03_PI_06_an_invalid_owner_policy_scoped_elsewhere_does_not_block(risk_table_path):
+    """Keeps the two tests above from gating everything: an invalid policy whose readable scope
+    does not cover this send (another connector) leaves the valid covering policy in charge."""
+    table = _table(risk_table_path)
+    elsewhere = _l3(id_="pol_a", connectors=("slack",))
+    elsewhere["limits"]["per_day"] = None
+    assert _decide(table, _status_proposal(), [elsewhere, _l3_b()]).outcome == "run"
