@@ -1,14 +1,15 @@
 ---
 name: api-kill-switch-attack-patterns
-description: tilo_api bulk-mutation routes (stop-all/pause/revoke) - "validate then apply" fixes still interleave store mutation with writer.append; attack with raising and slow writers
+description: tilo_api bulk-mutation routes (stop-all/pause/revoke) - fixes keep writer.append inline with lowering; attack with raising, slow and slow-failing writers
 metadata:
   type: project
 ---
-ST-3a round 2 (2026-09-25) fixed round-1 half-apply only for malformed *data*; the apply loop still did mutate-then-writer.append per policy.
+ST-3a round 2 (2026-09-25): the apply loop did mutate-then-writer.append per policy; a writer raising at call k half-applied, and two concurrent stop-alls doubled events.
 
-- Writer that raises on the k-th append: 500, policies 0..k-1 lowered with events, policy k lowered with history but NO policy.changed, rest untouched. Retry counts policy k as already_l1, so its event is never emitted (honesty-rule break).
-- Two concurrent stop-alls with a 10 ms writer: 39 events for 20 policies, duplicate history (no lock, TestClient threads reproduce it).
-- Principal.districts passed as a str turns `d in principal.districts` into substring matching (leak).
+Round 3 (2026-09-25) fixed those with pending_events + a global threading lock, but:
+- Lowering and writer.append are still interleaved, and the lock is held across writer calls. A harness that is down behind a 30 ms connect timeout makes 200-policy Stop-all take 6.3-7.5 s (the last policy reaches L1 after ~6.3 s), every retry pays it again (the flush runs before any lowering), and another world's stop-all waits on the same global lock (6.2 s for 1 policy). Spec budget: 5 s "whether the writer is healthy or entirely down".
+- Revoke still calls writer.append unguarded: 500, level L1 + history applied, no event, never retried.
+- _redact_data is shallow: a hidden event's ULID nested in a data list or dict reaches the viewer.
 
-**Why:** builders only fix the repro they were given; injected dependencies (writer, clock) are the untested failure surface.
-**How to apply:** for any route that loops "mutate + side-effect call", inject a Flaky writer (raise at call N) and a Slow writer + 2 threads. Script: scratchpad st3a_r2.py pattern. Related: [[eval-harness-recording-validation]].
+**Why:** builders fix the exception path and leave the latency path; the fake writers in _api_lib raise instantly.
+**How to apply:** always add a TimeoutWriter (sleep then raise) plus a cross-world concurrent call, and time when the Nth policy flips. Script: scratchpad st3a_r3.py. Related: [[eval-harness-recording-validation]].

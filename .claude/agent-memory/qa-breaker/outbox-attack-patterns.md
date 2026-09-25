@@ -1,16 +1,16 @@
 ---
 name: outbox-attack-patterns
-description: tilo_connectors outbox (ST-2) - in-memory pending state, per-instance adapter maps and emit failures are where "exactly once" breaks
+description: tilo_connectors outbox (ST-2) - in-memory pending state, per-instance adapter maps, unleased pending-transfer flush and lease expiry are where "exactly once" breaks
 metadata:
   type: project
 ---
-ST-2 round 2 (2026-09-25) FAILED again. Fixes addressed round-1 repros; new breaks:
+ST-2 round 2 (2026-09-25) FAILED: pending transfers in instance memory, emit error stopped batch, foreign-config instance marks entries "failed", "sending" re-claimable, overflow on huge undo window.
 
-- Pending data.transfer kept in Outbox instance memory (`_pending_transfers`): emit raises -> entry is "sent"; restart (new Outbox on same store) never emits it. Honesty-rule break.
-- emit raising inside `_dispatch_one` propagates out of dispatch_due, stopping the batch (API says never).
-- A second Outbox on the same store whose connector map lacks "gmail" marks another instance's entries permanently "failed" ("missing adapter" is per instance).
-- "sending" is in the claimable states, so concurrent dispatchers both call the adapter; two adapter instances (two processes) = two real sends.
-- undo_window_s has no schema max: huge value or year-9999 created_at raises uncaught OverflowError (add_seconds catches only ValueError/TypeError).
+ST-2 round 3 (2026-09-25) FAILED. Leases + store-resident pending fixed the round-2 repros, but:
+- `_flush_pending_transfers` snapshots pending then emits with no claim: 4 instances flushing one pending transfer concurrently emit 4 data.transfer for 1 send (repro D in scratchpad st2_r3.py).
+- Lease is wall-clock 30 s: clock advanced past it mid-send (or NTP step forward) lets a second instance with its own adapter send again (2 underlying sends); holder A's finalize then silently drops its emit.
+- Adapter raising forever: entry stays "sending", retried every dispatch forever, no attempt cap.
+- Still open from round 2: instance without the adapter marks entry "failed"; pending emits out of send order.
 
-**Why:** state that must survive a crash was put in process memory; per-instance config was treated as global truth.
-**How to apply:** for any outbox/queue, always test: new instance after injected failure, two instances with different config on one store, slow adapter + 2 threads. Script pattern: scratchpad st2_r2.py. Related: [[api-kill-switch-attack-patterns]].
+**Why:** each fix protected the exact repro path; the neighbouring path (flush vs dispatch, lease vs slow send) got no lock/claim.
+**How to apply:** for any "exactly once" store, run N instances concurrently on EVERY store-backed path (flush, retry, finalize), not just the claim. Related: [[api-kill-switch-attack-patterns]].
