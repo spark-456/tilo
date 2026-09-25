@@ -1,0 +1,1 @@
+- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 round 2 closed the modifier, condition, authz and card gaps. Still open: ungated T3 connector actions, duplicate hold ids, consent delegate

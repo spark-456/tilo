@@ -1,0 +1,1 @@
+- [Web stage attack patterns](web-stage-attack-patterns.md) — passive wheel console error; CSS-transform camera exposes canvas edges; modifier keys hijacked

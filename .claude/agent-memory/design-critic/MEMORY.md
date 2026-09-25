@@ -1,0 +1,1 @@
+- [Review harness notes](reference_review_harness.md) — Playwright-from-scratchpad recipe, Edge injection noise, cold-Vite CLS, artboard fetch errors, P0-08a grid defect
