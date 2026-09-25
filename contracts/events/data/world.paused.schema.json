@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/world.paused.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorldPausedData",
+  "description": "data of world.paused (PRD 9.5). Pause all from the app or the PAUSE keyword (FR-WLD-07, FR-CHN-06), or the kill switch when the hard cap is hit (FR-MTR-04, actor system). channel is where Pause all came from, null for the kill switch.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reason", "channel"],
+  "properties": {
+    "reason": { "type": "string", "enum": ["pause_all", "kill_switch"] },
+    "channel": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/channel" }, { "type": "null" }]
+    }
+  }
+}

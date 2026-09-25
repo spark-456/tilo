@@ -1,0 +1,34 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000036",
+  "seq": 36,
+  "ts": "2026-09-29T09:32:07.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "channel.message_in",
+  "actor": "u_owner",
+  "target": "I2",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "Your WhatsApp answer arrived.",
+  "cause": "01JB5VQ0000000000000000035",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "channel": "whatsapp",
+    "message_ref": "r_village_basic_1/29",
+    "card_id": "01JB5VQ0000000000000009001"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

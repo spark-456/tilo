@@ -1,0 +1,32 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000017",
+  "seq": 17,
+  "ts": "2026-09-29T09:30:44.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "agent.working",
+  "actor": "A_l1",
+  "target": "D1",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 1,
+  "summary": "The Lead is splitting the mail work into units.",
+  "cause": "01JB5VQ0000000000000000016",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "unit": null
+  },
+  "trace": {
+    "model_role": "lead",
+    "profile": "large",
+    "tokens_in": -5,
+    "tokens_out": 420,
+    "tool": null,
+    "latency_ms": 2600,
+    "archive_ref": "r_village_basic_1/10"
+  }
+}

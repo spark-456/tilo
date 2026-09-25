@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/outbox.schema.json",
+  "x-version": "1.0.0",
+  "title": "Outbox",
+  "description": "One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set; a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). Rules OB-01 to OB-05 are in contracts/outbox.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "idempotency_key",
+    "world_id",
+    "run_id",
+    "action_type",
+    "connector",
+    "recipients",
+    "attachments",
+    "modifiers",
+    "risk_tier",
+    "authz",
+    "undo_window_s",
+    "scheduled_at",
+    "state",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/ulid" },
+    "idempotency_key": {
+      "description": "Stable per step: a retry reuses it, and the connector runs a key at most once (OB-03).",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$"
+    },
+    "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+    "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+    "action_type": { "$ref": "common.schema.json#/$defs/action_type" },
+    "connector": { "$ref": "common.schema.json#/$defs/connector_id" },
+    "recipients": {
+      "description": "Everyone the side effect reaches; equals the recipients the gate card showed (card rule CR-12).",
+      "type": "array",
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/email_address" }
+    },
+    "attachments": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/artifact_ref" }
+    },
+    "modifiers": {
+      "description": "The PRD 10.4 conditions that apply to this side effect; any one makes it T3.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "policy.schema.json#/$defs/tier_condition" }
+    },
+    "risk_tier": { "$ref": "common.schema.json#/$defs/risk_tier" },
+    "authz": { "$ref": "common.schema.json#/$defs/authz" },
+    "undo_window_s": {
+      "description": "Seconds the person can still cancel (PRD 10.4: L2 default 60); 0 when none.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "scheduled_at": {
+      "description": "Earliest send time: created_at plus undo_window_s (OB-02).",
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "state": {
+      "description": "queued (ready, no undo window), scheduled (waiting out its undo window), sending, sent, cancelled (undone before sending) or failed.",
+      "type": "string",
+      "enum": ["queued", "scheduled", "sending", "sent", "cancelled", "failed"]
+    },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+  },
+  "if": {
+    "description": "OB-04 (PRD 10.4): T3 always needs a person, so a policy never authorises it; any modifier makes the side effect T3, and an attachment is itself a modifier (PRD 11.4), so it is listed.",
+    "properties": { "risk_tier": { "const": "T3" } },
+    "required": ["risk_tier"]
+  },
+  "then": {
+    "properties": {
+      "authz": { "properties": { "by": { "enum": ["person", "team_lead"] } } }
+    },
+    "if": { "properties": { "attachments": { "minItems": 1 } }, "required": ["attachments"] },
+    "then": { "properties": { "modifiers": { "contains": { "const": "attachments" } } } }
+  },
+  "else": {
+    "properties": {
+      "modifiers": { "maxItems": 0 },
+      "attachments": { "maxItems": 0 }
+    }
+  }
+}

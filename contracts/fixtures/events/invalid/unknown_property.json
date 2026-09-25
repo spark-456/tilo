@@ -1,0 +1,34 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000001",
+  "seq": 1,
+  "ts": "2026-09-29T09:30:02.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "world.requested",
+  "actor": "u_owner",
+  "target": "w_village_basic",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "You asked Tilo to triage your inbox and answer the supplier.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "title": "Triage my inbox and answer the supplier about Thursday",
+    "channel": "web"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  },
+  "priority": "high"
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/policy.changed.schema.json",
+  "x-version": "1.0.0",
+  "title": "PolicyChangedData",
+  "description": "data of policy.changed (PRD 9.5). The owner created, edited or revoked a policy, or used Stop all autopilot, which sets every policy to L1 (one event per policy). Only the owner changes policies (PRD 10.1), so authz is by person.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_id", "change", "level"],
+  "properties": {
+    "policy_id": { "$ref": "../../common.schema.json#/$defs/policy_id" },
+    "change": { "type": "string", "enum": ["created", "edited", "revoked", "stop_all"] },
+    "level": { "$ref": "../../common.schema.json#/$defs/autonomy_level" }
+  },
+  "if": { "properties": { "change": { "const": "stop_all" } }, "required": ["change"] },
+  "then": { "properties": { "level": { "const": "L1" } } }
+}

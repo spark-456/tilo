@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/agent.moved.schema.json",
+  "x-version": "1.0.0",
+  "title": "AgentMovedData",
+  "description": "data of agent.moved (PRD 9.5). actor walked from one building to target; movement is cosmetic (HR-3).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["from"],
+  "properties": { "from": { "$ref": "../../common.schema.json#/$defs/building_id" } }
+}

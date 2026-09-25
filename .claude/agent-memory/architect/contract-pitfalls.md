@@ -1,6 +1,6 @@
 ---
 name: contract-pitfalls
-description: Recurring traps when changing contracts/ and scripts/contracts_codegen.py (drift test sandbox, TS tuple generation, fixture sync, formatter versions)
+description: Recurring traps when changing contracts/ and scripts/contracts_codegen.py (drift sandbox, TS tuple/allOf/comment quirks, fixture sync, event registry rules, parallel BQ/ADR ids)
 metadata:
   type: project
 ---
@@ -20,6 +20,11 @@ Traps found while building P0-02 (2026-09-25), still true while the codegen setu
 - Security review round 4: an option that triggers an action (a gate's approve) needs a fixed id from a closed set, not an id or label a model writes. Its flags must be tied to the thing it acts on with if/then (approve.irreversible equals gate.irreversible). Otherwise a "send" option can be marked reversible and suggested. **How to apply:** for any answer that authorises, fix the ids (allOf of contains/minContains/maxContains gives each id at most once) and state which id opens it.
 - Security review round 5: fixed ids were not enough. The person taps the *label* (WhatsApp shows only labels), so an authorising option needs its label fixed by id too. Also, card fields copied from elsewhere (gate tier, irreversible, recipients) need a cross-reference rule back to their source. **How to apply:** never argue "the engine reads ids, so labels don't matter"; fix the labels. For cross-document rules, use `fixtures/<name>/crossref/{valid,invalid}` (contracts-check skips subfolders) plus a named reference-check test.
 - json-schema-to-typescript drops a named alias (for example CardOptionId becomes string) when a `$ref` has a sibling `description`. Put the text in the parent's description instead.
-- Parallel branches pick BQ ids on their own: P0-08a and P0-02 both used BQ-12. Check other feat/* branches (`git show <b>:docs/open-questions.md`) before choosing a new id.
+- Parallel branches pick BQ ids on their own: P0-08a and P0-02 both used BQ-12. Check other feat/* branches (`git show <b>:docs/open-questions.md`) before choosing a new id. P0-03 used BQ-20 to BQ-26 and ADR-0005, leaving BQ-18/19 and ADR-0004 for P0-04 in flight; the orchestrator may renumber.
+- json-schema-to-typescript turns a root-level `allOf` (even of pure if/then) into `{[k: string]: unknown} & X1`. Keep conditionals in one root if/then/else, nesting further if/then inside `then`/`else`.
+- A generated TS header must never contain `*/` (a glob like `contracts/**/*.schema.json` closed the comment and broke tsc).
+- The P0-03 tests validate one sample event (authz by person u_owner, data {}, target B0001) for every side-effect type. So per-type rules on authz.by or on data cannot live in event.schema.json; they go in the registry (authz_by) and the validator rules (EV-04). Test-writer minimal payloads (question.answered = {answered_by}) also fix which data fields may be required.
+- Event rules that need the registry, other fields or other events are EV-xx in contracts/event.rules.md, checked by scripts/contracts_events.py. Registry-only violations go in fixtures/events/registry/invalid/evNN_*.json, because fixtures/events/invalid/ must fail a schema.
+- Default `uv run pytest` includes the @slow drift tests; the whole suite takes ~95 s on this laptop, near check-fast's 2-minute budget. Slow P0-03 cost is the test lib re-parsing registry.yaml per parametrized test.
 
 Related: [[prd-gaps-defaults]]

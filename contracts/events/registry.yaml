@@ -1,0 +1,939 @@
+# Tilo event registry v1 (PRD 9.5, FR-WLD-03). Shape: registry.schema.json; rules: ../event.rules.md.
+#
+# Every type the harness may emit is listed here with exactly one world effect, one HUD effect,
+# one Story line template and one Trace row, its data schema, its valid fixture and the pillar
+# whose logic emits it. The harness never emits a type that is not listed (EV-01).
+#
+# Unknown types (HR-5): a consumer that meets a type it does not know (for example from a newer
+# harness) shows it in the Trace lens only; the world and the HUD never animate it and the Story
+# lens skips it. `unknown_types: trace_only` states this as data.
+#
+# Templates: {actor} and {target} become display names from the world layout (the id when there
+# is none); {data.<field>} is a required field of the type's data schema (contracts-check fails
+# otherwise). trace_row is the type-specific Detail column; the other Trace columns (seq, ts,
+# type, actor, target, severity, credits, authz, model profile, tokens, latency, archive link,
+# cause) are the same for every type. hud_effect "none" means the HUD does not change.
+#
+# side_effect: true marks a type that records a side effect or the decision that authorises one
+# (PRD 10.4 Audit, HR-7). Such an event carries authz (EV-03) from one of authz_by (EV-04), and
+# event.schema.json lists the same types (contracts-check fails if the lists drift).
+
+version: 1.0.0
+unknown_types: trace_only
+types:
+  world.requested:
+    family: world
+    verb: requested
+    priority: must
+    pillar: P1
+    default_severity: info
+    side_effect: false
+    world_effect: "An island appears for the new world."
+    hud_effect: "The run header shows the task title."
+    story_template: "{actor} asked for: {data.title}"
+    trace_row: "channel={data.channel}"
+    data_schema: events/data/world.requested.schema.json
+    fixture: fixtures/events/valid/world.requested.json
+  world.planned:
+    family: world
+    verb: planned
+    priority: must
+    pillar: P1
+    default_severity: info
+    side_effect: false
+    world_effect: "Plan outlines fade in on the island."
+    hud_effect: "The credit estimate shows as a range."
+    story_template: "{actor} planned {data.unit_count} units for a {data.tier} world."
+    trace_row: "approach={data.approach} units={data.unit_count} tier={data.tier}"
+    data_schema: events/data/world.planned.schema.json
+    fixture: fixtures/events/valid/world.planned.json
+  world.started:
+    family: world
+    verb: started
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The Town Hall lights up."
+    hud_effect: "The credits meter starts against the budget cap."
+    story_template: "Work started with a budget of {data.budget_cap} credits."
+    trace_row: "budget_cap={data.budget_cap}"
+    data_schema: events/data/world.started.schema.json
+    fixture: fixtures/events/valid/world.started.json
+  world.paused:
+    family: world
+    verb: paused
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A grey veil covers the world."
+    hud_effect: "A Paused banner shows with Resume."
+    story_template: "{actor} paused all work."
+    trace_row: "reason={data.reason} channel={data.channel}"
+    data_schema: events/data/world.paused.schema.json
+    fixture: fixtures/events/valid/world.paused.json
+  world.resumed:
+    family: world
+    verb: resumed
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The grey veil lifts."
+    hud_effect: "The Paused banner clears."
+    story_template: "{actor} resumed the work."
+    trace_row: "paused_for_s={data.paused_for_s}"
+    data_schema: events/data/world.resumed.schema.json
+    fixture: fixtures/events/valid/world.resumed.json
+  world.completed:
+    family: world
+    verb: completed
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "Fireworks over the Delivery Dock."
+    hud_effect: "The celebration shows credits used, credits saved and time saved."
+    story_template: "Done: {data.deliverable_count} deliverables for {data.credits_used} credits."
+    trace_row: "deliverables={data.deliverable_count} credits_used={data.credits_used}"
+    data_schema: events/data/world.completed.schema.json
+    fixture: fixtures/events/valid/world.completed.json
+  world.failed:
+    family: world
+    verb: failed
+    priority: must
+    pillar: P2
+    default_severity: blocked
+    side_effect: false
+    world_effect: "A half-mast flag on the Town Hall."
+    hud_effect: "A Blocked banner with the reason and a link to the Trace."
+    story_template: "The run stopped: {data.reason}"
+    trace_row: "unit={data.unit}"
+    data_schema: events/data/world.failed.schema.json
+    fixture: fixtures/events/valid/world.failed.json
+  plan.questions_asked:
+    family: plan
+    verb: questions_asked
+    priority: must
+    pillar: P1
+    default_severity: needs_you
+    side_effect: false
+    world_effect: "The Director stands at the Town Hall with a question bubble."
+    hud_effect: "Question cards open in the needs-you queue."
+    story_template: "{actor} has {data.question_count} questions that change the plan."
+    trace_row: "questions={data.question_count}"
+    data_schema: events/data/plan.questions_asked.schema.json
+    fixture: fixtures/events/valid/plan.questions_asked.json
+  plan.approaches_proposed:
+    family: plan
+    verb: approaches_proposed
+    priority: must
+    pillar: P1
+    default_severity: needs_you
+    side_effect: false
+    world_effect: "Blueprint scrolls unroll at the Town Hall, one per approach."
+    hud_effect: "The approach picker opens with time and credit ranges."
+    story_template: "{actor} proposed {data.approach_count} approaches to choose from."
+    trace_row: "approaches={data.approach_count}"
+    data_schema: events/data/plan.approaches_proposed.schema.json
+    fixture: fixtures/events/valid/plan.approaches_proposed.json
+  budget.requested:
+    family: budget
+    verb: requested
+    priority: must
+    pillar: P8
+    default_severity: needs_you
+    side_effect: false
+    world_effect: "The Treasury lamp lights."
+    hud_effect: "A budget card opens with the remaining plan and a new estimate."
+    story_template: "{actor} asked for {data.requested} more credits; {data.spent} of {data.cap} are spent."
+    trace_row: "requested={data.requested} spent={data.spent} cap={data.cap}"
+    data_schema: events/data/budget.requested.schema.json
+    fixture: fixtures/events/valid/budget.requested.json
+  budget.granted:
+    family: budget
+    verb: granted
+    priority: must
+    pillar: P1
+    default_severity: info
+    side_effect: true
+    authz_by: [person, policy]
+    world_effect: "Coins move from the Treasury to the district."
+    hud_effect: "The budget cap on the credits meter updates."
+    story_template: "{data.granted} credits approved; the cap is now {data.cap}."
+    trace_row: "granted={data.granted} cap={data.cap}"
+    data_schema: events/data/budget.granted.schema.json
+    fixture: fixtures/events/valid/budget.granted.json
+  level.created:
+    family: level
+    verb: created
+    priority: must
+    pillar: P3
+    default_severity: info
+    side_effect: false
+    world_effect: "A level plate rises."
+    hud_effect: "The level switcher gains a tab."
+    story_template: "Level {data.name} is planned."
+    trace_row: "name={data.name} index={data.index}"
+    data_schema: events/data/level.created.schema.json
+    fixture: fixtures/events/valid/level.created.json
+  level.completed:
+    family: level
+    verb: completed
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The level plate's edge gains a check."
+    hud_effect: "The level tab shows a check."
+    story_template: "{target} is complete."
+    trace_row: "level complete"
+    data_schema: events/data/level.completed.schema.json
+    fixture: fixtures/events/valid/level.completed.json
+  district.created:
+    family: district
+    verb: created
+    priority: must
+    pillar: P3
+    default_severity: info
+    side_effect: false
+    world_effect: "The district plot unrolls."
+    hud_effect: "The world outline lists the district."
+    story_template: "District {data.name} is set up."
+    trace_row: "name={data.name} lead={data.lead}"
+    data_schema: events/data/district.created.schema.json
+    fixture: fixtures/events/valid/district.created.json
+  district.completed:
+    family: district
+    verb: completed
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The district label gains a check."
+    hud_effect: "The world outline marks the district done."
+    story_template: "{target} is complete."
+    trace_row: "district complete"
+    data_schema: events/data/district.completed.schema.json
+    fixture: fixtures/events/valid/district.completed.json
+  building.planned:
+    family: building
+    verb: planned
+    priority: must
+    pillar: P3
+    default_severity: info
+    side_effect: false
+    world_effect: "A wireframe building appears."
+    hud_effect: "The world outline lists the building."
+    story_template: "{target} is planned."
+    trace_row: "plan_units={data.plan_units}"
+    data_schema: events/data/building.planned.schema.json
+    fixture: fixtures/events/valid/building.planned.json
+  building.constructing:
+    family: building
+    verb: constructing
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "Builder bots put up the building."
+    hud_effect: "The building's status reads Building."
+    story_template: "Work is starting at {target}."
+    trace_row: "unit={data.unit}"
+    data_schema: events/data/building.constructing.schema.json
+    fixture: fixtures/events/valid/building.constructing.json
+  building.operational:
+    family: building
+    verb: operational
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The building's windows glow."
+    hud_effect: "The building's status reads Working."
+    story_template: "{target} is at work."
+    trace_row: "unit={data.unit}"
+    data_schema: events/data/building.operational.schema.json
+    fixture: fixtures/events/valid/building.operational.json
+  building.scaled:
+    family: building
+    verb: scaled
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "An annex is added to the building."
+    hud_effect: "none"
+    story_template: "{target} grew to {data.floors} floors."
+    trace_row: "floors={data.floors}"
+    data_schema: events/data/building.scaled.schema.json
+    fixture: fixtures/events/valid/building.scaled.json
+  building.completed:
+    family: building
+    verb: completed
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A check badge appears on the building."
+    hud_effect: "The time-saved meter counts the finished units."
+    story_template: "{target} finished {data.unit_count} units."
+    trace_row: "unit_type={data.unit_type} unit_count={data.unit_count}"
+    data_schema: events/data/building.completed.schema.json
+    fixture: fixtures/events/valid/building.completed.json
+  building.archived:
+    family: building
+    verb: archived
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The building greys out."
+    hud_effect: "none"
+    story_template: "{target} is archived."
+    trace_row: "archived"
+    data_schema: events/data/building.archived.schema.json
+    fixture: fixtures/events/valid/building.archived.json
+  agent.spawned:
+    family: agent
+    verb: spawned
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "An agent steps out of the Agent Foundry door."
+    hud_effect: "The team count goes up by one."
+    story_template: "A {data.role} joined the team."
+    trace_row: "role={data.role}"
+    data_schema: events/data/agent.spawned.schema.json
+    fixture: fixtures/events/valid/agent.spawned.json
+  agent.assigned:
+    family: agent
+    verb: assigned
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The agent walks to its building."
+    hud_effect: "none"
+    story_template: "{actor} gave {target} a unit of work."
+    trace_row: "unit={data.unit}"
+    data_schema: events/data/agent.assigned.schema.json
+    fixture: fixtures/events/valid/agent.assigned.json
+  agent.moved:
+    family: agent
+    verb: moved
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The agent walks along the road, at most 2 s (HR-3)."
+    hud_effect: "none"
+    story_template: "{actor} walked to {target}."
+    trace_row: "from={data.from}"
+    data_schema: events/data/agent.moved.schema.json
+    fixture: fixtures/events/valid/agent.moved.json
+  agent.working:
+    family: agent
+    verb: working
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The agent works with a focused face."
+    hud_effect: "none"
+    story_template: "{actor} is working at {target}."
+    trace_row: "unit={data.unit}"
+    data_schema: events/data/agent.working.schema.json
+    fixture: fixtures/events/valid/agent.working.json
+  agent.handoff:
+    family: agent
+    verb: handoff
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The agent carries the item to the next agent."
+    hud_effect: "none"
+    story_template: "{actor} handed work to {target}."
+    trace_row: "typed envelope with artifact refs, acceptance criteria and provenance ids"
+    data_schema: events/data/agent.handoff.schema.json
+    fixture: fixtures/events/valid/agent.handoff.json
+  agent.help_requested:
+    family: agent
+    verb: help_requested
+    priority: must
+    pillar: P2
+    default_severity: fyi
+    side_effect: false
+    world_effect: "The agent raises a hand."
+    hud_effect: "none"
+    story_template: "{actor} asked {target} for help."
+    trace_row: "unit={data.unit}"
+    data_schema: events/data/agent.help_requested.schema.json
+    fixture: fixtures/events/valid/agent.help_requested.json
+  agent.escalated:
+    family: agent
+    verb: escalated
+    priority: must
+    pillar: P2
+    default_severity: fyi
+    side_effect: false
+    world_effect: "The agent walks up the chain to its supervisor."
+    hud_effect: "none"
+    story_template: "{actor} passed a question up to {target}."
+    trace_row: "reason={data.reason}"
+    data_schema: events/data/agent.escalated.schema.json
+    fixture: fixtures/events/valid/agent.escalated.json
+  agent.blocked:
+    family: agent
+    verb: blocked
+    priority: must
+    pillar: P2
+    default_severity: blocked
+    side_effect: false
+    world_effect: "A red marker over the agent, with a puzzled face."
+    hud_effect: "A Blocked card goes to the needs-you queue and the chosen channels."
+    story_template: "{actor} is blocked: {data.reason}"
+    trace_row: "unit={data.unit}"
+    data_schema: events/data/agent.blocked.schema.json
+    fixture: fixtures/events/valid/agent.blocked.json
+  agent.recovered:
+    family: agent
+    verb: recovered
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The agent's face turns determined."
+    hud_effect: "none"
+    story_template: "{actor} recovered on attempt {data.attempt}."
+    trace_row: "unit={data.unit} attempt={data.attempt}"
+    data_schema: events/data/agent.recovered.schema.json
+    fixture: fixtures/events/valid/agent.recovered.json
+  agent.idle:
+    family: agent
+    verb: idle
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The agent sits on a bench."
+    hud_effect: "none"
+    story_template: "{actor} is waiting for work."
+    trace_row: "idle"
+    data_schema: events/data/agent.idle.schema.json
+    fixture: fixtures/events/valid/agent.idle.json
+  agent.cloned:
+    family: agent
+    verb: cloned
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The agent splits in two."
+    hud_effect: "The team count goes up by one."
+    story_template: "{actor} split into two to work in parallel."
+    trace_row: "clone={target}"
+    data_schema: events/data/agent.cloned.schema.json
+    fixture: fixtures/events/valid/agent.cloned.json
+  agent.retired:
+    family: agent
+    verb: retired
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The agent walks into the Memory Vault."
+    hud_effect: "The team count goes down by one."
+    story_template: "{target} finished and retired."
+    trace_row: "retired"
+    data_schema: events/data/agent.retired.schema.json
+    fixture: fixtures/events/valid/agent.retired.json
+  agent.context_handoff_started:
+    family: agent
+    verb: context_handoff_started
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The agent sets its backpack down at the Memory Vault."
+    hud_effect: "none"
+    story_template: "{actor} wrote a handoff note at {data.context_pct}% of its context."
+    trace_row: "note={data.note} context_pct={data.context_pct}"
+    data_schema: events/data/agent.context_handoff_started.schema.json
+    fixture: fixtures/events/valid/agent.context_handoff_started.json
+  agent.context_handoff_completed:
+    family: agent
+    verb: context_handoff_completed
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The successor picks up the backpack and walks back."
+    hud_effect: "none"
+    story_template: "{actor} picked up the work from a handoff note."
+    trace_row: "predecessor={data.predecessor} verification_passed={data.verification_passed}"
+    data_schema: events/data/agent.context_handoff_completed.schema.json
+    fixture: fixtures/events/valid/agent.context_handoff_completed.json
+  skill.loaded:
+    family: skill
+    verb: loaded
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A book flies from the Library to the agent; its role card glows."
+    hud_effect: "none"
+    story_template: "{actor} loaded the {data.skill} skill, version {data.version}."
+    trace_row: "skill={data.skill} version={data.version}"
+    data_schema: events/data/skill.loaded.schema.json
+    fixture: fixtures/events/valid/skill.loaded.json
+  question.routed:
+    family: question
+    verb: routed
+    priority: must
+    pillar: P2
+    default_severity: needs_you
+    side_effect: false
+    world_effect: "The agent walks to Your Desk or the Expert Office."
+    hud_effect: "The question card opens in the needs-you queue and the chosen channels."
+    story_template: "{actor} asked {target} a question."
+    trace_row: "card={data.card_id} domain={data.domain}"
+    data_schema: events/data/question.routed.schema.json
+    fixture: fixtures/events/valid/question.routed.json
+  question.answered:
+    family: question
+    verb: answered
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A sealed note returns to the agent."
+    hud_effect: "The question card closes on every channel."
+    story_template: "The question is answered ({data.answered_by})."
+    trace_row: "answered_by={data.answered_by}"
+    data_schema: events/data/question.answered.schema.json
+    fixture: fixtures/events/valid/question.answered.json
+  meeting.called:
+    family: meeting
+    verb: called
+    priority: must
+    pillar: P4
+    default_severity: needs_you
+    side_effect: false
+    world_effect: "The Meeting Hall bell rings."
+    hud_effect: "A meeting card opens for the invitees."
+    story_template: "{actor} called a meeting at {target}."
+    trace_row: "card={data.card_id}"
+    data_schema: events/data/meeting.called.schema.json
+    fixture: fixtures/events/valid/meeting.called.json
+  meeting.started:
+    family: meeting
+    verb: started
+    priority: must
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "The invitees gather in the Meeting Hall."
+    hud_effect: "none"
+    story_template: "The meeting at {target} started."
+    trace_row: "started"
+    data_schema: events/data/meeting.started.schema.json
+    fixture: fixtures/events/valid/meeting.started.json
+  meeting.decision:
+    family: meeting
+    verb: decision
+    priority: must
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "A sealed decision card goes to the Town Hall."
+    hud_effect: "The meeting card closes on every channel."
+    story_template: "The meeting decided ({data.decided_by})."
+    trace_row: "decided_by={data.decided_by} option={data.option}"
+    data_schema: events/data/meeting.decision.schema.json
+    fixture: fixtures/events/valid/meeting.decision.json
+  meeting.ended:
+    family: meeting
+    verb: ended
+    priority: must
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "The invitees leave the Meeting Hall."
+    hud_effect: "none"
+    story_template: "The meeting at {target} ended."
+    trace_row: "ended"
+    data_schema: events/data/meeting.ended.schema.json
+    fixture: fixtures/events/valid/meeting.ended.json
+  connection.requested:
+    family: connection
+    verb: requested
+    priority: must
+    pillar: P6
+    default_severity: needs_you
+    side_effect: false
+    world_effect: "Bridge scaffolding goes up toward the island."
+    hud_effect: "A consent card opens on the web."
+    story_template: "{actor} asked to connect {data.connector}."
+    trace_row: "connector={data.connector} card={data.card_id}"
+    data_schema: events/data/connection.requested.schema.json
+    fixture: fixtures/events/valid/connection.requested.json
+  connection.consented:
+    family: connection
+    verb: consented
+    priority: must
+    pillar: P6
+    default_severity: info
+    side_effect: true
+    authz_by: [person]
+    world_effect: "The scaffold is finished and the bridge is ready to open."
+    hud_effect: "The consent card closes."
+    story_template: "{actor} allowed access to {data.connector}."
+    trace_row: "connector={data.connector} card={data.card_id}"
+    data_schema: events/data/connection.consented.schema.json
+    fixture: fixtures/events/valid/connection.consented.json
+  connection.established:
+    family: connection
+    verb: established
+    priority: must
+    pillar: P6
+    default_severity: info
+    side_effect: false
+    world_effect: "The bridge opens."
+    hud_effect: "none"
+    story_template: "{data.connector} is connected."
+    trace_row: "connector={data.connector}"
+    data_schema: events/data/connection.established.schema.json
+    fixture: fixtures/events/valid/connection.established.json
+  connection.rate_limited:
+    family: connection
+    verb: rate_limited
+    priority: must
+    pillar: P6
+    default_severity: fyi
+    side_effect: false
+    world_effect: "Traffic cones on the bridge."
+    hud_effect: "none"
+    story_template: "{data.connector} asked Tilo to slow down for {data.retry_after_s} s."
+    trace_row: "connector={data.connector} retry_after_s={data.retry_after_s}"
+    data_schema: events/data/connection.rate_limited.schema.json
+    fixture: fixtures/events/valid/connection.rate_limited.json
+  connection.expiring:
+    family: connection
+    verb: expiring
+    priority: must
+    pillar: P6
+    default_severity: nudge
+    side_effect: false
+    world_effect: "The bridge flickers."
+    hud_effect: "A reconnect toast."
+    story_template: "Access to {data.connector} expires soon."
+    trace_row: "connector={data.connector} expires_at={data.expires_at}"
+    data_schema: events/data/connection.expiring.schema.json
+    fixture: fixtures/events/valid/connection.expiring.json
+  connection.expired:
+    family: connection
+    verb: expired
+    priority: must
+    pillar: P6
+    default_severity: needs_you
+    side_effect: false
+    world_effect: "The bridge planks drop."
+    hud_effect: "A reconnect card opens on the web."
+    story_template: "Access to {data.connector} expired."
+    trace_row: "connector={data.connector}"
+    data_schema: events/data/connection.expired.schema.json
+    fixture: fixtures/events/valid/connection.expired.json
+  connection.revoked:
+    family: connection
+    verb: revoked
+    priority: must
+    pillar: P6
+    default_severity: fyi
+    side_effect: false
+    world_effect: "Cloud cover returns over the island."
+    hud_effect: "none"
+    story_template: "Access to {data.connector} was removed."
+    trace_row: "connector={data.connector}"
+    data_schema: events/data/connection.revoked.schema.json
+    fixture: fixtures/events/valid/connection.revoked.json
+  data.transfer:
+    family: data
+    verb: transfer
+    priority: must
+    pillar: P6
+    default_severity: info
+    side_effect: true
+    authz_by: [person, policy, team_lead]
+    world_effect: "A truck crosses the bridge carrying a crate or scroll."
+    hud_effect: "The Autonomy log lists the action with its authorisation."
+    story_template: "Data crossed the {data.connector} bridge ({data.action_type})."
+    trace_row: "{data.direction} {data.action_type} via {data.connector} tier={data.risk_tier} outbox={data.outbox_id}"
+    data_schema: events/data/data.transfer.schema.json
+    fixture: fixtures/events/valid/data.transfer.json
+  channel.message_in:
+    family: channel
+    verb: message_in
+    priority: must
+    pillar: P5
+    default_severity: info
+    side_effect: false
+    world_effect: "A boat docks at the pier by Your Desk."
+    hud_effect: "none"
+    story_template: "A {data.channel} message arrived."
+    trace_row: "channel={data.channel} message={data.message_ref} card={data.card_id}"
+    data_schema: events/data/channel.message_in.schema.json
+    fixture: fixtures/events/valid/channel.message_in.json
+  channel.message_out:
+    family: channel
+    verb: message_out
+    priority: must
+    pillar: P5
+    default_severity: info
+    side_effect: false
+    world_effect: "A boat leaves the pier."
+    hud_effect: "none"
+    story_template: "Tilo sent a {data.channel} message."
+    trace_row: "channel={data.channel} message={data.message_ref} card={data.card_id}"
+    data_schema: events/data/channel.message_out.schema.json
+    fixture: fixtures/events/valid/channel.message_out.json
+  artifact.created:
+    family: artifact
+    verb: created
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The item appears in the agent's hands."
+    hud_effect: "none"
+    story_template: "{actor} made {target}."
+    trace_row: "artifact={data.artifact}"
+    data_schema: events/data/artifact.created.schema.json
+    fixture: fixtures/events/valid/artifact.created.json
+  artifact.reviewed:
+    family: artifact
+    verb: reviewed
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The Verifier stamps the item."
+    hud_effect: "none"
+    story_template: "{actor} checked {target}: {data.result}."
+    trace_row: "result={data.result}"
+    data_schema: events/data/artifact.reviewed.schema.json
+    fixture: fixtures/events/valid/artifact.reviewed.json
+  artifact.delivered:
+    family: artifact
+    verb: delivered
+    priority: must
+    pillar: P6
+    default_severity: info
+    side_effect: false
+    world_effect: "A parcel rolls to the Delivery Dock."
+    hud_effect: "A delivered toast with an Open button."
+    story_template: "{target} was delivered as {data.format}."
+    trace_row: "format={data.format}"
+    data_schema: events/data/artifact.delivered.schema.json
+    fixture: fixtures/events/valid/artifact.delivered.json
+  artifact.versioned:
+    family: artifact
+    verb: versioned
+    priority: must
+    pillar: P7
+    default_severity: info
+    side_effect: false
+    world_effect: "The version badge ticks up."
+    hud_effect: "none"
+    story_template: "{target} has a new version."
+    trace_row: "previous_version={data.previous_version}"
+    data_schema: events/data/artifact.versioned.schema.json
+    fixture: fixtures/events/valid/artifact.versioned.json
+  artifact.rolled_back:
+    family: artifact
+    verb: rolled_back
+    priority: must
+    pillar: P7
+    default_severity: info
+    side_effect: false
+    world_effect: "The version badge rewinds."
+    hud_effect: "none"
+    story_template: "{target} was restored to version {data.restored_version} as a new version."
+    trace_row: "restored_version={data.restored_version}"
+    data_schema: events/data/artifact.rolled_back.schema.json
+    fixture: fixtures/events/valid/artifact.rolled_back.json
+  approval.requested:
+    family: approval
+    verb: requested
+    priority: must
+    pillar: P4
+    default_severity: gate
+    side_effect: false
+    world_effect: "The agent waits at the gate holding the item."
+    hud_effect: "A gate card goes to every enabled channel at the highest priority."
+    story_template: "{actor} is waiting at a gate for approval."
+    trace_row: "gate={data.gate_id} action={data.action_type} tier={data.risk_tier} irreversible={data.irreversible}"
+    data_schema: events/data/approval.requested.schema.json
+    fixture: fixtures/events/valid/approval.requested.json
+  approval.resolved:
+    family: approval
+    verb: resolved
+    priority: must
+    pillar: P4
+    default_severity: info
+    side_effect: true
+    authz_by: [person, team_lead]
+    world_effect: "A person opens the gate, or it stays shut on edit or hold."
+    hud_effect: "The gate card closes on every channel."
+    story_template: "{actor} answered the gate: {data.option}."
+    trace_row: "gate={data.gate_id} option={data.option} via={data.channel} outbox={data.outbox_id}"
+    data_schema: events/data/approval.resolved.schema.json
+    fixture: fixtures/events/valid/approval.resolved.json
+  policy.applied:
+    family: policy
+    verb: applied
+    priority: must
+    pillar: P4
+    default_severity: info
+    side_effect: true
+    authz_by: [policy]
+    world_effect: "The gate opens with a policy stamp."
+    hud_effect: "The Autonomy log lists the action with Undo and Report."
+    story_template: "A policy opened the gate for {data.action_type}."
+    trace_row: "policy={data.policy_id} gate={data.gate_id} level={data.level} undo_window_s={data.undo_window_s}"
+    data_schema: events/data/policy.applied.schema.json
+    fixture: fixtures/events/valid/policy.applied.json
+  policy.changed:
+    family: policy
+    verb: changed
+    priority: must
+    pillar: P4
+    default_severity: info
+    side_effect: true
+    authz_by: [person]
+    world_effect: "A ledger flips at the Town Hall."
+    hud_effect: "The Autonomy settings show the new level."
+    story_template: "{actor} set a policy to {data.level}."
+    trace_row: "policy={data.policy_id} change={data.change} level={data.level}"
+    data_schema: events/data/policy.changed.schema.json
+    fixture: fixtures/events/valid/policy.changed.json
+  alert.raised:
+    family: alert
+    verb: raised
+    priority: must
+    pillar: P4
+    default_severity: fyi
+    side_effect: false
+    world_effect: "A flag or marker by severity (PRD 10.2)."
+    hud_effect: "Notifies by rung: Story, toast, needs-you queue or chosen channels (PRD 10.2)."
+    story_template: "Something needs attention at {target}."
+    trace_row: "alert={data.alert_id} card={data.card_id}"
+    data_schema: events/data/alert.raised.schema.json
+    fixture: fixtures/events/valid/alert.raised.json
+  alert.resolved:
+    family: alert
+    verb: resolved
+    priority: must
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "The flag or marker is cleared."
+    hud_effect: "The notification clears on every channel."
+    story_template: "The alert at {target} is cleared."
+    trace_row: "alert={data.alert_id}"
+    data_schema: events/data/alert.resolved.schema.json
+    fixture: fixtures/events/valid/alert.resolved.json
+  memory.hit:
+    family: memory
+    verb: hit
+    priority: must
+    pillar: P7
+    default_severity: info
+    side_effect: false
+    world_effect: "The agent's backpack glows."
+    hud_effect: "The credits-saved meter goes up."
+    story_template: "{actor} reused an earlier result and saved {data.saved} credits."
+    trace_row: "origin_cost={data.origin_cost} lookup_cost={data.lookup_cost} saved={data.saved}"
+    data_schema: events/data/memory.hit.schema.json
+    fixture: fixtures/events/valid/memory.hit.json
+  memory.saved:
+    family: memory
+    verb: saved
+    priority: must
+    pillar: P7
+    default_severity: info
+    side_effect: false
+    world_effect: "Items are deposited in the Memory Vault."
+    hud_effect: "none"
+    story_template: "{actor} saved {data.item_count} items to memory."
+    trace_row: "layer={data.layer} items={data.item_count}"
+    data_schema: events/data/memory.saved.schema.json
+    fixture: fixtures/events/valid/memory.saved.json
+  app.spec:
+    family: app
+    verb: spec
+    priority: could
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A blueprint appears at the App Studio."
+    hud_effect: "none"
+    story_template: "{actor} drew up an app spec."
+    trace_row: "spec={data.spec}"
+    data_schema: events/data/app.spec.schema.json
+    fixture: fixtures/events/valid/app.spec.json
+  app.building:
+    family: app
+    verb: building
+    priority: could
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "Smoke rises from the App Studio chimney."
+    hud_effect: "none"
+    story_template: "The app is being built."
+    trace_row: "spec={data.spec}"
+    data_schema: events/data/app.building.schema.json
+    fixture: fixtures/events/valid/app.building.json
+  app.tested:
+    family: app
+    verb: tested
+    priority: could
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The App Studio chimney stops smoking."
+    hud_effect: "none"
+    story_template: "The app's tests ran (passed: {data.passed})."
+    trace_row: "spec={data.spec} passed={data.passed}"
+    data_schema: events/data/app.tested.schema.json
+    fixture: fixtures/events/valid/app.tested.json
+  app.deployed:
+    family: app
+    verb: deployed
+    priority: could
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A kiosk opens outside the App Studio."
+    hud_effect: "none"
+    story_template: "The app is live."
+    trace_row: "spec={data.spec}"
+    data_schema: events/data/app.deployed.schema.json
+    fixture: fixtures/events/valid/app.deployed.json
+  app.refreshed:
+    family: app
+    verb: refreshed
+    priority: could
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The kiosk screen refreshes."
+    hud_effect: "none"
+    story_template: "The app refreshed its data."
+    trace_row: "spec={data.spec}"
+    data_schema: events/data/app.refreshed.schema.json
+    fixture: fixtures/events/valid/app.refreshed.json

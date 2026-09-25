@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/world.requested.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorldRequestedData",
+  "description": "data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "channel"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1, "maxLength": 140 },
+    "channel": { "$ref": "../../common.schema.json#/$defs/channel" }
+  }
+}

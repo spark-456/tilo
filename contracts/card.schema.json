@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/card.schema.json",
   "x-version": "1.0.0",
   "title": "Card",
-  "description": "One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout; it names one of the options and that option is reversible (contracts/card.rules.md CR-01 to CR-03). A gate's or consent card's is always hold, so a gate never times out to go and a consent card never times out to a grant; every hold option is reversible, only a gate may offer an irreversible option, and neither a gate nor a consent card is delegated to the Director. A gate's option ids are the closed set approve, edit, hold, each with a fixed label (Approve, Edit first, Hold); only approve opens the gate, and its irreversible flag equals the gate's (CR-07, CR-08). The deterministic card builder writes a gate card's gate details and options, never a model, and the card validator checks them against the plan gate, the connector action and the held side effect (CR-09 to CR-12).",
+  "description": "One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout; it names one of the options and that option is reversible (contracts/card.rules.md CR-01 to CR-03). A gate's or consent card's is always hold, so a gate never times out to go and a consent card never times out to a grant; every hold option is reversible, only a gate may offer an irreversible option, and neither a gate nor a consent card is delegated to the Director. A gate's option ids are the closed set approve, edit, hold, each with a fixed label (Approve, Edit first, Hold); only approve opens the gate, and its irreversible flag equals the gate's (CR-07, CR-08). A consent card's option ids are the closed set connect, hold with fixed labels Connect, Hold; only connect grants (CR-13). The deterministic card builder writes a gate card's gate details and options, never a model, and the card validator checks them against the plan gate, the connector action and the outbox entry the gate releases (CR-09 to CR-12).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -163,11 +163,35 @@
     },
     "if": { "properties": { "kind": { "const": "consent" } }, "required": ["kind"] },
     "then": {
-      "description": "Granting a connection is an authorisation: a consent card offers a hold option, holds by default so a timeout never grants it, and is never delegated to the Director.",
+      "description": "Granting a connection is an authorisation: a consent card holds by default so a timeout never grants it, and is never delegated to the Director. Its options are the closed set connect and hold, each exactly once, with fixed labels Connect and Hold, because the person taps the label; only connect grants the connection (CR-13).",
       "properties": {
         "rung": { "const": "consent" },
         "options": {
-          "contains": { "properties": { "id": { "const": "hold" } }, "required": ["id"] }
+          "items": {
+            "properties": { "id": { "enum": ["connect", "hold"] } },
+            "allOf": [
+              {
+                "if": { "properties": { "id": { "const": "connect" } }, "required": ["id"] },
+                "then": { "properties": { "label": { "const": "Connect" } } }
+              },
+              {
+                "if": { "properties": { "id": { "const": "hold" } }, "required": ["id"] },
+                "then": { "properties": { "label": { "const": "Hold" } } }
+              }
+            ]
+          },
+          "allOf": [
+            {
+              "contains": { "properties": { "id": { "const": "connect" } }, "required": ["id"] },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": { "properties": { "id": { "const": "hold" } }, "required": ["id"] },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
         },
         "safe_default": { "const": "hold" },
         "actions": { "items": { "enum": ["show_me", "snooze"] } },
@@ -229,7 +253,7 @@
       "then": { "required": ["reason"], "properties": { "irreversible": { "const": false } } }
     },
     "gate": {
-      "description": "The exact action a gate card holds. The deterministic card builder copies it from the plan gate, the connector action and the held side effect; the card validator rejects any mismatch (card.rules.md CR-09 to CR-12).",
+      "description": "The exact action a gate card holds. The deterministic card builder copies it from the plan gate, the connector action and the proposed side effect (the outbox entry the gate releases); the card validator rejects any mismatch (card.rules.md CR-09 to CR-12).",
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "action", "recipients", "irreversible", "risk_tier"],

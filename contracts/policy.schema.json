@@ -158,19 +158,21 @@
       "additionalProperties": false,
       "required": ["condition", "raises_to"],
       "properties": {
-        "condition": {
-          "type": "string",
-          "enum": [
-            "new_recipients",
-            "attachments",
-            "external_sharing",
-            "deletion",
-            "money_or_legal",
-            "safety_flag"
-          ]
-        },
+        "condition": { "$ref": "#/$defs/tier_condition" },
         "raises_to": { "const": "T3" }
       }
+    },
+    "tier_condition": {
+      "description": "A PRD 10.4 context condition that raises any action to T3; also listed on the outbox entry it applies to (outbox.schema.json modifiers).",
+      "type": "string",
+      "enum": [
+        "new_recipients",
+        "attachments",
+        "external_sharing",
+        "deletion",
+        "money_or_legal",
+        "safety_flag"
+      ]
     },
     "max_level": {
       "description": "Highest autonomy level per tier; T3 is always L1 (a person).",

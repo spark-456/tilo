@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/app.tested.schema.json",
+  "x-version": "1.0.0",
+  "title": "AppTestedData",
+  "description": "data of app.tested (PRD 9.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spec", "passed"],
+  "properties": {
+    "spec": { "$ref": "../../common.schema.json#/$defs/artifact_ref" },
+    "passed": { "type": "boolean" }
+  }
+}
