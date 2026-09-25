@@ -2,3 +2,5 @@
 - [Test vs API-doc conflicts](test-vs-api-doc-conflicts.md) — tests contradicting their API_*.md push builders into silent "repair" writes
 - [SE size overruns](se-session-size-overruns.md) — P8 tickets exceed 400 lines, ship unused helpers, undeclared package deps
 - [ProviderError base class escapes](provider-error-base-class.md) — adapters raise bare ProviderError; routers catching 4 subtypes leak it
+- [Router per-profile checks](router-per-profile-checks.md) — cap/tokenizer checked once for first candidate; fallbacks sent over cap
+- [Idempotency resubmit probe](idempotency-resubmit-probe.md) — id-keyed stores overwrite on duplicate submit and reopen resolved gates
