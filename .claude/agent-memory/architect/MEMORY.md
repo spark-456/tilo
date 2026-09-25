@@ -1,1 +1,1 @@
-- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS alias/tuple quirks, invalid fixtures must fail schema, pin safety lists, bind author stamps to owner, BQ id clashes
+- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS alias/tuple quirks, invalid fixtures must fail schema, pin safety lists, bind author stamps to owner, policy/L2/gate-answerer binding, CRLF, BQ id clashes

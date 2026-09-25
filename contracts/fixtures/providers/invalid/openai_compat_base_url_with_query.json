@@ -1,0 +1,36 @@
+{
+  "models": {
+    "example": true,
+    "profiles": {
+      "generic-oai": {
+        "provider": "openai_compat",
+        "model": "example-openai-compatible-model",
+        "context": 128000,
+        "caps": ["json", "tools"],
+        "base_url": "https://api.example.com/v1?key=placeholder",
+        "api_key_env": "EXAMPLE_API_KEY"
+      }
+    },
+    "roles": {
+      "specialist": {
+        "primary": "generic-oai"
+      }
+    },
+    "rules": {
+      "deny": ["*-preview*"]
+    }
+  },
+  "prices": {
+    "status": "unset",
+    "effective_date": null,
+    "source": null,
+    "currency": "USD",
+    "credit_usd": 0.005,
+    "profiles": {
+      "generic-oai": {
+        "input": null,
+        "output": null
+      }
+    }
+  }
+}

@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import copy
 import pathlib
+import socket as socket_module
 
 import pytest
 import yaml
+from _fake_genai_sdk import fake_genai_sdk  # noqa: F401 -- re-exported so pytest can discover it
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 
@@ -28,6 +30,33 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 @pytest.fixture(scope="session")
 def repo_root() -> pathlib.Path:
     return REPO_ROOT
+
+
+# Ticket P0-05 (PL-02, EFF-01): "no test may open a real network connection".
+# Autouse so it covers every test in this directory, including ones ticket
+# P0-05 writes for adapters that build a real SDK/httpx client -- a stray
+# unmocked call fails loudly here instead of hanging or hitting a live model.
+# httpx.MockTransport and the google.genai sys.modules fakes (see
+# _fake_genai_sdk.py) never reach socket.socket.connect at all, so this is
+# defence in depth, not the primary mocking mechanism.
+_LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+@pytest.fixture(autouse=True)
+def block_non_local_sockets(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_connect = socket_module.socket.connect
+
+    def guarded_connect(self: socket_module.socket, address: object, *args: object, **kwargs: object) -> object:
+        host = address[0] if isinstance(address, tuple) else address
+        if host not in _LOOPBACK_HOSTS:
+            raise RuntimeError(
+                "packages/providers tests must not open real network connections (EFF-01: dev/CI make no "
+                f"paid calls unless LIVE=1) -- blocked socket connect to {address!r}. Use a fake provider, "
+                "an injected fake SDK client, or httpx.MockTransport instead."
+            )
+        return real_connect(self, address, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(socket_module.socket, "connect", guarded_connect)
 
 
 # A minimal but schema-shaped config/models.yaml + config/prices.yaml pair

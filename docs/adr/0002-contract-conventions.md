@@ -137,6 +137,17 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     one list. Consent cards get closed option ids `connect` and `hold` with fixed labels, like
     gates (CR-13). Changes made before the CP0 freeze keep version 1.0.0. The event contract's
     own decisions are in ADR-0005.
+11. **providers 1.1.0 (additive, 2026-09-25, ticket P0-02b, PL-02, BQ-33).** `$defs.profile` gains
+    two optional fields for the generic OpenAI-compatible adapter (ADR-0003 decision 2):
+    `base_url` (https only, with no user info, query or fragment, so a credential cannot sit in
+    the URL, PRD 16.1 rule 4; `format: uri`, at most 512 characters) and `api_key_env` (the
+    name of an environment variable, `^[A-Z][A-Z0-9_]{2,63}$`, never the key). An `if`/`else`
+    allows them only when `provider` is `openai_compat`; other profiles, `google` included,
+    must not carry them. Both are optional and independent. `format: uri` is documentation;
+    the pattern is what validators enforce. Each field also has `not: {pattern: "\n"}`,
+    because a Python JSON Schema validator's `$` matches before a final line break. The Python generator maps `string` + `uri` to `str`
+    (`--type-mappings`), so the generated field keeps its pattern and length instead of
+    becoming pydantic `AnyUrl`, which would drop both.
 
 ## Consequences
 - Builders import `tilo_contracts` or `@tilo/contracts` and never hand-write these shapes.

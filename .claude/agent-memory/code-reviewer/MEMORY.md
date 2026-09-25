@@ -2,3 +2,6 @@
 - [Harness single-writer probe](harness-single-writer-probe.md) — race two writers with the same writer_id; commit must CAS head.last_seq
 - [Flaky timing tests](flaky-timing-tests.md) — run suite 2-3x; tight wall-clock bounds in linear-time tests flake under load
 - [Skill checker probes](skill-checker-probes.md) — FR-AGT-04 check.py: mutate example outputs; refs checked for existence, not value/row match
+- [Test vs API-doc conflicts](test-vs-api-doc-conflicts.md) — tests contradicting their API_*.md push builders into silent "repair" writes
+- [SE size overruns](se-session-size-overruns.md) — P8 tickets exceed 400 lines, ship unused helpers, undeclared package deps
+- [ProviderError base class escapes](provider-error-base-class.md) — adapters raise bare ProviderError; routers catching 4 subtypes leak it
