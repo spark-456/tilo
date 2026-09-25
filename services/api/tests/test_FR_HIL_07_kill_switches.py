@@ -3,20 +3,29 @@ policies to L1 in <= 5 s; confirmed on every channel." PI-13 and PI-18
 (docs/security/p4-policy-invariants.md): Stop all autopilot sets every policy to L1, one
 `policy.changed` per policy, only the owner may do it, and one writer per world stamps every
 event -- tilo-api itself never does. Routes and shapes pinned in
-services/api/tests/API_ST3a.md (round 2, after code/security/qa review round 1 failed on: an
-invented run_id and an O(n^2) seq scan, a 403/404 membership oracle, half-applied Stop-alls on
-malformed policies, an unvalidated pause channel, and policy.changed always broadcast vis: "all").
+services/api/tests/API_ST3a.md (round 3, after code/security/qa review round 2 failed on: a
+policy read as L1 being skipped even when its own history disagreed (silent history repair), a
+kill switch that could not lower autonomy when the event writer was down, two concurrent kill
+switches double-writing, and policy.changed's vis carrying a district id foreign to the target
+world's own layout). Round 1's fixes (run_id/seq stamping, the 403/404 membership oracle,
+half-applied Stop-alls, the pause channel enum, and policy.changed's per-scope vis) are unchanged
+here and still pinned below.
 """
 
 from __future__ import annotations
 
+import json
 import pathlib
+import threading
 import time
 
 from _api_lib import (
     OWNER,
     WORLD,
+    FlakyEventWriter,
+    SlowEventWriter,
     as_principal,
+    as_writer,
     assert_part_carries_no_stamped_fields,
     base_policy,
     make_district,
@@ -439,7 +448,32 @@ def test_FR_HIL_07_stop_all_fails_safe_on_malformed_history_and_level(client, st
 
 
 _LEVELS = st.sampled_from(["L0", "L1", "L2", "L3", None, "not_a_real_level"])
-_HISTORY_SHAPES = st.sampled_from(["normal", "missing", "not_a_list", "empty_list"])
+# Round-3 code-review finding (biggest): "normal" was replaced with two distinct shapes because
+# the old single "normal" shape built history from base_policy(level="L2") and then overwrote
+# policy["level"] separately -- so a case with level="L1" silently got a *mismatched* history
+# (last entry "L2") and the old test still asserted it was skipped as already_l1. That was wrong:
+# a policy read as L1 is only left alone when its own history agrees. "matches_level" and
+# "mismatched_level" below make that distinction explicit and deliberate instead of accidental.
+_HISTORY_SHAPES = st.sampled_from(["matches_level", "mismatched_level", "missing", "not_a_list", "empty_list"])
+
+
+def _history_for(level: str | None, hist_shape: str) -> list[dict] | str | None:
+    """Builds the history shape a case asks for. `level` may itself be malformed (None or
+    "not_a_real_level"); "matches_level"/"mismatched_level" fall back to a plain "L2" entry for
+    the malformed-level cases since there is nothing valid to (mis)match against -- the level
+    fail-safe rule (not one of L0..L3 -> always lowered) dominates regardless of history there."""
+    valid_level = level if level in ("L0", "L1", "L2", "L3") else "L2"
+    if hist_shape == "missing":
+        return None  # caller deletes the key entirely
+    if hist_shape == "not_a_list":
+        return "oops"
+    if hist_shape == "empty_list":
+        return []
+    if hist_shape == "matches_level":
+        return [{"by": OWNER, "at": "2026-09-29T09:00:00.000Z", "change": "prior", "level": valid_level}]
+    # mismatched_level: pick something guaranteed different from valid_level.
+    other = "L3" if valid_level != "L3" else "L2"
+    return [{"by": OWNER, "at": "2026-09-29T09:00:00.000Z", "change": "prior", "level": other}]
 
 
 @st.composite
@@ -451,13 +485,20 @@ def _kill_switch_case(draw):
     return list(zip(levels, history_shapes, mapped))
 
 
-@settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=40, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(case=_kill_switch_case())
 def test_FR_HIL_07_PI_13_stop_all_never_half_applies_property(client, store, writer, case):
     """Property: whatever mix of well-formed, malformed and unmapped policies an owner has,
     Stop-all never raises, every one of them not already at L0 ends at L1 with exactly one new
     policy.changed each, and the response's stopped/already_l1 counts match -- no partial
-    application, whatever order the store's dict iterates in."""
+    application, whatever order the store's dict iterates in.
+
+    Round-3 code-review finding (biggest, "no silent history repair"): a policy read as L1 is
+    left alone (already_l1, no new history entry, no event) only when its own history agrees --
+    last entry also "L1". A policy at L1 whose history ends at a different level, or is missing,
+    not a list, or empty, is an *inconsistent* record: Stop-all lowers it through the exact same
+    normal path as any other policy (one new history entry, one policy.changed, counted in
+    "stopped"), never silently left alone and never silently "repaired" without an audit trail."""
     store.worlds.clear()
     store.policies.clear()
     store.policy_worlds.clear()
@@ -467,24 +508,27 @@ def test_FR_HIL_07_PI_13_stop_all_never_half_applies_property(client, store, wri
     pids: list[str] = []
     expected_stopped = 0
     expected_already_l1 = 0
+    already_l1_pids: set[str] = set()
     for i, (level, hist_shape, mapped) in enumerate(case):
         pid = f"pol_case_{i}"
         pids.append(pid)
         policy = base_policy(id_=pid, owner=OWNER, level="L2")
         policy["level"] = level
-        if hist_shape == "missing":
+        history = _history_for(level, hist_shape)
+        if history is None:
             del policy["history"]
-        elif hist_shape == "not_a_list":
-            policy["history"] = "oops"
-        elif hist_shape == "empty_list":
-            policy["history"] = []
+        else:
+            policy["history"] = history
         store.policies[pid] = policy
         if mapped:
             store.policy_worlds[pid] = WORLD
+
+        is_consistent_l1 = level == "L1" and hist_shape == "matches_level"
         if level == "L0":
             pass
-        elif level == "L1":
+        elif is_consistent_l1:
             expected_already_l1 += 1
+            already_l1_pids.add(pid)
         else:
             expected_stopped += 1
 
@@ -497,18 +541,87 @@ def test_FR_HIL_07_PI_13_stop_all_never_half_applies_property(client, store, wri
     assert body["already_l1"] == expected_already_l1
 
     expected_changed_ids = set()
-    for pid, (level, _, _) in zip(pids, case):
+    for pid, (level, hist_shape, _) in zip(pids, case):
         if level == "L0":
             assert store.policies[pid]["level"] == "L0"
         else:
             assert store.policies[pid]["level"] == "L1"
             assert isinstance(store.policies[pid]["history"], list)
             assert store.policies[pid]["history"][-1]["level"] == "L1"
-            if level != "L1":
+            if pid in already_l1_pids:
+                # Left alone: exactly the one pre-existing entry, never rewritten or repaired.
+                assert len(store.policies[pid]["history"]) == 1
+                assert store.policies[pid]["history"][-1]["change"] == "prior"
+            else:
                 expected_changed_ids.add(pid)
+                assert store.policies[pid]["history"][-1]["change"] == "stop_all"
 
     changed_ids = {e["data"]["policy_id"] for e in store.events.get(WORLD, []) if e["type"] == "policy.changed"}
     assert changed_ids == expected_changed_ids
+
+
+def test_FR_HIL_07_no_silent_history_repair_for_inconsistent_l1(client, store, writer):
+    """code-review finding (biggest, round 3): a policy already at level L1 is only left alone
+    when its own history agrees (last entry also L1) -- true idempotency. A policy that merely
+    reads level == "L1" while its history disagrees (ends at another level, or is empty) is an
+    inconsistent record, not a repeat Stop-all: it must go through the exact same normal path as
+    any other policy Stop-all lowers -- one new history entry (by/at/change/level), one
+    policy.changed, and counted in "stopped" -- never silently left as-is and never silently
+    "repaired" without an audit trail."""
+    store.worlds[WORLD] = make_world(owner=OWNER)
+
+    store.policies["pol_consistent_l1"] = base_policy(
+        id_="pol_consistent_l1",
+        owner=OWNER,
+        level="L1",
+        history=[{"by": OWNER, "at": "2026-09-29T09:00:00.000Z", "change": "revoked", "level": "L1"}],
+    )
+    store.policy_worlds["pol_consistent_l1"] = WORLD
+
+    store.policies["pol_mismatched_l1"] = base_policy(
+        id_="pol_mismatched_l1",
+        owner=OWNER,
+        level="L1",
+        history=[{"by": OWNER, "at": "2026-09-29T09:00:00.000Z", "change": "Created", "level": "L2"}],
+    )
+    store.policy_worlds["pol_mismatched_l1"] = WORLD
+
+    store.policies["pol_empty_history_l1"] = base_policy(
+        id_="pol_empty_history_l1", owner=OWNER, level="L1", history=[]
+    )
+    store.policy_worlds["pol_empty_history_l1"] = WORLD
+
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["already_l1"] == 1  # only pol_consistent_l1
+    assert body["stopped"] == 2  # pol_mismatched_l1 and pol_empty_history_l1
+
+    consistent = store.policies["pol_consistent_l1"]
+    assert len(consistent["history"]) == 1, "a truly consistent L1 policy is left alone -- no new entry"
+    assert consistent["history"][0]["change"] == "revoked"  # unchanged, not rewritten
+
+    mismatched = store.policies["pol_mismatched_l1"]
+    assert len(mismatched["history"]) == 2
+    assert mismatched["history"][-1] == {
+        "by": OWNER,
+        "at": mismatched["history"][-1]["at"],
+        "change": "stop_all",
+        "level": "L1",
+    }
+
+    empty_hist = store.policies["pol_empty_history_l1"]
+    assert len(empty_hist["history"]) == 1
+    assert empty_hist["history"][-1]["change"] == "stop_all"
+    assert empty_hist["history"][-1]["level"] == "L1"
+
+    changed_ids = {e["data"]["policy_id"] for e in store.events[WORLD] if e["type"] == "policy.changed"}
+    assert changed_ids == {"pol_mismatched_l1", "pol_empty_history_l1"}
+    assert "pol_consistent_l1" not in changed_ids
+    for e in store.events[WORLD]:
+        validate_event(e)
 
 
 def test_FR_HIL_07_policy_changed_vis_matches_the_policys_scope_districts(client, store, writer):
@@ -545,3 +658,243 @@ def test_FR_HIL_07_policy_changed_vis_matches_the_policys_scope_districts(client
     seen_policy_ids = {e["data"]["policy_id"] for e in events_resp.json()["events"] if e["type"] == "policy.changed"}
     assert "pol_open" in seen_policy_ids
     assert "pol_scoped" not in seen_policy_ids
+
+
+def test_FR_HIL_07_EV_13_policy_changed_vis_is_the_intersection_with_the_worlds_layout(client, store, writer):
+    """EV-13 (contracts/event.rules.md): "every district vis lists exists in the world's
+    layout." A policy's own scope.districts may name a district that is not part of the world
+    Stop-all is run against at all (policies live at org level, PRD 15.3, with no world_id of
+    their own): vis must be the *intersection* of scope.districts with this world's own
+    districts, never a foreign district id. When that intersection is empty -- every scoped
+    district is foreign to this world, or scope.districts was empty to begin with -- vis falls
+    back to "all" (round-3 security finding b; the fallback itself is logged as an open question
+    in API_ST3a.md, since the contract has no owner-only vis to fall back to instead)."""
+    real_district = "D1"
+    phantom_district = "D77"  # not in this world's layout at all
+    store.worlds[WORLD] = make_world(
+        owner=OWNER, districts={real_district: make_district("Mail", "Triaging the inbox")}
+    )
+
+    store.policies["pol_mixed"] = base_policy(
+        id_="pol_mixed", owner=OWNER, level="L2", districts=(real_district, phantom_district)
+    )
+    store.policy_worlds["pol_mixed"] = WORLD
+
+    store.policies["pol_all_foreign"] = base_policy(
+        id_="pol_all_foreign", owner=OWNER, level="L2", districts=(phantom_district,)
+    )
+    store.policy_worlds["pol_all_foreign"] = WORLD
+
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert resp.status_code == 200, resp.text
+
+    by_policy = {e["data"]["policy_id"]: e for e in store.events[WORLD] if e["type"] == "policy.changed"}
+    assert by_policy["pol_mixed"]["vis"] == [real_district], "the foreign district must be dropped, not kept"
+    assert by_policy["pol_all_foreign"]["vis"] == "all", "an empty intersection falls back to all"
+    for e in by_policy.values():
+        assert phantom_district not in json.dumps(e)
+        validate_event(e)
+
+
+# ---------------------------------------------------------------------------
+# Round-3 findings 2 and 3: the event writer going down must never stop a kill switch from
+# actually lowering autonomy (FR-HIL-07's <= 5s budget is about autonomy actually lowering, not
+# about the audit trail landing at the same instant), and pending parts must be written exactly
+# once each when the writer works again. Concurrent kill switches must not double-write either.
+
+
+def test_FR_HIL_07_stop_all_lowers_policies_even_when_the_writer_is_down(client, store):
+    """qa/security finding (biggest): autopilot must actually stop even when the harness (the
+    event writer) is unreachable. Every targeted policy is still lowered to L1; the policy.changed
+    parts that could not be handed to the writer are kept as pending parts in the store rather
+    than lost, and the response is never a 500."""
+    ids = _world_with_policies(store, 4, level="L2")
+    flaky = FlakyEventWriter(store, failing=True)
+    as_writer(flaky)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    started = time.monotonic()
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    elapsed = time.monotonic() - started
+
+    assert resp.status_code in (200, 202), resp.text
+    assert elapsed <= 5.0, f"stop-all took {elapsed:.2f}s with the writer down, must still be <= 5s"
+    body = resp.json()
+    assert body["stopped"] == len(ids)
+    assert body["pending"] == len(ids)
+    for pid in ids:
+        assert store.policies[pid]["level"] == "L1"
+        assert store.policies[pid]["history"][-1]["change"] == "stop_all"
+    assert store.events.get(WORLD, []) == [], "nothing actually reached the (down) writer"
+    pending = store.pending_events.get(WORLD, [])
+    assert len(pending) == len(ids)
+    for part in pending:
+        assert part["type"] == "policy.changed"
+        assert_part_carries_no_stamped_fields(part)
+
+
+def test_FR_HIL_07_stop_all_partial_writer_failure_keeps_only_the_unwritten_parts_pending(client, store):
+    """The writer can fail partway through a single Stop-all, not just be entirely down: some
+    policy.changed parts land, others don't. Every targeted policy is still lowered to L1; only
+    the parts that actually failed become pending, the rest are written normally."""
+    ids = _world_with_policies(store, 5, level="L2")
+    flaky = FlakyEventWriter(store, failing=False, fail_first_n=2)
+    as_writer(flaky)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+
+    assert resp.status_code in (200, 202), resp.text
+    body = resp.json()
+    assert body["stopped"] == len(ids)
+    assert body["pending"] == 2
+    for pid in ids:
+        assert store.policies[pid]["level"] == "L1"
+
+    written = {e["data"]["policy_id"] for e in store.events.get(WORLD, [])}
+    pending_ids = {p["data"]["policy_id"] for p in store.pending_events.get(WORLD, [])}
+    assert len(written) == 3
+    assert len(pending_ids) == 2
+    assert written | pending_ids == set(ids)
+    assert written.isdisjoint(pending_ids)
+
+
+def test_FR_HIL_07_pending_events_are_flushed_exactly_once_when_the_writer_recovers(client, store):
+    """Across the failure and the retry, each lowered policy has exactly one policy.changed in
+    the stream -- never zero (lost), never two (duplicated). API_ST3a.md pins the flush trigger as
+    "the next mutating call against this world": a second Stop-all, even though it is a no-op for
+    the already-L1 policies themselves, still flushes what an earlier failed call left pending."""
+    ids = _world_with_policies(store, 3, level="L2")
+    flaky = FlakyEventWriter(store, failing=True)
+    as_writer(flaky)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    first = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert first.status_code in (200, 202), first.text
+    assert first.json()["pending"] == len(ids)
+    assert store.events.get(WORLD, []) == []
+
+    flaky.failing = False  # "the harness" is back up
+
+    second = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert second.status_code == 200, second.text
+    assert second.json()["stopped"] == 0
+    assert second.json()["already_l1"] == len(ids)
+    assert second.json()["pending"] == 0
+    assert store.pending_events.get(WORLD, []) == []
+
+    changed = [e for e in store.events[WORLD] if e["type"] == "policy.changed"]
+    assert len(changed) == len(ids), "each pending part must be written exactly once, never dropped or duplicated"
+    assert {e["data"]["policy_id"] for e in changed} == set(ids)
+    for e in changed:
+        validate_event(e)
+
+
+def test_FR_HIL_07_pause_all_still_pauses_and_lowers_when_the_writer_is_down(client, store):
+    """Pause's world.paused follows the same rule as Stop-all's policy.changed: the writer being
+    down must not stop Pause from actually pausing and lowering autonomy."""
+    ids = _world_with_policies(store, 2, level="L3")
+    flaky = FlakyEventWriter(store, failing=True)
+    as_writer(flaky)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+
+    assert resp.status_code in (200, 202), resp.text
+    body = resp.json()
+    assert body["paused"] is True
+    assert body["pending"] == len(ids) + 1  # every policy.changed plus the world.paused part
+    for pid in ids:
+        assert store.policies[pid]["level"] == "L1"
+    assert store.events.get(WORLD, []) == []
+    pending_types = {p["type"] for p in store.pending_events.get(WORLD, [])}
+    assert pending_types == {"policy.changed", "world.paused"}
+
+    flaky.failing = False
+    second = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+    assert second.status_code == 200, second.text
+    assert second.json()["pending"] == 0
+    paused_events = [e for e in store.events[WORLD] if e["type"] == "world.paused"]
+    assert len(paused_events) == 1
+    changed = [e for e in store.events[WORLD] if e["type"] == "policy.changed"]
+    assert len(changed) == len(ids)
+
+
+def test_FR_HIL_07_concurrent_stop_alls_produce_exactly_one_change_per_policy(client, store):
+    """qa finding (biggest): two concurrent Stop-all requests (the owner double-tapping the
+    button, or app and WhatsApp racing) against a slow writer must not each independently see
+    every policy at L2 and both lower + emit for it. Exactly one policy.changed and one stop_all
+    history entry per policy survive the race."""
+    ids = _world_with_policies(store, 6, level="L2")
+    slow = SlowEventWriter(store, delay_s=0.05)
+    as_writer(slow)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    barrier = threading.Barrier(2)
+    responses: list = []
+    errors: list = []
+
+    def call():
+        try:
+            barrier.wait(timeout=5)
+            responses.append(client.post(f"/worlds/{WORLD}/autopilot/stop"))
+        except Exception as exc:  # pragma: no cover - surfaced via the assert below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=call) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+
+    assert not errors, errors
+    assert len(responses) == 2
+    for r in responses:
+        assert r.status_code in (200, 202), r.text
+
+    for pid in ids:
+        stop_all_entries = [h for h in store.policies[pid]["history"] if h.get("change") == "stop_all"]
+        assert len(stop_all_entries) == 1, f"{pid}: {len(stop_all_entries)} stop_all history entries"
+        assert store.policies[pid]["level"] == "L1"
+
+    changed = [e for e in store.events.get(WORLD, []) if e["type"] == "policy.changed"]
+    by_policy: dict[str, list] = {}
+    for e in changed:
+        by_policy.setdefault(e["data"]["policy_id"], []).append(e)
+    for pid in ids:
+        assert len(by_policy.get(pid, [])) == 1, f"{pid}: {len(by_policy.get(pid, []))} policy.changed events"
+
+
+def test_FR_HIL_07_concurrent_pause_alls_produce_exactly_one_world_paused(client, store):
+    """Pause's world.paused follows the same one-event rule as Stop-all's policy.changed under
+    concurrency (round-3 qa finding)."""
+    _world_with_policies(store, 3, level="L2")
+    slow = SlowEventWriter(store, delay_s=0.05)
+    as_writer(slow)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    barrier = threading.Barrier(2)
+    responses: list = []
+    errors: list = []
+
+    def call():
+        try:
+            barrier.wait(timeout=5)
+            responses.append(client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"}))
+        except Exception as exc:  # pragma: no cover - surfaced via the assert below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=call) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+
+    assert not errors, errors
+    assert len(responses) == 2
+    for r in responses:
+        assert r.status_code in (200, 202), r.text
+
+    paused_events = [e for e in store.events.get(WORLD, []) if e["type"] == "world.paused"]
+    assert len(paused_events) == 1, f"expected exactly one world.paused, got {len(paused_events)}"
