@@ -151,34 +151,10 @@ def _find_pem_spans(text: str) -> list[tuple[int, int]]:
     return spans
 
 
-def _has_split_key(value: Any) -> bool:
-    """True when a private key -- whole or partial -- spans more than one string
-    of the tree. Every string (keys before their values, in order) is joined
-    and scanned once, so a key stored as a list of lines, split across dict
-    entries or log args, reordered, or cut into chunks through its own BEGIN
-    and END lines is still found. Redacting such pieces one by one cannot be
-    made safe, so the whole value is withheld instead. Iterative, depth-capped
-    like the redactor, linear in the total text, and fail closed past
-    _MAX_JOINED_CHARS."""
-    pieces: list[str] = []
-    total = 0
-    stack: list[tuple[Any, int]] = [(value, 0)]
-    while stack:
-        node, depth = stack.pop()
-        if depth > _MAX_DEPTH:
-            continue
-        if isinstance(node, str):
-            pieces.append(node)
-            total += len(node)
-            if total > _MAX_JOINED_CHARS:
-                return True
-        elif isinstance(node, dict):
-            for key, child in reversed(list(node.items())):
-                stack.append((child, depth + 1))
-                if isinstance(key, str):
-                    stack.append((key, depth + 1))
-        elif isinstance(node, (list, tuple)):
-            stack.extend((child, depth + 1) for child in reversed(node))
+def _spans_cross_pieces(pieces: list[str]) -> bool:
+    """True when a PEM span in the join of `pieces` covers more than one piece."""
+    if len(pieces) < 2:
+        return False
     ends: list[int] = []
     offset = 0
     for piece in pieces:
@@ -188,6 +164,43 @@ def _has_split_key(value: Any) -> bool:
         if bisect.bisect_right(ends, start) != bisect.bisect_right(ends, end - 1):
             return True
     return False
+
+
+def _has_split_key(value: Any) -> bool:
+    """True when a private key -- whole or partial -- spans more than one string
+    of the tree. Every string is collected in order (dict keys before their
+    values) and three joins are scanned: all strings, values only and keys
+    only, so a key cut into chunks through its own BEGIN and END lines is found
+    whatever text sits between the chunks -- a list of lines, dict values under
+    any keys, dict keys, or log args. Redacting such pieces one by one cannot
+    be made safe, so the whole value is withheld instead. Iterative,
+    depth-capped like the redactor, linear in the total text, and fail closed
+    past _MAX_JOINED_CHARS."""
+    pieces: list[tuple[str, bool]] = []
+    total = 0
+    stack: list[tuple[Any, int, bool]] = [(value, 0, False)]
+    while stack:
+        node, depth, is_key = stack.pop()
+        if depth > _MAX_DEPTH:
+            continue
+        if isinstance(node, str):
+            pieces.append((node, is_key))
+            total += len(node)
+            if total > _MAX_JOINED_CHARS:
+                return True
+        elif isinstance(node, dict):
+            for key, child in reversed(list(node.items())):
+                stack.append((child, depth + 1, False))
+                if isinstance(key, str):
+                    stack.append((key, depth + 1, True))
+        elif isinstance(node, (list, tuple)):
+            stack.extend((child, depth + 1, False) for child in reversed(node))
+    keys = [text for text, is_key in pieces if is_key]
+    return (
+        _spans_cross_pieces([text for text, _ in pieces])
+        or (bool(keys) and _spans_cross_pieces([text for text, is_key in pieces if not is_key]))
+        or _spans_cross_pieces(keys)
+    )
 
 
 def _redact_pem_blocks(text: str) -> str:

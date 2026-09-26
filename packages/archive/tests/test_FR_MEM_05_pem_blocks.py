@@ -463,3 +463,66 @@ def test_FR_MEM_05_log_record_that_cannot_compose_keeps_no_raw_arg(capsys):
     for line in body_lines:
         assert line not in err
     assert api_key not in err
+
+
+# A chunked key whose pieces sit between other text: dict keys between values,
+# values between keys, a missing %(key)s in a log call. Detection must not
+# depend on what separates the pieces.
+CHUNK_SHAPES = {
+    "list_of_dicts": lambda ch: [{"chunk": c} for c in ch],
+    "values_under_index_keys": lambda ch: {str(i): c for i, c in enumerate(ch)},
+    "chunks_as_keys": lambda ch: {c: "x" for c in ch},
+}
+
+
+def _body_leaks(text: str, body: str, chunks: list[str]) -> list[str]:
+    flat = text.replace("\n", "").replace("\\n", "")
+    leaks = [c for c in chunks if len(c) >= 8 and c in body and c in text]
+    return leaks + ([body[:16]] if body.replace("\n", "")[:16] in flat else [])
+
+
+class _LinesStore:
+    """The `Store` protocol over a list: the exact lines LocalDirStore would
+    write, without ~20 ms of file I/O per append on Windows."""
+
+    def __init__(self) -> None:
+        self.lines: list[str] = []
+
+    def append_line(self, org_id: str, run_id: str, line: str) -> None:
+        self.lines.append(line)
+
+    def read_lines(self, org_id: str, run_id: str) -> list[str]:
+        return list(self.lines)
+
+
+def test_FR_MEM_05_chunked_key_between_dict_keys_or_values_leaves_no_body(tmp_path, capsys):
+    block, body_lines = build_pem_block(RNG, "RSA", n_lines=4, include_end=True)
+    body = "\n".join(body_lines)
+    chunks_by_size = {size: [block[i : i + size] for i in range(0, len(block), size)] for size in range(1, 201)}
+    logger = logging.getLogger("tilo.test.chunks")
+    logger.propagate = False  # pytest's own capture handler re-raises formatting errors
+    handler = logging.StreamHandler()
+    handler.addFilter(redact_mod.RedactingFilter())
+    logger.addHandler(handler)
+    try:
+        for name, shape in CHUNK_SHAPES.items():
+            lines = _LinesStore()
+            archive = RunArchive(lines, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+            on_disk = RunArchive(LocalDirStore(tmp_path / name), org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+            on_disk.append("tool_call", {"stdout": shape(chunks_by_size[17])})  # a size QA round 9 leaked
+            for size, chunks in chunks_by_size.items():
+                text = _all_text(redact_mod.redact(shape(chunks)))
+                assert not _body_leaks(text, body, chunks), f"{name}, chunk size {size}"
+                archive.append("tool_call", {"stdout": shape(chunks)})
+                assert not _body_leaks(lines.lines[-1], body, chunks), f"{name} archive, chunk size {size}"
+            raw_text = (tmp_path / name / ORG_ID / f"{RUN_ID}.jsonl").read_text(encoding="utf-8")
+            assert not _body_leaks(raw_text, body, chunks_by_size[17]), f"archive file for {name}"
+        for chunks in chunks_by_size.values():
+            logger.warning("%(missing)s", {str(i): c for i, c in enumerate(chunks)})
+    finally:
+        logger.removeHandler(handler)
+        logger.propagate = True
+    all_chunks = [c for chunks in chunks_by_size.values() for c in chunks]
+    err = capsys.readouterr().err
+    assert "[REDACTED:" in err
+    assert not _body_leaks(err, body, all_chunks), "log dict args with a missing key"
