@@ -12,6 +12,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from tilo_planning.artifacts import InMemoryArtifactStore
 from tilo_planning.intake import MAX_FILES, MAX_TOTAL_BYTES, IntakeFile, IntakeRejected, IntakeRequest, submit_intake
 from tilo_providers.interfaces import SafetyProvider
@@ -46,7 +47,9 @@ async def intake(
             return _rejected(f"The files total more than {MAX_TOTAL_BYTES // (1024 * 1024)} MB.")
         uploads.append(IntakeFile(filename=upload.filename or "", content=content))
     try:
-        result = submit_intake(IntakeRequest(text=text, files=uploads), safety=safety, store=store)
+        # CPU-bound extraction and a blocking screen call stay off the event loop.
+        request = IntakeRequest(text=text, files=uploads)
+        result = await run_in_threadpool(submit_intake, request, safety=safety, store=store)
     except IntakeRejected as exc:
         return _rejected(exc.reason)
     body = asdict(result)  # per-file text and events stay server-side

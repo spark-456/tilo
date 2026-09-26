@@ -1,7 +1,9 @@
 """Versioned artifact store with an origin record per version (FR-INT-02, PRD 13.3).
 
 In memory until the Firestore/GCS store lands. A put with bytes identical to the latest version
-returns that version; changed bytes make the next version.
+returns that version; changed bytes make the next version. Each version records its safety screen
+(`clean`, `flagged` with a reason, or `unscreened`), so a later reader (policy engine, OB-05) never
+takes an unscreened or flagged file for a clean one.
 """
 
 from __future__ import annotations
@@ -30,6 +32,8 @@ class StoredArtifact:
     content: bytes
     content_type: str | None
     origin: dict[str, Any]
+    screening: str = "unscreened"  # "clean" | "flagged" | "unscreened"
+    screening_reason: str | None = None
 
 
 class InMemoryArtifactStore:
@@ -46,6 +50,8 @@ class InMemoryArtifactStore:
         content_type: str | None,
         task_id: str,
         received_at: str,
+        screening: str = "unscreened",
+        screening_reason: str | None = None,
     ) -> StoredArtifact:
         sha256 = hashlib.sha256(content).hexdigest()
         with self._lock:
@@ -60,7 +66,9 @@ class InMemoryArtifactStore:
                 "received_at": received_at,
                 "task_id": task_id,
             }
-            stored = StoredArtifact(artifact_id, len(versions) + 1, filename, content, content_type, origin)
+            stored = StoredArtifact(
+                artifact_id, len(versions) + 1, filename, content, content_type, origin, screening, screening_reason
+            )
             versions.append(stored)
             return stored
 

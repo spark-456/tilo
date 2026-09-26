@@ -220,3 +220,75 @@ def test_FR_INT_02_corrupt_central_directory_fails_that_file_only(safety_provide
     assert file_result.text is None
     assert safety_provider.calls == []
     assert len(store.list_ids()) == 1
+
+
+def _submit(files, safety_provider):
+    store = InMemoryArtifactStore()
+    request = IntakeRequest(text="Ingest these files.", files=[IntakeFile(filename=n, content=c) for n, c in files])
+    return submit_intake(request, safety=safety_provider, store=store), store
+
+
+def test_FR_INT_02_high_ratio_docx_fails_that_file_with_bounded_text(safety_provider):
+    """PRD 16.2 cost abuse: a small, highly compressed DOCX must not expand into unbounded text
+    that is held in memory and sent to the paid safety screen."""
+    from tilo_planning.extraction import MAX_TEXT_CHARS
+
+    bomb = make_docx_bytes("A" * (MAX_TEXT_CHARS + 1))
+    assert len(bomb) < 10_000
+    result, _store = _submit([("bomb.docx", bomb), ("ok.docx", make_docx_bytes("Plain text."))], safety_provider)
+
+    assert result.files[0].status == "failed" and "too large" in result.files[0].error
+    assert result.files[0].text is None
+    assert result.files[1].status == "ok"
+    assert safety_provider.calls == [result.files[1].text]
+
+
+def test_FR_INT_02_decompression_budget_is_shared_by_the_request(safety_provider, monkeypatch):
+    import tilo_planning.extraction as extraction
+
+    one_file = make_docx_bytes("B" * 2000)
+    monkeypatch.setattr(extraction, "MAX_EXTRACTED_BYTES", 3000)
+    result, _store = _submit([(f"f{i}.docx", one_file) for i in range(3)], safety_provider)
+
+    assert [f.status for f in result.files][0] == "ok"
+    assert "failed" in [f.status for f in result.files][1:]
+
+
+def test_FR_INT_02_store_records_screening_per_version(safety_provider):
+    """OB-05 / PRD 10.4: a later reader must see a flagged or unscreened file as such."""
+    flagged = make_docx_bytes("Cover.", hidden_text=f"{INJECTION_PHRASE} now.")
+    junk_pdf = b"\n" + make_pdf_bytes()  # PDF readers accept it, the magic check does not
+    files = [("a.docx", flagged), ("b.pdf", junk_pdf), ("c.docx", make_docx_bytes("Plain text."))]
+    result, store = _submit(files, safety_provider)
+
+    stored = [store.get(f.artifact["artifact_id"], f.artifact["version"]) for f in result.files]
+    assert [s.screening for s in stored] == ["flagged", "unscreened", "clean"]
+    assert stored[0].screening_reason
+    assert safety_provider.native_calls == []
+
+
+def test_FR_INT_02_oversized_central_directory_refused_before_parsing(safety_provider, monkeypatch):
+    import tilo_planning.extraction as extraction
+
+    def must_not_parse(*_args, **_kwargs):
+        raise AssertionError("zipfile parsed a package whose end record already exceeds the part limit")
+
+    package = make_docx_bytes("Plain text.")  # 3 parts
+    monkeypatch.setattr(extraction, "MAX_ZIP_MEMBERS", 2)
+    monkeypatch.setattr(extraction.zipfile, "ZipFile", must_not_parse)
+    result, _store = _submit([("many.docx", package)], safety_provider)
+
+    assert result.files[0].status == "failed" and "too many parts" in result.files[0].error
+
+
+def test_FR_INT_02_xml_element_budget_is_shared_by_the_request(safety_provider, monkeypatch):
+    """A markup-only package (no text, millions of empty elements) is bounded by elements parsed,
+    not just bytes, so it cannot burn CPU inside the byte budget."""
+    import tilo_planning.extraction as extraction
+
+    one_file = make_docx_bytes("Short.")
+    monkeypatch.setattr(extraction, "MAX_XML_ELEMENTS", 12)
+    result, _store = _submit([(f"f{i}.docx", one_file) for i in range(3)], safety_provider)
+
+    assert result.files[0].status == "ok"
+    assert "failed" in [f.status for f in result.files][1:]

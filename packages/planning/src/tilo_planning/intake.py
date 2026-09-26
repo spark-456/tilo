@@ -13,7 +13,7 @@ from tilo_contracts import EVENT_DATA_MODELS, Event
 from tilo_providers.interfaces import SafetyProvider
 
 from tilo_planning.artifacts import InMemoryArtifactStore, new_ulid
-from tilo_planning.extraction import FILE_TYPES, ExtractionError, extract, file_type
+from tilo_planning.extraction import FILE_TYPES, Budget, ExtractionError, extract, file_type
 
 MAX_TEXT_CHARS = 4000
 MAX_FILES = 10
@@ -67,7 +67,8 @@ class IntakeResult:
 
 def submit_intake(request: IntakeRequest, *, safety: SafetyProvider, store: InMemoryArtifactStore) -> IntakeResult:
     names = _check_limits(request)
-    screened = [_screen(name, upload.content, safety) for name, upload in zip(names, request.files, strict=True)]
+    budget = Budget()  # one decompression budget for the whole request
+    screened = [_screen(n, f.content, safety, budget) for n, f in zip(names, request.files, strict=True)]
 
     task_id, world_id, run_id = f"t_{new_ulid()}", f"w_{new_ulid()}", f"r_{new_ulid()}"
     now = datetime.now(UTC)
@@ -86,7 +87,9 @@ def submit_intake(request: IntakeRequest, *, safety: SafetyProvider, store: InMe
     ):
         kind, mime_type, _magic = FILE_TYPES[PurePosixPath(name.lower()).suffix]
         stored = store.put(artifact_id=None, filename=name, content=upload.content, content_type=mime_type,
-                           task_id=task_id, received_at=received_at)  # fmt: skip
+                           task_id=task_id, received_at=received_at,
+                           screening="unscreened" if error else ("flagged" if flagged else "clean"),
+                           screening_reason=reason)  # fmt: skip
         ref = {"artifact_id": stored.artifact_id, "version": stored.version}
         if error is not None:
             severity, summary, tool = "fyi", f"Could not read {name}: {error}", None
@@ -104,10 +107,12 @@ def submit_intake(request: IntakeRequest, *, safety: SafetyProvider, store: InMe
     return IntakeResult(task_id, world_id, run_id, world_event, files)
 
 
-def _screen(name: str, content: bytes, safety: SafetyProvider) -> tuple[str | None, str | None, bool, str | None]:
+def _screen(
+    name: str, content: bytes, safety: SafetyProvider, budget: Budget
+) -> tuple[str | None, str | None, bool, str | None]:
     """(text, error, flagged, reason). An unreadable file is never passed to a model, so not screened."""
     try:
-        text = extract(name, content)
+        text = extract(name, content, budget)
     except ExtractionError as exc:
         return None, str(exc), False, None
     if text is None:
