@@ -22,9 +22,11 @@ function urlsFor(name: string): { layoutUrl: string | URL; eventsUrl: string | U
   if (name === "village-basic") {
     return { layoutUrl: VILLAGE_BASIC_LAYOUT_URL, eventsUrl: VILLAGE_BASIC_EVENTS_URL };
   }
+  // Encoded so "%", "/" or "../" in the name cannot reach the server as a path (P0-08b).
+  const file = encodeURIComponent(name);
   return {
-    layoutUrl: `/fixtures/${name}.layout.json`,
-    eventsUrl: `/fixtures/${name}.events.jsonl`,
+    layoutUrl: `/fixtures/${file}.layout.json`,
+    eventsUrl: `/fixtures/${file}.events.jsonl`,
   };
 }
 

@@ -112,6 +112,13 @@ body {
   color: var(--color-ink-2);
 }
 .trace-list li {
+  /* Fixed row box: a glyph from a fallback font must not grow the row (no layout shift). */
+  box-sizing: border-box;
+  height: 21px;
+  line-height: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   padding: 2px 0;
   border-bottom: 1px solid var(--color-surface-2);
 }
