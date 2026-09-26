@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { PAN_STEP_PX } from "../src/stage/camera";
+import { gotoStage } from "./support/camera";
 import { DESKTOP, MOBILE } from "./support/viewports";
 import { fixtureUrl, stageCanvas, stageFrame } from "./support/world";
 
@@ -41,7 +42,7 @@ test.use({ viewport: DESKTOP });
 test("P10 fixture mode: the camera still pans with the world on screen (keyboard arrow keys)", async ({
   page,
 }) => {
-  await page.goto(fixtureUrl("village-basic", { seq: 20 }));
+  await gotoStage(page, fixtureUrl("village-basic", { seq: 20 }));
   const frame = stageFrame(page);
   await expect(stageCanvas(page)).toBeVisible();
   await frame.focus();
