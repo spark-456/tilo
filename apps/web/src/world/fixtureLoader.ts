@@ -36,10 +36,16 @@ function parseJsonl(text: string): Event[] {
     .map((line) => JSON.parse(line) as Event);
 }
 
+// Vite's SPA fallback answers a missing file with index.html and status 200, so an HTML body is
+// treated as "not found" too; the caller shows an in-app alert instead of logging (P0-08b).
+function isFound(res: Response): boolean {
+  return res.ok && !(res.headers.get("content-type") ?? "").includes("text/html");
+}
+
 export async function loadFixture(name: string): Promise<LoadedFixture> {
   const { layoutUrl, eventsUrl } = urlsFor(name);
   const [layoutRes, eventsRes] = await Promise.all([fetch(layoutUrl), fetch(eventsUrl)]);
-  if (!layoutRes.ok || !eventsRes.ok) {
+  if (!isFound(layoutRes) || !isFound(eventsRes)) {
     throw new Error(
       `fixture "${name}": failed to load (layout ${layoutRes.status}, events ${eventsRes.status})`,
     );

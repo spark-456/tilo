@@ -13,6 +13,8 @@ export interface WorldFixtureState {
   readonly seq: number;
   readonly trace: ReadonlyArray<{ seq: number; type: string }>;
   readonly speedLabel: string | null;
+  /** Set when the named fixture could not be loaded (or no name was given); shown as an alert. */
+  readonly loadError: string | null;
   readonly onWorld: WorldSeam;
 }
 
@@ -31,6 +33,9 @@ export function useWorldFixture(): WorldFixtureState {
   const reducedMotionRef = useRef(false);
   reducedMotionRef.current = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [seq, setSeq] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(
+    fixture === "" ? "No fixture name was given, so the fixture could not be loaded." : null,
+  );
   const [trace, setTrace] = useState<ReadonlyArray<{ seq: number; type: string }>>([]);
   const stopRef = useRef<(() => void) | undefined>(undefined);
   // P7/HR-2 ("nothing moves before the first event"): the fetch starts only once Stage's Pixi
@@ -62,8 +67,9 @@ export function useWorldFixture(): WorldFixtureState {
             onTrace: (t) => !cancelled && setTrace(t),
           });
         })
-        .catch((err: unknown) => {
-          if (!cancelled) console.error("fixture mode: failed to load", fixture, err);
+        .catch(() => {
+          // A missing, non-JSON or malformed fixture: surfaced in-app, never on the console.
+          if (!cancelled) setLoadError(`Fixture "${fixture}" could not be loaded.`);
         });
       return () => {
         cancelled = true;
@@ -79,6 +85,7 @@ export function useWorldFixture(): WorldFixtureState {
     seq,
     trace,
     speedLabel: speed > 1 ? `${speed}×` : null,
+    loadError,
     onWorld,
   };
 }

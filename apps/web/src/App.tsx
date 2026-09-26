@@ -35,6 +35,11 @@ export function App() {
           Fixture replay — dev data, not a real run
         </div>
       )}
+      {world.loadError && (
+        <div className="fixture-load-alert" role="alert">
+          {world.loadError}
+        </div>
+      )}
       {world.active && world.speedLabel && (
         <div className="speed-badge" data-testid="speed-badge">
           {world.speedLabel}

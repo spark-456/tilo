@@ -76,6 +76,20 @@ body {
   color: var(--color-surface-1);
   font: 700 0.8125em var(--font-ui);
 }
+/* Fixed like the banner above it, so it never shifts the layout (P0-08b). Neutral tokens only. */
+.fixture-load-alert {
+  position: fixed;
+  top: 52px;
+  right: 12px;
+  z-index: 1000;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 10px 14px;
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 600 0.875em var(--font-ui);
+}
 .speed-badge {
   position: fixed;
   top: 12px;
