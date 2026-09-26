@@ -11,3 +11,5 @@
 - [API kill-switch attack patterns](api-kill-switch-attack-patterns.md) — raising/slow EventWriter breaks stop-all; str districts substring leak
 - [Metering loader attack patterns](metering-loader-attack-patterns.md) — generated models drop const/if-then; YAML parse and missing-file errors escape
 - [Cards store attack patterns](cards-store-attack-patterns.md) — same-id resubmit reopens approved gate; actor->authz invalid; Feb 31 / huge timeout crash
+- [Treasury attack patterns](treasury-attack-patterns.md) — non-UTC `at` bypasses day caps; size overrun; probe tz near midnight
+- [Sandbox web attack patterns](sandbox-web-attack-patterns.md) — NaN/inf quote 500; unlabelled values; payload in data-attr not hidden text; size

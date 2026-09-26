@@ -1,0 +1,19 @@
+{
+  "treasury": {
+    "reserve_margin": 0.15,
+    "request_at": 0.8
+  },
+  "caps": {
+    "run_credits": 300,
+    "user_day_credits": -5,
+    "org_day_credits": null
+  },
+  "spend": {
+    "daily_usd_soft": 15,
+    "daily_usd_hard": 25
+  },
+  "reconciliation": {
+    "tolerance": 0.1,
+    "billing_services": []
+  }
+}
