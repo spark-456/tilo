@@ -40,15 +40,13 @@ Ambiguities resolved here (CLAUDE.md: "apply the PRD's stated default ... note i
    columns (registry.yaml's module docstring: "severity, credits, authz, model profile, tokens,
    latency, archive link, cause" are the same for every type) already carry the signal without
    any contract change: a flagged file's `artifact.created` event raises `severity` from `info`
-   to `needs_you` (PRD 10.2 escalation ladder, already in `common.schema.json#/$defs/severity`)
-   and sets `trace.tool` to `"safety_provider"` (present whenever screening ran, flagged or not)
-   with a non-null `trace.archive_ref` pointing at the raw-archive record of that screening call
-   (PRD 13.2 "every ... tool call ..." is archived). This is logged in the report as the resolved
-   default, not `docs/open-questions.md` (a production doc this test-only pass does not touch).
-3. PDFs/PNGs/JPGs are "passed natively to models" (FR-INT-02) -- no text extraction happens for
-   them in this ticket, so no text exists to screen; safety screening is only exercised for the
-   four converted formats (DOCX/PPTX/XLSX/CSV). OCR/vision safety screening of native files is
-   out of scope here.
+   to `fyi` (PRD 10.2 ladder: a dot and a Story line, nothing waits -- `needs_you` would claim a
+   branch waits, which is untrue) and sets `trace.tool` to `"safety_provider"` (present whenever
+   screening ran, flagged or not). `trace.archive_ref` is not required: P7's raw archive is not
+   merged, and an archive link must never point at a record that does not exist.
+3. PDFs/PNGs/JPGs are "passed natively to models" (FR-INT-02) -- no text is extracted, but PRD
+   16.3 item 2 screens all intake, so the raw bytes go to the safety provider as
+   `check("", content=<bytes>, mime_type=<type>)`.
 4. DOCX/PPTX/XLSX fixtures are hand-built minimal OOXML packages via `zipfile` at runtime (no
    binary files committed, no new deps), per the ticket brief.
 """
@@ -282,9 +280,13 @@ def make_safety_provider():
     class DeterministicSafetyProvider(SafetyProvider):
         def __init__(self) -> None:
             self.calls: list[str] = []
+            self.native_calls: list[dict[str, Any]] = []
 
         def check(self, text: str, **kwargs: Any) -> dict[str, Any]:
-            self.calls.append(text)
+            if "content" in kwargs:
+                self.native_calls.append(kwargs)
+            else:
+                self.calls.append(text)
             flagged = INJECTION_PHRASE in text.upper()
             reason = f"instruction aimed at the assistant: {INJECTION_PHRASE!r}" if flagged else None
             return {"flagged": flagged, "reason": reason}

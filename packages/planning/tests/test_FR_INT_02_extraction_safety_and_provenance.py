@@ -49,8 +49,11 @@ def test_FR_INT_02_pdf_png_jpg_are_native_no_text_extracted(safety_provider, fil
 
     assert file_result.kind == "native"
     assert file_result.text is None
-    # No text was produced, so nothing was screened for this file.
+    # No text was produced, but the raw bytes are still screened (PRD 16.3 item 2).
     assert safety_provider.calls == []
+    assert len(safety_provider.native_calls) == 1
+    assert safety_provider.native_calls[0]["content"] == content
+    assert safety_provider.native_calls[0]["mime_type"] in {"application/pdf", "image/png", "image/jpeg"}
 
 
 def test_FR_INT_02_docx_is_converted_to_text(safety_provider):
@@ -120,7 +123,7 @@ def test_FR_INT_02_unflagged_file_is_not_flagged(safety_provider):
 
 def test_FR_INT_02_flag_surfaces_in_trace_without_side_effect(repo_root, registry, safety_provider):
     """Resolved default (see conftest.py docstring, item 2): a flagged file's artifact.created
-    event raises severity to needs_you and records trace.tool/trace.archive_ref -- the Trace
+    event raises severity to fyi and records trace.tool -- the Trace
     lens's existing generic columns -- rather than a new contracts field. artifact.created stays
     side_effect: false in the registry (screening a file is not itself a side effect, HR-7 /
     PRD 10.4) so this must not carry an authz."""
@@ -134,9 +137,8 @@ def test_FR_INT_02_flag_surfaces_in_trace_without_side_effect(repo_root, registr
     event = created_events[0]
     assert_valid_event(repo_root, registry, event)
 
-    assert event["severity"] == "needs_you", "a flagged file's artifact.created must escalate severity"
+    assert event["severity"] == "fyi", "a flagged file's artifact.created must escalate severity"
     assert event["trace"]["tool"] == "safety_provider"
-    assert event["trace"]["archive_ref"] is not None
     assert event["authz"] is None, "screening is not a side effect (HR-7); it must not carry authz"
 
 
