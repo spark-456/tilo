@@ -1,0 +1,33 @@
+{
+  "tester_id": "t_r7k2m9pz",
+  "consent": {
+    "tester_id": "t_r7k2m9pz",
+    "study": "EV-G3",
+    "consented_at": "2026-10-10T09:00:00.000Z",
+    "keep_data": false,
+    "delete_after": "2026-11-11"
+  },
+  "tag": {
+    "tester_id": "t_r7k2m9pz",
+    "kind": "run",
+    "ref": "r_village_basic_1"
+  },
+  "diary_entry": {
+    "tester_id": "t_r7k2m9pz",
+    "date": "2026-10-10",
+    "day": 1,
+    "minutes_saved_self": 25,
+    "trust": 4,
+    "reinvested": "Used the time to call a supplier back.",
+    "submitted_at": "2026-10-10T18:00:00.000Z"
+  },
+  "survey_response": {
+    "tester_id": "t_r7k2m9pz",
+    "submitted_at": "2026-10-12T09:00:00.000Z",
+    "trust": 5,
+    "reinvested_share": 0.5,
+    "reinvested_how": "Spent it on customer calls instead of drafting replies.",
+    "quote": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "quote_consent": true
+  }
+}

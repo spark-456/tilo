@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/pilot.schema.json",
+  "x-version": "1.0.0",
+  "title": "Pilot",
+  "description": "Records of the EV-G3 pilot (PRD 2.4, 14.4 'Pilot instrumentation', FR-MTR-09): consent, run and card tags, daily diary entries and exit-survey responses, each keyed by a pseudonymous tester id. S-24 and tilo-api write them; packages/metering reads them for the pilot report, which shows aggregates only. They hold the tester id, numbers and the tester's own short answers, never a name, an email address or task content (PRD 16.5). Each record is written on its own, so the root is a sampler with one optional property per definition, like common's; nothing sends a Pilot document. Rules MT-12 to MT-14 in contracts/metering.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tester_id": { "$ref": "#/$defs/tester_id" },
+    "consent": { "$ref": "#/$defs/consent" },
+    "tag": { "$ref": "#/$defs/tag" },
+    "diary_entry": { "$ref": "#/$defs/diary_entry" },
+    "survey_response": { "$ref": "#/$defs/survey_response" }
+  },
+  "$defs": {
+    "tester_id": {
+      "description": "Pseudonymous tester id: t_ and 6 to 32 lower-case letters or digits, assigned by Tilo. Never an email address, a name or a Tilo user id (PRD 16.5). The not-pattern rejects a final line break, which a Python validator's $ lets through.",
+      "type": "string",
+      "pattern": "^t_[a-z0-9]{6,32}$",
+      "not": { "pattern": "\n" }
+    },
+    "consent": {
+      "description": "A tester's written consent to the EV-G3 pilot rules (PRD 2.4): no confidential employer or client data, test Google accounts or personal accounts only. The tester's records are deleted on delete_after, 30 days after the study, unless keep_data is true; withdrawing consent deletes them at once (PRD 16.5, MT-12).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tester_id", "study", "consented_at", "keep_data", "delete_after"],
+      "properties": {
+        "tester_id": { "$ref": "#/$defs/tester_id" },
+        "study": { "type": "string", "const": "EV-G3" },
+        "consented_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "keep_data": { "type": "boolean" },
+        "delete_after": { "$ref": "common.schema.json#/$defs/calendar_date" }
+      }
+    },
+    "tag": {
+      "description": "Tags a run (run id) or a card (card ULID) with the tester who used it (PRD 14.4: pilot accounts tag every run and card). Which id goes with which kind is MT-13.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tester_id", "kind", "ref"],
+      "properties": {
+        "tester_id": { "$ref": "#/$defs/tester_id" },
+        "kind": { "type": "string", "enum": ["run", "card"] },
+        "ref": {
+          "anyOf": [
+            { "$ref": "common.schema.json#/$defs/run_id" },
+            { "$ref": "common.schema.json#/$defs/ulid" }
+          ]
+        }
+      }
+    },
+    "diary_entry": {
+      "description": "The 5-minute daily diary (PRD 2.4) for one of the three pilot days: minutes the tester thinks Tilo saved, a trust score from 1 to 5 and, in at most 280 characters, what they did with the time saved.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tester_id",
+        "date",
+        "day",
+        "minutes_saved_self",
+        "trust",
+        "reinvested",
+        "submitted_at"
+      ],
+      "properties": {
+        "tester_id": { "$ref": "#/$defs/tester_id" },
+        "date": { "$ref": "common.schema.json#/$defs/calendar_date" },
+        "day": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "minutes_saved_self": { "type": "integer", "minimum": 0 },
+        "trust": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "reinvested": { "type": "string", "maxLength": 280 },
+        "submitted_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      }
+    },
+    "survey_response": {
+      "description": "The exit survey (PRD 2.4): trust score, the share of saved time reinvested and how, and an optional quote. A quote is kept only with the tester's consent to quote it, so quote is null whenever quote_consent is false (BQ-66).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tester_id",
+        "submitted_at",
+        "trust",
+        "reinvested_share",
+        "reinvested_how",
+        "quote",
+        "quote_consent"
+      ],
+      "properties": {
+        "tester_id": { "$ref": "#/$defs/tester_id" },
+        "submitted_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "trust": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "reinvested_share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reinvested_how": { "type": "string", "maxLength": 500 },
+        "quote": { "type": ["string", "null"], "minLength": 1, "maxLength": 280 },
+        "quote_consent": { "type": "boolean" }
+      },
+      "if": { "properties": { "quote_consent": { "const": false } } },
+      "then": { "properties": { "quote": { "type": "null" } } }
+    }
+  }
+}

@@ -6,6 +6,7 @@ request, text past MAX_TEXT_CHARS fails the file, and an XML part with a DTD fai
 
 from __future__ import annotations
 
+import codecs
 import io
 import zipfile
 import zlib
@@ -132,13 +133,14 @@ def _xml_text(part: IO[bytes], budget: Budget, chars_left: int) -> str:
     """Stream one part through expat, stopping as soon as the byte budget or text cap is spent."""
     out: list[str] = []
     depth, depth_in_text, run, seen, tail, decl_at = 0, 0, 0, 0, b"", 0
+    utf8 = codecs.getincrementaldecoder("utf-8")()  # strict: any non-UTF-8 byte fails the part
 
     def reject_dtd(*_args: object) -> None:
         raise ExtractionError("XML part declares a DTD")
 
-    def start(name: str, _attrs: object) -> None:
+    def start(name: str, attrs: dict[str, str]) -> None:
         nonlocal depth, depth_in_text
-        budget.elements -= 1
+        budget.elements -= 1 + len(attrs)  # attributes cost parse time too
         depth += 1
         if budget.elements < 0 or depth > MAX_DEPTH:
             raise ExtractionError(_TOO_LARGE)
@@ -167,11 +169,16 @@ def _xml_text(part: IO[bytes], budget: Budget, chars_left: int) -> str:
 
     def check_raw(chunk: bytes) -> None:
         """expat buffers a whole token before any handler runs, so tokens are bounded in the raw bytes.
-        Only plain UTF-8 markup is read (what Office writes): no NUL byte (so no UTF-16, where 0x3C can
-        be half of another character), no `<!` (comment, DTD, CDATA) and no `<?` but the leading XML
-        declaration. In what remains every 0x3C byte starts a tag and none can sit inside one, so the
-        run between two of them bounds every tag, attribute list and text run expat holds."""
+        Only plain UTF-8 markup is read (what Office writes): valid UTF-8 with no NUL byte (so expat
+        never switches to UTF-16, where 0x3C can be half of another character, with or without a BOM),
+        no `<!` (comment, DTD, CDATA) and no `<?` but the leading XML declaration. In what remains every
+        0x3C byte starts a tag and none can sit inside one, so the run between two of them bounds every
+        tag, attribute list and text run expat holds."""
         nonlocal run, tail, seen, decl_at
+        try:
+            utf8.decode(chunk)
+        except UnicodeDecodeError as exc:
+            raise ExtractionError(_UNSUPPORTED) from exc
         window = tail + chunk
         if seen == 0:  # the declaration sits first (after an optional UTF-8 BOM) and closes within 256 bytes
             decl_at = 3 if chunk.startswith(b"\xef\xbb\xbf") else 0
