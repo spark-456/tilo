@@ -16,3 +16,6 @@
 - [Router real-factory probe](router-real-factory-path-probe.md) — router tests mock providers; replay stubs (embed) escape raw
 - [Router count_tokens escape](router-count-tokens-escape.md) — probe every provider method a router calls (count_tokens is live on Google), not only generate
 - [Timeout then late commit](timeout-then-late-commit-probe.md) — abandoned deadline-bounded writes commit late: duplicate on flush, seq out of order
+- [Router budget selection](router-budget-selection-probe.md) — budget between candidate prices refused outright; chaos test skips tight budgets
+- [Router cap ignores system/tools](router-cap-ignores-system-tools.md) — EFF-03 cap/price count only prompt; probe every request field
+- [Router failed-call charge](router-budget-failed-call-charge.md) — estimate deducted before send, never refunded on 429; fallback refused

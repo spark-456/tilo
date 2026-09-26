@@ -62,7 +62,7 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api services/harness/src packages/providers packages/contracts-py packages/policy/src packages/metering evals/src
+    uv run mypy services/api services/harness/src packages/providers packages/contracts-py packages/policy/src packages/metering evals/src services/connectors/src
     pnpm -r exec tsc --noEmit
 
 # Start the Firestore emulator and run the harness skeleton against it (P0-09).
@@ -72,6 +72,10 @@ harness-skeleton:
 # Run the eval harness (not built yet — ticket P3).
 eval:
     python -c "print('eval harness not built yet (ticket P3); nothing to run')"
+
+# PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
+conformance:
+    uv run python -m tilo_providers.conformance
 
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated

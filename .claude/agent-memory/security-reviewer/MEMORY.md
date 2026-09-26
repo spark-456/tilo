@@ -9,7 +9,7 @@
 - [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r4 FAIL: card in >25-digit run unredacted; prefix-first window leaks; logs/JWT closed
 - [Skill checker gaps](skill-checker-gaps.md): FR-AGT-04 re-scope r1 FAIL (366f357): guard.check_bounds never wired into checkers; missing safety_flags = clean
 - [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r5 FAIL (7a3051c); malformed scope 500s Stop all after pending pop, pause lost; dup parts on timeout
-- [Policy engine P4-01](policy-engine-p4-01.md): r9 PASS (c7569a9); open: FEFF in scope email, level!=history drop (5d), invisible BOM in regex
+- [Policy engine P4-01](policy-engine-p4-01.md): r9 PASS; P4-01b r10 FAIL, r11 PASS (dab6d8c, whole data validated); 5d open (#27)
 - [Outbox ST-2](outbox-st2.md): r5 PASS (2ff085b); open: writer must ack dup transfer, durable adapter dedupe, store authz/server time
 - [Cards API ST-3b](cards-api-st3b.md): r1 FAIL (ea775d2); answer route takes actor/channel/pin from body, open_gate trusts it
 - [Decision and manifest CC-SH](decision-manifest-cc-sh.md): r3 PASS (b34fb86); open: teams.yaml assigned_by self-declared, MF-06 redactor sole token guard
