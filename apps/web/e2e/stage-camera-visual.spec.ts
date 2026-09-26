@@ -12,6 +12,7 @@
 import { type Page, expect, test } from "@playwright/test";
 import { PAN_STEP_PX, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from "../src/stage/camera";
 import { expectSameBox, requireBox } from "./support/assertions";
+import { gotoStage } from "./support/camera";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP, reducedMotion: "reduce" });
@@ -59,7 +60,7 @@ async function cameraDrivenByCss(page: Page): Promise<boolean> {
 test("P0-08b camera C1 PRD-9.7: no element inside the stage frame has a CSS transform or transition driving the camera", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   await expect(page.getByTestId("stage-frame").locator("canvas")).toBeVisible();
   expect(await cameraDrivenByCss(page), "found a CSS transform/transition inside stage-frame").toBe(
     false,
@@ -76,7 +77,7 @@ test("P0-08b camera C1 PRD-9.7: no element inside the stage frame has a CSS tran
 test("P0-08b camera C1 PRD-9.7: the canvas exactly fills the stage frame at zoom 0.5, at zoom 2 and after panning every direction", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await expect(stage.locator("canvas")).toBeVisible();
   await stage.focus();
@@ -102,7 +103,7 @@ test("P0-08b camera C1 PRD-9.7: the canvas exactly fills the stage frame at zoom
 test("P0-08b camera C1 PRD-9.7: the canvas backing store is clientWidth x devicePixelRatio at zoom 0.5 and zoom 2 (no bitmap upscaling)", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await expect(stage.locator("canvas")).toBeVisible();
   await stage.focus();
@@ -127,7 +128,7 @@ test("P0-08b camera C1 PRD-9.7: the canvas backing store is clientWidth x device
 test("P0-08b camera C8 PRD-9.7 grid: zoomed out to ZOOM_MIN and panned, the iso grid still reaches every canvas corner", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await expect(stage.locator("canvas")).toBeVisible();
   await stage.focus();
@@ -156,7 +157,7 @@ test("P0-08b camera C8 PRD-9.7 grid: zoomed out to ZOOM_MIN and panned, the iso 
 test("P0-08b camera C8 PRD-9.7 grid: panning by PAN_STEP_PX moves the on-screen grid by exactly that many pixels", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await expect(stage.locator("canvas")).toBeVisible();
   await stage.focus();

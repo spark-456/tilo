@@ -19,6 +19,7 @@
  */
 import { expect, test } from "@playwright/test";
 import tokens from "../src/design/tokens";
+import { gotoStage } from "./support/camera";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP });
@@ -31,7 +32,7 @@ function hexToRgb(hex: string): string {
 test("P0-08b camera C11 PRD-17.5/18.2: the focused stage frame's outline colour is the focus token (tokens.color.brand.primary)", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await stage.focus();
   const outlineColor = await stage.evaluate((el) => getComputedStyle(el).outlineColor);

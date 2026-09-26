@@ -27,6 +27,9 @@ Trace lenses, cards and settings. P0-08a shipped the shell: tokens, layout frame
   No CSS transform on the canvas and no always-on ticker: one render per camera change, eased
   keyboard moves timed by `performance.now()`, and a render on resize, DPR change and
   visibility change (HR-2). Every drawn frame writes `data-camera-x/y/zoom` on the stage frame.
+- Readiness: the first frame is drawn as soon as Pixi's init resolves; from then on the stage
+  frame carries `data-stage-ready="true"` (never before). E2e specs navigate with
+  `gotoStage`/`reloadStage` from `e2e/support/camera.ts`, which wait for it.
 - World content plugs in through the `onWorld(world, requestRender)` prop (`WorldSeam`).
 
 ## Local rules

@@ -12,6 +12,7 @@
  */
 import { type Page, expect, test } from "@playwright/test";
 import { requireBox } from "./support/assertions";
+import { gotoStage } from "./support/camera";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP });
@@ -19,7 +20,7 @@ test.use({ viewport: DESKTOP });
 test("P0-08b camera C11 PRD-9.7/FR-WLD-11 keyboard focus: the stage frame's focus indicator is inset, so it can't be clipped by the viewport", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await stage.focus();
   const style = await stage.evaluate((el) => {
@@ -42,7 +43,7 @@ test("P0-08b camera C11 PRD-9.7/FR-WLD-11 keyboard focus: the stage frame's focu
 test("P0-08b camera C11 PRD-9.7/FR-WLD-11 keyboard focus: the indicator is visible at the stage frame's very top and bottom rows, not just its sides", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await expect(stage.locator("canvas")).toBeVisible();
   const box = requireBox(await stage.boundingBox(), "stage-frame");

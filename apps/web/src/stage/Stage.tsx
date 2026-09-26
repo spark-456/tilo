@@ -41,7 +41,9 @@ const KEYS: Record<string, (c: cam.CameraState) => cam.CameraState> = {
 export type WorldSeam = (world: Container, requestRender: () => void) => (() => void) | undefined;
 
 /** PRD 18.3 S-04 stage. The camera is the Pixi world container's transform (PRD 9.7); a frame
- * is drawn only on input, an eased keyboard move, resize or visibility change. */
+ * is drawn only on input, an eased keyboard move, resize or visibility change. Readiness: the
+ * stage frame gains `data-stage-ready="true"` and `data-camera-x/-y/-zoom` with the first drawn
+ * frame (right after Pixi's init), never before; input listeners are live from then on. */
 export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
   const frameRef = useRef<HTMLElement>(null);
   const [supported] = useState(() => !!document.createElement("canvas").getContext("webgl2"));
@@ -74,6 +76,7 @@ export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
       target.dataset.cameraX = String(x);
       target.dataset.cameraY = String(y);
       target.dataset.cameraZoom = String(z);
+      target.dataset.stageReady = "true";
     };
     // Eased moves are timed by performance.now(), so a long task or a frozen page lands on
     // the target at the next frame, and the last frame is always exactly the target.
@@ -171,10 +174,11 @@ export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
     );
 
     // The device-pixel box also reports devicePixelRatio changes, keeping the canvas sharp.
-    const observer = new ResizeObserver(() => {
+    const fit = () => {
       app.renderer.resize(target.clientWidth || 1, target.clientHeight || 1, devicePixelRatio);
       draw();
-    });
+    };
+    const observer = new ResizeObserver(fit);
     const onVisible = () => document.visibilityState === "visible" && draw();
     document.addEventListener("visibilitychange", onVisible, { signal: on.signal });
 
@@ -186,6 +190,7 @@ export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
       target.prepend(app.canvas);
       app.stage.addChild(world);
       unplug = seamRef.current?.(world, requestRender);
+      fit(); // the first frame, at once: input that arrived during init is already in `cur`
       const box = "devicePixelContentBoxSize" in ResizeObserverEntry.prototype;
       observer.observe(target, box ? { box: "device-pixel-content-box" } : {});
     });
@@ -203,9 +208,6 @@ export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
     <main
       className="stage-frame"
       data-testid="stage-frame"
-      data-camera-x={cam.INITIAL_CAMERA.x}
-      data-camera-y={cam.INITIAL_CAMERA.y}
-      data-camera-zoom={cam.INITIAL_CAMERA.zoom}
       aria-label="World stage"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard pan and zoom (PRD 9.7).
       tabIndex={0}

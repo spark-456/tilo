@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { CAMERA_PAN_MS } from "../src/stage/camera";
+import { gotoStage } from "./support/camera";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP });
 
 test("PRD-9.7/HR-2 stage: the iso grid has no idle animation of any kind", async ({ page }) => {
-  await page.goto("/");
+  await gotoStage(page);
 
   const canvas = page.getByTestId("stage-frame").locator("canvas");
   await expect(canvas).toBeVisible();
@@ -24,7 +25,7 @@ test("PRD-9.7/HR-2 stage: the iso grid has no idle animation of any kind", async
 test("P0-08b camera C10 PRD-9.7/HR-2 stage: after a camera move settles, the canvas stays pixel-identical for 2s of idle", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   const canvas = stage.locator("canvas");
   await expect(canvas).toBeVisible();
