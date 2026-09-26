@@ -57,7 +57,7 @@ class InMemoryArtifactStore:
         with self._lock:
             artifact_id = artifact_id or f"art_{new_ulid()}"
             versions = self._versions.setdefault(artifact_id, [])
-            if versions and versions[-1].origin["sha256"] == sha256:
+            if versions and versions[-1].origin["sha256"] == sha256 and versions[-1].screening == screening:
                 return versions[-1]
             origin = {
                 "source": "upload",

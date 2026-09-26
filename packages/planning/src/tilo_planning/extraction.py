@@ -17,6 +17,9 @@ MAX_ZIP_MEMBERS = 5000
 MAX_EXTRACTED_BYTES = 50 * 1024 * 1024  # decompressed XML read for one whole request
 MAX_XML_ELEMENTS = 1_000_000  # parsed elements for one whole request: about 1.5 s of CPU
 MAX_TEXT_CHARS = 200_000  # per file: more than a brief or a model context can use
+MAX_CENTRAL_DIRECTORY_BYTES = 1024 * 1024  # zipfile parses this many bytes of entries
+MAX_RUN_BYTES = 256 * 1024  # bytes between two '<': bounds any tag, attribute or text run expat buffers
+MAX_DEPTH = 256  # nested elements; OOXML stays far below this
 _CHUNK = 64 * 1024
 
 _OOXML = "application/vnd.openxmlformats-officedocument."
@@ -79,11 +82,16 @@ def extract(filename: str, content: bytes, budget: Budget | None = None) -> str 
 
 
 def _check_directory(content: bytes) -> None:
-    """Refuse an oversized central directory from its end record, before zipfile parses it."""
+    """Refuse an oversized central directory from its end record, before zipfile parses it. zipfile
+    walks the directory's byte size, not the entry count, so the size is what is bounded."""
     end = content.rfind(b"PK\x05\x06")
     if end < 0 or len(content) - end < 22:
         raise ExtractionError("unreadable package: no end of central directory")
-    if int.from_bytes(content[end + 10 : end + 12], "little") > MAX_ZIP_MEMBERS:  # 0xFFFF marks zip64
+    if end >= 20 and content[end - 20 : end - 16] == b"PK\x06\x07":
+        raise ExtractionError("zip64 packages are not accepted")
+    entries = int.from_bytes(content[end + 10 : end + 12], "little")
+    directory_bytes = int.from_bytes(content[end + 12 : end + 16], "little")
+    if entries > MAX_ZIP_MEMBERS or directory_bytes > MAX_CENTRAL_DIRECTORY_BYTES:
         raise ExtractionError("too many parts in the package")
 
 
@@ -122,34 +130,52 @@ def _ooxml_text(content: bytes, prefixes: tuple[str, ...], budget: Budget) -> st
 def _xml_text(part: IO[bytes], budget: Budget, chars_left: int) -> str:
     """Stream one part through expat, stopping as soon as the byte budget or text cap is spent."""
     out: list[str] = []
-    depth_in_text = 0
+    depth, depth_in_text, run = 0, 0, 0
 
     def reject_dtd(*_args: object) -> None:
         raise ExtractionError("XML part declares a DTD")
 
     def start(name: str, _attrs: object) -> None:
-        nonlocal depth_in_text
+        nonlocal depth, depth_in_text
         budget.elements -= 1
-        if budget.elements < 0:
+        depth += 1
+        if budget.elements < 0 or depth > MAX_DEPTH:
             raise ExtractionError(_TOO_LARGE)
         if name.rsplit(" ", 1)[-1] in _TEXT_TAGS:
             depth_in_text += 1
 
     def end(name: str) -> None:
-        nonlocal depth_in_text
+        nonlocal depth, depth_in_text
+        depth -= 1
         local = name.rsplit(" ", 1)[-1]
         if local in _TEXT_TAGS:
             depth_in_text -= 1
         elif local in _BREAK_TAGS:
-            out.append("\n")
+            keep("\n")
 
     def chars(text: str) -> None:
-        nonlocal chars_left
         if depth_in_text:
-            chars_left -= len(text)
-            if chars_left < 0:
+            keep(text)
+
+    def keep(text: str) -> None:
+        nonlocal chars_left
+        chars_left -= len(text)
+        if chars_left < 0:
+            raise ExtractionError(_TOO_LARGE)
+        out.append(text)
+
+    def check_runs(chunk: bytes) -> None:
+        """expat buffers a whole tag before any handler runs, so bound tags in the raw bytes."""
+        nonlocal run
+        pieces = chunk.split(b"<")
+        if len(pieces) == 1:
+            run += len(chunk)
+        else:  # the run carried over ends at the first '<'; the last piece carries on into the next chunk
+            if max([run + len(pieces[0]), *map(len, pieces[1:-1])]) > MAX_RUN_BYTES:
                 raise ExtractionError(_TOO_LARGE)
-            out.append(text)
+            run = len(pieces[-1])
+        if run > MAX_RUN_BYTES:
+            raise ExtractionError(_TOO_LARGE)
 
     parser = expat.ParserCreate(namespace_separator=" ")
     parser.buffer_text = True  # one character-data call between tags, however many lines
@@ -162,6 +188,7 @@ def _xml_text(part: IO[bytes], budget: Budget, chars_left: int) -> str:
         budget.remaining -= len(chunk)
         if budget.remaining < 0:
             raise ExtractionError(f"the files expand past the {MAX_EXTRACTED_BYTES // (1024 * 1024)} MB read limit")
+        check_runs(chunk)
         parser.Parse(chunk, False)
     parser.Parse(b"", True)
     return "".join(out).strip()
