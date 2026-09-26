@@ -44,6 +44,7 @@ _PARTS = {
 _TEXT_TAGS = {"t", "delText", "v"}  # w:t / a:t / xlsx t, tracked deletions, cell values
 _BREAK_TAGS = {"p", "row", "si"}
 _TOO_LARGE = "too large to read"
+_UNSUPPORTED = "unsupported XML: only plain UTF-8 Office markup is read"
 
 
 class ExtractionError(Exception):
@@ -130,7 +131,7 @@ def _ooxml_text(content: bytes, prefixes: tuple[str, ...], budget: Budget) -> st
 def _xml_text(part: IO[bytes], budget: Budget, chars_left: int) -> str:
     """Stream one part through expat, stopping as soon as the byte budget or text cap is spent."""
     out: list[str] = []
-    depth, depth_in_text, run = 0, 0, 0
+    depth, depth_in_text, run, seen, tail, decl_at = 0, 0, 0, 0, b"", 0
 
     def reject_dtd(*_args: object) -> None:
         raise ExtractionError("XML part declares a DTD")
@@ -164,9 +165,26 @@ def _xml_text(part: IO[bytes], budget: Budget, chars_left: int) -> str:
             raise ExtractionError(_TOO_LARGE)
         out.append(text)
 
-    def check_runs(chunk: bytes) -> None:
-        """expat buffers a whole tag before any handler runs, so bound tags in the raw bytes."""
-        nonlocal run
+    def check_raw(chunk: bytes) -> None:
+        """expat buffers a whole token before any handler runs, so tokens are bounded in the raw bytes.
+        Only plain UTF-8 markup is read (what Office writes): no NUL byte (so no UTF-16, where 0x3C can
+        be half of another character), no `<!` (comment, DTD, CDATA) and no `<?` but the leading XML
+        declaration. In what remains every 0x3C byte starts a tag and none can sit inside one, so the
+        run between two of them bounds every tag, attribute list and text run expat holds."""
+        nonlocal run, tail, seen, decl_at
+        window = tail + chunk
+        if seen == 0:  # the declaration sits first (after an optional UTF-8 BOM) and closes within 256 bytes
+            decl_at = 3 if chunk.startswith(b"\xef\xbb\xbf") else 0
+            if chunk.startswith(b"<?", decl_at) and b"?>" not in chunk[decl_at : decl_at + 256]:
+                raise ExtractionError(_UNSUPPORTED)
+        if b"\x00" in chunk or b"<!" in window:
+            raise ExtractionError(_UNSUPPORTED)
+        at = window.find(b"<?")
+        while at >= 0:
+            if seen - len(tail) + at != decl_at:
+                raise ExtractionError(_UNSUPPORTED)
+            at = window.find(b"<?", at + 1)
+        tail, seen = chunk[-1:], seen + len(chunk)
         pieces = chunk.split(b"<")
         if len(pieces) == 1:
             run += len(chunk)
@@ -177,7 +195,7 @@ def _xml_text(part: IO[bytes], budget: Budget, chars_left: int) -> str:
         if run > MAX_RUN_BYTES:
             raise ExtractionError(_TOO_LARGE)
 
-    parser = expat.ParserCreate(namespace_separator=" ")
+    parser = expat.ParserCreate("UTF-8", " ")
     parser.buffer_text = True  # one character-data call between tags, however many lines
     parser.StartDoctypeDeclHandler = reject_dtd
     parser.EntityDeclHandler = reject_dtd
@@ -188,7 +206,7 @@ def _xml_text(part: IO[bytes], budget: Budget, chars_left: int) -> str:
         budget.remaining -= len(chunk)
         if budget.remaining < 0:
             raise ExtractionError(f"the files expand past the {MAX_EXTRACTED_BYTES // (1024 * 1024)} MB read limit")
-        check_runs(chunk)
+        check_raw(chunk)
         parser.Parse(chunk, False)
     parser.Parse(b"", True)
     return "".join(out).strip()

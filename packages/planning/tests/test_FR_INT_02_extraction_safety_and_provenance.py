@@ -307,10 +307,17 @@ _W = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/20
 _MEMORY_BOUND = 64 * 1024 * 1024  # far below tilo-api's 512Mi (infra/modules/service/main.tf)
 
 
+_LT_EVERY_200K = ("x" * 200_000 + "<") * 25  # 5 MB with a '<' often enough to split raw runs
 _HOSTILE = {  # built lazily: a multi-megabyte parameter would become the test id
     "many attributes": lambda: _W + "<w:p " + " ".join(f'a{i}=""' for i in range(300_000)) + "/></w:document>",
     "huge attribute value": lambda: _W + '<w:p a="' + "x" * 5_000_000 + '"/></w:document>',
     "deep nesting": lambda: _W + "<w:r>" * 900_000 + "</w:r>" * 900_000 + "</w:document>",
+    # U+4E3C is 3C 4E in UTF-16LE: a raw 0x3C byte that is not '<'
+    "utf-16 attribute": lambda: ("﻿" + _W + '<w:p a="' + "丼" * 2_500_000 + '"/></w:document>').encode("utf-16-le"),
+    "comment": lambda: _W + "<!--" + _LT_EVERY_200K + "--></w:document>",
+    "processing instruction": lambda: _W + "<?pi " + _LT_EVERY_200K + "?></w:document>",
+    "doctype literal": lambda: '<!DOCTYPE x SYSTEM "' + _LT_EVERY_200K + '">' + _W + "</w:document>",
+    "declaration": lambda: '<?xml version="1.0" ' + _LT_EVERY_200K + "?>" + _W + "</w:document>",
 }
 
 
@@ -329,7 +336,7 @@ def test_FR_INT_02_hostile_markup_fails_that_file_within_a_memory_bound(safety_p
     finally:
         tracemalloc.stop()
 
-    assert result.files[0].status == "failed" and "too large" in result.files[0].error, shape
+    assert result.files[0].status == "failed" and result.files[0].error, shape
     assert result.files[1].status == "ok"
     assert peak < _MEMORY_BOUND, f"{shape}: peak {peak // 2**20} MiB"
 
