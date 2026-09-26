@@ -108,7 +108,7 @@ def test_FR_MTR_04_crossing_the_hard_cap_sets_replay_only_and_blocks_further_res
     it is refused before it is made -- see the new test below). So, unlike the original tests/P8-01
     version, the reservation here is sized to land exactly at the cap (not the 15%-margined estimate
     that would have been refused at reserve time): a genuine conflict between this ticket's two rules,
-    fixed minimally by changing only this numeric setup, not any assertion (see contract_needs).
+    fixed minimally by changing only this numeric setup, not any assertion.
 
     daily_usd_soft is 1.0 here, not the original tests/P8-01 value of 1_000_000.0: MeteringConfig
     now rejects daily_usd_hard < daily_usd_soft (added after that test was written), so soft can
@@ -179,3 +179,26 @@ def test_FR_MTR_04_a_reservation_that_would_cross_the_hard_cap_is_refused_and_fl
 
     blocked = treasury.reserve("r1", "s2", estimate=1.0, at=AT)
     assert blocked == Wait("replay_only")
+
+
+def test_FR_MTR_04_spend_alerts_and_kill_switch_count_committed_spend_not_open_reservations(tmp_path):
+    """Alerts and replay_only follow the day's committed spend only: another run's open reservation is
+    not money spent (credit_usd 0.005, so $0.50 soft = 100 credits, $1.00 hard = 200 credits)."""
+    treasury, flags = build_treasury(
+        tmp_path,
+        run_credits=100_000,
+        user_day_credits=None,
+        org_day_credits=None,
+        daily_usd_soft=0.5,
+        daily_usd_hard=1.0,
+    )
+    treasury.open_run("big", user_id="u_01", org_id="org_01", approved=100_000)
+    treasury.open_run("small", user_id="u_02", org_id="org_02", approved=100_000)
+    held = treasury.reserve("big", "s1", estimate=198.0 / 1.15, at=AT)  # 198 credits held open
+    small = treasury.reserve("small", "s1", estimate=1.0 / 1.15, at=AT)
+    assert not isinstance(held, Wait) and not isinstance(small, Wait)
+
+    result = treasury.commit(small, actual=1.0, at=AT)  # $0.005 committed today
+
+    assert result.alerts == ()
+    assert flags.get("replay_only") is False

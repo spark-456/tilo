@@ -217,15 +217,18 @@ class Treasury:
         rows += [(e, e.credits or 0.0) for e in self._ledger if e.kind == "commit"]
         return sum(n for r, n in rows if r.day == day and getattr(r, field) == value)
 
+    def _day_committed_total(self, day: date) -> float:
+        """Committed credits across every run, user and org on that UTC day."""
+        return sum(e.credits or 0.0 for e in self._ledger if e.kind == "commit" and e.day == day)
+
     def _day_deployment_total(self, day: date) -> float:
         """Committed plus outstanding credits across every run, user and org on that UTC day."""
-        total = sum(a.amount for a in self._active.values() if a.day == day)
-        return total + sum(e.credits or 0.0 for e in self._ledger if e.kind == "commit" and e.day == day)
+        return self._day_committed_total(day) + sum(a.amount for a in self._active.values() if a.day == day)
 
     def _spend_alerts(self, day: date) -> tuple[Alert, ...]:
         """The first time this UTC day's committed USD spend reaches soft, then hard; hard also flips
         replay_only (NFR-24). Must be called with the lock held, after the commit entry is appended."""
-        spend, spent_usd = self._config.spend, self._day_deployment_total(day) * self._prices.credit_usd
+        spend, spent_usd = self._config.spend, self._day_committed_total(day) * self._prices.credit_usd
         alerted, raised = self._alerted.setdefault(day, set()), []
         for kind, threshold in (("daily_spend_soft", spend.daily_usd_soft), ("daily_spend_hard", spend.daily_usd_hard)):
             if spent_usd >= threshold - _EPS and kind not in alerted:
