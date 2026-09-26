@@ -19,3 +19,4 @@
 - [Router budget selection](router-budget-selection-probe.md) — budget between candidate prices refused outright; chaos test skips tight budgets
 - [Router cap ignores system/tools](router-cap-ignores-system-tools.md) — EFF-03 cap/price count only prompt; probe every request field
 - [Router failed-call charge](router-budget-failed-call-charge.md) — estimate deducted before send, never refunded on 429; fallback refused
+- [Writer swap retry probe](writer-swap-retry-probe.md) — identity-gated retry triple-writes; content dedupe drops same-ms parts; 0.3s deadline treats slow as hung
