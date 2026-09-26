@@ -50,6 +50,11 @@ declared none of its own): `tilo_providers.config` uses `pydantic` (already list
 (already listed under the root dev dependency group); both are already installed into the
 shared `uv` workspace venv by `uv sync --all-packages`.
 
+## Python (`packages/policy`)
+
+`tilo-policy` declares `pyyaml`, `jsonschema` and `referencing` as runtime dependencies (ticket
+P4-01); all three are already listed above under the root dev dependency group (MIT). No new
+licence.
 Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject.toml`):
 
 | Dependency | Licence | Source |
@@ -60,6 +65,12 @@ Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject
 `google.genai.Client(vertexai=True, ...)` is only ever constructed under `LIVE=1`
 (`tilo_providers.factory`); dev/CI tests fake the `google.genai` import path at the
 `sys.modules` boundary and never install real credentials (EFF-01).
+
+## Python (`services/connectors`)
+
+`tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
+FR-AGT-11), both already listed above (MIT); and the in-workspace `tilo-policy` (not external).
+No new licence.
 
 ## JavaScript / TypeScript (root `package.json` devDependencies, `pnpm`-managed)
 
