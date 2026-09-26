@@ -1,10 +1,9 @@
 # `tilo_api` — public shape ticket FR-HIL-09/SEC-07 pins (roles and redaction)
 
-Requirements FR-HIL-09 and SEC-07 (roles and redaction). Invariant PI-18 of
-`docs/security/p4-policy-invariants.md` applies. This file is the contract the builder implements
-exactly; the tests in this directory import only what is listed here. Nothing here is business
-logic — it is the shape tests hold the builder to, the same convention `packages/policy/tests/API.md`
-uses for P4-01.
+Requirements FR-HIL-09 and SEC-07 (roles and redaction). This file is the contract the builder
+implements exactly; the tests in this directory import only what is listed here. Nothing here is
+business logic — it is the shape tests hold the builder to, the same convention
+`packages/policy/tests/API.md` uses for P4-01.
 
 Real sign-in, Firestore, and the harness's own internals are out of scope: this ticket adds route
 handlers over an **injected, in-memory store** (no Firestore, no network; PRD 15.3's document
@@ -23,7 +22,7 @@ kept only where a round changed something the redaction routes or `tilo_api.deps
 ```python
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Literal, Protocol
+from typing import Literal
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
 
@@ -44,16 +43,20 @@ class Principal:
     # same 404 as an unknown world_id, so a caller cannot tell
     # "that world does not exist" from "you are not in it" (round 1
     # security finding).
-    domain: str | None = None  # team_lead's PRD 8.3 expert domain; None otherwise
     districts: tuple[str, ...] = ()  # districts this principal may see beyond "vis": "all":
     # a team_lead's domain districts, or a viewer's shared
     # scope. Ignored when role == "owner" (owner sees
-    # everything, PRD 10.1). An approver's visibility is their
-    # assigned cards' context (PRD 10.1); the two read routes
-    # below treat "approver" the same as "viewer" (districts
-    # only) since neither route is card-scoped -- noted as an
-    # open question below, not required by FR-HIL-09/SEC-07's
-    # own acceptance text (which names Viewer and Team Lead).
+    # everything, PRD 10.1). PRD 10.1's role table scopes a team
+    # lead's view by *districts* ("Their districts plus
+    # summaries"), not by domain, so `Principal` carries no
+    # `domain` field -- domain only routes questions to a team
+    # lead (FR-AGT-06), a different capability neither route below
+    # implements. An approver's visibility is their assigned
+    # cards' context (PRD 10.1); the two read routes below treat
+    # "approver" the same as "viewer" (districts only) since
+    # neither route is card-scoped -- noted as an open question
+    # below, not required by FR-HIL-09/SEC-07's own acceptance
+    # text (which names Viewer and Team Lead).
 
 
 @dataclass
@@ -70,10 +73,6 @@ class WorldRecord:
     ]  # district_id -> DistrictRecord, this world's full layout (owner's-eye view). A test may
     # store None or another malformed value under a key to prove the read routes fail closed
     # (treat it as hidden) rather than raising.
-    run_id: str  # common.schema.json#/$defs/run_id: the world's current run, the harness's own
-    # record. tilo-api reads this to know which run an event belongs to; it never
-    # invents one (PI-18 round-1 finding: run_id = f"r_{world_id}" was tilo-api's own
-    # guess, not the harness's actual run).
 
 
 @dataclass
@@ -86,23 +85,7 @@ class Store:
     events: dict[str, list[dict]] = field(
         default_factory=dict
     )  # world_id -> event.schema.json records, append-only, oldest first (seq strictly increasing,
-    # EV-10). Only EventWriter.append appends here; a route handler never does.
-
-
-class EventWriter(Protocol):
-    """The single writer of events (PRD 15.3). tilo-api builds an event *part* -- every
-    event.schema.json field except v, id, seq, ts, world_id, run_id and trace -- and hands it
-    here. A production implementation talks to the harness process; this ticket only pins the
-    call shape. The redaction routes below never call it -- they are read-only -- but the shared
-    test scaffolding (services/api/tests/conftest.py) wires one up for every test regardless, the
-    same in-memory `_api_lib.FakeEventWriter` the FR-HIL-07 kill-switch routes exercise for real."""
-
-    def append(self, world_id: str, part: dict) -> dict:
-        """part keys: type, actor, target, level, district, item, severity, credits, summary,
-        cause, vis, authz, data (any key the caller has no value for is set to that field's
-        schema-honest default: null, "info", 0, or "all" for vis). Returns the fully stamped
-        event.schema.json record that was appended to store.events[world_id]."""
-        ...
+    # EV-10), read-only from these two routes' point of view.
 
 
 def get_current_principal() -> Principal:
@@ -115,18 +98,13 @@ def get_store() -> Store:
     """Raises NotImplementedError in production until Firestore wiring lands; every test
     overrides this via app.dependency_overrides[get_store]."""
     raise NotImplementedError
-
-
-def get_event_writer() -> EventWriter:
-    """Raises NotImplementedError in production until the harness wiring lands; every test
-    overrides this via app.dependency_overrides[get_event_writer]."""
-    raise NotImplementedError
 ```
 
 ## Routes (new; `tilo_api.app` currently has only `GET /healthz`)
 
 Both routes below take `principal: Principal = Depends(get_current_principal)` and
-`store: Store = Depends(get_store)`. Neither emits an event, so neither takes an `EventWriter`.
+`store: Store = Depends(get_store)`. Neither emits an event or takes an `EventWriter`; FR-HIL-07
+adds that seam back to `tilo_api.deps` for its own stop/pause/revoke routes.
 
 ### World membership check (applies first, on every route below that takes a `world_id` path
 parameter)

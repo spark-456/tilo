@@ -39,12 +39,8 @@ select = ["E", "F", "I", "UP"]
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
-# `services/api` and `packages/providers` are the only typecheck targets that recurse into a
-# `tests/` dir (every other target is `.../src`), so their `conftest.py`s are the only ones ever
-# handed to mypy without an `__init__.py` -- and both are named `conftest.py`, which mypy (run
-# without `--explicit-package-bases`) rejects as a duplicate top-level module the moment both
-# targets are checked in one invocation. Adding `__init__.py` would fix mypy but breaks pytest's
-# rootdir-relative sibling imports (e.g. `from _api_lib import ...`) in those same directories, so
-# excluding `conftest.py` from static typing (pytest still collects and runs it as normal) is the
-# narrower fix.
-exclude = ["conftest\\.py$"]
+# services/api/tests has no __init__.py (pytest's rootdir-relative sibling imports need that), so
+# its conftest.py collides with packages/providers/tests/conftest.py as a duplicate top-level
+# module once both are checked in one mypy invocation; excluding it here is narrower than adding
+# an __init__.py, which would break those sibling imports.
+exclude = ["services/api/tests/conftest\\.py$"]

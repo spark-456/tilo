@@ -120,7 +120,7 @@ def test_SEC_07_viewer_never_sees_hidden_district_name_or_summary(client, store)
 def test_FR_HIL_09_team_lead_sees_only_domain_districts(client, store):
     _two_district_world(store)
     # A Team Lead whose domain covers D2 only (PRD 10.1 "Their districts plus summaries").
-    as_principal(make_principal(user_id="u_finance_lead", role="team_lead", domain="finance", districts=(D2,)))
+    as_principal(make_principal(user_id="u_finance_lead", role="team_lead", districts=(D2,)))
 
     events_resp = client.get(f"/worlds/{WORLD}/events")
     world_resp = client.get(f"/worlds/{WORLD}")
@@ -548,7 +548,6 @@ def test_FR_HIL_09_SEC_07_property_hidden_district_content_never_leaks(client, s
         make_principal(
             user_id="u_scoped",
             role=role,
-            domain="finance" if role == "team_lead" else None,
             districts=tuple(visible),
         )
     )
@@ -627,7 +626,6 @@ def test_SEC_07_property_scoped_view_never_returns_a_real_store_id_or_archive_re
             make_principal(
                 user_id="u_scoped",
                 role=role,
-                domain="finance" if role == "team_lead" else None,
                 districts=tuple(visible),
             )
         )
