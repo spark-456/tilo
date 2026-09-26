@@ -85,7 +85,7 @@
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
-# meter.schema.json 1.0.0 sha256:f01aaa0abd04c157
+# meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
@@ -1523,7 +1523,7 @@ An https URL of host, optional port and path, with no user info, query or fragme
 
 class MeterBudget(BaseModel):
     """
-    The run's Treasury state (PRD 14.1): the approved cap, credits committed and credits reserved by running steps. spent plus reserved never exceeds cap (MT-03, MT-05).
+    The run's Treasury state (PRD 14.1): the approved cap, credits committed and credits reserved by running steps. spent plus reserved never exceeds cap unless an overrun (an actual cost above its reservation, recorded in full) has halted the run (MT-03, MT-05).
     """
 
     model_config = ConfigDict(

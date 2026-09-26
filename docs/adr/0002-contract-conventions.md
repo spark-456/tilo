@@ -195,7 +195,11 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     per-user daily credit caps are required numbers above zero and never null, because PRD 14.1
     and FR-MTR-04 require both from config; only the per-org daily cap is above zero or null for
     none (BQ-42), its key still required. This keeps the PRD shape where issue #7 and SE's
-    stand-in allowed every cap to be null. Daily spend caps are above zero (MT-01 keeps hard at least soft), eval pass caps above zero (BQ-43), and case
+    stand-in allowed every cap to be null. Rules MT-03 and MT-05 follow SE's merged Treasury
+    (P8-01b): an actual cost above its reservation is recorded in full and halts the run, a day
+    cap counts a commit on its reservation's UTC day (BQ-44), and every reservation waits while
+    the kill switch is on. A grant never lifts a run above `caps.run_credits`, which PRD 17.3
+    calls a ceiling; the Treasury's `grant` does not check this yet (issue #7). Daily spend caps are above zero (MT-01 keeps hard at least soft), eval pass caps above zero (BQ-43), and case
     counts for exactly the eight PRD 19.2 groups, whose rows sum to 160 although the heading says
     170 (BQ-67). `meter.schema.json` is the HUD meter's state for one run: `last_seq` lets a client
     drop a stale state, time saved may be negative and is never clamped, `steering_measured` says

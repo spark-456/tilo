@@ -41,7 +41,7 @@
       "not": { "pattern": "\n" }
     },
     "budget": {
-      "description": "The run's Treasury state (PRD 14.1): the approved cap, credits committed and credits reserved by running steps. spent plus reserved never exceeds cap (MT-03, MT-05).",
+      "description": "The run's Treasury state (PRD 14.1): the approved cap, credits committed and credits reserved by running steps. spent plus reserved never exceeds cap unless an overrun (an actual cost above its reservation, recorded in full) has halted the run (MT-03, MT-05).",
       "type": "object",
       "additionalProperties": false,
       "required": ["cap", "spent", "reserved"],
