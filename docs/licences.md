@@ -23,6 +23,7 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | fastapi | MIT | https://pypi.org/project/fastapi/ |
+| python-multipart (`tilo-api` form uploads) | Apache-2.0 | https://pypi.org/project/python-multipart/ |
 | uvicorn | BSD-3-Clause | https://pypi.org/project/uvicorn/ |
 
 ## Python (`packages/contracts-py`)
@@ -70,6 +71,12 @@ Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject
 
 `tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
 FR-AGT-11), both already listed above (MIT); and the in-workspace `tilo-policy` (not external).
+No new licence.
+
+## Python (`packages/planning`)
+
+`tilo-planning` (FR-INT-01/02) depends only on the in-workspace `tilo-contracts` and
+`tilo-providers` (not external); `tilo-api` now depends on the in-workspace `tilo-planning`.
 No new licence.
 
 ## JavaScript / TypeScript (root `package.json` and `apps/web`, `pnpm`-managed)

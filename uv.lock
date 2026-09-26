@@ -12,6 +12,7 @@ members = [
     "tilo-evals",
     "tilo-harness",
     "tilo-metering",
+    "tilo-planning",
     "tilo-policy",
     "tilo-providers",
     "tilo-sandbox-web",
@@ -1282,12 +1283,16 @@ version = "0.1.0"
 source = { editable = "services/api" }
 dependencies = [
     { name = "fastapi" },
+    { name = "python-multipart" },
+    { name = "tilo-planning" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "python-multipart", specifier = ">=0.0.18" },
+    { name = "tilo-planning", editable = "packages/planning" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
@@ -1373,6 +1378,21 @@ dependencies = [
 requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+]
+
+[[package]]
+name = "tilo-planning"
+version = "0.1.0"
+source = { editable = "packages/planning" }
+dependencies = [
+    { name = "tilo-contracts" },
+    { name = "tilo-providers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-providers", editable = "packages/providers" },
 ]
 
 [[package]]
