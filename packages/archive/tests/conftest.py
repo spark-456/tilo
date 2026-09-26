@@ -1,6 +1,5 @@
 """Shared fixtures and helpers for packages/archive acceptance tests
-(ticket FR-MEM-04 / FR-MEM-05 / SEC-14, PRD 13.2, 15.1, 16.1, 16.4, 16.5,
-22.2 D-09).
+(ticket FR-MEM-04, PRD 13.2, 15.1, 22.2 D-09).
 
 `tilo_archive` does not exist yet -- these tests are written before the
 package (test-writer step of the ticket loop, root CLAUDE.md). Every helper
@@ -16,12 +15,9 @@ packages/providers/tests/conftest.py).
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import re
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
-from types import ModuleType
 
 import pytest
 from hypothesis import settings
@@ -35,8 +31,6 @@ from hypothesis import settings
 settings.register_profile("archive", deadline=None)
 settings.load_profile("archive")
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-
 ORG_ID = "org_test01"
 RUN_ID = "r_test01"
 OTHER_RUN_ID = "r_other01"
@@ -49,9 +43,6 @@ ZERO_HASH = "0" * 64
 # phase0-stack.
 ARCHIVE_REF_RE = re.compile(r"^r_[0-9A-Za-z_]{1,48}/[0-9]{1,9}$")
 RUN_ID_RE = re.compile(r"^r_[0-9A-Za-z_]{1,48}$")
-
-ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-URLSAFE_ALPHABET = ALPHABET + "-_"
 
 
 class FakeClock:
@@ -93,147 +84,10 @@ def mentions_seq(problems: list[str], seq: int) -> bool:
     return any(pattern.search(p) for p in problems)
 
 
-def load_secret_scan() -> ModuleType:
-    """Loads scripts/secret_scan.py by path. Per the brief: "a package must
-    not import from scripts/, tests may load it by path" -- this is a test
-    helper, not part of tilo_archive.
-    """
-    path = REPO_ROOT / "scripts" / "secret_scan.py"
-    spec = importlib.util.spec_from_file_location("_secret_scan_by_path", path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def rand_token(rng, n: int, alphabet: str = ALPHABET) -> str:
-    return "".join(rng.choice(alphabet) for _ in range(n))
-
-
-def luhn_check_digit(number_without_check: str) -> str:
-    """Standard Luhn check digit for a digit string with the check digit
-    appended at the end (used only to build fake, clearly-synthetic test
-    card numbers at runtime -- never a literal card number in source)."""
-    total = 0
-    for i, ch in enumerate(reversed(number_without_check)):
-        d = int(ch)
-        if i % 2 == 0:
-            d *= 2
-            if d > 9:
-                d -= 9
-        total += d
-    return str((10 - (total % 10)) % 10)
-
-
-def is_luhn_valid(digits: str) -> bool:
-    total = 0
-    for i, ch in enumerate(reversed(digits)):
-        d = int(ch)
-        if i % 2 == 1:
-            d *= 2
-            if d > 9:
-                d -= 9
-        total += d
-    return total % 10 == 0
-
-
-def fake_luhn_card(rng, length: int = 16) -> str:
-    body = "4" + "".join(str(rng.randint(0, 9)) for _ in range(length - 2))
-    card = body + luhn_check_digit(body)
-    assert is_luhn_valid(card)
-    return card
-
-
-def fake_non_luhn_number(rng, length: int = 16) -> str:
-    """A digit string the same shape as a card number but Luhn-invalid, e.g.
-    an order number that must be left alone."""
-    while True:
-        digits = "".join(str(rng.randint(0, 9)) for _ in range(length))
-        if not is_luhn_valid(digits):
-            return digits
-
-
-def with_separator(digits: str, sep: str, group: int = 4) -> str:
-    return sep.join(digits[i : i + group] for i in range(0, len(digits), group))
-
-
-def fake_jwt(rng) -> str:
-    import base64
-
-    def b64(obj: dict) -> str:
-        raw = json.dumps(obj, sort_keys=True).encode("utf-8")
-        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
-
-    header = b64({"alg": "HS256", "typ": "JWT"})
-    payload = b64({"sub": "fake-user", "exp": 9999999999})
-    signature = rand_token(rng, 43, URLSAFE_ALPHABET)
-    return f"{header}.{payload}.{signature}"
-
-
-def fake_bearer_header(rng) -> tuple[str, str]:
-    """Returns (full "Authorization: Bearer <token>" header text, token alone)."""
-    token = rand_token(rng, 40, URLSAFE_ALPHABET)
-    return f"Authorization: Bearer {token}", token
-
-
-# ---------------------------------------------------------------------------
-# PEM private-key blocks, built purely from fragments at runtime (never a
-# literal "-----BEGIN ... PRIVATE KEY-----" contiguous in this file's own
-# source, so the pre-commit secret scan / guard hook never flags this file).
-# Mirrors scripts/secret_scan.py's own header pattern:
-# r"-----BEGIN [A-Z ]*PRIVATE KEY-----" (zero or more upper-case words before
-# "PRIVATE KEY", so the generic "" type word is a valid case too).
-# ---------------------------------------------------------------------------
-
-PEM_TYPE_WORDS = ["RSA", "EC", "DSA", "OPENSSH", "ENCRYPTED", ""]  # "" == generic "PRIVATE KEY"
-
-_PEM_B64_ALPHABET = ALPHABET + "+/"
-
-
-def pem_label(type_word: str) -> str:
-    key_word = "PRIVATE" + " " + "KEY"
-    return f"{type_word} {key_word}" if type_word else key_word
-
-
-def pem_body_lines(rng, n_lines: int = 6, line_len: int = 64) -> list[str]:
-    return ["".join(rng.choice(_PEM_B64_ALPHABET) for _ in range(line_len)) for _ in range(n_lines)]
-
-
-def build_pem_block(rng, type_word: str, n_lines: int = 6, include_end: bool = True) -> tuple[str, list[str]]:
-    """Builds a full PEM block (BEGIN header, multi-line base64 body, and
-    optionally the END line) at runtime. Returns (block_text, body_lines) so
-    callers can assert each body line individually disappears after redaction.
-    """
-    dashes = "-" * 5
-    label = pem_label(type_word)
-    begin_line = f"{dashes}{'BEGIN'} {label}{dashes}"
-    body = pem_body_lines(rng, n_lines=n_lines)
-    lines = [begin_line, *body]
-    if include_end:
-        end_line = f"{dashes}{'END'} {label}{dashes}"
-        lines.append(end_line)
-    return "\n".join(lines), body
-
-
-def build_service_account_payload(rng) -> dict:
-    """A dict shaped like a downloaded Google service-account key file: a PEM
-    private key with literal "\\n" escapes (as it appears once JSON-encoded),
-    plus private_key_id. The "type"/"service_account" marker is assembled
-    from separate variables so the literal pair never sits adjacent in this
-    file's source text.
-    """
-    block, body = build_pem_block(rng, "", n_lines=8)
-    escaped_key = block.replace("\n", "\\n")
-    type_field = "type"
-    type_marker = "service_account" + ""  # kept as a separate expression, not a dict literal pair
-    key_id = rand_token(rng, 40, "0123456789abcdef")
-    payload: dict = {}
-    payload[type_field] = type_marker
-    payload["project_id"] = "fake-" + "project"
-    payload["private_key_id"] = key_id
-    payload["private_key"] = escaped_key
-    payload["client_email"] = "fake-sa@" + "fake-project.iam.gserviceaccount.com"
-    return payload, body, key_id
+def identity_redactor(payload):
+    """Trivial redactor for FR-MEM-04 tests: the chain is under test here,
+    not redaction (FR-MEM-05 supplies the real redactor later)."""
+    return payload
 
 
 @pytest.fixture
@@ -247,4 +101,4 @@ def store(tmp_path):
 def archive(store):
     from tilo_archive.archive import RunArchive
 
-    return RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    return RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)

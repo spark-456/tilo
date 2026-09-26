@@ -11,10 +11,9 @@ import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from .record import VALID_KINDS, ZERO_HASH, canonical_json, format_ts, record_hash, split_jsonl
-from .redact import redact
 
 ORG_ID_RE = re.compile(r"^org_[0-9A-Za-z_]{1,48}$")
 RUN_ID_RE = re.compile(r"^r_[0-9A-Za-z_]{1,48}$")
@@ -99,9 +98,22 @@ def _parse_records(lines: list[str]) -> list[dict]:
 
 class RunArchive:
     """Appends redacted, hash-chained records for one run. Reopening (a new
-    instance over the same store/org/run) continues the chain from the head."""
+    instance over the same store/org/run) continues the chain from the head.
 
-    def __init__(self, store: Store, *, org_id: str, run_id: str, clock: Callable[[], datetime] | None = None):
+    `redactor` is required, with no default, so nothing can archive an
+    unredacted payload by omission. It runs on every payload before hashing
+    and writing; if it raises, the append fails closed and writes nothing.
+    FR-MEM-05 supplies the real redactor (shared redaction module)."""
+
+    def __init__(
+        self,
+        store: Store,
+        *,
+        org_id: str,
+        run_id: str,
+        redactor: Callable[[Any], Any],
+        clock: Callable[[], datetime] | None = None,
+    ):
         # fullmatch (not match): with a trailing "$", .match() alone would
         # accept a string with an extra trailing "\n" -- $ matches just
         # before a final newline, but .match() never checks that the whole
@@ -113,12 +125,19 @@ class RunArchive:
         self._store = store
         self._org_id = org_id
         self._run_id = run_id
+        self._redactor = redactor
         self._clock = clock or (lambda: datetime.now(UTC))
         self._records: list[dict] = _parse_records(store.read_lines(org_id, run_id))
 
     def append(self, kind: str, payload: object) -> str:
         if kind not in VALID_KINDS:
             raise ValueError(f"invalid kind: {kind!r} (must be one of {VALID_KINDS})")
+        try:
+            redacted = self._redactor(payload)
+        except Exception as exc:
+            # Fail closed; `from None` and the type name only, so the
+            # redactor's message (which may echo the payload) is not chained.
+            raise ValueError(f"redactor failed ({type(exc).__name__}); nothing archived") from None
         seq = self._records[-1]["seq"] + 1 if self._records else 1
         prev_hash = self._records[-1]["hash"] if self._records else ZERO_HASH
         record = {
@@ -127,7 +146,7 @@ class RunArchive:
             "seq": seq,
             "kind": kind,
             "ts": format_ts(self._clock()),
-            "payload": redact(payload),
+            "payload": redacted,
             "prev_hash": prev_hash,
         }
         try:

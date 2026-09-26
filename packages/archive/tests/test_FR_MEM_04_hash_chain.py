@@ -25,6 +25,7 @@ from conftest import (
     ZERO_HASH,
     FakeClock,
     canonical_hash,
+    identity_redactor,
     mentions_seq,
 )
 from hypothesis import given
@@ -86,7 +87,7 @@ def test_FR_MEM_04_head_matches_last_record(archive):
 
 def test_FR_MEM_04_local_dir_store_never_rewrites_existing_lines(tmp_path):
     store = LocalDirStore(tmp_path)
-    arch = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    arch = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     arch.append("model_call", {"i": 0})
     path = tmp_path / ORG_ID / f"{RUN_ID}.jsonl"
     assert path.exists()
@@ -190,7 +191,7 @@ def test_FR_MEM_04_verify_chain_detects_duplicate_seq(archive):
 def test_FR_MEM_04_verify_chain_detects_record_from_another_run(archive, store):
     for i in range(2):
         archive.append("model_call", {"i": i})
-    other = RunArchive(store, org_id=ORG_ID, run_id=OTHER_RUN_ID, clock=FakeClock())
+    other = RunArchive(store, org_id=ORG_ID, run_id=OTHER_RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     other.append("model_call", {"x": 1})
 
     records = archive.records() + other.records()
@@ -235,12 +236,12 @@ def test_FR_MEM_04_verify_chain_passes_when_records_match_expected_head(archive)
 
 
 def test_FR_MEM_04_reopened_archive_continues_chain(store):
-    first = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    first = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     first.append("model_call", {"i": 0})
     first.append("model_call", {"i": 1})
     head_after_first_session = first.head()
 
-    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     assert reopened.head() == head_after_first_session
 
     reopened.append("tool_call", {"i": 2})
@@ -266,14 +267,14 @@ def test_FR_MEM_04_invalid_kind_raises_and_writes_nothing(archive):
 @pytest.mark.parametrize("bad_run_id", ["not-valid", "r_", "R_bad", "", "r_" + "x" * 49])
 def test_FR_MEM_04_bad_run_id_raises_and_writes_nothing(store, bad_run_id):
     with pytest.raises(ValueError):
-        arch = RunArchive(store, org_id=ORG_ID, run_id=bad_run_id, clock=FakeClock())
+        arch = RunArchive(store, org_id=ORG_ID, run_id=bad_run_id, clock=FakeClock(), redactor=identity_redactor)
         arch.append("model_call", {"x": 1})
 
 
 @pytest.mark.parametrize("bad_org_id", ["bad org id", "org", "not_org_prefixed", ""])
 def test_FR_MEM_04_bad_org_id_raises_and_writes_nothing(store, bad_org_id):
     with pytest.raises(ValueError):
-        arch = RunArchive(store, org_id=bad_org_id, run_id=RUN_ID, clock=FakeClock())
+        arch = RunArchive(store, org_id=bad_org_id, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
         arch.append("model_call", {"x": 1})
 
 
@@ -286,7 +287,7 @@ def test_FR_MEM_04_id_with_trailing_newline_raises(store, suffix_id):
     org_id = suffix_id if suffix_id.startswith("org_") else ORG_ID
     run_id = suffix_id if suffix_id.startswith("r_") else RUN_ID
     with pytest.raises(ValueError):
-        arch = RunArchive(store, org_id=org_id, run_id=run_id, clock=FakeClock())
+        arch = RunArchive(store, org_id=org_id, run_id=run_id, clock=FakeClock(), redactor=identity_redactor)
         arch.append("model_call", {"x": 1})
 
 
@@ -327,7 +328,7 @@ def test_FR_MEM_04_infinite_payload_raises_and_writes_nothing(archive, bad_float
 )
 def test_FR_MEM_04_seq_strictly_increasing(tmp_path_factory, kinds):
     store = LocalDirStore(tmp_path_factory.mktemp("prop"))
-    arch = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    arch = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     expected_next_seq = 1
     for kind in kinds:
         arch.append(kind, {"k": kind})
@@ -393,11 +394,11 @@ def test_FR_MEM_04_int_keyed_payload_hash_stable_across_reopen(store):
     # reopen, json.loads had turned those keys into the strings "9"/"10",
     # which sort the other way -- a spurious "hash mismatch" on a record
     # nobody tampered with, and a different head after reopening.
-    arch = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    arch = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     arch.append("tool_call", {"rows": {10: "x", 9: "y"}})
     head = arch.head()
 
-    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     assert reopened.head() == head
 
     records = reopened.records()
@@ -417,7 +418,7 @@ def test_FR_MEM_04_cli_reports_truncated_tail_instead_of_crashing(tmp_path):
     # the CLI with an uncaught JSONDecodeError and no JSON output at all,
     # breaking its own output contract.
     store = LocalDirStore(tmp_path)
-    arch = RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())
+    arch = RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock(), redactor=identity_redactor)
     for i in range(3):
         arch.append("model_call", {"i": i})
     jsonl_path = tmp_path / "org_a" / "r_1.jsonl"
@@ -435,14 +436,14 @@ def test_FR_MEM_04_reopen_raises_value_error_naming_truncated_line(tmp_path):
     # JSONDecodeError that did not name the record, instead of a ValueError
     # naming the truncated tail line and appending nothing.
     store = LocalDirStore(tmp_path)
-    arch = RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())
+    arch = RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock(), redactor=identity_redactor)
     for i in range(3):
         arch.append("model_call", {"i": i})
     jsonl_path = tmp_path / "org_a" / "r_1.jsonl"
     _truncate_mid_append(jsonl_path)
 
     with pytest.raises(ValueError, match="line 4"):
-        RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())
+        RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock(), redactor=identity_redactor)
 
 
 # ---------------------------------------------------------------------------
@@ -479,7 +480,7 @@ def test_FR_MEM_04_reopen_raises_value_error_for_non_object_record(tmp_path, bad
     # AttributeError/TypeError from `self._records[-1]["seq"]`, not the
     # ValueError every other malformed-record case raises.
     store = LocalDirStore(tmp_path)
-    arch = RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())
+    arch = RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock(), redactor=identity_redactor)
     for i in range(3):
         arch.append("model_call", {"i": i})
     jsonl_path = tmp_path / "org_a" / "r_1.jsonl"
@@ -488,7 +489,7 @@ def test_FR_MEM_04_reopen_raises_value_error_for_non_object_record(tmp_path, bad
     jsonl_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="line 2"):
-        RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock())
+        RunArchive(store, org_id="org_a", run_id="r_1", clock=FakeClock(), redactor=identity_redactor)
 
 
 @pytest.mark.parametrize("bad_line", ["null", "[1, 2]"], ids=["null", "list"])
@@ -546,7 +547,7 @@ def test_FR_MEM_04_append_after_missing_trailing_newline_does_not_corrupt_prior_
     # must still be its own, unmodified, parseable line, and every later
     # reopen must see all 3 records with an intact chain.
     store = LocalDirStore(tmp_path)
-    arch = RunArchive(store, org_id="org_a", run_id="r_x", clock=FakeClock())
+    arch = RunArchive(store, org_id="org_a", run_id="r_x", clock=FakeClock(), redactor=identity_redactor)
     arch.append("model_call", {"i": 0})
     arch.append("model_call", {"i": 1})
     jsonl_path = tmp_path / "org_a" / "r_x.jsonl"
@@ -556,7 +557,7 @@ def test_FR_MEM_04_append_after_missing_trailing_newline_does_not_corrupt_prior_
     assert raw.endswith(b"\n")
     jsonl_path.write_bytes(raw[:-1])  # strip only the final newline byte
 
-    reopened = RunArchive(store, org_id="org_a", run_id="r_x", clock=FakeClock())
+    reopened = RunArchive(store, org_id="org_a", run_id="r_x", clock=FakeClock(), redactor=identity_redactor)
     assert len(reopened.records()) == 2
 
     ref = reopened.append("tool_call", {"i": 2})
@@ -566,7 +567,7 @@ def test_FR_MEM_04_append_after_missing_trailing_newline_does_not_corrupt_prior_
     assert len(lines) == 3
     assert lines[1] == original_line_2, "record 2 must not be merged with record 3"
 
-    twice_reopened = RunArchive(store, org_id="org_a", run_id="r_x", clock=FakeClock())
+    twice_reopened = RunArchive(store, org_id="org_a", run_id="r_x", clock=FakeClock(), redactor=identity_redactor)
     records = twice_reopened.records()
     assert len(records) == 3
     assert [r["seq"] for r in records] == [1, 2, 3]

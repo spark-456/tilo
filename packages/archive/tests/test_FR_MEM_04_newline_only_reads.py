@@ -27,7 +27,7 @@ import subprocess
 import sys
 
 import pytest
-from conftest import ORG_ID, RUN_ID, FakeClock
+from conftest import ORG_ID, RUN_ID, FakeClock, identity_redactor
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from tilo_archive.archive import LocalDirStore, RunArchive, verify_chain
@@ -61,7 +61,7 @@ def _run_cli(path) -> subprocess.CompletedProcess:
 @pytest.mark.parametrize("name,ch", SPECIAL_LINE_BREAKS, ids=[n for n, _ in SPECIAL_LINE_BREAKS])
 def test_FR_MEM_04_payload_with_str_splitlines_only_char_round_trips(tmp_path, name, ch):
     store = LocalDirStore(tmp_path)
-    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     n = 4
     texts = [f"before-{i}{ch}middle-{i}{ch}after-{i}" for i in range(n)]
     for text in texts:
@@ -72,7 +72,7 @@ def test_FR_MEM_04_payload_with_str_splitlines_only_char_round_trips(tmp_path, n
     # Reopen: a from-scratch RunArchive over the same store must read back
     # the exact same head, proving the reader did not shred any stored line
     # on this character.
-    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     assert reopened.head() == head_before, (
         f"{name}: reopening the archive changed its head -- a reader split a stored line on this character"
     )
@@ -89,7 +89,7 @@ def test_FR_MEM_04_payload_with_str_splitlines_only_char_round_trips(tmp_path, n
 @pytest.mark.parametrize("name,ch", SPECIAL_LINE_BREAKS, ids=[n for n, _ in SPECIAL_LINE_BREAKS])
 def test_FR_MEM_04_verify_cli_exits_0_with_correct_record_count(tmp_path, name, ch):
     store = LocalDirStore(tmp_path)
-    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     n = 5
     for i in range(n):
         archive.append("model_call", {"text": f"line{ch}break-{i}", "i": i})
@@ -107,11 +107,11 @@ def test_FR_MEM_04_verify_cli_exits_0_with_correct_record_count(tmp_path, name, 
 
 def test_FR_MEM_04_char_at_start_and_end_of_payload_value_round_trips(tmp_path):
     store = LocalDirStore(tmp_path)
-    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     for name, ch in SPECIAL_LINE_BREAKS:
         archive.append("model_call", {"kind": name, "text": f"{ch}payload-wrapped{ch}"})
 
-    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     records = reopened.records()
 
     assert len(records) == len(SPECIAL_LINE_BREAKS)
@@ -123,14 +123,14 @@ def test_FR_MEM_04_char_at_start_and_end_of_payload_value_round_trips(tmp_path):
 
 def test_FR_MEM_04_all_special_chars_combined_in_one_payload_round_trips(tmp_path):
     store = LocalDirStore(tmp_path)
-    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     combined = "".join(ch for _, ch in SPECIAL_LINE_BREAKS)
     text = f"start{combined}mid{combined}end"
     archive.append("model_call", {"text": text})
     archive.append("model_call", {"text": "plain-second-record"})
 
     head_before = archive.head()
-    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
 
     assert reopened.head() == head_before
     records = reopened.records()
@@ -161,12 +161,12 @@ _SPECIAL_CHARS_ONLY = st.text(alphabet=[ch for _, ch in SPECIAL_LINE_BREAKS] + l
 @settings(max_examples=25, deadline=None)
 def test_FR_MEM_04_property_round_trip_for_any_mix_of_special_separators(tmp_path_factory, texts):
     store = LocalDirStore(tmp_path_factory.mktemp("prop"))
-    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    archive = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
     for text in texts:
         archive.append("model_call", {"text": text})
 
     head_before = archive.head()
-    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock())
+    reopened = RunArchive(store, org_id=ORG_ID, run_id=RUN_ID, clock=FakeClock(), redactor=identity_redactor)
 
     assert reopened.head() == head_before
     records = reopened.records()
