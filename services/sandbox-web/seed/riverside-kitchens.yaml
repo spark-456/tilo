@@ -1,0 +1,30 @@
+# Fixture seed for the P8-07 Sandbox Web (SC-06 kitchen-renovation quotes,
+# PRD 4.3). Fictional contractor; domain is *.example per SE ticket rule
+# 0.15. rate_card drives the generic /s/<slug>/quote arithmetic: quote =
+# base_fee + per_sqft * sqft + per_cabinet * cabinets.
+slug: riverside-kitchens
+name: Riverside Kitchens
+kind: contractor
+domain: riverside-kitchens.example
+rate_card:
+  base_fee: 500
+  per_sqft: 85
+  per_cabinet: 120
+pages:
+  profile:
+    title: "Riverside Kitchens"
+    services: ["Full kitchen remodel", "Cabinet refacing", "Countertop replacement"]
+    reviews:
+      - author: "T. Ong"
+        rating: 5
+        text: "Finished on schedule and within quote."
+      - author: "M. Lee"
+        rating: 4
+        text: "Good communication throughout."
+    licence: "SG-BCA-KRW-00231"
+    insurance: "Public liability SGD 1,000,000, policy RK-INS-4471"
+    availability: ["2026-11-03", "2026-11-10", "2026-11-17"]
+  quote:
+    title: "Riverside Kitchens — get a quote"
+    accepts_post: true
+    inputs: ["sqft", "cabinets"]
