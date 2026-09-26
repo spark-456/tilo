@@ -1,0 +1,52 @@
+{
+  "approaches": [
+    {
+      "id": "quick",
+      "label": "Quick scan",
+      "summary": "Quick scan: overview research over 3 sources.",
+      "dimensions": {
+        "depth": "overview",
+        "sources": 3,
+        "parallelism": 3,
+        "verification": "basic",
+        "output_format": "pdf"
+      },
+      "time": { "min_s": 180, "max_s": 300 },
+      "credits": { "min": 30, "max": 45 },
+      "risks": ["A supplier may not have published prices"],
+      "skips": ["Warranty terms"]
+    },
+    {
+      "id": "thorough",
+      "label": "Thorough review",
+      "summary": "Thorough review: deep research over 8 sources.",
+      "dimensions": {
+        "depth": "deep",
+        "sources": 8,
+        "parallelism": 4,
+        "verification": "thorough",
+        "output_format": "pptx"
+      },
+      "time": { "min_s": 600, "max_s": 900 },
+      "credits": { "min": 90, "max": 130 },
+      "risks": ["A supplier may not have published prices"],
+      "skips": []
+    },
+    {
+      "id": "balanced",
+      "label": "Balanced",
+      "summary": "Balanced: standard research over 5 sources.",
+      "dimensions": {
+        "depth": "standard",
+        "sources": 5,
+        "parallelism": 2,
+        "verification": "standard",
+        "output_format": "pdf"
+      },
+      "time": { "min_s": 300, "max_s": 600 },
+      "credits": { "min": 50, "max": 80 },
+      "risks": ["A supplier may not have published prices"],
+      "skips": ["Warranty terms"]
+    }
+  ]
+}
