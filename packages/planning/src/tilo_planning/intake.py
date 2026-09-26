@@ -9,10 +9,11 @@ from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import Any
 
-from tilo_contracts import EVENT_DATA_MODELS, Event
 from tilo_providers.interfaces import SafetyProvider
 
 from tilo_planning.artifacts import InMemoryArtifactStore, new_ulid
+from tilo_planning.events import build_event as _event
+from tilo_planning.events import clip as _clip
 from tilo_planning.extraction import FILE_TYPES, Budget, ExtractionError, extract, file_type
 
 MAX_TEXT_CHARS = 4000
@@ -139,27 +140,3 @@ def _check_limits(request: IntakeRequest) -> list[str]:
             raise IntakeRejected(f"{_clip(name or 'A file', 80)} is not accepted; attach {_ACCEPTED} files.")
         names.append(name)
     return names
-
-
-def _clip(text: str, limit: int) -> str:
-    return text if len(text) <= limit else text[: limit - 1] + "…"
-
-
-def _event(base: dict[str, Any], *, tool: str | None, summary: str, **fields: Any) -> dict[str, Any]:
-    data_model = EVENT_DATA_MODELS[fields["type"]]
-    data = data_model.model_validate(fields["data"])
-    fields["data"] = data.model_dump(mode="json", by_alias=True, exclude_unset=True)
-    trace = dict.fromkeys(("model_role", "profile", "tokens_in", "tokens_out", "latency_ms", "archive_ref"))
-    raw = {
-        **base,
-        **fields,
-        "id": new_ulid(),
-        "level": None,
-        "district": None,
-        "credits": 0,
-        "summary": _clip(summary, 140),
-        "vis": "all",
-        "authz": None,
-        "trace": {**trace, "tool": tool},
-    }
-    return Event.model_validate(raw).model_dump(mode="json", exclude_unset=True)
