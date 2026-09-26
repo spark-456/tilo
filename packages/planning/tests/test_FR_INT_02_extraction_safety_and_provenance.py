@@ -12,7 +12,9 @@ required because there is no fake `SafetyProvider` yet.
 from __future__ import annotations
 
 import hashlib
+import io
 import re
+import zipfile
 
 import pytest
 from _planning_contracts_lib import (
@@ -292,3 +294,64 @@ def test_FR_INT_02_xml_element_budget_is_shared_by_the_request(safety_provider, 
 
     assert result.files[0].status == "ok"
     assert "failed" in [f.status for f in result.files][1:]
+
+
+def _package(document_xml: str) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("word/document.xml", document_xml)
+    return buf.getvalue()
+
+
+_W = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+_MEMORY_BOUND = 64 * 1024 * 1024  # far below tilo-api's 512Mi (infra/modules/service/main.tf)
+
+
+_LT_EVERY_200K = ("x" * 200_000 + "<") * 25  # 5 MB with a '<' often enough to split raw runs
+_HOSTILE = {  # built lazily: a multi-megabyte parameter would become the test id
+    "many attributes": lambda: _W + "<w:p " + " ".join(f'a{i}=""' for i in range(300_000)) + "/></w:document>",
+    "huge attribute value": lambda: _W + '<w:p a="' + "x" * 5_000_000 + '"/></w:document>',
+    "deep nesting": lambda: _W + "<w:r>" * 900_000 + "</w:r>" * 900_000 + "</w:document>",
+    # U+4E3C is 3C 4E in UTF-16LE: a raw 0x3C byte that is not '<'
+    "utf-16 attribute": lambda: ("﻿" + _W + '<w:p a="' + "丼" * 2_500_000 + '"/></w:document>').encode("utf-16-le"),
+    "comment": lambda: _W + "<!--" + _LT_EVERY_200K + "--></w:document>",
+    "processing instruction": lambda: _W + "<?pi " + _LT_EVERY_200K + "?></w:document>",
+    "doctype literal": lambda: '<!DOCTYPE x SYSTEM "' + _LT_EVERY_200K + '">' + _W + "</w:document>",
+    "declaration": lambda: '<?xml version="1.0" ' + _LT_EVERY_200K + "?>" + _W + "</w:document>",
+}
+
+
+@pytest.mark.parametrize("shape", list(_HOSTILE))
+def test_FR_INT_02_hostile_markup_fails_that_file_within_a_memory_bound(safety_provider, shape):
+    """expat buffers a whole tag, and every open element, before any handler runs; a small upload
+    must not be able to spend the instance's memory (PRD 16.2)."""
+    import tracemalloc
+
+    package = _package(_HOSTILE[shape]())
+    ok = make_docx_bytes("Plain text.")
+    tracemalloc.start()
+    try:
+        result, _store = _submit([("hostile.docx", package), ("ok.docx", ok)], safety_provider)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+
+    assert result.files[0].status == "failed" and result.files[0].error, shape
+    assert result.files[1].status == "ok"
+    assert peak < _MEMORY_BOUND, f"{shape}: peak {peak // 2**20} MiB"
+
+
+def test_FR_INT_02_lying_entry_count_is_still_refused(safety_provider):
+    """zipfile walks the central directory by its byte size; a forged entry count must not let
+    an oversized directory through."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
+        for i in range(6000):
+            zf.writestr(f"word/p{i}.bin", b"")
+    content = bytearray(buf.getvalue())
+    eocd = content.rfind(b"PK\x05\x06")
+    content[eocd + 8 : eocd + 12] = (1).to_bytes(2, "little") * 2  # entries on disk / in total
+
+    result, _store = _submit([("many.docx", bytes(content))], safety_provider)
+
+    assert result.files[0].status == "failed" and "too many parts" in result.files[0].error

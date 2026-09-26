@@ -17,6 +17,9 @@ MAX_ZIP_MEMBERS = 5000
 MAX_EXTRACTED_BYTES = 50 * 1024 * 1024  # decompressed XML read for one whole request
 MAX_XML_ELEMENTS = 1_000_000  # parsed elements for one whole request: about 1.5 s of CPU
 MAX_TEXT_CHARS = 200_000  # per file: more than a brief or a model context can use
+MAX_CENTRAL_DIRECTORY_BYTES = 1024 * 1024  # zipfile parses this many bytes of entries
+MAX_RUN_BYTES = 256 * 1024  # bytes between two '<': bounds any tag, attribute or text run expat buffers
+MAX_DEPTH = 256  # nested elements; OOXML stays far below this
 _CHUNK = 64 * 1024
 
 _OOXML = "application/vnd.openxmlformats-officedocument."
@@ -41,6 +44,7 @@ _PARTS = {
 _TEXT_TAGS = {"t", "delText", "v"}  # w:t / a:t / xlsx t, tracked deletions, cell values
 _BREAK_TAGS = {"p", "row", "si"}
 _TOO_LARGE = "too large to read"
+_UNSUPPORTED = "unsupported XML: only plain UTF-8 Office markup is read"
 
 
 class ExtractionError(Exception):
@@ -79,11 +83,16 @@ def extract(filename: str, content: bytes, budget: Budget | None = None) -> str 
 
 
 def _check_directory(content: bytes) -> None:
-    """Refuse an oversized central directory from its end record, before zipfile parses it."""
+    """Refuse an oversized central directory from its end record, before zipfile parses it. zipfile
+    walks the directory's byte size, not the entry count, so the size is what is bounded."""
     end = content.rfind(b"PK\x05\x06")
     if end < 0 or len(content) - end < 22:
         raise ExtractionError("unreadable package: no end of central directory")
-    if int.from_bytes(content[end + 10 : end + 12], "little") > MAX_ZIP_MEMBERS:  # 0xFFFF marks zip64
+    if end >= 20 and content[end - 20 : end - 16] == b"PK\x06\x07":
+        raise ExtractionError("zip64 packages are not accepted")
+    entries = int.from_bytes(content[end + 10 : end + 12], "little")
+    directory_bytes = int.from_bytes(content[end + 12 : end + 16], "little")
+    if entries > MAX_ZIP_MEMBERS or directory_bytes > MAX_CENTRAL_DIRECTORY_BYTES:
         raise ExtractionError("too many parts in the package")
 
 
@@ -122,36 +131,71 @@ def _ooxml_text(content: bytes, prefixes: tuple[str, ...], budget: Budget) -> st
 def _xml_text(part: IO[bytes], budget: Budget, chars_left: int) -> str:
     """Stream one part through expat, stopping as soon as the byte budget or text cap is spent."""
     out: list[str] = []
-    depth_in_text = 0
+    depth, depth_in_text, run, seen, tail, decl_at = 0, 0, 0, 0, b"", 0
 
     def reject_dtd(*_args: object) -> None:
         raise ExtractionError("XML part declares a DTD")
 
     def start(name: str, _attrs: object) -> None:
-        nonlocal depth_in_text
+        nonlocal depth, depth_in_text
         budget.elements -= 1
-        if budget.elements < 0:
+        depth += 1
+        if budget.elements < 0 or depth > MAX_DEPTH:
             raise ExtractionError(_TOO_LARGE)
         if name.rsplit(" ", 1)[-1] in _TEXT_TAGS:
             depth_in_text += 1
 
     def end(name: str) -> None:
-        nonlocal depth_in_text
+        nonlocal depth, depth_in_text
+        depth -= 1
         local = name.rsplit(" ", 1)[-1]
         if local in _TEXT_TAGS:
             depth_in_text -= 1
         elif local in _BREAK_TAGS:
-            out.append("\n")
+            keep("\n")
 
     def chars(text: str) -> None:
-        nonlocal chars_left
         if depth_in_text:
-            chars_left -= len(text)
-            if chars_left < 0:
-                raise ExtractionError(_TOO_LARGE)
-            out.append(text)
+            keep(text)
 
-    parser = expat.ParserCreate(namespace_separator=" ")
+    def keep(text: str) -> None:
+        nonlocal chars_left
+        chars_left -= len(text)
+        if chars_left < 0:
+            raise ExtractionError(_TOO_LARGE)
+        out.append(text)
+
+    def check_raw(chunk: bytes) -> None:
+        """expat buffers a whole token before any handler runs, so tokens are bounded in the raw bytes.
+        Only plain UTF-8 markup is read (what Office writes): no NUL byte (so no UTF-16, where 0x3C can
+        be half of another character), no `<!` (comment, DTD, CDATA) and no `<?` but the leading XML
+        declaration. In what remains every 0x3C byte starts a tag and none can sit inside one, so the
+        run between two of them bounds every tag, attribute list and text run expat holds."""
+        nonlocal run, tail, seen, decl_at
+        window = tail + chunk
+        if seen == 0:  # the declaration sits first (after an optional UTF-8 BOM) and closes within 256 bytes
+            decl_at = 3 if chunk.startswith(b"\xef\xbb\xbf") else 0
+            if chunk.startswith(b"<?", decl_at) and b"?>" not in chunk[decl_at : decl_at + 256]:
+                raise ExtractionError(_UNSUPPORTED)
+        if b"\x00" in chunk or b"<!" in window:
+            raise ExtractionError(_UNSUPPORTED)
+        at = window.find(b"<?")
+        while at >= 0:
+            if seen - len(tail) + at != decl_at:
+                raise ExtractionError(_UNSUPPORTED)
+            at = window.find(b"<?", at + 1)
+        tail, seen = chunk[-1:], seen + len(chunk)
+        pieces = chunk.split(b"<")
+        if len(pieces) == 1:
+            run += len(chunk)
+        else:  # the run carried over ends at the first '<'; the last piece carries on into the next chunk
+            if max([run + len(pieces[0]), *map(len, pieces[1:-1])]) > MAX_RUN_BYTES:
+                raise ExtractionError(_TOO_LARGE)
+            run = len(pieces[-1])
+        if run > MAX_RUN_BYTES:
+            raise ExtractionError(_TOO_LARGE)
+
+    parser = expat.ParserCreate("UTF-8", " ")
     parser.buffer_text = True  # one character-data call between tags, however many lines
     parser.StartDoctypeDeclHandler = reject_dtd
     parser.EntityDeclHandler = reject_dtd
@@ -162,6 +206,7 @@ def _xml_text(part: IO[bytes], budget: Budget, chars_left: int) -> str:
         budget.remaining -= len(chunk)
         if budget.remaining < 0:
             raise ExtractionError(f"the files expand past the {MAX_EXTRACTED_BYTES // (1024 * 1024)} MB read limit")
+        check_raw(chunk)
         parser.Parse(chunk, False)
     parser.Parse(b"", True)
     return "".join(out).strip()
