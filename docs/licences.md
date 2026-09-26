@@ -40,7 +40,8 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 
 `services/harness` also uses `pyyaml`, `jsonschema` and `referencing` (already listed under the
 root dev dependency group), declared as its own direct dependencies since its code imports them
-directly rather than relying only on the shared dev group.
+directly rather than relying only on the shared dev group. FR-AGT-01/02/03 adds the in-workspace
+`tilo-contracts` and `tilo-providers` members (not external; no new licence).
 
 ## Python (`packages/providers`)
 

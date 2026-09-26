@@ -273,8 +273,11 @@ async def run_plan(
         result.outcomes[unit["id"]] = outcome
         finished[unit["id"]].set_result(outcome.success)
 
-    async with asyncio.TaskGroup() as group:
-        for unit in order:
-            group.create_task(unit_task(unit))
+    try:
+        async with asyncio.TaskGroup() as group:
+            for unit in order:
+                group.create_task(unit_task(unit))
+    except ExceptionGroup as errors:  # e.g. WriterBusy or EventRejected: stop the run, raise it plainly
+        raise errors.exceptions[0] from None
     result.finished_at = clock()
     return result
