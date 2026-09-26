@@ -1,0 +1,10 @@
+{
+  "goal": "Scan competitor pricing pages and summarise changes this month.",
+  "deliverables": [{ "title": "Competitor Pricing Summary", "format": "markdown" }],
+  "audience": "Product team",
+  "deadline": null,
+  "constraints": [],
+  "sources": [{ "kind": "web", "ref": "competitor pricing pages" }],
+  "sensitivity": "public",
+  "ambiguous_fields": ["deadline"]
+}

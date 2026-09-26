@@ -1,0 +1,10 @@
+{
+  "goal": "Prepare the Q3 sales performance report for the leadership team.",
+  "deliverables": [{ "title": "Q3 Sales Report", "format": "pdf" }],
+  "audience": "Leadership team",
+  "deadline": "2026-10-05",
+  "constraints": ["Use only verified CRM data"],
+  "sources": [{ "kind": "connector", "ref": "crm-salesforce", "label": "Salesforce CRM" }],
+  "sensitivity": "business",
+  "ambiguous_fields": []
+}

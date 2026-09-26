@@ -1,0 +1,8 @@
+{
+  "goal": "Draft the vendor renewal memo.",
+  "deliverables": [{ "title": "Vendor Renewal Memo", "format": "docx" }],
+  "audience": "Procurement",
+  "deadline": "2026-10-01",
+  "constraints": [],
+  "sources": []
+}
