@@ -15,7 +15,7 @@ import yaml
 from .schemas import CONTRACTS, conforms
 
 TABLE_REF = "policy.schema.json#/$defs/risk_tier_table"
-DEFAULT_TABLE = CONTRACTS.parent / "config" / "autonomy.yaml"  # not in the repo yet (spark-456/tilo#1)
+DEFAULT_TABLE = CONTRACTS.parent / "config" / "autonomy.yaml"
 
 
 class PolicyConfigError(Exception):

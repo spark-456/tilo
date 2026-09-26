@@ -36,11 +36,13 @@ check-fast:
     uv run ruff format --check .
     uv run ruff check .
     pnpm exec biome check .
-    uv run pytest -q
+    uv run pytest -q -m "not emulator"
 
-# Run every test suite (Python + JS, once JS suites exist).
+# Run every test suite (Python + JS, once JS suites exist). Emulator-marked tests
+# (services/harness, P0-09) need Java + firebase-tools and run separately in CI
+# (see .github/workflows/ci.yml) and with `uv run pytest services/harness/tests -m emulator`.
 test:
-    uv run pytest -q
+    uv run pytest -q -m "not emulator"
     pnpm -r run test
 
 # Format everything in place.
@@ -60,12 +62,20 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api/src packages/providers packages/contracts-py packages/policy/src
+    uv run mypy services/api services/harness/src packages/providers packages/contracts-py packages/policy/src packages/metering evals/src services/connectors/src
     pnpm -r exec tsc --noEmit
+
+# Start the Firestore emulator and run the harness skeleton against it (P0-09).
+harness-skeleton:
+    uv run --package tilo-harness python -m tilo_harness.skeleton --world w_harness_skeleton --run r_harness_skeleton
 
 # Run the eval harness (not built yet — ticket P3).
 eval:
     python -c "print('eval harness not built yet (ticket P3); nothing to run')"
+
+# PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
+conformance:
+    uv run python -m tilo_providers.conformance
 
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated

@@ -169,6 +169,15 @@ def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | N
     return level_at(policy, at) if covered else None
 
 
+def _typed_words(instruction: dict) -> bool:
+    """ADR-0007, BQ-56: a WhatsApp message counts only as the owner's typed words (no tapped
+    option) answering no card or a question card; a gate, consent or meeting answer never does."""
+    data = instruction["data"]
+    if instruction["type"] != "channel.message_in":
+        return True
+    return data["option"] is None and data["card_kind"] in (None, "needs_you")
+
+
 @fail_closed(False)
 def instruction_counts(
     instruction: dict | None, world_id: str, policy: dict, destination: str | None, before: str, applied: list[dict]
@@ -180,7 +189,9 @@ def instruction_counts(
         instruction is not None
         and instruction["data"]["channel"] in INSTRUCTION_CHANNELS.get(instruction["type"], ())
         and conforms("event.schema.json", instruction, "id", "type", "actor", "ts", "world_id")
-        and conforms(f"events/data/{instruction['type']}.schema.json", instruction["data"], "channel", "destination")
+        # the whole data, so its if/then/else runs (a set card_id needs its card_kind, ADR-0007)
+        and conforms(f"events/data/{instruction['type']}.schema.json", instruction["data"])
+        and _typed_words(instruction)
         and (instruction["world_id"], instruction["actor"]) == (world_id, policy["owner"])
         and level_since(policy, before) <= ts(instruction["ts"]) < ts(before)
         and destination is not None
@@ -210,7 +221,13 @@ def opens_gate(reserved: dict, resolved: dict, owner: str, lead: dict | None, po
     if gate_tier(reserved) == "T3" and answer["channel"] == "whatsapp" and answer["pin_verified"] is not True:
         return False
     if authz["by"] == "person":
-        return authz["ref"] == owner or (gate["approver"] is not None and authz["ref"] == gate["approver"])
+        approver = gate["approver"]  # the owner's assignment, made no later than the answer (ADR-0006)
+        return authz["ref"] == owner or (
+            approver is not None
+            and approver["user"] == authz["ref"]
+            and approver["assigned_by"]["by"] == owner
+            and ts(approver["assigned_by"]["at"]) <= at
+        )
     return (
         authz["by"] == "team_lead"
         and allowed is not None

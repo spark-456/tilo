@@ -153,14 +153,13 @@ def decide(
     order, empty, or whose current `level` disagrees with its last entry, covers nothing —
     same as `_level_at` in the reference check) is not None.
 
-    "applied shape" (PI-10, PI-11 — this ticket's own convention, since policy.applied's schema
-    carries no credits field): each item of `applied` is
+    "applied shape" (PI-10, PI-11): each item of `applied` is a policy.applied part
     `{"type": "policy.applied", "authz": {"by": "policy", "ref": <policy_id>, "at": <ts>},
-      "data": <policy.applied data, includes policy_id and instruction_id>, "credits": <float>}`.
+      "data": <policy.applied data, includes policy_id, instruction_id and credits>}`.
     Daily cap counts entries whose `data["policy_id"]` equals the covering policy's id and whose
     `authz["at"]` falls on the same UTC calendar date (the `YYYY-MM-DD` prefix) as `now`,
     the proposal's own pending send included (so `len(matching) + 1 <= limits["per_day"]` when
-    per_day is not null); credits cap sums `credits` over the same matching entries plus
+    per_day is not null); credits cap sums `data["credits"]` over the same matching entries plus
     `proposal.credits`, checked against `limits["credits"]` the same way. Instruction reuse
     (PI-10) checks the *whole* `applied` list of the world (not filtered to this policy_id):
     no entry's `data["instruction_id"]` may equal the instruction being used.
@@ -208,7 +207,8 @@ def open_gate(
 
     Allowed answerers (PRD 10.1, mirrors `_may_answer` in
     tests/contracts/test_FR_WLD_03_outbox_crossref.py):
-    - authz["by"] == "person": authz["ref"] is world_owner or reserved["data"]["approver"].
+    - authz["by"] == "person": authz["ref"] is world_owner, or reserved["data"]["approver"]["user"]
+      when that assignment's `assigned_by` is the world_owner at or before authz["at"] (ADR-0006).
     - authz["by"] == "team_lead": reserved["data"]["team_lead"] is not None, and `team_lead` and
       `policy` are given and consistent — team_lead["id"] == authz["ref"], team_lead["domain"]
       == reserved["data"]["team_lead"]["domain"], team_lead["assigned_by"]["by"] == world_owner,

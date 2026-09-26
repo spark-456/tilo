@@ -29,7 +29,7 @@
     "id": { "$ref": "common.schema.json#/$defs/ulid" },
     "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
     "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
-    "kind": { "type": "string", "enum": ["needs_you", "gate", "consent", "meeting"] },
+    "kind": { "$ref": "#/$defs/kind" },
     "rung": {
       "description": "Escalation ladder rung (PRD 10.2); needs_you cards may be blocked.",
       "type": "string",
@@ -212,6 +212,7 @@
     }
   },
   "$defs": {
+    "kind": { "type": "string", "enum": ["needs_you", "gate", "consent", "meeting"] },
     "header": {
       "type": "object",
       "additionalProperties": false,

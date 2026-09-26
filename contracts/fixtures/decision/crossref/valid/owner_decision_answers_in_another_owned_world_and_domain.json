@@ -1,0 +1,57 @@
+{
+  "rule": null,
+  "note": "The owner's Decision (scope all) answers a repeat question routed to the finance domain in another world the same owner owns (DC-04: an owner's Decision answers any domain in scope).",
+  "decision": {
+    "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W5",
+    "org_id": "org_acme",
+    "question": "May Tilo reply to suppliers outside business hours?",
+    "domain": null,
+    "answer": "Yes, for suppliers already in the CRM; ask me about anyone new.",
+    "option_id": "yes_known_only",
+    "answered_by": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-09-29T09:30:00.000Z"
+    },
+    "source": {
+      "world_id": "w_village_basic",
+      "run_id": "r_village_basic_1",
+      "card_id": "01J8Z3K4M5N6P7Q8R9S0T1V2W1"
+    },
+    "scope": {
+      "worlds": "all",
+      "districts": "all"
+    },
+    "created_at": "2026-09-29T09:30:01.000Z",
+    "expires_at": null
+  },
+  "worlds": {
+    "w_village_basic": {
+      "org_id": "org_acme",
+      "owner": "u_owner"
+    },
+    "w_village_second": {
+      "org_id": "org_acme",
+      "owner": "u_owner"
+    }
+  },
+  "team_lead_at_answer": null,
+  "reuse": {
+    "answered": {
+      "ts": "2026-10-05T09:00:00.000Z",
+      "world_id": "w_village_second",
+      "district": "D2",
+      "data": {
+        "answered_by": "decision",
+        "decision_id": "01J8Z3K4M5N6P7Q8R9S0T1V2W5"
+      }
+    },
+    "routed": {
+      "data": {
+        "card_id": "01JB5VQ0000000000000009101",
+        "domain": "finance"
+      }
+    },
+    "team_lead": null
+  }
+}

@@ -100,7 +100,14 @@ def base_instruction(
         "actor": actor,
         "ts": ts,
         "world_id": world_id,
-        "data": {"channel": channel, "destination": destination},
+        # A full, schema-valid data shape. ADR-0007: a channel.message_in instruction is typed
+        # words answering no card; a world.requested carries its title.
+        "data": {"channel": channel, "destination": destination}
+        | (
+            {"message_ref": "r_village_basic_1/118", "card_id": None, "card_kind": None, "option": None}
+            if type_ == "channel.message_in"
+            else {"title": "Reply to the supplier"}
+        ),
     }
 
 
@@ -130,8 +137,8 @@ def applied_entry(
             "instruction_id": instruction_id,
             "undo_window_s": 60,
             "item": None,
+            "credits": credits,
         },
-        "credits": credits,
     }
 
 

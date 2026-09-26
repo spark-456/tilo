@@ -14,3 +14,9 @@ Round 6 / ST-3a-2 (2026-09-25, dispatch.py `_WorldChannel`) still fails:
 
 **Why:** builders fix the exact repro scenario and leave concurrent-caller and timing variants.
 **How to apply:** always run a slow-then-succeed writer + N concurrent calls on the same world and count writes per target; check commit order with a slow head. Scripts: scratchpad st3a_r6.py, st3a_r6_idreuse.py (also st3a_r3/r4/r5). Related: [[eval-harness-recording-validation]].
+**Why:** builders fix the exception path and leave the latency path; the fake writers in _api_lib raise instantly.
+**How to apply:** always add a TimeoutWriter (sleep then raise) plus a cross-world concurrent call, and time when the Nth policy flips. Script: scratchpad st3a_r3.py. Related: [[eval-harness-recording-validation]].
+**Why:** builders only fix the repro they were given; injected dependencies (writer, clock) are the untested failure surface.
+**How to apply:** for any route that loops "mutate + side-effect call", inject a Flaky writer (raise at call N) and a Slow writer + 2 threads. Script: scratchpad st3a_r2.py pattern. Related: [[eval-harness-recording-validation]].
+
+Round 5 (2026-09-25): per-part deadlines (give up on the future, leave it running, queue pending) create a new bug class. A writer that completes *after* its deadline lands the event AND leaves the part pending, so the next flush writes it twice (duplicate policy.changed). It also lets later parts commit before the late one (world.paused before policy.changed). Hung writer leaks ~1 thread per part per call. Attack any "timeout then retry" design with a writer that is slow-but-succeeds on call 1 only (scratchpad st3a_r5.py).

@@ -1,7 +1,8 @@
 # ADR-0002: Contract conventions, fixtures and code generation
 
 - Status: Accepted (2026-09-25, architect; ticket P0-02). Amended 2026-09-25 by ticket P0-03
-  (decisions 1, 8 and 10). The contract set freezes at CP0 on 29 Sep.
+  (decisions 1, 8 and 10) and by ticket CC-SH (decision 12). The contract set freezes at CP0 on
+  29 Sep; `manifest.schema.json` freezes on 1 Oct.
 - Deciders: architect, orchestrator
 - Requirement: FR-WLD-02 (PRD 15.2); FR-WLD-03 for the P0-03 amendment
 
@@ -113,7 +114,18 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
      answering event (P0-03) and as a Decision (PRD 15.1, CARD records DECISION). A gate card
      always offers an option with id `hold`, so its safe default resolves;
    - a layout gate's `between` is the pair `[building id, island id]` in that order.
-10. **The outbox is a contract (P0-03).** PRD 15 says every structure that crosses a service
+10. **providers 1.1.0 (additive, 2026-09-25, ticket P0-02b, PL-02, BQ-33).** `$defs.profile` gains
+    two optional fields for the generic OpenAI-compatible adapter (ADR-0003 decision 2):
+    `base_url` (https only, with no user info, query or fragment, so a credential cannot sit in
+    the URL, PRD 16.1 rule 4; `format: uri`, at most 512 characters) and `api_key_env` (the
+    name of an environment variable, `^[A-Z][A-Z0-9_]{2,63}$`, never the key). An `if`/`else`
+    allows them only when `provider` is `openai_compat`; other profiles, `google` included,
+    must not carry them. Both are optional and independent. `format: uri` is documentation;
+    the pattern is what validators enforce. Each field also has `not: {pattern: "\n"}`,
+    because a Python JSON Schema validator's `$` matches before a final line break. The Python generator maps `string` + `uri` to `str`
+    (`--type-mappings`), so the generated field keeps its pattern and length instead of
+    becoming pydantic `AnyUrl`, which would drop both.
+11. **The outbox is a contract (P0-03).** PRD 15 says every structure that crosses a service
     boundary is a contract, and an outbox entry crosses from the harness to `tilo-connectors`,
     so `outbox.schema.json` joins the CP0 set although PRD 15.2's table does not list it. An
     entry exists only once authorised, so `authz` is required; T3 needs a person; any modifier
@@ -137,17 +149,41 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     one list. Consent cards get closed option ids `connect` and `hold` with fixed labels, like
     gates (CR-13). Changes made before the CP0 freeze keep version 1.0.0. The event contract's
     own decisions are in ADR-0005.
-10. **providers 1.1.0 (additive, 2026-09-25, ticket P0-02b, PL-02, BQ-33).** `$defs.profile` gains
-    two optional fields for the generic OpenAI-compatible adapter (ADR-0003 decision 2):
-    `base_url` (https only, with no user info, query or fragment, so a credential cannot sit in
-    the URL, PRD 16.1 rule 4; `format: uri`, at most 512 characters) and `api_key_env` (the
-    name of an environment variable, `^[A-Z][A-Z0-9_]{2,63}$`, never the key). An `if`/`else`
-    allows them only when `provider` is `openai_compat`; other profiles, `google` included,
-    must not carry them. Both are optional and independent. `format: uri` is documentation;
-    the pattern is what validators enforce. Each field also has `not: {pattern: "\n"}`,
-    because a Python JSON Schema validator's `$` matches before a final line break. The Python generator maps `string` + `uri` to `str`
-    (`--type-mappings`), so the generated field keeps its pattern and length instead of
-    becoming pydantic `AnyUrl`, which would drop both.
+12. **Contracts SH asked for (ticket CC-SH, issues #3 to #5), all additive.**
+    `agents.schema.json` (named `AgentsConfig` through the generator's `ROOT_NAMES`) shapes
+    `config/agents.yaml`, which ships the PRD defaults. What the PRD fixes is `const`: one
+    Director per world and one Lead per district, depth 3, `handoff_at` 0.70 (D-08). A schema
+    cannot compare two fields, so `compact_at` < `handoff_at` becomes `compact_at` in (0, 0.70);
+    `handoff_at` repeats its `const` as `minimum` and `maximum` because the Python generator drops
+    a float `const`. `max_attempts` includes the first attempt and is at most 3 (BQ-58).
+    `decision.schema.json` is the PRD 15.1 Decision; `answered_by` is `authz` narrowed to a person
+    or a Team Lead, and a Team Lead's Decision names its domain. A Team Lead's `answered_by` also
+    carries `user`, the person who held the Team Lead id and answered (required for a Team Lead,
+    absent for a person, whose `ref` is already the user), because a `tl_` id is a mutable
+    indirection: the owner can put another person behind it without a new assignment stamp.
+    Reuse rules DC-01 to DC-04; a
+    gate is never opened from a Decision (BQ-60). Only the source world's owner or a Team Lead
+    gives a Decision (PRD 13.1; an Approver's answer makes none), a Decision's scope stays within
+    the worlds where its answerer has that authority, and reuse checks the answerer again in the
+    reusing world at the event's time, as OB-01 does for gates: the person is that world's owner,
+    or the Team Lead's record still exists with the same domain and the same `user`, assigned by
+    that world's owner no later than the answer. Cases are in `fixtures/decision/crossref/` with
+    the reference check in `test_FR_AGT_07_decision_crossref.py`. `manifest.schema.json` is the
+    PRD 13.3 manifest: lower-case SHA-256 hashes, a verified claim has a source; rules MF-01 to
+    MF-06 (BQ-59). A source `ref` is an allowlist of four closed shapes (an http or https URL of
+    host, port and a path without `;` or `=`; an artifact ref with a cell of letters, digits and
+    `. _ ~ ! : $ -`; a connector ref; a plain file name), because a denylist of user-info
+    spellings missed `//u@host`, `https:\u@host`, a leading space and query-string tokens (PRD
+    16.1 rule 4, 16.2); a web `ref` therefore carries no query, fragment or path parameters. A
+    bare token still fits a file name or an item id, so shapes are not the guarantee: the secret
+    redactor that guards the raw archive checks every manifest before it is written and before it
+    is exported, and a manifest it would change is refused (MF-06).
+    `question.answered` data 1.1.0 adds `decision_id`, set exactly when `answered_by` is
+    `decision`. A further valid case of an event type may sit next to the registry fixture as
+    `fixtures/events/valid/<type>--<case>.json` (`question.answered--from_decision.json` cites a
+    Decision fixture). `config/teams.yaml` is an example list of `team_lead.schema.json`
+    entries; a trailing `[]` in `CONFIG_SHAPES` marks such a list file, and
+    `just contracts-check` validates both new config files when present.
 
 ## Consequences
 - Builders import `tilo_contracts` or `@tilo/contracts` and never hand-write these shapes.
