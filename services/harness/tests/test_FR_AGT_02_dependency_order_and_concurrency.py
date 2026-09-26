@@ -52,14 +52,14 @@ def test_FR_AGT_02_four_independent_units_run_concurrently(tmp_path) -> None:
 def test_FR_AGT_02_chain_runs_strictly_in_order(tmp_path) -> None:
     layout = build_layout(
         district_specs=[
-            {"id": "D1", "lead": "A_lead", "specialists": ["A_s1", "A_s2", "A_s3"], "unit_ids": ["A", "B", "C"]}
+            {"id": "D1", "lead": "A_lead", "specialists": ["A_s1", "A_s2", "A_s3"], "unit_ids": ["U1", "U2", "U3"]}
         ]
     )
     plan = build_plan(
         [
-            build_unit("A"),
-            build_unit("B", depends_on=["A"]),
-            build_unit("C", depends_on=["B"]),
+            build_unit("U1"),
+            build_unit("U2", depends_on=["U1"]),
+            build_unit("U3", depends_on=["U2"]),
         ]
     )
     writer, _store = make_memory_writer(layout, world_id="w_chain")
@@ -67,13 +67,13 @@ def test_FR_AGT_02_chain_runs_strictly_in_order(tmp_path) -> None:
 
     run_plan_sync(plan, layout, writer=writer, config=_config(tmp_path), skills=_skills(tmp_path), runner=runner)
 
-    assert runner.starts == ["A", "B", "C"], f"FR-AGT-02: a chain must run strictly in order, got {runner.starts}"
+    assert runner.starts == ["U1", "U2", "U3"], f"FR-AGT-02: a chain must run strictly in order, got {runner.starts}"
     assert runner.max_in_flight == 1, (
         f"FR-AGT-02: a chain must never overlap, got max concurrency {runner.max_in_flight}"
     )
     # A must fully finish (be in `ends`) before B ever starts.
-    assert runner.ends.index("A") < runner.starts.index("B")
-    assert runner.ends.index("B") < runner.starts.index("C")
+    assert runner.ends.index("U1") < runner.starts.index("U2")
+    assert runner.ends.index("U2") < runner.starts.index("U3")
 
 
 def test_FR_AGT_02_diamond_runs_middle_two_concurrently(tmp_path) -> None:
@@ -85,16 +85,16 @@ def test_FR_AGT_02_diamond_runs_middle_two_concurrently(tmp_path) -> None:
                 "id": "D1",
                 "lead": "A_lead",
                 "specialists": ["A_s1", "A_s2", "A_s3", "A_s4"],
-                "unit_ids": ["A", "B", "C", "D"],
+                "unit_ids": ["U1", "U2", "U3", "U4"],
             }
         ]
     )
     plan = build_plan(
         [
-            build_unit("A"),
-            build_unit("B", depends_on=["A"]),
-            build_unit("C", depends_on=["A"]),
-            build_unit("D", depends_on=["B", "C"]),
+            build_unit("U1"),
+            build_unit("U2", depends_on=["U1"]),
+            build_unit("U3", depends_on=["U1"]),
+            build_unit("U4", depends_on=["U2", "U3"]),
         ]
     )
     writer, _store = make_memory_writer(layout, world_id="w_diamond")
@@ -102,9 +102,9 @@ def test_FR_AGT_02_diamond_runs_middle_two_concurrently(tmp_path) -> None:
 
     run_plan_sync(plan, layout, writer=writer, config=_config(tmp_path, 4), skills=_skills(tmp_path), runner=runner)
 
-    assert runner.ends.index("A") < runner.starts.index("B")
-    assert runner.ends.index("A") < runner.starts.index("C")
+    assert runner.ends.index("U1") < runner.starts.index("U2")
+    assert runner.ends.index("U1") < runner.starts.index("U3")
     assert runner.max_in_flight >= 2, "FR-AGT-02: the diamond's two middle units (B, C) must run together"
-    assert runner.ends.index("B") < runner.starts.index("D")
-    assert runner.ends.index("C") < runner.starts.index("D")
-    assert runner.starts[-1] == "D" and runner.starts.index("D") == 3
+    assert runner.ends.index("U2") < runner.starts.index("U4")
+    assert runner.ends.index("U3") < runner.starts.index("U4")
+    assert runner.starts[-1] == "U4" and runner.starts.index("U4") == 3
