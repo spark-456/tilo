@@ -1,6 +1,6 @@
 {
   "rule": null,
-  "note": "A T3 reply (a new recipient and an attachment) waits at a gate the owner assigned to an Approver. The Approver approved it on WhatsApp after tilo-channels checked their PIN (SEC-06), and the entry and its send carry the Approver's authz.",
+  "note": "A T3 reply (a new recipient and an attachment) waits at a gate the owner assigned to an Approver before the answer. The Approver approved it on WhatsApp after tilo-channels checked their PIN (SEC-06), and the entry and its send carry the Approver's authz.",
   "entry": {
     "id": "01JB5VQ0000000000000009010",
     "idempotency_key": "r_village_basic_1:U3:send_email:1",
@@ -46,7 +46,13 @@
         "artifact_id": "art_reply_draft",
         "version": 2
       },
-      "approver": "u_approver",
+      "approver": {
+        "user": "u_approver",
+        "assigned_by": {
+          "by": "u_owner",
+          "at": "2026-09-29T09:31:00.000Z"
+        }
+      },
       "team_lead": null
     }
   },

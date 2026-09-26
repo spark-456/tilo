@@ -13,7 +13,7 @@
  */
 import { type Page, expect, test } from "@playwright/test";
 import { PAN_STEP_PX } from "../src/stage/camera";
-import { readCamera } from "./support/camera";
+import { gotoStage, readCamera } from "./support/camera";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP, reducedMotion: "no-preference" });
@@ -27,7 +27,7 @@ const snapshot = (page: Page) =>
 test("P0-08b camera C8 PRD-9.7: a main-thread long task during a pan still leaves the canvas matching the settled camera once it resumes", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await expect(stage.locator("canvas")).toBeVisible();
   await stage.focus();

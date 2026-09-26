@@ -22,7 +22,7 @@
  */
 import { type Page, expect, test } from "@playwright/test";
 import { PAN_STEP_PX, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from "../src/stage/camera";
-import { readCamera } from "./support/camera";
+import { gotoStage, readCamera, reloadStage } from "./support/camera";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP, reducedMotion: "reduce" }); // instant moves: no easing to wait out
@@ -75,7 +75,7 @@ function collectConsoleProblems(page: Page): string[] {
 test("P0-08b camera C2 PRD-9.7 observable camera: stage-frame starts at the documented INITIAL_CAMERA", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   await expect(page.getByTestId("stage-frame").locator("canvas")).toBeVisible();
   const cam = await readCamera(page);
   expect(cam).toEqual({ x: 0, y: 0, zoom: 1 });
@@ -85,7 +85,7 @@ test("P0-08b camera C9 PRD-9.7 wheel: zero console errors/warnings across a run 
   page,
 }) => {
   const problems = collectConsoleProblems(page);
-  await page.goto("/");
+  await gotoStage(page);
   const center = await stageCenter(page);
   for (let i = 0; i < 20; i++) {
     const prevented = await dispatchWheel(page, {
@@ -103,19 +103,19 @@ test("P0-08b camera C9 PRD-9.7 wheel: zero console errors/warnings across a run 
 test("P0-08b camera C3 PRD-9.7 wheel: deltaMode 0/1/2 zoom by the same amount for the same on-screen distance", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const center = await stageCenter(page);
   const start = (await readCamera(page)).zoom;
   await dispatchWheel(page, { deltaY: -100, deltaMode: 0, clientX: center.x, clientY: center.y });
   const afterPixels = (await readCamera(page)).zoom;
   expect(afterPixels).toBeCloseTo(start + ZOOM_STEP, 5);
 
-  await page.reload();
+  await reloadStage(page);
   await dispatchWheel(page, { deltaY: -2.5, deltaMode: 1, clientX: center.x, clientY: center.y });
   const afterLines = (await readCamera(page)).zoom;
   expect(afterLines).toBeCloseTo(afterPixels, 5);
 
-  await page.reload();
+  await reloadStage(page);
   await dispatchWheel(page, { deltaY: -0.125, deltaMode: 2, clientX: center.x, clientY: center.y });
   const afterPages = (await readCamera(page)).zoom;
   expect(afterPages).toBeCloseTo(afterPixels, 5);
@@ -124,7 +124,7 @@ test("P0-08b camera C3 PRD-9.7 wheel: deltaMode 0/1/2 zoom by the same amount fo
 test("P0-08b camera C3 PRD-9.7 wheel: a smaller delta zooms proportionally less, one event never exceeds one ZOOM_STEP", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const center = await stageCenter(page);
   const start = (await readCamera(page)).zoom;
   await dispatchWheel(page, { deltaY: -50, clientX: center.x, clientY: center.y });
@@ -132,7 +132,7 @@ test("P0-08b camera C3 PRD-9.7 wheel: a smaller delta zooms proportionally less,
   expect(half - start).toBeCloseTo(ZOOM_STEP / 2, 5);
 
   // A single huge tick (e.g. a fast trackpad fling) still caps at one step.
-  await page.reload();
+  await reloadStage(page);
   await dispatchWheel(page, { deltaY: -100000, clientX: center.x, clientY: center.y });
   const capped = (await readCamera(page)).zoom;
   expect(capped - start).toBeCloseTo(ZOOM_STEP, 5);
@@ -141,7 +141,7 @@ test("P0-08b camera C3 PRD-9.7 wheel: a smaller delta zooms proportionally less,
 test("P0-08b camera C3 PRD-9.7 wheel: zoom keeps the world point under the pointer fixed, within 1px", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const box = await page.getByTestId("stage-frame").boundingBox();
   if (!box) throw new Error("stage-frame has no layout box");
   // An off-centre pointer, well inside the frame.
@@ -167,7 +167,7 @@ test("P0-08b camera C3 PRD-9.7 wheel: zoom keeps the world point under the point
 test("P0-08b camera C3 PRD-9.7 wheel: zoom stays clamped to [ZOOM_MIN, ZOOM_MAX] under a long run of extreme input", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const center = await stageCenter(page);
   for (let i = 0; i < 40; i++) {
     await dispatchWheel(page, { deltaY: -100000, clientX: center.x, clientY: center.y });
@@ -182,7 +182,7 @@ test("P0-08b camera C3 PRD-9.7 wheel: zoom stays clamped to [ZOOM_MIN, ZOOM_MAX]
 test("P0-08b camera C4 PRD-9.7 trackpad pinch (ctrlKey): zooms about the pointer, is preventDefault-able and never pans", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const center = await stageCenter(page);
   const before = await readCamera(page);
   const prevented = await dispatchWheel(page, {
@@ -205,13 +205,13 @@ test("P0-08b camera C4 PRD-9.7 trackpad pinch (ctrlKey): zooms about the pointer
 test("P0-08b camera C4 PRD-9.7 trackpad pinch: zoom is smooth/proportional to deltaY, not stepped like a mouse-wheel notch", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const center = await stageCenter(page);
   const start = (await readCamera(page)).zoom;
   await dispatchWheel(page, { deltaY: -20, ctrlKey: true, clientX: center.x, clientY: center.y });
   const small = (await readCamera(page)).zoom - start;
 
-  await page.reload();
+  await reloadStage(page);
   await dispatchWheel(page, { deltaY: -60, ctrlKey: true, clientX: center.x, clientY: center.y });
   const big = (await readCamera(page)).zoom - start;
 
@@ -223,7 +223,7 @@ test("P0-08b camera C4 PRD-9.7 trackpad pinch: zoom is smooth/proportional to de
 test("P0-08b camera C3 C4 PRD-9.7 mouse Ctrl + wheel notch (100px) zooms exactly one ZOOM_STEP, not to the clamp", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const center = await stageCenter(page);
   await page.mouse.move(center.x, center.y);
   await page.keyboard.down("Control");
@@ -235,7 +235,7 @@ test("P0-08b camera C3 C4 PRD-9.7 mouse Ctrl + wheel notch (100px) zooms exactly
 test("P0-08b camera C5 PRD-9.7 wheel: deltaX and Shift+vertical both pan horizontally by the same amount, never zoom", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const center = await stageCenter(page);
   const before = await readCamera(page);
   await dispatchWheel(page, { deltaX: -100, clientX: center.x, clientY: center.y });
@@ -244,7 +244,7 @@ test("P0-08b camera C5 PRD-9.7 wheel: deltaX and Shift+vertical both pan horizon
   expect(viaDeltaX.y).toBeCloseTo(before.y, 5);
   expect(Math.abs(viaDeltaX.x - before.x)).toBeGreaterThan(1);
 
-  await page.reload();
+  await reloadStage(page);
   await dispatchWheel(page, { deltaY: -100, shiftKey: true, clientX: center.x, clientY: center.y });
   const viaShift = await readCamera(page);
   expect(viaShift.zoom).toBeCloseTo(before.zoom, 9);
@@ -255,7 +255,7 @@ test("P0-08b camera C5 PRD-9.7 wheel: deltaX and Shift+vertical both pan horizon
 test("P0-08b camera C5 PRD-9.7 wheel: a plain vertical wheel still zooms (as in P0-08a), not pans", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const center = await stageCenter(page);
   const before = await readCamera(page);
   await dispatchWheel(page, { deltaY: -100, clientX: center.x, clientY: center.y });
@@ -268,7 +268,7 @@ test("P0-08b camera C5 PRD-9.7 wheel: a plain vertical wheel still zooms (as in 
 test("P0-08b camera C7 PRD-9.7 keyboard: Ctrl/Meta/Alt combinations with a camera key are never defaultPrevented (browser shortcuts pass)", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await stage.focus();
   const prevented = await stage.evaluate((el) =>
@@ -289,7 +289,7 @@ test("P0-08b camera C7 PRD-9.7 keyboard: Ctrl/Meta/Alt combinations with a camer
 test("P0-08b camera C7 PRD-9.7 keyboard: arrows pan by PAN_STEP_PX and +/- zoom by ZOOM_STEP (values, reduced motion so instant)", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await stage.focus();
   const start = await readCamera(page);

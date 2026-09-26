@@ -1,7 +1,8 @@
 ---
 name: intelligence-builder
 description: Builds P1 intake and planning, P2 agent harness (ADK, Python), provider-layer adapters and router, P7 memory, raw archive and provenance. Use for any Python harness, planner, provider adapter, memory or archive ticket.
-model: sonnet
+# Moved sonnet -> opus on 2026-09-25: escalated for reasoning/logic failures on P0-04, P0-05 and P0-06 (self-tuning rule: 3 tickets in a week).
+model: opus
 effort: high
 isolation: worktree
 color: blue

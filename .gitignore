@@ -65,6 +65,7 @@ docs/progress.html
 # Claude Code local state
 .claude/worktrees/
 .claude/settings.local.json
+.claude/launch.json
 
 # OS and editors
 .DS_Store

@@ -32,12 +32,16 @@ class GenerateRequest(BaseModel):  # one ModelProvider.generate() / .stream() ca
     system: str | None = None
     max_output_tokens: int | None = None
     tools: list[dict[str, Any]] | None = None
+    json_mode: bool = False  # PL-02 structured output: force JSON-only output, no schema
+    response_schema: dict[str, Any] | None = None  # PL-02 structured output: JSON output validated against this schema
 
 
 class GenerateResponse(BaseModel):  # one generate() result, or one stream() chunk
     model_config = ConfigDict(extra="forbid")
-    text: str
+    text: str | None = None  # None for a tool-call-only turn with no text content (PL-02, ticket P0-05)
     profile_id: str
+    tool_calls: list[dict[str, Any]] | None = None  # PL-02 tool calling: [{"name": ..., "args": {...}}]
+    usage: dict[str, int] | None = None  # PL-02 usage tokens: {"input_tokens", "output_tokens", "total_tokens"}
 
 
 class PriceQuote(BaseModel):  # standard list price, US dollars per million tokens (PL-06)
@@ -59,6 +63,16 @@ class ModelProvider(ABC):  # PRD 6.4: generate, stream, embed, count_tokens, cap
     def capabilities(self) -> set[Capability]: ...
     @abstractmethod
     def price(self) -> PriceQuote: ...
+
+    def redact(self, text: str) -> str:
+        """Scrubs this provider's own secret material (an API key value, an
+        Authorization header) out of `text` before it leaves the process --
+        e.g. a record-and-replay recording (PRD 16.1 rule 4). Defence in
+        depth for the case a live endpoint echoes a secret back into
+        ordinary model output, which never reaches `GenerateResponse`'s own
+        fields but could still land in `text`. Default: no-op; a provider
+        holding a raw secret (`openai_compat_adapter`) overrides it."""
+        return text
 
 
 class SearchProvider(ABC):  # PRD 6.1: grounded search

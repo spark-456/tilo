@@ -15,7 +15,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { CAMERA_PAN_MS, PAN_STEP_PX } from "../src/stage/camera";
-import { readCamera } from "./support/camera";
+import { gotoStage, readCamera } from "./support/camera";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP });
@@ -23,7 +23,7 @@ test.use({ viewport: DESKTOP });
 test("P0-08b camera C7 PRD-18.2/9.7 motion: a keyboard pan eases toward its target over about the 320ms design-system duration, not instantly", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await stage.focus();
   const before = await readCamera(page);
@@ -47,7 +47,7 @@ test.describe("reduced motion", () => {
   test("HR-3 P0-08b camera C7 PRD-18.2/9.7 motion: reduced motion makes a keyboard pan land on its target immediately, not over 320ms", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoStage(page);
     const stage = page.getByTestId("stage-frame");
     await stage.focus();
     const before = await readCamera(page);

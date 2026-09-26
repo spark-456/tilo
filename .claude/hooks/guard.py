@@ -27,11 +27,12 @@ SECRET_PATTERNS = [
     (r"\bsk-[A-Za-z0-9_\-]{20,}", "an API secret key"),
     (r"\bgh[pousr]_[A-Za-z0-9]{36}\b", "a GitHub token"),
     (r"\bEAA[A-Za-z0-9]{60,}", "a Meta / WhatsApp access token"),
+    (r"\bnvapi-[A-Za-z0-9_\-]{20,}", "an NVIDIA NIM API key"),
     (r"\"type\"\s*:\s*\"service_account\"", "a service account key"),
 ]
 
 SHELL_RULES = [
-    (r"\bgit\s+push\b.*(\s--force\b|\s-f\b|\s--force-with-lease\b|\s\+\S)", "force pushes are never allowed; ask the user"),
+    (r"\bgit\s+push\b[^;&|\r\n]*(\s--force\b|\s-f\b|\s--force-with-lease\b|\s\+\S)", "force pushes are never allowed; ask the user"),
     (r"\bgh\s+repo\s+(create|edit)\b.*(--public\b|--visibility[= ]public\b)",
      "the repository stays private until the user says otherwise"),
     (r"\bgh\s+repo\s+delete\b", "deleting the repository needs the user"),

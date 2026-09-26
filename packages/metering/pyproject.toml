@@ -1,0 +1,19 @@
+[project]
+name = "tilo-metering"
+version = "0.1.0"
+description = "tilo_metering — price book, metering config and flag store (PRD 14.1, 14.5, FR-MTR-01)"
+requires-python = "==3.12.*"
+dependencies = [
+    "tilo-contracts",
+    "pyyaml>=6.0",
+]
+
+[tool.uv.sources]
+tilo-contracts = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tilo_metering"]

@@ -21,8 +21,12 @@ UX-1–UX-9 (18.1); FR-WLD-* (world rendering); owned starting P0-08.
 
 ## Stage (`src/stage/`)
 - `camera.ts`: pure camera maths (pan/`zoomAt`/`normalizeWheel`/easing), unit-tested. `Stage.tsx`:
-  the camera is the Pixi world container's transform; no always-on ticker, draws on demand only
-  (HR-2). World content plugs in through `onWorld(world, requestRender)` (`WorldSeam`).
+  the camera is the Pixi world container's transform; no CSS transform, no always-on ticker, one
+  render per camera change/resize/DPR/visibility change (HR-2). Every drawn frame writes
+  `data-camera-x/y/zoom`. World content plugs in through `onWorld(world, requestRender)`.
+- Readiness: the first frame is drawn when Pixi's init resolves; only then does the stage frame
+  carry `data-stage-ready="true"`. E2e specs navigate with `gotoStage`/`reloadStage` from
+  `e2e/support/camera.ts`, which wait for it.
 
 ## World (`src/world/`)
 - FR-WLD-04 pure pipeline: `registry.ts` (generated from `contracts/events/registry.yaml`) →

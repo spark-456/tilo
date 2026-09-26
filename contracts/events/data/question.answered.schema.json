@@ -1,11 +1,22 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/events/data/question.answered.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "QuestionAnsweredData",
-  "description": "data of question.answered (PRD 9.5). answered_by default means the card timed out and the Director applied its safe default; that event has severity nudge (BQ-04, EV-08). Gates never time out to go.",
+  "description": "data of question.answered (PRD 9.5). answered_by default means the card timed out and the Director applied its safe default; that event has severity nudge (BQ-04, EV-08). Gates never time out to go. answered_by decision means a repeat question was answered from an earlier decision (FR-AGT-07), and decision_id cites it (decision.schema.json id, rule DC-04); decision_id is set exactly then and is null or absent otherwise (added in 1.1.0).",
   "type": "object",
   "additionalProperties": false,
   "required": ["answered_by"],
-  "properties": { "answered_by": { "$ref": "../../event.schema.json#/$defs/answer_source" } }
+  "properties": {
+    "answered_by": { "$ref": "../../event.schema.json#/$defs/answer_source" },
+    "decision_id": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/ulid" }, { "type": "null" }]
+    }
+  },
+  "if": { "properties": { "answered_by": { "const": "decision" } }, "required": ["answered_by"] },
+  "then": {
+    "required": ["decision_id"],
+    "properties": { "decision_id": { "$ref": "../../common.schema.json#/$defs/ulid" } }
+  },
+  "else": { "properties": { "decision_id": { "type": "null" } } }
 }

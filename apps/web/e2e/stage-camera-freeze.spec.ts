@@ -9,7 +9,7 @@
  */
 import { type Page, expect, test } from "@playwright/test";
 import { PAN_STEP_PX } from "../src/stage/camera";
-import { readCamera } from "./support/camera";
+import { gotoStage, readCamera } from "./support/camera";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP, reducedMotion: "no-preference" });
@@ -23,7 +23,7 @@ const snapshot = (page: Page) =>
 test("P0-08b camera C8 PRD-9.7: freezing the page mid-ease (backgrounded tab) still leaves the canvas on the settled camera once active again", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const stage = page.getByTestId("stage-frame");
   await expect(stage.locator("canvas")).toBeVisible();
   await stage.focus();

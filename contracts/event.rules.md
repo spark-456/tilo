@@ -49,7 +49,8 @@ version was approved and sent (outbox rule OB-05). With no gate card on the poli
 the connector, the destination (an opaque id) and the district the engine checked against the
 policy's scope, and the entry equals them (OB-01, OB-05). At L2 it also names the owner's
 instruction (`instruction_id`: an earlier `world.requested` from the web or mobile web or a
-`channel.message_in` from the owner's bound WhatsApp number, never an email, with the same
+`channel.message_in` the owner typed from their bound WhatsApp number (`option` null, `card_kind` null
+or `needs_you`, BQ-56), never an email or a tapped card option, with the same
 `destination`, used by no other `policy.applied`), which the Trace and HR-7's link show beside
 the policy (OB-01).
 
@@ -57,6 +58,9 @@ the policy (OB-01).
 
 - `fixtures/events/valid/<type>.json`: one valid event per registered type (the registry's
   `fixture`); each passes every rule above and round-trips through the generated models.
+  `fixtures/events/valid/<type>--<case>.json` is a further valid case of a type, checked the same
+  way (`question.answered--from_decision.json` cites the Decision
+  `fixtures/decision/valid/owner_answer_all_worlds.json`).
 - `fixtures/events/invalid/`: each fails `event.schema.json` or its type's data schema; the file
   name says which rule.
 - `fixtures/events/registry/invalid/evNN_*.json`: each passes both schemas and breaks only rule

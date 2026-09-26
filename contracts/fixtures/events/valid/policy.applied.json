@@ -36,7 +36,8 @@
     "item": {
       "artifact_id": "art_followup_reply",
       "version": 1
-    }
+    },
+    "credits": 2
   },
   "trace": {
     "model_role": null,

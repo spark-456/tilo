@@ -15,7 +15,7 @@
  * Public interface: e2e/support/camera.ts (readCamera); no new production exports.
  */
 import { type Page, expect, test } from "@playwright/test";
-import { readCamera } from "./support/camera";
+import { gotoStage, readCamera } from "./support/camera";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP, reducedMotion: "reduce", hasTouch: true });
@@ -77,7 +77,7 @@ async function stageCenter(page: Page) {
 test("P0-08b camera C6 PRD-9.7 pointer: one left-button drag pans by exactly its own movement", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   await page.mouse.move(600, 400);
   await page.mouse.down({ button: "left" });
   await page.mouse.move(500, 350);
@@ -88,7 +88,7 @@ test("P0-08b camera C6 PRD-9.7 pointer: one left-button drag pans by exactly its
 
 for (const button of ["right", "middle"] as const) {
   test(`P0-08b camera C6 PRD-9.7 pointer: a ${button}-button drag never pans`, async ({ page }) => {
-    await page.goto("/");
+    await gotoStage(page);
     const before = await readCamera(page);
     await page.mouse.move(600, 400);
     await page.mouse.down({ button });
@@ -105,7 +105,7 @@ for (const button of ["right", "middle"] as const) {
 test("P0-08b camera C6 PRD-9.7 touch: two fingers moving apart (fixed midpoint) zoom in about the midpoint, without panning", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const c = await stageCenter(page);
   const session = await cdp(page);
   const before = await readCamera(page);
@@ -130,7 +130,7 @@ test("P0-08b camera C6 PRD-9.7 touch: two fingers moving apart (fixed midpoint) 
 test("P0-08b camera C6 PRD-9.7 touch: two fingers moving together (fixed distance) pan by the midpoint's movement, without zooming", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const c = await stageCenter(page);
   const session = await cdp(page);
   const before = await readCamera(page);
@@ -154,7 +154,7 @@ test("P0-08b camera C6 PRD-9.7 touch: two fingers moving together (fixed distanc
 test("P0-08b camera C6 PRD-9.7 touch: landing a second finger causes no jump (camera unchanged the instant it lands)", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const c = await stageCenter(page);
   const session = await cdp(page);
 
@@ -180,7 +180,7 @@ test("P0-08b camera C6 PRD-9.7 touch: landing a second finger causes no jump (ca
 test("P0-08b camera C6 PRD-9.7 touch: lifting one of two fingers causes no jump, and the remaining finger then pans by its own delta only", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const c = await stageCenter(page);
   const session = await cdp(page);
 
@@ -212,7 +212,7 @@ test("P0-08b camera C6 PRD-9.7 touch: lifting one of two fingers causes no jump,
 test("P0-08b camera C6 PRD-9.7 touch: pointercancel on one finger causes no jump, and the other finger keeps panning correctly", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoStage(page);
   const c = await stageCenter(page);
   const session = await cdp(page);
   await recordTouchPointerIds(page);
