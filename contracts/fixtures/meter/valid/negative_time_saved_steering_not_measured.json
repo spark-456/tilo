@@ -1,0 +1,18 @@
+{
+  "run_id": "r_village_basic_1",
+  "last_seq": 0,
+  "credits_used": 0,
+  "credits_saved": 0,
+  "time_saved": {
+    "minutes": -6.5,
+    "low": -12.0,
+    "high": -1.0,
+    "steering_measured": false,
+    "method_url": "https://tilo.example/docs/time-saved-method"
+  },
+  "budget": {
+    "cap": 40,
+    "spent": 0,
+    "reserved": 0
+  }
+}
