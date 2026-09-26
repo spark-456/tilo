@@ -35,6 +35,11 @@ other service calls instead of naming a model. Business code asks for a **role**
   — only an injected `client=`/`transport=` (tests) is exempt.
 - `ModelProvider.redact(text)` (default no-op) scrubs a provider's own secret before it is
   written; `RecordReplayProvider` calls it, plus an `Authorization`/`Bearer` backstop.
+- `safety` (CC-SP-47, FR-INT-02): `check()` returns exactly `{flagged, reason}`; native files via
+  `check("", content=, mime_type=)` for PDF/PNG/JPEG only, anything else raises `RequestError` (fail closed).
+  `build_safety_provider(config)` reads the `safety` role (none in `config/models.yaml` yet, BQ-68):
+  `fake` -> `FakeSafetyProvider`, `model_armor` -> `SafetyRecordReplayProvider`
+  (`fixtures/safety-recordings/`); the live Model Armor adapter is a refusing stub (ADR-0003).
 - `Router._candidate` is the one choke point for every candidate touch (build, count_tokens, calls, first chunk):
   `RequestError`/stream-embed `SafetyError` raise (generate: `safety_blocked`), mid-stream -> `StreamInterruptedError`,
   anything else falls back (over budget: never sent). Only `RouterError`s leave, with `.attempts` and `__cause__`.
