@@ -2,7 +2,11 @@
 
 from fastapi import FastAPI
 
+from tilo_api import deps  # noqa: F401  (re-exported: tests import `tilo_api.deps` directly)
+from tilo_api.redaction import router as _redaction_router
+
 app = FastAPI(title="tilo-api")
+app.include_router(_redaction_router)
 
 
 @app.get("/healthz")
