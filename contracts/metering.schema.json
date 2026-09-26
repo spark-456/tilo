@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/metering.schema.json",
+  "x-version": "1.0.0",
+  "title": "Metering",
+  "description": "config/metering.yaml: the Treasury's settings (PRD 14.1, 14.4, 17.3; FR-MTR-02, -03, -04, -08). What the PRD states as a rule is const: the 15% reserve, the budget request at 80% and the reconciliation tolerance of 10%. Caps and daily spend limits are config with the PRD demo defaults. The credit unit (US$0.005) stays in config/prices.yaml. Rules a schema cannot express are MT-01.. in contracts/metering.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["treasury", "caps", "spend", "reconciliation"],
+  "properties": {
+    "treasury": { "$ref": "#/$defs/treasury" },
+    "caps": { "$ref": "#/$defs/caps" },
+    "spend": { "$ref": "#/$defs/spend" },
+    "reconciliation": { "$ref": "#/$defs/reconciliation" }
+  },
+  "$defs": {
+    "treasury": {
+      "description": "Reserve, then commit (PRD 14.1). Each step reserves its estimate times (1 + reserve_margin) before running and commits the actual cost after; a step that cannot reserve waits (FR-MTR-02). At request_at of the approved budget the Director raises budget.requested (FR-MTR-03). Both are fixed by the PRD; minimum and maximum repeat each const so generated Python checks it too.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reserve_margin", "request_at"],
+      "properties": {
+        "reserve_margin": { "type": "number", "const": 0.15, "minimum": 0.15, "maximum": 0.15 },
+        "request_at": { "type": "number", "const": 0.8, "minimum": 0.8, "maximum": 0.8 }
+      }
+    },
+    "caps": {
+      "description": "Credit caps per run, per user per day and per org per day, all from config (PRD 14.1). Demo defaults: 300 credits per public run (17.3); 1,500 credits per pilot tester per day (17.3); no separate org cap (BQ-42). The per-run and per-user daily caps are always set (FR-MTR-04); only the per-org daily cap may be null, meaning no separate org cap, and its key is still required so that the scope is not left out by accident. A day is the UTC calendar day (BQ-44).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_credits", "user_day_credits", "org_day_credits"],
+      "properties": {
+        "run_credits": { "$ref": "#/$defs/cap" },
+        "user_day_credits": { "$ref": "#/$defs/cap" },
+        "org_day_credits": { "$ref": "#/$defs/org_cap" }
+      }
+    },
+    "cap": {
+      "description": "Credits above zero. Never null: the per-run and per-user daily caps are required (PRD 14.1, FR-MTR-04).",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "org_cap": {
+      "description": "Credits above zero, or null for no separate per-org daily cap (BQ-42); the daily spend caps still apply to every org.",
+      "type": ["number", "null"],
+      "exclusiveMinimum": 0
+    },
+    "spend": {
+      "description": "US dollars of model spend per day for the deployment (PRD 14.1, 17.3; demo defaults US$15 soft, US$25 hard on tilo-demo). The soft cap raises an alert; the hard cap flips the kill switch, so the public link turns replay-only (NFR-24, FR-MTR-04). daily_usd_hard is at least daily_usd_soft (MT-01).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["daily_usd_soft", "daily_usd_hard"],
+      "properties": {
+        "daily_usd_soft": { "type": "number", "exclusiveMinimum": 0 },
+        "daily_usd_hard": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "reconciliation": {
+      "description": "Daily reconciliation (PRD 14.4, FR-MTR-08): ledger credits times US$0.005 must match billed model spend within the tolerance, fixed at 10% by the PRD; larger drift raises an alert and freezes new claims in the deck until explained (MT-02). billing_services names the billing-export services counted as model spend; empty until one is named.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tolerance", "billing_services"],
+      "properties": {
+        "tolerance": { "type": "number", "const": 0.1, "minimum": 0.1, "maximum": 0.1 },
+        "billing_services": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/billing_service" }
+        }
+      }
+    },
+    "billing_service": {
+      "description": "A service name as the billing export writes it: letters, digits, spaces and . _ ( ) -, starting with a letter or digit.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()-]{0,99}$"
+    }
+  }
+}

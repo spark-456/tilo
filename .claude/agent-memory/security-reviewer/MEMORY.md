@@ -1,16 +1,12 @@
 - [API authz and redaction](api-authz-redaction.md): ST-3a r1 FAIL: no world-membership check on reads, Stop all aborts mid-loop, unvalidated pause channel
-- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r9 FAIL (approval.requested.approver has no owner assignment stamp); open: recipients [] scope
-- [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r3 FAIL; Pause all gated on stopped>0 records nothing; vis/target/data.district leak hidden D ids
-- [Policy engine P4-01](policy-engine-p4-01.md): r4 FAIL; future-stamped policy dropped lets overlapping policy run past a revocation
-- [Outbox ST-2](outbox-st2.md): r3 FAIL; pending data.transfer flushed by any instance with no claim (duplicates); sent+pending not one atomic write
-- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 passed r10 (dd3d4b9); open for P4: recipients [] scope, credits self-declared
-- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 r5 FAIL (L2 instruction accepted from unauthenticated email; instruction reusable); P0-03 passed r10 (dd3d4b9); open: two tier sources; open for P4: recipients [] scope, credits self-declared
-- [Harness writer gaps](harness-writer-gaps.md): P0-09 r3 PASS, flagged: head counts + lease on client-facing world doc (10.1); ids `$` accepts trailing \n
+- [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 passed r10 (dd3d4b9); open: two tier sources; open for P4: recipients [] scope, credits self-declared
+- [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r7 FAIL (87d0d5d): writer retry keyed on writer object identity (stuck or duplicates); needs idempotency key
+- [Policy engine P4-01](policy-engine-p4-01.md): r9 PASS; P4-01b r10 FAIL, r11 PASS (dab6d8c, whole data validated); 5d open (#27)
+- [Outbox ST-2](outbox-st2.md): r5 PASS (2ff085b); open: writer must ack dup transfer, durable adapter dedupe, store authz/server time
 - [Archive redactor gaps](archive-redactor-gaps.md): FR-MEM-04/05 r4 FAIL: card in >25-digit run unredacted; prefix-first window leaks; logs/JWT closed
 - [Skill checker gaps](skill-checker-gaps.md): FR-AGT-04 re-scope r1 FAIL (366f357): guard.check_bounds never wired into checkers; missing safety_flags = clean
-- [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r5 FAIL (7a3051c); malformed scope 500s Stop all after pending pop, pause lost; dup parts on timeout
-- [Policy engine P4-01](policy-engine-p4-01.md): r9 PASS (c7569a9); open: FEFF in scope email, level!=history drop (5d), invisible BOM in regex
-- [Outbox ST-2](outbox-st2.md): r5 PASS (2ff085b); open: writer must ack dup transfer, durable adapter dedupe, store authz/server time
 - [Cards API ST-3b](cards-api-st3b.md): r1 FAIL (ea775d2); answer route takes actor/channel/pin from body, open_gate trusts it
 - [Decision and manifest CC-SH](decision-manifest-cc-sh.md): r3 PASS (b34fb86); open: teams.yaml assigned_by self-declared, MF-06 redactor sole token guard
+- [Sandbox Web P8-07](sandbox-web-p8-07.md): r3 PASS (43c1ddc); open: ZW/bidi check passes attr-only, HEAD on healthz, CSP extras
 - [Provider secret handling](provider-secret-handling.md): P0-05 r11 PASS (7a0d1be); residual for P0-06: malformed 200 body raises raw pydantic error (echoed key truncated)
+- [Harness writer gaps](harness-writer-gaps.md): P0-09 r6 PASS: head moved to _head/state (rules must deny it); open: ids `$` \n, emulator lock-timeout flake
