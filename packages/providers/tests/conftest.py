@@ -17,12 +17,16 @@ plain-module-import pattern tests/contracts uses for its own _lib.py.
 from __future__ import annotations
 
 import copy
+import json
 import pathlib
 import socket as socket_module
+from dataclasses import dataclass
+from typing import Any, Literal
 
 import pytest
 import yaml
 from _fake_genai_sdk import fake_genai_sdk  # noqa: F401 -- re-exported so pytest can discover it
+from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 
@@ -152,3 +156,234 @@ def write_providers_config(tmp_path: pathlib.Path, models: dict, prices: dict) -
     models_path.write_text(yaml.safe_dump(models, sort_keys=False), encoding="utf-8")
     prices_path.write_text(yaml.safe_dump(prices, sort_keys=False), encoding="utf-8")
     return models_path, prices_path
+
+
+@pytest.fixture
+def providers_config(tmp_path: pathlib.Path):
+    """A loaded, validated `ProvidersConfig` (BASE_MODELS + priced
+    BASE_PRICES_SET) for router tests (ticket P0-06) that need a real config
+    object without caring about the loader itself (that is P0-04's job,
+    already covered by test_NFR_25_*.py and test_PL_07_*.py)."""
+    from tilo_providers.config import load_providers_config  # noqa: PLC0415
+
+    models_path, prices_path = write_providers_config(tmp_path, models_config(), prices_config(set_=True))
+    return load_providers_config(models_path, prices_path)
+
+
+def build_providers_config(models: dict, prices: dict):
+    """Same validated shape as `providers_config`/`load_providers_config`,
+    but in memory (no disk I/O) -- for the Hypothesis property tests, which
+    must not use a function-scoped fixture like `tmp_path` inside `@given`
+    (Hypothesis's `function_scoped_fixture` health check forbids it, since
+    the fixture is not re-created per generated example)."""
+    from tilo_contracts import ProvidersModels, ProvidersPrices  # noqa: PLC0415
+    from tilo_providers.config import ProvidersConfig  # noqa: PLC0415
+
+    return ProvidersConfig(models=ProvidersModels.model_validate(models), prices=ProvidersPrices.model_validate(prices))
+
+
+def prices_config_for(price_by_profile: dict[str, tuple[float, float] | None], *, set_: bool = True) -> dict:
+    """Same shape as `prices_config()`, but priced for an arbitrary set of
+    profile ids -- for router test fixtures (cascade/capability configs
+    below) that do not use conftest's large/medium/small profiles."""
+    profiles: dict[str, dict[str, float | None]] = {}
+    for profile_id, price in price_by_profile.items():
+        if set_ and price is not None:
+            input_, output_ = price
+            profiles[profile_id] = {"input": input_, "output": output_}
+        else:
+            profiles[profile_id] = {"input": None, "output": None}
+    return {
+        "status": "set" if set_ else "unset",
+        "effective_date": "2026-10-01" if set_ else None,
+        "source": "Fake provider price page, retrieved 2026-10-01" if set_ else None,
+        "currency": "USD",
+        "credit_usd": 0.005,
+        "profiles": profiles,
+    }
+
+
+def cascade_models_config() -> dict:
+    """One role, "analyst", with a cost-ordered cascade (cheap -> mid ->
+    rich) for EFF-02 escalation tests: PRD 6.6 "Cascades" -- "Try the cheap
+    profile first; escalate only on schema failure, Verifier rejection or
+    low confidence; log every escalation with its reason." """
+    return {
+        "example": True,
+        "profiles": {
+            "cheap": {"provider": "fake", "model": "fake-cheap-1", "context": 100_000, "caps": ["json", "tools"]},
+            "mid": {"provider": "fake", "model": "fake-mid-1", "context": 100_000, "caps": ["json", "tools"]},
+            "rich": {"provider": "fake", "model": "fake-rich-1", "context": 100_000, "caps": ["json", "tools"]},
+        },
+        "roles": {
+            "analyst": {"primary": "cheap", "fallback": "rich", "cascade": ["cheap", "mid", "rich"]},
+        },
+        "rules": {"deny": []},
+    }
+
+
+def capability_models_config() -> dict:
+    """One role, "seer", whose primary profile lacks a capability its
+    fallback has -- for the PL-03 "a request needing a capability the
+    primary lacks goes straight to a profile that has it" test."""
+    return {
+        "example": True,
+        "profiles": {
+            "text-only": {"provider": "fake", "model": "fake-text-1", "context": 100_000, "caps": ["json"]},
+            "vision-capable": {
+                "provider": "fake",
+                "model": "fake-vision-1",
+                "context": 100_000,
+                "caps": ["json", "vision"],
+            },
+        },
+        "roles": {"seer": {"primary": "text-only", "fallback": "vision-capable"}},
+        "rules": {"deny": []},
+    }
+
+
+def token_cap_models_config() -> dict:
+    """One role, "summariser", with a deliberately tiny `max_input_tokens`
+    (word count, since every test double here counts tokens as
+    `len(text.split())` like `FakeModelProvider`) -- for EFF-03 compaction
+    tests."""
+    return {
+        "example": True,
+        "profiles": {
+            "capped": {"provider": "fake", "model": "fake-capped-1", "context": 1_000, "caps": ["json", "tools"]},
+        },
+        "roles": {
+            "summariser": {
+                "primary": "capped",
+                "fallback": "capped",
+                "max_input_tokens": 10,
+                "max_output_tokens": 50,
+            },
+        },
+        "rules": {"deny": []},
+    }
+
+
+def token_cap_tiered_models_config() -> dict:
+    """Two *distinct* profiles under one role, "tiered" -- unlike `token_cap_models_config`'s single
+    "capped" profile playing both primary and fallback, these are separate ids so a test can give each
+    its own `count_tokens` (a different tokenizer) and prove a fallback/escalation candidate gets
+    recompacted for its own tokenizer, not sent whatever the first candidate's tokenizer compacted to
+    (EFF-03, ticket P0-06 review follow-up)."""
+    return {
+        "example": True,
+        "profiles": {
+            "primary-cap": {"provider": "fake", "model": "fake-primary-1", "context": 1_000, "caps": ["json", "tools"]},
+            "fallback-cap": {
+                "provider": "fake",
+                "model": "fake-fallback-1",
+                "context": 1_000,
+                "caps": ["json", "tools"],
+            },
+        },
+        "roles": {
+            "tiered": {
+                "primary": "primary-cap",
+                "fallback": "fallback-cap",
+                "max_input_tokens": 10,
+                "max_output_tokens": 50,
+            },
+        },
+        "rules": {"deny": []},
+    }
+
+
+@dataclass
+class ScriptedCall:
+    """One scripted outcome for `ScriptedModelProvider.generate()`: either a
+    canned `GenerateResponse` ("ok") or an exception to raise ("error")."""
+
+    outcome: Literal["ok", "error"] = "ok"
+    text: str | None = "scripted response"
+    tool_calls: list[dict[str, Any]] | None = None
+    usage: dict[str, int] | None = None
+    error: Exception | None = None
+
+
+class ScriptedModelProvider(ModelProvider):
+    """Test double for router tests (PL-03/EFF-02/EFF-03, ticket P0-06):
+    plays back a fixed, ordered list of `ScriptedCall`s -- one consumed per
+    `generate()` call -- and records every `GenerateRequest` it actually
+    received, so a test can assert on what the router sent it (a compacted
+    prompt, a filled-in `max_output_tokens`, ...) without a network client
+    or a real adapter."""
+
+    def __init__(
+        self,
+        profile_id: str,
+        script: list[ScriptedCall],
+        *,
+        caps: set[Capability] | None = None,
+        price: PriceQuote | None = None,
+    ) -> None:
+        self.profile_id = profile_id
+        self._script = list(script)
+        self._caps = set(caps) if caps is not None else {Capability.JSON, Capability.TOOLS}
+        self._price = price if price is not None else PriceQuote(input=1.0, output=2.0)
+        self.calls: list[GenerateRequest] = []
+
+    def generate(self, request: GenerateRequest) -> GenerateResponse:
+        self.calls.append(request)
+        if not self._script:
+            raise AssertionError(
+                f"ScriptedModelProvider({self.profile_id!r}): ran out of scripted calls at call {len(self.calls)}"
+            )
+        step = self._script.pop(0)
+        if step.outcome == "error":
+            assert step.error is not None, "a scripted error step must set `error`"
+            raise step.error
+        return GenerateResponse(
+            text=step.text, profile_id=self.profile_id, tool_calls=step.tool_calls, usage=step.usage
+        )
+
+    def stream(self, request: GenerateRequest):
+        yield self.generate(request)
+
+    def embed(self, request: Any) -> Any:
+        raise NotImplementedError("router tests (ticket P0-06) do not exercise embed()")
+
+    def count_tokens(self, text: str) -> int:
+        return len(text.split())
+
+    def capabilities(self) -> set[Capability]:
+        return set(self._caps)
+
+    def price(self) -> PriceQuote:
+        return self._price
+
+
+CONFORMANCE_CHECK_NAMES = (
+    "schema_adherence",
+    "tool_calling",
+    "repair_rate",
+    "latency_budget",
+    "safety_handling",
+)
+
+
+def write_conformance_result_file(
+    conformance_dir: pathlib.Path,
+    profile_id: str,
+    *,
+    result: Literal["pass", "fail"] = "pass",
+    date_str: str = "2026-09-25",
+    build: str = "test-build",
+) -> pathlib.Path:
+    """Writes `<conformance_dir>/<profile_id>.json` in the shape PL-05's
+    conformance runner produces (see test_PL_05_conformance_suite.py),
+    without running the runner -- lets a config-loader gating test fix the
+    recorded result directly (PL-05: "a failing profile cannot be assigned
+    to a role")."""
+    conformance_dir.mkdir(parents=True, exist_ok=True)
+    checks = dict.fromkeys(CONFORMANCE_CHECK_NAMES, "pass")
+    if result == "fail":
+        checks["schema_adherence"] = "fail"
+    payload = {"profile_id": profile_id, "date": date_str, "build": build, "checks": checks, "result": result}
+    path = conformance_dir / f"{profile_id}.json"
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path

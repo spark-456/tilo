@@ -5,12 +5,15 @@ Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP c
 outbox for every side effect. The only service that can decrypt user OAuth tokens.
 
 ## Commands
-- Package and dev/test commands land with the connectors code (ticket P6).
+- `uv run pytest services/connectors/tests -q` — public API pinned in `tests/API.md` (ticket
+  ST-2: `tilo_connectors`, the outbox).
 - `just check` — full gate from the repo root.
 
 ## Contracts
-- Reads/writes: `packages/contracts-py` outbox/event types; Secret Manager and Cloud KMS for
-  token envelope encryption; Google Workspace APIs.
+- Reads `contracts/outbox.schema.json` (+ cross-refs), `data.transfer.schema.json`,
+  `contracts/fixtures/outbox/`; calls `tilo_policy.check_entry` for OB-01/OB-05 authorisation.
+  Writes: emits `data.transfer` parts (a registered type, no new one) via the `emit` callback
+  `Outbox` is constructed with. Token broker / Workspace APIs / KMS land with a later ticket.
 
 ## Config
 - `config/connectors.yaml` (adapters, scopes), `config/autonomy.yaml` (risk tiers per action).
@@ -20,6 +23,16 @@ outbox for every side effect. The only service that can decrypt user OAuth token
 
 ## Local rules
 - Connector side-effect methods are callable only from the outbox (SEC-03); every side-effect
-  event carries `authz` (SEC-11).
+  event carries `authz` (SEC-11). `side_effects.SIDE_EFFECT_METHOD_NAMES` names them (currently
+  `send_reply`); `outbox.py` is the one file allowed to call one, and its `Grant` is minted only
+  by `Outbox.dispatch_due()`, live only for the one send it names.
 - OAuth only, least privilege, incremental scopes; Tilo never sees, types or stores passwords.
-- Every side effect goes through the outbox exactly once (idempotency keys, no duplicate retries).
+- Exactly-once send, at-least-once delivery: `enqueue` is a no-op on a world_id + idempotency_key
+  already stored (OB-03), and the adapter dedupes its own send too, so a crash or retry never
+  sends twice. `Outbox` may hand the same `data.transfer` to `emit` more than once (a lease
+  expiring mid-emit, a restart); the harness event writer (PI-18) keeps exactly one per
+  `outbox_id`. Send order holds per `world_id` only: a rejected transfer blocks later ones of
+  its own world, never another's.
+- Trust boundary: `InMemoryOutboxStore`'s mutators are underscored and the only writers, each a
+  lock-guarded compare-and-set or lease, so several `tilo-connectors` instances sharing one store
+  never both win a write. IAM makes it the only writer to the real store in production.

@@ -2,6 +2,8 @@
 
 Updated: 2026-09-25 · Phase 0 (Foundations) · next gate **CP0 on 29 Sep** · CI on `main`: green
 
+**Paused 2026-09-26 for laptop shutdown.** P0-06 merged to `main` (9eeff14); CC-SE paused between review rounds (feat/CC-SE-contracts-se at fa0a1b8); P0-03b not started. Resume notes in the user's Claude memory (`memory/pause/`).
+
 ## Checkpoints
 
 | Checkpoint | Date | Status | Notes |

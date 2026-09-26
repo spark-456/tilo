@@ -14,4 +14,4 @@ prompts/
 `<role>` matches a role in `config/models.yaml`. Substitution: stdlib
 `string.Template` (`$name` / `${name}`, no `eval`), filled in strictly.
 
-No real prompts yet — scaffolding until the agent roles that need them (P2+) land.
+Provider-layer templates only (`router/` EFF-02 repair, `conformance/` PL-05 probe); agent-role prompts land in P2+.
