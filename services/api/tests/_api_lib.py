@@ -278,6 +278,7 @@ def as_principal_by_header(mapping: dict[str, deps.Principal]) -> None:
 
     def _resolve(request: Request) -> deps.Principal:
         key = request.headers.get(PRINCIPAL_HEADER)
+        assert key is not None, f"{PRINCIPAL_HEADER} header required"
         return mapping[key]
 
     app.dependency_overrides[deps.get_current_principal] = _resolve
@@ -293,11 +294,16 @@ def as_store_and_writer_by_header(mapping: dict[str, tuple[deps.Store, FakeEvent
     PRINCIPAL_HEADER with the matching key, exactly like as_principal_by_header does for the
     principal."""
 
+    def _resolve_key(request: Request) -> str:
+        key = request.headers.get(PRINCIPAL_HEADER)
+        assert key is not None, f"{PRINCIPAL_HEADER} header required"
+        return key
+
     def _resolve_store(request: Request) -> deps.Store:
-        return mapping[request.headers.get(PRINCIPAL_HEADER)][0]
+        return mapping[_resolve_key(request)][0]
 
     def _resolve_writer(request: Request):
-        return mapping[request.headers.get(PRINCIPAL_HEADER)][1]
+        return mapping[_resolve_key(request)][1]
 
     app.dependency_overrides[deps.get_store] = _resolve_store
     app.dependency_overrides[deps.get_event_writer] = _resolve_writer
