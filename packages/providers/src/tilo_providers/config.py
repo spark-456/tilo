@@ -9,7 +9,9 @@ price: an unset status, or any null price field, raises (PL-06)."""
 from __future__ import annotations
 
 import fnmatch
+import json
 import os
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -163,7 +165,30 @@ def _validate_price_fields_when_set(prices: ProvidersPrices, prices_path: Path) 
             )
 
 
-def load_providers_config(models_path: Path | str, prices_path: Path | str) -> ProvidersConfig:
+def profiles_used_by(role: ProvidersRole) -> set[str]:
+    return {role.primary, *([role.fallback] if role.fallback else []), *(role.cascade or ())}
+
+
+def _validate_conformance(models: ProvidersModels, conformance_dir: Path) -> None:
+    """PL-05: a failing profile cannot serve a role; a missing result warns (refused if required)."""
+    for role_id, role in models.roles.items():
+        for profile_id in sorted(profiles_used_by(role)):
+            path = conformance_dir / f"{profile_id}.json"
+            where = f"PL-05: role {role_id!r} profile {profile_id!r} conformance result {path}"
+            if not path.is_file() and os.environ.get("TILO_REQUIRE_CONFORMANCE") != "1":
+                warnings.warn(f"{where} is missing -- allowed in dev", stacklevel=2)
+                continue
+            try:  # a missing file here means TILO_REQUIRE_CONFORMANCE=1
+                passed = json.loads(path.read_text(encoding="utf-8")).get("result") == "pass"
+            except (OSError, ValueError, AttributeError) as error:
+                raise ProviderConfigError(f"{where} is missing or unreadable: {error}") from error
+            if not passed:
+                raise ProviderConfigError(f"{where} is failing")
+
+
+def load_providers_config(
+    models_path: Path | str, prices_path: Path | str, conformance_dir: Path | str | None = None
+) -> ProvidersConfig:
     """Loads, validates and start-up-checks the two config files; raises
     ProviderConfigError loudly rather than starting on a bad config."""
     models_path, prices_path = Path(models_path), Path(prices_path)
@@ -183,5 +208,7 @@ def load_providers_config(models_path: Path | str, prices_path: Path | str) -> P
     _validate_profile_endpoint_fields(models)
 
     _validate_startup_rules(models, prices)
+    if conformance_dir is not None:
+        _validate_conformance(models, Path(conformance_dir))
 
     return ProvidersConfig(models=models, prices=prices)
