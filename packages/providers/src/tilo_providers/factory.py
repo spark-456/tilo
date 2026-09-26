@@ -17,9 +17,10 @@ from tilo_providers.config import ProviderConfigError, ProvidersConfig
 from tilo_providers.interfaces import Capability, ModelProvider
 
 
-def build_provider(role_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str) -> ModelProvider:
-    role = config.roles[role_id]
-    profile_id = role.primary
+def build_provider(
+    role_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str, profile_id: str | None = None
+) -> ModelProvider:
+    profile_id = profile_id or config.roles[role_id].primary  # the router passes any cascade profile
     profile = config.profiles[profile_id]
 
     if profile.provider == "fake":
