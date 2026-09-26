@@ -1,4 +1,7 @@
-# `tilo_api` — public shape ticket ST-3a pins (round 5, after round 4 failed code/security/qa review)
+# `tilo_api` — public shape ticket ST-3a pins (round 8, redone per issue #46's binding S0 decision
+# after round 7/ST-3a-3's own writer design -- an 8-worker pool with an `_in_flight` map keyed by
+# `id(part)`, and a retry gate keyed on writer-*instance* identity -- failed code/security/qa
+# review a second time; see "What changed since round 7 (ST-3a-3) -- issue #46" below)
 
 Ticket ST-3a (session ST). Requirements FR-HIL-07 (kill switches), FR-HIL-09 and SEC-07 (roles
 and redaction). Invariants PI-13 and PI-18 of `docs/security/p4-policy-invariants.md` apply. This
@@ -502,6 +505,108 @@ all three reviewers again (issue #38's last comment, PR #39 stuck at the round c
     per call), but it only gets a fresh chance to retry a stuck head when a call supplies one,
     exactly as the pending/flush trigger has always worked.
 
+## What changed since round 7 (ST-3a-3) -- issue #46 (S0's decision, binding, round 8)
+
+Round 7 (immediately above) fixed issue #38's duplicate writes, out-of-order commits and
+permanently-stuck worlds by keying dedupe on a stable id carried *alongside* the part and by
+retrying a stuck head only when handed a **different** writer object than the one already presumed
+stuck (`head.attempt_writer is writer`). Issue #46 retires that instance-identity heuristic itself:
+it made round 7 permanently stuck against the far more common case of a shared writer object that
+merely *stops hanging* (the same long-lived harness connection recovering, or production's
+`get_event_writer()` handing back the very same client on every call) -- exactly the scenario
+`test_FR_HIL_07_pause_recovers_via_the_same_writer_object_once_it_stops_hanging` pins. S0's own
+comment on issue #46 is binding:
+
+> The idempotency key already exists: every event carries a required ULID `id`
+> (contracts/event.schema.json), and `EventWriter.append` already refuses a reused id (EV-10). Use
+> it: (1) Dispatcher (ST, services/api): build the full event, including `id`, once when the part
+> is enqueued. Every retry re-sends that same event. Dedupe the queue on `id`, not on content. At
+> most one append in flight per world. Read the part deadline from config, not a constant tuned to
+> the tests. (2) Harness writer (SH, services/harness/writer.py): if `append` gets an event whose
+> `id` is already committed and whose content is byte-identical to the committed event, return the
+> committed event (idempotent success) instead of raising. Same id with different content stays
+> EventRejected. (3) The api-side `EventWriter` protocol passes the pre-built event (with `id`)
+> instead of a bare part.
+
+Concretely, this round changes:
+
+1. **The full event, `id` included, is built once at enqueue time.** `tilo-api` no longer builds a
+   bare part (round 1-7's `type`/`actor`/.../`data` dict with no identity of its own); it builds
+   that same shape *plus a fresh `id` (a ULID)*, at the moment the part is enqueued onto a world's
+   queue, and hands that exact same dict to `EventWriter.append` on every retry -- the same object
+   (or an equivalent copy, e.g. after a persisted-queue reload, ambiguity 20, unchanged) every
+   time, never a freshly-`uuid4()`'d one per attempt. `seq`, `ts` and `run_id` remain writer-only,
+   stamped on first commit, exactly as every round before this one.
+2. **Dedupe moves from content, and from writer-instance identity, onto that `id`.** Round 7's
+   `_content_key` (JSON-serialize-and-hash the part) and its `head.attempt_writer is writer` retry
+   gate are both retired. `EventWriter.append` itself is now the one and only place idempotency is
+   decided (EV-10): the same `id` with byte-identical content already committed is a no-op success
+   (the already-committed record is returned); the same `id` with *different* content is
+   `EventRejected` (new, above) -- a real conflict, never a silent overwrite. This is strictly more
+   permissive about *retrying* (any writer object, the same one or a different one, may answer a
+   retry) and strictly less permissive about *content drift* under one id than round 7 was.
+3. **At most one `append` in flight per world, at any instant.** Round 7 allowed "parallel dispatch
+   within one world's writer calls... for latency," committed in an order-preserving buffer. Round
+   8 drops that complexity along with the bugs it produced (issue #38's duplicate writes and
+   out-of-order commits): exactly one `append` call is ever outstanding for a given world at a
+   time, in queue order, `world.paused` still jumping to the front ahead of any audit part
+   (unchanged from ST-3a-3). A part whose attempt does not settle within its own deadline is left
+   at the head, pending, for *this* call; the world's long-lived consumer gets another chance to
+   attempt that same head -- against whatever writer the *next* mutating call supplies, the same
+   instance or a different one, it no longer matters -- on a later call, never by spawning a second
+   concurrent attempt for it within the same call (ambiguity 21's "the consumer only gets a fresh
+   chance when a call supplies one" stays unchanged; what changes is that a *same-instance* retry
+   is now just as eligible as a different-instance one).
+4. **The per-part write deadline is config-backed, not a module constant.** Round 7's
+   `_PART_DEADLINE_S = 0.3` (a value ambiguity 16 explicitly left as "this ticket's own
+   implementation choice... not pinned... beyond 'meaningfully smaller than 5s'") is replaced by
+   `deps.get_part_write_deadline_s()` (new, above) -- injectable exactly like `get_store`/
+   `get_event_writer`, so production reads a real config value and every test can prove the route
+   reads it fresh rather than capturing a constant once at import time. Ambiguity 16's own
+   resolution (the exact number is still not pinned) is otherwise unchanged.
+5. **`_ALLOWED_PART_KEYS` gains `id`.** `_api_lib.py`'s allowlist of keys the event tilo-api hands
+   to `EventWriter.append` may carry now includes `id` (required, ULID-shaped) alongside the
+   existing part-content keys and `trace`; `seq`/`ts`/`run_id` remain the only fields still
+   forbidden on the caller's side (`_STAMPED_ONLY_KEYS`, now three entries instead of four).
+   `assert_part_carries_no_stamped_fields` (unchanged name) now also asserts `id`'s presence and
+   shape, not just the writer-only fields' absence.
+6. **`WorldRecord.paused` must never be observed `True` without its own `world.paused` event
+   existing somewhere in the store (pending or committed) -- fail-safe extended to a corrupted
+   `pending_events` entry.** Round 5's fail-safe rule for a malformed *policy* record (never abort
+   the kill switch, never half-apply) extends explicitly to a corrupted `store.pending_events`
+   entry for the *pause* flow specifically: a non-list value under `store.pending_events[world_id]`
+   (for example `None`, standing in for some other write having left it in a bad shape) must never
+   raise past the route, and -- because `world.paused` is set under the same lock that decides to
+   enqueue its own event -- must never leave `paused` flipped `True` with no corresponding event
+   anywhere (PRD 9.4 honesty: nothing animates without a recorded event, applied to the durable
+   flag itself, not only to the on-screen animation).
+7. **A fast (non-hanging) failure with call budget remaining is retried within the same call.**
+   Round 4-7 treated any raising `append` -- fast or slow -- as an immediate "queue it pending, move
+   on" signal. Round 8 distinguishes a *fast* failure (the attempt concluded, raising, well inside
+   its own per-part deadline) from a *hang* (the deadline itself elapsed): a fast failure, with
+   meaningful call budget still left, is retried right away, within the same call -- `EventWriter.
+   append` being idempotent-by-id (finding 2 above) makes an immediate retry safe -- rather than
+   being parked pending on its very first failure. This does not change how a *hang* is handled
+   (finding 3: still left pending for this call, retried only on a later one).
+
+Round 7's `test_FR_HIL_07_nine_hung_writer_calls_recover_via_a_swapped_in_healthy_writer` is
+removed (not merely superseded): it proved recovery specifically *by swapping in a different
+writer object*, the exact signal this round retires. Its scenario is covered by two round-8 tests
+instead: one using a single shared writer object throughout (never swapped), and one using a fresh
+writer object on every single call (the opposite extreme) against a persistently hung harness, to
+pin the thread-bound and single-in-flight properties independently of recovery.
+
+### Ambiguities resolved this round (round 8)
+
+22. **The exact config key/file for the part-write deadline.** Left as this ticket's own
+    implementation choice, same resolution style as ambiguity 16: `deps.get_part_write_deadline_s`
+    is the pinned, testable seam; which `config/*.yaml` file and key production reads through it is
+    not pinned here.
+23. **The stable event `id`'s exact minting point.** "Once when the part is enqueued" (S0's own
+    wording) is pinned; whether that happens inside the route handler itself or one layer down in
+    the dispatch module is this ticket's own implementation choice, same resolution style as
+    ambiguity 20's "any stable form is fine."
+
 ## `tilo_api.deps` (module; `Principal.channel` is new this round -- every test that constructs one
 via `make_principal(channel=...)` fails on that keyword until the builder adds the field)
 
@@ -626,22 +731,41 @@ class Store:
     # the stop, pause and revoke routes for exactly which worlds a given call flushes and counts.
 
 
-class EventWriter(Protocol):
-    """The single writer of events (PRD 15.3). tilo-api builds an event *part* -- every
-    event.schema.json field except v, id, seq, ts, world_id, run_id and trace (trace defaults to
-    all-null; neither event type this ticket emits makes a model or tool call) -- and hands it
-    here. A production implementation talks to the harness process; this ticket only pins the
-    call shape. Every test supplies its own in-memory stand-in (`_api_lib.FakeEventWriter`) that
-    stamps id/seq/ts/run_id itself (from Store.worlds[world_id].run_id and a per-world counter,
-    O(1) per call -- PI-18's "one writer" also fixes round 1's O(n) rescan-per-event) and appends
-    to Store.events, and that records every call so a test can assert the *un*stamped part
-    tilo-api handed over carried none of those four fields."""
+class EventRejected(Exception):
+    """Issue #46 (S0's decision, binding, round 8): raised by EventWriter.append when a caller
+    resends an `id` that is already committed for that world_id with *different* content than
+    what was committed under that id. Same id, same content -> idempotent success (the
+    already-committed record is returned, nothing new is appended, EV-10). Same id, different
+    content -> this exception; tilo-api must let a genuinely differing resend surface as a real
+    conflict, never silently overwrite the committed record and never silently drop the new one."""
 
-    def append(self, world_id: str, part: dict) -> dict:
-        """part keys: type, actor, target, level, district, item, severity, credits, summary,
-        cause, vis, authz, data (any key the caller has no value for is set to that field's
-        schema-honest default: null, "info", 0, or "all" for vis). Returns the fully stamped
-        event.schema.json record that was appended to store.events[world_id]."""
+
+class EventWriter(Protocol):
+    """The single writer of events (PRD 15.3). Round 8 (issue #46) replaces round 7's *bare part*
+    with the *full, pre-built event*: tilo-api now builds every event.schema.json field except
+    `seq`, `ts`, `run_id` and `trace` (trace defaults to all-null) -- crucially now **including
+    its own `id`, a ULID, built once when the part is enqueued and resent unchanged on every
+    retry** -- and hands the whole thing here. `append` dedupes on that `id` (EV-10), never on
+    raw content-equality (round 7's `_content_key`, retired) and never on whether this call
+    happens to be handed the same writer *object* as an earlier, still-outstanding attempt (round
+    7's `head.attempt_writer is writer` check, retired -- see "What changed since round 7" below).
+    A production implementation talks to the harness process (services/harness/writer.py, a
+    small SH ticket under this same requirement ID implements the identical idempotent-by-id
+    contract there); this ticket only pins the call shape. Every test supplies its own in-memory
+    stand-in (`_api_lib.FakeEventWriter`), which stamps `seq`/`ts`/`run_id` itself (from
+    Store.worlds[world_id].run_id and a per-world counter, O(1) per call) on first commit only,
+    returns the already-committed record unchanged on an idempotent-by-id retry, and raises
+    `EventRejected` when the same id shows up with different content -- and that records every
+    call so a test can assert the event tilo-api handed over carried its own stable `id` but none
+    of the three still-writer-only fields."""
+
+    def append(self, world_id: str, event: dict) -> dict:
+        """event keys: id, type, actor, target, level, district, item, severity, credits,
+        summary, cause, vis, authz, data (any key the caller has no value for is set to that
+        field's schema-honest default: null, "info", 0, or "all" for vis; `id` is always present,
+        a ULID, and is the sole idempotency key). Returns the fully stamped event.schema.json
+        record that is (or already was) appended to store.events[world_id]; raises
+        `EventRejected` on a same-id/different-content conflict."""
         ...
 
 
@@ -660,6 +784,20 @@ def get_store() -> Store:
 def get_event_writer() -> EventWriter:
     """Raises NotImplementedError in production until the harness wiring lands; every test
     overrides this via app.dependency_overrides[get_event_writer]."""
+    raise NotImplementedError
+
+
+def get_part_write_deadline_s() -> float:
+    """Round 8 (issue #46, S0's decision point 1: "Read the part deadline from config, not a
+    constant tuned to the tests"). Production reads this from `config/` (the exact file/key is
+    this ticket's own implementation choice, ambiguity 16 extended below -- e.g. a
+    `dispatch.part_write_deadline_s` entry in a new or existing `config/*.yaml`), never a module
+    constant like round 7's `_PART_DEADLINE_S = 0.3`. Resolved through this same Depends() seam as
+    get_store/get_event_writer/get_current_principal precisely so a test can prove the route reads
+    it fresh on every call rather than capturing a constant once at import time: every test
+    overrides this via app.dependency_overrides[get_part_write_deadline_s] (`_api_lib.
+    as_part_write_deadline`), and a test may re-install a different value mid-test to prove the
+    same writer/latency combination behaves differently under a shorter vs. a longer deadline."""
     raise NotImplementedError
 ```
 
@@ -856,7 +994,14 @@ against a single world `w`:
 
 Parallelism across *different* worlds is unaffected and still required (finding 2): world `w1`'s
 writes and world `w2`'s writes may proceed fully concurrently with each other: only the ordering
-*within* a single world's own stream is constrained. This round's tests pin two concrete cases: a
+*within* a single world's own stream is constrained. **Superseded in part by round 8 (issue #46,
+"What changed since round 7" finding 3): parallel dispatch *within* one world's own writer calls
+is no longer required or permitted at all -- at most one `append` is ever in flight for a given
+world, full stop, in queue order.** This simplification is what the id-based idempotency finding 2
+of round 8 makes safe to rely on instead of an in-order commit buffer: ordering within a world no
+longer needs a buffer to hold a fast-finishing later part back, because there never is a later part
+being attempted concurrently with an earlier, still-unsettled one. This round's tests pin two
+concrete cases: a
 world with **100** parts already pending (from an earlier failed call) lands in `store.events[w]`
 in exactly that queued order once flushed; and, within one `pause` call, ~~every `policy.changed`
 part it builds lands in `store.events[world_id]` before that same call's own `world.paused`

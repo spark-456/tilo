@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import pathlib
 import random
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -318,16 +319,35 @@ def as_writer(writer) -> None:
     app.dependency_overrides[deps.get_event_writer] = lambda: writer
 
 
+def as_part_write_deadline(seconds: float) -> None:
+    """Overrides deps.get_part_write_deadline_s (issue #46 / API_ST3a.md's "#46 redo": the
+    per-writer-attempt deadline is now read from config -- via this same Depends() seam every
+    other piece of injected state in this ticket uses -- never a module constant tuned to this
+    ticket's own tests). Installing this override, then re-installing it with a different value
+    mid-test, is what proves the route actually reads the value fresh rather than capturing a
+    constant once at import time."""
+    app.dependency_overrides[deps.get_part_write_deadline_s] = lambda: seconds
+
+
 # ---------------------------------------------------------------------------
 # FakeEventWriter: the in-memory stand-in for "the harness is the only writer of events" (PRD
-# 15.3), installed in every test via the `writer` fixture (conftest.py). It is the one place
-# id/seq/ts/run_id are stamped, on purpose (PI-18): tilo-api hands it an unstamped *part* and this
-# double is what proves, by recording every call, that tilo-api never computed those fields
-# itself (round-1 finding: tilo-api invented run_id = f"r_{world_id}" and rescanned
-# store.events[world_id] for the next seq on every single event, O(n) per call inside an O(n)
-# loop). A per-world counter here is O(1) per call instead.
+# 15.3), installed in every test via the `writer` fixture (conftest.py). Updated for issue #46 (S0's
+# decision, binding for this redo -- see API_ST3a.md "What changed since round 7 (ST-3a-3) -- issue
+# #46"): the idempotency key EV-10 already gives every event -- its own ULID `id` -- is what
+# `EventWriter.append` now dedupes on, not writer-instance identity and not raw content-equality.
+# tilo-api builds the *full* event once, at enqueue time, including that `id`; every retry -- of
+# this same event, to this same writer object or a brand-new one, it makes no difference -- hands
+# `append` that exact same event again. This double is what proves, by recording every call, that
+# tilo-api never computes id/seq/ts/run_id (PI-18): a caller-supplied `id` is required (asserted
+# below); `seq`, `ts` and `run_id` stay writer-only, stamped here, on first commit, and never
+# re-derived on a later idempotent hit -- a retry that matches an already-committed id and content
+# gets back that same committed record (same seq, same ts), not a fresh one. A per-world counter
+# (not round-1's O(n) rescan) is what assigns `seq` on first commit.
 
 _EVENT_PART_KEYS = (
+    "id",  # issue #46: no longer writer-only. tilo-api builds this once (a ULID) when the part is
+    # enqueued and resends the same value on every retry -- the stable idempotency key
+    # EventWriter.append dedupes on (EV-10), never id(part) and never raw JSON content.
     "type",
     "actor",
     "target",
@@ -343,9 +363,19 @@ _EVENT_PART_KEYS = (
     "data",
 )
 
-_STAMPED_ONLY_KEYS = ("id", "seq", "ts", "run_id")
+_STAMPED_ONLY_KEYS = ("seq", "ts", "run_id")  # writer-only; `id` moved out of this tuple for #46
 
 _ALLOWED_PART_KEYS = frozenset(_EVENT_PART_KEYS) | {"trace"}
+
+_ULID_RE = re.compile(r"^[0-7][0-9A-HJKMNP-TV-Z]{25}$")  # common.schema.json#/$defs/ulid
+
+
+class EventRejected(Exception):
+    """Raised by FakeEventWriter.append (standing in for the harness writer, services/harness/
+    writer.py, a small SH ticket under FR-HIL-07 per issue #46) when a caller resends an `id`
+    that is already committed for that world with *different* content -- a genuine conflict, not
+    a retry. Same id, same content -> idempotent success (the already-committed event is
+    returned, nothing new is appended); same id, different content -> this exception."""
 
 
 @dataclass
@@ -360,13 +390,8 @@ class FakeEventWriter:
         self.calls: list[RecordedWrite] = []
         self._counters: dict[str, int] = {}
 
-    def append(self, world_id: str, part: dict) -> dict:
-        self.calls.append(RecordedWrite(world_id=world_id, part=dict(part)))
-        seq = self._counters.get(world_id, 0) + 1
-        self._counters[world_id] = seq
-        world = self.store.worlds.get(world_id)
-        run_id = world.run_id if world is not None else f"r_{world_id[:44]}"
-        trace = part.get(
+    def _stamp(self, world_id: str, event: dict, *, seq: int, run_id: str, ts: str) -> dict:
+        trace = event.get(
             "trace",
             {
                 "model_role": None,
@@ -378,30 +403,57 @@ class FakeEventWriter:
                 "archive_ref": None,
             },
         )
-        event = {
+        return {
             "v": "1.0",
-            "id": ulid(seq),
+            "id": event["id"],
             "seq": seq,
-            "ts": part.get("ts") or "2026-09-29T09:30:00.000Z",
+            "ts": ts,
             "world_id": world_id,
             "run_id": run_id,
-            "type": part["type"],
-            "actor": part.get("actor", "system"),
-            "target": part.get("target", world_id),
-            "level": part.get("level"),
-            "district": part.get("district"),
-            "item": part.get("item"),
-            "severity": part.get("severity", "info"),
-            "credits": part.get("credits", 0),
-            "summary": (part.get("summary") or "")[:140] or "test event",
-            "cause": part.get("cause"),
-            "vis": part.get("vis", "all"),
-            "authz": part.get("authz"),
-            "data": part.get("data", {}),
+            "type": event["type"],
+            "actor": event.get("actor", "system"),
+            "target": event.get("target", world_id),
+            "level": event.get("level"),
+            "district": event.get("district"),
+            "item": event.get("item"),
+            "severity": event.get("severity", "info"),
+            "credits": event.get("credits", 0),
+            "summary": (event.get("summary") or "")[:140] or "test event",
+            "cause": event.get("cause"),
+            "vis": event.get("vis", "all"),
+            "authz": event.get("authz"),
+            "data": event.get("data", {}),
             "trace": trace,
         }
-        self.store.events.setdefault(world_id, []).append(event)
-        return event
+
+    def append(self, world_id: str, event: dict) -> dict:
+        """event is the *full*, pre-built event tilo-api built once at enqueue time (issue #46):
+        it carries its own `id` (a ULID) but none of `seq`/`ts`/`run_id`, which this double still
+        stamps, exactly like a real harness writer would. Idempotent by `id`, never by content
+        alone and never by which writer object happens to receive the call (S0's #46 decision:
+        "EventWriter.append already refuses a reused id... use it")."""
+        self.calls.append(RecordedWrite(world_id=world_id, part=dict(event)))
+        event_id = event.get("id")
+        assert isinstance(event_id, str) and event_id, (
+            "EventWriter.append requires a pre-built event with its own stable `id` (issue #46, "
+            "S0's decision) -- tilo-api must build the full event, id included, once at enqueue "
+            "time, never hand the writer a bare part"
+        )
+        committed = self.store.events.setdefault(world_id, [])
+        existing = next((e for e in committed if e.get("id") == event_id), None)
+        if existing is not None:
+            candidate = self._stamp(world_id, event, seq=existing["seq"], run_id=existing["run_id"], ts=existing["ts"])
+            if candidate == existing:
+                return existing  # idempotent success: the same id, the same content, EV-10
+            raise EventRejected(f"id {event_id!r} already committed for {world_id!r} with different content")
+        seq = self._counters.get(world_id, 0) + 1
+        self._counters[world_id] = seq
+        world = self.store.worlds.get(world_id)
+        run_id = world.run_id if world is not None else f"r_{world_id[:44]}"
+        ts = event.get("ts") or "2026-09-29T09:30:00.000Z"
+        stamped = self._stamp(world_id, event, seq=seq, run_id=run_id, ts=ts)
+        committed.append(stamped)
+        return stamped
 
 
 def make_writer(store: deps.Store) -> FakeEventWriter:
@@ -512,6 +564,83 @@ class BlockingEventWriter(FakeEventWriter):
         self._gate.set()
 
 
+class HangsOnceThenWorksEventWriter(FakeEventWriter):
+    """Issue #46 (S0's decision): recovery must never depend on tilo-api being handed a
+    *different* EventWriter instance -- a real harness connection can just as easily recover on
+    the very same object it started with, and production's own get_event_writer() dependency may
+    hand back either a fresh client per call or a long-lived one; either way, the *id*-based
+    idempotency EventWriter.append now guarantees (EV-10) is what makes a retry against the same
+    instance safe, not "is this a different writer object." The very first call to `append` on
+    one instance blocks until `release()` is called (standing in for one genuinely wedged
+    request); every later call on that SAME instance behaves exactly like a normal, healthy
+    FakeEventWriter, id-based dedupe included. A test using this MUST call `release()` (a
+    `finally` block) so the abandoned first attempt's thread does not outlive the test; whatever
+    it eventually commits once released is either the original write (if nothing else beat it to
+    that id) or a harmless no-op idempotent hit (if a later, non-blocking call on this same
+    instance already committed the same id/content first)."""
+
+    def __init__(self, store: deps.Store) -> None:
+        super().__init__(store)
+        self._gate = threading.Event()
+        self.entered = threading.Event()
+        self._first_call_started = False
+        self._first_call_lock = threading.Lock()
+
+    def append(self, world_id: str, event: dict) -> dict:
+        with self._first_call_lock:
+            is_first = not self._first_call_started
+            self._first_call_started = True
+        if is_first:
+            self.entered.set()
+            self._gate.wait()
+        return super().append(world_id, event)
+
+    def release(self) -> None:
+        self._gate.set()
+
+
+class ConcurrencyTracker:
+    """Shared across several writer instances (issue #46 test: "30 calls with per-request writers
+    against a hung harness" -- a fresh writer object per call, but the dispatcher's own "at most
+    one append in flight per world" invariant is a property of the *world*, not of any one writer
+    object, so the tracker -- not any single writer instance -- is what several instances report
+    into)."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.current = 0
+        self.max_seen = 0
+
+    def enter(self) -> None:
+        with self._lock:
+            self.current += 1
+            self.max_seen = max(self.max_seen, self.current)
+
+    def exit(self) -> None:
+        with self._lock:
+            self.current -= 1
+
+
+class TrackingBlockingEventWriter(BlockingEventWriter):
+    """A BlockingEventWriter (append never returns until release()) that also reports how many
+    concurrent append() calls are in flight into a ConcurrencyTracker shared across several
+    otherwise-independent writer instances -- built so a test can hand out a *fresh* instance per
+    request (as get_event_writer() legitimately may in production) while still observing a
+    single, world-wide "at most one append in flight" property that no individual instance could
+    see on its own."""
+
+    def __init__(self, store: deps.Store, tracker: ConcurrencyTracker) -> None:
+        super().__init__(store)
+        self.tracker = tracker
+
+    def append(self, world_id: str, event: dict) -> dict:
+        self.tracker.enter()
+        try:
+            return super().append(world_id, event)
+        finally:
+            self.tracker.exit()
+
+
 class ReversedDelayEventWriter(FakeEventWriter):
     """Sleeps a little less on each successive call (the *first* call to arrive sleeps the
     longest, the last sleeps almost none) -- built to make a round-5 "order within a world"
@@ -605,13 +734,37 @@ class SlowHistoryPolicy(dict):
         return super().get(key, default)
 
 
+_pending_part_id_counter = 0
+
+
+def _fresh_pending_part_id() -> str:
+    """A locally-unique ULID-shaped id for seeding a pending part directly in a test (standing in
+    for the id tilo-api would have built at the original, since-failed enqueue). Module-global
+    counter, not per-Store, since a test only ever needs these ids to be distinct from each other
+    within itself -- id collisions across unrelated tests do not matter, each test gets its own
+    fresh Store."""
+    global _pending_part_id_counter
+    _pending_part_id_counter += 1
+    return ulid(900_000_000 + _pending_part_id_counter)
+
+
 def make_pending_part(
-    *, policy_id: str, change: str = "stop_all", level: str = "L1", summary: str | None = None
+    *,
+    policy_id: str,
+    change: str = "stop_all",
+    level: str = "L1",
+    summary: str | None = None,
+    id_: str | None = None,
 ) -> dict:
     """A minimal, already-built event *part* (API_ST3a.md's EventWriter.append shape) for seeding
     Store.pending_events directly in a test, standing in for a part an earlier failed call would
-    have built. Pure data, no business logic -- the same convention base_event/base_policy follow."""
+    have built. Pure data, no business logic -- the same convention base_event/base_policy follow.
+    Issue #46: now carries its own `id` (a fresh one per call unless `id_` is given explicitly --
+    a test proving a *stable* id survives a reload passes the same part's own dict forward instead
+    of calling this again), since a pending part is exactly the same "full event, id included"
+    shape a route now builds and hands to EventWriter.append."""
     return {
+        "id": id_ if id_ is not None else _fresh_pending_part_id(),
         "type": "policy.changed",
         "actor": OWNER,
         "target": None,
@@ -629,8 +782,15 @@ def make_pending_part(
 
 
 def assert_part_carries_no_stamped_fields(part: dict) -> None:
-    """PI-18: the event part tilo-api hands to EventWriter.append carries none of the four fields
-    only a writer may set, and no key outside the part shape API_ST3a.md pins."""
+    """PI-18, updated for issue #46: the event tilo-api hands to EventWriter.append carries its
+    own stable, ULID-shaped `id` -- built once at enqueue time and resent unchanged on every retry,
+    the idempotency key EventWriter.append dedupes on (EV-10) -- but none of the three fields only
+    a writer may still set (`seq`, `ts`, `run_id`), and no key outside the part shape API_ST3a.md
+    pins."""
+    assert "id" in part, (
+        "tilo-api must build the event's own id at enqueue time (issue #46), not leave it for the writer"
+    )
+    assert isinstance(part["id"], str) and _ULID_RE.match(part["id"]), f"part['id'] is not ULID-shaped: {part['id']!r}"
     for key in _STAMPED_ONLY_KEYS:
         assert key not in part, f"tilo-api must not stamp {key!r} itself; found it in the part it built"
     unexpected = set(part) - _ALLOWED_PART_KEYS

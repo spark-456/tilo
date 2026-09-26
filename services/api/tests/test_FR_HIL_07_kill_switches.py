@@ -3,17 +3,17 @@ policies to L1 in <= 5 s; confirmed on every channel." PI-13 and PI-18
 (docs/security/p4-policy-invariants.md): Stop all autopilot sets every policy to L1, one
 `policy.changed` per policy, only the owner may do it, and one writer per world stamps every
 event -- tilo-api itself never does. Routes and shapes pinned in
-services/api/tests/API_ST3a.md (round 4, after code/security/qa review round 3 failed on: Pause's
-dedupe keyed on "did this call lower any policy" instead of a durable `paused` flag, a
-process-wide lock held across writer I/O so a slow/failing writer for one world stalled a kill
-switch against a different world, policy.changed's vis computed against the Stop-all *request*
-world instead of the policy's own *target* world, a redacted view still leaking a caller's own
-visibility scope through `vis`/`target`/`actor` and through nested `data` values, `pending` only
-ever counting the request's own world, and revoke raising a 500 on a down writer instead of
-queuing pending like stop/pause do). Round 1-3's own fixes (run_id/seq stamping, the 403/404
-membership oracle, half-applied Stop-alls, the pause channel enum, per-scope vis, no silent
-history repair, and pending-on-failure for stop/pause) are unchanged here and still pinned below.
-"""
+services/api/tests/API_ST3a.md (round 8, redone per GitHub issue #46's binding S0 decision after
+round 7/ST-3a-3 kept relying on writer-*instance* identity -- "is this the same writer object as
+the one already presumed stuck" -- to decide whether a retry was safe. #46's resolved design uses
+the idempotency key every event already carries instead: `EventWriter.append` receives the full,
+pre-built event, ULID `id` included, built once when a part is enqueued and resent unchanged on
+every retry; dedupe is on that `id`, never on raw content and never on which writer object
+receives the call (EV-10: a reused id with identical content is a no-op success, with different
+content it is rejected). Round 1-6's own fixes (run_id/seq stamping, the 403/404 membership
+oracle, half-applied Stop-alls, the pause channel enum, per-scope vis, no silent history repair,
+pending-on-failure for stop/pause/revoke, one consumer per world, world.paused jumping the queue)
+are unchanged here and still pinned below; this round's own tests are new."""
 
 from __future__ import annotations
 
@@ -23,19 +23,25 @@ import pathlib
 import threading
 import time
 
+import pytest
 from _api_lib import (
     OWNER,
     PRINCIPAL_HEADER,
     WORLD,
     BlockingEventWriter,
+    ConcurrencyTracker,
+    EventRejected,
     FakeEventWriter,
     FlakyEventWriter,
+    HangsOnceThenWorksEventWriter,
     LateSuccessEventWriter,
     PartiallySlowEventWriter,
     ReversedDelayEventWriter,
     SlowEventWriter,
     SlowFlakyEventWriter,
     SlowHistoryPolicy,
+    TrackingBlockingEventWriter,
+    as_part_write_deadline,
     as_principal,
     as_principal_by_header,
     as_store_and_writer_by_header,
@@ -47,6 +53,7 @@ from _api_lib import (
     make_principal,
     make_store,
     make_world,
+    ulid,
     validate_event,
 )
 from hypothesis import HealthCheck, given, settings
@@ -1611,8 +1618,10 @@ def _policy_with_malformed_scope(*, id_: str, owner: str = OWNER, level: str = "
 
 def _stale_world_paused_part() -> dict:
     """An event *part* (API_ST3a.md's EventWriter.append shape) standing in for a world.paused an
-    earlier (failed) Pause-all already built and left pending."""
+    earlier (failed) Pause-all already built and left pending. Carries its own id (issue #46):
+    a pending part is exactly the same "full event, id included" shape a route now builds."""
     return {
+        "id": ulid(800_000_001),
         "type": "world.paused",
         "actor": OWNER,
         "target": WORLD,
@@ -2029,80 +2038,17 @@ def test_FR_HIL_07_three_concurrent_stop_alls_plus_revokes_against_a_partially_s
         assert store.pending_events.get(WORLD, []) == [], f"trial {trial}: pending left after the final flush"
 
 
-def test_FR_HIL_07_nine_hung_writer_calls_recover_via_a_swapped_in_healthy_writer(client, store):
-    """issue #38 items 2-3: a hung writer attempt must free its own worker rather than pin a
-    thread per stuck part forever, and once a healthy writer is swapped in, the whole backlog --
-    world.paused included -- is still delivered exactly once and in its build order, with no
-    server restart and no thread-count blowup."""
-    n = 9
-    ids = _world_with_policies(store, n, level="L2")
-    hung = BlockingEventWriter(store)
-    as_writer(hung)
-    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
-
-    baseline = threading.active_count()
-    result: dict = {}
-
-    def call_pause():
-        result["resp"] = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
-
-    t = threading.Thread(target=call_pause, daemon=True)
-    t.start()
-    try:
-        assert hung.entered.wait(timeout=5), "pause never reached the (hung) writer at all"
-        time.sleep(0.3)  # let the implementation attempt (and give up waiting on) whatever it will
-
-        stuck_growth = threading.active_count() - baseline
-        assert stuck_growth <= 15, (
-            f"thread count grew by {stuck_growth} while stuck against a writer that never returns "
-            f"for a {n}-part backlog -- expected a small, bounded constant, not roughly one thread "
-            "per part"
-        )
-
-        t.join(timeout=8.0)
-        assert not t.is_alive(), "pause never returned even though the level change is lock/I-O independent"
-        assert "resp" in result
-        assert result["resp"].status_code in (200, 202), result["resp"].text
-        for pid in ids:
-            assert store.policies[pid]["level"] == "L1"
-        assert store.worlds[WORLD].paused is True
-
-        healthy = FakeEventWriter(store)
-        as_writer(healthy)
-
-        # The resolved flush trigger stays "the next mutating call that touches this world"
-        # (API_ST3a.md ambiguity 9, reaffirmed unchanged by ambiguity 21) -- a further call is what
-        # gives the long-lived, per-world consumer a fresh, healthy writer to retry the still-stuck
-        # head against; nothing in this ticket adds a background retry loop.
-        recover = client.post(f"/worlds/{WORLD}/autopilot/stop")
-        assert recover.status_code in (200, 202), recover.text
-
-        deadline = time.monotonic() + 5.0
-        while time.monotonic() < deadline:
-            if len(store.events.get(WORLD, [])) >= n + 1 and not store.pending_events.get(WORLD, []):
-                break
-            time.sleep(0.02)
-
-        events = store.events.get(WORLD, [])
-        assert store.pending_events.get(WORLD, []) == [], (
-            f"backlog never fully flushed after swapping in a healthy writer: {store.pending_events.get(WORLD, [])}"
-        )
-        types = [e["type"] for e in events]
-        assert types.count("world.paused") == 1
-        assert types.count("policy.changed") == n
-        assert types[0] == "world.paused", (
-            "world.paused was enqueued ahead of this call's own policy.changed parts and must still "
-            f"land first once recovery happens, got order {types}"
-        )
-        landed_pids = [e["data"]["policy_id"] for e in events if e["type"] == "policy.changed"]
-        assert sorted(landed_pids) == sorted(ids)
-        assert len(landed_pids) == len(set(landed_pids)), "no policy.changed was written twice"
-
-        grown_after = threading.active_count() - baseline
-        assert grown_after <= 15, f"thread count grew by {grown_after} after recovery -- expected a small bound"
-    finally:
-        hung.release()
-        t.join(timeout=5.0)
+# The round-7/ST-3a-3 version of this test proved recovery by *swapping in* a brand-new,
+# healthy FakeEventWriter instance once a hung backlog had been observed -- exactly the
+# writer-*identity* recovery signal issue #46 (round 8) retires: a dispatcher must recover a
+# world's backlog because EventWriter.append itself is answering again (id-based idempotency,
+# EV-10), never because tilo-api happened to be handed a *different* writer object. That
+# scenario is superseded by the round-8 tests below: `test_FR_HIL_07_pause_recovers_via_the_same_
+# writer_object_once_it_stops_hanging` proves the same nine-part-backlog-style recovery using one
+# shared writer instance throughout (never swapped), and
+# `test_FR_HIL_07_thirty_calls_with_per_request_writers_bound_threads_and_in_flight_appends_against_a_hung_harness`
+# proves the bounded-thread-growth half of the old test using fresh, per-request writer instances
+# instead (the opposite extreme from "never swapped": a *new* instance on every single call).
 
 
 def test_FR_HIL_07_pause_reaches_the_writer_within_2s_ahead_of_policy_changed_and_backlog(client, store):
@@ -2366,3 +2312,349 @@ def test_FR_HIL_07_two_store_instances_for_the_same_world_id_share_no_queue_or_d
         t.join(timeout=5.0)
     assert "a" in result
     assert result["a"].status_code in (200, 202), result["a"].text
+
+
+# ---------------------------------------------------------------------------
+# Round 8 (issue #46, S0's decision, binding -- kill-switch redo): "The idempotency key already
+# exists: every event carries a required ULID `id`... use it." EventWriter.append now receives the
+# full, pre-built event -- id included -- built once at enqueue time and resent unchanged on every
+# retry; dedupe is on that id, never on raw content (round 7's `_content_key`) and never on
+# writer-*instance* identity (round 7's `head.attempt_writer is writer` check, which is what made
+# round 7 permanently stuck against a shared writer object that merely stopped hanging, and is
+# retired by every test below that uses one shared instance throughout).
+
+
+def test_FR_HIL_07_pause_recovers_via_the_same_writer_object_once_it_stops_hanging(client, store):
+    """issue #46 (S0's decision): recovery must never depend on tilo-api being handed a
+    *different* EventWriter instance -- production's own get_event_writer() dependency may just as
+    well hand back the very same, now-recovering harness connection object on every call. One
+    writer OBJECT is used for this entire test: its first-ever `.append` call hangs until
+    `release()` is called (the harness momentarily wedged); every later call on that same instance
+    answers immediately (HangsOnceThenWorksEventWriter, _api_lib.py). The world must recover --
+    without a restart and without ever being handed a second writer instance -- and world.paused
+    must land exactly once, never twice."""
+    ids = _world_with_policies(store, 4, level="L2")
+    shared = HangsOnceThenWorksEventWriter(store)
+    as_writer(shared)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    result: dict = {}
+
+    def call_pause():
+        result["resp"] = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+
+    t = threading.Thread(target=call_pause, daemon=True)
+    t.start()
+    try:
+        assert shared.entered.wait(timeout=5), "pause never reached the (hanging) shared writer at all"
+        t.join(timeout=8.0)
+        assert not t.is_alive(), "pause never returned even though the level/pause-flag change is lock/I-O independent"
+        assert "resp" in result
+        assert result["resp"].status_code in (200, 202), result["resp"].text
+        for pid in ids:
+            assert store.policies[pid]["level"] == "L1"
+        assert store.worlds[WORLD].paused is True
+
+        # The same writer object throughout -- never swapped -- and the resolved flush trigger
+        # stays "the next mutating call that touches this world" (ambiguity 9/21, unchanged): a
+        # further call is what gives the long-lived per-world consumer another chance to retry
+        # the still-stuck head, now against the very same instance that is answering again.
+        deadline = time.monotonic() + 5.0
+        recovered = False
+        while time.monotonic() < deadline:
+            recover_resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+            assert recover_resp.status_code in (200, 202), recover_resp.text
+            events = store.events.get(WORLD, [])
+            if any(e["type"] == "world.paused" for e in events) and not store.pending_events.get(WORLD, []):
+                recovered = True
+                break
+            time.sleep(0.05)
+
+        assert recovered, "world.paused never landed even after the same writer object started answering again"
+        events = store.events.get(WORLD, [])
+        paused_events = [e for e in events if e["type"] == "world.paused"]
+        assert len(paused_events) == 1, f"expected exactly one world.paused, got {len(paused_events)}"
+        landed_pids = {e["data"]["policy_id"] for e in events if e["type"] == "policy.changed"}
+        assert landed_pids == set(ids)
+    finally:
+        shared.release()
+        t.join(timeout=5.0)
+
+
+def test_FR_HIL_07_a_new_writer_object_per_request_over_a_slow_harness_lands_each_event_once(client, store):
+    """issue #46: correctness must come from the id carried in the event itself, never from any
+    writer-instance-local state -- so it must survive the realistic opposite case too, where
+    get_event_writer() hands back a genuinely *different* object on every single call (an ordinary
+    stateless FastAPI dependency, or a fresh per-request harness client). A 0.6s-per-append writer
+    is slow enough to miss any reasonable per-part deadline at least once; repeated Stop-all calls,
+    each with its own brand-new SlowEventWriter instance, must still land the policy's one
+    policy.changed exactly once -- never zero, never twice -- once the backlog finally drains."""
+    ids = _world_with_policies(store, 1, level="L2")
+    pid = ids[0]
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    deadline = time.monotonic() + 6.0
+    landed = 0
+    while time.monotonic() < deadline:
+        as_writer(SlowEventWriter(store, delay_s=0.6))  # a brand-new instance every single call
+        resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        assert resp.status_code in (200, 202), resp.text
+        landed = len([e for e in store.events.get(WORLD, []) if e["data"].get("policy_id") == pid])
+        assert landed <= 1, f"{pid}'s policy.changed landed {landed} times -- must never exceed 1"
+        if landed == 1 and not store.pending_events.get(WORLD, []):
+            break
+
+    assert landed == 1, f"{pid}'s policy.changed never landed at all across repeated per-request writer instances"
+    assert store.policies[pid]["level"] == "L1"
+
+
+def test_FR_HIL_07_thirty_calls_with_per_request_writers_bound_threads_and_at_most_one_append_in_flight(client, store):
+    """issue #46, S0's decision point 1: "At most one append in flight per world" -- a hard cap
+    that must hold even when every single call supplies its own brand-new writer instance (the
+    realistic shape of get_event_writer() as an ordinary, stateless FastAPI dependency) and that
+    instance never returns at all. Also re-proves round-6's original thread-leak finding (issue
+    #38 item 3) stays fixed under the #46 redesign: 30 calls against a harness that never answers
+    must not leak anywhere near 30 threads *per part* -- growth stays roughly proportional to the
+    number of calls (one retry attempt each), never one thread per part per call."""
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+    tracker = ConcurrencyTracker()
+
+    baseline = threading.active_count()
+    for i in range(30):
+        pid = f"pol_thirty_{i}"
+        store.policies[pid] = base_policy(id_=pid, owner=OWNER, level="L2")
+        store.policy_worlds[pid] = WORLD
+        as_writer(TrackingBlockingEventWriter(store, tracker))
+        resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+        assert resp.status_code == 202, f"call {i}: {resp.text}"
+
+    assert tracker.max_seen <= 1, (
+        f"at most one append() must ever be in flight for this world at once, saw {tracker.max_seen}"
+    )
+    grown = threading.active_count() - baseline
+    assert grown <= 45, (
+        f"thread count grew by {grown} after 30 calls against a harness that never answers -- "
+        "expected roughly one retry attempt per call, not one per part per call"
+    )
+
+
+def test_FR_HIL_07_two_concurrent_calls_with_two_slow_writer_instances_on_one_store_produce_exactly_one_event(
+    client, store
+):
+    """Every existing concurrent-Stop-all test (round 3/7 above) uses one *shared* SlowEventWriter
+    for both racing calls; this closes the gap issue #46's id-based redesign specifically invites --
+    two calls racing for the *same* policy, each handed a genuinely *different* SlowEventWriter
+    instance against the same store/world, must still leave exactly one policy.changed.
+    Correctness here can only come from the per-world lock serializing the level/history mutation
+    (so the second call finds the policy already L1) -- never from writer-instance-local
+    bookkeeping, since these two instances share none."""
+    ids = _world_with_policies(store, 1, level="L2")
+    pid = ids[0]
+    principal = make_principal(user_id=OWNER, role="owner", world_id=WORLD)
+    as_store_and_writer_by_header(
+        {
+            "one": (store, SlowEventWriter(store, delay_s=0.05)),
+            "two": (store, SlowEventWriter(store, delay_s=0.05)),
+        }
+    )
+    as_principal_by_header({"one": principal, "two": principal})
+
+    barrier = threading.Barrier(2)
+    responses: list = []
+    errors: list = []
+
+    def call(key: str):
+        try:
+            barrier.wait(timeout=5)
+            responses.append(client.post(f"/worlds/{WORLD}/autopilot/stop", headers={PRINCIPAL_HEADER: key}))
+        except Exception as exc:  # pragma: no cover - surfaced via the assert below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=call, args=(k,)) for k in ("one", "two")]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+
+    assert not errors, errors
+    assert len(responses) == 2
+    for r in responses:
+        assert r.status_code in (200, 202), r.text
+
+    assert store.policies[pid]["level"] == "L1"
+    stop_all_entries = [h for h in store.policies[pid]["history"] if h.get("change") == "stop_all"]
+    assert len(stop_all_entries) == 1, f"{len(stop_all_entries)} stop_all history entries across two writer instances"
+    changed = [e for e in store.events.get(WORLD, []) if e["type"] == "policy.changed"]
+    assert len(changed) == 1, (
+        f"expected exactly one policy.changed across two independent writer instances, got {len(changed)}"
+    )
+
+
+def test_FR_HIL_07_two_parts_with_identical_content_but_different_ids_are_both_written(client, store, writer):
+    """issue #46, S0's decision point 1: dedupe the queue on id, never on content. Two logically
+    distinct events -- built here at the exact same frozen instant (the same literal `ts`/`at`),
+    with otherwise byte-identical content -- must land as two separate committed events when they
+    carry two different ids; a content-keyed dedupe (round 7's `_content_key`, the very thing #46
+    replaces) would have wrongly collapsed these into one. The flip side is pinned in the same
+    test: resending the *same* id with identical content is the idempotent no-op the harness
+    writer (#46 item 2) defines, and the same id with genuinely different content is a real
+    conflict (EventRejected), not a silent overwrite."""
+    frozen_at = "2026-09-29T09:30:00.000Z"
+    part_a = {
+        "id": ulid(700_000_001),
+        "type": "policy.changed",
+        "actor": OWNER,
+        "target": "pol_x",
+        "level": None,
+        "district": None,
+        "item": None,
+        "severity": "info",
+        "credits": 0,
+        "summary": "identical content",
+        "cause": None,
+        "vis": "all",
+        "authz": {"by": "person", "ref": OWNER, "at": frozen_at},
+        "data": {"policy_id": "pol_x", "change": "stop_all", "level": "L1"},
+        "ts": frozen_at,
+    }
+    part_b = dict(part_a, id=ulid(700_000_002))  # only the id differs -- content is otherwise identical
+
+    event_a = writer.append(WORLD, part_a)
+    event_b = writer.append(WORLD, part_b)
+
+    assert event_a["id"] == part_a["id"]
+    assert event_b["id"] == part_b["id"]
+    assert event_a["id"] != event_b["id"]
+    assert event_a["seq"] != event_b["seq"], "two distinct ids must never collapse onto one committed event"
+    landed = store.events[WORLD]
+    assert len(landed) == 2
+    assert {e["id"] for e in landed} == {part_a["id"], part_b["id"]}
+
+    # Resending part_a's exact id and content again must be an idempotent no-op, not a third event.
+    replay = writer.append(WORLD, dict(part_a))
+    assert replay == event_a
+    assert len(store.events[WORLD]) == 2, "resending the same id with identical content must not append a third event"
+
+    # The same id with genuinely different content is a real conflict, per #46 item 2.
+    conflicting = dict(part_a, summary="different content, same id")
+    with pytest.raises(EventRejected):
+        writer.append(WORLD, conflicting)
+    assert len(store.events[WORLD]) == 2, "a rejected conflicting resend must not be appended either"
+
+
+def test_FR_HIL_07_a_healthy_350ms_writer_drains_ten_parts_within_the_calls_budget(client, store):
+    """issue #46 item 1's own budget note ("read the part deadline from config... small enough
+    that even a full Stop-all's worth of missed deadlines cannot blow the 5s budget") cuts the
+    other way too: a writer that is merely slow, not hung -- 350ms is comfortably realistic
+    harness latency, not a hang -- must not be mistaken for one. A default deadline tuned too
+    tight against real latency would queue every part pending even though the harness was healthy
+    the whole time. Ten parts at 350ms each (3.5s serial) must all land as real, committed events,
+    with nothing left pending, inside the shared 5s call budget."""
+    ids = _world_with_policies(store, 10, level="L2")
+    slow = SlowEventWriter(store, delay_s=0.35)
+    as_writer(slow)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    started = time.monotonic()
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    elapsed = time.monotonic() - started
+
+    assert resp.status_code == 200, resp.text  # never 202: a healthy-but-slow writer must not end up pending
+    assert elapsed <= 5.0, f"stop-all took {elapsed:.2f}s draining 10 healthy-but-350ms-slow parts"
+    body = resp.json()
+    assert body["stopped"] == len(ids)
+    assert body["pending"] == 0, "a merely-slow (not hung) writer must not be treated as missing its deadline"
+    for pid in ids:
+        assert store.policies[pid]["level"] == "L1"
+    changed = [e for e in store.events.get(WORLD, []) if e["type"] == "policy.changed"]
+    assert len(changed) == len(ids)
+
+
+def test_FR_HIL_07_part_write_deadline_is_read_from_config_not_a_module_constant(client, store):
+    """issue #46 item 1: "Read the part deadline from config, not a constant tuned to the tests"
+    -- API_ST3a.md's #46 update adds `deps.get_part_write_deadline_s()`, resolved the same
+    injectable way as get_store/get_event_writer/get_current_principal, precisely so this is
+    provable: overriding it to a value shorter than a writer's own real latency must make that
+    latency look like a miss (queued pending); overriding it to a value comfortably longer must
+    let the very same writer land directly on a retry. A hardcoded module constant could not
+    respond to either override."""
+    _world_with_policies(store, 1, level="L2")
+    slow = SlowEventWriter(store, delay_s=0.2)
+    as_writer(slow)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    as_part_write_deadline(0.02)  # far shorter than the writer's own 0.2s latency
+    resp_short = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert resp_short.status_code == 202, resp_short.text
+    assert resp_short.json()["pending"] == 1, "a deadline shorter than the writer's own latency must miss it"
+
+    as_part_write_deadline(2.0)  # comfortably longer than the same writer's 0.2s latency
+    resp_long = client.post(f"/worlds/{WORLD}/autopilot/stop")  # flushes the now-pending part
+    assert resp_long.status_code == 200, resp_long.text
+    assert resp_long.json()["pending"] == 0, (
+        "the exact same writer, given a longer config-supplied deadline, must land within it -- "
+        "proving the deadline is read fresh, not captured once from a module constant"
+    )
+
+
+def test_FR_HIL_07_pause_flag_is_never_set_without_its_event_queued_even_with_corrupted_pending(client, store, writer):
+    """PRD 9.4 honesty (nothing animates without a recorded event) applied to the durable
+    WorldRecord.paused flag itself, not just the world.paused animation: `paused` must only ever
+    read True together with a world.paused event existing somewhere in the store (pending or
+    committed) -- never before it is queued, and never as a side effect of a request that
+    otherwise fails. A corrupted store.pending_events[world_id] (here: None instead of a list --
+    the same "some other write left this in a bad shape" scenario the round-5/6 malformed-scope
+    tests already cover for policy history) must be treated exactly like any other malformed
+    stored value in this ticket: never allowed to raise past the route (never a 500), and never
+    allowed to leave `paused` flipped True with no world.paused event anywhere."""
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.pending_events[WORLD] = None  # corrupted: a real list is always expected here
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+
+    assert resp.status_code in (200, 202), resp.text  # never a bare exception or 500
+    paused_flag = store.worlds[WORLD].paused
+    pending = store.pending_events.get(WORLD)
+    pending_list = pending if isinstance(pending, list) else []
+    committed = store.events.get(WORLD, [])
+    has_paused_event = any(p.get("type") == "world.paused" for p in pending_list) or any(
+        e["type"] == "world.paused" for e in committed
+    )
+    assert paused_flag == has_paused_event, (
+        f"paused={paused_flag} but a world.paused event "
+        f"{'exists' if has_paused_event else 'does not exist'} anywhere in the store -- the flag "
+        "must only ever be true together with its own queued event"
+    )
+    if paused_flag:
+        assert resp.json()["paused"] is True
+
+
+def test_FR_HIL_07_a_fast_failing_append_is_retried_within_budget_and_still_lands_before_policy_changed(client, store):
+    """A raising `append` that fails *fast* (no hang, no timeout -- an immediate rejection) with
+    ample call budget left must be retried within the same call, not parked pending the instant it
+    fails once: FlakyEventWriter here raises on its very first call only, then succeeds. Since
+    world.paused is enqueued ahead of every policy.changed this same Pause-all call builds
+    (ST-3a-3, still pinned), that first call is world.paused's own attempt -- this also proves
+    world.paused still lands *before* every policy.changed even after its own first attempt failed
+    fast and had to be retried."""
+    ids = _world_with_policies(store, 3, level="L2")
+    flaky = FlakyEventWriter(store, failing=False, fail_first_n=1)
+    as_writer(flaky)
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "web"})
+
+    assert resp.status_code == 200, resp.text  # never 202: a fast failure with budget left is retried, not parked
+    body = resp.json()
+    assert body["paused"] is True
+    assert body["pending"] == 0
+
+    events = store.events[WORLD]
+    types = [e["type"] for e in events]
+    assert types.count("world.paused") == 1
+    assert types.count("policy.changed") == len(ids)
+    assert types.index("world.paused") == 0, (
+        "world.paused must still land first even though its own first attempt failed fast and had to be retried"
+    )
