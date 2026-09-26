@@ -13,3 +13,4 @@
 - [Cards store attack patterns](cards-store-attack-patterns.md) — same-id resubmit reopens approved gate; actor->authz invalid; Feb 31 / huge timeout crash
 - [Treasury attack patterns](treasury-attack-patterns.md) — non-UTC `at` bypasses day caps; size overrun; probe tz near midnight
 - [Sandbox web attack patterns](sandbox-web-attack-patterns.md) — NaN/inf quote 500; unlabelled values; payload in data-attr not hidden text; size
+- [Harness executor attack patterns](harness-executor-attack-patterns.md) — runner self-cancel hangs dependents; bad outcome aborts run; YAML ValueError escapes

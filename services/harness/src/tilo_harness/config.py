@@ -25,7 +25,7 @@ def load_agents_config(path: Path | None = None) -> AgentsConfig:
     path = Path(path) if path is not None else DEFAULT_AGENTS_CONFIG
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, yaml.YAMLError) as error:
+    except Exception as error:  # any read or parse failure, even ValueError from a huge YAML int
         raise AgentsConfigError(f"{path}: cannot read agents config ({type(error).__name__})") from error
     problems = repo_validator().contract_problems("agents", data)
     if problems:

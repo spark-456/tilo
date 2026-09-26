@@ -45,13 +45,20 @@ def _read_capped(path: Path) -> bytes:
 
 
 def _read_skill(folder: Path) -> tuple[dict[str, Any], LoadedSkill]:
+    """Any read or parse failure (even ValueError or RecursionError from hostile YAML) is a SkillError."""
     try:
-        raw_yaml = _read_capped(folder / "skill.yaml")
-        raw_md = _read_capped(folder / "SKILL.md")
-        data = yaml.safe_load(raw_yaml.decode("utf-8"))
-        body = raw_md.decode("utf-8")
-    except (OSError, UnicodeError, yaml.YAMLError) as error:
+        return _parse_skill(folder)
+    except SkillError:
+        raise
+    except Exception as error:
         raise SkillError(f"{folder.name}: cannot read skill ({type(error).__name__})") from error
+
+
+def _parse_skill(folder: Path) -> tuple[dict[str, Any], LoadedSkill]:
+    raw_yaml = _read_capped(folder / "skill.yaml")
+    raw_md = _read_capped(folder / "SKILL.md")
+    data = yaml.safe_load(raw_yaml.decode("utf-8"))
+    body = raw_md.decode("utf-8")
     problems = repo_validator().contract_problems("skill", data)
     if problems:
         raise SkillError(f"{folder.name}: " + "; ".join(problems))

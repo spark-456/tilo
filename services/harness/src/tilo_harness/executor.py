@@ -10,15 +10,17 @@ whose dependency failed is skipped. Every event goes through the one `WorldWrite
 
 Per unit: agent.spawned (Lead spawns the worker), agent.assigned, skill.loaded per pinned skill,
 agent.working, the `UnitRunner`'s work, agent.handoff (typed envelope, worker to Lead) when it
-succeeded, agent.retired. A pinned skill whose files changed fails that unit before it works.
+succeeded with a contract-valid envelope, agent.retired. A pinned skill whose files changed,
+a runner that raises (or cancels its own work) and an outcome that breaks the envelope contract
+each fail that unit only: it retires, its dependents are skipped, the other units go on. Only a
+cancel of `run_plan` itself or a writer error (WriterBusy, EventRejected) ends the run.
 """
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from tilo_providers.interfaces import GenerateRequest, ModelProvider
@@ -46,13 +48,11 @@ class UnitOutcome:
     summary: str = ""
     artifact_refs: tuple[dict[str, Any], ...] = ()
     provenance_ids: tuple[str, ...] = ()
-    output: str | None = None
 
 
 @dataclass(frozen=True)
 class UnitContext:
     agent_id: str
-    lead_id: str
     skills: tuple[LoadedSkill, ...]
 
 
@@ -65,8 +65,6 @@ class RunResult:
     pins: Pins
     outcomes: dict[str, UnitOutcome] = field(default_factory=dict)
     skipped: list[str] = field(default_factory=list)
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
 
     @property
     def failed(self) -> list[str]:
@@ -91,7 +89,7 @@ class DefaultUnitRunner:
             },
         )
         response = await asyncio.to_thread(provider.generate, GenerateRequest(prompt=prompt))
-        return UnitOutcome(success=bool(response.text), summary=f"Finished {unit['title']}.", output=response.text)
+        return UnitOutcome(success=bool(response.text), summary=f"Finished {unit['title']}.")
 
 
 @dataclass(frozen=True)
@@ -160,6 +158,22 @@ def _roster(units: list[dict[str, Any]], layout: dict[str, Any], config: AgentsC
     return _Roster(directors[0], leads, levels, workers, sites)
 
 
+def _envelope(outcome: UnitOutcome, worker: str, lead: str, unit: dict[str, Any]) -> dict[str, Any] | None:
+    """The handoff envelope (PRD 8.4) for a successful outcome, or None if it breaks the contract."""
+    summary, refs, provenance = outcome.summary, outcome.artifact_refs, outcome.provenance_ids
+    if not (isinstance(summary, str) and isinstance(refs, list | tuple) and isinstance(provenance, list | tuple)):
+        return None
+    envelope = {
+        "from": worker,
+        "to": lead,
+        "artifact_refs": list(refs),
+        "summary": (summary or f"Finished unit {unit['id']}.")[:1000],
+        "acceptance_criteria": [f"Unit {unit['id']} done: {unit['title']}"[:300]],
+        "provenance_ids": list(provenance),
+    }
+    return None if repo_validator().contract_problems("envelope", envelope) else envelope
+
+
 class _Run:
     def __init__(self, writer: Any, roster: _Roster, skills: SkillRegistry, pins: Pins, runner: Any) -> None:
         self.writer, self.roster, self.skills, self.pins, self.runner = writer, roster, skills, pins, runner
@@ -212,21 +226,22 @@ class _Run:
             cause = self.emit(
                 "agent.working", worker, site, "The agent is working.", {"unit": unit_id}, cause=cause, **at
             )
+            ran: object
             try:
-                outcome = await self.runner.run(unit, UnitContext(worker, lead, loaded))
+                ran = await self.runner.run(unit, UnitContext(worker, loaded))
+            except asyncio.CancelledError:
+                task = asyncio.current_task()
+                if task is not None and task.cancelling():  # the run itself was cancelled
+                    raise
+                ran = None  # the runner cancelled its own work: this unit fails, the run goes on
             except Exception:  # a runner crash fails this unit closed; the run goes on
-                outcome = UnitOutcome(success=False, summary="The unit's work failed.")
-            if not isinstance(outcome, UnitOutcome):
-                outcome = UnitOutcome(success=False, summary="The unit's work returned no outcome.")
-        if outcome.success:
-            envelope = {
-                "from": worker,
-                "to": lead,
-                "artifact_refs": list(outcome.artifact_refs),
-                "summary": (outcome.summary or f"Finished unit {unit_id}.")[:1000],
-                "acceptance_criteria": [f"Unit {unit_id} done: {unit['title']}"],
-                "provenance_ids": list(outcome.provenance_ids),
-            }
+                ran = None
+            failed = UnitOutcome(success=False, summary="The unit's work failed.")
+            outcome = ran if isinstance(ran, UnitOutcome) else failed
+        envelope = _envelope(outcome, worker, lead, unit) if outcome.success is True else None
+        if envelope is None and outcome.success is not False:
+            outcome = UnitOutcome(success=False, summary="The unit's result was not a valid handoff.")
+        if envelope is not None:
             summary = "The agent handed its result to the Lead."
             cause = self.emit("agent.handoff", worker, lead, summary, {"envelope": envelope}, cause=cause, **at)
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
@@ -241,9 +256,7 @@ async def run_plan(
     config: AgentsConfig,
     skills: SkillRegistry,
     runner: UnitRunner,
-    clock: Callable[[], datetime] | None = None,
 ) -> RunResult:
-    clock = clock or (lambda: datetime.now(UTC))
     validator = repo_validator()
     problems = validator.contract_problems("plan", plan) + validator.contract_problems("layout", layout)
     if problems:
@@ -255,7 +268,7 @@ async def run_plan(
     except SkillError as error:
         raise PlanRefused([f"PG-11: {error}"]) from error
 
-    result = RunResult(pins=pins, started_at=clock())
+    result = RunResult(pins=pins)
     run = _Run(writer, roster, skills, pins, runner)
     run.spawn_team()
     slots = asyncio.Semaphore(config.limits.max_specialists)
@@ -279,5 +292,4 @@ async def run_plan(
                 group.create_task(unit_task(unit))
     except ExceptionGroup as errors:  # e.g. WriterBusy or EventRejected: stop the run, raise it plainly
         raise errors.exceptions[0] from None
-    result.finished_at = clock()
     return result
