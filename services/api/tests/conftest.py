@@ -55,7 +55,14 @@ def registry(repo_root: pathlib.Path):
 
 @pytest.fixture()
 def client():
+    """The app with the deterministic fake safety provider injected: the app itself ships none
+    (the screen belongs to packages/providers) and fails closed with 503 without one."""
     import tilo_api
+    from _api_contracts_lib import make_safety_provider
     from fastapi.testclient import TestClient
+    from tilo_api.intake import get_safety
 
-    return TestClient(tilo_api.app)
+    safety = make_safety_provider()
+    tilo_api.app.dependency_overrides[get_safety] = lambda: safety
+    yield TestClient(tilo_api.app)
+    tilo_api.app.dependency_overrides.pop(get_safety, None)

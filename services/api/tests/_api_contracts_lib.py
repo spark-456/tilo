@@ -126,3 +126,16 @@ def make_docx_bytes(visible_text: str, hidden_text: str | None = None) -> bytes:
 
 def make_png_bytes(size: int = 64) -> bytes:
     return b"\x89PNG\r\n\x1a\n" + (b"0" * size)
+
+
+def make_safety_provider():
+    """Deterministic `SafetyProvider` test double, same rule as the planning tests' fake: flags
+    text containing `INJECTION_PHRASE`; native bytes (`content=` kwarg) are never flagged."""
+    from tilo_providers.interfaces import SafetyProvider
+
+    class DeterministicSafetyProvider(SafetyProvider):
+        def check(self, text: str, **kwargs: Any) -> dict[str, Any]:
+            flagged = INJECTION_PHRASE in text.upper()
+            return {"flagged": flagged, "reason": "instruction aimed at the assistant" if flagged else None}
+
+    return DeterministicSafetyProvider()

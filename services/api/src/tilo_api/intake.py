@@ -1,17 +1,16 @@
 """POST /intake (FR-INT-01, FR-INT-02): multipart text + files -> task, world.requested, per-file status.
 
 A business-rule rejection (limits, file type) answers 422 {"error": reason} and stores nothing.
-Until the provider layer ships a safety adapter, the screen is `PatternSafetyProvider`: a
-deterministic check for instructions aimed at the assistant (no model call).
+The safety screen comes from the provider layer (PRD 16.3). Until it ships a safety adapter,
+none is configured and the route fails closed with 503: nothing is ingested unscreened.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import asdict
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from tilo_planning.artifacts import InMemoryArtifactStore
 from tilo_planning.intake import MAX_FILES, MAX_TOTAL_BYTES, IntakeFile, IntakeRejected, IntakeRequest, submit_intake
@@ -19,21 +18,7 @@ from tilo_providers.interfaces import SafetyProvider
 
 router = APIRouter()
 
-_INJECTION = re.compile(
-    r"\b(ignore|disregard|forget|override)\b.{0,40}\b(previous|prior|above|earlier|all|your)\b.{0,20}"
-    r"\b(instructions?|prompts?|rules)\b",
-    re.IGNORECASE | re.DOTALL,
-)
-
-
-class PatternSafetyProvider(SafetyProvider):
-    def check(self, text: str, **kwargs: Any) -> dict[str, Any]:
-        match = _INJECTION.search(text)
-        return {"flagged": bool(match), "reason": "instruction aimed at the assistant" if match else None}
-
-
 _store = InMemoryArtifactStore()
-_safety = PatternSafetyProvider()
 
 
 def get_store() -> InMemoryArtifactStore:
@@ -41,7 +26,7 @@ def get_store() -> InMemoryArtifactStore:
 
 
 def get_safety() -> SafetyProvider:
-    return _safety
+    raise HTTPException(status_code=503, detail="No safety provider is configured; intake is closed.")
 
 
 @router.post("/intake", status_code=201)
