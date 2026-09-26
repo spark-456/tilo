@@ -76,7 +76,17 @@ def _ooxml_text(content: bytes, prefixes: tuple[str, ...]) -> str:
                 if budget < 0:
                     raise ExtractionError("package expands beyond the size limit")
                 chunks.append(_xml_text(data))
-    except (zipfile.BadZipFile, zipfile.LargeZipFile, NotImplementedError, RuntimeError, EOFError, zlib.error) as exc:
+    # ValueError covers a corrupt central directory (negative seek) and undecodable member names.
+    except (
+        zipfile.BadZipFile,
+        zipfile.LargeZipFile,
+        NotImplementedError,
+        RuntimeError,
+        EOFError,
+        ValueError,
+        OSError,
+        zlib.error,
+    ) as exc:
         raise ExtractionError(f"unreadable package: {exc}") from exc
     return "\n".join(c for c in chunks if c)
 

@@ -204,3 +204,19 @@ def test_FR_INT_02_artifact_store_versions_changed_bytes(repo_root):
     assert store.get(first.artifact_id, version=1).content == b"AAA"
     assert store.get(first.artifact_id, version=2).content == b"BBB"
     assert store.get(first.artifact_id).content == b"BBB", "get() with no version returns the latest"
+
+
+def test_FR_INT_02_corrupt_central_directory_fails_that_file_only(safety_provider):
+    """An untrusted DOCX whose end-of-central-directory offset is corrupt makes zipfile raise
+    ValueError (negative seek). The file must come back "failed", never crash the submission."""
+    content = bytearray(make_docx_bytes("Plain text."))
+    eocd = content.rfind(b"PK\x05\x06")
+    content[eocd + 19] = 0xFF  # high byte of the central directory offset
+
+    _, file_result, store = _submit_one("brief.docx", bytes(content), safety_provider)
+
+    assert file_result.status == "failed"
+    assert file_result.error
+    assert file_result.text is None
+    assert safety_provider.calls == []
+    assert len(store.list_ids()) == 1

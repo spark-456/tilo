@@ -19,3 +19,4 @@
 - [Router budget selection](router-budget-selection-probe.md) — budget between candidate prices refused outright; chaos test skips tight budgets
 - [Router cap ignores system/tools](router-cap-ignores-system-tools.md) — EFF-03 cap/price count only prompt; probe every request field
 - [Router failed-call charge](router-budget-failed-call-charge.md) — estimate deducted before send, never refunded on 429; fallback refused
+- [Untrusted zip fuzz probe](untrusted-zip-fuzz-probe.md) — mutate OOXML bytes; ValueError/UnicodeDecodeError escaped intake extraction as 500
