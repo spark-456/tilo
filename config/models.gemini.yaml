@@ -1,0 +1,59 @@
+# EXAMPLE model profiles routing every role to the Gemini API's OpenAI-compatible endpoint,
+# for live tests with real Gemini models before Google Cloud billing exists (ADR-0003).
+# Selected instead of config/models.yaml by setting TILO_MODELS_FILE=config/models.gemini.yaml
+# (tilo_providers.config.resolve_models_path); no code edit needed. Shape mirrors
+# config/models.yaml: contracts/providers.schema.json $defs.models.
+#
+# NOT the submitted build's default: the submission routes every role through the google
+# adapter on Vertex AI (PRD 4.4). Recordings made with this file are not submission evidence;
+# redo them on Vertex once billing works.
+#
+# Profile ids match config/models.yaml on purpose: the same Gemini models at the same list
+# prices, so config/prices.yaml needs no extra entries. Caps list only what the openai_compat
+# adapter implements (text, JSON and tools); thinking, vision, audio and grounding stay with
+# the google adapter.
+#
+# Endpoint and model ids from Google's Gemini API docs, retrieved 2026-09-26:
+#   - https://ai.google.dev/gemini-api/docs/openai (base URL below)
+#   - https://ai.google.dev/gemini-api/docs/pricing (gemini-3.8-flash, gemini-3.7-flash,
+#     gemini-3.1-flash-lite)
+#
+# Free-tier keys: Google may use prompts and replies to improve its products. Send synthetic
+# test data only, never pilot data or real email. The key lives in the git-ignored .env as
+# GEMINI_API_KEY, typed by the user; calls happen only under the user's LIVE=1.
+example: true
+
+profiles:
+  flash-38:
+    provider: openai_compat
+    model: gemini-3.8-flash
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+    api_key_env: GEMINI_API_KEY
+    context: 1000000
+    caps: [json, tools]
+  flash-37:
+    provider: openai_compat
+    model: gemini-3.7-flash
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+    api_key_env: GEMINI_API_KEY
+    context: 1000000
+    caps: [json, tools]
+  lite-31:
+    provider: openai_compat
+    model: gemini-3.1-flash-lite
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+    api_key_env: GEMINI_API_KEY
+    context: 1000000
+    caps: [json, tools]
+
+roles:
+  director: { primary: flash-38, fallback: flash-37, thinking: high }
+  lead: { primary: flash-38, fallback: flash-37, thinking: medium }
+  specialist: { primary: flash-37, fallback: lite-31 }
+  verifier: { primary: flash-38, fallback: flash-37, thinking: high }
+  writer: { primary: flash-38, fallback: flash-37 }
+  narrator: { primary: lite-31, fallback: flash-37 }
+  autopilot: { primary: flash-37, fallback: lite-31 }
+
+rules:
+  deny: ["gemini-2.5-*", "*-preview*"]
