@@ -6,6 +6,7 @@ requires-python = "==3.12.*"
 members = [
     "tilo",
     "tilo-api",
+    "tilo-archive",
     "tilo-connectors",
     "tilo-contracts",
     "tilo-evals",
@@ -1294,6 +1295,11 @@ requires-dist = [
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
+
+[[package]]
+name = "tilo-archive"
+version = "0.1.0"
+source = { editable = "packages/archive" }
 
 [[package]]
 name = "tilo-connectors"

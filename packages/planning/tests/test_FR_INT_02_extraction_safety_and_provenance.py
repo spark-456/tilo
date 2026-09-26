@@ -318,6 +318,8 @@ _HOSTILE = {  # built lazily: a multi-megabyte parameter would become the test i
     "processing instruction": lambda: _W + "<?pi " + _LT_EVERY_200K + "?></w:document>",
     "doctype literal": lambda: '<!DOCTYPE x SYSTEM "' + _LT_EVERY_200K + '">' + _W + "</w:document>",
     "declaration": lambda: '<?xml version="1.0" ' + _LT_EVERY_200K + "?>" + _W + "</w:document>",
+    # a UTF-16LE BOM then only U+4E3C: no NUL byte, yet expat switches to UTF-16 and reads one huge name
+    "utf-16 bom without nul": lambda: b"\xff\xfe" + ("丼" * 200_000).encode("utf-16-le"),
 }
 
 

@@ -53,6 +53,8 @@ CONFIG_SHAPES = {
     "config/autonomy.yaml": "policy#risk_tier_table",
     "config/agents.yaml": "agents",
     "config/teams.yaml": "team_lead[]",
+    "config/metering.yaml": "metering",
+    "config/evals.yaml": "evals",
 }
 # Contract roots whose generated name is not the PascalCase file name.
 ROOT_NAMES = {"events/registry": "EventRegistry", "agents": "AgentsConfig"}
