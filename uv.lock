@@ -6,12 +6,14 @@ requires-python = "==3.12.*"
 members = [
     "tilo",
     "tilo-api",
+    "tilo-connectors",
     "tilo-contracts",
     "tilo-evals",
     "tilo-harness",
     "tilo-metering",
     "tilo-policy",
     "tilo-providers",
+    "tilo-sandbox-web",
 ]
 
 [[package]]
@@ -1289,6 +1291,23 @@ requires-dist = [
 ]
 
 [[package]]
+name = "tilo-connectors"
+version = "0.1.0"
+source = { editable = "services/connectors" }
+dependencies = [
+    { name = "jsonschema" },
+    { name = "referencing" },
+    { name = "tilo-policy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jsonschema", specifier = ">=4.18" },
+    { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-policy", editable = "packages/policy" },
+]
+
+[[package]]
 name = "tilo-contracts"
 version = "1.0.0"
 source = { editable = "packages/contracts-py" }
@@ -1374,12 +1393,29 @@ source = { editable = "packages/providers" }
 dependencies = [
     { name = "google-genai" },
     { name = "httpx" },
+    { name = "jsonschema" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "google-genai", specifier = ">=1.0" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "jsonschema", specifier = ">=4.18" },
+]
+
+[[package]]
+name = "tilo-sandbox-web"
+version = "0.1.0"
+source = { editable = "services/sandbox-web" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 
 [[package]]

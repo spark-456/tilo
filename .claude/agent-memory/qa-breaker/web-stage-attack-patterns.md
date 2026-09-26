@@ -32,4 +32,6 @@ CDP touch semantics: touchEnd touchPoints = fingers that LIFT; touchCancel must 
 
 11. P0-08b-player round 4 (f03c78c): reduced-motion toggle fixed (live getter; 90 -> 13 distinct frames). Still open: duplicate seq -> React duplicate-key console.error (reducer applies dups twice); out-of-order seq makes data-seq go down. world-trace-unknown/world-determinism specs snapshot the canvas without waiting for data-seq, so they flake under parallel load (product equal when waited). page.route on **/fixtures/<name>.* serves custom streams without writing files.
 
+12. P0-08b readiness (420cb4f): hit the init window with addInitScript + MutationObserver firing after 2 rAFs (setTimeout 0 lands before useEffect attaches listeners). Pixi init is fast even at 6x CPU throttle, so trusted Playwright input after goto rarely lands pre-ready. Synthetic pointerdown with an inactive pointerId makes setPointerCapture throw before reanchor() -> stale anchor jump; only synthetic, noted non-blocking.
+
 Also: stage `main` focus ring is the browser default 1px outline, clipped top/bottom by the viewport; only thin side lines show.

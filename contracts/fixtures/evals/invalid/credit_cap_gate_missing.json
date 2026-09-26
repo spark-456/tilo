@@ -1,0 +1,18 @@
+{
+  "credit_cap": {
+    "full": 2000,
+    "smoke": 200
+  },
+  "deploy_gate_repeats": 3,
+  "cost_regression_threshold": 0.2,
+  "groups": {
+    "E-PLAN": 10,
+    "E-RES": 10,
+    "E-DOC": 6,
+    "E-MAIL": 50,
+    "E-CHN": 30,
+    "E-ROUTE": 20,
+    "E-HAND": 20,
+    "E-RED": 14
+  }
+}

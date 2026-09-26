@@ -12,3 +12,5 @@
 - [Metering loader attack patterns](metering-loader-attack-patterns.md) — generated models drop const/if-then; YAML parse and missing-file errors escape
 - [Cards store attack patterns](cards-store-attack-patterns.md) — same-id resubmit reopens approved gate; actor->authz invalid; Feb 31 / huge timeout crash
 - [Fixture player attack patterns](fixture-player-attack-patterns.md) — bad ?fixture= logs console.error; seq-order fixed r5; camera e2e flakes
+- [Treasury attack patterns](treasury-attack-patterns.md) — non-UTC `at` bypasses day caps; size overrun; probe tz near midnight
+- [Sandbox web attack patterns](sandbox-web-attack-patterns.md) — NaN/inf quote 500; unlabelled values; payload in data-attr not hidden text; size
