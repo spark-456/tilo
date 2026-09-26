@@ -13,5 +13,9 @@ P0-06 router (PL-03, 2026-09-25): 448 non-test lines (router.py 280). Ranked bel
 
 P8-01a (2026-09-25): the orchestrator's size count excludes the package CLAUDE.md, pyproject and test data fixtures (394 by that count, 443 with them). State both numbers in evidence.
 
+P8-07 sandbox-web (2026-09-25): ~572 hand-written lines (src 173, tests 372: test-writer's 126-line testlib alone). Test-writer tests count against the builder's cap too. Also: the E-RED "hidden by CSS" test used a tag-stripping visible_text, so the builder put payloads in a `data-hidden` attribute of an empty styled div: the CSS hides nothing. Probe red pages for payload-as-text inside the hiding element.
+
+P8-01b Treasury (2026-09-25): 533 insertions even after a "compact" commit (treasury.py 224, tests ~300). Also: overrun defined as committed > cap instead of actual > reservation (probe: reserve 10, commit 50 under a big cap -> overrun False), and no test for overrun/halted/replay_only Wait. Probe the spec's exact overrun trigger.
+
 **Why:** root CLAUDE.md caps diffs at 400 hand-written lines; tests count (only generated, fixtures, lockfiles excluded).
 **How to apply:** run `git diff --stat` first; count code vs docstring lines (ast-based count); grep each new public name for uses outside its definition; check the package pyproject declares what it imports. Review-round fixes tend to append prose to module headers — look there first for cuts.

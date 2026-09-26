@@ -19,4 +19,6 @@ metadata:
 **How to apply:** for any stage/camera change, drive a Playwright script (channel msedge, scratchpad, require the worktree's node_modules/@playwright/test by absolute path, vite on a free port with --strictPort) that wheels, drags, keys (with and without modifiers) and resizes 1920->320, collecting console errors, and compare canvas boundingBox to stage-frame boundingBox after zoom-out and pan.
 
 6. P0-08a head 5757d28: pointer pan kept one shared `last` [x,y] for all pointers, so a two-finger touch (pinch) alternates deltas between fingers and the camera jumps by the finger distance (5 px pinch -> translate(-205px)). Attack via CDP `Input.dispatchTouchEvent` with two touchPoints in a hasTouch/isMobile context. Fix: track per-pointerId, pan only with one active pointer (or implement pinch zoom).
+7. P0-08b readiness (420cb4f): hit the init window with addInitScript + MutationObserver firing after 2 rAFs (setTimeout 0 lands before useEffect attaches listeners). Pixi init is fast even at 6x CPU throttle, so trusted Playwright input after goto rarely lands pre-ready. Synthetic pointerdown with an inactive pointerId makes setPointerCapture throw before reanchor() -> stale anchor jump; only synthetic, noted non-blocking.
+
 Also: stage `main` focus ring is the browser default 1px outline, clipped top/bottom by the viewport; only thin side lines show.

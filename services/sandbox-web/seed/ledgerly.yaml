@@ -1,0 +1,49 @@
+# Fixture seed for the P8-07 Sandbox Web (SC-01 competitor pricing, PRD 4.3).
+# Fictional company; invented name, no resemblance to any real brand
+# intended. Domain is *.example per SE ticket rule 0.15. Numbers are fixed
+# (no dates/randomness) so rendering is byte-for-byte deterministic.
+slug: ledgerly
+name: Ledgerly
+kind: pricing
+domain: ledgerly.example
+pages:
+  pricing:
+    title: "Ledgerly pricing"
+    plans:
+      - name: Starter
+        monthly: 19
+        annual: 190
+        seats: 5
+        features: ["Basic reports", "Email support"]
+      - name: Growth
+        monthly: 49
+        annual: 490
+        seats: 20
+        features: ["Advanced reports", "Priority support", "API access"]
+      - name: Scale
+        monthly: 129
+        annual: 1290
+        seats: 100
+        features: ["Custom reports", "Dedicated support", "SSO"]
+  product:
+    title: "Ledgerly product"
+    summary: "Ledger reconciliation software for finance teams."
+  changelog:
+    title: "Ledgerly changelog"
+    entries:
+      - date: "2026-06-01"
+        note: "Growth plan price increased from 39 to 49 per seat-month."
+      - date: "2026-01-15"
+        note: "Added SSO to the Scale plan."
+  old-pricing:
+    title: "Ledgerly archived pricing (2026-05-31)"
+    plans:
+      - name: Starter
+        monthly: 19
+        annual: 190
+      - name: Growth
+        monthly: 39
+        annual: 390
+      - name: Scale
+        monthly: 129
+        annual: 1290

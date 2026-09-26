@@ -1,15 +1,33 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/events/data/budget.requested.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "BudgetRequestedData",
-  "description": "data of budget.requested (PRD 9.5). Raised at 80% of the approved budget (PRD 14.1, FR-MTR-03).",
+  "description": "data of budget.requested (PRD 9.5). Raised at 80% of the approved budget with the remaining plan and a new estimate (PRD 14.1, FR-MTR-03). remaining_units are the plan units not finished yet, in plan order; estimate is the new estimate of the run's total credits, spent plus the remaining units (added in 1.1.0; rule MT-04 in contracts/metering.rules.md).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["requested", "spent", "cap"],
+  "required": ["requested", "spent", "cap", "remaining_units", "estimate"],
   "properties": {
     "requested": { "$ref": "../../common.schema.json#/$defs/credits" },
     "spent": { "$ref": "../../common.schema.json#/$defs/credits" },
-    "cap": { "$ref": "../../common.schema.json#/$defs/credits" }
+    "cap": { "$ref": "../../common.schema.json#/$defs/credits" },
+    "remaining_units": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/remaining_unit" }
+    },
+    "estimate": { "$ref": "../../common.schema.json#/$defs/credit_range" }
+  },
+  "$defs": {
+    "remaining_unit": {
+      "description": "A plan unit not finished yet, with its plan title.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit_id", "title"],
+      "properties": {
+        "unit_id": { "$ref": "../../common.schema.json#/$defs/unit_id" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 80 }
+      }
+    }
   }
 }

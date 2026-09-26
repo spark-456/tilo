@@ -1,0 +1,48 @@
+# Fixture seed for the P8-07 Sandbox Web (SC-01 competitor pricing, PRD 4.3).
+# Fictional company; invented name, no resemblance to any real brand
+# intended. Domain is *.example per SE ticket rule 0.15.
+slug: fluxpoint
+name: Fluxpoint
+kind: pricing
+domain: fluxpoint.example
+pages:
+  pricing:
+    title: "Fluxpoint pricing"
+    plans:
+      - name: Lite
+        monthly: 9
+        annual: 90
+        seats: 3
+        features: ["5 workflows", "Community support"]
+      - name: Team
+        monthly: 39
+        annual: 390
+        seats: 25
+        features: ["Unlimited workflows", "Email support", "Webhooks"]
+      - name: Business
+        monthly: 89
+        annual: 890
+        seats: 100
+        features: ["Priority support", "Audit log", "SSO"]
+  product:
+    title: "Fluxpoint product"
+    summary: "Workflow automation for operations teams."
+  changelog:
+    title: "Fluxpoint changelog"
+    entries:
+      - date: "2026-04-02"
+        note: "Team plan price increased from 29 to 39 per seat-month."
+      - date: "2026-01-05"
+        note: "Launched the Business plan."
+  old-pricing:
+    title: "Fluxpoint archived pricing (2026-04-01)"
+    plans:
+      - name: Lite
+        monthly: 9
+        annual: 90
+      - name: Team
+        monthly: 29
+        annual: 290
+      - name: Business
+        monthly: 89
+        annual: 890
