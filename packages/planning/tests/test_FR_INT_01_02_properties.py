@@ -7,12 +7,14 @@ resolved ambiguities.
 from __future__ import annotations
 
 from _planning_contracts_lib import INJECTION_PHRASE, make_docx_bytes, make_png_bytes
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from tilo_planning.artifacts import InMemoryArtifactStore
 from tilo_planning.intake import MAX_FILES, IntakeFile, IntakeRejected, IntakeRequest, submit_intake
 
-settings.register_profile("fr_int", deadline=None)
+# The shared safety_provider fake only records calls; no property here reads them, so reusing it
+# across generated inputs is safe.
+settings.register_profile("fr_int", deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
 settings.load_profile("fr_int")
 
 _SAFE_TEXT = st.text(alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd", "Zs")), max_size=30)

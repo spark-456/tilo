@@ -1,0 +1,17 @@
+[project]
+name = "tilo-planning"
+version = "0.1.0"
+description = "tilo_planning — intake and planning: limits, file extraction, safety screening, artifacts (PRD 7)"
+requires-python = "==3.12.*"
+dependencies = ["tilo-contracts", "tilo-providers"]
+
+[tool.uv.sources]
+tilo-contracts = { workspace = true }
+tilo-providers = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tilo_planning"]
