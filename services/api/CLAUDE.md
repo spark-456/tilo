@@ -24,4 +24,6 @@ from Firestore directly under security rules.
 ## Local rules
 - Every side effect goes through the outbox and the deterministic policy engine (never here
   directly); T3 actions always require a person to approve.
-- `GET /healthz` returns `{"status": "ok"}` — the only route this ticket adds.
+- `GET /healthz` returns `{"status": "ok"}`.
+- `POST /intake` (FR-INT-01/02, `tilo_api.intake`): multipart `text` + `files` -> 201 task, `world.requested`
+  and per-file status, or 422 `{"error": reason}` with nothing stored. Calls `tilo_planning.intake`.
