@@ -34,4 +34,6 @@ CDP touch semantics: touchEnd touchPoints = fingers that LIFT; touchCancel must 
 
 12. P0-08b readiness (420cb4f): hit the init window with addInitScript + MutationObserver firing after 2 rAFs (setTimeout 0 lands before useEffect attaches listeners). Pixi init is fast even at 6x CPU throttle, so trusted Playwright input after goto rarely lands pre-ready. Synthetic pointerdown with an inactive pointerId makes setPointerCapture throw before reanchor() -> stale anchor jump; only synthetic, noted non-blocking.
 
+8. P0-08b-player ?fixture= (0741248): the name is interpolated raw into `/fixtures/${name}...`, so `?fixture=%25` (a bare %) makes Vite answer 500 and the browser logs two "Failed to load resource" console errors, even though the in-app alert shows. Always try `%`, `%zz` on any URL built from a param; fix is encodeURIComponent. Also crowd-20 trace-list rows grow 18->19 px (CLS ~7e-5) while village-basic has none: measure layout-shift sources per fixture, not just one. Windows dev serves CROWD-20 case-insensitively (Linux would 404).
+
 Also: stage `main` focus ring is the browser default 1px outline, clipped top/bottom by the viewport; only thin side lines show.

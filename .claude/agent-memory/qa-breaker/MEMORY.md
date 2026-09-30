@@ -1,5 +1,5 @@
-- [Web stage attack patterns](web-stage-attack-patterns.md) — passive wheel error; canvas edges; modifier keys; timer-stopped ticker leaves stale grid
 - [Skill checker attacks](skill-checker-attacks.md) — FR-AGT-04 check.py crash on unhashable ids; weak injection regex
+- [Web stage attack patterns](web-stage-attack-patterns.md) — passive wheel error; canvas edges; modifier keys; timer-stopped ticker leaves stale grid; raw % in ?fixture= -> 500 console error
 - [Policy engine attack patterns](policy-engine-attack-patterns.md) — tier normalise/check drift, unicode \d timestamps, NaN caps
 - [API route attack patterns](api-route-attack-patterns.md) — kill-switch partial commit on unmapped policy, vis list leaks hidden ids, O(n) seq
 - [Eval harness recording validation](eval-harness-recording-validation.md) — fixes cover the repro only; fuzz every event field the runner reads
@@ -12,3 +12,4 @@
 - [Harness writer lease attacks](harness-writer-lease-attacks.md) — P0-09 same writer_id double lease overwrites Firestore events
 - [Treasury attack patterns](treasury-attack-patterns.md) — non-UTC `at` bypasses day caps; size overrun; probe tz near midnight
 - [Sandbox web attack patterns](sandbox-web-attack-patterns.md) — NaN/inf quote 500; unlabelled values; payload in data-attr not hidden text; size
+- [Harness executor attack patterns](harness-executor-attack-patterns.md) — runner self-cancel hangs dependents; bad outcome aborts run; YAML ValueError escapes
