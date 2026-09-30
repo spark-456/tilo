@@ -21,3 +21,4 @@
 - [Web e2e env noise](web-e2e-env-noise.md) — adblock360 injector console errors, timing project skipped on chromium fail, axe timeouts under load
 - [Executor runner-output probe](executor-runner-output-probe.md) — bad UnitOutcome aborts run, strands siblings "working"; failures retire as "finished"
 - [Split PR leftovers](split-pr-leftovers.md) — split branches keep sibling scaffolding justified by same-diff code; repo-wide config excludes
+- [Eval check vacuous pass](eval-check-vacuous-pass.md) — args looked up by name (dup entries), missing field None==None passes; probe these

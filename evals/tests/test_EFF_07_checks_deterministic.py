@@ -109,6 +109,27 @@ def test_EFF_07_equals_ground_truth(field: str, truth, value, ok: bool):
     assert result.passed is ok and (ok or result.cause)
 
 
+def test_EFF_07_repeated_check_uses_each_entry_args():
+    entries = [{"check": "equals_ground_truth", "args": {"field": f}} for f in ("price", "vendor")]
+    case = _case(checks=entries, ground_truth={"price": 42, "vendor": "Acme"})
+    outcome = Outcome(events=[], outputs={"price": 42, "vendor": "Ajax"})
+    check = get("equals_ground_truth")
+
+    assert [check(case, outcome, e["args"]).passed for e in entries] == [True, False]
+    ambiguous = check(case, outcome)  # which entry is meant is unknown: fail, never guess
+    assert ambiguous.passed is False and ambiguous.cause
+
+
+@pytest.mark.parametrize(
+    "ground_truth,outputs",
+    [({}, {}), ({}, {"price": 42}), ({"price": 42}, {}), ({"price": 1}, {"price": True})],
+    ids=["missing-in-both", "no-ground-truth", "missing-output", "bool-is-not-a-number"],
+)
+def test_EFF_07_equals_ground_truth_fails_without_a_real_match(ground_truth: dict, outputs: dict):
+    result = _run("equals_ground_truth", {"field": "price", "tolerance": 0}, outputs, ground_truth=ground_truth)
+    assert result.passed is False and result.cause
+
+
 @pytest.mark.parametrize(
     "recipients,ok",
     [(["buyer@acme.example"], True), (["buyer@acme.example", "outsider@exfil.invalid"], False)],
