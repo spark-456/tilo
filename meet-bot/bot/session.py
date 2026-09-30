@@ -13,6 +13,7 @@ import logging
 import os
 import time
 from collections import Counter
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -176,6 +177,12 @@ class LiveSession:
         self.tts = None
         self.speaker: Any = NullSpeaker()
         self.activity: VoiceActivity | None = None
+        self._out_q: asyncio.Queue = asyncio.Queue()  # replies waiting to be spoken and posted, in order
+        self._out_task: asyncio.Task | None = None
+        self.next_status_at: float | None = None
+        self.next_brain_at = 0.0
+        self.others_seen, self.alone_since = False, None
+        self.last_wait_msg, self.intro_sent = None, False
 
     def _build_fast(self) -> FastLLM | None:
         """One long-lived async client for direct answers; every attempt lands in latency.jsonl."""
@@ -251,7 +258,9 @@ class LiveSession:
                     await br.open_meeting(self.url or "")
                 asked = await br.join()
                 if self.voice:
-                    self.speaker = VoiceSpeaker(self.tts, Player(), _MicSwitch(br), self.activity)
+                    self.speaker = VoiceSpeaker(
+                        self.tts, Player(), _MicSwitch(br), self.activity, mic_policy=self.cfg.mic_policy
+                    )
                     await br.set_mic(False)  # a virtual microphone exists, so Meet may have joined unmuted
                 self.start = self.clock.now()
                 self.merger.t0 = self.start
@@ -458,16 +467,22 @@ class LiveSession:
             log.info("voice replies on (%s)", self.tts.name)
 
     async def _deliver(self, msg) -> tuple[bool, dict]:
-        """Send a reply out loud and in chat. Returns (delivered anywhere, timing info)."""
+        """Send a reply out loud and in chat. Returns (delivered anywhere, timing info).
+
+        The chat copy follows the first sound, so typing never delays the voice (and never competes with it for the UI)."""
         want_voice = self.voice and (msg.kind == "direct_reply" or (self.cfg.voice_nudges and msg.kind != "intro"))
         t0 = self.clock.now()
-        speak = asyncio.create_task(self.speaker.say(msg.text)) if want_voice else None
+        first_sound = asyncio.Event()
+        speak = asyncio.create_task(self.speaker.say(msg.text, on_first_sound=first_sound.set)) if want_voice else None
         chat_ok, chat_s, first_out = False, 0.0, None
         if self.reply_mode != "voice" or not want_voice:
+            if speak:
+                waiter = asyncio.ensure_future(first_sound.wait())
+                await asyncio.wait({speak, waiter}, return_when=asyncio.FIRST_COMPLETED)
+                waiter.cancel()
             t1 = self.clock.now()
             chat_ok = await self._post(msg.text, msg.kind)
-            chat_s = self.clock.now() - t1
-            first_out = chat_s
+            chat_s, first_out = self.clock.now() - t1, self.clock.now() - t0
         res = await speak if speak else None
         if (
             speak and not (res and res.spoken) and not chat_ok
@@ -506,6 +521,28 @@ class LiveSession:
             "voice_status": status,
         }
 
+    def _queue_delivery(self, msg, done: Callable[[bool, dict], None] | None = None) -> None:
+        """Replies go out one at a time from their own task, so speaking never holds up the main loop."""
+        self._out_q.put_nowait((msg, done))
+        if self._out_task is None or self._out_task.done():
+            self._out_task = asyncio.create_task(self._delivery_worker())
+
+    async def _delivery_worker(self) -> None:
+        while True:
+            msg, done = await self._out_q.get()
+            try:
+                ok, info = await self._deliver(msg)
+                if done:
+                    done(ok, info)
+            except Exception as e:  # one failed reply must not stop the next
+                log.exception("delivering a reply crashed: %s", e)
+
+    async def _keep_mic_open(self) -> None:
+        """MIC_POLICY=open: once the meeting has started the bot's mic stays on (it carries only synthesised speech,
+        silence otherwise), so no answer waits for an unmute. Someone muting it is undone at the next status check."""
+        if self.voice and self.gate_at is not None and self.cfg.mic_policy == "open":
+            await self.br.set_mic(True)
+
     async def _timed_quick(self, recent: list[Utterance], meta: dict[str, Any]):
         t = time.monotonic()
         msg = await self.brain.aquick_reply(recent, self.brain_elapsed())
@@ -522,10 +559,12 @@ class LiveSession:
             log.info("no reply to %r (not answerable from the meeting/project info, %.1fs)", meta["question"], model_s)
             return
         reply_ready = self.clock.now()
-        ok, info = await self._deliver(msg)
-        if ok:
-            self.brain.commit_chat(msg, self.brain_elapsed())
-            done = self.clock.now()
+        self.brain.commit_chat(msg, self.brain_elapsed())  # booked now: a second question cannot slip past the gap
+
+        def done(ok: bool, info: dict) -> None:
+            if not ok:
+                log.warning("the reply to %r could not be delivered anywhere", meta["question"])
+                return
             row = {
                 "question": meta["question"],
                 "reply": msg.text,
@@ -533,7 +572,7 @@ class LiveSession:
                 "model_s": round(model_s, 2),
                 "source": self.brain.last_quick_source,
                 **info,
-                "total_from_speech_end_s": round(done - meta["first_seen"], 2),
+                "total_from_speech_end_s": round(self.clock.now() - meta["first_seen"], 2),
                 "first_output_from_speech_end_s": round(reply_ready - meta["first_seen"] + info["first_output_s"], 2),
             }
             self.timeline.record("question_answered", **row)
@@ -546,164 +585,197 @@ class LiveSession:
                 info.get("voice_status", "off"),
             )
 
+        self._queue_delivery(msg, done)
+
     # -- loop -------------------------------------------------------------------------------------------------------
     async def _loop(self) -> None:
         cfg, br, brain = self.cfg, self.br, self.brain
         base_interval = cfg.brain_interval_s
-        interval, next_brain = base_interval, 0.0
-        brain_task = quick_task = None
-        next_status = self.clock.now() + 3
+        interval = base_interval
+        brain_task = quick_task = status_task = None
+        if self.next_status_at is None:
+            self.next_status_at = self.clock.now() + 3
         next_admit = next_chat = 0.0
-        others_seen, alone_since = False, None
-        last_wait_msg, intro_sent = None, False
-
-        while True:
-            await asyncio.sleep(0.5)
-            while not self.queue.empty():
-                blocks, now = self.queue.get_nowait()
-                for b in blocks:
-                    self.spans.touch(b.speaker, now - self.start)
-                for u in self.merger.feed(blocks, now):
+        try:
+            while True:
+                await asyncio.sleep(0.1)
+                while not self.queue.empty():
+                    blocks, now = self.queue.get_nowait()
+                    for b in blocks:
+                        self.spans.touch(b.speaker, now - self.start)
+                    for u in self.merger.feed(blocks, now):
+                        self.record_caption(u)
+                for u in self.merger.tick(self.clock.now()):
                     self.record_caption(u)
-            for u in self.merger.tick(self.clock.now()):
-                self.record_caption(u)
-            now = self.clock.now()
+                now = self.clock.now()
 
-            # --- fast path: answer questions (spoken or typed) now, not at the next analysis interval ------------
-            if quick_task and quick_task.done():
-                await self._finish_quick(quick_task)
-                quick_task = None
-            if brain and self.gate_at is not None:
-                gate = self.gate_at
-                if self.stt_mode == "elevenlabs":  # live partial words, before the server commits a pause
-                    opens = (
-                        [
-                            (
-                                Utterance("Speaker", self.partial[0], max(0.0, self.partial[2] - self.start)),
-                                now - self.partial[1],
-                            )
+                # --- fast path: answer questions (spoken or typed) now, not at the next analysis interval --------
+                if quick_task and quick_task.done():
+                    await self._finish_quick(quick_task)
+                    quick_task = None
+                if brain and self.gate_at is not None:
+                    gate = self.gate_at
+                    if self.stt_mode == "elevenlabs":  # live partial words, before the server commits a pause
+                        opens = (
+                            [
+                                (
+                                    Utterance("Speaker", self.partial[0], max(0.0, self.partial[2] - self.start)),
+                                    now - self.partial[1],
+                                )
+                            ]
+                            if self.partial
+                            else []
+                        )
+                    else:
+                        opens = [] if self.hybrid else self.merger.open_utterances(now)
+                    base = [self._shift(u) for u in self.store.window(self.elapsed(), 3)]
+                    q_any = brain.pending_question(base + [self._shift(u) for u, _ in opens])
+                    if q_any:
+                        self.first_seen.setdefault(_norm(q_any[1]), now)
+                    if quick_task is None:
+                        ready = base + [
+                            Utterance(u.speaker, u.text, max(0.0, u.t - gate))
+                            for u, idle in opens
+                            if idle >= self.partial_idle_s
                         ]
-                        if self.partial
-                        else []
-                    )
-                else:
-                    opens = [] if self.hybrid else self.merger.open_utterances(now)
-                base = [self._shift(u) for u in self.store.window(self.elapsed(), 3)]
-                q_any = brain.pending_question(base + [self._shift(u) for u, _ in opens])
-                if q_any:
-                    self.first_seen.setdefault(_norm(q_any[1]), now)
-                if quick_task is None:
-                    ready = base + [
-                        Utterance(u.speaker, u.text, max(0.0, u.t - gate))
-                        for u, idle in opens
-                        if idle >= self.partial_idle_s
-                    ]
-                    q = brain.pending_question(ready)
-                    if q:
-                        meta = {"question": q[1], "detected": now, "first_seen": self.first_seen.get(_norm(q[1]), now)}
-                        quick_task = asyncio.create_task(self._timed_quick(ready, meta))
+                        q = brain.pending_question(ready)
+                        if q:
+                            meta = {
+                                "question": q[1],
+                                "detected": now,
+                                "first_seen": self.first_seen.get(_norm(q[1]), now),
+                            }
+                            quick_task = asyncio.create_task(self._timed_quick(ready, meta))
 
-            # --- periodic analysis -------------------------------------------------------------------------------
-            if brain_task and brain_task.done():
-                try:
-                    res = brain_task.result()
-                except Exception as e:  # a bug in one cycle must not end the meeting
-                    log.exception("brain step crashed: %s", e)
-                    res = None
-                brain_task = None
-                if res is not None:
-                    interval = (
-                        min(base_interval * 4, interval * 2)
-                        if not res.ok and "quota" in (res.error or "")
-                        else base_interval
-                    )
-                    if res.chat:
-                        sent, _ = await self._deliver(res.chat)
-                        if sent:
-                            brain.commit_chat(res.chat, self.brain_elapsed())
-                    brain.write_outputs(self.out_dir, self.brain_elapsed())
-                    self.events.emit("agenda.update", state=brain.state.to_dict())
-            if brain and self.gate_at is not None and brain_task is None and now >= next_brain:
-                next_brain = now + interval
-                window = [self._shift(u) for u in self.store.window(self.elapsed(), cfg.window_minutes)]
-                brain_task = asyncio.create_task(asyncio.to_thread(brain.step, window, self.brain_elapsed()))
+                # --- periodic analysis ---------------------------------------------------------------------------
+                if brain_task and brain_task.done():
+                    try:
+                        res = brain_task.result()
+                    except Exception as e:  # a bug in one cycle must not end the meeting
+                        log.exception("brain step crashed: %s", e)
+                        res = None
+                    brain_task = None
+                    if res is not None:
+                        interval = (
+                            min(base_interval * 4, interval * 2)
+                            if not res.ok and "quota" in (res.error or "")
+                            else base_interval
+                        )
+                        if res.chat:
+                            chat = res.chat
+                            if chat.kind == "direct_reply":  # booked now, like a quick reply
+                                brain.commit_chat(chat, self.brain_elapsed())
+                                self._queue_delivery(chat)
+                            else:
+                                self._queue_delivery(
+                                    chat, lambda ok, _: ok and brain.commit_chat(chat, self.brain_elapsed())
+                                )
+                        brain.write_outputs(self.out_dir, self.brain_elapsed())
+                        self.events.emit("agenda.update", state=brain.state.to_dict())
+                if brain and self.gate_at is not None and brain_task is None and now >= self.next_brain_at:
+                    self.next_brain_at = now + interval
+                    window = [self._shift(u) for u in self.store.window(self.elapsed(), cfg.window_minutes)]
+                    brain_task = asyncio.create_task(asyncio.to_thread(brain.step, window, self.brain_elapsed()))
 
-            # --- typed chat (about every 1.5 s once the meeting has started) -------------------------------------
-            if self.gate_at is not None and now >= next_chat:
-                next_chat = now + 1.5
-                await self._read_chat()
+                # --- typed chat (about every 1.5 s once the meeting has started) ---------------------------------
+                if self.gate_at is not None and now >= next_chat:
+                    next_chat = now + 1.5
+                    await self._read_chat()
 
-            # --- admitting (frequent, cheap) ---------------------------------------------------------------------
-            if self.auto_admit and now >= next_admit:
-                next_admit = now + 3.0
-                for name in await br.admit_waiting(cfg.admit_allowed):
-                    self.events.emit("participant.admitted", name=name)
+                # --- admitting (frequent, cheap) -----------------------------------------------------------------
+                if self.auto_admit and now >= next_admit:
+                    next_admit = now + 3.0
+                    for name in await br.admit_waiting(cfg.admit_allowed):
+                        self.events.emit("participant.admitted", name=name)
 
-            # --- people, gate, exit conditions (People panel reads replace the chat panel: do them sparingly) ----
-            if now < next_status:
-                continue
-            next_status = now + (STATUS_EVERY_S if self.gate_at is None else 15.0)
-            if await br.meeting_ended():
-                log.info("meeting ended")
-                return
-            info = await br.participants()
-            if info is not None:
-                if info["self"]:
-                    self.ignore.add(info["self"].lower())
-                    self.merger.add_ignored(info["self"])
-                    if brain and not cfg.bot_display_name:
-                        brain.bot_name = info["self"]
-                others = info["others"]
-                spoke = [
-                    s
-                    for s in dict.fromkeys(u.speaker for u in list(self.store.items) + list(self.captions_store.items))
-                    if s.lower() not in self.ignore and not s.endswith("(chat)") and s != "Speaker"
-                ]
-                present = list(dict.fromkeys(others + spoke))
-                others_count = len(others)
-            else:  # panel unreadable: fall back to the head count
-                count = await br.people_count()
-                others_count = (count - 1) if count is not None else None
-                present = [u.speaker for u in self.store.items if u.speaker.lower() not in self.ignore]
-            if self.gate_at is not None:
-                await br.show_chat()  # the People read replaced the chat panel
-            if others_count:
-                others_seen, alone_since = True, None
-            elif others_count == 0 and others_seen:
-                alone_since = alone_since or now
-                if now - alone_since >= cfg.alone_grace_s:
-                    log.info("everyone else left; leaving")
-                    return
-            if brain:
-                brain.present = present
-            if scribe := getattr(self, "scribe", None):
-                scribe.set_keyterms(self._keyterms(present))
+                # --- people, gate, exit conditions: a task, because the People panel takes over a second to open --
+                if status_task and status_task.done():
+                    try:
+                        leave = status_task.result()
+                    except Exception as e:
+                        log.exception("status check crashed: %s", e)
+                        leave = False
+                    status_task = None
+                    self.next_status_at = self.clock.now() + (STATUS_EVERY_S if self.gate_at is None else 15.0)
+                    if leave:
+                        return
+                if status_task is None and now >= self.next_status_at:
+                    status_task = asyncio.create_task(self._status_step())
+        finally:
+            if status_task:
+                status_task.cancel()
 
-            if self.gate_at is None:
-                if gate_open(self.required, present):
-                    self.gate_at = self.elapsed()
-                    next_brain = now + base_interval
-                    self.events.emit("meeting.started", present=present, required=self.required)
-                    log.info("required people are here (%s): starting", ", ".join(present))
-                    if not intro_sent and await self._post(
-                        intro_text(self.record_audio, self.hybrid, self.voice), "intro"
-                    ):
-                        intro_sent = True
-                else:
-                    wait_msg = f"waiting for: {', '.join(missing_required(self.required, present)) or 'anyone to join'}"
-                    if wait_msg != last_wait_msg:
-                        log.info(wait_msg)
-                        last_wait_msg = wait_msg
-            self.stream_enabled = self.gate_at is not None and (others_count is None or others_count > 0)
-            if self.gate_at is None and self.elapsed() > cfg.empty_timeout_s:
-                log.info("required people did not arrive within %.0fs; leaving", cfg.empty_timeout_s)
-                return
-            if self.elapsed() > cfg.max_meeting_minutes * 60:
-                log.info("hit MAX_MEETING_MINUTES; leaving")
-                return
+    async def _status_step(self) -> bool:
+        """Meeting ended? Who is here? Has the meeting started for the bot? True means leave."""
+        cfg, br, brain = self.cfg, self.br, self.brain
+        now = self.clock.now()
+        if await br.meeting_ended():
+            log.info("meeting ended")
+            return True
+        info = await br.participants()
+        if info is not None:
+            if info["self"]:
+                self.ignore.add(info["self"].lower())
+                self.merger.add_ignored(info["self"])
+                if brain and not cfg.bot_display_name:
+                    brain.bot_name = info["self"]
+            others = info["others"]
+            spoke = [
+                s
+                for s in dict.fromkeys(u.speaker for u in list(self.store.items) + list(self.captions_store.items))
+                if s.lower() not in self.ignore and not s.endswith("(chat)") and s != "Speaker"
+            ]
+            present = list(dict.fromkeys(others + spoke))
+            others_count = len(others)
+        else:  # panel unreadable: fall back to the head count
+            count = await br.people_count()
+            others_count = (count - 1) if count is not None else None
+            present = [u.speaker for u in self.store.items if u.speaker.lower() not in self.ignore]
+        if self.gate_at is not None:
+            await br.show_chat()  # the People read replaced the chat panel
+        if others_count:
+            self.others_seen, self.alone_since = True, None
+        elif others_count == 0 and self.others_seen:
+            self.alone_since = self.alone_since or now
+            if now - self.alone_since >= cfg.alone_grace_s:
+                log.info("everyone else left; leaving")
+                return True
+        if brain:
+            brain.present = present
+        if scribe := getattr(self, "scribe", None):
+            scribe.set_keyterms(self._keyterms(present))
+
+        if self.gate_at is None:
+            if gate_open(self.required, present):
+                self.gate_at = self.elapsed()
+                self.next_brain_at = now + cfg.brain_interval_s
+                self.events.emit("meeting.started", present=present, required=self.required)
+                log.info("required people are here (%s): starting", ", ".join(present))
+                await self._keep_mic_open()
+                if not self.intro_sent and await self._post(
+                    intro_text(self.record_audio, self.hybrid, self.voice), "intro"
+                ):
+                    self.intro_sent = True
+            else:
+                wait_msg = f"waiting for: {', '.join(missing_required(self.required, present)) or 'anyone to join'}"
+                if wait_msg != self.last_wait_msg:
+                    log.info(wait_msg)
+                    self.last_wait_msg = wait_msg
+        else:
+            await self._keep_mic_open()  # re-check every status cycle: someone may have muted the bot
+        self.stream_enabled = self.gate_at is not None and (others_count is None or others_count > 0)
+        if self.gate_at is None and self.elapsed() > cfg.empty_timeout_s:
+            log.info("required people did not arrive within %.0fs; leaving", cfg.empty_timeout_s)
+            return True
+        if self.elapsed() > cfg.max_meeting_minutes * 60:
+            log.info("hit MAX_MEETING_MINUTES; leaving")
+            return True
+        return False
 
     # -- shutdown ---------------------------------------------------------------------------------------------------
     async def _shutdown(self) -> None:
+        if self._out_task:
+            self._out_task.cancel()
         try:
             if self.recorder:
                 self.recorder.stop()  # flushes the last speech segment

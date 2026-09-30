@@ -15,6 +15,7 @@ from . import selectors as S
 from .config import Config
 from .people import clean_name as _clean_name
 from .people import name_match as _name_match
+from .ui import ADMIT, CHAT_READ, MIC, PEOPLE, UIScheduler
 
 log = logging.getLogger("bot.browser")
 
@@ -71,7 +72,7 @@ class MeetBrowser:
     def __init__(self, cfg: Config, voice: bool = False) -> None:
         self.cfg = cfg
         self.voice = voice  # a virtual microphone exists: let Meet use it without a permission prompt
-        self.lock = asyncio.Lock()  # one UI action at a time (mic toggles and chat typing must not interleave)
+        self.ui = UIScheduler()  # one UI action at a time, mic first; see bot/ui.py
         self.page: Any = None
         self.ctx: Any = None
         self._pw: Any = None
@@ -295,10 +296,22 @@ class MeetBrowser:
         """Admit people waiting to join. With an allowlist only matching names are admitted; else everyone."""
         admitted: list[str] = []
         try:
-            if not await self.visible(S.ADMIT_BUTTON):
-                if await self.visible(S.ADMIT_PILL):  # top-right "Admit N guest(s)" opens the People panel
+            button, pill = await self.visible(S.ADMIT_BUTTON), await self.visible(S.ADMIT_PILL)
+            if not (button or pill or await self.visible(S.WAITING_MARK)):
+                return admitted  # nobody is waiting: a read-only check, the UI stays free
+            if not button and pill:  # top-right "Admit N guest(s)" opens the People panel
+                async with self.ui.section(ADMIT):
                     await self.click(S.ADMIT_PILL)
-                    await asyncio.sleep(1.2)
+                await asyncio.sleep(1.2)
+            async with self.ui.section(ADMIT):
+                return await self._admit_clicks(allowed)
+        except Exception as e:
+            log.warning("admit failed: %s", e)
+        return admitted
+
+    async def _admit_clicks(self, allowed: list[str]) -> list[str]:
+        admitted: list[str] = []
+        try:
             for strat in S.ADMIT_BUTTON.strategies:
                 buttons = locate(self.page, strat)
                 n = await buttons.count()
@@ -344,10 +357,14 @@ class MeetBrowser:
         """{'others': [...], 'waiting': [...], 'self': name|None} read from the People panel, or None if unreadable."""
         try:
             if not await self.visible(S.PEOPLE_PANEL_MARK):
-                if not await self.click(S.PEOPLE_BUTTON):
-                    return None
-                await asyncio.sleep(1.2)
-            rows = await self.page.evaluate(S.PARTICIPANTS_JS)
+                async with self.ui.section(PEOPLE):
+                    if not await self.click(S.PEOPLE_BUTTON):
+                        return None
+                await asyncio.sleep(1.2)  # the panel opens; chat and the mic may use the UI meanwhile
+            async with self.ui.section(PEOPLE):
+                rows = await self.page.evaluate(S.PARTICIPANTS_JS)
+            if not rows:  # the panel was replaced (the bot itself is always listed): unreadable, not an empty room
+                return None
         except Exception as e:
             log.warning("could not read participants: %s", e)
             return None
@@ -370,16 +387,19 @@ class MeetBrowser:
     # -- chat reading ----------------------------------------------------------------------------------------------
     async def show_chat(self) -> None:
         """Make the chat panel the visible side panel (reading the People panel replaces it)."""
-        if not await self.visible(S.CHAT_INPUT):
+        if await self.visible(S.CHAT_INPUT):
+            return
+        async with self.ui.section(CHAT_READ):
             await self.click(S.CHAT_OPEN)
-            await asyncio.sleep(0.6)
+        await asyncio.sleep(0.6)
 
     async def read_chat(self) -> list[tuple[str, str]] | None:
         """[(sender, text)] for every message currently in the chat panel, or None if the panel is not open."""
         from .chatread import parse_chat_panel
 
         try:
-            data = await self.page.evaluate(S.CHAT_READ_JS)
+            async with self.ui.section(CHAT_READ):
+                data = await self.page.evaluate(S.CHAT_READ_JS)
         except Exception as e:
             log.warning("could not read chat: %s", e)
             return None
@@ -397,14 +417,14 @@ class MeetBrowser:
     # -- microphone (the bot's own, for voice replies) ---------------------------------------------------------------
     async def set_mic(self, on: bool) -> bool:
         """Make the bot's Meet microphone on/off. True if it ended in the requested state."""
-        async with self.lock:
+        async with self.ui.section(MIC):
             now_on = await self.visible(S.MIC_TURN_OFF)  # the button says "Turn off" when the mic is currently on
             if now_on == on and (on or await self.visible(S.MIC_TURN_ON)):
                 return True
-            if not await self.click(S.MIC_TURN_OFF if not on else S.MIC_TURN_ON, timeout_s=1.5):
+            if not await self.click(S.MIC_TURN_OFF if not on else S.MIC_TURN_ON):
                 await self.page.keyboard.press("Control+d")  # Meet's shortcut for the mic
-            await asyncio.sleep(0.25)
-            ok = await self.visible(S.MIC_TURN_OFF) == on
-            if not ok:
-                await self.selector_miss(S.MIC_TURN_ON if on else S.MIC_TURN_OFF)
-            return ok
+        await asyncio.sleep(0.25)  # Meet updates the button a moment later; checking needs no lock
+        ok = await self.visible(S.MIC_TURN_OFF) == on
+        if not ok:
+            await self.selector_miss(S.MIC_TURN_ON if on else S.MIC_TURN_OFF)
+        return ok
