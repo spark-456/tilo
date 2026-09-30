@@ -1,0 +1,535 @@
+{
+  "v": "1.0",
+  "world_id": "w_crowd_20",
+  "tier": "city",
+  "theme": "metropolis",
+  "semantic": {
+    "levels": [
+      {
+        "id": "L1",
+        "name": "Crowd Floor",
+        "districts": [
+          {
+            "id": "D1",
+            "name": "Crowd District 1",
+            "icon": "workshop",
+            "lead": "A_l1",
+            "buildings": [
+              {
+                "id": "B1",
+                "name": "Crowd Bay 1.1",
+                "kind": "common",
+                "common_type": "town_hall",
+                "plan_units": []
+              },
+              {
+                "id": "B2",
+                "name": "Crowd Bay 1.2",
+                "kind": "common",
+                "common_type": "your_desk",
+                "plan_units": []
+              },
+              {
+                "id": "B3",
+                "name": "Crowd Bay 1.3",
+                "kind": "common",
+                "common_type": "library",
+                "plan_units": []
+              },
+              {
+                "id": "B4",
+                "name": "Crowd Bay 1.4",
+                "kind": "common",
+                "common_type": "browser_station",
+                "plan_units": []
+              },
+              {
+                "id": "B5",
+                "name": "Crowd Bay 1.5",
+                "kind": "common",
+                "common_type": "workshop",
+                "plan_units": []
+              }
+            ]
+          },
+          {
+            "id": "D2",
+            "name": "Crowd District 2",
+            "icon": "workshop",
+            "lead": "A_l2",
+            "buildings": [
+              {
+                "id": "B6",
+                "name": "Crowd Bay 2.1",
+                "kind": "common",
+                "common_type": "meeting_hall",
+                "plan_units": []
+              },
+              {
+                "id": "B7",
+                "name": "Crowd Bay 2.2",
+                "kind": "common",
+                "common_type": "connector_post",
+                "plan_units": []
+              },
+              {
+                "id": "B8",
+                "name": "Crowd Bay 2.3",
+                "kind": "common",
+                "common_type": "memory_vault",
+                "plan_units": []
+              },
+              {
+                "id": "B9",
+                "name": "Crowd Bay 2.4",
+                "kind": "common",
+                "common_type": "treasury",
+                "plan_units": []
+              },
+              {
+                "id": "B10",
+                "name": "Crowd Bay 2.5",
+                "kind": "common",
+                "common_type": "watchtower",
+                "plan_units": []
+              }
+            ]
+          },
+          {
+            "id": "D3",
+            "name": "Crowd District 3",
+            "icon": "workshop",
+            "lead": "A_l3",
+            "buildings": [
+              {
+                "id": "B11",
+                "name": "Crowd Bay 3.1",
+                "kind": "common",
+                "common_type": "delivery_dock",
+                "plan_units": []
+              },
+              {
+                "id": "B12",
+                "name": "Crowd Bay 3.2",
+                "kind": "common",
+                "common_type": "clock_tower",
+                "plan_units": []
+              },
+              {
+                "id": "B13",
+                "name": "Crowd Bay 3.3",
+                "kind": "common",
+                "common_type": "agent_foundry",
+                "plan_units": []
+              },
+              {
+                "id": "B14",
+                "name": "Crowd Bay 3.4",
+                "kind": "common",
+                "common_type": "mail_room",
+                "plan_units": []
+              },
+              {
+                "id": "B15",
+                "name": "Crowd Bay 3.5",
+                "kind": "common",
+                "common_type": "expert_office",
+                "plan_units": []
+              }
+            ]
+          },
+          {
+            "id": "D4",
+            "name": "Crowd District 4",
+            "icon": "workshop",
+            "lead": "A_l4",
+            "buildings": [
+              {
+                "id": "B16",
+                "name": "Crowd Bay 4.1",
+                "kind": "common",
+                "common_type": "town_hall",
+                "plan_units": []
+              },
+              {
+                "id": "B17",
+                "name": "Crowd Bay 4.2",
+                "kind": "common",
+                "common_type": "your_desk",
+                "plan_units": []
+              },
+              {
+                "id": "B18",
+                "name": "Crowd Bay 4.3",
+                "kind": "common",
+                "common_type": "library",
+                "plan_units": []
+              },
+              {
+                "id": "B19",
+                "name": "Crowd Bay 4.4",
+                "kind": "common",
+                "common_type": "browser_station",
+                "plan_units": []
+              },
+              {
+                "id": "B20",
+                "name": "Crowd Bay 4.5",
+                "kind": "common",
+                "common_type": "workshop",
+                "plan_units": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "islands": [],
+    "gates": [],
+    "agents": [
+      {
+        "id": "A_dir",
+        "rank": "director"
+      },
+      {
+        "id": "A_l1",
+        "rank": "lead"
+      },
+      {
+        "id": "A_l2",
+        "rank": "lead"
+      },
+      {
+        "id": "A_l3",
+        "rank": "lead"
+      },
+      {
+        "id": "A_l4",
+        "rank": "lead"
+      },
+      {
+        "id": "A_s1",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s2",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s3",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s4",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s5",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s6",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s7",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s8",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s9",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s10",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s11",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s12",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s13",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s14",
+        "rank": "specialist"
+      },
+      {
+        "id": "A_s15",
+        "rank": "specialist"
+      }
+    ]
+  },
+  "geometry": {
+    "solver_version": "1.0.0",
+    "levels": [
+      {
+        "id": "L1",
+        "index": 0,
+        "plate": {
+          "x": 0,
+          "y": 0,
+          "w": 17,
+          "d": 17
+        }
+      }
+    ],
+    "districts": [
+      {
+        "id": "D1",
+        "plot": {
+          "x": 0,
+          "y": 0,
+          "w": 16,
+          "d": 3
+        },
+        "tint": "district.1"
+      },
+      {
+        "id": "D2",
+        "plot": {
+          "x": 0,
+          "y": 4,
+          "w": 16,
+          "d": 3
+        },
+        "tint": "district.2"
+      },
+      {
+        "id": "D3",
+        "plot": {
+          "x": 0,
+          "y": 8,
+          "w": 16,
+          "d": 3
+        },
+        "tint": "district.3"
+      },
+      {
+        "id": "D4",
+        "plot": {
+          "x": 0,
+          "y": 12,
+          "w": 16,
+          "d": 3
+        },
+        "tint": "district.4"
+      }
+    ],
+    "buildings": [
+      {
+        "id": "B1",
+        "footprint": {
+          "x": 1,
+          "y": 1,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B2",
+        "footprint": {
+          "x": 4,
+          "y": 1,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B3",
+        "footprint": {
+          "x": 7,
+          "y": 1,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B4",
+        "footprint": {
+          "x": 10,
+          "y": 1,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B5",
+        "footprint": {
+          "x": 13,
+          "y": 1,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B6",
+        "footprint": {
+          "x": 1,
+          "y": 5,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B7",
+        "footprint": {
+          "x": 4,
+          "y": 5,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B8",
+        "footprint": {
+          "x": 7,
+          "y": 5,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B9",
+        "footprint": {
+          "x": 10,
+          "y": 5,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B10",
+        "footprint": {
+          "x": 13,
+          "y": 5,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B11",
+        "footprint": {
+          "x": 1,
+          "y": 9,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B12",
+        "footprint": {
+          "x": 4,
+          "y": 9,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B13",
+        "footprint": {
+          "x": 7,
+          "y": 9,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B14",
+        "footprint": {
+          "x": 10,
+          "y": 9,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B15",
+        "footprint": {
+          "x": 13,
+          "y": 9,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B16",
+        "footprint": {
+          "x": 1,
+          "y": 13,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B17",
+        "footprint": {
+          "x": 4,
+          "y": 13,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B18",
+        "footprint": {
+          "x": 7,
+          "y": 13,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B19",
+        "footprint": {
+          "x": 10,
+          "y": 13,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      },
+      {
+        "id": "B20",
+        "footprint": {
+          "x": 13,
+          "y": 13,
+          "w": 2,
+          "d": 2
+        },
+        "floors": 1
+      }
+    ],
+    "islands": [],
+    "roads": [],
+    "bridges": [],
+    "gates": []
+  }
+}

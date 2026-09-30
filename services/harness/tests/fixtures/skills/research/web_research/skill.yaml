@@ -1,0 +1,19 @@
+id: web_research
+version: 1.0.0
+domain: research
+author: "Ada Example <ada@example.com>"
+reviewer: "Grace Example <grace@example.com>"
+tools_allowed: [search_web]
+inputs:
+  type: object
+  additionalProperties: false
+  required: [query]
+  properties:
+    query: { type: string }
+outputs:
+  type: object
+  additionalProperties: false
+  required: [findings]
+  properties:
+    findings: { type: array }
+description: "Web research with citations for a specialist unit."

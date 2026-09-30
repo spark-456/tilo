@@ -12,9 +12,16 @@ setup:
     pnpm install
     uv run pre-commit install
 
-# Run the API dev server.
+# Run the web dev server (`just dev-api` in a second terminal runs the API).
 dev:
+    pnpm --filter @tilo/web run dev
+
+dev-api:
     uv run --package tilo-api uvicorn tilo_api:app --reload --port 8080
+
+# Regenerate apps/web design tokens from design/tokens.json (drift-tested).
+tokens:
+    node apps/web/scripts/generate-tokens.mjs
 
 # Format check + lint + typecheck + all tests (the full gate; matches PRD 20.4 "make check").
 # contracts-check runs first so CI fails on contract drift (FR-WLD-02).
@@ -62,7 +69,7 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api services/harness/src packages/providers packages/contracts-py packages/policy/src packages/metering evals/src services/connectors/src
+    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src
     pnpm -r exec tsc --noEmit
 
 # Start the Firestore emulator and run the harness skeleton against it (P0-09).

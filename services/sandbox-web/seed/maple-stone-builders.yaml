@@ -1,0 +1,29 @@
+# Fixture seed for the P8-07 Sandbox Web (SC-06 kitchen-renovation quotes,
+# PRD 4.3). Fictional contractor; domain is *.example per SE ticket rule
+# 0.15.
+slug: maple-stone-builders
+name: Maple & Stone Builders
+kind: contractor
+domain: maple-stone-builders.example
+rate_card:
+  base_fee: 800
+  per_sqft: 95
+  per_cabinet: 110
+pages:
+  profile:
+    title: "Maple & Stone Builders"
+    services: ["High-end kitchen remodel", "Custom cabinetry", "Stone countertops"]
+    reviews:
+      - author: "S. Goh"
+        rating: 4
+        text: "Excellent craftsmanship, ran a week over schedule."
+      - author: "J. Farrow"
+        rating: 5
+        text: "Worth the premium."
+    licence: "SG-BCA-KRW-00902"
+    insurance: "Public liability SGD 2,000,000, policy MSB-INS-8834"
+    availability: ["2026-11-06", "2026-11-13", "2026-11-20"]
+  quote:
+    title: "Maple & Stone Builders — get a quote"
+    accepts_post: true
+    inputs: ["sqft", "cabinets"]

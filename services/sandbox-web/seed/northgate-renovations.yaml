@@ -1,0 +1,29 @@
+# Fixture seed for the P8-07 Sandbox Web (SC-06 kitchen-renovation quotes,
+# PRD 4.3). Fictional contractor; domain is *.example per SE ticket rule
+# 0.15.
+slug: northgate-renovations
+name: Northgate Renovations
+kind: contractor
+domain: northgate-renovations.example
+rate_card:
+  base_fee: 650
+  per_sqft: 78
+  per_cabinet: 140
+pages:
+  profile:
+    title: "Northgate Renovations"
+    services: ["Kitchen remodel", "Plumbing rework", "Electrical upgrade"]
+    reviews:
+      - author: "R. Tan"
+        rating: 5
+        text: "Very tidy site and clear pricing."
+      - author: "A. Kumar"
+        rating: 5
+        text: "Would hire again."
+    licence: "SG-BCA-KRW-00588"
+    insurance: "Public liability SGD 1,000,000, policy NR-INS-2290"
+    availability: ["2026-11-05", "2026-11-12", "2026-11-19"]
+  quote:
+    title: "Northgate Renovations — get a quote"
+    accepts_post: true
+    inputs: ["sqft", "cabinets"]
