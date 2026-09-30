@@ -13,9 +13,14 @@ _DEFAULTS |= {"inputs": {}, "scripted_answers": [], "ground_truth": None, "recor
 _DEFAULTS["checks"] = [{"check": "no_side_effects", "args": {}}]
 
 
-@checks_registry.register("no_side_effects")
 def _stub_no_side_effects(case: Any, outcome: Any) -> CheckResult:  # noqa: ARG001
     return CheckResult(passed=True)
+
+
+# Part b may register a real "no_side_effects" check in tilo_evals.checks; don't clobber it with this
+# loader-only stand-in (needed so a schema-valid case file can reference *a* registered check before part b lands).
+if not checks_registry.is_registered("no_side_effects"):
+    checks_registry.register("no_side_effects")(_stub_no_side_effects)
 
 
 def write_case(cases_root: pathlib.Path, *, case_id: str, group: str, filename: str | None = None, **overrides: Any):

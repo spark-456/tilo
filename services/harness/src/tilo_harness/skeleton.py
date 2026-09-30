@@ -148,7 +148,10 @@ def _cli() -> None:
     parser.add_argument("--step-delay", type=float, default=0.0)
     args = parser.parse_args()
 
+    from tilo_harness.config import load_agents_config
     from tilo_harness.emulator import running_emulator
+
+    load_agents_config()  # FR-AGT-01: a missing or invalid config/agents.yaml stops start-up
     from tilo_harness.store import FirestoreStore
 
     with running_emulator():
