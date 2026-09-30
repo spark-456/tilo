@@ -5,6 +5,7 @@ All model access goes through the `LLM` protocol, so the provider is swappable. 
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -16,6 +17,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Protocol
 
+from .config import DEFAULT_MODEL
 from .instant import instant_answer
 from .people import question_of
 
@@ -24,11 +26,14 @@ log = logging.getLogger("bot.brain")
 STATUSES = ("not_started", "in_progress", "covered")
 _RANK = {s: i for i, s in enumerate(STATUSES)}
 _NULLISH = {"", "null", "none", "unknown", "n/a", "na", "tbd", "unassigned", "unspecified"}
-DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 class LLMUnavailable(RuntimeError):
     """The model could not be reached or refused (quota, key, network). Message is safe to show the user."""
+
+
+class Busy(LLMUnavailable):
+    """The model is rate limited (429). Do not wait and retry: use the fallback answer."""
 
 
 class SchemaError(ValueError):
@@ -478,8 +483,10 @@ class Brain:
         max_direct: int = 12,
         direct_gap_s: float = 6.0,
         knowledge: Any = None,
+        fast: Any = None,
     ) -> None:
         self.agenda, self.llm = agenda, llm
+        self.fast = fast  # async FastLLM for direct answers; without it they use the thread-bound `llm`
         self.knowledge = knowledge
         self.bot_name = bot_name
         self.present: list[str] = []
@@ -521,20 +528,13 @@ class Brain:
                 return (u.speaker, sentence)
         return None
 
-    def warm_up(self) -> None:
-        """Open (or keep open) the model connection so the next real reply is not slowed by a cold start."""
-        try:
-            getattr(self.llm, "ping", lambda: self.llm.generate("Reply with the JSON {}.", "ping"))()
-        except Exception as e:  # best effort
-            log.info("warm-up skipped: %s", e)
-
     pending_question = _pending_question
 
     def has_pending_question(self, utterances: list[Any]) -> bool:
         return self._pending_question(utterances) is not None
 
-    def quick_reply(self, utterances: list[Any], elapsed_s: float) -> ChatMessage | None:
-        """Fast path for a direct question: one tiny model call, one sentence out. Never raises."""
+    def _quick_request(self, utterances: list[Any], elapsed_s: float) -> ChatMessage | str | None:
+        """A finished reply from the meeting notes (no model), the prompt to send the model, or None (nothing to ask)."""
         question = self._pending_question(utterances)
         if question is None:
             return None
@@ -556,15 +556,41 @@ class Brain:
             "recent_transcript": [{"speaker": u.speaker, "text": u.text[-400:]} for u in utterances[-6:]],
             "project_context": self.knowledge.retrieve(question[1]) if self.knowledge else [],
         }
-        try:
-            obj = parse_json_reply(self.llm.generate(QUICK_PROMPT, "INPUT_JSON:\n" + json.dumps(payload)))
-            reply = obj.get("reply") if isinstance(obj, dict) else None
-        except (LLMUnavailable, json.JSONDecodeError) as e:
-            log.warning("quick reply failed: %s", e)
-            return None
+        return "INPUT_JSON:\n" + json.dumps(payload)
+
+    def _quick_message(self, raw: str, utterances: list[Any], elapsed_s: float) -> ChatMessage | None:
+        obj = parse_json_reply(raw)
+        reply = obj.get("reply") if isinstance(obj, dict) else None
         return self.policy.decide_direct(
             reply if isinstance(reply, str) else None, utterances, self.bot_name, elapsed_s
         )
+
+    def quick_reply(self, utterances: list[Any], elapsed_s: float) -> ChatMessage | None:
+        """Fast path for a direct question: one tiny model call, one sentence out. Never raises."""
+        req = self._quick_request(utterances, elapsed_s)
+        return req if not isinstance(req, str) else self._ask_quick_sync(req, utterances, elapsed_s)
+
+    async def aquick_reply(self, utterances: list[Any], elapsed_s: float) -> ChatMessage | None:
+        """`quick_reply` on the async fast client: no worker thread, no sleeping. Never raises."""
+        req = self._quick_request(utterances, elapsed_s)
+        if not isinstance(req, str):
+            return req
+        if self.fast is None:
+            return await asyncio.to_thread(self._ask_quick_sync, req, utterances, elapsed_s)
+        try:
+            return self._quick_message(
+                await self.fast.generate(QUICK_PROMPT, req, json_mode=True), utterances, elapsed_s
+            )
+        except (LLMUnavailable, json.JSONDecodeError) as e:  # Busy is an LLMUnavailable
+            log.warning("quick reply failed: %s", e)
+            return None
+
+    def _ask_quick_sync(self, req: str, utterances: list[Any], elapsed_s: float) -> ChatMessage | None:
+        try:
+            return self._quick_message(self.llm.generate(QUICK_PROMPT, req), utterances, elapsed_s)
+        except (LLMUnavailable, json.JSONDecodeError) as e:
+            log.warning("quick reply failed: %s", e)
+            return None
 
     def commit_chat(self, msg: ChatMessage, elapsed_s: float) -> None:
         self.policy.commit(msg, elapsed_s)
@@ -766,13 +792,6 @@ class GeminiLLM:
         if "2.5" in self.model and "pro" not in self.model:
             config["thinking_config"] = {"thinking_budget": 0}
         return self._invoke([types.Part.from_bytes(data=wav, mime_type="audio/wav"), prompt], config)
-
-    def ping(self) -> None:
-        """A one-token call that keeps the connection warm. Without it, a call after ~30 s of quiet takes ~12 s."""
-        config: dict[str, Any] = {"max_output_tokens": 1, "automatic_function_calling": {"disable": True}}
-        if "2.5" in self.model and "pro" not in self.model:
-            config["thinking_config"] = {"thinking_budget": 0}
-        self.client.models.generate_content(model=self.model, contents="ok", config=config)
 
     def _invoke(self, contents: Any, config: dict[str, Any]) -> str:
         for attempt in range(1, self.max_attempts + 1):

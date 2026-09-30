@@ -20,9 +20,10 @@ import wave
 from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
+from .config import DEFAULT_TTS_MODEL
+
 log = logging.getLogger("bot.tts")
 DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"  # a premade ElevenLabs voice ("Rachel"); override with ELEVENLABS_VOICE_ID
-DEFAULT_MODEL = "eleven_flash_v2_5"  # ElevenLabs' low-latency model; override with ELEVENLABS_TTS_MODEL
 MAX_CHARS = 400
 
 
@@ -57,7 +58,7 @@ class ElevenLabsTTS:
         if not self.key:
             raise TTSError("ELEVENLABS_API_KEY is not set")
         self.voice = voice_id or os.environ.get("ELEVENLABS_VOICE_ID", "") or DEFAULT_VOICE
-        self.model = model or os.environ.get("ELEVENLABS_TTS_MODEL", "") or DEFAULT_MODEL
+        self.model = model or os.environ.get("ELEVENLABS_TTS_MODEL", "") or DEFAULT_TTS_MODEL
         self.base_url = base_url.rstrip("/")
         self._client = client
 

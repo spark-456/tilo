@@ -42,3 +42,14 @@ Open problems seen in the last live run (fix first next time):
    ~1.8 s to first sound (mic unmute + espeak). Measure unmute time; consider keeping the mic unmuted while speaking soon.
 5. Speaker names: Scribe returned no speaker ids for a single speaker; multi-speaker not yet tested.
 6. `account_button` selector still misses (harmless).
+
+## Voice plan v2 tickets (docs/VOICE_ARCHITECTURE.md section 5)
+
+Branches `feat/VA-<nn>-<slug>` are cut from `chore/meet-bot-baseline` and merged back into it by PR. Nothing goes to `phase0-stack` or `main` until the VA-INT ticket.
+
+| Ticket | State |
+|---|---|
+| VA-01 fast-path model client | Code and 19 offline tests done (144 pass overall). Not yet measured live: the 12 s cold-call fix is unproven until a live run shows `model_attempt` rows and `model_s` in `latency.jsonl`. |
+| VA-02 question bookkeeping and chat | Next. |
+| VA-03 voice never waits for the UI | Queued. |
+| VA-04 turn trace, report, two-channel audio | Queued. |

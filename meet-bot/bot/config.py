@@ -11,6 +11,12 @@ ROOT = Path(__file__).resolve().parent.parent
 IN_CONTAINER = os.environ.get("TILO_IN_CONTAINER") == "1"
 SECRET_ENV_NAMES = ("GEMINI_API_KEY", "GEMINI_LIVE_API_KEY", "ELEVENLABS_API_KEY")
 # Gemini Live models tried by `live-probe`, fastest-first by third-party measurements (Sep 2026). Override with LIVE_MODELS.
+# Every model id lives here (or in .env), behind the provider interfaces.
+DEFAULT_MODEL = "gemini-2.5-flash"  # the analysis loop, when the model list cannot be read; override with GEMINI_MODEL
+DEFAULT_FAST_MODEL = "gemini-2.5-flash-lite"  # direct answers; override with FAST_MODEL
+DEFAULT_TTS_MODEL = "eleven_flash_v2_5"  # ElevenLabs' low-latency model; override with ELEVENLABS_TTS_MODEL
+STT_MODEL = "scribe_v2_realtime"  # ElevenLabs realtime speech to text
+THINKING_LEVELS = ("off", "minimal", "low", "medium", "high")
 DEFAULT_LIVE_MODELS = "gemini-3.1-flash-live-preview,gemini-3.8-live,gemini-2.5-flash-native-audio-preview-12-2025"
 
 
@@ -44,6 +50,13 @@ def _num(name: str, default: float) -> float:
         raise SystemExit(f"{name} must be a number, got {raw!r}") from None
 
 
+def _choice(name: str, default: str, allowed: tuple[str, ...]) -> str:
+    raw = os.environ.get(name, "").strip().lower() or default
+    if raw not in allowed:
+        raise SystemExit(f"{name} must be one of {', '.join(allowed)}, got {raw!r}")
+    return raw
+
+
 def _names(raw: str) -> list[str]:
     return [n.strip() for n in raw.split(",") if n.strip()]
 
@@ -53,6 +66,8 @@ class Config:
     bot_email: str
     bot_display_name: str
     gemini_model: str
+    fast_model: str
+    fast_thinking: str
     brain_interval_s: float
     window_minutes: float
     join_timeout_s: float
@@ -79,7 +94,6 @@ class Config:
     stt: str
     reply_mode: str
     voice_nudges: bool
-    keep_warm_s: float
     live_models: list[str]
     live_voice: str
     live_api_version: str
@@ -93,6 +107,8 @@ class Config:
             bot_email=e("BOT_GOOGLE_EMAIL", "").strip(),
             bot_display_name=e("BOT_DISPLAY_NAME", "").strip(),
             gemini_model=e("GEMINI_MODEL", "").strip(),
+            fast_model=e("FAST_MODEL", "").strip() or DEFAULT_FAST_MODEL,
+            fast_thinking=_choice("FAST_THINKING", "off", THINKING_LEVELS),
             brain_interval_s=max(10.0, _num("BRAIN_INTERVAL_SECONDS", 20)),
             window_minutes=_num("TRANSCRIPT_WINDOW_MINUTES", 5),
             join_timeout_s=_num("JOIN_TIMEOUT_SECONDS", 90),
@@ -121,7 +137,6 @@ class Config:
                 else "both"
             ),
             voice_nudges=e("VOICE_NUDGES", "0") == "1",
-            keep_warm_s=_num("KEEP_WARM_SECONDS", 5),
             live_models=_names(e("LIVE_MODELS", "") or DEFAULT_LIVE_MODELS),
             live_voice=e("LIVE_VOICE", "").strip(),
             live_api_version=e("LIVE_API_VERSION", "v1beta").strip() or "v1beta",
