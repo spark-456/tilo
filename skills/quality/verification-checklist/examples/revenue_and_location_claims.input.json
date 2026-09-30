@@ -1,7 +1,0 @@
-{
-  "deliverable_claims": [
-    { "claim_id": "c1", "text": "Revenue grew 12% year over year." },
-    { "claim_id": "c2", "text": "The company is headquartered in Singapore." }
-  ],
-  "evidence": [{ "source_id": "src-1", "text": "Annual report, page 4: revenue +12% YoY." }]
-}

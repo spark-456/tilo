@@ -1,6 +1,0 @@
-{
-  "verdicts": [
-    { "claim_id": "c1", "verdict": "verified", "evidence_source_ids": ["src-1"] },
-    { "claim_id": "c2", "verdict": "unverified", "evidence_source_ids": [] }
-  ]
-}
