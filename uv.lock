@@ -1394,12 +1394,14 @@ version = "0.1.0"
 source = { editable = "packages/planning" }
 dependencies = [
     { name = "tilo-contracts" },
+    { name = "tilo-policy" },
     { name = "tilo-providers" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-providers", editable = "packages/providers" },
 ]
 
