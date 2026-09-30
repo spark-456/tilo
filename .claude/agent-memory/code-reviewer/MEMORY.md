@@ -15,6 +15,7 @@
 - [Router budget selection](router-budget-selection-probe.md) — budget between candidate prices refused outright; chaos test skips tight budgets
 - [Router cap ignores system/tools](router-cap-ignores-system-tools.md) — EFF-03 cap/price count only prompt; probe every request field
 - [Router failed-call charge](router-budget-failed-call-charge.md) — estimate deducted before send, never refunded on 429; fallback refused
+- [Spend alert committed vs reserved](spend-alert-committed-vs-reserved.md) — daily spend alerts counted open reservations; probe big open reservation + tiny commit
 - [Untrusted zip fuzz probe](untrusted-zip-fuzz-probe.md) — mutate OOXML bytes; ValueError/UnicodeDecodeError escaped intake extraction as 500
 - [Harness single-writer probe](harness-single-writer-probe.md) — race two writers with the same writer_id; commit must CAS head.last_seq
 - [Flaky timing tests](flaky-timing-tests.md) — run suite 2-3x; tight wall-clock bounds in linear-time tests flake under load
@@ -23,3 +24,4 @@
 - [Web e2e env noise](web-e2e-env-noise.md) — adblock360 injector console errors, timing project skipped on chromium fail, axe timeouts under load
 - [Executor runner-output probe](executor-runner-output-probe.md) — bad UnitOutcome aborts run, strands siblings "working"; failures retire as "finished"
 - [Split PR leftovers](split-pr-leftovers.md) — split branches keep sibling scaffolding justified by same-diff code; repo-wide config excludes
+- [Eval check vacuous pass](eval-check-vacuous-pass.md) — args looked up by name (dup entries), missing field None==None passes; probe these
