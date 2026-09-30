@@ -20,3 +20,6 @@
 - [Flaky timing tests](flaky-timing-tests.md) — run suite 2-3x; tight wall-clock bounds in linear-time tests flake under load
 - [Skill checker probes](skill-checker-probes.md) — FR-AGT-04 check.py: mutate example outputs; refs checked for existence, not value/row match
 - [Writer swap retry probe](writer-swap-retry-probe.md) — identity-gated retry triple-writes; content dedupe drops same-ms parts; 0.3s deadline treats slow as hung
+- [Web e2e env noise](web-e2e-env-noise.md) — adblock360 injector console errors, timing project skipped on chromium fail, axe timeouts under load
+- [Executor runner-output probe](executor-runner-output-probe.md) — bad UnitOutcome aborts run, strands siblings "working"; failures retire as "finished"
+- [Split PR leftovers](split-pr-leftovers.md) — split branches keep sibling scaffolding justified by same-diff code; repo-wide config excludes
