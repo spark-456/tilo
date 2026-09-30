@@ -59,6 +59,7 @@ class FastLLM:
         self._factory = client_factory
         self._client: Any = None
         self._last_prewarm: float | None = None
+        self.last_call: dict[str, float] = {}  # clock time of the last request and of its first token
 
     # -- public --------------------------------------------------------------------------------------------------------
     async def stream(
@@ -105,6 +106,7 @@ class FastLLM:
                 last = e
                 continue
             first_token_s = self.clock() - started
+            self.last_call = {"request_at": started, "first_token_at": started + first_token_s}
             outcome = "cancelled"  # the consumer stopped early (barge-in): not a failure
             try:
                 if first:

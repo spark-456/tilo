@@ -9,6 +9,7 @@ The meeting "starts" for the bot (intro, clock, brain, chat) only once the requi
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -18,8 +19,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .audio_out import Player, setup_virtual_mic
-from .brain import Agenda, Brain, GeminiLLM, LLMUnavailable, _norm, chat_utterance
+from .audio_out import Player, WavTap, setup_virtual_mic
+from .brain import CHAT_SUFFIX, Agenda, Brain, GeminiLLM, LLMUnavailable, _norm, chat_utterance
 from .browser import MeetBrowser
 from .captions import CaptionMerger, CaptionReader, TranscriptStore, Utterance
 from .chat import ChatPoster, intro_text
@@ -44,6 +45,7 @@ from .playback import write_playback
 from .speaker import NullSpeaker, VoiceSpeaker
 from .stt_stream import AudioGate, ScribeStream, SpeakerNames, STTUnavailable
 from .timing import Timeline
+from .trace import Turn, TurnTrace
 from .tts import make_tts
 
 log = logging.getLogger("bot.session")
@@ -181,6 +183,9 @@ class LiveSession:
         self._out_task: asyncio.Task | None = None
         self.next_status_at: float | None = None
         self.next_brain_at = 0.0
+        self.conns = Timeline(self.out_dir / "connections.jsonl")  # model attempts, prewarms, Scribe connections
+        self.trace = TurnTrace(self.out_dir / "turns.jsonl", self.clock, self.start)
+        self.bot_tap: WavTap | None = None
         self.others_seen, self.alone_since = False, None
         self.last_wait_msg, self.intro_sent = None, False
 
@@ -191,7 +196,7 @@ class LiveSession:
         return FastLLM(
             self.cfg.fast_model,
             self.cfg.fast_thinking,
-            on_attempt=lambda row: self.timeline.record("model_attempt", **row),
+            on_attempt=lambda row: self.conns.record("prewarm" if row["outcome"] == "prewarm" else "attempt", **row),
         )
 
     def _prewarm(self) -> None:
@@ -263,6 +268,7 @@ class LiveSession:
                     )
                     await br.set_mic(False)  # a virtual microphone exists, so Meet may have joined unmuted
                 self.start = self.clock.now()
+                self.trace.audio_start = self.start
                 self.merger.t0 = self.start
                 if br.account_name:
                     self.merger.add_ignored(br.account_name)
@@ -321,13 +327,26 @@ class LiveSession:
         if not self.recorder.start():
             self.recorder, self.hybrid = None, False
             return
+        self.trace.audio_start = self.recorder.started_at  # time zero of audio.wav
+        if self.voice:
+            self.bot_tap = WavTap(self.out_dir / "bot.wav")
+            if self.bot_tap.start():
+                clock = {"audio_start": self.recorder.started_at, "bot_start": self.bot_tap.started_at}
+                (self.out_dir / "audio_clock.json").write_text(json.dumps(clock), encoding="utf-8")
+            else:
+                self.bot_tap = None
         if self.record_audio:
             self.events.emit("audio.recording", path=str(wav), starts_at_s=0)
         if self.stt_mode == "gemini":
             self.stt_task = asyncio.create_task(self._stt_worker())
         elif self.stt_mode == "elevenlabs":
             try:
-                self.scribe = ScribeStream(self._on_partial, self._on_final, keyterms=self._keyterms())
+                self.scribe = ScribeStream(
+                    self._on_partial,
+                    self._on_final,
+                    keyterms=self._keyterms(),
+                    on_event=lambda kind, **d: self.conns.record(kind, source="scribe", **d),
+                )
             except STTUnavailable as e:
                 log.warning("%s Falling back to captions.", e)
                 self.recorder.stop()
@@ -466,14 +485,25 @@ class LiveSession:
             self.activity = VoiceActivity()
             log.info("voice replies on (%s)", self.tts.name)
 
-    async def _deliver(self, msg) -> tuple[bool, dict]:
+    async def _deliver(self, msg, turn: Turn | None = None) -> tuple[bool, dict]:
         """Send a reply out loud and in chat. Returns (delivered anywhere, timing info).
 
         The chat copy follows the first sound, so typing never delays the voice (and never competes with it for the UI)."""
         want_voice = self.voice and (msg.kind == "direct_reply" or (self.cfg.voice_nudges and msg.kind != "intro"))
         t0 = self.clock.now()
         first_sound = asyncio.Event()
-        speak = asyncio.create_task(self.speaker.say(msg.text, on_first_sound=first_sound.set)) if want_voice else None
+
+        def mark(name: str, at: float | None = None) -> None:
+            if turn is not None:
+                turn.mark(name, at)
+
+        def heard_first() -> None:
+            first_sound.set()
+            mark("first_sample")
+
+        if want_voice:
+            mark("tts_request", t0)
+        speak = asyncio.create_task(self.speaker.say(msg.text, on_first_sound=heard_first)) if want_voice else None
         chat_ok, chat_s, first_out = False, 0.0, None
         if self.reply_mode != "voice" or not want_voice:
             if speak:
@@ -483,13 +513,23 @@ class LiveSession:
             t1 = self.clock.now()
             chat_ok = await self._post(msg.text, msg.kind)
             chat_s, first_out = self.clock.now() - t1, self.clock.now() - t0
+            if chat_ok:
+                mark("chat_posted")
         res = await speak if speak else None
+        if res is not None:
+            mark("playback_end")
+            if res.first_audio_s is not None:
+                mark("tts_first_pcm", t0 + res.first_audio_s)
+            if res.interrupted:
+                mark("barge_stop")
         if (
             speak and not (res and res.spoken) and not chat_ok
         ):  # voice-only mode and the voice failed: chat is the backup
             t1 = self.clock.now()
             chat_ok = await self._post(msg.text, msg.kind)
             chat_s, first_out = self.clock.now() - t1, (self.clock.now() - t0)
+            if chat_ok:
+                mark("chat_posted")
         if res is not None:
             self.timeline.record(
                 "speech",
@@ -515,27 +555,34 @@ class LiveSession:
             if x is not None
         ]
         status = "off" if res is None else ("spoken" if res.spoken else f"failed: {res.error}")
+        if res is not None and res.spoken:
+            outcome = "interrupted" if res.interrupted else "spoken"
+        else:
+            outcome = "chat_only" if chat_ok else "failed"
         return (chat_ok or bool(res and res.spoken)), {
             "chat_typing_s": round(chat_s, 2),
             "first_output_s": round(min(cands), 2) if cands else 0.0,
             "voice_status": status,
+            "outcome": outcome,
         }
 
-    def _queue_delivery(self, msg, done: Callable[[bool, dict], None] | None = None) -> None:
+    def _queue_delivery(self, msg, done: Callable[[bool, dict], None] | None = None, turn: Turn | None = None) -> None:
         """Replies go out one at a time from their own task, so speaking never holds up the main loop."""
-        self._out_q.put_nowait((msg, done))
+        self._out_q.put_nowait((msg, done, turn))
         if self._out_task is None or self._out_task.done():
             self._out_task = asyncio.create_task(self._delivery_worker())
 
     async def _delivery_worker(self) -> None:
         while True:
-            msg, done = await self._out_q.get()
+            msg, done, turn = await self._out_q.get()
             try:
-                ok, info = await self._deliver(msg)
+                ok, info = await self._deliver(msg, turn)
                 if done:
                     done(ok, info)
             except Exception as e:  # one failed reply must not stop the next
                 log.exception("delivering a reply crashed: %s", e)
+                if done:
+                    done(False, {"outcome": "failed"})
 
     async def _keep_mic_open(self) -> None:
         """MIC_POLICY=open: once the meeting has started the bot's mic stays on (it carries only synthesised speech,
@@ -546,7 +593,29 @@ class LiveSession:
     async def _timed_quick(self, recent: list[Utterance], meta: dict[str, Any]):
         t = time.monotonic()
         msg = await self.brain.aquick_reply(recent, self.brain_elapsed())
+        turn = meta.get("turn")
+        if turn is not None and self.brain.last_quick_source == "model":
+            call = self.fast.last_call if self.fast else {}
+            fresh = call.get("request_at", 0.0) >= t  # this call's times, not an earlier one's
+            turn.mark("llm_request", call["request_at"] if fresh else t)
+            if fresh:
+                turn.mark("llm_first_token", call["first_token_at"])
         return msg, time.monotonic() - t, meta
+
+    def _new_turn(self, q, meta: dict[str, Any]) -> Turn:
+        """A trace row for one question. The end of the human turn is the last loud audio frame when the meeting audio
+        is captured, the moment the chat message was read for typed chat, and an estimate otherwise."""
+        last_loud = self.activity.last_loud_at() if self.activity else None
+        if q.speaker.endswith(CHAT_SUFFIX):
+            end, source = meta["first_seen"], "chat"
+        elif last_loud is not None and 0 <= meta["detected"] - last_loud < 15:
+            end, source = last_loud, "audio"
+        else:
+            end, source = meta["detected"] - self.partial_idle_s, "estimate"
+        turn = self.trace.new_turn(q.speaker, q.text, end, source)
+        turn.mark("addressed", meta["first_seen"])
+        turn.mark("confirmed_end", meta["detected"])
+        return turn
 
     async def _finish_quick(self, task: asyncio.Task) -> None:
         try:
@@ -554,7 +623,12 @@ class LiveSession:
         except Exception as e:
             log.exception("quick reply crashed: %s", e)
             return
+        turn = meta.get("turn")
+        if turn is not None:
+            turn.route = "instant" if self.brain.last_quick_source == "local" else "model"
         if not msg:
+            if turn is not None:
+                self.trace.finish(turn, "no_reply")
             self.timeline.record("question_no_reply", question=meta["question"], model_s=round(model_s, 2))
             log.info("no reply to %r (not answerable from the meeting/project info, %.1fs)", meta["question"], model_s)
             return
@@ -562,6 +636,8 @@ class LiveSession:
         self.brain.commit_chat(msg, self.brain_elapsed())  # booked now: a second question cannot slip past the gap
 
         def done(ok: bool, info: dict) -> None:
+            if turn is not None:
+                self.trace.finish(turn, info.get("outcome", "failed"))
             if not ok:
                 log.warning("the reply to %r could not be delivered anywhere", meta["question"])
                 return
@@ -585,7 +661,7 @@ class LiveSession:
                 info.get("voice_status", "off"),
             )
 
-        self._queue_delivery(msg, done)
+        self._queue_delivery(msg, done, turn)
 
     # -- loop -------------------------------------------------------------------------------------------------------
     async def _loop(self) -> None:
@@ -645,6 +721,7 @@ class LiveSession:
                                 "detected": now,
                                 "first_seen": self.first_seen.get(_norm(q[1]), now),
                             }
+                            meta["turn"] = self._new_turn(q, meta)
                             quick_task = asyncio.create_task(self._timed_quick(ready, meta))
 
                 # --- periodic analysis ---------------------------------------------------------------------------
@@ -776,6 +853,8 @@ class LiveSession:
     async def _shutdown(self) -> None:
         if self._out_task:
             self._out_task.cancel()
+        if self.bot_tap:
+            self.bot_tap.stop()
         try:
             if self.recorder:
                 self.recorder.stop()  # flushes the last speech segment

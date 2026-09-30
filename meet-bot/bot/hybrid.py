@@ -37,6 +37,22 @@ STT_PROMPT = (
 )
 
 
+def parec_command(device: str) -> list[str]:
+    """Raw 16 kHz mono capture of a PulseAudio device with a 20 ms buffer (the default buffers far more)."""
+    return ["parec", f"--device={device}", f"--rate={RATE}", "--channels=1", "--format=s16le", "--latency-msec=20"]
+
+
+def wav_header(data_bytes: int) -> bytes:
+    return (
+        b"RIFF"
+        + struct.pack("<I", 36 + data_bytes)
+        + b"WAVEfmt "
+        + struct.pack("<IHHIIHH", 16, 1, 1, RATE, RATE * 2, 2, 16)
+        + b"data"
+        + struct.pack("<I", data_bytes)
+    )
+
+
 def rms(pcm: bytes) -> float:
     n = len(pcm) // 2
     if not n:
@@ -200,6 +216,10 @@ class VoiceActivity:
     def speaking_within(self, window_s: float) -> bool:
         return time.monotonic() - self._last_loud <= window_s
 
+    def last_loud_at(self) -> float | None:
+        """When the meeting last had sound (monotonic clock), or None if it never has."""
+        return self._last_loud if self._last_loud > 0 else None
+
     def loud_run_s(self) -> float:
         start = self._run_start
         return 0.0 if start is None or time.monotonic() - self._last_loud > 0.25 else time.monotonic() - start
@@ -224,6 +244,7 @@ class LiveRecorder:
         self._thread: threading.Thread | None = None
         self._wav = None
         self._bytes = 0
+        self.started_at = 0.0
 
     def start(self) -> bool:
         if not shutil.which("parec"):
@@ -233,26 +254,17 @@ class LiveRecorder:
             self.wav_path.parent.mkdir(parents=True, exist_ok=True)
             self._wav = self.wav_path.open("wb")
             self._wav.write(self._header(0))
-        self._proc = subprocess.Popen(
-            ["parec", f"--device={SINK_MONITOR}", f"--rate={RATE}", "--channels=1", "--format=s16le"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
+        self._proc = subprocess.Popen(self.command(), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        self.started_at = time.monotonic()  # time zero of audio.wav on the session clock
         self._thread = threading.Thread(target=self._pump, daemon=True)
         self._thread.start()
         log.info("capturing meeting audio%s", f" (also saving {self.wav_path})" if self.wav_path else "")
         return True
 
-    @staticmethod
-    def _header(data_bytes: int) -> bytes:
-        return (
-            b"RIFF"
-            + struct.pack("<I", 36 + data_bytes)
-            + b"WAVEfmt "
-            + struct.pack("<IHHIIHH", 16, 1, 1, RATE, RATE * 2, 2, 16)
-            + b"data"
-            + struct.pack("<I", data_bytes)
-        )
+    def command(self) -> list[str]:
+        return parec_command(SINK_MONITOR)
+
+    _header = staticmethod(wav_header)
 
     def _patch_header(self) -> None:
         if self._wav:

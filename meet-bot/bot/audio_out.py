@@ -11,7 +11,12 @@ import asyncio
 import logging
 import shutil
 import subprocess
+import threading
+import time
 from collections.abc import AsyncIterator, Callable
+from pathlib import Path
+
+from .hybrid import parec_command, wav_header
 
 log = logging.getLogger("bot.audio_out")
 MIC_SINK = "tilo_mic_sink"
@@ -88,3 +93,62 @@ class Player:
                 except TimeoutError:
                     proc.kill()
         return not cut
+
+
+class WavTap:
+    """What the bot actually sent into the meeting (the virtual mic's monitor) saved as bot.wav. It starts close to
+    audio.wav, and `audio_clock.json` records both start times so `audit` can line the two up."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._f = None
+        self._bytes = 0
+        self._proc: subprocess.Popen | None = None
+        self._thread: threading.Thread | None = None
+        self.started_at = 0.0
+
+    def command(self) -> list[str]:
+        return parec_command(f"{MIC_SINK}.monitor")
+
+    def open(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._f = self.path.open("wb")
+        self._f.write(wav_header(0))
+
+    def write(self, chunk: bytes) -> None:
+        if self._f:
+            self._f.write(chunk)
+            self._bytes += len(chunk)
+
+    def close(self) -> None:
+        if self._f:
+            self._f.seek(0)
+            self._f.write(wav_header(self._bytes))
+            self._f.close()
+            self._f = None
+
+    def start(self) -> bool:
+        if not shutil.which("parec"):
+            return False
+        self.open()
+        self._proc = subprocess.Popen(self.command(), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        self.started_at = time.monotonic()
+        self._thread = threading.Thread(target=self._pump, daemon=True)
+        self._thread.start()
+        return True
+
+    def _pump(self) -> None:
+        assert self._proc and self._proc.stdout
+        while chunk := self._proc.stdout.read(3200):
+            self.write(chunk)
+
+    def stop(self) -> None:
+        if self._proc and self._proc.poll() is None:
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+        if self._thread:
+            self._thread.join(timeout=3)
+        self.close()

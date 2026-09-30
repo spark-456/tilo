@@ -52,4 +52,4 @@ Branches `feat/VA-<nn>-<slug>` are cut from `chore/meet-bot-baseline` and merged
 | VA-01 fast-path model client | Merged (PR 75). Not yet measured live: the 12 s cold-call fix is unproven until a live run shows `model_attempt` rows and `model_s` in `latency.jsonl`. |
 | VA-02 question bookkeeping and chat | Merged (PR 76). Two older assertions were updated because the ticket changes the behaviour they pinned (an addressed question with no answer now gets a fallback line instead of silence). Live check pending. |
 | VA-03 voice never waits for the UI | Code and 16 offline tests done (176 pass overall). Fake-page mic wait 0 to 30 ms behind a slow chat post. Not yet measured live: needs a live run for unmute and first-sound numbers. |
-| VA-04 turn trace, report, two-channel audio | Queued. |
+| VA-04 turn trace, report, two-channel audio | Code and 16 offline tests done (192 pass overall). `report` and `audit` commands, `turns.jsonl`, `connections.jsonl`, `bot.wav`. Not yet run on a live meeting: the marks the v1 pipeline cannot produce (`probable_end`, `stt_final`, `first_sentence`, `barge_duck`) stay empty until Phase 2. |
