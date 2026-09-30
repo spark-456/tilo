@@ -77,3 +77,5 @@ Questions found while building. Each has the default we build on until the user 
 | BQ-43 | Decided by the orchestrator: eval credit caps full 2,000 (US$10), smoke 200 (US$1), gate 1,000 (US$5), inside the US$150 programme ceiling. | 2026-09-25 |
 | BQ-44 | Decided by the orchestrator: the policy engine defaults stand; the daily-cap day is the UTC calendar day. | 2026-09-25 |
 | BQ-45 to BQ-49 | Decided by the orchestrator: SW builds S-05 mobile, S-10 mobile, S-11, the S-14 replay entry and banner, and the HR-7 policy stamp on its stated defaults, using existing tokens only. | 2026-09-25 |
+| #46 | Decided by the orchestrator (S0, 2026-09-26; logged late): an event's ULID `id` is the idempotency key for `EventWriter.append`; no contract change. | 2026-10-01 |
+| BQ-67 | Decided by the orchestrator on the default (overridable): the eval set is 160 cases, the PRD 19.2 row counts that `config/evals.yaml` `groups` already lists; the heading's 170 is treated as a typo. AG-EVAL builds 160. | 2026-10-01 |
