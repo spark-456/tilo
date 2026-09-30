@@ -1,0 +1,74 @@
+@import "./tokens.css";
+
+body {
+  margin: 0;
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font-family: var(--font-ui);
+}
+/* PRD 9.6/18.2: stage mode is a display setting; type and targets scale by --ui-scale. */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  font-size: calc(16px * var(--ui-scale, 1));
+}
+.app-shell[data-stage-mode="on"] {
+  --ui-scale: var(--font-stage-mode-scale);
+}
+@media (max-width: 767px) {
+  .app-shell {
+    flex-direction: column;
+  }
+}
+.left-rail,
+.bottom-tabs {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: var(--color-surface-1);
+}
+.left-rail {
+  flex: 0 0 72px;
+  padding-top: 16px;
+}
+.stage-frame {
+  position: relative;
+  touch-action: none;
+  flex: 1;
+  overflow: hidden;
+  isolation: isolate;
+}
+.stage-frame > * {
+  position: absolute;
+  inset: 0;
+}
+.stage-frame > canvas {
+  z-index: -1; /* under the frame's own inset focus ring */
+}
+/* Inset, so the viewport edges can never clip it. No focus role exists yet: brand.primary. */
+.stage-frame:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: -3px;
+}
+.stage-fallback {
+  padding: 40vh 24px 0;
+  text-align: center;
+}
+.right-rail {
+  flex: 0 0 320px; /* + 2 x 20px padding = 360px (PRD 18.3) */
+  padding: 20px;
+  font-size: calc(14px * var(--ui-scale, 1));
+  background: var(--color-surface-1);
+}
+.right-rail p {
+  color: var(--color-ink-2);
+}
+.nav-btn {
+  min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  border: none;
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-brand-primary);
+  font: 700 0.875em var(--font-ui);
+}

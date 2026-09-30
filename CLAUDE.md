@@ -59,7 +59,7 @@ Changing a frozen contract (ADR first); applying infrastructure or spending mone
 
 ## Commands
 - `just setup` — `uv sync` + `pnpm install` for every workspace member
-- `just dev` — run the `tilo-api` dev server
+- `just dev` / `just dev-api` / `just tokens` — web dev server / `tilo-api` dev server / regenerate web tokens
 - `just check` — format check + lint + typecheck + all tests (the full gate; run before finishing a ticket)
 - `just check-fast` — format + lint + tests, used by `.claude/hooks/stop_check.py`, under 2 minutes
 - `just test` — all Python and JS test suites
