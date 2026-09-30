@@ -64,6 +64,19 @@ def _new_ulid(now: datetime) -> str:
     return "".join(_CROCKFORD[(value >> (i * 5)) & 0x1F] for i in range(25, -1, -1))
 
 
+def _identical(a: Any, b: Any) -> bool:
+    """Exact structural equality: unlike `==`, `1`, `1.0` and `True` differ, and NaN never
+    matches, so only a true resend of the committed event counts. Recursion is bounded by `b`,
+    the committed event, which validation already bounded."""
+    if type(a) is not type(b):
+        return False
+    if type(a) is dict:
+        return a.keys() == b.keys() and all(_identical(a[k], b[k]) for k in a)
+    if type(a) is list:
+        return len(a) == len(b) and all(_identical(x, y) for x, y in zip(a, b, strict=True))
+    return bool(a == b)
+
+
 def _format_ts(now: datetime) -> str:
     return now.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
 
@@ -195,7 +208,18 @@ class WorldWriter:
     def append(self, event: dict[str, Any]) -> dict[str, Any]:
         """Writes a pre-built event unchanged (the replay path): `seq` must be exactly
         `last_seq + 1`, `id` must be unused, `cause` must be null or an earlier event of this
-        world -- EventValidator's EV-10/EV-11 catch each case."""
+        world -- EventValidator's EV-10/EV-11 catch each case.
+
+        Idempotent resend (FR-HIL-07, issue #46): if `id` is already committed in this world and
+        `event` is identical to the committed event (same keys, same types, same values, all the
+        way down), returns a copy of the committed event and writes nothing. The committed event
+        comes from `WorldState`, which `open()` loads from the store, so this holds after a
+        takeover. The same id with any other content still raises `EventRejected` (EV-10)."""
+        if type(event) is dict:
+            event_id = event.get("id")
+            committed = self._state.seen.get(event_id) if type(event_id) is str else None
+            if committed is not None and _identical(event, committed):
+                return copy.deepcopy(committed)
         return self._write(dict(event) if type(event) is dict else event)
 
     def _write(self, event: dict[str, Any]) -> dict[str, Any]:

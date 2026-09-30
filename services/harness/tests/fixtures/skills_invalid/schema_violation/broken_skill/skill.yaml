@@ -1,0 +1,11 @@
+# Invalid on purpose (services/harness/tests, FR-AGT-03): missing "reviewer" and "outputs",
+# both required by contracts/skill.schema.json -- SkillRegistry must report this folder as
+# invalid and never load it.
+id: broken_skill
+version: 1.0.0
+domain: schema_violation
+author: "Ada Example <ada@example.com>"
+tools_allowed: []
+inputs:
+  type: object
+description: "Missing required fields on purpose."

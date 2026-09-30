@@ -1,0 +1,133 @@
+@import "./tokens.css";
+
+body {
+  margin: 0;
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font-family: var(--font-ui);
+}
+/* PRD 9.6/18.2: stage mode is a display setting; type and targets scale by --ui-scale. */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  font-size: calc(16px * var(--ui-scale, 1));
+}
+.app-shell[data-stage-mode="on"] {
+  --ui-scale: var(--font-stage-mode-scale);
+}
+@media (max-width: 767px) {
+  .app-shell {
+    flex-direction: column;
+  }
+}
+.left-rail,
+.bottom-tabs {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: var(--color-surface-1);
+}
+.left-rail {
+  flex: 0 0 72px;
+  padding-top: 16px;
+}
+.stage-frame {
+  position: relative;
+  touch-action: none;
+  flex: 1;
+  overflow: hidden;
+  isolation: isolate;
+}
+.stage-frame > * {
+  position: absolute;
+  inset: 0;
+}
+.stage-frame > canvas {
+  z-index: -1; /* under the frame's own inset focus ring */
+}
+/* Inset, so the viewport edges can never clip it. No focus role exists yet: brand.primary. */
+.stage-frame:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: -3px;
+}
+.stage-fallback {
+  padding: 40vh 24px 0;
+  text-align: center;
+}
+.right-rail {
+  flex: 0 0 320px; /* + 2 x 20px padding = 360px (PRD 18.3) */
+  padding: 20px;
+  font-size: calc(14px * var(--ui-scale, 1));
+  background: var(--color-surface-1);
+}
+.right-rail p {
+  color: var(--color-ink-2);
+}
+/* P0-08b-player fixture mode (HR-4/BQ-07, HR-6): fixed so no layout (mobile bottom tabs, stage
+   mode's --ui-scale) can ever cover it or push it off-screen. */
+.fixture-replay-banner {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-1);
+  color: var(--color-surface-1);
+  font: 700 0.8125em var(--font-ui);
+}
+/* Fixed like the banner above it, so it never shifts the layout (P0-08b). Neutral tokens only. */
+.fixture-load-alert {
+  position: fixed;
+  top: 52px;
+  right: 12px;
+  z-index: 1000;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 10px 14px;
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 600 0.875em var(--font-ui);
+}
+.speed-badge {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-primary);
+  color: var(--color-surface-1);
+  font: 700 0.8125em var(--font-mono);
+}
+.trace-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  font: 400 0.75em var(--font-mono);
+  color: var(--color-ink-2);
+}
+.trace-list li {
+  /* Fixed row box: a glyph from a fallback font must not grow the row (no layout shift). */
+  box-sizing: border-box;
+  height: 21px;
+  line-height: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--color-surface-2);
+}
+.nav-btn {
+  min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  border: none;
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-brand-primary);
+  font: 700 0.875em var(--font-ui);
+}
