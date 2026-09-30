@@ -1,6 +1,6 @@
 - [API authz and redaction](api-authz-redaction.md): ST-3a r1 FAIL: no world-membership check on reads, Stop all aborts mid-loop, unvalidated pause channel
 - [T3 invariant gaps](t3-invariant-gaps.md): P0-02 passed r5; P0-03 passed r10 (dd3d4b9); open: two tier sources; open for P4: recipients [] scope, credits self-declared
-- [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r7 FAIL (writer identity); PR #54 redaction r1 PASS flagged: SEC-07 counts open (#29), harness views.py weaker
+- [Redaction and kill switch](redaction-and-kill-switch.md): ST-3a r7 FAIL (writer identity); PR #54 r1 PASS flagged, merge re-check PASS (3e0748b); SEC-07 counts open (#29)
 - [Policy engine P4-01](policy-engine-p4-01.md): r9 PASS; P4-01b r10 FAIL, r11 PASS (dab6d8c, whole data validated); 5d open (#27)
 - [Outbox ST-2](outbox-st2.md): r5 PASS (2ff085b); open: writer must ack dup transfer, durable adapter dedupe, store authz/server time
 - [Archive redactor gaps](archive-redactor-gaps.md): r6 PASS then split; FR-MEM-04-only r1 PASS (2bcb609, injected redactor); FR-MEM-05 redo carries open list
