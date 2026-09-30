@@ -31,7 +31,7 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
   Risk tiers come from action type and context; a model never decides authorisation.
 - `WorldWriter` is the only writer per world: every event is checked against `EventValidator`
   first; a rejected event writes nothing. A lease on `orgs/{org}/worlds/{world}/_head/state`
-  enforces one writer, re-checked inside the same store transaction on every write.
+  enforces one writer, re-checked inside the same store transaction on every write. An identical resend of a committed event to `append` returns it and writes nothing (FR-HIL-07); any other id reuse is EV-10.
 - `FirestoreStore` refuses to start without `FIRESTORE_EMULATOR_HOST` and a `demo-` project id (ADR-0003: emulator only, no cloud credentials, never a real project).
 - `@pytest.mark.emulator` tests are excluded from `just check`'s default run; they run as their
   own CI step and via `uv run pytest services/harness/tests -m emulator`.

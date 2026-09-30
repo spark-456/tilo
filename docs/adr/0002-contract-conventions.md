@@ -1,7 +1,7 @@
 # ADR-0002: Contract conventions, fixtures and code generation
 
 - Status: Accepted (2026-09-25, architect; ticket P0-02). Amended 2026-09-25 by ticket P0-03
-  (decisions 1, 8 and 10) and by ticket CC-SH (decision 12). The contract set freezes at CP0 on
+  (decisions 1, 8 and 10), by ticket CC-SH (decision 12) and by ticket CC-SE (decision 13). The contract set freezes at CP0 on
   29 Sep; `manifest.schema.json` freezes on 1 Oct.
 - Deciders: architect, orchestrator
 - Requirement: FR-WLD-02 (PRD 15.2); FR-WLD-03 for the P0-03 amendment
@@ -184,6 +184,40 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     Decision fixture). `config/teams.yaml` is an example list of `team_lead.schema.json`
     entries; a trailing `[]` in `CONFIG_SHAPES` marks such a list file, and
     `just contracts-check` validates both new config files when present.
+13. **Contracts SE asked for (ticket CC-SE, issues #7 to #12), all additive.** Five new
+    contracts, each 1.0.0, with rules MT-01 to MT-14 in `contracts/metering.rules.md`:
+    `metering.schema.json` shapes `config/metering.yaml` and `evals.schema.json` shapes
+    `config/evals.yaml`; both files ship and `just contracts-check` validates them. As in decision
+    12, what the PRD states as a rule is `const`, with a float `const` repeated as `minimum` and
+    `maximum`: the 15% reserve and the budget request at 80% (14.1), the reconciliation tolerance of
+    10% (14.4), the 20% cost-regression threshold (EFF-06) and three deploy-gate repeats (19.2).
+    What the PRD calls a default or leaves to config is bounded only by sign: the per-run and
+    per-user daily credit caps are required numbers above zero and never null, because PRD 14.1
+    and FR-MTR-04 require both from config; only the per-org daily cap is above zero or null for
+    none (BQ-42), its key still required. This keeps the PRD shape where issue #7 and SE's
+    stand-in allowed every cap to be null. Rules MT-03 and MT-05 follow SE's merged Treasury
+    (P8-01b): an actual cost above its reservation is recorded in full and halts the run, a day
+    cap counts a commit on its reservation's UTC day (BQ-44), and every reservation waits while
+    the kill switch is on. A grant never lifts a run above `caps.run_credits`, which PRD 17.3
+    calls a ceiling; the Treasury's `grant` does not check this yet (issue #7). Daily spend caps are above zero (MT-01 keeps hard at least soft), eval pass caps above zero (BQ-43), and case
+    counts for exactly the eight PRD 19.2 groups, whose rows sum to 160 although the heading says
+    170 (BQ-67). `meter.schema.json` is the HUD meter's state for one run: `last_seq` lets a client
+    drop a stale state, time saved may be negative and is never clamped, `steering_measured` says
+    whether any attention was measured, and `method_url` is an https URL with no user info, query
+    or fragment. `attention.schema.json` is one measured span of a person's steering or review
+    time, holding ids and times only; its `ref` is a card ULID, an artifact id or null (BQ-65).
+    `pilot.schema.json` follows `common`'s sampler convention (decision 3), since each pilot record
+    is written on its own: a pseudonymous `tester_id` (`t_` and 6 to 32 lower-case letters or
+    digits, never an email address or a name), consent to study `EV-G3` with `delete_after`,
+    run and card tags, diary entries and survey responses with bounded free text; a survey `quote`
+    is null unless `quote_consent` is true, and withdrawing consent deletes the tester's records
+    (BQ-66, PRD 2.4, 16.5). `budget.requested` data 1.1.0 adds `remaining_units` (plan unit id and
+    title, at most 200, in plan order) and `estimate` (a `credit_range`), both required, so the
+    budget card can show the remaining plan and a new estimate (FR-MTR-03). A new required field
+    counts as minor here because nothing emits `budget.requested` yet and the contract set is not
+    frozen until CP0; after the freeze it would be major. The eval case file shape stays in
+    `evals/case.schema.json`, because only the eval harness reads it and it crosses no service
+    boundary.
 
 ## Consequences
 - Builders import `tilo_contracts` or `@tilo/contracts` and never hand-write these shapes.

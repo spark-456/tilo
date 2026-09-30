@@ -73,8 +73,10 @@ def test_D_11_append_rejects_every_seq_except_last_plus_one(village_basic_layout
     bad_seq = k + bad_offset
     if bad_seq < 0:
         return  # seq has schema minimum 0 (event.schema.json); not a seq-ordering case
+    # A fresh id, so only the seq rule is under test: an identical resend of an already
+    # committed event (same id, same content) is an idempotent success since FR-HIL-07.
     with pytest.raises(EventRejected) as excinfo:
-        writer.append(_built(bad_seq))
+        writer.append({**_built(bad_seq), "id": sequential_ulid(1000 + bad_seq)})
     assert any(p.startswith("EV-10") for p in excinfo.value.problems), excinfo.value.problems
     assert [e["seq"] for e in store.read_events("org_demo", "w_village_basic")] == list(range(1, k + 1)), (
         "D-11: a rejected append must not disturb the already-written prefix"

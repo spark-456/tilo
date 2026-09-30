@@ -20,7 +20,21 @@
   "data": {
     "requested": 20,
     "spent": 32,
-    "cap": 40
+    "cap": 40,
+    "remaining_units": [
+      {
+        "unit_id": "U0012",
+        "title": "Draft supplier reply"
+      },
+      {
+        "unit_id": "U0013",
+        "title": "Chart Q3 spend"
+      }
+    ],
+    "estimate": {
+      "min": 55,
+      "max": 68
+    }
   },
   "trace": {
     "model_role": null,

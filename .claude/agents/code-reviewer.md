@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Reviews a ticket's diff for correctness, simplicity, PRD and contract match, dead code and naming. Returns a binary PASS or FAIL with the single biggest problem. Use on every ticket after the builder finishes.
+description: Reviews a ticket's diff for correctness, simplicity, PRD and contract match, dead code and naming. Returns a binary PASS or FAIL with every blocking problem in one round. Use on every ticket after the builder finishes.
 model: opus
 # Baseline effort: high. Budget mode is on (docs/progress.md), so medium until the user reverts it.
 effort: medium
@@ -19,4 +19,4 @@ Check, in order:
 5. Hard rules in the root CLAUDE.md (model ids, secrets, paid calls, outbox, honesty rules).
 6. Size: hand-written lines under 400.
 
-Use the reviewer reply format in the root CLAUDE.md. One problem only: the one that matters most.
+Use the reviewer reply format in the root CLAUDE.md. List every blocking problem at once, most serious first; non-blocking findings go under FOLLOW-UPS.
