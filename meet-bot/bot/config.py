@@ -94,6 +94,7 @@ class Config:
     stt: str
     reply_mode: str
     voice_nudges: bool
+    mic_policy: str
     live_models: list[str]
     live_voice: str
     live_api_version: str
@@ -137,6 +138,7 @@ class Config:
                 else "both"
             ),
             voice_nudges=e("VOICE_NUDGES", "0") == "1",
+            mic_policy=_choice("MIC_POLICY", "open", ("open", "conversation")),
             live_models=_names(e("LIVE_MODELS", "") or DEFAULT_LIVE_MODELS),
             live_voice=e("LIVE_VOICE", "").strip(),
             live_api_version=e("LIVE_API_VERSION", "v1beta").strip() or "v1beta",

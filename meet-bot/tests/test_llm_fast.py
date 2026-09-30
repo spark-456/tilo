@@ -189,6 +189,7 @@ def test_VA_01_thinking_comes_from_config_not_the_model_name():
 
 
 def test_VA_01_fast_model_and_thinking_are_configuration(monkeypatch):
+    monkeypatch.setattr("bot.config.load_dotenv", lambda path=None: None)  # a developer's own .env must not leak in
     for name in ("FAST_MODEL", "FAST_THINKING"):
         monkeypatch.delenv(name, raising=False)
     base = Config.from_env()

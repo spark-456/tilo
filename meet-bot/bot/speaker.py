@@ -46,14 +46,14 @@ class SpeakResult:
 
 
 class Speaker(Protocol):
-    async def say(self, text: str) -> SpeakResult: ...
+    async def say(self, text: str, on_first_sound: Callable[[], None] | None = None) -> SpeakResult: ...
     async def stop(self) -> None: ...
 
 
 class NullSpeaker:
     """Chat-only mode."""
 
-    async def say(self, text: str) -> SpeakResult:
+    async def say(self, text: str, on_first_sound: Callable[[], None] | None = None) -> SpeakResult:
         return SpeakResult(False, error="voice replies are off")
 
     async def stop(self) -> None:
@@ -77,11 +77,13 @@ class VoiceSpeaker:
         max_wait_s: float = 5.0,
         barge_in_s: float = 0.5,
         tail_s: float = 0.4,
+        mic_policy: str = "conversation",
         sleep: Callable[[float], Any] = asyncio.sleep,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.tts, self.player, self.mic, self.activity = tts, player, mic, activity
         self.pause_s, self.max_wait_s, self.barge_in_s, self.tail_s = pause_s, max_wait_s, barge_in_s, tail_s
+        self.mic_policy = mic_policy  # open: the session keeps the mic on; conversation: unmute per answer
         self._sleep, self._clock = sleep, clock
         self._lock = asyncio.Lock()  # one thing said at a time; the next reply waits its turn
         self._stop = False
@@ -103,14 +105,14 @@ class VoiceSpeaker:
     def _human_took_over(self) -> bool:
         return self._stop or (self.activity is not None and self.activity.loud_run_s() >= self.barge_in_s)
 
-    async def say(self, text: str) -> SpeakResult:
+    async def say(self, text: str, on_first_sound: Callable[[], None] | None = None) -> SpeakResult:
         t0 = self._clock()
         async with self._lock:
             self._stop = False
             waited = await self._wait_for_pause()
             if waited is None:
                 return SpeakResult(False, error="people kept talking, so I stayed quiet", total_s=self._clock() - t0)
-            unmute = asyncio.create_task(self.mic.set(True))
+            unmute = asyncio.create_task(self.mic.set(True)) if self.mic_policy != "open" else None
             first_audio = None
             try:
                 stream = self.tts.stream(text)
@@ -119,8 +121,10 @@ class VoiceSpeaker:
                 except StopAsyncIteration:
                     raise TTSError("the voice service returned no audio") from None
                 first_audio = self._clock() - t0
-                if not await unmute:
+                if unmute is not None and not await unmute:
                     raise TTSError("could not unmute the Meet microphone")
+                if on_first_sound:
+                    on_first_sound()
                 done = await self.player.play(_prepend(first, stream), self.tts.sample_rate, self._human_took_over)
                 return SpeakResult(
                     True, interrupted=not done, waited_s=waited, first_audio_s=first_audio, total_s=self._clock() - t0
@@ -135,10 +139,11 @@ class VoiceSpeaker:
                     False, error=f"{type(e).__name__}: {e}"[:160], waited_s=waited, total_s=self._clock() - t0
                 )
             finally:
-                if not unmute.done():
-                    unmute.cancel()
-                await self._sleep(self.tail_s)
-                try:
-                    await self.mic.set(False)
-                except Exception as e:
-                    log.warning("could not re-mute the microphone: %s", e)
+                if unmute is not None:
+                    if not unmute.done():
+                        unmute.cancel()
+                    await self._sleep(self.tail_s)
+                    try:
+                        await self.mic.set(False)
+                    except Exception as e:
+                        log.warning("could not re-mute the microphone: %s", e)
