@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from bot.brain import Agenda, Brain, LLMUnavailable
+from bot.brain import COULD_NOT_GET_LINE, Agenda, Brain, LLMUnavailable
 from bot.captions import Utterance
 from bot.config import Config
 from bot.llm_fast import Busy, FastLLM
@@ -243,5 +243,8 @@ def test_VA_01_direct_questions_use_the_fast_client_and_not_the_thread_client():
 
 
 @pytest.mark.parametrize("exc", [Busy("429"), LLMUnavailable("down")])
-def test_VA_01_a_busy_or_down_model_gives_no_reply_and_never_raises(exc):
-    assert run(_brain(StubFast(exc=exc)).aquick_reply(ASK, 30)) is None
+def test_VA_01_a_busy_or_down_model_never_raises_and_only_speaks_when_addressed(exc):
+    addressed = run(_brain(StubFast(exc=exc)).aquick_reply(ASK, 30))
+    assert addressed is not None and addressed.text == COULD_NOT_GET_LINE  # never silent for a question put to Tilo
+    chatter = [Utterance("Sam", "When does the beta ship for everyone?", 5)]
+    assert run(_brain(StubFast(exc=exc)).aquick_reply(chatter, 30)) is None

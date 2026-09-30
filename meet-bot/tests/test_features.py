@@ -1,4 +1,4 @@
-from bot.brain import Agenda, Brain, ChatPolicy, validate_output
+from bot.brain import NO_ANSWER_LINE, Agenda, Brain, ChatPolicy, validate_output
 from bot.captions import Utterance
 from bot.mock_llm import ScriptedLLM
 from bot.people import clean_name, gate_open, missing_required, name_match
@@ -181,7 +181,9 @@ def test_quick_reply_is_one_small_call_answered_once_and_never_retried_when_unsu
     b.commit_chat(msg, 30)
     assert not b.has_pending_question(said)  # answered
     b2 = Brain(AGENDA, ScriptedLLM(['{"reply": null}']), 30, bot_name="tilo")
-    assert b2.quick_reply(said, 30) is None and not b2.has_pending_question(said)  # tried once, no retry storm
+    unsure = b2.quick_reply(said, 30)  # addressed but unanswerable: the fallback line (VA-02), not silence
+    assert unsure and unsure.text == NO_ANSWER_LINE and not b2.has_pending_question(said)  # tried once, no retry storm
+    assert len(b2.llm.calls) == 1
 
 
 def test_question_mode_answers_questions_without_the_name_and_addressed_mode_does_not():
