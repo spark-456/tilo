@@ -129,6 +129,7 @@ class ScribeStream:
         silence_s: float = 0.6,
         idle_close_s: float = 20.0,
         connect: Callable[..., Any] | None = None,
+        on_event: Callable[..., None] | None = None,
     ) -> None:
         self.key = api_key or os.environ.get("ELEVENLABS_API_KEY", "")
         if not self.key:
@@ -138,6 +139,7 @@ class ScribeStream:
         self.keyterms = [k for k in (keyterms or []) if k][:MAX_KEYTERMS]
         self.idle_close_s = idle_close_s
         self._connect = connect
+        self._on_event = on_event  # (kind, **data): connect | error, for connections.jsonl
         self.total_sent_s = 0.0  # audio seconds sent over all connections: what you are billed for
         self.connections = 0
         self.fatal: str | None = None
@@ -147,6 +149,10 @@ class ScribeStream:
         self._map: list[tuple[float, float]] = [(0.0, 0.0)]  # (seconds into this connection's stream, session seconds)
         self._conn_sent_s = 0.0
         self._next_t = 0.0
+
+    def _event(self, kind: str, **data: Any) -> None:
+        if self._on_event:
+            self._on_event(kind, **data)
 
     def set_keyterms(self, keyterms: list[str]) -> None:
         """Takes effect at the next connection (the terms are part of the connection URL)."""
@@ -188,6 +194,7 @@ class ScribeStream:
             except Exception as e:  # dropped connection / rejected params: retry, then give up loudly
                 msg = str(e).replace(self.key, "[redacted]")
                 log.warning("streaming transcription connection problem: %s", msg[:200])
+                self._event("error", message=msg[:120], retry_in_s=backoff)
                 if use_terms and "keyterm" in msg.lower():
                     use_terms = False
                 await asyncio.sleep(backoff)
@@ -207,6 +214,7 @@ class ScribeStream:
             self._full_url(use_terms), additional_headers={"xi-api-key": self.key}, max_size=2**22
         ) as ws:
             log.info("streaming transcription connected (speech started)")
+            self._event("connect", n=self.connections)
             recv = asyncio.create_task(self._receive(ws))
             try:
                 ended = await self._send(ws, audio_q, first)

@@ -50,6 +50,9 @@ Start with `--record-audio` (or `RECORD_AUDIO=1`). The bot then says in chat tha
 - `playback.html`: open in a browser; click a transcript line to hear that moment. Rebuild with `python -m bot.main playback`.
 - `transcript_audio.md`: a second transcript made by Gemini from the audio (`python -m bot.main retranscribe`), to compare with Meet's captions in `transcript.jsonl`.
 - `latency.jsonl`: per question, time from caption visible to detected, model call, chat typing, total.
+- `turns.jsonl`: one row per question with every stage (heard, model first token, first sound, chat posted) timed from the end of the human turn. Read it with `python -m bot.main report [out/<time>]`: a per-turn waterfall and p50/p90 per stage.
+- `connections.jsonl`: model attempts (outcome, code, first-token time), prewarms and Scribe connections, so a slow answer can be explained.
+- `bot.wav` (voice replies on): what the bot actually sent into the meeting, recorded next to `audio.wav` (`audio_clock.json` holds both start times). `python -m bot.main audit [out/<time>]` measures end of question to first bot sound from the recordings, to about 10 ms, and compares it with the log.
 
 Tuning: `DIRECT_REPLY_GAP_SECONDS` (default 6), `MAX_DIRECT_REPLIES` (12), `BRAIN_INTERVAL_SECONDS` (20), `ANSWER_MODE` (`questions` or `addressed`). Free-tier Gemini keys hit 429 limits if these are pushed too hard.
 

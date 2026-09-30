@@ -454,6 +454,35 @@ def cmd_playback(args: argparse.Namespace) -> int:
     return 0 if page else 1
 
 
+def _latest_run(arg: str | None) -> Path | None:
+    out = ROOT / "out"
+    runs = sorted(p for p in out.glob("2*") if p.is_dir()) if out.is_dir() else []
+    run = Path(arg) if arg else (runs[-1] if runs else None)
+    return run if run is not None and run.is_dir() else None
+
+
+def cmd_report(args: argparse.Namespace) -> int:
+    from .report import render_report
+
+    run = _latest_run(args.run)
+    if run is None:
+        print("no run folder found (give the path of a folder under out/)")
+        return 1
+    print(render_report(run))
+    return 0
+
+
+def cmd_audit(args: argparse.Namespace) -> int:
+    from .report import audit, render_audit
+
+    run = _latest_run(args.run)
+    if run is None:
+        print("no run folder found (give the path of a folder under out/)")
+        return 1
+    print(render_audit(audit(run)))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="bot", description="Google Meet note-taking bot (prototype)")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -521,6 +550,10 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--models", help="comma-separated Live model ids (default: LIVE_MODELS from .env or config)")
     pb = sub.add_parser("playback", help="rebuild playback.html for a run (default: the latest)")
     pb.add_argument("run", nargs="?")
+    rp = sub.add_parser("report", help="per-turn latency waterfall and p50/p90 for a run (default: the latest)")
+    rp.add_argument("run", nargs="?")
+    au = sub.add_parser("audit", help="measure end of question -> first bot sound from the recordings (needs bot.wav)")
+    au.add_argument("run", nargs="?")
     sub.add_parser("_check-login")
     return p
 
@@ -535,6 +568,8 @@ def main(argv: list[str] | None = None) -> int:
         "list-models": cmd_list_models,
         "_check-login": cmd_check_login,
         "playback": cmd_playback,
+        "report": cmd_report,
+        "audit": cmd_audit,
         "retranscribe": cmd_retranscribe,
         "stt-probe": cmd_stt_probe,
         "live-probe": cmd_live_probe,
