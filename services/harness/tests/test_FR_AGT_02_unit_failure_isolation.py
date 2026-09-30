@@ -33,6 +33,11 @@ BAD_OUTCOMES = {
     "non_str_summary": UnitOutcome(success=True, summary=42),  # type: ignore[arg-type]
     "refs_not_a_sequence": UnitOutcome(success=True, artifact_refs=7),  # type: ignore[arg-type]
     "success_not_bool": UnitOutcome(success="yes"),  # type: ignore[arg-type]
+    # Envelope-schema valid, but the writer's EventValidator rejects the handoff event.
+    "too_many_artifact_refs": UnitOutcome(
+        success=True, artifact_refs=tuple({"artifact_id": f"art_{i}", "version": 1} for i in range(40_000))
+    ),
+    "lone_surrogate_summary": UnitOutcome(success=True, summary="a\ud800b"),
 }
 
 
@@ -107,6 +112,29 @@ def test_FR_AGT_02_runner_self_cancel_fails_unit_and_skips_dependents(tmp_path: 
     assert result.skipped == ["U2"]
     assert result.outcomes["U3"].success is True
     events = _events(store, "w_cancel")
+    assert "A_s0" in {e["target"] for e in events if e["type"] == "agent.retired"}
+
+
+def test_FR_AGT_02_runner_cancelling_current_task_fails_unit_and_skips_dependents(tmp_path: Path) -> None:
+    plan, layout, writer, store, config, skills = _setup(tmp_path, "w_cancel_self", deps={"U2": ["U1"]})
+
+    async def cancel_current_task() -> UnitOutcome:
+        task = asyncio.current_task()
+        assert task is not None
+        task.cancel()
+        await asyncio.sleep(0)
+        return UnitOutcome(success=True)
+
+    async def go() -> Any:
+        run = run_plan(plan, layout, writer=writer, config=config, skills=skills, runner=_Runner(cancel_current_task))
+        return await asyncio.wait_for(run, timeout=5)
+
+    result = asyncio.run(go())
+
+    assert result.failed == ["U1"]
+    assert result.skipped == ["U2"]
+    assert result.outcomes["U3"].success is True
+    events = _events(store, "w_cancel_self")
     assert "A_s0" in {e["target"] for e in events if e["type"] == "agent.retired"}
 
 

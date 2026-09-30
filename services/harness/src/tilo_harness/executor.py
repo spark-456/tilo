@@ -12,8 +12,9 @@ Per unit: agent.spawned (Lead spawns the worker), agent.assigned, skill.loaded p
 agent.working, the `UnitRunner`'s work, agent.handoff (typed envelope, worker to Lead) when it
 succeeded with a contract-valid envelope, agent.retired. A pinned skill whose files changed,
 a runner that raises (or cancels its own work) and an outcome that breaks the envelope contract
-each fail that unit only: it retires, its dependents are skipped, the other units go on. Only a
-cancel of `run_plan` itself or a writer error (WriterBusy, EventRejected) ends the run.
+each fail that unit only, as does a handoff the writer rejects: it retires, its dependents are
+skipped, the other units go on. Only a cancel of `run_plan` itself or any other writer error
+(WriterBusy, EventRejected) ends the run.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from tilo_providers.prompts import load_prompt
 
 from tilo_harness.config import AgentsConfig
 from tilo_harness.skills import LoadedSkill, Pins, SkillError, SkillRegistry
-from tilo_harness.validator import repo_validator
+from tilo_harness.validator import EventRejected, repo_validator
 
 _WORKER_RANKS = ("specialist", "verifier", "writer")  # ranks that execute units (PRD 8.1)
 _LEVELS = 3  # Director -> Lead -> worker
@@ -228,7 +229,8 @@ class _Run:
             )
             ran: object
             try:
-                ran = await self.runner.run(unit, UnitContext(worker, loaded))
+                # Its own task, so a runner that cancels the current task cancels only its work.
+                ran = await asyncio.ensure_future(self.runner.run(unit, UnitContext(worker, loaded)))
             except asyncio.CancelledError:
                 task = asyncio.current_task()
                 if task is not None and task.cancelling():  # the run itself was cancelled
@@ -243,7 +245,10 @@ class _Run:
             outcome = UnitOutcome(success=False, summary="The unit's result was not a valid handoff.")
         if envelope is not None:
             summary = "The agent handed its result to the Lead."
-            cause = self.emit("agent.handoff", worker, lead, summary, {"envelope": envelope}, cause=cause, **at)
+            try:
+                cause = self.emit("agent.handoff", worker, lead, summary, {"envelope": envelope}, cause=cause, **at)
+            except EventRejected:  # the writer refused the handoff and wrote nothing: this unit fails
+                outcome = UnitOutcome(success=False, summary="The unit's result was not a valid handoff.")
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         return outcome
 
