@@ -1,0 +1,8 @@
+# tilo-api's kill-switch dispatcher (FR-HIL-07, issue #46). part_write_deadline_s bounds a single
+# EventWriter.append attempt before tilo-api treats it as unresolved for this call and leaves the
+# part queued (Store.pending_events) while the attempt keeps running in the background --
+# EventWriter.append is idempotent by id (EV-10), so a late success or failure is always safe to
+# leave uncancelled. Read via tilo_api.deps.get_part_write_deadline_s, never a module constant, so
+# production and tests can both change it without a code change (ambiguity 22, API_ST3a.md).
+dispatch:
+  part_write_deadline_s: 0.5
