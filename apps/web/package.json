@@ -15,6 +15,7 @@
     "@fontsource/jetbrains-mono": "^5.1.1",
     "@fontsource/nunito": "^5.1.1",
     "@fontsource/nunito-sans": "^5.1.1",
+    "@tilo/contracts": "workspace:*",
     "pixi.js": "^8.6.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -26,6 +27,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "fast-check": "^4.10.2",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "vitest": "^3.2.7"

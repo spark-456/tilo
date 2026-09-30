@@ -43,8 +43,10 @@ export type WorldSeam = (world: Container, requestRender: () => void) => (() => 
 /** PRD 18.3 S-04 stage. The camera is the Pixi world container's transform (PRD 9.7); a frame
  * is drawn only on input, an eased keyboard move, resize or visibility change. Readiness: the
  * stage frame gains `data-stage-ready="true"` and `data-camera-x/-y/-zoom` with the first drawn
- * frame (right after Pixi's init), never before; input listeners are live from then on. */
-export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
+ * frame (right after Pixi's init), never before; input listeners are live from then on. `seq`
+ * (P0-08b-player, FR-WLD-04) is purely a display attribute for a world-content consumer's own
+ * highest applied seq; Stage itself never reads or produces it. */
+export function Stage({ onWorld, seq }: { onWorld?: WorldSeam; seq?: number }) {
   const frameRef = useRef<HTMLElement>(null);
   const [supported] = useState(() => !!document.createElement("canvas").getContext("webgl2"));
   const msRef = useRef(0);
@@ -64,6 +66,7 @@ export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
     let goal = cur; // where keyboard moves are heading
     let ease: { from: cam.CameraState; t0: number } | null = null;
     let raf = 0;
+    let gridKey = ""; // the view the grid was last built for: world-content frames skip rebuilding it
 
     const draw = () => {
       const { clientWidth: w, clientHeight: h } = target;
@@ -71,7 +74,11 @@ export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
       const { x, y, zoom: z } = cur;
       world.position.set(w / 2 + x, h / 2 + y);
       world.scale.set(z);
-      drawIsoGrid(grid, (-w / 2 - x) / z, (-h / 2 - y) / z, (w / 2 - x) / z, (h / 2 - y) / z);
+      const key = `${x},${y},${z},${w},${h}`;
+      if (key !== gridKey) {
+        gridKey = key;
+        drawIsoGrid(grid, (-w / 2 - x) / z, (-h / 2 - y) / z, (w / 2 - x) / z, (h / 2 - y) / z);
+      }
       app.render();
       target.dataset.cameraX = String(x);
       target.dataset.cameraY = String(y);
@@ -208,6 +215,7 @@ export function Stage({ onWorld }: { onWorld?: WorldSeam }) {
     <main
       className="stage-frame"
       data-testid="stage-frame"
+      {...(seq !== undefined ? { "data-seq": seq } : {})}
       aria-label="World stage"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard pan and zoom (PRD 9.7).
       tabIndex={0}
