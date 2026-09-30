@@ -1,5 +1,9 @@
 """Treasury (PRD 14.1, 14.5, FR-MTR-02, FR-MTR-04): reserve estimate+15% before a step, commit the
-actual after, append-only ledger. Commits count on their reservation's UTC day. Daily USD caps: P8-01c."""
+actual after, append-only ledger. Commits count on their reservation's UTC day.
+
+Daily USD spend caps (P8-01c, NFR-24): the soft cap raises one Alert per UTC day; the hard cap raises
+one Alert, freezes new reserves via the replay_only kill switch, and is also checked pre-emptively in
+reserve() so a single large reservation cannot itself push the day over the top."""
 
 import threading
 from dataclasses import dataclass
@@ -31,8 +35,19 @@ class Wait:
 
 
 @dataclass(frozen=True)
+class Alert:
+    """The first time a UTC day's committed spend reaches a spend threshold (PRD 14.1, NFR-24)."""
+
+    kind: str  # daily_spend_soft | daily_spend_hard
+    day: date
+    spent_usd: float
+    threshold_usd: float
+
+
+@dataclass(frozen=True)
 class CommitResult:
     overrun: bool
+    alerts: tuple[Alert, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -90,6 +105,7 @@ class Treasury:
         self._runs: dict[str, _Run] = {}
         self._active: dict[str, Reservation] = {}
         self._ledger: list[LedgerEntry] = []
+        self._alerted: dict[date, set[str]] = {}  # UTC day -> spend-alert kinds already raised
 
     def open_run(self, run_id: str, *, user_id: str, org_id: str, approved: float) -> RunBudget:
         approved = _amount(approved, "approved")
@@ -119,6 +135,12 @@ class Treasury:
             ):
                 if cap is not None and self._day_total(field, ident, day) + amount > cap + _EPS:
                     return Wait(reason)
+            hard = self._config.spend.daily_usd_hard
+            if (self._day_deployment_total(day) + amount) * self._prices.credit_usd > hard + _EPS:
+                self._flags.set(
+                    "replay_only", True, reason=f"a reservation would cross the ${hard} daily hard spend cap on {day}"
+                )
+                return Wait("daily_spend_hard")
             reservation = Reservation(uuid4().hex, run_id, step_id, amount, run.user_id, run.org_id, day)
             self._active[reservation.id] = reservation
             self._ledger.append(LedgerEntry("reserve", run_id, run.user_id, run.org_id, at, step_id, amount))
@@ -148,7 +170,8 @@ class Treasury:
             self._ledger.append(entry)
             overrun = actual > active.amount + _EPS
             self._runs[active.run_id].halted |= overrun
-        return CommitResult(overrun=overrun)
+            alerts = self._spend_alerts(active.day)
+        return CommitResult(overrun=overrun, alerts=alerts)
 
     def release(self, reservation: Reservation) -> None:
         with self._lock:
@@ -193,3 +216,25 @@ class Treasury:
         rows: list[tuple[LedgerEntry | Reservation, float]] = [(a, a.amount) for a in self._active.values()]
         rows += [(e, e.credits or 0.0) for e in self._ledger if e.kind == "commit"]
         return sum(n for r, n in rows if r.day == day and getattr(r, field) == value)
+
+    def _day_committed_total(self, day: date) -> float:
+        """Committed credits across every run, user and org on that UTC day."""
+        return sum(e.credits or 0.0 for e in self._ledger if e.kind == "commit" and e.day == day)
+
+    def _day_deployment_total(self, day: date) -> float:
+        """Committed plus outstanding credits across every run, user and org on that UTC day."""
+        return self._day_committed_total(day) + sum(a.amount for a in self._active.values() if a.day == day)
+
+    def _spend_alerts(self, day: date) -> tuple[Alert, ...]:
+        """The first time this UTC day's committed USD spend reaches soft, then hard; hard also flips
+        replay_only (NFR-24). Must be called with the lock held, after the commit entry is appended."""
+        spend, spent_usd = self._config.spend, self._day_committed_total(day) * self._prices.credit_usd
+        alerted, raised = self._alerted.setdefault(day, set()), []
+        for kind, threshold in (("daily_spend_soft", spend.daily_usd_soft), ("daily_spend_hard", spend.daily_usd_hard)):
+            if spent_usd >= threshold - _EPS and kind not in alerted:
+                alerted.add(kind)
+                raised.append(Alert(kind, day, spent_usd, threshold))
+                if kind == "daily_spend_hard":
+                    reason = f"daily committed spend ${spent_usd:.2f} reached the ${threshold} hard cap on {day}"
+                    self._flags.set("replay_only", True, reason=reason)
+        return tuple(raised)

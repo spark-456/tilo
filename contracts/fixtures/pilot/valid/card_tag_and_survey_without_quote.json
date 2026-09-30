@@ -1,0 +1,23 @@
+{
+  "tag": {
+    "tester_id": "t_ab123456xyz789",
+    "kind": "card",
+    "ref": "01J8Z3K4M5N6P7Q8R9S0T1V2W1"
+  },
+  "survey_response": {
+    "tester_id": "t_ab123456xyz789",
+    "submitted_at": "2026-10-12T09:00:00.000Z",
+    "trust": 5,
+    "reinvested_share": 0.5,
+    "reinvested_how": "Spent it on customer calls instead of drafting replies.",
+    "quote": null,
+    "quote_consent": false
+  },
+  "consent": {
+    "tester_id": "t_ab123456xyz789",
+    "study": "EV-G3",
+    "consented_at": "2026-10-10T09:00:00.000Z",
+    "keep_data": true,
+    "delete_after": "2026-11-11"
+  }
+}
