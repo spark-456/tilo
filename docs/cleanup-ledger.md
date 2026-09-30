@@ -210,11 +210,12 @@ Repo-hygiene pass before feature work resumes. Started 2026-09-30 after `git fet
 ## Final state
 
 ### Open PRs
-- #24 FR-AGT-04: parked (#70).
+- None. #24 was merged from the user's account at 19:26 UTC (d4ac3b5), after this cleanup. With the user's OK it was reverted on phase0-stack on 2026-10-01 (3d37770; the tree is identical to bc66670). The FR-AGT-04 redo stays in #70.
 
 ### Worktrees
 - The main checkout on `phase0-stack`. Its only untracked item is `meet-bot/`, which stays uncommitted until the PL-01 decision.
 - `.claude/worktrees/agent-aae1d4cd456e97655` on `feat/FR-HIL-07-kill-switches` @ 42d4789: clean, pushed, parked for the ST kill-switch redo.
+- `.claude/worktrees/meet-bot` on `chore/meet-bot-baseline`: the meet-bot build worktree (added 2026-10-01). meet-bot work branches from here and merges back here, not into phase0-stack, until an integration ticket moves its model calls into `packages/providers` and its model ids into `config/`.
 
 ### Local branches (32)
 "+N" = commits not in `origin/phase0-stack`. Every branch is on origin under its own name, or reachable from another origin ref.
@@ -256,5 +257,5 @@ Repo-hygiene pass before feature work resumes. Started 2026-09-30 after `git fet
 
 ### Needs the user
 - Delete the stray `meet-bot/C:` folder: the auto-mode classifier denied it. It is gitignored now.
-- Delete the leftover worktree directories, which hold no git state (locked `node_modules`/`.venv` residue): `agent-a02268635cfdc7d63`, `se-feat-P8-01b-treasury`, `se-feat-P8-01c-kill-switch`, `se-feat-P8-07-sandbox-web`, `agent-a3d4197de3c2bba0b`, `agent-a6ae34c1da332263e`, `agent-abb8b5e5e07239b59`, `lucid-kilby-06f5a8`, `sw-player`, `cleanup-cam`, `cleanup-p806b`, all under `.claude/worktrees/`, plus the `sw-*.log` files there.
-- meet-bot and PL-01: move its model ids into `config/` (a meet-bot code change) or write an ADR scoping `meet-bot/` out of PL-01 and root pytest. Then run `git revert 32af67b` on phase0-stack.
+- The leftover worktree directories were deleted on 2026-10-01, with the user's OK. Before deletion, every one of their 1,748 non-dependency files was matched to an existing git blob.
+- meet-bot and PL-01: decided on the default. meet-bot lives on its own branch line (`chore/meet-bot-baseline`, worktree `.claude/worktrees/meet-bot`). It lands in phase0-stack through an integration ticket (VA-INT: model ids to `config/`, calls through `packages/providers`), after which `git revert 32af67b` is replaced by that ticket's merge.
