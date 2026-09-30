@@ -1,0 +1,44 @@
+# Decisions
+
+One line of reasoning each. Newest at the bottom.
+
+- **Lives in `meet-bot/` inside the Tilo repo, standalone** (own `pyproject.toml`, no `uv` workspace membership): keeps it out of Tilo's `just check` gate and its provider/model-id rules, which this prototype deliberately does not follow yet.
+- **Host CLI is stdlib-only and re-runs itself inside Docker** (`TILO_IN_CONTAINER=1`): one command set on Windows/Mac/Linux, no host installs, no shell scripts.
+- **Entrypoint is Python, not a shell script**: a Windows checkout with CRLF endings would break a `.sh` file inside Linux.
+- **Named Docker volume for the browser profile, not a bind mount**: Chromium profiles on a Windows bind mount hit NTFS permission and SQLite locking problems; `profile/` is still in `.gitignore`.
+- **`login` runs plain Chromium, not Playwright-controlled**: Google is far more likely to refuse sign-in in an automated browser; the same profile is then reused by Playwright.
+- **noVNC bound to 127.0.0.1 only; VNC has no password**: the session shows a signed-in account, so it must not be reachable from the network.
+- **Container runs as non-root `pwuser`**: PulseAudio refuses to run as root; Chromium still uses `--no-sandbox` (standard in containers).
+- **Bind-mount the whole project to `/app`**: agenda, outputs and debug screenshots land on the host, and code edits need no rebuild.
+- **Meeting created via `meet.google.com/new`; `--api-create` is a stub that says it is not implemented**: the Meet REST API needs a Google Cloud project and OAuth consent that a human must set up; stretch goal skipped.
+- **Camera/mic off by clicking "Continue without microphone and camera" or "Turn off ..." buttons**: no media device is ever opened; no fake devices or permission flags.
+- **Captions parsed from raw HTML in Python, not in the page**: the parser is testable offline; the page only ships `outerHTML` (throttled 250 ms via MutationObserver, plus a 1 s re-attach timer).
+- **Parser finds speaker blocks by text shape (name line + speech lines), never class names**: Meet's class names are obfuscated and change.
+- **Caption fixtures are synthetic**: no live meeting was available; `SAVE_CAPTION_SNAPSHOTS=1` records real ones for the first live test.
+- **Utterance settles after 2.5 s unchanged or when its block leaves the screen; growth after settling emits only the new suffix**: avoids duplicate text when Meet keeps a block visible.
+- **Bot's own captions ignored by name ("You", `BOT_DISPLAY_NAME`, name read from the account label)**: its mic is off, so this is a safety net.
+- **Model access behind an `LLM` protocol in `brain.py`; the model gets the transcript as JSON data and is told it is untrusted**: swappable provider, and transcript text cannot instruct the bot.
+- **Chat policy is code, model wording is optional**: the model may suggest text, but code decides whether to speak, and uses the model's sentence only if it is one short sentence about the trigger; otherwise a template.
+- **Intro message does not count toward the 4-message cap or the 5-minute gap**: it is a disclosure, not a nudge.
+- **Fair share = sequential window laid out in agenda order** (items without minutes split the leftover time): "untouched after its fair share" fires when an item is still `not_started` after its window ends.
+- **Action-item nudge needs the item to look incomplete in two consecutive brain runs**: avoids nagging over a half-formed item.
+- **Trigger priority: time warning, then agenda gap, then missing owner/due; each subject nudged once**: the time warning is the most useful and needs no model.
+- **Time warning skipped when the planned meeting is 10 minutes or shorter**: it would fire at the start.
+- **Agenda statuses only move forward; decisions and action items are unioned across runs; owner/due are never erased**: a forgetful model reply cannot undo tracked state.
+- **Model outage never stops the meeting**: 429/5xx retry with backoff (2, 4, 8, 16 s), then the step is skipped, the interval doubles up to 4x, and the time warning still works.
+- **Default model chosen by listing models and taking the highest plain `gemini-N-flash`; fallback `gemini-2.5-flash`**: "current Flash" without hard-coding; unverified against a real key.
+- **Bot leaves when the meeting ends, when everyone else left for 60 s (only after someone else was seen), after 15 min if nobody ever joins, or at `MAX_MEETING_MINUTES`**: guards against a bot sitting alone forever.
+- **No study of the reference repos (recallai, attendee) beyond prior knowledge**: web access was not used; approach (persistent login, caption region observation) follows what those projects are known for.
+- **Host via /new lands straight in the call**: `join` checks for "in call" first and closes the "Your meeting's ready" card (found in the first live run).
+- **Bot starts (intro, clock, brain, chat) only when required people are present**: required names come from the agenda `Required:` line, `--require`, or `REQUIRED_PARTICIPANTS`; with none, any other participant opens the gate. The intro chat waits for the gate too.
+- **Auto-admit is opt-in (`--auto-admit`), optionally limited by `ADMIT_ALLOWED_NAMES`**: admitting strangers by default would be unsafe.
+- **Direct questions get their own fast path and budget (default 12 replies, 6 s apart), separate from the 4-message nudge cap**: nudges stay rare; answers must be timely.
+- **`ANSWER_MODE=questions` by default**: live captions garble the assistant's name ("Tilo" -> "Heart", "Tyler"), so any question is offered to the model, which replies only if the meeting info answers it.
+- **Audio recording is opt-in and disclosed in the intro chat line**: it is a recording of other people; it stays in `out/` and is sent only to Gemini if `retranscribe` is run.
+- **Live finding (2026-09-29): Meet's captions are the weakest link**; on the same recording Gemini transcribed far more accurately. A hybrid or audio-based live transcript is the recommended next step.
+- **Project knowledge is plain keyword retrieval over local files, URLs and chat text**: fast, offline, no extra API; URLs must be public http(s) (private/loopback refused) and everything is passed to the model as untrusted data.
+- **Typed chat is a first-class question route**: exact text, no speech errors; pasted non-question chat text becomes answerable context.
+- **Streaming STT via ElevenLabs Scribe is implemented behind `--stt elevenlabs`, untested against the real service until a key exists**: protocol taken from the vendor docs, tested against a fake server; `stt-probe` measures the real service before we rely on it. Realtime diarization and free-tier API access were not documented (only claimed in vendor chat), so speaker ids are used when present and caption speakers otherwise.
+- **The key is only ever read from the environment and sent as the `xi-api-key` header; errors are redacted**.
+- **Voice architecture v2 is in `docs/VOICE_ARCHITECTURE.md` (2026-09-30)**: our own end-of-turn and floor control in front of any voice. Gemini Live is the target voice if `live-probe` (X4) shows it is instant; the streaming cascade is the fallback. The user confirmed that the bot is part of the Builder Cup submission and that free-tier Gemini data use is fine.
+- **`live-probe` speaks the raw Live WebSocket protocol, not the google-genai SDK**: same pattern as the Scribe client, testable against a fake server, and independent of SDK version drift. The AI Studio key is sent only in the `x-goog-api-key` header and redacted; Live model ids live in `bot/config.py` (`LIVE_MODELS`).
