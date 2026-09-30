@@ -8,8 +8,6 @@ repos:
       - id: check-json
       - id: check-toml
       - id: end-of-file-fixer
-        # Recorded Meet caption DOM fixtures are data: keep their bytes as captured.
-        exclude: ^meet-bot/tests/fixtures/
       - id: trailing-whitespace
       - id: mixed-line-ending
         args: ["--fix=lf"]
