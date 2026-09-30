@@ -1,0 +1,10 @@
+{
+  "goal": "Build a client-facing slide deck summarising the pilot results.",
+  "deliverables": [{ "title": "Pilot Results Deck", "format": "pptx" }],
+  "audience": "Client",
+  "deadline": "2026-10-10",
+  "constraints": ["No internal financials"],
+  "sources": [{ "kind": "file", "ref": "art_pilot_notes" }],
+  "sensitivity": "personal",
+  "ambiguous_fields": ["deliverables", "audience"]
+}
