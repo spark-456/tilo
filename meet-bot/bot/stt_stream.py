@@ -29,6 +29,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from .config import STT_MODEL
+from .keyterms import MAX_KEYTERMS
 
 log = logging.getLogger("bot.stt")
 DEFAULT_URL = "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
@@ -133,7 +134,8 @@ class ScribeStream:
         if not self.key:
             raise STTUnavailable("ELEVENLABS_API_KEY is not set. Add it to .env to use --stt elevenlabs.")
         self.on_partial, self.on_final = on_partial, on_final
-        self.url, self.keyterms, self.silence_s = url, [k for k in (keyterms or []) if k][:10], silence_s
+        self.url, self.silence_s = url, silence_s
+        self.keyterms = [k for k in (keyterms or []) if k][:MAX_KEYTERMS]
         self.idle_close_s = idle_close_s
         self._connect = connect
         self.total_sent_s = 0.0  # audio seconds sent over all connections: what you are billed for
@@ -145,6 +147,10 @@ class ScribeStream:
         self._map: list[tuple[float, float]] = [(0.0, 0.0)]  # (seconds into this connection's stream, session seconds)
         self._conn_sent_s = 0.0
         self._next_t = 0.0
+
+    def set_keyterms(self, keyterms: list[str]) -> None:
+        """Takes effect at the next connection (the terms are part of the connection URL)."""
+        self.keyterms = [k for k in keyterms if k][:MAX_KEYTERMS]
 
     def _full_url(self, with_keyterms: bool) -> str:
         params: list[tuple[str, str]] = [

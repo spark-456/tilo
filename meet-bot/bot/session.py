@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from .audio_out import Player, setup_virtual_mic
-from .brain import Agenda, Brain, GeminiLLM, LLMUnavailable, _norm
+from .brain import Agenda, Brain, GeminiLLM, LLMUnavailable, _norm, chat_utterance
 from .browser import MeetBrowser
 from .captions import CaptionMerger, CaptionReader, TranscriptStore, Utterance
 from .chat import ChatPoster, intro_text
@@ -35,9 +35,10 @@ from .hybrid import (
     assign_speaker,
     to_wav,
 )
+from .keyterms import build_keyterms
 from .knowledge import KnowledgeBase
 from .llm_fast import FastLLM
-from .people import gate_open, missing_required, question_of
+from .people import gate_open, missing_required
 from .playback import write_playback
 from .speaker import NullSpeaker, VoiceSpeaker
 from .stt_stream import AudioGate, ScribeStream, SpeakerNames, STTUnavailable
@@ -218,9 +219,9 @@ class LiveSession:
             finalized_after_s=round(self.elapsed() - u.t, 1),
         )
         if self.brain:
-            q = question_of(u.text, self.brain.bot_name, self.brain.policy.answer_mode)
-            if q:
-                self.first_seen.setdefault(_norm(q), heard_at if heard_at is not None else self.clock.now())
+            q = self.brain.question_in(u)
+            if q and self.brain.is_fresh(q):
+                self.first_seen.setdefault(_norm(q.text), heard_at if heard_at is not None else self.clock.now())
                 self._prewarm()
 
     def record_caption(self, u: Utterance) -> None:
@@ -317,16 +318,20 @@ class LiveSession:
             self.stt_task = asyncio.create_task(self._stt_worker())
         elif self.stt_mode == "elevenlabs":
             try:
-                terms = [self.brain.bot_name if self.brain else "Tilo"] + (
-                    [i.title for i in self.brain.agenda.items if len(i.title) <= 40] if self.brain else []
-                )
-                self.scribe = ScribeStream(self._on_partial, self._on_final, keyterms=terms)
+                self.scribe = ScribeStream(self._on_partial, self._on_final, keyterms=self._keyterms())
             except STTUnavailable as e:
                 log.warning("%s Falling back to captions.", e)
                 self.recorder.stop()
                 self.recorder, self.stt_mode, self.hybrid = None, "captions", False
                 return
             self.stt_task = asyncio.create_task(self._run_scribe())
+
+    def _keyterms(self, present: list[str] | None = None) -> list[str]:
+        b = self.brain
+        names = list(dict.fromkeys(self.required + (present or [])))
+        return build_keyterms(
+            b.bot_name if b else "Tilo", names, [i.title for i in b.agenda.items] if b else [], self.kb
+        )
 
     # -- streaming speech-to-text (ElevenLabs Scribe) ---------------------------------------------------------------
     async def _run_scribe(self) -> None:
@@ -427,9 +432,7 @@ class LiveSession:
             log.info("chat from %s: %s", sender, text[:120])
             if not asked and len(text) >= 20:
                 self.kb.add_chat(sender, text)  # pasted notes/links become answerable context
-            body = text if text.rstrip().endswith("?") else text.rstrip() + "?"
-            u = Utterance(f"{sender} (chat)", body if asked else text, self.elapsed())
-            self.record(u, heard_at=self.clock.now())
+            self.record(chat_utterance(sender, text, self.elapsed()), heard_at=self.clock.now())
 
     # -- answering ---------------------------------------------------------------------------------------------------
     async def _post(self, text: str, kind: str) -> bool:
@@ -574,7 +577,12 @@ class LiveSession:
                 gate = self.gate_at
                 if self.stt_mode == "elevenlabs":  # live partial words, before the server commits a pause
                     opens = (
-                        [(Utterance("Speaker", self.partial[0], max(0.0, self.elapsed())), now - self.partial[1])]
+                        [
+                            (
+                                Utterance("Speaker", self.partial[0], max(0.0, self.partial[2] - self.start)),
+                                now - self.partial[1],
+                            )
+                        ]
                         if self.partial
                         else []
                     )
@@ -668,6 +676,8 @@ class LiveSession:
                     return
             if brain:
                 brain.present = present
+            if scribe := getattr(self, "scribe", None):
+                scribe.set_keyterms(self._keyterms(present))
 
             if self.gate_at is None:
                 if gate_open(self.required, present):

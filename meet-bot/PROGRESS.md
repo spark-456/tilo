@@ -49,7 +49,7 @@ Branches `feat/VA-<nn>-<slug>` are cut from `chore/meet-bot-baseline` and merged
 
 | Ticket | State |
 |---|---|
-| VA-01 fast-path model client | Code and 19 offline tests done (144 pass overall). Not yet measured live: the 12 s cold-call fix is unproven until a live run shows `model_attempt` rows and `model_s` in `latency.jsonl`. |
-| VA-02 question bookkeeping and chat | Next. |
+| VA-01 fast-path model client | Merged (PR 75). Not yet measured live: the 12 s cold-call fix is unproven until a live run shows `model_attempt` rows and `model_s` in `latency.jsonl`. |
+| VA-02 question bookkeeping and chat | Code and 16 offline tests done (160 pass overall). Two older assertions were updated because the ticket changes the behaviour they pinned (an addressed question with no answer now gets a fallback line instead of silence). Live check pending. |
 | VA-03 voice never waits for the UI | Queued. |
 | VA-04 turn trace, report, two-channel audio | Queued. |
