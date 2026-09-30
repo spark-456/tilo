@@ -52,8 +52,12 @@ def test_D_11_two_concurrent_cli_runs_on_the_same_world_never_corrupt_the_stream
     # live lease on the same world (the qa-breaker repro's exact bug).
     proc_a = subprocess.Popen(args, cwd=repo_root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     proc_b = subprocess.Popen(args, cwd=repo_root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    out_a, err_a = proc_a.communicate(timeout=60)
-    out_b, err_b = proc_b.communicate(timeout=60)
+    # Generous timeouts (P0-09 follow-up, FR-AGT-01/02/03 ticket brief item 6c): under
+    # contention a loser retries the Firestore transaction before giving up as WriterBusy, which
+    # can take longer than 60s on a loaded CI runner; the test only cares that exactly one run
+    # wins and the stream stays uncorrupted, not how fast the loser gives up.
+    out_a, err_a = proc_a.communicate(timeout=180)
+    out_b, err_b = proc_b.communicate(timeout=180)
 
     assert (proc_a.returncode == 0) != (proc_b.returncode == 0), (
         f"D-11: exactly one of the two concurrent runs must succeed, got returncodes "

@@ -11,30 +11,30 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 - `just check` — full gate from the repo root
 
 ## Contracts
-- Reads (read-only): `contracts/event*.{schema.json,rules.md}`, `contracts/common.schema.json`,
-  `contracts/events/{registry.yaml,data/*.schema.json}`, `contracts/layout.schema.json`,
-  `contracts/plan.schema.json`, `contracts/envelope.schema.json`. `EventValidator` is a fresh
-  implementation of EV-01..EV-14 (never imports `scripts/`), checked against every fixture.
+- Reads (read-only): `contracts/event*`, `common`, `events/{registry.yaml,data/*}`, `layout`, `plan`,
+  `envelope`, `skill`, `agents` schemas. `EventValidator` is a fresh EV-01..EV-14 implementation
+  (never imports `scripts/`); `contract_problems(name, x)` checks any other contract.
 - Writes: Firestore (worlds, events, views, checkpoints); Pub/Sub to BigQuery (later ticket).
-- Own fixtures: `fixtures/three_agent/{layout,plan}.json`, validated against `plan.schema.json`
-  and `layout.schema.json`.
+- Own fixtures: `fixtures/three_agent/`; test skill folders in `tests/fixtures/skills*/`.
 
 ## Config
-- `config/models.yaml`, `config/skills/`, `config/teams/`, `config/autonomy.yaml`.
+- `config/agents.yaml` via `config.load_agents_config()` (invalid or missing: `AgentsConfigError`,
+  start-up stops). Skills from `skills/<domain>/<id>/` via `skills.SkillRegistry`.
 
 ## Requirement IDs
-- FR-P1..FR-P4 as pillars land. P0-09 (FR-AGT-01 partial, D-11, PRD 15.3): harness skeleton.
+- P0-09 (D-11): skeleton, writer, store. FR-AGT-01/02/03: `executor.run_plan` (PG-02/03/11
+  pre-flight writes nothing; `max_specialists` semaphore; deps before start), skill pins.
 
 ## Local rules
 - Never calls a model directly — always through `packages/providers`, by role (PL-01); the
-  P0-09 fixture plan makes zero model calls (deterministic ADK `BaseAgent`s, no `LlmAgent`).
-  Risk tiers come from action type and context; a model never decides authorisation.
+  default `UnitRunner` gets providers keyed by role name. Prompts live in `prompts/<role>/`.
 - `WorldWriter` is the only writer per world: every event is checked against `EventValidator`
   first; a rejected event writes nothing. A lease on `orgs/{org}/worlds/{world}/_head/state`
-  enforces one writer, re-checked inside the same store transaction on every write. An identical resend of a committed event to `append` returns it and writes nothing (FR-HIL-07); any other id reuse is EV-10.
+  enforces one writer, re-checked inside the same store transaction on every write; Firestore
+  contention (ABORTED) surfaces as `WriterBusy`. An identical resend to `append` returns the committed event and writes nothing (FR-HIL-07); any other id reuse is EV-10.
+- A run loads skills only from its pins; a changed skill file fails that unit closed.
 - `FirestoreStore` refuses to start without `FIRESTORE_EMULATOR_HOST` and a `demo-` project id (ADR-0003: emulator only, no cloud credentials, never a real project).
-- `@pytest.mark.emulator` tests are excluded from `just check`'s default run; they run as their
-  own CI step and via `uv run pytest services/harness/tests -m emulator`.
+- `@pytest.mark.emulator` tests are excluded from `just check`'s default run (own CI step; `-m emulator`).
 - No scenario-specific code; a scenario that needs code becomes a pillar requirement first.
-- `_head/state` under a world is not a PRD 15.3 client path (`events`/`views/{scope}`/`cards`/
-  `checkpoints` are); once a rules file exists (none yet), `_head/**` must deny every client, or a reading Owner/Team Lead sees every scope's view_seq, a hidden district's count included (PRD 10.1/SEC-07).
+- `_head/**` must deny every client once a rules file exists: it holds every scope's view_seq
+  (PRD 10.1/SEC-07). Risk tiers come from action type; a model never decides authorisation.

@@ -22,6 +22,6 @@
 - [Skill checker probes](skill-checker-probes.md) — FR-AGT-04 check.py: mutate example outputs; refs checked for existence, not value/row match
 - [Writer swap retry probe](writer-swap-retry-probe.md) — identity-gated retry triple-writes; content dedupe drops same-ms parts; 0.3s deadline treats slow as hung
 - [Web e2e env noise](web-e2e-env-noise.md) — adblock360 injector console errors, timing project skipped on chromium fail, axe timeouts under load
-- [Executor runner-output probe](executor-runner-output-probe.md) — bad UnitOutcome aborts run, strands siblings "working"; failures retire as "finished"
+- [Executor runner-output probe](executor-runner-output-probe.md) — schema-valid but writer-invalid outcome aborts run; current_task().cancel() hangs dependents
 - [Split PR leftovers](split-pr-leftovers.md) — split branches keep sibling scaffolding justified by same-diff code; repo-wide config excludes
 - [Eval check vacuous pass](eval-check-vacuous-pass.md) — args looked up by name (dup entries), missing field None==None passes; probe these
