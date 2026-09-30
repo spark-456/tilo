@@ -80,13 +80,17 @@ No new licence.
 `tilo-providers` (not external); `tilo-api` now depends on the in-workspace `tilo-planning`.
 No new licence.
 
-## JavaScript / TypeScript (root `package.json` devDependencies, `pnpm`-managed)
+## JavaScript / TypeScript (root `package.json` and `apps/web`, `pnpm`-managed)
 
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | @biomejs/biome | MIT | https://www.npmjs.com/package/@biomejs/biome |
 | firebase-tools (runs the Firestore emulator for `services/harness`, P0-09) | MIT | https://www.npmjs.com/package/firebase-tools |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
+| react, react-dom, pixi.js, vite, @vitejs/plugin-react, vitest, @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/ |
+| @playwright/test | Apache-2.0 | https://www.npmjs.com/package/@playwright/test |
+| @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
+| @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT; fonts Nunito, Nunito Sans, JetBrains Mono are OFL-1.1 | https://fonts.google.com/ |
 
 ## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)
 

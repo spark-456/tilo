@@ -31,10 +31,12 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 - `WorldWriter` is the only writer per world: every event is checked against `EventValidator`
   first; a rejected event writes nothing. A lease on `orgs/{org}/worlds/{world}/_head/state`
   enforces one writer, re-checked inside the same store transaction on every write; Firestore
-  contention (ABORTED) surfaces as `WriterBusy`.
+  contention (ABORTED) surfaces as `WriterBusy`. An identical resend of a committed event to
+  `append` returns it and writes nothing (FR-HIL-07); any other id reuse is EV-10.
 - A run loads skills only from its pins; a changed skill file fails that unit closed.
-- `FirestoreStore` refuses to start without `FIRESTORE_EMULATOR_HOST` and a `demo-` project id.
-- `@pytest.mark.emulator` tests are excluded from `just check`'s default run (own CI step).
+- `FirestoreStore` refuses to start without `FIRESTORE_EMULATOR_HOST` and a `demo-` project id (ADR-0003: emulator only, no cloud credentials, never a real project).
+- `@pytest.mark.emulator` tests are excluded from `just check`'s default run; they run as their
+  own CI step and via `uv run pytest services/harness/tests -m emulator`.
 - No scenario-specific code; a scenario that needs code becomes a pillar requirement first.
 - `_head/**` must deny every client once a rules file exists: it holds every scope's view_seq
   (PRD 10.1/SEC-07). Risk tiers come from action type; a model never decides authorisation.

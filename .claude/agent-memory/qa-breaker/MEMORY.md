@@ -7,6 +7,7 @@
 - [API kill-switch attack patterns](api-kill-switch-attack-patterns.md) — raising/slow EventWriter breaks stop-all; str districts substring leak
 - [Metering loader attack patterns](metering-loader-attack-patterns.md) — generated models drop const/if-then; YAML parse and missing-file errors escape
 - [Cards store attack patterns](cards-store-attack-patterns.md) — same-id resubmit reopens approved gate; actor->authz invalid; Feb 31 / huge timeout crash
+- [Fixture player attack patterns](fixture-player-attack-patterns.md) — bad ?fixture= logs console.error; seq-order fixed r5; camera e2e flakes
 - [Archive redaction attacks](archive-redaction-attacks.md) — FR-MEM-04 quadratic JWT regex, log arg leaks, CLI crash on partial line
 - [Harness writer lease attacks](harness-writer-lease-attacks.md) — P0-09 same writer_id double lease overwrites Firestore events
 - [Treasury attack patterns](treasury-attack-patterns.md) — non-UTC `at` bypasses day caps; size overrun; probe tz near midnight
