@@ -28,6 +28,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
 
+from .config import STT_MODEL
+
 log = logging.getLogger("bot.stt")
 DEFAULT_URL = "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
 FATAL = {"auth_error", "quota_exceeded", "unaccepted_terms"}
@@ -146,7 +148,7 @@ class ScribeStream:
 
     def _full_url(self, with_keyterms: bool) -> str:
         params: list[tuple[str, str]] = [
-            ("model_id", "scribe_v2_realtime"),
+            ("model_id", STT_MODEL),
             ("audio_format", "pcm_16000"),
             ("commit_strategy", "vad"),
             ("vad_silence_threshold_secs", str(self.silence_s)),

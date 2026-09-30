@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from collections import Counter
 from datetime import datetime
@@ -35,6 +36,7 @@ from .hybrid import (
     to_wav,
 )
 from .knowledge import KnowledgeBase
+from .llm_fast import FastLLM
 from .people import gate_open, missing_required, question_of
 from .playback import write_playback
 from .speaker import NullSpeaker, VoiceSpeaker
@@ -135,6 +137,9 @@ class LiveSession:
         self.timeline = Timeline(self.out_dir / "latency.jsonl")
         self.kb = build_knowledge(cfg, context)
         self.brain = build_brain(cfg, agenda_path, duration, self.kb)
+        self.fast = self._build_fast()
+        if self.brain:
+            self.brain.fast = self.fast
         self.required = list(
             dict.fromkeys((require or []) + cfg.required + (self.brain.agenda.required if self.brain else []))
         )
@@ -171,6 +176,25 @@ class LiveSession:
         self.speaker: Any = NullSpeaker()
         self.activity: VoiceActivity | None = None
 
+    def _build_fast(self) -> FastLLM | None:
+        """One long-lived async client for direct answers; every attempt lands in latency.jsonl."""
+        if not os.environ.get("GEMINI_API_KEY"):
+            return None
+        return FastLLM(
+            self.cfg.fast_model,
+            self.cfg.fast_thinking,
+            on_attempt=lambda row: self.timeline.record("model_attempt", **row),
+        )
+
+    def _prewarm(self) -> None:
+        """Open the model connection because a question is likely (rate limited inside FastLLM)."""
+        if self.fast is None:
+            return
+        try:
+            asyncio.get_running_loop().create_task(self.fast.prewarm())
+        except RuntimeError:  # no running loop (offline tools): nothing to warm
+            pass
+
     # -- time ------------------------------------------------------------------------------------------------------
     def elapsed(self) -> float:  # seconds since joining (also the audio clock)
         return self.clock.now() - self.start
@@ -197,6 +221,7 @@ class LiveSession:
             q = question_of(u.text, self.brain.bot_name, self.brain.policy.answer_mode)
             if q:
                 self.first_seen.setdefault(_norm(q), heard_at if heard_at is not None else self.clock.now())
+                self._prewarm()
 
     def record_caption(self, u: Utterance) -> None:
         u.t = round(u.t, 1)
@@ -240,9 +265,7 @@ class LiveSession:
                     auto_admit=self.auto_admit,
                 )
                 self.chat = ChatPoster(br)
-                if self.brain:
-                    asyncio.create_task(asyncio.to_thread(self.brain.warm_up))
-                    self.warm_task = asyncio.create_task(self._keep_warm())
+                self._prewarm()
                 if not await br.enable_captions():
                     log.error("captions could not be enabled: no speaker names, and no transcript without audio")
                 snap = self.cfg.debug_dir / "caption_snapshots" if self.cfg.save_caption_snapshots else None
@@ -417,20 +440,6 @@ class LiveSession:
             await self.br.shot(f"chat_{kind}")
         return ok
 
-    async def _keep_warm(self) -> None:
-        """Ping the model every few seconds while people are in the meeting so replies never hit a cold connection
-        (a call after ~30 s of quiet otherwise takes ~12 s instead of ~1 s)."""
-        every = self.cfg.keep_warm_s
-        if every <= 0:
-            return
-        while True:
-            await asyncio.sleep(every)
-            if self.stream_enabled or self.gate_at is None:
-                try:
-                    await asyncio.wait_for(asyncio.to_thread(self.brain.warm_up), timeout=20)
-                except Exception:
-                    pass
-
     def _setup_voice(self) -> None:
         """Voice replies need a TTS provider and a virtual microphone; without them the bot stays chat-only."""
         if self.reply_mode == "chat":
@@ -496,7 +505,7 @@ class LiveSession:
 
     async def _timed_quick(self, recent: list[Utterance], meta: dict[str, Any]):
         t = time.monotonic()
-        msg = await asyncio.to_thread(self.brain.quick_reply, recent, self.brain_elapsed())
+        msg = await self.brain.aquick_reply(recent, self.brain_elapsed())
         return msg, time.monotonic() - t, meta
 
     async def _finish_quick(self, task: asyncio.Task) -> None:
@@ -685,9 +694,6 @@ class LiveSession:
 
     # -- shutdown ---------------------------------------------------------------------------------------------------
     async def _shutdown(self) -> None:
-        warm = getattr(self, "warm_task", None)
-        if warm:
-            warm.cancel()
         try:
             if self.recorder:
                 self.recorder.stop()  # flushes the last speech segment
