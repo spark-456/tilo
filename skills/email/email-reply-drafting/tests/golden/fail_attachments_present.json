@@ -1,0 +1,26 @@
+{
+  "input": {
+    "instruction": "Confirm Thursday 4pm works.",
+    "thread": {
+      "subject": "Meeting this week?",
+      "messages": [
+        {
+          "from": "riya@example.com",
+          "to": ["assistant@example.com"],
+          "body": "Does Thursday 3pm work for you?",
+          "safety_flags": []
+        }
+      ]
+    },
+    "reply_to_sender": "riya@example.com"
+  },
+  "output": {
+    "to": ["riya@example.com"],
+    "cc": [],
+    "subject": "Re: Meeting this week?",
+    "body": "Thursday 4pm works, see attached agenda.",
+    "attachments": [{ "name": "agenda.pdf" }],
+    "injection_flagged": false
+  },
+  "expect": { "fail": "attachments-present" }
+}

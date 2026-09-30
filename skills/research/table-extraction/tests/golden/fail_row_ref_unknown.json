@@ -1,0 +1,13 @@
+{
+  "input": {
+    "table": {
+      "rows": [{ "row_ref": "r1", "cells": { "name": "Acme Corp" } }]
+    }
+  },
+  "output": {
+    "records": [
+      { "row_ref": "r-unknown", "fields": { "name": { "cell": "name", "value": "Acme Corp" } } }
+    ]
+  },
+  "expect": { "fail": "row-ref-invalid" }
+}

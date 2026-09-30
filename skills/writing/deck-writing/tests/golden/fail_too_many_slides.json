@@ -1,0 +1,23 @@
+{
+  "input": {
+    "material": [{ "source_id": "src-1", "text": "The team shipped the new onboarding flow." }],
+    "max_slides": 1
+  },
+  "output": {
+    "slides": [
+      {
+        "title": "Overview",
+        "bullets": [{ "text": "Shipped the new onboarding flow", "source_id": "src-1" }],
+        "source_refs": ["src-1"],
+        "charts": []
+      },
+      {
+        "title": "Next steps",
+        "bullets": [{ "text": "Plan the next iteration", "source_id": "src-1" }],
+        "source_refs": ["src-1"],
+        "charts": []
+      }
+    ]
+  },
+  "expect": { "fail": "slide-count-exceeded" }
+}

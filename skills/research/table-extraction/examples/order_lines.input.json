@@ -1,0 +1,14 @@
+{
+  "table": {
+    "rows": [
+      {
+        "row_ref": "r1",
+        "cells": { "name": "  Acme Corp  ", "segment": "Retail", "amount": "1500" }
+      },
+      {
+        "row_ref": "r2",
+        "cells": { "name": "Globex", "segment": "Manufacturing", "amount": "2300" }
+      }
+    ]
+  }
+}

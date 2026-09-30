@@ -1,0 +1,18 @@
+{
+  "input": {
+    "messages": [
+      {
+        "id": "m1",
+        "from": "news@example.com",
+        "subject": "Weekly digest",
+        "body": "Check out this week's top stories.",
+        "safety_flags": []
+      }
+    ],
+    "vip_senders": []
+  },
+  "output": {
+    "triage": [{ "message_id": "m1", "category": "newsletter_promotion", "priority": 10 }]
+  },
+  "expect": "pass"
+}

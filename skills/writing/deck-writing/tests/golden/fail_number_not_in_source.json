@@ -1,0 +1,17 @@
+{
+  "input": {
+    "material": [{ "source_id": "src-1", "text": "Revenue reached 1500 units in Q3." }],
+    "max_slides": 3
+  },
+  "output": {
+    "slides": [
+      {
+        "title": "Q3 growth",
+        "bullets": [{ "text": "Revenue reached 50 units", "source_id": "src-1" }],
+        "source_refs": ["src-1"],
+        "charts": []
+      }
+    ]
+  },
+  "expect": { "fail": "number-not-in-material" }
+}

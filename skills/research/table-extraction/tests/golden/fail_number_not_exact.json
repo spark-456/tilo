@@ -1,0 +1,11 @@
+{
+  "input": {
+    "table": {
+      "rows": [{ "row_ref": "r1", "cells": { "amount": "1500" } }]
+    }
+  },
+  "output": {
+    "records": [{ "row_ref": "r1", "fields": { "amount": { "cell": "amount", "value": 1499 } } }]
+  },
+  "expect": { "fail": "number-value-mismatch" }
+}

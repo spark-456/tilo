@@ -1,0 +1,20 @@
+{
+  "records": [
+    {
+      "row_ref": "r1",
+      "fields": {
+        "name": { "cell": "name", "value": "Acme Corp" },
+        "segment": { "cell": "segment", "value": "Retail" },
+        "amount": { "cell": "amount", "value": 1500 }
+      }
+    },
+    {
+      "row_ref": "r2",
+      "fields": {
+        "name": { "cell": "name", "value": "Globex" },
+        "segment": { "cell": "segment", "value": "Manufacturing" },
+        "amount": { "cell": "amount", "value": 2300 }
+      }
+    }
+  ]
+}

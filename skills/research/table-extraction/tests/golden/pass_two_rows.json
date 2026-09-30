@@ -1,0 +1,29 @@
+{
+  "input": {
+    "table": {
+      "rows": [
+        { "row_ref": "r1", "cells": { "name": "Acme Corp", "amount": "1500" } },
+        { "row_ref": "r2", "cells": { "name": "Globex", "amount": "2300" } }
+      ]
+    }
+  },
+  "output": {
+    "records": [
+      {
+        "row_ref": "r1",
+        "fields": {
+          "name": { "cell": "name", "value": "Acme Corp" },
+          "amount": { "cell": "amount", "value": 1500 }
+        }
+      },
+      {
+        "row_ref": "r2",
+        "fields": {
+          "name": { "cell": "name", "value": "Globex" },
+          "amount": { "cell": "amount", "value": 2300 }
+        }
+      }
+    ]
+  },
+  "expect": "pass"
+}

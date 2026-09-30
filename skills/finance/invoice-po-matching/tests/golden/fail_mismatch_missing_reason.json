@@ -1,0 +1,18 @@
+{
+  "input": {
+    "invoice_lines": [{ "line_id": "inv-1", "amount": 110.0, "description": "Widgets" }],
+    "po_lines": [{ "line_id": "po-1", "amount": 100.0, "description": "Widgets" }]
+  },
+  "output": {
+    "matches": [
+      {
+        "invoice_line_id": "inv-1",
+        "po_line_id": "po-1",
+        "status": "mismatched",
+        "reason_code": null
+      }
+    ],
+    "totals": { "invoice_total": 110.0, "po_total": 100.0 }
+  },
+  "expect": { "fail": "reason-code-invalid" }
+}

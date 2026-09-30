@@ -1,0 +1,7 @@
+{
+  "matches": [
+    { "invoice_line_id": "inv-1", "po_line_id": "po-1", "status": "matched", "reason_code": null },
+    { "invoice_line_id": "inv-2", "po_line_id": "po-2", "status": "matched", "reason_code": null }
+  ],
+  "totals": { "invoice_total": 150.0, "po_total": 150.0 }
+}

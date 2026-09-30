@@ -1,0 +1,132 @@
+id: quote-comparison
+version: 0.1.0
+domain: commerce
+author: Tilo build (drafted by Claude Code)
+reviewer: Pending domain expert review
+tools_allowed:
+  - read_file
+  - web_search
+inputs:
+  type: object
+  additionalProperties: false
+  required:
+    - requirements
+    - quotes
+  properties:
+    requirements:
+      type: array
+      minItems: 1
+      maxItems: 20
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - requirement_id
+          - must_have
+        properties:
+          requirement_id:
+            type: string
+            maxLength: 64
+          text:
+            type: string
+            maxLength: 500
+          must_have:
+            type: boolean
+    quotes:
+      type: array
+      minItems: 1
+      maxItems: 20
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - quote_id
+          - source_id
+          - line_items
+        properties:
+          quote_id:
+            type: string
+            maxLength: 64
+          source_id:
+            type: string
+            maxLength: 64
+          line_items:
+            type: array
+            maxItems: 50
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - description
+                - quantity
+                - unit_price
+              properties:
+                description:
+                  type: string
+                  maxLength: 500
+                quantity:
+                  type: number
+                unit_price:
+                  type: number
+          total:
+            description: An already-known total, used instead of recomputing from line_items when present.
+            type: number
+outputs:
+  type: object
+  additionalProperties: false
+  required:
+    - coverage
+    - totals
+    - recommendation
+  properties:
+    coverage:
+      type: array
+      maxItems: 400
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - quote_id
+          - requirement_id
+          - status
+        properties:
+          quote_id:
+            type: string
+            maxLength: 64
+          requirement_id:
+            type: string
+            maxLength: 64
+          status:
+            type: string
+            enum:
+              - met
+              - partial
+              - missing
+    totals:
+      type: array
+      minItems: 1
+      maxItems: 20
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - quote_id
+          - total
+        properties:
+          quote_id:
+            type: string
+            maxLength: 64
+          total:
+            type: number
+    recommendation:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - quote_id
+          properties:
+            quote_id:
+              type: string
+              maxLength: 64
+        - type: "null"
+description: Compare supplier quotes against requirements with a coverage matrix and recomputed totals; recommend only if a quote covers every must-have.

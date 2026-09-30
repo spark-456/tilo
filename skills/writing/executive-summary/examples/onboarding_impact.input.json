@@ -1,0 +1,10 @@
+{
+  "question": "Did revenue grow?",
+  "material": [
+    {
+      "source_id": "src-1",
+      "text": "Net income rose to 1500 thousand dollars in Q3, up from 1200 thousand in Q2."
+    }
+  ],
+  "max_words": 40
+}

@@ -1,0 +1,19 @@
+{
+  "input": {
+    "table": {
+      "rows": [{ "row_ref": "r1", "cells": { "name": "  Acme Corp  ", "segment": "Retail" } }]
+    }
+  },
+  "output": {
+    "records": [
+      {
+        "row_ref": "r1",
+        "fields": {
+          "name": { "cell": "name", "value": "Acme Corp" },
+          "segment": { "cell": "segment", "value": "Retail" }
+        }
+      }
+    ]
+  },
+  "expect": "pass"
+}
