@@ -183,6 +183,7 @@ class LiveSession:
         self._out_task: asyncio.Task | None = None
         self.next_status_at: float | None = None
         self.next_brain_at = 0.0
+        self.last_question_at = -1e9  # when a question was last put to the assistant
         self.conns = Timeline(self.out_dir / "connections.jsonl")  # model attempts, prewarms, Scribe connections
         self.trace = TurnTrace(self.out_dir / "turns.jsonl", self.clock, self.start)
         self.bot_tap: WavTap | None = None
@@ -196,6 +197,7 @@ class LiveSession:
         return FastLLM(
             self.cfg.fast_model,
             self.cfg.fast_thinking,
+            first_token_s=self.cfg.fast_first_token_s,
             fallback_model=self.cfg.gemini_model or DEFAULT_MODEL,
             on_attempt=lambda row: self.conns.record("prewarm" if row["outcome"] == "prewarm" else "attempt", **row),
         )
@@ -208,6 +210,12 @@ class LiveSession:
             asyncio.get_running_loop().create_task(self.fast.prewarm())
         except RuntimeError:  # no running loop (offline tools): nothing to warm
             pass
+
+    @staticmethod
+    def analysis_allowed(now: float, quick_running: bool, last_question_at: float) -> bool:
+        """The meeting-notes loop shares one small, throttled quota with the answers: it stays quiet while a question is
+        being answered and for 30 s after the last one, so a conversation is not starved by the notes."""
+        return not quick_running and now - last_question_at > 30.0
 
     @staticmethod
     def idle_needed(text: str, base: float) -> float:
@@ -729,6 +737,7 @@ class LiveSession:
                                 "first_seen": self.first_seen.get(_norm(q[1]), now),
                             }
                             meta["turn"] = self._new_turn(q, meta)
+                            self.last_question_at = now
                             quick_task = asyncio.create_task(self._timed_quick(ready, meta))
 
                 # --- periodic analysis ---------------------------------------------------------------------------
@@ -756,7 +765,13 @@ class LiveSession:
                                 )
                         brain.write_outputs(self.out_dir, self.brain_elapsed())
                         self.events.emit("agenda.update", state=brain.state.to_dict())
-                if brain and self.gate_at is not None and brain_task is None and now >= self.next_brain_at:
+                if (
+                    brain
+                    and self.gate_at is not None
+                    and brain_task is None
+                    and now >= self.next_brain_at
+                    and self.analysis_allowed(now, quick_task is not None, self.last_question_at)
+                ):
                     self.next_brain_at = now + interval
                     window = [self._shift(u) for u in self.store.window(self.elapsed(), cfg.window_minutes)]
                     brain_task = asyncio.create_task(asyncio.to_thread(brain.step, window, self.brain_elapsed()))
