@@ -223,10 +223,8 @@ def _floor_tier(
     tiers = [risk_table.tier_of(action, [])]
     for uid in gate["guards"]:
         for conn in units[uid]["connectors"] if uid in units else []:
-            tiers += [
-                d.get("risk_tier") if d.get("risk_tier") in TIER_ORDER else "T3"
-                for d in _declared(connectors.get(conn), action)
-            ]
+            declared = [d.get("risk_tier") for d in _declared(connectors.get(conn), action)]
+            tiers += [t if isinstance(t, str) and t in TIER_ORDER else "T3" for t in declared]
     return max(tiers, key=TIER_ORDER.index)
 
 

@@ -33,7 +33,7 @@ budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant
 - The plan validator takes its registries (risk table, connectors, skills, policies) as arguments;
   a schema failure (`schema`) stops the PG checks. Arrays over their cap and non-finite numbers are
   `schema`, checked so jsonschema never does quadratic work. PG-06 checks "never lower" only, against
-  the higher of the table and connector tiers (BQ-69). PG-10 reads a policy as `tilo_policy` does:
+  the higher of the table and connector tiers (BQ-72). PG-10 reads a policy as `tilo_policy` does:
   schema, owner, history level at `now` capped by `max_level`, expiry, scope.
 - A flagged file's `artifact.created` has severity `fyi` and `trace.tool` `safety_provider`;
   `trace.archive_ref` stays null until the raw archive (P7) exists.
