@@ -76,9 +76,9 @@ typecheck:
 harness-skeleton:
     uv run --package tilo-harness python -m tilo_harness.skeleton --world w_harness_skeleton --run r_harness_skeleton
 
-# Run the eval harness (not built yet — ticket P3).
+# Replay the eval set (no paid calls) and write evals/results.md; exit 0 all passed, 1 a case failed, 2 error, 3 stopped at the credit cap (EFF-07).
 eval:
-    python -c "print('eval harness not built yet (ticket P3); nothing to run')"
+    uv run python -m tilo_evals run --pass full
 
 # PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
 conformance:
