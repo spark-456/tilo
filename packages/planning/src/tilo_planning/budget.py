@@ -1,17 +1,22 @@
-"""Budget approval (FR-INT-08, PRD 7.1, 10.4, 14.1). The person confirms a budget cap, or an autonomy policy
-pre-approves it. Spending credits under the run budget is a T1 side effect (PRD 10.4), so a grant is the
-`grant_budget` action run through the deterministic policy engine; no model is consulted. Only an L3 "run"
-starts the work without the person: `budget.granted` then carries the policy's authz and `policy.applied`
-names the policy. Every other outcome, including an engine error or a risk table without `grant_budget`,
-waits for the person (the engine fails closed)."""
+"""Budget approval (FR-INT-08, PRD 7.1, 10.1, 10.4, 14.1). The world's owner confirms a budget cap, or an
+autonomy policy pre-approves it. Spending credits under the run budget is a T1 side effect (PRD 10.4), so a
+grant is the `grant_budget` action run through the deterministic policy engine; no model is consulted. Only
+an L3 "run" starts the work without the person: `budget.granted` then carries the policy's authz, which is
+the audit record naming the policy (BQ-23). A budget grant has no gate and no outbox entry, so no
+`policy.applied` is built (OB-01). The policy's daily limits are counted here from the owner's earlier
+policy-authorised grants. Every other outcome, including an engine error, a malformed earlier grant or a
+risk table without `grant_budget`, waits for the person (fail closed)."""
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import tilo_policy
+from tilo_contracts import EVENT_DATA_MODELS, Event
 
 from tilo_planning.events import build_event
 
@@ -22,7 +27,6 @@ BUDGET_GRANT_ACTION_TYPE = "grant_budget"
 class BudgetOutcome:
     decision: tilo_policy.Decision
     granted_event: dict[str, Any] | None  # budget.granted at `seq`, only when a policy ran it
-    applied_event: dict[str, Any] | None  # policy.applied at `seq + 1`, naming the policy
 
 
 def _positive(cap: float) -> float:
@@ -39,58 +43,75 @@ def _granted(cap: float, authz: dict[str, Any], actor: str, base: dict[str, Any]
     )  # fmt: skip
 
 
+def _day(at: str) -> str:
+    return datetime.strptime(at, "%Y-%m-%dT%H:%M:%S.%fZ").strftime("%Y-%m-%d")  # anything else raises
+
+
+def _over_limit(policy: dict[str, Any], earlier_grants: list[dict[str, Any]], cap: float, now: str) -> str | None:
+    """PI-11 for budget grants: today's grants by this policy, this one included, within per_day and credits.
+    Any malformed grant raises, and the caller waits for the person."""
+    per_day, most_credits = policy["limits"]["per_day"], policy["limits"]["credits"]
+    mine = []
+    for grant in earlier_grants:
+        Event.model_validate(grant)
+        EVENT_DATA_MODELS["budget.granted"].model_validate(grant["data"])
+        authz = grant["authz"]
+        if grant["type"] == "budget.granted" and (authz["by"], authz["ref"]) == ("policy", policy["id"]):
+            if _day(authz["at"]) == _day(now):
+                mine.append(grant)
+    if per_day is None or len(mine) + 1 > per_day:
+        return "l3_daily_cap_reached"
+    spent = [float(g["data"]["granted"]) for g in mine] + [float(cap)]
+    if not all(math.isfinite(c) and c >= 0 for c in spent):
+        raise ValueError("credits must be finite and non-negative")
+    if most_credits is not None and math.fsum(spent) > most_credits:
+        return "l3_credits_cap_reached"
+    return None
+
+
 def request_budget_grant(
     cap: float,
     *,
     table: tilo_policy.RiskTable,
     policies: list[dict[str, Any]],
     world_owner: str,
-    applied: list[dict[str, Any]],
+    earlier_grants: list[dict[str, Any]],
     now: str,
     base: dict[str, Any],
     seq: int,
-    gate_id: str,
-    outbox_id: str,
     connector: str,
     district: str,
 ) -> BudgetOutcome:
     """`table` is the risk-tier table to decide with; production passes one that lists `grant_budget` or
-    every grant waits for the person. `applied` is the owner's policy.applied events today (daily limits)."""
+    every grant waits for the person. `earlier_grants` is the owner's `budget.granted` events in every world
+    (their daily limits). No `policy.applied` exists for a grant, so the engine is given none."""
     proposal = tilo_policy.Proposal(
         world_id=base["world_id"], action_type=BUDGET_GRANT_ACTION_TYPE, connector=connector, district=district,
         destination=None, facts=tilo_policy.SideEffectFacts(), item=None, credits=_positive(cap), instruction=None,
     )  # fmt: skip
     decision = tilo_policy.decide(
-        proposal, table=table, policies=policies, world_owner=world_owner, applied=applied, now=now
+        proposal, table=table, policies=policies, world_owner=world_owner, applied=[], now=now
     )
     if decision.outcome != "run" or decision.authz is None or decision.policy_id is None:
-        return BudgetOutcome(decision, None, None)
+        return BudgetOutcome(decision, None)
     policy_id = decision.policy_id
+    try:
+        policy = next(p for p in policies if isinstance(p, dict) and p.get("id") == policy_id)
+        capped = _over_limit(policy, earlier_grants, cap, now)
+    except Exception:  # fail closed: a grant never runs on records it cannot read
+        capped = "l3_daily_cap_reached"
+    if capped is not None:
+        return BudgetOutcome(dataclasses.replace(decision, outcome="gate", authz=None, reason=capped), None)
     granted = _granted(cap, decision.authz, policy_id, base, seq, f"by policy {policy_id}")
-    data = {
-        "policy_id": policy_id,
-        "gate_id": gate_id,
-        "outbox_id": outbox_id,
-        "action_type": BUDGET_GRANT_ACTION_TYPE,
-        "connector": connector,
-        "destination": None,
-        "district": district,
-        "risk_tier": decision.tier,
-        "level": decision.level,
-        "instruction_id": None,
-        "undo_window_s": decision.undo_window_s or 0,  # L3 runs at once: no undo window
-        "item": None,
-        "credits": cap,
-    }
-    applied_event = build_event(
-        {**base, "actor": policy_id}, seq=seq + 1, type="policy.applied", target=gate_id, item=None,
-        severity="info", tool=None, cause=None, authz=decision.authz, data=data,
-        summary=f"Policy {policy_id} approved a budget of {cap:g} credits.",
-    )  # fmt: skip
-    return BudgetOutcome(decision, granted, applied_event)
+    return BudgetOutcome(decision, granted)
 
 
-def grant_budget_by_person(cap: float, *, owner: str, now: str, base: dict[str, Any], seq: int) -> dict[str, Any]:
-    """The person confirms the cap (FR-INT-08); `budget.granted` carries their authz."""
-    authz = {"by": "person", "ref": owner, "at": now}
-    return _granted(_positive(cap), authz, owner, base, seq, "by you")
+def grant_budget_by_person(
+    cap: float, *, world_owner: str, user: str, now: str, base: dict[str, Any], seq: int
+) -> dict[str, Any]:
+    """The world's owner confirms the cap (FR-INT-08); only the Owner sets budgets (PRD 10.1), so an
+    Approver, a Viewer or anyone else is refused. `budget.granted` carries the owner's authz."""
+    if not world_owner or user != world_owner:
+        raise PermissionError("PRD 10.1: only the world's owner sets budgets")
+    authz = {"by": "person", "ref": user, "at": now}
+    return _granted(_positive(cap), authz, user, base, seq, "by you")

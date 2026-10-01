@@ -16,7 +16,7 @@ budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant
 
 ## Contracts
 - Builds `world.requested`, `artifact.created`, `memory.hit`, `plan.questions_asked`,
-  `plan.approaches_proposed`, `budget.granted` and `policy.applied` events
+  `plan.approaches_proposed` and `budget.granted` events
   (`events.build_event`, validated with `tilo_contracts`); returns them, never writes them (the
   harness is the writer). Briefs are validated with the generated `Brief` (`brief.schema.json`).
 
@@ -31,5 +31,7 @@ budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant
 - A flagged file's `artifact.created` has severity `fyi` and `trace.tool` `safety_provider`;
   `trace.archive_ref` stays null until the raw archive (P7) exists.
 - Estimates are arithmetic only (no model, network or randomness); an unknown unit type refuses.
-- A budget grant's authz comes only from the person or the policy engine. The risk table is a parameter:
-  until `config/autonomy.yaml` lists `grant_budget`, the engine fails closed and every grant waits.
+- A budget grant's authz comes only from the world's owner (PRD 10.1) or the policy engine. The risk table
+  is a parameter: until `config/autonomy.yaml` lists `grant_budget`, the engine fails closed and every grant
+  waits. A policy grant is one `budget.granted` with authz by policy; it has no gate or outbox entry, so no
+  `policy.applied` is built, and its daily limits count earlier policy-authorised grants.
