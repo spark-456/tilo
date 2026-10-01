@@ -30,15 +30,20 @@ Kept in a new module family so this ticket never touches `services/api/tests/_ap
   different card under a used id is rejected; a resolved record is never reopened. CR-01 (safe
   default names an option), CR-02 (unique option ids), a real calendar `created_at` and a
   representable deadline are validator rules.
-- **Merging** keeps every card as its own record (own question, options and timeout); a group lists
-  as its first open member. Merged ids resolve through `get` and `answer`.
+- **Merging** keeps every card as its own record (own question and options); a group lists as its
+  first open member and one answer or one timeout closes the whole group with one part (BQ-72).
+- **Part scope (SEC-07):** every part carries `world_id`, `card_id`, `district`, `vis` ([district], or
+  None with `owner_only` True when the card has no district; never "all", BQ-73). A Team Lead's
+  question answer is `answered_by` "team_lead"; an unknown role is refused like a Viewer.
+- **One resolution per card:** answer and timeout claim the group under a lock before `writer.write`
+  and release the claim if the write raises, so racing answers or an answer racing tick write one part.
 - **Gate answers (CR-07, PI-02):** only `approve` writes `approval.resolved` and resolves; `edit` and
   `hold` write nothing and leave the gate open. **Consent (CR-13):** `connect` writes
   `connection.consented` (authz by the person); `hold` writes nothing.
 - **Timeouts (supersedes ambiguity 5):** each open card times out at its own `created_at + timeout`.
   A needs_you or meeting card writes `question.answered` (default, nudge) and resolves. A gate or
-  consent card stays open and writes one `alert.raised` (severity nudge, `alert_id` = `card_id` =
-  the card's id), because `question.answered` would close the card on every channel.
+  consent card stays open and writes one `alert.raised` (severity nudge, its own derived `alert_id`,
+  `card_id` = the card's id), because `question.answered` would close the card on every channel.
 
 ## Ambiguities resolved (root CLAUDE.md: PRD default, logged here, keep going)
 

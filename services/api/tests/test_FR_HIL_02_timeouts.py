@@ -89,7 +89,8 @@ def test_FR_HIL_02_PI_03_gate_never_times_out_to_go():
     assert writer.of_type("question.answered") == [], "question.answered would close the card on every channel"
     [nudge] = writer.of_type("alert.raised")
     assert nudge["severity"] == "nudge"
-    assert nudge["data"] == {"alert_id": card["id"], "card_id": card["id"]}
+    assert nudge["data"]["card_id"] == card["id"]
+    assert nudge["data"]["alert_id"] != card["id"], "the nudge has its own id"
 
     # Still answerable after the timeout, because it stayed held rather than closing.
     answered = store.answer(card["world_id"], card["id"], option="approve", channel="web", principal=OWNER_P)

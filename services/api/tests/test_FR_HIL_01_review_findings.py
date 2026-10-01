@@ -291,7 +291,7 @@ def test_FR_HIL_02_an_impossible_date_or_huge_timeout_is_rejected_not_raised(fie
 # -- FR-HIL-02: merged cards keep their own question, submit is not a scan ------------------------
 
 
-def test_FR_HIL_02_a_merged_card_keeps_its_own_question_and_options():
+def test_FR_HIL_02_a_merged_card_keeps_its_own_question_and_one_answer_closes_the_group():
     store, _clock, writer = _store()
     base = load_valid_card("needs_you_compare_basis")
     second = clone_card(base, id_="01J8Z3K4M5N6P7Q8R9S0T1V2WE", created_at=add_seconds(START, 10))
@@ -303,10 +303,11 @@ def test_FR_HIL_02_a_merged_card_keeps_its_own_question_and_options():
     assert store.get(W, second["id"])["what_happened"] == "A different question."
     assert store.answer(W, second["id"], option="per_kwh", channel="web", principal=OWNER_P).reason == "invalid_option"
     assert store.answer(W, second["id"], option="second_a", channel="web", principal=OWNER_P).outcome == "answered"
-    assert [c["id"] for c in store.list_for_world(W, principal=OWNER_P)] == [base["id"]]
-    assert store.answer(W, base["id"], option="per_kwh", channel="web", principal=OWNER_P).outcome == "answered"
-    assert store.list_for_world(W, principal=OWNER_P) == []
-    assert len(writer.of_type("question.answered")) == 2
+    assert store.list_for_world(W, principal=OWNER_P) == [], "one answer closes the whole merged group"
+    assert store.answer(W, base["id"], option="per_kwh", channel="web", principal=OWNER_P).reason == "already_resolved"
+    assert len(writer.of_type("question.answered")) == 1
+    later = clone_card(base, id_="01J8Z3K4M5N6P7Q8R9S0T1V2WG", created_at=add_seconds(START, 20))
+    assert store.submit(later).card_id == later["id"], "a card after the group closed starts a new group"
 
 
 def test_FR_HIL_02_cards_for_different_districts_or_assignees_never_merge():
@@ -320,17 +321,17 @@ def test_FR_HIL_02_cards_for_different_districts_or_assignees_never_merge():
     assert [r.outcome for r in results] == ["accepted", "accepted", "accepted", "merged"]
 
 
-def test_FR_HIL_02_a_merged_cards_own_timeout_applies_its_own_default():
+def test_FR_HIL_02_one_timeout_closes_the_whole_merged_group_with_one_nudge():
     store, clock, writer = _store()
     base = load_valid_card("needs_you_compare_basis")
     store.submit(base)
     store.submit(clone_card(base, id_="01J8Z3K4M5N6P7Q8R9S0T1V2WF", created_at=add_seconds(START, 30)))
 
-    clock.advance(base["timeout"])
+    clock.advance(base["timeout"] + 30)
     assert [r.card_id for r in store.tick()] == [base["id"]]
-    clock.advance(30)
-    assert [r.card_id for r in store.tick()] == ["01J8Z3K4M5N6P7Q8R9S0T1V2WF"]
-    assert len(writer.of_type("question.answered")) == 2
+    assert store.tick() == []
+    assert len(writer.of_type("question.answered")) == 1
+    assert store.list_for_world(W, principal=OWNER_P) == []
 
 
 def test_FR_HIL_01_every_emitted_part_is_a_registered_event_with_valid_data(registry, repo_root):
