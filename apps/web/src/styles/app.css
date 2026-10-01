@@ -131,3 +131,49 @@ body {
   color: var(--color-brand-primary);
   font: 700 0.875em var(--font-ui);
 }
+.nav-btn:focus-visible,
+.primary:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.flow-shell {
+  position: fixed;
+  top: 16px;
+  left: 88px;
+  z-index: 500;
+  box-sizing: border-box;
+  width: 280px;
+  padding: 16px;
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+}
+@media (max-width: 767px) {
+  .flow-shell {
+    left: 16px;
+    width: calc(100vw - 32px);
+  }
+}
+.flow-heading {
+  margin: 0 0 6px;
+  font: 700 1.125em / 1.25 var(--font-ui);
+}
+.flow-summary {
+  margin: 0 0 12px;
+  color: var(--color-ink-2);
+  font: 400 0.875em / 1.4 var(--font-ui);
+}
+.primary {
+  min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--radius-controls);
+  background: var(--color-brand-primary);
+  color: var(--color-surface-1);
+  font: 700 0.875em / 1 var(--font-ui);
+  cursor: pointer;
+}
+.primary[aria-busy="true"] {
+  background: var(--color-brand-primary-lip);
+}
