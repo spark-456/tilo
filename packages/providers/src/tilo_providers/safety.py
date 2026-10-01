@@ -141,12 +141,19 @@ class SafetyRecordReplayProvider(SafetyProvider):
 
 def build_safety_provider(config: ProvidersConfig, *, fixtures_dir: Path | str) -> SafetyProvider:
     """The "safety" role's primary profile: `provider: fake` gives
-    `FakeSafetyProvider`; a known live provider gives record-and-replay."""
+    `FakeSafetyProvider` (refused with `LIVE=1` or `K_SERVICE` set); a known
+    live provider gives record-and-replay."""
     if SAFETY_ROLE not in config.roles:
         raise ProviderConfigError(f"FR-INT-02: config/models.yaml has no {SAFETY_ROLE!r} role")
     profile_id = config.roles[SAFETY_ROLE].primary
     profile = config.profiles[profile_id]
     if profile.provider == "fake":
+        # SEC-04, PRD 16.3 item 2: the fake would fail open on a live or deployed service.
+        if os.environ.get("LIVE") == "1" or os.environ.get("K_SERVICE"):
+            raise ProviderConfigError(
+                f"FR-INT-02: refusing the fake safety provider for {profile_id!r} "
+                "with LIVE=1 or when deployed (K_SERVICE set)"
+            )
         return FakeSafetyProvider()
     if profile.provider not in _LIVE_SAFETY_PROVIDERS:
         raise ProviderConfigError(f"FR-INT-02: unknown safety provider {profile.provider!r} for {profile_id!r}")
