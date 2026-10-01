@@ -1,0 +1,10 @@
+{
+  "goal": "Send this week's team status email.",
+  "deliverables": [{ "title": "Weekly Status Email", "format": "email" }],
+  "audience": "Engineering team",
+  "deadline": "2026-09-26",
+  "constraints": [],
+  "sources": [],
+  "sensitivity": "business",
+  "ambiguous_fields": []
+}

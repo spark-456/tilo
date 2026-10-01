@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/evals.schema.json",
+  "x-version": "1.0.0",
+  "title": "Evals",
+  "description": "config/evals.yaml: eval pass settings (PRD 6.6 'Lean evals', 19.2; EFF-06, EFF-07). A full pass runs every case once and deploy-gate cases three times, and stops at its credit cap with partial results. What the PRD states as a rule is const (three repeats, the 20% cost-regression threshold); the credit caps are config. Rules MT-09 to MT-11 in contracts/metering.rules.md. The eval case file shape stays in evals/case.schema.json, because only the harness reads it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["credit_cap", "deploy_gate_repeats", "cost_regression_threshold", "groups"],
+  "properties": {
+    "credit_cap": { "$ref": "#/$defs/credit_cap" },
+    "deploy_gate_repeats": {
+      "description": "Runs of each deploy-gate case in a pass (PRD 6.6, 19.2: three times); every other case runs once.",
+      "type": "integer",
+      "const": 3
+    },
+    "cost_regression_threshold": {
+      "description": "A cost per task or per role more than this share above the baseline fails the nightly job (EFF-06: 20%). Minimum and maximum repeat the const so generated Python checks it too.",
+      "type": "number",
+      "const": 0.2,
+      "minimum": 0.2,
+      "maximum": 0.2
+    },
+    "groups": { "$ref": "#/$defs/groups" }
+  },
+  "$defs": {
+    "credit_cap": {
+      "description": "Credits one pass may spend before it stops and reports partial results (PRD 6.6, EFF-07): a full pass, the nightly smoke pass and the deploy-gate pass (gate cases three times each). Values are the BQ-43 placeholders until the user sets them; they only bite on live passes, since dev and CI replay recordings (EFF-01).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["full", "smoke", "gate"],
+      "properties": {
+        "full": { "type": "number", "exclusiveMinimum": 0 },
+        "smoke": { "type": "number", "exclusiveMinimum": 0 },
+        "gate": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "groups": {
+      "description": "Expected case count for each of the eight PRD 19.2 groups. The PRD rows sum to 160 although its heading says 170 cases; the rows are the default (BQ-67). The harness checks the case set in evals/cases/<group>/ against it (MT-10). Exactly these eight groups.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["E-PLAN", "E-RES", "E-DOC", "E-MAIL", "E-CHN", "E-ROUTE", "E-HAND", "E-RED"],
+      "properties": {
+        "E-PLAN": { "type": "integer", "minimum": 1 },
+        "E-RES": { "type": "integer", "minimum": 1 },
+        "E-DOC": { "type": "integer", "minimum": 1 },
+        "E-MAIL": { "type": "integer", "minimum": 1 },
+        "E-CHN": { "type": "integer", "minimum": 1 },
+        "E-ROUTE": { "type": "integer", "minimum": 1 },
+        "E-HAND": { "type": "integer", "minimum": 1 },
+        "E-RED": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

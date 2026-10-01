@@ -227,12 +227,15 @@ the handler read `store.worlds.get(world_id)` and 404 if that lookup itself miss
 - Locking: every targeted policy's level, history and `changed_by`, and every new part's
   enqueue, happen under a per-world **mutate** lock (sorted-and-acquired together across every
   touched world, to avoid lock-order deadlock between two calls touching overlapping world sets)
-  — held only for that in-memory decision, **never across a `writer.append` call**. A *separate*,
-  non-blocking per-world **drain** lock guards "at most one `append` in flight for this world at a
-  time" (issue #46, S0's decision point 1): a call that finds it already held by another
-  in-flight attempt (this call's own, or an earlier call's abandoned one) skips draining that
-  world entirely this call, leaving the in-flight attempt — and everything behind it in that
-  world's queue — exactly where it is. Because the mutate lock is never held across I/O, a kill
+  — held only for that in-memory decision, **never across a `writer.append` call**. A *separate*
+  per-world **in-flight record** (guarded by a short, never-across-I/O queue lock) enforces "at
+  most one `append` in flight for this world at a time" (issue #46, S0's decision point 1): a call
+  that finds one still younger than `dispatch.attempt_abandon_after_s` waits for it, up to its own
+  part deadline, and then leaves it — and everything behind it in that world's queue — where it
+  is. An attempt older than `attempt_abandon_after_s` is presumed lost: it stops counting, and the
+  call starts a fresh attempt of the same part (same `id`, so a late success of the old one is an
+  idempotent no-op, EV-10). At most two presumed-lost attempts are tolerated per world before no
+  new thread is started. Because the mutate lock is never held across I/O, a kill
   switch against world A never waits on world B's writer latency, and a second call against the
   *same* world, issued while the first is still stuck on (or past the deadline of) a writer call
   that never returns, itself returns quickly: by the time it runs, the first call's mutate section
@@ -258,8 +261,9 @@ whose attempt does not settle within `part_deadline_s` is a **hang**: the drain 
 stops right there (that part, and everything queued behind it, stays pending); the underlying
 attempt is never cancelled (Python threads cannot be cancelled) — it keeps running in the
 background, and whichever thread eventually observes it settle removes the part from the queue
-(and releases the world's drain lock) at that point, so a later call naturally finds the world
-free again once the writer genuinely answers. A part whose attempt **fails fast** (raises well
+(and clears the world's in-flight record) at that point, so a later call naturally finds the
+world free again once the writer genuinely answers; if it never does, the record is abandoned
+after `attempt_abandon_after_s` and the same part is retried. A part whose attempt **fails fast** (raises well
 within its deadline) does not block a different part still waiting behind it in the same drain:
 that different part is tried next, and the failed one is left pending, not retried again this
 call — **except** when nothing else is left to try in this drain (the failed part is the sole

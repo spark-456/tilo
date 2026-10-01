@@ -6,11 +6,12 @@ Design (issue #46, redone after the round-7/ST-3a-3 writer-identity approach was
 full event, id included, is built once when a part is enqueued (`events.new_part_id`) and resent
 unchanged on every retry. The queue *is* `Store.pending_events[world_id]`, deduped by that `id`,
 never by content and never by which writer object attempts it. At most one `append` is ever in
-flight per world at a time (`_world_locks(store, w)["drain"]`, a non-blocking lock: a call that
-finds it busy skips draining this call, leaving the in-flight attempt -- and everything behind it
--- exactly where it is). The fast, no-I/O mutation (policy level/history/changed_by, the `paused`
-flag, vis) happens under a separate, always-blocking per-world `"mutate"` lock, held only for that
-decision and the enqueue -- never across a `writer.append` call -- so one world's stuck writer
+flight per world at a time (`_world_locks(store, w)["inflight"]`: a call that finds a young one
+waits for it up to its own part deadline; one older than `attempt_abandon_after_s` is presumed lost
+and the same part, same `id`, is attempted again -- idempotent by EV-10). The fast, no-I/O
+mutation (policy level/history/changed_by, the `paused` flag, vis) happens under a separate,
+always-blocking per-world `"mutate"` lock, held only for that decision and the enqueue -- never
+across a `writer.append` call -- so one world's stuck writer
 never delays another call's mutation, on the same or a different world. `world.paused` is
 enqueued (and drained) ahead of this same call's own `policy.changed` parts (FR-WLD-07/NFR-07's 2s
 budget). Every lock lives on the `Store` instance itself (`Store.dispatch_state`), never a
@@ -37,6 +38,7 @@ from tilo_api.deps import (
     Principal,
     Store,
     WorldRecord,
+    get_attempt_abandon_after_s,
     get_current_principal,
     get_event_writer,
     get_part_write_deadline_s,
@@ -47,6 +49,7 @@ router = APIRouter()
 
 _CALL_BUDGET_S = 4.5  # a whole request's own write-attempt budget, under FR-HIL-07's 5s
 _SOLE_RETRY_LIMIT = 2  # total attempts for a fast-failing part with nothing else left to try
+_MAX_ABANDONED = 2  # presumed-lost attempts tolerated per world before no new thread is started
 _EXECUTOR = ThreadPoolExecutor(max_workers=16)  # shared, bounded across every Store and world;
 # correctness (one append in flight per world) comes from each world's own drain lock, not from
 # this pool's size -- it only bounds total OS threads.
@@ -66,7 +69,12 @@ def _world_locks(store: Store, world_id: str) -> dict:
     with ds["guard"]:
         entry = ds["worlds"].get(world_id)
         if entry is None:
-            entry = {"mutate": threading.Lock(), "drain": threading.Lock()}
+            entry = {
+                "mutate": threading.Lock(),
+                "queue": threading.RLock(),  # guards the queue list and the in-flight record
+                "inflight": None,  # the one _Attempt currently counted against this world
+                "abandoned": 0,  # presumed-lost attempts whose threads have not settled yet
+            }
             ds["worlds"][world_id] = entry
     return entry
 
@@ -94,77 +102,137 @@ def _locked(store: Store, world_ids):
 
 
 def _enqueue(store: Store, world_id: str, part: dict, *, front: bool = False) -> None:
-    queue = store.pending_events.get(world_id)
-    queue = list(queue) if isinstance(queue, list) else []
-    store.pending_events[world_id] = [part, *queue] if front else [*queue, part]
+    with _world_locks(store, world_id)["queue"]:
+        queue = store.pending_events.get(world_id)
+        queue = list(queue) if isinstance(queue, list) else []
+        store.pending_events[world_id] = [part, *queue] if front else [*queue, part]
 
 
 def _remove_pending(store: Store, world_id: str, part_id: str) -> None:
-    queue = store.pending_events.get(world_id)
-    if not isinstance(queue, list):
-        return
-    store.pending_events[world_id] = [p for p in queue if not (isinstance(p, dict) and p.get("id") == part_id)]
+    with _world_locks(store, world_id)["queue"]:
+        queue = store.pending_events.get(world_id)
+        if not isinstance(queue, list):
+            return
+        store.pending_events[world_id] = [p for p in queue if not (isinstance(p, dict) and p.get("id") == part_id)]
 
 
-def _on_late_settle(store: Store, world_id: str, part: dict, lock: threading.Lock, future: Future[dict]) -> None:
+class _Attempt:
+    """The one append currently in flight for a world (S0, issue #46 item 1)."""
+
+    def __init__(self, part_id: str) -> None:
+        self.part_id = part_id
+        self.started = time.monotonic()
+        self.future: Future[None]
+        self.abandoned = False
+
+
+def _run_attempt(store: Store, world_id: str, part: dict, writer: EventWriter, attempt: _Attempt) -> None:
+    """Runs on a worker thread. A success removes the part from the queue *before* this future
+    settles, so a call waiting on it never sees a committed part still pending."""
+    locks = _world_locks(store, world_id)
     try:
-        if future.exception() is None:
-            _remove_pending(store, world_id, part["id"])
+        writer.append(world_id, part)
+        _remove_pending(store, world_id, part["id"])
+    except Exception:
+        # issue #55 item 2: a writer that lost its lease or lost a commit race answers the resend
+        # with WriterBusy until it is reopened; reopening is the writer's own optional hook, and
+        # the resend (same id) is then idempotent.
+        reopen = getattr(writer, "reopen", None)
+        if callable(reopen):
+            try:
+                reopen()
+            except Exception:
+                pass
+        raise
     finally:
-        lock.release()
+        with locks["queue"]:
+            if locks["inflight"] is attempt:
+                locks["inflight"] = None
+            if attempt.abandoned:
+                locks["abandoned"] -= 1
 
 
-def drain(store: Store, world_id: str, writer: EventWriter, deadline_at: float, part_deadline_s: float) -> None:
+def drain(
+    store: Store,
+    world_id: str,
+    writer: EventWriter,
+    deadline_at: float,
+    part_deadline_s: float,
+    abandon_after_s: float,
+) -> None:
     """Attempts `store.pending_events[world_id]`'s head, oldest first, until the queue is empty,
     the shared deadline passes, or an attempt fails to settle within `part_deadline_s` (a hang):
-    that leaves it, and everything behind it, exactly where it is -- still pending -- while the
-    background attempt keeps running (EventWriter.append is idempotent by id, so a late success
-    or failure is always safe to leave uncancelled; Python threads cannot be cancelled). A fast
-    (non-hanging) failure does not block a *different* part behind it in the same call, but is
-    retried in place, up to `_SOLE_RETRY_LIMIT` attempts, when nothing else is left to try this
-    call (world.paused's own single-item phase; see the module docstring)."""
+    that leaves it, and everything behind it, still pending while the attempt keeps running in the
+    background (Python threads cannot be cancelled).
+
+    At most one attempt is in flight per world. A call that finds one still young waits for it, up
+    to its own part deadline. A call that finds one older than `abandon_after_s` presumes it lost,
+    stops counting it and starts a fresh attempt of the same part: `EventWriter.append` is
+    idempotent by event id (EV-10), so a late success of the abandoned attempt is a harmless no-op.
+    At most `_MAX_ABANDONED` presumed-lost attempts are tolerated per world; past that nothing new
+    is started, so a dead writer cannot leak unbounded threads. A fast (non-hanging) failure does
+    not block a *different* part behind it in the same call, but is retried in place, up to
+    `_SOLE_RETRY_LIMIT` attempts, when nothing else is left to try this call."""
     locks = _world_locks(store, world_id)
-    if not locks["drain"].acquire(blocking=False):
-        return
-    handed_off = False
     given_up: set[str] = set()
     sole_attempts: dict[str, int] = {}
-    try:
-        while time.monotonic() < deadline_at:
-            queue = store.pending_events.get(world_id)
-            if not isinstance(queue, list):
+
+    def note_failure(part_id: str, others_waiting: bool) -> None:
+        if others_waiting:
+            given_up.add(part_id)
+            return
+        sole_attempts[part_id] = sole_attempts.get(part_id, 0) + 1
+        if sole_attempts[part_id] >= _SOLE_RETRY_LIMIT:
+            given_up.add(part_id)
+
+    while time.monotonic() < deadline_at:
+        wait_on: Future[None] | None = None
+        wait_part = ""
+        wait_s = 0.0
+        with locks["queue"]:
+            current = locks["inflight"]
+            if current is not None:
+                age = time.monotonic() - current.started
+                if age >= abandon_after_s:
+                    current.abandoned = True
+                    locks["abandoned"] += 1
+                    locks["inflight"] = None
+                    current = None
+                else:
+                    wait_on = current.future
+                    wait_part = current.part_id
+                    wait_s = min(part_deadline_s - age, deadline_at - time.monotonic())
+            if current is None:
+                queue = store.pending_events.get(world_id)
+                if not isinstance(queue, list):
+                    return
+                candidates = [
+                    p for p in queue if isinstance(p, dict) and isinstance(p.get("id"), str) and p["id"] not in given_up
+                ]
+                if not candidates or locks["abandoned"] >= _MAX_ABANDONED:
+                    return
+                part = candidates[0]
+                attempt = _Attempt(part["id"])
+                locks["inflight"] = attempt
+                attempt.future = _EXECUTOR.submit(_run_attempt, store, world_id, part, writer, attempt)
+                future = attempt.future
+        if wait_on is not None:
+            if wait_s <= 0:
                 return
-            candidates = [
-                p for p in queue if isinstance(p, dict) and isinstance(p.get("id"), str) and p["id"] not in given_up
-            ]
-            if not candidates:
-                return
-            part = candidates[0]
-            remaining = deadline_at - time.monotonic()
-            if remaining <= 0:
-                return
-            future = _EXECUTOR.submit(writer.append, world_id, part)
             try:
-                future.result(timeout=min(part_deadline_s, remaining))
+                wait_on.result(timeout=wait_s)
             except FutureTimeoutError:
-                future.add_done_callback(
-                    lambda f, w=world_id, p=part, lk=locks["drain"]: _on_late_settle(store, w, p, lk, f)
-                )
-                handed_off = True
                 return
             except Exception:
-                if len(candidates) > 1:
-                    given_up.add(part["id"])
-                else:
-                    attempts = sole_attempts.get(part["id"], 0) + 1
-                    sole_attempts[part["id"]] = attempts
-                    if attempts >= _SOLE_RETRY_LIMIT:
-                        given_up.add(part["id"])
-            else:
-                _remove_pending(store, world_id, part["id"])
-    finally:
-        if not handed_off:
-            locks["drain"].release()
+                note_failure(wait_part, others_waiting=False)  # someone else's attempt failed fast
+            continue
+        remaining = deadline_at - time.monotonic()
+        try:
+            future.result(timeout=max(0.0, min(part_deadline_s, remaining)))
+        except FutureTimeoutError:
+            return
+        except Exception:
+            note_failure(part["id"], others_waiting=len(candidates) > 1)
 
 
 def _require_member_world(principal: Principal, store: Store, world_id: str) -> WorldRecord:
@@ -218,9 +286,11 @@ def _apply_stop_all(store: Store, owner: str, requested_world_id: str, change: s
     return stopped, already_l1, parts_by_world
 
 
-def _drain_touched(store: Store, touched, writer: EventWriter, deadline_at: float, part_deadline_s: float) -> int:
+def _drain_touched(
+    store: Store, touched, writer: EventWriter, deadline_at: float, part_deadline_s: float, abandon_after_s: float
+) -> int:
     for w in touched:
-        drain(store, w, writer, deadline_at, part_deadline_s)
+        drain(store, w, writer, deadline_at, part_deadline_s, abandon_after_s)
     return sum(len(store.pending_events.get(w) or []) for w in touched)
 
 
@@ -231,6 +301,7 @@ def stop_autopilot(
     store: Store = Depends(get_store),
     writer: EventWriter = Depends(get_event_writer),
     part_deadline_s: float = Depends(get_part_write_deadline_s),
+    abandon_after_s: float = Depends(get_attempt_abandon_after_s),
 ) -> JSONResponse:
     world = _require_member_world(principal, store, world_id)
     _require_owner(principal, world)
@@ -244,7 +315,7 @@ def stop_autopilot(
                 _enqueue(store, w, part)
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
-    pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s)
+    pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s, abandon_after_s)
     body = {
         "stopped": stopped,
         "already_l1": already_l1,
@@ -266,6 +337,7 @@ def pause_world(
     store: Store = Depends(get_store),
     writer: EventWriter = Depends(get_event_writer),
     part_deadline_s: float = Depends(get_part_write_deadline_s),
+    abandon_after_s: float = Depends(get_attempt_abandon_after_s),
 ) -> JSONResponse:
     world = _require_member_world(principal, store, world_id)
     _require_owner(principal, world)
@@ -277,7 +349,7 @@ def pause_world(
             world.paused = True
             part = events.world_paused_part(part_id=events.new_part_id(), world_id=world_id, channel=principal.channel)
             _enqueue(store, world_id, part, front=True)
-    drain(store, world_id, writer, deadline_at, part_deadline_s)  # priority phase: world.paused
+    drain(store, world_id, writer, deadline_at, part_deadline_s, abandon_after_s)  # priority phase: world.paused
     # (and any older backlog) ahead of this call's own policy.changed parts, built next.
 
     at = events.now()
@@ -287,7 +359,7 @@ def pause_world(
         for w, parts in parts_by_world.items():
             for part in parts:
                 _enqueue(store, w, part)
-    pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s)
+    pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s, abandon_after_s)
 
     body_out = {"stopped": stopped, "already_l1": already_l1, "paused": True, "pending": pending}
     return JSONResponse(content=body_out, status_code=202 if pending else 200)
@@ -300,6 +372,7 @@ def revoke_policy(
     store: Store = Depends(get_store),
     writer: EventWriter = Depends(get_event_writer),
     part_deadline_s: float = Depends(get_part_write_deadline_s),
+    abandon_after_s: float = Depends(get_attempt_abandon_after_s),
 ) -> dict:
     policy = store.policies.get(policy_id)
     if not isinstance(policy, dict) or principal.user_id != policy.get("owner"):
@@ -326,5 +399,5 @@ def revoke_policy(
             part_id=events.new_part_id(), policy_id=policy_id, change="revoked", owner=owner, at=at, vis=vis
         )
         _enqueue(store, target_world_id, part)
-    drain(store, target_world_id, writer, deadline_at, part_deadline_s)
+    drain(store, target_world_id, writer, deadline_at, part_deadline_s, abandon_after_s)
     return {"policy_id": policy_id, "level": "L1"}

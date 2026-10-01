@@ -6,3 +6,7 @@
 # production and tests can both change it without a code change (ambiguity 22, API_ST3a.md).
 dispatch:
   part_write_deadline_s: 0.5
+  # An append still unsettled after this long is presumed lost: the next call starts a fresh
+  # attempt of the same event id (idempotent) and stops counting the old one. At most two
+  # presumed-lost attempts per world are tolerated before nothing new is started.
+  attempt_abandon_after_s: 3.0

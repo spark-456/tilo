@@ -22,6 +22,7 @@ Channel = Literal["web", "mobile_web", "whatsapp", "email"]
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _DEFAULT_PART_WRITE_DEADLINE_S = 0.5
+_DEFAULT_ABANDON_AFTER_S = 3.0
 
 
 @dataclass(frozen=True)
@@ -83,7 +84,11 @@ class EventWriter(Protocol):
     stable `id` (a ULID), built once when the part is enqueued and resent unchanged on every
     retry -- the sole idempotency key `append` dedupes on (issue #46 / EV-10), never raw content
     and never which writer object happens to receive the call. `seq`, `ts`, `run_id` and `trace`
-    remain writer-only."""
+    remain writer-only.
+
+    A writer that wraps the harness `WorldWriter` should also expose an optional `reopen()`: the
+    dispatcher calls it after a failed append, before the same event is resent, so a stale lease
+    or an ambiguous commit (issue #55 item 2) recovers instead of answering WriterBusy forever."""
 
     def append(self, world_id: str, event: dict) -> dict:
         """Returns the committed event.schema.json record (the existing one, unchanged, on an
@@ -103,16 +108,26 @@ def get_event_writer() -> EventWriter:
     raise NotImplementedError
 
 
+def _dispatch_config(key: str, default: float) -> float:
+    try:
+        import yaml
+
+        raw = yaml.safe_load((_REPO_ROOT / "config" / "dispatch.yaml").read_text(encoding="utf-8"))
+        return float(raw["dispatch"][key])
+    except Exception:
+        return default
+
+
 def get_part_write_deadline_s() -> float:
     """A single writer.append attempt's bounded wait (issue #46, S0's decision point 1: read from
     config, never a constant tuned to tests). Resolved the same injectable way as get_store/
     get_event_writer/get_current_principal so a test can prove the route reads it fresh on every
     call; unlike those three this has a working default (below) since production needs no
     per-request test double for a plain config value -- most tests never override it."""
-    try:
-        import yaml
+    return _dispatch_config("part_write_deadline_s", _DEFAULT_PART_WRITE_DEADLINE_S)
 
-        raw = yaml.safe_load((_REPO_ROOT / "config" / "dispatch.yaml").read_text(encoding="utf-8"))
-        return float(raw["dispatch"]["part_write_deadline_s"])
-    except Exception:
-        return _DEFAULT_PART_WRITE_DEADLINE_S
+
+def get_attempt_abandon_after_s() -> float:
+    """How long an append may stay in flight before dispatch presumes it lost and retries the same
+    event id (idempotent, EV-10). Read from config/dispatch.yaml like the part deadline."""
+    return _dispatch_config("attempt_abandon_after_s", _DEFAULT_ABANDON_AFTER_S)

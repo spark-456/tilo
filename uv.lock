@@ -6,13 +6,16 @@ requires-python = "==3.12.*"
 members = [
     "tilo",
     "tilo-api",
+    "tilo-archive",
     "tilo-connectors",
     "tilo-contracts",
     "tilo-evals",
     "tilo-harness",
     "tilo-metering",
+    "tilo-planning",
     "tilo-policy",
     "tilo-providers",
+    "tilo-render",
     "tilo-sandbox-web",
 ]
 
@@ -1282,8 +1285,10 @@ source = { editable = "services/api" }
 dependencies = [
     { name = "fastapi" },
     { name = "jsonschema" },
+    { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "referencing" },
+    { name = "tilo-planning" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1291,10 +1296,17 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "jsonschema", specifier = ">=4.18" },
+    { name = "python-multipart", specifier = ">=0.0.18" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-planning", editable = "packages/planning" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
+
+[[package]]
+name = "tilo-archive"
+version = "0.1.0"
+source = { editable = "packages/archive" }
 
 [[package]]
 name = "tilo-connectors"
@@ -1331,12 +1343,16 @@ source = { editable = "evals" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pyyaml" },
+    { name = "referencing" },
+    { name = "tilo-contracts" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "jsonschema", specifier = ">=4.18" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
 ]
 
 [[package]]
@@ -1349,6 +1365,8 @@ dependencies = [
     { name = "jsonschema" },
     { name = "pyyaml" },
     { name = "referencing" },
+    { name = "tilo-contracts" },
+    { name = "tilo-providers" },
 ]
 
 [package.metadata]
@@ -1358,6 +1376,8 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.18" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-providers", editable = "packages/providers" },
 ]
 
 [[package]]
@@ -1373,6 +1393,23 @@ dependencies = [
 requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+]
+
+[[package]]
+name = "tilo-planning"
+version = "0.1.0"
+source = { editable = "packages/planning" }
+dependencies = [
+    { name = "tilo-contracts" },
+    { name = "tilo-policy" },
+    { name = "tilo-providers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tilo-providers", editable = "packages/providers" },
 ]
 
 [[package]]
@@ -1408,6 +1445,11 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.18" },
 ]
+
+[[package]]
+name = "tilo-render"
+version = "0.1.0"
+source = { editable = "services/render" }
 
 [[package]]
 name = "tilo-sandbox-web"

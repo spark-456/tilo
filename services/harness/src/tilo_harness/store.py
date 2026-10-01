@@ -153,4 +153,18 @@ class FirestoreStore:
                 transaction.create(self._views(org_id, world_id, scope).document(f"{doc['seq']:08d}"), doc)
             return new_head
 
-        return _run(self._client.transaction())
+        # Contention (gRPC ABORTED, e.g. "Transaction lock timeout") means another writer holds
+        # the world: raised directly from a read, or wrapped in ValueError once the library's
+        # commit retries are spent. Either way the caller sees WriterBusy, never a Google error.
+        from google.api_core.exceptions import Aborted
+
+        from tilo_harness.writer import WriterBusy
+
+        try:
+            return _run(self._client.transaction())
+        except Aborted as error:
+            raise WriterBusy(f"world {world_id!r} is busy: {error.message}") from error
+        except ValueError as error:
+            if isinstance(error.__cause__, Aborted):
+                raise WriterBusy(f"world {world_id!r} is busy: {error.__cause__.message}") from error
+            raise
