@@ -31,4 +31,8 @@ channel identity binding. Public ingress for signature-verified webhooks only.
 - Handler raises: the claim is kept (at-most-once, a partly applied side effect never repeats),
   outcome "failed", still 200 (Meta retries non-2xx), error logged by type only.
 - `keywords`: whole-message, case-insensitive; only bound numbers are obeyed; effect through the
-  injected control plane, then one confirmation to the sender.
+  injected control plane, then one confirmation to the sender; a failed effect gets one short
+  "Could not apply that" reply.
+- Hardening: app secret >= 32 bytes (constructor raises; empty key never verifies); wamids are never
+  logged (`message_ref`: sha256 prefix, they encode the number); object, field and `phone_number_id`
+  pinned; timestamps more than 60 s ahead are dropped like stale ones (and logged).

@@ -1,7 +1,7 @@
 """WhatsApp Cloud API webhook: signature verified, idempotent, ordered per sender (FR-CHN-02).
 
 Order of work in `WhatsAppWebhook.receive`: verify the signature over the raw bytes (nothing else
-runs on failure), parse Meta's `entry[].changes[].value.messages[]`, drop stale messages without
+runs on failure), parse Meta's `entry[].changes[].value.messages[]`, drop stale (or future-dated) messages without
 claiming them, then per message, inside that sender's lock, claim its id in the injected
 `DedupeStore` and call the handler. Message text, numbers in full and the app secret are never
 logged.
@@ -21,7 +21,11 @@ from typing import Any, Protocol
 log = logging.getLogger("tilo_channels.whatsapp")
 
 DEFAULT_MAX_AGE_S = 300.0
+DEFAULT_MAX_FUTURE_SKEW_S = 60.0
+MIN_APP_SECRET_BYTES = 32  # Meta app secrets are 32 characters
 _SIG_PREFIX = "sha256="
+_OBJECT = "whatsapp_business_account"
+_FIELD = "messages"
 
 
 class DedupeStore(Protocol):
@@ -57,27 +61,47 @@ def mask_number(number: str) -> str:
     return "***" + number[-4:]
 
 
+def message_ref(message_id: str) -> str:
+    """Irreversible log reference for a wamid: a wamid encodes the sender's number, so it is never logged."""
+    return hashlib.sha256(message_id.encode("utf-8", "replace")).hexdigest()[:12]
+
+
 def verify_signature(app_secret: bytes, raw_body: bytes, header: str | None) -> bool:
-    """True only for `sha256=` + lowercase-hex HMAC-SHA256(app_secret, raw_body). Never raises."""
-    if not header:
+    """True only for `sha256=` + lowercase-hex HMAC-SHA256(app_secret, raw_body). Never raises.
+
+    An empty key is never valid: anyone can sign with it."""
+    if not app_secret or not header or not header.isascii():
         return False
     expected = _SIG_PREFIX + hmac.new(app_secret, raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(header.encode("utf-8"), expected.encode("ascii"))
 
 
-def _parse_messages(payload: Any) -> list[InboundMessage]:
-    """Messages in payload order; malformed entries are skipped, `statuses` are ignored."""
+def _parse_messages(payload: Any, phone_number_id: str | None) -> list[InboundMessage]:
+    """Messages in payload order. Oddly shaped levels and other products, fields or numbers are
+    skipped; `statuses` are ignored."""
     found: list[InboundMessage] = []
-    if not isinstance(payload, dict):
+    if not isinstance(payload, dict) or payload.get("object") != _OBJECT:
         return found
-    for entry in payload.get("entry") or []:
-        for change in (entry.get("changes") or []) if isinstance(entry, dict) else []:
-            value = change.get("value") if isinstance(change, dict) else None
-            for raw in (value.get("messages") or []) if isinstance(value, dict) else []:
+    for entry in _as_list(payload.get("entry")):
+        for change in _as_list(entry.get("changes") if isinstance(entry, dict) else None):
+            if not isinstance(change, dict) or change.get("field") != _FIELD:
+                continue
+            value = change.get("value")
+            if not isinstance(value, dict):
+                continue
+            if phone_number_id is not None:
+                metadata = value.get("metadata")
+                if not isinstance(metadata, dict) or metadata.get("phone_number_id") != phone_number_id:
+                    continue
+            for raw in _as_list(value.get("messages")):
                 message = _parse_message(raw)
                 if message is not None:
                     found.append(message)
     return found
+
+
+def _as_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
 
 
 def _parse_message(raw: Any) -> InboundMessage | None:
@@ -88,7 +112,7 @@ def _parse_message(raw: Any) -> InboundMessage | None:
         return None
     try:
         timestamp = int(raw.get("timestamp"))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     text = None
     if kind == "text":
@@ -106,7 +130,13 @@ class WhatsAppWebhook:
         store: DedupeStore,
         handler: Callable[[InboundMessage], object],
         max_age_s: float = DEFAULT_MAX_AGE_S,
+        max_future_skew_s: float = DEFAULT_MAX_FUTURE_SKEW_S,
+        phone_number_id: str | None = None,
     ) -> None:
+        if len(app_secret) < MIN_APP_SECRET_BYTES:
+            raise ValueError(f"app secret must be at least {MIN_APP_SECRET_BYTES} bytes")
+        self._phone_number_id = phone_number_id
+        self._max_future_skew_s = max_future_skew_s
         self._app_secret = app_secret
         self._now = now
         self._store = store
@@ -125,12 +155,14 @@ class WhatsAppWebhook:
         if not isinstance(payload, dict):
             return WebhookResponse(400, ())
 
-        messages = _parse_messages(payload)
+        messages = _parse_messages(payload, self._phone_number_id)
         results: dict[int, str] = {}
         fresh: list[tuple[int, int]] = []  # (timestamp, payload position)
         now = self._now()
         for position, message in enumerate(messages):
-            if now - message.timestamp > self._max_age_s:
+            age = now - message.timestamp
+            if age > self._max_age_s or -age > self._max_future_skew_s:
+                log.warning("whatsapp message dropped stale ref=%s age_s=%d", message_ref(message.message_id), age)
                 results[position] = "stale"
             else:
                 fresh.append((message.timestamp, position))
@@ -148,8 +180,8 @@ class WhatsAppWebhook:
                 self._handler(message)
             except Exception as exc:  # at-most-once: the claim is kept, Meta still gets a 200
                 log.error(
-                    "whatsapp handler failed message_id=%s sender=%s error=%s",
-                    message.message_id,
+                    "whatsapp handler failed ref=%s sender=%s error=%s",
+                    message_ref(message.message_id),
                     mask_number(message.sender),
                     type(exc).__name__,
                 )

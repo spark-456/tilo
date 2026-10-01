@@ -20,6 +20,7 @@ PAUSE = "PAUSE"
 UNSUBSCRIBE = "UNSUBSCRIBE"
 _KEYWORDS = frozenset({STOP_AUTOPILOT, PAUSE, UNSUBSCRIBE})
 CHANNEL = "whatsapp"
+FAILED_REPLY = "Could not apply that. Use Stop all in the app."
 
 
 class Bindings(Protocol):
@@ -69,18 +70,18 @@ class KeywordHandler:
             confirmation = self._apply(keyword, user_id)
         except Exception as exc:
             log.error("keyword effect failed keyword=%s error=%s", keyword, type(exc).__name__)
+            self._reply(message.sender, keyword, FAILED_REPLY)
             return KeywordResult(True, keyword, False, False)
+        confirmed = self._reply(message.sender, keyword, confirmation)
+        return KeywordResult(True, keyword, True, confirmed)
+
+    def _reply(self, to: str, keyword: str, body: str) -> bool:
         try:
-            self._sender.send_text(message.sender, confirmation)
+            self._sender.send_text(to, body)
         except Exception as exc:
-            log.error(
-                "keyword confirmation failed keyword=%s to=%s error=%s",
-                keyword,
-                mask_number(message.sender),
-                type(exc).__name__,
-            )
-            return KeywordResult(True, keyword, True, False)
-        return KeywordResult(True, keyword, True, True)
+            log.error("keyword reply failed keyword=%s to=%s error=%s", keyword, mask_number(to), type(exc).__name__)
+            return False
+        return True
 
     def _apply(self, keyword: str, user_id: str) -> str:
         if keyword == STOP_AUTOPILOT:
