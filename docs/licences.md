@@ -23,6 +23,7 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | fastapi | MIT | https://pypi.org/project/fastapi/ |
+| python-multipart (`tilo-api` form uploads) | Apache-2.0 | https://pypi.org/project/python-multipart/ |
 | uvicorn | BSD-3-Clause | https://pypi.org/project/uvicorn/ |
 
 ## Python (`packages/contracts-py`)
@@ -30,6 +31,18 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | pydantic | MIT | https://pypi.org/project/pydantic/ |
+
+## Python (`services/harness`)
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| google-adk | Apache-2.0 | https://pypi.org/project/google-adk/ |
+| google-cloud-firestore | Apache-2.0 | https://pypi.org/project/google-cloud-firestore/ |
+
+`services/harness` also uses `pyyaml`, `jsonschema` and `referencing` (already listed under the
+root dev dependency group), declared as its own direct dependencies since its code imports them
+directly rather than relying only on the shared dev group. FR-AGT-01/02/03 adds the in-workspace
+`tilo-contracts` and `tilo-providers` members (not external; no new licence).
 
 ## Python (`packages/providers`)
 
@@ -55,12 +68,31 @@ Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject
 (`tilo_providers.factory`); dev/CI tests fake the `google.genai` import path at the
 `sys.modules` boundary and never install real credentials (EFF-01).
 
-## JavaScript / TypeScript (root `package.json` devDependencies, `pnpm`-managed)
+## Python (`services/connectors`)
+
+`tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
+FR-AGT-11), both already listed above (MIT); and the in-workspace `tilo-policy` (not external).
+No new licence.
+
+## Python (`packages/planning`)
+
+`tilo-planning` (FR-INT-01/02) depends only on the in-workspace `tilo-contracts` and
+`tilo-providers` (not external); `tilo-api` now depends on the in-workspace `tilo-planning`.
+No new licence.
+
+## JavaScript / TypeScript (root `package.json` and `apps/web`, `pnpm`-managed)
 
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | @biomejs/biome | MIT | https://www.npmjs.com/package/@biomejs/biome |
+| firebase-tools (runs the Firestore emulator for `services/harness`, P0-09) | MIT | https://www.npmjs.com/package/firebase-tools |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
+| react, react-dom, pixi.js, vite, @vitejs/plugin-react, vitest, @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/ |
+| @playwright/test | Apache-2.0 | https://www.npmjs.com/package/@playwright/test |
+| @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
+| @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT; fonts Nunito, Nunito Sans, JetBrains Mono are OFL-1.1 | https://fonts.google.com/ |
+| fast-check (property tests, ticket P0-08b-player, FR-WLD-04) | MIT | https://www.npmjs.com/package/fast-check |
+| @tilo/contracts (`packages/contracts-ts`, internal workspace package, not third-party) | n/a | `packages/contracts-ts` |
 
 ## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)
 
@@ -91,6 +123,7 @@ Third-party code run in CI (`.github/workflows/ci.yml`) or on developer machines
 | astral-sh/setup-uv | v4 | MIT | https://github.com/astral-sh/setup-uv |
 | actions/setup-node | v4 | MIT | https://github.com/actions/setup-node |
 | extractions/setup-just | v2 | MIT | https://github.com/extractions/setup-just |
+| actions/setup-java (Firestore emulator's JRE, P0-09) | v4 | MIT | https://github.com/actions/setup-java |
 | pre-commit/pre-commit-hooks | v5.0.0 | MIT | https://github.com/pre-commit/pre-commit-hooks |
 
 ## Fonts, icons and design assets

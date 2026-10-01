@@ -1,7 +1,7 @@
 # ADR-0006: Who may open a gate
 
-- Status: Accepted (2026-09-25, architect; ticket P0-03, security review round 8). Freezes with
-  the CP0 set on 29 Sep.
+- Status: Accepted (2026-09-25, architect; ticket P0-03, security review rounds 8 and 9).
+  Freezes with the CP0 set on 29 Sep.
 - Deciders: architect, orchestrator
 - Requirement: FR-WLD-03 (PRD 10.1, 10.3, 16.2, SEC-06, HR-7)
 
@@ -17,8 +17,13 @@ validated. Details and defaults are in BQ-32.
 
 ## Decision
 1. **The gate names who besides the owner may answer.** `approval.requested` carries
-   `approver` (a user id or null) and `team_lead` (`{domain, policy_id}` or null). The harness
-   copies both from the owner's records when it raises the gate; a model never sets them.
+   `approver` (null, or the owner's Approver assignment `{user, assigned_by: {by, at}}`) and
+   `team_lead` (`{domain, policy_id}` or null). The harness copies both from the owner's records
+   when it raises the gate (an Approver from the owner's assignment or share link, FR-HIL-12); a
+   model never sets them. The Approver assignment is an owner-made record like a Team Lead's
+   domain (decision 2) and uses the same `assignment` stamp, so a bare user id the harness names
+   proves nothing: security review round 9 found that any person named there, a Team Lead
+   outside their domain included, could open a T3 gate.
 2. **A Team Lead's domain is a record the owner made.** `contracts/team_lead.schema.json`
    (`TeamLead`: `id`, `user`, `domain`, `assigned_by`) is the shape of each `config/teams.yaml`
    entry and of a Team Lead set in the console. One domain per Team Lead. District scoping
@@ -28,8 +33,9 @@ validated. Details and defaults are in BQ-32.
    policy's action type in the owner's worlds, whatever the policy's level or scope, and is read
    from the current record (like scope, BQ-31).
 4. **OB-01 checks the answerer.** On a gate, `approval.resolved.authz.ref` is the world's owner,
-   the gate's `approver`, or a Team Lead whose record has the gate's domain and was assigned by
-   the world's owner no later than `authz.at`, while the named policy is the owner's own (owner
+   the gate's `approver.user` when `approver.assigned_by.by` is the world's owner and
+   `approver.assigned_by.at` is no later than `authz.at`, or a Team Lead whose record has the
+   gate's domain and was assigned by the world's owner no later than `authz.at`, while the named policy is the owner's own (owner
    and every stamp), has the gate's action type, lists the domain, was created no later than
    `authz.at` and had not expired.
 5. **The PIN is recorded.** `approval.resolved` carries `pin_verified`. A T3 gate answered on
@@ -37,8 +43,10 @@ validated. Details and defaults are in BQ-32.
    wrong or missing PIN.
 6. **Cases.** `fixtures/outbox/crossref/` gains the gate-path parts `team_lead` and a non-null
    `world_owner`, plus invalid cases for a Viewer, a Team Lead of another domain, a Team Lead
-   the policy does not allow, a domain someone else assigned and a T3 WhatsApp answer with no
-   PIN; the reference check is `tests/contracts/test_FR_WLD_03_outbox_crossref.py`.
+   the policy does not allow, a domain someone else assigned, a T3 WhatsApp answer with no PIN,
+   an Approver someone other than the owner assigned, an Approver assigned after the answer and a
+   Team Lead approving as a person through an Approver slot they named themself; the reference
+   check is `tests/contracts/test_FR_WLD_03_outbox_crossref.py`.
 
 ## Consequences
 - The P0-09 validator and the policy engine apply the answerer check before writing an outbox
@@ -46,5 +54,7 @@ validated. Details and defaults are in BQ-32.
 - The Team Lead console (FR-HIL-10) and `config/teams.yaml` loader validate against
   `team_lead.schema.json` and record `assigned_by`; only the owner may write it.
 - Sharing a gate with an Approver after it is raised (FR-HIL-12) re-raises it as a new
-  proposal with a new card, so `approval.requested` always names the Approver who answers.
+  proposal with a new card, so `approval.requested` always names the Approver who answers. Only
+  the owner creates an Approver assignment or share link; the API records `assigned_by` from the
+  signed-in owner, never from the request body or a model.
 - Adding district scoping for Team Leads later is a minor version of `team_lead.schema.json`.

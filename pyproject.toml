@@ -20,7 +20,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["services/api", "packages/providers", "packages/contracts-py", "packages/policy"]
+members = ["services/api", "services/harness", "services/sandbox-web", "packages/providers", "packages/contracts-py", "packages/policy", "packages/metering", "evals", "services/connectors", "packages/archive", "packages/planning", "services/render"]
 
 [tool.pytest.ini_options]
 markers = [
@@ -39,3 +39,8 @@ select = ["E", "F", "I", "UP"]
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
+# services/api/tests has no __init__.py (pytest's rootdir-relative sibling imports need that), so
+# its conftest.py collides with packages/providers/tests/conftest.py as a duplicate top-level
+# module once both are checked in one mypy invocation; excluding it here is narrower than adding
+# an __init__.py, which would break those sibling imports.
+exclude = ["services/api/tests/conftest\\.py$"]

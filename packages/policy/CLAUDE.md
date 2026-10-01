@@ -14,8 +14,7 @@ Lead's approve; checking an outbox entry against what was authorised (OB-01, OB-
   `contracts/outbox.rules.md`, `docs/security/p4-policy-invariants.md`. Writes nothing.
 
 ## Config
-- `config/autonomy.yaml` is `load_risk_table()`'s default; not in the repo yet
-  (spark-456/tilo#1), so callers pass an explicit path.
+- `config/autonomy.yaml` (the risk tier table) is `load_risk_table()`'s default path.
 
 ## Requirement IDs
 - FR-HIL-03, FR-HIL-04, FR-HIL-05, FR-HIL-08, engine half of FR-HIL-06; PI-01..PI-16 (P4-01).

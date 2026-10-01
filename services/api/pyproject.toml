@@ -8,7 +8,12 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "jsonschema>=4.18",
     "referencing>=0.30",
+    "python-multipart>=0.0.18",
+    "tilo-planning",
 ]
+
+[tool.uv.sources]
+tilo-planning = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

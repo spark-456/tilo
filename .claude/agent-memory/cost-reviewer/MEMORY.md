@@ -1,2 +1,4 @@
 - [P0-04 provider config pattern](p0-04-provider-config.md) — config-only slice (no adapters/network) is the right shape for PL-07/PL-06/NFR-25 tickets; good reference for future provider-layer reviews.
 - [EFF-01 adapter gate](eff01-adapter-gate.md) — LIVE gate must be in adapters too; probe direct construction with LIVE unset.
+- [P0-06 router](p0-06-router.md) — clean cascade/token-cap/LIVE-gate shape that passed review; reference for future router diffs.
+- [P8-01c spend-alert conflation](p8-01c-spend-alert-vs-reserve-conflation.md) — commit-time alert must count committed spend only; a shared helper with reserve() can leak outstanding reservations into it, false-tripping the NFR-24 kill switch.

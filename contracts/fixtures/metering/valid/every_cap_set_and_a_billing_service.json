@@ -1,0 +1,19 @@
+{
+  "treasury": {
+    "reserve_margin": 0.15,
+    "request_at": 0.8
+  },
+  "caps": {
+    "run_credits": 300,
+    "user_day_credits": 1500,
+    "org_day_credits": 6000
+  },
+  "spend": {
+    "daily_usd_soft": 10,
+    "daily_usd_hard": 10
+  },
+  "reconciliation": {
+    "tolerance": 0.1,
+    "billing_services": ["Vertex AI", "Cloud Run"]
+  }
+}

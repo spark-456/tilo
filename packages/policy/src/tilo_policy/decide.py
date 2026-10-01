@@ -67,7 +67,7 @@ def over_limit(policy: dict, applied: list[dict], credits: float, now: str) -> s
         return "l3_daily_cap_reached"
     if most_credits is None:
         return None
-    spent = [float(a["credits"]) for a in mine] + [float(credits)]
+    spent = [float(a["data"]["credits"]) for a in mine] + [float(credits)]
     if any(not c >= 0 for c in spent):  # negative or NaN credits never lower the total
         raise ValueError("credits must be non-negative")
     return "l3_credits_cap_reached" if math.fsum(spent) > most_credits else None

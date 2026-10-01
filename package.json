@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "firebase-tools": "15.31.0",
     "typescript": "^5.7.2"
   },
   "scripts": {

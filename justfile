@@ -12,9 +12,16 @@ setup:
     pnpm install
     uv run pre-commit install
 
-# Run the API dev server.
+# Run the web dev server (`just dev-api` in a second terminal runs the API).
 dev:
+    pnpm --filter @tilo/web run dev
+
+dev-api:
     uv run --package tilo-api uvicorn tilo_api:app --reload --port 8080
+
+# Regenerate apps/web design tokens from design/tokens.json (drift-tested).
+tokens:
+    node apps/web/scripts/generate-tokens.mjs
 
 # Format check + lint + typecheck + all tests (the full gate; matches PRD 20.4 "make check").
 # contracts-check runs first so CI fails on contract drift (FR-WLD-02).
@@ -36,11 +43,13 @@ check-fast:
     uv run ruff format --check .
     uv run ruff check .
     pnpm exec biome check .
-    uv run pytest -q
+    uv run pytest -q -m "not emulator"
 
-# Run every test suite (Python + JS, once JS suites exist).
+# Run every test suite (Python + JS, once JS suites exist). Emulator-marked tests
+# (services/harness, P0-09) need Java + firebase-tools and run separately in CI
+# (see .github/workflows/ci.yml) and with `uv run pytest services/harness/tests -m emulator`.
 test:
-    uv run pytest -q
+    uv run pytest -q -m "not emulator"
     pnpm -r run test
 
 # Format everything in place.
@@ -60,12 +69,20 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy --explicit-package-bases services/api packages/providers packages/contracts-py packages/policy/src
+    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src services/render/src
     pnpm -r exec tsc --noEmit
+
+# Start the Firestore emulator and run the harness skeleton against it (P0-09).
+harness-skeleton:
+    uv run --package tilo-harness python -m tilo_harness.skeleton --world w_harness_skeleton --run r_harness_skeleton
 
 # Run the eval harness (not built yet — ticket P3).
 eval:
     python -c "print('eval harness not built yet (ticket P3); nothing to run')"
+
+# PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
+conformance:
+    uv run python -m tilo_providers.conformance
 
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated

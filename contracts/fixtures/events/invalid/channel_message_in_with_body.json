@@ -21,6 +21,8 @@
     "channel": "whatsapp",
     "message_ref": "r_village_basic_1/29",
     "card_id": "01JB5VQ0000000000000009001",
+    "card_kind": "gate",
+    "option": "approve",
     "body": "Yes, send it.",
     "destination": null
   },

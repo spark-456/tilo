@@ -25,7 +25,7 @@ Ambiguity: apply the PRD's stated default, log it in `docs/open-questions.md`, k
 - The repo path contains spaces: always quote paths. Use forward slashes in code and scripts.
 - Task runner is `just` (not make). Every recipe calls `uv`, `pnpm`, Python or Node; no bash-only or PowerShell-only scripts. CI runs on Linux.
 - Line endings are LF (`.gitattributes`). The Bash tool collapses `\\` inside heredocs: write files with the Write tool, not heredocs.
-- Hooks: `.claude/hooks/guard.py` blocks edits to read-only paths, `.env` files, secret-looking content, `git push`, `terraform apply`, `tilo-demo` deploys and `LIVE=1`. Do not work around it; report instead.
+- Hooks: `.claude/hooks/guard.py` blocks edits to read-only paths, `.env` files, secret-looking content, force pushes, `terraform apply`, `tilo-demo` deploys and `LIVE=1`. Do not work around it; report instead.
 
 ## Ticket loop
 - One ticket = one requirement ID or a small related group. Branch `feat/<ID>-<slug>`; acceptance tests on `tests/<ID>` written first by test-writer and failing before implementation.
@@ -40,12 +40,15 @@ Work only in your worktree. Create `feat/<ID>-<slug>` from `main`, merge `tests/
 ### Reviewers
 You get the ticket, the PRD sections, the branch and the worktree path. You never see the builder's reasoning; do not trust summaries. Read `git diff main...<branch>` and run the tests yourself. Never edit files or commit.
 Automatic FAIL: any console error, layout shift, failing test, unregistered event type, schema drift, honesty-rule violation (PRD 9.4), model id outside config, secret in the diff, paid call without `LIVE=1`.
+Report every blocking problem in one round, so one fix pass can clear them all. A problem is blocking only if it breaks an acceptance test or PRD criterion, a hard rule, an automatic-FAIL item, security or data safety. Everything else is a follow-up and never fails the ticket on its own.
 Reply in exactly this form, no scores, no praise:
 ```
 VERDICT: PASS | FAIL
-BIGGEST PROBLEM: <one problem: file:line, what is wrong, what done looks like> | none
+BLOCKING: <every blocking problem, one per line: file:line, what is wrong, what done looks like> | none
+FOLLOW-UPS: <non-blocking findings, one per line, for a follow-up issue> | none
 EVIDENCE: <commands you ran and what they showed, at most 5 lines>
 ```
+After a FAIL the builder fixes every blocking problem in one pass, and only the reviewer that failed re-checks the fix. Which reviewers run on which tickets, and the round limit, are in `docs/parallel-sessions.md`.
 Save recurring defects, codebase patterns and PRD rules that keep being missed to your project memory.
 
 ## Ask the user before
@@ -56,7 +59,7 @@ Changing a frozen contract (ADR first); applying infrastructure or spending mone
 
 ## Commands
 - `just setup` — `uv sync` + `pnpm install` for every workspace member
-- `just dev` — run the `tilo-api` dev server
+- `just dev` / `just dev-api` / `just tokens` — web dev server / `tilo-api` dev server / regenerate web tokens
 - `just check` — format check + lint + typecheck + all tests (the full gate; run before finishing a ticket)
 - `just check-fast` — format + lint + tests, used by `.claude/hooks/stop_check.py`, under 2 minutes
 - `just test` — all Python and JS test suites

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/attention.schema.json",
+  "x-version": "1.0.0",
+  "title": "Attention",
+  "description": "One measured span of a person's attention on a run (PRD 14.2, FR-MTR-05): steering (intake, a question, a card, a take-over) or review (a deliverable open before approval). apps/web measures it, as do the channel handlers for WhatsApp and email answers; tilo-api writes it, and packages/metering subtracts the minutes from time saved. Event timestamps cannot give this, because the gap between a question and its answer is waiting time, not attention. A span holds ids and times only, never content (PRD 16.5). Rules MT-07 and MT-08 in contracts/metering.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "world_id", "run_id", "user", "kind", "started_at", "ended_at", "ref"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/ulid" },
+    "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+    "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+    "user": { "$ref": "common.schema.json#/$defs/user_id" },
+    "kind": { "type": "string", "enum": ["intake", "question", "card", "take_over", "review"] },
+    "started_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "ended_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "ref": {
+      "description": "What the attention was spent on: a card id (ULID) for a question or card span, the artifact open for review (art_ id) for a review span, and null for intake or a take-over with no card (BQ-65).",
+      "anyOf": [
+        { "$ref": "common.schema.json#/$defs/ulid" },
+        { "$ref": "common.schema.json#/$defs/artifact_id" },
+        { "type": "null" }
+      ]
+    }
+  }
+}

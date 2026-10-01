@@ -8,6 +8,8 @@ from __future__ import annotations
 import tilo_policy
 from _policy_lib import OWNER
 
+# approval.requested.approver is the owner's assignment of the gate (ADR-0006).
+APPROVER = {"user": "u_approver", "assigned_by": {"by": OWNER, "at": "2026-09-29T09:00:00.000Z"}}
 GATE = {"gate_id": "G1", "card_id": "01JB5VQ0000000000000009001", "outbox_id": "01JB5VQ0000000000000009002"}
 
 
@@ -45,7 +47,7 @@ def test_FR_HIL_03_PI_02_owner_approves_and_the_gate_opens():
 
 def test_FR_HIL_03_PI_02_named_approver_approves_and_the_gate_opens():
     resolved = _resolved(ref="u_approver")
-    decision = tilo_policy.open_gate(_reserved(approver="u_approver"), resolved, world_owner=OWNER)
+    decision = tilo_policy.open_gate(_reserved(approver=APPROVER), resolved, world_owner=OWNER)
     assert decision.outcome == "run"
     assert decision.authz["ref"] == "u_approver"
 
@@ -70,9 +72,7 @@ def test_PI_02_never_answered_stays_shut():
 
 def test_PI_02_answer_from_someone_else_opens_nothing():
     """Not the owner and not the named Approver — a Viewer or anyone else."""
-    decision = tilo_policy.open_gate(
-        _reserved(approver="u_approver"), _resolved(ref="u_random_viewer"), world_owner=OWNER
-    )
+    decision = tilo_policy.open_gate(_reserved(approver=APPROVER), _resolved(ref="u_random_viewer"), world_owner=OWNER)
     assert decision.outcome == "gate"
 
 
@@ -89,7 +89,7 @@ def test_PI_04_SEC_06_t3_gate_on_whatsapp_without_pin_opens_nothing():
 
 
 def test_PI_04_SEC_06_t3_gate_on_whatsapp_with_pin_opens():
-    reserved = _reserved(risk_tier="T3", approver="u_approver")
+    reserved = _reserved(risk_tier="T3", approver=APPROVER)
     resolved = _resolved(ref="u_approver", channel="whatsapp", pin_verified=True)
     decision = tilo_policy.open_gate(reserved, resolved, world_owner=OWNER)
     assert decision.outcome == "run"
