@@ -28,3 +28,18 @@ def test_QUOTA_the_first_token_deadline_is_configurable_and_defaults_to_6_second
 def test_QUOTA_the_session_builds_the_fast_client_with_that_deadline(session, monkeypatch):  # noqa: F811
     monkeypatch.setenv("GEMINI_API_KEY", "k-" + "z9" * 8)
     assert session._build_fast().first_token_s == pytest.approx(session.cfg.fast_first_token_s)
+
+
+def test_START_admitting_someone_triggers_the_start_check_at_once(session):  # noqa: F811
+    s = session
+    s.next_status_at = s.clock.now() + 50
+    s._on_admitted("Sam")
+    assert s.next_status_at <= s.clock.now()  # no waiting for the next 6 s check: speech right after admission counts
+    rows = (s.out_dir / "events.jsonl").read_text(encoding="utf-8")
+    assert "participant.admitted" in rows and "Sam" in rows
+
+
+def test_START_the_check_before_the_meeting_starts_runs_often():
+    from bot.session import STATUS_EVERY_S
+
+    assert STATUS_EVERY_S <= 3.0

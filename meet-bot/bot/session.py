@@ -49,7 +49,7 @@ from .trace import Turn, TurnTrace
 from .tts import make_tts
 
 log = logging.getLogger("bot.session")
-STATUS_EVERY_S = 6.0
+STATUS_EVERY_S = 3.0  # how often to check who is here before the meeting has started for the bot
 
 
 def build_knowledge(cfg: Config, routes: list[str]) -> KnowledgeBase:
@@ -210,6 +210,11 @@ class LiveSession:
             asyncio.get_running_loop().create_task(self.fast.prewarm())
         except RuntimeError:  # no running loop (offline tools): nothing to warm
             pass
+
+    def _on_admitted(self, name: str) -> None:
+        """Someone just came in: check at once whether the meeting can start, so their first words are not lost."""
+        self.events.emit("participant.admitted", name=name)
+        self.next_status_at = min(self.next_status_at or 0.0, self.clock.now())
 
     @staticmethod
     def analysis_allowed(now: float, quick_running: bool, last_question_at: float) -> bool:
@@ -785,7 +790,7 @@ class LiveSession:
                 if self.auto_admit and now >= next_admit:
                     next_admit = now + 3.0
                     for name in await br.admit_waiting(cfg.admit_allowed):
-                        self.events.emit("participant.admitted", name=name)
+                        self._on_admitted(name)
 
                 # --- people, gate, exit conditions: a task, because the People panel takes over a second to open --
                 if status_task and status_task.done():
