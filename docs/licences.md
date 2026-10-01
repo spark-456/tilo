@@ -80,6 +80,11 @@ No new licence.
 `tilo-providers` (not external); `tilo-api` now depends on the in-workspace `tilo-planning`.
 No new licence.
 
+## Python (`services/render`)
+
+`tilo-render` (AGR-01 / FR-CON-09) declares `pydantic` as a direct runtime dependency, already
+listed above under `packages/contracts-py` (MIT). No new licence.
+
 ## JavaScript / TypeScript (root `package.json` and `apps/web`, `pnpm`-managed)
 
 | Dependency | Licence | Source |
