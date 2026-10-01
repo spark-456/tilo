@@ -29,8 +29,9 @@ def build_hash(repo_root: Path | None = None) -> str:
 _COUNTS = ("ran", "passed", "failed", "pending", "not_run", "not_runnable")
 
 
-def _share(n: int, total: int) -> str:
-    return f"{n} of {total} passed" + (f" ({n / total:.0%})" if total else "")
+def _share(n: int, total: int, runs: bool = False) -> str:
+    """ "34 of 40 passed"; with repeats (deploy-gate cases run several times) the unit is runs, not cases."""
+    return f"{n} of {total} {'runs ' if runs else ''}passed" + (f" ({n / total:.0%})" if total else "")
 
 
 def group_summary(result: PassResult) -> dict[str, dict[str, int]]:
@@ -47,12 +48,12 @@ def group_summary(result: PassResult) -> dict[str, dict[str, int]]:
     return dict(sorted(groups.items()))
 
 
-def _group_line(group: str, row: dict[str, int]) -> str:
+def _group_line(group: str, row: dict[str, int], runs: bool = False) -> str:
     extra = [
         f"{row[k]} {label}" for k, label in (("pending", "pending autorater"), ("not_run", "not run (cap)")) if row[k]
     ]
     extra += [f"{row['not_runnable']} not runnable"] if row["not_runnable"] else []
-    return f"- {group}: {_share(row['passed'], row['ran'])}" + "".join(f"; {e}" for e in extra)
+    return f"- {group}: {_share(row['passed'], row['passed'] + row['failed'], runs)}" + "".join(f"; {e}" for e in extra)
 
 
 def failures_by_cause(result: PassResult) -> dict[str, list[str]]:
@@ -77,10 +78,9 @@ def _cost_per_role(result: PassResult) -> dict[str, float]:
 def summary_text(result: PassResult) -> str:
     """The CLI summary: counts first, then per case group, then why a partial pass stopped."""
     done = [r for r in result.ran if r.passed is not None]
-    lines = [
-        f"{result.pass_kind} pass: {_share(sum(r.passed is True for r in done), len(done))}, {result.spent:g} credits"
-    ]
-    lines += [_group_line(g, row) for g, row in group_summary(result).items()]
+    share = _share(sum(r.passed is True for r in done), len(done), result.repeated)
+    lines = [f"{result.pass_kind} pass: {share}, {result.spent:g} credits"]
+    lines += [_group_line(g, row, result.repeated) for g, row in group_summary(result).items()]
     if result.stop_reason:
         lines.append(f"stopped: {result.stop_reason}; {len(result.not_run)} case(s) not run")
     if result.not_runnable:
@@ -95,22 +95,24 @@ def render_section(result: PassResult, *, build_hash: str, now_utc: str) -> str:
     lines = [f"{_SECTION}{result.pass_kind}", ""]
     lines += [f"- Run at: {now_utc}", f"- Build hash: `{build_hash}`", f"- Roles: {roles}"]
     lines += [f"- Cost: {result.spent:g} credits of a {result.cap:g} cap (replayed recordings)", ""]
-    lines += ["### Results", _share(n_pass, len(done))]
+    lines += ["### Results", _share(n_pass, len(done), result.repeated)]
     if pending := [r for r in result.ran if r.passed is None]:
         lines.append(f"{len(pending)} pending autorater (not counted as passed)")
-    lines += ["", "### By case group"] + [_group_line(g, row) for g, row in group_summary(result).items()]
+    lines += ["", "### By case group"] + [
+        _group_line(g, row, result.repeated) for g, row in group_summary(result).items()
+    ]
     lines += ["", "### Spread"]
-    if result.pass_kind == "gate":
+    if result.repeated:
         repeats: dict[str, list[bool | None]] = defaultdict(list)
         for run in result.ran:
             repeats[run.case.id].append(run.passed)
         lines += [
             f"- {cid}: {sum(o is True for o in outs)} of {len(outs)} repeats passed"
             for cid, outs in sorted(repeats.items())
+            if len(outs) > 1
         ]
-        lines += [] if repeats else ["- no deploy_gate cases ran"]
     else:
-        lines.append("- one run per case (no repeats at this pass kind)")
+        lines.append("- one run per case (no repeats ran)")
     lines += ["", "### Failures grouped by cause"]
     by_cause = failures_by_cause(result)
     lines += [f"- {cause}: {', '.join(sorted(set(ids)))}" for cause, ids in sorted(by_cause.items())] or ["- none"]

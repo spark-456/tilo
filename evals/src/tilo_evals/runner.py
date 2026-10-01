@@ -5,6 +5,7 @@ cap (config/evals.yaml), and runs its deterministic checks. Autorater checks are
 reported as pending and never count as a pass. Dev and CI replay recordings, so nothing here is paid.
 """
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,15 @@ from .config import EvalsConfig
 from .executors import Executor, ExecutorError, ReplayExecutor
 
 PASS_KINDS = ("smoke", "full", "gate")
+
+
+class SelectionError(ValueError):
+    """The pass kind, --case or --group names nothing: the pass cannot run as asked."""
+
+
+def _one_line(text: str) -> str:
+    """One bounded line: a reason or cause can echo recorded text, and results.md is split on lines."""
+    return " ".join(text.split())[:300]
 
 
 @dataclass
@@ -43,6 +53,12 @@ class PassResult:
     spent: float = 0.0
 
     @property
+    def repeated(self) -> bool:
+        """True when a case ran more than once (deploy-gate repeats), so counts are of runs, not cases."""
+        ids = [r.case.id for r in self.ran]
+        return len(ids) != len(set(ids))
+
+    @property
     def failed(self) -> list[CaseRunResult]:
         return [r for r in self.ran if r.passed is False]
 
@@ -54,16 +70,22 @@ def _is_runnable(case: Case) -> bool:
 def _select(
     cases: list[Case], pass_kind: str, group: str | None, case_ids: list[str], config: EvalsConfig
 ) -> list[Case]:
+    if case_ids and (unknown := sorted(set(case_ids) - {c.id for c in cases})):
+        raise SelectionError(f"unknown case id(s): {', '.join(map(_one_line, unknown))}")
+    if group and not any(c.group == group for c in cases):
+        raise SelectionError(f"no cases in group {_one_line(group)!r}")
     selected = [c for c in cases if c.id in case_ids] if case_ids else [c for c in cases if group in (None, c.group)]
+    repeats = config.deploy_gate_repeats
     if pass_kind == "smoke":  # one ready, runnable case per group
         picked: dict[str, Case] = {}
         for case in sorted(selected, key=lambda c: c.id):
             if case.status == "ready" and _is_runnable(case):
                 picked.setdefault(case.group, case)
         return list(picked.values())
-    if pass_kind == "gate":  # deploy-gate cases, each repeated
-        return [c for c in selected if c.deploy_gate] * config.deploy_gate_repeats
-    return selected
+    if pass_kind == "gate":  # deploy-gate cases only, each repeated
+        return [c for c in selected if c.deploy_gate] * repeats
+    # full: every case once, deploy-gate cases deploy_gate_repeats times (PRD 19.2, MT-09)
+    return [c for case in selected for c in [case] * (repeats if case.deploy_gate else 1)]
 
 
 def _evaluate(case: Case, outcome: Any) -> CaseRunResult:
@@ -89,7 +111,7 @@ def _evaluate(case: Case, outcome: Any) -> CaseRunResult:
             result = CheckResult(False, f"{name}: check raised {type(exc).__name__}: {exc}")
         results.append({"check": name, "passed": result.passed, "cause": result.cause})
         if not result.passed and cause is None:  # one line, bounded: a cause can echo recorded text
-            cause = " ".join((result.cause or f"{name} failed").split())[:300]
+            cause = _one_line(result.cause or f"{name} failed")
     passed = None if not results and pending else cause is None
     return CaseRunResult(case, passed, results, outcome.credits or 0.0, role_costs, roles, cause, pending)
 
@@ -108,7 +130,7 @@ def run_pass(
     and every case after it, is listed under `not_run`, with `stopped_at_cap` and `stop_reason` set. A pass
     whose cap is already reached starts no further case. The cap is never exceeded."""
     if pass_kind not in PASS_KINDS:
-        raise ValueError(f"pass kind must be one of {PASS_KINDS}, got {pass_kind!r}")
+        raise SelectionError(f"pass kind must be one of {PASS_KINDS}, got {pass_kind!r}")
     selected = _select(load_cases(root=cases_root), pass_kind, group, case_ids or [], config)
     cap = float(config.credit_cap[pass_kind])
     result = PassResult(pass_kind, cap=cap, case_groups={c.id: c.group for c in selected})
@@ -123,10 +145,10 @@ def run_pass(
         try:
             outcome = executor.run(case)
         except ExecutorError as exc:
-            result.not_runnable[case.id] = str(exc)
+            result.not_runnable[case.id] = _one_line(str(exc))
             continue
         cost = outcome.credits or 0.0
-        if result.spent >= cap or result.spent + cost > cap:
+        if not math.isfinite(cost) or result.spent >= cap or result.spent + cost > cap:
             result.stopped_at_cap = True
             result.stop_reason = (
                 f"credit cap for the {pass_kind} pass is {cap:g}: {result.spent:g} spent, {case.id} needs {cost:g}"

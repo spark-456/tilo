@@ -82,6 +82,16 @@ def test_EFF_07_routed_domain_ignores_a_malformed_event_data_without_raising():
     assert not _run("routed_domain", {"expected": "legal"}, events).passed
 
 
+def test_EFF_07_routed_domain_null_expected_never_passes_when_the_domain_is_absent():
+    absent = [make_event(type="question.routed", data={"card_id": _CARD_A})]  # no "domain" key: not the same as null
+    result = _run("routed_domain", {"expected": None}, absent)
+    assert not result.passed and "no domain" in result.cause
+    for data in ("garbage", None, []):
+        assert not _run("routed_domain", {"expected": None}, [make_event(type="question.routed", data=data)]).passed
+    mixed = [_routed(None), make_event(type="question.routed", data={"card_id": _CARD_B})]
+    assert not _run("routed_domain", {"expected": None}, mixed).passed
+
+
 def test_EFF_07_answered_from_decision_passes_on_a_cited_decision():
     assert _run("answered_from_decision", {}, [_answered("decision", _DECISION)]).passed
     assert _run("answered_from_decision", {"decision_id": _DECISION}, [_answered("decision", _DECISION)]).passed
@@ -99,8 +109,14 @@ def test_EFF_07_answered_from_decision_fails_for_a_person_answer_a_wrong_citatio
 
 def test_EFF_07_answered_from_decision_expected_false_asserts_a_person_was_asked():
     assert _run("answered_from_decision", {"expected": False}, [_answered("person")]).passed
-    assert _run("answered_from_decision", {"expected": False}, []).passed
+    assert _run("answered_from_decision", {"expected": False}, [_answered("team_lead")]).passed
     assert not _run("answered_from_decision", {"expected": False}, [_answered("decision", _DECISION)]).passed
+
+
+def test_EFF_07_answered_from_decision_expected_false_never_passes_vacuously():
+    for events in ([], [make_event(type="world.started")], [make_event(type="question.answered", data={})]):
+        result = _run("answered_from_decision", {"expected": False}, events)
+        assert not result.passed and "no question.answered" in result.cause
 
 
 def test_EFF_07_route_checks_accept_the_contract_fixtures():

@@ -26,14 +26,17 @@ class Executor(Protocol):
 
 
 def _credits(case: Any, raw: Any) -> float:
+    """A recorded cost: absent is 0; otherwise a finite int or float >= 0 (never a bool or a string)."""
     if raw is None:
         return 0.0
+    if isinstance(raw, bool) or not isinstance(raw, int | float):
+        raise ExecutorError(f"case {case.id}: recording credits must be a number, got {type(raw).__name__}")
     try:
         value = float(raw)
-    except (TypeError, ValueError) as exc:
-        raise ExecutorError(f"case {case.id}: recording credits {raw!r} is not a number") from exc
+    except OverflowError as exc:  # an int too large for a float, such as 10**400
+        raise ExecutorError(f"case {case.id}: recording credits are too large") from exc
     if not math.isfinite(value) or value < 0:
-        raise ExecutorError(f"case {case.id}: recording credits must be a finite number >= 0, got {raw!r}")
+        raise ExecutorError(f"case {case.id}: recording credits must be a finite number >= 0")
     return value
 
 
@@ -51,8 +54,9 @@ def _event(case: Any, event: dict[str, Any]) -> dict[str, Any]:
 
 class ReplayExecutor:
     """Replays a recorded case. A line with a "type" key is a TiloEvent; the one line without one (if
-    present) is the final `{"outputs": {...}, "credits": n}` summary. Without a summary the case costs the
-    sum of its event credits. `base` is the directory a case's relative `recording` path is read from."""
+    present) is the final `{"outputs": {...}, "credits": n}` summary. The case costs the larger of the
+    summary's credits and the sum of its event credits. `base` is the directory a case's relative `recording`
+    path is read from."""
 
     def __init__(self, base: Path = Path(".")) -> None:
         self._base = base
@@ -87,5 +91,9 @@ class ReplayExecutor:
                 if not isinstance(outputs, dict):
                     raise ExecutorError(f"case {case.id}: recording outputs must be an object")
                 summary_credits = _credits(case, record.get("credits"))
-        credits = summary_credits if summary_credits is not None else sum(e["credits"] for e in events)
+        events_total = sum(e["credits"] for e in events)
+        # The cap charges the larger of the summary and the event sum, so a recording cannot under-charge it.
+        credits = max(events_total, summary_credits or 0.0)
+        if not math.isfinite(credits):
+            raise ExecutorError(f"case {case.id}: recording credits are too large")
         return Outcome(events=tuple(events), outputs=outputs, credits=credits)

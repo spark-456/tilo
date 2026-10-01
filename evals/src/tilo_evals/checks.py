@@ -167,7 +167,8 @@ def _events(outcome: Outcome, event_type: str) -> list[dict[str, Any]]:
 @register("routed_domain")
 def _routed_domain(case: Any, outcome: Outcome, args: dict[str, Any] | None = None) -> CheckResult:
     """E-ROUTE (FR-AGT-06): the question went to the expected Team Lead domain (null: the owner fallback).
-    `expected` comes from args, else ground_truth["domain"]; `card_id` picks one question, else all must match."""
+    `expected` comes from args, else ground_truth["domain"]; `card_id` picks one question, else all must match.
+    Fails when no question.routed matches, or one has no `domain` in its data (absent never reads as null)."""
     args = _args(case, "routed_domain", args)
     if args is None:
         return _ambiguous("routed_domain")
@@ -182,8 +183,9 @@ def _routed_domain(case: Any, outcome: Outcome, args: dict[str, Any] | None = No
         routed = [e for e in routed if e["data"].get("card_id") == args["card_id"]]
     if not routed:
         return CheckResult(False, "no question.routed event in the recording")
-    wrong = [e["data"].get("domain") for e in routed if e["data"].get("domain") != expected]
-    if wrong:
+    if missing := [e for e in routed if "domain" not in e["data"]]:  # data absent or not an object reads as {}
+        return CheckResult(False, f"{len(missing)} question.routed event(s) with no domain in their data")
+    if wrong := [e["data"]["domain"] for e in routed if e["data"]["domain"] != expected]:
         return CheckResult(False, f"routed to {wrong[0]!r}, expected {expected!r}")
     return CheckResult(True)
 
@@ -191,17 +193,19 @@ def _routed_domain(case: Any, outcome: Outcome, args: dict[str, Any] | None = No
 @register("answered_from_decision")
 def _answered_from_decision(case: Any, outcome: Outcome, args: dict[str, Any] | None = None) -> CheckResult:
     """E-ROUTE (FR-AGT-07): a repeat question was answered from a cited decision (`decision_id`, if given,
-    must be the one cited). `expected: false` asserts the opposite: no decision answered, a person was asked."""
+    must be the one cited). `expected: false` asserts the opposite: a question.answered exists and none is
+    answered_by decision. A recording with no question.answered fails, it never passes vacuously."""
     args = _args(case, "answered_from_decision", args)
     if args is None:
         return _ambiguous("answered_from_decision")
-    answered = [e["data"] for e in _events(outcome, "question.answered") if e["data"].get("answered_by") == "decision"]
+    events = [e["data"] for e in _events(outcome, "question.answered")]
+    answered = [d for d in events if d.get("answered_by") == "decision"]
     if args.get("expected", True) is False:
-        return (
-            CheckResult(False, "answered from a decision, expected a person to be asked")
-            if answered
-            else CheckResult(True)
-        )
+        if answered:
+            return CheckResult(False, "answered from a decision, expected a person to be asked")
+        if not any(isinstance(d.get("answered_by"), str) for d in events):  # nothing recorded proves nothing
+            return CheckResult(False, "no question.answered with an answered_by in the recording")
+        return CheckResult(True)
     if not answered:
         return CheckResult(False, "no question.answered with answered_by decision in the recording")
     cited = [a.get("decision_id") for a in answered]

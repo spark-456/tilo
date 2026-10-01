@@ -10,7 +10,9 @@ import re
 import pytest
 from conftest import add_case, make_event, write_evals_config
 from tilo_evals.__main__ import main
+from tilo_evals.checks import Outcome
 from tilo_evals.config import EvalsConfig
+from tilo_evals.executors import ExecutorError
 from tilo_evals.runner import run_pass
 
 
@@ -170,7 +172,11 @@ def test_EFF_07_autorater_checks_are_pending_and_never_a_pass(fake_repo):
     assert "1 pending autorater (not counted as passed)" in (fake_repo / "evals" / "results.md").read_text("utf-8")
 
 
-@pytest.mark.parametrize("bad_credits", [-1000, float("nan")], ids=["negative", "nan"])
+_BAD_CREDITS = [-1000, float("nan"), 10**400, True, "40", [1]]
+_BAD_IDS = ["negative", "nan", "huge_int", "bool", "numeric_string", "list"]
+
+
+@pytest.mark.parametrize("bad_credits", _BAD_CREDITS, ids=_BAD_IDS)
 def test_EFF_07_bad_recording_credits_do_not_corrupt_the_credit_cap(fake_repo, bad_credits):
     config = _config(fake_repo, full=100, smoke=100, gate=100)
     add_case(fake_repo, "E-RED-01", credits=bad_credits)
@@ -203,14 +209,90 @@ def test_EFF_07_unreadable_recording_is_not_runnable_and_the_pass_goes_on(fake_r
 
 @pytest.mark.parametrize(
     "bad_event",
-    [{"trace": "oops"}, {"trace": {"model_role": 3}}, {"credits": "lots"}, {"credits": -1e308}],
-    ids=["string_trace", "numeric_role", "string_credits", "negative_credits"],
+    [{"trace": "oops"}, {"trace": {"model_role": 3}}, {"credits": "lots"}, {"credits": -1e308}, {"credits": 10**400}]
+    + [{"credits": True}, {"credits": "40"}],
+    ids=["string_trace", "numeric_role", "string_credits", "negative", "huge_int", "bool", "numeric_string"],
 )
 def test_EFF_07_bad_event_field_is_not_runnable(fake_repo, bad_event):
     add_case(fake_repo, "E-RED-01", [{"type": "x", **bad_event}])
     add_case(fake_repo, "E-RED-02")
     result = run_pass(pass_kind="full", config=EvalsConfig.load("config/evals.yaml"))
     assert list(result.not_runnable) == ["E-RED-01"] and [r.case.id for r in result.ran] == ["E-RED-02"]
+
+
+def test_EFF_07_a_huge_summary_or_event_total_is_not_runnable_and_the_report_is_written(fake_repo):
+    add_case(fake_repo, "E-RED-01", [make_event(credits=1e308), make_event(seq=2, credits=1e308)], credits=1.0)
+    add_case(fake_repo, "E-RED-02")
+
+    assert main(["run", "--pass", "full", "--results-json", "results.json"]) == 0
+
+    data = _json(fake_repo)
+    assert data["not_runnable"] == ["E-RED-01"] and data["ran"] == ["E-RED-02"]
+
+
+def test_EFF_07_the_cap_charges_the_larger_of_the_summary_and_the_event_credits(fake_repo):
+    config = _config(fake_repo, full=100, smoke=100, gate=100)
+    add_case(fake_repo, "E-RED-01", [make_event(credits=70.0)], credits=0.0)  # a summary that understates
+    add_case(fake_repo, "E-RED-02", [make_event(credits=1.0)], credits=70.0)
+    result = run_pass(pass_kind="full", config=config)
+    assert [r.cost for r in result.ran] == [70.0] and result.spent == 70.0 and result.stopped_at_cap
+
+
+def test_EFF_07_a_non_finite_cost_from_an_executor_stops_the_pass(fake_repo):
+    class Nan:
+        def run(self, case):
+            return Outcome(events=(), outputs={}, credits=float("nan"))
+
+    add_case(fake_repo, "E-RED-01")
+    result = run_pass(pass_kind="full", config=EvalsConfig.load("config/evals.yaml"), executor=Nan())
+    assert result.ran == [] and result.stopped_at_cap and result.spent == 0.0
+
+
+def test_EFF_07_full_pass_repeats_deploy_gate_cases_and_counts_every_run_against_the_cap(fake_repo):
+    config = _config(fake_repo, full=100, smoke=100, gate=100)
+    add_case(fake_repo, "E-PLAN-01", credits=10.0)
+    add_case(fake_repo, "E-RED-01", credits=40.0, deploy_gate=True)
+    add_case(fake_repo, "E-RED-02", credits=1.0)
+
+    result = run_pass(pass_kind="full", config=config)  # 10 + 40 + 40, then 40 more would pass 100
+    assert [r.case.id for r in result.ran] == ["E-PLAN-01", "E-RED-01", "E-RED-01"] and result.spent == 90.0
+    assert [c.id for c in result.not_run] == ["E-RED-01", "E-RED-02"] and result.stopped_at_cap
+
+    roomy = run_pass(pass_kind="full", config=EvalsConfig.load(str(write_evals_config(fake_repo / "config"))))
+    assert [r.case.id for r in roomy.ran] == ["E-PLAN-01"] + ["E-RED-01"] * 3 + ["E-RED-02"]
+
+
+def test_EFF_07_repeated_runs_are_labelled_runs_with_the_spread_per_case(fake_repo, capsys):
+    add_case(fake_repo, "E-RED-01", deploy_gate=True)
+    assert main(["run", "--pass", "full"]) == 0
+    assert capsys.readouterr().out.startswith("full pass: 3 of 3 runs passed (100%)")
+    md = (fake_repo / "evals" / "results.md").read_text(encoding="utf-8")
+    assert "3 of 3 runs passed" in md and "- E-RED-01: 3 of 3 repeats passed" in md
+    add_case(fake_repo, "E-RED-02")
+    (fake_repo / "evals" / "cases" / "E-RED" / "E-RED-01.yaml").unlink()
+    assert main(["run", "--pass", "full"]) == 0
+    assert "1 of 1 passed" in capsys.readouterr().out
+
+
+def test_EFF_07_an_unknown_case_or_group_exits_2_and_writes_nothing(fake_repo, capsys):
+    add_case(fake_repo, "E-PLAN-01")
+    assert main(["run", "--pass", "full", "--case", "E-PLAN-09"]) == 2
+    assert "unknown case id" in capsys.readouterr().err
+    assert main(["run", "--pass", "full", "--group", "E-RED"]) == 2
+    assert "no cases in group" in capsys.readouterr().err
+    assert main(["run", "--pass", "full", "--case", "E-PLAN-01"]) == 0
+    assert main(["run", "--pass", "full", "--group", "E-PLAN"]) == 0
+
+
+def test_EFF_07_a_not_runnable_reason_is_one_bounded_line(fake_repo):
+    class Refuses:
+        def run(self, case):
+            raise ExecutorError("cannot read\n## Pass: smoke\n" + "x" * 1000)
+
+    add_case(fake_repo, "E-PLAN-01")
+    result = run_pass(pass_kind="full", config=EvalsConfig.load("config/evals.yaml"), executor=Refuses())
+    reason = result.not_runnable["E-PLAN-01"]
+    assert "\n" not in reason and len(reason) <= 300
 
 
 def test_EFF_07_live_flag_refuses_without_LIVE_and_says_not_built_with_it(fake_repo, monkeypatch, capsys):

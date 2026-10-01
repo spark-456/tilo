@@ -76,9 +76,9 @@ typecheck:
 harness-skeleton:
     uv run --package tilo-harness python -m tilo_harness.skeleton --world w_harness_skeleton --run r_harness_skeleton
 
-# Replay the eval set (no paid calls) and write evals/results.md; exit 0 all passed, 1 a case failed, 2 error, 3 stopped at the credit cap (EFF-07).
+# Replay the eval set (no paid calls) into the git-ignored evals/results.local.md (evals/results.md is the committed pass record); exit 0 all passed, 1 a case failed, 2 error, 3 stopped at the credit cap (EFF-07).
 eval:
-    uv run python -m tilo_evals run --pass full
+    uv run python -m tilo_evals run --pass full --results-md evals/results.local.md
 
 # PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
 conformance:

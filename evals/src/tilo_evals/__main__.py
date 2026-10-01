@@ -2,7 +2,8 @@
 [--results-json PATH] [--live]` (EFF-07; PRD 19.5, 6.6). `just eval` runs the replay set.
 
 Exit codes: 0 every case that ran passed; 1 at least one case failed; 2 the pass could not run (bad config or
-case file, `--live` refused); 3 the pass stopped at its credit cap with no failure (partial results).
+case file, an unknown --case or --group, `--live` refused); 3 the pass stopped at its credit cap with no failure
+(partial results).
 """
 
 import argparse
@@ -15,7 +16,7 @@ from pathlib import Path
 from .cases import CaseError
 from .config import EvalsConfig, EvalsConfigError
 from .results import build_hash, merge_results_md, render_json, render_section, summary_text
-from .runner import PASS_KINDS, run_pass
+from .runner import PASS_KINDS, SelectionError, run_pass
 
 EXIT_OK, EXIT_FAILED, EXIT_ERROR, EXIT_PARTIAL = 0, 1, 2, 3
 
@@ -49,7 +50,7 @@ def _run(args: argparse.Namespace) -> int:
     try:
         config = EvalsConfig.load("config/evals.yaml")
         result = run_pass(pass_kind=args.pass_kind, config=config, group=args.group, case_ids=args.case_ids)
-    except (EvalsConfigError, CaseError) as exc:
+    except (EvalsConfigError, CaseError, SelectionError) as exc:
         print(f"tilo_evals: {exc}", file=sys.stderr)
         return EXIT_ERROR
 

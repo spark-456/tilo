@@ -4,12 +4,12 @@
 The eval harness (PRD 19, EFF-06, EFF-07). P8-06a/b: case schema/loader, `EvalsConfig`, the check registry with its seven deterministic checks (the five of PRD 19.3 plus the E-ROUTE pair `routed_domain` and `answered_from_decision`). P8-06c/d: `ReplayExecutor`, `run_pass` with the credit cap (MT-09), `evals/results.md` and the CLI.
 
 ## Commands
-- `just eval` — replay every case under `evals/cases/` (full pass); `uv run python -m tilo_evals run --pass smoke|full|gate [--group G] [--case ID] [--results-md P] [--results-json P]`
+- `just eval` — replay every case under `evals/cases/` (full pass) into the git-ignored `evals/results.local.md`; `uv run python -m tilo_evals run --pass smoke|full|gate [--group G] [--case ID] [--results-md P] [--results-json P]`
 - `uv run pytest "evals/tests" -q` — the tests (fake repos under `tmp_path`, never `evals/cases`)
-- Exit codes: 0 every case that ran passed (or none ran), 1 a case failed, 2 the pass could not run (bad config or case file, `--live` refused), 3 stopped at the credit cap with no failure.
+- Exit codes: 0 every case that ran passed (or none ran), 1 a case failed, 2 the pass could not run (bad config or case file, unknown `--case` or `--group`, `--live` refused), 3 stopped at the credit cap with no failure.
 
 ## Contracts
-- Reads `evals/case.schema.json` (local; issue #8) for every `evals/cases/<group>/<id>.yaml`. A case's `recording` is a JSONL file of TiloEvents (path relative to the repo root) with an optional final `{"outputs": {...}, "credits": n}` line; without it the cost is the sum of the event credits.
+- Reads `evals/case.schema.json` (local; issue #8) for every `evals/cases/<group>/<id>.yaml`. A case's `recording` is a JSONL file of TiloEvents (path relative to the repo root) with an optional final `{"outputs": {...}, "credits": n}` line; the case costs the larger of the summary credits and the sum of the event credits.
 
 ## Config
 - `config/evals.yaml` via `EvalsConfig.load`: `credit_cap` per pass kind, `deploy_gate_repeats`; tests pass a `tmp_path` path.
@@ -19,8 +19,9 @@ The eval harness (PRD 19, EFF-06, EFF-07). P8-06a/b: case schema/loader, `EvalsC
 
 ## Local rules
 - No paid calls: only `ReplayExecutor` exists. `--live` refuses without the user's `LIVE=1` and, with it, says no live executor is built (it would go through `packages/providers`). No model id here (PL-01): results show profile names from each event's own trace.
-- Credit cap (MT-09): a case that would take the spend over `credit_cap[pass]`, and every case after it, is listed as not run with a stop reason; a pass whose cap is reached starts nothing more. Bad recordings (unreadable, negative or NaN credits) make a case not runnable, with the reason recorded, and never crash the pass.
+- A full pass runs every case once and deploy-gate cases `deploy_gate_repeats` times (PRD 19.2); every run counts against the cap, and counts are then labelled runs.
+- Credit cap (MT-09): a case that would take the spend over `credit_cap[pass]`, and every case after it, is listed as not run with a stop reason; a pass whose cap is reached starts nothing more. Bad recordings (unreadable; credits negative, NaN, huge, a bool or a string) make a case not runnable, with the reason recorded, and never crash the pass.
 - Autorater checks (`kind: autorater`) are never run here: reported as pending, never counted as passed.
-- `evals/results.md` keeps the latest run of each pass kind (counts first, per case group, spread, failures by cause, not runnable, not run).
+- `evals/results.md` is the official file (PRD 19.5): the CLI default, committed deliberately on pass dates (7, 12, 15 Oct); `just eval` writes `evals/results.local.md` instead so dev runs never dirty the tree. It keeps the latest run of each pass kind (counts first, per case group, spread, failures by cause, not runnable, not run).
 - `load_cases` rejects an unregistered check (a `kind: autorater` check is skipped, not looked up). A check is `get(name)(case, outcome, args)`; `args` is that entry's `checks[i].args`.
 - Case YAML is parsed with a no-alias loader: any `&anchor`/`*alias` in a case file is rejected, never expanded.
