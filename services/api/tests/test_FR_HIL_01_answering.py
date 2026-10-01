@@ -8,7 +8,7 @@ authorisation.
 
 from __future__ import annotations
 
-from _cards_lib import FakeClock, FakeEventWriter, load_valid_card, new_ulid
+from _cards_lib import OWNER_P, FakeClock, FakeEventWriter, answer_client, load_valid_card, new_ulid
 from tilo_api.cards import CardStore
 
 OWNER = "u_owner"
@@ -29,7 +29,7 @@ def test_FR_HIL_01_only_a_cards_own_option_id_is_accepted():
     option_ids = {o["id"] for o in card["options"]}
     assert "not_an_option" not in option_ids
 
-    result = store.answer(card["world_id"], card["id"], option="not_an_option", channel="web", actor=OWNER)
+    result = store.answer(card["world_id"], card["id"], option="not_an_option", channel="web", principal=OWNER_P)
 
     assert result.outcome == "rejected"
     assert result.reason == "invalid_option"
@@ -42,7 +42,7 @@ def test_FR_HIL_01_a_cards_real_option_id_is_accepted():
     store.submit(card, outbox_id=None)
     an_option = card["options"][0]["id"]
 
-    result = store.answer(card["world_id"], card["id"], option=an_option, channel="web", actor=OWNER)
+    result = store.answer(card["world_id"], card["id"], option=an_option, channel="web", principal=OWNER_P)
 
     assert result.outcome == "answered"
     assert result.reason is None
@@ -57,7 +57,7 @@ def test_FR_HIL_01_PI_04_email_never_answers_a_gate():
     store, _clock, _writer = _store(card["world_id"])
     store.submit(card, outbox_id=new_ulid("outbox-1"))
 
-    result = store.answer(card["world_id"], card["id"], option="approve", channel="email", actor=OWNER)
+    result = store.answer(card["world_id"], card["id"], option="approve", channel="email", principal=OWNER_P)
 
     assert result.outcome == "rejected"
     assert result.reason == "invalid_channel"
@@ -73,7 +73,7 @@ def test_FR_HIL_01_PI_04_consent_is_answered_on_the_web_only():
     store, _clock, _writer = _store(card["world_id"])
     store.submit(card, outbox_id=None)
 
-    result = store.answer(card["world_id"], card["id"], option="connect", channel="whatsapp", actor=OWNER)
+    result = store.answer(card["world_id"], card["id"], option="connect", channel="whatsapp", principal=OWNER_P)
 
     assert result.outcome == "rejected"
     assert result.reason == "invalid_channel"
@@ -85,7 +85,7 @@ def test_FR_HIL_01_needs_you_answer_emits_question_answered_by_person():
     store.submit(card, outbox_id=None)
     an_option = card["options"][0]["id"]
 
-    result = store.answer(card["world_id"], card["id"], option=an_option, channel="web", actor=OWNER)
+    result = store.answer(card["world_id"], card["id"], option=an_option, channel="web", principal=OWNER_P)
 
     assert len(result.emitted) == 1
     part = result.emitted[0]
@@ -100,7 +100,7 @@ def test_FR_HIL_01_gate_answer_emits_approval_resolved_with_the_answering_person
     outbox_id = new_ulid("outbox-2")
     store.submit(card, outbox_id=outbox_id)
 
-    result = store.answer(card["world_id"], card["id"], option="approve", channel="web", actor=OWNER)
+    result = store.answer(card["world_id"], card["id"], option="approve", channel="web", principal=OWNER_P)
 
     assert result.outcome == "answered"
     assert len(result.emitted) == 1
@@ -127,13 +127,13 @@ def test_FR_HIL_01_SEC_06_t3_gate_on_whatsapp_needs_pin_verified():
     store.submit(card, outbox_id=new_ulid("outbox-3"))
 
     missing_pin = store.answer(
-        card["world_id"], card["id"], option="approve", channel="whatsapp", actor=OWNER, pin_verified=False
+        card["world_id"], card["id"], option="approve", channel="whatsapp", principal=OWNER_P, pin_verified=False
     )
     assert missing_pin.outcome == "rejected"
     assert missing_pin.reason == "pin_required"
 
     with_pin = store.answer(
-        card["world_id"], card["id"], option="approve", channel="whatsapp", actor=OWNER, pin_verified=True
+        card["world_id"], card["id"], option="approve", channel="whatsapp", principal=OWNER_P, pin_verified=True
     )
     assert with_pin.outcome == "answered"
 
@@ -141,7 +141,7 @@ def test_FR_HIL_01_SEC_06_t3_gate_on_whatsapp_needs_pin_verified():
 def test_FR_HIL_01_answering_an_unknown_card_is_rejected():
     store, _clock, _writer = _store("w_01")
 
-    result = store.answer("w_01", "01J8Z3K4M5N6P7Q8R9S0T1V2WX", option="approve", channel="web", actor=OWNER)
+    result = store.answer("w_01", "01J8Z3K4M5N6P7Q8R9S0T1V2WX", option="approve", channel="web", principal=OWNER_P)
 
     assert result.outcome == "rejected"
     assert result.reason == "card_not_found"
@@ -152,31 +152,25 @@ def test_FR_HIL_01_answering_an_already_resolved_card_is_rejected():
     store, _clock, _writer = _store(card["world_id"])
     store.submit(card, outbox_id=None)
     an_option = card["options"][0]["id"]
-    first = store.answer(card["world_id"], card["id"], option=an_option, channel="web", actor=OWNER)
+    first = store.answer(card["world_id"], card["id"], option=an_option, channel="web", principal=OWNER_P)
     assert first.outcome == "answered"
 
-    second = store.answer(card["world_id"], card["id"], option=an_option, channel="web", actor=OWNER)
+    second = store.answer(card["world_id"], card["id"], option=an_option, channel="web", principal=OWNER_P)
 
     assert second.outcome == "rejected"
     assert second.reason == "already_resolved"
 
 
 def test_FR_HIL_01_POST_answer_route_rejects_an_option_the_card_does_not_offer():
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-    from tilo_api.cards import build_router
-
     card = load_valid_card("needs_you_blocked")
     store, _clock, _writer = _store(card["world_id"])
     store.submit(card, outbox_id=None)
 
-    app = FastAPI()
-    app.include_router(build_router(store))
-    client = TestClient(app)
+    client = answer_client(store, OWNER_P)
 
     bad_option = client.post(
         f"/worlds/{card['world_id']}/cards/{card['id']}/answer",
-        json={"option": "nonsense", "channel": "web", "actor": OWNER},
+        json={"option": "nonsense", "channel": "web"},
     )
 
     assert bad_option.status_code == 400
@@ -184,35 +178,29 @@ def test_FR_HIL_01_POST_answer_route_rejects_an_option_the_card_does_not_offer()
 
 
 def test_FR_HIL_01_POST_answer_route_matches_the_store():
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-    from tilo_api.cards import build_router
-
     card = load_valid_card("needs_you_blocked")
     store, _clock, _writer = _store(card["world_id"])
     store.submit(card, outbox_id=None)
     an_option = card["options"][0]["id"]
 
-    app = FastAPI()
-    app.include_router(build_router(store))
-    client = TestClient(app)
+    client = answer_client(store, OWNER_P)
 
     ok = client.post(
         f"/worlds/{card['world_id']}/cards/{card['id']}/answer",
-        json={"option": an_option, "channel": "web", "actor": OWNER},
+        json={"option": an_option, "channel": "web"},
     )
     assert ok.status_code == 200
     assert ok.json()["outcome"] == "answered"
 
     not_found = client.post(
         f"/worlds/{card['world_id']}/cards/not-a-real-id/answer",
-        json={"option": an_option, "channel": "web", "actor": OWNER},
+        json={"option": an_option, "channel": "web"},
     )
     assert not_found.status_code == 404
 
     already_resolved = client.post(
         f"/worlds/{card['world_id']}/cards/{card['id']}/answer",
-        json={"option": an_option, "channel": "web", "actor": OWNER},
+        json={"option": an_option, "channel": "web"},
     )
     assert already_resolved.status_code == 400
     assert already_resolved.json()["reason"] == "already_resolved"

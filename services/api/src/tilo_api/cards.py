@@ -1,20 +1,22 @@
-"""tilo_api.cards — the API side of cards and batching (FR-HIL-01, FR-HIL-02; PRD 10.2, 10.3,
-10.6, 9.5, FR-INT-09). Public shapes are pinned in services/api/tests/API_ST3b.md; that file's
-"Ambiguities resolved" section records the PRD defaults this module applies.
+"""tilo_api.cards -- the API side of cards and batching (FR-HIL-01, FR-HIL-02; PRD 10.1-10.3, 10.6,
+9.5, FR-INT-09). Public shapes are pinned in services/api/tests/API_ST3b.md; its "Ambiguities
+resolved" section and docs/open-questions.md record the PRD defaults this module applies.
 
-CardStore is a plain, deterministic in-memory store: an injected Clock and EventWriter, no
-network, no randomness. Every card is validated against contracts/card.schema.json (with
-contracts/common.schema.json resolved) before it is stored -- an invalid card is never shown and
-never times out. Gate and consent cards are authorisations and are never merged, never delegated
-to the Director and never time out to their "open" option; only a person's answer can resolve
-them. Deciding *who* may open a gate (PI-02) is packages/policy's job, not this module's: answer()
-only checks that the given option and channel are ones the card itself offers.
+CardStore is a plain, deterministic in-memory store: an injected Clock and EventWriter, no network,
+no randomness. A card is validated against contracts/card.schema.json plus the validator rules
+CR-01 and CR-02 before it is stored; an invalid card is never shown and never times out. Gate and
+consent cards are authorisations: never merged, never delegated to the Director, and never resolved
+by a timeout. Who answers comes only from the verified `deps.Principal` (PRD 10.1), never from the
+request body; a channel other than web and a PIN flag are accepted only from an authenticated
+tilo-channels caller. Deciding whether an answer opens a gate stays with packages/policy.
 """
 
 from __future__ import annotations
 
+import copy
 import datetime
 import functools
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -22,16 +24,23 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import jsonschema
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
+
+from tilo_api.deps import Principal, get_current_principal
+from tilo_api.redaction import _DISTRICT_RE, _safe_districts
 
 CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
 _ULID_RE = re.compile(r"^[0-7][0-9A-HJKMNP-TV-Z]{25}$")
+_USER_RE = re.compile(r"^u_[0-9A-Za-z_]{1,48}$")
+_MERGEABLE = ("needs_you", "meeting")
+_WEB_CHANNELS = ("web", "mobile_web")
+_STATUS = {"card_not_found": 404, "forbidden": 403}  # AnswerResult.reason -> HTTP status; others are 400
 
 
 def _parse_ts(ts: str) -> datetime.datetime:
@@ -54,13 +63,30 @@ def _card_schema() -> dict[str, Any]:
     return json.loads((CONTRACTS / "card.schema.json").read_text(encoding="utf-8"))
 
 
+def _deadline(card: dict) -> datetime.datetime:
+    """created_at + timeout; ValueError (not a real calendar instant) or OverflowError (a timeout
+    past year 9999) means the card can never time out, so it is rejected up front."""
+    return _parse_ts(card["created_at"]) + datetime.timedelta(seconds=card["timeout"])
+
+
 def _card_errors(card: Any) -> list[str]:
-    """jsonschema validation error messages for `card` against card.schema.json; empty when
-    valid. A rejected card is never stored and never times out."""
+    """Schema errors, then the validator-only rules CR-01 and CR-02 and a representable deadline;
+    empty when valid. A rejected card is never stored and never times out."""
     schema = _card_schema()
     cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
-    validator = cls(schema, registry=_registry())
-    return [e.message for e in validator.iter_errors(card)]
+    errors = [e.message for e in cls(schema, registry=_registry()).iter_errors(card)]
+    if errors:
+        return errors
+    ids = [o["id"] for o in card["options"]]
+    if len(set(ids)) != len(ids):
+        errors.append("CR-02: option ids must be unique within a card")
+    if card["safe_default"] not in ids:
+        errors.append("CR-01: safe_default must name one of options[].id")
+    try:
+        _deadline(card)
+    except (ValueError, OverflowError):
+        errors.append("created_at must be a real calendar instant and created_at + timeout must be representable")
+    return errors
 
 
 class Clock(Protocol):
@@ -96,27 +122,50 @@ class TimeoutResult:
 
 
 @dataclass
+class _Group:
+    """Cards that merged into one: the first card's id and created_at anchor the 60 s window."""
+
+    primary_id: str
+    anchor: datetime.datetime
+    open: int = 0
+
+
+@dataclass
 class _Record:
-    """One stored card and its group anchor. A merged card never gets its own record: it is only
-    an alias onto the group's original (CardStore._alias)."""
+    """One stored card with its own question and options; merging only groups records."""
 
     card: dict[str, Any]
     outbox_id: str | None
-    anchor_created_at: str
+    district: str | None
+    assignee: str | None
+    deadline: datetime.datetime
+    group: _Group
     status: str = "open"  # "open" | "resolved" -- a held gate/consent stays "open"
-    nudged: bool = False
 
     @property
     def kind(self) -> str:
         return self.card["kind"]
 
-    @property
-    def building(self) -> str:
-        return self.card["header"]["building"]
 
-    @property
-    def timeout(self) -> int:
-        return self.card["timeout"]
+def _can_see(p: Principal, world_id: str, owner: str | None, r: _Record) -> bool:
+    """PRD 10.1 scope: the owner sees every card, a Team Lead their districts' cards, an Approver
+    only the cards assigned to them; a Viewer none."""
+    if p.world_id != world_id or owner is None or _USER_RE.match(p.user_id) is None:
+        return False
+    if p.role == "owner":
+        return p.user_id == owner
+    if p.role == "team_lead":
+        return r.district is not None and r.district in _safe_districts(p.districts)
+    return p.role == "approver" and r.assignee == p.user_id
+
+
+def _can_answer(p: Principal, r: _Record) -> bool:
+    """A Team Lead answers only questions here: opening a gate needs the policy engine's lead
+    record and policy (open_gate), and consent is the owner's grant. An Approver answers assigned
+    questions and gates."""
+    if p.role == "owner":
+        return True
+    return (p.role == "team_lead" and r.kind in _MERGEABLE) or (p.role == "approver" and r.kind != "consent")
 
 
 class CardStore:
@@ -133,70 +182,104 @@ class CardStore:
         self._world_owners = dict(world_owners or {})
         self._merge_window_s = merge_window_s
         self._records: dict[str, dict[str, _Record]] = {}
-        self._alias: dict[str, dict[str, str]] = {}
+        self._seen: dict[tuple[str, str], tuple[str, SubmitResult]] = {}
+        self._groups: dict[tuple, _Group] = {}
+        self._pending: dict[tuple[str, str], _Record] = {}  # open and not yet nudged: tick's work set
 
     # -- submit ---------------------------------------------------------
 
-    def submit(self, card: dict, *, outbox_id: str | None = None) -> SubmitResult:
+    def submit(
+        self,
+        card: dict,
+        *,
+        outbox_id: str | None = None,
+        district: str | None = None,
+        assignee: str | None = None,
+    ) -> SubmitResult:
+        """`outbox_id` (gates only), `district` (a Team Lead sees only their districts' cards; none
+        means owner-only) and `assignee` (the Approver the owner assigned) are companion data the
+        harness already holds; a model never supplies them. Re-submitting identical content returns
+        the first result and changes nothing; a different card under a used id is rejected."""
         errors = _card_errors(card)
+        if not errors:
+            errors = self._companion_errors(card["kind"], outbox_id, district, assignee)
         if errors:
             return SubmitResult("rejected", None, tuple(errors))
 
-        kind = card["kind"]
-        if kind == "gate":
-            if not outbox_id or not _ULID_RE.match(outbox_id):
-                return SubmitResult("rejected", None, ("outbox_id is required and must be a ulid for a gate card",))
-        elif outbox_id is not None:
-            return SubmitResult("rejected", None, ("outbox_id must not be given for a non-gate card",))
+        world_id, card_id, kind = card["world_id"], card["id"], card["kind"]
+        digest = hashlib.sha256(json.dumps([card, outbox_id, district, assignee], sort_keys=True).encode()).hexdigest()
+        seen = self._seen.get((world_id, card_id))
+        if seen is not None:
+            return seen[1] if seen[0] == digest else SubmitResult("rejected", None, ("card id already used",))
 
-        world_id = card["world_id"]
-        card_id = card["id"]
-
-        if kind in ("gate", "consent"):
-            self._store_new(world_id, card_id, card, outbox_id)
-            return SubmitResult("accepted", card_id, ())
-
-        target = self._find_merge_target(world_id, card)
-        if target is not None:
-            self._alias.setdefault(world_id, {})[card_id] = target.card["id"]
-            return SubmitResult("merged", target.card["id"], ())
-
-        self._store_new(world_id, card_id, card, outbox_id)
-        return SubmitResult("accepted", card_id, ())
-
-    def _store_new(self, world_id: str, card_id: str, card: dict, outbox_id: str | None) -> None:
-        record = _Record(card=card, outbox_id=outbox_id, anchor_created_at=card["created_at"])
+        created = _parse_ts(card["created_at"])
+        key = (world_id, kind, card["header"]["building"], district, assignee)
+        group = self._groups.get(key) if kind in _MERGEABLE else None
+        merged = (
+            group is not None
+            and group.open > 0
+            and abs((created - group.anchor).total_seconds()) <= self._merge_window_s
+        )
+        if not merged:
+            group = _Group(card_id, created)
+            if kind in _MERGEABLE:
+                self._groups[key] = group
+        assert group is not None
+        record = _Record(copy.deepcopy(card), outbox_id, district, assignee, _deadline(card), group)
+        group.open += 1
         self._records.setdefault(world_id, {})[card_id] = record
-        self._alias.setdefault(world_id, {})[card_id] = card_id
+        self._pending[(world_id, card_id)] = record
+        result = SubmitResult("merged" if merged else "accepted", group.primary_id, ())
+        self._seen[(world_id, card_id)] = (digest, result)
+        return result
 
-    def _find_merge_target(self, world_id: str, card: dict) -> _Record | None:
-        """The group anchor is the *first* card's created_at (API_ST3b.md ambiguity 3); a new
-        needs_you/meeting card merges into the first open record of the same world, kind and
-        header.building (approximating "district") within merge_window_s of that anchor."""
-        created_at = _parse_ts(card["created_at"])
-        for record in self._records.get(world_id, {}).values():
-            if record.status != "open" or record.kind != card["kind"] or record.building != card["header"]["building"]:
-                continue
-            delta = abs((created_at - _parse_ts(record.anchor_created_at)).total_seconds())
-            if delta <= self._merge_window_s:
-                return record
-        return None
+    @staticmethod
+    def _companion_errors(kind: str, outbox_id: str | None, district: str | None, assignee: str | None) -> list[str]:
+        errors = []
+        if kind == "gate" and (not outbox_id or not _ULID_RE.match(outbox_id)):
+            errors.append("outbox_id is required and must be a ulid for a gate card")
+        if kind != "gate" and outbox_id is not None:
+            errors.append("outbox_id must not be given for a non-gate card")
+        if district is not None and not _DISTRICT_RE.match(district):
+            errors.append("district must be a district id")
+        if assignee is not None and not _USER_RE.match(assignee):
+            errors.append("assignee must be a user id")
+        return errors
+
+    def _resolve(self, world_id: str, record: _Record) -> None:
+        record.status = "resolved"
+        record.group.open -= 1
+        self._pending.pop((world_id, record.card["id"]), None)
 
     # -- reads ------------------------------------------------------------
 
     def get(self, world_id: str, card_id: str) -> dict | None:
-        primary = self._alias.get(world_id, {}).get(card_id)
-        if primary is None:
-            return None
-        record = self._records.get(world_id, {}).get(primary)
-        return record.card if record else None
+        """A card by its own submitted id, merged or not."""
+        record = self._records.get(world_id, {}).get(card_id)
+        return copy.deepcopy(record.card) if record else None
 
-    def list_for_world(self, world_id: str, *, as_user: str) -> list[dict]:
+    def list_for_world(self, world_id: str, *, principal: Principal) -> list[dict]:
+        """The cards `principal` may see, oldest first: one per open group (its first open
+        member, so a merge shows as one card until every member is answered). Raises
+        PermissionError for a Viewer or a non-member. A Team Lead sees only their districts' cards, so
+        a hidden district's cards and their count never leave the API (FR-HIL-09)."""
         owner = self._world_owners.get(world_id)
-        if owner is None or owner != as_user:
-            raise PermissionError(f"{as_user} is not the owner of world {world_id}")
-        records = self._records.get(world_id, {}).values()
-        return sorted((r.card for r in records if r.status == "open"), key=lambda c: c["created_at"])
+        if (
+            principal.role == "viewer"
+            or principal.world_id != world_id
+            or owner is None
+            or (principal.role == "owner" and principal.user_id != owner)
+        ):
+            raise PermissionError(f"{principal.user_id} may not list cards of world {world_id}")
+        shown: dict[int, _Record] = {}
+        for record in self._records.get(world_id, {}).values():
+            if (
+                record.status == "open"
+                and id(record.group) not in shown
+                and _can_see(principal, world_id, owner, record)
+            ):
+                shown[id(record.group)] = record
+        return sorted((copy.deepcopy(r.card) for r in shown.values()), key=lambda c: c["created_at"])
 
     # -- answer -------------------------------------------------------------
 
@@ -207,13 +290,19 @@ class CardStore:
         *,
         option: str,
         channel: str,
-        actor: str,
+        principal: Principal,
         pin_verified: bool = False,
     ) -> AnswerResult:
-        primary = self._alias.get(world_id, {}).get(card_id)
-        if primary is None:
+        """Rejections write nothing and leave the card open. A card outside the principal's scope
+        is "card_not_found" (no existence oracle); a Viewer or a role that may not answer that
+        kind is "forbidden"."""
+        record = self._records.get(world_id, {}).get(card_id)
+        if principal.role == "viewer":
+            return AnswerResult("rejected", "forbidden", ())
+        if record is None or not _can_see(principal, world_id, self._world_owners.get(world_id), record):
             return AnswerResult("rejected", "card_not_found", ())
-        record = self._records[world_id][primary]
+        if not _can_answer(principal, record):
+            return AnswerResult("rejected", "forbidden", ())
         if record.status != "open":
             return AnswerResult("rejected", "already_resolved", ())
 
@@ -225,95 +314,108 @@ class CardStore:
         if record.kind == "gate" and card["gate"]["risk_tier"] == "T3" and channel == "whatsapp" and not pin_verified:
             return AnswerResult("rejected", "pin_required", ())
 
+        authz = {"by": "person", "ref": principal.user_id, "at": self._clock.now()}
+        part: dict[str, Any] | None = None
+        closes = True
         if record.kind == "gate":
-            part: dict[str, Any] = {
-                "type": "approval.resolved",
-                "data": {
-                    "gate_id": card["gate"]["id"],
-                    "card_id": card["id"],
-                    "outbox_id": record.outbox_id,
-                    "option": option,
-                    "channel": channel,
-                    "pin_verified": pin_verified,
-                },
-                "authz": {"by": "person", "ref": actor, "at": self._clock.now()},
-            }
-            self._writer.write(part)
-            if option == "approve":
-                record.status = "resolved"
-            return AnswerResult("answered", None, (part,))
-
-        if record.kind == "consent":
-            # CR-13: only "connect" grants the connection. connection.consented is
-            # FR-HIL-08/token-broker territory -- out of scope here (API_ST3b.md ambiguity 7).
-            if option == "connect":
-                record.status = "resolved"
-            return AnswerResult("answered", None, ())
-
-        part = {"type": "question.answered", "data": {"answered_by": "person"}, "authz": None}
-        self._writer.write(part)
-        record.status = "resolved"
-        return AnswerResult("answered", None, (part,))
+            # CR-07: only approve opens a gate and writes approval.resolved; edit and hold write nothing.
+            closes = option == "approve"
+            data = {"gate_id": card["gate"]["id"], "card_id": card_id, "outbox_id": record.outbox_id}
+            data |= {"option": option, "channel": channel, "pin_verified": pin_verified}
+            part = {"type": "approval.resolved", "data": data, "authz": authz} if closes else None
+        elif record.kind == "consent":
+            # CR-13: only connect grants the connection; hold leaves it waiting.
+            closes = option == "connect"
+            data = {"connector": card["consent"]["connector"], "card_id": card_id, "scopes": card["consent"]["scopes"]}
+            part = {"type": "connection.consented", "data": data, "authz": authz} if closes else None
+        else:
+            part = {"type": "question.answered", "data": {"answered_by": "person"}, "authz": None}
+        if part is not None:
+            self._writer.write(part)  # before the state change: a failed write leaves the card open
+        if closes:
+            self._resolve(world_id, record)
+        return AnswerResult("answered", None, (part,) if part else ())
 
     # -- timeouts -------------------------------------------------------------
 
     def tick(self) -> list[TimeoutResult]:
+        """Every open card past its own deadline gets its safe default and a Nudge (BQ-04). A
+        question resolves (question.answered, answered_by default, severity nudge). A gate or
+        consent card is held, never resolved and never approved: it posts an alert.raised nudge
+        instead, because question.answered would close the card on every channel (PI-03)."""
         now = _parse_ts(self._clock.now())
         results: list[TimeoutResult] = []
-        for records in self._records.values():
-            for record in records.values():
-                if record.status != "open" or record.nudged:
-                    continue
-                deadline = _parse_ts(record.anchor_created_at) + datetime.timedelta(seconds=record.timeout)
-                if now < deadline:
-                    continue
-
-                self._writer.write(
-                    {
-                        "type": "question.answered",
-                        "data": {"answered_by": "default"},
-                        "authz": None,
-                        "severity": "nudge",
-                    }
-                )
-                record.nudged = True
-                held = record.kind in ("gate", "consent")
-                if not held:
-                    record.status = "resolved"
-                results.append(TimeoutResult(card_id=record.card["id"], kind=record.kind, held=held))
+        for (world_id, card_id), record in list(self._pending.items()):
+            if now < record.deadline:
+                continue
+            held = record.kind in ("gate", "consent")
+            if held:
+                part: dict[str, Any] = {"type": "alert.raised", "data": {"alert_id": card_id, "card_id": card_id}}
+            else:
+                part = {"type": "question.answered", "data": {"answered_by": "default"}}
+            self._writer.write({**part, "authz": None, "severity": "nudge"})
+            if held:
+                del self._pending[(world_id, card_id)]  # nudged once; still open for a person
+            else:
+                self._resolve(world_id, record)
+            results.append(TimeoutResult(card_id=card_id, kind=record.kind, held=held))
         return results
 
 
 class _AnswerBody(BaseModel):
+    """No identity field: who answers is the verified principal. `channel` and `pin_verified` are
+    honoured only from an authenticated tilo-channels caller."""
+
+    model_config = ConfigDict(extra="forbid")
+
     option: str
-    channel: str
-    actor: str
+    channel: str = "web"
     pin_verified: bool = False
+
+
+def get_channels_caller() -> bool:
+    """True only when the request was authenticated as tilo-channels, acting for the principal
+    (service-to-service auth lands with sign-in, PRD 15.3). Until then no caller is, so every
+    request is a web-session answer."""
+    return False
 
 
 def build_router(store: CardStore) -> APIRouter:
     router = APIRouter()
 
     @router.get("/worlds/{world_id}/cards")
-    def list_cards(world_id: str, as_user: str) -> list[dict]:
+    def list_cards(world_id: str, principal: Principal = Depends(get_current_principal)) -> list[dict]:
+        if principal.world_id != world_id:
+            raise HTTPException(status_code=404)  # same as an unknown world
         try:
-            return store.list_for_world(world_id, as_user=as_user)
+            return store.list_for_world(world_id, principal=principal)
         except PermissionError as exc:
-            raise HTTPException(status_code=403, detail=str(exc)) from exc
+            raise HTTPException(status_code=403) from exc
 
     @router.post("/worlds/{world_id}/cards/{card_id}/answer")
-    def answer_card(world_id: str, card_id: str, body: _AnswerBody) -> JSONResponse:
+    def answer_card(
+        world_id: str,
+        card_id: str,
+        body: _AnswerBody,
+        principal: Principal = Depends(get_current_principal),
+        from_channels: bool = Depends(get_channels_caller),
+    ) -> JSONResponse:
+        if principal.world_id != world_id:
+            raise HTTPException(status_code=404)
+        if not from_channels and (body.channel not in _WEB_CHANNELS or body.pin_verified):
+            return JSONResponse(status_code=403, content={"outcome": "rejected", "reason": "channel_not_permitted"})
         result = store.answer(
             world_id,
             card_id,
             option=body.option,
             channel=body.channel,
-            actor=body.actor,
+            principal=principal,
             pin_verified=body.pin_verified,
         )
         if result.outcome == "answered":
             return JSONResponse(status_code=200, content={"outcome": "answered"})
-        status_code = 404 if result.reason == "card_not_found" else 400
-        return JSONResponse(status_code=status_code, content={"outcome": "rejected", "reason": result.reason})
+        return JSONResponse(
+            status_code=_STATUS.get(result.reason or "", 400), content={"outcome": "rejected", "reason": result.reason}
+        )
 
     return router

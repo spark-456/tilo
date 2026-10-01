@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import pytest
 from _cards_lib import (
+    OWNER_P,
     FakeClock,
     FakeEventWriter,
+    answer_client,
     card_errors,
     clone_card,
     fixtures_dir,
@@ -22,6 +24,7 @@ from _cards_lib import (
     load_json,
     load_valid_card,
     new_ulid,
+    principal,
     valid_card_fixture_cases,
 )
 from tilo_api.cards import CardStore
@@ -135,7 +138,7 @@ def test_FR_HIL_01_listing_returns_the_worlds_cards_for_the_owner():
     store, _clock, _writer = _store(card["world_id"])
     store.submit(card, outbox_id=None)
 
-    cards = store.list_for_world(card["world_id"], as_user=OWNER)
+    cards = store.list_for_world(card["world_id"], principal=OWNER_P)
 
     assert [c["id"] for c in cards] == [card["id"]]
 
@@ -146,25 +149,17 @@ def test_FR_HIL_01_listing_refuses_a_non_owner():
     store.submit(card, outbox_id=None)
 
     with pytest.raises(PermissionError):
-        store.list_for_world(card["world_id"], as_user=OTHER)
+        store.list_for_world(card["world_id"], principal=principal("owner", OTHER))
 
 
 def test_FR_HIL_01_GET_worlds_cards_route_serves_the_owner():
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-    from tilo_api.cards import build_router
-
     card = load_valid_card("needs_you_blocked")
     store, _clock, _writer = _store(card["world_id"])
     store.submit(card, outbox_id=None)
 
-    app = FastAPI()
-    app.include_router(build_router(store))
-    client = TestClient(app)
-
-    ok = client.get(f"/worlds/{card['world_id']}/cards", params={"as_user": OWNER})
+    ok = answer_client(store, OWNER_P).get(f"/worlds/{card['world_id']}/cards")
     assert ok.status_code == 200
     assert [c["id"] for c in ok.json()] == [card["id"]]
 
-    forbidden = client.get(f"/worlds/{card['world_id']}/cards", params={"as_user": OTHER})
+    forbidden = answer_client(store, principal("owner", OTHER)).get(f"/worlds/{card['world_id']}/cards")
     assert forbidden.status_code == 403

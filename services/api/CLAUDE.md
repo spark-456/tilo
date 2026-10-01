@@ -27,3 +27,7 @@ from Firestore directly under security rules.
 - `GET /healthz` returns `{"status": "ok"}`.
 - `POST /intake` (FR-INT-01/02, `tilo_api.intake`): multipart `text` + `files` -> 201 task, `world.requested`
   and per-file status, or 422 `{"error": reason}` with nothing stored. Calls `tilo_planning.intake`.
+- Cards (FR-HIL-01/02, `tilo_api.cards`): `build_router(CardStore)` serves `GET /worlds/{id}/cards` and
+  `POST .../cards/{card_id}/answer`. Identity is the verified `deps.Principal` only; `channel` and
+  `pin_verified` count only from an authenticated tilo-channels caller (`get_channels_caller`). Viewer 403;
+  scope per PRD 10.1. Shapes and defaults: `services/api/tests/API_ST3b.md` (Round 2), BQ-69 to BQ-71.

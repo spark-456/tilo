@@ -155,6 +155,30 @@ def new_ulid(seed: str) -> str:
 # are structural, so these satisfy them without importing tilo_api.cards.
 
 
+def principal(role: str = "owner", user_id: str = "u_owner", world_id: str | None = "w_01", districts=()):
+    """A verified-principal test double (deps.Principal), the only source of who answers."""
+    from tilo_api.deps import Principal
+
+    return Principal(user_id=user_id, role=role, world_id=world_id, districts=tuple(districts))
+
+
+OWNER_P = principal()
+
+
+def answer_client(store, who, *, from_channels: bool = False):
+    """A TestClient over build_router(store) with `who` as the verified principal and, when
+    from_channels, the request authenticated as tilo-channels."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from tilo_api import cards, deps
+
+    app = FastAPI()
+    app.include_router(cards.build_router(store))
+    app.dependency_overrides[deps.get_current_principal] = lambda: who
+    app.dependency_overrides[cards.get_channels_caller] = lambda: from_channels
+    return TestClient(app)
+
+
 class FakeClock:
     def __init__(self, start: str) -> None:
         self._now = start

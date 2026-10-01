@@ -7,7 +7,7 @@ group's first card).
 
 from __future__ import annotations
 
-from _cards_lib import FakeClock, FakeEventWriter, add_seconds, clone_card, load_valid_card, new_ulid
+from _cards_lib import OWNER_P, FakeClock, FakeEventWriter, add_seconds, clone_card, load_valid_card, new_ulid
 from tilo_api.cards import CardStore
 
 OWNER = "u_owner"
@@ -42,7 +42,7 @@ def test_FR_HIL_02_three_cards_from_one_district_in_60s_merge():
     assert r3.outcome == "merged"
     assert r3.card_id == first["id"]
 
-    cards = store.list_for_world(base["world_id"], as_user=OWNER)
+    cards = store.list_for_world(base["world_id"], principal=OWNER_P)
     assert [c["id"] for c in cards] == [first["id"]], "three merged cards must show as exactly one"
 
 
@@ -60,7 +60,7 @@ def test_FR_HIL_02_cards_61s_apart_do_not_merge():
     assert r2.outcome == "accepted", "61 s apart is outside the 60 s merge window"
     assert r2.card_id == later["id"]
 
-    cards = store.list_for_world(base["world_id"], as_user=OWNER)
+    cards = store.list_for_world(base["world_id"], principal=OWNER_P)
     assert {c["id"] for c in cards} == {first["id"], later["id"]}
 
 
@@ -76,7 +76,7 @@ def test_FR_HIL_02_cards_from_different_districts_do_not_merge():
 
     assert r1.outcome == "accepted"
     assert r2.outcome == "accepted"
-    cards = store.list_for_world(base["world_id"], as_user=OWNER)
+    cards = store.list_for_world(base["world_id"], principal=OWNER_P)
     assert {c["id"] for c in cards} == {d1["id"], d2["id"]}
 
 
@@ -85,7 +85,7 @@ def test_FR_HIL_02_gate_cards_never_merge():
     another, even from the same building within the window -- both valid gate fixtures share
     building B2."""
     first = load_valid_card("gate_send_reply")
-    second = load_valid_card("gate_save_file_reversible")
+    second = clone_card(load_valid_card("gate_save_file_reversible"), id_="01J8Z3K4M5N6P7Q8R9S0T1V2W9")
     assert first["header"]["building"] == second["header"]["building"]
     assert first["kind"] == second["kind"] == "gate"
     store, _clock, _writer = _store(first["world_id"])
@@ -95,7 +95,7 @@ def test_FR_HIL_02_gate_cards_never_merge():
 
     assert r1.outcome == "accepted"
     assert r2.outcome == "accepted", "gate cards never merge, whatever their building or timing"
-    cards = store.list_for_world(first["world_id"], as_user=OWNER)
+    cards = store.list_for_world(first["world_id"], principal=OWNER_P)
     assert {c["id"] for c in cards} == {first["id"], second["id"]}
 
 

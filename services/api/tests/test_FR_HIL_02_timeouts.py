@@ -9,7 +9,7 @@ gate/consent, whose record stays open).
 
 from __future__ import annotations
 
-from _cards_lib import FakeClock, FakeEventWriter, load_valid_card, new_ulid
+from _cards_lib import OWNER_P, FakeClock, FakeEventWriter, load_valid_card, new_ulid
 from tilo_api.cards import CardStore
 
 OWNER = "u_owner"
@@ -54,7 +54,7 @@ def test_FR_HIL_02_a_card_not_yet_timed_out_is_left_alone():
 
     assert results == []
     assert writer.parts == []
-    cards = store.list_for_world(card["world_id"], as_user=OWNER)
+    cards = store.list_for_world(card["world_id"], principal=OWNER_P)
     assert cards[0]["id"] == card["id"], "an untimed-out card stays open and answerable"
 
 
@@ -65,7 +65,9 @@ def test_FR_HIL_02_a_timed_out_card_can_no_longer_be_answered_by_a_person():
     clock.advance(card["timeout"])
     store.tick()
 
-    result = store.answer(card["world_id"], card["id"], option=card["options"][0]["id"], channel="web", actor=OWNER)
+    result = store.answer(
+        card["world_id"], card["id"], option=card["options"][0]["id"], channel="web", principal=OWNER_P
+    )
 
     assert result.outcome == "rejected"
     assert result.reason == "already_resolved"
@@ -84,9 +86,13 @@ def test_FR_HIL_02_PI_03_gate_never_times_out_to_go():
     assert len(results) == 1
     assert results[0].held is True, "a gate must stay held (open), never resolved, at timeout"
     assert writer.of_type("approval.resolved") == [], "PI-03: a timed-out gate emits no approval.resolved"
+    assert writer.of_type("question.answered") == [], "question.answered would close the card on every channel"
+    [nudge] = writer.of_type("alert.raised")
+    assert nudge["severity"] == "nudge"
+    assert nudge["data"] == {"alert_id": card["id"], "card_id": card["id"]}
 
     # Still answerable after the timeout, because it stayed held rather than closing.
-    answered = store.answer(card["world_id"], card["id"], option="approve", channel="web", actor=OWNER)
+    answered = store.answer(card["world_id"], card["id"], option="approve", channel="web", principal=OWNER_P)
     assert answered.outcome == "answered"
 
 
@@ -101,8 +107,10 @@ def test_FR_HIL_02_PI_03_consent_never_times_out_to_connect():
     assert len(results) == 1
     assert results[0].held is True
     assert writer.of_type("connection.consented") == []
+    assert writer.of_type("question.answered") == []
+    assert [p["severity"] for p in writer.of_type("alert.raised")] == ["nudge"]
 
-    answered = store.answer(card["world_id"], card["id"], option="connect", channel="web", actor=OWNER)
+    answered = store.answer(card["world_id"], card["id"], option="connect", channel="web", principal=OWNER_P)
     assert answered.outcome == "answered"
 
 
@@ -119,4 +127,4 @@ def test_FR_HIL_02_PI_03_a_held_gate_is_nudged_only_once():
     second_results = store.tick()
 
     assert second_results == []
-    assert len(writer.of_type("question.answered")) == 1
+    assert len(writer.of_type("alert.raised")) == 1

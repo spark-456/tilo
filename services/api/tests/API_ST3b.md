@@ -9,6 +9,37 @@ is held to. Rendering a card in world/HUD/Story is SW's job, out of scope here.
 Kept in a new module family so this ticket never touches `services/api/tests/_api_lib.py`,
 `test_FR_HIL_07_*`, `test_FR_HIL_09_*` or `API_ST3a.md` (owned by a parallel ticket).
 
+## Round 2 (issue #32 review findings): this section supersedes the shapes and ambiguities below
+
+- **Identity.** `answer(world_id, card_id, *, option, channel, principal, pin_verified=False)` and
+  `list_for_world(world_id, *, principal)` take the verified `deps.Principal`; `actor` and `as_user`
+  are gone and the HTTP body forbids extra fields (a body naming an actor is a 422). Roles follow
+  PRD 10.1: the owner answers everything; a Viewer gets 403 (also on GET); a Team Lead sees and
+  answers needs_you and meeting cards of their `districts` only (a gate needs `open_gate`'s lead
+  record and policy, so it is 403 here); an Approver sees and answers assigned cards, not consent.
+  A card outside the principal's scope is 404 (no existence oracle); a refusal writes nothing and
+  leaves the card open.
+- **Companion data.** `submit(card, *, outbox_id=None, district=None, assignee=None)`: `district`
+  (card.schema.json has none; none means owner-only) and `assignee` (the Approver the owner assigned,
+  `approval.requested` approver.user) are data the harness holds. District and assignee are part of
+  the merge key, so a merge never crosses a visibility scope.
+- **Channel and PIN.** The route accepts `channel` other than web/mobile_web and `pin_verified` only
+  when `cards.get_channels_caller()` is true (an authenticated tilo-channels call; false until
+  service auth lands), else 403 `channel_not_permitted`.
+- **submit** is idempotent: identical content returns the first result and changes nothing; a
+  different card under a used id is rejected; a resolved record is never reopened. CR-01 (safe
+  default names an option), CR-02 (unique option ids), a real calendar `created_at` and a
+  representable deadline are validator rules.
+- **Merging** keeps every card as its own record (own question, options and timeout); a group lists
+  as its first open member. Merged ids resolve through `get` and `answer`.
+- **Gate answers (CR-07, PI-02):** only `approve` writes `approval.resolved` and resolves; `edit` and
+  `hold` write nothing and leave the gate open. **Consent (CR-13):** `connect` writes
+  `connection.consented` (authz by the person); `hold` writes nothing.
+- **Timeouts (supersedes ambiguity 5):** each open card times out at its own `created_at + timeout`.
+  A needs_you or meeting card writes `question.answered` (default, nudge) and resolves. A gate or
+  consent card stays open and writes one `alert.raised` (severity nudge, `alert_id` = `card_id` =
+  the card's id), because `question.answered` would close the card on every channel.
+
 ## Ambiguities resolved (root CLAUDE.md: PRD default, logged here, keep going)
 
 1. **District.** `card.schema.json` carries no `district` field (only `header.building`), and
