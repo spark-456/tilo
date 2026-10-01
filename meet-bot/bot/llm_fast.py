@@ -52,8 +52,11 @@ class FastLLM:
         clock: Callable[[], float] = time.monotonic,
         prewarm_every_s: float = 10.0,
         api_key: str | None = None,
+        fallback_model: str | None = None,
     ) -> None:
         self.model, self.thinking, self.purpose = model, thinking, purpose
+        self.fallback_model = fallback_model  # used for good if `model` is not available to this key
+        self._prewarm_off = False
         self.first_token_s, self.on_attempt, self.clock = first_token_s, on_attempt, clock
         self.prewarm_every_s, self._api_key = prewarm_every_s, api_key
         self._factory = client_factory
@@ -101,6 +104,10 @@ class FastLLM:
                     raise Busy("the model is rate limited") from None
                 if code in (400, 401, 403, 404):
                     self._report(attempt, "error", code, None, started, self._redact(e))
+                    if code == 404 and self.fallback_model and self.fallback_model != self.model and attempt == 1:
+                        log.warning("model %s is not available to this key; using %s", self.model, self.fallback_model)
+                        self.model = self.fallback_model
+                        continue
                     raise LLMUnavailable(self._explain(code, e)) from None
                 self._report(attempt, "error", code, None, started, self._redact(e))
                 last = e
@@ -131,7 +138,7 @@ class FastLLM:
     async def prewarm(self) -> bool:
         """Open the connection before it is needed. True if a call was made (at most one per `prewarm_every_s`)."""
         now = self.clock()
-        if self._last_prewarm is not None and now - self._last_prewarm < self.prewarm_every_s:
+        if self._prewarm_off or (self._last_prewarm is not None and now - self._last_prewarm < self.prewarm_every_s):
             return False
         self._last_prewarm = now
         try:
@@ -141,6 +148,8 @@ class FastLLM:
             self._report(1, "prewarm", None, None, now)
         except Exception as e:  # warming is best effort
             self._report(1, "error", _code(e), None, now, self._redact(e))
+            if _code(e) in (401, 403, 404):  # this key cannot call models.get: it would only fail again
+                self._prewarm_off = True
         return True
 
     # -- internals -----------------------------------------------------------------------------------------------------
