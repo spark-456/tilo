@@ -18,6 +18,7 @@ updates it.
 
 from __future__ import annotations
 
+import functools
 import json
 import math
 import re
@@ -81,26 +82,31 @@ def _json_tree_problems(event: Any) -> list[str]:
     nesting, an object whose __str__ raises) is rejected instead of crashing the walkers below."""
     if type(event) is not dict:
         return ["schema: (root): an event is a JSON object"]
+    too_many = [f"schema: (root): more than {_MAX_VALUES} values"]
     stack: list[tuple[Any, str, int]] = [(event, "", 0)]
-    count = 0
+    count = 1
     while stack:
         value, path, depth = stack.pop()
-        count += 1
         label = path or "(root)"
-        if count > _MAX_VALUES:
-            return [f"schema: (root): more than {_MAX_VALUES} values"]
         if depth > _MAX_DEPTH:
             return [f"schema: {label}: nested deeper than {_MAX_DEPTH} levels"]
         kind = type(value)
         if kind is dict:
+            # Each child is counted against the cap before it is pushed, so a very wide
+            # container is rejected without first stacking every one of its children.
             for key, child in value.items():
                 if type(key) is not str:
                     return [f"schema: {label}: a key is not a string"]
+                count += 1
+                if count > _MAX_VALUES:
+                    return too_many
                 stack.append((child, f"{path}/{_segment(key)}" if path else _segment(key), depth + 1))
         elif kind is list:
-            stack.extend(
-                (child, f"{path}/{index}" if path else str(index), depth + 1) for index, child in enumerate(value)
-            )
+            for index, child in enumerate(value):
+                count += 1
+                if count > _MAX_VALUES:
+                    return too_many
+                stack.append((child, f"{path}/{index}" if path else str(index), depth + 1))
         elif kind not in _JSON_SCALARS:
             return [f"schema: {label}: not a JSON value"]
     return []
@@ -217,6 +223,22 @@ def _is_send_of(cause: dict[str, Any] | None, delivered: dict[str, Any]) -> bool
     )
 
 
+_PROBLEM_CAP = 500
+_CUT = " ...[cut]"
+
+
+def _capped(problem: str) -> str:
+    """A problem string of at most _PROBLEM_CAP characters; a longer one (jsonschema can echo a
+    large value back) is cut and marked."""
+    return problem if len(problem) <= _PROBLEM_CAP else problem[: _PROBLEM_CAP - len(_CUT)] + _CUT
+
+
+@functools.cache
+def repo_validator() -> EventValidator:
+    """One shared validator over this repo's contracts/ (schemas are read once per process)."""
+    return EventValidator.from_repo()
+
+
 class EventRejected(Exception):
     """Raised by `WorldWriter.emit`/`.append` when an event fails `EventValidator.problems`;
     nothing is written to any store. Public per the ticket brief at `tilo_harness.validator`
@@ -307,9 +329,17 @@ class EventValidator:
         if tree_problems:
             return tree_problems
         try:
-            return self._problems(event, state)
+            return [_capped(problem) for problem in self._problems(event, state)]
         except Exception as error:  # fail closed: a validator crash rejects the event, it never escapes
             return [f"schema: (root): the event could not be validated ({type(error).__name__})"]
+
+    def contract_problems(self, name: str, instance: object) -> list[str]:
+        """Every violation of contracts/<name>.schema.json (e.g. "plan", "layout", "skill",
+        "agents") by `instance`, each capped like `problems`."""
+        try:
+            return [_capped(problem) for problem in self._schema_errors(name, instance)]
+        except Exception as error:  # fail closed, same as problems()
+            return [f"(root): could not be validated against {name} ({type(error).__name__})"]
 
     def _problems(self, event: dict[str, Any], state: WorldState | None) -> list[str]:
         finiteness_problems = _finiteness_problems(event)

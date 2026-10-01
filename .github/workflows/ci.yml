@@ -70,3 +70,18 @@ jobs:
 
       - name: JS dependency audit (SEC-13)
         run: pnpm audit --audit-level critical
+
+  # Antigravity pull requests (branches ag-web/*, ag-eval/*) may change only their lane's paths (docs/lanes.md).
+  lane-guard:
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'ag-')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Lane paths (docs/lanes.md)
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: python3 scripts/lane_guard.py --branch "$HEAD_REF" --base "$BASE_REF"

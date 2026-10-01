@@ -1,7 +1,7 @@
 # evals — `tilo_evals`
 
 ## Purpose
-The eval harness (PRD 19, EFF-06, EFF-07). Part a of P8-06: case schema/loader, a minimal check registry, `EvalsConfig`. Checks (b), executors/runner (c), `evals/results.md` (d) come later.
+The eval harness (PRD 19, EFF-06, EFF-07). Parts a+b of P8-06: case schema/loader, `EvalsConfig`, and the check registry with its five deterministic checks. Executors/runner and the credit cap (c), `evals/results.md` (d) come later.
 
 ## Commands
 - `uv run pytest "evals/tests" -q` — `just eval` not wired up yet (part c adds the runner)
@@ -18,3 +18,4 @@ The eval harness (PRD 19, EFF-06, EFF-07). Part a of P8-06: case schema/loader, 
 ## Local rules
 - No paid calls: this part has no executor yet.
 - `load_cases` rejects an unregistered check (a `kind: autorater` check is skipped, not looked up); `checks.register`/`is_registered` are the only entry points until part b (which adds lookup). Fake cases live under `tmp_path`, never `evals/cases`.
+- Case YAML is parsed with a no-alias loader: any `&anchor`/`*alias` in a case file is rejected, never expanded.

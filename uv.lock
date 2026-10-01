@@ -15,6 +15,7 @@ members = [
     "tilo-planning",
     "tilo-policy",
     "tilo-providers",
+    "tilo-render",
     "tilo-sandbox-web",
 ]
 
@@ -1336,12 +1337,16 @@ source = { editable = "evals" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pyyaml" },
+    { name = "referencing" },
+    { name = "tilo-contracts" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "jsonschema", specifier = ">=4.18" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
 ]
 
 [[package]]
@@ -1354,6 +1359,8 @@ dependencies = [
     { name = "jsonschema" },
     { name = "pyyaml" },
     { name = "referencing" },
+    { name = "tilo-contracts" },
+    { name = "tilo-providers" },
 ]
 
 [package.metadata]
@@ -1363,6 +1370,8 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.18" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-providers", editable = "packages/providers" },
 ]
 
 [[package]]
@@ -1434,6 +1443,11 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.18" },
 ]
+
+[[package]]
+name = "tilo-render"
+version = "0.1.0"
+source = { editable = "services/render" }
 
 [[package]]
 name = "tilo-sandbox-web"

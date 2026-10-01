@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import dataclass
+from itertools import islice
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from . import checks as checks_registry
 from .config import CappedError, read_yaml
 
 CASE_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "evals" / "case.schema.json"
+_MAX_SCHEMA_ERRORS = 20  # PR #35: consume at most this many before sorting, so a huge case can't stall the loader
 
 
 class CaseError(CappedError):
@@ -44,7 +46,8 @@ def load_cases(root: str = "evals/cases") -> list[Case]:
     for case_path in sorted(p for p in root_path.rglob("*") if p.suffix.lower() in (".yaml", ".yml")):
         raw = read_yaml(case_path, CaseError)
         case_id = raw.get("id", "<missing id>") if isinstance(raw, dict) else "<not a mapping>"
-        if errors := sorted(validator.iter_errors(raw), key=lambda e: list(e.path)):
+        capped = islice(validator.iter_errors(raw), _MAX_SCHEMA_ERRORS)
+        if errors := sorted(capped, key=lambda e: list(e.path)):
             raise CaseError(f"{case_path}: {case_id!r} failed the case schema: " + "; ".join(e.message for e in errors))
         group, dir_name = raw["group"], case_path.parent.name
         if dir_name != group or not case_id.startswith(f"{group}-") or case_path.name != f"{case_id}.yaml":
