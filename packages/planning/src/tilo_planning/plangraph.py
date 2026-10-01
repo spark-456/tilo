@@ -180,7 +180,7 @@ def _pg10(
         ref, action = gate["policy_ref"], gate["action_type"]
         if ref is None:
             continue
-        policy = policies.get(ref)
+        policy: Any = policies.get(ref)  # a missing or malformed record is unusable, not an error
         try:
             scope, expiry = policy["scope"], policy["expiry"]
             usable = (
