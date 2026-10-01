@@ -3,9 +3,9 @@
 import datetime
 import math
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, StrictStr, field_validator, model_validator
 
 MAX_SECTIONS = 60
 MAX_TABLE_ROWS = 500
@@ -15,6 +15,7 @@ MAX_PARAGRAPH_CHARS = 20_000
 
 class ParagraphBlock(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+    type: Literal["paragraph"] = "paragraph"
     text: str
 
     @field_validator("text")
@@ -27,6 +28,7 @@ class ParagraphBlock(BaseModel):
 
 class BulletsBlock(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+    type: Literal["bullets"] = "bullets"
     bullets: list[str]
 
     @field_validator("bullets")
@@ -42,15 +44,17 @@ class BulletsBlock(BaseModel):
 
 class TableBlock(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+    type: Literal["table"] = "table"
     table_id: str = Field(min_length=1)
 
 
 class ChartBlock(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+    type: Literal["chart"] = "chart"
     chart_id: str = Field(min_length=1)
 
 
-Block = ParagraphBlock | BulletsBlock | TableBlock | ChartBlock
+Block = Annotated[ParagraphBlock | BulletsBlock | TableBlock | ChartBlock, Field(discriminator="type")]
 
 
 class Section(BaseModel):
@@ -63,7 +67,7 @@ class Table(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     id: str = Field(min_length=1)
     columns: list[str]
-    rows: list[list[Any]]
+    rows: list[list[StrictStr | StrictInt | StrictFloat]]
 
     @model_validator(mode="after")
     def _validate_table(self) -> "Table":
@@ -102,7 +106,12 @@ class Chart(BaseModel):
 def _coerce_finite_float(val: Any, col_name: str) -> float:
     if isinstance(val, bool) or not isinstance(val, int | float):
         raise ValueError(f"Non-numeric value in column {col_name}")
-    fval = float(val)
+    if isinstance(val, int) and abs(val) > 2**53:
+        raise ValueError(f"Integer too large for precise representation in column {col_name}")
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"Numeric value out of bounds in column {col_name}") from exc
     if math.isnan(fval) or math.isinf(fval):
         raise ValueError(f"Non-numeric value in column {col_name}")
     return fval
@@ -169,11 +178,16 @@ class DeliverableSpec(BaseModel):
                 raise ValueError(f"At most {MAX_CHART_POINTS} points per chart allowed")
 
             y_idxs = [table.columns.index(y_col) for y_col in y_cols]
+            pie_total = 0.0
             for row in table.rows:
                 for y_idx, y_col in zip(y_idxs, y_cols, strict=True):
                     fval = _coerce_finite_float(row[y_idx], y_col)
-                    if chart.kind == ChartKind.PIE and fval < 0:
-                        raise ValueError("Pie chart cannot have negative values")
+                    if chart.kind == ChartKind.PIE:
+                        if fval < 0:
+                            raise ValueError("Pie chart cannot have negative values")
+                        pie_total += fval
+            if chart.kind == ChartKind.PIE and pie_total == 0:
+                raise ValueError("Pie chart total cannot be zero")
 
         for section in self.sections:
             for block in section.blocks:
