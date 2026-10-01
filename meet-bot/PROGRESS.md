@@ -76,3 +76,5 @@ All four Phase 1 tickets are merged (PRs 75 to 78) and green offline (192 pass, 
 
 ### CV-01 conversation mode (2026-10-02, user request)
 Tilo answers ordinary questions and small talk when spoken to (by name, in typed chat, or as a follow-up within 15 s), with no keywords or question mark needed. 209 tests pass. The live quality of the answers, and the 0.8 s extra wait for statements, are unmeasured: check in the next live meeting.
+
+- Handoff for the next agent: `docs/HANDOFF-2026-10-02.md` (what is done, open bugs, next tickets in order).
