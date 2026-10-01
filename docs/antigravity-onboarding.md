@@ -26,14 +26,14 @@ Per ticket: `git fetch origin`; `git checkout -b ag-eval/<ticket>-<slug> origin/
 
 Never: change anything outside `evals/cases/`, `evals/fixtures/` and new `evals/tests/test_PRD_19_2_*.py` (the CI lane guard fails the PR); use real companies, people, domains or numbers (`*.example`, `.invalid`, +1 555 0100 to 0199 only); put anything key-like in a case; set `LIVE=1`; open a `.env` file; force-push; or merge. If a case needs an unregistered check, say so on the issue and use the registered ones meanwhile.
 
-## AG-MEET
+## AG-RENDER
 
-You are the AG-MEET builder for Tilo's Google Meet bot: private repo `spark-456/tilo`, local clone `C:/Users/josna/OneDrive/Desktop/Claude Projects/Tilo`. Work only in the worktree `.claude/worktrees/meet-bot`, and only under `meet-bot/`. The bot lives on its own branch line, `chore/meet-bot-baseline`; nothing goes to `phase0-stack` until the integration ticket VA-INT.
+You are the AG-RENDER builder for Tilo: private repo `spark-456/tilo`, local clone `C:/Users/josna/OneDrive/Desktop/Claude Projects/Tilo`. Work only in the worktree `.claude/worktrees/ag-render`. Claude is the architect and reviewer; GitHub issues and PRs are our only channel. You build Tilo's PDF and PPTX deliverables (FR-CON-09) and their provenance appendix (the render side of FR-CON-10).
 
-Read first: `meet-bot/docs/VOICE_ARCHITECTURE.md` (sections 0, 3.4, 4, 5), `meet-bot/docs/SONNET_PROMPT.md` (its hard rules and per-ticket steps apply, with the changes written in each issue), `meet-bot/PROGRESS.md`, `meet-bot/DECISIONS.md`.
+Read first: `CLAUDE.md`, `docs/lanes.md`, `services/render/CLAUDE.md`, PRD sections 6.6, 12.4, 12.6 and 13.3.
 
-Your tickets are the issues labelled `lane:ag-meet`: #90 (VA-05, first: the fakes the others test against), then #91 (VA-06), #92 (VA-07), #93 (VA-12) and #94 (VA-09, Gemini Pro). Flash for the rest.
+Your tickets are the issues labelled `lane:ag-render`: #95 (AGR-01, Gemini Pro, must merge first), then #96 (PPTX) and #97 (PDF) in either order, then #98 (provenance appendix). Flash for #96 to #98.
 
-Per ticket: `git fetch origin`; `git checkout -b ag-meet/<VA-nn>-<slug> origin/chore/meet-bot-baseline`; tests first (named `test_VA_nn_...`); implement; run the meet-bot gate from `meet-bot/` (`python -m pytest -q`, `uv run --no-project --with ruff ruff check bot tests`, `uv run --no-project --with ruff ruff format --check bot tests`); update `PROGRESS.md` and `DECISIONS.md`; commit with `uv run --no-project --with pre-commit git commit` (trailer `Req: VA-nn`); push; open a PR into `chore/meet-bot-baseline` labelled `antigravity`; merge it yourself once the gate is green. VA-09 waits for my review comment before merging. Root CI is expected to be red on these PRs; the meet-bot gate is the merge gate.
+Per ticket: `git fetch origin`; `git checkout -b ag-render/<ticket>-<slug> origin/phase0-stack`; `just setup` once; commit the failing tests first; implement; `uv run pytest services/render -q`, then `just check`; commit with `uv run --no-project --with pre-commit git commit` (trailer `Req: FR-CON-09` or `FR-CON-10`); push; open a PR into `phase0-stack` labelled `antigravity` with `Closes #<issue>`, the IDs, the tests, the `just check` result and the hand-written line count. Then wait for my review comment and fix every blocking item in one pass.
 
-Never: change anything outside `meet-bot/`; create, read or write `meet-bot/.env`; run anything live (a real Meet, `live-probe`, real model or speech calls) unless the user says so on the issue; spend money; put a model id outside `bot/config.py`; force-push. Meeting features (specs MF-01 to MF-04) wait for the user's approval.
+Never: change anything outside `services/render/` and `templates/` (plus `uv.lock` and `docs/licences.md` for a new dependency; the CI lane guard fails the PR otherwise); edit `services/render/CLAUDE.md`, `contracts/`, `config/` or `design/`; touch `meet-bot/`; call a model or the network from render code; trust deliverable text (escape it); add a secret; set `LIVE=1`; open a `.env` file; force-push; or merge.

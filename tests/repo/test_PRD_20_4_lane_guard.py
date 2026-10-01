@@ -23,6 +23,14 @@ def test_PRD_20_4_lane_guard_allows_each_lanes_own_paths() -> None:
     assert lane_guard.violations("ag-web/AGW-02-s01-start", "phase0-stack", web) == []
     ev = ["evals/cases/E-RED/E-RED-01.yaml", "evals/fixtures/red/a.eml", "evals/tests/test_PRD_19_2_e_red_cases.py"]
     assert lane_guard.violations("ag-eval/AGE-02-e-red", "phase0-stack", ev) == []
+    render = ["services/render/src/tilo_render/pptx.py", "templates/deck/default.yaml", "uv.lock"]
+    assert lane_guard.violations("ag-render/AGR-02-pptx", "phase0-stack", render) == []
+
+
+def test_PRD_20_4_lane_guard_keeps_meet_bot_out_of_antigravity() -> None:
+    assert lane_guard.violations("ag-meet/VA-05-replay-harness", "chore/meet-bot-baseline", ["meet-bot/bot/x.py"])
+    assert lane_guard.violations("ag-render/AGR-02-pptx", "phase0-stack", ["meet-bot/bot/x.py"])
+    assert lane_guard.violations("ag-render/AGR-02-pptx", "phase0-stack", ["services/render/CLAUDE.md"])
 
 
 def test_PRD_20_4_lane_guard_rejects_claude_lane_paths_and_names_each() -> None:

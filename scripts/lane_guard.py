@@ -17,6 +17,7 @@ import sys
 LANES: dict[str, tuple[str, tuple[str, ...]]] = {
     "ag-web/": ("phase0-stack", ("apps/web/", "pnpm-lock.yaml", "docs/licences.md")),
     "ag-eval/": ("phase0-stack", ("evals/cases/", "evals/fixtures/", "evals/tests/test_PRD_19_2_")),
+    "ag-render/": ("phase0-stack", ("services/render/", "templates/", "uv.lock", "docs/licences.md")),
 }
 # Never changed by a lane, even under an allowed prefix: Claude-lane seams, generated files, rule files.
 DENIED: tuple[str, ...] = (
@@ -25,13 +26,15 @@ DENIED: tuple[str, ...] = (
     "apps/web/src/design/tokens.ts",
     "apps/web/src/styles/tokens.css",
     "apps/web/CLAUDE.md",
+    "services/render/CLAUDE.md",
 )
 
 
 def violations(branch: str, base: str, files: list[str]) -> list[str]:
     lane = next((prefix for prefix in LANES if branch.startswith(prefix)), None)
     if lane is None:
-        return []
+        # An ag-* branch that names no lane (for example ag-meet/: meet-bot stays with Claude) fails.
+        return [f"{branch!r} is not an Antigravity lane ({', '.join(LANES)})"] if branch.startswith("ag-") else []
     lane_base, allowed = LANES[lane]
     name = lane.rstrip("/")
     found = [] if base == lane_base else [f"base is {base!r}; lane {name} merges only into {lane_base!r}"]
