@@ -73,7 +73,11 @@ Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject
 `tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
 FR-AGT-11), both already listed above (MIT); and the in-workspace `tilo-policy` (not external).
 FR-CON-01 adds `pyyaml` (MIT, already listed above) as a direct dependency for the connector config
-loader. No new licence.
+loader. No new licence. FR-CON-02 adds `cryptography` for AES-GCM envelope encryption of OAuth tokens:
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| cryptography (`tilo_connectors.tokens`, FR-CON-02) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
 
 ## Python (`packages/planning`)
 
