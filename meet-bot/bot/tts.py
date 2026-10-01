@@ -13,14 +13,17 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import logging
 import os
 import shutil
+import time
 import wave
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any, Protocol
 
-from .config import DEFAULT_TTS_MODEL
+from .config import DEFAULT_TTS_MODEL, ROOT
 
 log = logging.getLogger("bot.tts")
 DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"  # a premade ElevenLabs voice ("Rachel"); override with ELEVENLABS_VOICE_ID
@@ -145,11 +148,35 @@ class FallbackTTS:
     A plan or key problem is remembered for the rest of the meeting (no repeated failing calls); a network blip is retried.
     """
 
-    def __init__(self, primary: TTSProvider, backup: TTSProvider) -> None:
+    def __init__(
+        self, primary: TTSProvider, backup: TTSProvider, state_path: Path | None = None, voice_key: str = ""
+    ) -> None:
         self.primary, self.backup = primary, backup
         self.name = primary.name
         self.sample_rate = primary.sample_rate
-        self._primary_dead = False
+        self._state, self._voice_key = state_path, voice_key
+        self._primary_dead = self._remembered_dead()
+
+    def _remembered_dead(self) -> bool:
+        """A voice the plan refused is not retried for a day: the failing first call otherwise delays the first reply."""
+        try:
+            data = json.loads(self._state.read_text(encoding="utf-8")) if self._state else {}
+        except (OSError, ValueError):
+            return False
+        dead = data.get("voice") == self._voice_key and time.time() - data.get("at", 0) < 86400
+        if dead:
+            log.info("the primary voice was refused earlier (%s): using the backup voice", data.get("reason", "plan"))
+        return dead
+
+    def _remember_dead(self, reason: str) -> None:
+        if self._state:
+            try:
+                self._state.parent.mkdir(parents=True, exist_ok=True)
+                self._state.write_text(
+                    json.dumps({"voice": self._voice_key, "at": time.time(), "reason": reason[:120]}), encoding="utf-8"
+                )
+            except OSError:
+                pass
 
     async def stream(self, text: str) -> AsyncIterator[bytes]:
         if not self._primary_dead:
@@ -164,6 +191,8 @@ class FallbackTTS:
                     " for the rest of this meeting" if permanent else " this time",
                 )
                 self._primary_dead = permanent
+                if permanent:
+                    self._remember_dead(str(e))
             except StopAsyncIteration:
                 pass
             else:
@@ -192,4 +221,8 @@ def make_tts() -> TTSProvider | None:
     except TTSError as e:
         log.info("ElevenLabs voice unavailable: %s", e)
         return local
-    return FallbackTTS(eleven, local) if local else eleven
+    return (
+        FallbackTTS(eleven, local, ROOT / "out" / ".tts_state.json", f"{eleven.voice}/{eleven.model}")
+        if local
+        else eleven
+    )

@@ -184,6 +184,7 @@ class LiveSession:
         self.next_status_at: float | None = None
         self.next_brain_at = 0.0
         self.last_question_at = -1e9  # when a question was last put to the assistant
+        self.delivering = False  # a reply is being spoken or typed right now
         self.conns = Timeline(self.out_dir / "connections.jsonl")  # model attempts, prewarms, Scribe connections
         self.trace = TurnTrace(self.out_dir / "turns.jsonl", self.clock, self.start)
         self.bot_tap: WavTap | None = None
@@ -595,6 +596,7 @@ class LiveSession:
     async def _delivery_worker(self) -> None:
         while True:
             msg, done, turn = await self._out_q.get()
+            self.delivering = True
             try:
                 ok, info = await self._deliver(msg, turn)
                 if done:
@@ -603,6 +605,8 @@ class LiveSession:
                 log.exception("delivering a reply crashed: %s", e)
                 if done:
                     done(False, {"outcome": "failed"})
+            finally:
+                self.delivering = False
 
     async def _keep_mic_open(self) -> None:
         """MIC_POLICY=open: once the meeting has started the bot's mic stays on (it carries only synthesised speech,
@@ -816,7 +820,8 @@ class LiveSession:
         if await br.meeting_ended():
             log.info("meeting ended")
             return True
-        info = await br.participants()
+        # Reading the People panel opens it over the chat, so it waits until nothing is being spoken or typed.
+        info = None if self.delivering else await br.participants()
         if info is not None:
             if info["self"]:
                 self.ignore.add(info["self"].lower())
@@ -831,9 +836,13 @@ class LiveSession:
             ]
             present = list(dict.fromkeys(others + spoke))
             others_count = len(others)
+            if brain:
+                brain.sole_human = others_count == 1
         else:  # panel unreadable: fall back to the head count
             count = await br.people_count()
             others_count = (count - 1) if count is not None else None
+            if brain and others_count is not None:
+                brain.sole_human = others_count == 1
             present = [u.speaker for u in self.store.items if u.speaker.lower() not in self.ignore]
         if self.gate_at is not None:
             await br.show_chat()  # the People read replaced the chat panel
