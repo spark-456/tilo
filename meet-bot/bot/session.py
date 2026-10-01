@@ -25,7 +25,7 @@ from .browser import MeetBrowser
 from .captions import CaptionMerger, CaptionReader, TranscriptStore, Utterance
 from .chat import ChatPoster, intro_text
 from .clock import SystemClock
-from .config import ROOT, Config
+from .config import DEFAULT_MODEL, ROOT, Config
 from .events import EventSink
 from .hybrid import (
     STT_PROMPT,
@@ -196,6 +196,7 @@ class LiveSession:
         return FastLLM(
             self.cfg.fast_model,
             self.cfg.fast_thinking,
+            fallback_model=self.cfg.gemini_model or DEFAULT_MODEL,
             on_attempt=lambda row: self.conns.record("prewarm" if row["outcome"] == "prewarm" else "attempt", **row),
         )
 

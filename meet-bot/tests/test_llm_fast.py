@@ -249,3 +249,58 @@ def test_VA_01_a_busy_or_down_model_never_raises_and_only_speaks_when_addressed(
     assert addressed is not None and addressed.text == COULD_NOT_GET_LINE  # never silent for a question put to Tilo
     chatter = [Utterance("Sam", "When does the beta ship for everyone?", 5)]
     assert run(_brain(StubFast(exc=exc)).aquick_reply(chatter, 30)) is None
+
+
+class ModelRecordingClient(FakeClient):
+    """Records which model each call asked for; `bad` models answer 404 like an unavailable Vertex publisher model."""
+
+    def __init__(self, bad=()):
+        super().__init__()
+        self.bad, self.models = set(bad), []
+
+    async def generate_content_stream(self, *, model, contents, config):
+        self.models.append(model)
+        if model in self.bad:
+            raise ApiError(404, "NOT_FOUND", "Publisher model was not found")
+        return self._chunks(["Fine."])
+
+
+def test_VA_01_a_missing_fast_model_falls_back_to_the_analysis_model_and_stays_there():
+    client = ModelRecordingClient(bad={"fast-x"})
+    llm = FastLLM(model="fast-x", fallback_model="analysis-y", client_factory=lambda: client)
+    assert run(llm.generate("sys", "q")) == "Fine."
+    assert client.models == ["fast-x", "analysis-y"] and llm.model == "analysis-y"
+    run(llm.generate("sys", "q"))
+    assert client.models[-1] == "analysis-y" and client.models.count("fast-x") == 1  # no second 404
+
+
+def test_VA_01_without_a_fallback_a_missing_model_still_fails_clearly():
+    llm = FastLLM(model="fast-x", client_factory=lambda: ModelRecordingClient(bad={"fast-x"}))
+    with pytest.raises(LLMUnavailable, match="FAST_MODEL"):
+        run(llm.generate("sys", "q"))
+
+
+@pytest.mark.parametrize("code", [401, 403, 404])
+def test_VA_01_prewarm_switches_itself_off_when_the_key_cannot_use_models_get(code):
+    class NoGet(FakeClient):
+        async def get(self, *, model, config=None):
+            self.gets += 1
+            raise ApiError(code, "UNAUTHENTICATED", "API keys are not supported by this API")
+
+    now = [0.0]
+    client = NoGet()
+    llm, _, _ = make(client, clock=lambda: now[0])
+
+    async def go():
+        first = await llm.prewarm()
+        now[0] += 60
+        return first, await llm.prewarm()
+
+    first, second = run(go())
+    assert first is True and second is False and client.gets == 1  # never asked again: it can only fail
+
+
+def test_VA_01_the_default_fast_model_is_one_the_analysis_loop_already_works_with():
+    from bot.config import DEFAULT_FAST_MODEL, DEFAULT_MODEL
+
+    assert DEFAULT_FAST_MODEL == DEFAULT_MODEL  # flash-lite returned 404 for this key; X1 decides on a faster one
