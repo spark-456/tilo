@@ -293,6 +293,36 @@ def token_cap_tiered_models_config() -> dict:
     }
 
 
+def safety_models_config(safety_provider: str = "fake") -> dict:
+    """A minimal config/models.yaml shape (contracts/providers.schema.json
+    $defs.models) with one "safety" role, for CC-SP-47 / FR-INT-02's
+    `build_safety_provider()` (issue #47 item 3: "a factory build_safety_provider()
+    driven by config/models.yaml"). No schema change is needed for this: a
+    profile's `provider` field is already a free-form slug
+    (`$defs.profile`), so a safety role/profile is exactly as generic as any
+    LLM role's -- `build_safety_provider` resolves `roles["safety"].primary`
+    the same way `tilo_providers.factory.build_provider` resolves any other
+    role. `safety_provider="fake"` exercises FakeSafetyProvider; any other
+    value (e.g. "model_armor") exercises the record-and-replay branch,
+    per issue #47 item 3 ("record-and-replay like the other providers...
+    Model Armor adapter later")."""
+    return {
+        "example": True,
+        "profiles": {
+            "safety-active": {
+                "provider": safety_provider,
+                "model": "fake-safety-1" if safety_provider == "fake" else "model-armor-1",
+                "context": 1,
+                "caps": [],
+            },
+        },
+        "roles": {
+            "safety": {"primary": "safety-active", "fallback": "safety-active"},
+        },
+        "rules": {"deny": []},
+    }
+
+
 @dataclass
 class ScriptedCall:
     """One scripted outcome for `ScriptedModelProvider.generate()`: either a
