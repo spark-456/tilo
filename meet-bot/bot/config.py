@@ -68,6 +68,7 @@ class Config:
     gemini_model: str
     fast_model: str
     fast_thinking: str
+    fast_first_token_s: float
     brain_interval_s: float
     window_minutes: float
     join_timeout_s: float
@@ -110,6 +111,7 @@ class Config:
             gemini_model=e("GEMINI_MODEL", "").strip(),
             fast_model=e("FAST_MODEL", "").strip() or DEFAULT_FAST_MODEL,
             fast_thinking=_choice("FAST_THINKING", "off", THINKING_LEVELS),
+            fast_first_token_s=_num("FAST_FIRST_TOKEN_SECONDS", 6),
             brain_interval_s=max(10.0, _num("BRAIN_INTERVAL_SECONDS", 20)),
             window_minutes=_num("TRANSCRIPT_WINDOW_MINUTES", 5),
             join_timeout_s=_num("JOIN_TIMEOUT_SECONDS", 90),
