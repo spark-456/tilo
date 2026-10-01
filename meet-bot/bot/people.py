@@ -35,6 +35,37 @@ def gate_open(required: list[str], present: list[str]) -> bool:
 
 
 _ASSISTANT_WORDS = {"assistant", "bot", "notetaker"}
+NAME_ALIASES = {"tilo": ("tillo", "tylo", "teelo")}  # common mishearings of the default name
+_GREETINGS = {"hey", "hi", "hello", "ok", "okay", "so", "and", "yo", "well", "right", "alright"}
+_FOLLOWUP_LEADS = {
+    "tell", "give", "remind", "summarise", "summarize", "repeat", "explain", "show", "say", "go", "continue",
+    "and", "what", "why", "how", "who", "when", "where", "which", "can", "could", "would", "should",
+    "do", "does", "did", "is", "are", "was", "will", "more",
+}  # fmt: skip
+
+
+def _names(bot_name: str) -> set[str]:
+    return {bot_name.lower(), *NAME_ALIASES.get(bot_name.lower(), ())} if bot_name else set()
+
+
+def _words_after_greeting(sentence: str) -> list[str]:
+    words = re.findall(r"[a-z']+", sentence.lower())
+    while words and words[0] in _GREETINGS:
+        words = words[1:]
+    return words
+
+
+def named_request(sentence: str, bot_name: str) -> bool:
+    """Spoken to the assistant by name, question mark or not: the name opens the sentence (after "hey", "okay"...) or
+    closes it. "I told Tilo about it" is talk about the assistant, not to it."""
+    words, names = _words_after_greeting(sentence), _names(bot_name)
+    return bool(words and names and (words[0] in names or words[-1] in names))
+
+
+def looks_like_followup(text: str) -> bool:
+    """A question or request, for the moments right after the assistant spoke when people answer it without its name."""
+    words = re.findall(r"[a-z']+", text.lower())
+    return bool(words) and (text.rstrip().endswith("?") or (len(words) >= 2 and words[0] in _FOLLOWUP_LEADS))
 
 
 def addressed(text: str, bot_name: str) -> bool:
@@ -47,7 +78,7 @@ def addressed(text: str, bot_name: str) -> bool:
         return False
     target = bot_name.lower()
     words = re.findall(r"[a-z']+", text.lower())
-    if target in words or _ASSISTANT_WORDS & set(words):
+    if _names(bot_name) & set(words) or _ASSISTANT_WORDS & set(words):
         return True
     for w in re.findall(r"([a-z']+),", text.lower()):  # vocative: "Tyler, what is..." (a misheard name)
         if 3 <= len(w) <= 8 and w[0] == target[0] and SequenceMatcher(None, w, target).ratio() >= 0.4:
@@ -56,9 +87,14 @@ def addressed(text: str, bot_name: str) -> bool:
 
 
 def addressed_sentence(text: str, bot_name: str) -> str | None:
-    """The first sentence of `text` that is a question aimed at the assistant, or None."""
-    for sent in re.split(r"(?<=[.?!])\s+", text):
+    """The first sentence of `text` aimed at the assistant (a question to it, or any sentence that calls it by name)."""
+    sents = re.split(r"(?<=[.?!])\s+", text)
+    for i, sent in enumerate(sents):
         if addressed(sent, bot_name):
+            return sent.strip()
+        if named_request(sent, bot_name):
+            if len(_words_after_greeting(sent)) == 1 and i + 1 < len(sents):  # "Hey Tilo. Tell me a joke."
+                return " ".join(sents[i:]).strip()
             return sent.strip()
     return None
 

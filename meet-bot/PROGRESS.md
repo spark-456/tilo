@@ -73,3 +73,6 @@ All four Phase 1 tickets are merged (PRs 75 to 78) and green offline (192 pass, 
 - Existing assertions changed on purpose: an addressed question with no answer now gets a fallback line (VA-02), so `test_quick_reply_is_one_small_call...` and `test_VA_01_a_busy_or_down_model...` assert the line, not silence.
 - `Config.from_env()` reads the developer's `.env`; tests that call it patch `bot.config.load_dotenv` to a no-op.
 - Ticket sizes ran over the ~400-line guide for VA-03 and VA-04 (about 800 lines each with tests); the session.py loop refactor is most of it.
+
+### CV-01 conversation mode (2026-10-02, user request)
+Tilo answers ordinary questions and small talk when spoken to (by name, in typed chat, or as a follow-up within 15 s), with no keywords or question mark needed. 209 tests pass. The live quality of the answers, and the 0.8 s extra wait for statements, are unmeasured: check in the next live meeting.

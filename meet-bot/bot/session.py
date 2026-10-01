@@ -208,6 +208,12 @@ class LiveSession:
         except RuntimeError:  # no running loop (offline tools): nothing to warm
             pass
 
+    @staticmethod
+    def idle_needed(text: str, base: float) -> float:
+        """How long a live partial must sit still before it counts as finished: a question mark says it is complete,
+        a statement ("Tilo tell me a joke") could still be mid-sentence, so it waits a little longer."""
+        return base if text.rstrip().endswith("?") else base + 0.8
+
     # -- time ------------------------------------------------------------------------------------------------------
     def elapsed(self) -> float:  # seconds since joining (also the audio clock)
         return self.clock.now() - self.start
@@ -712,7 +718,7 @@ class LiveSession:
                         ready = base + [
                             Utterance(u.speaker, u.text, max(0.0, u.t - gate))
                             for u, idle in opens
-                            if idle >= self.partial_idle_s
+                            if idle >= self.idle_needed(u.text, self.partial_idle_s)
                         ]
                         q = brain.pending_question(ready)
                         if q:

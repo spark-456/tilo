@@ -127,7 +127,7 @@ class Config:
             admit_allowed=_names(e("ADMIT_ALLOWED_NAMES", "")),
             required=_names(e("REQUIRED_PARTICIPANTS", "")),
             record_audio=e("RECORD_AUDIO", "0") == "1",
-            max_direct_replies=int(_num("MAX_DIRECT_REPLIES", 12)),
+            max_direct_replies=int(_num("MAX_DIRECT_REPLIES", 40)),
             direct_reply_gap_s=_num("DIRECT_REPLY_GAP_SECONDS", 6),
             hybrid=e("HYBRID_TRANSCRIPT", "0") == "1",
             context_dir=ROOT / e("CONTEXT_DIR", "context"),
