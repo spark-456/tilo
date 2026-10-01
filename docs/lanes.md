@@ -14,7 +14,7 @@ Updated 2026-10-01 by the orchestrator (Claude), who keeps this file current. Tw
 | CL-TRUST | Claude | `contracts/`, `config/`, `docs/adr/`, `packages/contracts-*`, `packages/providers/`, `packages/policy/`, `services/api/` (all but the intake module), `.github/`, `infra/`, `scripts/`, every `CLAUDE.md`, `.claude/` | `feat/<ID>-<slug>` from `phase0-stack` |
 | CL-PLAN | Claude | `packages/planning/`, `services/api` intake module, `prompts/` | same |
 | CL-HARNESS | Claude | `services/harness/`, `packages/archive/`, `packages/memory/`, `skills/` | same |
-| CL-REACH | Claude | `services/connectors/`, `services/channels/`, `services/browser/` | same |
+| CL-REACH | Claude (session "Tilo repo hygiene cleanup", from 2 Oct) | `services/connectors/`, `services/channels/`, `services/browser/` | same; the orchestrator merges |
 | CL-EVID | Claude | `evals/src/`, existing `evals/tests/`, `evals/case.schema.json`, `packages/metering/`, `services/sandbox-web/` | same |
 | CL-INT | Claude | the CP2 wiring across the lanes above, plus `apps/web/src/api/http*` (the web's HTTP client and sign-in) | same |
 | AG-WEB | Antigravity | `apps/web/**` except `apps/web/src/api/http*`, generated files (`src/world/registry.generated.ts`, `src/design/tokens.ts`, `src/styles/tokens.css`) and `apps/web/CLAUDE.md`; plus `pnpm-lock.yaml` and `docs/licences.md` | `ag-web/<ticket>-<slug>` from `phase0-stack`, worktree `.claude/worktrees/ag-web` |
@@ -55,14 +55,15 @@ Never given to Antigravity: the Meet bot (user, 2026-10-01), and security, concu
 
 | Lane | Ticket | IDs | Owner | Model | Status | Issue | PR |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| CL-TRUST | CC-SP-47 SafetyProvider | FR-INT-02 | Claude | - | finishing (merge base, tests) | #47 | - |
-| CL-PLAN | FR-INT-06/07/08 approaches, estimates, budget | FR-INT-06, -07, -08 | Claude | - | finishing; security review next | #68 | - |
+| CL-TRUST | CC-SP-47 SafetyProvider | FR-INT-02 | Claude | - | in review (code, security, cost) | #47 | #99 |
+| CL-PLAN | FR-INT-06/07/08 approaches, estimates, budget | FR-INT-06, -07, -08 | Claude | - | in review (code, security) | #68 | #100 |
 | CL-PLAN | FR-INT-09 PlanGraph validator | FR-INT-09 | Claude | - | queued (wip 81b44c8) | - | - |
 | CL-TRUST | FR-HIL-01/02 cards API | FR-HIL-01, -02 | Claude | - | queued (rebase onto redaction) | #32 | - |
 | CL-TRUST | CC-SP-64 `grant_budget` T1 | FR-INT-08 | Claude | - | queued (tests only) | #64 | - |
 | CL-TRUST | FR-HIL-07 kill switches (redo) | FR-HIL-07 | Claude | - | queued (wip 42d4789) | #46, #55 | - |
 | CL-EVID | P8-06c/d eval runner, credit cap, results | EFF-07 | Claude | - | queued (port from `feat/P8-06-eval-harness`) | - | - |
 | CL-INT | CP2 wiring | FR-WLD-05, CP2 | Claude | - | after the in-flight merges | - | - |
+| CL-REACH | FR-CON-01, -02, -03; FR-CHN-02, -03, -06, -07; then FR-CON-04, -05, FR-CHN-08..14, FR-CON-07, -08, -10 | see queue | Claude (hygiene session) | - | started 2 Oct | - | - |
 | AG-WEB | AGW-01 flow shell and TiloClient seam | PRD 18.3, UX-1..3 | Antigravity | Pro | open | #80 | - |
 | AG-WEB | AGW-02 S-01 Start | FR-INT-01 | Antigravity | Flash | open (after AGW-01) | #81 | - |
 | AG-WEB | AGW-03 S-02 Understanding | FR-INT-01, -03, -04, -05 | Antigravity | Flash | open (after AGW-01) | #82 | - |
