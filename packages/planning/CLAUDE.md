@@ -26,6 +26,9 @@ FR-INT-09: `plangraph.validate_plan` checks a plan against `plan.schema.json` an
   code; a candidate over the cap is recorded as an assumption with `question: null`.
 - A rejected submission stores nothing: limits first, then extraction and screening, then storage.
 - The plan validator takes its registries (risk table, connectors, skills, policies) as arguments;
-  a schema failure (`schema`) stops the PG checks. PG-06 checks "never lower" only.
+  a schema failure (`schema`) stops the PG checks. Arrays over their cap and non-finite numbers are
+  `schema`, checked so jsonschema never does quadratic work. PG-06 checks "never lower" only, against
+  the higher of the table and connector tiers (BQ-68). PG-10 reads a policy as `tilo_policy` does:
+  schema, owner, history level at `now` capped by `max_level`, expiry, scope.
 - A flagged file's `artifact.created` has severity `fyi` and `trace.tool` `safety_provider`;
   `trace.archive_ref` stays null until the raw archive (P7) exists.

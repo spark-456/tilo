@@ -5,7 +5,8 @@ person. Each violation names its rule id; a shape failure is reported as `schema
 cross-reference checks, since they assume the shape.
 
 PG-06 can only check "never lower" at plan time: units carry no per-action facts, so no context
-modifier can be shown to apply. Risk tiers come from `tilo_policy.RiskTable`."""
+modifier can be shown to apply. The tier a gate may not go below is the higher of the risk table's
+(`tilo_policy.RiskTable`) and the one each guarded unit's connectors declare for the action."""
 
 from __future__ import annotations
 
@@ -13,7 +14,8 @@ import functools
 import itertools
 import json
 import math
-from collections.abc import Collection, Iterator, Mapping
+from collections.abc import Iterator, Mapping
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +25,8 @@ import jsonschema
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 from tilo_policy import RiskTable
+from tilo_policy.coverage import in_force, level_at, stamped_by, ts
+from tilo_policy.schemas import conforms
 
 CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
 SCHEMA_RULE = "schema"
@@ -46,6 +50,12 @@ def _pattern(validator: Any, pattern: str, instance: Any, schema: dict[str, Any]
 
 
 @functools.cache
+def _plan_schema() -> dict[str, Any]:
+    schema: dict[str, Any] = json.loads((CONTRACTS / "plan.schema.json").read_text("utf-8"))
+    return schema
+
+
+@functools.cache
 def _plan_validator() -> Any:
     schemas = [json.loads(p.read_text("utf-8")) for p in sorted(CONTRACTS.glob("**/*.schema.json"))]
     # Without `$schema`, a `$ref` into another contract keeps the extended class (its `pattern`).
@@ -54,14 +64,78 @@ def _plan_validator() -> Any:
         (s["$id"], Resource.from_contents(s, default_specification=DRAFT202012)) for s in schemas
     )
     cls = jsonschema.validators.extend(jsonschema.Draft202012Validator, {"pattern": _pattern})
-    return cls(json.loads((CONTRACTS / "plan.schema.json").read_text("utf-8")), registry=registry)
+    return cls(_plan_schema(), registry=registry)
+
+
+@functools.cache
+def _array_caps() -> tuple[dict[str, int], dict[str, dict[str, int]]]:
+    """maxItems of the plan's arrays and of the arrays inside their items, read from the schema.
+    `guards` has none; a gate guards at most every unit, so it takes the units cap."""
+    schema = _plan_schema()
+    top = {key: prop["maxItems"] for key, prop in schema["properties"].items() if "maxItems" in prop}
+    nested: dict[str, dict[str, int]] = {}
+    for key in top:
+        item = schema["$defs"][schema["properties"][key]["items"]["$ref"].rsplit("/", 1)[1]]
+        nested[key] = {f: p["maxItems"] for f, p in item["properties"].items() if "maxItems" in p}
+    nested["gates"].setdefault("guards", top["units"])
+    return top, nested
+
+
+def _oversized(plan: Any) -> list[Violation]:
+    """Arrays over their cap, found before jsonschema runs: its uniqueItems is quadratic."""
+    if not isinstance(plan, dict):
+        return []
+    top, nested = _array_caps()
+    found = []
+    for key, cap in top.items():
+        items = plan.get(key)
+        if not isinstance(items, list):
+            continue
+        if len(items) > cap:
+            found.append(Violation(SCHEMA_RULE, f"/{key}: has more than {cap} items"))
+            continue
+        for i, item in enumerate(items):
+            for field, field_cap in nested[key].items():
+                value = item.get(field) if isinstance(item, dict) else None
+                if isinstance(value, list) and len(value) > field_cap:
+                    found.append(Violation(SCHEMA_RULE, f"/{key}/{i}/{field}: has more than {field_cap} items"))
+    return found
+
+
+def _numbers(value: Any, path: str = "") -> Iterator[tuple[str, int | float]]:
+    if isinstance(value, bool):
+        return
+    if isinstance(value, int | float):
+        yield path or "/", value
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            yield from _numbers(item, f"{path}/{key}")
+    elif isinstance(value, list):
+        for i, item in enumerate(value):
+            yield from _numbers(item, f"{path}/{i}")
+
+
+def _finite(number: int | float) -> bool:
+    """A finite float, so arithmetic on it never overflows: NaN, infinity and 10**400 are not."""
+    try:
+        return math.isfinite(number)
+    except OverflowError:
+        return False
 
 
 def _schema_violations(plan: Any) -> list[Violation]:
-    errors = sorted(_plan_validator().iter_errors(plan), key=lambda e: list(map(str, e.absolute_path)))
-    found = [Violation(SCHEMA_RULE, f"/{'/'.join(map(str, e.absolute_path))}: {e.message}") for e in errors]
-    if not found and not math.isfinite(plan["budget_cap"]):
-        found.append(Violation(SCHEMA_RULE, "/budget_cap: must be a finite number"))
+    found = _oversized(plan)
+    if found:
+        return found
+    try:
+        errors = sorted(_plan_validator().iter_errors(plan), key=lambda e: list(map(str, e.absolute_path)))
+        found = [Violation(SCHEMA_RULE, f"/{'/'.join(map(str, e.absolute_path))}: {e.message}") for e in errors]
+    except Exception:  # too deep to walk, or a number too long to print: fail closed
+        return [Violation(SCHEMA_RULE, "/: the plan could not be validated")]
+    if not found:
+        found = [
+            Violation(SCHEMA_RULE, f"{path}: must be a finite number") for path, n in _numbers(plan) if not _finite(n)
+        ]
     return found
 
 
@@ -72,6 +146,19 @@ def _utc_now() -> str:
 
 def _duplicates(ids: list[str]) -> list[str]:
     return sorted({i for i in ids if ids.count(i) > 1})
+
+
+def _declared(connector: Any, action: str) -> list[Mapping[str, Any]]:
+    """The connector's declarations of `action` (a missing or malformed connector declares none)."""
+    declared = connector.get("actions") if isinstance(connector, Mapping) else None
+    if not isinstance(declared, list):
+        return []
+    return [d for d in declared if isinstance(d, Mapping) and d.get("id") == action]
+
+
+def _approves(connector: Any, action: str) -> bool:
+    """The connector declares `action` as a side effect (gate_type: approval)."""
+    return any(d.get("gate_type") == "approval" for d in _declared(connector, action))
 
 
 def _pg01(plan: dict[str, Any]) -> Iterator[Violation]:
@@ -127,14 +214,31 @@ def _pg05(plan: dict[str, Any]) -> Iterator[Violation]:
                 )
 
 
-def _pg06(plan: dict[str, Any], risk_table: RiskTable) -> Iterator[Violation]:
+def _floor_tier(
+    gate: dict[str, Any], units: dict[str, Any], risk_table: RiskTable, connectors: Mapping[str, Any]
+) -> str:
+    """The higher of the table's tier and every tier the guarded units' connectors declare for the
+    action; a declared tier that is not T1..T3 counts as T3."""
+    action = gate["action_type"]
+    tiers = [risk_table.tier_of(action, [])]
+    for uid in gate["guards"]:
+        for conn in units[uid]["connectors"] if uid in units else []:
+            tiers += [
+                d.get("risk_tier") if d.get("risk_tier") in TIER_ORDER else "T3"
+                for d in _declared(connectors.get(conn), action)
+            ]
+    return max(tiers, key=TIER_ORDER.index)
+
+
+def _pg06(plan: dict[str, Any], risk_table: RiskTable, connectors: Mapping[str, Any]) -> Iterator[Violation]:
+    units = {u["id"]: u for u in plan["units"]}
     for gate in plan["gates"]:
-        base = risk_table.tier_of(gate["action_type"], [])
-        if TIER_ORDER.index(gate["risk_tier"]) < TIER_ORDER.index(base):
+        floor = _floor_tier(gate, units, risk_table, connectors)
+        if TIER_ORDER.index(gate["risk_tier"]) < TIER_ORDER.index(floor):
             yield Violation(
                 "PG-06",
-                f"gate {gate['id']} is {gate['risk_tier']}, "
-                f"below the {base} the risk table gives {gate['action_type']}",
+                f"gate {gate['id']} is {gate['risk_tier']}, below the {floor} that {gate['action_type']} has "
+                "in the risk table or its connectors",
             )
 
 
@@ -157,56 +261,75 @@ def _pg08(plan: dict[str, Any]) -> Iterator[Violation]:
 
 
 def _pg09(plan: dict[str, Any]) -> Iterator[Violation]:
+    """`not (min <= max)`, so a NaN that reached here is out of order too."""
     for a in plan["approaches"]:
-        if a["time"]["min_s"] > a["time"]["max_s"]:
-            yield Violation("PG-09", f"approach {a['id']}: time min_s is above max_s")
-        if a["credits"]["min"] > a["credits"]["max"]:
-            yield Violation("PG-09", f"approach {a['id']}: credits min is above max")
+        for key, low, high in (("time", "min_s", "max_s"), ("credits", "min", "max")):
+            pair = (a[key][low], a[key][high])
+            if not (all(map(_finite, pair)) and pair[0] <= pair[1]):
+                yield Violation("PG-09", f"approach {a['id']}: {key} {low} is not a finite number at or below {high}")
 
 
-def _approves(connector: Any, action: str) -> bool:
-    """The connector declares `action` as a side effect (gate_type: approval)."""
-    if not isinstance(connector, Mapping):
-        return False
-    declared = connector.get("actions") or []
-    return any(isinstance(d, Mapping) and d.get("id") == action and d.get("gate_type") == "approval" for d in declared)
+def _policy_scope(
+    policy: Any, gate: dict[str, Any], owner: str | None, now: str, risk_table: RiskTable
+) -> tuple[list[str], list[str]] | None:
+    """(connectors, districts) of a policy that may open `gate` at `now`, else None: a record that
+    conforms to policy.schema.json, is the owner's and in force (tilo_policy.coverage), and is at
+    L2 or L3 at `now` by its history, capped by the table's max_level for the gate's tier."""
+    try:
+        if not (
+            conforms("policy.schema.json", policy)
+            and policy["id"] == gate["policy_ref"]
+            and policy["action_type"] == gate["action_type"]
+            and all(v is None or _finite(v) for v in policy["limits"].values())
+            and in_force(policy, policy["owner"] if owner is None else owner, now)
+            and stamped_by(policy, now)
+        ):
+            return None
+        level = level_at(policy, now)
+        if level is None or min(level, risk_table.max_level.get(gate["risk_tier"], "L1")) not in POLICY_LEVELS:
+            return None
+        return list(policy["scope"]["connectors"]), list(policy["scope"]["districts"])
+    except Exception:  # a malformed record is unusable, not an error
+        return None
 
 
 def _pg10(
-    plan: dict[str, Any], policies: Mapping[str, Any], connectors: Mapping[str, Any], now: str
+    plan: dict[str, Any],
+    policies: Mapping[str, Any],
+    connectors: Mapping[str, Any],
+    owner: str | None,
+    now: str,
+    risk_table: RiskTable,
 ) -> Iterator[Violation]:
     units = {u["id"]: u for u in plan["units"]}
+    try:
+        ts(now)
+        clock_ok = True
+    except ValueError:
+        clock_ok = False
     for gate in plan["gates"]:
         ref, action = gate["policy_ref"], gate["action_type"]
         if ref is None:
             continue
-        policy: Any = policies.get(ref)  # a missing or malformed record is unusable, not an error
-        try:
-            scope, expiry = policy["scope"], policy["expiry"]
-            usable = (
-                policy["id"] == ref
-                and policy["action_type"] == action
-                and policy["level"] in POLICY_LEVELS
-                and (expiry is None or now < expiry)
-            )
-        except (KeyError, TypeError):
-            usable = False
-        if not usable:
-            yield Violation("PG-10", f"gate {gate['id']}: {ref} is not an unexpired L2/L3 policy for {action}")
+        scope = _policy_scope(policies.get(ref), gate, owner, now, risk_table) if clock_ok else None
+        if scope is None:
+            yield Violation("PG-10", f"gate {gate['id']}: {ref} is not the owner's L2/L3 policy for {action} now")
             continue
+        scope_connectors, scope_districts = scope
         for uid in gate["guards"]:
             unit = units.get(uid)
             if unit is None:
                 continue  # PG-05 reports a guard that names no unit
-            acting = [c for c in unit["connectors"] if _approves(connectors.get(c), action)]
-            outside = [c for c in acting if scope["connectors"] and c not in scope["connectors"]]
-            if scope["districts"] and unit["district"] not in scope["districts"]:
+            outside = [
+                c for c in unit["connectors"] if _approves(connectors.get(c), action) and c not in scope_connectors
+            ]
+            if scope_districts and unit["district"] not in scope_districts:  # empty districts: no restriction
                 outside.append(unit["district"])
             if outside:
                 yield Violation("PG-10", f"gate {gate['id']}: {ref} does not cover {', '.join(outside)} for {uid}")
 
 
-def _pg11(plan: dict[str, Any], skills: Collection[str], connectors: Mapping[str, Any]) -> Iterator[Violation]:
+def _pg11(plan: dict[str, Any], skills: AbstractSet[str], connectors: Mapping[str, Any]) -> Iterator[Violation]:
     for unit in plan["units"]:
         uid = unit["id"]
         for skill in unit["skills"]:
@@ -227,16 +350,21 @@ def validate_plan(
     *,
     risk_table: RiskTable,
     connectors: Mapping[str, Any],
-    skills: Collection[str],
+    skills: AbstractSet[str],
     policies: Mapping[str, Any],
+    owner: str | None = None,
     now: str | None = None,
 ) -> list[Violation]:
     """Every violation the plan has, in rule order; an empty list means valid.
 
-    `connectors` maps connector id to its connector.schema.json record, `skills` is the set of
-    skill ids, `policies` maps policy id to its policy.schema.json record. `now` (a
-    common.schema.json timestamp) decides whether a policy has expired; it defaults to the clock.
+    `connectors` maps connector id to its connector.schema.json record, `skills` is the set (or
+    frozenset) of skill ids, `policies` maps policy id to its policy.schema.json record. `owner` is
+    the world owner whose policies may open gates; None binds each policy to its own recorded owner
+    (every stamp still by that owner). `now` (a common.schema.json timestamp; anything else fails
+    every policy gate) decides which policy level is in force; it defaults to the clock.
     """
+    if not isinstance(skills, set | frozenset):  # a str would match substrings
+        raise TypeError("skills must be a set or frozenset of skill ids")
     found = _schema_violations(plan)
     if found:
         return found
@@ -247,11 +375,11 @@ def validate_plan(
         _pg03(plan, unit_ids),
         _pg04(plan),
         _pg05(plan),
-        _pg06(plan, risk_table),
+        _pg06(plan, risk_table, connectors),
         _pg07(plan),
         _pg08(plan),
         _pg09(plan),
-        _pg10(plan, policies, connectors, now or _utc_now()),
+        _pg10(plan, policies, connectors, owner, _utc_now() if now is None else now, risk_table),
         _pg11(plan, skills, connectors),
     )
     return [v for check in checks for v in check]
