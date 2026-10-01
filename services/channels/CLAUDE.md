@@ -25,3 +25,17 @@ channel identity binding. Public ingress for signature-verified webhooks only.
 - Email action links are signed, single-use and expire in 24 h.
 - Never send a real email or WhatsApp message from dev/CI — fakes or recorded-mode test
   accounts only.
+- Never log message bodies, the app secret, or phone numbers in full (mask to the last 4 digits,
+  `whatsapp.mask_number`). Log exception types, not exception messages.
+
+## WhatsApp webhook (FR-CHN-02) and keywords (FR-CHN-06)
+- `tilo_channels.whatsapp`: signature over the raw bytes (`hmac.compare_digest`), then dedupe through
+  the injected `DedupeStore.claim` (atomic set-if-absent), processing serialised per sender. Stale means
+  strictly older than `max_age_s` (default 300 s) and claims nothing. Duplicates and replays answer 200
+  with outcome "duplicate"; forged or missing signatures 401; signed non-JSON 400.
+- Handler errors: the dedupe claim is kept (at-most-once, so a partly applied side effect is never
+  repeated), the outcome is "failed", the webhook still answers 200 (Meta retries non-2xx) and the
+  error is logged with type only. Anything that must survive a handler failure belongs to the handler.
+- `tilo_channels.keywords`: whole-message, case-insensitive keywords; only bound numbers are obeyed;
+  the effect goes through the injected control plane, then one confirmation to the sender.
+- Package commands: `uv run --package tilo-channels pytest services/channels`.
