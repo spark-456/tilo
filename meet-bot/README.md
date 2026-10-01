@@ -54,7 +54,9 @@ Start with `--record-audio` (or `RECORD_AUDIO=1`). The bot then says in chat tha
 - `connections.jsonl`: model attempts (outcome, code, first-token time), prewarms and Scribe connections, so a slow answer can be explained.
 - `bot.wav` (voice replies on): what the bot actually sent into the meeting, recorded next to `audio.wav` (`audio_clock.json` holds both start times). `python -m bot.main audit [out/<time>]` measures end of question to first bot sound from the recordings, to about 10 ms, and compares it with the log.
 
-Tuning: `DIRECT_REPLY_GAP_SECONDS` (default 6), `MAX_DIRECT_REPLIES` (12), `BRAIN_INTERVAL_SECONDS` (20), `ANSWER_MODE` (`questions` or `addressed`). Free-tier Gemini keys hit 429 limits if these are pushed too hard.
+Talking to Tilo: say its name at the start or end of what you say ("Tilo, tell me a joke", "what do you think, Tilo"), or type in the chat; no question mark and no special words are needed, and it answers any topic in a sentence or two. For about 15 s after it answers you can follow up without the name. People talking among themselves are never answered, except a question the meeting notes or project files can answer.
+
+Tuning: `DIRECT_REPLY_GAP_SECONDS` (default 6), `MAX_DIRECT_REPLIES` (40), `BRAIN_INTERVAL_SECONDS` (20), `ANSWER_MODE` (`questions` or `addressed`). Free-tier Gemini keys hit 429 limits if these are pushed too hard.
 
 ## Transcript sources and project knowledge
 
