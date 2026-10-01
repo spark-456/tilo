@@ -1,0 +1,5 @@
+{
+  "seed": true,
+  "source": "SEED, not measured history. Empty at launch (PRD 7.3); filled from the first eval pass (29 Sep to 2 Oct). Each entry: credits_min, credits_max, time_min_s, time_max_s per unit.",
+  "unit_types": {}
+}

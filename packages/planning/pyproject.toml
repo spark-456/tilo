@@ -3,12 +3,12 @@ name = "tilo-planning"
 version = "0.1.0"
 description = "tilo_planning — intake and planning: limits, file extraction, safety screening, artifacts (PRD 7)"
 requires-python = "==3.12.*"
-dependencies = ["tilo-contracts", "tilo-providers", "tilo-policy", "jsonschema>=4.18", "referencing>=0.30"]
+dependencies = ["tilo-contracts", "tilo-policy", "tilo-providers", "jsonschema>=4.18", "referencing>=0.30"]
 
 [tool.uv.sources]
 tilo-contracts = { workspace = true }
-tilo-providers = { workspace = true }
 tilo-policy = { workspace = true }
+tilo-providers = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
