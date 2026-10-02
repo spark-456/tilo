@@ -6,13 +6,17 @@ Director failure stores nothing, a missing config is 503, a budget has a ceiling
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import pytest
 from _api_contracts_lib import INJECTION_PHRASE, make_docx_bytes
 from tilo_api import deps
 from tilo_api import intake as intake_module
 from tilo_planning.artifacts import InMemoryArtifactStore
+from tilo_planning.brief import BriefExtractionError
 from tilo_providers.config import ProviderConfigError
+from tilo_providers.errors import ProviderError
+from tilo_providers.interfaces import SafetyProvider
 
 ECHO = "ECHOME-7f3a"
 
@@ -181,11 +185,28 @@ def test_FR_INT_04_a_refused_chip_edit_does_not_echo_the_value(flow, edits):
     assert response.status_code == 422 and ECHO not in response.text
 
 
-def test_FR_INT_03_a_director_failure_logs_a_category_not_the_model_output(clear_flow, caplog):
-    clear_flow.provider.brief = {"goal": ECHO, "sensitivity": ECHO}
+def test_FR_INT_03_a_director_failure_logs_a_category_not_the_error_text(clear_flow, monkeypatch, caplog):
+    def failing(*_args: object, **_kwargs: object) -> None:
+        raise BriefExtractionError(f"the Director replied {ECHO}") from ValueError(f"input_value={ECHO}")
+
+    monkeypatch.setattr(intake_module, "extract_brief", failing)
     with caplog.at_level(logging.DEBUG):
         response = clear_flow.intake()
 
     assert response.status_code == 502 and ECHO not in response.text
     assert ECHO not in caplog.text
     assert any(r.name == "tilo_api.intake" for r in caplog.records), "the failure is still logged"
+
+
+def test_FR_INT_02_a_safety_failure_logs_a_category_not_the_error_text(clear_flow, caplog):
+    class Failing(SafetyProvider):
+        def check(self, text: str, **kwargs: Any) -> Any:
+            raise ProviderError(f"upstream replied {ECHO}")
+
+    clear_flow.app.dependency_overrides[intake_module.get_safety] = lambda: Failing()
+    with caplog.at_level(logging.DEBUG):
+        response = clear_flow.intake()
+
+    assert response.status_code == 503 and ECHO not in response.text
+    assert ECHO not in caplog.text
+    assert any(r.name == "tilo_api.intake" for r in caplog.records)
