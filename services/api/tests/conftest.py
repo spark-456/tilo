@@ -58,3 +58,36 @@ def client(store: deps.Store):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+# --- CL-INT-1 (CP2 thin slice, API flow): see API_CL_INT_1.md and _clint1_lib.py -----------------
+
+
+@pytest.fixture()
+def flow_factory(repo_root: pathlib.Path, store: deps.Store):
+    """Builds a `Flow` (the real app with a fake principal, the in-memory Store, a scripted director behind
+    a real Router, and by default a SafetyProvider spy). `safety=None` leaves `get_safety` un-overridden."""
+    from _clint1_lib import Flow, brief_reply, make_spy_safety
+
+    made: list[Flow] = []
+
+    def build(ambiguous: list[str] | None = None, *, safety: object = "spy") -> Flow:
+        spy = make_spy_safety() if safety == "spy" else safety
+        flow = Flow(repo_root, store, spy, brief_reply(["audience", "deadline"] if ambiguous is None else ambiguous))
+        made.append(flow)
+        return flow
+
+    yield build
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def flow(flow_factory):
+    """Default flow: the Director marks the audience and the deadline ambiguous (two questions)."""
+    return flow_factory()
+
+
+@pytest.fixture()
+def clear_flow(flow_factory):
+    """The Director marks nothing ambiguous (a clear task: zero questions)."""
+    return flow_factory([])
