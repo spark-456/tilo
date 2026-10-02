@@ -1,6 +1,6 @@
 // PRD 18.3 flow routes on the History API, no dependency: / S-01, /task/:id/understanding S-02,
 // /task/:id/approaches S-03, /world/:id S-04, /world/:id/delivery S-12. Anything else is Start.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 export type FlowScreen = "Start" | "Understanding" | "Approaches" | "World" | "Delivery";
 
@@ -48,3 +48,13 @@ export function useFlowRoute(): { readonly route: FlowRoute } {
 }
 
 export const useNavigate = () => useCallback(navigateFlow, []);
+
+/** The current path, re-read on every History API navigation. */
+export const usePathname = (): string =>
+  useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener("popstate", onChange);
+      return () => window.removeEventListener("popstate", onChange);
+    },
+    () => window.location.pathname,
+  );

@@ -35,6 +35,15 @@ UX-1–UX-9 (18.1); FR-WLD-* (world rendering); owned starting P0-08.
 - Fixture mode: `?fixture=<name>` plays a layout+stream into the world; `?seq=N`/`?speed=N`
   control replay. DOM contract: `apps/web/e2e/support/world.ts`.
 
+## Screens and navigation (`src/screens/`, AGW-08)
+- `meta.ts` is the PRD 18.3 table (S-01..S-25: name, priority, pillar, address, `built` or
+  `placeholder` status, route pattern). `routes.tsx` maps each routed screen to its `S_NN.tsx`.
+  Flow-shell screens (S-01..S-04, S-12) stay in `FlowShell.tsx` until their tickets replace them.
+- To build a screen: replace the body of its `S_NN.tsx` stub, flip its status in `meta.ts`.
+- `PrimaryNav.tsx` is the left rail and the five mobile tabs; `/more` reaches the rest and
+  `/screens` (dev only) lists every screen with its status. A control that does nothing yet is
+  `aria-disabled="true"` with a "Coming soon" title; it is never a dead click.
+
 ## Local rules
 - Nothing animates without a recorded event (honesty rules HR-1–HR-7, PRD 9.4).
 - One primary filled button per screen (UX-1); no streaks, hearts or fake urgency (UX-7).

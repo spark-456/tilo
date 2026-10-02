@@ -1,18 +1,14 @@
 import { memo } from "react";
 import { useIsFixtureClient } from "./api/ClientProvider";
 import { useMediaQuery } from "./hooks/useMediaQuery";
+import { usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
+import { PrimaryNav } from "./screens/PrimaryNav";
+import { matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
 import { useWorldFixture } from "./world/useWorldFixture";
 
-// World is the only screen that exists yet (PRD 5.5). Stage mode is a display setting (PRD 9.6).
-const Nav = ({ id }: { id: string }) => (
-  <nav className={id} data-testid={id} aria-label="Primary">
-    <button type="button" className="nav-btn" aria-current="page">
-      World
-    </button>
-  </nav>
-);
+// Stage mode is a display setting (PRD 9.6).
 // Memoised so each applied event adds one row instead of re-rendering the whole list.
 const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
   <li data-testid="trace-row" data-seq={seq} data-event-type={type}>
@@ -26,11 +22,18 @@ export function App() {
   const mobile = useMediaQuery("(max-width: 767px)");
   const world = useWorldFixture();
   const fixtureClient = useIsFixtureClient();
+  const screen = matchScreen(usePathname()); // null: the stage and the flow shell
   return (
     <div className="app-shell" data-stage-mode={stageMode ? "on" : "off"}>
-      {!mobile && <Nav id="left-rail" />}
-      <Stage {...(world.active ? { onWorld: world.onWorld, seq: world.seq } : {})} />
-      {!world.active && <FlowShell />}
+      {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
+      {screen ? (
+        <main className="screen-page" data-testid="screen-page" data-screen={screen.id}>
+          <screen.Component params={screen.params} />
+        </main>
+      ) : (
+        <Stage {...(world.active ? { onWorld: world.onWorld, seq: world.seq } : {})} />
+      )}
+      {!screen && !world.active && <FlowShell />}
       {(world.active || fixtureClient) && (
         // HR-4/BQ-07: permanent (fixture mode, and whenever the fixture client is active), never
         // dismissable, exposed to assistive tech; fixed so no layout (mobile bottom tabs,
@@ -51,7 +54,7 @@ export function App() {
         </div>
       )}
       {mobile ? (
-        <Nav id="bottom-tabs" />
+        <PrimaryNav id="bottom-tabs" mobile />
       ) : (
         <aside className="right-rail" data-testid="right-rail">
           <h2>Activity</h2>
