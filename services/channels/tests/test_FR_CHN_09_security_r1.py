@@ -158,3 +158,17 @@ def test_FR_CHN_09_expanding_characters_cannot_pin_a_worker() -> None:
     assert time.process_time() - started < 1.0
     assert (result.category, result.source) == ("fyi", "model")  # the model was still asked
     assert len(rig.safety.texts[-1]) >= 1_000_000  # and the screen still saw the whole body
+
+
+@pytest.mark.parametrize("hostile", ["(" * 497 + ")" * 497 + " <a@b.example>", ":" * 1_999 + "a@b"])
+def test_FR_CHN_09_a_from_that_breaks_the_address_parser_is_still_screened_and_triaged(hostile: str) -> None:
+    """parseaddr raises RecursionError on nested comments and colon runs well inside the 2000-character bound; the
+    mail must still reach the screen and the model (round 3 of #211), with no rule key."""
+    rig = make_rig()
+    mail, token = rig.mail(sender=hostile, reply=answer("fyi", "low"))
+
+    result = rig.svc.triage(USER, mail.message_id)
+
+    assert triage_module().bare_address(hostile) is None
+    assert rig.safety.texts and rig.model.calls_for(token)
+    assert (result.category, result.source) == ("fyi", "model")

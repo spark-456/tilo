@@ -76,7 +76,10 @@ def bare_address(value: Any) -> str | None:
     """The address of a From header with ASCII letters lower-cased, never its display name; None when there is none.
     An address with a control or format (zero-width) character, or one NFKC would change (the Kelvin sign,
     full-width letters), gets no key, so no look-alike shares a rule with the real address."""
-    address = parseaddr(value if isinstance(value, str) and len(value) <= MAX_FROM_CHARS else "")[1].strip()
+    try:  # parseaddr recurses on nested comments and colon runs: a hostile From gets no key, never a crash
+        address = parseaddr(value if isinstance(value, str) and len(value) <= MAX_FROM_CHARS else "")[1].strip()
+    except (RecursionError, ValueError):
+        return None
     if any(unicodedata.category(c)[0] == "C" for c in address) or unicodedata.normalize("NFKC", address) != address:
         return None
     address = address.translate(_ASCII_LOWER)
