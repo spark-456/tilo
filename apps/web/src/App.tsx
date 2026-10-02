@@ -20,6 +20,8 @@ const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
 const WORLD_SCREENS: ReadonlySet<string> = new Set(["S-05", "S-10", "S-11", "S-12"]);
 /** Screens outside a world address that still read the replayed run (AGW-08 group B): HR-6 applies. */
 const RUN_SCREENS: ReadonlySet<string> = new Set([
+  "S-06",
+  "S-07",
   "S-13",
   "S-14",
   "S-15",
@@ -30,8 +32,6 @@ const RUN_SCREENS: ReadonlySet<string> = new Set([
   "S-21",
   "S-23",
 ]);
-/** Screens whose right rail shows the live queue: the run screens and the Needs-you screens. */
-const QUEUE_RAIL_SCREENS: ReadonlySet<string> = new Set([...RUN_SCREENS, "S-06", "S-07"]);
 const stageMode = new URLSearchParams(window.location.search).get("display") === "stage";
 
 /** PRD 18.3 layout frame: desktop rails either side of the stage; mobile bottom tabs. */
@@ -128,7 +128,7 @@ export function App() {
             <>
               <h2>Activity</h2>
               <p data-testid="right-rail-meter">Nothing yet. This fills in once a run starts.</p>
-              {screen && QUEUE_RAIL_SCREENS.has(screen.id) ? (
+              {screen && RUN_SCREENS.has(screen.id) ? (
                 <NeedsYouRail />
               ) : (
                 <>
