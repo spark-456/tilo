@@ -1,0 +1,36 @@
+{
+  "approaches": [
+    {
+      "id": "a",
+      "label": "Approach A",
+      "summary": "Standard research, PDF output.",
+      "dimensions": {
+        "depth": "standard",
+        "sources": 5,
+        "parallelism": 2,
+        "verification": "standard",
+        "output_format": "pdf"
+      },
+      "time": { "min_s": 300, "max_s": 600 },
+      "credits": { "min": 50, "max": 80 },
+      "risks": [],
+      "skips": []
+    },
+    {
+      "id": "b",
+      "label": "Approach B",
+      "summary": "Standard research, Word output. Differs from Approach A only in output format.",
+      "dimensions": {
+        "depth": "standard",
+        "sources": 5,
+        "parallelism": 2,
+        "verification": "standard",
+        "output_format": "docx"
+      },
+      "time": { "min_s": 300, "max_s": 600 },
+      "credits": { "min": 50, "max": 80 },
+      "risks": [],
+      "skips": []
+    }
+  ]
+}
