@@ -104,7 +104,27 @@ body {
   border-radius: var(--radius-pill);
   background: var(--color-brand-primary);
   color: var(--color-surface-1);
-  font: 700 0.8125em var(--font-mono);
+  font: 700 0.8125em var(--font-ui); /* words in the UI face: the mono zero reads as an 8 */
+  white-space: nowrap;
+}
+/* Below 768 px the badge sits under the fixture banner at the right (one column, so the two never
+   meet at 320 px), and what the banner clears moves down with it. */
+@media (max-width: 767px) {
+  .speed-badge {
+    top: 48px;
+    right: 12px;
+    left: auto;
+    transform: none;
+  }
+  .app-shell[data-replay-badge="on"] .screen-page {
+    padding-top: 88px;
+  }
+  .app-shell[data-replay-badge="on"] .flow-shell {
+    top: 88px;
+  }
+  .app-shell[data-replay-badge="on"] .fixture-load-alert {
+    top: 84px;
+  }
 }
 .trace-list {
   list-style: none;
@@ -478,6 +498,11 @@ a.secondary {
   gap: 8px;
   margin-bottom: 8px;
 }
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
 .action-row.compact {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, auto));
@@ -490,15 +515,24 @@ a.secondary {
   }
   .action-row.compact .secondary {
     min-width: 0;
+    min-height: 44px; /* the mobile target size */
     padding: 4px;
     font-size: 0.75em;
     line-height: 1.15;
   }
-  .stat-tiles.three li {
-    padding: 8px;
+  /* Two-up, with the time-saved tile (the longest figure and its estimate link) across both
+     columns, so no tile is cramped at 390 or 320 px. */
+  .stat-tiles.three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .stat-tiles.three b {
-    font-size: 1em;
+  .stat-tiles.three li:first-child {
+    grid-column: 1 / -1;
+  }
+  .trace-record .secondary.placeholder.compact {
+    min-height: 44px; /* "Open record" */
+  }
+  .back-link {
+    min-height: 44px;
   }
 }
 /* Reserved boxes: data arriving (UX-1, CLS) never moves what is below or above it. */
@@ -510,7 +544,7 @@ a.secondary {
 }
 @media (max-width: 767px) {
   .delivery-slot .flow-slot {
-    min-height: 12.5em;
+    min-height: 14em; /* the two-up tiles: 222 px of finished content at 390, 360 and 320 */
   }
 }
 .right-rail {
@@ -922,11 +956,5 @@ a.secondary {
   .field textarea,
   .field input {
     min-height: 44px;
-  }
-}
-@media (max-width: 767px) {
-  .speed-badge.client-speed {
-    left: 12px; /* the fixture banner is on the right, so the two never meet */
-    transform: none;
   }
 }

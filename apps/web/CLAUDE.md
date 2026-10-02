@@ -30,6 +30,9 @@ UX-1–UX-9 (18.1); FR-WLD-* (world rendering); owned starting P0-08.
   `routes.tsx` maps each routed screen to its `S_NN.tsx`. To build one: replace the stub body and
   flip its status in `meta.ts`. `/more` and the dev-only `/screens` reach every screen.
 - A control that does nothing yet is `aria-disabled="true"` with a "Coming soon" title.
+- `?speed=` is parsed in `world/speed.ts` (clamped 0.1..1000); HR-6 badge reads "Replay at N× speed".
+- An unknown world id (fixture client knows one) or a path no screen owns under `/world/` or
+  `/task/` shows `NotFound`, never the Start screen or another world's run.
 
 ## Local rules
 - Nothing animates without a recorded event (honesty rules HR-1–HR-7, PRD 9.4).
