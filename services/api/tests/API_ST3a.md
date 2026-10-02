@@ -511,3 +511,7 @@ item 6; not attempted by this ticket)
 - `reopen()` is called only from the attempt still counted in flight and only after a `WriterBusy`
   (matched by class name). Dispatch config must be positive and finite, else it logs and uses the
   default. Left as follow-ups: L0 revoke semantics, sending the channel confirmations.
+- Round 2: the unmapped-revoke fallback above (spec text at "A policy with no world mapping") applies
+  only when the principal's world exists as a WorldRecord, the principal's role is `owner` and the
+  world's owner is the principal; otherwise only the level changes and no event is written to any
+  stream. Dispatch config values are capped at 4 s. Stop/Pause build `confirmations` defensively.

@@ -237,7 +237,7 @@ def test_FR_HIL_07_no_reopen_after_an_event_rejected_conflict(client, store):
     assert rejected.reopened == 0
 
 
-@pytest.mark.parametrize("bad", ["0", "-1", "nan", "inf", "'soon'", "null"])
+@pytest.mark.parametrize("bad", ["0", "-1", "nan", "inf", "1e9", "4.5", "'soon'", "null"])
 def test_FR_HIL_07_dispatch_config_must_be_positive_and_finite(tmp_path, monkeypatch, caplog, bad):
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "dispatch.yaml").write_text(
@@ -248,3 +248,69 @@ def test_FR_HIL_07_dispatch_config_must_be_positive_and_finite(tmp_path, monkeyp
         assert deps.get_part_write_deadline_s() == deps._DEFAULT_PART_WRITE_DEADLINE_S
         assert deps.get_attempt_abandon_after_s() == deps._DEFAULT_ABANDON_AFTER_S
     assert "using default" in caplog.text
+
+
+def _no_policy_changed_anywhere(store):
+    streams = (*store.events.values(), *store.pending_events.values())
+    return [e for stream in streams for e in stream if e.get("type") == "policy.changed"] == []
+
+
+def test_FR_HIL_07_unmapped_revoke_by_a_viewer_member_writes_no_event_to_the_owners_world(client, store, writer):
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.policies["pol_visitor"] = base_policy(id_="pol_visitor", owner="u_visitor", level="L2")
+    as_principal(make_principal(user_id="u_visitor", role="viewer", world_id=WORLD))
+    for _ in range(3):
+        assert client.post("/policies/pol_visitor/revoke").status_code == 200
+    assert store.policies["pol_visitor"]["level"] == "L1"
+    assert _no_policy_changed_anywhere(store)
+
+
+def test_FR_HIL_07_unmapped_revoke_with_an_unknown_principal_world_writes_no_event(client, store, writer):
+    store.policies["pol_x"] = base_policy(id_="pol_x", owner=OWNER, level="L2")
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id="w_nonexistent"))
+    assert client.post("/policies/pol_x/revoke").status_code == 200
+    assert store.policies["pol_x"]["level"] == "L1"
+    assert _no_policy_changed_anywhere(store)
+    assert "w_nonexistent" not in store.events and "w_nonexistent" not in store.pending_events
+
+
+def test_FR_HIL_07_unmapped_revoke_by_an_owner_of_another_world_writes_no_event(client, store, writer):
+    store.worlds[WORLD] = make_world(owner="u_someone_else")
+    store.policies["pol_x"] = base_policy(id_="pol_x", owner=OWNER, level="L2")
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
+    assert client.post("/policies/pol_x/revoke").status_code == 200
+    assert _no_policy_changed_anywhere(store)
+
+
+@pytest.mark.parametrize("bad_channels", [None, 7, "web", (1, None)])
+def test_FR_HIL_07_malformed_owner_channels_never_500_after_the_change(client, store, writer, bad_channels):
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.worlds[WORLD].owner_channels = bad_channels  # type: ignore[assignment]
+    store.policies["pol_a"] = base_policy(id_="pol_a", owner=OWNER, level="L3")
+    store.policy_worlds["pol_a"] = WORLD
+    as_principal(make_principal(user_id=OWNER, world_id=WORLD))
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert resp.status_code == 200, resp.text
+    assert store.policies["pol_a"]["level"] == "L1"
+    assert resp.json()["confirmations"] == []
+
+
+def test_FR_HIL_07_a_failed_thread_start_counts_nothing_and_leaves_the_part_pending(client, store, writer, monkeypatch):
+    store.worlds[WORLD] = make_world(owner=OWNER)
+    store.policies["pol_a"] = base_policy(id_="pol_a", owner=OWNER, level="L3")
+    store.policy_worlds["pol_a"] = WORLD
+    as_principal(make_principal(user_id=OWNER, world_id=WORLD))
+    real_start = threading.Thread.start
+
+    def failing_start(self):
+        if getattr(self._target, "__name__", "") == "_run_attempt":
+            raise RuntimeError("can't start new thread")
+        return real_start(self)
+
+    monkeypatch.setattr(threading.Thread, "start", failing_start)
+    resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
+    assert resp.status_code == 202, resp.text
+    assert store.policies["pol_a"]["level"] == "L1"
+    monkeypatch.setattr(threading.Thread, "start", real_start)
+    assert client.post(f"/worlds/{WORLD}/autopilot/stop").status_code == 200  # world not wedged
+    assert [e["data"]["policy_id"] for e in store.events[WORLD]] == ["pol_a"]

@@ -26,6 +26,7 @@ logger = logging.getLogger("tilo_api.deps")
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _DEFAULT_PART_WRITE_DEADLINE_S = 0.5
 _DEFAULT_ABANDON_AFTER_S = 3.0
+_MAX_DISPATCH_S = 4.0  # below a kill-switch call's 4.5 s write budget (FR-HIL-07's 5 s)
 
 
 @dataclass(frozen=True)
@@ -112,7 +113,8 @@ def get_event_writer() -> EventWriter:
 
 
 def _dispatch_config(key: str, default: float) -> float:
-    """A positive finite number from config/dispatch.yaml; anything else logs and uses the default."""
+    """A positive finite number, at most _MAX_DISPATCH_S, from config/dispatch.yaml; anything else
+    logs and uses the default."""
     try:
         import yaml
 
@@ -121,8 +123,10 @@ def _dispatch_config(key: str, default: float) -> float:
     except Exception as exc:
         logger.warning("dispatch config %s unreadable (%s); using default %s", key, exc, default)
         return default
-    if not (math.isfinite(value) and value > 0):
-        logger.warning("dispatch config %s=%r is not a positive finite number; using default %s", key, value, default)
+    if not (math.isfinite(value) and 0 < value <= _MAX_DISPATCH_S):
+        logger.warning(
+            "dispatch config %s=%r is not in (0, %s]; using default %s", key, value, _MAX_DISPATCH_S, default
+        )
         return default
     return value
 

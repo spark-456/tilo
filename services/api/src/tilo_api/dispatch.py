@@ -209,11 +209,16 @@ def drain(
                     return
                 part = candidates[0]
                 attempt = _Attempt(part["id"])
+                try:
+                    # Started before it is counted in flight; the thread's cleanup waits on this lock.
+                    threading.Thread(
+                        target=_run_attempt, args=(store, world_id, part, writer, attempt), daemon=True
+                    ).start()
+                except RuntimeError:
+                    logger.warning("could not start an append thread for world %s", world_id)
+                    return  # nothing was counted; the part stays pending for the next call
                 locks["inflight"] = attempt
                 future = attempt.future
-                threading.Thread(
-                    target=_run_attempt, args=(store, world_id, part, writer, attempt), daemon=True
-                ).start()
         if wait_on is not None:
             if wait_s <= 0:
                 return
@@ -267,6 +272,24 @@ def _touched_worlds(store: Store, world_id: str, owner: str) -> list[str]:
         if isinstance(policy, dict) and policy.get("owner") == owner:
             others.add(_world_for(store, policy_id, world_id) or world_id)
     return [world_id, *sorted(others - {world_id})]
+
+
+def _confirmations(world: WorldRecord) -> list[dict[str, str]]:
+    """Built after the change was applied, so a malformed owner_channels must never raise."""
+    channels = world.owner_channels
+    if not isinstance(channels, (tuple, list)):
+        return []
+    return [{"channel": c} for c in channels if isinstance(c, str)]
+
+
+def _revoke_fallback_world(store: Store, principal: Principal) -> str | None:
+    """The principal's own world, only when it exists and this principal owns it: a policy with no
+    mapping must never write an event into someone else's (or a nonexistent) stream."""
+    world_id = principal.world_id
+    world = store.worlds.get(world_id) if isinstance(world_id, str) else None
+    if isinstance(world, WorldRecord) and principal.role == "owner" and world.owner == principal.user_id:
+        return world_id
+    return None
 
 
 def _plan_stop_all(store: Store, owner: str, request_world: str, change: str, at: str):
@@ -331,7 +354,7 @@ def stop_autopilot(
     body = {
         "stopped": len(plan),
         "already_l1": already_l1,
-        "confirmations": [{"channel": c} for c in world.owner_channels],
+        "confirmations": _confirmations(world),
         "pending": pending,
     }
     return JSONResponse(content=body, status_code=202 if pending else 200)
@@ -390,8 +413,8 @@ def revoke_policy(
 
     owner = policy["owner"]
     at = events.now()
-    # Routed like Stop all: the policy's mapped world, else the principal's own world.
-    target = _world_for(store, policy_id, principal.world_id)
+    # Routed like Stop all: the policy's mapped world, else the principal's own world if they own it.
+    target = _world_for(store, policy_id, _revoke_fallback_world(store, principal))
 
     if target is None:
         # Nowhere to send an event; the level change alone still needs a per-policy lock.
