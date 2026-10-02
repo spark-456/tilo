@@ -22,11 +22,15 @@ TRUNCATED_MARKER = " [truncated]"
 _CUT_WINDOW = 8192  # longer than any secret shape the patterns below can match across the cut
 _CUT_HEADROOM = 64  # re-masking the cut tail may add a few placeholder characters
 _CUT_TAIL = 256  # the cut can leave a partial token this close to the end: that tail is masked again
-_CUT_SLACK = 1024  # an already-cut text may exceed the cap by at most this
+_CUT_PARTIAL = 4200  # a window that ends mid-secret: drop this much of the masked end (userinfo is up to 4,096)
 
+# Every shape here needs a word in _HINT_WORDS (its lower-case marker), or the gate skips it on
+# text that holds nothing else; test_FR_CON_07_more_secret_shapes_are_masked is the canary.
 _FREE_SECRETS = re.compile(
     r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}"
-    r"|\bsk-[A-Za-z0-9_-]{20,}"
+    # any case, but then the token must hold a digit or punctuation, so prose ("bearer instruments") stays
+    r"|\b(?i:bearer)\s+(?=[A-Za-z0-9._~+/=-]*[\d._~+/=-])[A-Za-z0-9._~+/=-]{8,}"
+    r"|\b(?i:sk)-[A-Za-z0-9_-]{20,}"
     r"|\bgh[pousr]_[A-Za-z0-9]{30,}"
     r"|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"
     r"|(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
@@ -41,15 +45,18 @@ _KEY_VALUE = re.compile(
     r"(?i)((?:password|passwd|pwd|secret|token|api[_-]?key|otp)[\"']?\s{0,8}[=:]\s{0,8})"
     rf"(?:{_QUOTED}|([^\s&\"']+))"
 )
-# `Authorization: <scheme> <anything>`: the scheme word stays, the rest of the line is the credential.
+# `Authorization:` and `Cookie:` values run to the end of the line. Only a known scheme word, with a
+# credential-looking value after it, stays; any other first word is the credential and is masked.
 # The scheme is possessive, so an already masked value is left alone (idempotent).
+_SCHEMES = "basic|bearer|digest|token|negotiate|ntlm|hoba|mutual|vapid|dpop|aws4-hmac-sha256"
 _AUTH_HEADER = re.compile(
-    r"(?i)(\bauthorization[\"']?\s{0,8}[=:]\s{0,8}+)"
-    rf"(?:{_QUOTED}|((?:[A-Za-z][A-Za-z0-9_-]{{0,31}}[ \t]+)?+)(?!\[masked:)[^\r\n]+)"
+    r"(?i)(\b(?:authorization|(?:set-)?cookie)[\"']?\s{0,8}[=:]\s{0,8}+)"
+    rf"(?:{_QUOTED}|((?:(?:{_SCHEMES})[ \t]+(?=[A-Za-z0-9._~+/=\"'\[]))?+)(?!\[masked:)[^\r\n]+)"
 )
-# `scheme://userinfo@` anywhere in text (a path, a query, page copy): the userinfo is dropped.
+# `scheme://userinfo@` anywhere in text (a path, a query, page copy): the userinfo, of any length and
+# with at most one space, is dropped.
 _URL_USERINFO = re.compile(
-    r"(?<![A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]{0,15}://)(?!\[masked:secret\]@)[^\s/?#]{1,4096}@"
+    r"(?<![A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]{0,63}://)(?!\[masked:secret\]@)[^\s/?#]+(?: [^\s/?#]+)?@"
 )
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}")
 _PHONE = re.compile(r"(?<![\w+])\+\d[\d ()-]{6,24}\d")
@@ -125,14 +132,15 @@ def _auth(m: re.Match[str]) -> str:
 
 
 def _mask(text: str) -> str:
-    low = text.lower()
-    words = any(map(low.__contains__, _HINT_WORDS))
+    low = text.casefold()
+    ascii_only = text.isascii()  # (?i) also folds U+017F, U+0131 and U+212A, so non-ASCII text runs every pass
+    words = not ascii_only or any(map(low.__contains__, _HINT_WORDS))
     card = sum(map(str.isdigit, text)) > 12 and _DIGITS13.search(text) is not None
     if "://" in text:
         text = _URL_USERINFO.sub(r"\1[masked:secret]@", text)
     if words:
         text = _FREE_SECRETS.sub(_MASK, text)
-    if "authorization" in low:
+    if not ascii_only or "authorization" in low or "cookie" in low:
         text = _AUTH_HEADER.sub(_auth, text)
     if words:
         text = _KEY_VALUE.sub(_kv, text)
@@ -144,18 +152,22 @@ def _mask(text: str) -> str:
 
 
 def mask_text(text: str) -> str:
-    """Mask `text`. Over MAX_TEXT_CHARS it is masked, then cut and marked; the result never exceeds
-    the cap by more than the marker, and masking it again changes nothing."""
+    """Mask `text`. If the masked text is over MAX_TEXT_CHARS (it can grow) or the raw text runs past
+    the window, it is cut and marked; the result never exceeds the cap by more than the marker, and
+    masking it again changes nothing. A text that already ends in the marker is masked without it."""
     if len(text) < 5:  # the shortest thing any pattern masks is `a@b.c` or `otp=1`
         return text
-    if text.endswith(TRUNCATED_MARKER) and len(text) <= MAX_TEXT_CHARS + _CUT_SLACK:
-        return _mask(text[: -len(TRUNCATED_MARKER)]) + TRUNCATED_MARKER  # already cut by us
-    if len(text) <= MAX_TEXT_CHARS:
-        return _mask(text)
-    masked = _mask(text[: MAX_TEXT_CHARS + _CUT_WINDOW])
-    if len(masked) <= MAX_TEXT_CHARS - _CUT_HEADROOM and len(text) <= MAX_TEXT_CHARS + _CUT_WINDOW:
-        return masked  # nothing was dropped
-    cut = masked[: MAX_TEXT_CHARS - _CUT_HEADROOM]
+    marked = text.endswith(TRUNCATED_MARKER)
+    body = text[: -len(TRUNCATED_MARKER)] if marked else text
+    window = MAX_TEXT_CHARS + _CUT_WINDOW
+    masked = _mask(body[:window])
+    past_window = len(body) > window
+    if len(masked) <= MAX_TEXT_CHARS and not past_window:
+        return masked + (TRUNCATED_MARKER if marked else "")
+    limit = MAX_TEXT_CHARS - _CUT_HEADROOM
+    if past_window:  # the window end can hold a partial secret, and masking may have moved it far back
+        limit = max(0, min(limit, len(masked) - _CUT_PARTIAL))
+    cut = masked[:limit]
     return cut[:-_CUT_TAIL] + _mask(cut[-_CUT_TAIL:]) + TRUNCATED_MARKER  # the tail may be a partial token
 
 
