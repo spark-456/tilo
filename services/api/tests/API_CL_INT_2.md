@@ -113,3 +113,10 @@ still work there (the run just does not start or fails alone).
 - Building events are not pinned (the executor emits none); `agent.*` and `artifact.created` are.
 - A gate raised on a T1/T2 action covered by an owner's L2/L3 policy (the `policy.applied` path) is FR-HIL-05/06,
   not pinned here. Pinned: with no covering policy the send gates, and T3 gates even under an L3 policy.
+
+## Follow-ups from #155 (safety subset)
+
+- A unit that names an artifact another world already created fails the world (`world.failed`) before anything is recorded or sent.
+- `gate.action.exact` is built from action, connector, destination and recipients; a send whose text would pass 500 characters fails closed (never cut).
+- The run's Outbox is scoped to its world (`abandon` and `cancel` refuse another world's entry) and halts at each claim once the world is paused.
+- A failed event write on a card answer is `503 {"outcome": "error", "reason": "event_write_failed"}`; the card stays open.

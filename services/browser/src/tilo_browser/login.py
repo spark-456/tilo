@@ -90,12 +90,17 @@ def _ref(n: dict) -> str:
     return str(n.get("attrs", {}).get("id") or "")
 
 
+def _autocomplete(n: dict) -> list[str]:
+    """`autocomplete` is a whitespace-separated token list ("billing cc-number", "section-x one-time-code")."""
+    return _attr(n, "autocomplete").split()
+
+
 def _is_password(n: dict) -> bool:
-    return _attr(n, "type") == "password" or _attr(n, "autocomplete") in _PASSWORD_AUTOCOMPLETE
+    return _attr(n, "type") == "password" or any(t in _PASSWORD_AUTOCOMPLETE for t in _autocomplete(n))
 
 
 def _is_otp(n: dict) -> bool:
-    if _attr(n, "autocomplete") == "one-time-code":
+    if "one-time-code" in _autocomplete(n):
         return True
     if _role(n) not in _INPUT_ROLES:
         return False
@@ -105,7 +110,7 @@ def _is_otp(n: dict) -> bool:
 
 
 def _is_payment(n: dict) -> bool:
-    return _attr(n, "autocomplete").startswith("cc-")
+    return any(t.startswith("cc-") for t in _autocomplete(n))
 
 
 def _asks_for_password(n: dict) -> bool:

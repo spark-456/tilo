@@ -428,7 +428,7 @@ def test_FR_MEM_04_cli_reports_truncated_tail_instead_of_crashing(tmp_path):
 
     assert result.returncode == 1
     out = json.loads(result.stdout.strip().splitlines()[-1])
-    assert out == {"ok": False, "records": 3, "problems": ["seq 4 (line 4): unparseable or truncated record"]}
+    assert out == {"ok": False, "records": 3, "problems": ["line 4: unparseable or truncated record"]}
 
 
 def test_FR_MEM_04_reopen_raises_value_error_naming_truncated_line(tmp_path):
