@@ -97,9 +97,9 @@ describe("FR_WLD_09 the scanner itself catches each kind of animation", () => {
   });
 
   it("FR_WLD_09 ignores comments and every rule has a name and a reason to exist", () => {
-    expect(scanSource("src/x.ts", "// requestAnimationFrame is not used\n/* setInterval */")).toEqual(
-      [],
-    );
+    expect(
+      scanSource("src/x.ts", "// requestAnimationFrame is not used\n/* setInterval */"),
+    ).toEqual([]);
     expect(scanSource("src/x.css", "/* transition: none */")).toEqual([]);
     for (const r of RULES) expect(r.why.length).toBeGreaterThan(10);
   });
