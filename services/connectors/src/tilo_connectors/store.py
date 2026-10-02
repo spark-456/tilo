@@ -60,6 +60,17 @@ class InMemoryOutboxStore:
             entry["state"] = "cancelled"
             return deepcopy(entry)
 
+    def _abandon(self, outbox_id: str, now: str) -> dict | None:  # unsent, no live lease -> failed, for Outbox.abandon
+        with self._lock:
+            entry = self._by_id.get(outbox_id)
+            if entry is None or entry["state"] not in ("queued", "scheduled", "sending"):
+                return None
+            expiry = self._send_leases.get(outbox_id, (None, None))[1]
+            if expiry is not None and now < expiry:
+                return None
+            entry["state"] = "failed"
+            return deepcopy(entry)
+
     def _claim_for_sending(self, outbox_id: str, holder: str, now: str, lease_seconds: float) -> dict | None:
         with self._lock:
             entry = self._by_id.get(outbox_id)
@@ -86,12 +97,17 @@ class InMemoryOutboxStore:
             _release(self._send_leases if kind == "send" else self._transfer_leases, outbox_id, holder)
 
     def _claim_oldest_pending_transfer(
-        self, holder: str, now: str, lease_seconds: float, exclude: frozenset[str] = frozenset()
-    ) -> tuple[str, str, dict] | None:  # oldest pending transfer of a world not in `exclude`
+        self,
+        holder: str,
+        now: str,
+        lease_seconds: float,
+        exclude: frozenset[str] = frozenset(),
+        only: str | None = None,
+    ) -> tuple[str, str, dict] | None:  # oldest pending transfer of a world not in `exclude` (and == `only`, if set)
         with self._lock:
             seen_worlds = set(exclude)
             for outbox_id, (world_id, transfer) in self._pending_transfers.items():
-                if world_id in seen_worlds:
+                if world_id in seen_worlds or only not in (None, world_id):
                     continue
                 seen_worlds.add(world_id)
                 if _try_claim(self._transfer_leases, outbox_id, holder, now, lease_seconds):

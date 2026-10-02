@@ -32,7 +32,8 @@ outbox for every side effect. The only service that can decrypt user OAuth token
   sends twice. `Outbox` may hand the same `data.transfer` to `emit` more than once (a lease
   expiring mid-emit, a restart); the harness event writer (PI-18) keeps exactly one per
   `outbox_id`. Send order holds per `world_id` only: a rejected transfer blocks later ones of
-  its own world, never another's.
+  its own world, never another's. `Outbox(..., world_id=w)` dispatches and emits only world w's;
+  `abandon(id)` fails an unsent entry with no live lease, so no later dispatch sends it.
 - Trust boundary: `InMemoryOutboxStore`'s mutators are underscored and the only writers, each a
   lock-guarded compare-and-set or lease, so several `tilo-connectors` instances sharing one store
   never both win a write. IAM makes it the only writer to the real store in production.

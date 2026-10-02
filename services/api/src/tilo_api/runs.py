@@ -13,7 +13,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Annotated, Any, cast
+from typing import Annotated, Any
 
 import tilo_planning.plangraph as plangraph
 import tilo_policy
@@ -25,7 +25,7 @@ from tilo_harness.validator import repo_validator
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps, events
-from tilo_api.cards import CardStore
+from tilo_api.cards import CardStore, _card_errors
 
 logger = logging.getLogger("tilo_api.runs")
 router = APIRouter()
@@ -113,17 +113,21 @@ class Run:
         if kw.get("check_pause", True) and self.paused():
             raise RunStopped
         district = kw.get("district")
+        vis = kw.get("vis", [district] if district else "all")  # a district's event is that district's (PRD 10.1)
+        if vis is None:
+            raise ValueError("an event's vis is never widened")
         event = {
             "id": kw.get("event_id") or events.new_part_id(), "type": type_, "actor": actor, "target": target,
             "level": self.levels.get(district) if district else None, "district": district, "item": None,
             "severity": kw.get("severity") or repo_validator().registry_types[type_]["default_severity"],
-            "credits": 0, "summary": summary[:140], "cause": kw.get("cause"), "vis": kw.get("vis") or "all",
+            "credits": 0, "summary": summary[:140], "cause": kw.get("cause"), "vis": vis,
             "authz": kw.get("authz"), "data": data,
         }  # fmt: skip
         return self.seams.writer.append(self.world_id, event)
 
     def emit(self, *, type: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
-        return self.put(type, actor, target, summary, data, district=kw.get("district"), cause=kw.get("cause"))
+        passed = {k: kw[k] for k in ("district", "cause", "vis") if k in kw}
+        return self.put(type, actor, target, summary, data, **passed)
 
     def write(self, part: dict) -> None:
         """The CardStore's part for a person's answer; an approve opens the waiting gate."""
@@ -149,13 +153,35 @@ class Run:
             logger.exception("run %s could not record its failure", self.run_id)
 
     def main(self) -> None:
+        """Every way out ends in a terminal event (or the pause) and leaves no entry of the run waiting to send."""
         try:
             asyncio.run(self._execute())
         except RunStopped:
-            return
-        except Exception:
+            pass
+        except BaseException as exc:  # the outbox re-raises a BaseException from a send; the run still ends
             logger.exception("run %s stopped on an error", self.run_id)
+            self._abandon_unsent()
             self._fail("an internal error stopped the work", None)
+            if isinstance(exc, KeyboardInterrupt):
+                raise
+        finally:
+            self._abandon_unsent()
+
+    def _outbox(self) -> Outbox:
+        """The run dispatches and records only its own world's entries (FR-WLD-07)."""
+        return Outbox(
+            self.seams.outbox_store, self.seams.adapters, emit=self._record_transfer, clock=events.now,
+            world_id=self.world_id,
+        )  # fmt: skip
+
+    def _abandon_unsent(self) -> None:
+        for outbox_id, send in self.sends.items():
+            entry = self.seams.outbox_store.get(outbox_id)
+            if "committed" not in send and entry is not None and entry["state"] in ("queued", "scheduled", "sending"):
+                try:
+                    self._outbox().abandon(outbox_id)
+                except Exception:
+                    logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
 
     def _prepare(self) -> Any:
         """Compile, validate, lay out. Returns the agents config, or None when no run may start."""
@@ -213,18 +239,29 @@ class Run:
         try:
             brief, unit_copy = copy.deepcopy(self.brief), copy.deepcopy(unit)
             to = self.seams.resolver(unit=unit_copy, action_type=action, item=dict(item), brief=brief)
-            recipients, destination, known = list(to["recipients"]), to["destination"], to.get("known_recipients")
+            recipients, destination, known = to["recipients"], to["destination"], to.get("known_recipients")
         except Exception as exc:
             raise _GateFailed("the send has no recipients") from exc
+        if not (isinstance(destination, str) and destination.strip() and isinstance(recipients, list) and recipients
+                and all(isinstance(r, str) and r.strip() for r in recipients)):  # fmt: skip
+            raise _GateFailed("the send has no recipients or no destination")  # fails closed, before any gate
         facts = tilo_policy.SideEffectFacts(recipients=tuple(recipients), known_recipients=tuple(known or ()))
         proposal = tilo_policy.Proposal(self.world_id, action, connector, district, destination, facts, item, 0, None)
         decision = tilo_policy.decide(
             proposal, table=tilo_policy.load_risk_table(), policies=list(self.store.policies.values()),
             world_owner=self.owner, applied=self._applied(), now=events.now(),
         )  # fmt: skip
+        if decision.outcome == "draft_only":  # an owner's L0 policy: nothing leaves Tilo (PRD 10.4, BQ-90)
+            self._deliver(unit, worker, item, {"artifact": item, "format": "in_app", "outbox_id": None}, made)
+            return
         tier = max(decision.tier, gate["risk_tier"], key=_TIERS.index)  # never below the plan's gate (PG-06)
         irreversible = self._action(connector, action)["irreversible"]  # type: ignore[index]
         card_id, outbox_id = events.new_part_id(), events.new_part_id()
+        card = self._gate_card(unit, worker, card_id, gate["id"], connector, action, tier, irreversible)
+        card["gate"]["action"] |= {"item": ref, "destination": destination}
+        card["gate"]["recipients"] = recipients
+        if _card_errors(card):  # checked before anything is written
+            raise _GateFailed("the gate card was refused")
         data = {
             "gate_id": gate["id"], "card_id": card_id, "outbox_id": outbox_id, "action_type": action,
             "risk_tier": tier, "irreversible": irreversible, "item": item, "approver": None, "team_lead": None,
@@ -232,9 +269,6 @@ class Run:
         summary = "The agent is waiting at a gate for approval."
         requested = self.put("approval.requested", worker, gate["id"], summary, data, district=district, cause=made)
         self.requested[card_id] = requested
-        card = self._gate_card(unit, worker, card_id, gate["id"], connector, action, tier, irreversible)
-        card["gate"]["action"] |= {"item": ref, "destination": destination}
-        card["gate"]["recipients"] = recipients
         if self.cards.submit(card, outbox_id=outbox_id, district=district).outcome != "accepted":
             raise _GateFailed("the gate card was refused")
         while card_id not in self.resolved:  # only a person's approve on the cards API opens it
@@ -264,18 +298,20 @@ class Run:
             "event_id": events.new_part_id(),  # resent unchanged if the outbox retries the transfer
         }  # fmt: skip
         transfer = await self._send(entry, evidence)
+        data = {"artifact": item, "format": _FORMATS.get(action, "in_app"), "outbox_id": outbox_id}
+        self._deliver(unit, worker, item, data, transfer["id"])
+
+    def _deliver(self, unit: dict, worker: str, item: dict, data: dict, cause: str) -> None:
         delivered = self.put(
-            "artifact.delivered", worker, item["artifact_id"], "The item was delivered.",
-            {"artifact": item, "format": _FORMATS.get(action, "in_app"), "outbox_id": outbox_id},
-            district=district, cause=transfer["id"],
+            "artifact.delivered", worker, item["artifact_id"], "The item was delivered.", data,
+            district=unit["district"], cause=cause,
         )  # fmt: skip
         self.titles[item["artifact_id"]] = unit["title"]
         self.delivered.append(delivered["id"])
 
     async def _send(self, entry: dict, evidence: dict[str, Any]) -> dict:
         """Enqueue with the person's authz, then dispatch until the outbox records the entry sent."""
-        view = cast(Any, _WorldEntries(self.seams.outbox_store, self.world_id))
-        outbox = Outbox(view, self.seams.adapters, emit=self._record_transfer, clock=events.now)
+        outbox = self._outbox()
         try:
             outbox.enqueue(entry, evidence)
         except OutboxRefused as exc:
@@ -290,16 +326,13 @@ class Run:
                 return self.sends[entry["id"]]["committed"]
             if state in ("failed", "cancelled"):
                 break
+        self._abandon_unsent()  # given up: the entry never sends later in a failed world
         raise _GateFailed("the send could not be confirmed")
 
     def _record_transfer(self, transfer: dict) -> None:
-        """The outbox's own data.transfer, written in the world whose entry it is."""
-        entry = self.seams.outbox_store.get(transfer["data"]["outbox_id"])
-        run = self.store.runs.get(entry["world_id"]) if entry else None
-        if run is None:
-            raise LookupError("no run for this outbox entry")
-        send = run.sends[entry["id"]]
-        send["committed"] = run.put(
+        """The outbox's own data.transfer for one of this run's entries (the outbox is scoped to this world)."""
+        send = self.sends[transfer["data"]["outbox_id"]]
+        send["committed"] = self.put(
             "data.transfer", send["worker"], send["island"], "The item crossed the bridge.", transfer["data"],
             district=send["district"], cause=send["cause"], authz=transfer["authz"], event_id=send["event_id"],
             check_pause=False,
@@ -340,20 +373,6 @@ class Run:
         """The owner's policy.applied events in every world, so a policy's daily caps never multiply (PI-11)."""
         worlds = [w for w, record in self.store.worlds.items() if record.owner == self.owner]
         return [e for w in worlds for e in self.store.events.get(w, []) if e.get("type") == "policy.applied"]
-
-
-class _WorldEntries:
-    """The shared outbox store as one run dispatches it: only its own world's entries, so an entry a paused world
-    left queued is never sent by another world's run (FR-WLD-07)."""
-
-    def __init__(self, store: Any, world_id: str) -> None:
-        self._store, self._world_id = store, world_id
-
-    def all_entries(self) -> list[dict]:
-        return [e for e in self._store.all_entries() if e["world_id"] == self._world_id]
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._store, name)
 
 
 class _GatedRunner:
