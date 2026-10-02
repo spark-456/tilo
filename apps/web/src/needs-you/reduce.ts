@@ -56,6 +56,9 @@ export function reduceNeedsYou(events: readonly Event[]): {
   const gates = new Map<string, GateRecord>();
   const questions = new Map<string, QuestionRecord>();
   for (const e of [...events].sort((a, b) => a.seq - b.seq)) {
+    // An event with no run id cannot be placed in a run, so it joins nothing (a server that omits
+    // run_id is out of date; the client never invents one).
+    if (typeof e.run_id !== "string" || e.run_id === "") continue;
     const gateId = field(e, "gate_id");
     const key = gateId ? gateKey(e.run_id, gateId) : null;
     const old = key ? gates.get(key) : undefined;
