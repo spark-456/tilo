@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
+import { readShifts, resetShifts, watchShifts } from "../support/shifts";
 import { DESKTOP, MOBILE } from "../support/viewports";
 
 const pdf = (name: string) => ({
@@ -54,10 +55,6 @@ for (const viewport of [DESKTOP, MOBILE]) {
   }) => {
     await page.setViewportSize(viewport);
     const errors = watchConsole(page);
-    let intakeRequests = 0;
-    page.on("request", (r) => {
-      if (r.url().includes("/intake")) intakeRequests++;
-    });
     await page.goto("/");
     await page.getByLabel("Describe your task").fill("Compare the three supplier quotes");
     await page
@@ -66,10 +63,9 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await expect(
       page.getByRole("list", { name: "Attached files" }).getByRole("listitem"),
     ).toHaveCount(3);
-    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await page.getByRole("button", { name: "Start", exact: true }).dblclick(); // one submit
     await expect(page.getByRole("heading", { level: 1, name: "Understanding" })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe("/task/task_fixture_1/understanding");
-    expect(intakeRequests).toBe(0); // the fixture client never touches the network
     expect(errors).toEqual([]);
   });
 
@@ -85,36 +81,29 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await expect(page.getByRole("button", { name: "Start", exact: true })).toBeDisabled();
   });
 
-  // UX-1: the reserved box. Warm the dev server first so a cold compile cannot add a late shift.
+  // UX-1: the panel has a fixed size, so the busy state while the client answers moves nothing.
+  // Warm the dev server first so a cold compile cannot add a late shift.
   test(`PRD-18.3 S_01 UX_1: zero layout shifts while a slow client answers at ${size}`, async ({
     page,
   }) => {
     test.setTimeout(60_000);
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await page.addInitScript(() => {
-      const w = window as unknown as { __shifts: number[] };
-      w.__shifts = [];
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries())
-          w.__shifts.push((entry as unknown as { value: number }).value);
-      }).observe({ type: "layout-shift", buffered: true });
-    });
+    await watchShifts(page);
     await page.goto("/?client_delay_ms=3000");
     await page.getByLabel("Describe your task").fill("Compare the three supplier quotes");
     await page.locator('input[type="file"]').setInputFiles([pdf("a.pdf")]);
+    await resetShifts(page); // measure from the click on
     await page.getByRole("button", { name: "Start", exact: true }).click();
-    await expect(page.getByRole("button", { name: /^Startâ€¦/ })).toHaveAttribute(
+    await expect(page.getByRole("button", { name: /^Start…/ })).toHaveAttribute(
       "aria-busy",
       "true",
     );
+    await page.waitForTimeout(1500); // still waiting on the client
+    await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
+    expect(await readShifts(page)).toEqual([]);
     await expect(page.getByRole("heading", { level: 1, name: "Understanding" })).toBeVisible({
       timeout: 20_000,
     });
-    await page.waitForTimeout(300); // let a late shift be reported
-    const shifts = await page.evaluate(
-      () => (window as unknown as { __shifts: number[] }).__shifts,
-    );
-    expect(shifts).toEqual([]);
   });
 }

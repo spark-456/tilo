@@ -69,7 +69,8 @@ async function drawnCamera(page: Page) {
 async function stageCenter(page: Page) {
   const box = await page.getByTestId("stage-frame").boundingBox();
   if (!box) throw new Error("stage-frame has no layout box");
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  // Three quarters across, not the middle: the S-01 Start panel covers the left of the stage.
+  return { x: box.x + box.width * 0.75, y: box.y + box.height / 2 };
 }
 
 // ---- mouse: pointerId / button isolation --------------------------------
