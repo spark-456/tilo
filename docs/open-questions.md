@@ -85,6 +85,7 @@ Questions found while building. Each has the default we build on until the user 
 | BQ-93 | FR-CON-04 / FR-CON-05 (PRD 6.6, 12.1): connector `limits` give no retry bound. | Reads: 3 requests per call and at most 60 s of waiting (Retry-After, else 1 s then 2 s); a Retry-After over 60 s is `RateLimited` at once. A side effect never waits or retries in the call (a wait could outlast the 30 s outbox lease and let another instance act): a 429, 5xx or lost answer leaves the entry due, and the next dispatch starts again with the earlier-attempt lookup. In a side effect a 400 or 404 answer is final (`SideEffectRefused`, entry `failed`) | PRD 6.6, 12.1 | 2026-10-02 |
 | BQ-94 | FR-CON-04 (PRD 12.2): Gmail label changes have no action id or risk tier. | Not built: no label-changing method or action (an unlisted action is T3, BQ-44) | PRD 12.2, 10.4 | 2026-10-02 |
 | BQ-95 | FR-CON-04 / FR-CON-05 (PRD 9.5, PI-16): should a read emit `data.transfer` with direction `in`? | Reads emit no `data.transfer`: the registry marks it a side effect that needs `authz`, and a read has none; only outbox side effects emit it (direction `out`) | PRD 9.5, 16.3 | 2026-10-02 |
+| BQ-107 | FR-INT-10 (issue #173): the PRD and contracts give no size bound for a plan, and a plan at its array caps (about 250 KiB) took 4.4 s to validate. | `validate_plan` rejects a plan over 64 KiB of compact UTF-8 JSON (`MAX_PLAN_BYTES`) as `schema` before any walk, and reads at most 50 schema errors (`MAX_ERRORS`) | PRD 7.1, contracts/plan.schema.json | 2026-10-02 |
 
 ## Answered
 
