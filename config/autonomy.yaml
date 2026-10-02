@@ -2,9 +2,18 @@
 # The deterministic policy engine (P4) loads this table; `just contracts-check` validates it.
 # An action type not listed here is T3 (BQ-44). A modifier raises any action to T3, and all six
 # are required by the schema, so none can be dropped. T3 runs at L1 only: a person decides.
+#
+# grant_budget (FR-INT-08, issue #64, ADR-0002 decision 14, BQ-75) is PRD 10.4's T1 example
+# "spend credits under the run budget": a budget grant that keeps the run within its run cap.
+# This table holds no credit amounts. The run cap (`caps.run_credits` in config/metering.yaml,
+# MT-03, PRD 17.3) must bound every grant, but `Treasury.grant` does not enforce it yet (issue
+# #51), and a policy with `limits.credits: null` has no credit bound (issue #106 item 1). Until
+# both are fixed, only a person's own approval may call the grant path (ADR-0002 decision 14).
+# A grant goes through no connector, so its connector id is the reserved `internal`.
 actions:
   create_draft: T1
   save_file: T1
+  grant_budget: T1
   send_email: T2
   post_status_update: T2
   share_file: T3

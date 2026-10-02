@@ -32,7 +32,7 @@ from Firestore directly under security rules.
   principal; another user's task is a 404. Safety (`deps.get_safety`) is built from the `safety` role at call
   time (503 without one) and screens the text, file names, typed answers and every brief-edit string; model
   calls go only through `deps.get_router`; the grant is `tilo_planning.budget` with the person's cap, one
-  grant per owner at a time (`Store.grant_lock`). Shapes: `services/api/tests/API_CL_INT_1.md`; defaults: BQ-75.
+  grant per owner at a time (`Store.grant_lock`). Shapes: `services/api/tests/API_CL_INT_1.md`; defaults: BQ-83.
 - Cards (FR-HIL-01/02, `tilo_api.cards`): `build_router(CardStore)` serves `GET /worlds/{id}/cards` and
   `POST .../cards/{card_id}/answer`. Identity is the verified `deps.Principal` only; `channel` and
   `pin_verified` count only from an authenticated tilo-channels caller (`get_channels_caller`). Viewer 403;

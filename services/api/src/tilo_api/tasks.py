@@ -212,7 +212,7 @@ def get_approaches(
             _append(store, task, [result.event])
             task.approaches = result.approaches
         approaches = task.approaches
-    # Default (PRD silent, BQ-75): the cheapest approach is recommended; ties keep the Director's order.
+    # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
     credit_usd = deps.providers_config().prices.credit_usd
     return {"task_id": task_id, "approaches": approaches, "recommended": recommended, "credit_usd": credit_usd}
