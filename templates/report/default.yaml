@@ -1,0 +1,44 @@
+page:
+  size: A4
+  margin_top_pt: 54
+  margin_bottom_pt: 54
+  margin_left_pt: 54
+  margin_right_pt: 54
+
+colors:
+  title: brand.primary
+  subtitle: ink.2
+  date: ink.2
+  heading: brand.primary
+  body: ink.1
+  bullet: ink.1
+  table_header_bg: brand.primary
+  table_header_fg: surface.1
+  table_row_fg: ink.1
+  table_grid: surface.2
+  chart_title: ink.1
+  chart_label: ink.1
+  chart_palette:
+    - brand.primary
+    - district.research
+    - district.analysis
+    - district.delivery
+    - district.accounts
+    - district.people
+    - district.learning
+    - signal.done
+
+typography:
+  title_size_pt: 24
+  subtitle_size_pt: 12
+  date_size_pt: 10
+  heading_size_pt: 16
+  body_size_pt: 10
+  bullet_size_pt: 10
+  table_header_size_pt: 9
+  table_body_size_pt: 9
+  chart_title_size_pt: 12
+  chart_label_size_pt: 8
+
+format:
+  number_format: "%g"
