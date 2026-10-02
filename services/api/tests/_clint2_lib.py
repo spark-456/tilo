@@ -297,7 +297,8 @@ class RunFlow:
         self.runner = ScriptedRunner(self.timeline)
         self.writer = StreamWriter(self.store, self.timeline)
         self.skills = SkillRegistry(SKILLS_ROOT)
-        self.recipients, self.known_recipients = [NEW_RECIPIENT], []
+        self.recipients: list[str] = [NEW_RECIPIENT]
+        self.known_recipients: list[str] = []
         self.compile_mode = "ok"  # "ok" | "raise" | a BAD_PLANS kind
         self.compile_calls: list[dict[str, Any]] = []
         self.resolver_calls: list[dict[str, Any]] = []

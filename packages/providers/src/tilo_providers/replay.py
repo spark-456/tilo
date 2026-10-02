@@ -90,6 +90,11 @@ def _join_chunks(chunks: list[GenerateResponse], profile_id: str) -> GenerateRes
     )
 
 
+def is_live_mode() -> bool:
+    """The one definition of live mode (EFF-01): only `LIVE=1`; "true", "0" and "" are not live."""
+    return os.environ.get("LIVE") == "1"
+
+
 class ReplayMissError(Exception):
     """No recording exists for a (role, profile, request) key. Record one
     with `LIVE=1 TILO_RECORD=1`, or use `tilo_providers.fake` for UI work."""
@@ -112,7 +117,7 @@ class RecordReplayProvider(ModelProvider):
         self._recordings_dir = Path(fixtures_dir) / "model-recordings" / role
 
     def _is_live(self) -> bool:
-        return os.environ.get("LIVE") == "1"
+        return is_live_mode()
 
     def _is_record(self) -> bool:
         return self._is_live() and os.environ.get("TILO_RECORD") == "1"

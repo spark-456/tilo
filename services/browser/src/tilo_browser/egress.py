@@ -25,6 +25,7 @@ _LOG_LIMIT = 200
 _C0_AND_SPACE = "".join(map(chr, range(0x21)))
 _TAB_NEWLINE = re.compile(r"[\t\n\r]")
 _SCHEMES = re.compile(r"(?:[A-Za-z][A-Za-z0-9+.-]*:)+")  # one or more, so view-source:https: unwraps
+_BRACKET_HOST = re.compile(r"(\[[0-9A-Za-z:.%_-]{1,64}\])(?::(\d*))?$")
 MAX_URL_LENGTH = 8192
 
 
@@ -59,8 +60,10 @@ def sanitise_url(raw: str) -> str:
     if len(raw) > MAX_URL_LENGTH or not re.match(r"[/\\]{2}", rest):
         return f"{scheme}:"
     parts = re.split(r"([/\\])", rest.lstrip("/\\"), maxsplit=1)
-    host, _, port = parts[0].rsplit("@", 1)[-1].partition(":")
-    if port and not (port.isascii() and port.isdigit()):
+    hostport = parts[0].rsplit("@", 1)[-1]
+    v6 = _BRACKET_HOST.match(hostport)  # an IPv6 literal logs as its bracketed host
+    host, port = (v6.group(1), v6.group(2)) if v6 else (hostport.partition(":")[0], hostport.partition(":")[2])
+    if (port and not (port.isascii() and port.isdigit())) or (hostport.startswith("[") and not v6):
         return f"{scheme}:"
     authority = mask_decoded(host) + (f":{port}" if port else "")
     path = "".join(parts[1:2]) + mask_decoded("".join(parts[2:])) if len(parts) > 1 else ""
