@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from copy import deepcopy
 
 from ._time import add_seconds
@@ -24,13 +25,16 @@ def _release(leases: dict[str, _Lease], key: str, holder: str) -> None:  # only 
 
 
 class InMemoryOutboxStore:
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], str] | None = None) -> None:
+        self._clock = clock  # set: claims compare against this time, not the caller's (Firestore: server time)
         self._lock = threading.Lock()
         self._by_id: dict[str, dict] = {}
         self._by_key: dict[tuple[str, str], str] = {}
         self._send_leases: dict[str, _Lease] = {}
         self._transfer_leases: dict[str, _Lease] = {}
         self._pending_transfers: dict[str, tuple[str, dict]] = {}  # outbox_id -> (world_id, transfer)
+        self._pending_alerts: dict[str, tuple[str, dict]] = {}  # outbox_id -> (world_id, alert part)
+        self._retries: dict[str, tuple[int, str, str]] = {}  # id -> (attempts, not_before, first failure); not in entry
 
     def get(self, outbox_id: str | None) -> dict | None:
         with self._lock:
@@ -42,6 +46,11 @@ class InMemoryOutboxStore:
     def all_entries(self) -> list[dict]:
         with self._lock:
             return [deepcopy(entry) for entry in self._by_id.values()]
+
+    def retry_state(self, outbox_id: str) -> tuple[int, str | None]:  # (failed attempts, first failure) so far
+        with self._lock:
+            attempts, _, since = self._retries.get(outbox_id, (0, "", None))
+            return attempts, since
 
     def _insert_if_absent(self, entry: dict) -> bool:  # OB-03: neither id nor key already stored
         with self._lock:
@@ -69,28 +78,51 @@ class InMemoryOutboxStore:
             if expiry is not None and now < expiry:
                 return None
             entry["state"] = "failed"
+            self._retries.pop(outbox_id, None)
             return deepcopy(entry)
 
-    def _claim_for_sending(self, outbox_id: str, holder: str, now: str, lease_seconds: float) -> dict | None:
+    def _claim_for_sending(
+        self, outbox_id: str, holder: str, now: str, lease_seconds: float, skew_s: float = 0
+    ) -> dict | None:  # never before scheduled_at + skew_s (PI-12) or the entry's not-before
         with self._lock:
+            now = self._clock() if self._clock is not None else now
             entry = self._by_id.get(outbox_id)
             if entry is None or entry["state"] not in ("queued", "scheduled", "sending"):
+                return None
+            if entry.get("undo_window_s") and "scheduled_at" in entry:
+                if now < add_seconds(entry["scheduled_at"], skew_s):
+                    return None
+            if now < self._retries.get(outbox_id, (0, ""))[1]:  # not before the entry's next attempt
                 return None
             if not _try_claim(self._send_leases, outbox_id, holder, now, lease_seconds):
                 return None
             entry["state"] = "sending"  # takes over an expired lease too
             return deepcopy(entry)
 
-    def _finalize_claim(self, outbox_id: str, holder: str, to_state: str, transfer: dict | None = None) -> dict | None:
+    def _finalize_claim(
+        self, outbox_id: str, holder: str, to_state: str, transfer: dict | None = None, alert: dict | None = None
+    ) -> dict | None:
         with self._lock:
             entry = self._by_id.get(outbox_id)
             if entry is None or entry["state"] != "sending" or self._send_leases.get(outbox_id, (None,))[0] != holder:
                 return None
-            entry["state"] = to_state  # + pending transfer, same write (PI-17)
+            entry["state"] = to_state  # + pending transfer or alert, same write (PI-17, FR-AGT-13)
             _release(self._send_leases, outbox_id, holder)
+            self._retries.pop(outbox_id, None)
             if transfer is not None:
                 self._pending_transfers.setdefault(outbox_id, (entry["world_id"], deepcopy(transfer)))
+            if alert is not None:
+                self._pending_alerts.setdefault(outbox_id, (entry["world_id"], deepcopy(alert)))
             return deepcopy(entry)
+
+    def _defer(self, outbox_id: str, holder: str, attempts: int, now: str, delay_s: float) -> None:
+        """Releases holder's send lease; no attempt before now + delay_s (store time when the store has a clock)."""
+        with self._lock:
+            now = self._clock() if self._clock is not None else now
+            if self._send_leases.get(outbox_id, (None,))[0] == holder:
+                since = self._retries.get(outbox_id, (0, "", None))[2] or now
+                self._retries[outbox_id] = (attempts, add_seconds(now, delay_s), since)
+                _release(self._send_leases, outbox_id, holder)
 
     def _release_lease(self, kind: str, outbox_id: str, holder: str) -> None:  # kind: "send"/"transfer"
         with self._lock:
@@ -113,6 +145,15 @@ class InMemoryOutboxStore:
                 if _try_claim(self._transfer_leases, outbox_id, holder, now, lease_seconds):
                     return (outbox_id, world_id, deepcopy(transfer))  # a mutating emit never corrupts a retry
             return None
+
+    def _pending_alerts_of(self, only: str | None) -> list[tuple[str, dict]]:  # at-least-once; alert_id dedupes
+        with self._lock:
+            items = self._pending_alerts.items()
+            return [(oid, deepcopy(part)) for oid, (world, part) in items if only in (None, world)]
+
+    def _discard_pending_alert(self, outbox_id: str) -> None:
+        with self._lock:
+            self._pending_alerts.pop(outbox_id, None)
 
     def _discard_pending_transfer(self, outbox_id: str, holder: str) -> None:  # always removed once delivered
         with self._lock:

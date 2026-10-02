@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable
 from copy import deepcopy
@@ -11,14 +12,35 @@ from typing import Any
 import tilo_policy
 
 from ._schema import outbox_validator
-from ._time import add_seconds
-from .errors import MissingGrant, OutboxRefused, SideEffectRefused
+from ._time import add_seconds, parse_ts
+from .errors import MissingGrant, OutboxRefused, ProviderUnavailable, RateLimited, SideEffectRefused
 from .registry import RESERVED_CONNECTOR_ID
 from .store import InMemoryOutboxStore
+from .tokens import ConnectionExpired, InsufficientScope, NotConnected
 
 _ALWAYS_DUE_STATES = ("queued", "sending")  # "scheduled" also once scheduled_at <= now
 _LEASE_SECONDS = 30  # generous next to any real adapter/emit call
 _LIVE_GRANTS: set[int] = set()  # ids of Grants a send is currently authorised for (SEC-03)
+_WAITS_FOR_A_PERSON = (InsufficientScope, NotConnected, ConnectionExpired)  # no provider call: uses no attempt
+_log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class RetryPolicy:  # between attempts of one entry (#163, FR-AGT-13); defaults: docs/open-questions.md
+    max_attempts: int = 8  # failures before the entry ends failed
+    max_age_s: float = 86_400  # a failure this long after the entry's first failure ends it failed
+    backoff_base_s: float = 30  # doubles with every failure
+    max_delay_s: float = 3_600  # caps the backoff and a Retry-After
+    ambiguous_delay_s: float = 60  # after ProviderUnavailable, so the earlier-attempt lookup sees a lagging index
+    clock_skew_s: float = 2  # a claim waits this long past scheduled_at, in case the dispatcher's clock is fast
+
+    def delay_s(self, exc: Exception, attempts: int) -> float:
+        floor: float = exc.retry_after_s if isinstance(exc, RateLimited) else 0
+        floor = self.ambiguous_delay_s if isinstance(exc, ProviderUnavailable) else floor
+        return min(self.max_delay_s, max(floor, self.backoff_base_s * 2 ** min(max(attempts, 1) - 1, 32)))
+
+
+_IMMEDIATE = RetryPolicy(max_delay_s=0, clock_skew_s=0)  # API.md "Failures": the next tick retries; still bounded
 
 
 def _transfer_event(entry: dict) -> dict:  # PI-16/17: "out", this id, authz and item unchanged
@@ -55,6 +77,8 @@ class Outbox:
         clock: Callable[[], str],
         *,
         world_id: str | None = None,
+        retry: RetryPolicy | None = None,  # production passes RetryPolicy()
+        alert: Callable[[dict], None] | None = None,  # gets alert.raised parts {type, authz, data, world_id}
     ) -> None:
         if any(name.strip() == RESERVED_CONNECTOR_ID for name in connectors):
             raise ValueError(f"connector id {RESERVED_CONNECTOR_ID!r} is reserved and cannot be bound")
@@ -63,6 +87,8 @@ class Outbox:
         self._emit = emit
         self._clock = clock
         self._world_id = world_id  # set: dispatch and emit only this world's entries and transfers
+        self._retry = retry if retry is not None else _IMMEDIATE
+        self._alert = alert
 
     def enqueue(self, entry: dict, evidence: dict) -> dict:
         if errors := sorted(outbox_validator().iter_errors(entry), key=lambda e: list(e.path)):
@@ -116,6 +142,7 @@ class Outbox:
         ours = [e for e in self._store.all_entries() if self._world_id in (None, e["world_id"])]
         settled = [self._dispatch_one(e["id"]) for e in ours if self._is_due(e, now)]
         self._flush_pending_transfers()
+        self._flush_pending_alerts()
         return [entry for entry in settled if entry is not None]
 
     @staticmethod
@@ -127,7 +154,8 @@ class Outbox:
 
     def _dispatch_one(self, outbox_id: str) -> dict | None:
         holder = uuid.uuid4().hex
-        if (claimed := self._store._claim_for_sending(outbox_id, holder, self._clock(), _LEASE_SECONDS)) is None:
+        skew = self._retry.clock_skew_s
+        if (claimed := self._store._claim_for_sending(outbox_id, holder, self._clock(), _LEASE_SECONDS, skew)) is None:
             return None
         name = claimed["connector"]
         adapter = None if name.strip() == RESERVED_CONNECTOR_ID else self._connectors.get(name)
@@ -149,14 +177,37 @@ class Outbox:
                 )
         except SideEffectRefused:  # final: it can never succeed as written; nothing is emitted
             return self._store._finalize_claim(outbox_id, holder, "failed")
-        except BaseException as exc:  # ambiguous: release the lease; swallow only a plain Exception
+        except Exception as exc:  # ambiguous or not final: retried later, within the policy's bounds
+            return self._retry_later(claimed, holder, exc)
+        except BaseException:  # a process death: release the lease and let it propagate
             self._store._release_lease("send", outbox_id, holder)
-            if isinstance(exc, Exception):
-                return None
             raise
         finally:
             _LIVE_GRANTS.discard(id(grant))
         return self._store._finalize_claim(outbox_id, holder, "sent", _transfer_event(claimed))  # PI-17, atomic
+
+    def _retry_later(self, entry: dict, holder: str, exc: Exception) -> dict | None:
+        now, policy = self._clock(), self._retry
+        attempts, since = self._store.retry_state(entry["id"])
+        attempts, since = attempts + (0 if isinstance(exc, _WAITS_FOR_A_PERSON) else 1), since or now
+        if attempts < policy.max_attempts and (parse_ts(now) - parse_ts(since)).total_seconds() < policy.max_age_s:
+            self._store._defer(entry["id"], holder, attempts, now, policy.delay_s(exc, attempts))
+            return None
+        if self._alert is None:
+            _log.error("outbox entry %s failed after its retries and no alert sink is wired", entry["id"])
+        data = {"alert_id": entry["id"], "card_id": None}
+        alert = {"type": "alert.raised", "authz": None, "data": data, "world_id": entry["world_id"]}
+        return self._store._finalize_claim(entry["id"], holder, "failed", alert=alert)
+
+    def _flush_pending_alerts(self) -> None:  # FR-AGT-13: an entry that ran out of retries never stops silently
+        if self._alert is None:
+            return
+        for outbox_id, part in self._store._pending_alerts_of(self._world_id):
+            try:
+                self._alert(part)
+            except Exception:
+                continue
+            self._store._discard_pending_alert(outbox_id)
 
     def _flush_pending_transfers(self) -> None:  # only emit path, oldest-first per world_id
         blocked_worlds: set[str] = set()
