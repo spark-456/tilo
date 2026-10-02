@@ -14,6 +14,7 @@ import { S_13 } from "./S_13";
 import { S_17 } from "./S_17";
 import { S_18 } from "./S_18";
 import { S_19 } from "./S_19";
+import { S_23 } from "./S_23";
 import type { ScreenProps } from "./routes";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -86,5 +87,15 @@ describe("AGW-08 S-17 lists are told apart by registered fields, not by fixture 
   it("shows the time saved only once world.completed is recorded", async () => {
     expect((await text(S_17, 43)).textContent).toContain("No time-saved estimate yet.");
     expect((await text(S_17, 44)).textContent).toContain("About 8 to 18 min saved (estimate)");
+  });
+});
+
+describe("AGW-08 S-23 the estimate example follows world.completed", () => {
+  it("shows the figure only once the run has finished", async () => {
+    expect((await text(S_23, 43)).textContent).not.toContain("min saved");
+    expect((await text(S_23, 43)).textContent).toContain(
+      "The example appears when the recorded run finishes.",
+    );
+    expect((await text(S_23, 44)).textContent).toContain("About 8 to 18 min saved (estimate)");
   });
 });

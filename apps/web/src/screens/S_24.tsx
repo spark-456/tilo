@@ -35,21 +35,24 @@ export function S_24() {
   return (
     <Page
       testid="pilot"
-      title="Pilot diary and survey"
+      title="Pilot diary"
       sub="A short note each day and one survey at the end. Results are aggregated; nobody sees your answers on their own."
     >
       <Section
         title="Today's diary"
+        action={<Chip tone="soon">Coming soon</Chip>}
         note="Two questions, a minute or less. Your own estimate is fine."
       >
-        <Chip tone="soon">Coming soon</Chip>
         {DIARY.map(([label, kind]) => (
           <Field key={label} label={label} kind={kind} />
         ))}
         <Placeholder label="Save today's diary" compact />
       </Section>
-      <Section title="Exit survey" note="Shown once, at the end of the pilot.">
-        <Chip tone="soon">Coming soon</Chip>
+      <Section
+        title="Exit survey"
+        action={<Chip tone="soon">Coming soon</Chip>}
+        note="Shown once, at the end of the pilot."
+      >
         {SURVEY.map((q) => (
           <Field key={q} label={q} kind="text" />
         ))}
