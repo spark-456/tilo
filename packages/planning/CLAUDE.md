@@ -41,4 +41,8 @@ budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant
 - A budget grant's authz comes only from the world's owner (PRD 10.1) or the policy engine. The risk table
   is a parameter: until `config/autonomy.yaml` lists `grant_budget`, the engine fails closed and every grant
   waits. A policy grant is one `budget.granted` with authz by policy; it has no gate or outbox entry, so no
-  `policy.applied` is built, and its daily limits count earlier policy-authorised grants.
+  `policy.applied` is built, and its daily limits count earlier policy-authorised grants. A `grant_budget`
+  policy with `limits.credits: null` covers no cap (it gates), and a grant is a world's first: `existing_cap`
+  other than 0 raises `TopUpNotSupported` until Treasury lands (BQ-100).
+- Credits the Director writes must be finite, a minimum 0 or more and a maximum above 0 (PG-09). The repair
+  prompt holds the problem lines in a `PROBLEMS` data block, and ids in them are shown only if they fit the id pattern.
