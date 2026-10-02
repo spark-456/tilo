@@ -32,9 +32,9 @@ channel identity binding. Public ingress for signature-verified webhooks only.
 - Hardening: app secret >= 32 bytes (constructor raises; empty key never verifies); wamids never
   logged (`message_ref`: sha256 prefix, they encode the number); object, field and `phone_number_id`
   pinned; timestamps over 60 s ahead are dropped like stale ones (and logged).
-- `links` (FR-CHN-07; BQ-75 to BQ-81): HMAC-SHA256 via `hmac.compare_digest`, signature checked before
-  claims; key ring read live; nonce consumed last (atomic), so a refusal never burns a link. 24 h expiry;
-  `answer` only for needs_you cards listing email, never gate or consent; opening a gate, consent or
-  meeting card without sign-in yields `requires_sign_in`; another signed-in viewer is refused; unknown or
-  retired key id is `unknown_key`; an answered card is `card_answered`. HTTP layer: `answer` must need a
-  POST confirm; a GET (scanner prefetch) only shows the card and never calls `redeem` for `answer`.
+- `links` (FR-CHN-07; BQ-75 to BQ-81): HMAC-SHA256 (`compare_digest`, prefix `tilo-link-v1|`), every
+  segment alphabet-checked before the MAC, claims parsed after; key ring live; nonce consumed last. Answer
+  only for plain needs_you cards listing email (allowlist, fail closed); gate, consent, meeting open
+  only signed in. Naive clock refused. HTTP layer (BQ-81): `answer` needs a POST confirm (a scanner GET
+  never answers); token in a URL fragment, not the path; public non-consuming verify; no consume on
+  requires_sign_in; first answer is a compare-and-set on the card; whether `open` needs a POST too.

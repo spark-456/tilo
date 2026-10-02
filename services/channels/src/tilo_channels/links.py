@@ -20,8 +20,8 @@ import re
 import secrets
 import threading
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 TTL = timedelta(hours=24)  # D1
@@ -30,7 +30,8 @@ _MIN_KEY_BYTES = 32
 _KID = re.compile(r"[A-Za-z0-9_-]{1,32}\Z")
 _B64 = re.compile(r"[A-Za-z0-9_-]+\Z")
 _ACTIONS = ("open", "answer")
-_SIGN_IN_KINDS = frozenset({"gate", "consent", "meeting"})
+_MAC_DOMAIN = b"tilo-link-v1|"  # domain separation: these keys sign nothing else
+_MAX_EXPIRY = 2**32  # epoch seconds, year 2106; anything larger is not one of our claims
 
 
 class LinkRefused(Exception):
@@ -104,9 +105,9 @@ class NonceStore(Protocol):
 
 @dataclass(frozen=True)
 class IssuedLink:
-    token: str
-    url: str
-    nonce: str
+    token: str = field(repr=False)  # a live 24 h bearer link: never in a repr, log or traceback
+    url: str = field(repr=False)
+    nonce: str = field(repr=False)
     key_id: str
     card_id: str
     user_id: str
@@ -122,7 +123,7 @@ class Redemption:
     user_id: str
     action: str
     option: str | None
-    nonce: str
+    nonce: str = field(repr=False)
     authn: str  # "session" if the viewer was the bound user, else "link"
     requires_sign_in: bool  # the caller sends the person through sign-in before anything else
 
@@ -145,15 +146,25 @@ def _b64d(text: str) -> bytes:
 
 
 def _mac(key: bytes, signed: str) -> bytes:
-    return hmac.new(key, signed.encode("ascii"), hashlib.sha256).digest()
+    return hmac.new(key, _MAC_DOMAIN + signed.encode("ascii"), hashlib.sha256).digest()
 
 
 def _options(card: Mapping[str, Any]) -> set[str]:
-    return {str(o.get("id")) for o in card.get("options") or [] if isinstance(o, Mapping)}
+    return {o["id"] for o in card.get("options") or [] if isinstance(o, Mapping) and isinstance(o.get("id"), str)}
 
 
-def _answerable_by_email(card: Mapping[str, Any]) -> bool:
-    return card.get("kind") == "needs_you" and "email" in (card.get("answer_channels") or [])
+def _question_card(card: Mapping[str, Any]) -> bool:
+    """Fail-closed allowlist: only a plain question card is answerable by email, however a crafted card
+    is shaped (a gate or consent object, another rung, answer_channels not a list)."""
+    channels = card.get("answer_channels")
+    return (
+        card.get("kind") == "needs_you"
+        and card.get("rung") in ("needs_you", "blocked")
+        and card.get("gate") is None
+        and card.get("consent") is None
+        and isinstance(channels, list)
+        and "email" in channels
+    )
 
 
 class LinkService:
@@ -175,11 +186,15 @@ class LinkService:
     def issue(self, *, card_id: str, user_id: str, action: str, option: str | None = None) -> IssuedLink:
         if action not in _ACTIONS:
             raise LinkRefused("unknown_action")
+        if not card_id:
+            raise LinkRefused("unknown_card")
+        if not user_id:
+            raise LinkRefused("wrong_user")
         state = self._cards(card_id)
         if state is None:
             raise LinkRefused("unknown_card")
         if action == "answer":
-            if not _answerable_by_email(state.card):  # D2: gates and consent never get an answer link
+            if not _question_card(state.card):  # D2: gates and consent never get an answer link
                 raise LinkRefused("not_allowed")
             if option is None or option not in _options(state.card):
                 raise LinkRefused("unknown_option")
@@ -187,7 +202,7 @@ class LinkService:
                 raise LinkRefused("card_answered")
         elif option is not None:
             raise LinkRefused("unknown_option")
-        issued_at = self._clock().replace(microsecond=0)
+        issued_at = self._now().replace(microsecond=0)
         expires_at = issued_at + TTL
         nonce = secrets.token_urlsafe(16)
         claims = {"n": nonce, "c": card_id, "u": user_id, "a": action, "o": option, "e": int(expires_at.timestamp())}
@@ -208,6 +223,12 @@ class LinkService:
             expires_at=expires_at,
         )
 
+    def _now(self) -> datetime:
+        now = self._clock()
+        if now.tzinfo is None or now.utcoffset() is None:  # a naive clock would tie expiry to the host zone
+            raise LinkRefused("bad_clock")
+        return now
+
     def _verify(self, token: str) -> dict[str, Any]:
         """Signature first; the claims are parsed only after the MAC matches."""
         parts = token.split(".") if isinstance(token, str) else []
@@ -215,7 +236,7 @@ class LinkService:
             raise LinkRefused("malformed")
         kid, body, sig = parts
         provided = _b64d(sig)
-        if len(provided) != hashlib.sha256().digest_size or not _KID.match(kid):
+        if len(provided) != hashlib.sha256().digest_size or not _KID.match(kid) or not _B64.match(body):
             raise LinkRefused("malformed")
         key = self._keys.get(kid)
         if key is None:  # D5: unknown and retired look the same
@@ -228,6 +249,8 @@ class LinkService:
                 raise ValueError
             if not (claims.get("o") is None or isinstance(claims["o"], str)) or type(claims["e"]) is not int:
                 raise ValueError
+            if not 0 < claims["e"] < _MAX_EXPIRY:
+                raise ValueError
         except (ValueError, KeyError, TypeError):
             raise LinkRefused("malformed") from None
         return claims
@@ -236,8 +259,8 @@ class LinkService:
         self, token: str, *, card_id: str, action: str, viewer: str | None = None, option: str | None = None
     ) -> Redemption:
         claims = self._verify(token)
-        now = self._clock()
-        expires_at = datetime.fromtimestamp(int(claims["e"]), tz=now.tzinfo)
+        now = self._now()
+        expires_at = datetime.fromtimestamp(claims["e"], tz=UTC)
         if now >= expires_at:
             raise LinkRefused("expired")
         if card_id != claims["c"]:
@@ -252,7 +275,7 @@ class LinkService:
         if state is None:
             raise LinkRefused("unknown_card")
         if claims["a"] == "answer":  # D2, D6: re-checked against the card as it is now
-            if not _answerable_by_email(state.card):
+            if not _question_card(state.card):
                 raise LinkRefused("not_allowed")
             if claims["o"] not in _options(state.card):
                 raise LinkRefused("unknown_option")
@@ -267,5 +290,5 @@ class LinkService:
             option=claims["o"],
             nonce=claims["n"],
             authn="session" if viewer is not None else "link",
-            requires_sign_in=viewer is None and state.card.get("kind") in _SIGN_IN_KINDS,  # D3
+            requires_sign_in=viewer is None and not _question_card(state.card),  # D3, allowlist
         )
