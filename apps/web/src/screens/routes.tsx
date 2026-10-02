@@ -2,7 +2,6 @@
 // component. The address pattern and the built/placeholder status live in meta.ts, so adding or
 // replacing a screen is a one-line change here plus its own file.
 import type { ComponentType } from "react";
-import { More, ScreensIndex } from "./ScreensIndex";
 import { S_05 } from "./S_05";
 import { S_06 } from "./S_06";
 import { S_07 } from "./S_07";
@@ -22,6 +21,7 @@ import { S_21 } from "./S_21";
 import { S_22 } from "./S_22";
 import { S_23 } from "./S_23";
 import { S_24 } from "./S_24";
+import { More, ScreensIndex } from "./ScreensIndex";
 import { SCREENS } from "./meta";
 
 export interface ScreenProps {

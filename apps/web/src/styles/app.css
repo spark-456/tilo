@@ -195,6 +195,23 @@ body {
   font: 700 0.875em / 1 var(--font-ui);
   cursor: pointer;
 }
+/* One box for loading, error, empty and ready, so a slow client never shifts the layout (CLS). */
+.flow-slot {
+  min-height: 11.5em;
+}
+.flow-loading {
+  display: block;
+  margin: 0 0 12px;
+  font: 400 0.875em / 1.4 var(--font-ui);
+}
+.flow-detail {
+  margin: 0 0 12px;
+  font: 400 0.875em / 1.4 var(--font-ui);
+}
+.flow-heading:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
 .flow-notice {
   margin: 0 0 12px;
   font: 600 0.875em / 1.4 var(--font-ui);

@@ -120,6 +120,28 @@ describe("PRD-18.3 flow: loading and empty states", () => {
     expect(button("primary")?.disabled).toBe(false);
   });
 
+  it("states no summary while loading, only once the data is ready", async () => {
+    await show("/world/w1/delivery", new FixtureClient({ delayMs: 50 }));
+    expect(container.querySelector(".flow-summary")).toBeNull();
+    await settle(80);
+    expect(container.querySelector(".flow-summary")?.textContent).toContain("Verified");
+  });
+
+  it("states no summary after an error", async () => {
+    await show("/world/w1/delivery", rejectingClient);
+    await settle(0);
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(container.querySelector(".flow-summary")).toBeNull();
+  });
+
+  it("moves focus to the new screen's heading after a route change", async () => {
+    await show("/", new FixtureClient());
+    await act(async () => button("primary")?.click());
+    await settle();
+    expect(window.location.pathname).toContain("/understanding");
+    expect(document.activeElement?.tagName).toBe("H1");
+  });
+
   it("approves the recommended approach with its cap from getApproaches", async () => {
     const approve = vi.fn(async () => ({ world_id: "w9" }));
     const fixture = new FixtureClient();
