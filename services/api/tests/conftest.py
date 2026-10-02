@@ -58,13 +58,53 @@ def client(store: deps.Store, writer: FakeEventWriter):
     """A TestClient over the real `tilo_api.app`, with the store, the event writer and a
     deterministic fake safety provider injected: the app itself ships no safety provider (the
     screen belongs to packages/providers) and `/intake` fails closed with 503 without one. No
-    principal is set yet -- individual tests set
-    `app.dependency_overrides[deps.get_current_principal]` for the role they want -- and
-    `dependency_overrides` is cleared at teardown so tests do not leak into each other."""
+    principal is set for the world routes -- individual tests set
+    `app.dependency_overrides[deps.get_current_principal]` for the role they want; until they do,
+    an intake tester is signed in, since `/intake` needs a principal (CL-INT-1). The model router is
+    a real Router over a scripted Director (no network). `dependency_overrides` is cleared at
+    teardown so tests do not leak into each other."""
+    from _clint1_lib import APPROACHES_REPLY, RoleScriptedProvider, brief_reply, build_router
+
     safety = make_safety_provider()
+    model_router = build_router(REPO_ROOT, RoleScriptedProvider(brief_reply([]), APPROACHES_REPLY))
     app.dependency_overrides[deps.get_store] = lambda: store
     app.dependency_overrides[deps.get_event_writer] = lambda: writer
     app.dependency_overrides[get_safety] = lambda: safety
+    app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(user_id="u_intake", role="owner")
+    app.dependency_overrides[deps.get_router] = lambda: model_router
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+# --- CL-INT-1 (CP2 thin slice, API flow): see API_CL_INT_1.md and _clint1_lib.py -----------------
+
+
+@pytest.fixture()
+def flow_factory(repo_root: pathlib.Path, store: deps.Store):
+    """Builds a `Flow` (the real app with a fake principal, the in-memory Store, a scripted director behind
+    a real Router, and by default a SafetyProvider spy). `safety=None` leaves `get_safety` un-overridden."""
+    from _clint1_lib import Flow, brief_reply, make_spy_safety
+
+    made: list[Flow] = []
+
+    def build(ambiguous: list[str] | None = None, *, safety: object = "spy") -> Flow:
+        spy = make_spy_safety() if safety == "spy" else safety
+        flow = Flow(repo_root, store, spy, brief_reply(["audience", "deadline"] if ambiguous is None else ambiguous))
+        made.append(flow)
+        return flow
+
+    yield build
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def flow(flow_factory):
+    """Default flow: the Director marks the audience and the deadline ambiguous (two questions)."""
+    return flow_factory()
+
+
+@pytest.fixture()
+def clear_flow(flow_factory):
+    """The Director marks nothing ambiguous (a clear task: zero questions)."""
+    return flow_factory([])
