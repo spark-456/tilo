@@ -46,8 +46,8 @@ test("S_23 renders, no console errors, placeholders aria-disabled", async ({ pag
     await expect(page.getByTestId("status-rows")).toContainText("No live service is connected");
   });
   // Every estimate links here: the delivery screen's link lands on this screen.
-  await page.goto("/world/w_village_basic/delivery");
-  await page.getByRole("link", { name: "How we estimate time saved" }).click();
+  await page.goto("/world/w_village_basic/delivery?speed=100"); // the link shows once the run is finished (S-12)
+  await page.getByRole("link", { name: "How we estimate" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "How we estimate" })).toBeVisible();
   expect(problems).toEqual([]);
 });
