@@ -11,9 +11,10 @@ summary, dimensions, time, credits, risks, skips) -- the same shape as the real 
 `contracts/fixtures/plan/valid/three_approaches_policy_gate.json`. Whether the set is pairwise
 distinct is a deterministic code check, `check_distinct` (PG-08: every pair differs on >= 2 of
 the 5 `dimensions` keys), never the model's job. A candidate set that fails distinctness is
-repaired or rejected in code -- never returned as-is (ticket brief) -- so the test on an
-indistinct canned pair accepts either outcome: `ApproachProposalError` (rejected) or a returned
-set that itself passes `check_distinct` and differs from the untouched canned input (repaired).
+repaired or rejected in code -- never returned as-is (ticket brief). Both paths are scripted: a
+Director that repeats the indistinct pair after the one PG-08 repair call is rejected with
+`ApproachProposalError` (two provider calls, not router exhaustion); one that answers with a distinct
+set on the repair call is returned.
 
 Public interface (this ticket's own design, from the PRD 7.1 FR-INT-06 row plus
 `contracts/plan.schema.json` and `contracts/plan.rules.md` PG-08/PG-09):
@@ -25,6 +26,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from _planning_contracts_lib import (
     ScriptedCall,
     ScriptedModelProvider,
@@ -102,19 +104,30 @@ def test_FR_INT_06_indistinct_candidate_pair_is_repaired_or_rejected_never_retur
     tmp_path, repo_root, registry
 ):
     payload = load_approaches_fixture("indistinct_pair")  # differs on 1 of 5 dimensions only
-    router = _router(tmp_path, payload)
+    # The Director repeats the same indistinct set when asked once more: the PG-08 repair path runs, then rejects.
+    reply = ScriptedCall(text=json.dumps(payload))
+    provider = ScriptedModelProvider("large", [reply, reply])
+    router = build_test_router(tmp_path, provider)
 
-    try:
-        result = propose_approaches(_brief(), router=router, base=sample_event_base(), seq=2)
-    except ApproachProposalError:
-        return  # rejecting an indistinct set outright satisfies "never returned"
+    with pytest.raises(ApproachProposalError, match="still break the rules after one repair"):
+        propose_approaches(_brief(), router=router, base=sample_event_base(), seq=2)
 
-    assert check_distinct(result.approaches), (
-        "FR-INT-06: a returned approach set must be pairwise distinct (PG-08) -- "
-        "a set that fails distinctness must be repaired or rejected, never returned as-is"
+    assert len(provider.calls) == 2, "FR-INT-06: one proposal, then exactly one repair call (PG-08)"
+    assert "PG-08: a and b differ on 1 of 5 dimensions" in provider.calls[1].prompt, "the repair names the problem"
+
+
+def test_FR_INT_06_indistinct_candidate_pair_is_repaired_when_the_second_reply_is_distinct(
+    tmp_path, repo_root, registry
+):
+    first = load_approaches_fixture("indistinct_pair")
+    second = load_approaches_fixture("distinct_three")
+    provider = ScriptedModelProvider(
+        "large", [ScriptedCall(text=json.dumps(first)), ScriptedCall(text=json.dumps(second))]
     )
-    assert [a["dimensions"] for a in result.approaches] != [a["dimensions"] for a in payload["approaches"]], (
-        "a 'repaired' set must actually change something; returning the untouched indistinct input is not a repair"
-    )
+
+    result = propose_approaches(_brief(), router=build_test_router(tmp_path, provider), base=sample_event_base(), seq=2)
+
+    assert len(provider.calls) == 2 and len(result.runs) == 2, "the repair is recorded as a second run"
+    assert check_distinct(result.approaches), "PG-08: a returned set is pairwise distinct"
     for approach in result.approaches:
         assert_valid_approach(repo_root, registry, approach)

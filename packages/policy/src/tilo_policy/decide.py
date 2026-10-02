@@ -66,7 +66,8 @@ def over_limit(policy: dict, applied: list[dict], credits: float, now: str) -> s
     if per_day is None or len(mine) + 1 > per_day:  # L2 and L3 always have a daily limit (schema)
         return "l3_daily_cap_reached"
     if most_credits is None:
-        return None
+        # A budget grant spends credits, so a policy with no credit bound covers no cap at all (#106 item 1).
+        return "l3_credits_cap_reached" if policy.get("action_type") == "grant_budget" else None
     spent = [float(a["data"]["credits"]) for a in mine] + [float(credits)]
     if any(not c >= 0 for c in spent):  # negative or NaN credits never lower the total
         raise ValueError("credits must be non-negative")
