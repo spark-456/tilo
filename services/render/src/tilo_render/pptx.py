@@ -23,11 +23,9 @@ from tilo_render.spec import (
     Table,
     TableBlock,
 )
-
-
-def _find_repo_root() -> Path:
-    cur = Path(__file__).resolve()
-    return next((p for p in [cur, *cur.parents] if (p / "design" / "tokens.json").exists()), Path.cwd())
+from tilo_render.text import find_repo_root as _find_repo_root
+from tilo_render.text import lines as _lines
+from tilo_render.text import sanitize_text
 
 
 def _resolve_color(role: str, tokens: dict[str, Any]) -> RGBColor:
@@ -36,21 +34,6 @@ def _resolve_color(role: str, tokens: dict[str, Any]) -> RGBColor:
         node = node[part]
     val = node["value"] if isinstance(node, dict) and "value" in node else str(node)
     return RGBColor.from_string(val.lstrip("#"))
-
-
-def sanitize_text(text: str) -> str:
-    norm = text.replace("\r\n", "\n").replace("\r", "\n")
-    return "".join(
-        c
-        for c in norm
-        if c in "\t\n"
-        or (
-            32 <= ord(c) != 127
-            and not (0x80 <= ord(c) <= 0x9F)
-            and not (0xD800 <= ord(c) <= 0xDFFF)
-            and ord(c) not in (0xFFFE, 0xFFFF)
-        )
-    )
 
 
 def _chunk_text(text: str, max_chars: int = 1000) -> list[str]:
@@ -106,11 +89,6 @@ def _add_title_slide(prs: Any, spec: DeliverableSpec, col: dict[str, RGBColor], 
         )
     p2 = tf.add_paragraph()
     p2.text, p2.font.size, p2.font.color.rgb = sanitize_text(spec.date), Pt(14), col["title_subtext"]
-
-
-def _lines(text: str) -> list[str]:
-    """Sanitise (XML-invalid characters, CR normalisation) and split into one string per line."""
-    return sanitize_text(text).split("\n")
 
 
 def _add_para_slide(prs: Any, heading: str, text: str, col: dict[str, RGBColor], typ: dict[str, float]) -> None:

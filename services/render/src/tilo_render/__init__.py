@@ -4,6 +4,7 @@ Deterministic code only: no model calls, no network, no clock (services/render/C
 """
 
 from .charts import ChartData
+from .pdf import render_pdf
 from .pptx import render_pptx
 from .spec import (
     MAX_CHART_POINTS,
@@ -38,5 +39,6 @@ __all__ = [
     "Section",
     "Table",
     "TableBlock",
+    "render_pdf",
     "render_pptx",
 ]
