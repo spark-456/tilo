@@ -1,10 +1,10 @@
 # ADR-0002: Contract conventions, fixtures and code generation
 
 - Status: Accepted (2026-09-25, architect; ticket P0-02). Amended 2026-09-25 by ticket P0-03
-  (decisions 1, 8 and 10), by ticket CC-SH (decision 12) and by ticket CC-SE (decision 13). The contract set freezes at CP0 on
-  29 Sep; `manifest.schema.json` freezes on 1 Oct.
+  (decisions 1, 8 and 10), by ticket CC-SH (decision 12), by ticket CC-SE (decision 13) and by ticket CC-SP-64
+  (decision 14, 2026-10-02). The contract set freezes at CP0 on 29 Sep; `manifest.schema.json` freezes on 1 Oct.
 - Deciders: architect, orchestrator
-- Requirement: FR-WLD-02 (PRD 15.2); FR-WLD-03 for the P0-03 amendment
+- Requirement: FR-WLD-02 (PRD 15.2); FR-WLD-03 for the P0-03 amendment; FR-INT-08 for decision 14
 
 ## Context
 PRD 15.2 makes versioned JSON Schemas in `contracts/` the single source of truth for every
@@ -218,6 +218,37 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     frozen until CP0; after the freeze it would be major. The eval case file shape stays in
     `evals/case.schema.json`, because only the eval harness reads it and it crosses no service
     boundary.
+14. **`grant_budget` and connector-less actions (ticket CC-SP-64, issue #64, FR-INT-08), config
+    and documentation only.** `config/autonomy.yaml` maps `grant_budget` to T1, PRD 10.4's example
+    "spend credits under the run budget". A budget grant goes through the deterministic policy
+    engine like any other side effect, so an L3 policy such as "auto-approve under 100 credits"
+    can approve one (FR-INT-08). Before this change an unlisted action type failed closed to T3
+    (BQ-44), and so did every grant. The table holds no credit amounts and its six modifiers are
+    fixed (BQ-16), so "under the run budget" is not a tier. The Treasury must never raise a run's
+    budget above `caps.run_credits` (MT-03, PRD 17.3), whoever approves the grant, but
+    `Treasury.grant` does not enforce that ceiling yet (issue #51, decision 13). A policy grant
+    also stays within the policy's `limits.per_day` and `limits.credits` (BQ-14, BQ-52).
+    `limits.credits` keeps its BQ-14 meaning, a daily total, which also bounds each grant: under
+    "auto-approve under 100 credits" an 80-credit grant runs and a second one that day waits.
+    `limits.credits` is optional in policy.schema.json, so an L3 `grant_budget` policy with
+    `limits.credits: null` has no credit bound at all today. Until `budget.py` gates a policy grant
+    when `limits.credits` is null or the grant would exceed `caps.run_credits` (issue #106 item 1),
+    nothing may call `request_budget_grant` without a person's own approval (for example FR-MTR-03
+    top-ups or a harness auto-start). Any active modifier makes a grant T3 in the table (PI-07),
+    but `request_budget_grant` does not pass a world's facts yet, so a modifier such as an
+    injection-flagged intake does not reach a grant until it does.
+    A grant goes through no `tilo-connectors` connector. A policy's `scope.connectors` still needs
+    at least one id, and the engine's proposal, `policy.applied` and an outbox entry each name a
+    connector. For an action that goes through no connector, that id is the reserved `internal`.
+    It is a valid `connector_id` that `config/connectors.yaml` never declares, so a policy scoped
+    to it covers no real connector; a budget policy's scope is `connectors: [internal]`. A policy
+    grant is recorded as one `budget.granted` whose `authz` is by the policy and names it (BQ-23).
+    A grant has no gate and no outbox entry, so the FR-INT-08 path writes no `policy.applied`
+    (OB-01 ties that event to an outbox entry it opened).
+    `fixtures/events/valid/policy.applied--grant_budget.json` shows the value in a schema-valid
+    `policy.applied`; its gate and outbox ids are sample values, not an emitted flow. No schema
+    changes: `connector_id` already admits `internal`, and only its meaning gains a reserved value
+    (BQ-75, overridable).
 
 ## Consequences
 - Builders import `tilo_contracts` or `@tilo/contracts` and never hand-write these shapes.
