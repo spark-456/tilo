@@ -11,6 +11,11 @@ const DIMS = [
   ["verification", "Verification"], ["output_format", "Output format"],
 ] as const;
 
+// The most credits one approval may grant: `caps.run_credits` in config/metering.yaml (PRD 14.1,
+// 17.3); services/api answers 422 above it. The web has no config read, so this mirrors it; change
+// both together.
+export const MAX_BUDGET_CAP_CREDITS = 300;
+
 const formatTime = (t: PlanApproach["time"]): string =>
   t.min_s >= 60 && t.min_s % 60 === 0 && t.max_s % 60 === 0
     ? `${t.min_s / 60}–${t.max_s / 60} min (${t.min_s}–${t.max_s} s)`
@@ -37,7 +42,13 @@ export function Approaches({ taskId }: { taskId: string }) {
   const active = selected ?? ready?.chosen;
   const rawCap = capDraft ?? String(active?.credits.max ?? 0);
   const parsed = Number(rawCap);
-  const validCap = rawCap.trim() !== "" && Number.isInteger(parsed) && parsed >= 1 ? parsed : null;
+  const validCap =
+    rawCap.trim() !== "" &&
+    Number.isInteger(parsed) &&
+    parsed >= 1 &&
+    parsed <= MAX_BUDGET_CAP_CREDITS
+      ? parsed
+      : null;
   const displayCap = validCap ?? active?.credits.max ?? 0;
 
   const action = useAction("start the run", async () => {
@@ -76,7 +87,7 @@ export function Approaches({ taskId }: { taskId: string }) {
               </div>
               <label className="budget-cap-field" htmlFor="budget-cap-input">
                 <span>Budget cap (credits)</span>
-                <input id="budget-cap-input" data-testid="budget-cap-input" type="number" min={1} step={1} aria-invalid={validCap === null} value={rawCap} onChange={(e) => setCapDraft(e.target.value)} />
+                <input id="budget-cap-input" data-testid="budget-cap-input" type="number" min={1} max={MAX_BUDGET_CAP_CREDITS} step={1} aria-invalid={validCap === null} value={rawCap} onChange={(e) => setCapDraft(e.target.value)} />
               </label>
               <p className="flow-detail" data-testid="budget-line">{`This run can use up to ${displayCap} credits (about US$${(displayCap * result.credit_usd).toFixed(2)}). You can pause it any time.`}</p>
             </div>

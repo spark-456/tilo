@@ -18,6 +18,15 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await expect(page.getByTestId("select-approach-quick")).toHaveAttribute("aria-pressed", "false");
     await expect(page.getByTestId("select-approach-thorough")).toHaveAttribute("aria-pressed", "false");
 
+    // 14 px exactly (the minimum on the type scale): the badge and the select button must not compound.
+    for (const id of ["recommended-badge", "select-approach-quick", "budget-cap-input"]) {
+      const size = await page.getByTestId(id).first().evaluate((el) => getComputedStyle(el).fontSize);
+      expect(Number.parseFloat(size), id).toBeGreaterThanOrEqual(14);
+    }
+    for (const id of ["recommended-badge", "select-approach-quick"]) {
+      await expect(page.getByTestId(id).first()).toHaveCSS("font-size", "14px");
+    }
+
     const primary = page.locator("button.primary");
     await expect(primary).toHaveCount(1);
     await expect(primary).toHaveText("Start this approach");
@@ -30,16 +39,16 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await expect(cap).toHaveValue("130");
     await expect(page.getByTestId("budget-line")).toHaveText("This run can use up to 130 credits (about US$0.65). You can pause it any time.");
 
-    for (const bad of ["", "0", "1.5"]) {
+    for (const bad of ["", "0", "1.5", "301", "1e20"]) {
       await cap.fill(bad);
       await expect(cap).toHaveAttribute("aria-invalid", "true");
       await expect(primary).toBeDisabled();
     }
 
-    await cap.fill("520");
+    await cap.fill("250");
     await expect(cap).toHaveAttribute("aria-invalid", "false");
     await expect(primary).toBeEnabled();
-    await expect(page.getByTestId("budget-line")).toHaveText("This run can use up to 520 credits (about US$2.60). You can pause it any time.");
+    await expect(page.getByTestId("budget-line")).toHaveText("This run can use up to 250 credits (about US$1.25). You can pause it any time.");
 
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
     expect(results.violations).toEqual([]);

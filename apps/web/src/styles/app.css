@@ -1312,8 +1312,12 @@ button.row {
   color: var(--color-ink-2);
   font: 400 0.875em / 1.3 var(--font-ui); /* 14 px: the minimum type size */
 }
+.approach-head {
+  font-size: 1em; /* the 14 px below must not compound with the shared 0.875em of this row */
+}
+.approach-head .secondary,
 .approach-head .btag {
-  font-size: 0.875em; /* 14 px minimum; .btag alone is 12 px */
+  font-size: 0.875rem; /* exactly 14 px: the minimum type size; .btag alone is 12 px */
 }
 .budget-cap-field input {
   width: 6em;

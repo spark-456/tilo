@@ -71,11 +71,11 @@ describe("AGW-04 S-03 Approaches and budget", () => {
     expect(q<HTMLButtonElement>("button.primary")?.disabled).toBe(false);
   });
 
-  it('FR-INT-08 S-03: the budget line reads exactly "This run can use up to 520 credits (about US$2.60). You can pause it any time." for a cap of 520 at 0.005 US$ per credit', async () => {
+  it('FR-INT-08 S-03: the budget line reads exactly "This run can use up to 250 credits (about US$1.25). You can pause it any time." for a cap of 250 at 0.005 US$ per credit', async () => {
     await openApproaches({ credit_usd: 0.005 });
     const capInput = q<HTMLInputElement>('[data-testid="budget-cap-input"]');
-    await act(async () => void (capInput && setInputValue(capInput, "520")));
-    expect(q('[data-testid="budget-line"]')?.textContent).toBe("This run can use up to 520 credits (about US$2.60). You can pause it any time.");
+    await act(async () => void (capInput && setInputValue(capInput, "250")));
+    expect(q('[data-testid="budget-line"]')?.textContent).toBe("This run can use up to 250 credits (about US$1.25). You can pause it any time.");
   });
 
   it("FR-INT-08 S-03: approve sends the chosen approach id and the edited cap", async () => {
@@ -92,18 +92,20 @@ describe("AGW-04 S-03 Approaches and budget", () => {
     expect(window.location.pathname).toBe("/world/w_approved");
   });
 
-  it("FR-INT-08 S-03: disables Start and marks input invalid on empty, 0 or 1.5 cap", async () => {
+  it("FR-INT-08 S-03: disables Start and marks input invalid on empty, 0, 1.5 or above-ceiling cap", async () => {
     await openApproaches();
     await act(async () => q<HTMLButtonElement>('[data-testid="select-approach-quick"]')?.click());
     const capInput = q<HTMLInputElement>('[data-testid="budget-cap-input"]');
-    for (const bad of ["", "0", "1.5"]) {
+    for (const bad of ["", "0", "1.5", "301", "1e20"]) {
       await act(async () => void (capInput && setInputValue(capInput, bad)));
       expect(capInput?.getAttribute("aria-invalid")).toBe("true");
       expect(q<HTMLButtonElement>("button.primary")?.disabled).toBe(true);
     }
-    await act(async () => void (capInput && setInputValue(capInput, "80")));
-    expect(capInput?.getAttribute("aria-invalid")).toBe("false");
-    expect(q<HTMLButtonElement>("button.primary")?.disabled).toBe(false);
+    for (const good of ["80", "300"]) {
+      await act(async () => void (capInput && setInputValue(capInput, good)));
+      expect(capInput?.getAttribute("aria-invalid")).toBe("false");
+      expect(q<HTMLButtonElement>("button.primary")?.disabled).toBe(false);
+    }
   });
 
   it("FR-INT-06 S-03: surfaces a load error with retry and keeps Start disabled", async () => {
