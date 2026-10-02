@@ -3,7 +3,8 @@
 Mail is untrusted data. The safety provider screens From, To, Cc, subject and body first; a flagged mail is
 `suspicious` and never reaches the model. Otherwise the "autopilot" role model sees the mail only as delimited data
 in the user prompt, with no tools, and answers `{"category", "priority"}`; anything else falls back to fyi/normal.
-The user's corrections, mutes and VIPs (P7 preferences, keyed by the bare From address) override the model. Triage
+The user's corrections, mutes and VIPs (P7 preferences, keyed by the bare From address) override the model, but never
+downgrade a model `suspicious` (BQ-132): a From header is not authenticated, so a rule must not hide a spoof. Triage
 itself never writes preferences, never sends and never logs or stores a subject, body or display name.
 """
 
@@ -11,12 +12,14 @@ from __future__ import annotations
 
 import json
 import logging
+import string
+import unicodedata
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from email.utils import parseaddr
 from typing import Any, Protocol
 
-from tilo_providers.interfaces import GenerateRequest, ModelProvider, SafetyProvider
+from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
 from tilo_providers.prompts import load_prompt
 
 CATEGORIES = ("needs_reply", "needs_action", "fyi", "newsletter_promo", "suspicious")
@@ -31,6 +34,8 @@ MAX_ANSWER_CHARS = 1_000
 UNIT = {"unit_type": "mail_triaged", "unit_count": 1}  # BQ-03
 
 _LOG = logging.getLogger(__name__)
+_ANGLES = {ord("<"): "‹", ord(">"): "›"}
+_ASCII_LOWER = str.maketrans(string.ascii_uppercase, string.ascii_lowercase)
 
 
 class MailReader(Protocol):  # the quarantined reader (PRD 16.3 item 3): read-only
@@ -67,16 +72,27 @@ class AgreementReport:
 
 
 def bare_address(value: Any) -> str | None:
-    """The lower-cased address of a From header, never its display name; None when there is none."""
-    address = parseaddr(value if isinstance(value, str) else "")[1].strip().lower()
+    """The address of a From header with ASCII letters lower-cased, never its display name; None when there is none.
+    An address with a control or format (zero-width) character, or one NFKC would change (the Kelvin sign,
+    full-width letters), gets no key, so no look-alike shares a rule with the real address."""
+    address = parseaddr(value if isinstance(value, str) else "")[1].strip()
+    if any(unicodedata.category(c)[0] == "C" for c in address) or unicodedata.normalize("NFKC", address) != address:
+        return None
+    address = address.translate(_ASCII_LOWER)
     return address if "@" in address and not any(c.isspace() for c in address) else None
 
 
-def _data(value: Any, cap: int) -> str:
-    """Untrusted text for the MAIL block, capped. Angle brackets become look-alikes so no mail can close the block.
-    TODO(#206): use tilo_providers.prompts.neutralise_marker once PR #206 lands."""
-    text = ", ".join(map(str, value)) if isinstance(value, list) else str(value or "")
-    return text[:cap].translate({ord("<"): "‹", ord(">"): "›"})
+def _render(value: Any, *, header: bool) -> str:
+    """Untrusted mail text exactly as the screen and (capped) the model see it. NFKC first, so no full-width or
+    small-form look-alike survives; then `<` and `>` become look-alikes, so no mail can open or close the MAIL block.
+    A header folds control and line-separator characters to a space, so it cannot forge another header line.
+    TODO(#206): share tilo_providers.prompts.neutralise_marker once PR #206 lands."""
+    if isinstance(value, list):
+        value = ", ".join(v for v in value if isinstance(v, str))
+    text = unicodedata.normalize("NFKC", value if isinstance(value, str) else "")
+    if header:
+        text = "".join(" " if unicodedata.category(c) in ("Cc", "Zl", "Zp") else c for c in text)
+    return text.translate(_ANGLES)
 
 
 def _parse(text: str | None) -> tuple[str, str] | None:
@@ -103,7 +119,7 @@ def _result(message_id: str, doc: Mapping[str, Any]) -> TriageResult:
     return TriageResult(
         message_id=message_id,
         category=label or doc["category"],
-        priority=doc.get("label_priority") or doc["priority"],
+        priority=(None if doc["flagged"] else doc.get("label_priority")) or doc["priority"],  # flagged stays high
         source="user" if label else doc["source"],
         flagged=doc["flagged"],
     )
@@ -141,40 +157,45 @@ class Triage:
 
     def _decide(self, user_id: str, mail: Mapping[str, Any]) -> dict[str, Any]:
         sender = bare_address(mail.get("from"))
-        screened = "\n".join(str(mail.get(k) or "") for k in ("from", "to", "cc", "subject", "body"))
+        fields = {
+            name: _render(mail.get("from" if name == "sender" else name), header=name != "body") for name in FIELD_CAPS
+        }
         doc: dict[str, Any] = {"sender": sender, "triaged_at": self._clock(), "flagged": False}
-        if self._safety.check(screened)["flagged"]:  # raises: nothing stored, nothing emitted (fail closed)
-            return {**doc, "category": "suspicious", "priority": "high", "source": "safety", "flagged": True}
+        flagged = {"category": "suspicious", "priority": "high", "source": "safety", "flagged": True}
+        if self._safety.check("\n".join(fields.values()))["flagged"]:  # raises: nothing stored or emitted
+            return {**doc, **flagged}
+        category, priority, source = self._ask(fields)  # always asked, even for a ruled sender (BQ-132)
+        if source == "safety":
+            return {**doc, **flagged}
         prefs = self._preferences.get(user_id) or {}
         rule = ((prefs.get("senders") or {}).get(sender) or {}) if sender else {}
-        vip = sender is not None and sender in (prefs.get("vips") or ())
-        rule_category = _pick(rule.get("category"), CATEGORIES)
-        rule_priority = "high" if vip else _pick(rule.get("priority"), PRIORITIES)  # BQ-134
-        if rule_category and rule_priority:  # the user already decided both: no model call
-            category, priority, source = rule_category, rule_priority, "rule"
-        else:
-            answer = self._ask(mail)
-            category, priority, source = (*answer, "model") if answer else (*FALLBACK, "fallback")
-            if rule_category:
-                category, source = rule_category, "rule"
-            priority = rule_priority or priority
-        if rule.get("muted") is True and category == "needs_reply":  # "don't ask me about these" (BQ-133)
-            category, source = "fyi", "rule"
+        if category != "suspicious":  # no rule or mute downgrades the model's suspicious (BQ-132)
+            rule_category = _pick(rule.get("category"), CATEGORIES)
+            category, source = (rule_category, "rule") if rule_category else (category, source)
+            priority = _pick(rule.get("priority"), PRIORITIES) or priority
+            if rule.get("muted") is True and category == "needs_reply":  # "don't ask me about these" (BQ-133)
+                category, source = "fyi", "rule"
+        if sender is not None and sender in (prefs.get("vips") or ()):  # BQ-134: a VIP only raises priority
+            priority = "high"
         return {**doc, "category": category, "priority": priority, "source": source}
 
-    def _ask(self, mail: Mapping[str, Any]) -> tuple[str, str] | None:
-        fields = {name: _data(mail.get("from" if name == "sender" else name), cap) for name, cap in FIELD_CAPS.items()}
+    def _ask(self, fields: Mapping[str, str]) -> tuple[str, str, str]:
+        capped = {name: text[: FIELD_CAPS[name]] for name, text in fields.items()}
         request = GenerateRequest(
             system=self._system,
-            prompt=load_prompt(ROLE, "triage_task.md", fields),
+            prompt=load_prompt(ROLE, "triage_task.md", capped),
             json_mode=True,
             max_output_tokens=64,
         )
-        response = self._model.generate(request)  # raises: nothing stored, nothing emitted
+        response: GenerateResponse | None = self._model.generate(request)  # raises: nothing stored or emitted
+        if response is None:  # the Router's own screen blocked the call (safety_blocked): a flag (BQ-135)
+            _LOG.info("triage flagged: safety_blocked")
+            return "suspicious", "high", "safety"
         answer = None if response.tool_calls else _parse(response.text)
         if answer is None:
             _LOG.info("triage fallback: %s", "tool_call" if response.tool_calls else "unusable_answer")
-        return answer
+            return (*FALLBACK, "fallback")
+        return (*answer, "model")
 
     # --- the user's own corrections: the only writers of preferences (PRD 11.3 Learning) ---
 
@@ -201,13 +222,13 @@ class Triage:
             raise ValueError("unknown priority")
         doc = self._stored(user_id, message_id)
         change = {k: v for k, v in (("category", category), ("priority", priority)) if v is not None}
-        if doc.get("sender"):  # the latest correction for an address wins; a relabel ends a mute
-            self._update_rule(user_id, doc["sender"], change, drop="muted" if category else None)
         if category:
             doc["label"] = category
         if priority:
             doc["label_priority"] = priority
-        self._results.put(user_id, message_id, doc)
+        self._results.put(user_id, message_id, doc)  # the label first: a failed put leaves no rule without it
+        if doc.get("sender"):  # the latest correction for an address wins; a relabel ends a mute
+            self._update_rule(user_id, doc["sender"], change, drop="muted" if category else None)
 
     def mute(self, user_id: str, message_id: str) -> None:
         sender = self._stored(user_id, message_id).get("sender")

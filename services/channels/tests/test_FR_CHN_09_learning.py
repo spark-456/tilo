@@ -197,5 +197,8 @@ def test_FR_CHN_09_property_later_mail_follows_the_latest_correction_else_the_mo
     for sender in _SENDERS:
         later, _ = rig.mail(sender=sender.upper(), reply=answer(model_category, model_priority))
         result = rig.svc.triage(USER, later.message_id)
+        if model_category == "suspicious":  # security r1: a rule never downgrades the model's suspicious (BQ-132)
+            assert (result.category, result.source) == ("suspicious", "model")
+            continue
         assert result.category == expected.get(sender, model_category)
         assert result.source == ("rule" if sender in expected else "model")

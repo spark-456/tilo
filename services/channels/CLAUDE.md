@@ -26,7 +26,7 @@ channel identity binding, Email Autopilot triage. Public ingress for signature-v
   non-JSON 400; handler raises: claim kept (at-most-once), 200 "failed". App secret >= 32 bytes; wamids
   never logged (`message_ref`); object, field and `phone_number_id` pinned.
 - `keywords`: whole-message, case-insensitive, bound numbers only; control-plane effect, then one confirmation or "Could not apply that".
-- `triage` (FR-CHN-09, BQ-130-138): safety flag > user label/rule/VIP/mute > model; mail only as prompt data, no tools.
+- `triage` (FR-CHN-09, BQ-130-138): flag > user label > model suspicious > rule/VIP/mute > model; mail only as prompt data, no tools.
 - `links` (FR-CHN-07; BQ-76 to BQ-82): HMAC-SHA256 (`compare_digest`, prefix `tilo-link-v1|`), segments
   alphabet-checked before the MAC; key ring live; nonce consumed last. Answer only plain needs_you cards
   listing email (fail closed); gate, consent, meeting open signed in. HTTP: `answer` needs a POST confirm;
