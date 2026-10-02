@@ -128,9 +128,17 @@ class OAuthSettings:
     redirect_base_url: str = "http://localhost:8080"
 
     def __post_init__(self) -> None:
-        url = urlsplit(self.redirect_base_url)
+        base = self.redirect_base_url
+        try:
+            url = urlsplit(base)
+            _ = url.port  # a bad port raises ValueError
+        except ValueError:
+            raise ValueError("the redirect base URL is not a valid URL") from None
         if url.scheme != "https" and not (url.scheme == "http" and url.hostname in _LOOPBACK_HOSTS):
             raise ValueError("the redirect base URL must be https (http is only for localhost)")
+        plain = bool(url.hostname) and "@" not in url.netloc and not any(c in base for c in "?#")
+        if not plain or any(c.isspace() for c in base):
+            raise ValueError("the redirect base URL needs a host and no user, query, fragment or spaces")
 
     @property
     def redirect_uri(self) -> str:
@@ -235,6 +243,16 @@ def _ulid(now: str) -> str:
     return "".join(_CROCKFORD[(value >> shift) & 31] for shift in range(125, -1, -5))
 
 
+def _ulid_seconds(ulid: str) -> float:
+    """The creation time a ULID carries (its first ten characters are milliseconds), or 0 if malformed."""
+    value = 0
+    for ch in ulid[:10]:
+        if ch not in _CROCKFORD:
+            return 0.0
+        value = value * 32 + _CROCKFORD.index(ch)
+    return value / 1000
+
+
 class TokenBroker:
     def __init__(
         self,
@@ -271,14 +289,22 @@ class TokenBroker:
         `before_established` runs once the record is stored, just before connection.established."""
         access, refresh, scopes, lifetime = parse_token_body(token_response, need_scope=True)
         with self._lock(user_id, connector):
+            previous = self._store.get(user_id, connector)
             if not refresh:
-                refresh = (self._readable(user_id, connector, self._store.get(user_id, connector)) or {}).get(
-                    "refresh_token"
-                )
+                refresh = (self._readable(user_id, connector, previous) or {}).get("refresh_token")
             self._put_connected(user_id, connector, access, refresh, scopes or [], lifetime)
-        if before_established is not None:
-            before_established()
-        self._emit_part("connection.established", user_id, connector)
+        try:
+            if before_established is not None:
+                before_established()
+            self._emit_part("connection.established", user_id, connector)
+        except Exception:
+            # Not recorded as established, so not connected: put back what was there before (or nothing).
+            with self._lock(user_id, connector):
+                if previous is None:
+                    self._store.delete(user_id, connector)
+                else:
+                    self._store.put(user_id, connector, previous)
+            raise
 
     def access_token_for_adapter(self, user_id: str, connector: str, *, required_scopes: Iterable[str]) -> str:
         """The one call that returns a plaintext token; refreshes first when it is about to expire."""
@@ -303,6 +329,17 @@ class TokenBroker:
         if record is None or record.get("state") != "connected":
             return frozenset()
         return frozenset(record.get("scopes", []))
+
+    def has_live_grant(self, user_id: str, *, excluding: str | None = None) -> bool:
+        """True when the user has a connected, readable record for any connector (but `excluding`). Every
+        Google connector shares one OAuth client and one grant per account, so revoking a token there ends
+        all of them (CON-D10)."""
+        for other in self._store.connectors_of(user_id):
+            record = self._store.get(user_id, other)
+            if other != excluding and record and record.get("state") == "connected":
+                if self._readable(user_id, other, record) is not None:
+                    return True
+        return False
 
     def connection_state(self, user_id: str, connector: str) -> str | None:
         record = self._store.get(user_id, connector)
@@ -331,8 +368,17 @@ class TokenBroker:
         done, now = 0, parse_ts(self._clock())
         for key in self._retry.connectors_of(user_id):
             record = self._retry.get(user_id, key) or {}
-            token = (self._readable(user_id, key, record, kind="revoke") or {}).get("token")
-            age = (now - parse_ts(record["created_at"])).total_seconds() if "created_at" in record else None
+            moved = record.get("sealed_as") == "token"  # the original ciphertext, kept as it was
+            age: float | None
+            if moved:
+                payload = self._readable(user_id, str(record.get("connector")), record)
+                token = (payload or {}).get("refresh_token") or (payload or {}).get("access_token")
+                age = now.timestamp() - _ulid_seconds(key)  # the key's own time: the record's is unbound
+            else:
+                token = (self._readable(user_id, key, record, kind="revoke") or {}).get("token")
+                age = (now - parse_ts(record["created_at"])).total_seconds() if "created_at" in record else None
+            if moved and not token and age is not None and age <= self._retention:
+                continue  # the KMS may be back later: keep it until the retention ends
             if not token or age is None or age > self._retention:
                 self._retry.delete(user_id, key)
                 _log.warning("a pending revoke for connector %r was dropped unrevoked", record.get("connector"))
@@ -444,21 +490,32 @@ class TokenBroker:
             payload = self._readable(user_id, connector, record) or {}
             token = payload.get("refresh_token") or payload.get("access_token")
             error: str | None = None
-            if record.get("state") == "connected" and not token:
+            if keep_retry and self.has_live_grant(user_id, excluding=connector):  # not in delete_user
+                # Google keeps one grant for every connector of this client; revoking it here would end
+                # the others while Tilo still shows them connected (CON-D10). The last one revokes it.
+                token = None
+            elif record.get("state") == "connected" and not token:
                 error = "the stored record could not be read"
             elif token:
                 error = self._revoke(str(token))
             if error is not None:
                 _log.warning("revoke at the provider failed for connector %r: %s", connector, error)
                 # Sealed and stored before the record is deleted: a KMS failure here leaves the record.
-                self._keep_revoke_for_retry(user_id, connector, token if keep_retry else None)
+                unread = record if keep_retry and not token and "ciphertext" in record else None
+                self._keep_revoke_for_retry(user_id, connector, token if keep_retry else None, unread)
             self._store.delete(user_id, connector)
         self._emit_part("connection.revoked", user_id, connector)
         return DisconnectResult(error is None and token is not None, error)
 
-    def _keep_revoke_for_retry(self, user_id: str, connector: str, token: Any) -> None:
-        """Keep the token still to be revoked sealed, keyed by its alert id, and raise alert.raised."""
+    def _keep_revoke_for_retry(
+        self, user_id: str, connector: str, token: Any, unread: dict[str, Any] | None = None
+    ) -> None:
+        """Keep the token still to be revoked sealed, keyed by its alert id, and raise alert.raised.
+        `unread` is a record the KMS could not decrypt: its ciphertext moves over unchanged."""
         alert_id = _ulid(self._clock())
+        if not token and unread is not None:
+            moved = {**unread, "alert_id": alert_id, "connector": connector, "created_at": self._clock()}
+            self._retry.put(user_id, alert_id, {**moved, "sealed_as": "token"})
         if token:
             created = self._clock()
             bind = [alert_id, connector, created]

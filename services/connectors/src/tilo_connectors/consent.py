@@ -226,10 +226,11 @@ class ConsentService:
         return {scope: " ".join(texts) for scope, texts in lines.items()}
 
     def _discard(self, user_id: str, connector: str, response: Mapping[str, Any]) -> None:
-        """Revoke tokens that will not be kept. Skipped when the user already has a grant: Google shares
-        the grant between tokens, so revoking would take the existing connection down with them."""
+        """Revoke tokens that will not be kept. Skipped when the user has a connected connector: every
+        Google connector shares one OAuth client and one grant (include_granted_scopes), so revoking
+        these tokens would end that connection at Google while Tilo still shows it connected (CON-D10)."""
         token = response.get("refresh_token") or response.get("access_token")
-        if not isinstance(token, str) or self._broker.granted_scopes(user_id, connector):
+        if not isinstance(token, str) or self._broker.has_live_grant(user_id):
             return
         answer = post_form(self._http, REVOKE_URL, {"token": token})
         if answer is None or answer[0] != 200:

@@ -265,13 +265,13 @@ def test_FR_CON_02_delete_user_drops_the_sealed_token_when_the_revoke_still_fail
     alerts: list[dict] = []
     retry_store = InMemoryTokenStore()
     broker = broker_with(env, alert=alerts.append, retry_store=retry_store)
-    broker.store_tokens(OWNER, "gmail", env.google.token_response([GMAIL_READONLY]))
     broker.store_tokens(OTHER, "gmail", env.google.token_response([GMAIL_READONLY]))
     env.google.revoke_mode = "network"
-    # An earlier failed disconnect left a sealed retry behind.
+    # An earlier failed disconnect left a sealed retry behind (the only connector then, so it revokes).
     broker.store_tokens(OWNER, "google_drive", env.google.token_response([DRIVE_FILE]))
     broker.disconnect(OWNER, "google_drive")
     assert len(retry_store.connectors_of(OWNER)) == 1
+    broker.store_tokens(OWNER, "gmail", env.google.token_response([GMAIL_READONLY]))
     alerts.clear()
 
     broker.delete_user(OWNER)

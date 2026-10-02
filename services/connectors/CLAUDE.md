@@ -37,4 +37,4 @@ outbox for every side effect. The only service that can decrypt user OAuth token
 - Tokens: AES-GCM under a per-record data key wrapped by a `Kms` (`FakeKms` in dev; `CloudKms` is
   unexercised until billing). Only `tokens.py` and `adapters/` call `access_token_for_adapter`; no
   other service imports `tilo_connectors.tokens` (SEC-02). `delete_user` leaves no token in any store
-  (CON-D4). Consent state and the revoke-retry store are in memory.
+  (CON-D4). Google keeps one grant per client: never revoke while another connector is connected (CON-D10). Consent state and the revoke-retry store are in memory.
