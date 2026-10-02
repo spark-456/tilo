@@ -82,8 +82,11 @@ No new licence.
 
 ## Python (`services/render`)
 
-`tilo-render` (AGR-01 / FR-CON-09) declares `pydantic` as a direct runtime dependency, already
-listed above under `packages/contracts-py` (MIT). No new licence.
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| python-pptx | MIT | https://pypi.org/project/python-pptx/ |
+
+`tilo-render` (AGR-01/02 / FR-CON-09) also uses `pydantic` (already listed under `packages/contracts-py`, MIT) and `pyyaml` (already listed under the root dev dependency group, MIT).
 
 ## JavaScript / TypeScript (root `package.json` and `apps/web`, `pnpm`-managed)
 

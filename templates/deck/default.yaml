@@ -1,0 +1,31 @@
+slide_size:
+  width_in: 13.333
+  height_in: 7.5
+
+table:
+  rows_per_slide: 10
+
+colors:
+  title_background: brand.primary
+  title_text: surface.1
+  title_subtext: surface.0
+  section_background: surface.0
+  section_title: brand.primary
+  slide_background: surface.1
+  slide_header: ink.1
+  slide_text: ink.1
+  table_header_bg: brand.primary
+  table_header_fg: surface.1
+  table_row_bg: surface.1
+  table_row_fg: ink.1
+
+typography:
+  title_size_pt: 40
+  subtitle_size_pt: 20
+  section_title_size_pt: 36
+  slide_title_size_pt: 24
+  body_size_pt: 16
+  bullet_size_pt: 16
+  table_header_size_pt: 14
+  table_body_size_pt: 12
+  chart_title_size_pt: 18
