@@ -49,15 +49,19 @@ _WEB_CHANNELS = ("web", "mobile_web")
 _STATUS = {"card_not_found": 404, "forbidden": 403}  # AnswerResult.reason -> HTTP status; others are 400
 
 
-def _alert_id(card_id: str) -> str:
-    """A ulid of its own for the timeout nudge, derived from the card id so a retry reuses it and
-    it never collides with an alert the harness raised under the card's id."""
-    n = int.from_bytes(hashlib.sha256(f"{card_id}:timeout".encode()).digest(), "big") % 32**25
+def _derived_id(seed: str) -> str:
+    """A ulid derived from `seed`: the same seed always gives the same id."""
+    n = int.from_bytes(hashlib.sha256(seed.encode()).digest(), "big") % 32**25
     chars = []
     for _ in range(25):
         n, r = divmod(n, 32)
         chars.append(_CROCKFORD[r])
     return "0" + "".join(chars)
+
+
+def _alert_id(card_id: str) -> str:
+    """The timeout nudge's own id: a retry reuses it and it never collides with an alert the harness raised."""
+    return _derived_id(f"{card_id}:timeout")
 
 
 def _parse_ts(ts: str) -> datetime.datetime:
@@ -164,6 +168,7 @@ class _Record:
     deadline: datetime.datetime
     group: _Group
     status: str = "open"  # "open" | "resolved" -- a held gate/consent stays "open"
+    attempt: tuple[tuple, dict] | None = None  # (who and what, part) of a write that raised: a retry resends it
 
     @property
     def kind(self) -> str:
@@ -290,6 +295,10 @@ class CardStore:
         part: dict[str, Any] = {"type": type_, "data": data, "authz": authz, "world_id": record.world_id}
         part |= {"card_id": record.card["id"], "district": record.district, "owner_only": record.district is None}
         part["vis"] = [record.district] if record.district else None
+        # One id per card resolution (card, event type, option), so a retry after a commit-then-raise is an identical
+        # resend the writer dedupes (FR-HIL-07, #155), never a second event. A question's data holds no option, so a
+        # question never gets two ids.
+        part["event_id"] = _derived_id(f"{record.world_id}:{record.card['id']}:{type_}:{data.get('option', '')}")
         if severity:
             part["severity"] = severity
         return part
@@ -361,8 +370,11 @@ class CardStore:
             if tier_t3 and channel == "whatsapp" and option == "approve" and not pin_verified:
                 return AnswerResult("rejected", "pin_required", ())
 
+            who = (option, channel, principal.user_id, pin_verified)
             authz = {"by": "person", "ref": principal.user_id, "at": self._clock.now()}
-            if record.kind == "gate":
+            if record.attempt is not None and record.attempt[0] == who:
+                part: dict | None = record.attempt[1]  # this answer again after a write that raised: resend it as is
+            elif record.kind == "gate":
                 # CR-07: only approve opens a gate and writes approval.resolved; edit and hold write nothing.
                 data = {"gate_id": card["gate"]["id"], "card_id": card_id, "outbox_id": record.outbox_id}
                 data |= {"option": option, "channel": channel, "pin_verified": pin_verified}
@@ -378,18 +390,19 @@ class CardStore:
             if part is None:
                 return AnswerResult("answered", None, ())
             record.group.resolving = True  # exactly one resolution per card: later answers and tick see this
-        self._write_then_close(record.group, part)
+        self._write_then_close(record, who, part)
         return AnswerResult("answered", None, (part,))
 
-    def _write_then_close(self, group: _Group, part: dict) -> None:
+    def _write_then_close(self, record: _Record, who: tuple, part: dict) -> None:
         try:
             self._writer.write(part)  # outside the lock; a failed write leaves the card open
         except BaseException:
             with self._lock:
-                group.resolving = False
+                record.group.resolving = False
+                record.attempt = (who, part)  # it may have committed: the same answer resends this exact part
             raise
         with self._lock:
-            self._resolve_group(group)
+            self._resolve_group(record.group)
 
     # -- timeouts -------------------------------------------------------------
 

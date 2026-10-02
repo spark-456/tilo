@@ -144,7 +144,7 @@ class Run:
             part["type"], authz["ref"] if authz else "system", data.get("gate_id", self.world_id),
             f"The gate card was answered: {data.get('option', 'default')}.", data, district=part["district"],
             cause=requested and requested["id"], authz=authz, vis=part["vis"], severity=part.get("severity"),
-            check_pause=False,
+            check_pause=False, event_id=part["event_id"],  # one id per resolution: a retry is an identical resend
         )  # fmt: skip
         if part["type"] == "approval.resolved":
             self.resolved[card_id] = committed
