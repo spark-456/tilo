@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 from typing import Protocol
 
-from tilo_channels.whatsapp import InboundMessage, mask_number
+from tilo_channels.whatsapp import InboundMessage, Sender, mask_number
 
 log = logging.getLogger("tilo_channels.keywords")
 
@@ -31,10 +31,6 @@ class Controls(Protocol):
     def stop_all_autopilot(self, user_id: str, *, channel: str) -> int: ...
     def pause_all(self, user_id: str, *, channel: str) -> None: ...
     def unsubscribe_whatsapp(self, user_id: str) -> None: ...
-
-
-class Sender(Protocol):
-    def send_text(self, to: str, body: str) -> None: ...
 
 
 @dataclass(frozen=True)

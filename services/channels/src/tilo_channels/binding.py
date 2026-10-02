@@ -27,7 +27,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from tilo_channels.whatsapp import mask_number
+from tilo_channels.whatsapp import Sender, mask_number
 
 log = logging.getLogger("tilo_channels.binding")
 
@@ -39,6 +39,7 @@ MIN_HASH_KEY_BYTES = 32
 # `send_caps`: the HTTP route must pass SEND_CAPS (the FR-CHN-03 acceptance tests start uncapped).
 SEND_CAPS: dict[str, tuple[tuple[int, int], ...]] = {"n": ((3600, 3), (86400, 10)), "u": ((3600, 5), (86400, 20))}
 OPT_IN_EVERY_S = 600
+_CAP_SCOPES = ("n", "u")
 _STRIP = str.maketrans("", "", " -.()")
 
 
@@ -65,10 +66,6 @@ class BindingStore(Protocol):
     def put(self, key: str, value: dict[str, Any]) -> None: ...
     def create(self, key: str, value: dict[str, Any]) -> bool: ...
     def delete(self, key: str) -> None: ...
-
-
-class Sender(Protocol):
-    def send_text(self, to: str, body: str) -> object: ...
 
 
 @dataclass(frozen=True)
@@ -110,7 +107,12 @@ class BindingService:
         self._sender = sender
         self._clock = clock
         self._key = hash_key
-        self._caps = send_caps or {}
+        caps = {} if send_caps is None else dict(send_caps)
+        if unknown := sorted(set(caps) - set(_CAP_SCOPES)):
+            raise ValueError(f"send_caps keys must be 'n' or 'u', got {unknown}")
+        if any(window < 1 or limit < 1 for pairs in caps.values() for window, limit in pairs):
+            raise ValueError("send_caps windows and limits must be at least 1")
+        self._caps = caps
 
     # --- web app ---------------------------------------------------------------------------------
 
@@ -118,12 +120,14 @@ class BindingService:
         wa_id = normalise_number(number)
         if wa_id is None:
             return _refused("invalid_number")
+        if not self._claim_send("u", user_id):  # first: every start counts, so a capped user learns nothing
+            return _refused("rate_limited")  # the pending code, if any, and its attempts stay as they are
         number_hash = self._mac("number", wa_id)
         owner = self._owner(number_hash)
         if owner is not None and owner != user_id:
             return _refused("number_taken")
-        if not self._claim_send(user_id, number_hash):
-            return _refused("rate_limited")  # the pending code, if any, and its attempts stay as they are
+        if not self._holds(number_hash, user_id) and not self._claim_send("n", number_hash):
+            return _refused("rate_limited")  # the number's holder, even a lapsed one, is not locked out by others
         code = f"{secrets.randbelow(1_000_000):06d}"
         pid = secrets.token_hex(8)
         pending = {
@@ -267,14 +271,13 @@ class BindingService:
         if self._holds(number_hash, user_id):
             self._store.delete(f"num:{number_hash}")
 
-    def _claim_send(self, user_id: str, number_hash: str) -> bool:
-        """Claims one slot in each SEC-10 send window; refused (claiming nothing) when any window is full."""
+    def _claim_send(self, scope: str, ident: str) -> bool:
+        """Claims one slot in each SEC-10 window of a scope ("n" number, "u" user); claims nothing when full."""
         now = self._clock()
         windows = []
-        for scope, ident in (("n", number_hash), ("u", user_id)):
-            for window, limit in self._caps.get(scope, ()):
-                bucket = int(now // window)
-                windows.append((f"cap:{scope}:{ident}:{window}:{bucket}", limit, (bucket + 1) * window))
+        for window, limit in self._caps.get(scope, ()):
+            bucket = int(now // window)
+            windows.append((f"cap:{scope}:{ident}:{window}:{bucket}", limit, (bucket + 1) * window))
         if any(self._store.get(f"{prefix}:{limit - 1}") is not None for prefix, limit, _ in windows):
             return False
         for prefix, limit, expires_at in windows:

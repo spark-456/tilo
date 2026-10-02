@@ -58,6 +58,12 @@ class WebhookResponse:
     outcomes: tuple[MessageOutcome, ...]
 
 
+class Sender(Protocol):
+    """The one outbound text port (the WhatsApp sender in production); binding, inbound, cards and keywords use it."""
+
+    def send_text(self, to: str, body: str) -> object: ...
+
+
 def mask_number(number: str) -> str:
     """Last four digits only, for logs."""
     return "***" + number[-4:]
