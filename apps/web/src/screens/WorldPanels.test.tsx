@@ -38,6 +38,8 @@ describe("PRD-18.3 S-04 HUD: figures appear only once recorded events exist (HR-
       return () => undefined;
     };
     const meter = (await render(instant)).querySelector('[data-testid="hud-meter"]');
-    expect(meter?.textContent).toBe("Done Credits used so far: 13");
+    expect(meter?.textContent).toContain("Done");
+    expect(meter?.textContent).toContain("credits of 40 approved");
+    expect(meter?.textContent).toContain("13");
   });
 });

@@ -21,9 +21,35 @@ export async function visit(page: Page, path: string, name: string, check: () =>
     // People read names, never machine ids (the run reference HR-4 asks for is the one exception).
     const text = (await page.getByTestId("screen-page").innerText()).replace("village_basic_1", "");
     expect(text).not.toMatch(/\b[a-z]+_[a-z0-9_]+\b|\b[A-Z]_[a-z0-9]+\b/);
+    await expectTypeScale(page);
   }
   const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag22aa"]).analyze();
   expect(axe.violations).toEqual([]);
+}
+
+/** PRD 18.2: every text size on the screen is on the 12/14/16/20/24/32/40 px scale, and the page
+ * title is above the section titles, which are above the row text, measured not eyeballed. */
+export async function expectTypeScale(page: Page) {
+  const sizes = await page.getByTestId("screen-page").evaluate((root) => {
+    const used = new Set<number>();
+    for (const el of root.querySelectorAll<HTMLElement>("*")) {
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent?.trim());
+      if (own) used.add(Number.parseFloat(getComputedStyle(el).fontSize));
+    }
+    const px = (sel: string) => {
+      const el = root.querySelector(sel);
+      return el ? Number.parseFloat(getComputedStyle(el).fontSize) : 0;
+    };
+    return {
+      used: [...used],
+      h1: px("h1"),
+      h2: px(".screen-section h2, .world-card h2"),
+      row: px(".bitem-main b, .world-body .bitem-sub"),
+    };
+  });
+  for (const size of sizes.used) expect([12, 14, 16, 20, 24, 32, 40], `${size}px`).toContain(size);
+  expect(sizes.h1).toBeGreaterThan(sizes.h2);
+  if (sizes.row) expect(sizes.h2).toBeGreaterThan(sizes.row);
 }
 
 /** A placeholder button is visible and titled "Coming soon" (its aria-disabled is checked by
