@@ -1,18 +1,18 @@
 // PRD 18.3 flow routes on the History API, no dependency: / S-01, /task/:id/understanding S-02,
-// /task/:id/approaches S-03, /world/:id S-04, /world/:id/delivery S-12. Anything else is Start.
+// /task/:id/approaches S-03, /world/:id S-04. Anything else is Start here; routes.tsx owns every
+// other screen (S-12 /world/:id/delivery included) and "Not found" under /world/ and /task/.
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
-export type FlowScreen = "Start" | "Understanding" | "Approaches" | "World" | "Delivery";
+export type FlowScreen = "Start" | "Understanding" | "Approaches" | "World";
 
 export type FlowRoute =
   | { readonly screen: "Start" }
   | { readonly screen: "Understanding" | "Approaches"; readonly taskId: string }
-  | { readonly screen: "World" | "Delivery"; readonly worldId: string };
+  | { readonly screen: "World"; readonly worldId: string };
 
 const ROUTES = [
   { re: /^\/task\/([^/]+)\/understanding\/?$/, screen: "Understanding", key: "taskId" },
   { re: /^\/task\/([^/]+)\/approaches\/?$/, screen: "Approaches", key: "taskId" },
-  { re: /^\/world\/([^/]+)\/delivery\/?$/, screen: "Delivery", key: "worldId" },
   { re: /^\/world\/([^/]+)\/?$/, screen: "World", key: "worldId" },
 ] as const;
 
@@ -24,7 +24,7 @@ export function matchFlowRoute(pathname: string): FlowRoute {
       const id = decodeURIComponent(raw);
       return key === "taskId"
         ? { screen: screen as "Understanding" | "Approaches", taskId: id }
-        : { screen: screen as "World" | "Delivery", worldId: id };
+        : { screen: "World", worldId: id };
     } catch {
       return { screen: "Start" }; // a malformed escape such as %E0 is an unknown path, not a crash
     }

@@ -1,4 +1,5 @@
 import type { Brief, Card, Event, Layout } from "@tilo/contracts";
+import { parseSpeed } from "../world/speed";
 import type {
   ApproachesResult,
   ApprovalRequest,
@@ -27,10 +28,9 @@ export interface FixtureClientOptions {
   readonly speed?: number;
 }
 
-/** Same rule as the world replay in useWorldFixture.ts: a finite number above 0, else 1. */
+/** Same rule as the world replay in useWorldFixture.ts (HR-6): above 0 and clamped, else 1. */
 export function replaySpeedFromSearch(search: string): number {
-  const speed = Number(new URLSearchParams(search).get("speed"));
-  return Number.isFinite(speed) && speed > 0 ? speed : 1;
+  return parseSpeed(new URLSearchParams(search).get("speed"));
 }
 
 /** The longest delay setTimeout honours; a larger one fires at once. */
@@ -56,6 +56,12 @@ export class FixtureClient implements TiloClient {
   /** The replay speed this client plays at; every screen shows a badge when it is not 1 (HR-6). */
   get replaySpeed(): number {
     return this.speed;
+  }
+
+  /** The fixture world is the only one this client knows; any other id is "Not found", never a
+   * replay of the village (real clients answer unknown ids themselves). */
+  hasWorld(worldId: string): boolean {
+    return worldId === FIXTURE_WORLD_ID;
   }
 
   async submitIntake(_text: string, files: File[]): Promise<IntakeResult> {

@@ -11,14 +11,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
-import jsonschema
-
 from tilo_providers.config import ProvidersConfig
 from tilo_providers.errors import ProviderError, RequestError, SafetyError
 from tilo_providers.factory import build_provider
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider
 from tilo_providers.prompts import load_prompt, neutralise_marker
-from tilo_providers.schema_guard import unique_items_violations
+from tilo_providers.schema_guard import first_error, short
 
 ProviderFor = Callable[[str], ModelProvider]
 
@@ -89,17 +87,16 @@ class RouterResult:
 
 
 def schema_error(response: GenerateResponse, schema: dict[str, Any]) -> str | None:
-    """The validation error for `response` against `schema` (capped length), or None if it is valid."""
+    """The validation error for `response` against `schema` (capped length), or None if it is valid.
+    `uniqueItems` is linear (`schema_guard`, #124); a fed-back error never echoes a value whole."""
     try:
         instance = json.loads(response.text or "")
-        if violations := unique_items_violations(instance, schema):  # #124: before jsonschema's quadratic uniqueItems
-            path, problem = violations[0]
-            return f"{path}: {problem}"[:300]
-        jsonschema.validate(instance, schema)
-    except (ValueError, jsonschema.ValidationError) as error:
-        message = error.message if isinstance(error, jsonschema.ValidationError) else f"not valid JSON ({error})"
-        return message[:300]  # a validation error fed back in a repair prompt is capped
-    return None
+    except (ValueError, RecursionError) as error:  # RecursionError: nested too deeply to parse
+        return short(f"not valid JSON ({error})")
+    try:
+        return first_error(instance, schema)
+    except (ValueError, RecursionError):  # too deep to walk, or a number too long to print
+        return "/: the output could not be validated"
 
 
 def _usage(attempt: RouterAttempt, response: GenerateResponse) -> None:

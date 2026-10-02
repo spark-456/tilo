@@ -242,7 +242,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     }) => {
       await page.setViewportSize(viewport);
       await page.goto(`${path}?speed=20`);
-      await expect(page.getByTestId("speed-badge")).toHaveText("20×");
+      await expect(page.getByTestId("speed-badge")).toHaveText("Replay at 20× speed");
       await expect(page.getByTestId("speed-badge")).toBeVisible();
     });
   }
@@ -254,7 +254,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await page.getByRole("link", { name: "Trace" }).first().click();
     expect(page.url()).not.toContain("speed");
     await expect(page.getByRole("heading", { level: 1, name: "Trace" })).toBeVisible();
-    await expect(page.getByTestId("speed-badge")).toHaveText("20×");
+    await expect(page.getByTestId("speed-badge")).toHaveText("Replay at 20× speed");
   });
   test(`HR_6 no badge at the recorded pace at ${viewport.width}x${viewport.height}`, async ({
     page,

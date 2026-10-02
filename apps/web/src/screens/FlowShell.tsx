@@ -1,6 +1,7 @@
-// PRD 18.3 flow screens S-01, S-02, S-03, S-04 and S-12 as placeholders (heading, one primary
-// button to the next step) that AGW-02 to AGW-05 fill in. Every client call has loading, empty
-// and error states with a retry (PRD 18.4); one filled primary button per screen (UX-1).
+// PRD 18.3 flow screens S-01, S-02, S-03 and S-04 as placeholders (heading, one primary button to
+// the next step) that AGW-02 to AGW-05 fill in. S-12 (Delivery) is S_12.tsx, routed by routes.tsx.
+// Every client call has loading, empty and error states with a retry (PRD 18.4); one filled
+// primary button per screen (UX-1).
 import { type ReactNode, useEffect, useRef } from "react";
 import { useClient } from "../api/ClientProvider";
 import type { ApproachesResult } from "../api/client";
@@ -138,34 +139,6 @@ function World({ worldId }: { worldId: string }) {
   return <Primary label="View delivery" action={action} />;
 }
 
-function Delivery({ worldId }: { worldId: string }) {
-  const client = useClient();
-  const [remote, retry] = useRemote("load the delivery", () => client.getDelivery(worldId));
-  const action = useAction("start a new task", async () => "/");
-  return (
-    <>
-      <Loaded
-        what="the delivery"
-        remote={remote}
-        retry={retry}
-        isEmpty={(d) => d.artifacts.length === 0}
-      >
-        {(d) => (
-          <>
-            <Summary>Verified deliverables are ready at the Delivery Dock.</Summary>
-            <p className="flow-detail">
-              {d.artifacts.length} deliverable(s), {d.credits_used} credits used.
-              {d.time_saved &&
-                ` About ${d.time_saved.low_min} to ${d.time_saved.high_min} min saved (estimate).`}
-            </p>
-          </>
-        )}
-      </Loaded>
-      <Primary label="New task" action={action} />
-    </>
-  );
-}
-
 export function FlowShell() {
   const { route } = useFlowRoute();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -200,8 +173,6 @@ export function FlowShell() {
             <World worldId={route.worldId} />
           </>
         );
-      case "Delivery":
-        return <Delivery worldId={route.worldId} />;
     }
   })();
   return (
