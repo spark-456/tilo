@@ -7,7 +7,9 @@ Approve on a T3 gate first asks for the PIN: the next text from that number with
 checked, one try per tap, and only then is the answer sent with `pin_verified=True`. Typed text never
 answers a card option (BQ-56). Channels writes only `channel.message_out` and `channel.message_in`; the
 API emits `question.answered` and `approval.resolved`. Numbers and PINs are never logged, archived or
-put in events. Defaults the PRD leaves open are BQ-89.
+put in events. A digits-only text within PIN_GRACE_S after a prompt's window (or after its one try) is
+consumed as `pin_late`, never routed on or archived. Sent cards are kept, in memory, until RETAIN_S after
+their deadline, so late taps get an honest reply. Defaults the PRD leaves open are BQ-89.
 """
 
 from __future__ import annotations
@@ -25,6 +27,15 @@ from tilo_channels.whatsapp import InboundMessage, mask_number, message_ref
 log = logging.getLogger("tilo_channels.cards")
 
 PIN_WINDOW_S = 300
+PIN_GRACE_S = 300
+RETAIN_S = 3600
+UNKNOWN_TEXT = "Could not confirm your answer. Check the card in Tilo before tapping again."
+LATE_TEXT = "That PIN came too late. Tap Approve again."
+# Hold and Edit first answer a gate without resolving it (tilo-api, #157): the WhatsApp copy stays open.
+GATE_STAYS_OPEN = {
+    "hold": "Held. You can still approve here or in Tilo.",
+    "edit": "Sent back for edits. You can still approve here or in Tilo.",
+}
 CHANNEL = "whatsapp"
 
 
@@ -58,7 +69,7 @@ class CardBindings(Protocol):
 
 @dataclass(frozen=True)
 class SendResult:
-    outcome: str  # "sent" | "not_bound" | "not_whatsapp" | "expired"
+    outcome: str  # "sent" | "not_bound" | "not_whatsapp" | "expired" | "closed" | "failed"
     message_id: str | None
 
 
@@ -75,8 +86,10 @@ class _Sent:
     user_id: str
     number: str
     deadline: float
+    message_id: str
     open: bool = True
     labels: dict[str, str] = field(default_factory=dict)
+    buttons: list[str] = field(default_factory=list)
 
 
 _IGNORED = ReplyResult("ignored", None, None)
@@ -84,6 +97,8 @@ _IGNORED = ReplyResult("ignored", None, None)
 
 def _deadline(card: Mapping[str, Any]) -> float:
     created = dt.datetime.fromisoformat(str(card["created_at"]).replace("Z", "+00:00"))
+    if created.tzinfo is None:
+        raise ValueError("created_at has no offset")
     return created.timestamp() + float(card["timeout"])
 
 
@@ -118,7 +133,7 @@ class WhatsAppCards:
         self._lock = threading.Lock()
         self._sent: dict[str, _Sent] = {}  # card_id -> sent record
         self._buttons: dict[str, tuple[str, str]] = {}  # button id -> (card_id, option)
-        self._pin_prompts: dict[str, tuple[str, float]] = {}  # number -> (card_id, asked_at)
+        self._pin_prompts: dict[str, tuple[str, float, bool]] = {}  # number -> (card_id, asked_at, try left)
 
     def send_card(self, card: Mapping[str, Any], *, user_id: str) -> SendResult:
         if CHANNEL not in card.get("answer_channels", ()):
@@ -126,21 +141,41 @@ class WhatsAppCards:
         number = self._bindings.number_for(user_id)
         if number is None:
             return SendResult("not_bound", None)
-        deadline = _deadline(card)
-        if self._clock() >= deadline:
-            return SendResult("expired", None)
-        card_id = str(card["id"])
-        buttons = [(f"tc1.{secrets.token_urlsafe(18)}", str(o["label"])) for o in card["options"]]
-        link = f"{self._web_url}/worlds/{card['world_id']}/cards/{card_id}"
-        body = f"{card['what_happened']}\n{card['why_it_matters']}\n\nOpen in Tilo: {link}"
-        message_id = self._sender.send_buttons(number, body, buttons)
-        sent = _Sent(card, user_id, number, deadline, labels={o["id"]: o["label"] for o in card["options"]})
+        try:
+            deadline = _deadline(card)
+            card_id = str(card["id"])
+            options = [(str(o["id"]), str(o["label"])) for o in card["options"]]
+            link = f"{self._web_url}/worlds/{card['world_id']}/cards/{card_id}"
+            body = f"{card['what_happened']}\n{card['why_it_matters']}\n\nOpen in Tilo: {link}"
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            log.error("card not sendable error=%s", type(exc).__name__)
+            return SendResult("failed", None)
+        if not options or self._clock() >= deadline:
+            return SendResult("expired" if options else "failed", None)
+        with self._lock:
+            self._prune()
+            known = self._sent.get(card_id)
+        if known is not None and not known.open:
+            return SendResult("closed", None)  # never reopened by a re-send
+        if known is not None and (known.user_id, known.number) == (user_id, number):
+            return SendResult("sent", known.message_id)  # a retry never sends twice
+        buttons = [(f"tc1.{secrets.token_urlsafe(18)}", label) for _, label in options]
+        try:
+            message_id = self._sender.send_buttons(number, body, buttons)
+        except Exception as exc:
+            log.error("card send failed card=%s error=%s", card_id, type(exc).__name__)
+            return SendResult("failed", None)
+        sent = _Sent(card, user_id, number, deadline, message_id, labels=dict(options), buttons=[b for b, _ in buttons])
         with self._lock:
             self._sent[card_id] = sent
-            for (button_id, _), option in zip(buttons, card["options"], strict=True):
-                self._buttons[button_id] = (card_id, str(option["id"]))
-        ref = self._archive.record(card["run_id"], "whatsapp.card_out", {"channel": CHANNEL, "card_id": card_id})
-        self._event(card, "channel.message_out", "system", {"channel": CHANNEL, "message_ref": ref, "card_id": card_id})
+            for (button_id, _), (option, _) in zip(buttons, options, strict=True):
+                self._buttons[button_id] = (card_id, option)
+        try:
+            ref = self._archive.record(card["run_id"], "whatsapp.card_out", {"channel": CHANNEL, "card_id": card_id})
+            data = {"channel": CHANNEL, "message_ref": ref, "card_id": card_id}
+            self._event(card, "channel.message_out", "system", data)
+        except Exception as exc:  # the message went out; a retry must not send it again
+            log.error("card send record failed card=%s error=%s", card_id, type(exc).__name__)
         return SendResult("sent", message_id)
 
     def handle(self, message: InboundMessage) -> ReplyResult:
@@ -155,6 +190,7 @@ class WhatsAppCards:
 
     def card_closed(self, card_id: str, *, channel: str) -> bool:
         with self._lock:
+            self._prune()
             sent = self._sent.get(card_id)
             if sent is None or not sent.open:
                 return False
@@ -170,6 +206,7 @@ class WhatsAppCards:
 
     def _tap(self, message: InboundMessage, user_id: str, button_id: str) -> ReplyResult:
         with self._lock:
+            self._prune()
             found = self._buttons.get(button_id)
             sent = self._sent.get(found[0]) if found else None
         if found is None or sent is None:
@@ -182,31 +219,43 @@ class WhatsAppCards:
             return refused
         if _needs_pin(sent.card, option):
             with self._lock:
-                self._pin_prompts[message.sender] = (card_id, self._clock())
+                self._pin_prompts[message.sender] = (card_id, self._clock(), True)
             minutes = int(self._pin_window_s // 60)
             text = f"To approve, reply with your Tilo PIN within {minutes} minutes. Nothing happens until then."
             return self._refuse(message, "pin_required", card_id, option, text)
         return self._answer(message, sent, card_id, option, pin_verified=False)
 
     def _pin_reply(self, message: InboundMessage, user_id: str) -> ReplyResult:
+        text, now = (message.text or "").strip(), self._clock()
         with self._lock:
-            prompt = self._pin_prompts.pop(message.sender, None)
-            sent = self._sent.get(prompt[0]) if prompt else None
-        if prompt is None or sent is None or self._clock() >= prompt[1] + self._pin_window_s:
-            return _IGNORED
-        card_id = prompt[0]
+            self._prune()
+            prompt = self._pin_prompts.get(message.sender)
+            if prompt is None:
+                return _IGNORED
+            card_id, asked_at, try_left = prompt
+            sent = self._sent.get(card_id)
+            if try_left and now < asked_at + self._pin_window_s:
+                self._pin_prompts[message.sender] = (card_id, asked_at, False)  # one try per tap
+            elif now < asked_at + self._pin_window_s + PIN_GRACE_S and text.isascii() and text.isdigit():
+                sent = None  # a late or second PIN: consumed here, never routed on
+            else:
+                return _IGNORED
+        if sent is None:
+            return self._refuse(message, "pin_late", card_id, "approve", LATE_TEXT)
         if user_id != sent.user_id:
             return self._refuse(message, "forbidden", card_id, None, "This card was not sent to this number.")
         refused = self._closed_or_expired(message, sent, card_id, "approve")
         if refused is not None:
             return refused
         try:
-            verified = self._pins.verify(sent.user_id, (message.text or "").strip())
+            verified = self._pins.verify(sent.user_id, text)
         except Exception as exc:
             log.error("pin check failed card=%s error=%s", card_id, type(exc).__name__)
             return self._refuse(message, "failed", card_id, "approve", "Could not check the PIN. Tap Approve again.")
         if not verified:
             return self._refuse(message, "wrong_pin", card_id, "approve", "Wrong PIN. Nothing was approved.")
+        with self._lock:
+            self._pin_prompts.pop(message.sender, None)
         return self._answer(message, sent, card_id, "approve", pin_verified=True)
 
     def _closed_or_expired(self, message: InboundMessage, sent: _Sent, card_id: str, option: str) -> ReplyResult | None:
@@ -231,16 +280,19 @@ class WhatsAppCards:
             )
         except Exception as exc:
             log.error("card answer failed card=%s error=%s", card_id, type(exc).__name__)
-            return self._refuse(message, "failed", card_id, option, "Could not record your answer. Try again.")
+            return self._refuse(message, "failed", card_id, option, UNKNOWN_TEXT)  # it may have been recorded
         if getattr(result, "outcome", None) != "answered":
             if getattr(result, "reason", None) == "already_resolved":
                 sent.open = False
                 return self._refuse(message, "already_answered", card_id, option, "This card was already answered.")
             log.warning("card answer rejected card=%s reason=%s", card_id, getattr(result, "reason", None))
             return self._refuse(message, "rejected", card_id, option, "Tilo could not take that answer.")
-        sent.open = False
+        keep_open = sent.card.get("kind") == "gate" and option in GATE_STAYS_OPEN  # the gate is not resolved
+        if not keep_open:
+            sent.open = False
         self._record_answer(message, sent, card_id, option)
-        self._say(message.sender, f"Done: {sent.labels.get(option, option)}.")
+        receipt = GATE_STAYS_OPEN[option] if keep_open else f"Done: {sent.labels.get(option, option)}."
+        self._say(message.sender, receipt)
         return ReplyResult("answered", card_id, option)
 
     def _record_answer(self, message: InboundMessage, sent: _Sent, card_id: str, option: str) -> None:
@@ -261,6 +313,16 @@ class WhatsAppCards:
             self._event(card, "channel.message_in", sent.user_id, data)
         except Exception as exc:  # the API already recorded the answer; tell the person anyway
             log.error("card answer record failed card=%s error=%s", card_id, type(exc).__name__)
+
+    def _prune(self) -> None:
+        """Drops cards RETAIN_S past their deadline, their buttons and spent PIN prompts. Lock held."""
+        now = self._clock()
+        for card_id in [c for c, sent in self._sent.items() if now >= sent.deadline + RETAIN_S]:
+            for button_id in self._sent.pop(card_id).buttons:
+                self._buttons.pop(button_id, None)
+        grace = self._pin_window_s + PIN_GRACE_S
+        for number in [n for n, prompt in self._pin_prompts.items() if now >= prompt[1] + grace]:
+            del self._pin_prompts[number]
 
     # --- outbound -------------------------------------------------------------------------------------
 
