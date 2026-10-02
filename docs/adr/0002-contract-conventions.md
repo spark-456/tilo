@@ -224,14 +224,19 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     engine like any other side effect, so an L3 policy such as "auto-approve under 100 credits"
     can approve one (FR-INT-08). Before this change an unlisted action type failed closed to T3
     (BQ-44), and so did every grant. The table holds no credit amounts and its six modifiers are
-    fixed (BQ-16), so "under the run budget" is not a tier. The Treasury never raises a run's
-    budget above `caps.run_credits` (MT-03, PRD 17.3), whoever approves the grant. A policy grant
+    fixed (BQ-16), so "under the run budget" is not a tier. The Treasury must never raise a run's
+    budget above `caps.run_credits` (MT-03, PRD 17.3), whoever approves the grant, but
+    `Treasury.grant` does not enforce that ceiling yet (issue #51, decision 13). A policy grant
     also stays within the policy's `limits.per_day` and `limits.credits` (BQ-14, BQ-52).
     `limits.credits` keeps its BQ-14 meaning, a daily total, which also bounds each grant: under
-    "auto-approve under 100 credits" an 80-credit grant runs and a second one that day waits. Any
-    active modifier still makes a grant T3 (PI-07). `Treasury.grant` does not check the ceiling
-    yet (issue #51, decision 13). Until it does, the policy's own limits are the only bound on a
-    policy grant, and the per-user daily cap is the only bound on what the run then spends.
+    "auto-approve under 100 credits" an 80-credit grant runs and a second one that day waits.
+    `limits.credits` is optional in policy.schema.json, so an L3 `grant_budget` policy with
+    `limits.credits: null` has no credit bound at all today. Until `budget.py` gates a policy grant
+    when `limits.credits` is null or the grant would exceed `caps.run_credits` (issue #106 item 1),
+    nothing may call `request_budget_grant` without a person's own approval (for example FR-MTR-03
+    top-ups or a harness auto-start). Any active modifier makes a grant T3 in the table (PI-07),
+    but `request_budget_grant` does not pass a world's facts yet, so a modifier such as an
+    injection-flagged intake does not reach a grant until it does.
     A grant goes through no `tilo-connectors` connector. A policy's `scope.connectors` still needs
     at least one id, and the engine's proposal, `policy.applied` and an outbox entry each name a
     connector. For an action that goes through no connector, that id is the reserved `internal`.

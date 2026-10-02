@@ -5,10 +5,10 @@
 #
 # grant_budget (FR-INT-08, issue #64, ADR-0002 decision 14, BQ-75) is PRD 10.4's T1 example
 # "spend credits under the run budget": a budget grant that keeps the run within its run cap.
-# This table holds no credit amounts. The Treasury never raises a run's budget above the run cap
-# (`caps.run_credits` in config/metering.yaml, metering rule MT-03, PRD 17.3), whoever approves,
-# so no tier or policy can grant more (`Treasury.grant` does not enforce this yet, issue #51).
-# A policy grant also stays within the policy's own limits.
+# This table holds no credit amounts. The run cap (`caps.run_credits` in config/metering.yaml,
+# MT-03, PRD 17.3) must bound every grant, but `Treasury.grant` does not enforce it yet (issue
+# #51), and a policy with `limits.credits: null` has no credit bound (issue #106 item 1). Until
+# both are fixed, only a person's own approval may call the grant path (ADR-0002 decision 14).
 # A grant goes through no connector, so its connector id is the reserved `internal`.
 actions:
   create_draft: T1
