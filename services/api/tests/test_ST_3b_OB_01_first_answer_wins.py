@@ -19,6 +19,7 @@ from tilo_api.cards import CardStore
 W = "w_01"
 START = "2026-09-29T09:30:00.000Z"
 REFUSED = {"outcome": "rejected", "reason": "already_resolved"}
+BUSY = {"outcome": "rejected", "reason": "busy"}  # a write is in flight and may still fail: retryable
 
 # fixture, first option, another option, the channels the two answers come from, the event the first one writes
 CASES = {
@@ -91,7 +92,8 @@ def test_ST_3b_OB_01_answers_at_once_from_two_channels_write_one_resolution(kind
     for t in threads:
         t.join()
 
-    assert sorted(r.reason or "answered" for r in results) == ["already_resolved"] * (len(calls) - 1) + ["answered"]
+    assert [r.outcome for r in results].count("answered") == 1
+    assert all(r.reason in ("busy", "already_resolved") for r in results if r.outcome == "rejected")
     assert [p["type"] for p in writer.parts] == [written]
 
 
@@ -152,8 +154,9 @@ def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_at_once_from_w
     wait_for(lambda: run_flow.events("world.completed"), what="world.completed")
     run_flow.quiet_stream()
 
-    assert sorted(r.status_code for r in replies) == [200] + [400] * 7
-    assert all(r.json() == REFUSED for r in replies if r.status_code == 400)
+    assert sorted(r.status_code for r in replies).count(200) == 1  # the rest: 409 busy (in flight) or 400 refused
+    assert all(r.json() == (REFUSED if r.status_code == 400 else BUSY) for r in replies if r.status_code != 200)
+    assert len(replies) == 8 and {r.status_code for r in replies} <= {200, 400, 409}
     assert _count_sends(run_flow) == (1, 1, 1)
 
 

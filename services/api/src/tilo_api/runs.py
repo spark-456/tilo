@@ -24,7 +24,7 @@ from tilo_harness.validator import repo_validator
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps, events
-from tilo_api.cards import CardStore, _card_errors
+from tilo_api.cards import AlreadyCommitted, CardStore, _card_errors
 
 logger = logging.getLogger("tilo_api.runs")
 router = APIRouter()
@@ -107,6 +107,7 @@ class Run:
         self.sends: dict[str, dict[str, Any]] = {}  # outbox_id -> what its data.transfer needs
         self.titles: dict[str, str] = {}  # artifact_id -> the delivering unit's title
         self.delivered: list[str] = []  # artifact.delivered event ids
+        self._built: dict[str, dict] = {}  # event id -> the event as first built, resent as is on an exact retry
         self.failure: str | None = None
         self._failed = False
 
@@ -130,7 +131,24 @@ class Run:
             "credits": 0, "summary": summary[:140], "cause": kw.get("cause"), "vis": vis,
             "authz": kw.get("authz"), "data": data,
         }  # fmt: skip
-        return self.seams.writer.append(self.world_id, event)
+        if not kw.get("event_id"):
+            return self.seams.writer.append(self.world_id, event)
+        same = ("type", "actor", "target", "data", "authz", "cause")
+        first = self._built.get(event["id"])  # a retried id: an event with the same content is the first, as built
+        if first is not None and all(first[k] == event[k] for k in same + ("vis", "district", "severity")):
+            event = first
+        else:
+            self._built[event["id"]] = copy.deepcopy(event)
+        try:
+            return self.seams.writer.append(self.world_id, event)
+        except Exception:
+            # An id already committed under other content means an earlier answer won although its caller saw a
+            # failure (any other error, an identical committed event included, is the caller's to retry).
+            stream = list(self.store.events.get(self.world_id, []))
+            committed = next((e for e in stream if e["id"] == event["id"]), None)
+            if committed is None or all(committed[k] == event[k] for k in same):
+                raise
+            raise AlreadyCommitted(committed) from None
 
     def emit(self, *, type: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
         passed = {k: kw[k] for k in ("district", "cause", "vis") if k in kw}
@@ -140,12 +158,18 @@ class Run:
         """The CardStore's part for a person's answer; an approve opens the waiting gate."""
         data, card_id, authz = part["data"], part["card_id"], part["authz"]
         requested = self.requested.get(card_id)
-        committed = self.put(
-            part["type"], authz["ref"] if authz else "system", data.get("gate_id", self.world_id),
-            f"The gate card was answered: {data.get('option', 'default')}.", data, district=part["district"],
-            cause=requested and requested["id"], authz=authz, vis=part["vis"], severity=part.get("severity"),
-            check_pause=False, event_id=part["event_id"],  # one id per resolution: a retry is an identical resend
-        )  # fmt: skip
+        try:
+            committed = self.put(
+                part["type"], authz["ref"] if authz else "system", data.get("gate_id", self.world_id),
+                f"The gate card was answered: {data.get('option', 'default')}.", data, district=part["district"],
+                cause=requested and requested["id"], authz=authz, vis=part["vis"], severity=part.get("severity"),
+                check_pause=False, event_id=part["event_id"],  # one id per resolution: a retry is an identical resend
+            )  # fmt: skip
+        except AlreadyCommitted as exc:
+            # The card resolves under the committed event (its authz opens the gate), never a second one.
+            if part["type"] == "approval.resolved":
+                self.resolved[card_id] = exc.args[0]
+            raise
         if part["type"] == "approval.resolved":
             self.resolved[card_id] = committed
 
