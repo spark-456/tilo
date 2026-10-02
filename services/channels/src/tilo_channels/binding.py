@@ -9,7 +9,6 @@ in production) and looked up by a keyed hash; codes are stored only as a keyed h
 - `pending:<id>`  -> {pid, number_hash, number_ct, code_hash, sent_at}
 - `try:<pid>:<i>` -> {expires_at}   attempt slot i of a code (atomic create); a replaced code keeps its slots
 - `cap:<n|u>:<hash or id>:<window>:<bucket>:<i>` -> {expires_at}   code-send slot i (SEC-10 caps)
-- `last:<hash>`   -> {user_id}      the user who last confirmed the number (exempt from its send cap)
 - `optin:<hash>`  -> {expires_at}   the last opt-in reply to an unbound number
 
 `expires_at` is for the store's TTL purge (a Firestore TTL policy in production).
@@ -111,6 +110,8 @@ class BindingService:
         caps = {} if send_caps is None else dict(send_caps)
         if unknown := sorted(set(caps) - set(_CAP_SCOPES)):
             raise ValueError(f"send_caps keys must be 'n' or 'u', got {unknown}")
+        if any(window < 1 or limit < 1 for pairs in caps.values() for window, limit in pairs):
+            raise ValueError("send_caps windows and limits must be at least 1")
         self._caps = caps
 
     # --- web app ---------------------------------------------------------------------------------
@@ -125,9 +126,8 @@ class BindingService:
         owner = self._owner(number_hash)
         if owner is not None and owner != user_id:
             return _refused("number_taken")
-        last = self._store.get(f"last:{number_hash}")
-        if (last is None or last["user_id"] != user_id) and not self._claim_send("n", number_hash):
-            return _refused("rate_limited")  # the number's last owner is never locked out by others' starts
+        if not self._holds(number_hash, user_id) and not self._claim_send("n", number_hash):
+            return _refused("rate_limited")  # the number's holder, even a lapsed one, is not locked out by others
         code = f"{secrets.randbelow(1_000_000):06d}"
         pid = secrets.token_hex(8)
         pending = {
@@ -188,7 +188,6 @@ class BindingService:
             return _refused("number_taken")
         if previous is not None and previous["number_hash"] != number_hash:
             self._release(previous["number_hash"], user_id)
-        self._store.put(f"last:{number_hash}", {"user_id": user_id})
         return _OK
 
     def allow_opt_in(self, number: str) -> bool:

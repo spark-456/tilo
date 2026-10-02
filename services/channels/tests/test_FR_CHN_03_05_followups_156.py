@@ -96,11 +96,50 @@ def test_SEC_10_last_owner_still_counts_against_the_user_cap() -> None:
     assert rig.svc.start(RIYA, NUM_KAI).reason == "rate_limited"
 
 
+def _lapsed_then_capped(rig: Rig) -> None:
+    """Sam uses the whole number cap on NUM_KAI, an hour after Riya's old holding ended."""
+    assert [rig.svc.start(SAM, NUM_KAI).reason for _ in range(4)] == [None, None, None, "rate_limited"]
+
+
+def _no_link_to(rig: Rig, number: str) -> bool:
+    """True when no record but the TTL'd cap slots (number-scoped, no user id) mentions the number's hash."""
+    number_hash = rig.svc._mac("number", number)
+    return not any(number_hash in f"{k}{v}" for k, v in rig.store._data.items() if not k.startswith("cap:"))
+
+
+def test_SEC_10_unbound_holder_loses_the_number_cap_exemption_and_leaves_no_link() -> None:
+    rig = Rig(send_caps=SEND_CAPS)
+    rig.bind(RIYA, NUM_KAI)
+    assert rig.svc.unbind(RIYA)
+    assert _no_link_to(rig, NUM_KAI)
+    rig.clock.advance(3600)  # fresh windows
+    _lapsed_then_capped(rig)
+    assert rig.svc.start(RIYA, NUM_KAI).reason == "rate_limited"
+
+
+def test_SEC_10_holder_who_moves_to_another_number_loses_the_old_numbers_exemption() -> None:
+    rig = Rig(send_caps=SEND_CAPS)
+    rig.bind(RIYA, NUM_KAI)
+    rig.bind(RIYA, NUM_RIYA)
+    assert _no_link_to(rig, NUM_KAI)
+    rig.clock.advance(3600)
+    _lapsed_then_capped(rig)
+    assert rig.svc.start(RIYA, NUM_KAI).reason == "rate_limited"
+
+
 # --- unknown cap keys are refused; an explicit empty mapping is no caps ---------------------------------
 
 
 @pytest.mark.parametrize("caps", [{"number": ((3600, 3),)}, {"n": ((3600, 3),), "x": ()}, {"user": ()}])
 def test_SEC_10_unknown_send_caps_keys_are_refused(caps: dict[str, Any]) -> None:
+    with pytest.raises(ValueError, match="send_caps"):
+        Rig(send_caps=caps)
+
+
+@pytest.mark.parametrize(
+    "caps", [{"n": ((0, 3),)}, {"u": ((-60, 3),)}, {"n": ((3600, 0),)}, {"u": ((3600, 3), (86400, -1))}]
+)
+def test_SEC_10_send_caps_windows_and_limits_must_be_positive(caps: dict[str, Any]) -> None:
     with pytest.raises(ValueError, match="send_caps"):
         Rig(send_caps=caps)
 
