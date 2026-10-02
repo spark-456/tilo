@@ -30,10 +30,7 @@ from tilo_render.spec import (
 
 def _find_repo_root() -> Path:
     cur = Path(__file__).resolve()
-    for parent in [cur] + list(cur.parents):
-        if (parent / "design" / "tokens.json").exists():
-            return parent
-    return Path.cwd()
+    return next((p for p in [cur, *cur.parents] if (p / "design" / "tokens.json").exists()), Path.cwd())
 
 
 def _resolve_color(role: str, tokens: dict[str, Any]) -> colors.HexColor:
@@ -47,8 +44,17 @@ def _resolve_color(role: str, tokens: dict[str, Any]) -> colors.HexColor:
 
 
 def sanitize_text(text: str) -> str:
+    norm = text.replace("\r\n", "\n").replace("\r", "\n")
     return "".join(
-        ch for ch in text if ch in "\t\n\r" or (ord(ch) >= 32 and ord(ch) != 127 and not (0x80 <= ord(ch) <= 0x9F))
+        c
+        for c in norm
+        if c in "\t\n"
+        or (
+            32 <= ord(c) != 127
+            and not (0x80 <= ord(c) <= 0x9F)
+            and not (0xD800 <= ord(c) <= 0xDFFF)
+            and ord(c) not in (0xFFFE, 0xFFFF)
+        )
     )
 
 
@@ -78,96 +84,47 @@ def render_pdf(
 
     colors_cfg = tmpl.get("colors", {})
     col_map = {k: _resolve_color(v, tokens) for k, v in colors_cfg.items() if k != "chart_palette"}
-    palette_roles = colors_cfg.get("chart_palette", ["brand.primary"])
-    palette = [_resolve_color(r, tokens) for r in palette_roles]
+    palette = [_resolve_color(r, tokens) for r in colors_cfg.get("chart_palette", ["brand.primary"])]
     typo = {k: float(v) for k, v in tmpl.get("typography", {}).items()}
     num_format = str(tmpl.get("format", {}).get("number_format", "%g"))
-
     page_cfg = tmpl.get("page", {})
-    margin_top = float(page_cfg.get("margin_top_pt", 54))
-    margin_bottom = float(page_cfg.get("margin_bottom_pt", 54))
-    margin_left = float(page_cfg.get("margin_left_pt", 54))
-    margin_right = float(page_cfg.get("margin_right_pt", 54))
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
         pagesize=A4,
-        leftMargin=margin_left,
-        rightMargin=margin_right,
-        topMargin=margin_top,
-        bottomMargin=margin_bottom,
+        leftMargin=float(page_cfg.get("margin_left_pt", 54)),
+        rightMargin=float(page_cfg.get("margin_right_pt", 54)),
+        topMargin=float(page_cfg.get("margin_top_pt", 54)),
+        bottomMargin=float(page_cfg.get("margin_bottom_pt", 54)),
     )
-    avail_width = doc.width
+    aw = doc.width
 
-    title_s = ParagraphStyle(
-        "DocTitle",
-        fontName="Helvetica-Bold",
-        fontSize=typo["title_size_pt"],
-        leading=typo["title_size_pt"] * 1.25,
-        textColor=col_map["title"],
-        spaceAfter=6,
+    def _ps(name: str, font: str, sz: float, col: colors.HexColor, **kw: Any) -> ParagraphStyle:
+        kw.setdefault("leading", sz * 1.25)
+        return ParagraphStyle(name, fontName=font, fontSize=sz, textColor=col, **kw)
+
+    title_s = _ps("T", "Helvetica-Bold", typo["title_size_pt"], col_map["title"], spaceAfter=6)
+    sub_s = _ps("S", "Helvetica", typo["subtitle_size_pt"], col_map["subtitle"], spaceAfter=4)
+    date_s = _ps("D", "Helvetica", typo["date_size_pt"], col_map["date"], spaceAfter=14)
+    heading_s = _ps("H", "Helvetica-Bold", typo["heading_size_pt"], col_map["heading"], spaceBefore=10, spaceAfter=6)
+    body_s = _ps(
+        "B", "Helvetica", typo["body_size_pt"], col_map["body"], leading=typo["body_size_pt"] * 1.35, spaceAfter=6
     )
-    sub_s = ParagraphStyle(
-        "DocSub",
-        fontName="Helvetica",
-        fontSize=typo["subtitle_size_pt"],
-        leading=typo["subtitle_size_pt"] * 1.25,
-        textColor=col_map["subtitle"],
-        spaceAfter=4,
-    )
-    date_s = ParagraphStyle(
-        "DocDate",
-        fontName="Helvetica",
-        fontSize=typo["date_size_pt"],
-        leading=typo["date_size_pt"] * 1.25,
-        textColor=col_map["date"],
-        spaceAfter=14,
-    )
-    heading_s = ParagraphStyle(
-        "Heading",
-        fontName="Helvetica-Bold",
-        fontSize=typo["heading_size_pt"],
-        leading=typo["heading_size_pt"] * 1.25,
-        textColor=col_map["heading"],
-        spaceBefore=10,
-        spaceAfter=6,
-    )
-    body_s = ParagraphStyle(
-        "Body",
-        fontName="Helvetica",
-        fontSize=typo["body_size_pt"],
-        leading=typo["body_size_pt"] * 1.35,
-        textColor=col_map["body"],
-        spaceAfter=6,
-    )
-    bullet_s = ParagraphStyle(
-        "Bullet",
-        fontName="Helvetica",
-        fontSize=typo["bullet_size_pt"],
+    bullet_s = _ps(
+        "BL",
+        "Helvetica",
+        typo["bullet_size_pt"],
+        col_map["bullet"],
         leading=typo["bullet_size_pt"] * 1.35,
-        textColor=col_map["bullet"],
         leftIndent=15,
         firstLineIndent=-10,
         spaceAfter=3,
     )
-    th_s = ParagraphStyle(
-        "TH",
-        fontName="Helvetica-Bold",
-        fontSize=typo["table_header_size_pt"],
-        leading=typo["table_header_size_pt"] * 1.2,
-        textColor=col_map["table_header_fg"],
-    )
-    td_s = ParagraphStyle(
-        "TD",
-        fontName="Helvetica",
-        fontSize=typo["table_body_size_pt"],
-        leading=typo["table_body_size_pt"] * 1.2,
-        textColor=col_map["table_row_fg"],
-    )
+    th_s = _ps("TH", "Helvetica-Bold", typo["table_header_size_pt"], col_map["table_header_fg"])
+    td_s = _ps("TD", "Helvetica", typo["table_body_size_pt"], col_map["table_row_fg"])
 
-    story: list[Any] = []
-    story.append(Paragraph(escape_text(spec.title), title_s))
+    story: list[Any] = [Paragraph(escape_text(spec.title), title_s)]
     if spec.subtitle:
         story.append(Paragraph(escape_text(spec.subtitle), sub_s))
     story.append(Paragraph(escape_text(spec.date), date_s))
@@ -187,15 +144,9 @@ def render_pdf(
             elif isinstance(block, TableBlock):
                 tbl = tbl_lookup[block.table_id]
                 h_cells = [Paragraph(escape_text(col), th_s) for col in tbl.columns]
-                d_rows = [
-                    [Paragraph(escape_text(format_value(cell, num_format)), td_s) for cell in row] for row in tbl.rows
-                ]
-                col_w = avail_width / len(tbl.columns)
-                table_flowable = PlTable(
-                    [h_cells] + d_rows,
-                    colWidths=[col_w] * len(tbl.columns),
-                    repeatRows=1,
-                )
+                d_rows = [[Paragraph(escape_text(format_value(c, num_format)), td_s) for c in row] for row in tbl.rows]
+                col_w = aw / len(tbl.columns)
+                table_flowable = PlTable([h_cells] + d_rows, colWidths=[col_w] * len(tbl.columns), repeatRows=1)
                 table_flowable.setStyle(
                     TableStyle(
                         [
@@ -208,12 +159,11 @@ def render_pdf(
                         ]
                     )
                 )
-                story.append(table_flowable)
-                story.append(Spacer(1, 8))
+                story.extend([table_flowable, Spacer(1, 8)])
             elif isinstance(block, ChartBlock):
                 ch = chart_lookup[block.chart_id]
                 ch_data = ChartData.from_spec(spec, ch.id)
-                ch_d = Drawing(avail_width, 180)
+                ch_d = Drawing(aw, 180)
                 ch_d.add(
                     String(
                         0,
@@ -224,47 +174,38 @@ def render_pdf(
                         fillColor=col_map["chart_title"],
                     )
                 )
-                if ch.kind == ChartKind.BAR:
-                    bc = VerticalBarChart()
-                    bc.x, bc.y, bc.width, bc.height = 40, 20, avail_width - 60, 130
-                    bc.data = [ch_data.series[col] for col in ch.y_columns]
-                    bc.categoryAxis.categoryNames = [sanitize_text(c) for c in ch_data.categories]
-                    bc.categoryAxis.labels.fontSize = typo["chart_label_size_pt"]
-                    bc.valueAxis.labels.fontSize = typo["chart_label_size_pt"]
-                    bc.barLabelFormat = num_format
-                    bc.barLabels.fontSize = typo["chart_label_size_pt"]
-                    bc.barLabels.nudge = 5
-                    for idx, _ in enumerate(ch.y_columns):
-                        bc.bars[idx].fillColor = palette[idx % len(palette)]
-                    ch_d.add(bc)
-                elif ch.kind == ChartKind.LINE:
-                    lc = HorizontalLineChart()
-                    lc.x, lc.y, lc.width, lc.height = 40, 20, avail_width - 60, 130
-                    lc.data = [ch_data.series[col] for col in ch.y_columns]
-                    lc.categoryAxis.categoryNames = [sanitize_text(c) for c in ch_data.categories]
-                    lc.categoryAxis.labels.fontSize = typo["chart_label_size_pt"]
-                    lc.valueAxis.labels.fontSize = typo["chart_label_size_pt"]
-                    lc.lineLabelFormat = num_format
-                    lc.lineLabels.fontSize = typo["chart_label_size_pt"]
-                    for idx, _ in enumerate(ch.y_columns):
-                        lc.lines[idx].strokeColor = palette[idx % len(palette)]
-                    ch_d.add(lc)
+                if ch.kind in (ChartKind.BAR, ChartKind.LINE):
+                    chart_obj = VerticalBarChart() if ch.kind == ChartKind.BAR else HorizontalLineChart()
+                    chart_obj.x, chart_obj.y, chart_obj.width, chart_obj.height = 40, 20, aw - 60, 130
+                    chart_obj.data = [ch_data.series[col] for col in ch.y_columns]
+                    chart_obj.categoryAxis.categoryNames = [sanitize_text(str(c)) for c in ch_data.categories]
+                    chart_obj.categoryAxis.labels.fontSize = typo["chart_label_size_pt"]
+                    chart_obj.valueAxis.labels.fontSize = typo["chart_label_size_pt"]
+                    if ch.kind == ChartKind.BAR:
+                        chart_obj.barLabelFormat = num_format
+                        chart_obj.barLabels.fontSize, chart_obj.barLabels.nudge = typo["chart_label_size_pt"], 5
+                        for idx, _ in enumerate(ch.y_columns):
+                            chart_obj.bars[idx].fillColor = palette[idx % len(palette)]
+                    else:
+                        chart_obj.lineLabelFormat = num_format
+                        chart_obj.lineLabels.fontSize = typo["chart_label_size_pt"]
+                        for idx, _ in enumerate(ch.y_columns):
+                            chart_obj.lines[idx].strokeColor = palette[idx % len(palette)]
+                    ch_d.add(chart_obj)
                 elif ch.kind == ChartKind.PIE:
                     pie = Pie()
-                    pie.x, pie.y, pie.width, pie.height = (avail_width - 130) / 2, 15, 130, 130
-                    y_col = ch.y_columns[0]
-                    vals = ch_data.series[y_col]
+                    pie.x, pie.y, pie.width, pie.height = (aw - 130) / 2, 15, 130, 130
+                    vals = ch_data.series[ch.y_columns[0]]
                     pie.data = vals
                     pie.labels = [
-                        f"{sanitize_text(c)}: {format_value(v, num_format)}" for c, v in zip(ch_data.categories, vals)
+                        f"{sanitize_text(str(c))}: {format_value(v, num_format)}"
+                        for c, v in zip(ch_data.categories, vals, strict=True)
                     ]
-                    pie.slices.labelRadius = 1.05
-                    pie.slices.fontSize = typo["chart_label_size_pt"]
+                    pie.slices.labelRadius, pie.slices.fontSize = 1.05, typo["chart_label_size_pt"]
                     for idx, _ in enumerate(vals):
                         pie.slices[idx].fillColor = palette[idx % len(palette)]
                     ch_d.add(pie)
-                story.append(ch_d)
-                story.append(Spacer(1, 8))
+                story.extend([ch_d, Spacer(1, 8)])
 
     doc.build(story)
     return buf.getvalue()

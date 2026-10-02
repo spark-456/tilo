@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from pypdf import PdfReader
-from tilo_render.pdf import render_pdf
+from tilo_render.pdf import _find_repo_root, render_pdf
 from tilo_render.spec import (
     BulletsBlock,
     Chart,
@@ -20,11 +20,7 @@ from tilo_render.spec import (
 
 
 def _make_sample_spec(rows: list[list[str | int | float]] | None = None) -> DeliverableSpec:
-    default_rows: list[list[str | int | float]] = [
-        ["Alpha", 10.0, 5.0],
-        ["Beta", 20.0, 15.0],
-        ["Gamma", 30.0, 25.0],
-    ]
+    default_rows: list[list[str | int | float]] = [["Alpha", 10.0, 5.0], ["Beta", 20.0, 15.0], ["Gamma", 30.0, 25.0]]
     t1 = Table(id="t1", columns=["label", "s1", "s2"], rows=rows or default_rows)
     return DeliverableSpec(
         title="Sample Report",
@@ -54,8 +50,7 @@ def _make_sample_spec(rows: list[list[str | int | float]] | None = None) -> Deli
 
 def test_FR_CON_09_pdf_chart_values_equal_the_source_table() -> None:
     spec = _make_sample_spec()
-    pdf_bytes = render_pdf(spec)
-    reader = PdfReader(io.BytesIO(pdf_bytes))
+    reader = PdfReader(io.BytesIO(render_pdf(spec)))
     full_text = "\n".join(page.extract_text() for page in reader.pages)
 
     t1 = spec.tables[0]
@@ -63,14 +58,18 @@ def test_FR_CON_09_pdf_chart_values_equal_the_source_table() -> None:
         assert col in full_text
     for row in t1.rows:
         for cell in row:
-            formatted = f"{cell:g}" if isinstance(cell, (int, float)) else str(cell)
-            assert formatted in full_text
+            assert (f"{cell:g}" if isinstance(cell, (int, float)) else str(cell)) in full_text
 
-    for chart in spec.charts:
-        assert chart.title in full_text
-
-    for val in [10.0, 20.0, 30.0, 5.0, 15.0, 25.0]:
-        assert f"{val:g}" in full_text
+    for chart_def in spec.charts:
+        assert chart_def.title in full_text
+        tbl = next(t for t in spec.tables if t.id == chart_def.table_id)
+        x_idx = tbl.columns.index(chart_def.x)
+        for row in tbl.rows:
+            assert str(row[x_idx]) in full_text
+        for y_col in chart_def.y_columns:
+            y_idx = tbl.columns.index(y_col)
+            for row in tbl.rows:
+                assert f"{float(row[y_idx]):g}" in full_text
 
 
 def test_FR_CON_09_pdf_opens_and_paginates_long_tables() -> None:
@@ -82,39 +81,44 @@ def test_FR_CON_09_pdf_opens_and_paginates_long_tables() -> None:
         tables=[t_long],
         sections=[Section(heading="Long Table Section", blocks=[TableBlock(table_id="t_long")])],
     )
-    pdf_bytes = render_pdf(spec)
-    reader = PdfReader(io.BytesIO(pdf_bytes))
+    reader = PdfReader(io.BytesIO(render_pdf(spec)))
     assert len(reader.pages) > 1
-
     for idx, page in enumerate(reader.pages):
         page_text = page.extract_text()
-        assert "ItemName" in page_text, f"Header ItemName missing on page {idx + 1}"
-        assert "MetricA" in page_text, f"Header MetricA missing on page {idx + 1}"
-        assert "MetricB" in page_text, f"Header MetricB missing on page {idx + 1}"
+        for col in ["ItemName", "MetricA", "MetricB"]:
+            assert col in page_text, f"Header {col} missing on page {idx + 1}"
 
 
 def test_FR_CON_09_pdf_escapes_untrusted_markup() -> None:
-    evil_text = '<a href="https://x.invalid">malicious</a> and <img src="bad.png"> & "quotes"'
+    bad_xml = '<a href="https://x.invalid">malicious</a> and <img src="bad.png"> & \ufffe\uffff\r\x00\x07'
+    bad_cat = "cat \ufffe\uffff\ud800\r\x00\x07<tag>'\""
+    t = Table(id="t_bad", columns=["col_cat", "val"], rows=[[bad_cat, 42.0]])
+    c = Chart(id="c_bad", kind=ChartKind.BAR, table_id="t_bad", x="col_cat", y="val", title="Chart Title")
     spec = DeliverableSpec(
-        title="Untrusted <Markup> & Test",
-        subtitle="Subtitle with <tags>",
+        title=f"Untrusted <Markup> & Test {bad_xml}",
+        subtitle=f"Subtitle with <tags> {bad_xml}",
         date="2026-10-02",
+        tables=[t],
+        charts=[c],
         sections=[
             Section(
-                heading="Heading <1>",
+                heading=f"Heading <1> {bad_xml}",
                 blocks=[
-                    ParagraphBlock(text=evil_text),
+                    ParagraphBlock(text=bad_xml),
                     BulletsBlock(bullets=['Bullet with <a href="bad">link</a>']),
+                    TableBlock(table_id="t_bad"),
+                    ChartBlock(chart_id="c_bad"),
                 ],
             )
         ],
     )
-    pdf_bytes = render_pdf(spec)
-    reader = PdfReader(io.BytesIO(pdf_bytes))
+    reader = PdfReader(io.BytesIO(render_pdf(spec)))
     full_text = "\n".join(page.extract_text() for page in reader.pages)
 
     assert '<a href="https://x.invalid">' in full_text
     assert '<img src="bad.png">' in full_text
+    for forbidden in ["\ufffe", "\uffff", "\ud800", "\x00", "\x07"]:
+        assert forbidden not in full_text
 
     for page in reader.pages:
         annots = page.get("/Annots")
@@ -123,33 +127,15 @@ def test_FR_CON_09_pdf_escapes_untrusted_markup() -> None:
 
 
 def test_FR_CON_09_pdf_colours_come_from_token_roles(tmp_path: Path) -> None:
-    spec = _make_sample_spec()
-    custom_tokens = {
-        "color": {
-            "brand": {"primary": {"value": "#123456"}},
-            "surface": {"0": {"value": "#FFFFFF"}, "1": {"value": "#FFFFFF"}, "2": {"value": "#EEEEEE"}},
-            "ink": {"1": {"value": "#111111"}, "2": {"value": "#222222"}},
-            "district": {
-                "research": {"value": "#333333"},
-                "analysis": {"value": "#444444"},
-                "delivery": {"value": "#555555"},
-            },
-            "signal": {"done": {"value": "#00AA00"}},
-        }
-    }
+    tokens = json.loads((_find_repo_root() / "design" / "tokens.json").read_text(encoding="utf-8"))
     tok_file = tmp_path / "tokens.json"
-    tok_file.write_text(json.dumps(custom_tokens), encoding="utf-8")
-    pdf_bytes = render_pdf(spec, tokens_path=tok_file)
-    assert len(pdf_bytes) > 0
+    tok_file.write_text(json.dumps(tokens), encoding="utf-8")
+    assert len(render_pdf(_make_sample_spec(), tokens_path=tok_file)) > 0
 
 
 def test_FR_CON_09_pdf_is_deterministic() -> None:
     spec = _make_sample_spec()
-    pdf1 = render_pdf(spec)
-    pdf2 = render_pdf(spec)
-    r1 = PdfReader(io.BytesIO(pdf1))
-    r2 = PdfReader(io.BytesIO(pdf2))
+    r1 = PdfReader(io.BytesIO(render_pdf(spec)))
+    r2 = PdfReader(io.BytesIO(render_pdf(spec)))
     assert len(r1.pages) == len(r2.pages)
-    t1 = "\n".join(p.extract_text() for p in r1.pages)
-    t2 = "\n".join(p.extract_text() for p in r2.pages)
-    assert t1 == t2
+    assert "\n".join(p.extract_text() for p in r1.pages) == "\n".join(p.extract_text() for p in r2.pages)
