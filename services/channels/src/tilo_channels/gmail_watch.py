@@ -35,7 +35,7 @@ _ISSUERS = frozenset({"https://accounts.google.com", "accounts.google.com"})
 _MAX_HISTORY_ID = 2**64 - 1
 
 
-class Mailbox(Protocol):  # tilo_connectors GmailAdapter in production
+class Mailbox(Protocol):  # production: an RPC client to tilo-connectors, never GmailAdapter in-process (SEC-02)
     def watch(self, user_id: str, *, topic_name: str, label_ids: Sequence[str]) -> dict[str, Any]: ...
     def stop_watch(self, user_id: str) -> None: ...
     def list_history(self, user_id: str, start_history_id: str, *, page_token: str | None = None) -> dict[str, Any]: ...
@@ -209,8 +209,10 @@ class GmailPushEndpoint:
             log.info("gmail push refused: %s", type(exc).__name__)
             return PushResponse(401, "unauthenticated")
         if not (
-            claims.get("aud") == self._audience
-            and claims.get("iss") in _ISSUERS
+            isinstance(claims, Mapping)
+            and claims.get("aud") == self._audience
+            and isinstance(claims.get("iss"), str)
+            and claims["iss"] in _ISSUERS
             and claims.get("email") == self._service_account
             and claims.get("email_verified") is True
         ):
@@ -219,10 +221,10 @@ class GmailPushEndpoint:
         notification = _notification(raw_body)
         if notification is None:
             return PushResponse(400, "malformed")
-        user_id = self._accounts(notification[0])
-        if user_id is None:
-            return PushResponse(200, "ignored")
         try:
+            user_id = self._accounts(notification[0])
+            if user_id is None:
+                return PushResponse(200, "ignored")
             self._on_notification(user_id, str(notification[1]))
         except Exception as exc:  # noqa: BLE001 - logged by type; Pub/Sub redelivers
             log.warning("gmail push failed: %s", type(exc).__name__)
