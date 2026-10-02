@@ -492,24 +492,22 @@ def base_budget_policy(
 
 
 def make_safety_provider():
-    """Deterministic `SafetyProvider` subclass (PL layer ABC has no fake yet -- ticket
-    brief). Flags any text containing `INJECTION_PHRASE`, case-insensitive, i.e. an
-    instruction aimed at the assistant rather than the task. `.calls` records every
-    text passed to `.check()` in order, for tests that assert what got screened."""
-    from tilo_providers.interfaces import SafetyProvider
+    """The real deterministic `FakeSafetyProvider` (it flags `INJECTION_PHRASE`, case-insensitive),
+    wrapped only to record what got screened: `.calls` holds every text-only check's text in order,
+    `.native_calls` each native check's `{content, mime_type}` (the media type already normalised)."""
+    from tilo_providers.interfaces import SafetyResult
+    from tilo_providers.safety import FakeSafetyProvider
 
-    class DeterministicSafetyProvider(SafetyProvider):
+    class RecordingFakeSafetyProvider(FakeSafetyProvider):
         def __init__(self) -> None:
             self.calls: list[str] = []
             self.native_calls: list[dict[str, Any]] = []
 
-        def check(self, text: str, **kwargs: Any) -> dict[str, Any]:
-            if "content" in kwargs:
-                self.native_calls.append(kwargs)
+        def _check(self, text: str, *, content: bytes | None, mime_type: str | None) -> SafetyResult:
+            if content is not None:
+                self.native_calls.append({"content": content, "mime_type": mime_type})
             else:
                 self.calls.append(text)
-            flagged = INJECTION_PHRASE in text.upper()
-            reason = f"instruction aimed at the assistant: {INJECTION_PHRASE!r}" if flagged else None
-            return {"flagged": flagged, "reason": reason}
+            return super()._check(text, content=content, mime_type=mime_type)
 
-    return DeterministicSafetyProvider()
+    return RecordingFakeSafetyProvider()

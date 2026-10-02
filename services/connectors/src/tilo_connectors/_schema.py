@@ -1,4 +1,4 @@
-"""tilo_connectors._schema — cached validators: outbox.schema.json (OB-05), connector.schema.json (FR-CON-01)."""
+"""tilo_connectors._schema — cached validators: outbox (OB-05), connector (FR-CON-01), manifest (FR-CON-10)."""
 
 from __future__ import annotations
 
@@ -41,5 +41,12 @@ def outbox_validator() -> jsonschema.protocols.Validator:
 @functools.lru_cache(maxsize=1)
 def connector_validator() -> jsonschema.protocols.Validator:
     schema = _load_json(_CONTRACTS_DIR / "connector.schema.json")
+    cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
+    return cls(schema, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
+def manifest_validator() -> jsonschema.protocols.Validator:
+    schema = _load_json(_CONTRACTS_DIR / "manifest.schema.json")
     cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
     return cls(schema, registry=_registry())
