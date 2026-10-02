@@ -31,7 +31,7 @@ Kept in a new module family so this ticket never touches `services/api/tests/_ap
   default names an option), CR-02 (unique option ids), a real calendar `created_at` and a
   representable deadline are validator rules.
 - **Merging** keeps every card as its own record (own question and options); a group lists as its
-  first open member and one answer or one timeout closes the whole group with one part (BQ-72).
+  first open member and one answer or one timeout closes the whole group with one part (BQ-74).
 - **Part scope (SEC-07):** every part carries `world_id`, `card_id`, `district`, `vis` ([district], or
   None with `owner_only` True when the card has no district; never "all", BQ-73). A Team Lead's
   question answer is `answered_by` "team_lead"; an unknown role is refused like a Viewer.

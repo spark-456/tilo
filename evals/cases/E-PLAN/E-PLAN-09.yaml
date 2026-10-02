@@ -1,0 +1,47 @@
+id: E-PLAN-09
+group: E-PLAN
+title: File intake — Supplier scorecard PDF report from attached Q3 CSV
+measures:
+  - EV-02
+  - EV-03
+  - FR-INT-03
+  - FR-INT-04
+  - FR-INT-06
+status: ready
+deploy_gate: false
+inputs:
+  task_kind: with_files
+  task: >-
+    Using the attached Q3 supplier CSV for Harrier Logistics
+    (procurement@harrier-logistics.example), generate a 3-page PDF supplier
+    scorecard report for the procurement director by 2026-10-15, ranking all
+    four suppliers by on-time rate and flagging any supplier with a defect rate
+    above 1.5%.
+  files:
+    - evals/fixtures/plan/harrier_q3_suppliers.csv
+scripted_answers: []
+ground_truth:
+  question_count: 0
+  approach_count: 2.5
+  brief_valid: true
+checks:
+  - check: schema_valid
+    args:
+      field: brief
+      schema: brief.schema.json
+  - check: schema_valid
+    args:
+      field: plan
+      schema: plan.schema.json
+  - check: equals_ground_truth
+    args:
+      field: question_count
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: approach_count
+      tolerance: 0.5
+recording: null
+notes: >-
+  EV-03 estimate accuracy (median within +-25% of historical unit-type cost) is
+  evaluated once replay recordings exist.

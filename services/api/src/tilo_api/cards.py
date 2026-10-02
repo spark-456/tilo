@@ -272,7 +272,7 @@ class CardStore:
         return errors
 
     def _resolve_group(self, group: _Group) -> None:
-        """Close every open member: one answer or one timeout closes a merged batch (BQ-72)."""
+        """Close every open member: one answer or one timeout closes a merged batch (BQ-74)."""
         for member in group.members:
             member.status = "resolved"
             self._pending.pop((member.world_id, member.card["id"]), None)
