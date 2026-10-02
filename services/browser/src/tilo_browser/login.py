@@ -11,6 +11,8 @@ from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from urllib.parse import parse_qsl, urlsplit
 
+from tilo_browser.masking import mask_text
+
 LOGIN_CARD_OPTION_IDS = ("connect_api", "upload_export", "skip")
 
 _INPUT_ROLES = {"textbox", "searchbox", "spinbutton", "combobox"}
@@ -58,10 +60,26 @@ class CardContext:
     timeout: int
 
 
-def _nodes(tree: dict) -> Iterator[dict]:
-    yield tree
-    for child in tree.get("children", []):
-        yield from _nodes(child)
+class TreeTooDeep(ValueError):
+    """An accessibility tree nested deeper than MAX_TREE_DEPTH: callers fail closed."""
+
+
+MAX_TREE_DEPTH = 256
+
+
+def iter_nodes(tree: dict) -> Iterator[dict]:
+    """Document-order walk, iterative (no RecursionError), failing closed past MAX_TREE_DEPTH."""
+    stack = [(tree, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > MAX_TREE_DEPTH:
+            raise TreeTooDeep(f"accessibility tree deeper than {MAX_TREE_DEPTH} levels")
+        yield node
+        stack.extend((c, depth + 1) for c in reversed(node.get("children") or []))
+
+
+def _role(n: dict) -> str:
+    return str(n.get("role") or "").lower()
 
 
 def _attr(n: dict, key: str) -> str:
@@ -79,7 +97,7 @@ def _is_password(n: dict) -> bool:
 def _is_otp(n: dict) -> bool:
     if _attr(n, "autocomplete") == "one-time-code":
         return True
-    if n.get("role") not in _INPUT_ROLES:
+    if _role(n) not in _INPUT_ROLES:
         return False
     label = str(n.get("name") or "").lower()
     named = (_attr(n, "name"), _attr(n, "id"), label)
@@ -91,20 +109,41 @@ def _is_payment(n: dict) -> bool:
 
 
 def _asks_for_password(n: dict) -> bool:
-    if n.get("role") not in _INPUT_ROLES:
+    if _role(n) not in _INPUT_ROLES:
         return False
     return any(
         _PASSWORD_LABEL.search(s) for s in (str(n.get("name") or "").lower(), _attr(n, "placeholder"), _attr(n, "name"))
     )
 
 
-def _refs(tree: dict, pred: Callable[[dict], bool]) -> tuple[str, ...]:
-    return tuple(r for n in _nodes(tree) if pred(n) and (r := _ref(n)))
+def is_input_node(n: dict) -> bool:
+    return _role(n) in _INPUT_ROLES
+
+
+def is_secure_node(n: dict) -> bool:
+    return _is_password(n) or _is_otp(n) or _is_payment(n)
+
+
+def node_ref(n: dict) -> str:
+    return _ref(n)
+
+
+def _nodes_where(tree: dict, pred: Callable[[dict], bool]) -> list[dict]:
+    return [n for n in iter_nodes(tree) if pred(n)]
+
+
+def _refs(nodes: list[dict]) -> tuple[str, ...]:
+    return tuple(r for n in nodes if (r := _ref(n)))
+
+
+def secure_nodes(tree: dict) -> list[dict]:
+    """Password, one-time-code and payment fields, with or without a ref."""
+    return _nodes_where(tree, is_secure_node)
 
 
 def secure_field_refs(tree: dict) -> list[str]:
-    """Password, one-time-code and payment fields: masked in screenshots, never typed into."""
-    return list(_refs(tree, lambda n: _is_password(n) or _is_otp(n) or _is_payment(n)))
+    """Refs of the secure fields: masked in screenshots, never typed into."""
+    return list(_refs(secure_nodes(tree)))
 
 
 def _is_sso_url(url: str) -> bool:
@@ -127,13 +166,13 @@ def _asks_in_text(text: str) -> bool:
 
 def detect_login(*, chain: Sequence[str], tree: dict, text: str) -> LoginSignal | None:
     for kind, pred in (("password_field", _is_password), ("otp_field", _is_otp)):
-        if refs := _refs(tree, pred):
-            return LoginSignal(kind, refs)
+        if nodes := _nodes_where(tree, pred):  # keyed on the node: an id-less field still counts
+            return LoginSignal(kind, _refs(nodes))
     if any(_is_sso_url(u) for u in chain):
         return LoginSignal("sso_redirect", ())
-    refs = _refs(tree, _asks_for_password)
-    if refs or _asks_in_text(text):
-        return LoginSignal("credentials_in_text", refs)
+    nodes = _nodes_where(tree, _asks_for_password)
+    if nodes or _asks_in_text(text):
+        return LoginSignal("credentials_in_text", _refs(nodes))
     return None
 
 
@@ -142,7 +181,24 @@ def _host_of(url: str) -> str:
         host = urlsplit(url).hostname or ""
     except ValueError:
         host = ""
-    return host if re.fullmatch(r"[a-z0-9.-]{1,80}", host) else "this site"
+    return mask_text(host) if re.fullmatch(r"[a-z0-9.-]{1,80}", host) else "this site"
+
+
+_OPTION_LABELS = {"connect_api": "Connect by API", "upload_export": "Upload an export", "skip": "Skip"}
+_SUGGESTED = "connect_api"
+_SUGGESTED_REASON = "A scoped, revocable connection works without sharing a password."
+
+
+def _option(option_id: str) -> dict:
+    option: dict = {
+        "id": option_id,
+        "label": _OPTION_LABELS[option_id],
+        "suggested": option_id == _SUGGESTED,
+        "irreversible": False,
+    }
+    if option_id == _SUGGESTED:
+        option["reason"] = _SUGGESTED_REASON
+    return option
 
 
 def build_login_card(signal: LoginSignal, *, url: str, ctx: CardContext) -> dict:
@@ -160,17 +216,7 @@ def build_login_card(signal: LoginSignal, *, url: str, ctx: CardContext) -> dict
             f"{host} asks for a sign-in. Tilo never types passwords or codes. "
             "Connect by API, upload an export, or skip this site."
         ),
-        "options": [
-            {
-                "id": "connect_api",
-                "label": "Connect by API",
-                "suggested": True,
-                "reason": "A scoped, revocable connection works without sharing a password.",
-                "irreversible": False,
-            },
-            {"id": "upload_export", "label": "Upload an export", "suggested": False, "irreversible": False},
-            {"id": "skip", "label": "Skip", "suggested": False, "irreversible": False},
-        ],
+        "options": [_option(oid) for oid in LOGIN_CARD_OPTION_IDS],
         "add_context": False,
         "actions": ["show_me", "snooze"],
         "answer_channels": ["web", "mobile_web", "whatsapp", "email"],

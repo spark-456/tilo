@@ -1315,13 +1315,13 @@ name = "tilo-browser"
 version = "0.1.0"
 source = { editable = "services/browser" }
 dependencies = [
-    { name = "jsonschema" },
+    { name = "idna" },
     { name = "tilo-providers" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "jsonschema", specifier = ">=4.18" },
+    { name = "idna", specifier = ">=3.7" },
     { name = "tilo-providers", editable = "packages/providers" },
 ]
 

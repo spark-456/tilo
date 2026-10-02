@@ -2,8 +2,8 @@
 
 `EgressPolicy.check` is the one gate every request passes (navigation, each redirect hop,
 subresources, a click's navigation). Anything it cannot parse unambiguously is blocked. A
-`Decision` never holds userinfo, query or fragment, so the log and `EgressBlocked` messages
-cannot leak them.
+`Decision` is built from validated parts only: no userinfo, query or fragment, and anything
+secret-looking in the host or path masked, so the log and `EgressBlocked` messages cannot leak.
 """
 
 from __future__ import annotations
@@ -13,20 +13,23 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from urllib.parse import unquote_plus
 
-from tilo_browser.masking import mask_text
+import idna
+
+from tilo_browser.masking import mask_decoded, mask_text
 
 _SCHEME = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*):(.*)$", re.S)
 _HOST = re.compile(r"^[a-z0-9-]+(?:\.[a-z0-9-]+)*$")
 _NUMERIC_LABEL = re.compile(r"^(?:\d+|0[xX][0-9a-fA-F]*)$")
-_UNSAFE_LOG = re.compile(r"[^A-Za-z0-9._~:/%!$&'()*+,;=-]")
+_UNSAFE_LOG = re.compile(r"[^A-Za-z0-9._~:/%!$&'()*+,;=\[\]-]")
+_LOG_LIMIT = 200
 
 
 @dataclass(frozen=True)
 class Decision:
     allowed: bool
     reason: str  # allowed | host_not_allowlisted | scheme_not_allowed | ip_literal | invalid_url | sensitive_query
-    url: str  # sanitised: no userinfo, no query, no fragment
-    host: str | None  # lower-case, IDNA A-label form
+    url: str  # sanitised: no userinfo, no query, no fragment, secrets masked
+    host: str | None  # lower-case, IDNA A-label form, secrets masked
     scheme: str | None
     redirect_from: str | None = None
 
@@ -38,12 +41,17 @@ class EgressBlocked(Exception):
 
 
 def sanitise_url(raw: str) -> str:
-    """Best-effort log form of any string: cut query, fragment and userinfo, replace odd characters."""
-    base = re.split(r"[?#]", raw, maxsplit=1)[0][:200]
-    m = re.match(r"^([^/\\]*://)([^/\\]*)(.*)$", base, re.S)
-    if m:
-        base = m.group(1) + m.group(2).rsplit("@", 1)[-1] + m.group(3)
-    return _UNSAFE_LOG.sub("_", base)
+    """Log form of any URL-ish string. Cuts query and fragment, then removes userinfo in every
+    form (`s://u:p@h`, `s:u:p@h`, `s:/u:p@h`, `//u:p@h`) BEFORE truncating, masks the host and
+    path (raw and percent-decoded) and replaces odd characters."""
+    base = re.split(r"[?#]", raw, maxsplit=1)[0]
+    m = re.match(r"^([A-Za-z][A-Za-z0-9+.-]*):", base)
+    prefix = f"{m.group(1).lower()}://" if m else "//"
+    rest = base[m.end() :] if m else base
+    parts = re.split(r"([/\\])", rest.lstrip("/\\"), maxsplit=1)
+    host = mask_decoded(parts[0].rsplit("@", 1)[-1])
+    path = "".join(parts[1:2]) + mask_decoded("".join(parts[2:])) if len(parts) > 1 else ""
+    return _UNSAFE_LOG.sub("_", (prefix + host + path)[:_LOG_LIMIT])
 
 
 def _is_ip_label(host: str) -> bool:
@@ -51,10 +59,10 @@ def _is_ip_label(host: str) -> bool:
 
 
 def _normalise_host(host: str) -> str | None:
-    """Lower-case IDNA A-label form, or None if it is not a plain DNS name."""
+    """Lower-case IDNA A-label form by UTS 46 non-transitional processing, as browsers do
+    (so glaßes.com stays distinct from glasses.com), or None if it is not a plain DNS name."""
     try:
-        ascii_host = host.lower().encode("idna").decode("ascii")
-        ascii_host.encode("ascii").decode("idna")  # an invalid A-label does not round-trip
+        ascii_host = idna.encode(host, uts46=True, transitional=False).decode("ascii").lower()
     except (UnicodeError, ValueError):
         return None
     return ascii_host if _HOST.match(ascii_host) else None
@@ -82,7 +90,7 @@ class EgressPolicy:
 
     def _decide(self, raw: str) -> Decision:
         def block(reason: str, host: str | None = None, scheme: str | None = None) -> Decision:
-            return Decision(False, reason, sanitise_url(raw), host, scheme)
+            return Decision(False, reason, sanitise_url(raw), host and mask_text(host), scheme)
 
         if not raw or any(ch.isspace() or ch == "\\" or ord(ch) < 32 or ord(ch) == 127 for ch in raw):
             return block("invalid_url")
@@ -114,8 +122,8 @@ class EgressPolicy:
         clean = sanitise_url(f"{scheme}://{ascii_host}{rest[2:][len(authority) :]}")
         decoded = unquote_plus(query)
         if query and (mask_text(query) != query or mask_text(decoded) != decoded):
-            return Decision(False, "sensitive_query", clean, ascii_host, scheme)
-        return Decision(True, "allowed", clean, ascii_host, scheme)
+            return Decision(False, "sensitive_query", clean, mask_text(ascii_host), scheme)
+        return Decision(True, "allowed", clean, mask_text(ascii_host), scheme)
 
     def check(self, url: str, *, redirect_from: str | None = None) -> Decision:
         d = self._decide(url)
