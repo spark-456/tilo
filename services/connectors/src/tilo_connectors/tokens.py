@@ -304,8 +304,12 @@ class TokenBroker:
                 self._roll_back(user_id, connector, previous, error)
                 raise
 
-    def access_token_for_adapter(self, user_id: str, connector: str, *, required_scopes: Iterable[str]) -> str:
-        """The one call that returns a plaintext token; refreshes first when it is about to expire."""
+    def access_token_for_adapter(
+        self, user_id: str, connector: str, *, required_scopes: Iterable[str], force_refresh: bool = False
+    ) -> str:
+        """The one call that returns a plaintext token; refreshes first when it is about to expire.
+        `force_refresh` is the adapters' 401 path (Google dropped the token before its expiry): it refreshes
+        this same user and connector's record now, after the same connected and scope checks."""
         with self._lock(user_id, connector):
             record = self._store.get(user_id, connector)
             if record is None:
@@ -318,7 +322,7 @@ class TokenBroker:
             payload = self._payload(user_id, connector, record)
             if payload is None:
                 raise TokenError("the stored record could not be read")
-            if parse_ts(add_seconds(self._clock(), self._skew)) < parse_ts(record["expires_at"]):
+            if not force_refresh and parse_ts(add_seconds(self._clock(), self._skew)) < parse_ts(record["expires_at"]):
                 return str(payload["access_token"])
             return self._refresh(user_id, connector, record, payload)
 
