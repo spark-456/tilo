@@ -21,6 +21,11 @@ from ._schema import connector_validator
 
 _MAX_MESSAGE = 500
 
+# ADR-0002 decision 14: `internal` names actions that go through no connector, and `grant_budget` is
+# such an action (a budget grant needs a person). No declared connector may take either.
+RESERVED_CONNECTOR_ID = "internal"
+RESERVED_ACTION_TYPES = frozenset({"grant_budget"})
+
 # PRD 9.5 effects of connection events, in the layout contract's island `state` vocabulary.
 _EVENT_STATE = {
     "connection.requested": "requested",
@@ -73,6 +78,13 @@ def _validated(entries: list[Any]) -> dict[str, dict[str, Any]]:
         ]
         if problems:
             raise ConnectorConfigError(f"connector {label!r}: {'; '.join(problems)}")
+        if entry["id"] == RESERVED_CONNECTOR_ID:
+            raise ConnectorConfigError(f"connector {entry['id']!r}: id is reserved for actions with no connector")
+        for action in entry["actions"]:
+            if action["id"] in RESERVED_ACTION_TYPES:
+                raise ConnectorConfigError(
+                    f"connector {label!r}: action {action['id']!r} is reserved and is not a connector action"
+                )
         if entry["id"] in declared:
             raise ConnectorConfigError(f"connector {entry['id']!r}: declared more than once")
         declared[entry["id"]] = copy.deepcopy(entry)
