@@ -331,6 +331,9 @@ a.secondary {
   gap: 4px;
   margin-bottom: 12px;
 }
+.lens-space {
+  height: 56px; /* the lens tabs' height and margin, kept where the page shows its own tabs */
+}
 .lens-tab {
   display: inline-flex;
   align-items: center;
@@ -347,6 +350,18 @@ a.secondary {
 .lens-tab[aria-current="page"] {
   background: var(--color-ink-1);
   color: var(--color-surface-1);
+}
+.chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-ink-1);
+  font-weight: 800;
+  font-size: 0.8125em;
+}
+.chip-needs {
+  background: var(--color-signal-needs);
 }
 .story-list {
   max-width: 720px;
@@ -375,55 +390,39 @@ a.secondary {
   color: var(--color-ink-2);
   font: 500 0.875em var(--font-mono);
 }
-.trace-scroll {
-  overflow-x: auto;
+/* Trace: two-line rows, so the record and the credits never leave the screen. */
+.trace-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 500 0.75em / 1.5 var(--font-mono);
 }
-/* Fixed layout and header widths: a row arriving never resizes a column (CLS). */
-.trace-table {
-  table-layout: fixed;
-  width: 1150px;
-  font: 500 0.75em var(--font-mono);
+.trace-rows li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-surface-2);
 }
-.trace-table td {
-  overflow-wrap: anywhere;
-  line-height: 1.5; /* a number, so a late font swap cannot change a row's height */
+.trace-top,
+.trace-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
 }
-.trace-table td {
-  vertical-align: top;
+.trace-seq,
+.trace-time,
+.trace-meta {
+  color: var(--color-ink-2);
 }
-.trace-table code {
-  display: block; /* the record id and its control never re-wrap when the mono font loads */
-  line-height: 1.5;
+.trace-seq {
+  min-width: 2.5em;
 }
-.trace-table th:nth-child(1) {
-  width: 56px;
+.trace-meta {
+  padding-left: 2.5em;
 }
-.trace-table th:nth-child(2) {
-  width: 64px;
-}
-.trace-table th:nth-child(3) {
-  width: 160px;
-}
-.trace-table th:nth-child(4) {
-  width: 100px;
-}
-.trace-table th:nth-child(5) {
-  width: 150px;
-}
-.trace-table th:nth-child(6) {
-  width: 110px;
-}
-.trace-table th:nth-child(7) {
-  width: 120px;
-}
-.trace-table th:nth-child(8) {
-  width: 80px;
-}
-.trace-table th:nth-child(9) {
-  width: 70px;
-}
-.trace-table th:nth-child(10) {
-  width: 240px;
+.trace-record {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .secondary.placeholder {
   min-height: 44px;
@@ -431,6 +430,12 @@ a.secondary {
   border-color: var(--color-ink-2);
   color: var(--color-ink-2);
   cursor: not-allowed;
+}
+.secondary.placeholder.compact {
+  min-height: 32px;
+  padding: 0 10px;
+  border-width: 1px;
+  font-size: 0.875em;
 }
 .soon {
   font-weight: 400;
@@ -448,6 +453,9 @@ a.secondary {
   padding: 0;
   list-style: none;
 }
+.stat-tiles.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .stat-tiles li {
   display: flex;
   flex-direction: column;
@@ -455,6 +463,9 @@ a.secondary {
   padding: 12px;
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-cards);
+}
+.stat-tiles.three b {
+  font: 900 1.25em / 1.15 var(--font-display);
 }
 .stat-name {
   font-weight: 700;
@@ -465,61 +476,130 @@ a.secondary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
-.right-rail {
-  overflow-y: auto;
+.action-row.compact {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, auto));
+  justify-content: start;
+}
+@media (max-width: 767px) {
+  .action-row.compact {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .action-row.compact .secondary {
+    min-width: 0;
+    padding: 4px;
+    font-size: 0.75em;
+    line-height: 1.15;
+  }
+  .stat-tiles.three li {
+    padding: 8px;
+  }
+  .stat-tiles.three b {
+    font-size: 1em;
+  }
 }
 /* Reserved boxes: data arriving (UX-1, CLS) never moves what is below or above it. */
-.hud-meter,
-.replay-tip {
-  min-height: 2.8em;
-  line-height: 1.4;
-}
-.trace-table th {
-  line-height: 1.5;
-  vertical-align: top;
-}
-.hud-line {
-  display: block; /* each figure starts at the left edge, so a changing number moves nothing */
+.screen-body .flow-slot {
+  display: flow-root; /* a first child's margin stays inside, so ready never moves the slot (CLS) */
 }
 .delivery-slot .flow-slot {
-  min-height: 33em;
+  min-height: 9em;
 }
 @media (max-width: 767px) {
   .delivery-slot .flow-slot {
-    min-height: 46em;
+    min-height: 12.5em;
   }
 }
-.world-panels {
-  padding-top: 36px; /* clears the fixed fixture banner */
-}
-.hud-sheet .world-panels {
-  padding-top: 0;
-}
-.world-panels a {
-  color: var(--color-brand-primary);
+.right-rail {
+  overflow-y: auto;
 }
 .world-panels h2 {
   margin: 16px 0 4px;
   font-size: 1em;
 }
-.outline,
-.outline ul {
+.world-panels a {
+  color: var(--color-brand-primary);
+}
+.hud-card {
+  min-height: 7.6em;
+  padding: 12px;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-cards);
+}
+.hud-card p {
   margin: 0;
-  padding-left: 16px;
-  font-size: 0.875em;
 }
-.outline li {
-  padding: 4px 0;
+.hud-figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 8px 0;
 }
-.outline a {
-  display: inline-flex;
+.hud-figures b {
+  display: block;
+  font: 900 1.5em / 1.1 var(--font-display);
+  color: var(--color-ink-1);
+}
+.hud-figures span {
+  color: var(--color-ink-2);
+  font-size: 0.8125em;
+}
+.hud-count {
+  display: flex;
   align-items: center;
-  min-height: 24px;
+  gap: 8px;
+}
+.hud-count h2 {
+  margin-right: auto;
+}
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rows li {
+  margin-bottom: 4px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 4px 10px;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  color: var(--color-ink-1);
+  text-decoration: none;
+}
+.world-panels a.row {
+  color: var(--color-ink-1);
+}
+.row:hover {
+  background: var(--color-surface-0);
+}
+.row-name {
+  display: flex;
+  flex-direction: column;
+  font-weight: 800;
+}
+.row-name small {
+  color: var(--color-ink-2);
+  font-weight: 400;
+  font-size: 0.8125em;
+}
+.row-state {
+  flex: 0 0 7.5em; /* a fixed box, left-aligned: a new state word never moves its left edge (CLS) */
+  color: var(--color-ink-2);
+  font-weight: 700;
+  font-size: 0.8125em;
 }
 @media (max-width: 767px) {
-  .outline a {
+  .row {
     min-height: 44px;
   }
 }
@@ -541,4 +621,10 @@ a.secondary {
   display: flex;
   align-items: center;
   font-weight: 700;
+}
+@media (max-width: 767px) {
+  .speed-badge.client-speed {
+    left: 12px; /* the fixture banner is on the right, so the two never meet */
+    transform: none;
+  }
 }
