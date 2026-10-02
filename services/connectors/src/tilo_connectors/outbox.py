@@ -99,6 +99,7 @@ class Outbox:
         world_id: str | None = None,
         retry: RetryPolicy | None = None,  # production passes RetryPolicy()
         alert: Callable[[dict], None] | None = None,  # gets alert.raised parts {type, authz, data, world_id}
+        halted: Callable[[], bool] | None = None,
     ) -> None:
         if any(name.strip() == RESERVED_CONNECTOR_ID for name in connectors):
             raise ValueError(f"connector id {RESERVED_CONNECTOR_ID!r} is reserved and cannot be bound")
@@ -109,6 +110,7 @@ class Outbox:
         self._world_id = world_id  # set: dispatch and emit only this world's entries and transfers
         self._retry = retry if retry is not None else _IMMEDIATE
         self._alert = alert
+        self._halted = halted  # set: asked at each claim; True means nothing more is claimed (a paused world)
 
     def enqueue(self, entry: dict, evidence: dict) -> dict:
         if errors := sorted(outbox_validator().iter_errors(entry), key=lambda e: list(e.path)):
@@ -145,7 +147,14 @@ class Outbox:
         if entry["scheduled_at"] != expected_scheduled_at:
             raise OutboxRefused(f"OB-02: bad scheduled_at, expected {expected_scheduled_at!r}")
 
+    def _own(self, outbox_id: str, verb: str) -> None:
+        """A world-scoped outbox never touches another world's entry; the refusal says no more than "not found"."""
+        entry = self._store.get(outbox_id)
+        if self._world_id is not None and entry is not None and entry["world_id"] != self._world_id:
+            raise OutboxRefused(f"cannot {verb} {outbox_id!r}: no such entry in this world")
+
     def cancel(self, outbox_id: str) -> dict:
+        self._own(outbox_id, "cancel")
         if (updated := self._store._cancel(outbox_id)) is None:
             raise OutboxRefused(f"cannot cancel {outbox_id!r}: not 'scheduled'")
         return updated
@@ -153,6 +162,7 @@ class Outbox:
     def abandon(self, outbox_id: str) -> dict:
         """A run gave up on this unsent entry: "failed", so no later dispatch_due() ever sends it. Refused while a
         live lease may be sending it, or once it is sent, failed or cancelled."""
+        self._own(outbox_id, "abandon")
         if (updated := self._store._abandon(outbox_id, self._clock())) is None:
             raise OutboxRefused(f"cannot abandon {outbox_id!r}: being sent or already settled")
         return updated
@@ -173,6 +183,8 @@ class Outbox:
         return state == "scheduled" and entry["scheduled_at"] <= now
 
     def _dispatch_one(self, outbox_id: str) -> dict | None:
+        if self._halted is not None and self._halted():  # asked at the claim itself, not once per dispatch_due
+            return None
         holder = uuid.uuid4().hex
         skew = self._retry.clock_skew_s
         if (claimed := self._store._claim_for_sending(outbox_id, holder, self._clock(), _LEASE_SECONDS, skew)) is None:

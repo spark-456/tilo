@@ -5,14 +5,14 @@ Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP c
 outbox for every side effect. The only service that can decrypt user OAuth tokens.
 
 ## Commands
-- `uv run pytest services/connectors/tests -q` — public API pinned in `tests/API*.md` (FR-CON-10: `provenance.py`).
-- `just check` — full gate from the repo root.
+- `uv run pytest services/connectors/tests -q` — public API pinned in `tests/API*.md` (FR-CON-10: `provenance.py`); `just check` is the full gate.
 
 ## Contracts
 - Reads `contracts/outbox.schema.json` (+ cross-refs), `data.transfer.schema.json`, `contracts/fixtures/outbox/`;
   calls `tilo_policy.check_entry` (OB-01/OB-05). Emits `data.transfer` via the `emit` callback `Outbox` gets.
 - `tokens.py`, `consent.py` and `adapters/` emit `connection.*` parts `{type, authz, data, user_id}` (`user_id` is the
   seam: the caller picks the world and actor); a failed revoke raises `alert.raised` via the optional `alert` callback.
+  The broker holds no lock while a hook, `emit` or `alert` runs: collect under the lock, call out after (#149).
 
 ## Config
 - Env only, never logged: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_BASE_URL`.
