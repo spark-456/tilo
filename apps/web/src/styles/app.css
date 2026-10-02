@@ -930,3 +930,49 @@ a.secondary {
     transform: none;
   }
 }
+/* AGW-04 S-03 Approaches and budget: approach cards and editable budget cap. */
+.flow-shell[data-screen="Approaches"] {
+  width: min(520px, calc(100vw - 464px));
+}
+.flow-shell[data-screen="Approaches"] .flow-slot {
+  min-height: 25em;
+}
+@media (max-width: 767px) {
+  .flow-shell[data-screen="Approaches"] {
+    width: calc(100vw - 32px);
+  }
+}
+.approach-card {
+  margin: 0 0 8px;
+  padding: 10px;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+}
+.approach-card[data-selected="true"] {
+  border-color: var(--color-brand-primary);
+}
+.approach-head,
+.budget-cap-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+  font: 700 0.875em var(--font-ui);
+}
+.approach-summary,
+.approach-meta {
+  margin: 0 0 4px;
+  color: var(--color-ink-2);
+  font: 400 0.8125em / 1.35 var(--font-ui);
+}
+.budget-cap-field input {
+  width: 6em;
+  padding: 4px 8px;
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 1em var(--font-ui);
+}
