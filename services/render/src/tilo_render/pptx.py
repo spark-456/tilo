@@ -108,20 +108,31 @@ def _add_title_slide(prs: Any, spec: DeliverableSpec, col: dict[str, RGBColor], 
     p2.text, p2.font.size, p2.font.color.rgb = sanitize_text(spec.date), Pt(14), col["title_subtext"]
 
 
+def _lines(text: str) -> list[str]:
+    """Sanitise (XML-invalid characters, CR normalisation) and split into one string per line."""
+    return sanitize_text(text).split("\n")
+
+
 def _add_para_slide(prs: Any, heading: str, text: str, col: dict[str, RGBColor], typ: dict[str, float]) -> None:
-    p = _body_tf(
-        _slide(prs, col["slide_background"], heading, col["slide_header"], typ["slide_title_size_pt"])
-    ).paragraphs[0]
-    p.text, p.font.size, p.font.color.rgb = sanitize_text(text), Pt(typ["body_size_pt"]), col["slide_text"]
+    tf = _body_tf(_slide(prs, col["slide_background"], heading, col["slide_header"], typ["slide_title_size_pt"]))
+    # One paragraph per line: python-pptx would turn "\n" in `p.text` into a line break inside ONE paragraph.
+    # A blank line stays an (empty) paragraph so the visual paragraph break survives.
+    for idx, line in enumerate(_lines(text)):
+        p = tf.paragraphs[0] if idx == 0 else tf.add_paragraph()
+        p.text, p.font.size, p.font.color.rgb = line, Pt(typ["body_size_pt"]), col["slide_text"]
 
 
 def _add_bullets_slide(
     prs: Any, heading: str, bullets: list[str], col: dict[str, RGBColor], typ: dict[str, float]
 ) -> None:
     tf = _body_tf(_slide(prs, col["slide_background"], heading, col["slide_header"], typ["slide_title_size_pt"]))
-    for idx, item in enumerate(bullets):
+    # Every non-blank line of every item is its own bullet paragraph with its own marker; blank lines are
+    # paragraph breaks, never empty bullets.
+    lines = [line for item in bullets for line in _lines(item) if line.strip()]
+    for idx, line in enumerate(lines):
         p = tf.paragraphs[0] if idx == 0 else tf.add_paragraph()
-        p.text = f"•  {sanitize_text(item)}"
+        p.text = f"•  {line}"
+        p.level = 0
         p.font.size, p.font.color.rgb = Pt(typ["bullet_size_pt"]), col["slide_text"]
 
 
