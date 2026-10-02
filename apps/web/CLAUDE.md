@@ -1,4 +1,5 @@
 # apps/web
+
 ## Purpose
 The Firebase-hosted web client (PRD 6.2): React UI, the PixiJS v8 isometric world, Story and
 Trace lenses, cards and settings.
@@ -11,8 +12,10 @@ Trace lenses, cards and settings.
 - Reads `packages/contracts-ts` types and Firestore docs under security rules; writes only through
   `tilo-api`, never to models, connectors or storage directly. Writes: none yet.
 
-## Config and requirement IDs
-`config/themes/` (world themes), feature flags. UX-1–UX-9 (18.1); FR-WLD-*; owned from P0-08.
+## Config
+`config/themes/` (world themes), feature flags.
+## Requirement IDs
+UX-1–UX-9 (18.1); FR-WLD-* (world rendering); owned starting P0-08.
 
 ## Stage and world (`src/stage/`, `src/world/`)
 - `Stage.tsx`: the camera is the Pixi world container's transform (`camera.ts`); no CSS transform,
@@ -33,6 +36,5 @@ Trace lenses, cards and settings.
   or `policy.applied` (stamp, HR-7). `/screens/cards`.
 
 ## Local rules
-- Nothing animates without a recorded event (HR-1–HR-7, PRD 9.4). `src/honesty/` (FR-WLD-09) fails
-  on any animation API outside `choreographer.ts`; allowlist + reasons: `test-support/honestyScan.ts`.
+- Nothing animates without a recorded event (HR-1–HR-7, PRD 9.4); `src/honesty/` (FR-WLD-09) fails on animation APIs outside `choreographer.ts` (allowlist: `test-support/honestyScan.ts`).
 - One primary filled button per screen (UX-1); no streaks, hearts or fake urgency (UX-7).

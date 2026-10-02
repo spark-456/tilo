@@ -26,8 +26,11 @@ function walk(dir: string): string[] {
 }
 
 const files = walk(SRC).map((p) => relative(SRC, p).replaceAll("\\", "/"));
-const found = (): Violation[] =>
-  files.flatMap((f) => scanSource(`src/${f}`, readFileSync(join(SRC, f), "utf8")));
+// index.html is scanned too: its inline <style> and <script> blocks can animate as well.
+const found = (): Violation[] => [
+  ...files.flatMap((f) => scanSource(`src/${f}`, readFileSync(join(SRC, f), "utf8"))),
+  ...scanSource("index.html", readFileSync(join(SRC, "..", "index.html"), "utf8")),
+];
 const allowed = (v: Violation) => ALLOWLIST.some((a) => a.file === v.file && a.rule === v.rule);
 
 describe("FR_WLD_09 static check: no animation outside the choreographer (HR-1, HR-2, HR-3)", () => {
@@ -92,6 +95,26 @@ describe("FR_WLD_09 the scanner itself catches each kind of animation", () => {
     ["src/x.css", ".a { animation: spin 1s infinite; }", "css-animation"],
     ["src/x.css", ".a { transition: opacity 0.2s; }", "css-transition"],
     ["src/x.css", "html { scroll-behavior: smooth; }", "css-smooth-scroll"],
+    ["src/x.ts", "el.style.transition = 'opacity 1s';", "style-assign-motion"],
+    ["src/x.ts", "el.style.animationName = 'spin';", "style-assign-motion"],
+    ["src/x.ts", "el.style.setProperty('transition', 'all 1s');", "style-assign-motion"],
+    ["src/x.ts", "el['animate']([{ opacity: 0 }], 200);", "waapi-bracket"],
+    ["src/x.ts", 'el["animate"]([{ opacity: 0 }], 200);', "waapi-bracket"],
+    ["src/x.ts", "el\n  .animate(\n    [{ opacity: 0 }],\n    200,\n  );", "waapi"],
+    ["src/x.ts", "el.animate\n(keyframes, 200);", "waapi"],
+    ["src/x.ts", "el?.animate(keyframes, 200);", "waapi"],
+    ["src/x.ts", "el.scrollIntoView({ behavior: 'smooth' });", "smooth-scroll-js"],
+    ["src/x.ts", 'window.scrollTo({ top: 0, behavior: "smooth" });', "smooth-scroll-js"],
+    ["src/x.ts", "requestIdleCallback(work);", "raf"],
+    ["src/x.ts", "const m = await import('framer-motion');", "tween-library"],
+    ["src/x.ts", "import 'gsap';", "tween-library"],
+    ["src/x.ts", "import { motion } from 'motion/react';", "tween-library"],
+    ["src/x.tsx", "const css = `@keyframes spin { to { opacity: 0; } }`;", "css-keyframes"],
+    ["src/x.tsx", "const css = `.a { transition: opacity 1s; }`;", "css-transition"],
+    ["index.html", "<style>.a { animation: spin 1s infinite; }</style>", "css-animation"],
+    ["index.html", "<style>@keyframes spin { to { opacity: 0; } }</style>", "css-keyframes"],
+    ["index.html", "<script>requestAnimationFrame(tick);</script>", "raf"],
+    ["index.html", "<script>setInterval(tick, 16)</script>", "interval"],
   ])("FR_WLD_09 flags %s: %s", (file, code, rule) => {
     expect(rulesHit(file, code)).toContain(rule);
   });
@@ -102,5 +125,48 @@ describe("FR_WLD_09 the scanner itself catches each kind of animation", () => {
     ).toEqual([]);
     expect(scanSource("src/x.css", "/* transition: none */")).toEqual([]);
     for (const r of RULES) expect(r.why.length).toBeGreaterThan(10);
+  });
+
+  // The comment stripper must not be fooled by comment markers inside strings, templates or regexes.
+  it.each([
+    ["// inside a string", "const u = 'x//'; requestAnimationFrame(f);"],
+    ["// inside a double-quoted string", 'const u = "a//b"; setInterval(f, 1);'],
+    ["/* inside a string", 'const s = "/*"; requestAnimationFrame(f); const t = "*/";'],
+    ["/* inside a string, then a real comment", "const s = '/*'; el.animate(k, 1); /* c */"],
+    ["// inside a template", "const u = `x//y`; requestAnimationFrame(f);"],
+    ["code inside a template expression", "const u = `// ${requestAnimationFrame(f)} //`;"],
+    ["code after a nested template", "const u = `a${`b//`}c`; requestAnimationFrame(f);"],
+    ["// inside a regex", "const r = /\\/\\//; requestAnimationFrame(f);"],
+    ["a quote inside a regex", "const r = /'/; requestAnimationFrame(f);"],
+    ["a quote inside a regex class", "const r = /[/']/; requestAnimationFrame(f);"],
+    ["an apostrophe in JSX text", "const a = <p>don't</p>;\nrequestAnimationFrame(f);"],
+    ["a closing JSX tag before a comment", "const a = <p>x</p>; // note\nsetInterval(f, 1);"],
+    ["code before a trailing comment", "requestAnimationFrame(f); // fine"],
+    ["division before a block comment", "const q = a / b; /* c */ setInterval(f, 1);"],
+  ])("FR_WLD_09 comment stripping: still scans real code after %s", (_name, code) => {
+    expect(scanSource("src/x.tsx", code).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ["a line comment", "// requestAnimationFrame(f)\nconst a = 1;"],
+    ["a block comment across lines", "/* setInterval\n el.animate( */ const a = 1;"],
+    ["a trailing comment", "const a = 1; // el.animate(k, 1)"],
+    ["a comment after a string with //", "const u = 'http://x'; // requestAnimationFrame(f)"],
+    ["a JSDoc block", "/** uses requestAnimationFrame */\nexport const a = 1;"],
+  ])("FR_WLD_09 comment stripping: ignores %s", (_name, code) => {
+    expect(scanSource("src/x.ts", code)).toEqual([]);
+  });
+
+  it("FR_WLD_09 a CSS string holding a comment marker does not hide rules; html comments are ignored", () => {
+    const css = '.a::after { content: "/*"; transition: opacity 1s; } /* c */';
+    expect(rulesHit("src/x.css", css)).toContain("css-transition");
+    expect(scanSource("index.html", "<!-- <style>.a{animation:x 1s}</style> -->")).toEqual([]);
+  });
+
+  it("FR_WLD_09 reports the right line for a multi-line match and for code after a string marker", () => {
+    expect(scanSource("src/x.ts", "a;\nb;\nel\n.animate(\nk)").map((v) => v.line)).toEqual([4]);
+    expect(
+      scanSource("src/x.ts", "const s = '/*';\nsetInterval(f, 1);").map((v) => v.line),
+    ).toEqual([2]);
   });
 });
