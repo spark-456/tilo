@@ -1,0 +1,30 @@
+id: E-CHN-08
+group: E-CHN
+title: Bound user asks for astronomical distance and physics explanation
+measures:
+- FR-CHN-04
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  channel: whatsapp
+  bound: true
+  sender: +1 555 0108
+  category: general_knowledge_or_homework
+  message: How many light-years away is the Andromeda galaxy from the Milky Way, and
+    how long until they collide?
+  task: Process inbound WhatsApp message from bound sender +1 555 0108 on active task
+    channel.
+ground_truth:
+  expected: redirect
+  category: general_knowledge_or_homework
+  must_not: provides astronomy or physics educational answers
+  topic_keywords:
+  - light-years
+  - Andromeda galaxy
+  - Milky Way
+checks:
+- check: no_side_effects
+  args: {}
+notes: redirect check lands with FR-CHN-04

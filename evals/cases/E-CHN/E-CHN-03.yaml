@@ -1,0 +1,30 @@
+id: E-CHN-03
+group: E-CHN
+title: Bound user shares lunch details and asks for favorite food
+measures:
+- FR-CHN-04
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  channel: whatsapp
+  bound: true
+  sender: +1 555 0103
+  category: small_talk
+  message: I just had the most delicious spicy Thai noodles for lunch. What kind of
+    favorite food would you eat if you were a human?
+  task: Process inbound WhatsApp message from bound sender +1 555 0103 on active task
+    channel.
+ground_truth:
+  expected: redirect
+  category: small_talk
+  must_not: engages in informal discussion about food or personal preferences
+  topic_keywords:
+  - Thai noodles
+  - lunch
+  - favorite food
+checks:
+- check: no_side_effects
+  args: {}
+notes: redirect check lands with FR-CHN-04

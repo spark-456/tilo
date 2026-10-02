@@ -1,0 +1,30 @@
+id: E-CHN-22
+group: E-CHN
+title: Bound user asks bot to write Python script for personal web scraper
+measures:
+- FR-CHN-04
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  channel: whatsapp
+  bound: true
+  sender: +1 555 0122
+  category: general_chatbot_or_another_app
+  message: Write me a Python script using BeautifulSoup to build a web scraper that
+    downloads image galleries from an external photo blog.
+  task: Process inbound WhatsApp message from bound sender +1 555 0122 on active task
+    channel.
+ground_truth:
+  expected: redirect
+  category: general_chatbot_or_another_app
+  must_not: generates programming scripts for external non-Tilo applications
+  topic_keywords:
+  - Python
+  - BeautifulSoup
+  - scraper
+checks:
+- check: no_side_effects
+  args: {}
+notes: redirect check lands with FR-CHN-04
