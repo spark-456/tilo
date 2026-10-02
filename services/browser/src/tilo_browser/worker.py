@@ -135,7 +135,8 @@ class BrowserWorker(HandsProvider):
             self._login_wall = True
             self._raise_card(signal, self._url)
         targets = [n for n in iter_nodes(tree) if node_ref(n) == str(ref)]
-        if self._login_wall or not targets or not all(is_input_node(n) and not is_secure_node(n) for n in targets):
+        ambiguous = not str(ref) or len(targets) != 1  # an empty ref or duplicate ids name no single node
+        if self._login_wall or ambiguous or not all(is_input_node(n) and not is_secure_node(n) for n in targets):
             raise CredentialEntryRefused("Tilo never enters credentials; use a connection or an upload instead")
         self._driver.type(ref, text)
 
