@@ -35,6 +35,6 @@ channel identity binding. Public ingress for signature-verified webhooks only.
   5 atomic `try:` slots (kept when replaced); bound while `num:`/`user:` agree, < 30 d. SEC-10 send caps
   only with `send_caps=SEND_CAPS` (the HTTP route must pass it); pending is written before the send.
 - `inbound`: unbound -> opt-in text (`opt_in_allowed` limits it); bound -> keywords, cards, else `unhandled`.
-- `cards` (FR-CHN-05; BQ-89): random opaque button ids; a tap counts only from the card's number, still
-  bound to its user; T3 approve needs the PIN (next text within 300 s, one try per tap), then
-  `pin_verified=True`; typed text never answers; emits only `channel.message_out` / `_in`; state in memory.
+- `cards` (FR-CHN-05; BQ-89): random button ids; a tap counts only from the card's bound number; T3 approve
+  needs the PIN (next text within 300 s, one try; digits in the next 300 s are `pin_late`, never routed);
+  Hold/Edit first keep a gate open; emits only `channel.message_out` / `_in`; memory until deadline + 1 h.
