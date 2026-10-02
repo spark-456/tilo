@@ -1,15 +1,16 @@
 // S-19 Connections (PRD 18.3, 12.1): every connection the world has, its state in words, the gates
 // that guard what it may do and the access still waiting for consent. Islands and gates come from
-// client.getLayout, consent cards from client.listCards. Connect and disconnect are placeholders.
-// Access copy follows PRD 18.4: you sign in with the provider and Tilo never sees your password.
-// No design export lists connections (design/source/INDEX.md, S-19): cards and rows after
-// "Tilo Team.dc.html", neutral role tokens.
+// client.getLayout (the world's starting state); consent requests come only from this run's
+// connection.requested events that no connection.consented or connection.revoked has answered.
+// Connect and disconnect are placeholders. Access copy follows PRD 18.4: you sign in with the
+// provider and Tilo never sees your password. No design export lists connections
+// (design/source/INDEX.md, S-19): cards and rows after "Tilo Team.dc.html", neutral role tokens.
 import { useClient } from "../api/ClientProvider";
 import { FIXTURE_WORLD_ID as worldId } from "../api/fixtures/derived";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
-import { Chip, Page, Row, Section, Stats, words } from "./kit";
+import { Chip, Page, Row, Section, Stats, field, nameOf, useFixtureRun, words } from "./kit";
 import { useRemote } from "./remote";
 
 const STATE = {
@@ -27,12 +28,17 @@ const KIND = {
 
 export function S_19() {
   const client = useClient();
-  const [layout, retryLayout] = useRemote("load the connections", () => client.getLayout(worldId));
-  const [cards, retryCards] = useRemote("load the consent requests", () =>
-    client.listCards(worldId),
+  const { events } = useFixtureRun();
+  const [layout, retry] = useRemote("load the connections", () => client.getLayout(worldId));
+  const answered = new Set(
+    events
+      .filter((e) => e.type === "connection.consented" || e.type === "connection.revoked")
+      .map((e) => field(e, "card_id") ?? field(e, "connector")),
+  );
+  const consent = events.filter(
+    (e) => e.type === "connection.requested" && !answered.has(field(e, "card_id")),
   );
   const islands = layout.status === "ready" ? layout.value.semantic.islands : [];
-  const consent = cards.status === "ready" ? cards.value.filter((c) => c.consent !== null) : [];
   return (
     <Page
       testid="connections"
@@ -45,18 +51,22 @@ export function S_19() {
             "Connected",
             layout.status === "ready" ? islands.filter((i) => i.state === "connected").length : "-",
           ],
-          ["Waiting for consent", cards.status === "ready" ? consent.length : "-"],
+          ["Waiting for consent", consent.length],
         ]}
       />
-      <Section title="In this world" reserve={9}>
+      <Section
+        title="In this world"
+        note="Where this world starts, from its layout."
+        reserve={[8, 12]}
+      >
         <Loaded
           what="the connections"
           remote={layout}
-          retry={retryLayout}
+          retry={retry}
           isEmpty={(l) => l.semantic.islands.length === 0}
         >
           {(l) => (
-            <ul className="rows" data-testid="connection-list">
+            <ul className="blist" data-testid="connection-list">
               {l.semantic.islands.map((i) => {
                 const gates = l.semantic.gates.filter((g) => g.between[1] === i.id);
                 return (
@@ -80,29 +90,35 @@ export function S_19() {
           )}
         </Loaded>
       </Section>
-      <Section title="Waiting for your consent" reserve={5}>
-        <Loaded what="the consent requests" remote={cards} retry={retryCards} isEmpty={() => false}>
-          {() =>
-            consent.length === 0 ? (
-              <p className="empty-note">No access request is waiting.</p>
-            ) : (
-              <ul className="rows" data-testid="consent-list">
-                {consent.map((c) => (
-                  <Row
-                    key={`${c.id}:${c.rung}:${c.what_happened}`}
-                    name={words(c.consent?.connector ?? "")}
-                    sub={c.consent?.scopes.join("; ")}
-                    state={<Chip tone="needs">Waiting</Chip>}
-                  >
-                    <AppLink to="/needs-you/consent" className="pill">
-                      Review
-                    </AppLink>
-                  </Row>
-                ))}
-              </ul>
-            )
-          }
-        </Loaded>
+      <Section
+        title="Waiting for your consent"
+        note="Each request lists exactly what it may do. You sign in with the provider; Tilo never sees your password."
+        reserve={[4, 6]}
+      >
+        {consent.length === 0 ? (
+          <p className="empty-note" data-testid="consent-empty">
+            No access request is waiting.
+          </p>
+        ) : (
+          <ul className="blist" data-testid="consent-list">
+            {consent.map((e) => (
+              <Row
+                key={e.seq}
+                name={nameOf(String(field(e, "connector")))}
+                sub={e.summary}
+                state={<Chip tone="needs">Waiting</Chip>}
+              >
+                <AppLink
+                  to="/needs-you/consent"
+                  className="pill"
+                  aria-label={`Review: ${e.summary}`}
+                >
+                  Review
+                </AppLink>
+              </Row>
+            ))}
+          </ul>
+        )}
       </Section>
     </Page>
   );
