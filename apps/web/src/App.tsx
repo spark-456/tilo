@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef } from "react";
 import { useIsFixtureClient, useReplaySpeed } from "./api/ClientProvider";
 import { useMediaQuery } from "./hooks/useMediaQuery";
+import { NeedsYouRail } from "./needs-you/NeedsYouRail";
 import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
 import { PrimaryNav } from "./screens/PrimaryNav";
@@ -29,6 +30,8 @@ const RUN_SCREENS: ReadonlySet<string> = new Set([
   "S-21",
   "S-23",
 ]);
+/** Screens whose right rail shows the live queue: the run screens and the Needs-you screens. */
+const QUEUE_RAIL_SCREENS: ReadonlySet<string> = new Set([...RUN_SCREENS, "S-06", "S-07"]);
 const stageMode = new URLSearchParams(window.location.search).get("display") === "stage";
 
 /** PRD 18.3 layout frame: desktop rails either side of the stage; mobile bottom tabs. */
@@ -125,8 +128,14 @@ export function App() {
             <>
               <h2>Activity</h2>
               <p data-testid="right-rail-meter">Nothing yet. This fills in once a run starts.</p>
-              <h2>Needs you</h2>
-              <p>Nothing needs you.</p>
+              {screen && QUEUE_RAIL_SCREENS.has(screen.id) ? (
+                <NeedsYouRail />
+              ) : (
+                <>
+                  <h2>Needs you</h2>
+                  <p>Nothing needs you.</p>
+                </>
+              )}
               <h2>Roster</h2>
               <p>No agents assigned.</p>
             </>
