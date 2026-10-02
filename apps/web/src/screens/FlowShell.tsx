@@ -29,7 +29,7 @@ function Summary({ children }: { children: ReactNode }) {
 /** The loading, error and empty states of one remote value; `children` renders the ready one.
  * All four states sit in one `flow-slot` with a reserved height, so data arriving (UX-1, CLS)
  * never moves what is below. */
-function Loaded<T>({
+export function Loaded<T>({
   what,
   remote,
   retry,
@@ -55,7 +55,7 @@ function Loaded<T>({
   return <div className="flow-slot">{body}</div>;
 }
 
-function Primary({
+export function Primary({
   label,
   action,
   disabled = false,

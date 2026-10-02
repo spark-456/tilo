@@ -4,7 +4,7 @@ import { sectionOf } from "./PrimaryNav";
 import { SCREENS } from "./meta";
 import { matchScreen } from "./routes";
 
-const FLOW_SCREENS = ["S-01", "S-02", "S-03", "S-04", "S-12"];
+const FLOW_SCREENS = ["S-01", "S-02", "S-03", "S-04"];
 
 describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
   it("S-01..S-24 are all listed, and only the Should screens have no address", () => {

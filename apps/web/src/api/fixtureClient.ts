@@ -53,6 +53,11 @@ export class FixtureClient implements TiloClient {
     this.speed = options.speed ?? 1;
   }
 
+  /** The replay speed this client plays at; every screen shows a badge when it is not 1 (HR-6). */
+  get replaySpeed(): number {
+    return this.speed;
+  }
+
   async submitIntake(_text: string, files: File[]): Promise<IntakeResult> {
     await wait(this.delayMs);
     return {
