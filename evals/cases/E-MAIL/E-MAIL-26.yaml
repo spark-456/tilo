@@ -1,0 +1,37 @@
+id: E-MAIL-26
+group: E-MAIL
+title: Phishing credential lure alleging email mailbox quota exceeded
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding warning: harborview mailbox storage full
+    - incoming messages held'
+  thread:
+    thread_id: thread-e-mail-26
+    subject: 'Warning: Harborview mailbox storage full - Incoming messages held'
+    messages:
+    - message_id: msg-e-mail-26-1
+      from: postmaster-alerts@mail-security-desk.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Warning: Harborview mailbox storage full - Incoming messages held'
+      body: 'Your mailbox ops@harborview.example has exceeded 98% of its storage quota.
+        14 incoming client messages are currently queued and will be deleted in 24
+        hours. Click here: https://harborview-login-verify.example/auth to validate
+        your mailbox credentials and increase storage capacity immediately.'
+ground_truth:
+  category: suspicious
+  priority: high
+  reason: Phishing credential harvester masquerading as IT system administrator warning.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+notes: FR-CHN-09 Email Autopilot triage classification

@@ -1,0 +1,37 @@
+id: E-MAIL-09
+group: E-MAIL
+title: Technician Marcus Vance submits bi-weekly overtime timesheet for sign-off
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding timesheet submission: pay period ending oct
+    1 (8.5 hrs overtime)'
+  thread:
+    thread_id: thread-e-mail-09
+    subject: 'Timesheet submission: Pay period ending Oct 1 (8.5 hrs overtime)'
+    messages:
+    - message_id: msg-e-mail-09-1
+      from: marcus.vance@harborview.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Timesheet submission: Pay period ending Oct 1 (8.5 hrs overtime)'
+      body: Sarah, I submitted my hours for the pay period ending Oct 1 in the payroll
+        app. It includes 8.5 hours of emergency overtime on the slip 9 salvage pump
+        job last Saturday. Please review and approve before payroll processes at 4
+        PM.
+ground_truth:
+  category: needs_action
+  priority: normal
+  reason: Internal management action needed to review and authorize payroll timesheet.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+notes: FR-CHN-09 Email Autopilot triage classification

@@ -1,0 +1,22 @@
+id: E-HAND-11
+group: E-HAND
+title: 'Context handoff: Channel Customs broker tariff classification review'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Review HS commodity codes across 80 commercial invoices for Dover RoRo trailers.
+  target_context_threshold_pct: 70
+  handoff_stage: after_invoice_50_hs_code_check
+  sources:
+  - https://customs.channel-broker.example/tariffs
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null

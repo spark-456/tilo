@@ -1,0 +1,38 @@
+id: E-MAIL-07
+group: E-MAIL
+title: Vendor invoice received for diesel filters and impeller kits due in 5 days
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding invoice #inv-2026-9412 from sound marine
+    supply'
+  thread:
+    thread_id: thread-e-mail-07
+    subject: 'Invoice #INV-2026-9412 from Sound Marine Supply'
+    messages:
+    - message_id: msg-e-mail-07-1
+      from: invoicing@soundmarinesupply.example
+      to:
+      - ops@harborview.example
+      cc:
+      - billing@harborview.example
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Invoice #INV-2026-9412 from Sound Marine Supply'
+      body: 'Attached is invoice #INV-2026-9412 for $1,420.50 covering your recent
+        shipment of Kestrel fuel filters and Brineflow pump impellers. Payment terms
+        are net 15, due by October 7, 2026. Please remit via ACH or portal.'
+ground_truth:
+  category: needs_action
+  priority: high
+  reason: Accounts payable invoice requiring verification against purchase order and
+    approval for payment.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+notes: FR-CHN-09 Email Autopilot triage classification

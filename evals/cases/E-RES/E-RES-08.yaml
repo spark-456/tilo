@@ -1,0 +1,39 @@
+id: E-RES-08
+group: E-RES
+title: 'Research SC-06: Maple & Stone Builders rate card and earliest availability'
+measures:
+- EV-01
+- EV-05
+status: ready
+deploy_gate: false
+inputs:
+  question: Find Maple & Stone Builders' base fee, per-cabinet rate, licence, and first November availability
+    date.
+  seed_urls:
+  - http://sandbox-web.example/s/maple-stone-builders/profile
+  seed_files:
+  - services/sandbox-web/seed/maple-stone-builders.yaml
+scripted_answers: []
+ground_truth:
+  base_fee: 800
+  per_cabinet: 110
+  licence: SG-BCA-KRW-00902
+  first_date: '2026-11-06'
+checks:
+- check: equals_ground_truth
+  args:
+    field: base_fee
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: per_cabinet
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: licence
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: first_date
+    tolerance: 0
+recording: null

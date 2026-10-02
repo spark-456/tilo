@@ -41,6 +41,8 @@ class InboundMessage:
     timestamp: int
     kind: str
     text: str | None
+    button_id: str | None = None  # reply-button id (interactive) or template quick-reply payload (button)
+    context_id: str | None = None  # wamid of the message replied to
 
 
 @dataclass(frozen=True)
@@ -118,7 +120,32 @@ def _parse_message(raw: Any) -> InboundMessage | None:
     if kind == "text":
         body = (raw.get("text") or {}).get("body") if isinstance(raw.get("text"), dict) else None
         text = body if isinstance(body, str) else None
-    return InboundMessage(message_id=message_id, sender=sender, timestamp=timestamp, kind=kind, text=text)
+    return InboundMessage(
+        message_id=message_id,
+        sender=sender,
+        timestamp=timestamp,
+        kind=kind,
+        text=text,
+        button_id=_button_id(raw, kind),
+        context_id=_str_at(raw, "context", "id"),
+    )
+
+
+def _str_at(raw: Any, *path: str) -> str | None:
+    """The non-empty string at `path` through nested objects, else None."""
+    for key in path:
+        raw = raw.get(key) if isinstance(raw, dict) else None
+    return raw if isinstance(raw, str) and raw else None
+
+
+def _button_id(raw: dict[str, Any], kind: str) -> str | None:
+    if kind == "interactive":
+        if _str_at(raw, "interactive", "type") != "button_reply":
+            return None
+        return _str_at(raw, "interactive", "button_reply", "id")
+    if kind == "button":
+        return _str_at(raw, "button", "payload")
+    return None
 
 
 class WhatsAppWebhook:

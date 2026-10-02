@@ -73,7 +73,21 @@ Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject
 `tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
 FR-AGT-11), both already listed above (MIT); and the in-workspace `tilo-policy` (not external).
 FR-CON-01 adds `pyyaml` (MIT, already listed above) as a direct dependency for the connector config
-loader. No new licence.
+loader. No new licence. FR-CON-02 adds `cryptography` for AES-GCM envelope encryption of OAuth tokens:
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| cryptography (`tilo_connectors.tokens`, FR-CON-02) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
+
+## Python (`services/browser`)
+
+`tilo-browser` (FR-CON-07/08) adds one direct runtime dependency, already in `uv.lock` through `httpx`:
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| idna (UTS 46 non-transitional host normalisation for the egress allowlist, as browsers do) | BSD-3-Clause | https://pypi.org/project/idna/ |
+
+Its tests use `jsonschema` and `referencing` from the root dev group (above).
 
 ## Python (`packages/planning`)
 
@@ -83,8 +97,11 @@ loader. No new licence.
 
 ## Python (`services/render`)
 
-`tilo-render` (AGR-01 / FR-CON-09) declares `pydantic` as a direct runtime dependency, already
-listed above under `packages/contracts-py` (MIT). No new licence.
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| python-pptx | MIT | https://pypi.org/project/python-pptx/ |
+
+`tilo-render` (AGR-01/02 / FR-CON-09) also uses `pydantic` (already listed under `packages/contracts-py`, MIT) and `pyyaml` (already listed under the root dev dependency group, MIT).
 
 ## JavaScript / TypeScript (root `package.json` and `apps/web`, `pnpm`-managed)
 

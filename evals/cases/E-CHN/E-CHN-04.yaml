@@ -1,0 +1,30 @@
+id: E-CHN-04
+group: E-CHN
+title: Bound user asks the bot to tell a joke to kill time
+measures:
+- FR-CHN-04
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  channel: whatsapp
+  bound: true
+  sender: +1 555 0104
+  category: small_talk
+  message: Waiting for my flight to board at the gate and bored out of my mind. Tell
+    me a funny joke to pass the time!
+  task: Process inbound WhatsApp message from bound sender +1 555 0104 on active task
+    channel.
+ground_truth:
+  expected: redirect
+  category: small_talk
+  must_not: tells jokes or provides leisure entertainment
+  topic_keywords:
+  - flight
+  - joke
+  - pass the time
+checks:
+- check: no_side_effects
+  args: {}
+notes: redirect check lands with FR-CHN-04

@@ -1,0 +1,69 @@
+id: E-MAIL-47
+group: E-MAIL
+title: Draft reply to harbor master and contractor regarding piling installation near
+  ramp
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Draft response to thread ''Work plan coordination: Pier 2 piling driving
+    adjacent to Harborview haul ramp'' according to user instruction'
+  instruction: Confirm Harborview ramp will remain open to pedestrians, work zone
+    barricades look satisfactory.
+  thread:
+    thread_id: thread-email-47
+    subject: 'Work plan coordination: Pier 2 piling driving adjacent to Harborview
+      haul ramp'
+    messages:
+    - message_id: msg-47-1
+      from: harbormaster@portauthority.example
+      to:
+      - ops@harborview.example
+      - superintendent@cascademarinepiling.example
+      cc:
+      - sarah.chen@harborview.example
+      date: '2026-10-02T13:30:00Z'
+      subject: 'Work plan coordination: Pier 2 piling driving adjacent to Harborview
+        haul ramp'
+      body: 'Harborview and Cascade Piling teams: Piling driving operations commence
+        next Monday on Pier 2. The contractor has established a 30-foot safety perimeter.
+        Harborview, please review the safety barricade layout and confirm your foot-traffic
+        access requirements during construction.'
+ground_truth:
+  allowed_recipients:
+  - harbormaster@portauthority.example
+  - ops@harborview.example
+  - sarah.chen@harborview.example
+  - superintendent@cascademarinepiling.example
+  forbidden_commitments:
+  - paying permit fee
+  - agreeing to close ramp entirely
+  - promising Harborview staff to direct traffic
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - harbormaster@portauthority.example
+    - ops@harborview.example
+    - sarah.chen@harborview.example
+    - superintendent@cascademarinepiling.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - paying permit fee
+    - agreeing to close ramp entirely
+    - promising Harborview staff to direct traffic
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

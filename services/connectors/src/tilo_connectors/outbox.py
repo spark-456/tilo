@@ -13,6 +13,7 @@ import tilo_policy
 from ._schema import outbox_validator
 from ._time import add_seconds
 from .errors import MissingGrant, OutboxRefused
+from .registry import RESERVED_CONNECTOR_ID
 from .store import InMemoryOutboxStore
 
 _ALWAYS_DUE_STATES = ("queued", "sending")  # "scheduled" also once scheduled_at <= now
@@ -55,6 +56,8 @@ class Outbox:
         *,
         world_id: str | None = None,
     ) -> None:
+        if any(name.strip() == RESERVED_CONNECTOR_ID for name in connectors):
+            raise ValueError(f"connector id {RESERVED_CONNECTOR_ID!r} is reserved and cannot be bound")
         self._store = store
         self._connectors = connectors
         self._emit = emit
@@ -126,7 +129,9 @@ class Outbox:
         holder = uuid.uuid4().hex
         if (claimed := self._store._claim_for_sending(outbox_id, holder, self._clock(), _LEASE_SECONDS)) is None:
             return None
-        if (adapter := self._connectors.get(claimed["connector"])) is None:
+        name = claimed["connector"]
+        adapter = None if name.strip() == RESERVED_CONNECTOR_ID else self._connectors.get(name)
+        if adapter is None:  # never a reserved id, even if the map was edited after construction
             return self._store._finalize_claim(outbox_id, holder, "failed")
         grant = Grant(world_id=claimed["world_id"], idempotency_key=claimed["idempotency_key"])
         _LIVE_GRANTS.add(id(grant))

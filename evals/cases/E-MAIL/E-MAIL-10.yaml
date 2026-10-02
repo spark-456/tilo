@@ -1,0 +1,40 @@
+id: E-MAIL-10
+group: E-MAIL
+title: Insurance agency requests renewal certificate of commercial liability
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding upcoming policy renewal: harborview marine
+    services commercial policy #gl-4481'
+  thread:
+    thread_id: thread-e-mail-10
+    subject: 'Upcoming policy renewal: Harborview Marine Services commercial policy
+      #GL-4481'
+    messages:
+    - message_id: msg-e-mail-10-1
+      from: renewals@maritimeunderwriters.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Upcoming policy renewal: Harborview Marine Services commercial policy
+        #GL-4481'
+      body: 'Your commercial general liability policy #GL-4481 expires on November
+        1. To prepare your renewal quote without disruption in coverage, please update
+        your estimated annual gross receipts and active vessel count on our secure
+        underwriting portal.'
+ground_truth:
+  category: needs_action
+  priority: normal
+  reason: Insurance underwriting requirement requiring administrative completion of
+    questionnaire.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+notes: FR-CHN-09 Email Autopilot triage classification

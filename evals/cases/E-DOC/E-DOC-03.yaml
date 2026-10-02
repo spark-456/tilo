@@ -1,0 +1,48 @@
+id: E-DOC-03
+group: E-DOC
+title: 'PDF deliverable: Bramble Foods gross profit by SKU category'
+measures:
+- FR-CON-09
+- FR-CON-10
+status: skeleton
+deploy_gate: false
+inputs:
+  format: pdf
+  title: 'PDF deliverable: Bramble Foods gross profit by SKU category'
+  required_sections:
+  - Margin Summary
+  - SKU Profit Table
+  - Category Profit Chart
+  table_fixture: evals/fixtures/doc/bramble_sku_margins.csv
+  label_column: sku_code
+  group_column: category
+  metric_column: gross_profit_gbp
+scripted_answers: []
+ground_truth:
+  required_sections:
+  - Margin Summary
+  - SKU Profit Table
+  - Category Profit Chart
+  chart_values:
+  - 8400
+  - 6100
+  - 12300
+  - 9200
+  - 4800
+  row_count: 5
+  total: 40800
+  by_group:
+    Beverages: 20700
+    Preserves: 10900
+    Bakery: 9200
+  max_row_label: SKU-OAT-03
+  max_row_value: 12300
+checks:
+- check: equals_ground_truth
+  args:
+    field: required_sections
+- check: equals_ground_truth
+  args:
+    field: chart_values
+    tolerance: 0
+recording: null

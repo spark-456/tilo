@@ -355,7 +355,8 @@ class CardStore:
             if channel not in card["answer_channels"]:
                 return AnswerResult("rejected", "invalid_channel", ())
             tier_t3 = record.kind == "gate" and card["gate"]["risk_tier"] == "T3"
-            if tier_t3 and channel == "whatsapp" and not pin_verified:
+            # SEC-06: the PIN guards the approval only; hold and edit write nothing and open no gate.
+            if tier_t3 and channel == "whatsapp" and option == "approve" and not pin_verified:
                 return AnswerResult("rejected", "pin_required", ())
 
             authz = {"by": "person", "ref": principal.user_id, "at": self._clock.now()}

@@ -29,3 +29,9 @@ export const useClient = (): TiloClient => useContext(ClientContext);
 
 /** True while the active client serves fixtures, so every screen shows the HR-4/BQ-07 banner. */
 export const useIsFixtureClient = (): boolean => useClient() instanceof FixtureClient;
+
+/** The fixture client's replay speed (1 for any other client): HR-6 needs a badge when it is not 1. */
+export function useReplaySpeed(): number {
+  const client = useClient();
+  return client instanceof FixtureClient ? client.replaySpeed : 1;
+}

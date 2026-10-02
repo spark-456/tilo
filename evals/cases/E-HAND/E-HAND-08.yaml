@@ -1,0 +1,22 @@
+id: E-HAND-08
+group: E-HAND
+title: 'Context handoff: Vermeer Industrial marine pump maintenance history rollup'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Compile 5-year service intervals and seal replacement records across 18 marine pump installations.
+  target_context_threshold_pct: 70
+  handoff_stage: after_vessel_10_service_log
+  sources:
+  - https://service.vermeer-industrial.example/marine-logs
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null
