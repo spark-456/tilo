@@ -7,7 +7,11 @@ in production) and looked up by a keyed hash; codes are stored only as a keyed h
 - `num:<hash>`    -> {user_id, verified_at}                       one number, at most one user
 - `user:<id>`     -> {number_hash, number_ct, verified_at}        one user, at most one number
 - `pending:<id>`  -> {pid, number_hash, number_ct, code_hash, sent_at}
-- `try:<pid>:<i>` -> {}   attempt slot i of a pending code, claimed with an atomic create
+- `try:<pid>:<i>` -> {expires_at}   attempt slot i of a code (atomic create); a replaced code keeps its slots
+- `cap:<n|u>:<hash or id>:<window>:<bucket>:<i>` -> {expires_at}   code-send slot i (SEC-10 caps)
+- `optin:<hash>`  -> {expires_at}   the last opt-in reply to an unbound number
+
+`expires_at` is for the store's TTL purge (a Firestore TTL policy in production).
 
 A binding counts only while both records agree and `now < verified_at + RECONFIRM_AFTER_S`. Defaults
 the PRD leaves open are BQ-89. Numbers and codes are never logged.
@@ -19,7 +23,7 @@ import hashlib
 import hmac
 import logging
 import secrets
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -31,15 +35,22 @@ CODE_TTL_S = 600
 MAX_CODE_ATTEMPTS = 5
 RECONFIRM_AFTER_S = 30 * 86400
 MIN_HASH_KEY_BYTES = 32
+# SEC-10 code-send caps, (window_s, sends) per number ("n") and per user ("u"). Off unless passed as
+# `send_caps`: the HTTP route must pass SEND_CAPS (the FR-CHN-03 acceptance tests start uncapped).
+SEND_CAPS: dict[str, tuple[tuple[int, int], ...]] = {"n": ((3600, 3), (86400, 10)), "u": ((3600, 5), (86400, 20))}
+OPT_IN_EVERY_S = 600
 _STRIP = str.maketrans("", "", " -.()")
 
 
 def normalise_number(raw: str) -> str | None:
-    """E.164 as typed -> WhatsApp wa_id digits; None unless 8 to 15 ASCII digits remain."""
+    """E.164 as typed -> WhatsApp wa_id digits; None unless 8 to 15 ASCII digits remain, the first is not 0
+    (no country code starts with 0, so "00" or a national 0 is refused) and they are not all the same."""
     digits = raw.translate(_STRIP)
     if digits.startswith("+"):
         digits = digits[1:]
     if not (digits.isascii() and digits.isdigit() and 8 <= len(digits) <= 15):
+        return None
+    if digits[0] == "0" or len(set(digits)) == 1:
         return None
     return digits
 
@@ -90,6 +101,7 @@ class BindingService:
         sender: Sender,
         clock: Callable[[], float],
         hash_key: bytes,
+        send_caps: Mapping[str, tuple[tuple[int, int], ...]] | None = None,
     ) -> None:
         if len(hash_key) < MIN_HASH_KEY_BYTES:
             raise ValueError(f"hash key must be at least {MIN_HASH_KEY_BYTES} bytes")
@@ -98,6 +110,7 @@ class BindingService:
         self._sender = sender
         self._clock = clock
         self._key = hash_key
+        self._caps = send_caps or {}
 
     # --- web app ---------------------------------------------------------------------------------
 
@@ -109,13 +122,9 @@ class BindingService:
         owner = self._owner(number_hash)
         if owner is not None and owner != user_id:
             return _refused("number_taken")
-        self._drop_pending(user_id)
+        if not self._claim_send(user_id, number_hash):
+            return _refused("rate_limited")  # the pending code, if any, and its attempts stay as they are
         code = f"{secrets.randbelow(1_000_000):06d}"
-        try:
-            self._sender.send_text(wa_id, f"Your Tilo code is {code}. It is valid for 10 minutes.")
-        except Exception as exc:
-            log.warning("binding code send failed user=%s error=%s", user_id, type(exc).__name__)
-            return _refused("send_failed")
         pid = secrets.token_hex(8)
         pending = {
             "pid": pid,
@@ -124,7 +133,17 @@ class BindingService:
             "code_hash": self._mac("code", f"{pid}|{code}"),
             "sent_at": self._clock(),
         }
-        self._store.put(f"pending:{user_id}", pending)
+        try:  # stored before the send, so a store failure never strands a code nobody can confirm
+            self._store.put(f"pending:{user_id}", pending)
+        except Exception as exc:
+            log.error("binding pending write failed user=%s error=%s", user_id, type(exc).__name__)
+            return _refused("unavailable")
+        try:
+            self._sender.send_text(wa_id, f"Your Tilo code is {code}. It is valid for 10 minutes.")
+        except Exception as exc:
+            log.warning("binding code send failed user=%s error=%s", user_id, type(exc).__name__)
+            self._drop_pending(user_id)
+            return _refused("send_failed")
         return _OK
 
     def confirm(self, user_id: str, code: str) -> BindingResult:
@@ -137,7 +156,8 @@ class BindingService:
         now = self._clock()
         if now >= pending["sent_at"] + CODE_TTL_S:
             return _refused("expired")
-        slot = next((i for i in range(MAX_CODE_ATTEMPTS) if self._store.create(f"try:{pid}:{i}", {})), None)
+        expiry = {"expires_at": pending["sent_at"] + CODE_TTL_S}
+        slot = next((i for i in range(MAX_CODE_ATTEMPTS) if self._store.create(f"try:{pid}:{i}", expiry)), None)
         if slot is None:
             return _refused("too_many_attempts")
         if not hmac.compare_digest(self._mac("code", f"{pid}|{code}"), pending["code_hash"]):
@@ -145,21 +165,46 @@ class BindingService:
         number_hash = pending["number_hash"]
         record = {"user_id": user_id, "verified_at": now}
         owner = self._owner(number_hash)
-        if owner not in (None, user_id) or (owner is None and not self._claim(number_hash, record)):
-            self._drop_pending(user_id)
-            return _refused("number_taken")
         if owner == user_id:
             self._store.put(f"num:{number_hash}", record)
-        self._unbind_number(user_id, keep=number_hash)
+        elif owner is not None or not self._claim(number_hash, record) or not self._holds(number_hash, user_id):
+            self._drop_pending(user_id)
+            return _refused("number_taken")
+        previous = self._store.get(f"user:{user_id}")
         self._store.put(
             f"user:{user_id}",
             {"number_hash": number_hash, "number_ct": pending["number_ct"], "verified_at": now},
         )
         self._drop_pending(user_id)
+        if self._owner(number_hash) != user_id:  # lost a race after the write: keep what the user had
+            if previous is None:
+                self._store.delete(f"user:{user_id}")
+            else:
+                self._store.put(f"user:{user_id}", previous)
+            return _refused("number_taken")
+        if previous is not None and previous["number_hash"] != number_hash:
+            self._release(previous["number_hash"], user_id)
         return _OK
 
+    def allow_opt_in(self, number: str) -> bool:
+        """At most one opt-in reply per number per OPT_IN_EVERY_S (InboundRouter `opt_in_allowed`)."""
+        key = f"optin:{self._mac('number', normalise_number(number) or number)}"
+        now = self._clock()
+        record = {"expires_at": now + OPT_IN_EVERY_S}
+        if self._store.create(key, record):
+            return True
+        seen = self._store.get(key)
+        if seen is not None and now < float(seen["expires_at"]):
+            return False
+        self._store.put(key, record)
+        return True
+
     def unbind(self, user_id: str) -> bool:
-        removed = self._unbind_number(user_id, keep=None)
+        user = self._store.get(f"user:{user_id}")
+        removed = user is not None
+        if user is not None:
+            self._release(user["number_hash"], user_id)
+            self._store.delete(f"user:{user_id}")
         if self._store.get(f"pending:{user_id}") is not None:
             self._drop_pending(user_id)
             removed = True
@@ -212,8 +257,31 @@ class BindingService:
         return str(record["user_id"])
 
     def _agrees(self, user_id: str, user: dict[str, Any]) -> bool:
-        record = self._store.get(f"num:{user['number_hash']}")
+        return self._holds(user["number_hash"], user_id)
+
+    def _holds(self, number_hash: str, user_id: str) -> bool:
+        record = self._store.get(f"num:{number_hash}")
         return record is not None and record["user_id"] == user_id
+
+    def _release(self, number_hash: str, user_id: str) -> None:
+        if self._holds(number_hash, user_id):
+            self._store.delete(f"num:{number_hash}")
+
+    def _claim_send(self, user_id: str, number_hash: str) -> bool:
+        """Claims one slot in each SEC-10 send window; refused (claiming nothing) when any window is full."""
+        now = self._clock()
+        windows = []
+        for scope, ident in (("n", number_hash), ("u", user_id)):
+            for window, limit in self._caps.get(scope, ()):
+                bucket = int(now // window)
+                windows.append((f"cap:{scope}:{ident}:{window}:{bucket}", limit, (bucket + 1) * window))
+        if any(self._store.get(f"{prefix}:{limit - 1}") is not None for prefix, limit, _ in windows):
+            return False
+        for prefix, limit, expires_at in windows:
+            slot = {"expires_at": float(expires_at)}
+            if not any(self._store.create(f"{prefix}:{i}", slot) for i in range(limit)):
+                return False  # a concurrent start took the last slot
+        return True
 
     def _claim(self, number_hash: str, record: dict[str, Any]) -> bool:
         """Atomic create; a lapsed or orphaned record (no valid owner) is overwritten."""
@@ -222,19 +290,6 @@ class BindingService:
         if self._owner(number_hash) is not None:
             return False
         self._store.put(f"num:{number_hash}", record)
-        return True
-
-    def _unbind_number(self, user_id: str, *, keep: str | None) -> bool:
-        user = self._store.get(f"user:{user_id}")
-        if user is None:
-            return False
-        number_hash = user["number_hash"]
-        if number_hash != keep:
-            record = self._store.get(f"num:{number_hash}")
-            if record is not None and record["user_id"] == user_id:
-                self._store.delete(f"num:{number_hash}")
-        if keep is None:
-            self._store.delete(f"user:{user_id}")
         return True
 
     def _pending_live(self, user_id: str) -> bool:
