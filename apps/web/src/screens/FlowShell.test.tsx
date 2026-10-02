@@ -117,7 +117,7 @@ describe("PRD-18.3 flow: loading and empty states", () => {
     expect(container.textContent).toContain(
       "up to 45 credits (about US$0.23). You can pause it any time.",
     );
-    expect(button("primary")?.disabled).toBe(false);
+    expect(button("primary")?.disabled).toBe(true);
   });
 
   it("states no summary while loading, only once the data is ready", async () => {
@@ -151,6 +151,9 @@ describe("PRD-18.3 flow: loading and empty states", () => {
       approve,
     });
     await settle(0);
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[data-testid="select-approach-quick"]')?.click(),
+    );
     await act(async () => button("primary")?.click());
     await settle();
     expect(approve).toHaveBeenCalledWith("t1", { approach_id: "quick", budget_cap: 45 });

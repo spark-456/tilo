@@ -19,9 +19,8 @@ const formatTime = (t: PlanApproach["time"]): string =>
 async function loadRecommendation(getApproaches: Promise<ApproachesResult>) {
   const result = await getApproaches;
   const chosen = result.approaches.find((a) => a.id === result.recommended);
-  if (result.approaches.length > 0 && !chosen) {
+  if (result.approaches.length > 0 && !chosen)
     throw new Error("the recommended approach is not in the list");
-  }
   return { result, chosen };
 }
 
@@ -34,16 +33,17 @@ export function Approaches({ taskId }: { taskId: string }) {
   const [capDraft, setCapDraft] = useState<string | null>(null);
 
   const ready = remote.status === "ready" ? remote.value : null;
-  const active = ready?.result.approaches.find((a) => a.id === selectedId) ?? ready?.chosen;
+  const selected = ready?.result.approaches.find((a) => a.id === selectedId);
+  const active = selected ?? ready?.chosen;
   const rawCap = capDraft ?? String(active?.credits.max ?? 0);
   const parsed = Number(rawCap);
   const validCap = rawCap.trim() !== "" && Number.isInteger(parsed) && parsed >= 1 ? parsed : null;
   const displayCap = validCap ?? active?.credits.max ?? 0;
 
   const action = useAction("start the run", async () => {
-    if (!active || validCap === null) throw new Error("no approach is loaded");
+    if (!selected || validCap === null) throw new Error("no approach is selected");
     const { world_id } = await client.approve(taskId, {
-      approach_id: active.id,
+      approach_id: selected.id,
       budget_cap: validCap,
     });
     return `/world/${encodeURIComponent(world_id)}`;
@@ -76,16 +76,14 @@ export function Approaches({ taskId }: { taskId: string }) {
               </div>
               <label className="budget-cap-field" htmlFor="budget-cap-input">
                 <span>Budget cap (credits)</span>
-                <input id="budget-cap-input" data-testid="budget-cap-input" type="number" min={1} step={1} value={rawCap} onChange={(e) => setCapDraft(e.target.value)} />
+                <input id="budget-cap-input" data-testid="budget-cap-input" type="number" min={1} step={1} aria-invalid={validCap === null} value={rawCap} onChange={(e) => setCapDraft(e.target.value)} />
               </label>
-              <p className="flow-detail" data-testid="budget-line">
-                {`This run can use up to ${displayCap} credits (about US$${(displayCap * result.credit_usd).toFixed(2)}). You can pause it any time.`}
-              </p>
+              <p className="flow-detail" data-testid="budget-line">{`This run can use up to ${displayCap} credits (about US$${(displayCap * result.credit_usd).toFixed(2)}). You can pause it any time.`}</p>
             </div>
           );
         }}
       </Loaded>
-      <Primary label="Start this approach" action={action} disabled={!ready?.chosen || validCap === null} />
+      <Primary label="Start this approach" action={action} disabled={!selected || validCap === null} />
     </>
   );
 }

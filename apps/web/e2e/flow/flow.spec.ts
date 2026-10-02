@@ -35,6 +35,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
       if (screen === "World") {
         await expect(page.getByTestId("stage-frame")).toHaveAttribute("data-stage-ready", "true");
       }
+      if (screen === "Approaches") await page.getByTestId("select-approach-quick").click();
       const next = SCREENS[i + 1];
       if (!next) break;
       const primary = page.locator("button.primary");
@@ -58,6 +59,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await page.goto("/?client_delay_ms=400");
     for (const [i, screen] of SCREENS.entries()) {
       await expect(page.getByRole("heading", { level: 1, name: screen })).toBeVisible();
+      if (screen === "Approaches") await page.getByTestId("select-approach-quick").click();
       await expect(page.locator("button.primary")).toBeEnabled();
       const ms = await page.evaluate(
         () =>

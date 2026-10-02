@@ -78,7 +78,7 @@ body {
   border-radius: var(--radius-pill);
   background: var(--color-ink-1);
   color: var(--color-surface-1);
-  font: 700 0.8125em var(--font-ui);
+  font: 700 0.75em var(--font-ui);
 }
 /* Fixed like the banner above it, so it never shifts the layout (P0-08b). Neutral tokens only. */
 .fixture-load-alert {
@@ -104,7 +104,7 @@ body {
   border-radius: var(--radius-pill);
   background: var(--color-brand-primary);
   color: var(--color-surface-1);
-  font: 700 0.8125em var(--font-mono);
+  font: 700 0.75em var(--font-mono);
 }
 .trace-list {
   list-style: none;
@@ -358,7 +358,7 @@ a.secondary {
   background: var(--color-surface-2);
   color: var(--color-ink-1);
   font-weight: 800;
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 .chip-needs {
   background: var(--color-signal-needs);
@@ -469,7 +469,7 @@ a.secondary {
 }
 .stat-name {
   font-weight: 700;
-  font-size: 0.8125em;
+  font-size: 0.75em;
   color: var(--color-ink-2);
 }
 .action-row {
@@ -545,7 +545,7 @@ a.secondary {
 }
 .hud-figures span {
   color: var(--color-ink-2);
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 .hud-count {
   display: flex;
@@ -590,13 +590,13 @@ a.secondary {
 .row-name small {
   color: var(--color-ink-2);
   font-weight: 400;
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 .row-state {
   flex: 0 0 7.5em; /* a fixed box, left-aligned: a new state word never moves its left edge (CLS) */
   color: var(--color-ink-2);
   font-weight: 700;
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 @media (max-width: 767px) {
   .row {
@@ -935,7 +935,8 @@ a.secondary {
   width: min(520px, calc(100vw - 464px));
 }
 .flow-shell[data-screen="Approaches"] .flow-slot {
-  min-height: 25em;
+  display: flow-root;
+  min-height: 33em;
 }
 @media (max-width: 767px) {
   .flow-shell[data-screen="Approaches"] {
@@ -943,8 +944,8 @@ a.secondary {
   }
 }
 .approach-card {
-  margin: 0 0 8px;
-  padding: 10px;
+  margin: 0 0 6px;
+  padding: 8px 10px;
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-controls);
   background: var(--color-surface-1);
@@ -958,14 +959,14 @@ a.secondary {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   font: 700 0.875em var(--font-ui);
 }
 .approach-summary,
 .approach-meta {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: var(--color-ink-2);
-  font: 400 0.8125em / 1.35 var(--font-ui);
+  font: 400 0.75em / 1.3 var(--font-ui);
 }
 .budget-cap-field input {
   width: 6em;
