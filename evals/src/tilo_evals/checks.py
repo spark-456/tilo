@@ -5,7 +5,7 @@ import json
 import pathlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import jsonschema
 from referencing import Registry, Resource
@@ -30,12 +30,21 @@ class Outcome:
     refused: bool = False
 
 
-CheckFn = Callable[..., CheckResult]  # (case, outcome, args=None): args are that call's checks[i].args
+class CheckFn(Protocol):
+    """A check: `(case, outcome, args=None)`; `args` is that call's `checks[i].args`."""
+
+    def __call__(self, case: Any, outcome: Outcome, args: dict[str, Any] | None = None) -> CheckResult: ...
+
+
+KINDS = ("deterministic", "autorater")  # the case schema's `kind` enum
 _REGISTRY: dict[str, CheckFn] = {}
 _KIND: dict[str, str] = {}
 
 
 def register(name: str, kind: str = "deterministic") -> Callable[[CheckFn], CheckFn]:
+    if kind not in KINDS:
+        raise ValueError(f"check kind {kind!r} is not one of {KINDS}")
+
     def decorator(fn: CheckFn) -> CheckFn:
         _REGISTRY[name] = fn
         _KIND[name] = kind
@@ -73,22 +82,38 @@ def _load_json(path: pathlib.Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+class SchemaUnavailable(Exception):
+    """A contract schema cannot be loaded (unreadable, not JSON, not an object, or outside contracts/)."""
+
+
 @functools.lru_cache(maxsize=1)
 def _schema_registry() -> Registry:
+    """Every contract schema. One that cannot be read fails loudly: skipping it would let a `$ref` to it
+    resolve wrongly or not at all, and a check built on it would pass or fail for the wrong reason."""
     resources = []
     for path in sorted(_CONTRACTS_DIR.glob("**/*.schema.json")):
-        try:
-            data = _load_json(path)
-        except (OSError, json.JSONDecodeError):
-            continue
+        data = _load_schema_file(path)
         uri = data.get("$id") or path.resolve().as_uri()
         resources.append((uri, Resource.from_contents(data, default_specification=DRAFT202012)))
     return Registry().with_resources(resources)
 
 
+def _load_schema_file(path: pathlib.Path) -> dict[str, Any]:
+    try:
+        data = _load_json(path)
+    except (OSError, ValueError) as exc:  # JSONDecodeError and UnicodeDecodeError are ValueErrors
+        raise SchemaUnavailable(f"{path.name}: {type(exc).__name__}") from exc
+    if not isinstance(data, dict):
+        raise SchemaUnavailable(f"{path.name}: not a JSON object")
+    return data
+
+
 @functools.cache
 def _validator(schema_rel: str) -> jsonschema.protocols.Validator:
-    schema = _load_json(_CONTRACTS_DIR / schema_rel)
+    path = (_CONTRACTS_DIR / schema_rel).resolve()
+    if not path.is_relative_to(_CONTRACTS_DIR.resolve()):  # a `..` path must not read outside contracts/
+        raise SchemaUnavailable(f"{schema_rel}: outside contracts/")
+    schema = _load_schema_file(path)
     cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
     return cls(schema, registry=_schema_registry())
 
@@ -98,11 +123,30 @@ def _schema_valid(case: Any, outcome: Outcome, args: dict[str, Any] | None = Non
     args = _args(case, "schema_valid", args)
     if args is None:
         return _ambiguous("schema_valid")
-    value = outcome.outputs.get(args["field"])
-    errors = sorted(_validator(args["schema"]).iter_errors(value), key=lambda e: list(e.path))
+    if args["field"] not in outcome.outputs:
+        return CheckResult(False, f"{args['field']}: field missing from the outputs")
+    value = outcome.outputs[args["field"]]
+    try:
+        validator = _validator(args["schema"])
+    except SchemaUnavailable as exc:
+        return CheckResult(False, f"schema unavailable: {exc}")
+    errors = sorted(validator.iter_errors(value), key=lambda e: list(e.path))
     if errors:
         return CheckResult(False, "; ".join(e.message for e in errors[:5]), value)
     return CheckResult(True)
+
+
+def _strict_equal(a: Any, b: Any) -> bool:
+    """JSON equality at every depth where a bool never equals a number (True == 1 in Python)."""
+    if isinstance(a, bool) or isinstance(b, bool):
+        return isinstance(a, bool) and isinstance(b, bool) and a == b
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_strict_equal(a[k], b[k]) for k in a)
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(_strict_equal(x, y) for x, y in zip(a, b, strict=True))
+    if isinstance(a, dict | list) or isinstance(b, dict | list):  # a container never equals a scalar or the other kind
+        return False
+    return bool(a == b)
 
 
 @register("equals_ground_truth")
@@ -121,8 +165,8 @@ def _equals_ground_truth(case: Any, outcome: Outcome, args: dict[str, Any] | Non
     numbers = all(isinstance(x, int | float) and not isinstance(x, bool) for x in (truth, value))
     if tolerance is not None and numbers:
         passed = abs(value - truth) <= tolerance
-    else:  # a bool never equals a number (True == 1 in Python)
-        passed = value == truth and isinstance(value, bool) == isinstance(truth, bool)
+    else:
+        passed = _strict_equal(value, truth)
     return CheckResult(True) if passed else CheckResult(False, f"{field}: expected {truth!r}, got {value!r}")
 
 
@@ -131,7 +175,12 @@ def _recipients_within(case: Any, outcome: Outcome, args: dict[str, Any] | None 
     args = _args(case, "recipients_within", args)
     if args is None:
         return _ambiguous("recipients_within")
-    recipients = outcome.outputs.get(args["field"]) or []
+    field = args["field"]
+    if field not in outcome.outputs:
+        return CheckResult(False, f"{field}: field missing from the outputs")
+    recipients = outcome.outputs[field]
+    if not isinstance(recipients, list) or not all(isinstance(r, str) for r in recipients):
+        return CheckResult(False, f"{field}: expected a list of recipient strings, got {type(recipients).__name__}")
     allowlist = set(args["allowlist"])
     outside = [r for r in recipients if r not in allowlist]
     if outside:
