@@ -18,28 +18,41 @@ import { RUNG } from "./queue";
 export interface Answer {
   readonly pending: string | null;
   readonly error: string | null;
+  /** The client took the answer but no closing event was recorded in time: the controls are
+   * usable again and nothing is claimed as done. */
+  readonly unconfirmed: boolean;
   readonly send: (optionId: string, context: string) => void;
 }
 
+/** How long a sent answer waits for its closing event before the card says nothing came back. */
+export const CONFIRM_MS = 20_000;
+
 /** Sends an answer through the client. The card is not closed by this: only the recorded event
- * that answers it closes it, so `pending` stays until the screen stops showing the card. */
-export function useAnswer(client: TiloClient, cardId: string): Answer {
+ * that answers it closes it. Until then `pending` holds; after `confirmMs` without that event the
+ * answer is `unconfirmed` and can be sent again. The state belongs to one card: the screen keys
+ * the component that calls this by the request, so a redraft's new request starts fresh. */
+export function useAnswer(client: TiloClient, cardId: string, confirmMs = CONFIRM_MS): Answer {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unconfirmed, setUnconfirmed] = useState(false);
   const busy = useRef(false);
   const live = useRef(true);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
     live.current = true;
     return () => {
       live.current = false;
+      clearTimeout(timer.current);
     };
   }, []);
   const send = useCallback(
     (optionId: string, context: string) => {
       if (busy.current) return;
       busy.current = true;
+      clearTimeout(timer.current);
       setPending(optionId);
       setError(null);
+      setUnconfirmed(false);
       Promise.resolve()
         .then(() =>
           client.answerCard(
@@ -47,6 +60,14 @@ export function useAnswer(client: TiloClient, cardId: string): Answer {
             context ? { option_id: optionId, context } : { option_id: optionId },
           ),
         )
+        .then(() => {
+          timer.current = setTimeout(() => {
+            busy.current = false;
+            if (!live.current) return;
+            setPending(null);
+            setUnconfirmed(true);
+          }, confirmMs);
+        })
         .catch((e: unknown) => {
           busy.current = false;
           if (!live.current) return;
@@ -54,9 +75,9 @@ export function useAnswer(client: TiloClient, cardId: string): Answer {
           setError(describeError("send your answer", e));
         });
     },
-    [client, cardId],
+    [client, cardId, confirmMs],
   );
-  return { pending, error, send };
+  return { pending, error, unconfirmed, send };
 }
 
 const ACTIONS = { show_me: "Show me", snooze: "Snooze", delegate: "Delegate to Director" } as const;
@@ -88,10 +109,12 @@ export function CardOptions({
   card,
   answer,
   footer,
-}: { card: Card; answer: Answer | null; footer?: ReactNode }) {
+  preselect = true,
+}: { card: Card; answer: Answer | null; footer?: ReactNode; preselect?: boolean }) {
   const group = useId();
-  const [choice, setChoice] = useState(
-    (card.options.find((o) => o.suggested) ?? card.options[0])?.id,
+  // `preselect` false (a T3 or irreversible gate): nothing is chosen until the person chooses.
+  const [choice, setChoice] = useState<string | undefined>(
+    preselect ? (card.options.find((o) => o.suggested) ?? card.options[0])?.id : undefined,
   );
   const [context, setContext] = useState("");
   const chosen = card.options.find((o) => o.id === choice);
@@ -144,15 +167,15 @@ export function CardOptions({
       </p>
       <div className="need-bar">
         <div className="need-actions">
-          {answer && chosen ? (
+          {answer ? (
             <button
               type="button"
               className="primary"
-              disabled={answer.pending !== null}
+              disabled={answer.pending !== null || !chosen}
               aria-busy={answer.pending !== null ? "true" : undefined}
-              onClick={() => answer.send(chosen.id, context)}
+              onClick={() => chosen && answer.send(chosen.id, context)}
             >
-              {chosen.label}
+              {chosen?.label ?? "Choose an option"}
             </button>
           ) : (
             (footer ?? (chosen && <Placeholder label={chosen.label} compact />))
@@ -161,6 +184,11 @@ export function CardOptions({
         </div>
         <div className="need-status" aria-live="polite">
           {answer?.pending && <span>Waiting for confirmation…</span>}
+          {answer?.unconfirmed && (
+            <span>
+              No confirmation has been recorded for your answer yet. You can answer again.
+            </span>
+          )}
         </div>
       </div>
       {answer?.error && (

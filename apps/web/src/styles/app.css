@@ -970,12 +970,12 @@ a.secondary {
 }
 .need-where {
   color: var(--color-ink-2);
-  font-size: 0.875em;
+  font-size: calc(14px * var(--ui-scale, 1));
   font-weight: 700;
 }
 .need-what {
   margin: 0;
-  font: 900 1.25em / 1.25 var(--font-display); /* 20 */
+  font: 900 calc(20px * var(--ui-scale, 1)) / 1.25 var(--font-display);
 }
 .need-why {
   margin: 0;
@@ -1055,7 +1055,7 @@ a.secondary {
 .need-status {
   min-height: 1.5em; /* "Waiting for confirmation…" arrives into reserved room */
   color: var(--color-ink-2);
-  font-size: 0.875em;
+  font-size: calc(14px * var(--ui-scale, 1));
 }
 .need-error {
   margin: 0;
@@ -1073,7 +1073,7 @@ a.secondary {
 }
 .gate-facts dt {
   color: var(--color-ink-2);
-  font-size: 0.875em;
+  font-size: calc(14px * var(--ui-scale, 1));
   font-weight: 700;
 }
 .gate-facts dd {
@@ -1100,10 +1100,22 @@ a.secondary {
   padding: 0 12px 0 6px;
   border: 2px solid var(--color-policy);
   border-radius: var(--radius-pill);
-  font: 800 0.875em / 1 var(--font-ui);
+  font: 800 calc(14px * var(--ui-scale, 1)) / 1 var(--font-ui);
 }
 .gate-sheet a.pill {
   align-self: flex-start;
+}
+/* The one filled button is the hero (artboard 2-4: 48 px, 56 px on a phone); what is not built yet
+   is quieter, so a row of placeholders never reads as the main action. */
+.need-bar .primary {
+  min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+}
+.need-actions .soon-row .secondary.placeholder,
+.need-actions .secondary.placeholder {
+  border-color: transparent;
+  background: var(--color-surface-0);
+  color: var(--color-ink-2);
+  font-weight: 600;
 }
 @media (max-width: 767px) {
   .need-card,
@@ -1114,6 +1126,10 @@ a.secondary {
     grid-template-columns: 1fr;
     gap: 0;
   }
+  .need-bar .primary {
+    min-height: 56px;
+    flex: 1;
+  }
 }
 .gallery-grid {
   display: grid;
@@ -1122,10 +1138,10 @@ a.secondary {
   align-items: start;
 }
 .gate-slot {
-  min-height: 3em; /* the longest outcome line (two lines on desktop, three on a phone) */
+  min-height: 1.5em; /* the outcome line arriving: one line on desktop, two on a phone */
 }
 @media (max-width: 767px) {
   .gate-slot {
-    min-height: 5em;
+    min-height: 3em;
   }
 }

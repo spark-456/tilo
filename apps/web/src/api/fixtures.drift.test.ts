@@ -14,6 +14,7 @@ import {
 import { EVENTS_VILLAGE_BASIC } from "./fixtures/events";
 import { LAYOUT_VILLAGE_BASIC } from "./fixtures/layout";
 import { PLAN_TWO_APPROACHES } from "./fixtures/plan";
+import { EVENT_POLICY_APPLIED } from "./fixtures/policy";
 
 const root = fileURLToPath(new URL("../../../../contracts/fixtures/", import.meta.url));
 const text = (path: string): string => readFileSync(`${root}${path}`, "utf8");
@@ -39,6 +40,10 @@ describe("PRD-18.3 flow: fixture modules deep-equal their contracts/fixtures sou
       "needs_you_compare_basis",
     ];
     expect(CARDS_VALID).toEqual(names.map((n) => json(`card/valid/${n}.json`)));
+  });
+  it("the policy.applied event the dev gallery draws", () => {
+    expect(EVENT_POLICY_APPLIED).toEqual(json("events/valid/policy.applied.json"));
+    expect(EVENTS_VILLAGE_BASIC.map((e) => e.id)).not.toContain(EVENT_POLICY_APPLIED.id);
   });
   it("events, the full 44-event stream in file order", () => {
     const lines = text("streams/village-basic.jsonl")

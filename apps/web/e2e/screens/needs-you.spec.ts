@@ -9,6 +9,25 @@ import { DESKTOP, MOBILE } from "../support/viewports";
 
 const SUMMARY = "The reply is ready. Sending it needs your approval.";
 
+// HR-6: both Needs-you screens replay the run at the client's speed, so both say so.
+for (const path of ["/needs-you", "/needs-you/gate"]) {
+  test(`S_06 S_07 HR-6 shows the speed badge at ?speed=8 on ${path}`, async ({ page }) => {
+    await page.goto(`${path}?speed=8`);
+    await expect(page.getByTestId("speed-badge")).toHaveText("8×");
+  });
+}
+
+test("S_06 moves focus to the queue heading when the focused row closes", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(DESKTOP);
+  await page.goto("/needs-you?speed=5", { waitUntil: "commit" }); // the replay starts at mount, not at load
+  const link = page.getByRole("link", { name: /^Review the gate/ });
+  await link.waitFor({ timeout: 30_000 });
+  await link.focus();
+  await expect(page.getByTestId("needs-empty")).toBeVisible({ timeout: 30_000 }); // the row closed
+  await expect(page.getByRole("heading", { level: 2, name: "Waiting for you" })).toBeFocused();
+});
+
 for (const viewport of [DESKTOP, MOBILE]) {
   test(`S_06 follows the run's events and shows the same row at ${viewport.width}x${viewport.height}`, async ({
     page,
@@ -16,8 +35,10 @@ for (const viewport of [DESKTOP, MOBILE]) {
     test.setTimeout(90_000);
     const problems = watchConsole(page);
     await page.setViewportSize(viewport);
-    await page.goto("/needs-you?speed=5");
-    await expect(page.getByRole("heading", { level: 1, name: "Needs you" })).toBeVisible();
+    await page.goto("/needs-you?speed=5", { waitUntil: "commit" }); // the replay starts at mount, not at load
+    await expect(page.getByRole("heading", { level: 1, name: "Needs you" })).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(page.getByTestId("fixture-replay-banner")).toBeVisible();
     // Before approval.requested nothing waits (HR-1): an honest empty state, no row.
     await expect(page.getByTestId("needs-empty")).toBeVisible();

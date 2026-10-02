@@ -32,7 +32,7 @@ UX-1–UX-9 (18.1); FR-WLD-* (world rendering); owned starting P0-08.
 - A control that does nothing yet is `aria-disabled="true"` with a "Coming soon" title.
 
 ## Needs you (`src/needs-you/`, AGW-05)
-- `queue.ts`/`gates.ts` derive queue and gates from events only (HR-1); a card joins on same id and
+- `reduce.ts` (one reducer; queue.ts, gates.ts wrap it) derives queue and gates from events only, by run (HR-1); a card joins on same id and
   run id. A gate opens on `approval.resolved` (approve) or `policy.applied` (stamp, HR-7). `/screens/cards`.
 
 ## Local rules

@@ -1,19 +1,20 @@
 // S-07 gate sheet (PRD 18.3, 18.4, 10.4): the exact action, who receives it and whether it can be
 // undone, then the three fixed options Approve, Edit first and Hold (card rule CR-07). Everything
 // shown follows the gate's recorded events (HR-1): the gate counts as open only after an
-// approval.resolved that says approve, or a policy.applied, arrives. A person-approved gate and a
-// policy-opened one look different and both link to the authorisation (HR-7, BQ-49: a round
-// "Policy" stamp with a check glyph in the policy colour). No design export shows the policy variant.
+// approval.resolved that says approve (by a person or Team Lead), or a policy.applied (by a policy),
+// arrives. A person-approved gate and a policy-opened one look different and both link to the
+// authorisation (HR-7, BQ-49: a round "Policy" stamp with a check glyph in the policy colour). No
+// design export shows the policy variant.
 import type { Card, Event, Layout } from "@tilo/contracts";
 import { AppLink } from "../screens/AppLink";
 import { Chip, Soon, authzText, nameOf, stamp, words } from "../screens/kit";
 import { type Answer, CardHead, CardOptions } from "./CardView";
-import { DONE, type GateRecord, isOpen, policyLine, policyName } from "./gates";
+import { DONE, type GateRecord, isOpen, openedBy, policyLine, policyName } from "./gates";
 import { RUNG, askedBy } from "./queue";
+import { field, numField } from "./reduce";
 
 const OPTION = { approve: "Approve", edit: "Edit first", hold: "Hold" } as const;
-
-const str = (e: Event, key: string): string => String((e.data as Record<string, unknown>)[key]);
+const TIER = { T1: 1, T2: 2, T3: 3 } as const;
 
 interface Facts {
   readonly action: string;
@@ -26,32 +27,46 @@ interface Facts {
   readonly sent: boolean;
 }
 
-/** What the gate holds: from its card, else from the event that opened it. */
+/** The stricter of two risk tiers: a card and its request may disagree, the sheet never softens. */
+const stricter = (a: string | null, b: string | null): string =>
+  (TIER[(a ?? "T1") as keyof typeof TIER] ?? 0) >= (TIER[(b ?? "T1") as keyof typeof TIER] ?? 0)
+    ? (a ?? "T1")
+    : (b ?? "T1");
+
+/** What the gate holds: from its card and the request that opened it, the stricter of the two. */
 function factsOf(record: GateRecord, card: Card | null): Facts | null {
+  const policy = record.outcome.state === "policy" ? record.outcome.event : null;
+  const e = record.requested ?? policy;
+  const asked = record.requested;
+  const askedIrreversible = asked
+    ? (asked.data as { irreversible?: unknown } | null)?.irreversible
+    : null;
   if (card?.gate) {
     const g = card.gate;
     return {
       action: g.action.exact,
       recipients: g.recipients,
       item: g.action.item ? `${g.action.item.label}, version ${g.action.item.version}` : null,
-      irreversible: g.irreversible,
-      tier: g.risk_tier,
+      irreversible: g.irreversible || askedIrreversible === true,
+      tier: stricter(g.risk_tier, asked ? field(asked, "risk_tier") : null),
       sent: g.action.type === "send_email",
     };
   }
-  const policy = record.outcome.state === "policy" ? record.outcome.event : null;
-  const e = record.requested ?? policy;
   if (!e) return null;
-  const version = (e.data as { item?: { version?: number } | null }).item?.version;
+  const version = (e.data as { item?: { version?: number } | null } | null)?.item?.version;
   return {
-    action: words(str(e, "action_type")),
+    action: words(field(e, "action_type") ?? "action"),
     recipients: null,
     item: e.item ? `${e.item.label}${version ? `, version ${version}` : ""}` : null,
-    irreversible: policy ? null : (e.data as { irreversible?: boolean }).irreversible === true,
-    tier: str(e, "risk_tier"),
-    sent: str(e, "action_type") === "send_email",
+    irreversible: policy && !asked ? null : askedIrreversible === true,
+    tier: field(e, "risk_tier") ?? "T1",
+    sent: field(e, "action_type") === "send_email",
   };
 }
+
+/** A T3 or irreversible gate offers no preselected option: the person must choose. */
+const needsDeliberateChoice = (f: Facts | null): boolean =>
+  f !== null && (f.tier === "T3" || f.irreversible === true);
 
 /** PRD 18.4 gate copy: exact action, recipient, irreversibility. */
 function GateFacts({ f }: { f: Facts }) {
@@ -101,7 +116,7 @@ function PolicyStamp() {
         <path
           d="M4.5 8.2l2.3 2.3 4.7-4.9"
           fill="none"
-          stroke="#fff"
+          stroke="var(--color-surface-1)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -117,14 +132,15 @@ function Outcome({ record }: { record: GateRecord }) {
   const out = record.outcome;
   if (out.state === "policy") {
     const e = out.event;
+    const policyId = field(e, "policy_id");
     return (
       <div className="gate-status" data-testid="policy-line">
         <PolicyStamp />
         <p>
           {policyLine(
-            DONE[str(e, "action_type")] ?? "Done",
-            policyName(str(e, "policy_id")),
-            Number(str(e, "undo_window_s")),
+            DONE[field(e, "action_type") ?? ""] ?? "Done",
+            policyId ? policyName(policyId) : null,
+            numField(e, "undo_window_s"),
           )}
         </p>
       </div>
@@ -156,15 +172,16 @@ export function GateSheet({
   answer,
 }: { record: GateRecord; card: Card | null; layout: Layout | null; answer: Answer | null }) {
   const out = record.outcome;
-  const policy = out.state === "policy" ? out.event : null;
+  const policy: Event | null = out.state === "policy" ? out.event : null;
   const lead = policy ?? record.requested;
   const facts = factsOf(record, card);
+  const policyId = policy ? field(policy, "policy_id") : null;
   return (
     <article
       className="gate-sheet"
       data-testid="gate-sheet"
       data-gate-state={out.state}
-      data-opened-by={policy ? "policy" : isOpen(record) ? "person" : "none"}
+      data-opened-by={openedBy(record)}
     >
       {/* One reserved slot: the answer arriving moves nothing below it (UX-1, CLS). */}
       <div className="gate-slot">
@@ -180,7 +197,7 @@ export function GateSheet({
                 {policy ? "Opened by a rule" : RUNG.gate.label}
               </Chip>
               <span className="need-where">
-                {policy ? policyName(str(policy, "policy_id")) : askedBy(layout, lead)}
+                {policyId ? policyName(policyId) : policy ? "A rule" : askedBy(layout, lead)}
               </span>
             </div>
             <h3 className="need-what">{lead.summary}</h3>
@@ -196,7 +213,7 @@ export function GateSheet({
       {/* The parts that change with the gate come last, so changing them moves nothing above. */}
       {out.state === "waiting" &&
         (card ? (
-          <CardOptions card={card} answer={answer} />
+          <CardOptions card={card} answer={answer} preselect={!needsDeliberateChoice(facts)} />
         ) : (
           <>
             <p className="section-note">
@@ -208,7 +225,8 @@ export function GateSheet({
       {policy && (
         <>
           <p className="section-note">
-            {nameOf(str(policy, "connector"))} · {words(str(policy, "action_type"))}
+            {nameOf(field(policy, "connector") ?? "")} ·{" "}
+            {words(field(policy, "action_type") ?? "action")}
           </p>
           <Soon labels={["Undo"]} />
         </>
