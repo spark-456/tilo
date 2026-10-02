@@ -108,6 +108,16 @@ def submit_intake(request: IntakeRequest, *, safety: SafetyProvider, store: InMe
     return IntakeResult(task_id, world_id, run_id, world_event, files)
 
 
+def screen_task_text(request: IntakeRequest, *, safety: SafetyProvider) -> None:
+    """PRD 16.3 item 2: the task text and the file names (which become brief labels) are screened too, after
+    the limits and before any file is read or stored. Flagged text is refused, since the Director would read
+    it next; the person can rephrase it."""
+    names = _check_limits(request)
+    for text in (request.text, "\n".join(names)):
+        if text and safety.check(text)["flagged"]:
+            raise IntakeRejected("The safety screen flagged the task text or a file name; rephrase it.")
+
+
 def _screen(
     name: str, content: bytes, safety: SafetyProvider, budget: Budget
 ) -> tuple[str | None, str | None, bool, str | None]:

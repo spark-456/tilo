@@ -21,6 +21,13 @@ profiles:
     model: gemini-3.1-flash-lite
     context: 1000000
     caps: [json, tools]
+  # FR-INT-02 (issue #103): the dev safety screen. The provider layer refuses a fake safety profile in
+  # live mode or when deployed (K_SERVICE set), so intake fails closed there until Model Armor is wired.
+  safety-fake:
+    provider: fake
+    model: fake-safety
+    context: 1000000
+    caps: []
 
 roles:
   director: { primary: flash-38, fallback: flash-37, thinking: high }
@@ -30,6 +37,7 @@ roles:
   writer: { primary: flash-38, fallback: flash-37 }
   narrator: { primary: lite-31, fallback: flash-37 } # fallback added for NFR-25 (BQ-18)
   autopilot: { primary: flash-37, fallback: lite-31 }
+  safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only; never a weaker fallback
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]
