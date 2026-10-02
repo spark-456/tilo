@@ -59,7 +59,7 @@ export const SCREENS: readonly ScreenMeta[] = [
       "Inspect panel",
       "P3",
       `${W}/inspect/B1`,
-      /^/world/([^/]+)/inspect/([^/]+)/?$/,
+      /^\/world\/([^/]+)\/inspect\/([^/]+)\/?$/,
     ),
   ),
   must("S-06", "Needs-you queue and card", "P4", "/needs-you", /^\/needs-you\/?$/),
