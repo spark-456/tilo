@@ -207,9 +207,9 @@ def test_FR_CON_07_masking_text_at_and_over_the_cap_is_fast(unit):
 
     for size in (MAX_TEXT_CHARS, MAX_TEXT_CHARS * 2):
         text = unit * (size // len(unit) + 1)
-        start = time.perf_counter()
+        start = time.process_time()
         mask_text(text)
-        assert time.perf_counter() - start < 2.0, (unit, size)
+        assert time.process_time() - start < 2.0, (unit, size)
 
 
 def test_FR_CON_07_capture_caps_page_text_before_masking(make_rig):
