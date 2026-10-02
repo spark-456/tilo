@@ -15,15 +15,23 @@ from __future__ import annotations
 
 import logging
 import math
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
+
+from fastapi import HTTPException
+from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
+from tilo_planning.questions import Question
+from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
+from tilo_providers.router import Router
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
 Channel = Literal["web", "mobile_web", "whatsapp", "email"]
 
 logger = logging.getLogger("tilo_api.deps")
 _REPO_ROOT = Path(__file__).resolve().parents[4]
+FIXTURES_DIR = _REPO_ROOT / "fixtures"  # record-and-replay recordings (EFF-01)
 _DEFAULT_PART_WRITE_DEADLINE_S = 0.5
 _DEFAULT_ABANDON_AFTER_S = 3.0
 _MAX_DISPATCH_S = 4.0  # below a kill-switch call's 4.5 s write budget (FR-HIL-07's 5 s)
@@ -60,6 +68,25 @@ class WorldRecord:
 
 
 @dataclass
+class TaskRecord:
+    """One intake's planning state (CL-INT-1, services/api/tests/API_CL_INT_1.md). `draft` is the brief
+    as the questions left it; `brief` is the draft with the person's answers and chip edits applied."""
+
+    owner: str  # the principal who created it: the world's owner (PRD 10.1)
+    world_id: str
+    run_id: str
+    draft: dict
+    brief: dict
+    questions: list[Question]
+    next_seq: int  # the next event seq in this world
+    answers: dict[str, str | None] = field(default_factory=dict)  # field -> answer; None when skipped
+    edits: dict[str, Any] = field(default_factory=dict)
+    approaches: list[dict] | None = None  # proposed for the current brief
+    granted: bool = False
+    lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+
+
+@dataclass
 class Store:
     """In-memory injected state; one instance per test, mutated in place by route handlers."""
 
@@ -76,6 +103,8 @@ class Store:
     # part's own `id`, oldest first.
     dispatch_state: dict = field(default_factory=dict, repr=False, compare=False)  # dispatch.py's
     # own per-world and per-policy locks; opaque to every route outside dispatch.py.
+    tasks: dict[str, TaskRecord] = field(default_factory=dict)  # task_id -> record (CL-INT-1)
+    memory: MemoryLookup = field(default_factory=InMemoryPreferenceStore)  # FR-INT-05 seam until P7
 
 
 class EventRejected(Exception):
@@ -110,6 +139,21 @@ def get_store() -> Store:
 
 def get_event_writer() -> EventWriter:
     raise NotImplementedError
+
+
+def providers_config() -> ProvidersConfig:
+    """Read on every call, not at import: `TILO_MODELS_FILE` picks the models file (PL-02)."""
+    return load_providers_config(resolve_models_path(_REPO_ROOT), _REPO_ROOT / "config" / "prices.yaml")
+
+
+def get_router() -> Router:
+    """Every model call goes through the provider layer's Router (PL-01); it replays recordings unless the
+    user turned live mode on (EFF-01)."""
+    try:
+        return Router(providers_config(), fixtures_dir=FIXTURES_DIR)
+    except ProviderConfigError as exc:
+        logger.warning("model router unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="The model router is not configured.") from exc
 
 
 def _dispatch_config(key: str, default: float) -> float:
