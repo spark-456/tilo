@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from _chn_0305_lib import GATE_T3, NUM_RIYA, PIN_WINDOW_S, QUESTION, RIYA, WEB_URL, ApiAnswer, CardRig, make_card
+from _chn_0305_lib import GATE_T3, NUM_RIYA, PIN_WINDOW_S, QUESTION, RIYA, SAM, WEB_URL, ApiAnswer, CardRig, make_card
 from tilo_channels.inbound import InboundRouter
 
 UNKNOWN = "Could not confirm your answer. Check the card in Tilo before tapping again."
@@ -137,7 +137,7 @@ def _api_keeps_gates_open(rig: CardRig, monkeypatch: pytest.MonkeyPatch) -> None
     ("option", "reply"),
     [
         ("hold", "Held. You can still approve here or in Tilo."),
-        ("edit", "Sent back for edits. You can still approve here or in Tilo."),
+        ("edit", f"To edit, open it in Tilo: {WEB_URL}/worlds/w_chn05/cards/{GATE_T3}. Nothing was approved."),
     ],
 )
 def test_FR_CHN_05_hold_or_edit_keeps_the_gate_open_for_a_pin_approve(
@@ -151,3 +151,26 @@ def test_FR_CHN_05_hold_or_edit_keeps_the_gate_open_for_a_pin_approve(
     assert rig.text(NUM_RIYA, rig.pin).outcome == "answered"
     assert [(c["option"], c["pin_verified"]) for c in rig.api.calls] == [(option, False), ("approve", True)]
     assert rig.api.closed[GATE_T3] == ("approve", "whatsapp")
+
+
+@pytest.mark.parametrize("option", ["hold", "edit"])
+def test_FR_CHN_05_approve_then_hold_or_edit_then_correct_pin_makes_no_approve_call(
+    rig: CardRig, monkeypatch: pytest.MonkeyPatch, option: str
+) -> None:
+    """The person's last choice wins: Hold or Edit first after Approve cancels the PIN prompt."""
+    _api_keeps_gates_open(rig, monkeypatch)
+    sent = rig.send(GATE_T3)
+    assert rig.tap(sent, "approve", card_id=GATE_T3).outcome == "pin_required"
+    assert rig.tap(sent, option, card_id=GATE_T3).outcome == "answered"
+    assert rig.text(NUM_RIYA, rig.pin).outcome == "pin_late"
+    assert [(c["option"], c["pin_verified"]) for c in rig.api.calls] == [(option, False)]
+    assert rig.pins.checks == []
+    assert rig.tap(sent, "approve", card_id=GATE_T3).outcome == "pin_required"  # a new Approve re-prompts
+    assert rig.text(NUM_RIYA, rig.pin).outcome == "answered"
+
+
+def test_FR_CHN_05_resend_to_another_user_retires_the_old_buttons(rig: CardRig) -> None:
+    first = rig.send(QUESTION, user=RIYA)
+    rig.send(QUESTION, user=SAM)
+    assert rig.tap(first, "per_pack", card_id=QUESTION).outcome == "unknown_card"
+    assert rig.api.calls == []

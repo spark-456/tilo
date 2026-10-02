@@ -34,7 +34,7 @@ LATE_TEXT = "That PIN came too late. Tap Approve again."
 # Hold and Edit first answer a gate without resolving it (tilo-api, #157): the WhatsApp copy stays open.
 GATE_STAYS_OPEN = {
     "hold": "Held. You can still approve here or in Tilo.",
-    "edit": "Sent back for edits. You can still approve here or in Tilo.",
+    "edit": "To edit, open it in Tilo: {link}. Nothing was approved.",  # the API records nothing for Edit first
 }
 CHANNEL = "whatsapp"
 
@@ -145,7 +145,7 @@ class WhatsAppCards:
             deadline = _deadline(card)
             card_id = str(card["id"])
             options = [(str(o["id"]), str(o["label"])) for o in card["options"]]
-            link = f"{self._web_url}/worlds/{card['world_id']}/cards/{card_id}"
+            link = self._link(card)
             body = f"{card['what_happened']}\n{card['why_it_matters']}\n\nOpen in Tilo: {link}"
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             log.error("card not sendable error=%s", type(exc).__name__)
@@ -167,6 +167,9 @@ class WhatsAppCards:
             return SendResult("failed", None)
         sent = _Sent(card, user_id, number, deadline, message_id, labels=dict(options), buttons=[b for b, _ in buttons])
         with self._lock:
+            replaced = self._sent.get(card_id)
+            for button_id in replaced.buttons if replaced is not None else ():  # a re-send retires old buttons
+                self._buttons.pop(button_id, None)
             self._sent[card_id] = sent
             for (button_id, _), (option, _) in zip(buttons, options, strict=True):
                 self._buttons[button_id] = (card_id, option)
@@ -223,6 +226,10 @@ class WhatsAppCards:
             minutes = int(self._pin_window_s // 60)
             text = f"To approve, reply with your Tilo PIN within {minutes} minutes. Nothing happens until then."
             return self._refuse(message, "pin_required", card_id, option, text)
+        with self._lock:  # the last choice wins: another option spends a pending PIN prompt for this card
+            prompt = self._pin_prompts.get(message.sender)
+            if prompt is not None and prompt[0] == card_id:
+                self._pin_prompts[message.sender] = (card_id, prompt[1], False)
         return self._answer(message, sent, card_id, option, pin_verified=False)
 
     def _pin_reply(self, message: InboundMessage, user_id: str) -> ReplyResult:
@@ -291,7 +298,10 @@ class WhatsAppCards:
         if not keep_open:
             sent.open = False
         self._record_answer(message, sent, card_id, option)
-        receipt = GATE_STAYS_OPEN[option] if keep_open else f"Done: {sent.labels.get(option, option)}."
+        link = self._link(sent.card)
+        receipt = (
+            GATE_STAYS_OPEN[option].format(link=link) if keep_open else f"Done: {sent.labels.get(option, option)}."
+        )
         self._say(message.sender, receipt)
         return ReplyResult("answered", card_id, option)
 
@@ -313,6 +323,9 @@ class WhatsAppCards:
             self._event(card, "channel.message_in", sent.user_id, data)
         except Exception as exc:  # the API already recorded the answer; tell the person anyway
             log.error("card answer record failed card=%s error=%s", card_id, type(exc).__name__)
+
+    def _link(self, card: Mapping[str, Any]) -> str:
+        return f"{self._web_url}/worlds/{card['world_id']}/cards/{card['id']}"
 
     def _prune(self) -> None:
         """Drops cards RETAIN_S past their deadline, their buttons and spent PIN prompts. Lock held."""
