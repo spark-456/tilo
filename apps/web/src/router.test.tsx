@@ -37,4 +37,19 @@ describe("PRD-18.3 flow: the router maps each flow path to its screen and unknow
   it("maps unknown paths to Start", () => {
     expect(matchFlowRoute("/unknown/path/here")).toEqual({ screen: "Start" });
   });
+
+  it("maps a malformed percent escape to Start instead of throwing", () => {
+    for (const path of [
+      "/task/%E0/understanding",
+      "/task/%/approaches",
+      "/world/%E0%A4%A",
+      "/world/%E0/delivery",
+    ]) {
+      expect(matchFlowRoute(path)).toEqual({ screen: "Start" });
+    }
+  });
+
+  it("decodes a well-formed escape", () => {
+    expect(matchFlowRoute("/world/a%20b")).toEqual({ screen: "World", worldId: "a b" });
+  });
 });

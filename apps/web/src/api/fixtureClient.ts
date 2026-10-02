@@ -1,122 +1,135 @@
-import type { Brief, Card, Event, Layout, PlanApproach } from "@tilo/contracts";
-import type { AttachmentRef, ClarifyingQuestion, DeliveryView, TiloClient } from "./client";
+import type { Brief, Card, Event, Layout } from "@tilo/contracts";
+import type {
+  ApprovalRequest,
+  ApproachesResult,
+  CardAnswer,
+  DeliveryResult,
+  IntakeResult,
+  QuestionAnswer,
+  TiloClient,
+} from "./client";
+import { BRIEF_SUPPLIER_COMPARISON } from "./fixtures/brief";
+import { CARDS_VALID } from "./fixtures/cards";
 import {
   FIXTURE_APPROACHES,
-  FIXTURE_BRIEF,
-  FIXTURE_CARDS,
   FIXTURE_DELIVERY,
-  FIXTURE_EVENTS,
-  FIXTURE_LAYOUT,
   FIXTURE_QUESTIONS,
-} from "./fixtures";
+  FIXTURE_TASK_ID,
+  FIXTURE_WORLD_ID,
+} from "./fixtures/derived";
+import { EVENTS_VILLAGE_BASIC } from "./fixtures/events";
+import { LAYOUT_VILLAGE_BASIC } from "./fixtures/layout";
 
 export interface FixtureClientOptions {
+  /** Deterministic latency added to every request, so tests can observe loading states. */
   readonly delayMs?: number;
-  readonly intervalMs?: number;
+  /** Replay speed-up for subscribeEvents; the same meaning as the existing `?speed=` param. */
+  readonly speed?: number;
+}
+
+/** Same rule as the world replay in useWorldFixture.ts: a finite number above 0, else 1. */
+export function replaySpeedFromSearch(search: string): number {
+  const speed = Number(new URLSearchParams(search).get("speed"));
+  return Number.isFinite(speed) && speed > 0 ? speed : 1;
 }
 
 const wait = (ms: number): Promise<void> =>
   ms <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
 
+/** TiloClient on the typed contract fixtures. Everything it returns is dev data (HR-4, BQ-07). */
 export class FixtureClient implements TiloClient {
   private readonly delayMs: number;
-  private readonly intervalMs: number;
-  private currentBrief: Brief = FIXTURE_BRIEF;
-  private answeredCardIds = new Set<string>();
+  private readonly speed: number;
+  private brief: Brief = BRIEF_SUPPLIER_COMPARISON;
+  private readonly answered = new Set<string>();
 
   constructor(options: FixtureClientOptions = {}) {
-    this.delayMs = options.delayMs ?? 30;
-    this.intervalMs = options.intervalMs ?? 10;
+    this.delayMs = options.delayMs ?? 0;
+    this.speed = options.speed ?? 1;
   }
 
-  async submitIntake(
-    text: string,
-    _attachments: readonly AttachmentRef[],
-  ): Promise<{ taskId: string; brief: Brief; questions: readonly ClarifyingQuestion[] }> {
+  async submitIntake(_text: string, files: File[]): Promise<IntakeResult> {
     await wait(this.delayMs);
-    const goal = text.trim().length > 0 ? text.trim() : FIXTURE_BRIEF.goal;
-    this.currentBrief = { ...FIXTURE_BRIEF, goal };
     return {
-      taskId: "task-1",
-      brief: this.currentBrief,
+      task_id: FIXTURE_TASK_ID,
+      brief: this.brief,
+      files: files.map((f) => ({
+        name: f.name,
+        status: "ok",
+        safety_flagged: false,
+        reason: null,
+      })),
       questions: FIXTURE_QUESTIONS,
     };
   }
 
   async answerQuestions(
     _taskId: string,
-    _answers: Readonly<Record<string, string>>,
-    briefEdits?: Partial<Brief>,
+    _answers: QuestionAnswer[],
+    briefEdits: Partial<Brief>,
   ): Promise<{ brief: Brief }> {
     await wait(this.delayMs);
-    this.currentBrief = { ...this.currentBrief, ...briefEdits };
-    return { brief: this.currentBrief };
+    this.brief = { ...this.brief, ...briefEdits };
+    return { brief: this.brief };
   }
 
-  async getApproaches(
-    _taskId: string,
-  ): Promise<{ approaches: readonly PlanApproach[]; recommendedId: string }> {
+  async getApproaches(taskId: string): Promise<ApproachesResult> {
     await wait(this.delayMs);
-    const first = FIXTURE_APPROACHES[0];
-    return {
-      approaches: FIXTURE_APPROACHES,
-      recommendedId: first ? first.id : "quick",
-    };
+    return { task_id: taskId, ...FIXTURE_APPROACHES };
   }
 
-  async approve(
-    _taskId: string,
-    _approachId: string,
-    _budgetCap: number,
-  ): Promise<{ worldId: string; runId: string }> {
+  async approve(_taskId: string, _req: ApprovalRequest): Promise<{ world_id: string }> {
     await wait(this.delayMs);
-    return { worldId: "w_village_basic", runId: "r_village_basic_1" };
+    return { world_id: FIXTURE_WORLD_ID };
   }
 
   async getLayout(_worldId: string): Promise<Layout> {
     await wait(this.delayMs);
-    return FIXTURE_LAYOUT;
+    return LAYOUT_VILLAGE_BASIC;
   }
 
+  /** Replays the recorded stream in seq order, following the recorded `ts` gaps divided by the
+   * speed (the world replay's timing, HR-6). The returned function stops it. */
   subscribeEvents(_worldId: string, onEvent: (e: Event) => void): () => void {
-    const sorted = [...FIXTURE_EVENTS].sort((a, b) => a.seq - b.seq);
-    let idx = 0;
-    let active = true;
-    const timer = setInterval(() => {
-      if (!active || idx >= sorted.length) {
-        clearInterval(timer);
-        return;
-      }
-      const next = sorted[idx];
-      idx += 1;
-      if (next && active) {
-        onEvent(next);
-      }
-    }, this.intervalMs);
-
+    const events: readonly Event[] = [...EVENTS_VILLAGE_BASIC].sort((a, b) => a.seq - b.seq);
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const play = (i: number) => {
+      const event = events[i];
+      if (stopped || !event) return;
+      const prev = events[i - 1];
+      const gap = prev ? (Date.parse(event.ts) - Date.parse(prev.ts)) / this.speed : 0;
+      timer = setTimeout(
+        () => {
+          if (stopped) return;
+          onEvent(event);
+          play(i + 1);
+        },
+        Math.max(0, gap),
+      );
+    };
+    play(0);
     return () => {
-      active = false;
-      clearInterval(timer);
+      stopped = true;
+      clearTimeout(timer);
     };
   }
 
-  async listCards(_worldId: string): Promise<readonly Card[]> {
+  async listCards(worldId: string): Promise<Card[]> {
     await wait(this.delayMs);
-    return FIXTURE_CARDS.filter((c) => !this.answeredCardIds.has(c.id));
+    return CARDS_VALID.filter((c) => !this.answered.has(c.id)).map((c) => ({
+      ...c,
+      world_id: worldId,
+    }));
   }
 
-  async answerCard(
-    _worldId: string,
-    cardId: string,
-    _optionId: string,
-    _context?: string,
-  ): Promise<void> {
+  async answerCard(cardId: string, _answer: CardAnswer): Promise<void> {
     await wait(this.delayMs);
-    this.answeredCardIds.add(cardId);
+    this.answered.add(cardId);
   }
 
-  async getDelivery(worldId: string): Promise<DeliveryView> {
+  async getDelivery(worldId: string): Promise<DeliveryResult> {
     await wait(this.delayMs);
-    return { ...FIXTURE_DELIVERY, worldId };
+    return { ...FIXTURE_DELIVERY, world_id: worldId };
   }
 }

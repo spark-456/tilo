@@ -1,21 +1,31 @@
-import { type ReactNode, createContext, useContext, useMemo } from "react";
+import { type ReactNode, createContext, useContext } from "react";
 import type { TiloClient } from "./client";
-import { FixtureClient } from "./fixtureClient";
+import { FixtureClient, replaySpeedFromSearch } from "./fixtureClient";
 
-const defaultClient = new FixtureClient();
-const ClientContext = createContext<TiloClient>(defaultClient);
+// The fixture client is the default until CL-INT adds src/api/http.ts. `?client_delay_ms=N` adds
+// a fixed latency to it so tests can observe loading and busy states deterministically.
+function createDefaultClient(): TiloClient {
+  const search = typeof window === "undefined" ? "" : window.location.search;
+  const delay = Number(new URLSearchParams(search).get("client_delay_ms"));
+  return new FixtureClient({
+    delayMs: Number.isFinite(delay) && delay > 0 ? delay : 0,
+    speed: replaySpeedFromSearch(search),
+  });
+}
+
+const ClientContext = createContext<TiloClient>(createDefaultClient());
 
 export function ClientProvider({
   client,
   children,
 }: {
-  readonly client?: TiloClient;
+  readonly client: TiloClient;
   readonly children: ReactNode;
 }) {
-  const value = useMemo(() => client ?? defaultClient, [client]);
-  return <ClientContext.Provider value={value}>{children}</ClientContext.Provider>;
+  return <ClientContext.Provider value={client}>{children}</ClientContext.Provider>;
 }
 
-export function useTiloClient(): TiloClient {
-  return useContext(ClientContext);
-}
+export const useClient = (): TiloClient => useContext(ClientContext);
+
+/** True while the active client serves fixtures, so every screen shows the HR-4/BQ-07 banner. */
+export const useIsFixtureClient = (): boolean => useClient() instanceof FixtureClient;

@@ -1,61 +1,50 @@
+// PRD 18.3 flow routes on the History API, no dependency: / S-01, /task/:id/understanding S-02,
+// /task/:id/approaches S-03, /world/:id S-04, /world/:id/delivery S-12. Anything else is Start.
 import { useCallback, useEffect, useState } from "react";
 
 export type FlowScreen = "Start" | "Understanding" | "Approaches" | "World" | "Delivery";
 
-export interface FlowRoute {
-  readonly screen: FlowScreen;
-  readonly taskId?: string;
-  readonly worldId?: string;
-}
+export type FlowRoute =
+  | { readonly screen: "Start" }
+  | { readonly screen: "Understanding" | "Approaches"; readonly taskId: string }
+  | { readonly screen: "World" | "Delivery"; readonly worldId: string };
 
-const UNDERSTANDING_RE = /^\/task\/([^/]+)\/understanding\/?$/;
-const APPROACHES_RE = /^\/task\/([^/]+)\/approaches\/?$/;
-const DELIVERY_RE = /^\/world\/([^/]+)\/delivery\/?$/;
-const WORLD_RE = /^\/world\/([^/]+)\/?$/;
+const ROUTES = [
+  { re: /^\/task\/([^/]+)\/understanding\/?$/, screen: "Understanding", key: "taskId" },
+  { re: /^\/task\/([^/]+)\/approaches\/?$/, screen: "Approaches", key: "taskId" },
+  { re: /^\/world\/([^/]+)\/delivery\/?$/, screen: "Delivery", key: "worldId" },
+  { re: /^\/world\/([^/]+)\/?$/, screen: "World", key: "worldId" },
+] as const;
 
 export function matchFlowRoute(pathname: string): FlowRoute {
-  const uMatch = UNDERSTANDING_RE.exec(pathname);
-  if (uMatch?.[1]) {
-    return { screen: "Understanding", taskId: decodeURIComponent(uMatch[1]) };
-  }
-  const aMatch = APPROACHES_RE.exec(pathname);
-  if (aMatch?.[1]) {
-    return { screen: "Approaches", taskId: decodeURIComponent(aMatch[1]) };
-  }
-  const dMatch = DELIVERY_RE.exec(pathname);
-  if (dMatch?.[1]) {
-    return { screen: "Delivery", worldId: decodeURIComponent(dMatch[1]) };
-  }
-  const wMatch = WORLD_RE.exec(pathname);
-  if (wMatch?.[1]) {
-    return { screen: "World", worldId: decodeURIComponent(wMatch[1]) };
+  for (const { re, screen, key } of ROUTES) {
+    const raw = re.exec(pathname)?.[1];
+    if (raw === undefined) continue;
+    try {
+      const id = decodeURIComponent(raw);
+      return key === "taskId"
+        ? { screen: screen as "Understanding" | "Approaches", taskId: id }
+        : { screen: screen as "World" | "Delivery", worldId: id };
+    } catch {
+      return { screen: "Start" }; // a malformed escape such as %E0 is an unknown path, not a crash
+    }
   }
   return { screen: "Start" };
 }
 
 export function navigateFlow(to: string): void {
-  if (typeof window === "undefined") return;
   window.history.pushState({}, "", to);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
-export function useFlowRoute(): {
-  readonly route: FlowRoute;
-  readonly navigate: (to: string) => void;
-} {
-  const [route, setRoute] = useState<FlowRoute>(() =>
-    matchFlowRoute(typeof window !== "undefined" ? window.location.pathname : "/"),
-  );
-
+export function useFlowRoute(): { readonly route: FlowRoute } {
+  const [route, setRoute] = useState<FlowRoute>(() => matchFlowRoute(window.location.pathname));
   useEffect(() => {
     const onPopState = () => setRoute(matchFlowRoute(window.location.pathname));
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
-
-  const navigate = useCallback((to: string) => {
-    navigateFlow(to);
-  }, []);
-
-  return { route, navigate };
+  return { route };
 }
+
+export const useNavigate = () => useCallback(navigateFlow, []);

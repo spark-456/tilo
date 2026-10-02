@@ -1,61 +1,39 @@
-import type {
-  ArtifactRef,
-  Brief,
-  Card,
-  Credits,
-  DeliverableFormat,
-  Event,
-  Layout,
-  PlanApproach,
-} from "@tilo/contracts";
+// The seam between AG-WEB and the Claude lane CL-INT (issue #80). The interface below is
+// verbatim from the issue (kept on its lines with biome-ignore); changing a signature needs the
+// orchestrator's OK on that issue.
+import type { Brief, Card, Event, Layout, PlanApproach } from "@tilo/contracts";
 
-export interface AttachmentRef {
-  readonly name: string;
-  readonly size: number;
-  readonly mime: string;
+// biome-ignore format: verbatim from issue #80
+export interface IntakeFileStatus { name: string; status: "ok" | "failed"; safety_flagged: boolean; reason: string | null }
+// biome-ignore format: verbatim from issue #80
+export interface ClarifyingQuestion { field: string; text: string; suggested_answers: string[] } // [0] is the Director's guess, used on skip
+// biome-ignore format: verbatim from issue #80
+export interface IntakeResult { task_id: string; brief: Brief; files: IntakeFileStatus[]; questions: ClarifyingQuestion[] }
+// biome-ignore format: verbatim from issue #80
+export interface QuestionAnswer { field: string; answer: string | null } // null = skipped; the brief records the assumption
+// biome-ignore format: verbatim from issue #80
+export interface ApproachesResult { task_id: string; approaches: PlanApproach[]; recommended: string; credit_usd: number }
+// biome-ignore format: verbatim from issue #80
+export interface ApprovalRequest { approach_id: string; budget_cap: number }
+// biome-ignore format: verbatim from issue #80
+export interface DeliveredArtifact { id: string; title: string; kind: string; version: number }
+// biome-ignore format: verbatim from issue #80
+export interface DeliveryResult {
+  world_id: string; artifacts: DeliveredArtifact[]; credits_used: number;
+  time_saved: { low_min: number; high_min: number } | null; // always shown as an estimate (PRD 18.4)
 }
+// biome-ignore format: verbatim from issue #80
+export interface CardAnswer { option_id: string; context?: string }
 
-export interface ClarifyingQuestion {
-  readonly id: string;
-  readonly prompt: string;
-  readonly options: readonly string[];
-  readonly safe_default: string;
-}
-
-export interface DeliveryArtifact {
-  readonly ref: ArtifactRef;
-  readonly title: string;
-  readonly format: DeliverableFormat;
-  readonly verified: boolean;
-}
-
-export interface DeliveryView {
-  readonly worldId: string;
-  readonly artifacts: readonly DeliveryArtifact[];
-  readonly creditsUsed: Credits;
-}
-
+// biome-ignore format: verbatim from issue #80
 export interface TiloClient {
-  submitIntake(
-    text: string,
-    attachments: readonly AttachmentRef[],
-  ): Promise<{ taskId: string; brief: Brief; questions: readonly ClarifyingQuestion[] }>;
-  answerQuestions(
-    taskId: string,
-    answers: Readonly<Record<string, string>>,
-    briefEdits?: Partial<Brief>,
-  ): Promise<{ brief: Brief }>;
-  getApproaches(
-    taskId: string,
-  ): Promise<{ approaches: readonly PlanApproach[]; recommendedId: string }>;
-  approve(
-    taskId: string,
-    approachId: string,
-    budgetCap: number,
-  ): Promise<{ worldId: string; runId: string }>;
+  submitIntake(text: string, files: File[]): Promise<IntakeResult>;
+  answerQuestions(taskId: string, answers: QuestionAnswer[], briefEdits: Partial<Brief>): Promise<{ brief: Brief }>;
+  getApproaches(taskId: string): Promise<ApproachesResult>;
+  approve(taskId: string, req: ApprovalRequest): Promise<{ world_id: string }>;
   getLayout(worldId: string): Promise<Layout>;
-  subscribeEvents(worldId: string, onEvent: (e: Event) => void): () => void;
-  listCards(worldId: string): Promise<readonly Card[]>;
-  answerCard(worldId: string, cardId: string, optionId: string, context?: string): Promise<void>;
-  getDelivery(worldId: string): Promise<DeliveryView>;
+  subscribeEvents(worldId: string, onEvent: (e: Event) => void): () => void; // returns unsubscribe
+  listCards(worldId: string): Promise<Card[]>;
+  answerCard(cardId: string, answer: CardAnswer): Promise<void>;
+  getDelivery(worldId: string): Promise<DeliveryResult>;
 }
