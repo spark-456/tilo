@@ -3,9 +3,10 @@
 A sender with no valid binding gets exactly one reply, the opt-in instructions, and nothing else runs:
 no keyword effect, no card answer, no event. The text is the same for every unbound sender and message
 and never echoes what was sent. A bound sender goes to the keyword handler (FR-CHN-06), then to the
-card handler (FR-CHN-05); anything left is `unhandled` (FR-CHN-04 owns that reply). A handler that
-raises gives route `failed` and one short reply. `opt_in_allowed` (BindingService.allow_opt_in in
-production) rate-limits the opt-in reply per number; without it every unbound message gets one.
+card handler (FR-CHN-05); anything left is `off_topic` (FR-CHN-04): one fixed redirect line to the sender,
+no model call, no archive record, no event, nothing echoed. A handler that raises gives route `failed`
+and one short reply. `opt_in_allowed` (BindingService.allow_opt_in in production)
+rate-limits the opt-in reply per number; without it every unbound message gets one.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ class CardHandler(Protocol):  # tilo_channels.cards.WhatsAppCards
 
 @dataclass(frozen=True)
 class RouteResult:
-    route: str  # "opt_in" | "keyword" | "card" | "unhandled" | "failed"
+    route: str  # "opt_in" | "keyword" | "card" | "off_topic" | "failed"
 
 
 FAILED_TEXT = "Something went wrong with that message. Please check Tilo."
@@ -42,6 +43,13 @@ def opt_in_text(web_url: str) -> str:
     return (
         "This number is not linked to Tilo. To get and answer Tilo cards here, sign in at "
         f"{web_url} and link your WhatsApp number."
+    )
+
+
+def off_topic_text(web_url: str) -> str:
+    return (
+        "I'm Tilo's automated assistant and I only help with your Tilo tasks and cards; "
+        f"for anything else, open {web_url}."
     )
 
 
@@ -60,6 +68,7 @@ class InboundRouter:
         self._bindings = bindings
         self._sender = sender
         self._opt_in = opt_in_text(web_url)
+        self._off_topic = off_topic_text(web_url)
         self._keywords = keywords
         self._cards = cards
 
@@ -80,7 +89,8 @@ class InboundRouter:
             log.error("inbound handler failed ref=%s error=%s", message_ref(message.message_id), type(exc).__name__)
             self._say(message.sender, FAILED_TEXT)
             return RouteResult("failed")
-        return RouteResult("unhandled")
+        self._say(message.sender, self._off_topic)
+        return RouteResult("off_topic")
 
     def _say(self, to: str, body: str) -> None:
         try:
