@@ -14,6 +14,11 @@ _FIXTURES_DIR = REPO_ROOT / "evals" / "fixtures"
 _CONFIG_PATH = REPO_ROOT / "config" / "evals.yaml"
 _EMAIL_OR_URL_HOST_RE = re.compile(r"(?:@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}|https?://([A-Za-z0-9.\-]+\.[A-Za-z]{2,}))")
 _PHONE_RE = re.compile(r"\+1[\s\-]?555[\s\-]?(01\d{2}|\d{4})")
+_DENYLIST_BRANDS_RE = re.compile(
+    r"\b(?:Google(?:\s+Drive)?|BeautifulSoup|Microsoft|Slack|Dropbox|Amazon|Apple|OpenAI|Yanmar|Johnson\s+pump|Pettit|Interlux|Wells\s+Fargo|GreenDot|Seattle\s+Boat\s+Show|Pacific\s+Northwest\s+Marine\s+Trades|seattlecharters)\b",
+    re.IGNORECASE,
+)
+_REAL_ROUTING_RE = re.compile(r"\b(?!0{9}\b)\d{9}\b")
 
 
 def _iter_eval_files() -> list[Path]:
@@ -26,17 +31,16 @@ def _iter_eval_files() -> list[Path]:
 def test_PRD_19_2_eval_set_structure_cases_load_and_respect_group_caps_and_contiguous_ids() -> None:
     cfg = EvalsConfig.load(str(_CONFIG_PATH))
     cases = load_cases(str(_CASES_DIR))
-    assert cases, "expected eval cases under evals/cases"
+    assert len(cases) == sum(cfg.groups.values()) == 160, f"expected all 160 eval cases, got {len(cases)}"
     ids = [c.id for c in cases]
     assert len(ids) == len(set(ids)), "duplicate case ids found"
     by_group: dict[str, list[str]] = {}
     for case in cases:
         by_group.setdefault(case.group, []).append(case.id)
     counts = Counter(c.group for c in cases)
-    for group, actual in counts.items():
-        assert group in cfg.groups, f"unknown group {group!r}"
-        assert actual <= cfg.groups[group], f"group {group} has {actual} cases, exceeds cap {cfg.groups[group]}"
-        expected_ids = [f"{group}-{i:02d}" for i in range(1, actual + 1)]
+    assert dict(counts) == cfg.groups, f"expected all 8 groups complete {cfg.groups}, got {dict(counts)}"
+    for group, expected_count in cfg.groups.items():
+        expected_ids = [f"{group}-{i:02d}" for i in range(1, expected_count + 1)]
         assert sorted(by_group[group]) == expected_ids, f"group {group} ids must run from 01 without gaps"
 
 
@@ -55,6 +59,10 @@ def test_PRD_19_2_eval_set_structure_no_case_or_fixture_trips_secret_scan() -> N
 def test_PRD_19_2_eval_set_structure_fictional_domains_and_phone_numbers_only() -> None:
     for path in _iter_eval_files():
         text = path.read_text(encoding="utf-8")
+        brand_match = _DENYLIST_BRANDS_RE.search(text)
+        assert brand_match is None, f"{path.name}: real brand {brand_match.group(0)!r} found"
+        routing_match = _REAL_ROUTING_RE.search(text)
+        assert routing_match is None, f"{path.name}: 9-digit routing/account number {routing_match.group(0)!r} found"
         for match in _EMAIL_OR_URL_HOST_RE.finditer(text):
             token = match.group(1) or match.group(0).lstrip("@")
             assert token.endswith((".example", ".invalid")), (
