@@ -18,33 +18,23 @@ channel identity binding. Public ingress for signature-verified webhooks only.
   SEC-08 (signed webhooks and signed email links). FR-CHN-02, -03, -05, -06, -07 are built.
 
 ## Local rules
-- Webhooks are signature-verified, idempotent, ordered per user; forged or replayed requests are
-  rejected. Email action links are signed, single-use, 24 h.
-- Never send a real email or WhatsApp message from dev/CI; fakes or recorded-mode accounts only.
-- Never log message bodies, secrets, tokens, nonces or full phone numbers (`whatsapp.mask_number`:
-  last 4 digits). Log exception types, not exception messages.
-- `whatsapp`: HMAC over the raw bytes, dedupe via injected `DedupeStore.claim`, serialised per
-  sender. Stale = strictly older than `max_age_s` (300 s), claims nothing. Duplicate or replay: 200,
-  outcome "duplicate"; forged or missing signature 401; signed non-JSON 400. Handler raises: claim
-  kept (at-most-once), outcome "failed", still 200 (Meta retries non-2xx), error logged by type only.
-- `keywords`: whole-message, case-insensitive; only bound numbers obeyed; effect through the injected
-  control plane, then one confirmation; a failed effect gets one short "Could not apply that" reply.
-- Hardening: app secret >= 32 bytes (constructor raises; empty key never verifies); wamids never
-  logged (`message_ref`: sha256 prefix, they encode the number); object, field and `phone_number_id`
-  pinned; timestamps over 60 s ahead are dropped like stale ones (and logged).
-- `links` (FR-CHN-07; BQ-76 to BQ-82): HMAC-SHA256 (`compare_digest`, prefix `tilo-link-v1|`), every
-  segment alphabet-checked before the MAC, claims parsed after; key ring live; nonce consumed last. Answer
-  only for plain needs_you cards listing email (allowlist, fail closed); gate, consent, meeting open
-  only signed in. Naive clock refused. HTTP layer (BQ-82): `answer` needs a POST confirm (a scanner GET
-  never answers); token in a URL fragment, not the path; public non-consuming verify; no consume on
-  requires_sign_in; first answer is a compare-and-set on the card; whether `open` needs a POST too.
-- `binding` (FR-CHN-03; BQ-89): numbers stored only via the injected cipher, looked up by HMAC (key >= 32
-  bytes); codes stored only as an HMAC, 6 digits, 10 min, 5 attempts claimed as atomic `try:<pid>:<i>`
-  slots; a binding counts only while `num:` and `user:` records agree and `now < verified_at + 30 d`.
-- `inbound`: unbound sender -> one fixed opt-in text with the web URL, nothing else runs; bound ->
-  keywords, then cards, else `unhandled` (FR-CHN-04).
-- `cards` (FR-CHN-05; BQ-89): one reply button per option, random opaque ids; a tap counts only from the
-  number the card went to while still bound to its user; T3 approve asks for the PIN (next text within
-  300 s, one try per tap) and only then answers with `pin_verified=True`; typed text never answers; the
-  API emits `question.answered` / `approval.resolved`, channels only `channel.message_out` / `_in`.
-  Sent-card state is in memory (no store in the pinned API yet).
+- Webhooks signature-verified, idempotent, ordered per user; forged or replayed rejected. Never send real
+  email or WhatsApp from dev/CI. Never log bodies, secrets, tokens, nonces or full numbers (`mask_number`:
+  last 4); log exception types, not messages.
+- `whatsapp`: HMAC over raw bytes, dedupe via `DedupeStore.claim`, serialised per sender. Stale (older than
+  300 s, or over 60 s ahead) claims nothing. Duplicate 200 "duplicate"; forged/missing signature 401; signed
+  non-JSON 400; handler raises: claim kept (at-most-once), 200 "failed". App secret >= 32 bytes; wamids
+  never logged (`message_ref`); object, field and `phone_number_id` pinned.
+- `keywords`: whole-message, case-insensitive, bound numbers only; effect via the control plane, then one
+  confirmation, or one "Could not apply that".
+- `links` (FR-CHN-07; BQ-76 to BQ-82): HMAC-SHA256 (`compare_digest`, prefix `tilo-link-v1|`), segments
+  alphabet-checked before the MAC; key ring live; nonce consumed last. Answer only plain needs_you cards
+  listing email (fail closed); gate, consent, meeting open signed in. HTTP: `answer` needs a POST confirm;
+  token in the fragment; verify never consumes; first answer is a compare-and-set on the card.
+- `binding` (FR-CHN-03; BQ-89): numbers only via the injected cipher, looked up by HMAC (key >= 32 bytes);
+  codes stored as HMAC, 6 digits, 10 min, 5 attempts as atomic `try:<pid>:<i>` slots; bound only while
+  `num:` and `user:` agree and `now < verified_at + 30 d`.
+- `inbound`: unbound sender -> one fixed opt-in text only; bound -> keywords, cards, else `unhandled`.
+- `cards` (FR-CHN-05; BQ-89): random opaque button ids; a tap counts only from the card's number, still
+  bound to its user; T3 approve needs the PIN (next text within 300 s, one try per tap), then
+  `pin_verified=True`; typed text never answers; emits only `channel.message_out` / `_in`; state in memory.
