@@ -86,6 +86,7 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
         "writer",
         "narrator",
         "autopilot",
+        "safety",  # CL-INT-1 / issue #103: the dev safety screen
     }
     assert config.roles["director"].primary == "flash-38"
     assert config.roles["director"].fallback == "flash-37"

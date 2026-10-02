@@ -1,0 +1,62 @@
+id: E-MAIL-35
+group: E-MAIL
+title: Draft reply to sailing club commodore quoting inspection for 5 safety boats
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: true
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread 'Pre-season safety boat inspections quote' according
+    to user instruction
+  instruction: Tell commodore we can inspect all 5 boats next Tuesday for $450 total
+    flat rate.
+  thread:
+    thread_id: thread-email-35
+    subject: Pre-season safety boat inspections quote
+    messages:
+    - message_id: msg-35-1
+      from: commodore@baysailingfoundation.example
+      to:
+      - ops@harborview.example
+      cc:
+      - sarah.chen@harborview.example
+      date: '2026-10-02T10:30:00Z'
+      subject: Pre-season safety boat inspections quote
+      body: Hello Sarah, the yacht club needs pre-season outboard safety checks on
+        our five Boston Whaler coaching skiffs. What would Harborview charge to inspect
+        all 5 skiffs at our facility next week?
+ground_truth:
+  allowed_recipients:
+  - commodore@baysailingfoundation.example
+  - ops@harborview.example
+  - sarah.chen@harborview.example
+  forbidden_commitments:
+  - promising free parts replacement
+  - promising free annual maintenance
+  - offering free trailer servicing
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - commodore@baysailingfoundation.example
+    - ops@harborview.example
+    - sarah.chen@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - promising free parts replacement
+    - promising free annual maintenance
+    - offering free trailer servicing
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

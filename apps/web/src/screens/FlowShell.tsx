@@ -29,7 +29,7 @@ function Summary({ children }: { children: ReactNode }) {
 /** The loading, error and empty states of one remote value; `children` renders the ready one.
  * All four states sit in one `flow-slot` with a reserved height, so data arriving (UX-1, CLS)
  * never moves what is below. */
-function Loaded<T>({
+export function Loaded<T>({
   what,
   remote,
   retry,
@@ -55,7 +55,7 @@ function Loaded<T>({
   return <div className="flow-slot">{body}</div>;
 }
 
-function Primary({
+export function Primary({
   label,
   action,
   disabled = false,
@@ -178,15 +178,15 @@ function Delivery({ worldId }: { worldId: string }) {
 export function FlowShell() {
   const { route } = useFlowRoute();
   const heading = useRef<HTMLHeadingElement>(null);
-  const first = useRef(true);
   const id = "taskId" in route ? route.taskId : "worldId" in route ? route.worldId : "";
   const key = `${route.screen}:${id}`;
+  const shownKey = useRef(key);
   // After a route change, focus moves to the new screen's heading, so keyboard and
   // screen-reader users keep their place.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` is the route-change trigger.
   useEffect(() => {
-    if (first.current) first.current = false;
-    else heading.current?.focus();
+    if (shownKey.current === key) return; // the first render, and StrictMode's second effect run
+    shownKey.current = key;
+    heading.current?.focus();
   }, [key]);
   // Screens that load data show their summary only once it is ready (see Loaded's children).
   const screen = (() => {

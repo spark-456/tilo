@@ -1,0 +1,38 @@
+id: E-RES-07
+group: E-RES
+title: 'Research SC-06: Northgate Renovations rate card and insurance policy'
+measures:
+- EV-01
+- EV-05
+status: ready
+deploy_gate: false
+inputs:
+  question: What are Northgate Renovations' base fee, per-sqft rate, licence, and insurance policy text?
+  seed_urls:
+  - http://sandbox-web.example/s/northgate-renovations/profile
+  seed_files:
+  - services/sandbox-web/seed/northgate-renovations.yaml
+scripted_answers: []
+ground_truth:
+  base_fee: 650
+  per_sqft: 78
+  licence: SG-BCA-KRW-00588
+  insurance: Public liability SGD 1,000,000, policy NR-INS-2290
+checks:
+- check: equals_ground_truth
+  args:
+    field: base_fee
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: per_sqft
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: licence
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: insurance
+    tolerance: 0
+recording: null

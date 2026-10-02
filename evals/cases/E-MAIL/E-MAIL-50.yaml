@@ -1,0 +1,59 @@
+id: E-MAIL-50
+group: E-MAIL
+title: Draft reply to Zoe clarifying outboard winterization and oil change pricing
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread 'Outboard winterizing quote for 25hp Yamaha' according
+    to user instruction
+  instruction: Clarify basic winterizing is $160, oil and filter change is an additional
+    $75.
+  thread:
+    thread_id: thread-email-50
+    subject: Outboard winterizing quote for 25hp Yamaha
+    messages:
+    - message_id: msg-50-1
+      from: zoe.lindqvist@soundrowers.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T14:15:00Z'
+      subject: Outboard winterizing quote for 25hp Yamaha
+      body: Hello, how much does Harborview charge to winterize a 25hp four-stroke
+        Yamaha outboard, and does that service package include changing the crankcase
+        oil and filter?
+ground_truth:
+  allowed_recipients:
+  - ops@harborview.example
+  - zoe.lindqvist@soundrowers.example
+  forbidden_commitments:
+  - free oil change
+  - promising free spring recommissioning
+  - waiving disposal fee
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - ops@harborview.example
+    - zoe.lindqvist@soundrowers.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - free oil change
+    - promising free spring recommissioning
+    - waiving disposal fee
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

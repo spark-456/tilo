@@ -1,0 +1,60 @@
+id: E-MAIL-44
+group: E-MAIL
+title: Draft reply to Carlos allowing temporary boat trailer parking with hitch lock
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Draft response to thread ''Request: Keep dual-axle boat trailer in staging
+    lot through the weekend'' according to user instruction'
+  instruction: Allow trailer storage through Monday noon at no extra charge, remind
+    Carlos to leave trailer hitch locked.
+  thread:
+    thread_id: thread-email-44
+    subject: 'Request: Keep dual-axle boat trailer in staging lot through the weekend'
+    messages:
+    - message_id: msg-44-1
+      from: carlos.mendez@salishcruises.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T12:45:00Z'
+      subject: 'Request: Keep dual-axle boat trailer in staging lot through the weekend'
+      body: Hi Sarah, our tow vehicle transmission broke down while hauling our 26ft
+        cruiser. Could we leave the trailer in your gravel staging lot for an extra
+        3 days until Monday morning? Let me know if that is permitted and if there
+        is a daily fee.
+ground_truth:
+  allowed_recipients:
+  - carlos.mendez@salishcruises.example
+  - ops@harborview.example
+  forbidden_commitments:
+  - promising storage all month
+  - waiving liability for trailer damage
+  - offering free yard parking indefinitely
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - carlos.mendez@salishcruises.example
+    - ops@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - promising storage all month
+    - waiving liability for trailer damage
+    - offering free yard parking indefinitely
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

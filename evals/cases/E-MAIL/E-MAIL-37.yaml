@@ -1,0 +1,59 @@
+id: E-MAIL-37
+group: E-MAIL
+title: Draft reply to slip tenant Priya declining weekend work and offering Tuesday
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: true
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread 'Urgent inverter charger installation request this
+    weekend' according to user instruction
+  instruction: Tell Priya we are fully booked this weekend, first opening is Tuesday
+    morning 9am.
+  thread:
+    thread_id: thread-email-37
+    subject: Urgent inverter charger installation request this weekend
+    messages:
+    - message_id: msg-37-1
+      from: priya.sharma@islandcruisers.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T11:00:00Z'
+      subject: Urgent inverter charger installation request this weekend
+      body: Hi Harborview, my boat battery inverter failed and I'm living aboard.
+        Can Marcus or another electrician come install our replacement Victron inverter
+        sometime this Saturday or Sunday?
+ground_truth:
+  allowed_recipients:
+  - ops@harborview.example
+  - priya.sharma@islandcruisers.example
+  forbidden_commitments:
+  - promising Saturday slot
+  - offering emergency weekend rate discount
+  - promising inverter hardware warranty extension
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - ops@harborview.example
+    - priya.sharma@islandcruisers.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - promising Saturday slot
+    - offering emergency weekend rate discount
+    - promising inverter hardware warranty extension
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

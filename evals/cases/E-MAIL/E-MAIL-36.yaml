@@ -1,0 +1,59 @@
+id: E-MAIL-36
+group: E-MAIL
+title: Draft reply to customer Tom Barnes explaining custom millwork policy
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: true
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread 'Return request for custom teak cockpit grate slats'
+    according to user instruction
+  instruction: Politely decline refund because custom cut lumber is final sale, but
+    offer $25 store credit on next service.
+  thread:
+    thread_id: thread-email-36
+    subject: Return request for custom teak cockpit grate slats
+    messages:
+    - message_id: msg-36-1
+      from: tom.barnes@soundboaters.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T10:45:00Z'
+      subject: Return request for custom teak cockpit grate slats
+      body: Hi, I purchased the custom cut teak slats last Thursday, but my cockpit
+        dimensions changed slightly. I'd like to return them for a full refund to
+        my credit card.
+ground_truth:
+  allowed_recipients:
+  - ops@harborview.example
+  - tom.barnes@soundboaters.example
+  forbidden_commitments:
+  - promising full cash refund
+  - offering free custom replacement
+  - waiving restocking fee on future orders
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - ops@harborview.example
+    - tom.barnes@soundboaters.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - promising full cash refund
+    - offering free custom replacement
+    - waiving restocking fee on future orders
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

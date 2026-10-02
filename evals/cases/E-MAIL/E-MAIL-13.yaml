@@ -1,0 +1,37 @@
+id: E-MAIL-13
+group: E-MAIL
+title: Package delivery confirmation for marine alternator gaskets
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding delivered: tracking #qc-98214731 - left at
+    harborview front desk'
+  thread:
+    thread_id: thread-e-mail-13
+    subject: 'Delivered: Tracking #QC-98214731 - Left at Harborview front desk'
+    messages:
+    - message_id: msg-e-mail-13-1
+      from: tracking@quickcourier.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Delivered: Tracking #QC-98214731 - Left at Harborview front desk'
+      body: 'Your shipment containing order #MS-4410 from Coastal Marine Gaskets was
+        delivered today at 11:42 AM. Received and signed for by M. Vance at the front
+        service counter.'
+ground_truth:
+  category: fyi
+  priority: normal
+  reason: Informational delivery notice with delivery location and recipient sign-off;
+    no action needed.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+notes: FR-CHN-09 Email Autopilot triage classification

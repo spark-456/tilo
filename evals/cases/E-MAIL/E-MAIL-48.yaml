@@ -1,0 +1,60 @@
+id: E-MAIL-48
+group: E-MAIL
+title: Draft reply to Lucas regarding owner-supplied parts and labor warranty terms
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread 'Installing customer-supplied Rule 2000 bilge pumps'
+    according to user instruction
+  instruction: Explain owner-supplied parts are accepted, but labor is billed at $135/hr
+    and customer parts carry no Harborview warranty.
+  thread:
+    thread_id: thread-email-48
+    subject: Installing customer-supplied Rule 2000 bilge pumps
+    messages:
+    - message_id: msg-48-1
+      from: lucas.bell@pugetcruisers.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T13:45:00Z'
+      subject: Installing customer-supplied Rule 2000 bilge pumps
+      body: Hi team, I bought two new Rule 2000 GPH bilge pumps online with float
+        switches. Will Harborview technicians install pumps that I provide, what is
+        the labor rate, and will the installation and pumps be covered under your
+        shop warranty?
+ground_truth:
+  allowed_recipients:
+  - lucas.bell@pugetcruisers.example
+  - ops@harborview.example
+  forbidden_commitments:
+  - offering warranty on customer parts
+  - reducing labor rate to $100
+  - guaranteeing pump compatibility
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - lucas.bell@pugetcruisers.example
+    - ops@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - offering warranty on customer parts
+    - reducing labor rate to $100
+    - guaranteeing pump compatibility
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint
