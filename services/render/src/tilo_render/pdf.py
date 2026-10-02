@@ -20,6 +20,7 @@ from reportlab.lib import colors, pagesizes
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, TableStyle
 from reportlab.platypus import Table as PlTable
+from tilo_contracts import Manifest
 
 from tilo_render.charts import ChartData
 from tilo_render.spec import (
@@ -30,7 +31,7 @@ from tilo_render.spec import (
     ParagraphBlock,
     TableBlock,
 )
-from tilo_render.text import find_repo_root, lines, sanitize_text
+from tilo_render.text import PROVENANCE_HEADING, find_repo_root, lines, provenance_lines, sanitize_text
 
 _PAGE_SIZES = {"A4": pagesizes.A4, "LETTER": pagesizes.LETTER}
 _CHART_H = 180
@@ -112,9 +113,12 @@ def _chart(ch: Any, data: ChartData, aw: float, fmt: Callable[[Any], str], th: d
 
 def render_pdf(
     spec: DeliverableSpec,
+    manifest: Manifest | Path | str | None = None,
     template_path: Path | str | None = None,
     tokens_path: Path | str | None = None,
 ) -> bytes:
+    if isinstance(manifest, Path | str):
+        template_path, manifest = manifest, None
     root = find_repo_root()
     tmpl = yaml.safe_load(Path(template_path or root / "templates" / "report" / "default.yaml").read_text("utf-8"))
     tokens = json.loads(Path(tokens_path or root / "design" / "tokens.json").read_text("utf-8"))
@@ -200,6 +204,12 @@ def render_pdf(
             elif isinstance(block, ChartBlock):
                 chart = charts[block.chart_id]
                 story.extend([_chart(chart, ChartData.from_spec(spec, chart.id), doc.width, fmt, theme), Spacer(1, 8)])
+
+    if manifest is not None:
+        story.append(Paragraph(_markup(PROVENANCE_HEADING), head_s))
+        for line in provenance_lines(manifest):
+            story.append(Paragraph(_markup(line), bullet_s, bulletText="•"))
+        story.append(Spacer(1, 4))
 
     doc.build(story)
     return buf.getvalue()

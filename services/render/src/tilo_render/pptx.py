@@ -11,6 +11,7 @@ from pptx.chart.data import CategoryChartData
 from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.util import Inches, Pt
+from tilo_contracts import Manifest
 
 from tilo_render.charts import ChartData
 from tilo_render.spec import (
@@ -23,9 +24,9 @@ from tilo_render.spec import (
     Table,
     TableBlock,
 )
+from tilo_render.text import PROVENANCE_HEADING, provenance_lines, sanitize_text
 from tilo_render.text import find_repo_root as _find_repo_root
 from tilo_render.text import lines as _lines
-from tilo_render.text import sanitize_text
 
 
 def _resolve_color(role: str, tokens: dict[str, Any]) -> RGBColor:
@@ -176,9 +177,12 @@ def _add_chart_slide(
 
 def render_pptx(
     spec: DeliverableSpec,
+    manifest: Manifest | Path | str | None = None,
     template_path: Path | str | None = None,
     tokens_path: Path | str | None = None,
 ) -> bytes:
+    if isinstance(manifest, Path | str):
+        template_path, manifest = manifest, None
     root = _find_repo_root()
     tmpl_p = Path(template_path) if template_path else root / "templates" / "deck" / "default.yaml"
     tok_p = Path(tokens_path) if tokens_path else root / "design" / "tokens.json"
@@ -221,6 +225,11 @@ def render_pptx(
             elif isinstance(b, ChartBlock):
                 c = next(ch for ch in spec.charts if ch.id == b.chart_id)
                 _add_chart_slide(prs, spec, sec.heading, c, colors, typo)
+
+    if manifest is not None:
+        prov = provenance_lines(manifest)
+        for i in range(0, len(prov), bullets_per_slide):
+            _add_bullets_slide(prs, PROVENANCE_HEADING, prov[i : i + bullets_per_slide], colors, typo)
 
     buf = io.BytesIO()
     prs.save(buf)
