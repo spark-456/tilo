@@ -1,5 +1,3 @@
-"""Acceptance tests for E-RED red-team eval cases (PRD 19.2 E-RED, EV-09, SEC-04, PRD 19.4 gate 3)."""
-
 import re
 import subprocess
 import sys
@@ -13,6 +11,7 @@ _CASES_DIR = REPO_ROOT / "evals" / "cases"
 _RED_FIXTURES_DIR = REPO_ROOT / "evals" / "fixtures" / "red"
 _URL_RE = re.compile(r"https?://[^\s\"'<>)\],]+")
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})")
+_PHONE_RE = re.compile(r"\+1 555 \d{4}")
 _EXPECTED_CATEGORIES = {
     "hidden_web_text",
     "document_injection",
@@ -31,13 +30,19 @@ def _e_red_cases() -> list[Case]:
 def _bait_host(entry: str) -> str:
     if "://" in entry:
         return (urlparse(entry).hostname or "").lower().rstrip(".")
-    return entry.rsplit("@", 1)[-1].split("/", 1)[0].split(":", 1)[0].lower().rstrip(".")
+    if "@" in entry:
+        return entry.rsplit("@", 1)[-1].split("/", 1)[0].split(":", 1)[0].lower().rstrip(".")
+    return entry
 
 
 def _extract_hosts(text: str) -> list[str]:
     hosts = [urlparse(m.group(0)).hostname or "" for m in _URL_RE.finditer(text)]
     hosts.extend(m.group(1).lower() for m in _EMAIL_RE.finditer(text))
     return [h.lower().rstrip(".") for h in hosts if h]
+
+
+def _extract_phones(text: str) -> list[str]:
+    return [m.group(0) for m in _PHONE_RE.finditer(text)]
 
 
 def test_PRD_19_2_e_red_fourteen_cases_two_per_category() -> None:
@@ -71,16 +76,42 @@ def test_PRD_19_2_e_red_every_bait_host_ends_in_invalid_and_fixtures_exist() -> 
     cases = _e_red_cases()
     assert len(cases) == 14
     referenced_files: list[str] = []
+
+    # Read sandbox web seed to verify paths
+    seed_path = REPO_ROOT / "services/sandbox-web/seed/redteam-notes.yaml"
+    seed_content = seed_path.read_text(encoding="utf-8") if seed_path.exists() else ""
+
     for case in cases:
         assert case.ground_truth is not None
+
+        # Verify bait is actually in the fixture or inputs
+        case_texts = []
+        if case.inputs.get("prompt"):
+            case_texts.append(case.inputs["prompt"])
+        if case.inputs.get("sandbox_path"):
+            page_key = case.inputs["sandbox_path"].strip("/")
+            assert page_key in seed_content, f"Sandbox path {page_key} not in seed"
+
         for bait_entry in case.ground_truth["bait"]:
             host = _bait_host(str(bait_entry))
-            assert host.endswith(".invalid"), f"{case.id}: bait host {host!r} does not end in .invalid"
+            if not bait_entry.startswith("+"):
+                assert host.endswith(".invalid"), f"{case.id}: bait host {host!r} does not end in .invalid"
         for rel in case.inputs.get("files") or []:
             referenced_files.append(rel)
             path = REPO_ROOT / rel
             assert path.is_file() and _RED_FIXTURES_DIR in path.resolve().parents, f"{case.id}: missing {rel}"
-            assert path.read_text(encoding="utf-8").strip()
+            content = path.read_text(encoding="utf-8").strip()
+            assert content, f"File {rel} is empty"
+            case_texts.append(content)
+
+        # Verify bait is planted
+        all_text = " ".join(case_texts)
+        if case_texts:  # Only if we have inline payload or files
+            for bait_entry in case.ground_truth["bait"]:
+                # strip out unicode format for check
+                b = bait_entry.replace("\u200b", "").replace("\u202e", "")
+                t = all_text.replace("\u200b", "").replace("\u202e", "")
+                assert b in t, f"Bait {bait_entry} not found in case texts for {case.id}"
 
     assert referenced_files, "expected referenced red-team fixture files"
     exts = {(REPO_ROOT / rel).suffix for rel in referenced_files}
@@ -88,8 +119,12 @@ def test_PRD_19_2_e_red_every_bait_host_ends_in_invalid_and_fixtures_exist() -> 
 
     texts = [c.path.read_text(encoding="utf-8") for c in cases]
     texts.extend(p.read_text(encoding="utf-8") for p in sorted(_RED_FIXTURES_DIR.rglob("*")) if p.is_file())
+
     for host in [h for text in texts for h in _extract_hosts(text)]:
         assert host.endswith((".example", ".invalid")), f"non-fictional host found: {host}"
+
+    for phone in [p for text in texts for p in _extract_phones(text)]:
+        assert phone.startswith("+1 555 01"), f"phone not in +1 555 0100-0199: {phone}"
 
 
 def test_PRD_19_2_e_red_secret_scan_passes_on_all_cases_and_fixtures() -> None:
