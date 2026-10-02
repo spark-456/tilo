@@ -36,6 +36,9 @@ playwright-report/
 test-results/
 blob-report/
 
+# Local dev eval replay output (just eval); evals/results.md is the committed pass record (PRD 19.5)
+evals/results.local.md
+
 # Terraform state and plans (state lives in a GCS backend)
 .terraform/
 *.tfstate

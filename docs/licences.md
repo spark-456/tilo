@@ -72,7 +72,8 @@ Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject
 
 `tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
 FR-AGT-11), both already listed above (MIT); and the in-workspace `tilo-policy` (not external).
-No new licence.
+FR-CON-01 adds `pyyaml` (MIT, already listed above) as a direct dependency for the connector config
+loader. No new licence.
 
 ## Python (`packages/planning`)
 
@@ -101,6 +102,7 @@ No new licence.
 | @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
 | @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT; fonts Nunito, Nunito Sans, JetBrains Mono are OFL-1.1 | https://fonts.google.com/ |
 | fast-check (property tests, ticket P0-08b-player, FR-WLD-04) | MIT | https://www.npmjs.com/package/fast-check |
+| happy-dom (DOM for React component unit tests, AGW-01; dev only) | MIT | https://www.npmjs.com/package/happy-dom |
 | @tilo/contracts (`packages/contracts-ts`, internal workspace package, not third-party) | n/a | `packages/contracts-ts` |
 
 ## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)

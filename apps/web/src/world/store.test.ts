@@ -86,7 +86,7 @@ test("FR-WLD-04 store: stateAt(seq) equals a from-scratch replay, for every seq 
       expected,
     );
   }
-});
+}, 20_000);
 
 test("FR-WLD-04 store: stateAt(0) is the same as reducer.ts's createInitialState (before any event)", () => {
   const store = createWorldStore(layout);

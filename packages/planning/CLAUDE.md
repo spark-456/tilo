@@ -6,12 +6,19 @@ types and extracts files (`extraction`), screens them with a `SafetyProvider` an
 versioned artifacts with an origin record (`artifacts`). FR-INT-03/04/05: `brief.extract_brief` asks
 the `director` role (through `tilo_providers.router.Router`) for a brief and the ambiguous fields;
 `questions.generate_questions` checks `memory` first, then ranks and caps the questions in code.
+FR-INT-09: `plangraph.validate_plan` checks a plan against `plan.schema.json` and PG-01..PG-11
+(`plan.rules.md`) with no model, returning every `Violation` with its rule id.
+FR-INT-06/07/08: `approaches.propose_approaches` asks the `director` role for 2-3 approaches and checks
+PG-07/08/09 in code (one repair through the router, then reject); `estimate.estimate_units` sums
+historical unit costs (seed table `unit_cost_seed.json`, empty at launch, PRD 7.3); `budget` grants a
+budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant_budget` action type.
 
 ## Commands
 - `uv run pytest packages/planning` — tests; `just check` — full gate from the repo root
 
 ## Contracts
-- Builds `world.requested`, `artifact.created`, `memory.hit` and `plan.questions_asked` events
+- Builds `world.requested`, `artifact.created`, `memory.hit`, `plan.questions_asked`,
+  `plan.approaches_proposed` and `budget.granted` events
   (`events.build_event`, validated with `tilo_contracts`); returns them, never writes them (the
   harness is the writer). Briefs are validated with the generated `Brief` (`brief.schema.json`).
 
@@ -23,5 +30,15 @@ the `director` role (through `tilo_providers.router.Router`) for a brief and the
 - The model only flags ambiguous fields. Memory lookup, ranking, the cap of 3 and assumptions are
   code; a candidate over the cap is recorded as an assumption with `question: null`.
 - A rejected submission stores nothing: limits first, then extraction and screening, then storage.
+- The plan validator takes its registries (risk table, connectors, skills, policies) as arguments;
+  a schema failure (`schema`) stops the PG checks. Arrays over their cap and non-finite numbers are
+  `schema`, checked so jsonschema never does quadratic work. PG-06 checks "never lower" only, against
+  the higher of the table and connector tiers (BQ-72). PG-10 reads a policy as `tilo_policy` does:
+  schema, owner, history level at `now` capped by `max_level`, expiry, scope.
 - A flagged file's `artifact.created` has severity `fyi` and `trace.tool` `safety_provider`;
   `trace.archive_ref` stays null until the raw archive (P7) exists.
+- Estimates are arithmetic only (no model, network or randomness); an unknown unit type refuses.
+- A budget grant's authz comes only from the world's owner (PRD 10.1) or the policy engine. The risk table
+  is a parameter: until `config/autonomy.yaml` lists `grant_budget`, the engine fails closed and every grant
+  waits. A policy grant is one `budget.granted` with authz by policy; it has no gate or outbox entry, so no
+  `policy.applied` is built, and its daily limits count earlier policy-authorised grants.

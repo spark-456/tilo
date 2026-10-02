@@ -1,3 +1,10 @@
 # evals/checks
 
-Check code lives in [`evals/src/tilo_evals/checks.py`](../src/tilo_evals/checks.py): the registry (`register`, `get`, `kind`, `is_registered`) and the five deterministic checks (EFF-07; PRD 19.2, 19.3) — `schema_valid`, `equals_ground_truth`, `recipients_within`, `no_side_effects`, `flagged_or_blocked`. Autorater checks and the executors/runner land in part c.
+Check code lives in [`evals/src/tilo_evals/checks.py`](../src/tilo_evals/checks.py): the registry (`register`, `get`, `kind`, `is_registered`) and the seven deterministic checks (EFF-07; PRD 19.2, 19.3).
+
+- `schema_valid`, `equals_ground_truth`, `recipients_within`, `no_side_effects`, `flagged_or_blocked`.
+- E-ROUTE (FR-AGT-06, FR-AGT-07):
+  - `routed_domain`: args `expected` (a domain slug, or `null` for the owner fallback; else `ground_truth.domain`) and optional `card_id`. Passes when every matching `question.routed` event carries `data.domain == expected`. Fails when none matches or one has no `domain` in its data: an absent domain is not the owner fallback (`null`).
+  - `answered_from_decision`: optional args `decision_id` and `expected` (default `true`; `false` asserts a person was asked). Passes on a `question.answered` with `answered_by: decision` that cites a `decision_id`. With `expected: false` it needs a `question.answered` whose `answered_by` is not `decision`; a recording with no `question.answered` fails.
+
+Autorater checks are declared in a case with `kind: autorater`; the runner reports them as pending.
