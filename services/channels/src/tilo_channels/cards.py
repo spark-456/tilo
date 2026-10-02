@@ -22,13 +22,14 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from tilo_channels.whatsapp import InboundMessage, mask_number, message_ref
+from tilo_channels.whatsapp import InboundMessage, Sender, mask_number, message_ref
 
 log = logging.getLogger("tilo_channels.cards")
 
 PIN_WINDOW_S = 300
 PIN_GRACE_S = 300
 RETAIN_S = 3600
+SEND_WAIT_S = 30  # how long a second send of a card waits for the first one to finish
 UNKNOWN_TEXT = "Could not confirm your answer. Check the card in Tilo before tapping again."
 LATE_TEXT = "That PIN came too late. Tap Approve again."
 # Hold and Edit first answer a gate without resolving it (tilo-api, #157): the WhatsApp copy stays open.
@@ -57,8 +58,7 @@ class EventWriter(Protocol):
     def write(self, part: dict[str, Any]) -> None: ...
 
 
-class CardSender(Protocol):
-    def send_text(self, to: str, body: str) -> object: ...
+class CardSender(Sender, Protocol):
     def send_buttons(self, to: str, body: str, buttons: Sequence[tuple[str, str]]) -> str: ...
 
 
@@ -87,7 +87,8 @@ class _Sent:
     number: str
     deadline: float
     message_id: str
-    open: bool = True
+    open: bool = True  # read and written under WhatsAppCards._lock
+    stayed: set[str] = field(default_factory=set)  # gate options (hold, edit) already answered and recorded
     labels: dict[str, str] = field(default_factory=dict)
     buttons: list[str] = field(default_factory=list)
 
@@ -132,6 +133,7 @@ class WhatsAppCards:
         self._pin_window_s = pin_window_s
         self._lock = threading.Lock()
         self._sent: dict[str, _Sent] = {}  # card_id -> sent record
+        self._sending: dict[str, threading.Event] = {}  # card_id -> set when its send in flight has finished
         self._buttons: dict[str, tuple[str, str]] = {}  # button id -> (card_id, option)
         self._pin_prompts: dict[str, tuple[str, float, bool]] = {}  # number -> (card_id, asked_at, try left)
 
@@ -152,27 +154,41 @@ class WhatsAppCards:
             return SendResult("failed", None)
         if not options or self._clock() >= deadline:
             return SendResult("expired" if options else "failed", None)
-        with self._lock:
-            self._prune()
-            known = self._sent.get(card_id)
-        if known is not None and not known.open:
-            return SendResult("closed", None)  # never reopened by a re-send
-        if known is not None and (known.user_id, known.number) == (user_id, number):
-            return SendResult("sent", known.message_id)  # a retry never sends twice
-        buttons = [(f"tc1.{secrets.token_urlsafe(18)}", label) for _, label in options]
+        while True:
+            with self._lock:
+                self._prune()
+                known = self._sent.get(card_id)
+                if known is not None and not known.open:
+                    return SendResult("closed", None)  # never reopened by a re-send
+                if known is not None and (known.user_id, known.number) == (user_id, number):
+                    return SendResult("sent", known.message_id)  # a retry never sends twice
+                in_flight = self._sending.get(card_id)
+                if in_flight is None:
+                    self._sending[card_id] = done = threading.Event()  # reserved: one send per card at a time
+                    break
+            if not in_flight.wait(SEND_WAIT_S):
+                return SendResult("failed", None)
         try:
-            message_id = self._sender.send_buttons(number, body, buttons)
-        except Exception as exc:
-            log.error("card send failed card=%s error=%s", card_id, type(exc).__name__)
-            return SendResult("failed", None)
-        sent = _Sent(card, user_id, number, deadline, message_id, labels=dict(options), buttons=[b for b, _ in buttons])
-        with self._lock:
-            replaced = self._sent.get(card_id)
-            for button_id in replaced.buttons if replaced is not None else ():  # a re-send retires old buttons
-                self._buttons.pop(button_id, None)
-            self._sent[card_id] = sent
-            for (button_id, _), (option, _) in zip(buttons, options, strict=True):
-                self._buttons[button_id] = (card_id, option)
+            buttons = [(f"tc1.{secrets.token_urlsafe(18)}", label) for _, label in options]
+            try:
+                message_id = self._sender.send_buttons(number, body, buttons)
+            except Exception as exc:
+                log.error("card send failed card=%s error=%s", card_id, type(exc).__name__)
+                return SendResult("failed", None)
+            sent = _Sent(
+                card, user_id, number, deadline, message_id, labels=dict(options), buttons=[b for b, _ in buttons]
+            )
+            with self._lock:
+                replaced = self._sent.get(card_id)
+                for button_id in replaced.buttons if replaced is not None else ():  # a re-send retires old buttons
+                    self._buttons.pop(button_id, None)
+                self._sent[card_id] = sent
+                for (button_id, _), (option, _) in zip(buttons, options, strict=True):
+                    self._buttons[button_id] = (card_id, option)
+        finally:
+            with self._lock:
+                self._sending.pop(card_id, None)
+            done.set()
         try:
             ref = self._archive.record(card["run_id"], "whatsapp.card_out", {"channel": CHANNEL, "card_id": card_id})
             data = {"channel": CHANNEL, "message_ref": ref, "card_id": card_id}
@@ -266,7 +282,9 @@ class WhatsAppCards:
         return self._answer(message, sent, card_id, "approve", pin_verified=True)
 
     def _closed_or_expired(self, message: InboundMessage, sent: _Sent, card_id: str, option: str) -> ReplyResult | None:
-        if not sent.open:
+        with self._lock:
+            is_open = sent.open
+        if not is_open:
             return self._refuse(message, "already_answered", card_id, option, "This card was already answered.")
         if self._clock() >= sent.deadline:
             return self._refuse(message, "expired", card_id, option, "This card has timed out.")
@@ -276,6 +294,13 @@ class WhatsAppCards:
         self, message: InboundMessage, sent: _Sent, card_id: str, option: str, *, pin_verified: bool
     ) -> ReplyResult:
         card = sent.card
+        stays_open = card.get("kind") == "gate" and option in GATE_STAYS_OPEN  # the gate is not resolved
+        if stays_open:
+            with self._lock:
+                repeated = option in sent.stayed
+            if repeated:  # the same Hold or Edit again: same reply, no second event or API call
+                self._say(message.sender, self._receipt(sent, option, stays_open))
+                return ReplyResult("answered", card_id, option)
         try:
             result = self._api.answer(
                 str(card["world_id"]),
@@ -290,20 +315,24 @@ class WhatsAppCards:
             return self._refuse(message, "failed", card_id, option, UNKNOWN_TEXT)  # it may have been recorded
         if getattr(result, "outcome", None) != "answered":
             if getattr(result, "reason", None) == "already_resolved":
-                sent.open = False
+                with self._lock:
+                    sent.open = False
                 return self._refuse(message, "already_answered", card_id, option, "This card was already answered.")
             log.warning("card answer rejected card=%s reason=%s", card_id, getattr(result, "reason", None))
             return self._refuse(message, "rejected", card_id, option, "Tilo could not take that answer.")
-        keep_open = sent.card.get("kind") == "gate" and option in GATE_STAYS_OPEN  # the gate is not resolved
-        if not keep_open:
-            sent.open = False
+        with self._lock:
+            if stays_open:
+                sent.stayed.add(option)
+            else:
+                sent.open = False
         self._record_answer(message, sent, card_id, option)
-        link = self._link(sent.card)
-        receipt = (
-            GATE_STAYS_OPEN[option].format(link=link) if keep_open else f"Done: {sent.labels.get(option, option)}."
-        )
-        self._say(message.sender, receipt)
+        self._say(message.sender, self._receipt(sent, option, stays_open))
         return ReplyResult("answered", card_id, option)
+
+    def _receipt(self, sent: _Sent, option: str, stays_open: bool) -> str:
+        if stays_open:
+            return GATE_STAYS_OPEN[option].format(link=self._link(sent.card))
+        return f"Done: {sent.labels.get(option, option)}."
 
     def _record_answer(self, message: InboundMessage, sent: _Sent, card_id: str, option: str) -> None:
         card = sent.card

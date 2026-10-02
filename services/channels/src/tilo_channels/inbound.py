@@ -16,13 +16,9 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from tilo_channels.keywords import Bindings, KeywordHandler
-from tilo_channels.whatsapp import InboundMessage, mask_number, message_ref
+from tilo_channels.whatsapp import InboundMessage, Sender, mask_number, message_ref
 
 log = logging.getLogger("tilo_channels.inbound")
-
-
-class Sender(Protocol):
-    def send_text(self, to: str, body: str) -> object: ...
 
 
 class _CardReply(Protocol):
