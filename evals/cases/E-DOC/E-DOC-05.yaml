@@ -1,44 +1,48 @@
 id: E-DOC-05
 group: E-DOC
-title: PPTX deck — Alder Studio Q4 retainer revenue mix by client tier
+title: 'PPTX deliverable: Solano Packaging plant defect review slides'
 measures:
-  - FR-CON-09
-  - EV-01
+- FR-CON-09
+- FR-CON-10
 status: skeleton
 deploy_gate: false
 inputs:
   format: pptx
-  task: >-
-    Prepare a PPTX board deck for Alder Studio summarizing Q4 retainer revenue
-    from the attached CSV, including a chart of monthly retainer revenue (in
-    thousands) by client tier.
-  files:
-    - evals/fixtures/doc/alder_studio_retainers.csv
+  title: 'PPTX deliverable: Solano Packaging plant defect review slides'
   required_sections:
-    - Q4 Retainer Overview
-    - Revenue Mix Chart
-    - Renewal Pipeline
-  chart_label_column: client_tier
-  chart_value_column: monthly_retainer_k
+  - Quality Overview
+  - Batch Defect Table
+  - Plant Defect Chart
+  table_fixture: evals/fixtures/doc/solano_pallet_defects.csv
+  label_column: batch_id
+  group_column: plant
+  metric_column: defect_count
 scripted_answers: []
 ground_truth:
   required_sections:
-    - Q4 Retainer Overview
-    - Revenue Mix Chart
-    - Renewal Pipeline
+  - Quality Overview
+  - Batch Defect Table
+  - Plant Defect Chart
   chart_values:
-    Foundational: 28
-    Growth Studio: 45
-    Enterprise Bespoke: 60
-    Seasonal Campaign: 16
+  - 12
+  - 7
+  - 19
+  - 5
+  - 11
+  row_count: 5
+  total: 54
+  by_group:
+    Bristol: 31
+    Leeds: 18
+    Glasgow: 5
+  max_row_label: B-403
+  max_row_value: 19
 checks:
-  - check: equals_ground_truth
-    args:
-      field: required_sections
-  - check: equals_ground_truth
-    args:
-      field: chart_values
+- check: equals_ground_truth
+  args:
+    field: required_sections
+- check: equals_ground_truth
+  args:
+    field: chart_values
+    tolerance: 0
 recording: null
-notes: >-
-  Deliverable section, chart-source equality, and clean-open checks run once the
-  render service is wired (FR-CON-09).

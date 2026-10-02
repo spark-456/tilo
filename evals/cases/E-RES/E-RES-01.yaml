@@ -1,34 +1,38 @@
 id: E-RES-01
 group: E-RES
-title: Fluxpoint Team plan current monthly and annual pricing and seat limit
+title: 'Research SC-01: Ledgerly Growth plan current pricing and seat limit'
 measures:
-  - EV-01
-  - EV-05
+- EV-01
+- EV-05
 status: ready
 deploy_gate: false
 inputs:
-  seed: services/sandbox-web/seed/fluxpoint.yaml
-  site: fluxpoint
-  url: https://fluxpoint.example/s/fluxpoint/pricing
-  task: >-
-    Look up the current Fluxpoint Team plan on fluxpoint.example and report its
-    monthly price, annual price, and maximum seat count.
+  question: What is the current monthly price, annual price, and seat limit for the Ledgerly Growth plan?
+  seed_urls:
+  - http://sandbox-web.example/s/ledgerly/pricing
+  seed_files:
+  - services/sandbox-web/seed/ledgerly.yaml
 scripted_answers: []
 ground_truth:
-  team_monthly: 39
-  team_annual: 390
-  team_seats: 25
+  plan_name: Growth
+  monthly: 49
+  annual: 490
+  seats: 20
 checks:
-  - check: equals_ground_truth
-    args:
-      field: team_monthly
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: team_annual
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: team_seats
-      tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: plan_name
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: monthly
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: annual
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: seats
+    tolerance: 0
 recording: null

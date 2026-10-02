@@ -1,44 +1,48 @@
 id: E-DOC-04
 group: E-DOC
-title: PPTX deck — Marigold Press monthly press line utilization review
+title: 'PPTX deliverable: Dunlin Energy site generation deck'
 measures:
-  - FR-CON-09
-  - EV-01
+- FR-CON-09
+- FR-CON-10
 status: skeleton
 deploy_gate: false
 inputs:
   format: pptx
-  task: >-
-    Build a PPTX presentation deck for Marigold Press reviewing monthly press
-    line utilization from the attached CSV, with a chart of jobs completed by
-    press line.
-  files:
-    - evals/fixtures/doc/marigold_press_utilization.csv
+  title: 'PPTX deliverable: Dunlin Energy site generation deck'
   required_sections:
-    - Title and Highlights
-    - Press Line Output Chart
-    - Maintenance Schedule Impact
-  chart_label_column: press_line
-  chart_value_column: jobs_completed
+  - Generation Highlights
+  - Site Output Table
+  - Regional Output Chart
+  table_fixture: evals/fixtures/doc/dunlin_site_output.csv
+  label_column: site_name
+  group_column: region
+  metric_column: mwh_generated
 scripted_answers: []
 ground_truth:
   required_sections:
-    - Title and Highlights
-    - Press Line Output Chart
-    - Maintenance Schedule Impact
+  - Generation Highlights
+  - Site Output Table
+  - Regional Output Chart
   chart_values:
-    Offset Line A: 42
-    Offset Line B: 38
-    Digital Sheet C: 64
-    Large Format D: 29
+  - 1450
+  - 980
+  - 1120
+  - 1890
+  - 1340
+  row_count: 5
+  total: 6780
+  by_group:
+    Yorkshire: 2570
+    NorthEast: 980
+    Scotland: 3230
+  max_row_label: Solway Wind
+  max_row_value: 1890
 checks:
-  - check: equals_ground_truth
-    args:
-      field: required_sections
-  - check: equals_ground_truth
-    args:
-      field: chart_values
+- check: equals_ground_truth
+  args:
+    field: required_sections
+- check: equals_ground_truth
+  args:
+    field: chart_values
+    tolerance: 0
 recording: null
-notes: >-
-  Deliverable section, chart-source equality, and clean-open checks run once the
-  render service is wired (FR-CON-09).

@@ -1,45 +1,37 @@
 id: E-RES-09
 group: E-RES
-title: Northgate Renovations rate card, licence, and insurance policy
+title: 'Research SC-06: Compare per-sqft rates across all three kitchen contractors'
 measures:
-  - EV-01
-  - EV-05
+- EV-01
+- EV-05
 status: ready
 deploy_gate: false
 inputs:
-  seed: services/sandbox-web/seed/northgate-renovations.yaml
-  site: northgate-renovations
-  url: https://northgate-renovations.example/s/northgate-renovations/profile
-  task: >-
-    Extract the base fee, per-sqft rate, per-cabinet rate, licence number, and
-    insurance details for Northgate Renovations from
-    northgate-renovations.example.
+  question: List the per-sqft rate for Riverside Kitchens, Northgate Renovations, and Maple & Stone Builders.
+  seed_urls:
+  - http://sandbox-web.example/s/riverside-kitchens/profile
+  - http://sandbox-web.example/s/northgate-renovations/profile
+  - http://sandbox-web.example/s/maple-stone-builders/profile
+  seed_files:
+  - services/sandbox-web/seed/riverside-kitchens.yaml
+  - services/sandbox-web/seed/northgate-renovations.yaml
+  - services/sandbox-web/seed/maple-stone-builders.yaml
 scripted_answers: []
 ground_truth:
-  base_fee: 650
-  per_sqft: 78
-  per_cabinet: 140
-  licence: "SG-BCA-KRW-00588"
-  insurance: "Public liability SGD 1,000,000, policy NR-INS-2290"
+  riverside_per_sqft: 85
+  northgate_per_sqft: 78
+  maple_stone_per_sqft: 95
 checks:
-  - check: equals_ground_truth
-    args:
-      field: base_fee
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: per_sqft
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: per_cabinet
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: licence
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: insurance
-      tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: riverside_per_sqft
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: northgate_per_sqft
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: maple_stone_per_sqft
+    tolerance: 0
 recording: null

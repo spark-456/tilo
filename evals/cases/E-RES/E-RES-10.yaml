@@ -1,45 +1,41 @@
 id: E-RES-10
 group: E-RES
-title: Riverside Kitchens rate card, licence, and earliest available date
+title: 'Research SC-06: Compare licences and first available November dates'
 measures:
-  - EV-01
-  - EV-05
+- EV-01
+- EV-05
 status: ready
 deploy_gate: false
 inputs:
-  seed: services/sandbox-web/seed/riverside-kitchens.yaml
-  site: riverside-kitchens
-  url: https://riverside-kitchens.example/s/riverside-kitchens/profile
-  task: >-
-    Read the Riverside Kitchens profile and quote details at
-    riverside-kitchens.example and report the base fee, per-sqft rate,
-    per-cabinet rate, licence number, and earliest available date.
+  question: Extract the BCA licence and first available November date for Riverside Kitchens and Northgate
+    Renovations.
+  seed_urls:
+  - http://sandbox-web.example/s/riverside-kitchens/profile
+  - http://sandbox-web.example/s/northgate-renovations/profile
+  seed_files:
+  - services/sandbox-web/seed/riverside-kitchens.yaml
+  - services/sandbox-web/seed/northgate-renovations.yaml
 scripted_answers: []
 ground_truth:
-  base_fee: 500
-  per_sqft: 85
-  per_cabinet: 120
-  licence: "SG-BCA-KRW-00231"
-  first_available_date: "2026-11-03"
+  riverside_licence: SG-BCA-KRW-00231
+  riverside_first_date: '2026-11-03'
+  northgate_licence: SG-BCA-KRW-00588
+  northgate_first_date: '2026-11-05'
 checks:
-  - check: equals_ground_truth
-    args:
-      field: base_fee
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: per_sqft
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: per_cabinet
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: licence
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: first_available_date
-      tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: riverside_licence
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: riverside_first_date
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: northgate_licence
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: northgate_first_date
+    tolerance: 0
 recording: null

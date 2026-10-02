@@ -1,43 +1,48 @@
 id: E-DOC-06
 group: E-DOC
-title: PPTX deck — Veridian Advisory regional SLA compliance and ticket closure
+title: 'PPTX deliverable: Vermeer Industrial pump orders summary deck'
 measures:
-  - FR-CON-09
-  - EV-01
+- FR-CON-09
+- FR-CON-10
 status: skeleton
 deploy_gate: false
 inputs:
   format: pptx
-  task: >-
-    Create a PPTX quarterly service review deck for Veridian Advisory from the
-    attached SLA CSV, charting tickets closed per service region.
-  files:
-    - evals/fixtures/doc/veridian_sla_compliance.csv
+  title: 'PPTX deliverable: Vermeer Industrial pump orders summary deck'
   required_sections:
-    - Regional SLA Summary
-    - Ticket Closure Volume Chart
-    - Staffing Actions
-  chart_label_column: service_region
-  chart_value_column: tickets_closed
+  - Pipeline Overview
+  - Order Value Table
+  - Sector Revenue Chart
+  table_fixture: evals/fixtures/doc/vermeer_pump_orders.csv
+  label_column: order_ref
+  group_column: sector
+  metric_column: order_value_eur
 scripted_answers: []
 ground_truth:
   required_sections:
-    - Regional SLA Summary
-    - Ticket Closure Volume Chart
-    - Staffing Actions
+  - Pipeline Overview
+  - Order Value Table
+  - Sector Revenue Chart
   chart_values:
-    APAC South: 540
-    APAC North: 410
-    EMEA Central: 630
-    Americas West: 480
+  - 34000
+  - 52000
+  - 28000
+  - 41000
+  - 39000
+  row_count: 5
+  total: 194000
+  by_group:
+    Marine: 62000
+    DistrictHeating: 91000
+    WaterTreatment: 41000
+  max_row_label: ORD-72
+  max_row_value: 52000
 checks:
-  - check: equals_ground_truth
-    args:
-      field: required_sections
-  - check: equals_ground_truth
-    args:
-      field: chart_values
+- check: equals_ground_truth
+  args:
+    field: required_sections
+- check: equals_ground_truth
+  args:
+    field: chart_values
+    tolerance: 0
 recording: null
-notes: >-
-  Deliverable section, chart-source equality, and clean-open checks run once the
-  render service is wired (FR-CON-09).

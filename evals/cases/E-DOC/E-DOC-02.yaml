@@ -1,43 +1,48 @@
 id: E-DOC-02
 group: E-DOC
-title: PDF report — Kestrel Warehousing Q3 depot energy consumption and solar offset
+title: 'PDF deliverable: Kestrel Studio sprint hours by practice'
 measures:
-  - FR-CON-09
-  - EV-01
+- FR-CON-09
+- FR-CON-10
 status: skeleton
 deploy_gate: false
 inputs:
   format: pdf
-  task: >-
-    Produce a PDF sustainability report for Kestrel Warehousing from the
-    attached depot energy CSV, plotting kWh used per depot.
-  files:
-    - evals/fixtures/doc/kestrel_warehouse_energy.csv
+  title: 'PDF deliverable: Kestrel Studio sprint hours by practice'
   required_sections:
-    - Overview
-    - Depot Energy Usage Chart
-    - Solar Offset Breakdown
-  chart_label_column: depot
-  chart_value_column: kwh_used
+  - Sprint Overview
+  - Workstream Hours Table
+  - Practice Allocation Chart
+  table_fixture: evals/fixtures/doc/kestrel_sprint_hours.csv
+  label_column: workstream
+  group_column: practice
+  metric_column: hours
 scripted_answers: []
 ground_truth:
   required_sections:
-    - Overview
-    - Depot Energy Usage Chart
-    - Solar Offset Breakdown
+  - Sprint Overview
+  - Workstream Hours Table
+  - Practice Allocation Chart
   chart_values:
-    Jurong West: 18400
-    Tuas South: 24100
-    Changi North: 15900
-    Woodlands East: 12600
+  - 42
+  - 68
+  - 95
+  - 55
+  - 36
+  row_count: 5
+  total: 296
+  by_group:
+    Design: 110
+    Engineering: 150
+    Research: 36
+  max_row_label: API Gateway
+  max_row_value: 95
 checks:
-  - check: equals_ground_truth
-    args:
-      field: required_sections
-  - check: equals_ground_truth
-    args:
-      field: chart_values
+- check: equals_ground_truth
+  args:
+    field: required_sections
+- check: equals_ground_truth
+  args:
+    field: chart_values
+    tolerance: 0
 recording: null
-notes: >-
-  Deliverable section, chart-source equality, and clean-open checks run once the
-  render service is wired (FR-CON-09).

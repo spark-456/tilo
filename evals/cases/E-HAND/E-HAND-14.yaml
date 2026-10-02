@@ -1,27 +1,22 @@
 id: E-HAND-14
 group: E-HAND
-title: Context handoff — Sunstone Ceramics kiln firing cycle defect aggregation
+title: 'Context handoff: Meadowlark Garden Centre autumn stocktake variance report'
 measures:
-  - EV-10
-  - FR-AGT-09
+- EV-10
+- FR-AGT-09
 status: skeleton
 deploy_gate: false
 inputs:
-  handoff_trigger_pct: 70
-  task: >-
-    Analyze 25 kiln firing temperature curves and glaze defect counts for
-    Sunstone Ceramics, hand off cumulative defect tallies at 70% context fill,
-    and output the kiln calibration report without rework.
+  task: Compare physical count sheets against POS inventory across 6 nursery departments.
+  target_context_threshold_pct: 70
+  handoff_stage: after_department_4_count_reconciliation
+  sources:
+  - https://inventory.meadowlark-garden.example/autumn-count
 scripted_answers: []
 ground_truth:
   rework: false
 checks:
-  - check: equals_ground_truth
-    args:
-      field: rework
-  - check: no_side_effects
-    args: {}
+- check: equals_ground_truth
+  args:
+    field: rework
 recording: null
-notes: >-
-  Handoff continuity check (EV-10, FR-AGT-09) runs once harness context-handoff
-  recordings exist.

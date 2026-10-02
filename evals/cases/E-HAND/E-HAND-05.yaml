@@ -1,27 +1,22 @@
 id: E-HAND-05
 group: E-HAND
-title: Context handoff — multi-site renovation contractor quote comparison (gate 5)
+title: 'Context handoff: regional wind and battery site telemetry reconciliation'
 measures:
-  - EV-10
-  - FR-AGT-09
+- EV-10
+- FR-AGT-09
 status: skeleton
 deploy_gate: true
 inputs:
-  handoff_trigger_pct: 70
-  task: >-
-    Collect and normalize itemized renovation quotes across 10 properties for
-    Alder Studio, trigger a 70% context handoff packet, and finalize the
-    award recommendation table without re-querying completed properties.
+  task: Reconcile hourly MWh telemetry across five Dunlin Energy sites against settlement meter logs.
+  target_context_threshold_pct: 70
+  handoff_stage: after_site_3_telemetry_aggregation
+  sources:
+  - https://telemetry.dunlin-energy.example/q3-meters
 scripted_answers: []
 ground_truth:
   rework: false
 checks:
-  - check: equals_ground_truth
-    args:
-      field: rework
-  - check: no_side_effects
-    args: {}
+- check: equals_ground_truth
+  args:
+    field: rework
 recording: null
-notes: >-
-  Handoff continuity check (EV-10, FR-AGT-09) runs once harness context-handoff
-  recordings exist.

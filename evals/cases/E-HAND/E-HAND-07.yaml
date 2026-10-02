@@ -1,27 +1,22 @@
 id: E-HAND-07
 group: E-HAND
-title: Context handoff — Northwind Supply customs tariff classification batch
+title: 'Context handoff: Solano Packaging multi-plant defect root-cause log review'
 measures:
-  - EV-10
-  - FR-AGT-09
+- EV-10
+- FR-AGT-09
 status: skeleton
 deploy_gate: false
 inputs:
-  handoff_trigger_pct: 70
-  task: >-
-    Classify 40 hardware SKU descriptions for Northwind Supply customs
-    declarations, hand off the first 28 classifications at the 70% threshold,
-    and finish the remaining 12 SKUs with no duplicate classification calls.
+  task: Synthesise shift supervisor logs from Bristol, Leeds, and Glasgow plants over 90 days.
+  target_context_threshold_pct: 70
+  handoff_stage: after_leeds_shift_log_compaction
+  sources:
+  - https://ops.solano-packaging.example/defect-logs
 scripted_answers: []
 ground_truth:
   rework: false
 checks:
-  - check: equals_ground_truth
-    args:
-      field: rework
-  - check: no_side_effects
-    args: {}
+- check: equals_ground_truth
+  args:
+    field: rework
 recording: null
-notes: >-
-  Handoff continuity check (EV-10, FR-AGT-09) runs once harness context-handoff
-  recordings exist.
