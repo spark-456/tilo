@@ -16,12 +16,14 @@ and `emit` are all injected; the OAuth client id and secret come from the enviro
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import logging
 import os
 import secrets
 import threading
-from collections.abc import Callable, Iterable, Mapping
+import time
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any, NoReturn, Protocol
 from urllib.parse import urlsplit
@@ -41,6 +43,7 @@ _LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1")
 _DEFAULT_RETRY_RETENTION_S = 7 * 86400
 _CLOCK_SKEW_S = 300  # a retry key further ahead than this is not ours
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+_SETTLE_WAIT_S = 10.0  # the longest a call waits for another thread's store_tokens events to land
 
 
 class TokenError(Exception):
@@ -61,6 +64,10 @@ class ConnectionExpired(TokenError):
 
 class TokenRefreshFailed(TokenError):
     """A refresh did not get through (5xx, network); the connection stays and the next call retries."""
+
+
+class _Expired(ConnectionExpired):
+    """Raised under the connector lock; connection.expired is emitted once the lock is released."""
 
 
 class InsufficientScope(TokenError):
@@ -276,6 +283,8 @@ class TokenBroker:
         self._locks: dict[tuple[str, str], threading.Lock] = {}
         self._user_locks: dict[str, threading.Lock] = {}
         self._guard = threading.Lock()
+        self._saving: dict[tuple[str, str], int] = {}  # a stored record whose events are pending -> its thread
+        self._settled = threading.Condition()
 
     # -- public ---------------------------------------------------------------------------------
 
@@ -290,37 +299,73 @@ class TokenBroker:
         """Seal a token endpoint response and store it. No refresh token in it keeps the stored one.
         `before_established` runs once the record is stored, just before connection.established."""
         access, refresh, scopes, lifetime = parse_token_body(token_response, need_scope=True)
-        with self._lock(user_id, connector):  # held to the end: no adapter sees the token before the events
+        key = (user_id, connector)
+        with self._held(user_id, connector):  # user then connector: no revoke of the user's grant in between
             previous = self._store.get(user_id, connector)
             if not refresh:
                 refresh = (self._readable(user_id, connector, previous) or {}).get("refresh_token")
             self._put_connected(user_id, connector, access, refresh, scopes or [], lifetime)
-            try:
-                if before_established is not None:
-                    before_established()
-                self._emit_part("connection.established", user_id, connector)
-            except Exception as error:
-                # Not recorded as established, so not connected: put back what was there before (or nothing).
-                self._roll_back(user_id, connector, previous, error)
-                raise
+            with self._settled:
+                self._saving[key] = threading.get_ident()
+        # No lock is held while the hook and the emit run (either may call back in); until the events land,
+        # this connector's adapters and disconnects wait in _held, and calls from this thread are refused.
+        try:
+            if before_established is not None:
+                before_established()
+            self._emit_part("connection.established", user_id, connector)
+        except Exception as error:
+            # Not recorded as established, so not connected: put back what was there before (or nothing).
+            with self._user_lock(user_id), self._lock(user_id, connector):
+                marked = self._roll_back(user_id, connector, previous, error)
+            if marked:
+                try:
+                    self._emit_part("connection.expired", user_id, connector)
+                except Exception:  # noqa: BLE001 - the original error must surface
+                    _log.error("connection.expired for connector %r could not be emitted", connector)
+            raise
+        finally:
+            with self._settled:
+                self._saving.pop(key, None)
+                self._settled.notify_all()
 
-    def access_token_for_adapter(self, user_id: str, connector: str, *, required_scopes: Iterable[str]) -> str:
-        """The one call that returns a plaintext token; refreshes first when it is about to expire."""
-        with self._lock(user_id, connector):
-            record = self._store.get(user_id, connector)
-            if record is None:
-                raise NotConnected("no connection for this user and connector")
-            if record.get("state") == "expired":
-                raise ConnectionExpired("the connection expired; connect again")
-            missing = [s for s in required_scopes if s not in record.get("scopes", [])]
-            if missing:
-                raise InsufficientScope(missing)
-            payload = self._payload(user_id, connector, record)
-            if payload is None:
-                raise TokenError("the stored record could not be read")
-            if parse_ts(add_seconds(self._clock(), self._skew)) < parse_ts(record["expires_at"]):
-                return str(payload["access_token"])
-            return self._refresh(user_id, connector, record, payload)
+    def access_token_for_adapter(
+        self, user_id: str, connector: str, *, required_scopes: Iterable[str], force_refresh: bool = False
+    ) -> str:
+        """The one call that returns a plaintext token; refreshes first when it is about to expire.
+        `force_refresh` is the adapters' 401 path (Google dropped the token before its expiry): it refreshes
+        this same user and connector's record now, after the same connected and scope checks."""
+        try:
+            with self._held(user_id, connector, user=False):
+                record = self._store.get(user_id, connector)
+                if record is None:
+                    raise NotConnected("no connection for this user and connector")
+                if record.get("state") == "expired":
+                    raise ConnectionExpired("the connection expired; connect again")
+                missing = [s for s in required_scopes if s not in record.get("scopes", [])]
+                if missing:
+                    raise InsufficientScope(missing)
+                payload = self._payload(user_id, connector, record)
+                if payload is None:
+                    raise TokenError("the stored record could not be read")
+                now = parse_ts(add_seconds(self._clock(), self._skew))
+                if not force_refresh and now < parse_ts(record["expires_at"]):
+                    return str(payload["access_token"])
+                return self._refresh(user_id, connector, record, payload)
+        except _Expired:
+            self._emit_part("connection.expired", user_id, connector)
+            raise ConnectionExpired("the connection expired; connect again") from None
+
+    def discard_tokens(self, user_id: str, connector: str, token_response: Mapping[str, Any]) -> None:
+        """Revoke tokens a consent flow will not keep, unless the user holds a live grant: every Google
+        connector shares one OAuth client and one grant, so revoking these would end that connection at
+        Google while Tilo still shows it connected (CON-D10). Checked and revoked under the user lock."""
+        token = token_response.get("refresh_token") or token_response.get("access_token")
+        if not isinstance(token, str):
+            return
+        with self._user_lock(user_id):
+            error = None if self.has_live_grant(user_id) else self._revoke(token)
+        if error is not None:
+            _log.warning("discarded tokens for connector %r could not be revoked", connector)
 
     def granted_scopes(self, user_id: str, connector: str) -> frozenset[str]:
         record = self._store.get(user_id, connector)
@@ -365,10 +410,12 @@ class TokenBroker:
         with self._user_lock(user_id):
             return self._retry_pending(user_id)
 
-    def _retry_pending(self, user_id: str) -> int:
+    def _retry_pending(self, user_id: str, skip: Collection[str] = ()) -> int:
         done, now = 0, parse_ts(self._clock())
         live = self.has_live_grant(user_id)  # CON-D10: another connected connector shares the grant
         for key in self._retry.connectors_of(user_id):
+            if key in skip:
+                continue
             record = self._retry.get(user_id, key) or {}
             moved = record.get("sealed_as") == "token"  # the original ciphertext, kept as it was
             age: float | None
@@ -404,14 +451,39 @@ class TokenBroker:
         with self._guard:
             return self._user_locks.setdefault(user_id, threading.Lock())
 
-    def _roll_back(self, user_id: str, connector: str, previous: dict[str, Any] | None, error: Exception) -> None:
+    @contextlib.contextmanager
+    def _held(self, user_id: str, connector: str, *, user: bool = True) -> Iterator[None]:
+        """The user lock (unless `user` is False), then the connector lock, once no store_tokens of this
+        connector is between its put and its events. A call from the thread running those events (a hook
+        or sink calling back in) is refused rather than left to hang; no wait outlasts _SETTLE_WAIT_S."""
+        key, deadline = (user_id, connector), time.monotonic() + _SETTLE_WAIT_S
+        while True:
+            with contextlib.ExitStack() as held:
+                if user:
+                    held.enter_context(self._user_lock(user_id))
+                held.enter_context(self._lock(user_id, connector))
+                with self._settled:
+                    owner = self._saving.get(key)
+                if owner is None:
+                    yield
+                    return
+            if owner == threading.get_ident():
+                raise TokenError("this connection is still being saved")
+            with self._settled:
+                left = deadline - time.monotonic()
+                if left <= 0 or not self._settled.wait_for(lambda: key not in self._saving, timeout=left):
+                    raise TokenError("this connection is still being saved; try again later")
+
+    def _roll_back(self, user_id: str, connector: str, previous: dict[str, Any] | None, error: Exception) -> bool:
         """Undo a put whose events did not land. If that write fails too, the record must not stay live with
-        no events: log the original error (its type only: a message could echo a token) and mark it unusable."""
+        no events: log the original error (its type only: a message could echo a token) and mark it unusable.
+        True when that marker landed (the caller emits connection.expired)."""
         try:
             if previous is None:
                 self._store.delete(user_id, connector)
             else:
                 self._store.put(user_id, connector, previous)
+            return False
         except Exception as second:  # noqa: BLE001
             _log.error(
                 "rolling back connector %r after %s failed with %s; marking it unusable",
@@ -421,8 +493,10 @@ class TokenBroker:
             )
             try:
                 self._store.put(user_id, connector, {"v": 1, "state": "expired", "scopes": [], "expires_at": None})
+                return True
             except Exception:  # noqa: BLE001
                 _log.error("connector %r could not be marked unusable either; fix the store", connector)
+                return False
 
     def _emit_part(self, event_type: str, user_id: str, connector: str) -> None:
         self._emit({"type": event_type, "authz": None, "data": {"connector": connector}, "user_id": user_id})
@@ -497,14 +571,17 @@ class TokenBroker:
             access, rotated, scopes, lifetime = parse_token_body(answer[1], need_scope=False)
         except TokenError:
             raise TokenRefreshFailed("the token refresh did not get through; try again later") from None
-        self._put_connected(user_id, connector, access, rotated or refresh, scopes or record["scopes"], lifetime)
+        try:
+            self._put_connected(user_id, connector, access, rotated or refresh, scopes or record["scopes"], lifetime)
+        except Exception:  # noqa: BLE001 - a KMS or store error text must not travel
+            raise TokenRefreshFailed("the refreshed token could not be saved; try again later") from None
         return access
 
     def _expire(self, user_id: str, connector: str) -> NoReturn:
-        """The provider will not refresh this grant: drop the tokens, keep a marker, say so once."""
+        """The provider will not refresh this grant: drop the tokens and keep a marker. The caller says so
+        once, after the lock is released."""
         self._store.put(user_id, connector, {"v": 1, "state": "expired", "scopes": [], "expires_at": None})
-        self._emit_part("connection.expired", user_id, connector)
-        raise ConnectionExpired("the connection expired; connect again")
+        raise _Expired("the connection expired; connect again")
 
     def _revoke(self, token: str) -> str | None:
         """None when the provider revoked it, else a short reason."""
@@ -514,7 +591,8 @@ class TokenBroker:
         return None if answer[0] == 200 else f"the provider answered {answer[0]}"
 
     def _disconnect(self, user_id: str, connector: str, *, keep_retry: bool) -> DisconnectResult:
-        with self._user_lock(user_id), self._lock(user_id, connector):
+        alerts: list[str] = []  # raised once the locks are released: a sink may call back in
+        with self._held(user_id, connector):
             record = self._store.get(user_id, connector)
             if record is None:
                 return DisconnectResult(False, None)
@@ -523,7 +601,10 @@ class TokenBroker:
             error: str | None = None
             if keep_retry and self.has_live_grant(user_id, excluding=connector):  # not in delete_user
                 # Google keeps one grant for every connector of this client; revoking it here would end
-                # the others while Tilo still shows them connected (CON-D10). The last one revokes it.
+                # the others while Tilo still shows them connected (CON-D10). The last one revokes it, and
+                # when every live sibling is unreadable this token is kept for it (it may never read one).
+                if token and not self._readable_sibling(user_id, connector):
+                    alerts.append(self._keep_revoke_for_retry(user_id, connector, token))
                 token = None
             elif record.get("state") == "connected" and not token:
                 error = "the stored record could not be read"
@@ -533,16 +614,28 @@ class TokenBroker:
                 _log.warning("revoke at the provider failed for connector %r: %s", connector, error)
                 # Sealed and stored before the record is deleted: a KMS failure here leaves the record.
                 unread = record if keep_retry and not token and "ciphertext" in record else None
-                self._keep_revoke_for_retry(user_id, connector, token if keep_retry else None, unread)
+                alerts.append(self._keep_revoke_for_retry(user_id, connector, token if keep_retry else None, unread))
             self._store.delete(user_id, connector)
+            if keep_retry and not self.has_live_grant(user_id):
+                self._retry_pending(user_id, skip=alerts)  # the last connector: earlier pending revokes go now
+        for alert_id in alerts:
+            self._raise_alert(user_id, alert_id)
         self._emit_part("connection.revoked", user_id, connector)
         return DisconnectResult(error is None and token is not None, error)
 
+    def _readable_sibling(self, user_id: str, connector: str) -> bool:
+        """True when another connector's record is connected and the KMS can read it now."""
+        for other in self._store.connectors_of(user_id):
+            record = self._store.get(user_id, other) if other != connector else None
+            if (record or {}).get("state") == "connected" and self._readable(user_id, other, record):
+                return True
+        return False
+
     def _keep_revoke_for_retry(
         self, user_id: str, connector: str, token: Any, unread: dict[str, Any] | None = None
-    ) -> None:
-        """Keep the token still to be revoked sealed, keyed by its alert id, and raise alert.raised.
-        `unread` is a record the KMS could not decrypt: its ciphertext moves over unchanged."""
+    ) -> str:
+        """Keep the token still to be revoked sealed, keyed by its alert id; the caller raises alert.raised
+        with the id returned. `unread` is a record the KMS could not decrypt: its ciphertext moves unchanged."""
         alert_id = _ulid(self._clock())
         if not token and unread is not None:
             moved = {**unread, "alert_id": alert_id, "connector": connector, "created_at": self._clock()}
@@ -553,7 +646,7 @@ class TokenBroker:
             sealed = self._seal("revoke", user_id, alert_id, {"token": str(token)}, bind)
             record = {"v": 1, "alert_id": alert_id, "connector": connector, "created_at": created, **sealed}
             self._retry.put(user_id, alert_id, record)
-        self._raise_alert(user_id, alert_id)
+        return alert_id
 
     def _raise_alert(self, user_id: str, alert_id: str) -> None:
         """alert.raised carries no token. Without an alert sink the failure is only logged, loudly."""

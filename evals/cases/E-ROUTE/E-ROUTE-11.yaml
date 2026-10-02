@@ -1,0 +1,35 @@
+id: E-ROUTE-11
+group: E-ROUTE
+title: Answer repeat inbound supplier link question from Security Team Lead decision
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Screen inbound Harrier Logistics customs broker emails for external portal links.
+  question: May the agent follow an inbound customs link when the host is on the approved Harrier Logistics
+    supplier list?
+  question_domain: security
+  topic_key: inbound_supplier_domain_check
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3B1
+  world_id: w_harrier_ops
+  district: D1
+  asked_at: '2026-10-02T11:00:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: security
+  answered_from_decision: true
+  decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E1
+checks:
+- check: routed_domain
+  args:
+    expected: security
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3B1
+- check: answered_from_decision
+  args:
+    expected: true
+    decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E1
+recording: null

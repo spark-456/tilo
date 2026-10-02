@@ -2,6 +2,7 @@ import type { Brief, DeliverableFormat } from "@tilo/contracts";
 import { useState } from "react";
 import { useClient } from "../../api/ClientProvider";
 import type { IntakeFileStatus, IntakeResult } from "../../api/client";
+import { AppLink } from "../AppLink";
 import { Loaded, Primary } from "../FlowShell";
 import { type Remote, useAction } from "../remote";
 
@@ -14,6 +15,8 @@ const DATA_CLASSES = ["personal", "business", "public"] as const;
 // biome-ignore format: compact enum sets from contracts/common.schema.json
 const FORMATS = new Set<string>(["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app"]);
 
+// S-01 hands its result over here: the client seam has no "get intake" call, so a brief exists only
+// for a task submitted in this session (a direct link to any other task gets the empty notice).
 const intakes = new Map<string, IntakeResult>();
 export const rememberIntake = (i: IntakeResult): void => void intakes.set(i.task_id, i);
 
@@ -42,6 +45,12 @@ function invalidFields(b: Brief, d: Record<BriefField, string>): Set<BriefField>
     return !title || title.length > 120 || !FORMATS.has(fmt);
   });
   if (delivBad) bad.add("deliverables");
+  // brief.schema.json: constraints are 1-300 characters each, at most 20; sources at most 50, a label
+  // 120 characters and a bare ref 2000.
+  const cons = csv(d.constraints);
+  if (cons.length > 20 || cons.some((c) => c.length > 300)) bad.add("constraints");
+  const srcs = csv(d.sources);
+  if (srcs.length > 50 || srcs.some((x, i) => x.length > (b.sources[i]?.label !== undefined ? 120 : 2000))) bad.add("sources");
   return bad;
 }
 
@@ -61,8 +70,8 @@ function toBriefEdits(b: Brief, draft: Record<BriefField, string>, bad: Set<Brie
   }
   if (draft.audience !== init.audience && !bad.has("audience")) edits.audience = draft.audience.trim();
   if (draft.deadline !== init.deadline && !bad.has("deadline")) edits.deadline = draft.deadline.trim() || null;
-  if (draft.constraints !== init.constraints) edits.constraints = csv(draft.constraints);
-  if (draft.sources !== init.sources) {
+  if (draft.constraints !== init.constraints && !bad.has("constraints")) edits.constraints = csv(draft.constraints);
+  if (draft.sources !== init.sources && !bad.has("sources")) {
     edits.sources = csv(draft.sources).map((item, i) => {
       const orig = b.sources[i];
       if (!orig) return { kind: "web", ref: item };
@@ -73,6 +82,26 @@ function toBriefEdits(b: Brief, draft: Record<BriefField, string>, bad: Set<Brie
   return edits;
 }
 
+const LIMITS: Partial<Record<BriefField, string>> = {
+  goal: "Goal: 1 to 500 characters",
+  audience: "Audience: 1 to 200 characters",
+  deadline: "Deadline: a date as YYYY-MM-DD, or empty",
+  deliverables:
+    "Deliverables: up to 10, each 'Title (format)' with a title under 120 characters and a known format",
+  constraints: "Constraints: up to 20, each under 300 characters",
+  sources: "Sources: up to 50, each short enough to read as a label",
+  sensitivity: "Sensitivity: personal, business or public",
+};
+/** Why Continue is off, in words (colour and the disabled state alone never say it). */
+const continueReason = (has: boolean, bad: Set<BriefField>): string | null =>
+  !has
+    ? null
+    : bad.size === 0
+      ? null
+      : `Continue is off until these are fixed. ${FIELDS.filter(([f]) => bad.has(f))
+          .map(([f]) => LIMITS[f])
+          .join(". ")}.`;
+
 // biome-ignore format: compact status formatter
 const fileStatus = (f: IntakeFileStatus): string =>
   f.safety_flagged ? `Flagged: ${f.reason ?? ""}`.trim() : f.status === "failed" ? `Couldn't read: ${f.reason ?? ""}`.trim() : f.status;
@@ -80,8 +109,9 @@ const fileStatus = (f: IntakeFileStatus): string =>
 // biome-ignore format: compact component
 export function Understanding({ taskId }: { taskId: string }) {
   const client = useClient();
-  const [, setTick] = useState(0);
   const intake = intakes.get(taskId) ?? null;
+  // Read in the first render, not through a loading state: the brief is already in memory, so a
+  // "Loading" box here would only shift the layout when the form replaces it.
   const remote: Remote<IntakeResult | null> = { status: "ready", value: intake };
   const [draft, setDraft] = useState<Record<BriefField, string> | null>(() => (intake ? toDraft(intake.brief) : null));
   const activeDraft = draft ?? (intake ? toDraft(intake.brief) : null);
@@ -90,6 +120,7 @@ export function Understanding({ taskId }: { taskId: string }) {
   const [answers, setAnswers] = useState<Record<number, string | null>>({});
   const [skipped, setSkipped] = useState<Record<number, boolean>>({});
   const pick = (i: number, val: string | null, isSkip: boolean) => { setSkipped((m) => ({ ...m, [i]: isSkip })); setAnswers((a) => ({ ...a, [i]: val })); };
+  const reason = continueReason(Boolean(intake), bad);
   const action = useAction("confirm the brief", async () => {
     if (!intake || !activeDraft) throw new Error("no brief is loaded");
     const qAnswers = questions.map((q, i) => ({ field: q.field, answer: skipped[i] ? null : (answers[i] ?? null) }));
@@ -100,7 +131,7 @@ export function Understanding({ taskId }: { taskId: string }) {
   // biome-ignore format: compact JSX
   return (
     <div className="s02-understanding">
-      <Loaded what="the brief" remote={remote} retry={() => setTick((n) => n + 1)} isEmpty={(v) => v === null}>
+      <Loaded what="the brief" remote={remote} isEmpty={(v) => v === null} empty={<><p>Tilo has no brief for this task in this session, so nothing is shown and nothing was changed.</p><AppLink to="/" className="secondary">Describe the task again</AppLink></>}>
         {(loaded) => !loaded || !activeDraft ? null : (
           <>
             <p className="flow-summary">Review the extracted brief and clarifying questions.</p>
@@ -150,6 +181,7 @@ export function Understanding({ taskId }: { taskId: string }) {
           </>
         )}
       </Loaded>
+      {reason && <output className="flow-detail" data-testid="continue-reason">{reason}</output>}
       <Primary label="Continue" action={action} disabled={!intake || bad.size > 0} />
     </div>
   );

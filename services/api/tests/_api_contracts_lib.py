@@ -134,7 +134,7 @@ def make_safety_provider():
     from tilo_providers.interfaces import SafetyProvider
 
     class DeterministicSafetyProvider(SafetyProvider):
-        def check(self, text: str, **kwargs: Any) -> dict[str, Any]:
+        def _check(self, text: str, **kwargs: Any) -> dict[str, Any]:
             flagged = INJECTION_PHRASE in text.upper()
             return {"flagged": flagged, "reason": "instruction aimed at the assistant" if flagged else None}
 

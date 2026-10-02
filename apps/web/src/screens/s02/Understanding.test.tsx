@@ -42,6 +42,12 @@ async function openUnderstanding(overrides: Partial<IntakeResult> = {}) {
     root.render(<ClientProvider client={client}><FlowShell /></ClientProvider>);
     window.dispatchEvent(new PopStateEvent("popstate"));
   });
+  // S-01 starts only with text in the task box; its result is handed to S-02 (rememberIntake).
+  const box = q<HTMLTextAreaElement>("textarea");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(box, "Compare the two supplier quotes");
+    box?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
   await act(async () => q("button.primary")?.click());
   await settle();
   return { answerQuestions };
@@ -60,7 +66,9 @@ describe("AGW-03 S-02 Understanding", () => {
       root.render(<ClientProvider client={new FixtureClient()}><FlowShell /></ClientProvider>);
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect(q('[role="alert"]')?.textContent).toContain("Nothing came back for the brief.");
+    expect(q('[role="alert"]')?.textContent).toContain("Tilo has no brief for this task in this session");
+    expect(q('[role="alert"] a')?.getAttribute("href")).toBe("/"); // its own next step, not a retry that cannot change anything
+    expect(q('[role="alert"] button')).toBeNull();
     expect(q('[data-testid="brief-chips"]')).toBeNull();
     expect(container.textContent).not.toContain("quote_a.pdf");
     expect(q<HTMLButtonElement>("button.primary")?.disabled).toBe(true);
@@ -118,6 +126,24 @@ describe("AGW-03 S-02 Understanding", () => {
         { kind: "web", ref: "battery review" },
       ],
     });
+  });
+
+  it("FR-INT-03 S-02: constraint and source chips enforce the schema's length limits and say why Continue is off", async () => {
+    await openUnderstanding();
+    expect(q('[data-testid="continue-reason"]')).toBeNull();
+    const cons = q<HTMLInputElement>('[data-testid="brief-chip-constraints"] input');
+    await act(async () => void (cons && setFieldValue(cons, "x".repeat(301))));
+    expect(cons?.getAttribute("aria-invalid")).toBe("true");
+    expect(q<HTMLButtonElement>("button.primary")?.disabled).toBe(true);
+    expect(q('[data-testid="continue-reason"]')?.textContent).toContain("Constraints: up to 20, each under 300 characters");
+    await act(async () => void (cons && setFieldValue(cons, "x".repeat(300))));
+    expect(cons?.getAttribute("aria-invalid")).toBeNull();
+    expect(q('[data-testid="continue-reason"]')).toBeNull();
+    const sources = q<HTMLInputElement>('[data-testid="brief-chip-sources"] input');
+    await act(async () => void (sources && setFieldValue(sources, `Quote A, ${"y".repeat(121)}`)));
+    expect(sources?.getAttribute("aria-invalid")).toBe("true");
+    expect(q<HTMLButtonElement>("button.primary")?.disabled).toBe(true);
+    expect(q('[data-testid="continue-reason"]')?.textContent).toContain("Sources:");
   });
 
   it("FR-INT-01 S-02: each file shows its status; a failed or flagged file shows the API's reason", async () => {

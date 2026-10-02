@@ -1425,6 +1425,8 @@ dependencies = [
     { name = "jsonschema" },
     { name = "pyyaml" },
     { name = "referencing" },
+    { name = "tilo-archive" },
+    { name = "tilo-contracts" },
     { name = "tilo-policy" },
 ]
 
@@ -1434,6 +1436,8 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.18" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-archive", editable = "packages/archive" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "tilo-policy", editable = "packages/policy" },
 ]
 
@@ -1553,6 +1557,7 @@ dependencies = [
     { name = "google-genai" },
     { name = "httpx" },
     { name = "jsonschema" },
+    { name = "referencing" },
 ]
 
 [package.metadata]
@@ -1560,6 +1565,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=1.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.18" },
+    { name = "referencing", specifier = ">=0.30" },
 ]
 
 [[package]]

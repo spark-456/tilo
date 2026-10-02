@@ -1,0 +1,390 @@
+scenarios:
+  E-ROUTE-01:
+    world_id: w_harrier_ops
+    district: D1
+    team_leads: &id001
+    - &id002
+      id: tl_security
+      user: u_security_lead
+      domain: security
+      assigned_by:
+        by: u_owner
+        at: '2026-09-29T09:00:00.000Z'
+    - id: tl_finance
+      user: u_finance_lead
+      domain: finance
+      assigned_by:
+        by: u_owner
+        at: '2026-09-29T09:00:00.000Z'
+    - id: tl_legal
+      user: u_legal_lead
+      domain: legal
+      assigned_by:
+        by: u_owner
+        at: '2026-09-29T09:00:00.000Z'
+    - id: tl_automation
+      user: u_automation_lead
+      domain: automation
+      assigned_by:
+        by: u_owner
+        at: '2026-09-29T09:00:00.000Z'
+    - id: tl_research
+      user: u_research_lead
+      domain: research
+      assigned_by:
+        by: u_owner
+        at: '2026-09-29T09:00:00.000Z'
+    decisions: []
+  E-ROUTE-02:
+    world_id: w_harrier_ops
+    district: D1
+    team_leads: *id001
+    decisions: []
+  E-ROUTE-03:
+    world_id: w_bramble_supply
+    district: D1
+    team_leads: *id001
+    decisions: []
+  E-ROUTE-04:
+    world_id: w_kestrel_ops
+    district: D1
+    team_leads: *id001
+    decisions: []
+  E-ROUTE-05:
+    world_id: w_dunlin_grid
+    district: D1
+    team_leads: *id001
+    decisions: []
+  E-ROUTE-06:
+    world_id: w_solano_qa
+    district: D1
+    team_leads: *id001
+    decisions: []
+  E-ROUTE-07:
+    world_id: w_solano_qa
+    district: D1
+    team_leads: *id001
+    decisions: []
+  E-ROUTE-08:
+    world_id: w_bramble_supply
+    district: D1
+    team_leads: *id001
+    decisions: []
+  E-ROUTE-09:
+    world_id: w_fictionalboatco_zeta_sales
+    district: D1
+    team_leads:
+    - *id002
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V4D1
+      org_id: org_fictionalboatco_zeta
+      topic_key: late_fee_waiver_limit
+      question: May we waive late-payment interest up to EUR 250 for municipal buyers?
+      domain: null
+      answer: Waive up to EUR 250 during Q2 only.
+      option_id: waive_q2
+      answered_by:
+        by: person
+        ref: u_owner
+        at: '2026-06-01T09:00:00.000Z'
+      source:
+        world_id: w_fictionalboatco_zeta_sales
+        run_id: r_fictionalboatco_zeta_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C1
+      scope:
+        worlds: all
+        districts: all
+      created_at: '2026-06-01T09:00:01.000Z'
+      expires_at: '2026-09-01T00:00:00.000Z'
+  E-ROUTE-10:
+    world_id: w_marigold_pub
+    district: D2
+    team_leads:
+    - *id002
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V4D2
+      org_id: org_marigold
+      topic_key: nda_mutual_term_years
+      question: Should subcontractor NDAs in District D1 use a 3-year mutual confidentiality term?
+      domain: null
+      answer: Yes, 3-year mutual term for D1 print vendors.
+      option_id: three_year_d1
+      answered_by:
+        by: person
+        ref: u_owner
+        at: '2026-09-20T09:00:00.000Z'
+      source:
+        world_id: w_marigold_pub
+        run_id: r_marigold_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C2
+      scope:
+        worlds:
+        - w_marigold_pub
+        districts:
+        - D1
+      created_at: '2026-09-20T09:00:01.000Z'
+      expires_at: '2026-12-31T00:00:00.000Z'
+  E-ROUTE-11:
+    world_id: w_harrier_ops
+    district: D1
+    team_leads: *id001
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V5E1
+      org_id: org_harrier
+      topic_key: inbound_supplier_domain_check
+      question: Can a supplier portal link be opened from an inbound email?
+      domain: security
+      answer: Only links to domains on the approved supplier list; flag the rest.
+      option_id: approved_domains_only
+      answered_by:
+        by: team_lead
+        ref: tl_security
+        user: u_security_lead
+        at: '2026-09-29T10:00:00.000Z'
+      source:
+        world_id: w_harrier_ops
+        run_id: r_harrier_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C3
+      scope:
+        worlds:
+        - w_harrier_ops
+        districts:
+        - D1
+      created_at: '2026-09-29T10:00:01.000Z'
+      expires_at: '2026-12-29T10:00:00.000Z'
+  E-ROUTE-12:
+    world_id: w_harrier_ops
+    district: D1
+    team_leads: *id001
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V5E2
+      org_id: org_harrier
+      topic_key: demurrage_auto_approval_cap
+      question: What is the single-invoice demurrage threshold on the UK-NL corridor?
+      domain: finance
+      answer: Approve documented port demurrage up to GBP 400; escalate anything higher.
+      option_id: cap_gbp_400
+      answered_by:
+        by: team_lead
+        ref: tl_finance
+        user: u_finance_lead
+        at: '2026-09-29T11:00:00.000Z'
+      source:
+        world_id: w_harrier_ops
+        run_id: r_harrier_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C4
+      scope:
+        worlds: all
+        districts: all
+      created_at: '2026-09-29T11:00:01.000Z'
+      expires_at: '2026-12-31T00:00:00.000Z'
+  E-ROUTE-13:
+    world_id: w_bramble_supply
+    district: D1
+    team_leads: *id001
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V5E3
+      org_id: org_bramble
+      topic_key: supplier_msa_governing_law
+      question: Which governing law is permitted on domestic Bramble Foods supplier MSAs?
+      domain: legal
+      answer: Standard domestic MSAs must use England and Wales; Scottish law requires counsel review.
+      option_id: england_and_wales
+      answered_by:
+        by: team_lead
+        ref: tl_legal
+        user: u_legal_lead
+        at: '2026-09-29T12:00:00.000Z'
+      source:
+        world_id: w_bramble_supply
+        run_id: r_bramble_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C5
+      scope:
+        worlds: all
+        districts: all
+      created_at: '2026-09-29T12:00:01.000Z'
+      expires_at: null
+  E-ROUTE-14:
+    world_id: w_kestrel_ops
+    district: D1
+    team_leads: *id001
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V5E4
+      org_id: org_kestrel
+      topic_key: ledger_export_delimiter
+      question: What delimiter and encoding should nightly accounting exports use?
+      domain: automation
+      answer: Always emit UTF-8 comma-separated CSV with an explicit header row.
+      option_id: utf8_comma_csv
+      answered_by:
+        by: team_lead
+        ref: tl_automation
+        user: u_automation_lead
+        at: '2026-09-29T13:00:00.000Z'
+      source:
+        world_id: w_kestrel_ops
+        run_id: r_kestrel_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C6
+      scope:
+        worlds:
+        - w_kestrel_ops
+        districts: all
+      created_at: '2026-09-29T13:00:01.000Z'
+      expires_at: null
+  E-ROUTE-15:
+    world_id: w_kestrel_ops
+    district: D1
+    team_leads: *id001
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V5E5
+      org_id: org_kestrel
+      topic_key: saas_pricing_currency_basis
+      question: How should vendor pricing tables record plan rates?
+      domain: research
+      answer: Record exact native list figures from the vendor pricing page without FX conversion.
+      option_id: native_list_price
+      answered_by:
+        by: team_lead
+        ref: tl_research
+        user: u_research_lead
+        at: '2026-09-29T14:00:00.000Z'
+      source:
+        world_id: w_kestrel_ops
+        run_id: r_kestrel_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C7
+      scope:
+        worlds: all
+        districts: all
+      created_at: '2026-09-29T14:00:01.000Z'
+      expires_at: '2026-12-31T00:00:00.000Z'
+  E-ROUTE-16:
+    world_id: w_solano_qa
+    district: D1
+    team_leads: *id001
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V5E6
+      org_id: org_solano
+      topic_key: pii_redaction_in_defect_logs
+      question: Must operator names and phone numbers be stripped from quality exports?
+      domain: security
+      answer: Yes, replace operator names with role IDs and strip all phone numbers before export.
+      option_id: redact_operator_pii
+      answered_by:
+        by: team_lead
+        ref: tl_security
+        user: u_security_lead
+        at: '2026-09-29T15:00:00.000Z'
+      source:
+        world_id: w_solano_qa
+        run_id: r_solano_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C8
+      scope:
+        worlds: all
+        districts: all
+      created_at: '2026-09-29T15:00:01.000Z'
+      expires_at: null
+  E-ROUTE-17:
+    world_id: w_fictionalboatco_zeta_sales
+    district: D1
+    team_leads: *id001
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V5E7
+      org_id: org_fictionalboatco_zeta
+      topic_key: early_payment_discount_2pct
+      question: Is the 2% 10-day early-payment discount allowed on Marine pump orders above EUR 30,000?
+      domain: finance
+      answer: Yes, 2% net-10 is pre-approved for existing Marine accounts.
+      option_id: allow_2pct_net10
+      answered_by:
+        by: team_lead
+        ref: tl_finance
+        user: u_finance_lead
+        at: '2026-09-29T16:00:00.000Z'
+      source:
+        world_id: w_fictionalboatco_zeta_sales
+        run_id: r_fictionalboatco_zeta_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C9
+      scope:
+        worlds:
+        - w_fictionalboatco_zeta_sales
+        districts:
+        - D1
+      created_at: '2026-09-29T16:00:01.000Z'
+      expires_at: '2026-12-31T00:00:00.000Z'
+  E-ROUTE-18:
+    world_id: w_alder_studio
+    district: D1
+    team_leads: *id001
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V5E8
+      org_id: org_alder
+      topic_key: subcontractor_ip_assignment
+      question: What IP assignment clause is required for Alder Studio freelance creatives?
+      domain: legal
+      answer: Require full work-for-hire assignment upon invoice settlement; portfolio display needs client
+        consent.
+      option_id: work_for_hire_full
+      answered_by:
+        by: team_lead
+        ref: tl_legal
+        user: u_legal_lead
+        at: '2026-09-29T17:00:00.000Z'
+      source:
+        world_id: w_alder_studio
+        run_id: r_alder_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2D0
+      scope:
+        worlds: all
+        districts: all
+      created_at: '2026-09-29T17:00:01.000Z'
+      expires_at: null
+  E-ROUTE-19:
+    world_id: w_harrier_ops
+    district: D1
+    team_leads: *id001
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V2W5
+      org_id: org_harrier
+      topic_key: out_of_hours_crm_supplier_reply
+      question: May Tilo reply to suppliers outside business hours?
+      domain: null
+      answer: Yes, for suppliers already in the CRM; ask me about anyone new.
+      option_id: yes_known_only
+      answered_by:
+        by: person
+        ref: u_owner
+        at: '2026-09-29T09:30:00.000Z'
+      source:
+        world_id: w_harrier_ops
+        run_id: r_harrier_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2W1
+      scope:
+        worlds: all
+        districts: all
+      created_at: '2026-09-29T09:30:01.000Z'
+      expires_at: null
+  E-ROUTE-20:
+    world_id: w_solano_qa
+    district: D1
+    team_leads: *id001
+    decisions:
+    - id: 01J8Z3K4M5N6P7Q8R9S0T1V5E9
+      org_id: org_solano
+      topic_key: visitor_escort_badge_policy
+      question: What escort policy applies to visiting equipment technicians at Bristol?
+      domain: null
+      answer: Issue a timed day badge and require floor-lead sign-in at each bay.
+      option_id: timed_badge_bay_signin
+      answered_by:
+        by: person
+        ref: u_owner
+        at: '2026-09-29T18:00:00.000Z'
+      source:
+        world_id: w_solano_qa
+        run_id: r_solano_1
+        card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2D2
+      scope:
+        worlds: all
+        districts: all
+      created_at: '2026-09-29T18:00:01.000Z'
+      expires_at: '2026-12-31T00:00:00.000Z'

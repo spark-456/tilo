@@ -10,6 +10,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     const problems = watchConsole(page);
     await page.setViewportSize(viewport);
     await page.goto("/");
+    await page.getByLabel("Describe your task").fill("Compare the two supplier quotes"); // S-01 needs text
     await page.getByRole("button", { name: "Start task" }).click();
 
     await expect(page.getByRole("heading", { level: 1, name: "Understanding" })).toBeVisible();

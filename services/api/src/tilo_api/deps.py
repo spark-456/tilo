@@ -164,6 +164,26 @@ def providers_config() -> ProvidersConfig:
     return load_providers_config(resolve_models_path(_REPO_ROOT), _REPO_ROOT / "config" / "prices.yaml")
 
 
+MAX_BUDGET_CAP_CREDITS = 300.0  # BQ-99: PRD 17.3's per-run cap, used when config/metering.yaml gives none
+
+
+def budget_cap_ceiling() -> float:
+    """The most credits one approval may grant: `caps.run_credits` in config/metering.yaml (PRD 14.1, 17.3), or
+    MAX_BUDGET_CAP_CREDITS when the file or the value is missing or unusable (BQ-99)."""
+    try:
+        import yaml
+
+        value = yaml.safe_load((_REPO_ROOT / "config" / "metering.yaml").read_text(encoding="utf-8"))["caps"][
+            "run_credits"
+        ]
+    except Exception as exc:
+        logger.warning("metering config unreadable (%s); using the default budget ceiling", type(exc).__name__)
+        return MAX_BUDGET_CAP_CREDITS
+    if isinstance(value, bool) or not isinstance(value, int | float) or not (math.isfinite(value) and value > 0):
+        return MAX_BUDGET_CAP_CREDITS
+    return float(value)
+
+
 def get_router() -> Router:
     """Every model call goes through the provider layer's Router (PL-01); it replays recordings unless the
     user turned live mode on (EFF-01)."""

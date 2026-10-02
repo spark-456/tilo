@@ -5,6 +5,7 @@ from collections import Counter
 from urllib.parse import urlparse
 
 from conftest import REPO_ROOT
+from test_PRD_19_2_eval_set_structure import DENYLIST_BRANDS_RE, REAL_ROUTING_RE
 from tilo_evals import Case, load_cases
 
 _CASES_DIR = REPO_ROOT / "evals" / "cases"
@@ -96,19 +97,15 @@ def test_PRD_19_2_e_chn_ground_truth_matches_planted_message() -> None:
             assert kw.lower() in msg_lower, f"{case.id}: topic keyword {kw!r} not found in message"
 
 
-_DENYLIST_BRANDS_RE = re.compile(
-    r"\b(?:Google|Drive|BeautifulSoup|Microsoft|Slack|Dropbox|Amazon|Apple|OpenAI)\b",
-    re.IGNORECASE,
-)
-
-
 def test_PRD_19_2_e_chn_fictional_hosts_brands_and_secret_scan() -> None:
     cases = _e_chn_cases()
     assert len(cases) == 30
     texts = [c.path.read_text(encoding="utf-8") for c in cases]
     for case, text in zip(cases, texts, strict=True):
-        m = _DENYLIST_BRANDS_RE.search(text)
+        m = DENYLIST_BRANDS_RE.search(text)
         assert m is None, f"{case.id}: real brand {m.group(0)!r} found"
+        routing_match = REAL_ROUTING_RE.search(text)
+        assert routing_match is None, f"{case.id}: routing/account number {routing_match.group(0)!r} found"
     for host in [h for text in texts for h in _extract_hosts(text)]:
         assert host.endswith((".example", ".invalid")), f"non-fictional host found: {host}"
     for phone in [p for text in texts for p in _extract_phones(text)]:

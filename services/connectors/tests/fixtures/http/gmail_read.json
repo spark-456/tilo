@@ -1,0 +1,163 @@
+{
+  "format": "tilo.http-recording/1",
+  "connector": "gmail",
+  "note": "Hand-written (FR-CON-04): search a supplier's threads, open the message, list labels. No real account; every address is at example.com.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/threads",
+        "params": {
+          "q": "from:supplier@example.com"
+        },
+        "headers": {
+          "authorization": "REDACTED"
+        },
+        "json": null
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json; charset=UTF-8"
+        },
+        "json": {
+          "threads": [
+            {
+              "id": "thr_supplier_1",
+              "snippet": "Hi, Can you confirm the delivery date for order 4471?",
+              "historyId": "1001"
+            }
+          ],
+          "resultSizeEstimate": 1
+        },
+        "content_b64": null
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/msg_supplier_1",
+        "params": {
+          "format": "full"
+        },
+        "headers": {
+          "authorization": "REDACTED"
+        },
+        "json": null
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json; charset=UTF-8"
+        },
+        "json": {
+          "id": "msg_supplier_1",
+          "threadId": "thr_supplier_1",
+          "labelIds": ["INBOX", "UNREAD"],
+          "snippet": "Hi, Can you confirm the delivery date for order 4471?",
+          "sizeEstimate": 2048,
+          "payload": {
+            "mimeType": "multipart/mixed",
+            "filename": "",
+            "headers": [
+              {
+                "name": "From",
+                "value": "supplier@example.com"
+              },
+              {
+                "name": "To",
+                "value": "owner@example.com"
+              },
+              {
+                "name": "Subject",
+                "value": "Delivery date for order 4471"
+              },
+              {
+                "name": "Message-ID",
+                "value": "<order4471.1@mail.example.com>"
+              },
+              {
+                "name": "Date",
+                "value": "Fri, 02 Oct 2026 08:15:00 +0000"
+              },
+              {
+                "name": "Content-Type",
+                "value": "multipart/mixed; boundary=\"b1\""
+              }
+            ],
+            "body": {
+              "size": 0
+            },
+            "parts": [
+              {
+                "mimeType": "text/plain",
+                "filename": "",
+                "headers": [
+                  {
+                    "name": "Content-Type",
+                    "value": "text/plain; charset=\"utf-8\""
+                  }
+                ],
+                "body": {
+                  "size": 63,
+                  "data": "SGksCgpDYW4geW91IGNvbmZpcm0gdGhlIGRlbGl2ZXJ5IGRhdGUgZm9yIG9yZGVyIDQ0NzE_CgpUaGFua3MK"
+                }
+              },
+              {
+                "mimeType": "application/pdf",
+                "filename": "terms.pdf",
+                "headers": [
+                  {
+                    "name": "Content-Type",
+                    "value": "application/pdf; name=\"terms.pdf\""
+                  },
+                  {
+                    "name": "Content-Disposition",
+                    "value": "attachment; filename=\"terms.pdf\""
+                  }
+                ],
+                "body": {
+                  "size": 1234,
+                  "attachmentId": "att_terms_1"
+                }
+              }
+            ]
+          }
+        },
+        "content_b64": null
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/labels",
+        "params": {},
+        "headers": {
+          "authorization": "REDACTED"
+        },
+        "json": null
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json; charset=UTF-8"
+        },
+        "json": {
+          "labels": [
+            {
+              "id": "INBOX",
+              "name": "INBOX",
+              "type": "system"
+            },
+            {
+              "id": "Label_7",
+              "name": "Suppliers",
+              "type": "user"
+            }
+          ]
+        },
+        "content_b64": null
+      }
+    }
+  ]
+}

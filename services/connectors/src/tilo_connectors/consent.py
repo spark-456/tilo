@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import logging
 import secrets
 import threading
 from collections.abc import Callable, Mapping, Sequence
@@ -22,9 +21,8 @@ from typing import Any
 from urllib.parse import urlencode
 
 from ._time import add_seconds, parse_ts
-from .tokens import REVOKE_URL, TOKEN_URL, OAuthSettings, TokenBroker, post_form
+from .tokens import TOKEN_URL, OAuthSettings, TokenBroker, post_form
 
-_log = logging.getLogger(__name__)
 _MAX_FLOWS_PER_USER = 20
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -226,12 +224,7 @@ class ConsentService:
         return {scope: " ".join(texts) for scope, texts in lines.items()}
 
     def _discard(self, user_id: str, connector: str, response: Mapping[str, Any]) -> None:
-        """Revoke tokens that will not be kept. Skipped when the user has a connected connector: every
-        Google connector shares one OAuth client and one grant (include_granted_scopes), so revoking
-        these tokens would end that connection at Google while Tilo still shows it connected (CON-D10)."""
-        token = response.get("refresh_token") or response.get("access_token")
-        if not isinstance(token, str) or self._broker.has_live_grant(user_id):
-            return
-        answer = post_form(self._http, REVOKE_URL, {"token": token})
-        if answer is None or answer[0] != 200:
-            _log.warning("discarded tokens for connector %r could not be revoked", connector)
+        """Revoke tokens that will not be kept, unless the user has a connected connector (one shared
+        Google grant, CON-D10). The broker checks and revokes under the user lock, so a store of another
+        connector cannot land between the check and the revoke."""
+        self._broker.discard_tokens(user_id, connector, response)

@@ -1,29 +1,32 @@
-// PRD 18.3 flow screens S-01, S-02, S-03, S-04 and S-12 as placeholders (heading, one primary
-// button to the next step) that AGW-02 to AGW-05 fill in. Every client call has loading, empty
-// and error states with a retry (PRD 18.4); one filled primary button per screen (UX-1).
+// PRD 18.3 flow screens S-01, S-02, S-03 and S-04 as placeholders (heading, one primary button to
+// the next step) that AGW-02 to AGW-05 fill in. S-12 (Delivery) is S_12.tsx, routed by routes.tsx.
+// Every client call has loading, empty and error states with a retry (PRD 18.4); one filled
+// primary button per screen (UX-1).
 import { type ReactNode, useEffect, useRef } from "react";
 import { useClient } from "../api/ClientProvider";
 import type { ApproachesResult } from "../api/client";
 import { useFlowRoute } from "../router";
+import { StartScreen } from "./flow/StartScreen";
+import "./flow/flow.css";
 import { type Action, type Remote, useAction, useRemote } from "./remote";
-import { Understanding, rememberIntake } from "./s02/Understanding";
+import { Understanding } from "./s02/Understanding";
 
 const enc = encodeURIComponent;
-// AGW-02 replaces this with the task box.
-const INTAKE_TEXT = "Triage my inbox and answer the supplier about Thursday";
 
-function Notice({ message, onRetry }: { message: string; onRetry: () => void }) {
+function Notice({ message, onRetry }: { message: string; onRetry?: (() => void) | undefined }) {
   return (
     <div className="flow-notice" role="alert">
       <p>{message}</p>
-      <button type="button" className="secondary" onClick={onRetry}>
-        Try again
-      </button>
+      {onRetry && (
+        <button type="button" className="secondary" onClick={onRetry}>
+          Try again
+        </button>
+      )}
     </div>
   );
 }
 
-function Summary({ children }: { children: ReactNode }) {
+export function Summary({ children }: { children: ReactNode }) {
   return <p className="flow-summary">{children}</p>;
 }
 
@@ -35,12 +38,16 @@ export function Loaded<T>({
   remote,
   retry,
   isEmpty,
+  empty,
   children,
 }: {
   what: string;
   remote: Remote<T>;
-  retry: () => void;
+  /** Omit it when a retry cannot change the outcome (the data is already in memory). */
+  retry?: (() => void) | undefined;
   isEmpty: (value: T) => boolean;
+  /** Replaces the generic empty notice, for an empty state that has its own next step. */
+  empty?: ReactNode;
   children: (value: T) => ReactNode;
 }) {
   let body: ReactNode;
@@ -49,7 +56,13 @@ export function Loaded<T>({
   } else if (remote.status === "error") {
     body = <Notice message={remote.message} onRetry={retry} />;
   } else if (isEmpty(remote.value)) {
-    body = <Notice message={`Nothing came back for ${what}. You can try again.`} onRetry={retry} />;
+    body = empty ? (
+      <div className="flow-notice" role="alert">
+        {empty}
+      </div>
+    ) : (
+      <Notice message={`Nothing came back for ${what}. You can try again.`} onRetry={retry} />
+    );
   } else {
     body = children(remote.value);
   }
@@ -75,16 +88,6 @@ export function Primary({
       </button>
     </>
   );
-}
-
-function Start() {
-  const client = useClient();
-  const action = useAction("start the task", async () => {
-    const intake = await client.submitIntake(INTAKE_TEXT, []);
-    rememberIntake(intake);
-    return `/task/${enc(intake.task_id)}/understanding`;
-  });
-  return <Primary label="Start task" action={action} />;
 }
 
 /** The recommended approach and its cap (its upper credit estimate), from getApproaches. */
@@ -140,34 +143,6 @@ function World({ worldId }: { worldId: string }) {
   return <Primary label="View delivery" action={action} />;
 }
 
-function Delivery({ worldId }: { worldId: string }) {
-  const client = useClient();
-  const [remote, retry] = useRemote("load the delivery", () => client.getDelivery(worldId));
-  const action = useAction("start a new task", async () => "/");
-  return (
-    <>
-      <Loaded
-        what="the delivery"
-        remote={remote}
-        retry={retry}
-        isEmpty={(d) => d.artifacts.length === 0}
-      >
-        {(d) => (
-          <>
-            <Summary>Verified deliverables are ready at the Delivery Dock.</Summary>
-            <p className="flow-detail">
-              {d.artifacts.length} deliverable(s), {d.credits_used} credits used.
-              {d.time_saved &&
-                ` About ${d.time_saved.low_min} to ${d.time_saved.high_min} min saved (estimate).`}
-            </p>
-          </>
-        )}
-      </Loaded>
-      <Primary label="New task" action={action} />
-    </>
-  );
-}
-
 export function FlowShell() {
   const { route } = useFlowRoute();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -185,12 +160,7 @@ export function FlowShell() {
   const screen = (() => {
     switch (route.screen) {
       case "Start":
-        return (
-          <>
-            <Summary>Describe what you want Tilo to handle.</Summary>
-            <Start />
-          </>
-        );
+        return <StartScreen />;
       case "Understanding":
         return <Understanding taskId={route.taskId} />;
       case "Approaches":
@@ -202,13 +172,11 @@ export function FlowShell() {
             <World worldId={route.worldId} />
           </>
         );
-      case "Delivery":
-        return <Delivery worldId={route.worldId} />;
     }
   })();
   return (
     <section
-      className="flow-shell"
+      className={route.screen === "Start" ? "flow-shell flow-wide" : "flow-shell"}
       data-testid="flow-shell"
       data-screen={route.screen}
       aria-label="Task flow"

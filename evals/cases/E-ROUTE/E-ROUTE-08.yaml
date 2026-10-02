@@ -1,0 +1,34 @@
+id: E-ROUTE-08
+group: E-ROUTE
+title: Fallback to owner when no Facilities Team Lead is configured
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Schedule Bramble Foods cold-storage compressor servicing around the autumn preserves run.
+  question: Can Bay 4 cold storage be taken offline for 90 minutes on Sunday morning without moving the
+    preserves stock?
+  question_domain: facilities
+  topic_key: chiller_maintenance_window
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A8
+  world_id: w_bramble_supply
+  district: D1
+  asked_at: '2026-10-02T10:35:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: null
+  answered_from_decision: false
+  decision_id: null
+checks:
+- check: routed_domain
+  args:
+    expected: null
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A8
+- check: answered_from_decision
+  args:
+    expected: false
+recording: null
