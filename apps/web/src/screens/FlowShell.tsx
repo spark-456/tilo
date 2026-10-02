@@ -6,6 +6,7 @@ import { useClient } from "../api/ClientProvider";
 import type { ApproachesResult } from "../api/client";
 import { useFlowRoute } from "../router";
 import { type Action, type Remote, useAction, useRemote } from "./remote";
+import { Understanding, rememberIntake } from "./s02/Understanding";
 
 const enc = encodeURIComponent;
 // AGW-02 replaces this with the task box.
@@ -80,18 +81,10 @@ function Start() {
   const client = useClient();
   const action = useAction("start the task", async () => {
     const intake = await client.submitIntake(INTAKE_TEXT, []);
+    rememberIntake(intake);
     return `/task/${enc(intake.task_id)}/understanding`;
   });
   return <Primary label="Start task" action={action} />;
-}
-
-function Understanding({ taskId }: { taskId: string }) {
-  const client = useClient();
-  const action = useAction("confirm the brief", async () => {
-    await client.answerQuestions(taskId, [], {});
-    return `/task/${enc(taskId)}/approaches`;
-  });
-  return <Primary label="Confirm understanding" action={action} />;
 }
 
 /** The recommended approach and its cap (its upper credit estimate), from getApproaches. */
