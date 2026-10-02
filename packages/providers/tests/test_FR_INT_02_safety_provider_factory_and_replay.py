@@ -203,7 +203,7 @@ def test_FR_INT_02_written_recording_scrubs_an_authorization_like_secret(tmp_pat
         role="safety", profile_id="model-armor-1", live_factory=_EchoingLiveSafetyProvider, fixtures_dir=tmp_path
     )
     result = provider.check("some text")
-    assert fake_secret in result["reason"], "test setup: the live double must actually echo the secret"
+    assert fake_secret not in result["reason"], "#103: a live reason is mapped to a fixed category, never echoed"
 
     recording_files = list(tmp_path.rglob("*.json"))
     assert recording_files, "record mode must write a recording file"

@@ -35,6 +35,9 @@ The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `Search
 - `safety` (CC-SP-47, FR-INT-02, BQ-68): `check()` returns exactly `{flagged, reason}`; `check("", content=, mime_type=)`
   screens PDF/PNG/JPEG only, anything else raises `RequestError` (fail closed). `build_safety_provider` reads the
   `safety` role: `fake` -> `FakeSafetyProvider`, `model_armor` -> `SafetyRecordReplayProvider` (live stub refuses).
+  Adapters implement `_check`; `SafetyProvider.check` runs the media-type gate. The role never falls back (only `primary`
+  is read), a live reason is mapped to a fixed category, recordings are written atomically, a corrupt one is a `ProviderError`,
+  and the fake is refused when `LIVE` is 1 or `K_SERVICE`/`CLOUD_RUN_JOB` is set at all (even empty).
 - `Router._candidate` is the one choke point for every candidate touch (build, count_tokens, calls, first chunk):
   `RequestError`/stream-embed `SafetyError` raise (generate: `safety_blocked`), mid-stream -> `StreamInterruptedError`,
   anything else falls back (over budget: never sent). Only `RouterError`s leave, with `.attempts` and `__cause__`.
