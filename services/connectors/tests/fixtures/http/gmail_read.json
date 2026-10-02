@@ -53,10 +53,7 @@
         "json": {
           "id": "msg_supplier_1",
           "threadId": "thr_supplier_1",
-          "labelIds": [
-            "INBOX",
-            "UNREAD"
-          ],
+          "labelIds": ["INBOX", "UNREAD"],
           "snippet": "Hi, Can you confirm the delivery date for order 4471?",
           "sizeEstimate": 2048,
           "payload": {

@@ -26,7 +26,7 @@ outbox for every side effect. The only service that can decrypt user OAuth token
   `authz` (SEC-11). `side_effects.SIDE_EFFECT_METHOD_NAMES` names them; `outbox.py` is the one file
   allowed to call one, and its `Grant` is minted only by `Outbox.dispatch_due()`.
 - Adapters: every Google call goes through an injected `Transport` (fakes or `recording.ReplayTransport` in dev and
-  CI), no logging. `execute_side_effect` raising `SideEffectRefused` fails the entry; other errors leave it due.
+  CI), no logging. A side effect never waits (the lease); `SideEffectRefused` fails the entry, other errors leave it due.
 - OAuth only, least privilege, incremental scopes; Tilo never sees, types or stores passwords.
 - Exactly-once send, at-least-once delivery: `enqueue` is a no-op on a world_id + idempotency_key
   already stored (OB-03), and the adapter dedupes its own send. `Outbox` may hand the same

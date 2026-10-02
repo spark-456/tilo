@@ -94,13 +94,16 @@ class GoogleAdapter:
         json: Any = None,
         content: bytes | None = None,
         headers: Mapping[str, str] | None = None,
+        patient: bool = True,
     ) -> ApiResponse:
-        """One Google call. 429 and 5xx retried (a POST only on 429: a 5xx may have been carried out, so
-        the outbox retries it after its earlier-attempt lookup); a 401 gets one forced refresh."""
+        """One Google call; a 401 gets one forced refresh. A patient call (a read) retries 429, 5xx and a
+        lost answer. A side effect is never patient: it never waits, because a wait can outlast the outbox
+        lease and let another instance send; the entry stays due and the next dispatch starts again with
+        the earlier-attempt lookup."""
         token = self._broker.access_token_for_adapter(user_id, self.id, required_scopes=scopes)
         refreshed, waited = False, 0
-        for attempt in range(1, self._max_attempts + 1):
-            last = attempt == self._max_attempts
+        for attempt in range(1, self._max_attempts + 2):  # one extra request only after a 401
+            last = not patient or attempt >= self._max_attempts
             try:
                 response = self._transport.request(
                     method,
@@ -111,7 +114,7 @@ class GoogleAdapter:
                     content=content,
                 )
             except TransportError:
-                if method != "GET" or last:
+                if last:
                     raise ProviderUnavailable("Google did not answer") from None
                 waited += self._wait(2 ** (attempt - 1), waited)
                 continue
@@ -133,7 +136,7 @@ class GoogleAdapter:
             if status == 429:  # PRD 9.5: not a side effect, so authz is null
                 data = {"connector": self.id, "retry_after_s": wait}
                 self._emit({"type": "connection.rate_limited", "authz": None, "data": data, "user_id": user_id})
-            if last or (method != "GET" and status != 429) or waited + wait > MAX_WAIT_S:
+            if last or waited + wait > MAX_WAIT_S:
                 if status == 429:
                     raise RateLimited(wait)
                 raise ProviderUnavailable(f"Google answered {status}")
@@ -164,4 +167,6 @@ class GoogleAdapter:
 
 def _retry_after(response: ApiResponse) -> int | None:
     value = str(response.headers.get("retry-after", "")).strip()
-    return int(value) if value.isascii() and value.isdigit() else None  # an HTTP-date falls back to the backoff
+    if not (value.isascii() and value.isdigit()):
+        return None  # an HTTP-date falls back to the backoff
+    return int(value) if len(value) <= 9 else 999_999_999  # capped before int(): never a huge parse

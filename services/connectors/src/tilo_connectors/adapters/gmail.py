@@ -5,6 +5,7 @@ acted on. A side effect's audience is exactly the entry's recipients; no artifac
 from __future__ import annotations
 
 import base64
+import email
 import email.policy
 import email.utils
 import re
@@ -69,8 +70,10 @@ class GmailAdapter(GoogleAdapter):
         threads = [{k: str(t.get(k, "")) for k in ("id", "snippet")} for t in body.get("threads") or []]
         return {"threads": threads, "next_page_token": body.get("nextPageToken")}
 
-    def _get(self, user_id: str, scopes: list[str], path: str, params: Any = None) -> dict[str, Any]:
-        return self._json(user_id, scopes, "GET", GMAIL_API + path, params=params)
+    def _get(
+        self, user_id: str, scopes: list[str], path: str, params: Any = None, patient: bool = True
+    ) -> dict[str, Any]:
+        return self._json(user_id, scopes, "GET", GMAIL_API + path, params=params, patient=patient)
 
     def execute_side_effect(self, entry: Mapping[str, Any], grant: Grant) -> dict[str, Any]:  # the only one (SEC-03)
         self._check_grant(entry, grant)
@@ -82,10 +85,12 @@ class GmailAdapter(GoogleAdapter):
             raise SideEffectRefused("gmail has no side effect for this action")
         item = self._artifact(entry.get("item"), "email")
         subject, text = item.get("subject"), item.get("body_text")
-        if not isinstance(subject, str) or not isinstance(text, str) or _has_control(subject):
+        if not _sendable(subject) or not _sendable(text) or _has_control(str(subject)):
             raise SideEffectRefused("the email text cannot be sent as written")
         recipients = list(entry.get("recipients") or [])
         if not recipients or not all(isinstance(r, str) and _ADDRESS.fullmatch(r) for r in recipients):
+            raise SideEffectRefused("the recipients cannot be used")
+        if _to_round_trip(recipients) != recipients:  # nothing re-encoded or re-read: To is exactly these
             raise SideEffectRefused("the recipients cannot be used")
         files = [self._artifact(ref, "file") for ref in entry.get("attachments") or []]
         self._check_attachments(files)
@@ -105,27 +110,33 @@ class GmailAdapter(GoogleAdapter):
             msg["Subject"] = subject
         else:
             self._reply_headers(user, scopes, thread_id, msg)
-        msg.set_content(text)
-        for f in files:
-            mime = str(f.get("mime_type", ""))
-            maintype, subtype = (mime if _MIME.fullmatch(mime) else "application/octet-stream").split("/", 1)
-            msg.add_attachment(bytes(f["content"]), maintype=maintype, subtype=subtype, filename=_safe_name(f["name"]))
-        raw = {"raw": base64.urlsafe_b64encode(msg.as_bytes(policy=email.policy.SMTP)).decode("ascii")}
+        try:  # final, not retried for ever: text the MIME writer cannot encode never becomes sendable
+            msg.set_content(text)
+            for f in files:
+                mime = str(f.get("mime_type", ""))
+                main, sub = (mime if _MIME.fullmatch(mime) else "application/octet-stream").split("/", 1)
+                msg.add_attachment(bytes(f["content"]), maintype=main, subtype=sub, filename=_safe_name(f["name"]))
+            raw = {"raw": base64.urlsafe_b64encode(msg.as_bytes(policy=email.policy.SMTP)).decode("ascii")}
+        except (UnicodeError, ValueError, TypeError):
+            raise SideEffectRefused("the email cannot be encoded as written") from None
         if thread_id is not None:
             raw["threadId"] = thread_id
         if capability == "write":
-            draft = self._json(user, scopes, "POST", GMAIL_API + "/drafts", json={"message": raw})
+            draft = self._json(user, scopes, "POST", GMAIL_API + "/drafts", json={"message": raw}, patient=False)
             return _result(draft.get("id"), draft.get("message"))
-        sent = self._json(user, scopes, "POST", GMAIL_API + "/messages/send", json=raw)
+        sent = self._json(user, scopes, "POST", GMAIL_API + "/messages/send", json=raw, patient=False)
         return _result(sent.get("id"), sent)
 
     def _check_attachments(self, files: list[Mapping[str, Any]]) -> None:
         total = 0
         for f in files:
             name, content = f.get("name"), f.get("content")
-            if not isinstance(name, str) or not isinstance(content, bytes | bytearray):
+            if not isinstance(name, str) or not isinstance(content, bytes | bytearray) or not _sendable(name):
                 raise SideEffectRefused("an attachment cannot be read")
-            trimmed = name.strip().rstrip(". ").lower()  # "a.exe." and "a.exe " open as .exe on Windows
+            if any(unicodedata.category(c) in ("Cc", "Cf", "Zl", "Zp") for c in name):  # NUL, ZWSP, RLO, ...
+                raise SideEffectRefused("an attachment's name has hidden characters")
+            # The name actually sent, cut at ':' (NTFS streams); "a.exe." and "a.exe " open as .exe on Windows.
+            trimmed = _safe_name(name).split(":", 1)[0].rstrip().rstrip(". ").lower()
             if "." in trimmed and "." + trimmed.rsplit(".", 1)[1] in BLOCKED_ATTACHMENT_EXTENSIONS:
                 raise SideEffectRefused("an attachment's file type is blocked")
             total += len(content)
@@ -136,14 +147,14 @@ class GmailAdapter(GoogleAdapter):
         """Only Tilo's own drafts or sent mail count: a received message with that Message-ID never does."""
         query = f"rfc822msgid:{message_id.strip('<>')}"
         if capability == "write":
-            drafts = self._get(user, scopes, "/drafts", {"q": query}).get("drafts") or []
+            drafts = self._get(user, scopes, "/drafts", {"q": query}, patient=False).get("drafts") or []
             return _result(drafts[0].get("id"), drafts[0].get("message")) if drafts else None
-        sent = self._get(user, scopes, "/messages", {"q": query + " in:sent"}).get("messages") or []
+        sent = self._get(user, scopes, "/messages", {"q": query + " in:sent"}, patient=False).get("messages") or []
         return _result(sent[0].get("id"), sent[0]) if sent else None
 
     def _reply_headers(self, user: str, scopes: list[str], thread_id: str, msg: EmailMessage) -> None:
         """Subject, In-Reply-To and References from the thread's last message; its Reply-To is ignored."""
-        thread = self._get(user, scopes, f"/threads/{thread_id}", {"format": "metadata"})
+        thread = self._get(user, scopes, f"/threads/{thread_id}", {"format": "metadata"}, patient=False)
         messages = [m for m in thread.get("messages") or [] if "DRAFT" not in (m.get("labelIds") or [])]
         if not messages:
             raise SideEffectRefused("the thread has no message to reply to")
@@ -151,12 +162,31 @@ class GmailAdapter(GoogleAdapter):
         msg["Subject"] = "Re: " + _RE_PREFIX.sub("", _no_control(headers.get("subject", ""))).strip()
         if last_id := _MSG_ID.findall(headers.get("message-id", ""))[:1]:
             msg["In-Reply-To"] = last_id[0]
-            msg["References"] = " ".join(_MSG_ID.findall(headers.get("references", "")) + last_id)
+            msg["References"] = " ".join(_MSG_ID.findall(headers.get("references", ""))[-20:] + last_id)  # bounded
 
 
 def _result(resource_id: Any, message: Any) -> dict[str, Any]:
     thread_id = message.get("threadId", "") if isinstance(message, dict) else ""
     return {"id": str(resource_id or ""), "thread_id": str(thread_id)}
+
+
+def _sendable(text: Any) -> bool:
+    """A str that UTF-8 can encode (no lone surrogate)."""
+    try:
+        return isinstance(text, str) and text.encode("utf-8") is not None
+    except UnicodeEncodeError:
+        return False
+
+
+def _to_round_trip(recipients: list[str]) -> list[str]:
+    """The addresses a mail reader parses back out of the To header as written. Printable ASCII only; an
+    address the writer re-encodes (RFC 2047 inside the address) or splits never matches."""
+    if not all(c.isascii() and c.isprintable() for r in recipients for c in r):
+        return []
+    probe = EmailMessage()
+    probe["To"] = ", ".join(recipients)
+    parsed = email.message_from_bytes(probe.as_bytes(policy=email.policy.SMTP), policy=email.policy.default)
+    return [a.addr_spec for a in parsed["To"].addresses]
 
 
 def _has_control(text: str) -> bool:
