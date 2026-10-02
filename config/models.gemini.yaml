@@ -53,7 +53,7 @@ roles:
   verifier: { primary: flash-38, fallback: flash-37, thinking: high }
   writer: { primary: flash-38, fallback: flash-37 }
   narrator: { primary: lite-31, fallback: flash-37 }
-  autopilot: { primary: flash-37, fallback: lite-31 }
+  autopilot: { primary: flash-37, fallback: lite-31, max_input_tokens: 16000 }
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]

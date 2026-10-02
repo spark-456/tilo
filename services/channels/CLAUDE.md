@@ -2,7 +2,7 @@
 
 ## Purpose
 Cloud Run service (PRD 6.2): WhatsApp webhook and sender, email notifications, web push,
-channel identity binding. Public ingress for signature-verified webhooks only.
+channel identity binding, Email Autopilot triage. Public ingress for signature-verified webhooks only.
 
 ## Commands
 - `uv run --package tilo-channels pytest services/channels`; `just check` from the repo root.
@@ -15,7 +15,7 @@ channel identity binding. Public ingress for signature-verified webhooks only.
 
 ## Requirement IDs
 - Section 11 (channels and Email Autopilot); SEC-06 (channel identity binding and T3 PIN),
-  SEC-08 (signed webhooks and signed email links). FR-CHN-02, -03, -05, -06, -07 are built.
+  SEC-08 (signed webhooks and signed email links). FR-CHN-02, -03, -05, -06, -07, -09 are built.
 
 ## Local rules
 - Webhooks signature-verified, idempotent, ordered per user; forged or replayed rejected. Never send real
@@ -25,8 +25,8 @@ channel identity binding. Public ingress for signature-verified webhooks only.
   300 s, or over 60 s ahead) claims nothing. Duplicate 200 "duplicate"; forged/missing signature 401; signed
   non-JSON 400; handler raises: claim kept (at-most-once), 200 "failed". App secret >= 32 bytes; wamids
   never logged (`message_ref`); object, field and `phone_number_id` pinned.
-- `keywords`: whole-message, case-insensitive, bound numbers only; effect via the control plane, then one
-  confirmation, or one "Could not apply that".
+- `keywords`: whole-message, case-insensitive, bound numbers only; control-plane effect, then one confirmation or "Could not apply that".
+- `triage` (FR-CHN-09, BQ-130-138): safety flag > user label/rule/VIP/mute > model; mail only as prompt data, no tools.
 - `links` (FR-CHN-07; BQ-76 to BQ-82): HMAC-SHA256 (`compare_digest`, prefix `tilo-link-v1|`), segments
   alphabet-checked before the MAC; key ring live; nonce consumed last. Answer only plain needs_you cards
   listing email (fail closed); gate, consent, meeting open signed in. HTTP: `answer` needs a POST confirm;
