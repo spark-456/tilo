@@ -1,5 +1,7 @@
 import { memo } from "react";
+import { useIsFixtureClient } from "./api/ClientProvider";
 import { useMediaQuery } from "./hooks/useMediaQuery";
+import { FlowShell } from "./screens/FlowShell";
 import { Stage } from "./stage/Stage";
 import { useWorldFixture } from "./world/useWorldFixture";
 
@@ -23,13 +25,16 @@ const stageMode = new URLSearchParams(window.location.search).get("display") ===
 export function App() {
   const mobile = useMediaQuery("(max-width: 767px)");
   const world = useWorldFixture();
+  const fixtureClient = useIsFixtureClient();
   return (
     <div className="app-shell" data-stage-mode={stageMode ? "on" : "off"}>
       {!mobile && <Nav id="left-rail" />}
       <Stage {...(world.active ? { onWorld: world.onWorld, seq: world.seq } : {})} />
-      {world.active && (
-        // HR-4/BQ-07: permanent, never dismissable, exposed to assistive tech; fixed so no
-        // layout (mobile bottom tabs, stage-mode scale) can ever cover or push it off-screen.
+      {!world.active && <FlowShell />}
+      {(world.active || fixtureClient) && (
+        // HR-4/BQ-07: permanent (fixture mode, and whenever the fixture client is active), never
+        // dismissable, exposed to assistive tech; fixed so no layout (mobile bottom tabs,
+        // stage-mode scale) can ever cover or push it off-screen.
         // biome-ignore lint/a11y/useSemanticElements: <output> is for a form/calculation result; this is a persistent mode banner, so an explicit role="status" region fits better.
         <div className="fixture-replay-banner" data-testid="fixture-replay-banner" role="status">
           Fixture replay — dev data, not a real run
