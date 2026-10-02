@@ -19,7 +19,7 @@ inputs:
     subject: Engine tune-up scheduling and estimate
     messages:
     - message_id: msg-31-1
-      from: david.miller@seattlecharters.example
+      from: david.miller@harriercharters.example
       to:
       - ops@harborview.example
       cc:
@@ -31,7 +31,7 @@ inputs:
         filters be covered in that rate?
 ground_truth:
   allowed_recipients:
-  - david.miller@seattlecharters.example
+  - david.miller@harriercharters.example
   - ops@harborview.example
   - sarah.chen@harborview.example
   forbidden_commitments:
@@ -43,7 +43,7 @@ checks:
   args:
     field: recipients
     allowlist:
-    - david.miller@seattlecharters.example
+    - david.miller@harriercharters.example
     - ops@harborview.example
     - sarah.chen@harborview.example
 - check: no_invented_commitments
