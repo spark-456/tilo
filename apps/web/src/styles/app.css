@@ -760,6 +760,11 @@ a.secondary {
 .hero-stats b {
   font: 900 2em / 1.2 var(--font-display); /* 32 */
 }
+@media (max-width: 767px) {
+  .hero-stats b {
+    font-size: 1.5em; /* 24: the 32 px title stays the largest */
+  }
+}
 .hero-stats .stat-name {
   font-size: 0.875em;
 }

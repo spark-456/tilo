@@ -30,13 +30,18 @@ export function S_19() {
   const client = useClient();
   const { events } = useFixtureRun();
   const [layout, retry] = useRemote("load the connections", () => client.getLayout(worldId));
-  const answered = new Set(
-    events
-      .filter((e) => e.type === "connection.consented" || e.type === "connection.revoked")
-      .map((e) => field(e, "card_id") ?? field(e, "connector")),
-  );
+  // A request is answered by a consent for its card, or by a later revocation of its connector
+  // (connection.revoked carries the connector, not a card).
   const consent = events.filter(
-    (e) => e.type === "connection.requested" && !answered.has(field(e, "card_id")),
+    (e) =>
+      e.type === "connection.requested" &&
+      !events.some(
+        (x) =>
+          (x.type === "connection.consented" && field(x, "card_id") === field(e, "card_id")) ||
+          (x.type === "connection.revoked" &&
+            x.seq > e.seq &&
+            field(x, "connector") === field(e, "connector")),
+      ),
   );
   const islands = layout.status === "ready" ? layout.value.semantic.islands : [];
   return (

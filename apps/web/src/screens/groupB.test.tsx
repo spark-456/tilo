@@ -3,6 +3,7 @@
 // recorded events of the run, whatever the client would answer. Each case renders the screen on a
 // run that has recorded only the first events (a prefix of the village stream), so the moments
 // between events are tested exactly, not by timing.
+import type { Event } from "@tilo/contracts";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
@@ -62,6 +63,54 @@ describe("AGW-08 S-18 questions waiting follow approval.requested and approval.r
 describe("AGW-08 S-19 consent requests come only from connection.requested events", () => {
   it("says none is waiting when the run recorded no consent request", async () => {
     expect((await text(S_19, 44)).textContent).toContain("No access request is waiting.");
+  });
+
+  /** The village stream's first event reshaped into one connection event. */
+  const conn = (seq: number, type: string, data: object): Event => ({
+    ...(EVENTS_VILLAGE_BASIC[0] as Event),
+    id: `01JB5VQ00000000000000099${String(seq).padStart(2, "0")}`,
+    seq,
+    type,
+    summary: `${type} ${seq}`,
+    data,
+  });
+  const withEvents = async (events: Event[]) => {
+    const client = new FixtureClient();
+    client.subscribeEvents = (_world, onEvent) => {
+      for (const e of events) onEvent(e);
+      return () => undefined;
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    await act(async () => {
+      createRoot(container).render(
+        <ClientProvider client={client}>
+          <S_19 />
+        </ClientProvider>,
+      );
+    });
+    return container.textContent ?? "";
+  };
+  const requested = conn(1, "connection.requested", { connector: "google_drive", card_id: "c1" });
+
+  it("lists a request until it is answered", async () => {
+    expect(await withEvents([requested])).toContain("Google Drive");
+  });
+  it("stops listing it once its card is consented", async () => {
+    const consented = conn(2, "connection.consented", {
+      connector: "google_drive",
+      card_id: "c1",
+      scopes: ["Create files"],
+    });
+    expect(await withEvents([requested, consented])).toContain("No access request is waiting.");
+  });
+  it("stops listing it once its connector is revoked (that event has no card id)", async () => {
+    const revoked = conn(2, "connection.revoked", { connector: "google_drive" });
+    expect(await withEvents([requested, revoked])).toContain("No access request is waiting.");
+  });
+  it("keeps a request that another connector's revocation did not answer", async () => {
+    const other = conn(2, "connection.revoked", { connector: "gmail" });
+    expect(await withEvents([requested, other])).toContain("Google Drive");
   });
 });
 

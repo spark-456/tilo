@@ -61,6 +61,12 @@ export function S_15() {
         ]}
       />
       <Section
+        title="Stop all autopilot"
+        note="Sets every rule to level L1 at once, so everything waits for you. Pause all also stops the agents."
+      >
+        <Placeholder label="Stop all autopilot" compact />
+      </Section>
+      <Section
         title="Levels"
         note="Every action starts at level L1: it waits for you until you say otherwise."
       >
@@ -142,12 +148,6 @@ export function S_15() {
             })}
           </ul>
         )}
-      </Section>
-      <Section
-        title="Stop all autopilot"
-        note="Sets every rule to level L1 at once, so everything waits for you. Pause all also stops the agents."
-      >
-        <Placeholder label="Stop all autopilot" compact />
       </Section>
     </Page>
   );
