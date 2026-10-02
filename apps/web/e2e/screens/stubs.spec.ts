@@ -10,10 +10,6 @@ const STUBS: ReadonlyArray<readonly [string, string, string]> = [
   ["S_07", "/needs-you/gate", "Gate sheet"],
   ["S_08", "/needs-you/consent", "Connection consent sheet"],
   ["S_09", "/meeting", "Meeting"],
-  ["S_21", "/library/artifacts", "Artifact history and restore"],
-  ["S_22", "/settings", "Settings"],
-  ["S_23", "/estimate", "How we estimate; status page"],
-  ["S_24", "/pilot", "Pilot diary and survey"],
 ];
 
 for (const [id, path, name] of STUBS) {

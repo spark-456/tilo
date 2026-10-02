@@ -70,6 +70,10 @@ export function noLayoutShift(rows: ReadonlyArray<readonly [string, string, stri
       }) => {
         test.setTimeout(60_000);
         await page.setViewportSize(viewport);
+        // Warm the dev server (dependency optimisation, fonts) before the shifts are watched, so a
+        // fresh server cannot show a cold-start reflow that no user sees.
+        await page.goto(`${path}?speed=100`);
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
         await page.addInitScript(() => {
           const w = window as unknown as { __shifts: number[] };
           w.__shifts = [];

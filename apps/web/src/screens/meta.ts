@@ -85,16 +85,18 @@ export const SCREENS: readonly ScreenMeta[] = [
   built(must("S-18", "Team Lead console", "P4", "/team", /^\/team\/?$/)),
   built(must("S-19", "Connections", "P6", "/connections", /^\/connections\/?$/)),
   later("S-20", "Skills library", "P2"),
-  must(
-    "S-21",
-    "Artifact history and restore",
-    "P7",
-    "/library/artifacts",
-    /^\/library\/artifacts\/?$/,
+  built(
+    must(
+      "S-21",
+      "Artifact history and restore",
+      "P7",
+      "/library/artifacts",
+      /^\/library\/artifacts\/?$/,
+    ),
   ),
-  must("S-22", "Settings", "P7", "/settings", /^\/settings\/?$/),
-  must("S-23", "How we estimate; status page", "P8", "/estimate", /^\/estimate\/?$/),
-  must("S-24", "Pilot diary and survey", "P8", "/pilot", /^\/pilot\/?$/),
+  built(must("S-22", "Settings", "P7", "/settings", /^\/settings\/?$/)),
+  built(must("S-23", "How we estimate; status page", "P8", "/estimate", /^\/estimate\/?$/)),
+  built(must("S-24", "Pilot diary and survey", "P8", "/pilot", /^\/pilot\/?$/)),
   later("S-25", "Stage mode overlay", "P3"),
 ];
 
