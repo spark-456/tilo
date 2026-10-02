@@ -27,11 +27,8 @@ describe("PRD-18.3 flow: the router maps each flow path to its screen and unknow
     });
   });
 
-  it("maps /world/:worldId/delivery to Delivery", () => {
-    expect(matchFlowRoute("/world/abc/delivery")).toEqual({
-      screen: "Delivery",
-      worldId: "abc",
-    });
+  it("leaves /world/:worldId/delivery to S-12 (routes.tsx), so the flow shell has no Delivery", () => {
+    expect(matchFlowRoute("/world/abc/delivery")).toEqual({ screen: "Start" });
   });
 
   it("maps unknown paths to Start", () => {

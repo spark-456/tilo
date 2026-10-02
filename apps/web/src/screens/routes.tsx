@@ -3,6 +3,8 @@
 // replacing a screen is a one-line change here plus its own file.
 import type { ComponentType } from "react";
 import { CardsGallery } from "../needs-you/CardsGallery";
+import { matchFlowRoute } from "../router";
+import { NotFound } from "./NotFound";
 import { S_05 } from "./S_05";
 import { S_06 } from "./S_06";
 import { S_07 } from "./S_07";
@@ -62,7 +64,8 @@ const EXTRA: ReadonlyArray<{ id: string; re: RegExp; Component: ComponentType<Sc
     : []),
 ];
 
-/** The screen a path belongs to, or null for the flow shell (S-01 to S-04) and unknowns. */
+/** The screen a path belongs to, or null for the flow shell (S-01 to S-04) and unknowns. A path
+ * under /world/ or /task/ that neither a screen nor a flow screen owns is "Not found", not Start. */
 export function matchScreen(pathname: string): ScreenMatch | null {
   for (const { id, re, Component } of EXTRA)
     if (re.test(pathname)) return { id, params: [], Component };
@@ -70,6 +73,9 @@ export function matchScreen(pathname: string): ScreenMatch | null {
     const m = pattern?.exec(pathname);
     const Component = COMPONENTS[id];
     if (m && Component) return { id, params: m.slice(1).map(decode), Component };
+  }
+  if (/^\/(world|task)\//.test(pathname) && matchFlowRoute(pathname).screen === "Start") {
+    return { id: "not-found", params: [], Component: NotFound };
   }
   return null;
 }

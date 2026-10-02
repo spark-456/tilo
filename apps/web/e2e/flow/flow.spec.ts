@@ -90,7 +90,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
 // UX-1: a client with latency (?client_delay_ms) must not shift the layout when data arrives.
 // Loading, error, empty and ready occupy one reserved box in FlowShell.
 for (const viewport of [DESKTOP, MOBILE]) {
-  for (const path of ["/task/t/approaches", "/world/w/delivery"]) {
+  for (const path of ["/task/t/approaches", "/world/w_village_basic/delivery"]) {
     test(`PRD-18.3 UX_1: ${path} has zero layout shifts while a slow client answers at ${viewport.width}x${viewport.height}`, async ({
       page,
     }) => {
