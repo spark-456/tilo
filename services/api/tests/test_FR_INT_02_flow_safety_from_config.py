@@ -88,12 +88,13 @@ def test_FR_INT_02_flow_deployed_service_refuses_the_fake_safety_provider(flow_f
     assert flow.intake(files=[("brief.docx", make_docx_bytes("Plain."))]).status_code == 201  # dev: the fake is fine
     monkeypatch.setenv("K_SERVICE", "tilo-api")
     before = _stored()
+    calls = list(flow.provider.calls)  # the dev intake above made its one brief call (FR-INT-03)
 
     response = flow.intake(files=[("brief.docx", make_docx_bytes("Plain."))])
 
     assert response.status_code == 503, response.text
     assert _stored() == before
-    assert flow.provider.calls == []
+    assert flow.provider.calls == calls  # the refused intake sent nothing to a model
 
 
 def test_FR_INT_02_flow_unrecorded_live_safety_profile_fails_closed(flow_factory, configured):
