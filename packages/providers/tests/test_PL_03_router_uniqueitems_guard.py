@@ -5,8 +5,10 @@ failure at once, not a stall, under anyOf and recursion too."""
 
 from __future__ import annotations
 
+import copy
 import json
 import time
+from decimal import Decimal
 
 import jsonschema
 import pydantic
@@ -18,6 +20,7 @@ from conftest import (
     prices_config_for,
     write_providers_config,
 )
+from tilo_providers import schema_guard
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse
 from tilo_providers.router import schema_error
 from tilo_providers.schema_guard import MESSAGE_CHARS
@@ -128,6 +131,28 @@ def test_PL_03_bounded_any_of_and_one_of_agree_with_jsonschema(keyword, value) -
 def test_PL_03_deeply_nested_model_output_is_not_valid_json() -> None:
     reply = GenerateResponse(text="[" * 100_000 + "]" * 100_000, profile_id="cheap")
     assert (schema_error(reply, _SCHEMA) or "").startswith("not valid JSON")
+
+
+def test_PL_03_validator_and_schema_check_are_built_once_per_schema_content() -> None:
+    schema = {"type": "object", "properties": {"tags": {"anyOf": [{"type": "array"}, {"type": "null"}]}}}
+    assert schema_guard.validator(schema) is schema_guard.validator(copy.deepcopy(schema))
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [{"anyOf": [{"type": "integer"}, {"type": "null"}]}, {"oneOf": [{"type": "string"}, {"maxLength": 10**6}]}],
+)
+def test_PL_03_any_of_and_one_of_messages_never_echo_a_value_whole(schema) -> None:
+    errors = list(schema_guard.validator(schema).iter_errors("x" * 100_000))
+    assert len(errors) == 1
+    assert len(errors[0].message) < 200
+
+
+def test_PL_03_unique_items_compares_decimals_by_value() -> None:
+    check = schema_guard.validator({"uniqueItems": True})
+    assert [e.validator for e in check.iter_errors([Decimal("1"), Decimal("1.0")])] == ["uniqueItems"]
+    assert [e.validator for e in check.iter_errors([Decimal("1.5"), 1.5, True])] == ["uniqueItems"]
+    assert list(check.iter_errors([Decimal("1"), Decimal("2"), True])) == []
 
 
 def test_PL_03_echoed_values_are_truncated() -> None:

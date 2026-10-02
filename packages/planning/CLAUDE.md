@@ -27,11 +27,11 @@ budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant
   model calls; extraction is stdlib only and treats uploads as untrusted (bounded decompression, no DTDs).
 - The model only flags ambiguous fields. Memory lookup, ranking, the cap of 3 and assumptions are code; a
   candidate over the cap is an assumption with `question: null`. A rejected submission stores nothing.
-- The plan validator takes its registries as arguments; a `schema` failure stops the PG checks. A plan over
-  `MAX_PLAN_BYTES` (BQ-107) is `schema` before any walk; the schema has every `$ref` inlined, a linear `uniqueItems`
-  (`tilo_providers.schema_guard`, #173), stops at `MAX_ERRORS` and caps messages; non-finite numbers are `schema`.
-  The first caller with client JSON (FR-INT-10) must pass `owner` (BQ-72) and run it off the event loop. PG-06
-  checks "never lower" only, against the higher of the table and connector tiers; PG-10 reads policies as `tilo_policy`.
+- The plan validator takes its registries as arguments; a `schema` failure stops the PG checks. A plan deeper than
+  `MAX_PLAN_DEPTH` (no recursion) or over `MAX_PLAN_BYTES` (BQ-107) is `schema` before any other walk; the schema
+  has every `$ref` inlined, a linear `uniqueItems` (`schema_guard`, #173), stops at `MAX_ERRORS` and caps messages;
+  non-finite numbers are `schema`. The first caller with client JSON (FR-INT-10) must pass `owner` (BQ-72) and run
+  it off the event loop. PG-06 checks "never lower" only, against the higher of the table and connector tiers.
 - A flagged file's `artifact.created` has severity `fyi` and `trace.tool` `safety_provider`; `trace.archive_ref`
   stays null until the raw archive (P7) exists. Estimates are arithmetic only; an unknown unit type refuses.
 - A budget grant's authz comes only from the world's owner (PRD 10.1) or the policy engine. The risk table

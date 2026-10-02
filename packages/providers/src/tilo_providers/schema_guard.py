@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import functools
 import itertools
+import json
+import numbers
+import reprlib
 from collections.abc import Iterator
 from typing import Any
 
@@ -24,7 +27,7 @@ def _canonical(value: Any) -> Any:
     """A hashable form equal for JSON-equal values: numbers by value, booleans apart from numbers."""
     if isinstance(value, bool):
         return ("b", value)
-    if isinstance(value, int | float):
+    if isinstance(value, numbers.Number):  # by value: 1 == 1.0 == Decimal("1.0")
         return ("n", value)
     if isinstance(value, str):
         return ("s", value)
@@ -54,7 +57,7 @@ def any_of(validator: Any, branches: list[Any], instance: Any, schema: dict[str,
         if not errors:
             return
         found += errors
-    yield ValidationError(f"{instance!r} is not valid under any of the given schemas", context=found)
+    yield ValidationError(f"{reprlib.repr(instance)} is not valid under any of the given schemas", context=found)
 
 
 def one_of(validator: Any, branches: list[Any], instance: Any, schema: dict[str, Any]) -> Iterator[ValidationError]:
@@ -70,9 +73,9 @@ def one_of(validator: Any, branches: list[Any], instance: Any, schema: dict[str,
         else:
             valid.append(subschema)
     if not valid:
-        yield ValidationError(f"{instance!r} is not valid under any of the given schemas", context=found)
+        yield ValidationError(f"{reprlib.repr(instance)} is not valid under any of the given schemas", context=found)
     elif len(valid) > 1:
-        yield ValidationError(f"{instance!r} is valid under each of {', '.join(map(repr, valid[1:] + valid[:1]))}")
+        yield ValidationError(f"{reprlib.repr(instance)} is valid under {len(valid)} of the given schemas")
 
 
 @functools.cache
@@ -82,7 +85,13 @@ def guarded(cls: Any) -> Any:
 
 
 def validator(schema: dict[str, Any]) -> Any:
-    """A guarded validator for `schema` (its own `$schema` dialect), after checking the schema."""
+    """A guarded validator for `schema` (its own `$schema` dialect), the schema checked once per content."""
+    return _validator(json.dumps(schema, sort_keys=True))
+
+
+@functools.lru_cache(maxsize=128)
+def _validator(key: str) -> Any:
+    schema = json.loads(key)
     cls = guarded(jsonschema.validators.validator_for(schema))
     cls.check_schema(schema)
     return cls({key: value for key, value in schema.items() if key != "$schema"})

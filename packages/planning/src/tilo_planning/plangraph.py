@@ -34,6 +34,7 @@ POLICY_LEVELS = ("L2", "L3")  # PG-10: only a policy that acts without a person 
 DIMENSIONS = ("depth", "sources", "parallelism", "verification", "output_format")
 MIN_DIFFERING = 2  # PG-08
 MAX_PLAN_BYTES = 64 * 1024  # BQ-107: the PRD and contracts set none; checked before any walk
+MAX_PLAN_DEPTH = 16  # BQ-107: containers nested in a plan; plan.schema.json needs 4
 
 
 @dataclass(frozen=True)
@@ -85,8 +86,24 @@ def _plan_validator() -> Any:
     return cls(_inlined(_contract("plan.schema.json"), "plan.schema.json"))
 
 
+def _too_deep(plan: Any) -> list[Violation]:
+    """Containers nested over MAX_PLAN_DEPTH, found without recursion before anything else walks the plan
+    (measuring its bytes costs bytes x depth). Every value takes at least a byte, so a plan with more values
+    than MAX_PLAN_BYTES is too big and the pass stops there."""
+    stack, seen = [(plan, 1)], 0
+    while stack:
+        node, depth = stack.pop()
+        if (seen := seen + 1) > MAX_PLAN_BYTES:
+            return [Violation(SCHEMA_RULE, f"/: the plan is larger than {MAX_PLAN_BYTES} bytes")]
+        if isinstance(node, dict | list):
+            if depth > MAX_PLAN_DEPTH:
+                return [Violation(SCHEMA_RULE, f"/: the plan is nested deeper than {MAX_PLAN_DEPTH} levels")]
+            stack.extend((child, depth + 1) for child in (node.values() if isinstance(node, dict) else node))
+    return []
+
+
 def _too_big(plan: Any) -> list[Violation]:
-    """A plan over MAX_PLAN_BYTES as compact UTF-8 JSON, measured before any walk and stopping at the cap."""
+    """A plan over MAX_PLAN_BYTES as compact UTF-8 JSON, measured (after `_too_deep`) stopping at the cap."""
     size = 0
     try:
         for chunk in json.JSONEncoder(ensure_ascii=False, separators=(",", ":")).iterencode(plan):
@@ -120,7 +137,7 @@ def _finite(number: int | float) -> bool:
 
 
 def _schema_violations(plan: Any) -> list[Violation]:
-    found = _too_big(plan)
+    found = _too_deep(plan) or _too_big(plan)
     if found:
         return found
     try:

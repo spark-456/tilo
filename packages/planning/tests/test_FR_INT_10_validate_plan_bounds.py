@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 from _plan_validator_lib import make_gate, make_plan, make_unit, rule_ids
 from tilo_planning import approaches, brief, plangraph
-from tilo_planning.plangraph import MAX_PLAN_BYTES, Violation, validate_plan
+from tilo_planning.plangraph import MAX_PLAN_BYTES, MAX_PLAN_DEPTH, Violation, validate_plan
 from tilo_providers import conformance, schema_guard
 from tilo_providers.schema_guard import MAX_ERRORS, MESSAGE_CHARS
 
@@ -81,6 +81,21 @@ def test_FR_INT_10_largest_valid_plan_under_the_byte_cap_passes_in_under_a_secon
     violations, elapsed = _timed(plan, registries)
     assert violations == []
     assert elapsed < LIMIT_S
+
+
+@pytest.mark.parametrize("depth", [100, 500, 990])
+@pytest.mark.parametrize("kind", ["list", "dict"])
+def test_FR_INT_10_deeply_nested_plan_under_the_byte_cap_is_schema_in_under_a_second(kind, depth, registries) -> None:
+    """Measuring bytes costs bytes x depth (#192 review): many small values under deep nesting, under 64 KiB."""
+    plan = make_plan([make_unit("U1")], [])
+    room = MAX_PLAN_BYTES - 16 - (_size(plan) - len('"Unit U1"')) - depth * (2 if kind == "list" else len('{"a":}'))
+    nested: Any = [0] * ((room - 1) // 2)  # "[0,0,...]" is 2n + 1 bytes
+    for _ in range(depth):
+        nested = [nested] if kind == "list" else {"a": nested}
+    plan["units"][0]["title"] = nested
+    violations, elapsed = _timed(plan, registries)
+    assert elapsed < LIMIT_S
+    assert violations == [Violation("schema", f"/: the plan is nested deeper than {MAX_PLAN_DEPTH} levels")]
 
 
 def test_FR_INT_10_a_long_bad_value_is_truncated_in_its_violation(registries) -> None:
