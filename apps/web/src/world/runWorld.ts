@@ -8,7 +8,8 @@ import type { Container } from "pixi.js";
 import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
 import { type Frame, frameOf } from "./frame";
 import { applyEvent, createInitialState } from "./reducer";
-import { createLayer, renderAgents, renderStatic } from "./renderer";
+import { createLayer, renderAgents, renderSelection, renderStatic } from "./renderer";
+import { getSelection, subscribeSelection } from "./selection";
 import { createWorldStore } from "./store";
 
 const MOVE_DURATION_MS = 600; // a plausible walk; HR-3 caps it at MAX_DURATION_MS regardless
@@ -33,6 +34,8 @@ export function runWorld(opts: RunWorldOptions): () => void {
   const { world, requestRender, layout, events, seqParam, speed, reducedMotion, onSeq, onTrace } =
     opts;
   const layer = createLayer(world);
+  // FR-WLD-06: the ring follows the run's one selection; choosing redraws one frame, nothing more.
+  const selected = () => getSelection(layout.world_id);
   const agentIds = layout.semantic.agents.map((a) => a.id);
 
   if (seqParam !== null) {
@@ -41,11 +44,16 @@ export function runWorld(opts: RunWorldOptions): () => void {
     const state = store.stateAt(seqParam);
     const frame = frameOf(layout, state);
     renderStatic(layer, frame);
-    renderAgents(layer, frame, new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }])));
+    const places = new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }]));
+    renderAgents(layer, frame, places);
+    const ring = () => {
+      renderSelection(layer, frame, places, selected());
+      requestRender();
+    };
+    ring();
     onSeq(state.seq);
     onTrace(state.trace);
-    requestRender();
-    return () => {};
+    return subscribeSelection(ring);
   }
 
   let state = createInitialState(layout); // live playback folds events in one at a time
@@ -96,6 +104,7 @@ export function runWorld(opts: RunWorldOptions): () => void {
       });
     }
     renderAgents(layer, lastFrame, display);
+    renderSelection(layer, lastFrame, display, selected());
     requestRender();
     return busy;
   }
@@ -160,8 +169,12 @@ export function runWorld(opts: RunWorldOptions): () => void {
   if (document.readyState === "complete") startPlayback();
   else window.addEventListener("load", startPlayback, { once: true });
 
+  const unselect = subscribeSelection(() => {
+    if (!stopped) drawAgents(performance.now()); // a ring redraw: a frame, not an animation
+  });
   return () => {
     stopped = true;
+    unselect();
     window.removeEventListener("load", startPlayback);
     if (timer) clearTimeout(timer);
     if (raf) cancelAnimationFrame(raf);
