@@ -9,7 +9,12 @@ import { App } from "./App";
 
 // Render once the UI faces load, so text never reflows (no layout shift).
 const root = createRoot(document.getElementById("root") as HTMLElement);
-const fonts = ["400 1em 'Nunito Sans'", "700 1em 'Nunito Sans'"].map((f) => document.fonts.load(f));
+const fonts = [
+  "900 1em 'Nunito'",
+  "400 1em 'Nunito Sans'",
+  "700 1em 'Nunito Sans'",
+  "500 1em 'JetBrains Mono'",
+].map((f) => document.fonts.load(f));
 Promise.all(fonts)
   .catch(() => undefined)
   .then(() =>

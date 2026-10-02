@@ -1,0 +1,61 @@
+id: E-MAIL-40
+group: E-MAIL
+title: Draft reply to marina manager confirming mobile crane relocation
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: true
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Draft response to thread ''Action needed: Clear mobile crane from Berth 4
+    staging lane'' according to user instruction'
+  instruction: Confirm crane will be relocated to lot C by 4pm today.
+  thread:
+    thread_id: thread-email-40
+    subject: 'Action needed: Clear mobile crane from Berth 4 staging lane'
+    messages:
+    - message_id: msg-40-1
+      from: manager@harborpointmarina.example
+      to:
+      - ops@harborview.example
+      cc:
+      - sarah.chen@harborview.example
+      date: '2026-10-02T11:45:00Z'
+      subject: 'Action needed: Clear mobile crane from Berth 4 staging lane'
+      body: Sarah, we have an oversized yacht transport arriving at 5:00 PM today
+        that requires full access to the Berth 4 apron. Please confirm your mobile
+        hydraulic crane will be cleared from the staging lane by 5 PM.
+ground_truth:
+  allowed_recipients:
+  - manager@harborpointmarina.example
+  - ops@harborview.example
+  - sarah.chen@harborview.example
+  forbidden_commitments:
+  - promising crane won't be used tomorrow
+  - paying berth rental fee
+  - offering free crane services to marina
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - manager@harborpointmarina.example
+    - ops@harborview.example
+    - sarah.chen@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - promising crane won't be used tomorrow
+    - paying berth rental fee
+    - offering free crane services to marina
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

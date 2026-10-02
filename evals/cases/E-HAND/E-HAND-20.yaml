@@ -1,0 +1,22 @@
+id: E-HAND-20
+group: E-HAND
+title: 'Context handoff: Harrier Logistics warehouse lease & insurance renewal pack'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Cross-reference 10 depot lease break clauses with renewed public liability schedules.
+  target_context_threshold_pct: 70
+  handoff_stage: after_depot_6_lease_abstract
+  sources:
+  - https://legal.harrier-logistics.example/depot-leases
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null

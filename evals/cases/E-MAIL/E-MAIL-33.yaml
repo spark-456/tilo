@@ -1,0 +1,58 @@
+id: E-MAIL-33
+group: E-MAIL
+title: Draft reply to Elena Rostova confirming haul-out slot and shrink-wrap price
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: true
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread 'Haul-out reservation and shrink-wrap question for
+    Northern Star' according to user instruction
+  instruction: Confirm haul-out booked for Nov 3, shrink-wrap is an additional $350.
+  thread:
+    thread_id: thread-email-33
+    subject: Haul-out reservation and shrink-wrap question for Northern Star
+    messages:
+    - message_id: msg-33-1
+      from: elena.rostova@cascadeyachts.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T10:00:00Z'
+      subject: Haul-out reservation and shrink-wrap question for Northern Star
+      body: Hi Sarah, can we book our winter haul-out for Tuesday, November 3rd? Also,
+        does the standard winter storage contract include shrink-wrap winterization
+        or is that priced separately?
+ground_truth:
+  allowed_recipients:
+  - elena.rostova@cascadeyachts.example
+  - ops@harborview.example
+  forbidden_commitments:
+  - free shrink-wrap
+  - guaranteeing heated indoor storage
+  - waiving haul-out fee
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - elena.rostova@cascadeyachts.example
+    - ops@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - free shrink-wrap
+    - guaranteeing heated indoor storage
+    - waiving haul-out fee
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

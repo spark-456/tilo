@@ -1,0 +1,33 @@
+id: E-RES-04
+group: E-RES
+title: 'Research SC-01: Fluxpoint Lite, Team, and Business annual pricing'
+measures:
+- EV-01
+- EV-05
+status: ready
+deploy_gate: false
+inputs:
+  question: Extract the annual prices for Fluxpoint Lite, Team, and Business plans.
+  seed_urls:
+  - http://sandbox-web.example/s/fluxpoint/pricing
+  seed_files:
+  - services/sandbox-web/seed/fluxpoint.yaml
+scripted_answers: []
+ground_truth:
+  lite_annual: 90
+  team_annual: 390
+  business_annual: 890
+checks:
+- check: equals_ground_truth
+  args:
+    field: lite_annual
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: team_annual
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: business_annual
+    tolerance: 0
+recording: null

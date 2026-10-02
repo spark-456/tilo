@@ -1,0 +1,37 @@
+id: E-RES-05
+group: E-RES
+title: 'Research SC-01: Cross-vendor middle-tier monthly pricing comparison'
+measures:
+- EV-01
+- EV-05
+status: ready
+deploy_gate: false
+inputs:
+  question: What are the current monthly prices for Ledgerly Growth, Beacontrack Pro, and Fluxpoint Team?
+  seed_urls:
+  - http://sandbox-web.example/s/ledgerly/pricing
+  - http://sandbox-web.example/s/beacontrack/pricing
+  - http://sandbox-web.example/s/fluxpoint/pricing
+  seed_files:
+  - services/sandbox-web/seed/ledgerly.yaml
+  - services/sandbox-web/seed/beacontrack.yaml
+  - services/sandbox-web/seed/fluxpoint.yaml
+scripted_answers: []
+ground_truth:
+  ledgerly_growth_monthly: 49
+  beacontrack_pro_monthly: 45
+  fluxpoint_team_monthly: 39
+checks:
+- check: equals_ground_truth
+  args:
+    field: ledgerly_growth_monthly
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: beacontrack_pro_monthly
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: fluxpoint_team_monthly
+    tolerance: 0
+recording: null

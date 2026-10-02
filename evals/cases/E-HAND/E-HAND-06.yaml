@@ -1,0 +1,22 @@
+id: E-HAND-06
+group: E-HAND
+title: 'Context handoff: Bramble Foods 40-SKU allergen and nutrition matrix audit'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Cross-check supplier allergen certificates against 40 SKU label proofs for Bramble Foods.
+  target_context_threshold_pct: 70
+  handoff_stage: after_sku_25_certificate_check
+  sources:
+  - https://qa.bramble-foods.example/allergen-matrix
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null

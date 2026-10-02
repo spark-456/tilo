@@ -1,0 +1,22 @@
+id: E-HAND-18
+group: E-HAND
+title: 'Context handoff: Plover Cold Storage ammonia chiller temperature excursion audit'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Inspect 15-minute compressor and cold-room logs across 8 chambers for excursion events.
+  target_context_threshold_pct: 70
+  handoff_stage: after_chamber_5_log_scan
+  sources:
+  - https://safety.plover-storage.example/chiller-logs
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null

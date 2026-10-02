@@ -1,0 +1,24 @@
+id: E-HAND-02
+group: E-HAND
+title: 'Context handoff: six-vendor SaaS pricing & changelog synthesis'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: true
+inputs:
+  task: Compare current and archived pricing plus 18-month changelogs across Ledgerly, Beacontrack, and
+    Fluxpoint.
+  target_context_threshold_pct: 70
+  handoff_stage: after_vendor_2_changelog_compaction
+  sources:
+  - http://sandbox-web.example/s/ledgerly/pricing
+  - http://sandbox-web.example/s/beacontrack/pricing
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null
