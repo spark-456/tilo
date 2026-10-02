@@ -27,10 +27,7 @@ from tilo_render.spec import (
 
 def _find_repo_root() -> Path:
     cur = Path(__file__).resolve()
-    for parent in [cur] + list(cur.parents):
-        if (parent / "design" / "tokens.json").exists():
-            return parent
-    return Path.cwd()
+    return next((p for p in [cur, *cur.parents] if (p / "design" / "tokens.json").exists()), Path.cwd())
 
 
 def _resolve_color(role: str, tokens: dict[str, Any]) -> RGBColor:
@@ -42,9 +39,33 @@ def _resolve_color(role: str, tokens: dict[str, Any]) -> RGBColor:
 
 
 def sanitize_text(text: str) -> str:
+    norm = text.replace("\r\n", "\n").replace("\r", "\n")
     return "".join(
-        ch for ch in text if ch in "\t\n\r" or (ord(ch) >= 32 and ord(ch) != 127 and not (0x80 <= ord(ch) <= 0x9F))
+        c
+        for c in norm
+        if c in "\t\n"
+        or (
+            32 <= ord(c) != 127
+            and not (0x80 <= ord(c) <= 0x9F)
+            and not (0xD800 <= ord(c) <= 0xDFFF)
+            and ord(c) not in (0xFFFE, 0xFFFF)
+        )
     )
+
+
+def _chunk_text(text: str, max_chars: int = 1000) -> list[str]:
+    if len(text) <= max_chars:
+        return [text] if text else [""]
+    chunks: list[str] = []
+    while text:
+        if len(text) <= max_chars:
+            chunks.append(text)
+            break
+        sp = text.rfind(" ", 0, max_chars)
+        idx = max_chars if sp <= 0 else sp + 1
+        chunks.append(text[:idx])
+        text = text[idx:]
+    return chunks or [""]
 
 
 def _slide(
@@ -55,7 +76,6 @@ def _slide(
     slide.background.fill.fore_color.rgb = bg
     if heading and h_col:
         tb = slide.shapes.add_textbox(Inches(1.0), Inches(0.8), Inches(11.3), Inches(1.0))
-        tb.text_frame.word_wrap = True
         p = tb.text_frame.paragraphs[0]
         p.text, p.font.size, p.font.bold, p.font.color.rgb = sanitize_text(heading), Pt(h_pt), True, h_col
     return slide
@@ -70,7 +90,6 @@ def _body_tf(slide: Any) -> Any:
 def _add_title_slide(prs: Any, spec: DeliverableSpec, col: dict[str, RGBColor], typ: dict[str, float]) -> None:
     slide = _slide(prs, col["title_background"])
     tf = slide.shapes.add_textbox(Inches(1.5), Inches(2.0), Inches(10.3), Inches(3.5)).text_frame
-    tf.word_wrap = True
     p0 = tf.paragraphs[0]
     p0.text, p0.font.size, p0.font.bold, p0.font.color.rgb = (
         sanitize_text(spec.title),
@@ -89,26 +108,21 @@ def _add_title_slide(prs: Any, spec: DeliverableSpec, col: dict[str, RGBColor], 
     p2.text, p2.font.size, p2.font.color.rgb = sanitize_text(spec.date), Pt(14), col["title_subtext"]
 
 
-def _add_para_slide(
-    prs: Any, heading: str, block: ParagraphBlock, col: dict[str, RGBColor], typ: dict[str, float]
-) -> None:
-    slide = _slide(prs, col["slide_background"], heading, col["slide_header"], typ["slide_title_size_pt"])
-    p = _body_tf(slide).paragraphs[0]
-    p.text, p.font.size, p.font.color.rgb = sanitize_text(block.text), Pt(typ["body_size_pt"]), col["slide_text"]
+def _add_para_slide(prs: Any, heading: str, text: str, col: dict[str, RGBColor], typ: dict[str, float]) -> None:
+    p = _body_tf(
+        _slide(prs, col["slide_background"], heading, col["slide_header"], typ["slide_title_size_pt"])
+    ).paragraphs[0]
+    p.text, p.font.size, p.font.color.rgb = sanitize_text(text), Pt(typ["body_size_pt"]), col["slide_text"]
 
 
 def _add_bullets_slide(
-    prs: Any, heading: str, block: BulletsBlock, col: dict[str, RGBColor], typ: dict[str, float]
+    prs: Any, heading: str, bullets: list[str], col: dict[str, RGBColor], typ: dict[str, float]
 ) -> None:
-    slide = _slide(prs, col["slide_background"], heading, col["slide_header"], typ["slide_title_size_pt"])
-    tf = _body_tf(slide)
-    for idx, item in enumerate(block.bullets):
+    tf = _body_tf(_slide(prs, col["slide_background"], heading, col["slide_header"], typ["slide_title_size_pt"]))
+    for idx, item in enumerate(bullets):
         p = tf.paragraphs[0] if idx == 0 else tf.add_paragraph()
-        p.text, p.font.size, p.font.color.rgb = (
-            f"•  {sanitize_text(item)}",
-            Pt(typ["bullet_size_pt"]),
-            col["slide_text"],
-        )
+        p.text = f"•  {sanitize_text(item)}"
+        p.font.size, p.font.color.rgb = Pt(typ["bullet_size_pt"]), col["slide_text"]
 
 
 def _add_table_slide(
@@ -148,9 +162,14 @@ def _add_chart_slide(
     slide = _slide(prs, col["slide_background"], heading, col["slide_header"], typ["slide_title_size_pt"])
     cdata = CategoryChartData()
     cd = ChartData.from_spec(spec, chart_def.id)
-    cdata.categories = [sanitize_text(c) for c in cd.categories]
+    cdata.categories = [sanitize_text(str(c)) for c in cd.categories]
+    seen_names: set[str] = set()
     for s_name, s_vals in cd.series.items():
-        cdata.add_series(sanitize_text(s_name), tuple(s_vals))
+        name = sanitize_text(str(s_name))
+        while name in seen_names:
+            name = f"{name}_"
+        seen_names.add(name)
+        cdata.add_series(name, tuple(s_vals))
     kinds = {
         ChartKind.BAR: XL_CHART_TYPE.COLUMN_CLUSTERED,
         ChartKind.LINE: XL_CHART_TYPE.LINE,
@@ -162,8 +181,8 @@ def _add_chart_slide(
     chart.has_title = True
     chart.chart_title.text_frame.text = sanitize_text(chart_def.title)
     if chart.chart_title.text_frame.paragraphs:
-        p = chart.chart_title.text_frame.paragraphs[0]
-        p.font.size, p.font.color.rgb = Pt(typ["chart_title_size_pt"]), col["slide_header"]
+        chart.chart_title.text_frame.paragraphs[0].font.size = Pt(typ["chart_title_size_pt"])
+        chart.chart_title.text_frame.paragraphs[0].font.color.rgb = col["slide_header"]
 
 
 def render_pptx(
@@ -183,34 +202,36 @@ def render_pptx(
     colors = {k: _resolve_color(v, tokens) for k, v in tmpl.get("colors", {}).items()}
     typo = {k: float(v) for k, v in tmpl.get("typography", {}).items()}
     rows_per_slide = int(tmpl.get("table", {}).get("rows_per_slide", 10))
+    bullets_per_slide = int(tmpl.get("bullets", {}).get("items_per_slide", 8))
+    chars_per_slide = int(tmpl.get("paragraph", {}).get("chars_per_slide", 1000))
 
     prs = pptx.Presentation()
-    slide_size = tmpl.get("slide_size", {})
-    prs.slide_width = Inches(float(slide_size.get("width_in", 13.333)))
-    prs.slide_height = Inches(float(slide_size.get("height_in", 7.5)))
+    prs.core_properties.title, prs.core_properties.author = sanitize_text(spec.title), "Tilo"
+    size = tmpl.get("slide_size", {})
+    prs.slide_width, prs.slide_height = (
+        Inches(float(size.get("width_in", 13.333))),
+        Inches(float(size.get("height_in", 7.5))),
+    )
 
     _add_title_slide(prs, spec, colors, typo)
 
-    for section in spec.sections:
-        _slide(
-            prs,
-            colors["section_background"],
-            section.heading,
-            colors["section_title"],
-            typo["section_title_size_pt"],
-        )
-        for block in section.blocks:
-            if isinstance(block, ParagraphBlock):
-                _add_para_slide(prs, section.heading, block, colors, typo)
-            elif isinstance(block, BulletsBlock):
-                _add_bullets_slide(prs, section.heading, block, colors, typo)
-            elif isinstance(block, TableBlock):
-                t = next(tbl for tbl in spec.tables if tbl.id == block.table_id)
-                for i in range(0, len(t.rows), rows_per_slide):
-                    _add_table_slide(prs, section.heading, t, t.rows[i : i + rows_per_slide], colors, typo)
-            elif isinstance(block, ChartBlock):
-                c = next(ch for ch in spec.charts if ch.id == block.chart_id)
-                _add_chart_slide(prs, spec, section.heading, c, colors, typo)
+    for sec in spec.sections:
+        _slide(prs, colors["section_background"], sec.heading, colors["section_title"], typo["section_title_size_pt"])
+        for b in sec.blocks:
+            if isinstance(b, ParagraphBlock):
+                for chunk in _chunk_text(b.text, max_chars=chars_per_slide):
+                    _add_para_slide(prs, sec.heading, chunk, colors, typo)
+            elif isinstance(b, BulletsBlock):
+                items = b.bullets or [""]
+                for i in range(0, len(items), bullets_per_slide):
+                    _add_bullets_slide(prs, sec.heading, items[i : i + bullets_per_slide], colors, typo)
+            elif isinstance(b, TableBlock):
+                t = next(tbl for tbl in spec.tables if tbl.id == b.table_id)
+                for i in range(0, max(1, len(t.rows)), rows_per_slide):
+                    _add_table_slide(prs, sec.heading, t, t.rows[i : i + rows_per_slide], colors, typo)
+            elif isinstance(b, ChartBlock):
+                c = next(ch for ch in spec.charts if ch.id == b.chart_id)
+                _add_chart_slide(prs, spec, sec.heading, c, colors, typo)
 
     buf = io.BytesIO()
     prs.save(buf)
