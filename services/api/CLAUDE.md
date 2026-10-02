@@ -37,3 +37,9 @@ from Firestore directly under security rules.
   `POST .../cards/{card_id}/answer`. Identity is the verified `deps.Principal` only; `channel` and
   `pin_verified` count only from an authenticated tilo-channels caller (`get_channels_caller`). Viewer 403;
   scope per PRD 10.1. Shapes and defaults: `services/api/tests/API_ST3b.md` (Round 2), BQ-69 to BQ-73.
+- Run (CL-INT-2, `tilo_api.runs`): approve starts the task's one run on its own thread: the compiled plan must pass
+  `validate_plan`, then the harness executor runs it through the run seams in `tilo_api.deps`; a send stops at a gate
+  card in the world's `CardStore` (`GET/POST /worlds/{id}/cards...`) and reaches the outbox only after the owner
+  approves. Every event goes through `deps.get_event_writer`; a paused world gets nothing more.
+  `GET /worlds/{id}/delivery` is the owner's `DeliveryResult` (409 until `world.completed`). Shapes:
+  `services/api/tests/API_CL_INT_2.md`; defaults: BQ-90.

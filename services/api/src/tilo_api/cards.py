@@ -20,6 +20,7 @@ import hashlib
 import json
 import re
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -448,11 +449,21 @@ def get_channels_caller() -> bool:
     return False
 
 
-def build_router(store: CardStore) -> APIRouter:
+def build_router(
+    cards: CardStore | Callable[..., CardStore], *, answer_guard: Callable[..., None] | None = None
+) -> APIRouter:
+    """`cards` is one CardStore, or a dependency that finds the world's own; `answer_guard` (a dependency) may
+    refuse an answer before the store sees it."""
     router = APIRouter()
+    get_cards = cards if not isinstance(cards, CardStore) else (lambda: cards)
+    guards = [Depends(answer_guard)] if answer_guard is not None else []
 
     @router.get("/worlds/{world_id}/cards")
-    def list_cards(world_id: str, principal: Principal = Depends(get_current_principal)) -> list[dict]:
+    def list_cards(
+        world_id: str,
+        principal: Principal = Depends(get_current_principal),
+        store: CardStore = Depends(get_cards),
+    ) -> list[dict]:
         if principal.world_id != world_id:
             raise HTTPException(status_code=404)  # same as an unknown world
         try:
@@ -460,13 +471,14 @@ def build_router(store: CardStore) -> APIRouter:
         except PermissionError as exc:
             raise HTTPException(status_code=403) from exc
 
-    @router.post("/worlds/{world_id}/cards/{card_id}/answer")
+    @router.post("/worlds/{world_id}/cards/{card_id}/answer", dependencies=guards)
     def answer_card(
         world_id: str,
         card_id: str,
         body: _AnswerBody,
         principal: Principal = Depends(get_current_principal),
         from_channels: bool = Depends(get_channels_caller),
+        store: CardStore = Depends(get_cards),
     ) -> JSONResponse:
         if principal.world_id != world_id:
             raise HTTPException(status_code=404)

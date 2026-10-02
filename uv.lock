@@ -1289,7 +1289,10 @@ dependencies = [
     { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "referencing" },
+    { name = "tilo-connectors" },
+    { name = "tilo-harness" },
     { name = "tilo-planning" },
+    { name = "tilo-policy" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1300,7 +1303,10 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.18" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-connectors", editable = "services/connectors" },
+    { name = "tilo-harness", editable = "services/harness" },
     { name = "tilo-planning", editable = "packages/planning" },
+    { name = "tilo-policy", editable = "packages/policy" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
