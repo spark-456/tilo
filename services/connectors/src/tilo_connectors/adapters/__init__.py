@@ -14,6 +14,11 @@ from ._transport import RateLimited as RateLimited
 from ._transport import SideEffectRefused as SideEffectRefused
 from ._transport import Transport as Transport
 from ._transport import TransportError as TransportError
+from .drive import DRIVE_API as DRIVE_API
+from .drive import DRIVE_UPLOAD_API as DRIVE_UPLOAD_API
+from .drive import MAX_DOWNLOAD_BYTES as MAX_DOWNLOAD_BYTES
+from .drive import DriveAdapter as DriveAdapter
+from .drive import InMemoryPicks as InMemoryPicks
 from .gmail import BLOCKED_ATTACHMENT_EXTENSIONS as BLOCKED_ATTACHMENT_EXTENSIONS
 from .gmail import GMAIL_API as GMAIL_API
 from .gmail import MAX_ATTACHMENT_BYTES as MAX_ATTACHMENT_BYTES

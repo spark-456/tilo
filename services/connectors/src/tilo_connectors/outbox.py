@@ -12,7 +12,7 @@ import tilo_policy
 
 from ._schema import outbox_validator
 from ._time import add_seconds
-from .errors import MissingGrant, OutboxRefused
+from .errors import MissingGrant, OutboxRefused, SideEffectRefused
 from .store import InMemoryOutboxStore
 
 _ALWAYS_DUE_STATES = ("queued", "sending")  # "scheduled" also once scheduled_at <= now
@@ -119,14 +119,20 @@ class Outbox:
             return self._store._finalize_claim(outbox_id, holder, "failed")
         grant = Grant(world_id=claimed["world_id"], idempotency_key=claimed["idempotency_key"])
         _LIVE_GRANTS.add(id(grant))
+        execute = getattr(adapter, "execute_side_effect", None)  # FR-CON-04/05 adapters; else send_reply
         try:  # copies: a mutating adapter never touches what _transfer_event reads back below
-            adapter.send_reply(
-                claimed["destination"],
-                deepcopy(claimed["item"]),
-                deepcopy(claimed["recipients"]),
-                claimed["idempotency_key"],
-                grant,
-            )
+            if execute is not None:
+                execute(deepcopy(claimed), grant)
+            else:
+                adapter.send_reply(
+                    claimed["destination"],
+                    deepcopy(claimed["item"]),
+                    deepcopy(claimed["recipients"]),
+                    claimed["idempotency_key"],
+                    grant,
+                )
+        except SideEffectRefused:  # final: it can never succeed as written; nothing is emitted
+            return self._store._finalize_claim(outbox_id, holder, "failed")
         except BaseException as exc:  # ambiguous: release the lease; swallow only a plain Exception
             self._store._release_lease("send", outbox_id, holder)
             if isinstance(exc, Exception):
