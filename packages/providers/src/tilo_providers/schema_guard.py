@@ -1,92 +1,117 @@
-"""tilo_providers.schema_guard -- a linear pre-check run before jsonschema (issue #124).
+"""tilo_providers.schema_guard -- a linear `uniqueItems` for the jsonschema validators Tilo runs (#124, #173).
 
-jsonschema's `uniqueItems` sorts the items and, when they are unsortable (dicts, lists, mixed types),
-falls back to comparing every pair: 100 gates x 200 dicts took 29 s. For an array the schema declares
-`uniqueItems` with a scalar item `type`, an item of another type can only fail validation, so
-`unique_items_violations` finds it in one pass and the caller reports it as a schema error without
-calling `iter_errors`/`validate`. Arrays whose items are containers or untyped are not covered here
-(their own maxItems caps are the bound). Only `$ref`, `allOf`, `properties`, `additionalProperties`
-and `items` are followed; `anyOf`/`oneOf`/`if` are skipped since a branch that does not apply could
-wrongly reject a valid instance."""
+jsonschema's `uniqueItems` compares every pair of unsortable items (3000 dicts took 39.5 s). `unique_items`
+hashes a canonical form of each item (1 == 1.0, True != 1), so the keyword is linear wherever jsonschema meets
+it: anyOf/oneOf/if, `$ref`, recursion, any item type. `guarded(cls)` adds it and `anyOf`/`oneOf` that keep
+at most MAX_ERRORS errors per branch. A subschema's `$schema` swaps in a stock class, so `validator` drops
+the root's (no other is allowed, tested). Callers read MAX_ERRORS errors; messages are capped (`short`)."""
 
 from __future__ import annotations
 
+import functools
+import itertools
+import json
+import numbers
+import reprlib
+from collections.abc import Iterator
 from typing import Any
 
-from referencing import Registry, Resource
-from referencing.jsonschema import DRAFT202012
+import jsonschema
+from jsonschema.exceptions import ValidationError, best_match
 
-_SCALAR = {
-    "string": lambda v: isinstance(v, str),
-    "integer": lambda v: (isinstance(v, int) and not isinstance(v, bool)) or (isinstance(v, float) and v.is_integer()),
-    "number": lambda v: isinstance(v, int | float) and not isinstance(v, bool),
-    "boolean": lambda v: isinstance(v, bool),
-    "null": lambda v: v is None,
-}
-_MAX_DEPTH = 200  # instance nesting plus $ref hops; past it the rest is left to jsonschema
+MAX_ERRORS = 50  # errors read from one validation; the rest are not computed
+MESSAGE_CHARS = 300  # longest error message kept: its head and tail, joined by " ... "
 
 
-def unique_items_violations(
-    instance: Any, schema: dict[str, Any], *, registry: Registry | None = None
-) -> list[tuple[str, str]]:
-    """(JSON pointer, message) for the first item of each `uniqueItems` array whose type is not the
-    scalar type its schema declares. `registry` resolves `$ref`s into other schema documents."""
-    try:
-        resource = Resource.from_contents(schema, default_specification=DRAFT202012)
-        uri = schema.get("$id", "urn:tilo:schema-guard")
-        registry = (registry or Registry()).with_resource(uri, resource)
-    except Exception:  # an unknown dialect or a bad $id: jsonschema reports it
-        return []
-    found: list[tuple[str, str]] = []
-    _walk(instance, schema, registry.resolver(base_uri=uri), "", 0, found)
-    return found
+def _canonical(value: Any) -> Any:
+    """A hashable form equal for JSON-equal values: numbers by value, booleans apart from numbers."""
+    if isinstance(value, bool):
+        return ("b", value)
+    if isinstance(value, numbers.Number):  # by value: 1 == 1.0 == Decimal("1.0")
+        return ("n", value)
+    if isinstance(value, str):
+        return ("s", value)
+    if isinstance(value, list):
+        return ("a", tuple(map(_canonical, value)))
+    if isinstance(value, dict):
+        return ("o", frozenset((key, _canonical(item)) for key, item in value.items()))
+    return ("z", repr(value))
 
 
-def _lookup(ref: str, resolver: Any) -> tuple[Any, Any] | None:
-    try:
-        resolved = resolver.lookup(ref)
-    except Exception:  # unresolvable: jsonschema reports it
-        return None
-    return resolved.contents, resolved.resolver
-
-
-def _scalar_type(items: Any, resolver: Any) -> str | None:
-    for _ in range(10):
-        if not isinstance(items, dict):
-            return None
-        if isinstance(items.get("type"), str):
-            return items["type"] if items["type"] in _SCALAR else None
-        if "$ref" not in items or (target := _lookup(items["$ref"], resolver)) is None:
-            return None
-        items, resolver = target
-    return None
-
-
-def _walk(node: Any, schema: Any, resolver: Any, path: str, depth: int, found: list[tuple[str, str]]) -> None:
-    if depth > _MAX_DEPTH or not isinstance(schema, dict) or not isinstance(node, list | dict):
+def unique_items(validator: Any, unique: Any, instance: Any, schema: dict[str, Any]) -> Iterator[ValidationError]:
+    if not unique or not validator.is_type(instance, "array"):
         return
-    if "$ref" in schema and (target := _lookup(schema["$ref"], resolver)) is not None:
-        _walk(node, target[0], target[1], path, depth + 1, found)
-    for sub in schema.get("allOf") or ():
-        _walk(node, sub, resolver, path, depth + 1, found)
-    if isinstance(node, list):
-        _walk_array(node, schema, resolver, path, depth, found)
-    else:
-        props = schema.get("properties") or {}
-        extra = schema.get("additionalProperties")
-        for key, value in node.items():
-            sub = props.get(key, extra)
-            if isinstance(sub, dict):
-                _walk(value, sub, resolver, f"{path}/{key}", depth + 1, found)
+    seen: dict[Any, int] = {}
+    for index, item in enumerate(instance):
+        first = seen.setdefault(_canonical(item), index)
+        if first != index:
+            yield ValidationError(f"has non-unique elements (item {index} repeats item {first})")
+            return
 
 
-def _walk_array(node: list[Any], schema: dict[str, Any], resolver: Any, path: str, depth: int, found: list) -> None:
-    items = schema.get("items")
-    if schema.get("uniqueItems") is True and (kind := _scalar_type(items, resolver)) is not None:
-        for i, item in enumerate(node):
-            if not _SCALAR[kind](item):
-                found.append((f"{path}/{i}", f"item is not of type '{kind}'"))
-                return
-    if isinstance(items, dict):
-        for i, item in enumerate(node):
-            _walk(item, items, resolver, f"{path}/{i}", depth + 1, found)
+def any_of(validator: Any, branches: list[Any], instance: Any, schema: dict[str, Any]) -> Iterator[ValidationError]:
+    """jsonschema's `anyOf`, keeping at most MAX_ERRORS errors per branch (it kept every one)."""
+    found: list[ValidationError] = []
+    for index, subschema in enumerate(branches):
+        errors = list(itertools.islice(validator.descend(instance, subschema, schema_path=index), MAX_ERRORS))
+        if not errors:
+            return
+        found += errors
+    yield ValidationError(f"{reprlib.repr(instance)} is not valid under any of the given schemas", context=found)
+
+
+def one_of(validator: Any, branches: list[Any], instance: Any, schema: dict[str, Any]) -> Iterator[ValidationError]:
+    """jsonschema's `oneOf`, keeping at most MAX_ERRORS errors per branch."""
+    found: list[ValidationError] = []
+    valid: list[Any] = []
+    for index, subschema in enumerate(branches):
+        if valid:
+            if validator.evolve(schema=subschema).is_valid(instance):
+                valid.append(subschema)
+        elif errors := list(itertools.islice(validator.descend(instance, subschema, schema_path=index), MAX_ERRORS)):
+            found += errors
+        else:
+            valid.append(subschema)
+    if not valid:
+        yield ValidationError(f"{reprlib.repr(instance)} is not valid under any of the given schemas", context=found)
+    elif len(valid) > 1:
+        yield ValidationError(f"{reprlib.repr(instance)} is valid under {len(valid)} of the given schemas")
+
+
+@functools.cache
+def guarded(cls: Any) -> Any:
+    """`cls` with the linear `uniqueItems` and the bounded `anyOf` and `oneOf`."""
+    return jsonschema.validators.extend(cls, {"uniqueItems": unique_items, "anyOf": any_of, "oneOf": one_of})
+
+
+def validator(schema: dict[str, Any]) -> Any:
+    """A guarded validator for `schema` (its own `$schema` dialect), the schema checked once per content."""
+    return _validator(json.dumps(schema, sort_keys=True))
+
+
+@functools.lru_cache(maxsize=128)
+def _validator(key: str) -> Any:
+    schema = json.loads(key)
+    cls = guarded(jsonschema.validators.validator_for(schema))
+    cls.check_schema(schema)
+    return cls({key: value for key, value in schema.items() if key != "$schema"})
+
+
+def short(message: str) -> str:
+    if len(message) <= MESSAGE_CHARS:
+        return message
+    half = (MESSAGE_CHARS - 5) // 2
+    return f"{message[:half]} ... {message[-half:]}"
+
+
+def describe(error: ValidationError) -> str:  # "/json/pointer: message", capped
+    return short(f"/{'/'.join(map(str, error.absolute_path))}: {error.message}")
+
+
+def first_error(instance: Any, schema: dict[str, Any]) -> str | None:
+    """The first of the shallowest of the first `MAX_ERRORS` errors of `instance` against `schema`,
+    taken down into its anyOf/oneOf branches as jsonschema's `best_match` does, described."""
+    errors = list(itertools.islice(validator(schema).iter_errors(instance), MAX_ERRORS))
+    if not errors:
+        return None
+    return describe(best_match([min(errors, key=lambda error: len(error.path))]))

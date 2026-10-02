@@ -5,7 +5,9 @@ an L3 "run" starts the work without the person: `budget.granted` then carries th
 the audit record naming the policy (BQ-23). A budget grant has no gate and no outbox entry, so no
 `policy.applied` is built (OB-01). The policy's daily limits are counted here from the owner's earlier
 policy-authorised grants. Every other outcome, including an engine error, a malformed earlier grant or a
-risk table without `grant_budget`, waits for the person (fail closed)."""
+risk table without `grant_budget`, waits for the person (fail closed). A grant is the world's first budget, so
+`granted` always equals `cap`; a top-up on an existing cap is refused until Treasury applies the MT-03
+ceiling (BQ-100, issue #51)."""
 
 from __future__ import annotations
 
@@ -23,10 +25,21 @@ from tilo_planning.events import build_event
 BUDGET_GRANT_ACTION_TYPE = "grant_budget"
 
 
+class TopUpNotSupported(ValueError):
+    """A grant named an existing cap; only a world's first grant is built (BQ-100)."""
+
+
 @dataclass(frozen=True)
 class BudgetOutcome:
     decision: tilo_policy.Decision
     granted_event: dict[str, Any] | None  # budget.granted at `seq`, only when a policy ran it
+
+
+def _first_grant(existing_cap: float) -> None:
+    """BQ-100: `budget.granted` records `granted == cap`, true only for a world's first grant. A top-up would
+    set the cap to the increment, so any existing cap (or a value that is not a number) is refused."""
+    if existing_cap != 0:  # NaN is unequal to 0, so it is refused too
+        raise TopUpNotSupported("BQ-100: a top-up on an existing budget cap waits for the Treasury ticket (#51)")
 
 
 def _positive(cap: float) -> float:
@@ -64,7 +77,7 @@ def _over_limit(policy: dict[str, Any], earlier_grants: list[dict[str, Any]], ca
     spent = [float(g["data"]["granted"]) for g in mine] + [float(cap)]
     if not all(math.isfinite(c) and c >= 0 for c in spent):
         raise ValueError("credits must be finite and non-negative")
-    if most_credits is not None and math.fsum(spent) > most_credits:
+    if most_credits is None or math.fsum(spent) > most_credits:  # no credit bound covers no cap (#106)
         return "l3_credits_cap_reached"
     return None
 
@@ -81,10 +94,12 @@ def request_budget_grant(
     seq: int,
     connector: str,
     district: str,
+    existing_cap: float = 0.0,
 ) -> BudgetOutcome:
     """`table` is the risk-tier table to decide with; production passes one that lists `grant_budget` or
     every grant waits for the person. `earlier_grants` is the owner's `budget.granted` events in every world
     (their daily limits). No `policy.applied` exists for a grant, so the engine is given none."""
+    _first_grant(existing_cap)
     proposal = tilo_policy.Proposal(
         world_id=base["world_id"], action_type=BUDGET_GRANT_ACTION_TYPE, connector=connector, district=district,
         destination=None, facts=tilo_policy.SideEffectFacts(), item=None, credits=_positive(cap), instruction=None,
@@ -107,11 +122,12 @@ def request_budget_grant(
 
 
 def grant_budget_by_person(
-    cap: float, *, world_owner: str, user: str, now: str, base: dict[str, Any], seq: int
+    cap: float, *, world_owner: str, user: str, now: str, base: dict[str, Any], seq: int, existing_cap: float = 0.0
 ) -> dict[str, Any]:
     """The world's owner confirms the cap (FR-INT-08); only the Owner sets budgets (PRD 10.1), so an
     Approver, a Viewer or anyone else is refused. `budget.granted` carries the owner's authz."""
     if not world_owner or user != world_owner:
         raise PermissionError("PRD 10.1: only the world's owner sets budgets")
+    _first_grant(existing_cap)
     authz = {"by": "person", "ref": user, "at": now}
     return _granted(_positive(cap), authz, user, base, seq, "by you")

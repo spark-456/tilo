@@ -17,14 +17,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 from tilo_planning.artifacts import InMemoryArtifactStore
-from tilo_planning.brief import BriefExtractionError
+from tilo_planning.brief import BriefExtractionError, extract_brief
 from tilo_planning.intake import (
     MAX_FILES,
     MAX_TOTAL_BYTES,
     IntakeFile,
     IntakeRejected,
     IntakeRequest,
-    IntakeResult,
     screen_task_text,
     submit_intake,
 )
@@ -45,11 +44,6 @@ _store = InMemoryArtifactStore()
 
 def get_store() -> InMemoryArtifactStore:
     return _store
-
-
-def _screen_and_store(request: IntakeRequest, safety: SafetyProvider, store: InMemoryArtifactStore) -> IntakeResult:
-    screen_task_text(request, safety=safety)
-    return submit_intake(request, safety=safety, store=store)
 
 
 @router.post("/intake", status_code=201)
@@ -74,17 +68,22 @@ async def intake(
     request = IntakeRequest(text=text, files=uploads, user_id=principal.user_id)
     try:
         # CPU-bound extraction and blocking screen and model calls stay off the event loop.
-        result = await run_in_threadpool(_screen_and_store, request, safety, store)
+        await run_in_threadpool(screen_task_text, request, safety=safety)
+        # The Director reads only the screened text, and runs before anything is stored: a failure leaves no
+        # artifacts without a task (BQ-99).
+        try:
+            extraction = await run_in_threadpool(extract_brief, text, router=model_router)
+        except BriefExtractionError as exc:
+            # A category only: the error text can quote the model's output.
+            logger.warning("brief extraction failed: %s", type(exc.__cause__ or exc).__name__)
+            raise HTTPException(status_code=502, detail="The Director could not draft a brief.") from exc
+        result = await run_in_threadpool(submit_intake, request, safety=safety, store=store)
     except IntakeRejected as exc:
         return _rejected(exc.reason)
     except (ProviderError, ReplayMissError) as exc:
-        logger.warning("safety screen failed: %s", exc)
+        logger.warning("safety screen failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing was stored.") from exc
-    try:
-        task_id, task = await run_in_threadpool(create_task, tasks, result, text, model_router)
-    except BriefExtractionError as exc:
-        logger.warning("brief extraction failed: %s", exc)
-        raise HTTPException(status_code=502, detail="The Director could not draft a brief.") from exc
+    task_id, task = create_task(tasks, result, extraction)
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [

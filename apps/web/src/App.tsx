@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef } from "react";
 import { useIsFixtureClient, useReplaySpeed } from "./api/ClientProvider";
 import { useMediaQuery } from "./hooks/useMediaQuery";
+import { NeedsYouRail } from "./needs-you/NeedsYouRail";
 import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
 import { PrimaryNav } from "./screens/PrimaryNav";
@@ -19,6 +20,8 @@ const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
 const WORLD_SCREENS: ReadonlySet<string> = new Set(["S-05", "S-10", "S-11", "S-12"]);
 /** Screens outside a world address that still read the replayed run (AGW-08 group B): HR-6 applies. */
 const RUN_SCREENS: ReadonlySet<string> = new Set([
+  "S-06",
+  "S-07",
   "S-13",
   "S-14",
   "S-15",
@@ -125,8 +128,14 @@ export function App() {
             <>
               <h2>Activity</h2>
               <p data-testid="right-rail-meter">Nothing yet. This fills in once a run starts.</p>
-              <h2>Needs you</h2>
-              <p>Nothing needs you.</p>
+              {screen && RUN_SCREENS.has(screen.id) ? (
+                <NeedsYouRail />
+              ) : (
+                <>
+                  <h2>Needs you</h2>
+                  <p>Nothing needs you.</p>
+                </>
+              )}
               <h2>Roster</h2>
               <p>No agents assigned.</p>
             </>
