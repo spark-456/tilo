@@ -21,7 +21,7 @@ import pathlib
 
 import pytest
 from _api_contracts_lib import build_registry, make_safety_provider
-from _api_lib import make_store
+from _api_lib import FakeEventWriter, make_store, make_writer
 from fastapi.testclient import TestClient
 from tilo_api import app, deps
 from tilo_api.intake import get_safety
@@ -45,15 +45,25 @@ def store() -> deps.Store:
 
 
 @pytest.fixture()
-def client(store: deps.Store):
-    """A TestClient over the real `tilo_api.app`, with the redaction store and a deterministic
-    fake safety provider injected: the app itself ships no safety provider (the screen belongs to
-    packages/providers) and `/intake` fails closed with 503 without one. No principal is set for
-    the redaction routes yet -- individual tests set
+def writer(store: deps.Store) -> FakeEventWriter:
+    """The in-memory stand-in for "the harness is the only writer of events" (PRD 15.3, PI-18):
+    tilo-api hands it unstamped event parts; it stamps id/seq/ts/run_id and appends to
+    store.events. Built on the same store instance the test holds, so store.events reflects every
+    write immediately."""
+    return make_writer(store)
+
+
+@pytest.fixture()
+def client(store: deps.Store, writer: FakeEventWriter):
+    """A TestClient over the real `tilo_api.app`, with the store, the event writer and a
+    deterministic fake safety provider injected: the app itself ships no safety provider (the
+    screen belongs to packages/providers) and `/intake` fails closed with 503 without one. No
+    principal is set yet -- individual tests set
     `app.dependency_overrides[deps.get_current_principal]` for the role they want -- and
     `dependency_overrides` is cleared at teardown so tests do not leak into each other."""
     safety = make_safety_provider()
     app.dependency_overrides[deps.get_store] = lambda: store
+    app.dependency_overrides[deps.get_event_writer] = lambda: writer
     app.dependency_overrides[get_safety] = lambda: safety
     with TestClient(app) as c:
         yield c

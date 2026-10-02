@@ -1,30 +1,33 @@
-# `tilo_api` — public shape ticket FR-HIL-09/SEC-07 pins (roles and redaction)
+# `tilo_api` — public shape ticket ST-3a pins (kill switches + roles/redaction)
 
-Requirements FR-HIL-09 and SEC-07 (roles and redaction). This file is the contract the builder
-implements exactly; the tests in this directory import only what is listed here. Nothing here is
-business logic — it is the shape tests hold the builder to, the same convention
-`packages/policy/tests/API.md` uses for P4-01.
+Requirements FR-HIL-07 (kill switches, PI-13, PI-18), FR-HIL-09 and SEC-07 (roles and redaction).
+This file is the contract the builder implements exactly; the tests in this directory import only
+what is listed here. Nothing here is business logic — it is the shape tests hold the builder to,
+the same convention `packages/policy/tests/API.md` uses for P4-01.
 
 Real sign-in, Firestore, and the harness's own internals are out of scope: this ticket adds route
 handlers over an **injected, in-memory store** (no Firestore, no network; PRD 15.3's document
-layout is the shape to keep in mind for a later ticket, not implemented here) and an **injected
-principal** (no real auth; "Auth is a test double" per the ticket brief).
+layout is the shape to keep in mind for a later ticket, not implemented here), an **injected
+principal** (no real auth), and an **injected event writer** standing in for the harness (PRD
+15.3: the harness is the only writer of events; tilo-api never stamps `id`, `seq`, `ts` or
+`run_id`, and after issue #46 it never stamps `id` either past enqueue time — see below).
 
-This file is split out of the original ST-3a spec (session ST, which also covered FR-HIL-07 kill
-switches on the same in-memory `Store`/`Principal` shapes, PR #39). Only the sections the roles and
-redaction routes need are kept here; the kill-switch route specs (`stop`, `pause`, `revoke`,
-pending-write flush, per-world locking/ordering) and their own round-by-round review history live
-with FR-HIL-07 instead. Round numbers below refer to that same shared review history (rounds 1-7),
-kept only where a round changed something the redaction routes or `tilo_api.deps` still rely on.
+**History.** PR #39 (session ST-3a) covered both halves on one shared `Store`/`Principal` shape
+across seven review rounds; PR #54 split it, shipping only the roles/redaction half (this same
+file, trimmed) so the kill-switch half could be redone from a clean review slate. Issue #46 is
+S0's binding decision that replaced round 7/ST-3a-3's writer-*instance*-identity retry design
+(rejected in review a second time) with an id-based one — this redo. Round numbers below refer to
+that same shared review history; only what still holds is kept.
 
 ## `tilo_api.deps` (module)
 
 ```python
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, Protocol
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
+Channel = Literal["web", "mobile_web", "whatsapp", "email"]
 
 
 @dataclass(frozen=True)
@@ -34,29 +37,19 @@ class Principal:
 
     user_id: str  # common.schema.json#/$defs/user_id
     role: Role
-    world_id: str | None = None  # The one world this principal is a member of (the sign-in layer
-    # resolves it from the world's own membership record, PRD 15.3
-    # orgs/{org}/users/{uid}); None means no membership anywhere.
-    # Every world route checks principal.world_id == the path's
-    # world_id before it does anything else with store.worlds --
-    # a mismatch (wrong world, or no membership) gets exactly the
-    # same 404 as an unknown world_id, so a caller cannot tell
-    # "that world does not exist" from "you are not in it" (round 1
-    # security finding).
+    world_id: str | None = None  # The one world this principal is a member of. Every world route
+    # checks principal.world_id == the path's world_id before it does anything else with
+    # store.worlds -- a mismatch (wrong world, or no membership) gets exactly the same 404 as an
+    # unknown world_id, so a caller cannot tell "that world does not exist" from "you are not in
+    # it" (round-1 security finding).
+    channel: Channel = "web"  # the session channel sign-in resolved for this request (round-6/
+    # ST-3a-2, issue #38 item 5): the pause route's world.paused.data.channel comes from here,
+    # never from the request body, so a caller cannot claim a confirmation channel it is not on.
     districts: tuple[str, ...] = ()  # districts this principal may see beyond "vis": "all":
-    # a team_lead's domain districts, or a viewer's shared
-    # scope. Ignored when role == "owner" (owner sees
-    # everything, PRD 10.1). PRD 10.1's role table scopes a team
-    # lead's view by *districts* ("Their districts plus
-    # summaries"), not by domain, so `Principal` carries no
-    # `domain` field -- domain only routes questions to a team
-    # lead (FR-AGT-06), a different capability neither route below
-    # implements. An approver's visibility is their assigned
-    # cards' context (PRD 10.1); the two read routes below treat
-    # "approver" the same as "viewer" (districts only) since
-    # neither route is card-scoped -- noted as an open question
-    # below, not required by FR-HIL-09/SEC-07's own acceptance
-    # text (which names Viewer and Team Lead).
+    # a team_lead's domain districts, or a viewer's shared scope. Ignored when role == "owner"
+    # (owner sees everything, PRD 10.1). `Principal` carries no `domain` field: PRD 10.1's role
+    # table scopes a team lead's view by *districts*, not by domain, and domain only routes
+    # questions to a team lead (FR-AGT-06), a capability no route here implements.
 
 
 @dataclass
@@ -68,24 +61,77 @@ class DistrictRecord:
 @dataclass
 class WorldRecord:
     owner: str  # common.schema.json#/$defs/user_id
-    districts: dict[
-        str, "DistrictRecord | None"
-    ]  # district_id -> DistrictRecord, this world's full layout (owner's-eye view). A test may
-    # store None or another malformed value under a key to prove the read routes fail closed
-    # (treat it as hidden) rather than raising.
+    districts: dict[str, "DistrictRecord | None"]  # district_id -> DistrictRecord, this world's
+    # full layout. A test may store None or another malformed value under a key to prove the read
+    # routes (and the kill-switch vis computation) fail closed rather than raising.
+    owner_channels: tuple[str, ...] = ("web", "whatsapp", "email")  # the owner's enabled channels
+    # for kill-switch confirmations (PRD 10.2's "all enabled channels"; mobile_web treated as the
+    # same surface as web for this purpose).
+    run_id: str = "r_village_basic_1"  # the world's current run, the harness's own record; the
+    # event writer reads this to stamp an event's run_id, never invents one.
+    paused: bool = False  # true once Pause all has actually paused this world. This -- and only
+    # this, checked under the world's own lock -- is what dedupes world.paused (round-4 security
+    # finding, biggest: dedupe on "did this call's own Stop-all step lower anything" silently
+    # drops two real, first-time-pause cases: a Pause-all right after a Stop-all, and a world with
+    # no L2/L3 policies at all). PRD 9.4 honesty extends to this durable flag itself: it is never
+    # observed True without a world.paused event existing somewhere in the store, pending or
+    # committed.
 
 
 @dataclass
 class Store:
-    """In-memory injected state (no Firestore this ticket). One instance built fresh per test
-    and supplied by overriding get_store; a route handler mutates it in place, the same object
-    the test holds, so a test can inspect the result without a second GET."""
+    """In-memory injected state (no Firestore this ticket). One instance built fresh per test and
+    supplied by overriding get_store; a route handler mutates it in place, the same object the
+    test holds."""
 
     worlds: dict[str, WorldRecord] = field(default_factory=dict)
-    events: dict[str, list[dict]] = field(
-        default_factory=dict
-    )  # world_id -> event.schema.json records, append-only, oldest first (seq strictly increasing,
-    # EV-10), read-only from these two routes' point of view.
+    events: dict[str, list[dict]] = field(default_factory=dict)  # world_id -> event.schema.json
+    # records, append-only (EV-10), oldest first. Only EventWriter.append writes here.
+    policies: dict[str, dict] = field(default_factory=dict)  # policy_id -> policy.schema.json
+    # record (mutated in place: level, changed_by, history). A test may store a record missing
+    # "history", with "history" not a list, or with "level" absent or not one of L0..L3, to prove
+    # a kill switch fails safe -- ends at L1 with exactly one new event, never a 500, never left
+    # half-changed against its siblings.
+    policy_worlds: dict[str, str] = field(default_factory=dict)  # policy_id -> the world whose
+    # event stream receives that policy's policy.changed (policy.schema.json carries no world_id
+    # of its own, PRD 15.3 keeps policies at the org level). A policy_id absent from this map
+    # still gets an event, routed to the world a kill switch was pressed in, never a KeyError.
+    pending_events: dict[str, list[dict]] = field(default_factory=dict)  # world_id -> event parts
+    # a mutating route built but EventWriter.append has not yet confirmed committed -- this list
+    # *is* that world's write queue, oldest first, deduped by each part's own `id` (issue #46),
+    # never by content and never by which writer object attempts it. A part sits here both before
+    # and during an attempt, and is removed only once `append` actually confirms it committed.
+
+
+class EventRejected(Exception):
+    """Raised by EventWriter.append when a caller resends an `id` already committed for that
+    world_id with genuinely different content than what was committed under that id. Same id,
+    same content -> idempotent success (the already-committed record is returned, nothing new is
+    appended, EV-10). Same id, different content -> this exception: a genuine conflict must
+    surface, never a silent overwrite and never a silently dropped new one."""
+
+
+class EventWriter(Protocol):
+    """The single writer of events (PRD 15.3). tilo-api builds every event.schema.json field
+    except `seq`, `ts`, `run_id` and `trace` (trace defaults to all-null) -- **including its own
+    `id`, a ULID, built once when the part is enqueued and resent unchanged on every retry**
+    (issue #46) -- and hands the whole thing here. `append` dedupes on that `id` alone, never on
+    raw content-equality and never on whether this call happens to be handed the same writer
+    *object* as an earlier, still-outstanding attempt. A production implementation talks to the
+    harness process (services/harness/writer.py implements the identical idempotent-by-id
+    contract there, a small SH ticket under this same requirement); every test here supplies its
+    own in-memory stand-in (`_api_lib.FakeEventWriter`), which stamps `seq`/`ts`/`run_id` itself
+    (from `Store.worlds[world_id].run_id` and a per-world counter) on first commit only, returns
+    the already-committed record unchanged on an idempotent-by-id retry, and raises
+    `EventRejected` on a same-id/different-content conflict."""
+
+    def append(self, world_id: str, event: dict) -> dict:
+        """event keys: id (a ULID, the sole idempotency key, always present), type, actor,
+        target, level, district, item, severity, credits, summary, cause, vis, authz, data (any
+        key the caller has no value for is set to that field's schema-honest default). Returns
+        the fully stamped event.schema.json record that is (or already was) appended to
+        store.events[world_id]; raises EventRejected on a same-id/different-content conflict."""
+        ...
 
 
 def get_current_principal() -> Principal:
@@ -98,13 +144,36 @@ def get_store() -> Store:
     """Raises NotImplementedError in production until Firestore wiring lands; every test
     overrides this via app.dependency_overrides[get_store]."""
     raise NotImplementedError
+
+
+def get_event_writer() -> EventWriter:
+    """Raises NotImplementedError in production until the harness wiring lands; every test
+    overrides this via app.dependency_overrides[get_event_writer]."""
+    raise NotImplementedError
+
+
+def get_part_write_deadline_s() -> float:
+    """Issue #46, S0's decision point 1: "Read the part deadline from config, not a constant
+    tuned to the tests." Resolved through this same Depends() seam as get_store/get_event_writer/
+    get_current_principal so a test can prove a route reads it fresh on every call rather than
+    capturing a constant once at import time -- every test overrides this via
+    app.dependency_overrides[get_part_write_deadline_s] (`_api_lib.as_part_write_deadline`), and a
+    test may re-install a different value mid-test. Unlike the three functions above, this one
+    has a real, working production default (reads `config/dispatch.yaml`'s
+    `dispatch.part_write_deadline_s`, falling back to a hard-coded default if the file or key is
+    missing) since it needs no per-request test double for a plain config value -- most tests
+    never override it at all."""
+    ...
 ```
 
 ## Routes (new; `tilo_api.app` currently has only `GET /healthz`)
 
-Both routes below take `principal: Principal = Depends(get_current_principal)` and
-`store: Store = Depends(get_store)`. Neither emits an event or takes an `EventWriter`; FR-HIL-07
-adds that seam back to `tilo_api.deps` for its own stop/pause/revoke routes.
+Every route below takes `principal: Principal = Depends(get_current_principal)` and
+`store: Store = Depends(get_store)`; the three that emit events (`stop`, `pause`, `revoke`) also
+take `writer: EventWriter = Depends(get_event_writer)` and
+`part_deadline_s: float = Depends(get_part_write_deadline_s)`. `now()` (`tilo_api.events`) is
+used only for `policy["history"]`/`policy["changed_by"]` entries (plain dict fields tilo-api
+itself owns) — never to stamp an event's own `ts`, which is `EventWriter`'s job.
 
 ### World membership check (applies first, on every route below that takes a `world_id` path
 parameter)
@@ -112,9 +181,170 @@ parameter)
 Before anything else: if `principal.world_id != world_id`, respond exactly as for
 `world_id not in store.worlds` — same status (404), same body, so a caller cannot distinguish "no
 such world" from "you are not a member of it". Only once `principal.world_id == world_id` does
-the handler read `store.worlds.get(world_id)` and 404 if that lookup itself misses (a member
-whose own world record is missing is an inconsistent store, treated the same way — still 404, no
-new status code invented for it).
+the handler read `store.worlds.get(world_id)` and 404 if that lookup itself misses.
+
+### `POST /worlds/{world_id}/autopilot/stop` — FR-HIL-07, PI-13, PI-18
+
+- 404 per the membership check above.
+- 403 when `principal.world_id == world_id` but (`principal.role != "owner"` or
+  `principal.user_id != store.worlds[world_id].owner`); the store is unchanged.
+- 200 or 202 otherwise (202 exactly when this call's response `"pending"` count is nonzero).
+  **Plans, then applies, in one pass under a lock — never half-applies:** every policy in
+  `store.policies` owned by `store.worlds[world_id].owner` is considered; a policy at `"L0"` is
+  skipped untouched (already below L1); a policy that is **provably** consistent at L1 —
+  `level == "L1"` **and** its own non-empty `history`'s last entry also reads `"L1"` — is skipped
+  as `already_l1` (a true idempotent repeat, no history entry, no event, the record left exactly
+  as it was; round-3 finding "no silent history repair": a policy that merely *reads* L1 while its
+  history disagrees, or has no readable history at all, is an *inconsistent* record, not a proven
+  repeat, and goes through the normal path below). Every other policy — whatever its `level` reads
+  as, including missing or not one of `L0`..`L3` — gets exactly one history entry
+  `{"by": owner, "at": now, "change": "stop_all", "level": "L1"}` appended (a missing or non-list
+  `history` is replaced with a fresh one-entry list, never raises; an inconsistent-L1 record's
+  disagreeing history is never rewritten, only appended to), `level = "L1"`,
+  `changed_by = {"by": owner, "at": now}`, and exactly one `policy.changed` part built for the
+  target world `store.policy_worlds.get(policy_id, world_id)` (a policy with no entry in
+  `policy_worlds` still gets an event, routed to the world Stop-all was pressed in, never a
+  `KeyError`) and enqueued for that world, per "Pending writes and flush" below. The part's `data`
+  is `{"policy_id": policy_id, "change": "stop_all", "level": "L1"}`, `authz` is
+  `{"by": "person", "ref": owner, "at": now}`, and `vis` is computed by `events.policy_vis`
+  against **the target world's own districts** (`store.worlds[target_world_id].districts`, not
+  `store.worlds[world_id]`, the request world — round-4 finding, biggest: `vis` must reflect where
+  the event is actually filed, not where the button was pressed) — see "`policy.changed`
+  visibility" below. No request ever returns 500, whatever shape the matched policies are in or
+  however the writer behaves.
+- Response body:
+  `{"stopped": <int>, "already_l1": <int>, "confirmations": [{"channel": c} for c in store.worlds[world_id].owner_channels], "pending": <int>}`.
+  `"stopped"` counts only policies actually changed this call — a policy's level change never
+  depends on whether its `policy.changed` part was successfully written (the kill switch *is* the
+  level change; the event is its audit trail, and the two never fail together). `"pending"` is the
+  count of parts still sitting in `store.pending_events`, **summed across every world this call
+  touches** (the request's own `world_id`, plus every world an owned policy is mapped to via
+  `policy_worlds` — round-4 security finding: a Stop-all that routes a part to a mapped world B is
+  just as responsible for B's pending count as for A's own).
+- Performance: 200 policies owned by the world's owner complete within 5 s wall-clock whether the
+  writer is healthy, entirely down, or slow-then-failing. This holds on a **retry** too: a second
+  Stop-all issued while the writer is still down also completes within 5 s.
+- Locking: every targeted policy's level, history and `changed_by`, and every new part's
+  enqueue, happen under a per-world **mutate** lock (sorted-and-acquired together across every
+  touched world, to avoid lock-order deadlock between two calls touching overlapping world sets)
+  — held only for that in-memory decision, **never across a `writer.append` call**. A *separate*
+  per-world **in-flight record** (guarded by a short, never-across-I/O queue lock) enforces "at
+  most one `append` in flight for this world at a time" (issue #46, S0's decision point 1): a call
+  that finds one still younger than `dispatch.attempt_abandon_after_s` waits for it, up to its own
+  part deadline, and then leaves it — and everything behind it in that world's queue — where it
+  is. An attempt older than `attempt_abandon_after_s` is presumed lost: it stops counting, and the
+  call starts a fresh attempt of the same part (same `id`, so a late success of the old one is an
+  idempotent no-op, EV-10). At most two presumed-lost attempts are tolerated per world before no
+  new thread is started. Because the mutate lock is never held across I/O, a kill
+  switch against world A never waits on world B's writer latency, and a second call against the
+  *same* world, issued while the first is still stuck on (or past the deadline of) a writer call
+  that never returns, itself returns quickly: by the time it runs, the first call's mutate section
+  has already released that world's lock, so the second call finds every policy already at L1.
+
+### Pending writes and flush
+
+`EventWriter.append` can raise, or simply not settle within its own per-part deadline (a hang).
+Either way tilo-api does **not** let that stop the level change the part records, and does
+**not** lose the part: it stays in (or is added to) `store.pending_events[world_id]`, counted in
+the response's `"pending"`. **Flush trigger:** every mutating route (`stop`, `pause`, `revoke`)
+attempts to drain every world it touches, oldest-queued-part-first, before computing its own
+response — this is "the next mutating call that touches a world", not a background job, and is
+the one resolved trigger for retrying whatever an earlier failed/hung call left behind. A part is
+removed from the queue only once `append` actually confirms it committed (the stamped record is
+already in `store.events` by then), so a part already written is never re-sent, and a part that
+keeps failing stays pending indefinitely rather than being dropped.
+
+**Within one drain of one world**, parts are attempted strictly in queue order, one at a time
+(issue #46 retires round 7's parallel-dispatch-within-a-world design entirely: it produced
+duplicate writes, out-of-order commits, and a world stuck forever behind a hung writer). A part
+whose attempt does not settle within `part_deadline_s` is a **hang**: the drain for this call
+stops right there (that part, and everything queued behind it, stays pending); the underlying
+attempt is never cancelled (Python threads cannot be cancelled) — it keeps running in the
+background, and whichever thread eventually observes it settle removes the part from the queue
+(and clears the world's in-flight record) at that point, so a later call naturally finds the
+world free again once the writer genuinely answers; if it never does, the record is abandoned
+after `attempt_abandon_after_s` and the same part is retried. A part whose attempt **fails fast** (raises well
+within its deadline) does not block a different part still waiting behind it in the same drain:
+that different part is tried next, and the failed one is left pending, not retried again this
+call — **except** when nothing else is left to try in this drain (the failed part is the sole
+remaining candidate), in which case it is retried in place, a small bounded number of times,
+since there is nothing more useful this call could otherwise do with its remaining budget. This
+is what lets `world.paused` — enqueued and drained on its own, ahead of anything else (see next
+section) — recover from a single fast failure and still land first, without letting an
+ever-failing writer spin a whole call's budget on one permanently broken part when others are
+waiting.
+
+### `world.paused` goes first (FR-WLD-07, NFR-07: pause confirms within 2 s)
+
+The pause route enqueues `world.paused` at the **front** of `store.worlds[world_id]`'s queue —
+ahead of anything already pending there, and ahead of this same call's own `policy.changed`
+parts, which are not even built yet — and drains it in its own phase before computing the
+stop-all-style plan at all. Only once that phase returns (settled, given up, or handed off to a
+hang) does pause build and enqueue its `policy.changed` parts and drain again. This is what keeps
+`world.paused` reaching the writer within 2 s even against a slow writer working through an
+unrelated backlog, and keeps it landing first in `store.events[world_id]` even when its own first
+attempt fails fast and has to be retried (see "Pending writes and flush" above).
+
+### `POST /worlds/{world_id}/pause` — FR-HIL-07 ("Pause all stops the agents too", PRD 10.4)
+
+- Same membership, 404 and 403 as stop-all above.
+- Request body: `{"channel": <common.schema.json#/$defs/channel> | null}` — **typed to the
+  schema's own enum**, so a value outside it is a 422 from request validation, before the handler
+  runs (nothing changes, nothing is emitted). The body is otherwise unused:
+  `world.paused.data.channel` comes from `principal.channel` (the caller's own resolved session
+  channel), never from the body — round-6/ST-3a-2, issue #38 item 5: a caller must not be able to
+  claim a confirmation channel it is not actually on.
+- 200 or 202 (same rule as stop-all): under the world's lock, when `store.worlds[world_id].paused`
+  is **not already True**, sets it True and builds one `world.paused` part
+  (`data == {"reason": "pause_all", "channel": principal.channel}`, `authz: null` since
+  `world.paused` is `side_effect: false`, `vis: "all"`) — enqueued at the front, per above. When
+  already True, no new part is built (a true idempotent repeat). **This dedupe is keyed on the
+  flag alone, checked under the lock, never on whether this call's own Stop-all step lowered
+  anything** (round-4 security finding, biggest: a Pause-all right after a Stop-all, or a world
+  with no L2/L3 policies at all, both read `stopped == 0` yet are real, first-time pauses that a
+  `stopped`-keyed dedupe would silently drop). Runs the same owned-policy plan-and-apply as
+  stop-all afterward (same fail-safe, no-silent-repair, per-target-world `vis`, and
+  pending-on-failure rules). `"paused"` is `true` whenever the request reaches this point at all,
+  regardless of whether `world.paused`'s own part is still pending.
+- Response body:
+  `{"stopped": <int>, "already_l1": <int>, "paused": true, "pending": <int>}` (`"pending"` defined
+  exactly as in stop-all's response, counting the `world.paused` part when one was built this
+  call too).
+
+### `POST /policies/{policy_id}/revoke` — FR-HIL-07, PI-13
+
+- 404 when `policy_id` is not in `store.policies`, **or** when
+  `principal.user_id != store.policies[policy_id]["owner"]` — exactly the same status and body
+  either way, so a non-owner cannot tell "no such policy" from "not yours" (round-1 security
+  finding). The store is unchanged in both cases.
+- 200 otherwise, **never 500 even when the writer is down**. When `policy_id` maps to a world
+  (`store.policy_worlds.get(policy_id)` is not `None`), that world's mutate lock is acquired
+  first: under it, one history entry `{"by": owner, "at": now, "change": "revoked", "level": "L1"}`
+  is always appended (even if already L1 — revoke is a distinct, explicit act, not a bulk
+  operation, so it never skips the way stop-all's `already_l1` case does), `level = "L1"`,
+  `changed_by` set, and one `policy.changed` part (`data.change == "revoked"`) is built and
+  enqueued to the tail of the mapped world's queue — so draining that world (which always starts
+  from the current head) flushes whatever was already pending there, oldest first, before this
+  new part is ever attempted. A policy with no world mapping (policies live at org level) is
+  still revoked (history entry, L1); its mutation is taken under a lock **scoped to that one
+  policy id** instead (round-6/ST-3a-2, issue #38 item 5: a policy-id lock, not a world lock, so
+  two concurrent revokes of the same unmapped policy cannot race and drop one's history entry,
+  and an unrelated Stop-all/Pause-all against a different world is never blocked by it); no world
+  lock is acquired and nothing is enqueued (there is no world to write to).
+- Response 200 body: `{"policy_id": policy_id, "level": "L1"}` — revoke is a single-policy,
+  single-event act, so its response carries no `"pending"` field of its own.
+
+### `policy.changed` visibility (EV-13)
+
+`vis` is `events.policy_vis(policy, world_districts)`: the intersection of the policy's own
+`scope.districts` with the **target** world's own district ids (never the request world's, when
+they differ — round-4 finding), in that world's own key order, when the intersection is
+non-empty; `"all"` when the scope is missing/malformed, the target world has no layout, or the
+intersection is empty. A non-string or otherwise unhashable entry in `scope.districts` (round-6/
+ST-3a-2, issue #38 item 1: `[["D1"], 123, None, {"x": 1}, "D9"]`, mixed among a real district id)
+is filtered out before any membership test runs, so it never raises `TypeError` and never aborts
+the kill switch — every well-formed policy in the same call still reaches L1 and gets its own
+event.
 
 ### `GET /worlds/{world_id}/events` — FR-HIL-09, SEC-07
 
@@ -190,27 +420,18 @@ new status code invented for it).
 An event in `store.events[world_id]` may itself be malformed — missing `id` (or `id` not a
 string), a `cause` that is not a string or `None` (for example a list), or missing any other key
 this schema requires. Such an event is dropped before the visibility filter runs, for **every**
-principal including the owner (resolved default, this ticket may only write
-`services/api/tests`: the same "cannot be safely read, cannot be honestly shown to anyone" rule
-round 2 already applies to a malformed `WorldRecord.districts` entry). It never raises (never a
-500) and never blocks its well-formed siblings in the same response.
+principal including the owner. It never raises (never a 500) and never blocks its well-formed
+siblings in the same response.
 
-### Depth and dict keys (round-5 finding, qa/security — "What changed since round 4," findings 5-6)
+### Depth and dict keys (round-5 finding, qa/security)
 
 `data` is not schema-bounded in depth; a payload nested arbitrarily deep (this ticket's own test
 uses 500 levels) must never turn into a 500. **The owner's response never walks `data` at all** —
-the stored value is copied forward unchanged into the response, exactly like every other
-unredacted owner field, so depth cannot 500 the owner's path and the owner still receives the
-event, `data` included, however deeply nested (ambiguity 15). **The non-owner (scoped) redaction
-walk fails closed past a bounded depth: the event is dropped entirely** — the same treatment a
-malformed event already gets, on the reasoning that `data` too deep to safely walk cannot be
-honestly redacted, and cannot therefore be honestly shown to a scoped viewer either. The exact
-depth the scoped walk's own bound sits at is this ticket's own implementation choice (ambiguity
-16-adjacent; not pinned beyond "500 levels must not 500 and must be dropped for a non-owner").
-Dict **keys** within `data` are walked and redacted using the same rules as dict **values** at the
-same position (round-5 finding 6): see the `data` row of the allowlist table above for the exact
-per-key treatment (district-id key: hidden drops the whole event, visible is left unchanged;
-ULID key: visible is renamed to the named event's view-local id, hidden/unknown drops the key).
+the stored value is copied forward unchanged into the response, however deeply nested. **The
+non-owner (scoped) redaction walk fails closed past a bounded depth: the event is dropped
+entirely** — the same treatment a malformed event already gets. Dict **keys** within `data` are
+walked and redacted using the same rules as dict **values** at the same position (round-5 finding
+6): see the `data` row of the allowlist table above for the exact per-key treatment.
 
 ### `GET /worlds/{world_id}` — FR-HIL-09, SEC-07 (layout/summary)
 
@@ -221,12 +442,9 @@ ULID key: visible is renamed to the named event's view-local id, hidden/unknown 
   `{"id": did, "name": ..., "summary": ...}`. A **hidden district is left out of the list
   entirely** — not included with its name blanked or its id kept — because no hidden district's
   id or name may appear anywhere in the response JSON; `has_hidden_districts` is the only trace
-  that fog exists (a bare boolean, no id, no name, no count, matching PRD 10.1 "hidden districts
-  show fog with no names or counts"). **Fail closed on a malformed record:** a district entry
-  that is `None` or otherwise missing a usable `.name`/`.summary` is treated as hidden — left out
-  of `districts` and counted toward `has_hidden_districts` — never a 500, whoever is asking
-  (even the owner, who otherwise sees everything: a malformed record cannot be shown, honestly,
-  to anyone).
+  that fog exists. **Fail closed on a malformed record:** a district entry that is `None` or
+  otherwise missing a usable `.name`/`.summary` is treated as hidden — never a 500, whoever is
+  asking.
 
 ## Role resolution this ticket assumes (not itself a new route)
 
@@ -245,43 +463,55 @@ item 6; not attempted by this ticket)
   correctly redacted or dropped by the rules above. Fixing this needs either the harness to write
   per-scope summaries/totals itself (PRD 15.3), or a contract change to `event.schema.json`/the
   `events/data/*` schemas so a redacted view can strip or recompute them — spark-456/tilo#29 tracks
-  the contract side (EV-13: an event with `district` set should not be allowed `vis: "all"`, which
-  is what lets `district.created`/`agent.spawned`'s own fixtures name a district in free text on an
-  otherwise-global event). Both are out of reach for a ticket that may only touch
-  `services/api/tests/` and `services/api/src/tilo_api/` without a contract change.
+  the contract side (EV-13). Out of reach for a ticket that may only touch `services/api/tests/`
+  and `services/api/src/tilo_api/` without a contract change.
 
-## Ambiguities resolved (kept out of `docs/open-questions.md`: this ticket may only touch
-`services/api/tests/`; logged here and in the test-writer's report instead)
+## Ambiguities resolved
 
-4. **Hidden districts on `GET /worlds/{world_id}`** (unchanged from round 1): left out of the
-   list entirely rather than included with blanked fields. New this round: a malformed district
-   record is folded into the same "hidden" treatment, for the same no-leak reason, and additionally
-   because a value tilo-api cannot safely read cannot be honestly shown to anyone, owner included.
-6. **World membership source**: `Principal.world_id` is a single value (one world per principal)
-   because nothing in scope for this ticket needs a principal bound to more than one world at a
-   time; a person who owns or belongs to several worlds in the product's real data model is later
-   work (the real sign-in/session resolver, PRD 15.3), out of scope for this in-memory test double.
-8. **View-local id scheme.** A scoped (non-owner) response's event `id` is `f"v{seq}"`, where
-   `seq` is that same event's own dense position in *this response*: simple, deterministic given
-   the store's contents and the caller's own visibility, trivially distinct from a real ULID
-   (which never starts with `"v"`), and derivable from data the route already computes for `seq`
-   itself rather than needing a second id-minting scheme. A `cause` naming a visible event is
-   remapped the same way, using that *other* event's own view `seq`. The owner's response never
-   uses this scheme — see "Owner vs. everyone else" under `GET /worlds/{world_id}/events` above.
-11. **Malformed-event ownership.** A malformed event is dropped from *every* principal's response,
-    owner included (not only scoped ones) — see "Malformed events" above; this mirrors round 2's
-    own resolution for a malformed `WorldRecord.districts` entry (ambiguity 4) rather than
-    introducing a second rule for events.
-15. **Owner's response for depth-500 `data`.** The owner's view returns the stored event, `data`
-    included, unmodified — never redacted, never dropped — regardless of nesting depth, because the
-    owner's response path never recurses over `data` at all ("What changed since round 4," finding
-    5). This was a real choice, not the only defensible one (an alternative would drop *every*
-    viewer's copy of an absurdly deep event, owner included, for uniformity) — resolved toward
-    "owner sees everything" (PRD 10.1) since deep-but-well-formed `data` is not itself a malformed
-    record the way a missing `id` or a non-string `cause` is (ambiguity 11), and the owner's code
-    path has no reason to ever inspect `data`'s shape at all.
-17. **ULID-shaped `data` key naming a hidden or unknown event (finding 6).** Dropped (key and value
-    both removed from the rebuilt dict) rather than kept with some placeholder key, since a JSON key
-    cannot be null and inventing a synthetic placeholder key (e.g. `"_hidden"`) would itself be new
-    information not present in the original shape and could collide with a real key already in the
-    same dict.
+4. **Hidden districts on `GET /worlds/{world_id}`**: left out of the list entirely rather than
+   included with blanked fields; a malformed district record is folded into the same "hidden"
+   treatment.
+6. **World membership source**: `Principal.world_id` is a single value (one world per principal).
+8. **View-local id scheme**: `f"v{seq}"`, that event's own dense position in *this response*.
+11. **Malformed-event ownership**: dropped from *every* principal's response, owner included.
+15. **Owner's response for depth-500 `data`**: returned unmodified, since the owner's response
+    path never inspects `data`'s shape at all.
+17. **ULID-shaped `data` key naming a hidden or unknown event**: dropped (key and value both
+    removed), since a JSON key cannot be `null`.
+16, 22. **The exact per-part write deadline and its config key/file** (`config/dispatch.yaml`'s
+    `dispatch.part_write_deadline_s`): this ticket's own implementation choice; only the
+    injectable seam (`get_part_write_deadline_s`) and "meaningfully smaller than 5s" are pinned.
+19. **The unmapped-revoke lock's scope**: one lock per policy id (`Store.dispatch_state`), not a
+    world lock (there is no world) and not one lock for every unmapped policy.
+20. **The stable id's storage**: alongside the part, as the part's own `id` field (issue #46 makes
+    this simpler than an earlier "id carried alongside, never inside" design — `id` is now itself
+    a required, schema-legitimate part field, EV-10's own idempotency key, not a dispatch-only
+    bookkeeping value).
+21. **Which call gets to retry a stuck head**: whichever mutating call next touches that world and
+    finds the world's drain lock free — never a background job, and never contingent on being
+    handed a different writer object than the one already presumed stuck.
+23. **The stable id's exact minting point**: once when the part is enqueued
+    (`events.new_part_id`, called from the route handler at plan-build time); which layer mints it
+    is this ticket's own implementation choice.
+
+## PR #120 review fixes (FR-HIL-07)
+
+- Every append attempt runs on its own daemon thread (not joined at exit); per world at most one
+  in flight plus two presumed-lost. There is no shared pool, so one world's hung writer cannot
+  starve another. An attempt's age counts from when its thread starts.
+- `world.paused` from a person's Pause all has `actor` = the principal's user id (contract fixture
+  and schema: `system` is only the hard-cap kill switch). `authz` stays null.
+- Pause all plans and applies every level change first (never waits on I/O), enqueues `world.paused`
+  at the head of the request world's queue, drains that part alone first, then everything else.
+- A non-string `policy_worlds` entry falls back to the request world (revoke: the principal's
+  world); a non-WorldRecord target is treated as having no layout. Every part is planned before any
+  policy changes, so a bad record never half-applies or 500s.
+- Revoke of a policy with no mapping routes its `policy.changed` to the principal's world; with no
+  world at all only the level changes.
+- `reopen()` is called only from the attempt still counted in flight and only after a `WriterBusy`
+  (matched by class name). Dispatch config must be positive and finite, else it logs and uses the
+  default. Left as follow-ups: L0 revoke semantics, sending the channel confirmations.
+- Round 2: the unmapped-revoke fallback above (spec text at "A policy with no world mapping") applies
+  only when the principal's world exists as a WorldRecord, the principal's role is `owner` and the
+  world's owner is the principal; otherwise only the level changes and no event is written to any
+  stream. Dispatch config values are capped at 4 s. Stop/Pause build `confirmations` defensively.
