@@ -7,6 +7,7 @@ from collections import Counter
 from urllib.parse import urlparse
 
 from conftest import REPO_ROOT
+from test_PRD_19_2_eval_set_structure import DENYLIST_BRANDS_RE, REAL_ROUTING_RE
 from tilo_evals import Case, load_cases
 
 _CASES_DIR = REPO_ROOT / "evals" / "cases"
@@ -142,21 +143,14 @@ def test_PRD_19_2_e_mail_ground_truth_matches_planted_content() -> None:
                 )
 
 
-_DENYLIST_BRANDS_RE = re.compile(
-    r"\b(?:Yanmar|Johnson\s+pump|Pettit|Interlux|Wells\s+Fargo|GreenDot|Seattle\s+Boat\s+Show|Pacific\s+Northwest\s+Marine\s+Trades|seattlecharters)\b",
-    re.IGNORECASE,
-)
-_REAL_ROUTING_RE = re.compile(r"\b(?!0{9}\b)\d{9}\b")
-
-
 def test_PRD_19_2_e_mail_all_addresses_end_in_example_and_secret_scan() -> None:
     cases = _e_mail_cases()
     texts = [c.path.read_text(encoding="utf-8") for c in cases]
     for case, text in zip(cases, texts, strict=True):
-        brand_match = _DENYLIST_BRANDS_RE.search(text)
+        brand_match = DENYLIST_BRANDS_RE.search(text)
         assert brand_match is None, f"{case.id}: real brand/event {brand_match.group(0)!r} found"
-        routing_match = _REAL_ROUTING_RE.search(text)
-        assert routing_match is None, f"{case.id}: 9-digit routing/account number {routing_match.group(0)!r} found"
+        routing_match = REAL_ROUTING_RE.search(text)
+        assert routing_match is None, f"{case.id}: routing/account number {routing_match.group(0)!r} found"
     for email in [e for text in texts for e in _extract_emails(text)]:
         assert email.endswith(".example"), f"email address not ending in .example: {email}"
     for host in [h for text in texts for h in _extract_hosts(text)]:

@@ -531,8 +531,13 @@ a.secondary {
   .trace-record .secondary.placeholder.compact {
     min-height: 44px; /* "Open record" */
   }
-  .back-link {
+  .back-link,
+  .tile-link {
     min-height: 44px;
+  }
+  .tile-link {
+    display: inline-flex;
+    align-items: center;
   }
 }
 /* Reserved boxes: data arriving (UX-1, CLS) never moves what is below or above it. */
@@ -544,7 +549,7 @@ a.secondary {
 }
 @media (max-width: 767px) {
   .delivery-slot .flow-slot {
-    min-height: 14em; /* the two-up tiles: 222 px of finished content at 390, 360 and 320 */
+    min-height: 15.25em; /* the two-up tiles and the 44 px estimate link: 244 px of finished content */
   }
 }
 .right-rail {
@@ -781,6 +786,9 @@ a.secondary {
 .btag[data-tone="fyi"] {
   border-color: var(--color-signal-fyi);
 }
+.btag[data-tone="gate"] {
+  border-color: var(--color-signal-gate);
+}
 .btag[data-tone="policy"] {
   border-color: var(--color-policy); /* PRD 18.6: the policy colour, with the word "Policy" */
 }
@@ -956,5 +964,217 @@ a.secondary {
   .field textarea,
   .field input {
     min-height: 44px;
+  }
+}
+.rail-needs {
+  height: 9em; /* fits one row and a half: the list scrolls, nothing below it moves */
+  overflow-y: auto;
+}
+.rail-needs:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.rail-needs p {
+  margin: 0;
+}
+/* AGW-05: the card and the gate sheet (PRD 10.3, 18.4). Neutral role tokens only; every text size
+   is on the 12/14/16/20/24/32/40 scale. A suggested option has its own pill, never colour alone. */
+.need-card,
+.gate-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  max-width: 560px;
+  padding: 20px;
+  border: 2px solid var(--color-surface-2);
+  border-bottom-width: 4px;
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+}
+.gate-sheet[data-opened-by="policy"] {
+  border-color: var(--color-policy); /* HR-7: the policy colour, with the stamp and its words */
+}
+.need-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.need-where {
+  color: var(--color-ink-2);
+  font-size: calc(14px * var(--ui-scale, 1));
+  font-weight: 700;
+}
+.need-what {
+  margin: 0;
+  font: 900 calc(20px * var(--ui-scale, 1)) / 1.25 var(--font-display);
+}
+.need-why {
+  margin: 0;
+  color: var(--color-ink-2);
+  line-height: 1.4;
+}
+.need-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.need-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 2px solid var(--color-surface-2);
+  border-bottom-width: 4px;
+  border-radius: var(--radius-controls);
+  cursor: pointer;
+}
+.need-option[data-selected="true"] {
+  border-color: var(--color-brand-primary);
+  background: var(--color-surface-0);
+}
+.need-option input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--color-brand-primary);
+}
+.need-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.35;
+}
+.need-option-text .btag {
+  margin-left: 8px;
+}
+.btag[data-tone="suggested"] {
+  border-color: var(--color-brand-primary);
+  background: var(--color-brand-primary);
+  color: var(--color-surface-1);
+}
+.need-context textarea {
+  border-style: solid;
+  border-color: var(--color-ink-2);
+  cursor: text;
+}
+.need-context textarea:disabled {
+  cursor: not-allowed;
+}
+.need-default {
+  margin: 0;
+}
+/* The one filled button stays in view however long the card is (it sticks to the page's bottom). */
+.need-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0 4px;
+  border-top: 2px solid var(--color-surface-2);
+  background: var(--color-surface-1);
+}
+.need-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.need-status {
+  min-height: 1.5em; /* "Waiting for confirmation…" arrives into reserved room */
+  color: var(--color-ink-2);
+  font-size: calc(14px * var(--ui-scale, 1));
+}
+.need-error {
+  margin: 0;
+  color: var(--color-signal-blocked);
+}
+.gate-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.gate-facts div {
+  display: grid;
+  grid-template-columns: 9em 1fr;
+  gap: 8px;
+}
+.gate-facts dt {
+  color: var(--color-ink-2);
+  font-size: calc(14px * var(--ui-scale, 1));
+  font-weight: 700;
+}
+.gate-facts dd {
+  margin: 0;
+  line-height: 1.4;
+}
+.gate-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  font-weight: 700;
+}
+.gate-status p {
+  margin: 0;
+}
+.policy-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-height: 28px;
+  padding: 0 12px 0 6px;
+  border: 2px solid var(--color-policy);
+  border-radius: var(--radius-pill);
+  font: 800 calc(14px * var(--ui-scale, 1)) / 1 var(--font-ui);
+}
+.gate-sheet a.pill {
+  align-self: flex-start;
+}
+/* The one filled button is the hero (artboard 2-4: 48 px, 56 px on a phone); what is not built yet
+   is quieter, so a row of placeholders never reads as the main action. */
+.need-bar .primary {
+  min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+}
+.need-actions .soon-row .secondary.placeholder,
+.need-actions .secondary.placeholder {
+  border-color: transparent;
+  background: var(--color-surface-0);
+  color: var(--color-ink-2);
+  font-weight: 600;
+}
+@media (max-width: 767px) {
+  .need-card,
+  .gate-sheet {
+    padding: 16px;
+  }
+  .gate-facts div {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .need-bar .primary {
+    min-height: 56px;
+    flex: 1;
+  }
+}
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.gate-slot {
+  min-height: 1.5em; /* the outcome line arriving: one line on desktop, two on a phone */
+}
+@media (max-width: 767px) {
+  .gate-slot {
+    min-height: 3em;
   }
 }

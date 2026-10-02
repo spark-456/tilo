@@ -2,6 +2,7 @@
 // component. The address pattern and the built/placeholder status live in meta.ts, so adding or
 // replacing a screen is a one-line change here plus its own file.
 import type { ComponentType } from "react";
+import { CardsGallery } from "../needs-you/CardsGallery";
 import { matchFlowRoute } from "../router";
 import { NotFound } from "./NotFound";
 import { S_05 } from "./S_05";
@@ -56,7 +57,10 @@ const decode = (s: string | undefined): string => {
 const EXTRA: ReadonlyArray<{ id: string; re: RegExp; Component: ComponentType<ScreenProps> }> = [
   { id: "more", re: /^\/more\/?$/, Component: More },
   ...(import.meta.env.DEV
-    ? [{ id: "screens", re: /^\/screens\/?$/, Component: ScreensIndex }]
+    ? [
+        { id: "screens", re: /^\/screens\/?$/, Component: ScreensIndex },
+        { id: "screens-cards", re: /^\/screens\/cards\/?$/, Component: CardsGallery },
+      ]
     : []),
 ];
 

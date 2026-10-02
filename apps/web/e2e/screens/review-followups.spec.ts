@@ -226,9 +226,10 @@ for (const viewport of [MOBILE, NARROW]) {
     expect(Math.abs(credits.y - count.y)).toBeLessThanOrEqual(1);
     expect(time.width).toBeGreaterThanOrEqual(viewport.width - 64);
     expect(credits.width).toBeGreaterThanOrEqual(viewport.width / 2 - 40);
-    // The estimate link and its figure fit on one line each, so nothing wraps over two lines.
+    // The estimate link is a 44 px target and fits on one line.
     const link = await box(delivery.getByRole("link", { name: "How we estimate" }));
-    expect(link.height).toBeLessThan(40);
+    expect(link.height).toBeGreaterThanOrEqual(44);
+    expect(link.width).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       viewport.width,
     );

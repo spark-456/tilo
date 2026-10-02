@@ -34,6 +34,10 @@ UX-1–UX-9 (18.1); FR-WLD-* (world rendering); owned starting P0-08.
 - An unknown world id (fixture client knows one) or a path no screen owns under `/world/` or
   `/task/` shows `NotFound`, never the Start screen or another world's run.
 
+## Needs you (`src/needs-you/`, AGW-05)
+- `reduce.ts` (one reducer; queue.ts, gates.ts wrap it) derives queue and gates from events only, by run (HR-1); a card joins on same id and
+  run id. A gate opens on `approval.resolved` (approve) or `policy.applied` (stamp, HR-7). `/screens/cards`.
+
 ## Local rules
 - Nothing animates without a recorded event (honesty rules HR-1–HR-7, PRD 9.4).
 - One primary filled button per screen (UX-1); no streaks, hearts or fake urgency (UX-7).

@@ -79,6 +79,9 @@ loader. No new licence. FR-CON-02 adds `cryptography` for AES-GCM envelope encry
 | --- | --- | --- |
 | cryptography (`tilo_connectors.tokens`, FR-CON-02) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
 
+FR-CON-10 (`tilo_connectors.provenance`) adds the in-workspace `tilo-archive` and `tilo-contracts`
+(not external). No new licence.
+
 ## Python (`services/browser`)
 
 `tilo-browser` (FR-CON-07/08) adds one direct runtime dependency, already in `uv.lock` through `httpx`:
@@ -100,8 +103,10 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | python-pptx | MIT | https://pypi.org/project/python-pptx/ |
+| reportlab | BSD | https://pypi.org/project/reportlab/ |
+| pypdf | BSD-3-Clause | https://pypi.org/project/pypdf/ |
 
-`tilo-render` (AGR-01/02 / FR-CON-09) also uses `pydantic` (already listed under `packages/contracts-py`, MIT) and `pyyaml` (already listed under the root dev dependency group, MIT).
+`tilo-render` (AGR-01/02/03 / FR-CON-09) also uses `pydantic` (already listed under `packages/contracts-py`, MIT) and `pyyaml` (already listed under the root dev dependency group, MIT).
 
 ## JavaScript / TypeScript (root `package.json` and `apps/web`, `pnpm`-managed)
 
@@ -111,6 +116,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | firebase-tools (runs the Firestore emulator for `services/harness`, P0-09) | MIT | https://www.npmjs.com/package/firebase-tools |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
 | react, react-dom, pixi.js, vite, @vitejs/plugin-react, vitest, @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/ |
+| vite 6.4.x (#69, replaces 5.4.x; pulls esbuild 0.25, rollup, fdir, tinyglobby, all MIT; no licence change) | MIT | https://www.npmjs.com/package/vite |
 | @playwright/test | Apache-2.0 | https://www.npmjs.com/package/@playwright/test |
 | @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
 | @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT; fonts Nunito, Nunito Sans, JetBrains Mono are OFL-1.1 | https://fonts.google.com/ |

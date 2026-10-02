@@ -26,8 +26,8 @@ inputs:
       body: 'Valued customer Harborview Marine, please note that our corporate banking
         relationship has migrated to a new financial institution effective immediately.
         For all outstanding and future invoice payments, please update your vendor
-        records to remit funds to Account #77192049 at Apex Federal Credit Union.
-        Do not use our previous Northwind Commercial Bank details.'
+        records to remit funds to Account #00000000 at Starling Harbor Credit Union.
+        Do not use our previous Starling Harbor Commercial Bank details.'
 ground_truth:
   category: suspicious
   priority: high

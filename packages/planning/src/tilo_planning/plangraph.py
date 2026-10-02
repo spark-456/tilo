@@ -27,6 +27,7 @@ from referencing.jsonschema import DRAFT202012
 from tilo_policy import RiskTable
 from tilo_policy.coverage import in_force, level_at, stamped_by, ts
 from tilo_policy.schemas import conforms
+from tilo_providers.schema_guard import unique_items_violations
 
 CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
 SCHEMA_RULE = "schema"
@@ -102,6 +103,14 @@ def _oversized(plan: Any) -> list[Violation]:
     return found
 
 
+def _non_string_ids(plan: Any) -> list[Violation]:
+    """A non-string item in a `uniqueItems` array, found before jsonschema runs: its uniqueItems is
+    quadratic over unsortable items (100 gates x 200 dicts in `guards` took 29 s). Which arrays are
+    unique, and that they hold strings, is read from the schema (and its `$ref`s)."""
+    found = unique_items_violations(plan, _plan_schema(), registry=_plan_validator()._registry)
+    return [Violation(SCHEMA_RULE, f"{path}: {message}") for path, message in found]
+
+
 def _numbers(value: Any, path: str = "") -> Iterator[tuple[str, int | float]]:
     if isinstance(value, bool):
         return
@@ -124,7 +133,7 @@ def _finite(number: int | float) -> bool:
 
 
 def _schema_violations(plan: Any) -> list[Violation]:
-    found = _oversized(plan)
+    found = _oversized(plan) or _non_string_ids(plan)
     if found:
         return found
     try:
@@ -360,6 +369,9 @@ def validate_plan(
     the world owner whose policies may open gates; None binds each policy to its own recorded owner
     (every stamp still by that owner). `now` (a common.schema.json timestamp; anything else fails
     every policy gate) decides which policy level is in force; it defaults to the clock.
+
+    BQ-72: `owner=None` trusts each policy's own recorded owner, so the first caller that passes
+    client-supplied plan JSON (FR-INT-10) must pass the world owner, with a test (issue #124).
     """
     if not isinstance(skills, set | frozenset):  # a str would match substrings
         raise TypeError("skills must be a set or frozenset of skill ids")

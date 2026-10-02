@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import itertools
 import json
+import math
+import re
 from dataclasses import dataclass
 from typing import Annotated, Any
 
@@ -49,6 +51,18 @@ def check_distinct(approaches: list[dict[str, Any]]) -> bool:
     return all(differing_dimensions(a, b) >= MIN_DIFFERING for a, b in itertools.combinations(approaches, 2))
 
 
+def _label(value: Any) -> str:
+    """A model-written id as it appears in a problem line: only the id pattern's own characters, never prose."""
+    return value if isinstance(value, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,31}", value) else "?"
+
+
+def _credit_ok(value: Any, *, positive: bool) -> bool:
+    """A finite number of credits (a bool is not one): above 0 for a maximum, 0 or more for a minimum."""
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        return False
+    return value > 0 if positive else value >= 0
+
+
 def problems(approaches: list[dict[str, Any]]) -> list[str]:
     """Every PG-07/08/09 rule the set breaks, in words the Director can act on. Empty when the set is usable."""
     found = []
@@ -57,10 +71,15 @@ def problems(approaches: list[dict[str, Any]]) -> list[str]:
         found.append("PG-07: approach ids must be unique")
     for a, b in itertools.combinations(approaches, 2):
         if (n := differing_dimensions(a, b)) < MIN_DIFFERING:
-            found.append(f"PG-08: {a['id']} and {b['id']} differ on {n} of 5 dimensions; they must differ on 2")
+            found.append(
+                f"PG-08: {_label(a['id'])} and {_label(b['id'])} differ on {n} of 5 dimensions; they must differ on 2"
+            )
     for a in approaches:
-        if a["time"]["min_s"] > a["time"]["max_s"] or a["credits"]["min"] > a["credits"]["max"]:
-            found.append(f"PG-09: {a['id']} has a range whose minimum is above its maximum")
+        credits = a["credits"]
+        if not (_credit_ok(credits["min"], positive=False) and _credit_ok(credits["max"], positive=True)):
+            found.append(f"PG-09: {_label(a['id'])} has credits that are not finite or a maximum that is not above 0")
+        elif a["time"]["min_s"] > a["time"]["max_s"] or credits["min"] > credits["max"]:
+            found.append(f"PG-09: {_label(a['id'])} has a range whose minimum is above its maximum")
     return found
 
 
@@ -99,7 +118,8 @@ def propose_approaches(
     runs = [run]
     if found := problems(approaches):  # one repair through the router, then reject
         previous = _data(json.dumps({"approaches": approaches}, ensure_ascii=False, indent=2), "PREVIOUS")
-        variables = {"problems": "\n".join(f"- {p}" for p in found), "brief": brief_text, "previous": previous}
+        listed = _data("\n".join(f"- {p}" for p in found), "PROBLEMS")
+        variables = {"problems": listed, "brief": brief_text, "previous": previous}
         remaining = None if budget is None else run.budget
         run, approaches = _ask(router, load_prompt(DIRECTOR_ROLE, "approaches_repair.md", variables), remaining)
         runs.append(run)

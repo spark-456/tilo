@@ -52,9 +52,10 @@ def test_FR_CHN_05_pin_in_the_grace_window_never_reaches_unhandled(rig: CardRig)
     rig.clock.advance(PIN_WINDOW_S + 1)
     assert router.handle(rig.message(NUM_RIYA, text=f" {rig.pin} ")).route == "card"
     assert _texts(rig)[-1] == LATE and rig.pins.checks == []
-    assert router.handle(rig.message(NUM_RIYA, text="what is the status?")).route == "unhandled"  # not digits
+    free_text = ("unhandled", "off_topic")  # FR-CHN-04 renames the free-text route (API_FR_CHN_04.md)
+    assert router.handle(rig.message(NUM_RIYA, text="what is the status?")).route in free_text  # not digits
     rig.clock.advance(PIN_WINDOW_S)  # grace over: digits are ordinary text again
-    assert router.handle(rig.message(NUM_RIYA, text=rig.pin)).route == "unhandled"
+    assert router.handle(rig.message(NUM_RIYA, text=rig.pin)).route in free_text
 
 
 def test_FR_CHN_05_answered_pin_leaves_no_late_capture(rig: CardRig) -> None:

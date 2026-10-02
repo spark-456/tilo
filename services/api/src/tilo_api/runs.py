@@ -12,7 +12,6 @@ import math
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
-from types import SimpleNamespace
 from typing import Annotated, Any
 
 import tilo_planning.plangraph as plangraph
@@ -34,8 +33,16 @@ _TIERS = ("T1", "T2", "T3")
 _FORMATS = {"send_email": "email"}  # the deliverable_format a send action delivers
 _GATE_TIMEOUT_S = 86_400  # BQ-90: then the card holds; a gate never times out to go
 _POLL_S = 0.25  # how often a waiting gate looks for an answer or a pause
+_EXACT_MAX = 500  # card.schema.json: gate.action.exact
 _SEND_RETRY_DELAYS_S = (0.0, 0.2, 0.5, 1.0, 2.0, 2.0)  # FR-AGT-11: the send step is retried, never resent
-_CLOCK = SimpleNamespace(now=events.now)
+
+
+class _WallClock:
+    def now(self) -> str:
+        return events.now()
+
+
+_CLOCK = _WallClock()
 
 
 class RunStopped(Exception):
@@ -168,10 +175,11 @@ class Run:
             self._abandon_unsent()
 
     def _outbox(self) -> Outbox:
-        """The run dispatches and records only its own world's entries (FR-WLD-07)."""
+        """The run dispatches and records only its own world's entries, and claims none once the world is paused
+        (FR-WLD-07)."""
         return Outbox(
             self.seams.outbox_store, self.seams.adapters, emit=self._record_transfer, clock=events.now,
-            world_id=self.world_id,
+            world_id=self.world_id, halted=self.paused,
         )  # fmt: skip
 
     def _abandon_unsent(self) -> None:
@@ -232,6 +240,8 @@ class Run:
     async def gate(self, unit: dict, worker: str, action: str, ref: dict, made: str) -> None:
         """PRD 10.3/10.4: the policy engine assesses the send, a person approves it, the outbox sends it once."""
         item, district = {"artifact_id": ref["artifact_id"], "version": ref["version"]}, unit["district"]
+        if self.foreign([item]):  # fails closed before the policy engine or any card sees it
+            raise _GateFailed("the item to send belongs to another world")
         gate = next((g for g in self.plan["gates"] if unit["id"] in g["guards"] and g["action_type"] == action), None)
         connector = next((c for c in unit["connectors"] if self._action(c, action)), None)
         if gate is None or connector is None:
@@ -258,7 +268,10 @@ class Run:
         irreversible = self._action(connector, action)["irreversible"]  # type: ignore[index]
         card_id, outbox_id = events.new_part_id(), events.new_part_id()
         card = self._gate_card(unit, worker, card_id, gate["id"], connector, action, tier, irreversible)
-        card["gate"]["action"] |= {"item": ref, "destination": destination}
+        exact = self._exact(connector, action, destination, recipients)
+        if len(exact) > _EXACT_MAX:  # never cut: a cut would hide a recipient from the person approving
+            raise _GateFailed("the send names too many recipients to show on one card")
+        card["gate"]["action"] |= {"item": ref, "destination": destination, "exact": exact}
         card["gate"]["recipients"] = recipients
         if _card_errors(card):  # checked before anything is written
             raise _GateFailed("the gate card was refused")
@@ -359,11 +372,25 @@ class Run:
             ],
             "add_context": False, "actions": ["show_me"], "answer_channels": ["web", "mobile_web", "whatsapp"],
             "created_at": events.now(), "timeout": _GATE_TIMEOUT_S, "safe_default": "hold",
-            "gate": {"id": gate_id, "action": {"type": action, "connector": connector,
-                                               "exact": f"{unit['title']} by {name}."[:500]},
+            "gate": {"id": gate_id, "action": {"type": action, "connector": connector, "exact": ""},
                      "irreversible": irreversible, "risk_tier": tier},
             "consent": None,
         }  # fmt: skip
+
+    def foreign(self, refs: list[dict]) -> list[str]:
+        """Artifact ids that another world already holds: a unit never makes or sends another world's item. A
+        runner names its own artifacts only; the streams are what say whose an item is."""
+        ids = {ref["artifact_id"] for ref in refs}
+        return sorted(
+            i for w, stream in self.store.events.items() if w != self.world_id for e in stream
+            if e.get("type") == "artifact.created" and (i := e["data"]["artifact"]["artifact_id"]) in ids
+        )  # fmt: skip
+
+    def _exact(self, connector: str, action: str, destination: str, recipients: list[str]) -> str:
+        """What the send does, from the action, connector, destination and recipients only; no model-written text
+        (a unit's title is not trusted to describe what is sent)."""
+        name = self.seams.connectors.get(connector)["name"]
+        return f"{action} by {name} to {', '.join(recipients)} (destination {destination})."
 
     def _action(self, connector: str, action: str) -> dict | None:
         declared = self.seams.connectors.get(connector)["actions"] if connector in self.seams.connectors else []
@@ -389,6 +416,10 @@ class _GatedRunner:
         refs = list(outcome.artifact_refs) if isinstance(outcome.artifact_refs, list | tuple) else None
         if refs is None or not all(conforms("common.schema.json#/$defs/artifact_ref", ref) for ref in refs):
             return UnitOutcome(success=False, summary="The unit named an artifact that does not exist.")
+        if foreign := self._run.foreign(refs):  # nothing of this unit is recorded
+            self._run.failure = "the unit named an item that belongs to another world"
+            logger.warning("run %s: a unit named items of another world: %s", self._run.run_id, foreign)
+            return UnitOutcome(success=False, summary="The unit named an artifact that does not belong to this world.")
         made = {
             ref["artifact_id"]: self._run.put(
                 "artifact.created", context.agent_id, ref["artifact_id"], "The agent made an item.",

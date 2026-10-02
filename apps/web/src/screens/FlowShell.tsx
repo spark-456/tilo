@@ -6,11 +6,11 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { useClient } from "../api/ClientProvider";
 import type { ApproachesResult } from "../api/client";
 import { useFlowRoute } from "../router";
+import { StartScreen } from "./flow/StartScreen";
+import "./flow/flow.css";
 import { type Action, type Remote, useAction, useRemote } from "./remote";
 
 const enc = encodeURIComponent;
-// AGW-02 replaces this with the task box.
-const INTAKE_TEXT = "Triage my inbox and answer the supplier about Thursday";
 
 function Notice({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
@@ -23,7 +23,7 @@ function Notice({ message, onRetry }: { message: string; onRetry: () => void }) 
   );
 }
 
-function Summary({ children }: { children: ReactNode }) {
+export function Summary({ children }: { children: ReactNode }) {
   return <p className="flow-summary">{children}</p>;
 }
 
@@ -75,15 +75,6 @@ export function Primary({
       </button>
     </>
   );
-}
-
-function Start() {
-  const client = useClient();
-  const action = useAction("start the task", async () => {
-    const intake = await client.submitIntake(INTAKE_TEXT, []);
-    return `/task/${enc(intake.task_id)}/understanding`;
-  });
-  return <Primary label="Start task" action={action} />;
 }
 
 function Understanding({ taskId }: { taskId: string }) {
@@ -165,12 +156,7 @@ export function FlowShell() {
   const screen = (() => {
     switch (route.screen) {
       case "Start":
-        return (
-          <>
-            <Summary>Describe what you want Tilo to handle.</Summary>
-            <Start />
-          </>
-        );
+        return <StartScreen />;
       case "Understanding":
         return (
           <>
@@ -191,7 +177,7 @@ export function FlowShell() {
   })();
   return (
     <section
-      className="flow-shell"
+      className={route.screen === "Start" ? "flow-shell flow-wide" : "flow-shell"}
       data-testid="flow-shell"
       data-screen={route.screen}
       aria-label="Task flow"

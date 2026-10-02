@@ -35,7 +35,7 @@ class EgressPolicy:
 
 ```python
 def mask_text(text: str) -> str      # [masked:secret|card|email|phone]; idempotent; see test docstring
-def mask_data(value: Any) -> Any     # recursive over dict/list/str, copies, other types untouched
+def mask_data(value: Any) -> Any     # iterative over dict/list/tuple/str (keys too), copies, other types untouched
 ```
 
 ## `tilo_browser.login`

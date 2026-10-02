@@ -18,6 +18,7 @@ from tilo_providers.errors import ProviderError, RequestError, SafetyError
 from tilo_providers.factory import build_provider
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider
 from tilo_providers.prompts import load_prompt
+from tilo_providers.schema_guard import unique_items_violations
 
 ProviderFor = Callable[[str], ModelProvider]
 
@@ -90,7 +91,11 @@ class RouterResult:
 def schema_error(response: GenerateResponse, schema: dict[str, Any]) -> str | None:
     """The validation error for `response` against `schema` (capped length), or None if it is valid."""
     try:
-        jsonschema.validate(json.loads(response.text or ""), schema)
+        instance = json.loads(response.text or "")
+        if violations := unique_items_violations(instance, schema):  # #124: before jsonschema's quadratic uniqueItems
+            path, problem = violations[0]
+            return f"{path}: {problem}"[:300]
+        jsonschema.validate(instance, schema)
     except (ValueError, jsonschema.ValidationError) as error:
         message = error.message if isinstance(error, jsonschema.ValidationError) else f"not valid JSON ({error})"
         return message[:300]  # a validation error fed back in a repair prompt is capped
