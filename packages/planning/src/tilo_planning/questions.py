@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Any
 
 from tilo_planning.brief import CHIP_FIELDS, BriefValidationError, complete_brief, validate_brief
@@ -110,6 +111,35 @@ def record_assumption(brief: dict[str, Any], question: Question, assumed: str | 
     value = clip(assumed if assumed is not None else question.suggested_answers[0], 300)
     updated["assumptions"].append({"question": question.text, "assumed": value})
     return validate_brief(updated)
+
+
+def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, today: date) -> dict[str, Any]:
+    """The person's answer to `question` (FR-INT-04). The Director's guess (the first suggested answer) keeps
+    the chip; another suggested answer sets the chip value it stands for; anything else is set as typed. An
+    answer the chip cannot hold raises BriefValidationError, and the person edits the chip instead."""
+    if answer == question.suggested_answers[0]:
+        return validate_brief(copy.deepcopy(brief))
+    field = question.field
+    value: Any = _ANSWER_VALUES.get(field, {}).get(answer, answer)
+    if field == "deliverables":
+        value = [{**d, "format": value} for d in brief["deliverables"]]
+    elif field == "constraints":
+        value = [] if value is None else list(dict.fromkeys([*brief["constraints"], value]))
+    elif field == "sources" and value in (None, "web"):
+        kept = [s for s in brief["sources"] if s["kind"] != "web"]
+        value = kept if value is None else [*kept, {"kind": "web", "ref": brief["goal"]}]
+    elif field == "deadline" and value == "end_of_week":
+        value = (today + timedelta(days=(4 - today.weekday()) % 7)).isoformat()  # the coming Friday
+    return validate_brief({**copy.deepcopy(brief), field: value})
+
+
+# Suggested answers (from _WORDING) that stand for a chip value; any other answer is set as typed.
+_ANSWER_VALUES: dict[str, dict[str, Any]] = {
+    "deliverables": {"A PDF report": "pdf", "A slide deck": "pptx", "A document I can edit": "docx"},
+    "deadline": {"No firm deadline": None, "By the end of this week": "end_of_week"},
+    "constraints": {"No extra rules": None},
+    "sources": {"Only what I attached": None, "The web as well": "web"},
+}
 
 
 def _current(brief: dict[str, Any], field: str) -> str:
