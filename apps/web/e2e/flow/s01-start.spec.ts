@@ -95,7 +95,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await page.locator('input[type="file"]').setInputFiles([pdf("a.pdf")]);
     await resetShifts(page); // measure from the click on
     await page.getByRole("button", { name: "Start", exact: true }).click();
-    await expect(page.getByRole("button", { name: /^Start…/ })).toHaveAttribute(
+    await expect(page.getByRole("button", { name: /^Startâ€¦/ })).toHaveAttribute(
       "aria-busy",
       "true",
     );

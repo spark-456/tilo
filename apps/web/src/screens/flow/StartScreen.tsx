@@ -71,12 +71,12 @@ export function StartScreen() {
             {text.length.toLocaleString("en-US")} / {MAX_TEXT.toLocaleString("en-US")}
           </p>
         </div>
-        <fieldset className="chips" aria-label="Suggested tasks">
+        <fieldset className="task-chips" aria-label="Suggested tasks">
           {SUGGESTED_TASKS.map((task) => (
             <button
               type="button"
               key={task}
-              className="chip"
+              className="task-chip"
               onClick={() => {
                 edit(task);
                 box.current?.focus();
