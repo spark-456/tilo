@@ -88,7 +88,7 @@ def test_FR_INT_02_flow_answers_fail_closed_when_the_screen_errors(flow):
     from tilo_providers.interfaces import SafetyProvider
 
     class Broken(SafetyProvider):
-        def check(self, text, *, content=None, mime_type=None):
+        def _check(self, text, *, content=None, mime_type=None):
             raise RequestError("screen unavailable")
 
     intake = flow.new_task()
