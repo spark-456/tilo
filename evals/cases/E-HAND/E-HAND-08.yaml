@@ -1,0 +1,27 @@
+id: E-HAND-08
+group: E-HAND
+title: Context handoff — Starling Marine seasonal berth maintenance log synthesis
+measures:
+  - EV-10
+  - FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  handoff_trigger_pct: 70
+  task: >-
+    Review 22 berth inspection reports for Starling Marine, preserve open
+    work-order counts across the 70% context handoff, and produce a consolidated
+    dock maintenance schedule without re-reading earlier reports.
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+  - check: equals_ground_truth
+    args:
+      field: rework
+  - check: no_side_effects
+    args: {}
+recording: null
+notes: >-
+  Handoff continuity check (EV-10, FR-AGT-09) runs once harness context-handoff
+  recordings exist.

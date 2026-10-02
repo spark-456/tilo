@@ -1,0 +1,27 @@
+id: E-HAND-10
+group: E-HAND
+title: Context handoff — Fluxpoint vs Ledgerly multi-year TCO model across 8 team sizes
+measures:
+  - EV-10
+  - FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  handoff_trigger_pct: 70
+  task: >-
+    Compute 3-year total cost of ownership tables comparing Fluxpoint, Ledgerly,
+    and Beacontrack across 8 team cohorts, hand off cohort 1-5 tables at 70%
+    context capacity, and finish cohorts 6-8 without recomputing cohorts 1-5.
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+  - check: equals_ground_truth
+    args:
+      field: rework
+  - check: no_side_effects
+    args: {}
+recording: null
+notes: >-
+  Handoff continuity check (EV-10, FR-AGT-09) runs once harness context-handoff
+  recordings exist.

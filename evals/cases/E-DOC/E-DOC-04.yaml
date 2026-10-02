@@ -1,0 +1,44 @@
+id: E-DOC-04
+group: E-DOC
+title: PPTX deck — Marigold Press monthly press line utilization review
+measures:
+  - FR-CON-09
+  - EV-01
+status: skeleton
+deploy_gate: false
+inputs:
+  format: pptx
+  task: >-
+    Build a PPTX presentation deck for Marigold Press reviewing monthly press
+    line utilization from the attached CSV, with a chart of jobs completed by
+    press line.
+  files:
+    - evals/fixtures/doc/marigold_press_utilization.csv
+  required_sections:
+    - Title and Highlights
+    - Press Line Output Chart
+    - Maintenance Schedule Impact
+  chart_label_column: press_line
+  chart_value_column: jobs_completed
+scripted_answers: []
+ground_truth:
+  required_sections:
+    - Title and Highlights
+    - Press Line Output Chart
+    - Maintenance Schedule Impact
+  chart_values:
+    Offset Line A: 42
+    Offset Line B: 38
+    Digital Sheet C: 64
+    Large Format D: 29
+checks:
+  - check: equals_ground_truth
+    args:
+      field: required_sections
+  - check: equals_ground_truth
+    args:
+      field: chart_values
+recording: null
+notes: >-
+  Deliverable section, chart-source equality, and clean-open checks run once the
+  render service is wired (FR-CON-09).

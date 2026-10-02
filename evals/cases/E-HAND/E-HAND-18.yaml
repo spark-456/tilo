@@ -1,0 +1,27 @@
+id: E-HAND-18
+group: E-HAND
+title: Context handoff — Copperfield Foundry 15-alloy melt log reconciliation
+measures:
+  - EV-10
+  - FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  handoff_trigger_pct: 70
+  task: >-
+    Review 15 induction furnace melt logs for Copperfield Foundry, preserve
+    scrap-to-charge ratios across the 70% context handoff, and complete the
+    monthly metallurgical summary without rework.
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+  - check: equals_ground_truth
+    args:
+      field: rework
+  - check: no_side_effects
+    args: {}
+recording: null
+notes: >-
+  Handoff continuity check (EV-10, FR-AGT-09) runs once harness context-handoff
+  recordings exist.

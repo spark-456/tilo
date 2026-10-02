@@ -1,0 +1,45 @@
+id: E-RES-10
+group: E-RES
+title: Riverside Kitchens rate card, licence, and earliest available date
+measures:
+  - EV-01
+  - EV-05
+status: ready
+deploy_gate: false
+inputs:
+  seed: services/sandbox-web/seed/riverside-kitchens.yaml
+  site: riverside-kitchens
+  url: https://riverside-kitchens.example/s/riverside-kitchens/profile
+  task: >-
+    Read the Riverside Kitchens profile and quote details at
+    riverside-kitchens.example and report the base fee, per-sqft rate,
+    per-cabinet rate, licence number, and earliest available date.
+scripted_answers: []
+ground_truth:
+  base_fee: 500
+  per_sqft: 85
+  per_cabinet: 120
+  licence: "SG-BCA-KRW-00231"
+  first_available_date: "2026-11-03"
+checks:
+  - check: equals_ground_truth
+    args:
+      field: base_fee
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: per_sqft
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: per_cabinet
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: licence
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: first_available_date
+      tolerance: 0
+recording: null

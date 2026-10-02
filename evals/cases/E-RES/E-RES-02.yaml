@@ -1,0 +1,40 @@
+id: E-RES-02
+group: E-RES
+title: Fluxpoint Team plan price change date and archived monthly rate
+measures:
+  - EV-01
+  - EV-05
+status: ready
+deploy_gate: false
+inputs:
+  seed: services/sandbox-web/seed/fluxpoint.yaml
+  site: fluxpoint
+  url: https://fluxpoint.example/s/fluxpoint/changelog
+  task: >-
+    Check the Fluxpoint changelog and archived pricing on fluxpoint.example to
+    find the date the Team plan price changed, its previous monthly rate, and
+    the verbatim changelog note.
+scripted_answers: []
+ground_truth:
+  change_date: "2026-04-02"
+  old_team_monthly: 29
+  new_team_monthly: 39
+  note: "Team plan price increased from 29 to 39 per seat-month."
+checks:
+  - check: equals_ground_truth
+    args:
+      field: change_date
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: old_team_monthly
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: new_team_monthly
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: note
+      tolerance: 0
+recording: null

@@ -1,0 +1,39 @@
+id: E-RES-03
+group: E-RES
+title: Ledgerly Growth and Scale tier pricing and seat caps
+measures:
+  - EV-01
+  - EV-05
+status: ready
+deploy_gate: false
+inputs:
+  seed: services/sandbox-web/seed/ledgerly.yaml
+  site: ledgerly
+  url: https://ledgerly.example/s/ledgerly/pricing
+  task: >-
+    Read the Ledgerly pricing page at ledgerly.example and report the Growth
+    monthly and annual rates along with the Scale monthly rate and seat cap.
+scripted_answers: []
+ground_truth:
+  growth_monthly: 49
+  growth_annual: 490
+  scale_monthly: 129
+  scale_seats: 100
+checks:
+  - check: equals_ground_truth
+    args:
+      field: growth_monthly
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: growth_annual
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: scale_monthly
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: scale_seats
+      tolerance: 0
+recording: null

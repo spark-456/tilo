@@ -1,0 +1,40 @@
+id: E-RES-06
+group: E-RES
+title: Beacontrack historical Basic and Enterprise plan changes
+measures:
+  - EV-01
+  - EV-05
+status: ready
+deploy_gate: false
+inputs:
+  seed: services/sandbox-web/seed/beacontrack.yaml
+  site: beacontrack
+  url: https://beacontrack.example/s/beacontrack/changelog
+  task: >-
+    Check Beacontrack's changelog and archived pricing at beacontrack.example
+    for the dates and prior monthly prices of the Basic and Enterprise plan
+    increases.
+scripted_answers: []
+ground_truth:
+  basic_change_date: "2026-05-20"
+  old_basic_monthly: 12
+  enterprise_change_date: "2026-02-10"
+  old_enterprise_monthly: 89
+checks:
+  - check: equals_ground_truth
+    args:
+      field: basic_change_date
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: old_basic_monthly
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: enterprise_change_date
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: old_enterprise_monthly
+      tolerance: 0
+recording: null

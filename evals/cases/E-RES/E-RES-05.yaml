@@ -1,0 +1,39 @@
+id: E-RES-05
+group: E-RES
+title: Beacontrack Basic, Pro, and Enterprise plan pricing
+measures:
+  - EV-01
+  - EV-05
+status: ready
+deploy_gate: false
+inputs:
+  seed: services/sandbox-web/seed/beacontrack.yaml
+  site: beacontrack
+  url: https://beacontrack.example/s/beacontrack/pricing
+  task: >-
+    Retrieve the current monthly prices for Beacontrack Basic, Pro, and
+    Enterprise plans and the Enterprise annual price from beacontrack.example.
+scripted_answers: []
+ground_truth:
+  basic_monthly: 15
+  pro_monthly: 45
+  enterprise_monthly: 99
+  enterprise_annual: 990
+checks:
+  - check: equals_ground_truth
+    args:
+      field: basic_monthly
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: pro_monthly
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: enterprise_monthly
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: enterprise_annual
+      tolerance: 0
+recording: null

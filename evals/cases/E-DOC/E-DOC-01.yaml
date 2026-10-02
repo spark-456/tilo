@@ -1,0 +1,46 @@
+id: E-DOC-01
+group: E-DOC
+title: PDF report — Harrier Logistics Q3 regional freight shipment volumes
+measures:
+  - FR-CON-09
+  - EV-01
+status: skeleton
+deploy_gate: false
+inputs:
+  format: pdf
+  task: >-
+    Generate a PDF operations report for Harrier Logistics covering Q3 regional
+    freight lanes using the attached CSV table, with a bar chart of shipments
+    by lane.
+  files:
+    - evals/fixtures/doc/harrier_q3_freight.csv
+  required_sections:
+    - Executive Summary
+    - Regional Lane Volume Chart
+    - On-Time Performance Analysis
+    - Recommendations
+  chart_label_column: lane
+  chart_value_column: shipments_q3
+scripted_answers: []
+ground_truth:
+  required_sections:
+    - Executive Summary
+    - Regional Lane Volume Chart
+    - On-Time Performance Analysis
+    - Recommendations
+  chart_values:
+    SG-MY: 420
+    SG-TH: 310
+    SG-ID: 285
+    SG-VN: 195
+checks:
+  - check: equals_ground_truth
+    args:
+      field: required_sections
+  - check: equals_ground_truth
+    args:
+      field: chart_values
+recording: null
+notes: >-
+  Deliverable section, chart-source equality, and clean-open checks run once the
+  render service is wired (FR-CON-09).

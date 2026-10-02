@@ -1,0 +1,43 @@
+id: E-DOC-02
+group: E-DOC
+title: PDF report — Kestrel Warehousing Q3 depot energy consumption and solar offset
+measures:
+  - FR-CON-09
+  - EV-01
+status: skeleton
+deploy_gate: false
+inputs:
+  format: pdf
+  task: >-
+    Produce a PDF sustainability report for Kestrel Warehousing from the
+    attached depot energy CSV, plotting kWh used per depot.
+  files:
+    - evals/fixtures/doc/kestrel_warehouse_energy.csv
+  required_sections:
+    - Overview
+    - Depot Energy Usage Chart
+    - Solar Offset Breakdown
+  chart_label_column: depot
+  chart_value_column: kwh_used
+scripted_answers: []
+ground_truth:
+  required_sections:
+    - Overview
+    - Depot Energy Usage Chart
+    - Solar Offset Breakdown
+  chart_values:
+    Jurong West: 18400
+    Tuas South: 24100
+    Changi North: 15900
+    Woodlands East: 12600
+checks:
+  - check: equals_ground_truth
+    args:
+      field: required_sections
+  - check: equals_ground_truth
+    args:
+      field: chart_values
+recording: null
+notes: >-
+  Deliverable section, chart-source equality, and clean-open checks run once the
+  render service is wired (FR-CON-09).

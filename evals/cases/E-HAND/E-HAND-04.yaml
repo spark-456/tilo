@@ -1,0 +1,27 @@
+id: E-HAND-04
+group: E-HAND
+title: Context handoff — warehouse solar and grid tariff reconciliation (gate 4)
+measures:
+  - EV-10
+  - FR-AGT-09
+status: skeleton
+deploy_gate: true
+inputs:
+  handoff_trigger_pct: 70
+  task: >-
+    Aggregate 24 monthly utility statements for Kestrel Warehousing depots,
+    hand off intermediate kWh and tariff totals at 70% context usage, and
+    compute the annual net-metering savings with no duplicate passes.
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+  - check: equals_ground_truth
+    args:
+      field: rework
+  - check: no_side_effects
+    args: {}
+recording: null
+notes: >-
+  Handoff continuity check (EV-10, FR-AGT-09) runs once harness context-handoff
+  recordings exist.

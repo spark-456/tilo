@@ -1,0 +1,27 @@
+id: E-HAND-09
+group: E-HAND
+title: Context handoff — Brinewater Guild member renewal dues reconciliation
+measures:
+  - EV-10
+  - FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  handoff_trigger_pct: 70
+  task: >-
+    Cross-check 30 member dues statements for Brinewater Guild against bank
+    remittance batches, hand off reconciled member IDs at 70% context usage,
+    and output the final arrears list with zero rework.
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+  - check: equals_ground_truth
+    args:
+      field: rework
+  - check: no_side_effects
+    args: {}
+recording: null
+notes: >-
+  Handoff continuity check (EV-10, FR-AGT-09) runs once harness context-handoff
+  recordings exist.

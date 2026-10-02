@@ -1,0 +1,40 @@
+id: E-RES-04
+group: E-RES
+title: Ledgerly Growth tier price increase date and historical rate
+measures:
+  - EV-01
+  - EV-05
+status: ready
+deploy_gate: false
+inputs:
+  seed: services/sandbox-web/seed/ledgerly.yaml
+  site: ledgerly
+  url: https://ledgerly.example/s/ledgerly/changelog
+  task: >-
+    Inspect the Ledgerly changelog and archived pricing on ledgerly.example to
+    determine when the Growth plan increased in price, what the old and new
+    monthly rates were, and the exact changelog note.
+scripted_answers: []
+ground_truth:
+  change_date: "2026-06-01"
+  old_growth_monthly: 39
+  new_growth_monthly: 49
+  note: "Growth plan price increased from 39 to 49 per seat-month."
+checks:
+  - check: equals_ground_truth
+    args:
+      field: change_date
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: old_growth_monthly
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: new_growth_monthly
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: note
+      tolerance: 0
+recording: null

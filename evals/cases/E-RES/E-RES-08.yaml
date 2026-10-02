@@ -1,0 +1,30 @@
+id: E-RES-08
+group: E-RES
+title: Maple & Stone Builders insurance coverage and earliest availability
+measures:
+  - EV-01
+  - EV-05
+status: ready
+deploy_gate: false
+inputs:
+  seed: services/sandbox-web/seed/maple-stone-builders.yaml
+  site: maple-stone-builders
+  url: https://maple-stone-builders.example/s/maple-stone-builders/profile
+  task: >-
+    Look up Maple & Stone Builders on maple-stone-builders.example and report
+    their verbatim public liability insurance statement and first available
+    start date.
+scripted_answers: []
+ground_truth:
+  insurance: "Public liability SGD 2,000,000, policy MSB-INS-8834"
+  first_available_date: "2026-11-06"
+checks:
+  - check: equals_ground_truth
+    args:
+      field: insurance
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: first_available_date
+      tolerance: 0
+recording: null

@@ -1,0 +1,43 @@
+id: E-DOC-03
+group: E-DOC
+title: PDF report — Bramble Cold-Chain corridor spoilage audit
+measures:
+  - FR-CON-09
+  - EV-01
+status: skeleton
+deploy_gate: false
+inputs:
+  format: pdf
+  task: >-
+    Create a PDF quality audit report for Bramble Cold-Chain from the attached
+    corridor spoilage CSV, charting spoilage units by corridor.
+  files:
+    - evals/fixtures/doc/bramble_coldchain_spoilage.csv
+  required_sections:
+    - Audit Scope
+    - Corridor Spoilage Chart
+    - Root-Cause Remedies
+  chart_label_column: corridor
+  chart_value_column: spoilage_units
+scripted_answers: []
+ground_truth:
+  required_sections:
+    - Audit Scope
+    - Corridor Spoilage Chart
+    - Root-Cause Remedies
+  chart_values:
+    Coastal North: 12
+    Highland Express: 19
+    Harbor Direct: 7
+    Island Ferry: 15
+checks:
+  - check: equals_ground_truth
+    args:
+      field: required_sections
+  - check: equals_ground_truth
+    args:
+      field: chart_values
+recording: null
+notes: >-
+  Deliverable section, chart-source equality, and clean-open checks run once the
+  render service is wired (FR-CON-09).

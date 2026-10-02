@@ -1,0 +1,43 @@
+id: E-DOC-06
+group: E-DOC
+title: PPTX deck — Veridian Advisory regional SLA compliance and ticket closure
+measures:
+  - FR-CON-09
+  - EV-01
+status: skeleton
+deploy_gate: false
+inputs:
+  format: pptx
+  task: >-
+    Create a PPTX quarterly service review deck for Veridian Advisory from the
+    attached SLA CSV, charting tickets closed per service region.
+  files:
+    - evals/fixtures/doc/veridian_sla_compliance.csv
+  required_sections:
+    - Regional SLA Summary
+    - Ticket Closure Volume Chart
+    - Staffing Actions
+  chart_label_column: service_region
+  chart_value_column: tickets_closed
+scripted_answers: []
+ground_truth:
+  required_sections:
+    - Regional SLA Summary
+    - Ticket Closure Volume Chart
+    - Staffing Actions
+  chart_values:
+    APAC South: 540
+    APAC North: 410
+    EMEA Central: 630
+    Americas West: 480
+checks:
+  - check: equals_ground_truth
+    args:
+      field: required_sections
+  - check: equals_ground_truth
+    args:
+      field: chart_values
+recording: null
+notes: >-
+  Deliverable section, chart-source equality, and clean-open checks run once the
+  render service is wired (FR-CON-09).
