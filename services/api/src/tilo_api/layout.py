@@ -10,6 +10,40 @@ from typing import Any
 _WORKER_PREFIX = {"specialist": "A_s", "writer": "A_w", "verifier": "A_v"}
 
 
+def visible_layout(layout: dict[str, Any], districts: tuple[str, ...]) -> dict[str, Any] | None:
+    """A non-owner's view of a layout (PRD 10.1): only the districts in `districts`, with their levels, their
+    leads, and the gates whose buildings are all visible, plus the islands those gates reach. Geometry is dropped
+    (it places hidden districts); worker agents stay, as in the event view, since nothing ties one to a district.
+    None when no district is visible: a layout schema-valid with no district cannot exist, so it is a 404."""
+    semantic = layout["semantic"]
+    all_buildings = {b["id"] for lv in semantic["levels"] for d in lv["districts"] for b in d["buildings"]}
+    levels, buildings, hidden_leads = [], set(), set()
+    for level in semantic["levels"]:
+        kept = [d for d in level["districts"] if d["id"] in districts]
+        hidden_leads |= {d["lead"] for d in level["districts"] if d["id"] not in districts}
+        buildings |= {b["id"] for d in kept for b in d["buildings"]}
+        if kept:
+            levels.append({**level, "districts": kept})
+    if not levels:
+        return None
+    gates = [
+        g for g in semantic["gates"]
+        if all(end in buildings for end in g["between"] if end in all_buildings)
+        and any(end in buildings for end in g["between"])
+    ]  # fmt: skip
+    reached = {end for g in gates for end in g["between"]}
+    return {
+        **layout,
+        "geometry": None,
+        "semantic": {
+            "levels": levels,
+            "islands": [i for i in semantic["islands"] if i["id"] in reached],
+            "gates": gates,
+            "agents": [a for a in semantic["agents"] if a["id"] not in hidden_leads],
+        },
+    }
+
+
 def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
     units = plan["units"]
     agents: list[dict[str, str]] = [{"id": "A_director", "rank": "director"}]
