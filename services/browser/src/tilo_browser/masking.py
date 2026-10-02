@@ -13,6 +13,10 @@ from itertools import accumulate
 from typing import Any
 from urllib.parse import unquote
 
+# Text is cut to this many characters before masking, so the cost per call is bounded (256 KiB, about 0.5 s worst case).
+MAX_TEXT_CHARS = 1 << 18
+TRUNCATED_MARKER = " [truncated]"
+
 _FREE_SECRETS = re.compile(
     r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}"
     r"|\bsk-[A-Za-z0-9_-]{20,}"
@@ -22,9 +26,18 @@ _FREE_SECRETS = re.compile(
     r"|\bya29\.[A-Za-z0-9_-]{20,}"
 )
 # The keyword is matched directly (no prefix scan), so a long word cannot make this quadratic.
+# A quoted value is taken whole (bounded), so `"password": "a b c"` leaves no tail.
 _KEY_VALUE = re.compile(
-    r"(?i)((?:password|passwd|pwd|secret|token|api[_-]?key|otp)[\"']?\s{0,8}[=:]\s{0,8}[\"']?)[^\s&\"']+"
+    r"(?i)((?:password|passwd|pwd|secret|token|api[_-]?key|otp)[\"']?\s{0,8}[=:]\s{0,8})"
+    r"(\"[^\"\n]{1,512}\"|'[^'\n]{1,512}'|[\"']?[^\s&\"']+)"
 )
+# `Authorization: <scheme> <credentials>`; the scheme is possessive so a masked value is left alone.
+_AUTH_HEADER = re.compile(
+    r"(?i)(\bauthorization[\"']?\s{0,8}[=:]\s{0,8}[\"']?(?:(?:basic|bearer|digest|token)\s{1,8})?+)"
+    r"(?!\[masked:)[A-Za-z0-9._~+/=-]{4,}"
+)
+# `scheme://userinfo@` anywhere in text (a path, a query, page copy): the userinfo is dropped.
+_URL_USERINFO = re.compile(r"(?<![A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]{0,15}://)[^\s/?#]{1,4096}@")
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}")
 _PHONE = re.compile(r"(?<![\w+])\+\d[\d ()-]{6,24}\d")
 # Digit groups of 2+ digits joined by one space or dash; a lone digit is never part of a card layout.
@@ -75,9 +88,25 @@ def _mask_cards(text: str) -> str:
     return "".join(out)
 
 
+def _mask_value(m: re.Match[str]) -> str:
+    value = m.group(2)
+    quote = value[0] if len(value) > 1 and value[0] in "\"'" and value[-1] == value[0] else ""
+    return f"{m.group(1)}{quote}[masked:secret]{quote}"
+
+
+def _cap(text: str) -> str:
+    if len(text) <= MAX_TEXT_CHARS or (
+        len(text) <= MAX_TEXT_CHARS + len(TRUNCATED_MARKER) and text.endswith(TRUNCATED_MARKER)
+    ):
+        return text
+    return text[:MAX_TEXT_CHARS] + TRUNCATED_MARKER
+
+
 def mask_text(text: str) -> str:
+    text = _URL_USERINFO.sub(r"\1[masked:secret]@", _cap(text))
     text = _FREE_SECRETS.sub("[masked:secret]", text)
-    text = _KEY_VALUE.sub(r"\1[masked:secret]", text)
+    text = _AUTH_HEADER.sub(r"\1[masked:secret]", text)
+    text = _KEY_VALUE.sub(_mask_value, text)
     text = _mask_cards(text)
     text = _EMAIL.sub("[masked:email]", text)
     return _PHONE.sub("[masked:phone]", text)
@@ -93,10 +122,38 @@ def mask_decoded(text: str) -> str:
 
 
 def mask_data(value: Any) -> Any:
-    if isinstance(value, str):
-        return mask_text(value)
-    if isinstance(value, dict):
-        return {k: mask_data(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [mask_data(v) for v in value]
-    return value
+    """Copy of `value` with every string and string dict key masked; dict, list and tuple are
+    walked, other scalars kept. Iterative, so depth is unbounded; a shared list or dict (or a
+    cycle) is copied once."""
+    out: list[Any] = [None]
+    seen: dict[int, Any] = {}
+    tuples: list[tuple[list[Any], Any, Any]] = []  # (items, parent, slot), parents before children
+    stack: list[tuple[Any, Any, Any]] = [(value, out, 0)]
+    while stack:
+        src, dst, slot = stack.pop()
+        if isinstance(src, str):
+            dst[slot] = mask_text(src)
+        elif not isinstance(src, dict | list | tuple):
+            dst[slot] = src
+        elif id(src) in seen:
+            dst[slot] = seen[id(src)]
+        elif isinstance(src, dict):
+            copy: Any = {}
+            seen[id(src)] = dst[slot] = copy
+            used: set[Any] = set()
+            for k, v in src.items():
+                key = mask_text(k) if isinstance(k, str) else k
+                while key in used:  # two secret keys must not collapse into one entry
+                    key = f"{key}#"
+                used.add(key)
+                stack.append((v, copy, key))
+        else:
+            copy = dst[slot] = [None] * len(src)
+            if isinstance(src, list):
+                seen[id(src)] = copy
+            else:
+                tuples.append((copy, dst, slot))
+            stack.extend((v, copy, i) for i, v in enumerate(src))
+    for items, parent, slot in reversed(tuples):  # a child tuple is rebuilt before its parent
+        parent[slot] = tuple(items)
+    return out[0]
