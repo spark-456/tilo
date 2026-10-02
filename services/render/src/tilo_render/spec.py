@@ -108,10 +108,7 @@ def _coerce_finite_float(val: Any, col_name: str) -> float:
         raise ValueError(f"Non-numeric value in column {col_name}")
     if isinstance(val, int) and abs(val) > 2**53:
         raise ValueError(f"Integer too large for precise representation in column {col_name}")
-    try:
-        fval = float(val)
-    except OverflowError as exc:
-        raise ValueError(f"Numeric value out of bounds in column {col_name}") from exc
+    fval = float(val)
     if math.isnan(fval) or math.isinf(fval):
         raise ValueError(f"Non-numeric value in column {col_name}")
     return fval

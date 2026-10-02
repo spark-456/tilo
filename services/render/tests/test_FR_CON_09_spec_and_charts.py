@@ -36,14 +36,20 @@ def test_FR_CON_09_spec_rejects_unknown_ids_columns_and_non_numeric_values() -> 
         c1 = Chart(id="c1", kind=ChartKind.BAR, table_id="table1", x="label", y=["miss"], title="C")
         make_spec(tables=[table], charts=[c1])
 
-    for bad_val in ("not_a_number", True, None, float("nan"), float("inf")):
-        with pytest.raises(ValueError):
+    for bad_val in ("not_a_number", float("nan"), float("inf")):
+        with pytest.raises(ValueError, match="Non-numeric value in column value"):
             t_bad = Table(id="table1", columns=["label", "value"], rows=[["A", bad_val], ["B", 20]])
             c1 = Chart(id="c1", kind=ChartKind.BAR, table_id="table1", x="label", y=["value"], title="C")
             make_spec(tables=[t_bad], charts=[c1])
 
+    for raw_val in (True, None):
+        with pytest.raises(ValueError):
+            Table(id="table1", columns=["label", "value"], rows=[["A", raw_val]])  # type: ignore[list-item]
+
     with pytest.raises(ValueError, match="Table cannot be empty"):
         Table(id="table1", columns=[], rows=[])
+    with pytest.raises(ValueError, match="Table cannot be empty"):
+        Table(id="table1", columns=["label", "value"], rows=[])
 
     t_two = Table(id="table1", columns=["l", "v", "o"], rows=[["A", 10, 5], ["B", 20, 15]])
     with pytest.raises(ValueError, match="Pie chart can only have one y column"):
@@ -94,15 +100,15 @@ def test_FR_CON_09_spec_enforces_the_safety_limits() -> None:
     )
 )
 def test_FR_CON_09_chart_data_equals_the_source_table(source_rows: list[tuple[str, float, int]]) -> None:
-    rows = [[label, val_a, val_b] for label, val_a, val_b in source_rows]
+    rows: list[list[str | int | float]] = [[label, val_a, val_b] for label, val_a, val_b in source_rows]
     table = Table(id="table1", columns=["label", "series_a", "series_b"], rows=rows)
     c1 = Chart(id="c1", kind=ChartKind.BAR, table_id="table1", x="label", y=["series_a", "series_b"], title="C")
     spec = make_spec(tables=[table], charts=[c1])
 
     chart_data = ChartData.from_spec(spec, "c1")
-    assert chart_data.categories == [row[0] for row in rows]
-    assert chart_data.series["series_a"] == [float(row[1]) for row in rows]
-    assert chart_data.series["series_b"] == [float(row[2]) for row in rows]
+    assert chart_data.categories == [label for label, _, _ in source_rows]
+    assert chart_data.series["series_a"] == [float(val_a) for _, val_a, _ in source_rows]
+    assert chart_data.series["series_b"] == [float(val_b) for _, _, val_b in source_rows]
 
 
 def test_FR_CON_09_chart_data_is_deterministic() -> None:
