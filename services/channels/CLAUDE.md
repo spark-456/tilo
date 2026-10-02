@@ -32,9 +32,9 @@ channel identity binding. Public ingress for signature-verified webhooks only.
 - Hardening: app secret >= 32 bytes (constructor raises; empty key never verifies); wamids never
   logged (`message_ref`: sha256 prefix, they encode the number); object, field and `phone_number_id`
   pinned; timestamps over 60 s ahead are dropped like stale ones (and logged).
-- `links` (FR-CHN-07; BQ-75 to BQ-81): HMAC-SHA256 (`compare_digest`, prefix `tilo-link-v1|`), every
+- `links` (FR-CHN-07; BQ-76 to BQ-82): HMAC-SHA256 (`compare_digest`, prefix `tilo-link-v1|`), every
   segment alphabet-checked before the MAC, claims parsed after; key ring live; nonce consumed last. Answer
   only for plain needs_you cards listing email (allowlist, fail closed); gate, consent, meeting open
-  only signed in. Naive clock refused. HTTP layer (BQ-81): `answer` needs a POST confirm (a scanner GET
+  only signed in. Naive clock refused. HTTP layer (BQ-82): `answer` needs a POST confirm (a scanner GET
   never answers); token in a URL fragment, not the path; public non-consuming verify; no consume on
   requires_sign_in; first answer is a compare-and-set on the card; whether `open` needs a POST too.
