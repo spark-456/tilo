@@ -14,12 +14,11 @@ from typing import Any
 import pydantic
 from tilo_contracts import Brief
 from tilo_providers.interfaces import Capability, GenerateRequest
-from tilo_providers.prompts import load_prompt
+from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.router import Router, RouterError, RouterResult
 
 DIRECTOR_ROLE = "director"
 CHIP_FIELDS = ("goal", "deliverables", "audience", "deadline", "constraints", "sources", "sensitivity")
-_END_MARKER = "TASK>>>"
 
 
 class BriefExtractionError(Exception):
@@ -77,7 +76,7 @@ def extract_brief(task_text: str, *, router: Router, budget: float | None = None
     """PRD 16.3 item 1: the task text is passed only as delimited data, after the instructions."""
     request = GenerateRequest(
         system=load_prompt(DIRECTOR_ROLE, "brief_system.md"),
-        prompt=load_prompt(DIRECTOR_ROLE, "brief_task.md", {"task": task_text.replace(_END_MARKER, "TASK> > >")}),
+        prompt=load_prompt(DIRECTOR_ROLE, "brief_task.md", {"task": neutralise_marker(task_text, "TASK")}),
         json_mode=True,
         response_schema=output_schema(),
     )

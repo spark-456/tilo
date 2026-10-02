@@ -105,11 +105,18 @@ def generate_questions(
     return QuestionsResult(brief, questions, event, hit_events)
 
 
-def record_assumption(brief: dict[str, Any], question: Question, assumed: str | None = None) -> dict[str, Any]:
-    """A skipped question keeps `assumed` (default: the Director's guess), shown as "Assumed: ..."."""
-    updated = copy.deepcopy(brief)
-    value = clip(assumed if assumed is not None else question.suggested_answers[0], 300)
-    updated["assumptions"].append({"question": question.text, "assumed": value})
+def record_assumption(
+    brief: dict[str, Any], question: Question, assumed: str | None = None, *, today: date | None = None
+) -> dict[str, Any]:
+    """A skipped question keeps `assumed` (default: the Director's guess), recorded as "Label: value" like
+    an assumption over the cap, and shown as "Assumed: ...". The assumption is the value the plan uses
+    (BQ-97), so the field takes it too: the guess leaves the chip as it is, another value is applied as
+    an answer would be."""
+    value = assumed if assumed is not None else question.suggested_answers[0]
+    updated = apply_answer(brief, question, value, today=today or date.today())
+    updated["assumptions"].append(
+        {"question": question.text, "assumed": clip(f"{_WORDING[question.field][0]}: {value}", 300)}
+    )
     return validate_brief(updated)
 
 
