@@ -22,12 +22,10 @@ from pathlib import Path
 from typing import Any
 
 import jsonschema
-from referencing import Registry, Resource
-from referencing.jsonschema import DRAFT202012
 from tilo_policy import RiskTable
 from tilo_policy.coverage import in_force, level_at, stamped_by, ts
 from tilo_policy.schemas import conforms
-from tilo_providers.schema_guard import unique_items_violations
+from tilo_providers.schema_guard import MAX_ERRORS, describe, guarded
 
 CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
 SCHEMA_RULE = "schema"
@@ -35,6 +33,8 @@ TIER_ORDER = ("T1", "T2", "T3")
 POLICY_LEVELS = ("L2", "L3")  # PG-10: only a policy that acts without a person may open a gate
 DIMENSIONS = ("depth", "sources", "parallelism", "verification", "output_format")
 MIN_DIFFERING = 2  # PG-08
+MAX_PLAN_BYTES = 64 * 1024  # BQ-107: the PRD and contracts set none; checked before any walk
+MAX_PLAN_DEPTH = 16  # BQ-107: containers nested in a plan; plan.schema.json needs 4
 
 
 @dataclass(frozen=True)
@@ -51,64 +51,68 @@ def _pattern(validator: Any, pattern: str, instance: Any, schema: dict[str, Any]
 
 
 @functools.cache
-def _plan_schema() -> dict[str, Any]:
-    schema: dict[str, Any] = json.loads((CONTRACTS / "plan.schema.json").read_text("utf-8"))
-    return schema
+def _contract(name: str) -> dict[str, Any]:
+    contract: dict[str, Any] = json.loads((CONTRACTS / name).read_text("utf-8"))
+    return contract
+
+
+def _inlined(node: Any, doc: str, seen: tuple[str, ...] = ()) -> Any:
+    """`node` (in contract `doc`) with every `$ref` replaced by a copy of its target. Each `$ref`
+    lookup cost about 150 us per id: 4.4 s for a plan at its array caps (#173). A cyclic `$ref`, or one
+    beside anything but a description, fails start-up."""
+    if isinstance(node, list):
+        return [_inlined(item, doc, seen) for item in node]
+    if not isinstance(node, dict):
+        return node
+    out = {key: _inlined(value, doc, seen) for key, value in node.items() if key not in ("$ref", "$defs", "$schema")}
+    if not isinstance(ref := node.get("$ref"), str):
+        return out
+    target_doc, _, pointer = ref.partition("#")
+    target_doc = target_doc or doc
+    if f"{target_doc}#{pointer}" in seen or set(out) - {"description"}:
+        raise ValueError(f"cannot inline $ref {ref} in {doc}")
+    target: Any = _contract(target_doc)
+    for part in filter(None, pointer.split("/")):
+        target = target[part]
+    resolved = _inlined(target, target_doc, (*seen, f"{target_doc}#{pointer}"))
+    return {**out, **resolved}
 
 
 @functools.cache
 def _plan_validator() -> Any:
-    schemas = [json.loads(p.read_text("utf-8")) for p in sorted(CONTRACTS.glob("**/*.schema.json"))]
-    # Without `$schema`, a `$ref` into another contract keeps the extended class (its `pattern`).
-    schemas = [{k: v for k, v in s.items() if k != "$schema"} for s in schemas]
-    registry = Registry().with_resources(
-        (s["$id"], Resource.from_contents(s, default_specification=DRAFT202012)) for s in schemas
-    )
-    cls = jsonschema.validators.extend(jsonschema.Draft202012Validator, {"pattern": _pattern})
-    return cls(_plan_schema(), registry=registry)
+    """Validates against plan.schema.json with every `$ref` inlined, a linear `uniqueItems` and the
+    `pattern` above; no `$schema` is left to swap in a stock validator class."""
+    cls = guarded(jsonschema.validators.extend(jsonschema.Draft202012Validator, {"pattern": _pattern}))
+    return cls(_inlined(_contract("plan.schema.json"), "plan.schema.json"))
 
 
-@functools.cache
-def _array_caps() -> tuple[dict[str, int], dict[str, dict[str, int]]]:
-    """maxItems of the plan's arrays and of the arrays inside their items, read from the schema.
-    `guards` has none; a gate guards at most every unit, so it takes the units cap."""
-    schema = _plan_schema()
-    top = {key: prop["maxItems"] for key, prop in schema["properties"].items() if "maxItems" in prop}
-    nested: dict[str, dict[str, int]] = {}
-    for key in top:
-        item = schema["$defs"][schema["properties"][key]["items"]["$ref"].rsplit("/", 1)[1]]
-        nested[key] = {f: p["maxItems"] for f, p in item["properties"].items() if "maxItems" in p}
-    nested["gates"].setdefault("guards", top["units"])
-    return top, nested
+def _too_deep(plan: Any) -> list[Violation]:
+    """Containers nested over MAX_PLAN_DEPTH, found without recursion before anything else walks the plan
+    (measuring its bytes costs bytes x depth). Every value takes at least a byte, so a plan with more values
+    than MAX_PLAN_BYTES is too big and the pass stops there."""
+    stack, seen = [(plan, 1)], 0
+    while stack:
+        node, depth = stack.pop()
+        if (seen := seen + 1) > MAX_PLAN_BYTES:
+            return [Violation(SCHEMA_RULE, f"/: the plan is larger than {MAX_PLAN_BYTES} bytes")]
+        if isinstance(node, dict | list):
+            if depth > MAX_PLAN_DEPTH:
+                return [Violation(SCHEMA_RULE, f"/: the plan is nested deeper than {MAX_PLAN_DEPTH} levels")]
+            stack.extend((child, depth + 1) for child in (node.values() if isinstance(node, dict) else node))
+    return []
 
 
-def _oversized(plan: Any) -> list[Violation]:
-    """Arrays over their cap, found before jsonschema runs: its uniqueItems is quadratic."""
-    if not isinstance(plan, dict):
-        return []
-    top, nested = _array_caps()
-    found = []
-    for key, cap in top.items():
-        items = plan.get(key)
-        if not isinstance(items, list):
-            continue
-        if len(items) > cap:
-            found.append(Violation(SCHEMA_RULE, f"/{key}: has more than {cap} items"))
-            continue
-        for i, item in enumerate(items):
-            for field, field_cap in nested[key].items():
-                value = item.get(field) if isinstance(item, dict) else None
-                if isinstance(value, list) and len(value) > field_cap:
-                    found.append(Violation(SCHEMA_RULE, f"/{key}/{i}/{field}: has more than {field_cap} items"))
-    return found
-
-
-def _non_string_ids(plan: Any) -> list[Violation]:
-    """A non-string item in a `uniqueItems` array, found before jsonschema runs: its uniqueItems is
-    quadratic over unsortable items (100 gates x 200 dicts in `guards` took 29 s). Which arrays are
-    unique, and that they hold strings, is read from the schema (and its `$ref`s)."""
-    found = unique_items_violations(plan, _plan_schema(), registry=_plan_validator()._registry)
-    return [Violation(SCHEMA_RULE, f"{path}: {message}") for path, message in found]
+def _too_big(plan: Any) -> list[Violation]:
+    """A plan over MAX_PLAN_BYTES as compact UTF-8 JSON, measured (after `_too_deep`) stopping at the cap."""
+    size = 0
+    try:
+        for chunk in json.JSONEncoder(ensure_ascii=False, separators=(",", ":")).iterencode(plan):
+            size += len(chunk.encode("utf-8", "surrogatepass"))
+            if size > MAX_PLAN_BYTES:
+                return [Violation(SCHEMA_RULE, f"/: the plan is larger than {MAX_PLAN_BYTES} bytes")]
+    except (TypeError, ValueError, RecursionError):  # not JSON, a number too long to print, too deep
+        return [Violation(SCHEMA_RULE, "/: the plan could not be validated")]
+    return []
 
 
 def _numbers(value: Any, path: str = "") -> Iterator[tuple[str, int | float]]:
@@ -133,12 +137,15 @@ def _finite(number: int | float) -> bool:
 
 
 def _schema_violations(plan: Any) -> list[Violation]:
-    found = _oversized(plan) or _non_string_ids(plan)
+    found = _too_deep(plan) or _too_big(plan)
     if found:
         return found
     try:
-        errors = sorted(_plan_validator().iter_errors(plan), key=lambda e: list(map(str, e.absolute_path)))
-        found = [Violation(SCHEMA_RULE, f"/{'/'.join(map(str, e.absolute_path))}: {e.message}") for e in errors]
+        errors = sorted(
+            itertools.islice(_plan_validator().iter_errors(plan), MAX_ERRORS),
+            key=lambda e: list(map(str, e.absolute_path)),
+        )
+        found = [Violation(SCHEMA_RULE, describe(e)) for e in errors]
     except Exception:  # too deep to walk, or a number too long to print: fail closed
         return [Violation(SCHEMA_RULE, "/: the plan could not be validated")]
     if not found:

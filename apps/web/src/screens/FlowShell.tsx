@@ -1,15 +1,16 @@
-// PRD 18.3 flow screens S-01, S-02, S-03, S-04 and S-12 as placeholders (heading, one primary
-// button to the next step) that AGW-02 to AGW-05 fill in. Every client call has loading, empty
-// and error states with a retry (PRD 18.4); one filled primary button per screen (UX-1).
+// PRD 18.3 flow screens S-01, S-02, S-03 and S-04 as placeholders (heading, one primary button to
+// the next step) that AGW-02 to AGW-05 fill in. S-12 (Delivery) is S_12.tsx, routed by routes.tsx.
+// Every client call has loading, empty and error states with a retry (PRD 18.4); one filled
+// primary button per screen (UX-1).
 import { type ReactNode, useEffect, useRef } from "react";
 import { useClient } from "../api/ClientProvider";
 import { useFlowRoute } from "../router";
+import { StartScreen } from "./flow/StartScreen";
+import "./flow/flow.css";
 import { type Action, type Remote, useAction, useRemote } from "./remote";
 import { Approaches } from "./s03/Approaches";
 
 const enc = encodeURIComponent;
-// AGW-02 replaces this with the task box.
-const INTAKE_TEXT = "Triage my inbox and answer the supplier about Thursday";
 
 function Notice({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
@@ -22,7 +23,7 @@ function Notice({ message, onRetry }: { message: string; onRetry: () => void }) 
   );
 }
 
-function Summary({ children }: { children: ReactNode }) {
+export function Summary({ children }: { children: ReactNode }) {
   return <p className="flow-summary">{children}</p>;
 }
 
@@ -76,15 +77,6 @@ export function Primary({
   );
 }
 
-function Start() {
-  const client = useClient();
-  const action = useAction("start the task", async () => {
-    const intake = await client.submitIntake(INTAKE_TEXT, []);
-    return `/task/${enc(intake.task_id)}/understanding`;
-  });
-  return <Primary label="Start task" action={action} />;
-}
-
 function Understanding({ taskId }: { taskId: string }) {
   const client = useClient();
   const action = useAction("confirm the brief", async () => {
@@ -97,34 +89,6 @@ function Understanding({ taskId }: { taskId: string }) {
 function World({ worldId }: { worldId: string }) {
   const action = useAction("open the delivery", async () => `/world/${enc(worldId)}/delivery`);
   return <Primary label="View delivery" action={action} />;
-}
-
-function Delivery({ worldId }: { worldId: string }) {
-  const client = useClient();
-  const [remote, retry] = useRemote("load the delivery", () => client.getDelivery(worldId));
-  const action = useAction("start a new task", async () => "/");
-  return (
-    <>
-      <Loaded
-        what="the delivery"
-        remote={remote}
-        retry={retry}
-        isEmpty={(d) => d.artifacts.length === 0}
-      >
-        {(d) => (
-          <>
-            <Summary>Verified deliverables are ready at the Delivery Dock.</Summary>
-            <p className="flow-detail">
-              {d.artifacts.length} deliverable(s), {d.credits_used} credits used.
-              {d.time_saved &&
-                ` About ${d.time_saved.low_min} to ${d.time_saved.high_min} min saved (estimate).`}
-            </p>
-          </>
-        )}
-      </Loaded>
-      <Primary label="New task" action={action} />
-    </>
-  );
 }
 
 export function FlowShell() {
@@ -144,12 +108,7 @@ export function FlowShell() {
   const screen = (() => {
     switch (route.screen) {
       case "Start":
-        return (
-          <>
-            <Summary>Describe what you want Tilo to handle.</Summary>
-            <Start />
-          </>
-        );
+        return <StartScreen />;
       case "Understanding":
         return (
           <>
@@ -166,13 +125,11 @@ export function FlowShell() {
             <World worldId={route.worldId} />
           </>
         );
-      case "Delivery":
-        return <Delivery worldId={route.worldId} />;
     }
   })();
   return (
     <section
-      className="flow-shell"
+      className={route.screen === "Start" ? "flow-shell flow-wide" : "flow-shell"}
       data-testid="flow-shell"
       data-screen={route.screen}
       aria-label="Task flow"

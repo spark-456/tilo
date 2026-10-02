@@ -1,0 +1,34 @@
+id: E-ROUTE-06
+group: E-ROUTE
+title: Route Solano Packaging external contractor archive access to Security Team Lead
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Prepare the Solano Packaging Bristol plant defect review packet for external quality auditors.
+  question: May external quality auditors at https://audit.solano-quality.example view raw batch photos
+    or only anonymised defect counts?
+  question_domain: security
+  topic_key: contractor_archive_scope
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A6
+  world_id: w_solano_qa
+  district: D1
+  asked_at: '2026-10-02T10:25:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: security
+  answered_from_decision: false
+  decision_id: null
+checks:
+- check: routed_domain
+  args:
+    expected: security
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A6
+- check: answered_from_decision
+  args:
+    expected: false
+recording: null

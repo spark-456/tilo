@@ -32,9 +32,9 @@ channel identity binding. Public ingress for signature-verified webhooks only.
   listing email (fail closed); gate, consent, meeting open signed in. HTTP: `answer` needs a POST confirm;
   token in the fragment; verify never consumes; first answer is a compare-and-set on the card.
 - `binding` (FR-CHN-03; BQ-89): number via cipher, HMAC lookup (key >= 32 B); code HMAC, 6 digits, 10 min,
-  5 atomic `try:` slots (kept when replaced); bound while `num:`/`user:` agree, < 30 d. SEC-10 send caps
-  only with `send_caps=SEND_CAPS` (the HTTP route must pass it); pending is written before the send.
-- `inbound`: unbound -> opt-in text (`opt_in_allowed` limits it); bound -> keywords, cards, else `unhandled`.
+  5 atomic `try:` slots (kept when replaced); bound while `num:`/`user:` agree, < 30 d. SEC-10 caps only
+  with `send_caps=SEND_CAPS` (unknown keys: ValueError; user window first; holder exempt from the number cap).
+- `inbound`: unbound -> opt-in text (`opt_in_allowed` limits it); bound -> keywords, cards, else `off_topic` (fixed redirect, no model).
 - `cards` (FR-CHN-05; BQ-89): random button ids; a tap counts only from the card's bound number; T3 approve
   needs the PIN (next text within 300 s, one try; digits in the next 300 s are `pin_late`, never routed);
-  Hold/Edit first keep a gate open; emits only `channel.message_out` / `_in`; memory until deadline + 1 h.
+  Hold/Edit keep a gate open (repeats: one event); one send per card id; emits `channel.message_out`/`_in`.

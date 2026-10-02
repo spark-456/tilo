@@ -125,7 +125,7 @@ def make_spy_safety() -> Any:
         def __init__(self) -> None:
             self.calls: list[tuple[str, bool, str | None]] = []
 
-        def check(self, text: str, *, content: bytes | None = None, mime_type: str | None = None) -> Any:
+        def _check(self, text: str, *, content: bytes | None = None, mime_type: str | None = None) -> Any:
             self.calls.append((text, content is not None, mime_type))
             flagged = INJECTION_PHRASE in text.upper()
             return {"flagged": flagged, "reason": "instruction aimed at the assistant" if flagged else None}

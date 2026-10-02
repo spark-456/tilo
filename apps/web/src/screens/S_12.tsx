@@ -49,7 +49,10 @@ export function S_12({ params }: ScreenProps) {
                       : "No estimate"}
                   </b>
                   <span>
-                    estimate · <AppLink to="/estimate">How we estimate</AppLink>
+                    estimate ·{" "}
+                    <AppLink className="tile-link" to="/estimate">
+                      How we estimate
+                    </AppLink>
                   </span>
                 </li>
                 <li>

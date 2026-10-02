@@ -117,7 +117,7 @@ def test_PRD_6_4_fake_sibling_providers_pass_conformance_check():
             return {"results": [f"result for {query}"]}
 
     class FakeSafetyProvider(SafetyProvider):
-        def check(self, text, **kwargs):
+        def _check(self, text, **kwargs):
             return {"flags": [], "blocked": False}
 
     class FakeSpeechProvider(SpeechProvider):

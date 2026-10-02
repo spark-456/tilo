@@ -5,6 +5,9 @@ import { DESKTOP, MOBILE } from "../support/viewports";
 const SCREENS = ["Start", "Understanding", "Approaches", "World", "Delivery"] as const;
 const BANNER = "Fixture replay — dev data, not a real run";
 
+/** S-01 starts only with text in the task box. */
+const fillStart = (page: Page) => page.getByLabel("Describe your task").fill("Triage my inbox");
+
 /** Asserts what every flow screen must show: heading, banner, one filled primary button, axe. */
 async function checkScreen(page: Page, heading: string) {
   await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
@@ -38,6 +41,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
       if (screen === "Approaches") await page.getByTestId("select-approach-quick").click();
       const next = SCREENS[i + 1];
       if (!next) break;
+      if (screen === "Start") await fillStart(page);
       const primary = page.locator("button.primary");
       await expect(primary).toBeEnabled();
       await primary.click();
@@ -59,6 +63,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await page.goto("/?client_delay_ms=400");
     for (const [i, screen] of SCREENS.entries()) {
       await expect(page.getByRole("heading", { level: 1, name: screen })).toBeVisible();
+      if (screen === "Start") await fillStart(page);
       if (screen === "Approaches") await page.getByTestId("select-approach-quick").click();
       await expect(page.locator("button.primary")).toBeEnabled();
       const ms = await page.evaluate(
@@ -87,7 +92,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
 // UX-1: a client with latency (?client_delay_ms) must not shift the layout when data arrives.
 // Loading, error, empty and ready occupy one reserved box in FlowShell.
 for (const viewport of [DESKTOP, MOBILE]) {
-  for (const path of ["/task/t/approaches", "/world/w/delivery"]) {
+  for (const path of ["/task/t/approaches", "/world/w_village_basic/delivery"]) {
     test(`PRD-18.3 UX_1: ${path} has zero layout shifts while a slow client answers at ${viewport.width}x${viewport.height}`, async ({
       page,
     }) => {

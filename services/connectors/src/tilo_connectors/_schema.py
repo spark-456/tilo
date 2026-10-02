@@ -1,4 +1,4 @@
-"""tilo_connectors._schema — cached validators: outbox.schema.json (OB-05), connector.schema.json (FR-CON-01)."""
+"""tilo_connectors._schema — cached validators: outbox (OB-05), connector (FR-CON-01), manifest (FR-CON-10)."""
 
 from __future__ import annotations
 
@@ -41,5 +41,16 @@ def outbox_validator() -> jsonschema.protocols.Validator:
 @functools.lru_cache(maxsize=1)
 def connector_validator() -> jsonschema.protocols.Validator:
     schema = _load_json(_CONTRACTS_DIR / "connector.schema.json")
+    cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
+    return cls(schema, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
+def manifest_validator() -> jsonschema.protocols.Validator:
+    """Without uniqueItems on parents and inputs: jsonschema compares those pairwise (O(n^2)), so
+    provenance.build_manifest refuses a repeated (artifact_id, version) first, in O(n) (#187)."""
+    schema = _load_json(_CONTRACTS_DIR / "manifest.schema.json")
+    for field in ("parents", "inputs"):
+        schema["properties"][field].pop("uniqueItems", None)
     cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
     return cls(schema, registry=_registry())

@@ -7,6 +7,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import type { WorldSeam } from "../stage/Stage";
 import { loadFixture } from "./fixtureLoader";
 import { runWorld } from "./runWorld";
+import { parseSpeed, speedBadgeText } from "./speed";
 
 export interface WorldFixtureState {
   readonly active: boolean;
@@ -23,8 +24,7 @@ function parseParams(search: string) {
   const fixture = params.get("fixture");
   const seqRaw = params.get("seq");
   const seqParam = seqRaw !== null && Number.isFinite(Number(seqRaw)) ? Number(seqRaw) : null;
-  const speedRaw = Number(params.get("speed"));
-  const speed = Number.isFinite(speedRaw) && speedRaw > 0 ? speedRaw : 1;
+  const speed = parseSpeed(params.get("speed"));
   return { fixture, seqParam, speed };
 }
 
@@ -84,7 +84,7 @@ export function useWorldFixture(): WorldFixtureState {
     active: fixture !== null,
     seq,
     trace,
-    speedLabel: speed > 1 ? `${speed}×` : null,
+    speedLabel: speedBadgeText(speed),
     loadError,
     onWorld,
   };

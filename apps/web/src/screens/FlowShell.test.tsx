@@ -42,6 +42,19 @@ async function show(path: string, client: TiloClient): Promise<void> {
 }
 const settle = (ms = PRESS_MS + 20) =>
   act(async () => void (await new Promise((r) => setTimeout(r, ms))));
+/** S-01 starts only with text in the box. */
+async function fillTask(text = "Triage my inbox") {
+  const box = container.querySelector("textarea");
+  const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+  await act(async () => {
+    set?.call(box, text);
+    box?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+const tryAgain = () =>
+  [...container.querySelectorAll<HTMLButtonElement>("button.secondary")].find(
+    (b) => b.textContent === "Try again",
+  );
 const button = (cls: string) => container.querySelector<HTMLButtonElement>(`button.${cls}`);
 
 beforeEach(() => {
@@ -80,6 +93,7 @@ describe("PRD-18.3 flow: a rejecting client shows the error and a retry, never a
     const consoleError = vi.spyOn(console, "error");
     const submit = vi.fn(fail);
     await show("/", { ...rejectingClient, submitIntake: submit });
+    await fillTask();
     await act(async () => button("primary")?.click());
     expect(button("primary")?.getAttribute("aria-busy")).toBe("true");
     await settle();
@@ -89,7 +103,7 @@ describe("PRD-18.3 flow: a rejecting client shows the error and a retry, never a
     );
     expect(window.location.pathname).toBe("/");
 
-    await act(async () => button("secondary")?.click());
+    await act(async () => tryAgain()?.click());
     await settle();
     expect(submit).toHaveBeenCalledTimes(2);
     expect(consoleError).not.toHaveBeenCalled();
@@ -100,7 +114,7 @@ describe("PRD-18.3 flow: a rejecting client shows the error and a retry, never a
     const throwing = () => {
       throw new Error("bad state");
     };
-    await show("/world/w1/delivery", { ...rejectingClient, getDelivery: throwing });
+    await show("/task/t1/approaches", { ...rejectingClient, getApproaches: throwing });
     await settle(0);
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("bad state");
     expect(unhandled).toEqual([]);
@@ -121,14 +135,14 @@ describe("PRD-18.3 flow: loading and empty states", () => {
   });
 
   it("states no summary while loading, only once the data is ready", async () => {
-    await show("/world/w1/delivery", new FixtureClient({ delayMs: 50 }));
+    await show("/task/t1/approaches", new FixtureClient({ delayMs: 50 }));
     expect(container.querySelector(".flow-summary")).toBeNull();
     await settle(80);
-    expect(container.querySelector(".flow-summary")?.textContent).toContain("Verified");
+    expect(container.querySelector(".flow-summary")?.textContent).toContain("Compare priced");
   });
 
   it("states no summary after an error", async () => {
-    await show("/world/w1/delivery", rejectingClient);
+    await show("/task/t1/approaches", rejectingClient);
     await settle(0);
     expect(container.querySelector('[role="alert"]')).not.toBeNull();
     expect(container.querySelector(".flow-summary")).toBeNull();
@@ -136,6 +150,7 @@ describe("PRD-18.3 flow: loading and empty states", () => {
 
   it("moves focus to the new screen's heading after a route change", async () => {
     await show("/", new FixtureClient());
+    await fillTask();
     await act(async () => button("primary")?.click());
     await settle();
     expect(window.location.pathname).toContain("/understanding");
@@ -176,26 +191,23 @@ describe("PRD-18.3 flow: loading and empty states", () => {
     expect(button("primary")?.disabled).toBe(true);
   });
 
-  it("an empty delivery is an empty state with a retry", async () => {
+  it("a recommendation that is not in the approaches list is an error with a retry", async () => {
     const fixture = new FixtureClient();
-    await show("/world/w1/delivery", {
+    await show("/task/t1/approaches", {
       ...rejectingClient,
-      getDelivery: async (id) => ({ ...(await fixture.getDelivery(id)), artifacts: [] }),
+      getApproaches: async (id) => ({ ...(await fixture.getApproaches(id)), recommended: "nope" }),
     });
     await settle(0);
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Nothing came back");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "the recommended approach is not in the list",
+    );
     expect(button("secondary")).not.toBeNull();
+    expect(button("primary")?.disabled).toBe(true);
   });
 
   it("every screen has exactly one primary button", async () => {
     const client = new FixtureClient();
-    for (const path of [
-      "/",
-      "/task/t/understanding",
-      "/task/t/approaches",
-      "/world/w",
-      "/world/w/delivery",
-    ]) {
+    for (const path of ["/", "/task/t/understanding", "/task/t/approaches", "/world/w"]) {
       await show(path, client);
       await settle(0);
       expect(container.querySelectorAll("button.primary")).toHaveLength(1);

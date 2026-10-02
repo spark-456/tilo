@@ -73,7 +73,9 @@ export function S_05({ params }: ScreenProps) {
   return (
     <div className="screen-body wide" data-testid="inspect-panel">
       <p>
-        <AppLink to={`/world/${encodeURIComponent(worldId)}`}>Back to the world</AppLink>
+        <AppLink className="back-link" to={`/world/${encodeURIComponent(worldId)}`}>
+          Back to the world
+        </AppLink>
       </p>
       <h1>{layout.status === "ready" ? (found ? found.name : "Not found") : "Inspect"}</h1>
       <Loaded what="the world" remote={layout} retry={retry} isEmpty={() => false}>

@@ -62,7 +62,7 @@ def test_CP2_no_event_of_a_run_carries_a_model_id(run_flow):
     assert not [model for model in ids if model in text]
 
 
-@pytest.mark.parametrize("cap", [1, 7.5, 500])
+@pytest.mark.parametrize("cap", [1, 7.5, 300])  # 300: the most one approval may grant (#139, BQ-99)
 def test_CP2_the_budget_is_never_exceeded(run_flow, cap):
     run_flow.start()
     assert run_flow.approve(cap=cap).status_code == 200

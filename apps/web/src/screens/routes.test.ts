@@ -32,6 +32,26 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
     expect(matchScreen("/nowhere")).toBeNull();
   });
 
+  it("UX_1 a path under /world/ or /task/ that no screen owns is Not found, never Start", () => {
+    for (const path of [
+      "/world/w/inspect/B1/x",
+      "/world/w/inspect/B1//",
+      "/world/w/inspect",
+      "/world/w/unknown",
+      "/world/",
+      "/task/t/unknown",
+      "/world/%E0/x",
+    ]) {
+      expect(matchScreen(path)?.id, path).toBe("not-found");
+    }
+    // Real addresses are untouched: the flow shell and every screen keep theirs.
+    expect(matchScreen("/world/w/inspect/B1")?.id).toBe("S-05");
+    expect(matchScreen("/world/w/delivery")?.id).toBe("S-12");
+    expect(matchScreen("/world/w")).toBeNull();
+    expect(matchScreen("/task/t/approaches")).toBeNull();
+    expect(matchScreen("/nowhere")).toBeNull();
+  });
+
   it("serves /more and, in dev, /screens", () => {
     expect(matchScreen("/more")?.id).toBe("more");
     expect(matchScreen("/screens")?.id).toBe("screens");
