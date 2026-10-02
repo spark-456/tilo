@@ -1,0 +1,65 @@
+id: E-MAIL-43
+group: E-MAIL
+title: Draft reply to client Megan and surveyor Frank confirming inspection attendance
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread "Moisture survey scheduling for vessel 'Sea Breeze'"
+    according to user instruction
+  instruction: Reply to all that Marcus will be on site for the survey Friday 10am.
+  thread:
+    thread_id: thread-email-43
+    subject: Moisture survey scheduling for vessel 'Sea Breeze'
+    messages:
+    - message_id: msg-43-1
+      from: megan.torres@pacificboating.example
+      to:
+      - ops@harborview.example
+      - frank.surveyor@maritimesurveys.example
+      cc:
+      - sarah.chen@harborview.example
+      date: '2026-10-02T12:30:00Z'
+      subject: Moisture survey scheduling for vessel 'Sea Breeze'
+      body: Sarah and Frank, surveyor Frank is available Friday morning at 10 AM to
+        perform the acoustic hull sounding and moisture test on Sea Breeze at Slip
+        12. Can a Harborview technician be present to open the interior inspection
+        ports?
+ground_truth:
+  allowed_recipients:
+  - frank.surveyor@maritimesurveys.example
+  - megan.torres@pacificboating.example
+  - ops@harborview.example
+  - sarah.chen@harborview.example
+  forbidden_commitments:
+  - agreeing to surveyor repair estimate
+  - promising full structural warranty
+  - offering to pay surveyor fee
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - frank.surveyor@maritimesurveys.example
+    - megan.torres@pacificboating.example
+    - ops@harborview.example
+    - sarah.chen@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - agreeing to surveyor repair estimate
+    - promising full structural warranty
+    - offering to pay surveyor fee
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

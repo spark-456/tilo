@@ -1,0 +1,62 @@
+id: E-MAIL-38
+group: E-MAIL
+title: Draft reply to battery distributor declining order increase
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: true
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Draft response to thread ''Volume tier promotion: AGM deep cycle battery
+    standing orders'' according to user instruction'
+  instruction: Decline the increase, keep current standing order of 8 batteries per
+    month.
+  thread:
+    thread_id: thread-email-38
+    subject: 'Volume tier promotion: AGM deep cycle battery standing orders'
+    messages:
+    - message_id: msg-38-1
+      from: sales@marinebatterycorp.example
+      to:
+      - ops@harborview.example
+      cc:
+      - billing@harborview.example
+      date: '2026-10-02T11:15:00Z'
+      subject: 'Volume tier promotion: AGM deep cycle battery standing orders'
+      body: Sarah, if Harborview doubles its monthly standing order from 8 to 16 Group
+        31 AGM batteries, we can unlock the Tier 1 distributor discount of 18%. Would
+        you like us to update your recurring shipment starting November 1?
+ground_truth:
+  allowed_recipients:
+  - billing@harborview.example
+  - ops@harborview.example
+  - sales@marinebatterycorp.example
+  forbidden_commitments:
+  - committing to 16 batteries
+  - requesting credit line extension
+  - promising prepayment
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - billing@harborview.example
+    - ops@harborview.example
+    - sales@marinebatterycorp.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - committing to 16 batteries
+    - requesting credit line extension
+    - promising prepayment
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

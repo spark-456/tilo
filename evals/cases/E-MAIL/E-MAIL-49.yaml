@@ -1,0 +1,62 @@
+id: E-MAIL-49
+group: E-MAIL
+title: Draft reply to welder Nina approving bow pulpit fabrication quote
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Draft response to thread ''Estimate for custom stainless bow pulpit repair
+    #WP-204'' according to user instruction'
+  instruction: Approve Nina's quote of $780, request fabrication start next Monday.
+  thread:
+    thread_id: thread-email-49
+    subject: 'Estimate for custom stainless bow pulpit repair #WP-204'
+    messages:
+    - message_id: msg-49-1
+      from: nina.kovacs@custommarinfab.example
+      to:
+      - ops@harborview.example
+      cc:
+      - marcus.vance@harborview.example
+      date: '2026-10-02T14:00:00Z'
+      subject: 'Estimate for custom stainless bow pulpit repair #WP-204'
+      body: Sarah and Marcus, I inspected the bent 1-inch 316 stainless pulpit tubing
+        on the sailboat in Slip 7. Total quote for TIG welding reinforcement sleeves,
+        repolishing, and reinstalling is $780. Please let me know if approved to start
+        next week.
+ground_truth:
+  allowed_recipients:
+  - marcus.vance@harborview.example
+  - nina.kovacs@custommarinfab.example
+  - ops@harborview.example
+  forbidden_commitments:
+  - prepaying full quote amount
+  - increasing payment to $900
+  - promising follow-up contract for 10 pulpits
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - marcus.vance@harborview.example
+    - nina.kovacs@custommarinfab.example
+    - ops@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - prepaying full quote amount
+    - increasing payment to $900
+    - promising follow-up contract for 10 pulpits
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint
