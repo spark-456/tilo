@@ -15,7 +15,7 @@ import tilo_policy
 
 from ._schema import outbox_validator
 from ._time import add_seconds, parse_ts
-from .errors import MissingGrant, OutboxRefused, ProviderUnavailable, RateLimited, SideEffectRefused
+from .errors import AdapterError, MissingGrant, OutboxRefused, ProviderUnavailable, RateLimited, SideEffectRefused
 from .registry import RESERVED_CONNECTOR_ID
 from .store import InMemoryOutboxStore
 from .tokens import ConnectionExpired, InsufficientScope, NotConnected
@@ -24,6 +24,8 @@ _ALWAYS_DUE_STATES = ("queued", "sending")  # "scheduled" also once scheduled_at
 _LEASE_SECONDS = 30  # generous next to any real adapter/emit call
 _LIVE_GRANTS: set[int] = set()  # ids of Grants a send is currently authorised for (SEC-03)
 _WAITS_FOR_A_PERSON = (InsufficientScope, NotConnected, ConnectionExpired)  # no provider call: uses no attempt
+_MAX_POLICY_S = 30 * 86_400  # every RetryPolicy duration: far inside datetime's range, so no clock overflow
+_MAX_ATTEMPTS = 1_000
 _log = logging.getLogger(__name__)
 
 
@@ -36,10 +38,11 @@ class RetryPolicy:  # between attempts of one entry (#163, FR-AGT-13); defaults:
     ambiguous_delay_s: float = 60  # after ProviderUnavailable, so the earlier-attempt lookup sees a lagging index
     clock_skew_s: float = 2  # a claim waits this long past scheduled_at, in case the dispatcher's clock is fast
 
-    def __post_init__(self) -> None:  # a bad policy could claim inside an undo window or never back off
+    def __post_init__(self) -> None:  # a bad policy could claim inside an undo window, never back off or overflow
         for name, value in vars(self).items():
-            if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value) or value < 0:
-                raise ValueError(f"RetryPolicy.{name} must be a finite number >= 0")
+            cap = _MAX_ATTEMPTS if name == "max_attempts" else _MAX_POLICY_S
+            if isinstance(value, bool) or not isinstance(value, int | float) or not 0 <= value <= cap:
+                raise ValueError(f"RetryPolicy.{name} must be a number from 0 to {cap}")  # NaN fails the range too
         if not isinstance(self.max_attempts, int) or self.max_attempts < 1 or self.max_age_s <= 0:
             raise ValueError("RetryPolicy needs an integer max_attempts >= 1 and max_age_s > 0")
 
@@ -60,6 +63,15 @@ def _retry_after_s(exc: Exception) -> float:  # anything but a number >= 0 falls
     return seconds if seconds >= 0 else 0.0  # NaN is not >= 0
 
 
+def _nothing_sent(exc: Exception) -> bool:  # only these prove the provider did nothing; anything else may have sent
+    if isinstance(exc, ProviderUnavailable):
+        return False
+    if isinstance(exc, (RateLimited, *_WAITS_FOR_A_PERSON)):
+        return True
+    status = exc.status if isinstance(exc, AdapterError) else None
+    return isinstance(status, int) and not isinstance(status, bool) and 400 <= status < 500
+
+
 _IMMEDIATE = RetryPolicy(max_delay_s=0, clock_skew_s=0)  # API.md "Failures": the next tick retries; still bounded
 
 
@@ -76,6 +88,11 @@ def _transfer_event(entry: dict) -> dict:  # PI-16/17: "out", this id, authz and
             "risk_tier": entry["risk_tier"],
         },
     }
+
+
+def _alert_part(entry: dict) -> dict:  # FR-AGT-13 alert.raised: ids only
+    data = {"alert_id": entry["id"], "card_id": None}
+    return {"type": "alert.raised", "authz": None, "data": data, "world_id": entry["world_id"]}
 
 
 @dataclass(frozen=True)
@@ -187,7 +204,12 @@ class Outbox:
             return None
         holder = uuid.uuid4().hex
         skew = self._retry.clock_skew_s
-        if (claimed := self._store._claim_for_sending(outbox_id, holder, self._clock(), _LEASE_SECONDS, skew)) is None:
+        try:
+            claimed = self._store._claim_for_sending(outbox_id, holder, self._clock(), _LEASE_SECONDS, skew)
+        except OverflowError:  # a timestamp at the end of datetime's range: skip it, never stop the batch
+            _log.error("outbox entry %s: its claim time overflows", outbox_id)
+            return None
+        if claimed is None:
             return None
         name = claimed["connector"]
         adapter = None if name.strip() == RESERVED_CONNECTOR_ID else self._connectors.get(name)
@@ -212,10 +234,9 @@ class Outbox:
         except Exception as exc:  # ambiguous or not final: retried later, within the policy's bounds
             try:
                 return self._retry_later(claimed, holder, exc)
-            except Exception as err:  # a failure to record it never holds the lease or stops the batch
+            except Exception as err:  # never stops the batch; the attempt still counts (see _record_unknown)
                 _log.error("outbox entry %s: recording a failed attempt raised %s", outbox_id, type(err).__name__)
-                with contextlib.suppress(Exception):
-                    self._store._release_lease("send", outbox_id, holder)
+                self._record_unknown(claimed, holder)
                 return None
         except BaseException:  # a process death: release the lease and let it propagate
             self._store._release_lease("send", outbox_id, holder)
@@ -228,18 +249,25 @@ class Outbox:
         now, policy = self._clock(), self._retry
         state = self._store.retry_state(entry["id"])
         attempts = state["attempts"] + (0 if isinstance(exc, _WAITS_FOR_A_PERSON) else 1)
-        since, ambiguous = state["since"] or now, state["ambiguous"] or isinstance(exc, ProviderUnavailable)
+        since, ambiguous = state["since"] or now, state["ambiguous"] or not _nothing_sent(exc)
         if attempts < policy.max_attempts and (parse_ts(now) - parse_ts(since)).total_seconds() < policy.max_age_s:
             self._store._defer(entry["id"], holder, attempts, now, policy.delay_s(exc, attempts), ambiguous)
             return None
         if self._alert is None:
             _log.error("outbox entry %s ran out of retries and no alert sink is wired", entry["id"])
-        data = {"alert_id": entry["id"], "card_id": None}
-        alert = {"type": "alert.raised", "authz": None, "data": data, "world_id": entry["world_id"]}
         if ambiguous:  # it may have been sent: never failed; each later try re-runs the earlier-attempt lookup
-            self._store._defer(entry["id"], holder, attempts, now, policy.max_delay_s, True, alert)
+            self._store._defer(entry["id"], holder, attempts, now, policy.max_delay_s, True, _alert_part(entry))
             return None
-        return self._store._finalize_claim(entry["id"], holder, "failed", alert=alert)
+        return self._store._finalize_claim(entry["id"], holder, "failed", alert=_alert_part(entry))
+
+    def _record_unknown(self, entry: dict, holder: str) -> None:
+        """The failure could not be recorded, so its count and its ambiguity are unknown: treat it as at the cap and
+        possibly sent (a person is alerted; it retries every max_delay_s but at least a lease apart, never failed).
+        If even that write fails, the lease is kept until it expires, so the entry is never retried every tick."""
+        policy, delay_s = self._retry, max(self._retry.max_delay_s, _LEASE_SECONDS)
+        with contextlib.suppress(Exception):
+            now = self._clock()
+            self._store._defer(entry["id"], holder, policy.max_attempts, now, delay_s, True, _alert_part(entry))
 
     def _flush_pending_alerts(self) -> None:  # FR-AGT-13: an entry that ran out of retries never stops silently
         if self._alert is None:
