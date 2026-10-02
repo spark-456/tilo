@@ -103,4 +103,19 @@ describe("PRD-18.3 flow: the fixture client replays events in seq order and stop
       expect(replaySpeedFromSearch(bad)).toBe(1);
     }
   });
+
+  it("HR_6 clamps an extreme ?speed= to a sane range, so the replay and its badge agree (#43)", () => {
+    expect(replaySpeedFromSearch("?speed=1e308")).toBe(1000);
+    expect(replaySpeedFromSearch("?speed=1e-300")).toBe(0.1);
+  });
+});
+
+describe("HR_1 the fixture client knows exactly one world", () => {
+  it("answers true for the fixture world and false for any other id", () => {
+    const client = new FixtureClient();
+    expect(client.hasWorld("w_village_basic")).toBe(true);
+    for (const id of ["nope", "", "w_village_basic2", "__proto__", "W_VILLAGE_BASIC"]) {
+      expect(client.hasWorld(id), id).toBe(false);
+    }
+  });
 });

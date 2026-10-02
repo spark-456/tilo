@@ -17,8 +17,9 @@ import type { Page } from "@playwright/test";
 //     ?seq=N            Jumps straight to the state at seq N, no animation (a static frame).
 //                        Without it, playback plays from the start following the recorded `ts`
 //                        gaps at 1x.
-//     ?speed=N           N > 1 compresses time; a visible "N×" badge shows while it applies
-//                        (absent at 1x, i.e. without this param or with ?speed=1).
+//     ?speed=N           N != 1 changes the pace (clamped to 0.1..1000); a visible
+//                        "Replay at N× speed" badge shows while it applies (absent at 1x, i.e.
+//                        without this param or with ?speed=1).
 //     ?display=stage     Existing App.tsx param (1920x1080 presenter layout).
 //
 //   DOM (data-testid, matching apps/web/e2e/support/assertions.ts's existing convention):
@@ -31,7 +32,7 @@ import type { Page } from "@playwright/test";
 //     [data-testid="trace-row"]   one row inside trace-list, carrying `data-seq` and
 //                                  `data-event-type` attributes and visible text that includes
 //                                  both the seq and the type.
-//     [data-testid="speed-badge"] the HR-6 "N×" compression badge; absent (not just hidden) at 1x.
+//     [data-testid="speed-badge"] the HR-6 "Replay at N× speed" badge (role=status); absent (not just hidden) at 1x.
 //     [data-testid="fixture-replay-banner"] the HR-4/BQ-07 permanent label containing the text
 //                                  "Fixture replay", with role="status" or inside a landmark
 //                                  region with an accessible name. Never removed, hidden by CSS
