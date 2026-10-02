@@ -81,9 +81,9 @@ export const SCREENS: readonly ScreenMeta[] = [
   built(must("S-14", "Worlds list and replays", "P3", "/worlds", /^\/worlds\/?$/)),
   built(must("S-15", "Autonomy", "P4", "/autonomy", /^\/autonomy\/?$/)),
   built(must("S-16", "Channels", "P5", "/channels", /^\/channels\/?$/)),
-  must("S-17", "Email Autopilot home", "P5", "/mail", /^\/mail\/?$/),
-  must("S-18", "Team Lead console", "P4", "/team", /^\/team\/?$/),
-  must("S-19", "Connections", "P6", "/connections", /^\/connections\/?$/),
+  built(must("S-17", "Email Autopilot home", "P5", "/mail", /^\/mail\/?$/)),
+  built(must("S-18", "Team Lead console", "P4", "/team", /^\/team\/?$/)),
+  built(must("S-19", "Connections", "P6", "/connections", /^\/connections\/?$/)),
   later("S-20", "Skills library", "P2"),
   must(
     "S-21",
