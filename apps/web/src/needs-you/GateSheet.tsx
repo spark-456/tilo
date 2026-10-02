@@ -46,7 +46,11 @@ function factsOf(record: GateRecord, card: Card | null): Facts | null {
     return {
       action: g.action.exact,
       recipients: g.recipients,
-      item: g.action.item ? `${g.action.item.label}, version ${g.action.item.version}` : null,
+      item: g.action.item
+        ? `${g.action.item.label}, version ${g.action.item.version}`
+        : asked?.item
+          ? `${asked.item.label}`
+          : null,
       irreversible: g.irreversible || askedIrreversible === true,
       tier: stricter(g.risk_tier, asked ? field(asked, "risk_tier") : null),
       sent: g.action.type === "send_email",
@@ -212,7 +216,13 @@ export function GateSheet({
       )}
       {/* The parts that change with the gate come last, so changing them moves nothing above. */}
       {out.state === "waiting" &&
-        (card ? (
+        (card && facts?.item == null ? (
+          // HR-1, FR-HIL-01: a gate that does not say what it holds is never answerable, so no
+          // approve path is drawn without the "What it holds" row above it.
+          <p className="section-note" data-testid="gate-item-missing">
+            This gate does not say what it holds, so it cannot be answered here.
+          </p>
+        ) : card ? (
           <CardOptions card={card} answer={answer} preselect={!needsDeliberateChoice(facts)} />
         ) : (
           <>

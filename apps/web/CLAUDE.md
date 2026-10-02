@@ -10,18 +10,18 @@ Trace lenses, cards and settings.
 
 ## Contracts
 - Reads `packages/contracts-ts` types and Firestore docs under security rules; writes only through
-  `tilo-api`, never to models, connectors or storage directly. Writes: none yet.
+  `tilo-api` (`src/api/http.ts`, chosen by `VITE_TILO_API_URL`, else the fixture client; polls events by seq).
 
-## Config
-`config/themes/` (world themes), feature flags.
-## Requirement IDs
-UX-1–UX-9 (18.1); FR-WLD-* (world rendering); owned starting P0-08.
+## Config and requirement IDs
+`config/themes/` (world themes), feature flags. UX-1–UX-9 (18.1); FR-WLD-*; owned from P0-08.
 
 ## Stage and world (`src/stage/`, `src/world/`)
 - `Stage.tsx`: the camera is the Pixi world container's transform (`camera.ts`); no CSS transform,
   no always-on ticker (HR-2). `data-stage-ready="true"` appears with the first frame.
 - FR-WLD-04 pipeline: `registry.ts` → `reducer.ts` (HR-5) → `store.ts` → `frame.ts` → `renderer.ts`;
   `choreographer.ts` (HR-3) alone animates. `?fixture=<name>`, `?seq=N`, `?speed=N` control replay.
+- FR-WLD-06: `selection.ts` keeps one selection per world (display state, never an event).
+  `SelectionBar` is in every lens; `data-lens-control` buttons toggle it; the stage rings it.
 
 ## Screens (`src/screens/`, AGW-08)
 - `meta.ts` is the PRD 18.3 table (S-01..S-25, status, route pattern); `routes.tsx` maps each
@@ -36,5 +36,5 @@ UX-1–UX-9 (18.1); FR-WLD-* (world rendering); owned starting P0-08.
   or `policy.applied` (stamp, HR-7). `/screens/cards`.
 
 ## Local rules
-- Nothing animates without a recorded event (honesty rules HR-1–HR-7, PRD 9.4).
+- Nothing animates without a recorded event (HR-1–HR-7, PRD 9.4); `src/honesty/` (FR-WLD-09) fails on animation APIs outside `choreographer.ts` (allowlist: `test-support/honestyScan.ts`).
 - One primary filled button per screen (UX-1); no streaks, hearts or fake urgency (UX-7).

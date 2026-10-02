@@ -7,6 +7,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import type { WorldSeam } from "../stage/Stage";
 import { loadFixture } from "./fixtureLoader";
 import { runWorld } from "./runWorld";
+import { useSelection } from "./selection";
 import { parseSpeed, speedBadgeText } from "./speed";
 
 export interface WorldFixtureState {
@@ -14,6 +15,8 @@ export interface WorldFixtureState {
   readonly seq: number;
   readonly trace: ReadonlyArray<{ seq: number; type: string }>;
   readonly speedLabel: string | null;
+  /** The run's selected object (FR-WLD-06), for the stage frame's data-selected. */
+  readonly selected: string | null;
   /** Set when the named fixture could not be loaded (or no name was given); shown as an alert. */
   readonly loadError: string | null;
   readonly onWorld: WorldSeam;
@@ -36,6 +39,8 @@ export function useWorldFixture(): WorldFixtureState {
   const [loadError, setLoadError] = useState<string | null>(
     fixture === "" ? "No fixture name was given, so the fixture could not be loaded." : null,
   );
+  const [worldId, setWorldId] = useState(""); // set once the layout is loaded
+  const [selected] = useSelection(worldId);
   const [trace, setTrace] = useState<ReadonlyArray<{ seq: number; type: string }>>([]);
   const stopRef = useRef<(() => void) | undefined>(undefined);
   // P7/HR-2 ("nothing moves before the first event"): the fetch starts only once Stage's Pixi
@@ -55,6 +60,7 @@ export function useWorldFixture(): WorldFixtureState {
       dataRef.current
         .then(({ layout, events }) => {
           if (cancelled) return;
+          setWorldId(layout.world_id);
           stopRef.current = runWorld({
             world,
             requestRender,
@@ -85,6 +91,7 @@ export function useWorldFixture(): WorldFixtureState {
     seq,
     trace,
     speedLabel: speedBadgeText(speed),
+    selected,
     loadError,
     onWorld,
   };

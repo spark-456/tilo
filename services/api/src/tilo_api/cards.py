@@ -46,18 +46,28 @@ _MERGEABLE = ("needs_you", "meeting")
 _ROLES = ("owner", "team_lead", "approver")  # any other role (a Viewer included) answers and lists nothing
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _WEB_CHANNELS = ("web", "mobile_web")
-_STATUS = {"card_not_found": 404, "forbidden": 403}  # AnswerResult.reason -> HTTP status; others are 400
+_STATUS = {"card_not_found": 404, "forbidden": 403, "busy": 409}  # AnswerResult.reason -> HTTP; others are 400
 
 
-def _alert_id(card_id: str) -> str:
-    """A ulid of its own for the timeout nudge, derived from the card id so a retry reuses it and
-    it never collides with an alert the harness raised under the card's id."""
-    n = int.from_bytes(hashlib.sha256(f"{card_id}:timeout".encode()).digest(), "big") % 32**25
+class AlreadyCommitted(Exception):
+    """Raised by an event writer when this resolution's event id is already committed under other content (an
+    earlier answer won, though its caller saw a failure). The card then resolves as already answered."""
+
+
+def _derived_id(seed: str) -> str:
+    """A ulid derived from `seed`: the same seed always gives the same id. Its time part is arbitrary (some ids
+    decode to the year 2047), so never sort or order events by these ids; `seq` is the order."""
+    n = int.from_bytes(hashlib.sha256(seed.encode()).digest(), "big") % 32**25
     chars = []
     for _ in range(25):
         n, r = divmod(n, 32)
         chars.append(_CROCKFORD[r])
     return "0" + "".join(chars)
+
+
+def _alert_id(card_id: str) -> str:
+    """The timeout nudge's own id: a retry reuses it and it never collides with an alert the harness raised."""
+    return _derived_id(f"{card_id}:timeout")
 
 
 def _parse_ts(ts: str) -> datetime.datetime:
@@ -117,7 +127,9 @@ class EventWriter(Protocol):
     unstamped part: {"type": str, "data": dict, "authz": dict | None, "severity"?: str} plus the
     scope the writer needs to stamp it: "world_id", "card_id" (question.answered data has no card
     field), "district", "vis" (["<district>"], or None for an owner-only card whose district is
-    unknown) and "owner_only". The writer must not default a part without a vis to "all"."""
+    unknown), "owner_only" and "event_id" (the event's own `id`, one per card resolution: the writer
+    must commit under it and resend it unchanged). The writer must not default a part without a vis
+    to "all". If that id is already committed under other content, it raises AlreadyCommitted."""
 
 
 @dataclass(frozen=True)
@@ -164,6 +176,7 @@ class _Record:
     deadline: datetime.datetime
     group: _Group
     status: str = "open"  # "open" | "resolved" -- a held gate/consent stays "open"
+    attempt: tuple[tuple, dict] | None = None  # (who and what, part) of a write that raised: a retry resends it
 
     @property
     def kind(self) -> str:
@@ -277,7 +290,7 @@ class CardStore:
     def _resolve_group(self, group: _Group) -> None:
         """Close every open member: one answer or one timeout closes a merged batch (BQ-74)."""
         for member in group.members:
-            member.status = "resolved"
+            member.status, member.attempt = "resolved", None
             self._pending.pop((member.world_id, member.card["id"]), None)
         group.closed, group.resolving = True, False
 
@@ -290,6 +303,10 @@ class CardStore:
         part: dict[str, Any] = {"type": type_, "data": data, "authz": authz, "world_id": record.world_id}
         part |= {"card_id": record.card["id"], "district": record.district, "owner_only": record.district is None}
         part["vis"] = [record.district] if record.district else None
+        # One id per card resolution (card, event type, option), so a retry after a commit-then-raise is an identical
+        # resend the writer dedupes (FR-HIL-07, #155), never a second event. A question's data holds no option, so a
+        # question never gets two ids.
+        part["event_id"] = _derived_id(f"{record.world_id}:{record.card['id']}:{type_}:{data.get('option', '')}")
         if severity:
             part["severity"] = severity
         return part
@@ -348,8 +365,10 @@ class CardStore:
                 return AnswerResult("rejected", "card_not_found", ())
             if not _can_answer(principal, record):
                 return AnswerResult("rejected", "forbidden", ())
-            if record.status != "open" or record.group.resolving:
+            if record.status != "open":
                 return AnswerResult("rejected", "already_resolved", ())
+            if record.group.resolving:  # a write is in flight and may still fail, so the card may reopen: retry
+                return AnswerResult("rejected", "busy", ())
 
             card = record.card
             if option not in {o["id"] for o in card["options"]}:
@@ -361,8 +380,11 @@ class CardStore:
             if tier_t3 and channel == "whatsapp" and option == "approve" and not pin_verified:
                 return AnswerResult("rejected", "pin_required", ())
 
+            who = (option, channel, principal.user_id, principal.role, pin_verified)
             authz = {"by": "person", "ref": principal.user_id, "at": self._clock.now()}
-            if record.kind == "gate":
+            if record.attempt is not None and record.attempt[0] == who:
+                part: dict | None = record.attempt[1]  # this answer again after a write that raised: resend it as is
+            elif record.kind == "gate":
                 # CR-07: only approve opens a gate and writes approval.resolved; edit and hold write nothing.
                 data = {"gate_id": card["gate"]["id"], "card_id": card_id, "outbox_id": record.outbox_id}
                 data |= {"option": option, "channel": channel, "pin_verified": pin_verified}
@@ -378,18 +400,26 @@ class CardStore:
             if part is None:
                 return AnswerResult("answered", None, ())
             record.group.resolving = True  # exactly one resolution per card: later answers and tick see this
-        self._write_then_close(record.group, part)
+        if not self._write_then_close(record, who, part):
+            return AnswerResult("rejected", "already_resolved", ())  # an earlier answer committed: it won
         return AnswerResult("answered", None, (part,))
 
-    def _write_then_close(self, group: _Group, part: dict) -> None:
+    def _write_then_close(self, record: _Record, who: tuple, part: dict) -> bool:
+        """False when the resolution was already committed by an earlier answer (the card closes under it)."""
         try:
             self._writer.write(part)  # outside the lock; a failed write leaves the card open
+        except AlreadyCommitted:
+            with self._lock:
+                self._resolve_group(record.group)
+            return False
         except BaseException:
             with self._lock:
-                group.resolving = False
+                record.group.resolving = False
+                record.attempt = (who, part)  # it may have committed: the same answer resends this exact part
             raise
         with self._lock:
-            self._resolve_group(group)
+            self._resolve_group(record.group)
+        return True
 
     # -- timeouts -------------------------------------------------------------
 
@@ -412,25 +442,38 @@ class CardStore:
                     record.group.resolving = True
                 claimed.append((key, record, held))
         results: list[TimeoutResult] = []
-        try:
-            for key, record, held in claimed:
+        failures: list[Exception] = []
+        for i, (key, record, held) in enumerate(claimed):
+            try:
                 if held:
                     data = {"alert_id": _alert_id(key[1]), "card_id": key[1]}
                     self._writer.write(self._part(record, "alert.raised", data, severity="nudge"))
                 else:
                     part = self._part(record, "question.answered", {"answered_by": "default"}, severity="nudge")
-                    self._writer.write(part)
+                    try:
+                        self._writer.write(part)
+                    except AlreadyCommitted:  # a person's answer is already committed: the question is resolved
+                        pass
                     with self._lock:
                         self._resolve_group(record.group)
                 results.append(TimeoutResult(card_id=key[1], kind=record.kind, held=held))
-        except BaseException:
-            with self._lock:  # unwritten claims go back to the work set; the next tick retries them
-                for key, record, held in claimed[len(results) :]:
-                    if held:
-                        self._pending[key] = record
-                    else:
-                        record.group.resolving = False
-            raise
+            except AlreadyCommitted:  # the nudge itself is already committed
+                results.append(TimeoutResult(card_id=key[1], kind=record.kind, held=held))
+            except BaseException as exc:
+                # This claim, and (if the failure is not an ordinary error) every later one, goes back to the
+                # work set for the next tick; an ordinary failure never blocks the cards after it.
+                rest = [claimed[i]] if isinstance(exc, Exception) else claimed[i:]
+                with self._lock:
+                    for k, r, h in rest:
+                        if h:
+                            self._pending[k] = r
+                        else:
+                            r.group.resolving = False
+                if not isinstance(exc, Exception):
+                    raise
+                failures.append(exc)
+        if failures:
+            raise failures[0]
         return results
 
 
