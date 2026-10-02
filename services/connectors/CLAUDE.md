@@ -5,28 +5,28 @@ Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP c
 outbox for every side effect. The only service that can decrypt user OAuth tokens.
 
 ## Commands
-- `uv run pytest services/connectors/tests -q` — public API pinned in `tests/API.md`.
+- `uv run pytest services/connectors/tests -q` — public API pinned in `tests/API.md`, `tests/API_FR_CON_04_05.md`.
 - `just check` — full gate from the repo root.
 
 ## Contracts
-- Reads `contracts/outbox.schema.json` (+ cross-refs), `data.transfer.schema.json`,
-  `contracts/fixtures/outbox/`; calls `tilo_policy.check_entry` for OB-01/OB-05 authorisation.
-  Emits `data.transfer` parts via the `emit` callback `Outbox` is constructed with.
-- `tokens.py` and `consent.py` (FR-CON-02/03) emit `connection.*` parts `{type, authz, data, user_id}`
-  and `alert.raised` via the optional `alert` callback when a revoke fails. `user_id` is the seam:
-  the caller picks the world and the actor.
+- Reads `contracts/outbox.schema.json` (+ cross-refs), `data.transfer.schema.json`, `contracts/fixtures/outbox/`;
+  calls `tilo_policy.check_entry` (OB-01/OB-05). Emits `data.transfer` via the `emit` callback `Outbox` gets.
+- `tokens.py`, `consent.py` and `adapters/` emit `connection.*` parts `{type, authz, data, user_id}` (`user_id` is the
+  seam: the caller picks the world and actor); a failed revoke raises `alert.raised` via the optional `alert` callback.
 
 ## Config
 - Env only, never logged: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_BASE_URL`.
-- `config/connectors.yaml` (adapters, scopes), `config/autonomy.yaml` (risk tiers per action).
+- `config/connectors.yaml` (gmail, google_drive: scopes, actions), `config/autonomy.yaml` (risk tiers per action).
 
 ## Requirement IDs
-- Section 12 (connectors, hands and deliverables); SEC-02, SEC-03, SEC-09, SEC-11, SEC-14.
+- Section 12 (connectors, hands and deliverables; FR-CON-04/05 Gmail, Drive); SEC-02, SEC-03, SEC-09, SEC-11, SEC-14.
 
 ## Local rules
 - Side-effect methods are callable only from the outbox (SEC-03); every side-effect event carries
   `authz` (SEC-11). `side_effects.SIDE_EFFECT_METHOD_NAMES` names them; `outbox.py` is the one file
   allowed to call one, and its `Grant` is minted only by `Outbox.dispatch_due()`.
+- Adapters: every Google call goes through an injected `Transport` (fakes or `recording.ReplayTransport` in dev and
+  CI), no logging. A side effect never waits (the lease); `SideEffectRefused` fails the entry, other errors leave it due.
 - OAuth only, least privilege, incremental scopes; Tilo never sees, types or stores passwords.
 - Exactly-once send, at-least-once delivery: `enqueue` is a no-op on a world_id + idempotency_key
   already stored (OB-03), and the adapter dedupes its own send. `Outbox` may hand the same

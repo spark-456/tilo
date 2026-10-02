@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-SIDE_EFFECT_METHOD_NAMES: frozenset[str] = frozenset({"send_reply"})  # callable only from outbox.py
+SIDE_EFFECT_METHOD_NAMES: frozenset[str] = frozenset({"send_reply", "execute_side_effect"})  # only from outbox.py
 
 
 @dataclass(frozen=True)
