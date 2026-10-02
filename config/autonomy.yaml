@@ -8,8 +8,9 @@
 # This table holds no credit amounts. The run cap (`caps.run_credits` in config/metering.yaml,
 # MT-03, PRD 17.3) must bound every grant, but `Treasury.grant` does not enforce it yet (issue
 # #51). A `grant_budget` policy with `limits.credits: null` covers no cap: the engine gates it
-# (issue #106, BQ-100). Until Treasury enforces the ceiling, a policy grant is bounded by its own
-# credit limit only (ADR-0002 decision 14).
+# (issue #106, BQ-100). Until the run cap is also enforced (issue #51), nothing may call
+# `request_budget_grant` without a person's own approval, for example a harness auto-start or
+# FR-MTR-03 top-ups (ADR-0002 decision 14).
 # A grant goes through no connector, so its connector id is the reserved `internal`.
 actions:
   create_draft: T1

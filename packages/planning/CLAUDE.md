@@ -32,7 +32,9 @@ budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant
 - A rejected submission stores nothing: limits first, then extraction and screening, then storage.
 - The plan validator takes its registries (risk table, connectors, skills, policies) as arguments;
   a schema failure (`schema`) stops the PG checks. Arrays over their cap and non-finite numbers are
-  `schema`, checked so jsonschema never does quadratic work. PG-06 checks "never lower" only, against
+  `schema`, checked so jsonschema never does quadratic work; so is a non-string item in any `uniqueItems`
+  array (`tilo_providers.schema_guard`, #124). The first caller of `validate_plan` with client JSON must
+  pass `owner` (BQ-72). PG-06 checks "never lower" only, against
   the higher of the table and connector tiers (BQ-72). PG-10 reads a policy as `tilo_policy` does:
   schema, owner, history level at `now` capped by `max_level`, expiry, scope.
 - A flagged file's `artifact.created` has severity `fyi` and `trace.tool` `safety_provider`;
@@ -41,8 +43,4 @@ budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant
 - A budget grant's authz comes only from the world's owner (PRD 10.1) or the policy engine. The risk table
   is a parameter: until `config/autonomy.yaml` lists `grant_budget`, the engine fails closed and every grant
   waits. A policy grant is one `budget.granted` with authz by policy; it has no gate or outbox entry, so no
-  `policy.applied` is built, and its daily limits count earlier policy-authorised grants. A `grant_budget`
-  policy with `limits.credits: null` covers no cap (it gates), and a grant is a world's first: `existing_cap`
-  other than 0 raises `TopUpNotSupported` until Treasury lands (BQ-100).
-- Credits the Director writes must be finite, a minimum 0 or more and a maximum above 0 (PG-09). The repair
-  prompt holds the problem lines in a `PROBLEMS` data block, and ids in them are shown only if they fit the id pattern.
+  `policy.applied` is built, and its daily limits count earlier policy-authorised grants.
