@@ -39,6 +39,7 @@ _DEFAULT_EXPIRES_IN = 3600
 _MAX_EXPIRES_IN = 366 * 86400
 _LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1")
 _DEFAULT_RETRY_RETENTION_S = 7 * 86400
+_CLOCK_SKEW_S = 300  # a retry key further ahead than this is not ours
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 
@@ -273,6 +274,7 @@ class TokenBroker:
         self._alert, self._retention = alert, retry_retention_s
         self._retry = retry_store if retry_store is not None else InMemoryTokenStore()
         self._locks: dict[tuple[str, str], threading.Lock] = {}
+        self._user_locks: dict[str, threading.Lock] = {}
         self._guard = threading.Lock()
 
     # -- public ---------------------------------------------------------------------------------
@@ -288,23 +290,19 @@ class TokenBroker:
         """Seal a token endpoint response and store it. No refresh token in it keeps the stored one.
         `before_established` runs once the record is stored, just before connection.established."""
         access, refresh, scopes, lifetime = parse_token_body(token_response, need_scope=True)
-        with self._lock(user_id, connector):
+        with self._lock(user_id, connector):  # held to the end: no adapter sees the token before the events
             previous = self._store.get(user_id, connector)
             if not refresh:
                 refresh = (self._readable(user_id, connector, previous) or {}).get("refresh_token")
             self._put_connected(user_id, connector, access, refresh, scopes or [], lifetime)
-        try:
-            if before_established is not None:
-                before_established()
-            self._emit_part("connection.established", user_id, connector)
-        except Exception:
-            # Not recorded as established, so not connected: put back what was there before (or nothing).
-            with self._lock(user_id, connector):
-                if previous is None:
-                    self._store.delete(user_id, connector)
-                else:
-                    self._store.put(user_id, connector, previous)
-            raise
+            try:
+                if before_established is not None:
+                    before_established()
+                self._emit_part("connection.established", user_id, connector)
+            except Exception as error:
+                # Not recorded as established, so not connected: put back what was there before (or nothing).
+                self._roll_back(user_id, connector, previous, error)
+                raise
 
     def access_token_for_adapter(self, user_id: str, connector: str, *, required_scopes: Iterable[str]) -> str:
         """The one call that returns a plaintext token; refreshes first when it is about to expire."""
@@ -331,14 +329,13 @@ class TokenBroker:
         return frozenset(record.get("scopes", []))
 
     def has_live_grant(self, user_id: str, *, excluding: str | None = None) -> bool:
-        """True when the user has a connected, readable record for any connector (but `excluding`). Every
-        Google connector shares one OAuth client and one grant per account, so revoking a token there ends
-        all of them (CON-D10)."""
+        """True when the user has a record in state "connected" for any connector (but `excluding`),
+        whether or not the KMS can read it now: an outage must never make a connected connector look
+        absent. Every Google connector shares one OAuth client and one grant per account, so revoking a
+        token there ends all of them (CON-D10)."""
         for other in self._store.connectors_of(user_id):
-            record = self._store.get(user_id, other)
-            if other != excluding and record and record.get("state") == "connected":
-                if self._readable(user_id, other, record) is not None:
-                    return True
+            if other != excluding and (self._store.get(user_id, other) or {}).get("state") == "connected":
+                return True
         return False
 
     def connection_state(self, user_id: str, connector: str) -> str | None:
@@ -365,7 +362,12 @@ class TokenBroker:
     def retry_pending_revokes(self, user_id: str) -> int:
         """Retry this user's earlier failed revokes; one older than the retention limit, or that cannot
         be read, is dropped. Returns how many went through."""
+        with self._user_lock(user_id):
+            return self._retry_pending(user_id)
+
+    def _retry_pending(self, user_id: str) -> int:
         done, now = 0, parse_ts(self._clock())
+        live = self.has_live_grant(user_id)  # CON-D10: another connected connector shares the grant
         for key in self._retry.connectors_of(user_id):
             record = self._retry.get(user_id, key) or {}
             moved = record.get("sealed_as") == "token"  # the original ciphertext, kept as it was
@@ -374,6 +376,7 @@ class TokenBroker:
                 payload = self._readable(user_id, str(record.get("connector")), record)
                 token = (payload or {}).get("refresh_token") or (payload or {}).get("access_token")
                 age = now.timestamp() - _ulid_seconds(key)  # the key's own time: the record's is unbound
+                age = None if age < -_CLOCK_SKEW_S else max(age, 0.0)  # a key from the future is malformed
             else:
                 token = (self._readable(user_id, key, record, kind="revoke") or {}).get("token")
                 age = (now - parse_ts(record["created_at"])).total_seconds() if "created_at" in record else None
@@ -382,6 +385,8 @@ class TokenBroker:
             if not token or age is None or age > self._retention:
                 self._retry.delete(user_id, key)
                 _log.warning("a pending revoke for connector %r was dropped unrevoked", record.get("connector"))
+            elif live:
+                continue  # never while the user is connected elsewhere; kept until the retention ends
             elif self._revoke(str(token)) is None:
                 self._retry.delete(user_id, key)
                 done += 1
@@ -392,6 +397,32 @@ class TokenBroker:
     def _lock(self, user_id: str, connector: str) -> threading.Lock:
         with self._guard:
             return self._locks.setdefault((user_id, connector), threading.Lock())
+
+    def _user_lock(self, user_id: str) -> threading.Lock:
+        """Serialises the check-then-revoke of one user's disconnects (always taken before a connector lock).
+        In memory: CAS on the shared state replaces it with Firestore (CON-D9)."""
+        with self._guard:
+            return self._user_locks.setdefault(user_id, threading.Lock())
+
+    def _roll_back(self, user_id: str, connector: str, previous: dict[str, Any] | None, error: Exception) -> None:
+        """Undo a put whose events did not land. If that write fails too, the record must not stay live with
+        no events: log the original error (its type only: a message could echo a token) and mark it unusable."""
+        try:
+            if previous is None:
+                self._store.delete(user_id, connector)
+            else:
+                self._store.put(user_id, connector, previous)
+        except Exception as second:  # noqa: BLE001
+            _log.error(
+                "rolling back connector %r after %s failed with %s; marking it unusable",
+                connector,
+                type(error).__name__,
+                type(second).__name__,
+            )
+            try:
+                self._store.put(user_id, connector, {"v": 1, "state": "expired", "scopes": [], "expires_at": None})
+            except Exception:  # noqa: BLE001
+                _log.error("connector %r could not be marked unusable either; fix the store", connector)
 
     def _emit_part(self, event_type: str, user_id: str, connector: str) -> None:
         self._emit({"type": event_type, "authz": None, "data": {"connector": connector}, "user_id": user_id})
@@ -483,7 +514,7 @@ class TokenBroker:
         return None if answer[0] == 200 else f"the provider answered {answer[0]}"
 
     def _disconnect(self, user_id: str, connector: str, *, keep_retry: bool) -> DisconnectResult:
-        with self._lock(user_id, connector):
+        with self._user_lock(user_id), self._lock(user_id, connector):
             record = self._store.get(user_id, connector)
             if record is None:
                 return DisconnectResult(False, None)
