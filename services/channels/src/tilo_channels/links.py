@@ -32,6 +32,7 @@ _B64 = re.compile(r"[A-Za-z0-9_-]+\Z")
 _ACTIONS = ("open", "answer")
 _MAC_DOMAIN = b"tilo-link-v1|"  # domain separation: these keys sign nothing else
 _MAX_EXPIRY = 2**32  # epoch seconds, year 2106; anything larger is not one of our claims
+_MAX_BODY = 1024  # decoded claims are ~200 bytes; a bigger body is not one of ours and is not parsed
 
 
 class LinkRefused(Exception):
@@ -40,6 +41,11 @@ class LinkRefused(Exception):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
+
+
+class _BadIdentifier(LinkRefused, ValueError):
+    """issue() was given a card or user id that is not a non-blank str. A ValueError (caller bug) that
+    also stays a LinkRefused, so callers catching the stable refusal codes keep working."""
 
 
 class KeyRing:
@@ -150,7 +156,13 @@ def _mac(key: bytes, signed: str) -> bytes:
 
 
 def _options(card: Mapping[str, Any]) -> set[str]:
-    return {o["id"] for o in card.get("options") or [] if isinstance(o, Mapping) and isinstance(o.get("id"), str)}
+    """Option ids, or none at all unless options is a list of objects that all carry a str id."""
+    options = card.get("options")
+    if not isinstance(options, list) or not all(
+        isinstance(o, Mapping) and isinstance(o.get("id"), str) for o in options
+    ):
+        return set()
+    return {o["id"] for o in options}
 
 
 def _question_card(card: Mapping[str, Any]) -> bool:
@@ -186,10 +198,10 @@ class LinkService:
     def issue(self, *, card_id: str, user_id: str, action: str, option: str | None = None) -> IssuedLink:
         if action not in _ACTIONS:
             raise LinkRefused("unknown_action")
-        if not card_id:
-            raise LinkRefused("unknown_card")
-        if not user_id:
-            raise LinkRefused("wrong_user")
+        if not isinstance(card_id, str) or not card_id.strip():
+            raise _BadIdentifier("unknown_card")
+        if not isinstance(user_id, str) or not user_id.strip():
+            raise _BadIdentifier("wrong_user")
         state = self._cards(card_id)
         if state is None:
             raise LinkRefused("unknown_card")
@@ -243,15 +255,22 @@ class LinkService:
             raise LinkRefused("unknown_key")
         if not hmac.compare_digest(_mac(key, f"{kid}.{body}"), provided):
             raise LinkRefused("bad_signature")
+        raw = _b64d(body)
+        if len(raw) > _MAX_BODY:
+            raise LinkRefused("malformed")
         try:
-            claims = json.loads(_b64d(body))
-            if not isinstance(claims, dict) or not all(isinstance(claims.get(k), str) for k in "ncua"):
+            claims = json.loads(raw)
+            if not isinstance(claims, dict) or not all(isinstance(claims.get(k), str) for k in "ncu"):
                 raise ValueError
-            if not (claims.get("o") is None or isinstance(claims["o"], str)) or type(claims["e"]) is not int:
+            if claims.get("a") not in _ACTIONS or "o" not in claims or type(claims.get("e")) is not int:
+                raise ValueError
+            if (claims["o"] is None) != (claims["a"] == "open") or not (
+                claims["o"] is None or isinstance(claims["o"], str)
+            ):
                 raise ValueError
             if not 0 < claims["e"] < _MAX_EXPIRY:
                 raise ValueError
-        except (ValueError, KeyError, TypeError):
+        except (ValueError, RecursionError):
             raise LinkRefused("malformed") from None
         return claims
 
