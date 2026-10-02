@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
 import { LAYOUT_VILLAGE_BASIC } from "../api/fixtures/layout";
-import { findItem } from "../screens/S_05";
+import { findItem } from "../screens/findItem";
 import { getSelection, involves, objectIds, select, subscribeSelection } from "./selection";
 
 const events = EVENTS_VILLAGE_BASIC;
@@ -42,7 +42,16 @@ describe("FR-WLD-06 one selection per run, shared by World, Story, Trace and Ins
 
   it("FR_WLD_06 every object the layout and events produce can be selected and inspected", () => {
     const ids = objectIds(LAYOUT_VILLAGE_BASIC, events);
-    for (const id of ["A_dir", "A_s1", "L1", "D1", "B1", "I1", "art_triage_list", "art_reply_draft"]) {
+    for (const id of [
+      "A_dir",
+      "A_s1",
+      "L1",
+      "D1",
+      "B1",
+      "I1",
+      "art_triage_list",
+      "art_reply_draft",
+    ]) {
       expect(ids.has(id), id).toBe(true);
       expect(findItem(LAYOUT_VILLAGE_BASIC, id, events), id).not.toBeNull();
     }

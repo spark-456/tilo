@@ -11,7 +11,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
 import { watchConsole } from "../support/screens";
-import { DESKTOP } from "../support/viewports";
+import { DESKTOP, MOBILE } from "../support/viewports";
 
 const W = "/world/w_village_basic";
 const FAST = "?speed=100";
@@ -20,16 +20,18 @@ const A_S1_SEQS = [14, 18, 19, 20, 21, 22, 23, 24, 25, 27, 40];
 const hudRow = (page: Page, name: RegExp) =>
   page.getByTestId("world-hud").getByRole("button", { name });
 const highlightedSeqs = (page: Page, rows: string) =>
-  page.locator(`${rows}[data-selected="true"]`).evaluateAll((els) =>
-    els.map((el) => Number(el.getAttribute("data-seq"))),
-  );
+  page
+    .locator(`${rows}[data-selected="true"]`)
+    .evaluateAll((els) => els.map((el) => Number(el.getAttribute("data-seq"))));
+const lens = (page: Page, name: string) =>
+  page.getByRole("navigation", { name: "Lens" }).getByRole("link", { name });
 const finished = (page: Page) =>
   expect(page.getByTestId("hud-meter")).toContainText("Done", { timeout: 15_000 });
 
 /** Milliseconds from the next click until every selector matches (frame by frame). */
 async function msUntil(page: Page, click: () => Promise<void>, selectors: string[]) {
   await page.evaluate((all) => {
-    const w = window as unknown as { __ms?: number };
+    const w = window as unknown as { __ms: number | undefined };
     w.__ms = undefined;
     document.addEventListener(
       "click",
@@ -49,7 +51,9 @@ async function msUntil(page: Page, click: () => Promise<void>, selectors: string
   return page.evaluate(() => (window as unknown as { __ms: number }).__ms);
 }
 
-test("FR_WLD_06 a selection made in the World lens follows to Story and Trace", async ({ page }) => {
+test("FR_WLD_06 a selection made in the World lens follows to Story and Trace", async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   const problems = watchConsole(page);
   await page.setViewportSize(DESKTOP);
@@ -64,13 +68,13 @@ test("FR_WLD_06 a selection made in the World lens follows to Story and Trace", 
   await expect(hudRow(page, /Director/)).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("selection-bar")).toContainText("Specialist 1");
 
-  await page.getByRole("link", { name: "Story", exact: true }).click();
+  await lens(page, "Story").click();
   await expect(page.getByTestId("story-lens")).toContainText("Specialist 1");
   await expect(page.locator('[data-testid="story-lens"] li[data-seq]')).toHaveCount(44);
   expect(await highlightedSeqs(page, "[data-testid=story-lens] li")).toEqual(A_S1_SEQS);
   await expect(hudRow(page, /Specialist 1/)).toHaveAttribute("aria-pressed", "true");
 
-  await page.getByRole("link", { name: "Trace", exact: true }).click();
+  await lens(page, "Trace").click();
   await expect(page.getByTestId("trace-lens-row")).toHaveCount(44);
   expect(await highlightedSeqs(page, "[data-testid=trace-lens-row]")).toEqual(A_S1_SEQS);
   // The lenses are routes of one page: the selection survived with no reload.
@@ -90,7 +94,8 @@ test("FR_WLD_06 selecting an agent highlights it in all three lenses in <= 200 m
   // From Story: the Story rows and the World roster in the rail light up together.
   const fromStory = await msUntil(
     page,
-    () => page.getByTestId("story-lens").getByRole("button", { name: "Specialist 1" }).first().click(),
+    () =>
+      page.getByTestId("story-lens").getByRole("button", { name: "Specialist 1" }).first().click(),
     [
       '[data-testid=story-lens] li[data-selected="true"]',
       '[data-testid=world-hud] button[aria-pressed="true"]',
@@ -99,20 +104,16 @@ test("FR_WLD_06 selecting an agent highlights it in all three lenses in <= 200 m
   );
   expect(fromStory, "Story to Story, World roster and bar").toBeLessThanOrEqual(200);
   // To Trace and to World: the highlight is there when the lens opens, within the same budget.
-  const toTrace = await msUntil(
-    page,
-    () => page.getByRole("link", { name: "Trace", exact: true }).click(),
-    ['[data-testid=trace-lens-row][data-selected="true"]'],
-  );
+  const toTrace = await msUntil(page, () => lens(page, "Trace").click(), [
+    '[data-testid=trace-lens-row][data-selected="true"]',
+  ]);
   expect(toTrace, "Trace").toBeLessThanOrEqual(200);
-  const toWorld = await msUntil(
-    page,
-    () => page.getByRole("link", { name: "World", exact: true }).click(),
-    ['[data-testid=world-hud] button[aria-pressed="true"]'],
-  );
+  const toWorld = await msUntil(page, () => lens(page, "World").click(), [
+    '[data-testid=world-hud] button[aria-pressed="true"]',
+  ]);
   expect(toWorld, "World").toBeLessThanOrEqual(200);
   // And the other way: from Trace the World roster lights up at once.
-  await page.getByRole("link", { name: "Trace", exact: true }).click();
+  await lens(page, "Trace").click();
   await page.getByTestId("selection-bar").getByRole("button", { name: "Clear" }).click();
   const fromTrace = await msUntil(
     page,
@@ -185,7 +186,7 @@ test("FR_WLD_06 Inspect opens from the selection for every kind of object", asyn
   await page.setViewportSize(DESKTOP);
   const kinds: Array<[string, string, string]> = [
     ["A_s1", "Specialist 1", "Agent"],
-    ["B1", "Mail Room", "Building"],
+    ["B1", "Mail Room", "Common building"],
     ["L1", "Inbox", "Level"],
     ["D1", "Mail", "District"],
     ["I1", "Gmail", "Island"],
@@ -219,7 +220,9 @@ test("FR_WLD_06 selecting shifts nothing on the page and passes axe", async ({ p
     await finished(page);
     const tops = () =>
       page
-        .locator("[data-testid=selection-bar], [data-testid=world-hud] .row, .story-list li, .trace-rows li")
+        .locator(
+          "[data-testid=selection-bar], [data-testid=world-hud] .row, .story-list li, .trace-rows li",
+        )
         .evaluateAll((els) => els.slice(0, 40).map((el) => el.getBoundingClientRect().top));
     const before = await tops();
     await hudRow(page, /Specialist 1/).click();
@@ -229,5 +232,26 @@ test("FR_WLD_06 selecting shifts nothing on the page and passes axe", async ({ p
       .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
       .analyze();
     expect(axe.violations, path).toEqual([]);
+  }
+});
+
+test("FR_WLD_06 on a phone every selection control is at least 44 x 44 px and nothing scrolls sideways", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(MOBILE);
+  for (const lensPath of ["/story", "/trace"]) {
+    await page.goto(`${W}${lensPath}${FAST}`);
+    await expect(page.locator("[data-seq]")).toHaveCount(44, { timeout: 15_000 });
+    await page.locator("main [data-lens-control]").first().click();
+    await expect(page.getByTestId("selection-bar")).toHaveAttribute("data-selected-id", /.+/);
+    for (const control of await page.locator("main [data-lens-control]").all()) {
+      const b = await control.boundingBox();
+      expect(b?.height ?? 0, lensPath).toBeGreaterThanOrEqual(44);
+      expect(b?.width ?? 0, lensPath).toBeGreaterThanOrEqual(44);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      MOBILE.width,
+    );
   }
 });

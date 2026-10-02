@@ -352,7 +352,89 @@ a.secondary {
   margin-bottom: 12px;
 }
 .lens-space {
-  height: 56px; /* the lens tabs' height and margin, kept where the page shows its own tabs */
+  height: 108px; /* the lens tabs and the selection bar (56 + 52 px), kept where the page shows its own */
+}
+/* FR-WLD-06: one selection across World, Story and Trace. A selected thing gets a heavier outline
+   and the bar names it, so colour never carries it alone. Outlines sit inside the box: nothing
+   moves when something is chosen or cleared. */
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  height: 44px;
+  margin-bottom: 8px;
+  font-size: 0.875em;
+}
+.selection-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selection-bar a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+.pick-box,
+button.pick {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+}
+button.pick {
+  border-color: var(--color-surface-2);
+  background: transparent;
+  color: var(--color-ink-1);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.story-list button.pick {
+  font-size: 0.875em;
+}
+button.pick:hover,
+button.row:hover {
+  background: var(--color-surface-0);
+}
+button.pick:focus-visible,
+button.row:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+button.pick[aria-pressed="true"],
+button.row[aria-pressed="true"] {
+  border-color: var(--color-ink-1);
+  background: var(--color-surface-2);
+  box-shadow: inset 0 0 0 2px var(--color-ink-1);
+}
+button.row {
+  width: 100%;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.story-list li[data-selected="true"],
+.trace-rows li[data-selected="true"] {
+  background: var(--color-surface-2);
+  outline: 2px solid var(--color-ink-1);
+  outline-offset: -2px;
+}
+@media (max-width: 767px) {
+  .pick-box,
+  button.pick,
+  .selection-bar a {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 .lens-tab {
   display: inline-flex;
