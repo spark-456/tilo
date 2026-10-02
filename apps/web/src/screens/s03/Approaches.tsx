@@ -16,6 +16,8 @@ const DIMS = [
 // both together.
 export const MAX_BUDGET_CAP_CREDITS = 300;
 
+export const CAP_RULE = `Enter a whole number from 1 to ${MAX_BUDGET_CAP_CREDITS} credits.`;
+
 const formatTime = (t: PlanApproach["time"]): string =>
   t.min_s >= 60 && t.min_s % 60 === 0 && t.max_s % 60 === 0
     ? `${t.min_s / 60}–${t.max_s / 60} min (${t.min_s}–${t.max_s} s)`
@@ -49,7 +51,6 @@ export function Approaches({ taskId }: { taskId: string }) {
     parsed <= MAX_BUDGET_CAP_CREDITS
       ? parsed
       : null;
-  const displayCap = validCap ?? active?.credits.max ?? 0;
 
   const action = useAction("start the run", async () => {
     if (!selected || validCap === null) throw new Error("no approach is selected");
@@ -87,9 +88,10 @@ export function Approaches({ taskId }: { taskId: string }) {
               </div>
               <label className="budget-cap-field" htmlFor="budget-cap-input">
                 <span>Budget cap (credits)</span>
-                <input id="budget-cap-input" data-testid="budget-cap-input" type="number" min={1} max={MAX_BUDGET_CAP_CREDITS} step={1} aria-invalid={validCap === null} value={rawCap} onChange={(e) => setCapDraft(e.target.value)} />
+                <input id="budget-cap-input" data-testid="budget-cap-input" type="number" min={1} max={MAX_BUDGET_CAP_CREDITS} step={1} aria-invalid={validCap === null} aria-describedby="budget-cap-hint" value={rawCap} onChange={(e) => setCapDraft(e.target.value)} />
               </label>
-              <p className="flow-detail" data-testid="budget-line">{`This run can use up to ${displayCap} credits (about US$${(displayCap * result.credit_usd).toFixed(2)}). You can pause it any time.`}</p>
+              <output id="budget-cap-hint" className="budget-cap-hint" data-testid="budget-cap-hint">{validCap === null ? CAP_RULE : ""}</output>
+              <p className="flow-detail" data-testid="budget-line">{validCap === null ? "The cost is shown once the cap is valid." : `This run can use up to ${validCap} credits (about US$${(validCap * result.credit_usd).toFixed(2)}). You can pause it any time.`}</p>
             </div>
           );
         }}

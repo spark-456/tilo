@@ -96,15 +96,21 @@ describe("AGW-04 S-03 Approaches and budget", () => {
     await openApproaches();
     await act(async () => q<HTMLButtonElement>('[data-testid="select-approach-quick"]')?.click());
     const capInput = q<HTMLInputElement>('[data-testid="budget-cap-input"]');
-    for (const bad of ["", "0", "1.5", "301", "1e20"]) {
+    expect(capInput?.getAttribute("aria-describedby")).toBe("budget-cap-hint");
+    for (const bad of ["", "0", "1.5", "-5", "301", "1e20"]) {
       await act(async () => void (capInput && setInputValue(capInput, bad)));
-      expect(capInput?.getAttribute("aria-invalid")).toBe("true");
-      expect(q<HTMLButtonElement>("button.primary")?.disabled).toBe(true);
+      expect(capInput?.getAttribute("aria-invalid"), bad).toBe("true");
+      expect(q<HTMLButtonElement>("button.primary")?.disabled, bad).toBe(true);
+      // The reason is in words, tied to the input; the cost line states no number for a bad cap.
+      expect(q('[data-testid="budget-cap-hint"]')?.textContent, bad).toBe("Enter a whole number from 1 to 300 credits.");
+      expect(q('[data-testid="budget-line"]')?.textContent, bad).not.toMatch(/\d/);
     }
     for (const good of ["80", "300"]) {
       await act(async () => void (capInput && setInputValue(capInput, good)));
       expect(capInput?.getAttribute("aria-invalid")).toBe("false");
       expect(q<HTMLButtonElement>("button.primary")?.disabled).toBe(false);
+      expect(q('[data-testid="budget-cap-hint"]')?.textContent).toBe(""); // the message clears
+      expect(q('[data-testid="budget-line"]')?.textContent).toContain(`up to ${good} credits`);
     }
   });
 

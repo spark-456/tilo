@@ -1264,27 +1264,33 @@ button.row {
 .flow-shell[data-screen="Approaches"] {
   width: min(520px, calc(100vw - 464px));
 }
+/* The slot reserves the ready height (cards, cap box, rule line, cost line), measured: 588 px at
+   1440, 754 px at 768 (the stage rail leaves 304 px), 625 px at 390, 698 px at 360, 754 px at 320. */
 .flow-shell[data-screen="Approaches"] .flow-slot {
   display: flow-root;
-  min-height: 33em;
+  min-height: 37em;
+}
+@media (max-width: 1023px) {
+  .flow-shell[data-screen="Approaches"] .flow-slot {
+    min-height: 48em;
+  }
 }
 @media (max-width: 767px) {
   .flow-shell[data-screen="Approaches"] {
     width: calc(100vw - 32px);
   }
-  /* Narrower cards wrap more: reserve the ready height (566 px at 390, 639 px at 360, 683 px at 320). */
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 37em;
+    min-height: 40em;
   }
 }
 @media (max-width: 389px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 41em;
+    min-height: 44em;
   }
 }
 @media (max-width: 359px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 44em;
+    min-height: 48em;
   }
 }
 .approach-card {
@@ -1318,6 +1324,15 @@ button.row {
 .approach-head .secondary,
 .approach-head .btag {
   font-size: 0.875rem; /* exactly 14 px: the minimum type size; .btag alone is 12 px */
+}
+.budget-cap-hint {
+  display: block;
+  min-height: 2.8em; /* two lines, reserved: the rule appears without moving what is below */
+  margin: 0;
+  font: 700 0.875em / 1.4 var(--font-ui);
+}
+.s03-approaches .flow-detail {
+  min-height: 4.2em; /* three lines: the valid line and the neutral one take the same room */
 }
 .budget-cap-field input {
   width: 6em;

@@ -39,14 +39,19 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await expect(cap).toHaveValue("130");
     await expect(page.getByTestId("budget-line")).toHaveText("This run can use up to 130 credits (about US$0.65). You can pause it any time.");
 
-    for (const bad of ["", "0", "1.5", "301", "1e20"]) {
+    const hint = page.getByTestId("budget-cap-hint");
+    await expect(cap).toHaveAttribute("aria-describedby", "budget-cap-hint");
+    for (const bad of ["", "0", "1.5", "-5", "301", "1e20"]) {
       await cap.fill(bad);
-      await expect(cap).toHaveAttribute("aria-invalid", "true");
-      await expect(primary).toBeDisabled();
+      await expect(cap, bad).toHaveAttribute("aria-invalid", "true");
+      await expect(primary, bad).toBeDisabled();
+      await expect(hint, bad).toHaveText("Enter a whole number from 1 to 300 credits.");
+      await expect(page.getByTestId("budget-line"), bad).not.toHaveText(/\d/);
     }
 
     await cap.fill("250");
     await expect(cap).toHaveAttribute("aria-invalid", "false");
+    await expect(hint).toHaveText("");
     await expect(primary).toBeEnabled();
     await expect(page.getByTestId("budget-line")).toHaveText("This run can use up to 250 credits (about US$1.25). You can pause it any time.");
 
