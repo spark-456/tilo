@@ -41,7 +41,9 @@ def validate_brief(data: Any) -> dict[str, Any]:
     try:
         brief = Brief.model_validate(data).model_dump(mode="json")
     except pydantic.ValidationError as error:
-        raise BriefValidationError(str(error)) from error
+        # Where and why only: pydantic's own text quotes the input, which may be a person's edit or model output.
+        problems = "; ".join(f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in error.errors())
+        raise BriefValidationError(problems) from error
     for source in brief["sources"]:
         if source.get("label") is None:  # optional in the contract, never null
             source.pop("label", None)
@@ -98,5 +100,5 @@ def extract_brief(task_text: str, *, router: Router, budget: float | None = None
 def edit_brief_field(brief: dict[str, Any], field: str, value: Any) -> dict[str, Any]:
     """A person edits one chip. Returns a new, validated brief; the original is left unchanged."""
     if field not in CHIP_FIELDS:
-        raise BriefValidationError(f"{field!r} is not an editable brief field")
+        raise BriefValidationError("That is not an editable brief field")
     return validate_brief({**copy.deepcopy(brief), field: value})

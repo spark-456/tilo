@@ -47,6 +47,10 @@ def connector_validator() -> jsonschema.protocols.Validator:
 
 @functools.lru_cache(maxsize=1)
 def manifest_validator() -> jsonschema.protocols.Validator:
+    """Without uniqueItems on parents and inputs: jsonschema compares those pairwise (O(n^2)), so
+    provenance.build_manifest refuses a repeated (artifact_id, version) first, in O(n) (#187)."""
     schema = _load_json(_CONTRACTS_DIR / "manifest.schema.json")
+    for field in ("parents", "inputs"):
+        schema["properties"][field].pop("uniqueItems", None)
     cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
     return cls(schema, registry=_registry())

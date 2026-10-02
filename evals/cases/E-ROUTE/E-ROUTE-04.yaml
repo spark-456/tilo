@@ -1,0 +1,34 @@
+id: E-ROUTE-04
+group: E-ROUTE
+title: Route Kestrel Studio nightly webhook retry schedule to Automation Team Lead
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Configure the Kestrel Studio sprint-hours sync job between the time tracker and the billing ledger.
+  question: When the time-tracker endpoint returns HTTP 503, should the sync worker retry 3 times with
+    exponential backoff or pause the queue?
+  question_domain: automation
+  topic_key: webhook_retry_backoff
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A4
+  world_id: w_kestrel_ops
+  district: D1
+  asked_at: '2026-10-02T10:15:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: automation
+  answered_from_decision: false
+  decision_id: null
+checks:
+- check: routed_domain
+  args:
+    expected: automation
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A4
+- check: answered_from_decision
+  args:
+    expected: false
+recording: null

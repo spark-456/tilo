@@ -1,0 +1,35 @@
+id: E-ROUTE-18
+group: E-ROUTE
+title: Answer repeat subcontractor IP assignment question from Legal Team Lead decision
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Verify Alder Studio freelance illustration agreements before releasing sprint deliverables.
+  question: Do Alder Studio freelance illustration contracts require full work-for-hire IP assignment
+    upon payment?
+  question_domain: legal
+  topic_key: subcontractor_ip_assignment
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3B8
+  world_id: w_alder_studio
+  district: D1
+  asked_at: '2026-10-02T11:35:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: legal
+  answered_from_decision: true
+  decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E8
+checks:
+- check: routed_domain
+  args:
+    expected: legal
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3B8
+- check: answered_from_decision
+  args:
+    expected: true
+    decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E8
+recording: null
