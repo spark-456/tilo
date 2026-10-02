@@ -10,6 +10,7 @@ from __future__ import annotations
 import pathlib
 
 import pytest
+from _plan_validator_lib import build_fake_connectors, build_fake_policies, build_fake_skills, build_risk_table
 from _planning_contracts_lib import build_registry, make_safety_provider
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -28,3 +29,26 @@ def registry(repo_root: pathlib.Path):
 @pytest.fixture()
 def safety_provider():
     return make_safety_provider()
+
+
+# --- FR-INT-09 (PlanGraph validator) fixtures --------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def risk_table(repo_root: pathlib.Path):
+    return build_risk_table(repo_root)
+
+
+@pytest.fixture(scope="session")
+def fake_connectors(repo_root: pathlib.Path):
+    return build_fake_connectors(repo_root)
+
+
+@pytest.fixture(scope="session")
+def fake_skills():
+    return build_fake_skills()
+
+
+@pytest.fixture(scope="session")
+def fake_policies(repo_root: pathlib.Path):
+    return build_fake_policies(repo_root)

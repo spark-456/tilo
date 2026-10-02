@@ -1402,6 +1402,8 @@ name = "tilo-planning"
 version = "0.1.0"
 source = { editable = "packages/planning" }
 dependencies = [
+    { name = "jsonschema" },
+    { name = "referencing" },
     { name = "tilo-contracts" },
     { name = "tilo-policy" },
     { name = "tilo-providers" },
@@ -1409,6 +1411,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "jsonschema", specifier = ">=4.18" },
+    { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-providers", editable = "packages/providers" },
