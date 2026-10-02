@@ -747,6 +747,9 @@ a.secondary {
 .btag[data-tone="fyi"] {
   border-color: var(--color-signal-fyi);
 }
+.btag[data-tone="gate"] {
+  border-color: var(--color-signal-gate);
+}
 .btag[data-tone="policy"] {
   border-color: var(--color-policy); /* PRD 18.6: the policy colour, with the word "Policy" */
 }
@@ -929,4 +932,15 @@ a.secondary {
     left: 12px; /* the fixture banner is on the right, so the two never meet */
     transform: none;
   }
+}
+.rail-needs {
+  height: 9em; /* fits one row and a half: the list scrolls, nothing below it moves */
+  overflow-y: auto;
+}
+.rail-needs:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.rail-needs p {
+  margin: 0;
 }
