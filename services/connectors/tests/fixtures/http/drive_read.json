@@ -1,0 +1,82 @@
+{
+  "format": "tilo.http-recording/1",
+  "connector": "google_drive",
+  "note": "Hand-written (FR-CON-05): get_metadata, then download (metadata, then content) of one file the user picked. No real account.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files/file_picked_1",
+        "params": {},
+        "headers": {
+          "authorization": "REDACTED"
+        },
+        "json": null
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json; charset=UTF-8"
+        },
+        "json": {
+          "id": "file_picked_1",
+          "name": "Q3 figures.txt",
+          "mimeType": "text/plain",
+          "size": "39",
+          "parents": [
+            "folder_user_1"
+          ]
+        },
+        "content_b64": null
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files/file_picked_1",
+        "params": {},
+        "headers": {
+          "authorization": "REDACTED"
+        },
+        "json": null
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json; charset=UTF-8"
+        },
+        "json": {
+          "id": "file_picked_1",
+          "name": "Q3 figures.txt",
+          "mimeType": "text/plain",
+          "size": "39",
+          "parents": [
+            "folder_user_1"
+          ]
+        },
+        "content_b64": null
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files/file_picked_1",
+        "params": {
+          "alt": "media"
+        },
+        "headers": {
+          "authorization": "REDACTED"
+        },
+        "json": null
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/plain"
+        },
+        "json": null,
+        "content_b64": "UXVhcnRlcmx5IGZpZ3VyZXMsIHBpY2tlZCBieSB0aGUgdXNlci4K"
+      }
+    }
+  ]
+}
