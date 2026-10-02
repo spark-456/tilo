@@ -1,29 +1,25 @@
-"""Kill switches (FR-HIL-07, PI-13, PI-18, issue #46's binding S0 decision): stop/pause/revoke.
-Only the policy owner stops, pauses or revokes; a non-member/non-owner gets the same 404 as
-unknown (no oracle).
+"""Kill switches (FR-HIL-07, PI-13, PI-18): Stop all autopilot, Pause all, revoke a policy.
+Only the policy owner acts; a non-member or non-owner gets the same 404 as unknown (no oracle).
+Deterministic: no model is involved and every decision is plain code.
 
-Design (issue #46, redone after the round-7/ST-3a-3 writer-identity approach was rejected): the
-full event, id included, is built once when a part is enqueued (`events.new_part_id`) and resent
-unchanged on every retry. The queue *is* `Store.pending_events[world_id]`, deduped by that `id`,
-never by content and never by which writer object attempts it. At most one `append` is ever in
-flight per world at a time (`_world_locks(store, w)["inflight"]`: a call that finds a young one
-waits for it up to its own part deadline; one older than `attempt_abandon_after_s` is presumed lost
-and the same part, same `id`, is attempted again -- idempotent by EV-10). The fast, no-I/O
-mutation (policy level/history/changed_by, the `paused` flag, vis) happens under a separate,
-always-blocking per-world `"mutate"` lock, held only for that decision and the enqueue -- never
-across a `writer.append` call -- so one world's stuck writer
-never delays another call's mutation, on the same or a different world. `world.paused` is
-enqueued (and drained) ahead of this same call's own `policy.changed` parts (FR-WLD-07/NFR-07's 2s
-budget). Every lock lives on the `Store` instance itself (`Store.dispatch_state`), never a
-module-level dict, so two Store instances sharing a world_id string never share lock or queue
-state (ST-3a-3).
+Level changes are planned in full, then applied under a per-world "mutate" lock that is never held
+across I/O, so a stuck writer never delays a level change. Each event part is built once, `id`
+included, and resent unchanged on every retry; the queue is `Store.pending_events[world_id]`,
+deduped by that id (EV-10), never by content or writer object. At most one append is in flight per
+world, each on its own daemon thread (not joined at exit). A call that finds a young attempt waits
+for it up to its part deadline; one older than `attempt_abandon_after_s` is presumed lost and the
+same part is sent again. At most `_MAX_ABANDONED` presumed-lost threads per world, so one world's
+hung writer never takes threads another world needs. Pause all applies its level changes first,
+then drains `world.paused` alone first, then everything else (FR-WLD-07's 2 s). All lock and queue
+state lives on the `Store` instance. Round history is in services/api/tests/API_ST3a.md.
 """
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from contextlib import contextmanager
 from typing import Literal
@@ -46,13 +42,11 @@ from tilo_api.deps import (
 )
 
 router = APIRouter()
+logger = logging.getLogger("tilo_api.dispatch")
 
 _CALL_BUDGET_S = 4.5  # a whole request's own write-attempt budget, under FR-HIL-07's 5s
 _SOLE_RETRY_LIMIT = 2  # total attempts for a fast-failing part with nothing else left to try
-_MAX_ABANDONED = 2  # presumed-lost attempts tolerated per world before no new thread is started
-_EXECUTOR = ThreadPoolExecutor(max_workers=16)  # shared, bounded across every Store and world;
-# correctness (one append in flight per world) comes from each world's own drain lock, not from
-# this pool's size -- it only bounds total OS threads.
+_MAX_ABANDONED = 2  # presumed-lost threads tolerated per world before no new thread starts
 
 
 def _dispatch_bucket(store: Store) -> dict:
@@ -117,39 +111,43 @@ def _remove_pending(store: Store, world_id: str, part_id: str) -> None:
 
 
 class _Attempt:
-    """The one append currently in flight for a world (S0, issue #46 item 1)."""
+    """The one append in flight for a world. `started` is when its thread was started."""
 
     def __init__(self, part_id: str) -> None:
         self.part_id = part_id
         self.started = time.monotonic()
-        self.future: Future[None]
+        self.future: Future[None] = Future()
         self.abandoned = False
 
 
 def _run_attempt(store: Store, world_id: str, part: dict, writer: EventWriter, attempt: _Attempt) -> None:
-    """Runs on a worker thread. A success removes the part from the queue *before* this future
-    settles, so a call waiting on it never sees a committed part still pending."""
+    """Thread body. A success leaves the queue before the future settles, so a waiter never sees a
+    committed part still pending. A WriterBusy answer (matched by name: tilo-api cannot import the
+    harness) reopens the writer, but only while this attempt is still the one counted in flight."""
     locks = _world_locks(store, world_id)
+    error: Exception | None = None
     try:
         writer.append(world_id, part)
         _remove_pending(store, world_id, part["id"])
-    except Exception:
-        # issue #55 item 2: a writer that lost its lease or lost a commit race answers the resend
-        # with WriterBusy until it is reopened; reopening is the writer's own optional hook, and
-        # the resend (same id) is then idempotent.
+    except Exception as exc:
+        error = exc
+        with locks["queue"]:
+            current = locks["inflight"] is attempt and not attempt.abandoned
         reopen = getattr(writer, "reopen", None)
-        if callable(reopen):
+        if current and type(exc).__name__ == "WriterBusy" and callable(reopen):
             try:
                 reopen()
             except Exception:
-                pass
-        raise
-    finally:
-        with locks["queue"]:
-            if locks["inflight"] is attempt:
-                locks["inflight"] = None
-            if attempt.abandoned:
-                locks["abandoned"] -= 1
+                logger.warning("writer reopen failed for world %s", world_id)
+    with locks["queue"]:
+        if locks["inflight"] is attempt:
+            locks["inflight"] = None
+        if attempt.abandoned:
+            locks["abandoned"] -= 1
+    if error is None:
+        attempt.future.set_result(None)
+    else:
+        attempt.future.set_exception(error)
 
 
 def drain(
@@ -159,20 +157,13 @@ def drain(
     deadline_at: float,
     part_deadline_s: float,
     abandon_after_s: float,
+    only_type: str | None = None,
 ) -> None:
-    """Attempts `store.pending_events[world_id]`'s head, oldest first, until the queue is empty,
-    the shared deadline passes, or an attempt fails to settle within `part_deadline_s` (a hang):
-    that leaves it, and everything behind it, still pending while the attempt keeps running in the
-    background (Python threads cannot be cancelled).
-
-    At most one attempt is in flight per world. A call that finds one still young waits for it, up
-    to its own part deadline. A call that finds one older than `abandon_after_s` presumes it lost,
-    stops counting it and starts a fresh attempt of the same part: `EventWriter.append` is
-    idempotent by event id (EV-10), so a late success of the abandoned attempt is a harmless no-op.
-    At most `_MAX_ABANDONED` presumed-lost attempts are tolerated per world; past that nothing new
-    is started, so a dead writer cannot leak unbounded threads. A fast (non-hanging) failure does
-    not block a *different* part behind it in the same call, but is retried in place, up to
-    `_SOLE_RETRY_LIMIT` attempts, when nothing else is left to try this call."""
+    """Attempts the world's pending parts oldest first until the queue is empty, the deadline
+    passes, or an attempt does not settle within `part_deadline_s` (that part and everything behind
+    it stay pending). See the module docstring for the in-flight and abandon rules. A fast failure
+    does not block a different part behind it; it is retried in place up to `_SOLE_RETRY_LIMIT`
+    attempts only when nothing else is left to try."""
     locks = _world_locks(store, world_id)
     given_up: set[str] = set()
     sole_attempts: dict[str, int] = {}
@@ -207,15 +198,22 @@ def drain(
                 if not isinstance(queue, list):
                     return
                 candidates = [
-                    p for p in queue if isinstance(p, dict) and isinstance(p.get("id"), str) and p["id"] not in given_up
+                    p
+                    for p in queue
+                    if isinstance(p, dict)
+                    and isinstance(p.get("id"), str)
+                    and p["id"] not in given_up
+                    and (only_type is None or p.get("type") == only_type)
                 ]
                 if not candidates or locks["abandoned"] >= _MAX_ABANDONED:
                     return
                 part = candidates[0]
                 attempt = _Attempt(part["id"])
                 locks["inflight"] = attempt
-                attempt.future = _EXECUTOR.submit(_run_attempt, store, world_id, part, writer, attempt)
                 future = attempt.future
+                threading.Thread(
+                    target=_run_attempt, args=(store, world_id, part, writer, attempt), daemon=True
+                ).start()
         if wait_on is not None:
             if wait_s <= 0:
                 return
@@ -249,41 +247,57 @@ def _require_owner(principal: Principal, world: WorldRecord) -> None:
         raise HTTPException(status_code=403)
 
 
+def _world_for(store: Store, policy_id: object, fallback: str | None) -> str | None:
+    """The world whose stream gets a policy's events: its mapping if that is a string, else the
+    fallback (a malformed mapping never raises)."""
+    mapped = store.policy_worlds.get(policy_id) if isinstance(policy_id, str) else None
+    return mapped if isinstance(mapped, str) and mapped else fallback
+
+
+def _layout(store: Store, world_id: str | None) -> dict | None:
+    """The target world's districts, or None (no layout) for an unknown or non-WorldRecord entry."""
+    world = store.worlds.get(world_id) if isinstance(world_id, str) else None
+    return world.districts if isinstance(world, WorldRecord) and isinstance(world.districts, dict) else None
+
+
 def _touched_worlds(store: Store, world_id: str, owner: str) -> list[str]:
-    """The request's own world plus every owned policy's mapped world -- pending must count, and a
-    later call must flush, every world a call's own policies could route an event to."""
-    touched = {world_id}
+    """The request's world first, then every other world an owned policy routes to, sorted."""
+    others = {world_id}
     for policy_id, policy in store.policies.items():
         if isinstance(policy, dict) and policy.get("owner") == owner:
-            touched.add(store.policy_worlds.get(policy_id, world_id))
-    return sorted(touched)
+            others.add(_world_for(store, policy_id, world_id) or world_id)
+    return [world_id, *sorted(others - {world_id})]
 
 
-def _apply_stop_all(store: Store, owner: str, requested_world_id: str, change: str, at: str):
-    """Called with every touched world's mutate lock already held: plans and applies in one pass
-    (never half-applies), skipping L0 and provably-consistent L1 policies (round-3, "no silent
-    history repair"). Returns (stopped, already_l1, {target_world_id: [new part, ...]})."""
-    stopped = 0
+def _plan_stop_all(store: Store, owner: str, request_world: str, change: str, at: str):
+    """Plans every part before anything changes, so a bad record can never half-apply. Skips L0 and
+    provably consistent L1 policies (no silent history repair). Returns (plan, already_l1) where
+    plan is a list of (policy, target_world_id, part)."""
+    plan: list[tuple[dict, str, dict]] = []
     already_l1 = 0
-    parts_by_world: dict[str, list[dict]] = {}
     for policy_id, policy in list(store.policies.items()):
-        if not isinstance(policy, dict) or policy.get("owner") != owner:
-            continue
-        if policy.get("level") == "L0":
+        if not isinstance(policy, dict) or policy.get("owner") != owner or policy.get("level") == "L0":
             continue
         if events.is_consistent_l1(policy):
             already_l1 += 1
             continue
-        target_world_id = store.policy_worlds.get(policy_id, requested_world_id)
-        target_world = store.worlds.get(target_world_id)
-        vis = events.policy_vis(policy, target_world.districts if target_world else None)
-        events.apply_level_change(policy, owner=owner, change=change, at=at)
+        target = _world_for(store, policy_id, request_world) or request_world
         part = events.policy_changed_part(
-            part_id=events.new_part_id(), policy_id=policy_id, change=change, owner=owner, at=at, vis=vis
+            part_id=events.new_part_id(),
+            policy_id=policy_id,
+            change=change,
+            owner=owner,
+            at=at,
+            vis=events.policy_vis(policy, _layout(store, target)),
         )
-        parts_by_world.setdefault(target_world_id, []).append(part)
-        stopped += 1
-    return stopped, already_l1, parts_by_world
+        plan.append((policy, target, part))
+    return plan, already_l1
+
+
+def _apply_plan(store: Store, plan, owner: str, change: str, at: str) -> None:
+    for policy, target, part in plan:
+        events.apply_level_change(policy, owner=owner, change=change, at=at)
+        _enqueue(store, target, part)
 
 
 def _drain_touched(
@@ -291,7 +305,7 @@ def _drain_touched(
 ) -> int:
     for w in touched:
         drain(store, w, writer, deadline_at, part_deadline_s, abandon_after_s)
-    return sum(len(store.pending_events.get(w) or []) for w in touched)
+    return sum(len(q) for q in (store.pending_events.get(w) for w in touched) if isinstance(q, list))
 
 
 @router.post("/worlds/{world_id}/autopilot/stop")
@@ -309,15 +323,13 @@ def stop_autopilot(
     at = events.now()
     touched = _touched_worlds(store, world_id, world.owner)
     with _locked(store, touched):
-        stopped, already_l1, parts_by_world = _apply_stop_all(store, world.owner, world_id, "stop_all", at)
-        for w, parts in parts_by_world.items():
-            for part in parts:
-                _enqueue(store, w, part)
+        plan, already_l1 = _plan_stop_all(store, world.owner, world_id, "stop_all", at)
+        _apply_plan(store, plan, world.owner, "stop_all", at)
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
     pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s, abandon_after_s)
     body = {
-        "stopped": stopped,
+        "stopped": len(plan),
         "already_l1": already_l1,
         "confirmations": [{"channel": c} for c in world.owner_channels],
         "pending": pending,
@@ -343,25 +355,23 @@ def pause_world(
     _require_owner(principal, world)
     del body  # validated against the schema enum (422 outside it); principal.channel is authoritative
 
-    deadline_at = time.monotonic() + _CALL_BUDGET_S
-    with _locked(store, [world_id]):
-        if not world.paused:
-            world.paused = True
-            part = events.world_paused_part(part_id=events.new_part_id(), world_id=world_id, channel=principal.channel)
-            _enqueue(store, world_id, part, front=True)
-    drain(store, world_id, writer, deadline_at, part_deadline_s, abandon_after_s)  # priority phase: world.paused
-    # (and any older backlog) ahead of this call's own policy.changed parts, built next.
-
     at = events.now()
     touched = _touched_worlds(store, world_id, world.owner)
     with _locked(store, touched):
-        stopped, already_l1, parts_by_world = _apply_stop_all(store, world.owner, world_id, "stop_all", at)
-        for w, parts in parts_by_world.items():
-            for part in parts:
-                _enqueue(store, w, part)
-    pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s, abandon_after_s)
+        # Levels first (never waits on I/O), then world.paused at the head of its world's queue.
+        plan, already_l1 = _plan_stop_all(store, world.owner, world_id, "stop_all", at)
+        _apply_plan(store, plan, world.owner, "stop_all", at)
+        if not world.paused:
+            world.paused = True
+            part = events.world_paused_part(
+                part_id=events.new_part_id(), world_id=world_id, actor=principal.user_id, channel=principal.channel
+            )
+            _enqueue(store, world_id, part, front=True)
 
-    body_out = {"stopped": stopped, "already_l1": already_l1, "paused": True, "pending": pending}
+    deadline_at = time.monotonic() + _CALL_BUDGET_S
+    drain(store, world_id, writer, deadline_at, part_deadline_s, abandon_after_s, only_type="world.paused")
+    pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s, abandon_after_s)
+    body_out = {"stopped": len(plan), "already_l1": already_l1, "paused": True, "pending": pending}
     return JSONResponse(content=body_out, status_code=202 if pending else 200)
 
 
@@ -380,24 +390,26 @@ def revoke_policy(
 
     owner = policy["owner"]
     at = events.now()
-    target_world_id = store.policy_worlds.get(policy_id)
+    # Routed like Stop all: the policy's mapped world, else the principal's own world.
+    target = _world_for(store, policy_id, principal.world_id)
 
-    if target_world_id is None:
-        # No world to flush or lock -- the mutation alone still needs one, scoped to this policy
-        # id (round-6/ST-3a-2, issue #38 item 5), so two concurrent revokes of the same unmapped
-        # policy cannot race and drop one's history entry.
+    if target is None:
+        # Nowhere to send an event; the level change alone still needs a per-policy lock.
         with _policy_lock(store, policy_id):
             events.apply_level_change(policy, owner=owner, change="revoked", at=at)
         return {"policy_id": policy_id, "level": "L1"}
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
-    with _locked(store, [target_world_id]):
-        target_world = store.worlds.get(target_world_id)
-        vis = events.policy_vis(policy, target_world.districts if target_world else None)
-        events.apply_level_change(policy, owner=owner, change="revoked", at=at)
+    with _locked(store, [target]):
         part = events.policy_changed_part(
-            part_id=events.new_part_id(), policy_id=policy_id, change="revoked", owner=owner, at=at, vis=vis
+            part_id=events.new_part_id(),
+            policy_id=policy_id,
+            change="revoked",
+            owner=owner,
+            at=at,
+            vis=events.policy_vis(policy, _layout(store, target)),
         )
-        _enqueue(store, target_world_id, part)
-    drain(store, target_world_id, writer, deadline_at, part_deadline_s, abandon_after_s)
+        events.apply_level_change(policy, owner=owner, change="revoked", at=at)
+        _enqueue(store, target, part)
+    drain(store, target, writer, deadline_at, part_deadline_s, abandon_after_s)
     return {"policy_id": policy_id, "level": "L1"}

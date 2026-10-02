@@ -8,11 +8,13 @@ store or writer.
 `Store.dispatch_state` is FR-HIL-07's own per-world lock and per-policy lock bookkeeping
 (services/api/src/tilo_api/dispatch.py): it lives on the Store instance itself, never a
 module-level dict keyed by world_id alone, so two Store instances that happen to use the same
-world_id string never share lock state (ST-3a-3, issue #38 item 3).
+world_id string never share lock state.
 """
 
 from __future__ import annotations
 
+import logging
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol
@@ -20,6 +22,7 @@ from typing import Literal, Protocol
 Role = Literal["owner", "team_lead", "approver", "viewer"]
 Channel = Literal["web", "mobile_web", "whatsapp", "email"]
 
+logger = logging.getLogger("tilo_api.deps")
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _DEFAULT_PART_WRITE_DEADLINE_S = 0.5
 _DEFAULT_ABANDON_AFTER_S = 3.0
@@ -34,7 +37,7 @@ class Principal:
     world_id: str | None = None  # the one world this principal is a member of; a mismatch with
     # the path's world_id gets the same 404 as an unknown world (no membership oracle)
     channel: Channel = "web"  # the session channel sign-in resolved for this request (FR-HIL-07,
-    # issue #38 item 5): world.paused.data.channel is derived from here, never from a request body
+    # world.paused.data.channel is derived from here, never from a request body
     districts: tuple[str, ...] = ()  # visible beyond vis: "all"; ignored for role == "owner"
 
 
@@ -109,25 +112,28 @@ def get_event_writer() -> EventWriter:
 
 
 def _dispatch_config(key: str, default: float) -> float:
+    """A positive finite number from config/dispatch.yaml; anything else logs and uses the default."""
     try:
         import yaml
 
         raw = yaml.safe_load((_REPO_ROOT / "config" / "dispatch.yaml").read_text(encoding="utf-8"))
-        return float(raw["dispatch"][key])
-    except Exception:
+        value = float(raw["dispatch"][key])
+    except Exception as exc:
+        logger.warning("dispatch config %s unreadable (%s); using default %s", key, exc, default)
         return default
+    if not (math.isfinite(value) and value > 0):
+        logger.warning("dispatch config %s=%r is not a positive finite number; using default %s", key, value, default)
+        return default
+    return value
 
 
 def get_part_write_deadline_s() -> float:
-    """A single writer.append attempt's bounded wait (issue #46, S0's decision point 1: read from
-    config, never a constant tuned to tests). Resolved the same injectable way as get_store/
-    get_event_writer/get_current_principal so a test can prove the route reads it fresh on every
-    call; unlike those three this has a working default (below) since production needs no
-    per-request test double for a plain config value -- most tests never override it."""
+    """A single writer.append attempt's bounded wait (issue #46: read from config, injectable so a
+    test can prove it is read fresh on every call; unlike the other three it has a working default)."""
     return _dispatch_config("part_write_deadline_s", _DEFAULT_PART_WRITE_DEADLINE_S)
 
 
 def get_attempt_abandon_after_s() -> float:
-    """How long an append may stay in flight before dispatch presumes it lost and retries the same
-    event id (idempotent, EV-10). Read from config/dispatch.yaml like the part deadline."""
+    """How long an append may stay in flight before dispatch presumes it lost and resends the same
+    event id (idempotent, EV-10)."""
     return _dispatch_config("attempt_abandon_after_s", _DEFAULT_ABANDON_AFTER_S)

@@ -493,3 +493,21 @@ item 6; not attempted by this ticket)
 23. **The stable id's exact minting point**: once when the part is enqueued
     (`events.new_part_id`, called from the route handler at plan-build time); which layer mints it
     is this ticket's own implementation choice.
+
+## PR #120 review fixes (FR-HIL-07)
+
+- Every append attempt runs on its own daemon thread (not joined at exit); per world at most one
+  in flight plus two presumed-lost. There is no shared pool, so one world's hung writer cannot
+  starve another. An attempt's age counts from when its thread starts.
+- `world.paused` from a person's Pause all has `actor` = the principal's user id (contract fixture
+  and schema: `system` is only the hard-cap kill switch). `authz` stays null.
+- Pause all plans and applies every level change first (never waits on I/O), enqueues `world.paused`
+  at the head of the request world's queue, drains that part alone first, then everything else.
+- A non-string `policy_worlds` entry falls back to the request world (revoke: the principal's
+  world); a non-WorldRecord target is treated as having no layout. Every part is planned before any
+  policy changes, so a bad record never half-applies or 500s.
+- Revoke of a policy with no mapping routes its `policy.changed` to the principal's world; with no
+  world at all only the level changes.
+- `reopen()` is called only from the attempt still counted in flight and only after a `WriterBusy`
+  (matched by class name). Dispatch config must be positive and finite, else it logs and uses the
+  default. Left as follow-ups: L0 revoke semantics, sending the channel confirmations.

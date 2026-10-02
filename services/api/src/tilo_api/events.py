@@ -1,10 +1,7 @@
-"""Unstamped event.schema.json *parts* for FR-HIL-07's two side-effect types, plus the plain
-policy-record helpers (PI-13, PI-18: the event writer -- standing in for the harness, PRD 15.3 --
-is the only one that stamps `seq`, `ts`, `run_id` and `trace`; tilo-api never does). Each part
-carries its own `id`, a ULID minted once when it is enqueued (issue #46) and resent unchanged on
-every retry: the idempotency key EventWriter.append dedupes on (EV-10), never content and never
-writer-instance identity. Pure functions only -- no locking, no writer I/O, no HTTP; dispatch.py
-orchestrates these under its own per-world/per-policy locks.
+"""Unstamped event.schema.json parts for FR-HIL-07's two side-effect types, plus plain policy-record
+helpers. The event writer (the harness, PRD 15.3) alone stamps seq, ts, run_id and trace. Each part
+carries its own `id`, minted once when enqueued and resent unchanged on every retry: the idempotency
+key EventWriter.append dedupes on (EV-10). Pure functions: no locking, no I/O.
 """
 
 from __future__ import annotations
@@ -23,9 +20,8 @@ def now() -> str:
 
 
 def new_part_id() -> str:
-    """A fresh id matching common.schema.json#/$defs/ulid's pattern (`[0-7][0-9A-HJKMNP-TV-Z]{25}`).
-    uuid4's 122 random bits comfortably cover this; only "practically unique" is needed here --
-    monotonic ordering is the writer's own stamped `seq`, not this id's job."""
+    """A fresh id matching common.schema.json#/$defs/ulid's pattern. Only uniqueness matters;
+    ordering is the writer's stamped `seq`."""
     n = uuid.uuid4().int % (32**25)
     body = []
     for _ in range(25):
@@ -35,11 +31,8 @@ def new_part_id() -> str:
 
 
 def policy_vis(policy: dict, world_districts: dict[str, Any] | None) -> Any:
-    """EV-13: the intersection of scope.districts with the *target* world's own layout (a policy
-    carries no world_id of its own). Missing/malformed scope, no layout, or an empty intersection
-    fall back to "all". Never raises on a non-string or unhashable scope.districts entry
-    (round-6/ST-3a-2, issue #38 item 1) -- filtering by `isinstance(d, str)` first keeps an
-    unhashable value from ever reaching the `in world_districts` membership test."""
+    """EV-13: the intersection of scope.districts with the target world's layout. A missing or
+    malformed scope, no layout, or an empty intersection falls back to "all"; never raises."""
     if not world_districts:
         return "all"
     scope = policy.get("scope")
@@ -52,9 +45,8 @@ def policy_vis(policy: dict, world_districts: dict[str, Any] | None) -> Any:
 
 
 def is_consistent_l1(policy: dict) -> bool:
-    """True idempotency (round-3, "no silent history repair"): a policy reading level == "L1" is
-    left alone only when its own last history entry agrees -- never merely because the field
-    reads "L1"."""
+    """A policy reading L1 is left alone only when its own last history entry agrees (no silent
+    history repair)."""
     if policy.get("level") != "L1":
         return False
     history = policy.get("history")
@@ -67,8 +59,8 @@ def is_consistent_l1(policy: dict) -> bool:
 
 
 def apply_level_change(policy: dict, *, owner: str, change: str, at: str) -> None:
-    """Fails safe on a missing/malformed history or level (round-1): always appends a fresh entry,
-    never rewrites or drops what was already there."""
+    """Always appends a fresh history entry, never rewrites one; tolerates missing or malformed
+    history and level."""
     history = policy.get("history")
     history = list(history) if isinstance(history, list) else []
     history.append({"by": owner, "at": at, "change": change, "level": "L1"})
@@ -90,11 +82,11 @@ def policy_changed_part(*, part_id: str, policy_id: str, change: str, owner: str
     }
 
 
-def world_paused_part(*, part_id: str, world_id: str, channel: str | None) -> dict:
+def world_paused_part(*, part_id: str, world_id: str, actor: str, channel: str | None) -> dict:
     return {
         "id": part_id,
         "type": "world.paused",
-        "actor": "system",
+        "actor": actor,
         "target": world_id,
         "summary": "Pause all stopped every agent in this world",
         "vis": "all",
