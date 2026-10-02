@@ -6,14 +6,10 @@ from typing import Any
 
 import yaml
 from conftest import REPO_ROOT
+from test_PRD_19_2_eval_set_structure import DENYLIST_BRANDS_RE, REAL_ROUTING_RE
 from tilo_evals import Case, load_cases
 
 _CASES_DIR = REPO_ROOT / "evals" / "cases"
-_DENYLIST_BRANDS_RE = re.compile(
-    r"\b(?:Google|Drive|BeautifulSoup|Microsoft|Slack|Dropbox|Amazon|Apple|OpenAI|Yanmar|Johnson\s+pump|Pettit|Interlux|Wells\s+Fargo|GreenDot|Seattle\s+Boat\s+Show|Pacific\s+Northwest\s+Marine\s+Trades|seattlecharters|Northwind|Contoso|AdventureWorks)\b",
-    re.IGNORECASE,
-)
-_REAL_ROUTING_RE = re.compile(r"\b(?!0{9}\b)\d{9}\b")
 _GATE_TAG_RE = re.compile(r"\(gate\s*\d+\)", re.IGNORECASE)
 
 
@@ -105,7 +101,7 @@ def test_PRD_19_2_e_res_doc_hand_brand_and_routing_denylist() -> None:
     all_paths = [c.path for c in cases] + fixture_files
     for path in all_paths:
         text = path.read_text(encoding="utf-8")
-        brand_match = _DENYLIST_BRANDS_RE.search(text)
+        brand_match = DENYLIST_BRANDS_RE.search(f"{path.name}\n{text}")
         assert brand_match is None, f"{path.name}: real brand {brand_match.group(0)!r} found"
-        routing_match = _REAL_ROUTING_RE.search(text)
-        assert routing_match is None, f"{path.name}: 9-digit routing/account number {routing_match.group(0)!r} found"
+        routing_match = REAL_ROUTING_RE.search(text)
+        assert routing_match is None, f"{path.name}: routing/account number {routing_match.group(0)!r} found"

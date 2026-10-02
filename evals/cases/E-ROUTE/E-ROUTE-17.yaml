@@ -8,13 +8,13 @@ measures:
 status: ready
 deploy_gate: false
 inputs:
-  task: Prepare Vermeer Industrial marine pump order invoices for October dispatch.
+  task: Prepare FictionalBoatCo_Zeta Industrial marine pump order invoices for October dispatch.
   question: May we apply the standard 2% 10-day early-payment discount on Marine sector orders over EUR
     30,000?
   question_domain: finance
   topic_key: early_payment_discount_2pct
   card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3B7
-  world_id: w_vermeer_sales
+  world_id: w_fictionalboatco_zeta_sales
   district: D1
   asked_at: '2026-10-02T11:30:00.000Z'
   context_fixture: evals/fixtures/route/routing_scenarios.yaml

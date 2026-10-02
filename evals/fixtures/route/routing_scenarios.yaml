@@ -71,13 +71,13 @@ scenarios:
     team_leads: *id001
     decisions: []
   E-ROUTE-09:
-    world_id: w_vermeer_sales
+    world_id: w_fictionalboatco_zeta_sales
     district: D1
     team_leads:
     - *id002
     decisions:
     - id: 01J8Z3K4M5N6P7Q8R9S0T1V4D1
-      org_id: org_vermeer
+      org_id: org_fictionalboatco_zeta
       topic_key: late_fee_waiver_limit
       question: May we waive late-payment interest up to EUR 250 for municipal buyers?
       domain: null
@@ -88,8 +88,8 @@ scenarios:
         ref: u_owner
         at: '2026-06-01T09:00:00.000Z'
       source:
-        world_id: w_vermeer_sales
-        run_id: r_vermeer_1
+        world_id: w_fictionalboatco_zeta_sales
+        run_id: r_fictionalboatco_zeta_1
         card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C1
       scope:
         worlds: all
@@ -284,12 +284,12 @@ scenarios:
       created_at: '2026-09-29T15:00:01.000Z'
       expires_at: null
   E-ROUTE-17:
-    world_id: w_vermeer_sales
+    world_id: w_fictionalboatco_zeta_sales
     district: D1
     team_leads: *id001
     decisions:
     - id: 01J8Z3K4M5N6P7Q8R9S0T1V5E7
-      org_id: org_vermeer
+      org_id: org_fictionalboatco_zeta
       topic_key: early_payment_discount_2pct
       question: Is the 2% 10-day early-payment discount allowed on Marine pump orders above EUR 30,000?
       domain: finance
@@ -301,12 +301,12 @@ scenarios:
         user: u_finance_lead
         at: '2026-09-29T16:00:00.000Z'
       source:
-        world_id: w_vermeer_sales
-        run_id: r_vermeer_1
+        world_id: w_fictionalboatco_zeta_sales
+        run_id: r_fictionalboatco_zeta_1
         card_id: 01J8Z3K4M5N6P7Q8R9S0T1V2C9
       scope:
         worlds:
-        - w_vermeer_sales
+        - w_fictionalboatco_zeta_sales
         districts:
         - D1
       created_at: '2026-09-29T16:00:01.000Z'

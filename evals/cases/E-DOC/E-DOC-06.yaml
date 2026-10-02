@@ -1,6 +1,6 @@
 id: E-DOC-06
 group: E-DOC
-title: 'PPTX deliverable: Vermeer Industrial pump orders summary deck'
+title: 'PPTX deliverable: FictionalBoatCo_Zeta Industrial pump orders summary deck'
 measures:
 - FR-CON-09
 - FR-CON-10
@@ -8,12 +8,12 @@ status: skeleton
 deploy_gate: false
 inputs:
   format: pptx
-  title: 'PPTX deliverable: Vermeer Industrial pump orders summary deck'
+  title: 'PPTX deliverable: FictionalBoatCo_Zeta Industrial pump orders summary deck'
   required_sections:
   - Pipeline Overview
   - Order Value Table
   - Sector Revenue Chart
-  table_fixture: evals/fixtures/doc/vermeer_pump_orders.csv
+  table_fixture: evals/fixtures/doc/fictionalboatco_zeta_pump_orders.csv
   label_column: order_ref
   group_column: sector
   metric_column: order_value_eur

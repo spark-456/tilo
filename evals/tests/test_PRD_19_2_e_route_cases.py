@@ -7,6 +7,7 @@ from typing import Any
 
 import yaml
 from conftest import REPO_ROOT, make_event
+from test_PRD_19_2_eval_set_structure import DENYLIST_BRANDS_RE, REAL_ROUTING_RE
 from tilo_evals import Case, load_cases
 from tilo_evals.checks import Outcome, get
 
@@ -15,11 +16,6 @@ _ROUTE_FIXTURE_REL = "evals/fixtures/route/routing_scenarios.yaml"
 _ROUTE_FIXTURE_PATH = REPO_ROOT / _ROUTE_FIXTURE_REL
 _ULID_RE = re.compile(r"^01[0-9A-HJKMNP-TV-Z]{24}$")
 _GATE_TAG_RE = re.compile(r"\(gate\s*\d+\)", re.IGNORECASE)
-_DENYLIST_BRANDS_RE = re.compile(
-    r"\b(?:Google|Drive|BeautifulSoup|Microsoft|Slack|Dropbox|Amazon|Apple|OpenAI|Yanmar|Johnson\s+pump|Pettit|Interlux|Wells\s+Fargo|GreenDot|Seattle\s+Boat\s+Show|Pacific\s+Northwest\s+Marine\s+Trades|seattlecharters|Northwind|Contoso|AdventureWorks)\b",
-    re.IGNORECASE,
-)
-_REAL_ROUTING_RE = re.compile(r"\b(?!0{9}\b)\d{9}\b")
 
 
 def _e_route_cases() -> list[Case]:
@@ -156,10 +152,10 @@ def test_PRD_19_2_e_route_brand_routing_number_and_fictional_host_denylist() -> 
         assert _GATE_TAG_RE.search(case.title) is None, f"{case.id}: gate tag found in title {case.title!r}"
     for path in all_paths:
         text = path.read_text(encoding="utf-8")
-        brand_match = _DENYLIST_BRANDS_RE.search(text)
+        brand_match = DENYLIST_BRANDS_RE.search(f"{path.name}\n{text}")
         assert brand_match is None, f"{path.name}: real/sample brand {brand_match.group(0)!r} found"
-        routing_match = _REAL_ROUTING_RE.search(text)
-        assert routing_match is None, f"{path.name}: 9-digit routing/account number {routing_match.group(0)!r} found"
+        routing_match = REAL_ROUTING_RE.search(text)
+        assert routing_match is None, f"{path.name}: routing/account number {routing_match.group(0)!r} found"
     proc = subprocess.run(
         [sys.executable, str(REPO_ROOT / "scripts" / "secret_scan.py"), *(str(p) for p in all_paths)],
         capture_output=True,

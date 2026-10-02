@@ -8,13 +8,13 @@ measures:
 status: ready
 deploy_gate: false
 inputs:
-  task: Process Vermeer Industrial Q3 district-heating pump invoice adjustments.
+  task: Process FictionalBoatCo_Zeta Industrial Q3 district-heating pump invoice adjustments.
   question: May we waive late-payment interest up to EUR 250 for municipal district-heating buyers who
     pay within 7 days?
   question_domain: finance
   topic_key: late_fee_waiver_limit
   card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A9
-  world_id: w_vermeer_sales
+  world_id: w_fictionalboatco_zeta_sales
   district: D1
   asked_at: '2026-10-02T10:40:00.000Z'
   context_fixture: evals/fixtures/route/routing_scenarios.yaml

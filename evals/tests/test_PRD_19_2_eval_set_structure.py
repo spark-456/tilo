@@ -14,11 +14,18 @@ _FIXTURES_DIR = REPO_ROOT / "evals" / "fixtures"
 _CONFIG_PATH = REPO_ROOT / "config" / "evals.yaml"
 _EMAIL_OR_URL_HOST_RE = re.compile(r"(?:@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}|https?://([A-Za-z0-9.\-]+\.[A-Za-z]{2,}))")
 _PHONE_RE = re.compile(r"\+1[\s\-]?555[\s\-]?(01\d{2}|\d{4})")
-_DENYLIST_BRANDS_RE = re.compile(
-    r"\b(?:Google(?:\s+Drive)?|BeautifulSoup|Microsoft|Slack|Dropbox|Amazon|Apple|OpenAI|Yanmar|Johnson\s+pump|Pettit|Interlux|Wells\s+Fargo|GreenDot|Seattle\s+Boat\s+Show|Pacific\s+Northwest\s+Marine\s+Trades|seattlecharters)\b",
+DENYLIST_BRANDS_RE = re.compile(
+    r"\b(?:Google(?:\s+Drive)?|BeautifulSoup|Microsoft|Slack|Dropbox|Amazon|Apple|OpenAI"
+    r"|Yanmar|Johnson\s+pump|Pettit|Interlux|Wells\s+Fargo|GreenDot|Seattle\s+Boat\s+Show"
+    r"|Pacific\s+Northwest\s+Marine\s+Trades|seattlecharters"
+    r"|Vermeer|Northwind|Contoso|AdventureWorks)\b",
     re.IGNORECASE,
 )
-_REAL_ROUTING_RE = re.compile(r"\b(?!0{9}\b)\d{9}\b")
+REAL_ROUTING_RE = re.compile(
+    r"\b(?!0{3}[- ]?0{3}[- ]?0{3}\b)\d{3}[- ]?\d{3}[- ]?\d{3}\b"
+    r"|\b(?!0{4}[- ]0{4}[- ]0\b)\d{4}[- ]\d{4}[- ]\d\b"
+    r"|\b(?!0{10,12}\b)\d{10,12}\b"
+)
 
 
 def _iter_eval_files() -> list[Path]:
@@ -59,10 +66,10 @@ def test_PRD_19_2_eval_set_structure_no_case_or_fixture_trips_secret_scan() -> N
 def test_PRD_19_2_eval_set_structure_fictional_domains_and_phone_numbers_only() -> None:
     for path in _iter_eval_files():
         text = path.read_text(encoding="utf-8")
-        brand_match = _DENYLIST_BRANDS_RE.search(text)
+        brand_match = DENYLIST_BRANDS_RE.search(f"{path.name}\n{text}")
         assert brand_match is None, f"{path.name}: real brand {brand_match.group(0)!r} found"
-        routing_match = _REAL_ROUTING_RE.search(text)
-        assert routing_match is None, f"{path.name}: 9-digit routing/account number {routing_match.group(0)!r} found"
+        routing_match = REAL_ROUTING_RE.search(text)
+        assert routing_match is None, f"{path.name}: routing/account number {routing_match.group(0)!r} found"
         for match in _EMAIL_OR_URL_HOST_RE.finditer(text):
             token = match.group(1) or match.group(0).lstrip("@")
             assert token.endswith((".example", ".invalid")), (
