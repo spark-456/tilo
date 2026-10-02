@@ -10,6 +10,7 @@ import { S_08 } from "./S_08";
 import { S_09 } from "./S_09";
 import { S_10 } from "./S_10";
 import { S_11 } from "./S_11";
+import { S_12 } from "./S_12";
 import { S_13 } from "./S_13";
 import { S_14 } from "./S_14";
 import { S_15 } from "./S_15";
@@ -31,7 +32,7 @@ export interface ScreenProps {
 // biome-ignore format: one line per screen keeps group edits to a single line.
 const COMPONENTS: Readonly<Record<string, ComponentType<ScreenProps>>> = {
   "S-05": S_05, "S-06": S_06, "S-07": S_07, "S-08": S_08, "S-09": S_09, "S-10": S_10,
-  "S-11": S_11, "S-13": S_13, "S-14": S_14, "S-15": S_15, "S-16": S_16, "S-17": S_17,
+  "S-11": S_11, "S-12": S_12, "S-13": S_13, "S-14": S_14, "S-15": S_15, "S-16": S_16, "S-17": S_17,
   "S-18": S_18, "S-19": S_19, "S-21": S_21, "S-22": S_22, "S-23": S_23, "S-24": S_24,
 };
 
@@ -57,7 +58,7 @@ const EXTRA: ReadonlyArray<{ id: string; re: RegExp; Component: ComponentType<Sc
     : []),
 ];
 
-/** The screen a path belongs to, or null for the flow shell (S-01 to S-04, S-12) and unknowns. */
+/** The screen a path belongs to, or null for the flow shell (S-01 to S-04) and unknowns. */
 export function matchScreen(pathname: string): ScreenMatch | null {
   for (const { id, re, Component } of EXTRA)
     if (re.test(pathname)) return { id, params: [], Component };

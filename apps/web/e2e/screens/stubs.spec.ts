@@ -6,13 +6,10 @@ import { expectNoDeadControls, watchConsole } from "../support/screens";
 import { DESKTOP, MOBILE } from "../support/viewports";
 
 const STUBS: ReadonlyArray<readonly [string, string, string]> = [
-  ["S_05", "/world/w_village_basic/inspect/B1", "Inspect panel"],
   ["S_06", "/needs-you", "Needs-you queue and card"],
   ["S_07", "/needs-you/gate", "Gate sheet"],
   ["S_08", "/needs-you/consent", "Connection consent sheet"],
   ["S_09", "/meeting", "Meeting"],
-  ["S_10", "/world/w_village_basic/story", "Story lens"],
-  ["S_11", "/world/w_village_basic/trace", "Trace lens"],
   ["S_13", "/library", "Library and Memory Vault"],
   ["S_14", "/worlds", "Worlds list and replays"],
   ["S_15", "/autonomy", "Autonomy"],

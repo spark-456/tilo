@@ -1,9 +1,10 @@
 import { memo } from "react";
 import { useIsFixtureClient } from "./api/ClientProvider";
 import { useMediaQuery } from "./hooks/useMediaQuery";
-import { usePathname } from "./router";
+import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
 import { PrimaryNav } from "./screens/PrimaryNav";
+import { WorldPanels } from "./screens/WorldPanels";
 import { matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
 import { useWorldFixture } from "./world/useWorldFixture";
@@ -22,7 +23,10 @@ export function App() {
   const mobile = useMediaQuery("(max-width: 767px)");
   const world = useWorldFixture();
   const fixtureClient = useIsFixtureClient();
-  const screen = matchScreen(usePathname()); // null: the stage and the flow shell
+  const path = usePathname();
+  const screen = matchScreen(path); // null: the stage and the flow shell
+  const flow = matchFlowRoute(path);
+  const hudWorld = !screen && flow.screen === "World" ? flow.worldId : null; // S-04 HUD panels
   return (
     <div className="app-shell" data-stage-mode={stageMode ? "on" : "off"}>
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
@@ -54,15 +58,29 @@ export function App() {
         </div>
       )}
       {mobile ? (
-        <PrimaryNav id="bottom-tabs" mobile />
+        <>
+          {hudWorld && (
+            <details className="hud-sheet">
+              <summary>World status</summary>
+              <WorldPanels worldId={hudWorld} />
+            </details>
+          )}
+          <PrimaryNav id="bottom-tabs" mobile />
+        </>
       ) : (
         <aside className="right-rail" data-testid="right-rail">
-          <h2>Activity</h2>
-          <p data-testid="right-rail-meter">Nothing yet. This fills in once a run starts.</p>
-          <h2>Needs you</h2>
-          <p>Nothing needs you.</p>
-          <h2>Roster</h2>
-          <p>No agents assigned.</p>
+          {hudWorld ? (
+            <WorldPanels worldId={hudWorld} />
+          ) : (
+            <>
+              <h2>Activity</h2>
+              <p data-testid="right-rail-meter">Nothing yet. This fills in once a run starts.</p>
+              <h2>Needs you</h2>
+              <p>Nothing needs you.</p>
+              <h2>Roster</h2>
+              <p>No agents assigned.</p>
+            </>
+          )}
           {world.active && (
             <>
               <h2>Trace</h2>

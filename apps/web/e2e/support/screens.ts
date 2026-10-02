@@ -11,9 +11,10 @@ export function watchConsole(page: Page): string[] {
   return problems;
 }
 
-/** Every button on the screen is a placeholder (aria-disabled or disabled): never a dead click. */
+/** Every button on the screen is a placeholder (aria-disabled or disabled): never a dead click.
+ * The one filled primary button navigates, and each screen's own test clicks it. */
 export async function expectNoDeadControls(page: Page, scope = "main") {
-  const buttons = page.locator(`${scope} button`);
+  const buttons = page.locator(`${scope} button:not(.primary)`);
   for (let i = 0; i < (await buttons.count()); i++) {
     const b = buttons.nth(i);
     const disabled = (await b.getAttribute("aria-disabled")) === "true" || (await b.isDisabled());

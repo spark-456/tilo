@@ -24,7 +24,7 @@ function Notice({ message, onRetry }: { message: string; onRetry: () => void }) 
 }
 
 /** The loading, error and empty states of one remote value; `children` renders the ready one. */
-function Loaded<T>({
+export function Loaded<T>({
   what,
   remote,
   retry,
@@ -45,7 +45,7 @@ function Loaded<T>({
   return <>{children(remote.value)}</>;
 }
 
-function Primary({
+export function Primary({
   label,
   action,
   disabled = false,
