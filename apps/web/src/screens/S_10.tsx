@@ -3,8 +3,8 @@
 // Layout after design/source "Tilo 2 Balanced Refined.dc.html" 2-1 and "Tilo World Player.dc.html".
 import type { Severity } from "@tilo/contracts";
 import { useClient, useIsFixtureClient } from "../api/ClientProvider";
-import { elapsed, useRunLog } from "../world/runLog";
 import { isKnownType } from "../world/registry";
+import { elapsed, useRunLog } from "../world/runLog";
 import { LensTabs } from "./LensTabs";
 import type { ScreenProps } from "./routes";
 
@@ -21,12 +21,20 @@ export function S_10({ params }: ScreenProps) {
   const worldId = params[0] ?? "";
   const client = useClient();
   const events = useRunLog(client, worldId);
-  const replaying = useIsFixtureClient() && events.at(-1)?.type !== "world.completed";
+  const fixture = useIsFixtureClient();
+  const replaying = events.at(-1)?.type !== "world.completed";
   const story = events.filter((e) => isKnownType(e.type));
   return (
     <div className="screen-body wide" data-testid="story-lens">
       <LensTabs worldId={worldId} current="story" />
       <h1>Story</h1>
+      {fixture && (
+        <p className="screen-tag replay-tip">
+          {replaying
+            ? `Replaying the recorded fixture: ${story.length} events so far. Add ?speed=20 to the address to fast-forward.`
+            : "The recorded fixture replay has finished."}
+        </p>
+      )}
       {story.length === 0 ? (
         <p>Nothing has happened yet. The story fills in as events arrive.</p>
       ) : (
@@ -45,12 +53,6 @@ export function S_10({ params }: ScreenProps) {
             ))}
           </ol>
         </div>
-      )}
-      {replaying && (
-        <p className="screen-tag">
-          Replaying the recorded fixture at its own pace ({story.length} events so far). Add{" "}
-          <code>?speed=20</code> to the address to fast-forward.
-        </p>
       )}
     </div>
   );

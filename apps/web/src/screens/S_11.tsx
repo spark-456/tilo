@@ -2,8 +2,8 @@
 // types the registry does not know (HR-5 puts those here and nowhere else). Columns are the
 // event's own `trace` block. The raw-record viewer is not built: its control is a placeholder.
 import { useClient } from "../api/ClientProvider";
-import { elapsed, useRunLog } from "../world/runLog";
 import { isKnownType } from "../world/registry";
+import { elapsed, useRunLog } from "../world/runLog";
 import { LensTabs } from "./LensTabs";
 import { Placeholder } from "./Placeholder";
 import type { ScreenProps } from "./routes";

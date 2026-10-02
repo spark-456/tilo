@@ -7,10 +7,10 @@ import { useClient } from "../api/ClientProvider";
 import { type WorldState, reduce } from "../world/reducer";
 import { elapsed, useRunLog } from "../world/runLog";
 import { AppLink } from "./AppLink";
-import { Placeholder } from "./Placeholder";
 import { Loaded } from "./FlowShell";
-import type { ScreenProps } from "./routes";
+import { Placeholder } from "./Placeholder";
 import { useRemote } from "./remote";
+import type { ScreenProps } from "./routes";
 
 interface Found {
   readonly kind: string;
@@ -103,6 +103,7 @@ export function S_05({ params }: ScreenProps) {
               <p>
                 <b>State:</b> {item.state(reduce(l, events))}
               </p>
+              <Placeholder label="Follow in the world" />
               <h2>What happened here</h2>
               {mine.length === 0 ? (
                 <p>No event has named this yet.</p>
@@ -116,7 +117,6 @@ export function S_05({ params }: ScreenProps) {
                   ))}
                 </ol>
               )}
-              <Placeholder label="Follow in the world" />
             </>
           );
         }}

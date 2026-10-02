@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { useIsFixtureClient } from "./api/ClientProvider";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { matchFlowRoute, usePathname } from "./router";
@@ -25,6 +25,19 @@ export function App() {
   const fixtureClient = useIsFixtureClient();
   const path = usePathname();
   const screen = matchScreen(path); // null: the stage and the flow shell
+  const firstPath = useRef(true);
+  // After a route change a full-page screen's heading takes focus, so keyboard and screen-reader
+  // users keep their place (the flow shell does the same for its own heading).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `path` is the route-change trigger.
+  useEffect(() => {
+    if (firstPath.current) {
+      firstPath.current = false;
+      return;
+    }
+    const h1 = document.querySelector<HTMLElement>(".screen-page h1");
+    h1?.setAttribute("tabindex", "-1");
+    h1?.focus();
+  }, [path]);
   const flow = matchFlowRoute(path);
   const hudWorld = !screen && flow.screen === "World" ? flow.worldId : null; // S-04 HUD panels
   return (

@@ -261,6 +261,7 @@ a.secondary {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable; /* a growing list never changes the width (CLS) */
   box-sizing: border-box;
   padding: 24px;
 }
@@ -366,9 +367,52 @@ a.secondary {
 .trace-scroll {
   overflow-x: auto;
 }
+/* Fixed layout and header widths: a row arriving never resizes a column (CLS). */
 .trace-table {
-  min-width: 1000px;
+  table-layout: fixed;
+  width: 1150px;
   font: 500 0.75em var(--font-mono);
+}
+.trace-table td {
+  overflow-wrap: anywhere;
+  line-height: 1.5; /* a number, so a late font swap cannot change a row's height */
+}
+.trace-table td {
+  vertical-align: top;
+}
+.trace-table code {
+  display: block; /* the record id and its control never re-wrap when the mono font loads */
+  line-height: 1.5;
+}
+.trace-table th:nth-child(1) {
+  width: 56px;
+}
+.trace-table th:nth-child(2) {
+  width: 64px;
+}
+.trace-table th:nth-child(3) {
+  width: 160px;
+}
+.trace-table th:nth-child(4) {
+  width: 100px;
+}
+.trace-table th:nth-child(5) {
+  width: 150px;
+}
+.trace-table th:nth-child(6) {
+  width: 110px;
+}
+.trace-table th:nth-child(7) {
+  width: 120px;
+}
+.trace-table th:nth-child(8) {
+  width: 80px;
+}
+.trace-table th:nth-child(9) {
+  width: 70px;
+}
+.trace-table th:nth-child(10) {
+  width: 240px;
 }
 .secondary.placeholder {
   min-height: 44px;
@@ -414,6 +458,27 @@ a.secondary {
 }
 .right-rail {
   overflow-y: auto;
+}
+/* Reserved boxes: data arriving (UX-1, CLS) never moves what is below or above it. */
+.hud-meter,
+.replay-tip {
+  min-height: 2.8em;
+  line-height: 1.4;
+}
+.trace-table th {
+  line-height: 1.5;
+  vertical-align: top;
+}
+.hud-line {
+  display: block; /* each figure starts at the left edge, so a changing number moves nothing */
+}
+.delivery-slot .flow-slot {
+  min-height: 33em;
+}
+@media (max-width: 767px) {
+  .delivery-slot .flow-slot {
+    min-height: 46em;
+  }
 }
 .world-panels h2 {
   margin: 16px 0 4px;

@@ -23,7 +23,7 @@ test("S_04 renders, no console errors, placeholders aria-disabled", async ({ pag
   await expect(page.getByRole("heading", { level: 1, name: "World" })).toBeVisible();
   await expect(page.getByTestId("stage-frame")).toHaveAttribute("data-stage-ready", "true");
   // Numbers come only from recorded events: the meter ends on the run's 13 credits.
-  await expect(page.getByTestId("hud-meter")).toHaveText("Done. 13 credits used so far.");
+  await expect(page.getByTestId("hud-meter")).toHaveText("Done Credits used so far: 13");
   await expect(hud.getByRole("link", { name: "Story" })).toBeVisible();
   await expect(hud.getByRole("link", { name: "Mail Room" })).toHaveAttribute(
     "href",
@@ -130,3 +130,37 @@ test("S_04 lens tabs and the outline reach Story, Trace and Inspect", async ({ p
   await page.getByRole("link", { name: "World" }).first().click();
   await expect(page.getByRole("heading", { level: 1, name: "World" })).toBeVisible();
 });
+
+// UX-1: with a slow client and events arriving, nothing on S-04, S-05, S-10, S-11 or S-12 moves.
+const SETTLED: ReadonlyArray<readonly [string, string, string]> = [
+  ["S_04", W, "Done Credits used so far: 13"],
+  ["S_10", `${W}/story`, DONE],
+  ["S_11", `${W}/trace`, "world.completed"],
+  ["S_05", `${W}/inspect/B1`, "State: Finished"],
+  ["S_12", `${W}/delivery`, "Triage list"],
+];
+for (const viewport of [DESKTOP, MOBILE]) {
+  for (const [id, path, settled] of SETTLED) {
+    test(`${id} UX_1 has zero layout shifts while a slow client answers at ${viewport.width}x${viewport.height}`, async ({
+      page,
+    }) => {
+      test.setTimeout(60_000);
+      await page.setViewportSize(viewport);
+      await page.addInitScript(() => {
+        const w = window as unknown as { __shifts: number[] };
+        w.__shifts = [];
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries())
+            w.__shifts.push((entry as unknown as { value: number }).value);
+        }).observe({ type: "layout-shift", buffered: true });
+      });
+      await page.goto(`${path}?client_delay_ms=800&speed=100`, { waitUntil: "commit" });
+      await expect(page.getByText(settled).first()).toBeAttached({ timeout: 20_000 }); // S-04 is in a closed sheet on mobile
+      await page.waitForTimeout(300); // let a late shift be reported
+      const shifts = await page.evaluate(
+        () => (window as unknown as { __shifts: number[] }).__shifts,
+      );
+      expect(shifts).toEqual([]);
+    });
+  }
+}

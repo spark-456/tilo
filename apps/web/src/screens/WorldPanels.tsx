@@ -38,10 +38,13 @@ export function WorldPanels({ worldId }: { worldId: string }) {
       <LensTabs worldId={worldId} current="world" />
       <h2>Activity</h2>
       {events.length === 0 ? (
-        <p data-testid="hud-meter">Nothing yet. This fills in once a run starts.</p>
+        <p className="hud-meter" data-testid="hud-meter">
+          Nothing yet. This fills in once a run starts.
+        </p>
       ) : (
-        <p data-testid="hud-meter">
-          {state ? STATUS[state.status] : "Working"}. {creditsUsed(events)} credits used so far.
+        <p className="hud-meter" data-testid="hud-meter">
+          <span className="hud-line">{state ? STATUS[state.status] : "Working"}</span>{" "}
+          <span className="hud-line">Credits used so far: {creditsUsed(events)}</span>
         </p>
       )}
       <h2>Needs you</h2>
@@ -49,43 +52,45 @@ export function WorldPanels({ worldId }: { worldId: string }) {
         {waiting === 0 ? "Nothing needs you." : `${waiting} waiting. `}
         {waiting > 0 && <AppLink to="/needs-you">Open the queue</AppLink>}
       </p>
-      <h2>Roster</h2>
-      {layout === null ? (
-        <p>{remote.status === "error" ? remote.message : "Loading the roster…"}</p>
-      ) : (
-        <ul className="outline">
-          {layout.semantic.agents.map((a) => (
-            <li key={a.id}>
-              <AppLink to={`${base}/inspect/${encodeURIComponent(a.id)}`}>
-                {a.rank} {a.id}
-              </AppLink>
-              {" · "}
-              {state?.agents[a.id]?.spawned ? "joined" : "not joined yet"}
-            </li>
-          ))}
-        </ul>
-      )}
-      <h2>World outline</h2>
-      {layout === null ? null : (
-        <ul className="outline">
-          {layout.semantic.levels.map((level) => (
-            <li key={level.id}>
-              <AppLink to={`${base}/inspect/${level.id}`}>Level {level.name}</AppLink>
-              <ul>
-                {level.districts.flatMap((d) =>
-                  d.buildings.map((b) => (
-                    <li key={b.id}>
-                      <AppLink to={`${base}/inspect/${b.id}`}>{b.name}</AppLink>
-                      {" · "}
-                      {d.name}, {BUILDING[state?.buildings[b.id]?.status ?? "hidden"]}
-                    </li>
-                  )),
-                )}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="hud-slot">
+        {layout === null ? (
+          <p>{remote.status === "error" ? remote.message : "Loading the roster…"}</p>
+        ) : (
+          <>
+            <h2>Roster</h2>
+            <ul className="outline">
+              {layout.semantic.agents.map((a) => (
+                <li key={a.id}>
+                  <AppLink to={`${base}/inspect/${encodeURIComponent(a.id)}`}>
+                    {a.rank} {a.id}
+                  </AppLink>
+                  {" · "}
+                  {state?.agents[a.id]?.spawned ? "joined" : "not joined yet"}
+                </li>
+              ))}
+            </ul>
+            <h2>World outline</h2>
+            <ul className="outline">
+              {layout.semantic.levels.map((level) => (
+                <li key={level.id}>
+                  <AppLink to={`${base}/inspect/${level.id}`}>Level {level.name}</AppLink>
+                  <ul>
+                    {level.districts.flatMap((d) =>
+                      d.buildings.map((b) => (
+                        <li key={b.id}>
+                          <AppLink to={`${base}/inspect/${b.id}`}>{b.name}</AppLink>
+                          {" · "}
+                          {d.name}, {BUILDING[state?.buildings[b.id]?.status ?? "hidden"]}
+                        </li>
+                      )),
+                    )}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
     </div>
   );
 }

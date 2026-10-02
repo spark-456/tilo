@@ -6,8 +6,8 @@ import { useClient } from "../api/ClientProvider";
 import { AppLink } from "./AppLink";
 import { Loaded, Primary } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
-import type { ScreenProps } from "./routes";
 import { useAction, useRemote } from "./remote";
+import type { ScreenProps } from "./routes";
 
 export function S_12({ params }: ScreenProps) {
   const worldId = params[0] ?? "";
@@ -15,7 +15,7 @@ export function S_12({ params }: ScreenProps) {
   const [remote, retry] = useRemote("load the delivery", () => client.getDelivery(worldId));
   const again = useAction("start a new task", async () => "/");
   return (
-    <div className="screen-body wide" data-testid="delivery">
+    <div className="screen-body wide delivery-slot" data-testid="delivery">
       <h1>Delivery</h1>
       <Loaded
         what="the delivery"
@@ -25,7 +25,7 @@ export function S_12({ params }: ScreenProps) {
       >
         {(d) => (
           <>
-            <p className="delivery-done">
+            <p className="flow-summary delivery-done">
               <span aria-hidden="true">&#10003; </span>
               Finished: {d.artifacts.length}{" "}
               {d.artifacts.length === 1 ? "deliverable is" : "deliverables are"} ready.
