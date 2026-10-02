@@ -2,3 +2,39 @@
 
 Deterministic code only: no model calls, no network, no clock (services/render/CLAUDE.md).
 """
+
+from .charts import ChartData
+from .spec import (
+    MAX_CHART_POINTS,
+    MAX_PARAGRAPH_CHARS,
+    MAX_SECTIONS,
+    MAX_TABLE_ROWS,
+    Block,
+    BulletsBlock,
+    Chart,
+    ChartBlock,
+    ChartKind,
+    DeliverableSpec,
+    ParagraphBlock,
+    Section,
+    Table,
+    TableBlock,
+)
+
+__all__ = [
+    "Block",
+    "BulletsBlock",
+    "Chart",
+    "ChartBlock",
+    "ChartData",
+    "ChartKind",
+    "DeliverableSpec",
+    "MAX_CHART_POINTS",
+    "MAX_PARAGRAPH_CHARS",
+    "MAX_SECTIONS",
+    "MAX_TABLE_ROWS",
+    "ParagraphBlock",
+    "Section",
+    "Table",
+    "TableBlock",
+]

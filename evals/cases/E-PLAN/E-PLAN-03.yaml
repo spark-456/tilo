@@ -1,0 +1,46 @@
+id: E-PLAN-03
+group: E-PLAN
+title: Clear task — Warehouse packaging vendor price comparison PDF for Redkite Goods
+measures:
+  - EV-02
+  - EV-03
+  - FR-INT-03
+  - FR-INT-04
+  - FR-INT-06
+status: ready
+deploy_gate: false
+inputs:
+  task_kind: clear
+  task: >-
+    Produce a PDF comparison report of corrugated box pricing and lead times
+    across three regional suppliers for the purchasing manager at Redkite Home
+    Goods (purchasing@redkite-goods.example) by 2026-10-16. Compare the rate
+    cards at https://vendors.redkite-goods.example/corrugated-2026 for 10,000
+    unit orders and cap shipping lead time at 5 business days.
+  files: []
+scripted_answers: []
+ground_truth:
+  question_count: 0
+  approach_count: 2.5
+  brief_valid: true
+checks:
+  - check: schema_valid
+    args:
+      field: brief
+      schema: brief.schema.json
+  - check: schema_valid
+    args:
+      field: plan
+      schema: plan.schema.json
+  - check: equals_ground_truth
+    args:
+      field: question_count
+      tolerance: 0
+  - check: equals_ground_truth
+    args:
+      field: approach_count
+      tolerance: 0.5
+recording: null
+notes: >-
+  EV-03 estimate accuracy (median within +-25% of historical unit-type cost) is
+  evaluated once replay recordings exist.

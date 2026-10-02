@@ -1,4 +1,4 @@
-"""tilo_connectors._schema — a cached validator for contracts/outbox.schema.json (OB-05)."""
+"""tilo_connectors._schema — cached validators: outbox.schema.json (OB-05), connector.schema.json (FR-CON-01)."""
 
 from __future__ import annotations
 
@@ -34,5 +34,12 @@ def _registry() -> Registry:
 @functools.lru_cache(maxsize=1)
 def outbox_validator() -> jsonschema.protocols.Validator:
     schema = _load_json(_CONTRACTS_DIR / "outbox.schema.json")
+    cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
+    return cls(schema, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
+def connector_validator() -> jsonschema.protocols.Validator:
+    schema = _load_json(_CONTRACTS_DIR / "connector.schema.json")
     cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
     return cls(schema, registry=_registry())
