@@ -192,12 +192,7 @@ export function FlowShell() {
           </>
         );
       case "Understanding":
-        return (
-          <>
-            <Summary>Review the extracted brief and clarifying questions.</Summary>
-            <Understanding taskId={route.taskId} />
-          </>
-        );
+        return <Understanding taskId={route.taskId} />;
       case "Approaches":
         return <Approaches taskId={route.taskId} />;
       case "World":
