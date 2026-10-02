@@ -20,6 +20,7 @@ from _api_contracts_lib import assert_valid_event
 from _clint1_lib import FLOW_USER, registered_event_types, spy_on
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tilo_api import deps
 
 CAP = 50  # not equal to any number in the scripted approaches (credits 30-45 and 90-130)
 
@@ -165,7 +166,7 @@ def test_FR_INT_08_flow_property_a_grant_is_exactly_a_finite_positive_cap_or_not
     )
 
     events = _granted(clear_flow, intake["world_id"])
-    if math.isfinite(cap) and cap > 0:
+    if math.isfinite(cap) and 0 < cap <= deps.budget_cap_ceiling():  # above the run cap is 422 (#139, BQ-99)
         assert response.status_code == 200, response.text
         (event,) = events
         assert event["data"]["cap"] == event["data"]["granted"] == cap
