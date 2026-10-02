@@ -6,6 +6,7 @@ import type { Event, Layout } from "@tilo/contracts";
 import { useClient } from "../api/ClientProvider";
 import { type WorldState, reduce } from "../world/reducer";
 import { elapsed, useRunLog } from "../world/runLog";
+import { BUILDING_STATE, agentNames } from "../world/runSummary";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
@@ -18,15 +19,6 @@ interface Found {
   readonly where: string;
   readonly state: (s: WorldState) => string;
 }
-
-const BUILDING_STATE = {
-  hidden: "Not planned yet",
-  planned: "Planned",
-  constructing: "Being built",
-  operational: "At work",
-  completed: "Finished",
-  archived: "Archived",
-} as const;
 
 /** The item with this id anywhere in the layout, with its place and its state text. */
 export function findItem(layout: Layout, id: string): Found | null {
@@ -64,7 +56,7 @@ export function findItem(layout: Layout, id: string): Found | null {
   if (!agent) return null;
   return {
     kind: "Agent",
-    name: `${agent.rank} ${agent.id}`,
+    name: agentNames(layout).get(id) ?? agent.id,
     where: agent.team_lead ? `Team of ${agent.team_lead}` : "Part of the team",
     state: (s) => (s.agents[id]?.spawned ? "Joined the team" : "Not joined yet"),
   };
@@ -77,26 +69,20 @@ export function S_05({ params }: ScreenProps) {
   const client = useClient();
   const events = useRunLog(client, worldId);
   const [layout, retry] = useRemote("load the world", () => client.getLayout(worldId));
+  const found = layout.status === "ready" ? findItem(layout.value, itemId) : null;
   return (
     <div className="screen-body wide" data-testid="inspect-panel">
       <p>
         <AppLink to={`/world/${encodeURIComponent(worldId)}`}>Back to the world</AppLink>
       </p>
+      <h1>{layout.status === "ready" ? (found ? found.name : "Not found") : "Inspect"}</h1>
       <Loaded what="the world" remote={layout} retry={retry} isEmpty={() => false}>
         {(l) => {
           const item = findItem(l, itemId);
-          if (!item) {
-            return (
-              <>
-                <h1>Not found</h1>
-                <p>There is nothing called {itemId} in this world.</p>
-              </>
-            );
-          }
+          if (!item) return <p>There is nothing called {itemId} in this world.</p>;
           const mine = events.filter((e) => names(e, itemId));
           return (
             <>
-              <h1>{item.name}</h1>
               <p className="screen-tag">
                 {item.kind} · {item.where}
               </p>

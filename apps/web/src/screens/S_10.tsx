@@ -5,6 +5,7 @@ import type { Severity } from "@tilo/contracts";
 import { useClient, useIsFixtureClient } from "../api/ClientProvider";
 import { isKnownType } from "../world/registry";
 import { elapsed, useRunLog } from "../world/runLog";
+import { worldStatus } from "../world/runSummary";
 import { LensTabs } from "./LensTabs";
 import type { ScreenProps } from "./routes";
 
@@ -22,7 +23,7 @@ export function S_10({ params }: ScreenProps) {
   const client = useClient();
   const events = useRunLog(client, worldId);
   const fixture = useIsFixtureClient();
-  const replaying = events.at(-1)?.type !== "world.completed";
+  const status = worldStatus(events);
   const story = events.filter((e) => isKnownType(e.type));
   return (
     <div className="screen-body wide" data-testid="story-lens">
@@ -30,9 +31,11 @@ export function S_10({ params }: ScreenProps) {
       <h1>Story</h1>
       {fixture && (
         <p className="screen-tag replay-tip">
-          {replaying
-            ? `Replaying the recorded fixture: ${story.length} events so far. Add ?speed=20 to the address to fast-forward.`
-            : "The recorded fixture replay has finished."}
+          {status === "failed"
+            ? "The recorded run stopped with an error."
+            : status === "completed"
+              ? "The recorded fixture replay has finished."
+              : `Replaying the recorded fixture: ${story.length} events so far.`}
         </p>
       )}
       {story.length === 0 ? (

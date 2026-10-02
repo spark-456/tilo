@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from "react";
-import { useIsFixtureClient } from "./api/ClientProvider";
+import { useIsFixtureClient, useReplaySpeed } from "./api/ClientProvider";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
@@ -24,6 +24,7 @@ export function App() {
   const mobile = useMediaQuery("(max-width: 767px)");
   const world = useWorldFixture();
   const fixtureClient = useIsFixtureClient();
+  const replaySpeed = useReplaySpeed();
   const path = usePathname();
   const screen = matchScreen(path); // null: the stage and the flow shell
   const previousPath = useRef(path);
@@ -52,7 +53,10 @@ export function App() {
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
         <main className="screen-page" data-testid="screen-page" data-screen={screen.id}>
-          <screen.Component params={screen.params} />
+          <screen.Component
+            key={`${screen.id}:${screen.params.join("/")}`}
+            params={screen.params}
+          />
         </main>
       ) : (
         <Stage {...(world.active ? { onWorld: world.onWorld, seq: world.seq } : {})} />
@@ -77,12 +81,24 @@ export function App() {
           {world.speedLabel}
         </div>
       )}
+      {worldId && replaySpeed !== 1 && !world.active && (
+        // HR-6: a replay that is not at its recorded pace always says so, on every world screen and
+        // after lens navigation drops ?speed (the client keeps its speed).
+        <div className="speed-badge client-speed" data-testid="speed-badge">
+          {replaySpeed}×
+        </div>
+      )}
       {mobile ? (
         <>
           {hudWorld && (
-            <details className="hud-sheet">
+            <details
+              className="hud-sheet"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") e.currentTarget.open = false;
+              }}
+            >
               <summary>World status</summary>
-              <WorldPanels worldId={hudWorld} />
+              <WorldPanels key={hudWorld} worldId={hudWorld} />
             </details>
           )}
           <PrimaryNav id="bottom-tabs" mobile />
@@ -90,7 +106,7 @@ export function App() {
       ) : (
         <aside className="right-rail" data-testid="right-rail">
           {worldId ? (
-            <WorldPanels worldId={worldId} tabs={hudWorld !== null} />
+            <WorldPanels key={worldId} worldId={worldId} tabs={hudWorld !== null} />
           ) : (
             <>
               <h2>Activity</h2>

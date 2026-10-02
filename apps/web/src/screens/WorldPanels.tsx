@@ -1,94 +1,115 @@
-// S-04 HUD panels (PRD 18.3): the meter, needs-you count, roster and a keyboard world outline for
-// one world, in the right rail on desktop and a bottom sheet on mobile. Every number is derived
-// from the recorded events (HR-1); before the first event nothing shows a figure (UX-3, HR-2).
+// S-04 HUD panels (PRD 18.3), after the "Live meter", needs-you and roster blocks of design/source
+// "Tilo 2 Balanced Refined.dc.html" 2-1: hero figures, a needs-you count chip, roster and outline
+// rows. Right rail on desktop, bottom sheet on mobile. Every figure is derived from the recorded
+// events (HR-1); before the first event nothing shows a figure (UX-3, HR-2).
 import type { Layout } from "@tilo/contracts";
 import { useClient } from "../api/ClientProvider";
 import { reduce } from "../world/reducer";
 import { creditsUsed, useRunLog, waitingForYou } from "../world/runLog";
+import {
+  BUILDING_STATE,
+  RUN_STATUS_LABEL,
+  agentNames,
+  budgetCap,
+  worldStatus,
+} from "../world/runSummary";
 import { AppLink } from "./AppLink";
 import { LensTabs } from "./LensTabs";
 import { useRemote } from "./remote";
 
-const STATUS = {
-  idle: "Getting ready",
-  started: "Working",
-  paused: "Paused",
-  completed: "Done",
-  failed: "Stopped with an error",
-} as const;
-const BUILDING = {
-  hidden: "not planned yet",
-  planned: "planned",
-  constructing: "being built",
-  operational: "at work",
-  completed: "finished",
-  archived: "archived",
-} as const;
-
-/** `tabs`: show the lens tabs (S-04 has no page header of its own; the lens screens do). */
+/** `tabs`: show the lens tabs (S-04 has no page header of its own; the lens screens do). Without
+ * them the same height stays reserved, so the rail does not jump between world screens. */
 export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: boolean }) {
   const client = useClient();
   const events = useRunLog(client, worldId);
-  const [remote] = useRemote("load the world", () => client.getLayout(worldId));
-  const layout: Layout | null = remote.status === "ready" ? remote.value : null;
+  const [layoutRemote] = useRemote("load the world", () => client.getLayout(worldId));
+  const [deliveryRemote] = useRemote("load the delivery", () => client.getDelivery(worldId));
+  const layout: Layout | null = layoutRemote.status === "ready" ? layoutRemote.value : null;
   const state = layout ? reduce(layout, events) : null;
+  const names = layout ? agentNames(layout) : null;
+  const acted = new Set(events.map((e) => e.actor));
+  const status = worldStatus(events);
+  const cap = budgetCap(events);
   const waiting = waitingForYou(events);
+  const saved =
+    status === "completed" && deliveryRemote.status === "ready"
+      ? deliveryRemote.value.time_saved
+      : null;
   const base = `/world/${encodeURIComponent(worldId)}`;
   return (
     <div className="world-panels" data-testid="world-hud">
-      {tabs && <LensTabs worldId={worldId} current="world" />}
-      <h2>Activity</h2>
-      {events.length === 0 ? (
-        <p className="hud-meter" data-testid="hud-meter">
-          Nothing yet. This fills in once a run starts.
-        </p>
-      ) : (
-        <p className="hud-meter" data-testid="hud-meter">
-          <span className="hud-line">{state ? STATUS[state.status] : "Working"}</span>{" "}
-          <span className="hud-line">Credits used so far: {creditsUsed(events)}</span>
-        </p>
-      )}
-      <h2>Needs you</h2>
-      <p>
-        {waiting === 0 ? "Nothing needs you." : `${waiting} waiting. `}
-        {waiting > 0 && <AppLink to="/needs-you">Open the queue</AppLink>}
-      </p>
-      <div className="hud-slot">
-        {layout === null ? (
-          <p>{remote.status === "error" ? remote.message : "The roster is loading…"}</p>
+      {tabs ? <LensTabs worldId={worldId} current="world" /> : <div className="lens-space" />}
+      <section className="hud-card" aria-label="Live meter" data-testid="hud-meter">
+        {events.length === 0 ? (
+          <p>Nothing yet. This fills in once a run starts.</p>
         ) : (
           <>
-            <h2>Roster</h2>
-            <ul className="outline">
+            <span className="chip">{RUN_STATUS_LABEL[status]}</span>
+            <div className="hud-figures">
+              <div>
+                <b>{creditsUsed(events)}</b>
+                <span>{cap === null ? "credits used" : `credits of ${cap} approved`}</span>
+              </div>
+              <div>
+                <b>{saved ? `${saved.low_min} to ${saved.high_min} min` : "Not yet"}</b>
+                <span>saved · estimate</span>
+              </div>
+            </div>
+            {saved && <AppLink to="/estimate">How we estimate</AppLink>}
+          </>
+        )}
+      </section>
+      <div className="hud-count">
+        <h2>Needs you</h2>
+        {waiting > 0 && <AppLink to="/needs-you">Open the queue</AppLink>}
+        <span className={waiting > 0 ? "chip chip-needs" : "chip"} data-testid="needs-count">
+          {waiting}
+        </span>
+      </div>
+      <div className="hud-slot">
+        {layout === null || names === null ? (
+          <p>{layoutRemote.status === "error" ? layoutRemote.message : "The team is loading…"}</p>
+        ) : (
+          <>
+            <h2>Team</h2>
+            <ul className="rows">
               {layout.semantic.agents.map((a) => (
                 <li key={a.id}>
-                  <AppLink to={`${base}/inspect/${encodeURIComponent(a.id)}`}>
-                    {a.rank} {a.id}
+                  <AppLink className="row" to={`${base}/inspect/${encodeURIComponent(a.id)}`}>
+                    <span className="row-name">{names.get(a.id)}</span>
+                    <span className="row-state">
+                      {state?.agents[a.id]?.spawned || acted.has(a.id)
+                        ? "Joined"
+                        : "Not joined yet"}
+                    </span>
                   </AppLink>
-                  {" · "}
-                  {state?.agents[a.id]?.spawned ? "joined" : "not joined yet"}
                 </li>
               ))}
             </ul>
-            <h2>World outline</h2>
-            <ul className="outline">
-              {layout.semantic.levels.map((level) => (
-                <li key={level.id}>
+            {layout.semantic.levels.map((level) => (
+              <section key={level.id}>
+                <h2>
                   <AppLink to={`${base}/inspect/${level.id}`}>Level {level.name}</AppLink>
-                  <ul>
-                    {level.districts.flatMap((d) =>
-                      d.buildings.map((b) => (
-                        <li key={b.id}>
-                          <AppLink to={`${base}/inspect/${b.id}`}>{b.name}</AppLink>
-                          {" · "}
-                          {d.name}, {BUILDING[state?.buildings[b.id]?.status ?? "hidden"]}
-                        </li>
-                      )),
-                    )}
-                  </ul>
-                </li>
-              ))}
-            </ul>
+                </h2>
+                <ul className="rows">
+                  {level.districts.flatMap((d) =>
+                    d.buildings.map((b) => (
+                      <li key={b.id}>
+                        <AppLink className="row" to={`${base}/inspect/${b.id}`}>
+                          <span className="row-name">
+                            {b.name}
+                            <small>{d.name}</small>
+                          </span>
+                          <span className="row-state">
+                            {BUILDING_STATE[state?.buildings[b.id]?.status ?? "hidden"]}
+                          </span>
+                        </AppLink>
+                      </li>
+                    )),
+                  )}
+                </ul>
+              </section>
+            ))}
           </>
         )}
       </div>
