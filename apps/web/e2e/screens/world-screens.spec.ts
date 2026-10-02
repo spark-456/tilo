@@ -34,9 +34,11 @@ test("S_04 renders, no console errors, placeholders aria-disabled", async ({ pag
   await expect(meter).toContainText("estimate");
   await expect(page.getByTestId("needs-count")).toHaveText("0");
   // Rows with role names and state, not raw ids.
-  await expect(hud.getByRole("link", { name: /Specialist 1/ })).toContainText("Joined");
-  await expect(hud.getByRole("link", { name: /Director/ })).toContainText("Joined");
-  await expect(hud.getByRole("link", { name: /Mail Room/ })).toHaveAttribute(
+  await expect(hud.getByRole("button", { name: /Specialist 1/ })).toContainText("Joined");
+  await expect(hud.getByRole("button", { name: /Director/ })).toContainText("Joined");
+  // A row selects its object for every lens (FR-WLD-06); the selection bar opens Inspect.
+  await hud.getByRole("button", { name: /Mail Room/ }).click();
+  await expect(hud.getByRole("link", { name: "Inspect" })).toHaveAttribute(
     "href",
     `${W}/inspect/B1`,
   );

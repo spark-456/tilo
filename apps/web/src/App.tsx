@@ -100,7 +100,11 @@ export function App() {
           />
         </main>
       ) : (
-        <Stage {...(world.active ? { onWorld: world.onWorld, seq: world.seq } : {})} />
+        <Stage
+          {...(world.active
+            ? { onWorld: world.onWorld, seq: world.seq, selected: world.selected }
+            : {})}
+        />
       )}
       {!screen && !world.active && <FlowShell />}
       {(world.active || fixtureClient) && (
