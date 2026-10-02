@@ -33,3 +33,4 @@ client. An unauthenticated caller gets the 401 the auth dependency raises, befor
 - Partial answers: every asked question must be answered or skipped (`answer: null`) before approaches.
 - "The person's confirmed cap" is the `budget_cap` in the approve request; the grant equals it exactly.
 - A second approve never writes a second `budget.granted` (409, or 200 with the same `world_id`).
+- Follow-ups (#139, BQ-99): the last action on a chip wins (an answer drops the field earlier edit; in one request the edit wins); the goal answer "Something else, which I will describe" is 422 (describe it in the goal chip); a flagged file stays out of `brief.sources`; the Director runs before any file is stored (502 stores nothing); `budget_cap` above `caps.run_credits` in `config/metering.yaml` (300) is 422; a 422 or a log never quotes the input or the model error text.

@@ -21,9 +21,10 @@ import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from tilo_planning.approaches import ApproachProposalError, propose_approaches
-from tilo_planning.brief import BriefValidationError, edit_brief_field, extract_brief
+from tilo_planning.brief import BriefValidationError, ExtractionResult, edit_brief_field
 from tilo_planning.intake import IntakeResult
 from tilo_planning.questions import apply_answer, generate_questions, record_assumption
+from tilo_providers.config import ProviderConfigError
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
@@ -84,16 +85,15 @@ def _append(store: deps.Store, task: deps.TaskRecord, events: list[dict[str, Any
     task.next_seq = max([task.next_seq - 1, *(e["seq"] for e in events)]) + 1
 
 
-def create_task(store: deps.Store, intake: IntakeResult, text: str, router: Router) -> tuple[str, deps.TaskRecord]:
-    """FR-INT-03/04: the Director's brief for the task text, then the questions, decided in code. Raises
-    BriefExtractionError when no schema-valid brief comes back."""
+def create_task(store: deps.Store, intake: IntakeResult, extraction: ExtractionResult) -> tuple[str, deps.TaskRecord]:
+    """FR-INT-03/04: the task from its intake and the Director's brief (extracted first, so a failed extraction
+    stores nothing), then the questions, decided in code."""
     owner = intake.event["actor"]
-    extraction = extract_brief(text, router=router)
     draft = copy.deepcopy(extraction.brief)
     draft["sources"] += [
         {"kind": "file", "ref": f.artifact["artifact_id"], "label": f.filename[:120]}
         for f in intake.files
-        if f.status == "ok"
+        if f.status == "ok" and not f.safety_flagged  # a flagged file is quarantined: never a source (BQ-99)
     ]
     intake_events = [intake.event, *(e for f in intake.files for e in f.events)]
     task = deps.TaskRecord(owner, intake.world_id, intake.run_id, draft, draft, [], len(intake_events) + 1)
@@ -118,7 +118,7 @@ def _owned(store: deps.Store, task_id: str, principal: deps.Principal) -> deps.T
 def _brief(task: deps.TaskRecord, answers: dict[str, str | None], edits: dict[str, Any]) -> dict[str, Any]:
     brief, today = task.draft, date.today()
     for question in task.questions:
-        if question.field in answers:
+        if question.field in answers and question.field not in edits:  # an edit stands over the answer (BQ-99)
             answer = answers[question.field]
             if answer is None:
                 brief = record_assumption(brief, question)
@@ -185,7 +185,10 @@ def answer_questions(
         if task.granted:
             raise HTTPException(status_code=409, detail="The budget is approved; the brief is final.")
         answers = {**task.answers, **{a.field: a.answer for a in body.answers}}
-        edits = {**task.edits, **body.brief_edits}
+        # The last action on a field wins (BQ-99): an answer drops the field's earlier edit; in one request the
+        # edit wins, since a JSON body has no order between its answers and its edits.
+        answered = {a.field for a in body.answers}
+        edits = {**{f: v for f, v in task.edits.items() if f not in answered}, **body.brief_edits}
         try:
             brief = _brief(task, answers, edits)
         except BriefValidationError as exc:
@@ -202,6 +205,11 @@ def get_approaches(
 ) -> dict[str, Any]:
     """FR-INT-06: the Director's 2-3 approaches for the confirmed brief, proposed once per brief."""
     task = _owned(store, task_id, principal)
+    try:
+        credit_usd = deps.providers_config().prices.credit_usd  # before any model call is spent
+    except ProviderConfigError as exc:
+        logger.warning("provider config unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="The model configuration is not available.") from exc
     with task.lock:
         if any(q.field not in task.answers for q in task.questions):
             raise HTTPException(status_code=409, detail="Answer or skip every question first.")
@@ -216,7 +224,6 @@ def get_approaches(
         approaches = task.approaches
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
-    credit_usd = deps.providers_config().prices.credit_usd
     return {"task_id": task_id, "approaches": approaches, "recommended": recommended, "credit_usd": credit_usd}
 
 
@@ -232,6 +239,8 @@ def approve(
     policy may grant it; otherwise the owner's own confirmation does (PRD 10.1, 10.4). The grant then starts
     the task's one run (CL-INT-2); a run that cannot start never changes this answer."""
     task = _owned(store, task_id, principal)
+    if body.budget_cap > (ceiling := deps.budget_cap_ceiling()):  # finite already: the body refuses NaN and Infinity
+        raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
     with store.grant_lock(task.owner), task.lock:  # always in this order: the owner's grants, then the task
         if task.granted:
             raise HTTPException(status_code=409, detail="This task's budget is already approved.")
