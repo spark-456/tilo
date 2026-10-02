@@ -54,7 +54,7 @@ class Outbox:
         emit: Callable[[dict], None],
         clock: Callable[[], str],
     ) -> None:
-        if RESERVED_CONNECTOR_ID in connectors:
+        if any(name.strip() == RESERVED_CONNECTOR_ID for name in connectors):
             raise ValueError(f"connector id {RESERVED_CONNECTOR_ID!r} is reserved and cannot be bound")
         self._store = store
         self._connectors = connectors
@@ -118,7 +118,8 @@ class Outbox:
         holder = uuid.uuid4().hex
         if (claimed := self._store._claim_for_sending(outbox_id, holder, self._clock(), _LEASE_SECONDS)) is None:
             return None
-        adapter = None if claimed["connector"] == RESERVED_CONNECTOR_ID else self._connectors.get(claimed["connector"])
+        name = claimed["connector"]
+        adapter = None if name.strip() == RESERVED_CONNECTOR_ID else self._connectors.get(name)
         if adapter is None:  # never a reserved id, even if the map was edited after construction
             return self._store._finalize_claim(outbox_id, holder, "failed")
         grant = Grant(world_id=claimed["world_id"], idempotency_key=claimed["idempotency_key"])

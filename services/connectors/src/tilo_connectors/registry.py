@@ -78,6 +78,9 @@ def _validated(entries: list[Any]) -> dict[str, dict[str, Any]]:
         ]
         if problems:
             raise ConnectorConfigError(f"connector {label!r}: {'; '.join(problems)}")
+        # The schema patterns end in `$`, which also matches before a final newline: refuse it here.
+        if any(i != i.strip() for i in [entry["id"], *(a["id"] for a in entry["actions"])]):
+            raise ConnectorConfigError(f"connector {label!r}: an id or action id has surrounding whitespace")
         if entry["id"] == RESERVED_CONNECTOR_ID:
             raise ConnectorConfigError(f"connector {entry['id']!r}: id is reserved for actions with no connector")
         for action in entry["actions"]:

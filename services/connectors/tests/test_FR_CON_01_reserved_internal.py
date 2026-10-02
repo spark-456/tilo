@@ -38,6 +38,25 @@ def test_FR_CON_01_registry_refuses_a_grant_budget_connector_action(tmp_path):
         load_registry(path)
 
 
+def test_FR_CON_01_registry_refuses_reserved_ids_with_a_trailing_newline(tmp_path):
+    # `$` in the schema patterns matches before a final "\n", so these pass the schema itself.
+    entry = mock_entry()
+    entry["actions"][0]["id"] = "grant_budget\n"
+    for entries in ([mock_entry("internal\n")], [entry]):
+        with pytest.raises(ConnectorConfigError, match="whitespace"):
+            load_registry(write_config(tmp_path, entries))
+
+
+def test_FR_CON_01_outbox_refuses_to_bind_internal_with_a_trailing_newline():
+    with pytest.raises(ValueError, match="reserved"):
+        tilo_connectors.Outbox(
+            tilo_connectors.InMemoryOutboxStore(),
+            {"internal\n": FakeGmail()},
+            [].append,
+            ManualClock("2026-09-29T09:00:00.000Z"),
+        )
+
+
 def test_FR_CON_01_a_normal_config_still_loads(tmp_path):
     registry = load_registry(write_config(tmp_path, [mock_entry(), mock_entry("mock_two")]))
 
