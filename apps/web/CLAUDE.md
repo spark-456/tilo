@@ -36,5 +36,5 @@ UX-1–UX-9 (18.1); FR-WLD-* (world rendering); owned starting P0-08.
   or `policy.applied` (stamp, HR-7). `/screens/cards`.
 
 ## Local rules
-- Nothing animates without a recorded event (honesty rules HR-1–HR-7, PRD 9.4).
+- Nothing animates without a recorded event (HR-1–HR-7, PRD 9.4); `src/honesty/` (FR-WLD-09) fails on animation APIs outside `choreographer.ts` (allowlist: `test-support/honestyScan.ts`).
 - One primary filled button per screen (UX-1); no streaks, hearts or fake urgency (UX-7).
