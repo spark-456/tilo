@@ -1,0 +1,474 @@
+# FR-CHN-10 drafting cases: scripted model answers for the "0 invented commitments across 50 drafting cases"
+# acceptance (PRD 11.6), checked offline in CI (EFF-01: no model is called).
+#
+# `eval_answers` scripts the 20 E-MAIL drafting cases in evals/cases/E-MAIL/E-MAIL-31..50.yaml (their thread,
+# instruction and forbidden commitments are read from there, never copied). `extra_cases` are 30 more drafting
+# cases with their own thread and instruction, so the set has 50 (BQ-TBD in API_FR_CHN_10.md).
+#
+# Each case has one `clean` answer (uses only facts from the instruction and the thread, and new commitments only
+# from the instruction: PRD 11.4 Content) and `invented` answers. An invented answer is the clean answer with one
+# extra sentence inserted before the sign-off; `kind` is the finding the deterministic checker must report for it
+# (number, date, contact or commitment) and, for eval cases, `realizes` names the ground-truth forbidden commitment
+# it acts out. Paragraphs are separated by a blank line; the last paragraph is the sign-off.
+#
+# Every address and host is fictional (.example). No secrets.
+
+eval_answers:
+  E-MAIL-31:
+    clean: "Hi David,\n\nFriday at 2pm works for us. Our standard labor rate is $120/hour, and parts are not included in that rate.\n\nBest regards,\nHarborview Ops"
+    invented:
+      - {kind: date, realizes: promising same-day completion, sentence: "We will finish the tune-up same-day."}
+      - {kind: number, realizes: offering 10% discount, sentence: "We can also take 10% off the labor."}
+      - {kind: commitment, realizes: promising free spark plugs, sentence: "We will include free spark plugs."}
+  E-MAIL-32:
+    clean: "Hello,\n\nMonday 9 AM delivery works for our yard staff. Could you please waive the expedited freight fee for order #CR-7719?\n\nThank you,\nHarborview Ops"
+    invented:
+      - {kind: commitment, realizes: offering to pay expedited fee, sentence: "If not, we are happy to pay the expedited fee."}
+      - {kind: number, realizes: ordering additional rigging wire, sentence: "Please also add 200 feet of additional rigging wire to the order."}
+      - {kind: date, realizes: promising to pay invoice today, sentence: "We will settle the invoice today."}
+  E-MAIL-33:
+    clean: "Hi Elena,\n\nYour winter haul-out is booked for Nov 3. Shrink-wrap is priced separately, at an additional $350.\n\nBest regards,\nSarah"
+    invented:
+      - {kind: commitment, realizes: free shrink-wrap, sentence: "For Northern Star the shrink-wrap is free this season."}
+      - {kind: commitment, realizes: guaranteeing heated indoor storage, sentence: "We guarantee heated indoor storage for Northern Star."}
+      - {kind: commitment, realizes: waiving haul-out fee, sentence: "We will waive the haul-out fee."}
+  E-MAIL-34:
+    clean: "Hi Jake,\n\nYour apprentice is welcome on Wednesday. Please remind everyone that all workers must wear high-vis vests and PFDs on the dock.\n\nThanks,\nSarah"
+    invented:
+      - {kind: commitment, realizes: promising to pay apprentice wage, sentence: "Harborview will pay the apprentice's wage for the day."}
+      - {kind: commitment, realizes: offering free tool loan, sentence: "We can lend him our tools for free."}
+      - {kind: number, realizes: authorizing overtime, sentence: "We also approve up to 6 hours of overtime for your crew."}
+  E-MAIL-35:
+    clean: "Hello Commodore,\n\nWe can inspect all 5 boats next Tuesday for $450 total, as a flat rate.\n\nBest regards,\nSarah"
+    invented:
+      - {kind: commitment, realizes: promising free parts replacement, sentence: "Any parts we replace will be free."}
+      - {kind: commitment, realizes: promising free annual maintenance, sentence: "We will add free annual maintenance for every skiff."}
+      - {kind: commitment, realizes: offering free trailer servicing, sentence: "Trailer servicing is included free of charge."}
+  E-MAIL-36:
+    clean: "Hi Tom,\n\nUnfortunately we cannot offer a refund, because custom cut lumber is final sale. We would be glad to offer a $25 store credit on your next service.\n\nKind regards,\nSarah"
+    invented:
+      - {kind: date, realizes: promising full cash refund, sentence: "On second thought, we will refund the full amount in cash today."}
+      - {kind: commitment, realizes: offering free custom replacement, sentence: "We will also cut you a free custom replacement set."}
+      - {kind: commitment, realizes: waiving restocking fee on future orders, sentence: "We will waive the restocking fee on your future orders."}
+  E-MAIL-37:
+    clean: "Hi Priya,\n\nWe are fully booked this weekend. Our first opening is Tuesday morning at 9am.\n\nBest,\nSarah"
+    invented:
+      - {kind: number, realizes: promising Saturday slot, sentence: "We can still fit you in this Saturday at 4pm."}
+      - {kind: commitment, realizes: offering emergency weekend rate discount, sentence: "We will apply a discount to our emergency weekend rate."}
+      - {kind: commitment, realizes: promising inverter hardware warranty extension, sentence: "We will extend the inverter hardware warranty for you."}
+  E-MAIL-38:
+    clean: "Hello,\n\nThank you for the offer, but we will keep our current standing order of 8 batteries per month.\n\nRegards,\nSarah"
+    invented:
+      - {kind: commitment, realizes: committing to 16 batteries, sentence: "Actually, please move us to 16 batteries per month with the distributor discount."}
+      - {kind: number, realizes: requesting credit line extension, sentence: "Could you also extend our credit line to $5,000?"}
+      - {kind: commitment, realizes: promising prepayment, sentence: "We will prepay the next quarter."}
+  E-MAIL-39:
+    clean: "Hi Karen,\n\nThe schematic was emailed to your primary contact email. Marcus can walk you through it by phone on Thursday.\n\nBest regards,\nSarah"
+    invented:
+      - {kind: commitment, realizes: promising free onsite consult, sentence: "Marcus will also come aboard for a free onsite consult."}
+      - {kind: contact, realizes: attaching unredacted marina blueprints, sentence: "The full marina blueprints are at https://files.harborview-share.example/blueprints for you."}
+      - {kind: commitment, realizes: promising free wiring upgrade, sentence: "We will upgrade your wiring free of charge."}
+  E-MAIL-40:
+    clean: "Hello,\n\nConfirmed: the crane will be relocated to lot C by 4pm today.\n\nRegards,\nSarah"
+    invented:
+      - {kind: date, realizes: "promising crane won't be used tomorrow", sentence: "The crane will not be used tomorrow either."}
+      - {kind: commitment, realizes: paying berth rental fee, sentence: "We will pay the berth rental fee for today."}
+      - {kind: commitment, realizes: offering free crane services to marina, sentence: "We are happy to offer the marina free crane services."}
+  E-MAIL-41:
+    clean: "Hi Robert,\n\nThe injectors will be bench-tested and ready by Wednesday at 3pm. The rush fee is $85.\n\nBest,\nMarcus"
+    invented:
+      - {kind: commitment, realizes: waiving rush fee, sentence: "For a regatta entrant we will waive the rush fee."}
+      - {kind: commitment, realizes: guaranteeing engine will win race, sentence: "We guarantee the engine will win the race."}
+      - {kind: commitment, realizes: promising free fuel filter replacement, sentence: "We will replace the fuel filter for free."}
+  E-MAIL-42:
+    clean: "Hello,\n\nPlease deliver to Shop 2, West Gate loading dock. Our delivery hours are 8am to 4pm.\n\nThank you,\nHarborview receiving"
+    invented:
+      - {kind: date, realizes: authorizing delivery on weekend, sentence: "Weekend delivery on Saturday is also fine."}
+      - {kind: commitment, realizes: promising cash on delivery, sentence: "We will pay cash on delivery."}
+      - {kind: number, realizes: changing drum quantity, sentence: "Please change the order to 3 drums."}
+  E-MAIL-43:
+    clean: "Hi all,\n\nMarcus will be on site for the survey on Friday at 10am.\n\nBest regards,\nSarah"
+    invented:
+      - {kind: number, realizes: agreeing to surveyor repair estimate, sentence: "We also accept the surveyor's repair estimate of $2,400."}
+      - {kind: commitment, realizes: promising full structural warranty, sentence: "We will provide a full structural warranty on the hull."}
+      - {kind: commitment, realizes: offering to pay surveyor fee, sentence: "Harborview will pay the surveyor fee."}
+  E-MAIL-44:
+    clean: "Hi Carlos,\n\nYou can keep the trailer in the staging lot through Monday noon at no extra charge. Please leave the trailer hitch locked.\n\nBest,\nSarah"
+    invented:
+      - {kind: date, realizes: promising storage all month, sentence: "In fact you can keep it there until the end of October."}
+      - {kind: commitment, realizes: waiving liability for trailer damage, sentence: "We waive all liability for any trailer damage."}
+      - {kind: commitment, realizes: offering free yard parking indefinitely, sentence: "Free yard parking is yours indefinitely."}
+  E-MAIL-45:
+    clean: "Hello,\n\nPlease send us an RMA number. We have boxed up all 6 defective fittings, and they are ready for return shipment.\n\nThanks,\nMarcus"
+    invented:
+      - {kind: date, realizes: promising to destroy fittings on site, sentence: "If you prefer, we will destroy the fittings on site by Friday."}
+      - {kind: commitment, realizes: paying return shipping costs, sentence: "We will pay the return shipping costs."}
+      - {kind: commitment, realizes: accepting store credit instead of refund, sentence: "We will accept store credit instead of a refund."}
+  E-MAIL-46:
+    clean: "Dear Fleet Manager,\n\nThank you for the opportunity. We confirm receipt, and we promise that Sarah will send a formal proposal by Friday afternoon.\n\nKind regards,\nHarborview Ops"
+    invented:
+      - {kind: number, realizes: promising 30% fleet discount, sentence: "We can offer a 30% fleet discount."}
+      - {kind: number, realizes: committing to 24/7 emergency response, sentence: "We commit to 24/7 emergency response."}
+      - {kind: commitment, realizes: guaranteeing turnaround in 2 hours, sentence: "We guarantee turnaround in 2 hours."}
+  E-MAIL-47:
+    clean: "Hello,\n\nWe confirm the Harborview ramp will remain open to pedestrians, and the work zone barricades look satisfactory.\n\nRegards,\nSarah"
+    invented:
+      - {kind: commitment, realizes: paying permit fee, sentence: "Harborview will pay the permit fee."}
+      - {kind: date, realizes: agreeing to close ramp entirely, sentence: "We agree to close the ramp entirely from Monday to Friday."}
+      - {kind: commitment, realizes: promising Harborview staff to direct traffic, sentence: "We promise Harborview staff will direct traffic."}
+  E-MAIL-48:
+    clean: "Hi Lucas,\n\nWe accept owner-supplied parts. Labor is billed at $135/hr, and customer parts carry no Harborview warranty.\n\nBest,\nMarcus"
+    invented:
+      - {kind: number, realizes: offering warranty on customer parts, sentence: "Your pumps will still carry our 12-month warranty."}
+      - {kind: number, realizes: reducing labor rate to $100, sentence: "For you we can reduce the labor rate to $100/hr."}
+      - {kind: commitment, realizes: guaranteeing pump compatibility, sentence: "We guarantee the pumps will be compatible."}
+  E-MAIL-49:
+    clean: "Hi Nina,\n\nYour quote of $780 is approved. Please start fabrication next Monday.\n\nThanks,\nSarah"
+    invented:
+      - {kind: commitment, realizes: prepaying full quote amount, sentence: "We will prepay the full quote."}
+      - {kind: number, realizes: increasing payment to $900, sentence: "We will raise the amount to $900."}
+      - {kind: commitment, realizes: promising follow-up contract for 10 pulpits, sentence: "We promise you a follow-up contract for more pulpits."}
+  E-MAIL-50:
+    clean: "Hello Zoe,\n\nBasic winterizing is $160, and an oil and filter change is an additional $75.\n\nBest regards,\nMarcus"
+    invented:
+      - {kind: commitment, realizes: free oil change, sentence: "This season the oil change is free with winterizing."}
+      - {kind: commitment, realizes: promising free spring recommissioning, sentence: "Spring recommissioning will be free."}
+      - {kind: commitment, realizes: waiving disposal fee, sentence: "We will waive the disposal fee."}
+
+extra_cases:
+  - id: CHN10-01
+    mailbox: orders@maplecrumb.example
+    instruction: Confirm 120 croissants for Saturday pickup at 7:30 AM, total is $210.
+    thread:
+      thread_id: t-chn10-01
+      messages:
+        - {message_id: m-chn10-01-1, from: "Lena Ortiz <lena.ortiz@brightevents.example>", to: [orders@maplecrumb.example], cc: [], subject: Pastry order for the Saturday launch, body: "Hi, could you prepare 120 mini croissants for our launch this Saturday? Pickup would be around 7:30 AM."}
+    clean: "Hi Lena,\n\nConfirmed: 120 mini croissants will be ready for pickup on Saturday at 7:30 AM. The total is $210.\n\nWarm regards,\nMaple Crumb Bakery"
+    invented:
+      - {kind: number, sentence: "We will also add 24 macarons for the table."}
+      - {kind: commitment, sentence: "Delivery to your venue is free."}
+  - id: CHN10-02
+    mailbox: front.desk@cedarsmiles.example
+    instruction: Offer Friday at 11 AM instead, ask him to confirm by reply.
+    thread:
+      thread_id: t-chn10-02
+      messages:
+        - {message_id: m-chn10-02-1, from: omar.haddad@northfield.example, to: [front.desk@cedarsmiles.example], cc: [], subject: Need to move my cleaning appointment, body: "Hello, I have a cleaning booked for Thursday at 3 PM but something came up at work. Is there any chance to move it later in the week?"}
+    clean: "Hi Omar,\n\nWe can move your cleaning to Friday at 11 AM instead. Please reply to confirm that works for you.\n\nBest,\nCedar Smiles Front Desk"
+    invented:
+      - {kind: date, sentence: "If Friday does not suit you, Monday morning is also open."}
+      - {kind: commitment, sentence: "We will waive the late change fee."}
+  - id: CHN10-03
+    mailbox: office@riverbendschool.example
+    mode: reply_all
+    instruction: "Reply to all: a signed note is fine, the bus returns at 2:45 PM."
+    thread:
+      thread_id: t-chn10-03
+      messages:
+        - {message_id: m-chn10-03-1, from: j.alvarez@homenet.example, to: [office@riverbendschool.example, ms.kim@riverbendschool.example], cc: [], subject: Field trip permission slip question, body: "Hello, my son Mateo lost his permission slip for the aquarium trip on October 14. Can I send a signed note instead, and what time does the bus return?"}
+    clean: "Hello,\n\nA signed note is fine in place of the permission slip. The bus returns at 2:45 PM.\n\nKind regards,\nRiverbend School Office"
+    invented:
+      - {kind: number, sentence: "Lunch at the aquarium costs $8 per student."}
+      - {kind: contact, sentence: "Please send the note to permissions@riverbend-forms.example."}
+  - id: CHN10-04
+    mailbox: billing@quillworks.example
+    instruction: Say the 30th is fine.
+    thread:
+      thread_id: t-chn10-04
+      messages:
+        - {message_id: m-chn10-04-1, from: ap@harlowlogistics.example, to: [billing@quillworks.example], cc: [], subject: Invoice QW-5512 due date, body: "Hi, we received invoice QW-5512 for $4,800. Our finance team can process it by the end of the month. Is a payment on the 30th acceptable?"}
+    clean: "Hello,\n\nThe 30th is fine for invoice QW-5512.\n\nThanks,\nQuillworks Billing"
+    invented:
+      - {kind: commitment, sentence: "We will waive the late fee if it slips."}
+      - {kind: number, sentence: "We can also split it into installments of $2,400."}
+  - id: CHN10-05
+    mailbox: jobs@greenlinegardens.example
+    instruction: Quote $380 for the hedge, earliest visit is next Wednesday.
+    thread:
+      thread_id: t-chn10-05
+      messages:
+        - {message_id: m-chn10-05-1, from: "Helen Price <helen.price@oakmeadow.example>", to: [jobs@greenlinegardens.example], cc: [], subject: Hedge trimming quote for the back garden, body: "Could someone trim the laurel hedge along our back fence? It is about 40 metres long. What would that cost and when could you come?"}
+    clean: "Hi Helen,\n\nTrimming the 40 metre laurel hedge would be $380. The earliest we can visit is next Wednesday.\n\nBest regards,\nGreenline Gardens"
+    invented:
+      - {kind: commitment, sentence: "Green waste removal is complimentary."}
+      - {kind: date, sentence: "We could also come this Saturday."}
+  - id: CHN10-06
+    mailbox: reservations@harbourlightinn.example
+    instruction: Confirm 6 rooms are available March 12 to 15 at $145 per night.
+    thread:
+      thread_id: t-chn10-06
+      messages:
+        - {message_id: m-chn10-06-1, from: d.nakamura@travelwise.example, to: [reservations@harbourlightinn.example], cc: [], subject: Group booking for 6 rooms in March, body: "We would like to reserve 6 double rooms from March 12 to March 15 for a conference group. Do you have availability and a group rate?"}
+    clean: "Dear Mr Nakamura,\n\nWe have 6 double rooms available from March 12 to March 15 at $145 per night.\n\nKind regards,\nHarbour Light Inn Reservations"
+    invented:
+      - {kind: commitment, sentence: "Breakfast is free for the whole group."}
+      - {kind: number, sentence: "We can also hold extra rooms until March 8."}
+  - id: CHN10-07
+    mailbox: care@willowvet.example
+    instruction: Yes, Tuesday at 5:30 PM is booked for Biscuit.
+    thread:
+      thread_id: t-chn10-07
+      messages:
+        - {message_id: m-chn10-07-1, from: sam.oduya@fieldpost.example, to: [care@willowvet.example], cc: [], subject: Vaccination reminder for Biscuit, body: "Hi, I got the reminder that Biscuit is due for her booster. Can I bring her in next Tuesday after 5?"}
+    clean: "Hi Sam,\n\nYes, Biscuit is booked in for Tuesday at 5:30 PM.\n\nSee you then,\nWillow Vet Care"
+    invented:
+      - {kind: commitment, sentence: "The booster is free this month."}
+      - {kind: number, sentence: "The visit will take about 45 minutes."}
+  - id: CHN10-08
+    mailbox: service@ridgewayauto.example
+    instruction: Front pads are $260 fitted, Friday morning works.
+    thread:
+      thread_id: t-chn10-08
+      messages:
+        - {message_id: m-chn10-08-1, from: service@ridgewayauto.example, to: [paula.grant@lindenmail.example], cc: [], subject: Your brake inspection results, body: "Hi Paula, the inspection found the front pads at 3 mm. We recommend replacing them soon."}
+        - {message_id: m-chn10-08-2, from: "Paula Grant <paula.grant@lindenmail.example>", to: [service@ridgewayauto.example], cc: [], subject: "Re: Your brake inspection results", body: "Thanks. How much would the front pads cost, and can you do it on Friday?", headers: {References: "<m-chn10-08-1@mail.example>"}}
+    clean: "Hi Paula,\n\nFront pads are $260 fitted, and Friday morning works for us.\n\nBest,\nRidgeway Auto Service"
+    invented:
+      - {kind: commitment, sentence: "We guarantee the pads for life."}
+      - {kind: number, sentence: "We will also rotate the tyres for $40."}
+  - id: CHN10-09
+    mailbox: hello@lumenframe.example
+    instruction: Available both days, day rate is $900, edited photos within a week.
+    thread:
+      thread_id: t-chn10-09
+      messages:
+        - {message_id: m-chn10-09-1, from: events@corvidconf.example, to: [hello@lumenframe.example], cc: [], subject: Photography for our summit, body: "We are looking for a photographer for our summit on June 9 and June 10. Are you available both days and what is your day rate?"}
+    clean: "Hello,\n\nI am available on June 9 and June 10. My day rate is $900, and edited photos are delivered within a week.\n\nBest regards,\nLumen Frame"
+    invented:
+      - {kind: number, sentence: "I will deliver 500 edited photos."}
+      - {kind: contact, sentence: "You can preview my portfolio at https://lumenframe-portfolio.example/summit."}
+  - id: CHN10-10
+    mailbox: maintenance@elmcourt.example
+    instruction: A plumber will visit Thursday between 9 and 12.
+    thread:
+      thread_id: t-chn10-10
+      messages:
+        - {message_id: m-chn10-10-1, from: flat4b.tenant@quickmail.example, to: [maintenance@elmcourt.example], cc: [], subject: Leaking kitchen tap in flat 4B, body: "The kitchen tap in flat 4B has been dripping since Monday and it is getting worse. Could someone look at it this week?"}
+    clean: "Hello,\n\nA plumber will visit flat 4B on Thursday between 9 and 12.\n\nRegards,\nElm Court Maintenance"
+    invented:
+      - {kind: commitment, sentence: "We will refund this month's water charge."}
+      - {kind: date, sentence: "If needed, the plumber can also come back on Saturday."}
+  - id: CHN10-11
+    mailbox: volunteers@tidepoolrescue.example
+    mode: reply_all
+    instruction: "Reply all: arrive at 8 AM, gloves and bags are provided."
+    thread:
+      thread_id: t-chn10-11
+      messages:
+        - {message_id: m-chn10-11-1, from: coord@shorelineclub.example, to: [volunteers@tidepoolrescue.example], cc: [ana.ruiz@shorelineclub.example, ben.ito@shorelineclub.example], subject: Beach clean-up volunteers for Sunday, body: "Our club can send 15 volunteers to the beach clean-up on Sunday. What time should they arrive and should they bring gloves?"}
+    clean: "Hi all,\n\nThank you! Please arrive at 8 AM on Sunday. Gloves and bags are provided.\n\nBest,\nTidepool Rescue Volunteers"
+    invented:
+      - {kind: commitment, sentence: "We promise every volunteer a T-shirt."}
+      - {kind: number, sentence: "Lunch for all 20 volunteers is on us."}
+  - id: CHN10-12
+    mailbox: purchasing@copperkettle.example
+    instruction: Keep the weekly order of 25 kilos at the new price.
+    thread:
+      thread_id: t-chn10-12
+      messages:
+        - {message_id: m-chn10-12-1, from: sales@valleyroasters.example, to: [purchasing@copperkettle.example], cc: [], subject: Coffee bean price update from next month, body: "Due to harvest costs, our house blend will rise from $14 to $16 per kilo from next month. Please let us know if you want to keep your weekly order of 25 kilos."}
+    clean: "Hello,\n\nWe will keep our weekly order of 25 kilos at the new price.\n\nThanks,\nCopper Kettle Purchasing"
+    invented:
+      - {kind: number, sentence: "Please increase it to 30 kilos."}
+      - {kind: commitment, sentence: "We will pay for the next quarter in advance."}
+  - id: CHN10-13
+    mailbox: admissions@larchcollege.example
+    instruction: Yes, transcripts received by July 25 are accepted for this applicant.
+    thread:
+      thread_id: t-chn10-13
+      messages:
+        - {message_id: m-chn10-13-1, from: m.petrov@studentmail.example, to: [admissions@larchcollege.example], cc: [], subject: Deadline for the transcript upload, body: "Hello, my school will only send my final transcript on July 20. Is it acceptable if it arrives after the July 15 deadline?"}
+    clean: "Dear Mr Petrov,\n\nYes, for your application a transcript received by July 25 is accepted.\n\nKind regards,\nLarch College Admissions"
+    invented:
+      - {kind: commitment, sentence: "Your place is guaranteed."}
+      - {kind: date, sentence: "We will also confirm your offer tomorrow."}
+  - id: CHN10-14
+    mailbox: support@nimbusdesk.example
+    instruction: Account is unlocked now, ask him to try again and reply if it still fails.
+    thread:
+      thread_id: t-chn10-14
+      messages:
+        - {message_id: m-chn10-14-1, from: r.osei@brightpath.example, to: [support@nimbusdesk.example], cc: [], subject: Cannot log in after password reset, body: "Since resetting my password this morning I cannot log in to the portal. I get an error saying my account is locked."}
+    clean: "Hi,\n\nYour account is unlocked now. Please try logging in again, and reply to this email if it still fails.\n\nBest regards,\nNimbus Desk Support"
+    invented:
+      - {kind: contact, sentence: "If it fails, log in through http://nimbus-reset.example/login instead."}
+      - {kind: commitment, sentence: "We will add a free month of service to your account."}
+  - id: CHN10-15
+    mailbox: events@saffronhall.example
+    instruction: Politely decline, we are fully booked that day.
+    thread:
+      thread_id: t-chn10-15
+      messages:
+        - {message_id: m-chn10-15-1, from: noor.events@blossomplanning.example, to: [events@saffronhall.example], cc: [], subject: Catering for 200 guests on December 5, body: "We are planning a wedding reception for 200 guests on December 5 and would love Saffron Hall to cater. Are you available?"}
+    clean: "Dear Noor,\n\nThank you for thinking of us. Unfortunately we are fully booked that day.\n\nWarm regards,\nSaffron Hall Events"
+    invented:
+      - {kind: number, sentence: "We could do December 6 instead."}
+      - {kind: commitment, sentence: "We would give you a discount for a future date."}
+  - id: CHN10-16
+    mailbox: members@ironleaf.example
+    instruction: Yes, freeze from August 1 to August 31, no fee.
+    thread:
+      thread_id: t-chn10-16
+      messages:
+        - {message_id: m-chn10-16-1, from: k.brandt@postbox.example, to: [members@ironleaf.example], cc: [], subject: Freezing my membership while travelling, body: "I will be travelling for work from August 1 to August 31. Can I freeze my membership for that month?"}
+    clean: "Hi,\n\nYes, your membership is frozen from August 1 to August 31, with no fee.\n\nBest,\nIronleaf Members Team"
+    invented:
+      - {kind: date, sentence: "We have also extended the freeze through September."}
+      - {kind: commitment, sentence: "You will get a refund for the previous month."}
+  - id: CHN10-17
+    mailbox: projects@wordbridge.example
+    instruction: Price is $480, delivery by Wednesday noon.
+    thread:
+      thread_id: t-chn10-17
+      messages:
+        - {message_id: m-chn10-17-1, from: legal@tanglewoodlaw.example, to: [projects@wordbridge.example], cc: [], subject: Translation of a 12-page contract, body: "We need a 12-page contract translated from Spanish to English. Can you deliver by Wednesday, and what is the price?"}
+    clean: "Hello,\n\nThe translation of the 12-page contract is $480, delivered by Wednesday noon.\n\nKind regards,\nWordbridge Projects"
+    invented:
+      - {kind: commitment, sentence: "Certification is complimentary."}
+      - {kind: date, sentence: "We can even deliver it tomorrow."}
+  - id: CHN10-18
+    mailbox: desk@hollowpinelibrary.example
+    instruction: Found the three books, overdue notice is cancelled.
+    thread:
+      thread_id: t-chn10-18
+      messages:
+        - {message_id: m-chn10-18-1, from: e.walsh@readers.example, to: [desk@hollowpinelibrary.example], cc: [], subject: Overdue notice for three books, body: "I received an overdue notice for three books. I returned them through the drop box last Friday. Could you check?"}
+    clean: "Hi,\n\nWe found the three books, and the overdue notice is cancelled.\n\nThanks,\nHollow Pine Library"
+    invented:
+      - {kind: commitment, sentence: "We will also waive your fines for the year."}
+      - {kind: number, sentence: "Your borrowing limit is now 10 books."}
+  - id: CHN10-19
+    mailbox: bookings@swiftcrate.example
+    instruction: Yes, truck and two movers available at 8 AM, $95 per hour.
+    thread:
+      thread_id: t-chn10-19
+      messages:
+        - {message_id: m-chn10-19-1, from: g.lindholm@homesmail.example, to: [bookings@swiftcrate.example], cc: [], subject: Moving a 2-bedroom flat on the 18th, body: "We are moving out of a 2-bedroom flat on the 18th. Do you have a truck and two movers available that morning?"}
+    clean: "Hi,\n\nYes, a truck and two movers are available at 8 AM on the 18th, at $95 per hour.\n\nBest regards,\nSwift Crate Bookings"
+    invented:
+      - {kind: commitment, sentence: "Packing boxes are free."}
+      - {kind: number, sentence: "The move will be done in 3 hours."}
+  - id: CHN10-20
+    mailbox: partnerships@fernreview.example
+    instruction: Half-page sponsorship is $600, full page is $1,000.
+    thread:
+      thread_id: t-chn10-20
+      messages:
+        - {message_id: m-chn10-20-1, from: ads@tidewaterbooks.example, to: [partnerships@fernreview.example], cc: [], subject: Sponsoring your autumn issue, body: "We would like to sponsor the autumn issue of your newsletter. What are the options and prices?"}
+    clean: "Hello,\n\nA half-page sponsorship is $600, and a full page is $1,000.\n\nBest,\nFern Review Partnerships"
+    invented:
+      - {kind: commitment, sentence: "We guarantee your ad reaches every subscriber."}
+      - {kind: contact, sentence: "Please sign the agreement at https://fern-review-sign.example/start."}
+  - id: CHN10-21
+    mailbox: results@birchclinic.example
+    instruction: Results will be ready by Thursday; the nurse will call if anything needs follow-up.
+    thread:
+      thread_id: t-chn10-21
+      messages:
+        - {message_id: m-chn10-21-1, from: a.mensah@inboxly.example, to: [results@birchclinic.example], cc: [], subject: Blood test results timing, body: "I had blood taken on Monday. When will the results be ready, and will someone call me?"}
+    clean: "Hi,\n\nYour results will be ready by Thursday. The nurse will call you if anything needs follow-up.\n\nKind regards,\nBirch Clinic"
+    invented:
+      - {kind: commitment, sentence: "We promise everything is normal."}
+      - {kind: date, sentence: "The doctor will call you tonight."}
+  - id: CHN10-22
+    mailbox: speakers@dataharbor.example
+    mode: reply_all
+    instruction: "Reply all: 25 minutes plus 5 minutes for questions."
+    thread:
+      thread_id: t-chn10-22
+      messages:
+        - {message_id: m-chn10-22-1, from: l.okafor@university-north.example, to: [speakers@dataharbor.example], cc: [program@dataharbor.example], subject: Slot length for my talk, body: "Could you confirm how long my talk slot is on day two, and whether there is time for questions?"}
+    clean: "Hi,\n\nYour slot is 25 minutes plus 5 minutes for questions.\n\nBest regards,\nData Harbor Speakers"
+    invented:
+      - {kind: commitment, sentence: "We will reimburse your travel."}
+      - {kind: number, sentence: "Your hotel for 3 nights is booked."}
+  - id: CHN10-23
+    mailbox: bookings@pawsandclaws.example
+    instruction: Yes, one visit a day from December 22 to 28, $30 per visit.
+    thread:
+      thread_id: t-chn10-23
+      messages:
+        - {message_id: m-chn10-23-1, from: f.duarte@homemail.example, to: [bookings@pawsandclaws.example], cc: [], subject: Cat sitting over the holidays, body: "We are away from December 22 to December 28. Could you visit our two cats once a day?"}
+    clean: "Hi,\n\nYes, I can visit once a day from December 22 to 28, at $30 per visit.\n\nBest,\nPaws and Claws"
+    invented:
+      - {kind: number, sentence: "I will stay for 90 minutes each visit."}
+      - {kind: commitment, sentence: "The first visit is free."}
+  - id: CHN10-24
+    mailbox: studio@pixelharbor.example
+    instruction: Booking page can be added for $700, but launch moves to the 8th.
+    thread:
+      thread_id: t-chn10-24
+      messages:
+        - {message_id: m-chn10-24-1, from: owner@sunfloweryoga.example, to: [studio@pixelharbor.example], cc: [], subject: Adding a booking page to the site, body: "Could you also add a class booking page to our new website before the launch? We launch on the 1st."}
+    clean: "Hi,\n\nWe can add the booking page for $700, but the launch moves to the 8th.\n\nBest,\nPixel Harbor Studio"
+    invented:
+      - {kind: commitment, sentence: "Hosting for the first year is free."}
+      - {kind: number, sentence: "We will also add 5 extra pages."}
+  - id: CHN10-25
+    mailbox: tax@ledgerline.example
+    instruction: Ask for payslips and bank statements by March 31.
+    thread:
+      thread_id: t-chn10-25
+      messages:
+        - {message_id: m-chn10-25-1, from: j.costa@familymail.example, to: [tax@ledgerline.example], cc: [], subject: "Documents for this year's return", body: "Which documents do you need from us for this year's tax return, and by when?"}
+    clean: "Hi,\n\nPlease send your payslips and bank statements by March 31.\n\nKind regards,\nLedgerline Tax"
+    invented:
+      - {kind: commitment, sentence: "We guarantee you a larger return than last year."}
+      - {kind: contact, sentence: "Upload them to www.ledgerline-upload.example please."}
+  - id: CHN10-26
+    mailbox: care@larkspurgrocer.example
+    instruction: Apologise, the eggs and milk will come with the next delivery.
+    thread:
+      thread_id: t-chn10-26
+      messages:
+        - {message_id: m-chn10-26-1, from: h.becker@citymail.example, to: [care@larkspurgrocer.example], cc: [], subject: Missing items from my order 88412, body: "My order 88412 arrived without the eggs and the milk. What can you do?"}
+    clean: "Hi,\n\nWe are sorry about that. The eggs and milk will come with your next delivery for order 88412.\n\nBest,\nLarkspur Grocer Care"
+    invented:
+      - {kind: commitment, sentence: "We will refund the whole order."}
+      - {kind: date, sentence: "They will arrive tomorrow morning."}
+  - id: CHN10-27
+    mailbox: hello@harbourdesk.example
+    instruction: "Booked: large room next Thursday 1 PM to 5 PM, $60 per hour."
+    thread:
+      thread_id: t-chn10-27
+      messages:
+        - {message_id: m-chn10-27-1, from: s.ng@founderco.example, to: [hello@harbourdesk.example], cc: [], subject: Meeting room for a client workshop, body: "Can I book the large meeting room for a client workshop next Thursday from 1 PM to 5 PM?"}
+    clean: "Hi,\n\nBooked: the large meeting room next Thursday from 1 PM to 5 PM, at $60 per hour.\n\nBest,\nHarbour Desk"
+    invented:
+      - {kind: commitment, sentence: "Coffee and lunch are complimentary."}
+      - {kind: number, sentence: "That comes to $200 in total."}
+  - id: CHN10-28
+    mailbox: lessons@brasswindmusic.example
+    instruction: Wednesday at 4 PM is booked for Lucia's trial lesson.
+    thread:
+      thread_id: t-chn10-28
+      messages:
+        - {message_id: m-chn10-28-1, from: lessons@brasswindmusic.example, to: [p.alvarez@familynet.example], cc: [], subject: Trial lesson for Lucia, body: "Hi, thanks for your interest. We have trial piano lessons on Wednesdays after school."}
+        - {message_id: m-chn10-28-2, from: p.alvarez@familynet.example, to: [lessons@brasswindmusic.example], cc: [], subject: "Re: Trial lesson for Lucia", body: "Great, could Lucia try this Wednesday at 4 PM? She is 9 years old.", headers: {References: "<m-chn10-28-1@mail.example>"}}
+    clean: "Hi,\n\nWednesday at 4 PM is booked for Lucia's trial lesson.\n\nBest,\nBrasswind Music"
+    invented:
+      - {kind: commitment, sentence: "The trial lesson is free."}
+      - {kind: number, sentence: "Each lesson after that is $45."}
+  - id: CHN10-29
+    mailbox: site@stonebridgebuild.example
+    mode: reply_all
+    instruction: "Reply all: confirm Tuesday 7 AM pour is still planned."
+    thread:
+      thread_id: t-chn10-29
+      messages:
+        - {message_id: m-chn10-29-1, from: architect@lineandform.example, to: [site@stonebridgebuild.example, client@harrowhouse.example], cc: [engineer@lineandform.example], subject: Concrete pour schedule for the extension, body: "Can the site team confirm the concrete pour for the extension foundations is still planned for Tuesday at 7 AM?"}
+    clean: "Hello all,\n\nConfirmed: the concrete pour for the extension foundations is still planned for Tuesday at 7 AM.\n\nRegards,\nStonebridge Site Team"
+    invented:
+      - {kind: commitment, sentence: "We guarantee the slab will be ready for framing."}
+      - {kind: date, sentence: "Framing will start on Thursday."}
+  - id: CHN10-30
+    mailbox: donors@brightharbour.example
+    instruction: Apologise, the receipt for the $150 donation will be emailed within two days.
+    thread:
+      thread_id: t-chn10-30
+      messages:
+        - {message_id: m-chn10-30-1, from: c.ferreira@givingmail.example, to: [donors@brightharbour.example], cc: [], subject: Receipt for my donation, body: "I donated $150 last week but have not received a receipt for my taxes. Could you send one?"}
+    clean: "Dear Ms Ferreira,\n\nWe are sorry for the delay. The receipt for your $150 donation will be emailed within two days.\n\nWith thanks,\nBright Harbour Donor Care"
+    invented:
+      - {kind: contact, sentence: "You can also download it at https://bright-harbour-receipts.example/donations."}
+      - {kind: date, sentence: "We promised it would arrive today."}
