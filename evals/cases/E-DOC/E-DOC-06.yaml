@@ -45,4 +45,23 @@ checks:
   args:
     field: chart_values
     tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: row_count
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: total
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: by_group
+- check: equals_ground_truth
+  args:
+    field: max_row_label
+- check: equals_ground_truth
+  args:
+    field: max_row_value
+    tolerance: 0
 recording: null
+notes: Files-open-cleanly check lands with the render service (FR-CON-09).

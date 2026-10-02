@@ -1,0 +1,35 @@
+id: E-ROUTE-17
+group: E-ROUTE
+title: Answer repeat early-payment discount question from Finance Team Lead decision
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Prepare Vermeer Industrial marine pump order invoices for October dispatch.
+  question: May we apply the standard 2% 10-day early-payment discount on Marine sector orders over EUR
+    30,000?
+  question_domain: finance
+  topic_key: early_payment_discount_2pct
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3B7
+  world_id: w_vermeer_sales
+  district: D1
+  asked_at: '2026-10-02T11:30:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: finance
+  answered_from_decision: true
+  decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E7
+checks:
+- check: routed_domain
+  args:
+    expected: finance
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3B7
+- check: answered_from_decision
+  args:
+    expected: true
+    decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E7
+recording: null
