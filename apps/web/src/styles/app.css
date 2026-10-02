@@ -710,6 +710,28 @@ a.secondary {
   font-size: 0.8125em;
   font-weight: 700;
 }
+/* Read-only form fields for screens whose form is not built yet (S-24). */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0;
+  font-weight: 700;
+  font-size: 0.875em;
+}
+.field textarea,
+.field input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  padding: 8px 12px;
+  border: 2px dashed var(--color-ink-3);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font: 400 1em / 1.4 var(--font-ui);
+  cursor: not-allowed;
+}
 .screen-body a.pill {
   display: inline-flex;
   align-items: center;
@@ -724,7 +746,7 @@ a.secondary {
 }
 @media (max-width: 767px) {
   .screen-body h1 {
-    font-size: 1.25em; /* the longest title fits one line in either font, so a font swap moves nothing */
+    font-size: 1.125em; /* the longest title fits one line in either font, so a font swap moves nothing */
   }
   .page-head {
     flex-direction: column;
