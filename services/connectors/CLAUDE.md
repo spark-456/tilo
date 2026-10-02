@@ -17,7 +17,7 @@ outbox for every side effect. The only service that can decrypt user OAuth token
   the caller picks the world and the actor.
 
 ## Config
-- Env only, never logged: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`.
+- Env only, never logged: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_BASE_URL`.
 - `config/connectors.yaml` (adapters, scopes), `config/autonomy.yaml` (risk tiers per action).
 
 ## Requirement IDs
@@ -36,4 +36,5 @@ outbox for every side effect. The only service that can decrypt user OAuth token
   lease writers, so several instances sharing one store never both win a write.
 - Tokens: AES-GCM under a per-record data key wrapped by a `Kms` (`FakeKms` in dev; `CloudKms` is
   unexercised until billing). Only `tokens.py` and `adapters/` call `access_token_for_adapter`; no
-  other service imports `tilo_connectors.tokens` (SEC-02). The consent state table is in memory.
+  other service imports `tilo_connectors.tokens` (SEC-02). `delete_user` leaves no token in any store
+  (CON-D4). Consent state and the revoke-retry store are in memory.

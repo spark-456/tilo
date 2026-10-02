@@ -24,6 +24,7 @@ import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, NoReturn, Protocol
+from urllib.parse import urlsplit
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -35,6 +36,9 @@ _log = logging.getLogger(__name__)
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 _DEFAULT_EXPIRES_IN = 3600
+_MAX_EXPIRES_IN = 366 * 86400
+_LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1")
+_DEFAULT_RETRY_RETENTION_S = 7 * 86400
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 
@@ -123,6 +127,11 @@ class OAuthSettings:
     client_secret: str = field(repr=False)
     redirect_base_url: str = "http://localhost:8080"
 
+    def __post_init__(self) -> None:
+        url = urlsplit(self.redirect_base_url)
+        if url.scheme != "https" and not (url.scheme == "http" and url.hostname in _LOOPBACK_HOSTS):
+            raise ValueError("the redirect base URL must be https (http is only for localhost)")
+
     @property
     def redirect_uri(self) -> str:
         return self.redirect_base_url.rstrip("/") + "/oauth/google/callback"
@@ -134,7 +143,9 @@ class OAuthSettings:
             if not environ.get(name):
                 raise ValueError(f"{name} is not set")
             values[name] = environ[name]
-        return cls(values["GOOGLE_OAUTH_CLIENT_ID"], values["GOOGLE_OAUTH_CLIENT_SECRET"])
+        base = environ.get("GOOGLE_OAUTH_REDIRECT_BASE_URL")
+        kwargs = {"redirect_base_url": base} if base else {}
+        return cls(values["GOOGLE_OAUTH_CLIENT_ID"], values["GOOGLE_OAUTH_CLIENT_SECRET"], **kwargs)
 
 
 class TokenStore(Protocol):
@@ -198,6 +209,20 @@ def post_form(http: HttpClient, url: str, data: Mapping[str, str]) -> tuple[int,
     return status, body if isinstance(body, dict) else {}
 
 
+def parse_token_body(body: Mapping[str, Any], *, need_scope: bool) -> tuple[str, str | None, list[str] | None, int]:
+    """(access token, refresh token, scopes, lifetime in s) of a token endpoint body, or a fixed-text
+    TokenError: a wrong type must never reach an exception message, where it could echo a token."""
+    access, refresh, scope = body.get("access_token"), body.get("refresh_token"), body.get("scope")
+    expires = body.get("expires_in", _DEFAULT_EXPIRES_IN)
+    bad = not isinstance(access, str) or not access
+    bad = bad or (refresh is not None and (not isinstance(refresh, str) or not refresh))
+    bad = bad or (scope is None and need_scope) or (scope is not None and not isinstance(scope, str))
+    bad = bad or isinstance(expires, bool) or not isinstance(expires, int | float) or not 0 < expires <= _MAX_EXPIRES_IN
+    if bad:
+        raise TokenError("the token response is malformed")
+    return str(access), refresh, None if scope is None else str(scope).split(), int(expires)
+
+
 # ---- sealing -----------------------------------------------------------------------------------
 
 
@@ -223,29 +248,36 @@ class TokenBroker:
         refresh_skew_s: int = 60,
         alert: Callable[[dict[str, Any]], None] | None = None,
         retry_store: TokenStore | None = None,
+        retry_retention_s: int = _DEFAULT_RETRY_RETENTION_S,
     ) -> None:
         self._store, self._kms, self._http, self._settings = store, kms, http, settings
         self._clock, self._emit, self._skew = clock, emit, refresh_skew_s
-        self._alert = alert
+        self._alert, self._retention = alert, retry_retention_s
         self._retry = retry_store if retry_store is not None else InMemoryTokenStore()
         self._locks: dict[tuple[str, str], threading.Lock] = {}
         self._guard = threading.Lock()
 
     # -- public ---------------------------------------------------------------------------------
 
-    def store_tokens(self, user_id: str, connector: str, token_response: Mapping[str, Any]) -> None:
-        """Seal a token endpoint response and store it. No refresh token in it keeps the stored one."""
-        access, scope = token_response.get("access_token"), token_response.get("scope")
-        if not isinstance(access, str) or not access or not isinstance(scope, str):
-            raise TokenError("the token response is incomplete")
+    def store_tokens(
+        self,
+        user_id: str,
+        connector: str,
+        token_response: Mapping[str, Any],
+        *,
+        before_established: Callable[[], None] | None = None,
+    ) -> None:
+        """Seal a token endpoint response and store it. No refresh token in it keeps the stored one.
+        `before_established` runs once the record is stored, just before connection.established."""
+        access, refresh, scopes, lifetime = parse_token_body(token_response, need_scope=True)
         with self._lock(user_id, connector):
-            refresh = token_response.get("refresh_token")
             if not refresh:
                 refresh = (self._readable(user_id, connector, self._store.get(user_id, connector)) or {}).get(
                     "refresh_token"
                 )
-            lifetime = int(token_response.get("expires_in", _DEFAULT_EXPIRES_IN))
-            self._put_connected(user_id, connector, access, refresh, scope.split(), lifetime)
+            self._put_connected(user_id, connector, access, refresh, scopes or [], lifetime)
+        if before_established is not None:
+            before_established()
         self._emit_part("connection.established", user_id, connector)
 
     def access_token_for_adapter(self, user_id: str, connector: str, *, required_scopes: Iterable[str]) -> str:
@@ -277,40 +309,35 @@ class TokenBroker:
         return None if record is None else str(record.get("state"))
 
     def disconnect(self, user_id: str, connector: str) -> DisconnectResult:
-        """Revoke at the provider, then delete whatever it answered (fail toward deletion)."""
-        with self._lock(user_id, connector):
-            record = self._store.get(user_id, connector)
-            if record is None:
-                return DisconnectResult(False, None)
-            payload = self._readable(user_id, connector, record) or {}
-            token = payload.get("refresh_token") or payload.get("access_token")
-            error: str | None = None
-            if record.get("state") == "connected" and not token:
-                error = "the stored record could not be read"
-            elif token:
-                error = self._revoke(str(token))
-            self._store.delete(user_id, connector)
-            if error is not None:
-                _log.warning("revoke at the provider failed for connector %s: %s", connector, error)
-                self._keep_revoke_for_retry(user_id, connector, token)
-        self._emit_part("connection.revoked", user_id, connector)
-        return DisconnectResult(error is None and token is not None, error)
+        """Revoke at the provider, then delete whatever it answered (fail toward deletion). A failed
+        revoke keeps the token sealed in the retry store and raises alert.raised."""
+        return self._disconnect(user_id, connector, keep_retry=True)
 
     def delete_user(self, user_id: str) -> None:
-        """Revoke and delete every connection of one user. A pending revoke retry (still ciphertext) is
-        tried once more here and otherwise kept, so a live grant at the provider is not forgotten."""
+        """Delete every token of one user, in every store (PRD 16.5). Each revoke is tried; one that
+        still fails drops its token anyway and raises alert.raised, so a live grant at the provider
+        is reported rather than kept."""
         for connector in self._store.connectors_of(user_id):
-            self.disconnect(user_id, connector)
+            self._disconnect(user_id, connector, keep_retry=False)
         self.retry_pending_revokes(user_id)
+        for key in self._retry.connectors_of(user_id):
+            self._retry.delete(user_id, key)
+            _log.warning("a pending revoke was dropped with its user")
+            self._raise_alert(user_id, _ulid(self._clock()))
 
     def retry_pending_revokes(self, user_id: str) -> int:
-        """Retry the revokes that failed earlier for this user; returns how many went through."""
-        done = 0
-        for connector in self._retry.connectors_of(user_id):
-            record = self._retry.get(user_id, connector)
-            token = (self._readable(user_id, connector, record, kind="revoke") or {}).get("token")
-            if token and self._revoke(str(token)) is None:
-                self._retry.delete(user_id, connector)
+        """Retry this user's earlier failed revokes; one older than the retention limit, or that cannot
+        be read, is dropped. Returns how many went through."""
+        done, now = 0, parse_ts(self._clock())
+        for key in self._retry.connectors_of(user_id):
+            record = self._retry.get(user_id, key) or {}
+            token = (self._readable(user_id, key, record, kind="revoke") or {}).get("token")
+            age = (now - parse_ts(record["created_at"])).total_seconds() if "created_at" in record else None
+            if not token or age is None or age > self._retention:
+                self._retry.delete(user_id, key)
+                _log.warning("a pending revoke for connector %r was dropped unrevoked", record.get("connector"))
+            elif self._revoke(str(token)) is None:
+                self._retry.delete(user_id, key)
                 done += 1
         return done
 
@@ -344,7 +371,9 @@ class TokenBroker:
         raises TokenError."""
         if record is None or "ciphertext" not in record:
             return None
-        bind = [record.get("scopes"), record.get("expires_at")] if kind == "token" else record.get("alert_id")
+        bind = [record.get("scopes"), record.get("expires_at")]
+        if kind == "revoke":
+            bind = [record.get("alert_id"), record.get("connector"), record.get("created_at")]
         context = self._context(kind, user_id, connector)
         try:
             key = self._kms.decrypt(base64.b64decode(record["wrapped_key"]), aad=context)
@@ -383,17 +412,16 @@ class TokenBroker:
             "client_secret": self._settings.client_secret,
         }
         answer = post_form(self._http, TOKEN_URL, form)
-        if answer is None or answer[0] != 200 or not isinstance(answer[1].get("access_token"), str):
-            if answer is not None and answer[0] == 400 and answer[1].get("error") == "invalid_grant":
-                self._expire(user_id, connector)
-            raise TokenRefreshFailed("the token refresh did not get through; try again later")
-        body = answer[1]
-        scope = body.get("scope")
-        scopes = scope.split() if isinstance(scope, str) else record["scopes"]
-        lifetime = int(body.get("expires_in", _DEFAULT_EXPIRES_IN))
-        rotated = body.get("refresh_token") or refresh
-        self._put_connected(user_id, connector, body["access_token"], rotated, scopes, lifetime)
-        return str(body["access_token"])
+        if answer is not None and answer[0] == 400 and answer[1].get("error") == "invalid_grant":
+            self._expire(user_id, connector)
+        try:
+            if answer is None or answer[0] != 200:
+                raise TokenError("the provider did not answer with tokens")
+            access, rotated, scopes, lifetime = parse_token_body(answer[1], need_scope=False)
+        except TokenError:
+            raise TokenRefreshFailed("the token refresh did not get through; try again later") from None
+        self._put_connected(user_id, connector, access, rotated or refresh, scopes or record["scopes"], lifetime)
+        return access
 
     def _expire(self, user_id: str, connector: str) -> NoReturn:
         """The provider will not refresh this grant: drop the tokens, keep a marker, say so once."""
@@ -408,12 +436,44 @@ class TokenBroker:
             return "the provider could not be reached"
         return None if answer[0] == 200 else f"the provider answered {answer[0]}"
 
+    def _disconnect(self, user_id: str, connector: str, *, keep_retry: bool) -> DisconnectResult:
+        with self._lock(user_id, connector):
+            record = self._store.get(user_id, connector)
+            if record is None:
+                return DisconnectResult(False, None)
+            payload = self._readable(user_id, connector, record) or {}
+            token = payload.get("refresh_token") or payload.get("access_token")
+            error: str | None = None
+            if record.get("state") == "connected" and not token:
+                error = "the stored record could not be read"
+            elif token:
+                error = self._revoke(str(token))
+            if error is not None:
+                _log.warning("revoke at the provider failed for connector %r: %s", connector, error)
+                # Sealed and stored before the record is deleted: a KMS failure here leaves the record.
+                self._keep_revoke_for_retry(user_id, connector, token if keep_retry else None)
+            self._store.delete(user_id, connector)
+        self._emit_part("connection.revoked", user_id, connector)
+        return DisconnectResult(error is None and token is not None, error)
+
     def _keep_revoke_for_retry(self, user_id: str, connector: str, token: Any) -> None:
-        """Keep the token still to be revoked, encrypted, and raise alert.raised (no token in either)."""
+        """Keep the token still to be revoked sealed, keyed by its alert id, and raise alert.raised."""
         alert_id = _ulid(self._clock())
         if token:
-            sealed = self._seal("revoke", user_id, connector, {"token": str(token)}, alert_id)
-            self._retry.put(user_id, connector, {"v": 1, "alert_id": alert_id, **sealed})
-        if self._alert is not None:
-            data = {"alert_id": alert_id, "card_id": None}
-            self._alert({"type": "alert.raised", "authz": None, "data": data, "user_id": user_id})
+            created = self._clock()
+            bind = [alert_id, connector, created]
+            sealed = self._seal("revoke", user_id, alert_id, {"token": str(token)}, bind)
+            record = {"v": 1, "alert_id": alert_id, "connector": connector, "created_at": created, **sealed}
+            self._retry.put(user_id, alert_id, record)
+        self._raise_alert(user_id, alert_id)
+
+    def _raise_alert(self, user_id: str, alert_id: str) -> None:
+        """alert.raised carries no token. Without an alert sink the failure is only logged, loudly."""
+        if self._alert is None:
+            _log.error("a provider revoke failed and no alert sink is wired")
+            return
+        part = {"type": "alert.raised", "authz": None, "data": {"alert_id": alert_id, "card_id": None}}
+        try:
+            self._alert({**part, "user_id": user_id})
+        except Exception:  # noqa: BLE001 - a broken sink must not stop a deletion
+            _log.error("the alert sink failed for alert %s", alert_id)

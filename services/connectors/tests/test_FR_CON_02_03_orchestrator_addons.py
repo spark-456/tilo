@@ -79,7 +79,7 @@ def test_FR_CON_02_a_failed_revoke_deletes_locally_raises_alert_raised_and_keeps
     validate_part(alerts[0])
     assert alerts[0]["type"] == "alert.raised" and alerts[0]["user_id"] == OWNER
     assert alerts[0]["data"]["card_id"] is None
-    pending = retry_store.get(OWNER, "gmail")
+    pending = retry_store.get(OWNER, alerts[0]["data"]["alert_id"])  # keyed by alert id
     assert pending is not None, "a retry is kept"
     blob = repr(alerts) + repr(pending)
     assert leaks(blob, [response["access_token"], response["refresh_token"]]) == []
@@ -105,7 +105,7 @@ def test_FR_CON_02_a_retry_that_fails_again_keeps_the_pending_revoke():
     assert broker.retry_pending_revokes(OWNER) == 0
 
     assert len(env.google.calls_to(REVOKE_URL)) == calls + 1
-    assert retry_store.connectors_of(OWNER) == ["gmail"]
+    assert len(retry_store.connectors_of(OWNER)) == 1
 
 
 def test_FR_CON_02_every_connection_part_names_its_owner_and_never_a_world_or_an_actor():

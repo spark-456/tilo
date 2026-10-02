@@ -13,15 +13,19 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
 import secrets
 import threading
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
 
 from ._time import add_seconds, parse_ts
-from .tokens import TOKEN_URL, OAuthSettings, TokenBroker, post_form
+from .tokens import REVOKE_URL, TOKEN_URL, OAuthSettings, TokenBroker, post_form
+
+_log = logging.getLogger(__name__)
+_MAX_FLOWS_PER_USER = 20
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _ACCESS_LINE = "You sign in with Google; Tilo never sees your password."  # PRD 18.4, "Access"
@@ -43,7 +47,7 @@ class _Flow:
     user_id: str
     connector: str
     card_id: str
-    verifier: str
+    verifier: str = field(repr=False)
     expires_at: str
     lines: dict[str, str]  # requested scope -> its plain-language line, in the order asked
 
@@ -86,7 +90,7 @@ class ConsentService:
         needed = self._needed(user_id, connector, capabilities)
         if not needed:
             return None
-        lines = list(self._lines(connector, capabilities, needed).values())
+        lines = list(dict.fromkeys(self._lines(connector, capabilities, needed).values()))  # one per text
         name = self._connectors[connector]["name"]
         reason = f"Tilo uses {name} only as listed above. {_ACCESS_LINE}"
         self._emit_part("connection.requested", user_id, {"connector": connector, "card_id": card_id})
@@ -119,19 +123,16 @@ class ConsentService:
         needed = self._needed(user_id, connector, capabilities)
         if not needed:
             return None
+        lines = self._lines(connector, capabilities, needed)  # refuses before a flow is minted
         verifier = secrets.token_urlsafe(48)  # 64 RFC 7636 characters
         state = secrets.token_urlsafe(32)
-        flow = _Flow(
-            user_id,
-            connector,
-            card_id,
-            verifier,
-            add_seconds(self._clock(), self._ttl),
-            self._lines(connector, capabilities, needed),
-        )
+        flow = _Flow(user_id, connector, card_id, verifier, add_seconds(self._clock(), self._ttl), lines)
         with self._lock:
             now = parse_ts(self._clock())
             self._flows = {k: f for k, f in self._flows.items() if parse_ts(f.expires_at) >= now}  # drop stale
+            mine = [k for k, f in self._flows.items() if f.user_id == user_id]
+            for old in mine[: max(0, len(mine) - _MAX_FLOWS_PER_USER + 1)]:  # keep the newest, cap per user
+                del self._flows[old]
             self._flows[state] = flow
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("ascii")).digest()).rstrip(b"=")
         query = {
@@ -168,14 +169,23 @@ class ConsentService:
         if answer is None or answer[0] != 200 or not isinstance(answer[1].get("access_token"), str):
             raise ConsentRefused("Google did not accept the sign-in; start again")
         response = answer[1]
-        granted = frozenset(str(response.get("scope", "")).split())
-        lines = [line for scope, line in flow.lines.items() if scope in granted]
+        scope = response.get("scope")
+        granted = frozenset(scope.split()) if isinstance(scope, str) else frozenset()
+        lines = list(dict.fromkeys(line for s, line in flow.lines.items() if s in granted))  # one per text
         if not lines:
+            self._discard(user_id, flow.connector, response)
             raise ConsentRefused("none of the access asked for was granted")
-        authz = {"by": "person", "ref": user_id, "at": self._clock()}
-        data = {"connector": flow.connector, "card_id": flow.card_id, "scopes": lines}
-        self._emit_part("connection.consented", user_id, data, authz)
-        self._broker.store_tokens(user_id, flow.connector, response)
+
+        def consented() -> None:  # runs after the record is stored, before connection.established
+            authz = {"by": "person", "ref": user_id, "at": self._clock()}
+            data = {"connector": flow.connector, "card_id": flow.card_id, "scopes": lines}
+            self._emit_part("connection.consented", user_id, data, authz)
+
+        try:
+            self._broker.store_tokens(user_id, flow.connector, response, before_established=consented)
+        except Exception:  # noqa: BLE001 - a bad body or a KMS failure: nothing connected, nothing kept
+            self._discard(user_id, flow.connector, response)
+            raise ConsentRefused("the connection could not be saved; start again") from None
         return ConsentResult(flow.connector, flow.card_id, granted)
 
     # -- internals ------------------------------------------------------------------------------
@@ -201,7 +211,8 @@ class ConsentService:
         return [s for i, s in enumerate(wanted) if s not in granted and s not in wanted[:i]]
 
     def _lines(self, connector: str, capabilities: Sequence[str], needed: list[str]) -> dict[str, str]:
-        """scope -> the plain-language line: the description of the declared action(s) that need it."""
+        """scope -> the plain-language line: the description of the declared action(s) that need it.
+        A scope no requested action describes is refused: nothing is shown or minted without words."""
         decl = self._connectors[connector]
         lines: dict[str, list[str]] = {scope: [] for scope in needed}
         for capability in capabilities:
@@ -210,4 +221,16 @@ class ConsentService:
                     text = action["description"]
                     if scope in lines and action["capability"] == capability and text not in lines[scope]:
                         lines[scope].append(text)
+        if any(not texts for texts in lines.values()):
+            raise ConsentRefused("a scope has no plain-language description; it cannot be asked for")
         return {scope: " ".join(texts) for scope, texts in lines.items()}
+
+    def _discard(self, user_id: str, connector: str, response: Mapping[str, Any]) -> None:
+        """Revoke tokens that will not be kept. Skipped when the user already has a grant: Google shares
+        the grant between tokens, so revoking would take the existing connection down with them."""
+        token = response.get("refresh_token") or response.get("access_token")
+        if not isinstance(token, str) or self._broker.granted_scopes(user_id, connector):
+            return
+        answer = post_form(self._http, REVOKE_URL, {"token": token})
+        if answer is None or answer[0] != 200:
+            _log.warning("discarded tokens for connector %r could not be revoked", connector)
