@@ -1,6 +1,6 @@
 id: E-HAND-08
 group: E-HAND
-title: 'Context handoff: Vermeer Industrial marine pump maintenance history rollup'
+title: 'Context handoff: FictionalBoatCo_Zeta Industrial marine pump maintenance history rollup'
 measures:
 - EV-10
 - FR-AGT-09
@@ -11,7 +11,7 @@ inputs:
   target_context_threshold_pct: 70
   handoff_stage: after_vessel_10_service_log
   sources:
-  - https://service.vermeer-industrial.example/marine-logs
+  - https://service.fictionalboatco-zeta-industrial.example/marine-logs
 scripted_answers: []
 ground_truth:
   rework: false

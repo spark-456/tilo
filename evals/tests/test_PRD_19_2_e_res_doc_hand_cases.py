@@ -1,13 +1,16 @@
 """Acceptance tests for E-RES, E-DOC, and E-HAND eval cases (PRD 19.2)."""
 
 import csv
+import re
 from typing import Any
 
 import yaml
 from conftest import REPO_ROOT
+from test_PRD_19_2_eval_set_structure import DENYLIST_BRANDS_RE, REAL_ROUTING_RE
 from tilo_evals import Case, load_cases
 
 _CASES_DIR = REPO_ROOT / "evals" / "cases"
+_GATE_TAG_RE = re.compile(r"\(gate\s*\d+\)", re.IGNORECASE)
 
 
 def _all_scalars(value: Any) -> set[str]:
@@ -71,6 +74,8 @@ def test_PRD_19_2_e_res_doc_hand_six_e_doc_cases_match_csv_fixtures() -> None:
         assert gt["by_group"] == by_group
         assert gt["max_row_label"] == max_row[label_col]
         assert gt["max_row_value"] == int(max_row[metric_col])
+        checked_fields = {c["args"]["field"] for c in case.checks if c["check"] == "equals_ground_truth"}
+        assert checked_fields == set(gt.keys()), f"{case.id}: checks {checked_fields} must cover all ground_truth keys"
 
 
 def test_PRD_19_2_e_res_doc_hand_twenty_e_hand_cases_five_in_deploy_gate() -> None:
@@ -82,3 +87,21 @@ def test_PRD_19_2_e_res_doc_hand_twenty_e_hand_cases_five_in_deploy_gate() -> No
         assert "EV-10" in case.measures and "FR-AGT-09" in case.measures
         assert case.ground_truth == {"rework": False}
         assert {"check": "equals_ground_truth", "args": {"field": "rework"}} in case.checks
+
+
+def test_PRD_19_2_e_res_doc_hand_brand_and_routing_denylist() -> None:
+    cases = _group_cases("E-RES") + _group_cases("E-DOC") + _group_cases("E-HAND")
+    assert len(cases) == 36
+    for case in cases:
+        assert _GATE_TAG_RE.search(case.title) is None, f"{case.id}: gate tag in title {case.title!r}"
+    doc_fixtures = REPO_ROOT / "evals" / "fixtures" / "doc"
+    fixture_files = sorted(p for p in doc_fixtures.rglob("*") if p.is_file())
+    assert len(fixture_files) == 6
+
+    all_paths = [c.path for c in cases] + fixture_files
+    for path in all_paths:
+        text = path.read_text(encoding="utf-8")
+        brand_match = DENYLIST_BRANDS_RE.search(f"{path.name}\n{text}")
+        assert brand_match is None, f"{path.name}: real brand {brand_match.group(0)!r} found"
+        routing_match = REAL_ROUTING_RE.search(text)
+        assert routing_match is None, f"{path.name}: routing/account number {routing_match.group(0)!r} found"
