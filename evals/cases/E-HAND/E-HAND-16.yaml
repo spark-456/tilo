@@ -1,0 +1,22 @@
+id: E-HAND-16
+group: E-HAND
+title: 'Context handoff: Starling Kitchen corporate menu allergen & cost re-pricing'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Recalculate ingredient cost per head and allergen tags for 32 autumn buffet items.
+  target_context_threshold_pct: 70
+  handoff_stage: after_item_20_recipe_costing
+  sources:
+  - https://menu.starling-kitchen.example/autumn-costing
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null

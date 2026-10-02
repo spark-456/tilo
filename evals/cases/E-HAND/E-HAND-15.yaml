@@ -1,0 +1,22 @@
+id: E-HAND-15
+group: E-HAND
+title: 'Context handoff: Finch Timber Yard kiln-drying batch moisture log analysis'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Analyse moisture sensor curves across 24 kiln batches and flag out-of-spec loads.
+  target_context_threshold_pct: 70
+  handoff_stage: after_batch_15_curve_summary
+  sources:
+  - https://kiln.finch-timber.example/moisture-logs
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null

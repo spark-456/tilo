@@ -1,0 +1,35 @@
+id: E-RES-02
+group: E-RES
+title: 'Research SC-01: Ledgerly changelog date and previous Growth price'
+measures:
+- EV-01
+- EV-05
+status: ready
+deploy_gate: false
+inputs:
+  question: When did Ledgerly increase the Growth plan price, and what was the old monthly price on the
+    archived pricing page?
+  seed_urls:
+  - http://sandbox-web.example/s/ledgerly/changelog
+  - http://sandbox-web.example/s/ledgerly/old-pricing
+  seed_files:
+  - services/sandbox-web/seed/ledgerly.yaml
+scripted_answers: []
+ground_truth:
+  change_date: '2026-06-01'
+  old_growth_monthly: 39
+  new_growth_monthly: 49
+checks:
+- check: equals_ground_truth
+  args:
+    field: change_date
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: old_growth_monthly
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: new_growth_monthly
+    tolerance: 0
+recording: null
