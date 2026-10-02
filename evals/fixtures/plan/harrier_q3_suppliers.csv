@@ -1,0 +1,5 @@
+supplier_id,company_name,contact_email,contact_phone,on_time_rate_pct,defect_rate_pct,quarterly_spend_usd,portal_url
+SUP-101,Bramble Fasteners Ltd,orders@bramble-parts.example,+1 555 0112,98.4,0.3,48200,https://portal.bramble-parts.example/q3
+SUP-102,Fenwick Cold Chain Co,dispatch@fenwick-coldchain.example,+1 555 0118,89.1,1.8,63500,https://status.fenwick-coldchain.example/sla
+SUP-103,Larkspur Packaging Group,accounts@larkspur-pack.example,+1 555 0124,95.7,0.6,31900,https://portal.larkspur-pack.example/reports
+SUP-104,Oakhaven Freight Services,ops@oakhaven-freight.example,+1 555 0131,84.2,2.4,54100,https://track.oakhaven-freight.example/metrics
