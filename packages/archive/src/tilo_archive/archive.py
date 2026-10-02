@@ -91,7 +91,9 @@ def _parse_records(lines: list[str]) -> list[dict]:
         except json.JSONDecodeError as exc:
             raise ValueError(f"unparseable or truncated record at line {i}: {exc}") from exc
         if not isinstance(parsed, dict):
-            raise ValueError(f"record at line {i} is not a JSON object: {parsed!r}")
+            # The JSON type only: a stored line can hold anything, and an
+            # error message must not echo it back.
+            raise ValueError(f"record at line {i} is not a JSON object (got {type(parsed).__name__})")
         records.append(parsed)
     return records
 
@@ -131,13 +133,21 @@ class RunArchive:
 
     def append(self, kind: str, payload: object) -> str:
         if kind not in VALID_KINDS:
-            raise ValueError(f"invalid kind: {kind!r} (must be one of {VALID_KINDS})")
+            # Name the allowed kinds only: `kind` is caller input (a swapped
+            # call puts the payload here) and has not been redacted.
+            raise ValueError(f"invalid kind (must be one of {VALID_KINDS})")
+        redactor_error: str | None = None
         try:
             redacted = self._redactor(payload)
         except Exception as exc:
-            # Fail closed; `from None` and the type name only, so the
-            # redactor's message (which may echo the payload) is not chained.
-            raise ValueError(f"redactor failed ({type(exc).__name__}); nothing archived") from None
+            redactor_error = type(exc).__name__
+        if redactor_error is not None:
+            # Fail closed. Raised outside the `except` block so the
+            # redactor's exception (whose message may echo the payload) is
+            # neither the cause nor the `__context__`. A BaseException
+            # (KeyboardInterrupt, SystemExit) is not caught: it passes
+            # through unwrapped and nothing has been written.
+            raise ValueError(f"redactor failed ({redactor_error}); nothing archived")
         seq = self._records[-1]["seq"] + 1 if self._records else 1
         prev_hash = self._records[-1]["hash"] if self._records else ZERO_HASH
         record = {
