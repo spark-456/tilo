@@ -1,22 +1,33 @@
 // S-18 Team Lead console (PRD 18.3, 10.5): the questions waiting, the decision history and answer
-// stats. The queue is client.listCards; history is the recorded approval.resolved events. Which
-// domain a card is routed to is not in the fixture cards, so every open card is listed. Answering
-// belongs to the Needs-you screen (S-06), so each card links there. "Promote to skill" is a Should
+// stats. All of it follows this run's recorded events: a question is waiting from its
+// approval.requested until an approval.resolved names the same gate, so the count is 0 before the
+// request, 1 until the answer and 0 after (the same count as S-15 and S-17). Which Team Lead
+// domain a question is routed to is not in the events of this run, so every open question is
+// listed. Answering belongs to the Needs-you screen (S-06). "Promote to skill" is a Should
 // feature: a placeholder. design/source "Tilo Team.dc.html" is org admin, not this view: its card
 // and row language, neutral role tokens.
-import { useClient } from "../api/ClientProvider";
 import { AppLink } from "./AppLink";
-import { Loaded } from "./FlowShell";
-import { Chip, EventList, Page, Row, Section, Soon, Stats, authzText, useFixtureRun } from "./kit";
-import { useRemote } from "./remote";
-
-const KIND = { needs_you: "Question", gate: "Approval", consent: "Access", meeting: "Meeting" };
+import {
+  Chip,
+  EventList,
+  Page,
+  Row,
+  Section,
+  Soon,
+  Stats,
+  authzText,
+  field,
+  useFixtureRun,
+  words,
+} from "./kit";
 
 export function S_18() {
-  const client = useClient();
-  const { events, worldId } = useFixtureRun();
-  const [cards, retry] = useRemote("load the questions", () => client.listCards(worldId));
+  const { events } = useFixtureRun();
   const answered = events.filter((e) => e.type === "approval.resolved");
+  const answeredGates = new Set(answered.map((e) => field(e, "gate_id")));
+  const open = events.filter(
+    (e) => e.type === "approval.requested" && !answeredGates.has(field(e, "gate_id")),
+  );
   const byLead = answered.filter((e) => e.authz?.by === "team_lead").length;
   return (
     <Page
@@ -24,39 +35,44 @@ export function S_18() {
       title="Team Lead console"
       sub="Questions that need an expert, the answers given so far, and how fast they came."
     >
-      <Soon labels={["Promote an answer to a skill"]} />
       <Stats
         items={[
-          ["Questions waiting", cards.status === "ready" ? cards.value.length : "-"],
+          ["Questions waiting", open.length],
           ["Answers recorded", answered.length],
           ["Answered by a Team Lead", byLead],
         ]}
       />
       <Section
         title="Questions waiting"
-        note="Open cards. Answer them on the Needs-you screen."
-        reserve={[15, 38]}
+        note="Open questions of this run. Answer them on the Needs-you screen."
+        reserve={[4, 8]}
       >
-        <Loaded what="the questions" remote={cards} retry={retry} isEmpty={(c) => c.length === 0}>
-          {(list) => (
-            <ul className="rows" data-testid="lead-queue">
-              {list.map((c) => (
-                <Row
-                  key={`${c.id}:${c.rung}:${c.what_happened}`}
-                  name={c.what_happened}
-                  sub={c.why_it_matters}
-                  state={<Chip tone="needs">{KIND[c.kind]}</Chip>}
-                >
-                  <AppLink to="/needs-you" className="pill">
-                    Open
-                  </AppLink>
-                </Row>
-              ))}
-            </ul>
-          )}
-        </Loaded>
+        {open.length === 0 ? (
+          <p className="empty-note" data-testid="lead-empty">
+            No question is waiting.
+          </p>
+        ) : (
+          <ul className="blist" data-testid="lead-queue">
+            {open.map((e) => (
+              <Row
+                key={String(field(e, "card_id"))}
+                name={e.summary}
+                sub={words(String(field(e, "action_type")))}
+                state={<Chip tone="needs">Approval</Chip>}
+              >
+                <AppLink to="/needs-you" className="pill" aria-label={`Open: ${e.summary}`}>
+                  Open
+                </AppLink>
+              </Row>
+            ))}
+          </ul>
+        )}
       </Section>
-      <Section title="Decision history" reserve={4}>
+      <Section
+        title="Decision history"
+        reserve={[4, 5]}
+        action={<Soon labels={["Promote an answer to a skill"]} />}
+      >
         <EventList
           events={answered}
           all={events}
@@ -68,7 +84,7 @@ export function S_18() {
         <p className="empty-note" data-testid="lead-stats">
           {byLead === 0
             ? "No Team Lead has answered, so there is no answer time to show."
-            : `${byLead} answer(s) by a Team Lead.`}
+            : `${byLead} ${byLead === 1 ? "answer" : "answers"} by a Team Lead.`}
         </p>
       </Section>
     </Page>

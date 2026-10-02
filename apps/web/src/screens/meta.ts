@@ -49,9 +49,9 @@ const later = (id: string, name: string, pillar: string): ScreenMeta => ({
 });
 
 export const SCREENS: readonly ScreenMeta[] = [
-  must("S-01", "Start", "P1", "/"),
-  must("S-02", "Understanding", "P1", `${T}/understanding`),
-  must("S-03", "Approaches and budget", "P1", `${T}/approaches`),
+  built(must("S-01", "Start", "P1", "/")),
+  built(must("S-02", "Understanding", "P1", `${T}/understanding`)),
+  built(must("S-03", "Approaches and budget", "P1", `${T}/approaches`)),
   built(must("S-04", "World with HUD", "P3", W)),
   built(
     must(

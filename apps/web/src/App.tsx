@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from "react";
-import { useIsFixtureClient } from "./api/ClientProvider";
+import { useIsFixtureClient, useReplaySpeed } from "./api/ClientProvider";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
@@ -17,6 +17,18 @@ const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
   </li>
 ));
 const WORLD_SCREENS: ReadonlySet<string> = new Set(["S-05", "S-10", "S-11", "S-12"]);
+/** Screens outside a world address that still read the replayed run (AGW-08 group B): HR-6 applies. */
+const RUN_SCREENS: ReadonlySet<string> = new Set([
+  "S-13",
+  "S-14",
+  "S-15",
+  "S-16",
+  "S-17",
+  "S-18",
+  "S-19",
+  "S-21",
+  "S-23",
+]);
 const stageMode = new URLSearchParams(window.location.search).get("display") === "stage";
 
 /** PRD 18.3 layout frame: desktop rails either side of the stage; mobile bottom tabs. */
@@ -24,6 +36,7 @@ export function App() {
   const mobile = useMediaQuery("(max-width: 767px)");
   const world = useWorldFixture();
   const fixtureClient = useIsFixtureClient();
+  const replaySpeed = useReplaySpeed();
   const path = usePathname();
   const screen = matchScreen(path); // null: the stage and the flow shell
   const previousPath = useRef(path);
@@ -52,7 +65,10 @@ export function App() {
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
         <main className="screen-page" data-testid="screen-page" data-screen={screen.id}>
-          <screen.Component params={screen.params} />
+          <screen.Component
+            key={`${screen.id}:${screen.params.join("/")}`}
+            params={screen.params}
+          />
         </main>
       ) : (
         <Stage {...(world.active ? { onWorld: world.onWorld, seq: world.seq } : {})} />
@@ -77,12 +93,26 @@ export function App() {
           {world.speedLabel}
         </div>
       )}
+      {(worldId || (screen && RUN_SCREENS.has(screen.id))) &&
+        replaySpeed !== 1 &&
+        !world.active && (
+          // HR-6: a replay that is not at its recorded pace always says so, on every world screen and
+          // after lens navigation drops ?speed (the client keeps its speed).
+          <div className="speed-badge client-speed" data-testid="speed-badge">
+            {replaySpeed}×
+          </div>
+        )}
       {mobile ? (
         <>
           {hudWorld && (
-            <details className="hud-sheet">
+            <details
+              className="hud-sheet"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") e.currentTarget.open = false;
+              }}
+            >
               <summary>World status</summary>
-              <WorldPanels worldId={hudWorld} />
+              <WorldPanels key={hudWorld} worldId={hudWorld} />
             </details>
           )}
           <PrimaryNav id="bottom-tabs" mobile />
@@ -90,7 +120,7 @@ export function App() {
       ) : (
         <aside className="right-rail" data-testid="right-rail">
           {worldId ? (
-            <WorldPanels worldId={worldId} tabs={hudWorld !== null} />
+            <WorldPanels key={worldId} worldId={worldId} tabs={hudWorld !== null} />
           ) : (
             <>
               <h2>Activity</h2>
