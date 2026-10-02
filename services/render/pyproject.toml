@@ -7,6 +7,8 @@ dependencies = [
     "pydantic>=2.13.5",
     "python-pptx>=1.0.2",
     "pyyaml>=6.0.2",
+    "pypdf>=5.0.0",
+    "reportlab>=4.2.5",
 ]
 
 [build-system]
