@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import math
 import uuid
 from collections.abc import Callable
 from copy import deepcopy
@@ -34,10 +36,28 @@ class RetryPolicy:  # between attempts of one entry (#163, FR-AGT-13); defaults:
     ambiguous_delay_s: float = 60  # after ProviderUnavailable, so the earlier-attempt lookup sees a lagging index
     clock_skew_s: float = 2  # a claim waits this long past scheduled_at, in case the dispatcher's clock is fast
 
+    def __post_init__(self) -> None:  # a bad policy could claim inside an undo window or never back off
+        for name, value in vars(self).items():
+            if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value) or value < 0:
+                raise ValueError(f"RetryPolicy.{name} must be a finite number >= 0")
+        if not isinstance(self.max_attempts, int) or self.max_attempts < 1 or self.max_age_s <= 0:
+            raise ValueError("RetryPolicy needs an integer max_attempts >= 1 and max_age_s > 0")
+
     def delay_s(self, exc: Exception, attempts: int) -> float:
-        floor: float = exc.retry_after_s if isinstance(exc, RateLimited) else 0
+        floor = _retry_after_s(exc) if isinstance(exc, RateLimited) else 0.0
         floor = self.ambiguous_delay_s if isinstance(exc, ProviderUnavailable) else floor
         return min(self.max_delay_s, max(floor, self.backoff_base_s * 2 ** min(max(attempts, 1) - 1, 32)))
+
+
+def _retry_after_s(exc: Exception) -> float:  # anything but a number >= 0 falls back to the backoff
+    value = getattr(exc, "retry_after_s", 0)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return 0.0
+    try:
+        seconds = float(value)
+    except OverflowError:
+        return math.inf  # capped at max_delay_s
+    return seconds if seconds >= 0 else 0.0  # NaN is not >= 0
 
 
 _IMMEDIATE = RetryPolicy(max_delay_s=0, clock_skew_s=0)  # API.md "Failures": the next tick retries; still bounded
@@ -178,7 +198,13 @@ class Outbox:
         except SideEffectRefused:  # final: it can never succeed as written; nothing is emitted
             return self._store._finalize_claim(outbox_id, holder, "failed")
         except Exception as exc:  # ambiguous or not final: retried later, within the policy's bounds
-            return self._retry_later(claimed, holder, exc)
+            try:
+                return self._retry_later(claimed, holder, exc)
+            except Exception as err:  # a failure to record it never holds the lease or stops the batch
+                _log.error("outbox entry %s: recording a failed attempt raised %s", outbox_id, type(err).__name__)
+                with contextlib.suppress(Exception):
+                    self._store._release_lease("send", outbox_id, holder)
+                return None
         except BaseException:  # a process death: release the lease and let it propagate
             self._store._release_lease("send", outbox_id, holder)
             raise
@@ -188,15 +214,19 @@ class Outbox:
 
     def _retry_later(self, entry: dict, holder: str, exc: Exception) -> dict | None:
         now, policy = self._clock(), self._retry
-        attempts, since = self._store.retry_state(entry["id"])
-        attempts, since = attempts + (0 if isinstance(exc, _WAITS_FOR_A_PERSON) else 1), since or now
+        state = self._store.retry_state(entry["id"])
+        attempts = state["attempts"] + (0 if isinstance(exc, _WAITS_FOR_A_PERSON) else 1)
+        since, ambiguous = state["since"] or now, state["ambiguous"] or isinstance(exc, ProviderUnavailable)
         if attempts < policy.max_attempts and (parse_ts(now) - parse_ts(since)).total_seconds() < policy.max_age_s:
-            self._store._defer(entry["id"], holder, attempts, now, policy.delay_s(exc, attempts))
+            self._store._defer(entry["id"], holder, attempts, now, policy.delay_s(exc, attempts), ambiguous)
             return None
         if self._alert is None:
-            _log.error("outbox entry %s failed after its retries and no alert sink is wired", entry["id"])
+            _log.error("outbox entry %s ran out of retries and no alert sink is wired", entry["id"])
         data = {"alert_id": entry["id"], "card_id": None}
         alert = {"type": "alert.raised", "authz": None, "data": data, "world_id": entry["world_id"]}
+        if ambiguous:  # it may have been sent: never failed; each later try re-runs the earlier-attempt lookup
+            self._store._defer(entry["id"], holder, attempts, now, policy.max_delay_s, True, alert)
+            return None
         return self._store._finalize_claim(entry["id"], holder, "failed", alert=alert)
 
     def _flush_pending_alerts(self) -> None:  # FR-AGT-13: an entry that ran out of retries never stops silently

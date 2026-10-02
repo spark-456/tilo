@@ -10,6 +10,10 @@ Between two attempts of one entry the outbox keeps store-side metadata outside t
 - After `max_attempts` failures, or a failure `max_age_s` after its first failure, the entry ends `failed` and
   one registered `alert.raised` goes to the optional `alert` sink (FR-AGT-13: never a silent stop).
   Errors that wait for a person (missing consent, no or expired connection) use no attempt; the age bounds them.
+- An entry with any ambiguous attempt may have been sent, so the caps never fail it: it raises its alert once and
+  keeps retrying every `max_delay_s` (each retry re-runs the earlier-attempt lookup) until it settles or is abandoned.
+- An error while recording a failure releases the lease and never stops the batch; a bad `retry_after_s` falls back
+  to the backoff. `RetryPolicy` refuses values that are not finite or out of range.
 - A claim re-checks `scheduled_at` (plus `clock_skew_s`) and the not-before inside the store, against the
   store's own clock when it has one (the Firestore store will use server time), never before.
 
@@ -39,9 +43,13 @@ class Scripted(FakeGmail):
     def __init__(self, clock: ManualClock, errors: list[BaseException] | None = None, forever: Exception | None = None):
         super().__init__()
         self.clock, self.errors, self.forever, self.calls = clock, list(errors or []), forever, []
+        self.lose_answer_on: set[int] = set()  # call numbers that send, then lose the answer
 
     def send_reply(self, thread_id, item, recipients, idempotency_key, grant):
         self.calls.append(self.clock())
+        if len(self.calls) in self.lose_answer_on:
+            super().send_reply(thread_id, item, recipients, idempotency_key, grant)
+            raise ProviderUnavailable("Google sent it; the answer was lost")
         if self.forever is not None:
             raise self.forever
         if self.errors:
@@ -273,3 +281,91 @@ def test_OB_02_store_claims_still_accept_entries_without_schedule_fields(field):
     entry[field] = 60 if field == "undo_window_s" else add_seconds(T0, 60)
     store._insert_if_absent(entry)
     assert store._claim_for_sending("o_1", "h", T0, 30) is not None
+
+
+# --- Security review of #190: a send that may have happened never ends failed; bookkeeping never starves ------
+
+
+def test_FR_CON_04_an_attempt_that_may_have_sent_is_never_failed_by_the_attempt_cap(gate_case_factory):
+    outbox, gmail, clock, emitted, alerts, oid = _setup(gate_case_factory, errors=[RuntimeError("503")] * 7)
+    gmail.lose_answer_on = {8}  # the 8th attempt sends, then its answer is lost
+    for _ in range(8):
+        outbox.dispatch_due()
+        clock.advance(3600)
+    assert len(gmail.calls) == 8 and len(gmail.sent) == 1
+    assert _state(outbox, oid) != "failed", "the email went: failed would hide it and invite a resend"
+    assert [p["data"]["alert_id"] for p in alerts] == [oid]
+    outbox.dispatch_due()  # the next lookup finds the send and settles it
+    assert _state(outbox, oid) == "sent" and len(gmail.sent) == 1
+    assert [p["data"]["outbox_id"] for p in emitted] == [oid] and len(alerts) == 1
+
+
+def test_FR_AGT_13_an_ambiguous_entry_keeps_retrying_at_max_delay_and_alerts_once(gate_case_factory):
+    outbox, gmail, clock, _, alerts, oid = _setup(
+        gate_case_factory, forever=ProviderUnavailable("x"), retry=RetryPolicy(max_attempts=1)
+    )
+    outbox.dispatch_due()  # attempt 1 reaches the cap, but it may have sent
+    for _ in range(9):
+        clock.advance(3599)
+        outbox.dispatch_due()  # not before max_delay_s
+        clock.advance(1)
+        outbox.dispatch_due()
+    assert len(gmail.calls) == 10 and _state(outbox, oid) == "sending" and len(alerts) == 1
+    assert outbox.abandon(oid)["state"] == "failed"
+    outbox.dispatch_due()
+    assert len(alerts) == 1
+
+
+def test_FR_AGT_13_a_bad_retry_after_on_one_world_never_stops_another(gate_case_factory):
+    class BadRetryAfter(FakeGmail):
+        def send_reply(self, thread_id, item, recipients, idempotency_key, grant):
+            if idempotency_key == "k_a":
+                raise RateLimited("120")  # type: ignore[arg-type]  # a non-numeric value from some adapter
+            return super().send_reply(thread_id, item, recipients, idempotency_key, grant)
+
+    gmail, clock, emitted = BadRetryAfter(), ManualClock(T0), []
+    outbox = Outbox(InMemoryOutboxStore(), {"gmail": gmail}, emitted.append, clock, retry=RetryPolicy())
+    for oid, key, world in (("01JB5VQ0000000000000009801", "k_a", WORLD), ("01JB5VQ0000000000000009802", "k_b", "w_b")):
+        case = gate_case_factory(outbox_id=oid, idempotency_key=key, world_id=world)
+        outbox.enqueue(case["entry"], evidence_from_case(case))
+    outbox.dispatch_due()
+    assert [p["data"]["outbox_id"] for p in emitted] == ["01JB5VQ0000000000000009802"]
+    clock.advance(29)
+    assert outbox.dispatch_due() == [], "a bad Retry-After falls back to the backoff (30 s)"
+    clock.advance(1)
+    outbox.dispatch_due()
+    assert outbox._store.retry_state("01JB5VQ0000000000000009801")["attempts"] == 2
+
+
+def test_FR_AGT_13_a_store_error_while_recording_a_failure_releases_the_lease(gate_case_factory, caplog):
+    outbox, gmail, clock, emitted, _, oid = _setup(gate_case_factory, errors=[RuntimeError("503")])
+    store = outbox._store
+
+    def broken(*_args, **_kw):
+        raise OSError("store unavailable")
+
+    store._defer = broken
+    caplog.set_level(logging.ERROR)
+    assert outbox.dispatch_due() == []
+    assert any("OSError" in r.getMessage() for r in caplog.records)
+    del store._defer
+    outbox.dispatch_due()  # the lease was released: the next tick claims it again
+    assert _state(outbox, oid) == "sent"
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("max_attempts", 0),
+        ("max_age_s", 0),
+        ("max_age_s", float("inf")),
+        ("backoff_base_s", -1),
+        ("max_delay_s", float("nan")),
+        ("ambiguous_delay_s", -0.5),
+        ("clock_skew_s", -55),
+        ("clock_skew_s", float("inf")),
+    ],
+)
+def test_FR_AGT_13_retry_policy_refuses_values_out_of_range(field, value):
+    with pytest.raises(ValueError):
+        RetryPolicy(**{field: value})

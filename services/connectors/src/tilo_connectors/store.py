@@ -34,7 +34,8 @@ class InMemoryOutboxStore:
         self._transfer_leases: dict[str, _Lease] = {}
         self._pending_transfers: dict[str, tuple[str, dict]] = {}  # outbox_id -> (world_id, transfer)
         self._pending_alerts: dict[str, tuple[str, dict]] = {}  # outbox_id -> (world_id, alert part)
-        self._retries: dict[str, tuple[int, str, str]] = {}  # id -> (attempts, not_before, first failure); not in entry
+        self._retries: dict[str, dict] = {}  # id -> retry_state(); store-side, never in the contract entry
+        self._alerted: set[str] = set()  # outbox ids whose alert.raised is already written: once per entry
 
     def get(self, outbox_id: str | None) -> dict | None:
         with self._lock:
@@ -47,10 +48,15 @@ class InMemoryOutboxStore:
         with self._lock:
             return [deepcopy(entry) for entry in self._by_id.values()]
 
-    def retry_state(self, outbox_id: str) -> tuple[int, str | None]:  # (failed attempts, first failure) so far
+    def retry_state(self, outbox_id: str) -> dict:  # attempts, not_before, since (first failure), ambiguous
         with self._lock:
-            attempts, _, since = self._retries.get(outbox_id, (0, "", None))
-            return attempts, since
+            return {
+                "attempts": 0,
+                "not_before": "",
+                "since": None,
+                "ambiguous": False,
+                **self._retries.get(outbox_id, {}),
+            }
 
     def _insert_if_absent(self, entry: dict) -> bool:  # OB-03: neither id nor key already stored
         with self._lock:
@@ -92,7 +98,7 @@ class InMemoryOutboxStore:
             if entry.get("undo_window_s") and "scheduled_at" in entry:
                 if now < add_seconds(entry["scheduled_at"], skew_s):
                     return None
-            if now < self._retries.get(outbox_id, (0, ""))[1]:  # not before the entry's next attempt
+            if now < self._retries.get(outbox_id, {}).get("not_before", ""):  # not before the next attempt
                 return None
             if not _try_claim(self._send_leases, outbox_id, holder, now, lease_seconds):
                 return None
@@ -111,18 +117,30 @@ class InMemoryOutboxStore:
             self._retries.pop(outbox_id, None)
             if transfer is not None:
                 self._pending_transfers.setdefault(outbox_id, (entry["world_id"], deepcopy(transfer)))
-            if alert is not None:
-                self._pending_alerts.setdefault(outbox_id, (entry["world_id"], deepcopy(alert)))
+            self._record_alert(outbox_id, entry["world_id"], alert)
             return deepcopy(entry)
 
-    def _defer(self, outbox_id: str, holder: str, attempts: int, now: str, delay_s: float) -> None:
+    def _record_alert(self, outbox_id: str, world_id: str, alert: dict | None) -> None:  # under the lock; once
+        if alert is not None and outbox_id not in self._alerted:
+            self._alerted.add(outbox_id)
+            self._pending_alerts[outbox_id] = (world_id, deepcopy(alert))
+
+    def _defer(
+        self, outbox_id: str, holder: str, attempts: int, now: str, delay_s: float, ambiguous: bool = False,
+        alert: dict | None = None,
+    ) -> None:  # fmt: skip
         """Releases holder's send lease; no attempt before now + delay_s (store time when the store has a clock)."""
         with self._lock:
             now = self._clock() if self._clock is not None else now
-            if self._send_leases.get(outbox_id, (None,))[0] == holder:
-                since = self._retries.get(outbox_id, (0, "", None))[2] or now
-                self._retries[outbox_id] = (attempts, add_seconds(now, delay_s), since)
-                _release(self._send_leases, outbox_id, holder)
+            entry = self._by_id.get(outbox_id)
+            if entry is None or self._send_leases.get(outbox_id, (None,))[0] != holder:
+                return
+            since = self._retries.get(outbox_id, {}).get("since") or now
+            not_before = add_seconds(now, delay_s)
+            self._retries[outbox_id] = {"attempts": attempts, "not_before": not_before, "since": since,
+                                        "ambiguous": ambiguous}  # fmt: skip
+            self._record_alert(outbox_id, entry["world_id"], alert)
+            _release(self._send_leases, outbox_id, holder)
 
     def _release_lease(self, kind: str, outbox_id: str, holder: str) -> None:  # kind: "send"/"transfer"
         with self._lock:
