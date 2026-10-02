@@ -29,7 +29,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
     await expect(page.locator("button.primary")).toHaveCount(1);
-    const start = page.getByRole("button", { name: "Start", exact: true });
+    const start = page.getByRole("button", { name: "Start task", exact: true });
     await expect(start).toBeDisabled(); // an empty box has nothing to start
     const box = await start.boundingBox();
     expect(box && box.y + box.height <= viewport.height).toBe(true);
@@ -63,7 +63,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await expect(
       page.getByRole("list", { name: "Attached files" }).getByRole("listitem"),
     ).toHaveCount(3);
-    await page.getByRole("button", { name: "Start", exact: true }).dblclick(); // one submit
+    await page.getByRole("button", { name: "Start task", exact: true }).dblclick(); // one submit
     await expect(page.getByRole("heading", { level: 1, name: "Understanding" })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe("/task/task_fixture_1/understanding");
     expect(errors).toEqual([]);
@@ -78,7 +78,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     const eleven = Array.from({ length: 11 }, (_, i) => pdf(`f${i}.pdf`));
     await page.locator('input[type="file"]').setInputFiles(eleven);
     await expect(page.getByRole("alert").first()).toHaveText("11 files attached; the limit is 10.");
-    await expect(page.getByRole("button", { name: "Start", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Start task", exact: true })).toBeDisabled();
   });
 
   // UX-1: the panel has a fixed size, so the busy state while the client answers moves nothing.
@@ -94,8 +94,8 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await page.getByLabel("Describe your task").fill("Compare the three supplier quotes");
     await page.locator('input[type="file"]').setInputFiles([pdf("a.pdf")]);
     await resetShifts(page); // measure from the click on
-    await page.getByRole("button", { name: "Start", exact: true }).click();
-    await expect(page.getByRole("button", { name: /^Start…/ })).toHaveAttribute(
+    await page.getByRole("button", { name: "Start task", exact: true }).click();
+    await expect(page.getByRole("button", { name: /^Start task…/ })).toHaveAttribute(
       "aria-busy",
       "true",
     );
