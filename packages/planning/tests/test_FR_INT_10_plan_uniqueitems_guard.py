@@ -1,7 +1,7 @@
 """FR-INT-10 prerequisite (issue #124): jsonschema's `uniqueItems` compares every pair when the items
 are unsortable, so a plan with 100 gates x 200 dicts in `guards` took 29 s inside the maxItems caps.
-Every `uniqueItems` array in plan.schema.json holds string ids, so `validate_plan` rejects a
-non-string item there as a `schema` violation before `iter_errors` runs."""
+Its `uniqueItems` is now linear (`tilo_providers.schema_guard`, #173), so a non-string item there is a
+`schema` violation found at once."""
 
 from __future__ import annotations
 
@@ -25,14 +25,15 @@ def _run(plan, risk_table, fake_connectors, fake_skills, fake_policies):
 
 
 def _unique_arrays() -> list[tuple[str, str]]:
-    """(`units` or `gates`, field) of every uniqueItems array in the plan schema, read from it."""
+    """(collection, field) of every uniqueItems property of any plan.schema.json def, read from it."""
     schema = json.loads((CONTRACTS / "plan.schema.json").read_text("utf-8"))
-    found = []
-    for def_name, collection in (("unit", "units"), ("gate", "gates")):
-        for field, prop in schema["$defs"][def_name]["properties"].items():
-            if prop.get("uniqueItems"):
-                found.append((collection, field))
-    return found
+    collections = {"unit": "units", "gate": "gates"}
+    return [
+        (collections.get(name, name), field)
+        for name, definition in schema["$defs"].items()
+        for field, prop in definition.get("properties", {}).items()
+        if prop.get("uniqueItems")
+    ]
 
 
 def _small_plan() -> dict[str, Any]:
@@ -53,14 +54,16 @@ def test_FR_INT_10_the_schema_has_the_unique_arrays_the_guard_covers() -> None:
 def test_FR_INT_10_100_gates_x_200_dict_guards_rejected_in_under_a_second(
     risk_table, fake_connectors, fake_skills, fake_policies
 ) -> None:
-    units = [make_unit(f"U{i}") for i in range(200)]
-    gates = [make_gate(f"G{g}", "send_email", [], "T3", None) for g in range(100)]
-    for g, gate in enumerate(gates):
-        gate["guards"] = [{"k": g * 1000 + i} for i in range(200)]
-    started = time.perf_counter()
-    violations = _run(make_plan(units, gates), risk_table, fake_connectors, fake_skills, fake_policies)
-    assert time.perf_counter() - started < LIMIT_S
-    assert rule_ids(violations) == {"schema"}
+    """At 100 x 200 the plan is over the byte cap (#173); 20 x 200 is under it and reaches the schema."""
+    for gate_count, units_count in ((100, 200), (20, 20)):
+        units = [make_unit(f"U{i}") for i in range(units_count)]
+        gates = [make_gate(f"G{g}", "send_email", [], "T3", None) for g in range(gate_count)]
+        for g, gate in enumerate(gates):
+            gate["guards"] = [{"k": g * 1000 + i} for i in range(200)]
+        started = time.perf_counter()
+        violations = _run(make_plan(units, gates), risk_table, fake_connectors, fake_skills, fake_policies)
+        assert time.perf_counter() - started < LIMIT_S
+        assert rule_ids(violations) == {"schema"}
     assert any("/gates/0/guards/0" in v.message and "string" in v.message for v in violations)
 
 
