@@ -53,6 +53,8 @@ class Outbox:
         connectors: dict[str, Any],
         emit: Callable[[dict], None],
         clock: Callable[[], str],
+        *,
+        world_id: str | None = None,
     ) -> None:
         if any(name.strip() == RESERVED_CONNECTOR_ID for name in connectors):
             raise ValueError(f"connector id {RESERVED_CONNECTOR_ID!r} is reserved and cannot be bound")
@@ -60,6 +62,7 @@ class Outbox:
         self._connectors = connectors
         self._emit = emit
         self._clock = clock
+        self._world_id = world_id  # set: dispatch and emit only this world's entries and transfers
 
     def enqueue(self, entry: dict, evidence: dict) -> dict:
         if errors := sorted(outbox_validator().iter_errors(entry), key=lambda e: list(e.path)):
@@ -101,9 +104,17 @@ class Outbox:
             raise OutboxRefused(f"cannot cancel {outbox_id!r}: not 'scheduled'")
         return updated
 
+    def abandon(self, outbox_id: str) -> dict:
+        """A run gave up on this unsent entry: "failed", so no later dispatch_due() ever sends it. Refused while a
+        live lease may be sending it, or once it is sent, failed or cancelled."""
+        if (updated := self._store._abandon(outbox_id, self._clock())) is None:
+            raise OutboxRefused(f"cannot abandon {outbox_id!r}: being sent or already settled")
+        return updated
+
     def dispatch_due(self) -> list[dict]:
         now = self._clock()
-        settled = [self._dispatch_one(e["id"]) for e in self._store.all_entries() if self._is_due(e, now)]
+        ours = [e for e in self._store.all_entries() if self._world_id in (None, e["world_id"])]
+        settled = [self._dispatch_one(e["id"]) for e in ours if self._is_due(e, now)]
         self._flush_pending_transfers()
         return [entry for entry in settled if entry is not None]
 
@@ -146,7 +157,7 @@ class Outbox:
         while True:
             holder = uuid.uuid4().hex
             claim = self._store._claim_oldest_pending_transfer(
-                holder, self._clock(), _LEASE_SECONDS, exclude=frozenset(blocked_worlds)
+                holder, self._clock(), _LEASE_SECONDS, exclude=frozenset(blocked_worlds), only=self._world_id
             )
             if claim is None:
                 return

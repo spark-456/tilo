@@ -11,6 +11,7 @@ wired, and each task appends to it in strictly increasing `seq`.
 from __future__ import annotations
 
 import copy
+import logging
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import UTC, date, datetime
 from typing import Annotated, Any
@@ -28,8 +29,9 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Router
 
-from tilo_api import deps
+from tilo_api import deps, runs
 
+logger = logging.getLogger("tilo_api.tasks")
 router = APIRouter()
 
 DIRECTOR = "A_director"  # the actor of the Director's planning events
@@ -220,10 +222,15 @@ def get_approaches(
 
 @router.post("/tasks/{task_id}/approve")
 def approve(
-    task_id: str, principal: Principal, body: Annotated[ApproveIn, Depends(_json_body(ApproveIn))], store: StoreDep
+    task_id: str,
+    principal: Principal,
+    body: Annotated[ApproveIn, Depends(_json_body(ApproveIn))],
+    store: StoreDep,
+    seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
 ) -> dict[str, Any]:
     """FR-INT-08: the owner picks an approach and confirms a cap; the grant is exactly that cap (#106). An L3
-    policy may grant it; otherwise the owner's own confirmation does (PRD 10.1, 10.4)."""
+    policy may grant it; otherwise the owner's own confirmation does (PRD 10.1, 10.4). The grant then starts
+    the task's one run (CL-INT-2); a run that cannot start never changes this answer."""
     task = _owned(store, task_id, principal)
     with store.grant_lock(task.owner), task.lock:  # always in this order: the owner's grants, then the task
         if task.granted:
@@ -248,4 +255,10 @@ def approve(
             raise HTTPException(status_code=403, detail="Only the world's owner sets budgets.") from exc
         _append(store, task, [event])
         task.granted = True
+        approach = next(a for a in task.approaches if a["id"] == body.approach_id)
+    if seams is not None:
+        try:
+            runs.start_run(store, task, approach=approach, budget_cap=cap, seams=seams)
+        except Exception:
+            logger.exception("the run for task %s did not start", task_id)
     return {"world_id": task.world_id}

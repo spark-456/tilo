@@ -13,14 +13,20 @@ world_id string never share lock state.
 
 from __future__ import annotations
 
+import functools
 import logging
 import math
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, cast
 
 from fastapi import HTTPException
+from tilo_connectors import InMemoryOutboxStore
+from tilo_connectors.registry import ConnectorRegistry, load_registry
+from tilo_harness.executor import DefaultUnitRunner
+from tilo_harness.skills import SkillRegistry
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
@@ -109,6 +115,8 @@ class Store:
     memory: MemoryLookup = field(default_factory=InMemoryPreferenceStore)  # FR-INT-05 seam until P7
     grant_locks: dict[str, threading.Lock] = field(default_factory=dict, repr=False, compare=False)
     _grant_locks_guard: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+    runs: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)  # world_id -> runs.Run (CL-INT-2)
+    runs_guard: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def grant_lock(self, owner: str) -> threading.Lock:
         """FR-INT-08: one owner's grants are decided one at a time, so a policy's daily limits count every
@@ -176,6 +184,69 @@ def get_safety() -> SafetyProvider:
         raise HTTPException(
             status_code=503, detail="No safety provider is configured; nothing is screened, so nothing is accepted."
         ) from exc
+
+
+# --- the run seams (CL-INT-2, services/api/tests/API_CL_INT_2.md); each default is the production wiring (BQ-90) ---
+
+
+def _no_plan_compiler(*, brief: dict, approach: dict, budget_cap: float) -> dict:
+    raise NotImplementedError("the Director's plan compiler is not built yet (FR-INT-09), so no run starts")
+
+
+def get_plan_compiler() -> Callable[..., dict]:
+    """`compile(*, brief, approach, budget_cap) -> PlanGraph`."""
+    return _no_plan_compiler
+
+
+def get_layout_builder() -> Callable[..., dict]:
+    """`layout_for(plan, *, world_id) -> layout`, deterministic."""
+    from tilo_api.layout import build_layout
+
+    return build_layout
+
+
+class _RoleModel:
+    """A worker role's model, always through the Router (PL-01); the harness runner calls only `generate`."""
+
+    def __init__(self, router: Router, role: str) -> None:
+        self._router, self._role = router, role
+
+    def generate(self, request: Any) -> Any:
+        return self._router.generate(self._role, request).response
+
+
+def get_unit_runner() -> Any:
+    router = get_router()
+    return DefaultUnitRunner(
+        cast(Any, {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier")})
+    )
+
+
+def _no_recipients(*, unit: dict, action_type: str, item: dict, brief: dict) -> dict:
+    raise LookupError("no address book is wired yet, so a send has no recipients")
+
+
+def get_action_resolver() -> Callable[..., dict]:
+    """`resolve(*, unit, action_type, item, brief) -> {destination, recipients, known_recipients?}`."""
+    return _no_recipients
+
+
+def get_skill_registry() -> SkillRegistry:
+    return SkillRegistry(_REPO_ROOT / "skills")
+
+
+def get_connector_registry() -> ConnectorRegistry:
+    path = _REPO_ROOT / "config" / "connectors.yaml"
+    return load_registry(path) if path.is_file() else ConnectorRegistry({})
+
+
+def get_connector_adapters() -> dict[str, Any]:
+    return {}  # no live adapter in dev (EFF-01): a send has nowhere to go
+
+
+@functools.cache
+def get_outbox_store() -> InMemoryOutboxStore:
+    return InMemoryOutboxStore()  # the process's own until the Firestore store lands
 
 
 def _dispatch_config(key: str, default: float) -> float:
