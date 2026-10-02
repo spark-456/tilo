@@ -99,7 +99,8 @@ for (const viewport of [DESKTOP, MOBILE]) {
             w.__shifts.push((entry as unknown as { value: number }).value);
         }).observe({ type: "layout-shift", buffered: true });
       });
-      // "commit": do not wait for the load event, which can outlast the 3 s of latency; a latency this long keeps the loading state observable under a parallel load.
+      // "commit": do not wait for the load event, which can outlast the latency. 3 s keeps the
+      // loading state observable even when a parallel load delays the first poll.
       await page.goto(`${path}?client_delay_ms=3000`, { waitUntil: "commit" });
       await expect(page.getByText(/^Loading the /)).toBeVisible();
       await expect(page.getByText(/^Loading the /)).toBeHidden({ timeout: 20_000 });
