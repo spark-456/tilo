@@ -94,7 +94,7 @@ def pilot_agreement(records: Iterable[Mapping], *, started_at: float) -> Agreeme
   that is not `needs_reply` (and, for a safety failure, not `source == "model"`): fail closed.
 - **Learning (PRD 11.3, 13.1).** A correction becomes a sender rule in the preference store: later mail from the
   same address (bare address, case-insensitive; never a display name) gets the corrected category
-  (`source == "rule"`) and, if given, priority, ahead of the model. The latest correction for an address wins.
+  (`source == "rule"`) and, if given, priority, ahead of the model, except that a model `suspicious` is never overridden (BQ-132). The latest correction for an address wins.
   The corrected message itself then triages to the user's label (`source == "user"`). `mute` means later mail
   from that address is never `needs_reply` (it becomes `fyi`). A VIP address gets priority `high`. Rules are per
   user and survive a restart. An unknown category or priority, or a correction with neither, raises

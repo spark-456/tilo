@@ -194,7 +194,9 @@ def test_FR_CHN_09_learned_corrections_lift_day_two_agreement_to_at_least_85_per
     report = _pilot(learn=True)
     assert report.labelled == 30
     assert report.rate is not None and report.rate >= 0.85
-    assert report.agreed == 30
+    # A rule never downgrades a model "suspicious" (security review r1 of #211, BQ-132): the two newsletter
+    # cases the model wrongly calls suspicious stay suspicious on day two, so 28 of 30 agree, not 30.
+    assert report.agreed == 28
     assert report.meets_target is True
 
 
