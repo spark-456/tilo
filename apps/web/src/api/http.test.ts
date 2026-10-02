@@ -81,7 +81,10 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
     expect(result.files.map((f) => f.name)).toEqual(["a.pdf", "b.pdf", "c.pdf"]);
     expect(result.files[1]).toMatchObject({ status: "failed", safety_flagged: false });
     expect(result.files[1]?.reason).not.toContain("boom"); // server error text is not shown
-    expect(result.files[2]).toMatchObject({ safety_flagged: true });
+    expect(result.files[2]).toMatchObject({
+      safety_flagged: true,
+      reason: "The safety check flagged this file.", // the provider's own text is not shown
+    });
   });
 
   it("answerQuestions, getApproaches and approve use the task routes", async () => {
@@ -192,6 +195,29 @@ describe("CL-INT-3: error mapping", () => {
     }
   });
 
+  it("a card answer's reason code becomes a fixed sentence", async () => {
+    const card: Card = { ...(CARDS_VALID[0] as Card), world_id: "w1" };
+    const answer = async (status: number, reason: string) => {
+      const c = client(script(json([card]), json({ outcome: "rejected", reason }, status)).fetch);
+      await c.listCards("w1");
+      return c.answerCard(card.id, { option_id: "approve" }).catch((e) => e);
+    };
+    expect((await answer(400, "already_resolved")).message).toBe("This card was already answered.");
+    expect((await answer(400, "pin_required")).message).toMatch(/PIN/);
+    expect((await answer(403, "forbidden")).message).toMatch(/access/);
+    expect((await answer(404, "card_not_found")).message).toMatch(/find that card/);
+    expect((await answer(400, "something_new")).message).toBe("Tilo could not accept that.");
+  });
+
+  it("marks failures of writes, so a retryable one is not reported as 'nothing changed'", async () => {
+    const write = await client(script(new TypeError("offline")).fetch)
+      .approve("t1", { approach_id: "quick", budget_cap: 5 })
+      .catch((e) => e);
+    expect(write).toMatchObject({ retryable: true, write: true });
+    const read = await fail(new TypeError("offline")).catch((e) => e);
+    expect(read).toMatchObject({ retryable: true, write: false });
+  });
+
   it("a 5xx is retryable and never shows server text", async () => {
     const error = await fail(json({ detail: "Traceback in tilo_api/runs.py" }, 503)).catch(
       (e) => e,
@@ -216,17 +242,16 @@ describe("CL-INT-3 / FR-WLD-05: subscribeEvents polls GET /worlds/{id}/events wi
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  // The owner's view omits v, world_id, run_id and item (services/api redaction.py).
-  const view = (e: Event) => {
-    const { v: _v, world_id: _w, run_id: _r, item: _i, ...rest } = e;
-    return rest;
-  };
+  // An up-to-date server (CL-INT-4) returns the stored event whole, for the requested world.
+  const view = (e: Event): Event => ({ ...e, world_id: "w1" });
+  const without = (e: Event, ...keys: string[]) =>
+    Object.fromEntries(Object.entries(view(e)).filter(([k]) => !keys.includes(k)));
   const sample = [...EVENTS_VILLAGE_BASIC].sort((a, b) => a.seq - b.seq).slice(0, 5);
   const settle = async (ms: number) => {
     await vi.advanceTimersByTimeAsync(ms);
   };
 
-  it("delivers in seq order, fills the fields the view omits and dedupes by id", async () => {
+  it("delivers in seq order, keeps run_id and item as sent and dedupes by id", async () => {
     const { calls, fetch } = script(
       json({ events: [sample[2], sample[0], sample[1]].map((e) => view(e as Event)) }),
       json({ events: sample.slice(0, 4).map((e) => view(e)) }), // overlaps: 0..2 repeat
@@ -235,7 +260,7 @@ describe("CL-INT-3 / FR-WLD-05: subscribeEvents polls GET /worlds/{id}/events wi
     const stop = client(fetch).subscribeEvents("w1", (e) => got.push(e));
     await settle(0);
     expect(got.map((e) => e.seq)).toEqual(sample.slice(0, 3).map((e) => e.seq));
-    expect(got[0]).toMatchObject({ v: "1.0", world_id: "w1", item: null, id: sample[0]?.id });
+    expect(got[0]).toEqual(view(sample[0] as Event));
     await settle(1000);
     expect(got.map((e) => e.seq)).toEqual(sample.slice(0, 4).map((e) => e.seq));
     expect(calls.map((c) => c.url)).toEqual([
@@ -279,6 +304,65 @@ describe("CL-INT-3 / FR-WLD-05: subscribeEvents polls GET /worlds/{id}/events wi
     stop();
     await settle(5000);
     expect(c.calls).toHaveLength(1);
+  });
+
+  it("fills only v and world_id when they are absent, from the request's own world", async () => {
+    const { fetch } = script(json({ events: [without(sample[0] as Event, "v", "world_id")] }));
+    const got: Event[] = [];
+    client(fetch).subscribeEvents("w1", (e) => got.push(e));
+    await settle(0);
+    expect(got[0]).toEqual(view(sample[0] as Event));
+  });
+
+  it("withholds a row with no run_id or no item key, stops, and reports an out-of-date server once", async () => {
+    for (const bad of [
+      without(sample[1] as Event, "run_id"),
+      { ...view(sample[1] as Event), run_id: "" },
+      without(sample[1] as Event, "item"),
+      { ...view(sample[1] as Event), world_id: "w_other" },
+    ]) {
+      const { calls, fetch } = script(
+        json({ events: [view(sample[0] as Event), bad, view(sample[2] as Event)] }),
+        json({ events: [] }),
+      );
+      const got: number[] = [];
+      const errors: Error[] = [];
+      client(fetch).subscribeEvents(
+        "w1",
+        (e) => got.push(e.seq),
+        (e) => errors.push(e),
+      );
+      await settle(5000);
+      expect(got).toEqual([sample[0]?.seq]); // the complete row before it, nothing after it
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({
+        message: "This server is out of date for live runs.",
+        retryable: false,
+      });
+      expect(calls).toHaveLength(1);
+    }
+  });
+
+  it("keeps an item the server sent as null (a null is the server's own statement)", async () => {
+    const { fetch } = script(json({ events: [{ ...view(sample[0] as Event), item: null }] }));
+    const got: Event[] = [];
+    client(fetch).subscribeEvents("w1", (e) => got.push(e));
+    await settle(0);
+    expect(got[0]?.item).toBeNull();
+  });
+
+  it("keeps polling when the consumer throws", async () => {
+    const { fetch } = script(
+      json({ events: [view(sample[0] as Event)] }),
+      json({ events: sample.slice(0, 2).map((e) => view(e)) }),
+    );
+    const got: number[] = [];
+    client(fetch).subscribeEvents("w1", (e) => {
+      got.push(e.seq);
+      throw new Error("consumer bug");
+    });
+    await settle(1000);
+    expect(got).toEqual(sample.slice(0, 2).map((e) => e.seq));
   });
 
   it("drops malformed rows and keeps unknown event types (HR-5: they go to the Trace)", async () => {
