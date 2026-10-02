@@ -79,6 +79,16 @@ loader. No new licence. FR-CON-02 adds `cryptography` for AES-GCM envelope encry
 | --- | --- | --- |
 | cryptography (`tilo_connectors.tokens`, FR-CON-02) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
 
+## Python (`services/browser`)
+
+`tilo-browser` (FR-CON-07/08) adds one direct runtime dependency, already in `uv.lock` through `httpx`:
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| idna (UTS 46 non-transitional host normalisation for the egress allowlist, as browsers do) | BSD-3-Clause | https://pypi.org/project/idna/ |
+
+Its tests use `jsonschema` and `referencing` from the root dev group (above).
+
 ## Python (`packages/planning`)
 
 `tilo-planning` (FR-INT-01/02) depends only on the in-workspace `tilo-contracts` and
