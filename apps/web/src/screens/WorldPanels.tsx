@@ -25,7 +25,8 @@ const BUILDING = {
   archived: "archived",
 } as const;
 
-export function WorldPanels({ worldId }: { worldId: string }) {
+/** `tabs`: show the lens tabs (S-04 has no page header of its own; the lens screens do). */
+export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: boolean }) {
   const client = useClient();
   const events = useRunLog(client, worldId);
   const [remote] = useRemote("load the world", () => client.getLayout(worldId));
@@ -35,7 +36,7 @@ export function WorldPanels({ worldId }: { worldId: string }) {
   const base = `/world/${encodeURIComponent(worldId)}`;
   return (
     <div className="world-panels" data-testid="world-hud">
-      <LensTabs worldId={worldId} current="world" />
+      {tabs && <LensTabs worldId={worldId} current="world" />}
       <h2>Activity</h2>
       {events.length === 0 ? (
         <p className="hud-meter" data-testid="hud-meter">
@@ -54,7 +55,7 @@ export function WorldPanels({ worldId }: { worldId: string }) {
       </p>
       <div className="hud-slot">
         {layout === null ? (
-          <p>{remote.status === "error" ? remote.message : "Loading the roster…"}</p>
+          <p>{remote.status === "error" ? remote.message : "The roster is loading…"}</p>
         ) : (
           <>
             <h2>Roster</h2>

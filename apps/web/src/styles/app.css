@@ -277,6 +277,11 @@ a.secondary {
   margin: 0 0 8px;
   font: 900 1.5em / 1.25 var(--font-display);
 }
+.screen-body h1:focus-visible {
+  width: fit-content;
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
 .screen-tag {
   color: var(--color-ink-2);
   font-weight: 700;
@@ -479,6 +484,15 @@ a.secondary {
   .delivery-slot .flow-slot {
     min-height: 46em;
   }
+}
+.world-panels {
+  padding-top: 36px; /* clears the fixed fixture banner */
+}
+.hud-sheet .world-panels {
+  padding-top: 0;
+}
+.world-panels a {
+  color: var(--color-brand-primary);
 }
 .world-panels h2 {
   margin: 16px 0 4px;

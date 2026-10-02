@@ -16,6 +16,7 @@ const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
     {seq} {type}
   </li>
 ));
+const WORLD_SCREENS: ReadonlySet<string> = new Set(["S-05", "S-10", "S-11", "S-12"]);
 const stageMode = new URLSearchParams(window.location.search).get("display") === "stage";
 
 /** PRD 18.3 layout frame: desktop rails either side of the stage; mobile bottom tabs. */
@@ -25,21 +26,27 @@ export function App() {
   const fixtureClient = useIsFixtureClient();
   const path = usePathname();
   const screen = matchScreen(path); // null: the stage and the flow shell
-  const firstPath = useRef(true);
+  const previousPath = useRef(path);
   // After a route change a full-page screen's heading takes focus, so keyboard and screen-reader
   // users keep their place (the flow shell does the same for its own heading).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `path` is the route-change trigger.
   useEffect(() => {
-    if (firstPath.current) {
-      firstPath.current = false;
-      return;
-    }
+    if (previousPath.current === path) return; // not the first render, nor StrictMode's second effect
+    previousPath.current = path;
     const h1 = document.querySelector<HTMLElement>(".screen-page h1");
     h1?.setAttribute("tabindex", "-1");
     h1?.focus();
   }, [path]);
+  // The world a path belongs to: its S-04 panels fill the right rail on every world screen (S-04,
+  // S-05, S-10, S-11, S-12) and, on mobile, a bottom sheet on S-04 itself.
   const flow = matchFlowRoute(path);
-  const hudWorld = !screen && flow.screen === "World" ? flow.worldId : null; // S-04 HUD panels
+  const worldId = screen
+    ? WORLD_SCREENS.has(screen.id)
+      ? (screen.params[0] ?? null)
+      : null
+    : flow.screen === "World"
+      ? flow.worldId
+      : null;
+  const hudWorld = screen ? null : worldId;
   return (
     <div className="app-shell" data-stage-mode={stageMode ? "on" : "off"}>
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
@@ -82,8 +89,8 @@ export function App() {
         </>
       ) : (
         <aside className="right-rail" data-testid="right-rail">
-          {hudWorld ? (
-            <WorldPanels worldId={hudWorld} />
+          {worldId ? (
+            <WorldPanels worldId={worldId} tabs={hudWorld !== null} />
           ) : (
             <>
               <h2>Activity</h2>
