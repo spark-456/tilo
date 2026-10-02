@@ -185,3 +185,24 @@ def test_FR_CON_04_a_huge_retry_after_is_capped_not_parsed():
 
     assert raised.value.retry_after_s == 999_999_999 and g.sleeps == []
     assert [r.url for r in g.apis.requests] == [f"{GMAIL_API}/labels"]
+
+
+def test_FR_CON_04_a_world_scoped_outbox_never_sends_another_worlds_entry():
+    """#151 (FR-WLD-07) with the Gmail adapter: Outbox(world_id="w1") never reaches execute_side_effect for an
+    entry of another world; that world's own outbox sends it exactly once."""
+    from tilo_connectors.outbox import Outbox
+
+    g = make_gapi_env()
+    case = gmail_case(item=g.artifacts.put_email("art_e"), destination=None)
+    entry = enqueue(g.outbox, case)
+    assert entry["world_id"] != "w1"
+    connectors = {"gmail": g.gmail, "google_drive": g.drive}
+
+    w1 = Outbox(g.store, connectors, emit=g.env.emitted.append, clock=g.env.clock, world_id="w1")
+    assert w1.dispatch_due() == []
+    assert g.apis.requests == [] and g.spy.asked == [], "no token, no request for another world's entry"
+    assert g.store.get(entry["id"])["state"] == "queued"
+
+    own = Outbox(g.store, connectors, emit=g.env.emitted.append, clock=g.env.clock, world_id=entry["world_id"])
+    assert _states(own.dispatch_due()) == ["sent"]
+    assert len(g.apis.sent()) == 1
