@@ -1,0 +1,452 @@
+"""The run after approve (CL-INT-2; PRD 5.4 CP2, 8.5, 9.4, 10.3, 10.4; services/api/tests/API_CL_INT_2.md; BQ-90).
+The approved plan runs only if `validate_plan` accepts it. A unit's send goes through the policy engine and waits
+at a gate card until a person approves; only then does the outbox send it, once. Every event goes through the
+single writer, each built once with its own id; a paused world gets nothing more from the run."""
+
+from __future__ import annotations
+
+import asyncio
+import copy
+import logging
+import math
+import threading
+from collections.abc import Callable
+from dataclasses import dataclass
+from types import SimpleNamespace
+from typing import Annotated, Any
+
+import tilo_planning.plangraph as plangraph
+import tilo_policy
+from fastapi import APIRouter, Depends, HTTPException, Request
+from tilo_connectors import Outbox, OutboxRefused
+from tilo_harness.config import load_agents_config
+from tilo_harness.executor import UnitOutcome, run_plan
+from tilo_harness.validator import repo_validator
+from tilo_policy.schemas import conforms
+
+from tilo_api import deps, events
+from tilo_api.cards import CardStore, _card_errors
+
+logger = logging.getLogger("tilo_api.runs")
+router = APIRouter()
+
+_TIERS = ("T1", "T2", "T3")
+_FORMATS = {"send_email": "email"}  # the deliverable_format a send action delivers
+_GATE_TIMEOUT_S = 86_400  # BQ-90: then the card holds; a gate never times out to go
+_POLL_S = 0.25  # how often a waiting gate looks for an answer or a pause
+_SEND_RETRY_DELAYS_S = (0.0, 0.2, 0.5, 1.0, 2.0, 2.0)  # FR-AGT-11: the send step is retried, never resent
+_CLOCK = SimpleNamespace(now=events.now)
+
+
+class RunStopped(Exception):
+    """The world is paused: the run writes nothing more."""
+
+
+class _GateFailed(Exception):
+    """The gated step could not finish; its unit fails."""
+
+
+@dataclass(frozen=True)
+class Seams:
+    compiler: Callable[..., dict]
+    layout_builder: Callable[..., dict]
+    runner: Any
+    resolver: Callable[..., dict]
+    skills: Any
+    connectors: Any
+    adapters: dict[str, Any]
+    outbox_store: Any
+    writer: deps.EventWriter
+
+
+def run_seams(request: Request) -> Seams | None:
+    """The seams as the app wires them, overrides included; if any cannot be built, no run starts."""
+    overrides = request.app.dependency_overrides
+    names = "plan_compiler layout_builder unit_runner action_resolver skill_registry connector_registry"
+    names += " connector_adapters outbox_store event_writer"
+    try:
+        return Seams(*(overrides.get(seam, seam)() for seam in (getattr(deps, f"get_{n}") for n in names.split())))
+    except Exception as exc:
+        logger.warning("the run seams are not wired, so no run starts: %s", type(exc).__name__)
+        return None
+
+
+def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: Seams) -> None:
+    with store.runs_guard:  # one run per world
+        if task.world_id in store.runs:
+            return
+        run = store.runs[task.world_id] = Run(store, task, approach, budget_cap, seams)
+    threading.Thread(target=run.main, name=f"run-{task.world_id}", daemon=True).start()
+
+
+class _NoCards:
+    def write(self, part: dict) -> None:
+        raise RuntimeError("a world with no run holds no cards")
+
+
+class Run:
+    """Also the executor's writer (`emit`) and its CardStore's (`write`): both end at the single writer."""
+
+    def __init__(self, store: deps.Store, task: deps.TaskRecord, approach: dict, cap: float, seams: Seams) -> None:
+        self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)
+        self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
+        self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
+        self.plan: dict[str, Any] = {}
+        self.layout: dict[str, Any] = {}
+        self.levels: dict[str, str] = {}
+        self.director = "system"
+        self.requested: dict[str, dict] = {}  # card_id -> approval.requested
+        self.resolved: dict[str, dict] = {}  # card_id -> approval.resolved
+        self.sends: dict[str, dict[str, Any]] = {}  # outbox_id -> what its data.transfer needs
+        self.titles: dict[str, str] = {}  # artifact_id -> the delivering unit's title
+        self.delivered: list[str] = []  # artifact.delivered event ids
+        self.failure: str | None = None
+        self._failed = False
+
+    def paused(self) -> bool:
+        world = self.store.worlds.get(self.world_id)
+        return world is None or world.paused
+
+    def put(self, type_: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
+        """Builds the event once, with its own id, and appends it through the single writer. A paused world gets
+        nothing (FR-WLD-07), except the record of a person's answer or of a send that already happened."""
+        if kw.get("check_pause", True) and self.paused():
+            raise RunStopped
+        district = kw.get("district")
+        vis = kw.get("vis", [district] if district else "all")  # a district's event is that district's (PRD 10.1)
+        if vis is None:
+            raise ValueError("an event's vis is never widened")
+        event = {
+            "id": kw.get("event_id") or events.new_part_id(), "type": type_, "actor": actor, "target": target,
+            "level": self.levels.get(district) if district else None, "district": district, "item": None,
+            "severity": kw.get("severity") or repo_validator().registry_types[type_]["default_severity"],
+            "credits": 0, "summary": summary[:140], "cause": kw.get("cause"), "vis": vis,
+            "authz": kw.get("authz"), "data": data,
+        }  # fmt: skip
+        return self.seams.writer.append(self.world_id, event)
+
+    def emit(self, *, type: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
+        passed = {k: kw[k] for k in ("district", "cause", "vis") if k in kw}
+        return self.put(type, actor, target, summary, data, **passed)
+
+    def write(self, part: dict) -> None:
+        """The CardStore's part for a person's answer; an approve opens the waiting gate."""
+        data, card_id, authz = part["data"], part["card_id"], part["authz"]
+        requested = self.requested.get(card_id)
+        committed = self.put(
+            part["type"], authz["ref"] if authz else "system", data.get("gate_id", self.world_id),
+            f"The gate card was answered: {data.get('option', 'default')}.", data, district=part["district"],
+            cause=requested and requested["id"], authz=authz, vis=part["vis"], severity=part.get("severity"),
+            check_pause=False,
+        )  # fmt: skip
+        if part["type"] == "approval.resolved":
+            self.resolved[card_id] = committed
+
+    def _fail(self, reason: str, unit: str | None) -> None:
+        try:
+            if not (self._failed or self.paused()):
+                self._failed = True
+                self.put(
+                    "world.failed", "system", self.world_id, f"Stopped: {reason}", {"reason": reason, "unit": unit}
+                )
+        except Exception:
+            logger.exception("run %s could not record its failure", self.run_id)
+
+    def main(self) -> None:
+        """Every way out ends in a terminal event (or the pause) and leaves no entry of the run waiting to send."""
+        try:
+            asyncio.run(self._execute())
+        except RunStopped:
+            pass
+        except BaseException as exc:  # the outbox re-raises a BaseException from a send; the run still ends
+            logger.exception("run %s stopped on an error", self.run_id)
+            self._abandon_unsent()
+            self._fail("an internal error stopped the work", None)
+            if isinstance(exc, KeyboardInterrupt):
+                raise
+        finally:
+            self._abandon_unsent()
+
+    def _outbox(self) -> Outbox:
+        """The run dispatches and records only its own world's entries (FR-WLD-07)."""
+        return Outbox(
+            self.seams.outbox_store, self.seams.adapters, emit=self._record_transfer, clock=events.now,
+            world_id=self.world_id,
+        )  # fmt: skip
+
+    def _abandon_unsent(self) -> None:
+        for outbox_id, send in self.sends.items():
+            entry = self.seams.outbox_store.get(outbox_id)
+            if "committed" not in send and entry is not None and entry["state"] in ("queued", "scheduled", "sending"):
+                try:
+                    self._outbox().abandon(outbox_id)
+                except Exception:
+                    logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
+
+    def _prepare(self) -> Any:
+        """Compile, validate, lay out. Returns the agents config, or None when no run may start."""
+        try:
+            plan = self.seams.compiler(brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap)
+        except Exception:
+            self._fail("the Director could not plan this task", None)
+            return None
+        registry = self.seams.connectors
+        violations = plangraph.validate_plan(
+            plan, risk_table=tilo_policy.load_risk_table(), connectors={c: registry.get(c) for c in registry.ids()},
+            skills=frozenset(skill_id for skill_id, _ in self.seams.skills.catalog()),
+            policies=dict(self.store.policies), owner=self.owner,
+        )  # fmt: skip
+        if violations:
+            self._fail("the plan broke " + ", ".join(sorted({v.rule_id for v in violations})), None)
+            return None
+        try:
+            self.layout, config = self.seams.layout_builder(plan, world_id=self.world_id), load_agents_config()
+        except Exception:
+            self._fail("the world could not be laid out", None)
+            return None
+        self.plan, semantic = plan, self.layout["semantic"]
+        self.levels = {d["id"]: level["id"] for level in semantic["levels"] for d in level["districts"]}
+        self.director = next((a["id"] for a in semantic["agents"] if a["rank"] == "director"), "system")
+        return config
+
+    async def _execute(self) -> None:
+        config = self._prepare()
+        if config is None:
+            return
+        stream = self.store.events.get(self.world_id, [])
+        granted = next((e["id"] for e in reversed(stream) if e["type"] == "budget.granted"), None)
+        summary = f"Work started with a budget of {self.cap:g} credits."
+        self.put("world.started", self.director, self.world_id, summary, {"budget_cap": self.cap}, cause=granted)
+        runner = _GatedRunner(self, self.seams.runner)
+        result = await run_plan(
+            self.plan, self.layout, writer=self, config=config, skills=self.seams.skills, runner=runner
+        )
+        if stopped := result.failed + result.skipped:
+            self._fail(self.failure or "a unit failed, so the work stopped", stopped[0])
+            return
+        credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
+        data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
+        cause = self.delivered[-1] if self.delivered else None
+        self.put("world.completed", self.director, self.world_id, "The work is done.", data, cause=cause)
+
+    async def gate(self, unit: dict, worker: str, action: str, ref: dict, made: str) -> None:
+        """PRD 10.3/10.4: the policy engine assesses the send, a person approves it, the outbox sends it once."""
+        item, district = {"artifact_id": ref["artifact_id"], "version": ref["version"]}, unit["district"]
+        gate = next((g for g in self.plan["gates"] if unit["id"] in g["guards"] and g["action_type"] == action), None)
+        connector = next((c for c in unit["connectors"] if self._action(c, action)), None)
+        if gate is None or connector is None:
+            raise _GateFailed(f"no gate or connector for {action}")
+        try:
+            brief, unit_copy = copy.deepcopy(self.brief), copy.deepcopy(unit)
+            to = self.seams.resolver(unit=unit_copy, action_type=action, item=dict(item), brief=brief)
+            recipients, destination, known = to["recipients"], to["destination"], to.get("known_recipients")
+        except Exception as exc:
+            raise _GateFailed("the send has no recipients") from exc
+        if not (isinstance(destination, str) and destination.strip() and isinstance(recipients, list) and recipients
+                and all(isinstance(r, str) and r.strip() for r in recipients)):  # fmt: skip
+            raise _GateFailed("the send has no recipients or no destination")  # fails closed, before any gate
+        facts = tilo_policy.SideEffectFacts(recipients=tuple(recipients), known_recipients=tuple(known or ()))
+        proposal = tilo_policy.Proposal(self.world_id, action, connector, district, destination, facts, item, 0, None)
+        decision = tilo_policy.decide(
+            proposal, table=tilo_policy.load_risk_table(), policies=list(self.store.policies.values()),
+            world_owner=self.owner, applied=self._applied(), now=events.now(),
+        )  # fmt: skip
+        if decision.outcome == "draft_only":  # an owner's L0 policy: nothing leaves Tilo (PRD 10.4, BQ-90)
+            self._deliver(unit, worker, item, {"artifact": item, "format": "in_app", "outbox_id": None}, made)
+            return
+        tier = max(decision.tier, gate["risk_tier"], key=_TIERS.index)  # never below the plan's gate (PG-06)
+        irreversible = self._action(connector, action)["irreversible"]  # type: ignore[index]
+        card_id, outbox_id = events.new_part_id(), events.new_part_id()
+        card = self._gate_card(unit, worker, card_id, gate["id"], connector, action, tier, irreversible)
+        card["gate"]["action"] |= {"item": ref, "destination": destination}
+        card["gate"]["recipients"] = recipients
+        if _card_errors(card):  # checked before anything is written
+            raise _GateFailed("the gate card was refused")
+        data = {
+            "gate_id": gate["id"], "card_id": card_id, "outbox_id": outbox_id, "action_type": action,
+            "risk_tier": tier, "irreversible": irreversible, "item": item, "approver": None, "team_lead": None,
+        }  # fmt: skip
+        summary = "The agent is waiting at a gate for approval."
+        requested = self.put("approval.requested", worker, gate["id"], summary, data, district=district, cause=made)
+        self.requested[card_id] = requested
+        if self.cards.submit(card, outbox_id=outbox_id, district=district).outcome != "accepted":
+            raise _GateFailed("the gate card was refused")
+        while card_id not in self.resolved:  # only a person's approve on the cards API opens it
+            if self.paused():
+                raise RunStopped
+            await asyncio.sleep(_POLL_S)
+        resolved = self.resolved[card_id]
+        if self.paused():
+            raise RunStopped
+        if tilo_policy.open_gate(requested, resolved, world_owner=self.owner).outcome != "run":
+            raise _GateFailed("the gate did not open")
+        created = events.now()
+        entry = {
+            "id": outbox_id, "idempotency_key": f"{self.run_id}:{unit['id']}:{action}:1", "world_id": self.world_id,
+            "run_id": self.run_id, "action_type": action, "connector": connector, "recipients": recipients,
+            "attachments": [], "item": item, "destination": destination, "modifiers": list(decision.modifiers),
+            "risk_tier": tier, "authz": resolved["authz"], "undo_window_s": 0, "scheduled_at": created,
+            "state": "queued", "created_at": created,
+        }  # fmt: skip
+        evidence: dict[str, Any] = {
+            "reserved_by": requested, "authorised_by": resolved, "policy": None, "team_lead": None,
+            "world_owner": self.owner, "instruction": None, "earlier_applied": [],
+        }  # fmt: skip
+        island = next((g["between"][1] for g in self.layout["semantic"]["gates"] if g["id"] == gate["id"]), gate["id"])
+        self.sends[outbox_id] = {
+            "worker": worker, "island": island, "district": district, "cause": resolved["id"],
+            "event_id": events.new_part_id(),  # resent unchanged if the outbox retries the transfer
+        }  # fmt: skip
+        transfer = await self._send(entry, evidence)
+        data = {"artifact": item, "format": _FORMATS.get(action, "in_app"), "outbox_id": outbox_id}
+        self._deliver(unit, worker, item, data, transfer["id"])
+
+    def _deliver(self, unit: dict, worker: str, item: dict, data: dict, cause: str) -> None:
+        delivered = self.put(
+            "artifact.delivered", worker, item["artifact_id"], "The item was delivered.", data,
+            district=unit["district"], cause=cause,
+        )  # fmt: skip
+        self.titles[item["artifact_id"]] = unit["title"]
+        self.delivered.append(delivered["id"])
+
+    async def _send(self, entry: dict, evidence: dict[str, Any]) -> dict:
+        """Enqueue with the person's authz, then dispatch until the outbox records the entry sent."""
+        outbox = self._outbox()
+        try:
+            outbox.enqueue(entry, evidence)
+        except OutboxRefused as exc:
+            raise _GateFailed("the outbox refused the send") from exc
+        for delay in _SEND_RETRY_DELAYS_S:
+            await asyncio.sleep(delay)
+            if self.paused():
+                raise RunStopped
+            await asyncio.to_thread(outbox.dispatch_due)
+            state = (self.seams.outbox_store.get(entry["id"]) or {}).get("state")
+            if state == "sent" and "committed" in self.sends[entry["id"]]:
+                return self.sends[entry["id"]]["committed"]
+            if state in ("failed", "cancelled"):
+                break
+        self._abandon_unsent()  # given up: the entry never sends later in a failed world
+        raise _GateFailed("the send could not be confirmed")
+
+    def _record_transfer(self, transfer: dict) -> None:
+        """The outbox's own data.transfer for one of this run's entries (the outbox is scoped to this world)."""
+        send = self.sends[transfer["data"]["outbox_id"]]
+        send["committed"] = self.put(
+            "data.transfer", send["worker"], send["island"], "The item crossed the bridge.", transfer["data"],
+            district=send["district"], cause=send["cause"], authz=transfer["authz"], event_id=send["event_id"],
+            check_pause=False,
+        )  # fmt: skip
+
+    def _gate_card(self, unit: dict, worker: str, card_id: str, gate_id: str, connector: str, action: str,
+                   tier: str, irreversible: bool) -> dict:  # fmt: skip
+        """The deterministic gate card (PRD 10.3): from the plan gate, the connector action and the send."""
+        building = next(
+            b["id"] for level in self.layout["semantic"]["levels"] for d in level["districts"]
+            for b in d["buildings"] if unit["id"] in b["plan_units"]
+        )  # fmt: skip
+        name, undo = self.seams.connectors.get(connector)["name"], "cannot" if irreversible else "can"
+        return {
+            "id": card_id, "world_id": self.world_id, "run_id": self.run_id, "kind": "gate", "rung": "gate",
+            "header": {"building": building, "agent": worker},
+            "what_happened": f"{unit['title']}: the draft is ready."[:140],
+            "why_it_matters": f"It goes out by {name} ({action}) and {undo} be undone."[:280],
+            "options": [
+                {"id": "approve", "label": "Approve", "suggested": False, "irreversible": irreversible},
+                {"id": "edit", "label": "Edit first", "suggested": True, "irreversible": False,
+                 "reason": "Check the draft and who it goes to once before it is sent."},
+                {"id": "hold", "label": "Hold", "suggested": False, "irreversible": False},
+            ],
+            "add_context": False, "actions": ["show_me"], "answer_channels": ["web", "mobile_web", "whatsapp"],
+            "created_at": events.now(), "timeout": _GATE_TIMEOUT_S, "safe_default": "hold",
+            "gate": {"id": gate_id, "action": {"type": action, "connector": connector,
+                                               "exact": f"{unit['title']} by {name}."[:500]},
+                     "irreversible": irreversible, "risk_tier": tier},
+            "consent": None,
+        }  # fmt: skip
+
+    def _action(self, connector: str, action: str) -> dict | None:
+        declared = self.seams.connectors.get(connector)["actions"] if connector in self.seams.connectors else []
+        return next((a for a in declared if a["id"] == action), None)
+
+    def _applied(self) -> list[dict]:
+        """The owner's policy.applied events in every world, so a policy's daily caps never multiply (PI-11)."""
+        worlds = [w for w, record in self.store.worlds.items() if record.owner == self.owner]
+        return [e for w in worlds for e in self.store.events.get(w, []) if e.get("type") == "policy.applied"]
+
+
+class _GatedRunner:
+    """Each artifact a unit made is recorded before anything refers to it; a unit with actions then stops at its
+    gate before it hands off."""
+
+    def __init__(self, run: Run, inner: Any) -> None:
+        self._run, self._inner = run, inner
+
+    async def run(self, unit: Any, context: Any) -> UnitOutcome:
+        outcome = await self._inner.run(unit, context)
+        if not isinstance(outcome, UnitOutcome) or outcome.success is not True:
+            return outcome
+        refs = list(outcome.artifact_refs) if isinstance(outcome.artifact_refs, list | tuple) else None
+        if refs is None or not all(conforms("common.schema.json#/$defs/artifact_ref", ref) for ref in refs):
+            return UnitOutcome(success=False, summary="The unit named an artifact that does not exist.")
+        made = {
+            ref["artifact_id"]: self._run.put(
+                "artifact.created", context.agent_id, ref["artifact_id"], "The agent made an item.",
+                {"artifact": {"artifact_id": ref["artifact_id"], "version": ref["version"]}}, district=unit["district"],
+            )["id"]
+            for ref in refs
+        }  # fmt: skip
+        try:
+            for action in unit["actions"]:  # the item to send is the unit's first artifact
+                if not refs:
+                    raise _GateFailed("the step had nothing to send")
+                await self._run.gate(unit, context.agent_id, action, refs[0], made[refs[0]["artifact_id"]])
+        except _GateFailed as exc:
+            self._run.failure = str(exc)
+            return UnitOutcome(success=False, summary="The gated step could not finish.")
+        return outcome
+
+
+def get_card_store(world_id: str, store: Annotated[deps.Store, Depends(deps.get_store)]) -> CardStore:
+    """The world's own CardStore, its run's; a world with no run has no cards."""
+    if (run := store.runs.get(world_id)) is not None:
+        return run.cards
+    owners = {world_id: world.owner} if (world := store.worlds.get(world_id)) else {}
+    return CardStore(clock=_CLOCK, writer=_NoCards(), world_owners=owners)
+
+
+def answer_guard(
+    world_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
+) -> None:
+    """Pause all is final for the run (BQ-90): an answer in a paused world changes nothing."""
+    world = store.worlds.get(world_id)
+    if principal.world_id == world_id and world is not None and world.paused:
+        raise HTTPException(status_code=409, detail="This world is paused; nothing it holds is sent.")
+
+
+@router.get("/worlds/{world_id}/delivery")
+def get_delivery(
+    world_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
+) -> dict[str, Any]:
+    """Issue #80's DeliveryResult, for the world's owner only, once `world.completed` is written."""
+    world = store.worlds.get(world_id)
+    owner = world.owner if world is not None else None
+    if principal.world_id != world_id or (principal.role, principal.user_id) != ("owner", owner):
+        raise HTTPException(status_code=404)
+    stream = store.events.get(world_id, [])
+    completed = next((e for e in stream if e["type"] == "world.completed"), None)
+    if completed is None:
+        raise HTTPException(status_code=409, detail="Nothing is delivered until the work is done.")
+    titles = run.titles if (run := store.runs.get(world_id)) else {}
+    delivered = [(e["data"]["artifact"], e["data"]["format"]) for e in stream if e["type"] == "artifact.delivered"]
+    artifacts = [
+        {"id": a["artifact_id"], "title": titles.get(a["artifact_id"], "Delivered item"), "kind": kind,
+         "version": a["version"]}
+        for a, kind in delivered
+    ]  # fmt: skip
+    credits = completed["data"]["credits_used"]
+    return {"world_id": world_id, "artifacts": artifacts, "credits_used": credits, "time_saved": None}  # FR-MTR-02

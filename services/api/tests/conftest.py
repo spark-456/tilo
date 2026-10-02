@@ -108,3 +108,29 @@ def flow(flow_factory):
 def clear_flow(flow_factory):
     """The Director marks nothing ambiguous (a clear task: zero questions)."""
     return flow_factory([])
+
+
+# --- CL-INT-2 (CP2 thin slice, the run after approve): see API_CL_INT_2.md and _clint2_lib.py ----
+
+
+@pytest.fixture()
+def run_flow(repo_root: pathlib.Path):
+    """A clear task (no questions) with the run seams installed: scripted plan compiler, layout builder, unit runner
+    and action resolver, one mock connector, an in-memory outbox store and a stand-in for the single event writer."""
+    from _clint2_lib import build_run_flow
+
+    rf = build_run_flow(repo_root)
+    yield rf
+    rf.close()
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def crashing_run_flow(repo_root: pathlib.Path):
+    """Same, but the mock connector records its first send and then raises (a send step that must be retried)."""
+    from _clint2_lib import CrashAfterSendMock, build_run_flow
+
+    rf = build_run_flow(repo_root, adapter_factory=CrashAfterSendMock)
+    yield rf
+    rf.close()
+    app.dependency_overrides.clear()

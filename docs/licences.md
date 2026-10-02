@@ -92,8 +92,8 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 ## Python (`packages/planning`)
 
 `tilo-planning` (FR-INT-01/02) depends only on the in-workspace `tilo-contracts` and
-`tilo-providers` (not external); `tilo-api` now depends on the in-workspace `tilo-planning`.
-No new licence.
+`tilo-providers` (not external); `tilo-api` now depends on the in-workspace `tilo-planning`, and
+(CL-INT-2) on the in-workspace `tilo-policy`, `tilo-harness` and `tilo-connectors`. No new licence.
 
 ## Python (`services/render`)
 

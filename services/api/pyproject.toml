@@ -11,10 +11,16 @@ dependencies = [
     "referencing>=0.30",
     "python-multipart>=0.0.18",
     "tilo-planning",
+    "tilo-policy",
+    "tilo-harness",
+    "tilo-connectors",
 ]
 
 [tool.uv.sources]
 tilo-planning = { workspace = true }
+tilo-policy = { workspace = true }
+tilo-harness = { workspace = true }
+tilo-connectors = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
