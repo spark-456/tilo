@@ -31,6 +31,7 @@ ROLE = "autopilot"
 FALLBACK = ("fyi", "normal")  # BQ-136: never needs_reply (no ask), never newsletter_promo (never buried)
 FIELD_CAPS = {"sender": 500, "to": 1_000, "cc": 1_000, "subject": 500, "body": 8_000}  # EFF-03, chars
 MAX_ANSWER_CHARS = 1_000
+MAX_FROM_CHARS = 2_000  # a longer From header gets no rule key (parseaddr and NFKC never see more than this)
 UNIT = {"unit_type": "mail_triaged", "unit_count": 1}  # BQ-03
 
 _LOG = logging.getLogger(__name__)
@@ -75,24 +76,28 @@ def bare_address(value: Any) -> str | None:
     """The address of a From header with ASCII letters lower-cased, never its display name; None when there is none.
     An address with a control or format (zero-width) character, or one NFKC would change (the Kelvin sign,
     full-width letters), gets no key, so no look-alike shares a rule with the real address."""
-    address = parseaddr(value if isinstance(value, str) else "")[1].strip()
+    address = parseaddr(value if isinstance(value, str) and len(value) <= MAX_FROM_CHARS else "")[1].strip()
     if any(unicodedata.category(c)[0] == "C" for c in address) or unicodedata.normalize("NFKC", address) != address:
         return None
     address = address.translate(_ASCII_LOWER)
     return address if "@" in address and not any(c.isspace() for c in address) else None
 
 
-def _render(value: Any, *, header: bool) -> str:
-    """Untrusted mail text exactly as the screen and (capped) the model see it. NFKC first, so no full-width or
-    small-form look-alike survives; then `<` and `>` become look-alikes, so no mail can open or close the MAIL block.
-    A header folds control and line-separator characters to a space, so it cannot forge another header line.
+def _render(value: Any, *, header: bool, limit: int) -> tuple[str, str]:
+    """(head, rest): the untrusted mail text as the model sees it, and the raw text beyond `limit` characters.
+    Only the first `limit` raw characters are normalised: NFKC is quadratic on characters that expand (U+FDFA), so
+    unbounded mail would pin a worker. NFKC first, so no full-width or small-form look-alike survives; then `<` and
+    `>` become look-alikes, so no mail can open or close the MAIL block. A header folds control and line-separator
+    characters to a space, so it cannot forge another header line. The model gets the head capped again to `limit`;
+    the screen gets head and rest, so it covers at least everything the model sees.
     TODO(#206): share tilo_providers.prompts.neutralise_marker once PR #206 lands."""
     if isinstance(value, list):
         value = ", ".join(v for v in value if isinstance(v, str))
-    text = unicodedata.normalize("NFKC", value if isinstance(value, str) else "")
+    text = value if isinstance(value, str) else ""
+    head = unicodedata.normalize("NFKC", text[:limit])
     if header:
-        text = "".join(" " if unicodedata.category(c) in ("Cc", "Zl", "Zp") else c for c in text)
-    return text.translate(_ANGLES)
+        head = "".join(" " if unicodedata.category(c) in ("Cc", "Zl", "Zp") else c for c in head)
+    return head.translate(_ANGLES), text[limit:]
 
 
 def _parse(text: str | None) -> tuple[str, str] | None:
@@ -157,12 +162,16 @@ class Triage:
 
     def _decide(self, user_id: str, mail: Mapping[str, Any]) -> dict[str, Any]:
         sender = bare_address(mail.get("from"))
-        fields = {
-            name: _render(mail.get("from" if name == "sender" else name), header=name != "body") for name in FIELD_CAPS
+        parts = {
+            name: _render(mail.get("from" if name == "sender" else name), header=name != "body", limit=cap)
+            for name, cap in FIELD_CAPS.items()
         }
+        fields = {name: head for name, (head, _rest) in parts.items()}
         doc: dict[str, Any] = {"sender": sender, "triaged_at": self._clock(), "flagged": False}
         flagged = {"category": "suspicious", "priority": "high", "source": "safety", "flagged": True}
-        if self._safety.check("\n".join(fields.values()))["flagged"]:  # raises: nothing stored or emitted
+        if self._safety.check("\n".join(head + rest for head, rest in parts.values()))[
+            "flagged"
+        ]:  # raises: nothing stored or emitted
             return {**doc, **flagged}
         category, priority, source = self._ask(fields)  # always asked, even for a ruled sender (BQ-132)
         if source == "safety":

@@ -3,6 +3,7 @@ reconstruct the MAIL marker or share a look-alike's rule key (PRD 11.4, 16.3; BQ
 
 from __future__ import annotations
 
+import time
 import unicodedata
 
 import pytest
@@ -140,3 +141,20 @@ def test_FR_CHN_09_failed_result_write_leaves_no_rule() -> None:
         rig.svc.correct(USER, mail.message_id, category="needs_reply")
 
     assert rig.preferences.writes == 0
+
+
+def test_FR_CHN_09_expanding_characters_cannot_pin_a_worker() -> None:
+    """NFKC is quadratic on characters that expand (U+FDFA, U+3300), so only a field's first `cap` raw characters
+    are normalised: a 1 MB body and a 100k-character subject triage in well under a second (round 2 of #211)."""
+    rig = make_rig()
+    mail, token = rig.mail(reply=answer("fyi", "low"))
+    mail.subject = f"hello [{token}] " + "㌀" * 100_000
+    mail.body = "ﷺ" * 1_000_000
+    mail.sender = "Vendor " + "ﷺ" * 100_000 + " <vendor@supplier.example>"
+
+    started = time.process_time()
+    result = rig.svc.triage(USER, mail.message_id)
+
+    assert time.process_time() - started < 1.0
+    assert (result.category, result.source) == ("fyi", "model")  # the model was still asked
+    assert len(rig.safety.texts[-1]) >= 1_000_000  # and the screen still saw the whole body
