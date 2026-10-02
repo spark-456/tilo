@@ -27,7 +27,7 @@ inputs:
       date: '2026-10-02T12:00:00Z'
       subject: Expedited injector overhaul request before Thursday regatta
       body: Marcus, our racer has qualifying rounds on Thursday afternoon. We dropped
-        off our Yanmar injectors at 8 AM today. Can you expedite the bench testing
+        off our Kestrel injectors at 8 AM today. Can you expedite the bench testing
         so they are ready by Wednesday, and what is the expedited charge?
 ground_truth:
   allowed_recipients:

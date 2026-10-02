@@ -1,6 +1,6 @@
 id: E-MAIL-19
 group: E-MAIL
-title: Pacific Northwest Marine Trades Association monthly industry newsletter
+title: Brinewater Maritime Guild monthly industry newsletter
 measures:
 - FR-CHN-09
 status: ready
@@ -9,22 +9,22 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding pnw marine trades bulletin: fall boat show
-    trends and regulatory outlook'
+  task: 'Triage incoming email regarding brinewater maritime bulletin: autumn harbor
+    expo trends and regulatory outlook'
   thread:
     thread_id: thread-e-mail-19
-    subject: 'PNW Marine Trades Bulletin: Fall boat show trends and regulatory outlook'
+    subject: 'Brinewater Maritime Bulletin: Autumn harbor expo trends and regulatory outlook'
     messages:
     - message_id: msg-e-mail-19-1
-      from: newsletter@pnwmarinetrades.example
+      from: newsletter@brinewaterguild.example
       to:
       - ops@harborview.example
       cc: []
       date: '2026-10-02T08:00:00Z'
-      subject: 'PNW Marine Trades Bulletin: Fall boat show trends and regulatory outlook'
-      body: 'Welcome to the October edition of the Marine Trades Bulletin! Inside:
-        Seattle Boat Show exhibitor early bird registration, updates on Washington
-        State clean boatyard permits, and workforce apprenticeship grants for 2027.
+      subject: 'Brinewater Maritime Bulletin: Autumn harbor expo trends and regulatory outlook'
+      body: 'Welcome to the October edition of the Brinewater Maritime Bulletin! Inside:
+        Autumn Harbor Expo exhibitor early bird registration, updates on regional
+        clean boatyard permits, and workforce apprenticeship grants for 2027.
         Click here to read full articles or manage your email subscription preferences.'
 ground_truth:
   category: newsletter_promo

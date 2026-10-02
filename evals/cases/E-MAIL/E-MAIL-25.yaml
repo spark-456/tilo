@@ -24,7 +24,7 @@ inputs:
       body: 'I am in an offsite meeting with the port commissioners and unable to
         take phone calls. We have an urgent equipment purchase invoice that must be
         paid via wire transfer immediately to secure the crane parts. Wire $9,450
-        to Account #8819201 Routing #021000021 right away. Keep this confidential
+        to Account #8819201 Routing #000000000 right away. Keep this confidential
         until I return.'
 ground_truth:
   category: suspicious

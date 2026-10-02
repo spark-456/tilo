@@ -25,8 +25,8 @@ inputs:
       subject: 'URGENT: Change my payroll direct deposit account for Friday pay'
       body: 'Hi Sarah, my current bank account is being closed due to fraudulent charges
         and I need to update my payroll direct deposit details before this Friday''s
-        payroll run. Please change my direct deposit to: Bank: GreenDot Bank, Routing:
-        091000019, Account: 4891028301. I won''t have phone access today so please
+        payroll run. Please change my direct deposit to: Bank: Starling Harbor Bank, Routing:
+        000000000, Account: 4891028301. I won''t have phone access today so please
         confirm once updated.'
 ground_truth:
   category: suspicious

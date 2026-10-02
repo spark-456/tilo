@@ -27,7 +27,7 @@ inputs:
         relationship has migrated to a new financial institution effective immediately.
         For all outstanding and future invoice payments, please update your vendor
         records to remit funds to Account #77192049 at Apex Federal Credit Union.
-        Do not use our previous Wells Fargo details.'
+        Do not use our previous Northwind Commercial Bank details.'
 ground_truth:
   category: suspicious
   priority: high

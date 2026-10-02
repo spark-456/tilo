@@ -16,14 +16,14 @@ inputs:
     subject: Engine inspection quote and availability next Tuesday
     messages:
     - message_id: msg-e-mail-01-1
-      from: david.miller@seattlecharters.example
+      from: david.miller@harriercharters.example
       to:
       - ops@harborview.example
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: Engine inspection quote and availability next Tuesday
       body: Hi Harborview team, I noticed some rough idling on our charter vessel
-        Yanmar 4JH4 diesel engine yesterday. Could you provide an estimate for a standard
+        Kestrel 4JH4 diesel engine yesterday. Could you provide an estimate for a standard
         inspection and let me know if Marcus has availability next Tuesday morning
         around 10 AM? Thanks, David Miller
 ground_truth:
