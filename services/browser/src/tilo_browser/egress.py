@@ -22,6 +22,10 @@ _HOST = re.compile(r"^[a-z0-9-]+(?:\.[a-z0-9-]+)*$")
 _NUMERIC_LABEL = re.compile(r"^(?:\d+|0[xX][0-9a-fA-F]*)$")
 _UNSAFE_LOG = re.compile(r"[^A-Za-z0-9._~:/%!$&'()*+,;=\[\]-]")
 _LOG_LIMIT = 200
+_C0_AND_SPACE = "".join(map(chr, range(0x21)))
+_TAB_NEWLINE = re.compile(r"[\t\n\r]")
+_SCHEMES = re.compile(r"(?:[A-Za-z][A-Za-z0-9+.-]*:)+")  # one or more, so view-source:https: unwraps
+MAX_URL_LENGTH = 8192
 
 
 @dataclass(frozen=True)
@@ -41,17 +45,27 @@ class EgressBlocked(Exception):
 
 
 def sanitise_url(raw: str) -> str:
-    """Log form of any URL-ish string. Cuts query and fragment, then removes userinfo in every
-    form (`s://u:p@h`, `s:u:p@h`, `s:/u:p@h`, `//u:p@h`) BEFORE truncating, masks the host and
-    path (raw and percent-decoded) and replaces odd characters."""
-    base = re.split(r"[?#]", raw, maxsplit=1)[0]
-    m = re.match(r"^([A-Za-z][A-Za-z0-9+.-]*):", base)
-    prefix = f"{m.group(1).lower()}://" if m else "//"
-    rest = base[m.end() :] if m else base
+    """Log form of any URL-ish string: `scheme://host[:port]/path`, never userinfo, query or fragment.
+
+    First pre-processes the way browsers do (WHATWG: strip leading and trailing C0 controls and
+    spaces, delete every tab, LF and CR) and unwraps nested schemes (`view-source:https://...`,
+    `blob:https://...`; the outer scheme is kept). Userinfo is cut before truncating; host and path
+    are masked (raw and percent-decoded). Anything that is not `scheme://authority` (or
+    `//authority`) with a numeric port, or is over 8 KB, is logged as `scheme:` alone."""
+    s = _TAB_NEWLINE.sub("", raw.strip(_C0_AND_SPACE))
+    m = _SCHEMES.match(s)
+    scheme = m.group(0).split(":", 1)[0].lower() if m else ""
+    rest = re.split(r"[?#]", s[m.end() :] if m else s, maxsplit=1)[0]
+    if len(raw) > MAX_URL_LENGTH or not re.match(r"[/\\]{2}", rest):
+        return f"{scheme}:"
     parts = re.split(r"([/\\])", rest.lstrip("/\\"), maxsplit=1)
-    host = mask_decoded(parts[0].rsplit("@", 1)[-1])
+    host, _, port = parts[0].rsplit("@", 1)[-1].partition(":")
+    if port and not (port.isascii() and port.isdigit()):
+        return f"{scheme}:"
+    authority = mask_decoded(host) + (f":{port}" if port else "")
     path = "".join(parts[1:2]) + mask_decoded("".join(parts[2:])) if len(parts) > 1 else ""
-    return _UNSAFE_LOG.sub("_", (prefix + host + path)[:_LOG_LIMIT])
+    prefix = f"{scheme}://" if scheme else "//"
+    return _UNSAFE_LOG.sub("_", (prefix + authority + path)[:_LOG_LIMIT])
 
 
 def _is_ip_label(host: str) -> bool:
@@ -92,7 +106,12 @@ class EgressPolicy:
         def block(reason: str, host: str | None = None, scheme: str | None = None) -> Decision:
             return Decision(False, reason, sanitise_url(raw), host and mask_text(host), scheme)
 
-        if not raw or any(ch.isspace() or ch == "\\" or ord(ch) < 32 or ord(ch) == 127 for ch in raw):
+        # Anything a browser would rewrite before parsing (C0 or space at the ends, tab/LF/CR
+        # inside, backslashes) is refused outright, so the gate never judges a different URL
+        # than the one the browser would load. Nested schemes fail the scheme allowlist below.
+        if not raw or len(raw) > MAX_URL_LENGTH:
+            return block("invalid_url")
+        if any(ch.isspace() or ch == "\\" or ord(ch) < 32 or ord(ch) == 127 for ch in raw):
             return block("invalid_url")
         base, _, _fragment = raw.partition("#")
         base, _, query = base.partition("?")
