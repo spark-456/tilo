@@ -18,9 +18,8 @@ channel identity binding. Public ingress for signature-verified webhooks only.
   SEC-08 (signed webhooks and signed email links). FR-CHN-02, -03, -05, -06, -07 are built.
 
 ## Local rules
-- Webhooks signature-verified, idempotent, ordered per user; forged or replayed rejected. Never send real
-  email or WhatsApp from dev/CI. Never log bodies, secrets, tokens, nonces or full numbers (`mask_number`:
-  last 4); log exception types, not messages.
+- Webhooks signature-verified, idempotent, ordered per user; forged or replayed rejected. Never send real email or
+  WhatsApp from dev/CI. Never log bodies, secrets, tokens, nonces or full numbers (`mask_number`: last 4) or exception messages.
 - `whatsapp`: HMAC over raw bytes, dedupe via `DedupeStore.claim`, serialised per sender. Stale (older than
   300 s, or over 60 s ahead) claims nothing. Duplicate 200 "duplicate"; forged/missing signature 401; signed
   non-JSON 400; handler raises: claim kept (at-most-once), 200 "failed". App secret >= 32 bytes; wamids
@@ -38,3 +37,4 @@ channel identity binding. Public ingress for signature-verified webhooks only.
 - `cards` (FR-CHN-05; BQ-89): random button ids; a tap counts only from the card's bound number; T3 approve
   needs the PIN (next text within 300 s, one try; digits in the next 300 s are `pin_late`, never routed);
   Hold/Edit keep a gate open (repeats: one event); one send per card id; emits `channel.message_out`/`_in`.
+- `drafting` (FR-CHN-10; BQ-139-151): raw-capped thread as prompt data only, no tools; envelope from the thread; `find_invented` gate.
