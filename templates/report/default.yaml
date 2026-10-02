@@ -16,4 +16,5 @@ colors:
 typography:
   {title_size_pt: 24, subtitle_size_pt: 12, date_size_pt: 10, heading_size_pt: 16, body_size_pt: 10, bullet_size_pt: 10,
    table_header_size_pt: 9, table_body_size_pt: 9, chart_title_size_pt: 12, chart_label_size_pt: 8}
-format: {number_format: "%g"}
+# Python format spec for every float in tables and chart data labels; integers in tables use thousands separators.
+format: {number_format: ",.10g"}
