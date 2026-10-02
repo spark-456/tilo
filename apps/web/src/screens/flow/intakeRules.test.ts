@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { MAX_BYTES, MAX_FILES, MAX_TEXT, checkIntake } from "./intakeRules";
+import {
+  MAX_BYTES,
+  MAX_FILES,
+  MAX_TEXT,
+  checkIntake,
+  clipText,
+  codePoints,
+  fileStatuses,
+} from "./intakeRules";
 
 const MB = 1024 * 1024;
 const file = (name: string, size = 1) => ({ name, size });
@@ -42,5 +50,33 @@ describe("FR-INT-01 S-01: intake limits, with the server's wording", () => {
     expect(checkIntake("task", [file(long)])).toBe(
       `${"n".repeat(79)}… is not accepted; attach PDF, DOCX, PPTX, XLSX, CSV, PNG or JPG files.`,
     );
+  });
+
+  it("FR-INT-01 S-01: the text limit counts code points, as the server's len() does, and clipping never splits a pair", () => {
+    expect(codePoints("a😀b")).toBe(3);
+    expect(checkIntake("😀".repeat(MAX_TEXT), [])).toBeNull(); // 8,000 UTF-16 units
+    expect(checkIntake("😀".repeat(MAX_TEXT + 1), [])).toBe(
+      "The text is 4001 characters; the limit is 4000.",
+    );
+    const clipped = clipText(`${"😀".repeat(MAX_TEXT)}😀`);
+    expect(Array.from(clipped)).toHaveLength(MAX_TEXT);
+    expect(clipped.endsWith("😀")).toBe(true);
+    expect(clipText("short")).toBe("short");
+  });
+
+  it("FR-INT-01 S-01: each file's status reflects the type, the file count and the total size", () => {
+    expect(fileStatuses([file("a.pdf"), file("b.txt")])).toEqual(["Ready to send", "Not accepted"]);
+    expect(fileStatuses(files(12)).slice(9)).toEqual([
+      "Ready to send",
+      "Over the 10 file limit",
+      "Over the 10 file limit",
+    ]);
+    const sizes = [file("a.pdf", 50 * MB), file("b.pdf", 1), file("c.pdf", 1)];
+    expect(fileStatuses(sizes)).toEqual([
+      "Ready to send",
+      "Over the 50 MB total",
+      "Over the 50 MB total",
+    ]);
+    expect(fileStatuses([])).toEqual([]);
   });
 });
