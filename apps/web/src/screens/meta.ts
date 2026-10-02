@@ -63,7 +63,7 @@ export const SCREENS: readonly ScreenMeta[] = [
     ),
   ),
   built(must("S-06", "Needs-you queue and card", "P4", "/needs-you", /^\/needs-you\/?$/)),
-  must("S-07", "Gate sheet", "P4", "/needs-you/gate", /^\/needs-you\/gate\/?$/),
+  built(must("S-07", "Gate sheet", "P4", "/needs-you/gate", /^\/needs-you\/gate\/?$/)),
   must("S-08", "Connection consent sheet", "P6", "/needs-you/consent", /^\/needs-you\/consent\/?$/),
   must("S-09", "Meeting", "P2", "/meeting", /^\/meeting\/?$/),
   built(must("S-10", "Story lens", "P3", `${W}/story`, /^\/world\/([^/]+)\/story\/?$/)),

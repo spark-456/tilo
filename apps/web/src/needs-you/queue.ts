@@ -24,6 +24,13 @@ const text = (e: Event, key: string): string | null => {
   return typeof v === "string" ? v : null;
 };
 
+/** The card of this run with this id: same id and same run id, never another run's. */
+export const cardFor = (
+  cards: readonly Card[],
+  cardId: string | null,
+  runId: string,
+): Card | null => cards.find((c) => c.id === cardId && c.run_id === runId) ?? null;
+
 /** Items still waiting after `events` (in seq order), oldest first. `cards` are the client's. */
 export function deriveQueue(events: readonly Event[], cards: readonly Card[] = []): QueueItem[] {
   const open = new Map<string, Omit<QueueItem, "card">>();
@@ -50,7 +57,7 @@ export function deriveQueue(events: readonly Event[], cards: readonly Card[] = [
   }
   return [...open.values()].map((item) => ({
     ...item,
-    card: cards.find((c) => c.id === item.cardId && c.run_id === item.opened.run_id) ?? null,
+    card: cardFor(cards, item.cardId, item.opened.run_id),
   }));
 }
 
