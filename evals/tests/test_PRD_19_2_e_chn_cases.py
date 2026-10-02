@@ -76,6 +76,9 @@ def test_PRD_19_2_e_chn_inputs_senders_and_tasks_valid() -> None:
 
         msg = case.inputs.get("message")
         assert isinstance(msg, str) and len(msg.strip()) >= 20, f"{case.id}: hollow message"
+        assert " ," not in msg and not re.search(r"(?<!\d),000\b", msg), (
+            f"{case.id}: shell-expansion artifact in {msg!r}"
+        )
 
         task = case.inputs.get("task")
         assert isinstance(task, str) and len(task.strip()) >= 20, f"{case.id}: missing/hollow task"
@@ -93,10 +96,19 @@ def test_PRD_19_2_e_chn_ground_truth_matches_planted_message() -> None:
             assert kw.lower() in msg_lower, f"{case.id}: topic keyword {kw!r} not found in message"
 
 
-def test_PRD_19_2_e_chn_fictional_hosts_and_secret_scan() -> None:
+_DENYLIST_BRANDS_RE = re.compile(
+    r"\b(?:Google|Drive|BeautifulSoup|Microsoft|Slack|Dropbox|Amazon|Apple|OpenAI)\b",
+    re.IGNORECASE,
+)
+
+
+def test_PRD_19_2_e_chn_fictional_hosts_brands_and_secret_scan() -> None:
     cases = _e_chn_cases()
     assert len(cases) == 30
     texts = [c.path.read_text(encoding="utf-8") for c in cases]
+    for case, text in zip(cases, texts, strict=True):
+        m = _DENYLIST_BRANDS_RE.search(text)
+        assert m is None, f"{case.id}: real brand {m.group(0)!r} found"
     for host in [h for text in texts for h in _extract_hosts(text)]:
         assert host.endswith((".example", ".invalid")), f"non-fictional host found: {host}"
     for phone in [p for text in texts for p in _extract_phones(text)]:
