@@ -1,7 +1,7 @@
 import type { Brief, Card, Event, Layout } from "@tilo/contracts";
 import type {
-  ApprovalRequest,
   ApproachesResult,
+  ApprovalRequest,
   CardAnswer,
   DeliveryResult,
   IntakeResult,

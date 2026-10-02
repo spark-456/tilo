@@ -81,3 +81,34 @@ for (const viewport of [DESKTOP, MOBILE]) {
     }
   });
 }
+
+// UX-1: a client with latency (?client_delay_ms) must not shift the layout when data arrives.
+// Loading, error, empty and ready occupy one reserved box in FlowShell.
+for (const viewport of [DESKTOP, MOBILE]) {
+  for (const path of ["/task/t/approaches", "/world/w/delivery"]) {
+    test(`PRD-18.3 UX_1: ${path} has zero layout shifts while a slow client answers at ${viewport.width}x${viewport.height}`, async ({
+      page,
+    }) => {
+      test.setTimeout(60_000);
+      await page.setViewportSize(viewport);
+      await page.addInitScript(() => {
+        const w = window as unknown as { __shifts: number[] };
+        w.__shifts = [];
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries())
+            w.__shifts.push((entry as unknown as { value: number }).value);
+        }).observe({ type: "layout-shift", buffered: true });
+      });
+      // "commit": do not wait for the load event, which can outlast the 800 ms of latency.
+      await page.goto(`${path}?client_delay_ms=800`, { waitUntil: "commit" });
+      await expect(page.getByText(/^Loading the /)).toBeVisible();
+      await expect(page.getByText(/^Loading the /)).toBeHidden({ timeout: 10_000 });
+      await expect(page.locator(".flow-summary")).toBeVisible();
+      await page.waitForTimeout(300); // let a late shift be reported
+      const shifts = await page.evaluate(
+        () => (window as unknown as { __shifts: number[] }).__shifts,
+      );
+      expect(shifts).toEqual([]);
+    });
+  }
+}

@@ -1,10 +1,9 @@
 // PRD 18.3 flow screens S-01, S-02, S-03, S-04 and S-12 as placeholders (heading, one primary
 // button to the next step) that AGW-02 to AGW-05 fill in. Every client call has loading, empty
 // and error states with a retry (PRD 18.4); one filled primary button per screen (UX-1).
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { useClient } from "../api/ClientProvider";
 import type { ApproachesResult } from "../api/client";
-import type { FlowRoute } from "../router";
 import { useFlowRoute } from "../router";
 import { type Action, type Remote, useAction, useRemote } from "./remote";
 
@@ -23,7 +22,13 @@ function Notice({ message, onRetry }: { message: string; onRetry: () => void }) 
   );
 }
 
-/** The loading, error and empty states of one remote value; `children` renders the ready one. */
+function Summary({ children }: { children: ReactNode }) {
+  return <p className="flow-summary">{children}</p>;
+}
+
+/** The loading, error and empty states of one remote value; `children` renders the ready one.
+ * All four states sit in one `flow-slot` with a reserved height, so data arriving (UX-1, CLS)
+ * never moves what is below. */
 function Loaded<T>({
   what,
   remote,
@@ -37,12 +42,17 @@ function Loaded<T>({
   isEmpty: (value: T) => boolean;
   children: (value: T) => ReactNode;
 }) {
-  if (remote.status === "loading") return <output>Loading {what}…</output>;
-  if (remote.status === "error") return <Notice message={remote.message} onRetry={retry} />;
-  if (isEmpty(remote.value)) {
-    return <Notice message={`Nothing came back for ${what}. You can try again.`} onRetry={retry} />;
+  let body: ReactNode;
+  if (remote.status === "loading") {
+    body = <output className="flow-loading">Loading {what}…</output>;
+  } else if (remote.status === "error") {
+    body = <Notice message={remote.message} onRetry={retry} />;
+  } else if (isEmpty(remote.value)) {
+    body = <Notice message={`Nothing came back for ${what}. You can try again.`} onRetry={retry} />;
+  } else {
+    body = children(remote.value);
   }
-  return <>{children(remote.value)}</>;
+  return <div className="flow-slot">{body}</div>;
 }
 
 function Primary({
@@ -117,11 +127,14 @@ function Approaches({ taskId }: { taskId: string }) {
         isEmpty={(v) => v.chosen === undefined}
       >
         {({ result, chosen }) => (
-          <p>
-            Recommended: {chosen?.label}. This run can use up to {chosen?.credits.max} credits
-            (about US${((chosen?.credits.max ?? 0) * result.credit_usd).toFixed(2)}). You can pause
-            it any time.
-          </p>
+          <>
+            <Summary>Compare priced approaches and confirm your budget cap.</Summary>
+            <p className="flow-detail">
+              Recommended: {chosen?.label}. This run can use up to {chosen?.credits.max} credits
+              (about US${((chosen?.credits.max ?? 0) * result.credit_usd).toFixed(2)}). You can
+              pause it any time.
+            </p>
+          </>
         )}
       </Loaded>
       <Primary label="Approve & start" action={action} disabled={!ready?.chosen} />
@@ -147,11 +160,14 @@ function Delivery({ worldId }: { worldId: string }) {
         isEmpty={(d) => d.artifacts.length === 0}
       >
         {(d) => (
-          <p>
-            {d.artifacts.length} deliverable(s), {d.credits_used} credits used.
-            {d.time_saved &&
-              ` About ${d.time_saved.low_min} to ${d.time_saved.high_min} min saved (estimate).`}
-          </p>
+          <>
+            <Summary>Verified deliverables are ready at the Delivery Dock.</Summary>
+            <p className="flow-detail">
+              {d.artifacts.length} deliverable(s), {d.credits_used} credits used.
+              {d.time_saved &&
+                ` About ${d.time_saved.low_min} to ${d.time_saved.high_min} min saved (estimate).`}
+            </p>
+          </>
         )}
       </Loaded>
       <Primary label="New task" action={action} />
@@ -159,31 +175,49 @@ function Delivery({ worldId }: { worldId: string }) {
   );
 }
 
-const SUMMARY: Record<FlowRoute["screen"], string> = {
-  Start: "Describe what you want Tilo to handle.",
-  Understanding: "Review the extracted brief and clarifying questions.",
-  Approaches: "Compare priced approaches and confirm your budget cap.",
-  World: "Your agent team is working in the world.",
-  Delivery: "Verified deliverables are ready at the Delivery Dock.",
-};
-
 export function FlowShell() {
   const { route } = useFlowRoute();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const first = useRef(true);
+  const id = "taskId" in route ? route.taskId : "worldId" in route ? route.worldId : "";
+  const key = `${route.screen}:${id}`;
+  // After a route change, focus moves to the new screen's heading, so keyboard and
+  // screen-reader users keep their place.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` is the route-change trigger.
+  useEffect(() => {
+    if (first.current) first.current = false;
+    else heading.current?.focus();
+  }, [key]);
+  // Screens that load data show their summary only once it is ready (see Loaded's children).
   const screen = (() => {
     switch (route.screen) {
       case "Start":
-        return <Start />;
+        return (
+          <>
+            <Summary>Describe what you want Tilo to handle.</Summary>
+            <Start />
+          </>
+        );
       case "Understanding":
-        return <Understanding taskId={route.taskId} />;
+        return (
+          <>
+            <Summary>Review the extracted brief and clarifying questions.</Summary>
+            <Understanding taskId={route.taskId} />
+          </>
+        );
       case "Approaches":
         return <Approaches taskId={route.taskId} />;
       case "World":
-        return <World worldId={route.worldId} />;
+        return (
+          <>
+            <Summary>Watch the run here as it happens.</Summary>
+            <World worldId={route.worldId} />
+          </>
+        );
       case "Delivery":
         return <Delivery worldId={route.worldId} />;
     }
   })();
-  const id = "taskId" in route ? route.taskId : "worldId" in route ? route.worldId : "";
   return (
     <section
       className="flow-shell"
@@ -191,9 +225,10 @@ export function FlowShell() {
       data-screen={route.screen}
       aria-label="Task flow"
     >
-      <h1 className="flow-heading">{route.screen}</h1>
-      <p className="flow-summary">{SUMMARY[route.screen]}</p>
-      <div key={`${route.screen}:${id}`}>{screen}</div>
+      <h1 className="flow-heading" ref={heading} tabIndex={-1}>
+        {route.screen}
+      </h1>
+      <div key={key}>{screen}</div>
     </section>
   );
 }
