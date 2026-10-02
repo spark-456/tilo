@@ -33,8 +33,13 @@ export function replaySpeedFromSearch(search: string): number {
   return Number.isFinite(speed) && speed > 0 ? speed : 1;
 }
 
+/** The longest delay setTimeout honours; a larger one fires at once. */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
 const wait = (ms: number): Promise<void> =>
-  ms <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
+  ms <= 0
+    ? Promise.resolve()
+    : new Promise((resolve) => setTimeout(resolve, Math.min(ms, MAX_TIMER_MS)));
 
 /** TiloClient on the typed contract fixtures. Everything it returns is dev data (HR-4, BQ-07). */
 export class FixtureClient implements TiloClient {
@@ -105,7 +110,7 @@ export class FixtureClient implements TiloClient {
           onEvent(event);
           play(i + 1);
         },
-        Math.max(0, gap),
+        Math.min(Math.max(0, gap), MAX_TIMER_MS), // setTimeout overflows above 2^31-1 ms
       );
     };
     play(0);

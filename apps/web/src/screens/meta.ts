@@ -37,6 +37,8 @@ const must = (
   priority: "Must",
   ...(pattern ? { pattern } : {}),
 });
+/** Flip a row to built in the change that replaces its stub (AGW-08). */
+const built = (m: ScreenMeta): ScreenMeta => ({ ...m, status: "built" });
 const later = (id: string, name: string, pillar: string): ScreenMeta => ({
   id,
   name,
@@ -47,9 +49,9 @@ const later = (id: string, name: string, pillar: string): ScreenMeta => ({
 });
 
 export const SCREENS: readonly ScreenMeta[] = [
-  must("S-01", "Start", "P1", "/"),
-  must("S-02", "Understanding", "P1", `${T}/understanding`),
-  must("S-03", "Approaches and budget", "P1", `${T}/approaches`),
+  built(must("S-01", "Start", "P1", "/")),
+  built(must("S-02", "Understanding", "P1", `${T}/understanding`)),
+  built(must("S-03", "Approaches and budget", "P1", `${T}/approaches`)),
   must("S-04", "World with HUD", "P3", W),
   must("S-05", "Inspect panel", "P3", `${W}/inspect/B1`, /^\/world\/([^/]+)\/inspect\/([^/]+)\/?$/),
   must("S-06", "Needs-you queue and card", "P4", "/needs-you", /^\/needs-you\/?$/),
