@@ -623,8 +623,9 @@ a.secondary {
   font-weight: 700;
 }
 /* AGW-08 group B: cards, chips and rows after design/source "Tilo Worlds.dc.html" and "Tilo Team.dc.html".
-   Neutral role tokens only. A reserved body has a fixed height inline, so recorded events arriving
-   inside it never move what is around it (CLS). */
+   Neutral role tokens only. Every text size is on the PRD 18.2 scale (12/14/16/20/24/32/40 px,
+   as em of the 16 px shell size). A reserved body has a fixed height inline, so recorded events
+   arriving inside it never move what is around it (CLS). */
 .page {
   padding-top: 24px; /* clears the fixed fixture banner at the top right */
 }
@@ -633,32 +634,41 @@ a.secondary {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 .page-head h1 {
   margin: 0;
+  font: 900 2.5em / 1.1 var(--font-display); /* 40: the display step */
 }
 .page-sub {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
   max-width: 52ch;
   color: var(--color-ink-2);
-  font-size: 0.9375em;
+  font-size: 1em;
   line-height: 1.5;
 }
 .card {
   margin: 0 0 16px;
-  padding: 16px 20px;
+  padding: 20px 24px;
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-cards);
   background: var(--color-surface-1);
 }
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 4px;
+}
 .screen-section h2 {
-  margin: 0 0 4px;
-  font: 800 1.125em / 1.3 var(--font-display);
+  margin: 0;
+  font: 900 1.5em / 1.25 var(--font-display); /* 24: one step below the title */
 }
 .section-note,
 .empty-note {
-  margin: 0 0 8px;
+  margin: 0 0 12px;
   color: var(--color-ink-2);
   font-size: 0.875em;
   line-height: 1.5;
@@ -667,31 +677,33 @@ a.secondary {
   overflow-y: auto;
   height: calc(var(--lines) * 1.6em);
 }
-@media (max-width: 767px) {
-  .section-box.reserved {
-    height: calc(var(--lines-narrow) * 1.6em);
-  }
+.section-box.reserved:focus-visible,
+.screen-body a.pill:focus-visible,
+.field textarea:focus-visible,
+.field input:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
 }
 .section-box .flow-slot {
   min-height: 0; /* the reserved box, not the slot, holds the height */
   display: flow-root; /* a list's own margin stays inside the slot, so the slot never moves */
 }
-.rows {
+.blist {
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.row {
+.bitem {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--color-surface-2);
 }
-.row:last-child {
+.bitem:last-child {
   border-bottom: 0;
 }
-.row-main {
+.bitem-main {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -699,11 +711,17 @@ a.secondary {
   gap: 2px;
   line-height: 1.4;
 }
-.row-sub {
-  color: var(--color-ink-2);
-  font-size: 0.8125em;
+.bitem-main b {
+  font-size: 1em; /* 16: below the section title, above the muted line */
 }
-.chip {
+.bitem-sub {
+  color: var(--color-ink-2);
+  font-size: 0.875em;
+}
+.bitem .soon-row {
+  margin: 0;
+}
+.btag {
   display: inline-flex;
   align-items: center;
   flex: none;
@@ -717,22 +735,22 @@ a.secondary {
   font: 700 0.75em / 1 var(--font-ui);
   white-space: nowrap;
 }
-.chip[data-tone="done"] {
+.btag[data-tone="done"] {
   border-color: var(--color-signal-done);
 }
-.chip[data-tone="needs"] {
+.btag[data-tone="needs"] {
   border-color: var(--color-signal-needs);
 }
-.chip[data-tone="blocked"] {
+.btag[data-tone="blocked"] {
   border-color: var(--color-signal-blocked);
 }
-.chip[data-tone="fyi"] {
+.btag[data-tone="fyi"] {
   border-color: var(--color-signal-fyi);
 }
-.chip[data-tone="policy"] {
+.btag[data-tone="policy"] {
   border-color: var(--color-policy); /* PRD 18.6: the policy colour, with the word "Policy" */
 }
-.chip[data-tone="soon"] {
+.btag[data-tone="soon"] {
   border-style: dashed;
   color: var(--color-ink-2);
 }
@@ -740,61 +758,127 @@ a.secondary {
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); /* three figures fit one phone row */
 }
 .hero-stats b {
-  font: 900 1.75em / 1.2 var(--font-display);
+  font: 900 2em / 1.2 var(--font-display); /* 32 */
+}
+.hero-stats .stat-name {
+  font-size: 0.875em;
 }
 .soon-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+.filter-bar {
   margin: 0 0 16px;
 }
-.row .soon-row {
-  margin: 0;
-}
-.secondary.placeholder.compact {
+.page .secondary.placeholder.compact {
   min-height: 36px;
   padding: 0 12px;
-  font-size: 0.8125em;
+  font-size: 0.875em;
 }
-.secondary.placeholder.compact .soon {
-  position: absolute; /* still in the accessible name; the row's one chip says it once */
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
+.world-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.world-grid .flow-slot {
+  min-height: 0;
 }
 .world-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  overflow: hidden;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
 }
-.world-card h3 {
-  margin: 0;
-  font: 800 1.125em / 1.3 var(--font-display);
-}
-.world-card .card-top {
+.world-thumb {
+  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.world-card .card-top .chip:last-child {
-  min-width: 7em; /* "Replaying" and "Finished" take the same room, so the pill never moves */
+  flex: none;
+  align-items: flex-end; /* the drawing sits under the tag and the state pill */
   justify-content: center;
+  box-sizing: border-box;
+  height: 9em;
+  padding-bottom: 8px;
+  background: var(--color-fog);
+}
+.world-thumb svg {
+  height: 5em;
+}
+.world-thumb .btag {
+  position: absolute;
+  top: 12px;
+}
+.world-thumb .btag:first-child {
+  left: 12px;
+}
+.world-thumb .btag:last-child {
+  right: 12px;
+  min-width: 6.5em; /* "Recorded", "Replaying" and "Finished" take the same room */
+  justify-content: center;
+}
+.world-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+.world-card h2 {
+  margin: 0;
+  min-height: 2.6em; /* two lines: the title arriving with the first event moves nothing */
+  font: 900 1.25em / 1.3 var(--font-display); /* 20 */
+}
+.world-card [data-testid="replay-note"] {
+  min-height: 4.2em; /* three lines of 14 px text at 1.5 */
+}
+.world-card .bitem-sub {
+  margin: 0;
+  line-height: 1.5;
 }
 .world-card progress {
   width: 100%;
   height: 10px;
   accent-color: var(--color-brand-primary);
 }
+.world-card .card-foot span:first-child {
+  white-space: nowrap;
+}
 .world-card .card-foot {
   display: grid;
-  grid-template-columns: 1fr 1fr; /* both left-aligned: a changing text never moves its neighbour */
+  grid-template-columns: 1fr 7em; /* the date column has a fixed width: a changing text never moves it */
   gap: 8px;
   margin: 0;
-  font-size: 0.8125em;
+  font-size: 0.875em;
   font-weight: 700;
+}
+.world-card .soon-row {
+  margin-top: auto;
+}
+/* Read-only form fields for screens whose form is not built yet (S-24). */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0;
+  font-weight: 700;
+  font-size: 0.875em;
+}
+.field textarea,
+.field input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 2px dashed var(--color-ink-3);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font: 400 1em / 1.4 var(--font-ui);
+  cursor: not-allowed;
 }
 .screen-body a.pill {
   display: inline-flex;
@@ -809,23 +893,29 @@ a.secondary {
   text-decoration: none;
 }
 @media (max-width: 767px) {
-  .screen-body h1 {
-    font-size: 1.25em; /* the longest title fits one line in either font, so a font swap moves nothing */
+  .page-head h1 {
+    font-size: 2em; /* 32 */
+  }
+  .screen-section h2 {
+    font-size: 1.25em; /* 20 */
   }
   .page-head {
     flex-direction: column;
     gap: 12px;
   }
-  .row {
+  .bitem {
     flex-wrap: wrap;
   }
-  .row-main {
+  .bitem-main {
     flex-basis: 100%; /* the name gets the whole line; its state and control sit below it */
   }
-  .screen-body a.pill {
-    min-height: 44px;
+  .card {
+    padding: 16px;
   }
-  .secondary.placeholder.compact {
+  .screen-body a.pill,
+  .page .secondary.placeholder.compact,
+  .field textarea,
+  .field input {
     min-height: 44px;
   }
 }

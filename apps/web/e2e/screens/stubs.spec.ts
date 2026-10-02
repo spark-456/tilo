@@ -76,9 +76,7 @@ test("AGW-08 /screens lists every screen id with built or placeholder status and
   await expect(rows.last()).toContainText("S-25");
   // Each linked screen opens: follow the S-13 link.
   await page.getByRole("link", { name: "Library and Memory Vault" }).click();
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Library and Memory Vault" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
   expect(page.url()).toMatch(/\/library$/);
   expect(problems).toEqual([]);
 });
@@ -102,9 +100,7 @@ test("AGW-08 More reaches every screen the tabs do not, and nav links navigate",
   await page.getByRole("link", { name: "Autonomy" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Autonomy" })).toBeVisible();
   await nav.getByRole("link", { name: "Library" }).click();
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Library and Memory Vault" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { level: 1, name: "Autonomy" })).toBeVisible();
   expect(problems).toEqual([]);

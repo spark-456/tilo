@@ -1,14 +1,28 @@
 // S-15 Autonomy (PRD 18.3, 10.4): levels, the gates that stand in for policies, the kill switch and
-// the Autonomy log. The log is every recorded event that carries `authz` (UX-9); an action a policy
-// authorised wears the policy colour and a "Policy" stamp (PRD 18.6). Policies themselves are not
-// served by the fixture client, so none is listed. Rows after design/source "Tilo Team.dc.html"
-// ("When Tilo stops and asks", rules only); the rest uses neutral role tokens.
+// the Autonomy log. The log is every recorded event that carries `authz` (UX-9); each row says who
+// authorised it and when (authz.at) and links to its authorisation in the Trace (HR-7). An action a
+// policy authorised wears the policy colour and a "Policy" stamp (PRD 18.6). Policies themselves
+// are not served by the fixture client, so none is listed. Rows after design/source "Tilo Team.dc.html".
+import type { Event } from "@tilo/contracts";
 import { useClient } from "../api/ClientProvider";
 import { waitingForYou } from "../world/runLog";
+import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
 import { findItem } from "./S_05";
-import { Chip, Page, Row, Section, Soon, Stats, authzText, useFixtureRun, words } from "./kit";
+import {
+  Chip,
+  Page,
+  Row,
+  Section,
+  Soon,
+  Stats,
+  authzText,
+  field,
+  stamp,
+  useFixtureRun,
+  words,
+} from "./kit";
 import { useRemote } from "./remote";
 
 // PRD 10.4 levels.
@@ -19,11 +33,21 @@ const LEVELS: ReadonlyArray<readonly [string, string, string]> = [
   ["L3", "Standing rules", "Pre-authorised actions run within limits and appear in a digest."],
 ];
 
+/** The approval that released an outgoing action (same outbox entry), else the event itself. */
+const authorisation = (events: readonly Event[], e: Event): Event =>
+  events.find(
+    (x) =>
+      x.type === "approval.resolved" &&
+      field(x, "outbox_id") != null &&
+      field(x, "outbox_id") === field(e, "outbox_id"),
+  ) ?? e;
+
 export function S_15() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
   const [layout, retry] = useRemote("load the gates", () => client.getLayout(worldId));
   const log = events.filter((e) => e.authz !== null);
+  const trace = `/world/${encodeURIComponent(worldId)}/trace`;
   return (
     <Page
       testid="autonomy"
@@ -37,28 +61,24 @@ export function S_15() {
         ]}
       />
       <Section
-        title="Stop all autopilot"
-        note="Sets every rule to level L1 at once, so everything waits for you. Pause all also stops the agents."
+        title="Levels"
+        note="Every action starts at level L1: it waits for you until you say otherwise."
       >
-        <Placeholder label="Stop all autopilot" compact />
-      </Section>
-      <Section title="Levels">
-        <ul className="rows">
+        <ul className="blist">
           {LEVELS.map(([id, name, what]) => (
-            <Row
-              key={id}
-              name={name}
-              sub={what}
-              state={<Chip tone={id === "L1" ? "done" : "fyi"}>{id}</Chip>}
-            />
+            <Row key={id} name={name} sub={what} state={<Chip tone="none">{id}</Chip>} />
           ))}
         </ul>
       </Section>
-      <Section title="Rules" note="A gate with no rule waits for a person." reserve={7}>
-        <Soon labels={["New rule"]} />
+      <Section
+        title="Rules"
+        note="A gate with no rule waits for a person."
+        reserve={5}
+        action={<Soon labels={["New rule"]} />}
+      >
         <Loaded what="the gates" remote={layout} retry={retry} isEmpty={() => false}>
           {(l) => (
-            <ul className="rows" data-testid="gates">
+            <ul className="blist" data-testid="gates">
               {l.semantic.gates.map((g) => (
                 <Row
                   key={g.id}
@@ -80,33 +100,54 @@ export function S_15() {
       <Section
         title="Autonomy log"
         note="Every action with an authoriser, as it was recorded."
-        reserve={[14, 26]}
+        reserve={[16, 30]}
       >
         {log.length === 0 ? (
           <p className="empty-note">No authorised action has been recorded yet.</p>
         ) : (
-          <ul className="rows" data-testid="autonomy-log">
-            {log.map((e) => (
-              <Row
-                key={e.seq}
-                name={e.summary}
-                sub={e.authz ? `Authorised by ${authzText(e.authz).toLowerCase()}` : undefined}
-                state={
-                  <Chip tone={e.authz?.by === "policy" ? "policy" : "done"}>
-                    {e.authz?.by === "policy" ? "Policy stamp" : "Approved"}
-                  </Chip>
-                }
-              >
-                {e.type === "data.transfer" && (
+          <ul className="blist" data-testid="autonomy-log">
+            {log.map((e) => {
+              const a = e.authz;
+              const by = authorisation(events, e);
+              return (
+                <Row
+                  key={e.seq}
+                  name={e.summary}
+                  sub={
+                    a ? `Authorised by ${authzText(a).toLowerCase()} · ${stamp(a.at)}` : undefined
+                  }
+                  state={
+                    <Chip tone={a?.by === "policy" ? "policy" : "done"}>
+                      {a?.by === "policy" ? "Policy stamp" : "Approved"}
+                    </Chip>
+                  }
+                >
                   <span className="soon-row">
-                    <Placeholder label="Undo" compact />
-                    <Placeholder label="Report" compact />
+                    <AppLink
+                      to={trace}
+                      className="pill"
+                      aria-label={`Authorisation for: ${e.summary} (${by.summary})`}
+                    >
+                      See authorisation
+                    </AppLink>
+                    {e.type === "data.transfer" && field(e, "direction") === "out" && (
+                      <>
+                        <Placeholder label="Undo" compact />
+                        <Placeholder label="Report" compact />
+                      </>
+                    )}
                   </span>
-                )}
-              </Row>
-            ))}
+                </Row>
+              );
+            })}
           </ul>
         )}
+      </Section>
+      <Section
+        title="Stop all autopilot"
+        note="Sets every rule to level L1 at once, so everything waits for you. Pause all also stops the agents."
+      >
+        <Placeholder label="Stop all autopilot" compact />
       </Section>
     </Page>
   );

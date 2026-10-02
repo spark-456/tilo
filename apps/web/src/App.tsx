@@ -17,6 +17,18 @@ const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
   </li>
 ));
 const WORLD_SCREENS: ReadonlySet<string> = new Set(["S-05", "S-10", "S-11", "S-12"]);
+/** Screens outside a world address that still read the replayed run (AGW-08 group B): HR-6 applies. */
+const RUN_SCREENS: ReadonlySet<string> = new Set([
+  "S-13",
+  "S-14",
+  "S-15",
+  "S-16",
+  "S-17",
+  "S-18",
+  "S-19",
+  "S-21",
+  "S-23",
+]);
 const stageMode = new URLSearchParams(window.location.search).get("display") === "stage";
 
 /** PRD 18.3 layout frame: desktop rails either side of the stage; mobile bottom tabs. */
@@ -81,13 +93,15 @@ export function App() {
           {world.speedLabel}
         </div>
       )}
-      {worldId && replaySpeed !== 1 && !world.active && (
-        // HR-6: a replay that is not at its recorded pace always says so, on every world screen and
-        // after lens navigation drops ?speed (the client keeps its speed).
-        <div className="speed-badge client-speed" data-testid="speed-badge">
-          {replaySpeed}×
-        </div>
-      )}
+      {(worldId || (screen && RUN_SCREENS.has(screen.id))) &&
+        replaySpeed !== 1 &&
+        !world.active && (
+          // HR-6: a replay that is not at its recorded pace always says so, on every world screen and
+          // after lens navigation drops ?speed (the client keeps its speed).
+          <div className="speed-badge client-speed" data-testid="speed-badge">
+            {replaySpeed}×
+          </div>
+        )}
       {mobile ? (
         <>
           {hudWorld && (

@@ -22,12 +22,28 @@ export const field = (e: Event, key: string): unknown => (e.data as Record<strin
 export const words = (id: string): string =>
   id.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
+/** Real plurals: "1 level", "2 levels". */
+export const plural = (n: number, one: string, many = `${one}s`): string =>
+  `${n} ${n === 1 ? one : many}`;
+
+/** Brand and channel names as people write them ("WhatsApp", "Google Drive"). */
+const NAMES: Readonly<Record<string, string>> = {
+  gmail: "Gmail",
+  google_drive: "Google Drive",
+  whatsapp: "WhatsApp",
+  email: "Email",
+};
+export const nameOf = (id: string): string => NAMES[id] ?? words(id);
+
 /** "2026-09-29T09:30:02.000Z" -> "29 Sep 2026". */
 export function longDate(ts: string): string {
   const d = new Date(ts);
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-09-29T09:32:09.500Z" -> "29 Sep 2026, 09:32 UTC". */
+export const stamp = (ts: string): string => `${longDate(ts)}, ${ts.slice(11, 16)} UTC`;
 
 /** Who authorised an action, in words (PRD 10.4 `authz`): never a colour alone, never an id. */
 export const authzText = (a: Authz): string =>
@@ -55,11 +71,14 @@ export function Page({
   );
 }
 
-/** Every control that does nothing yet, in one compact row (AGW-08): visible, aria-disabled. */
-export function Soon({ labels }: { labels: readonly string[] }) {
+/** Controls that do nothing yet, in one compact row (AGW-08): visible, aria-disabled. Put it
+ * where the real controls will sit: a section's `action`, a filter bar, or the end of a section. */
+export function Soon({
+  labels,
+  className = "",
+}: { labels: readonly string[]; className?: string }) {
   return (
-    <div className="soon-row">
-      <Chip tone="soon">Coming soon</Chip>
+    <div className={`soon-row ${className}`.trim()}>
       {labels.map((l) => (
         <Placeholder key={l} label={l} compact />
       ))}
@@ -70,7 +89,7 @@ export function Soon({ labels }: { labels: readonly string[] }) {
 /** A state in words, tinted by tone: the colour never carries the meaning alone. */
 export function Chip({ tone, children }: { tone: string; children: ReactNode }) {
   return (
-    <span className="chip" data-tone={tone}>
+    <span className="btag" data-tone={tone}>
       {children}
     </span>
   );
@@ -99,12 +118,16 @@ export function Section({
   title,
   note,
   reserve,
+  action,
   children,
-}: { title: string; note?: string; reserve?: Lines; children: ReactNode }) {
+}: { title: string; note?: string; reserve?: Lines; action?: ReactNode; children: ReactNode }) {
   const [wide, narrow] = typeof reserve === "number" ? [reserve, reserve] : (reserve ?? []);
   return (
     <section className="screen-section card" aria-label={title}>
-      <h2>{title}</h2>
+      <div className="card-head">
+        <h2>{title}</h2>
+        {action}
+      </div>
       {note && <p className="section-note">{note}</p>}
       {wide ? (
         <section
@@ -136,10 +159,10 @@ export function Row({
   children,
 }: { name: ReactNode; sub?: ReactNode; state?: ReactNode; children?: ReactNode }) {
   return (
-    <li className="row">
-      <div className="row-main">
+    <li className="bitem">
+      <div className="bitem-main">
         <b>{name}</b>
-        {sub && <span className="row-sub">{sub}</span>}
+        {sub && <span className="bitem-sub">{sub}</span>}
       </div>
       {state}
       {children}
@@ -161,7 +184,7 @@ export function EventList({
 }) {
   if (events.length === 0) return <p className="empty-note">{empty}</p>;
   return (
-    <ul className="rows">
+    <ul className="blist">
       {events.map((e) => (
         <Row key={e.seq} name={e.summary} sub={elapsed(all, e)} state={extra?.(e)} />
       ))}
