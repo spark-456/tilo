@@ -1,9 +1,13 @@
 // Test-only helpers for the AGW-05 Needs-you tests (not shipped app code). Every event is built from
 // its contract fixture in contracts/fixtures/events/valid, so it carries every required field
-// (outbox_id, item, approver, team_lead, authz ...); a test only names what it varies.
+// (outbox_id, item, approver, team_lead, authz ...); a test only names what it varies. `liveClient`
+// is a client whose events and answers the test controls one by one.
 import fs from "node:fs";
 import path from "node:path";
 import type { Card, Event } from "@tilo/contracts";
+import { act } from "react";
+import type { CardAnswer } from "../src/api/client";
+import { FixtureClient } from "../src/api/fixtureClient";
 import { CARDS_VALID } from "../src/api/fixtures/cards";
 import { CONTRACTS_DIR } from "./worldFixtures";
 
@@ -47,8 +51,13 @@ const build = (
   };
 };
 
-export const requested = (seq: number, cardId = GATE_REPLY.id, gateId = "G1", run = RUN_A) =>
-  build("approval.requested", seq, run, { gate_id: gateId, card_id: cardId });
+export const requested = (
+  seq: number,
+  cardId = GATE_REPLY.id,
+  gateId = "G1",
+  run = RUN_A,
+  data: object = {},
+) => build("approval.requested", seq, run, { gate_id: gateId, card_id: cardId, ...data });
 export const resolved = (
   seq: number,
   option: string,
@@ -57,9 +66,34 @@ export const resolved = (
   run = RUN_A,
   over: Partial<Event> = {},
 ) => build("approval.resolved", seq, run, { gate_id: gateId, card_id: cardId, option }, over);
-export const policyApplied = (seq: number, gateId = "G1", run = RUN_A, over: Partial<Event> = {}) =>
-  build("policy.applied", seq, run, { gate_id: gateId }, over);
+export const policyApplied = (
+  seq: number,
+  gateId = "G1",
+  run = RUN_A,
+  over: Partial<Event> = {},
+  data: object = {},
+) => build("policy.applied", seq, run, { gate_id: gateId, ...data }, over);
 export const routed = (seq: number, cardId = QUESTION.id, actor = "A_s1", run = RUN_A) =>
   build("question.routed", seq, run, { card_id: cardId }, { actor });
 export const answered = (seq: number, target = "A_s1", run = RUN_A, over: Partial<Event> = {}) =>
   build("question.answered", seq, run, {}, { target, ...over });
+
+/** A client whose events arrive when the test pushes them, and which records every answer. */
+export function liveClient(cards: readonly Card[]) {
+  const sent: Array<readonly [string, CardAnswer]> = [];
+  let deliver: (e: Event) => void = () => undefined;
+  const client = new FixtureClient();
+  client.subscribeEvents = (_world, onEvent) => {
+    deliver = onEvent;
+    return () => undefined;
+  };
+  client.listCards = async () => [...cards];
+  client.answerCard = async (id, answer) => {
+    sent.push([id, answer]);
+  };
+  return {
+    client,
+    sent,
+    push: (e: Event) => act(async () => deliver(e)),
+  };
+}

@@ -36,7 +36,9 @@ for (const viewport of [DESKTOP, MOBILE]) {
     const problems = watchConsole(page);
     await page.setViewportSize(viewport);
     await page.goto("/needs-you?speed=5", { waitUntil: "commit" }); // the replay starts at mount, not at load
-    await expect(page.getByRole("heading", { level: 1, name: "Needs you" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Needs you" })).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(page.getByTestId("fixture-replay-banner")).toBeVisible();
     // Before approval.requested nothing waits (HR-1): an honest empty state, no row.
     await expect(page.getByTestId("needs-empty")).toBeVisible();

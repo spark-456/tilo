@@ -6,7 +6,6 @@ import { expectNoDeadControls, watchConsole } from "../support/screens";
 import { DESKTOP, MOBILE } from "../support/viewports";
 
 const STUBS: ReadonlyArray<readonly [string, string, string]> = [
-  ["S_07", "/needs-you/gate", "Gate sheet"],
   ["S_08", "/needs-you/consent", "Connection consent sheet"],
   ["S_09", "/meeting", "Meeting"],
 ];
