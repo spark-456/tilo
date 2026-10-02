@@ -15,7 +15,7 @@ channel identity binding. Public ingress for signature-verified webhooks only.
 
 ## Requirement IDs
 - Section 11 (channels and Email Autopilot); SEC-06 (channel identity binding and T3 PIN),
-  SEC-08 (signed webhooks and signed email links). FR-CHN-02, -03, -06, -07 are built.
+  SEC-08 (signed webhooks and signed email links). FR-CHN-02, -03, -05, -06, -07 are built.
 
 ## Local rules
 - Webhooks are signature-verified, idempotent, ordered per user; forged or replayed requests are
@@ -43,3 +43,8 @@ channel identity binding. Public ingress for signature-verified webhooks only.
   slots; a binding counts only while `num:` and `user:` records agree and `now < verified_at + 30 d`.
 - `inbound`: unbound sender -> one fixed opt-in text with the web URL, nothing else runs; bound ->
   keywords, then cards, else `unhandled` (FR-CHN-04).
+- `cards` (FR-CHN-05; BQ-89): one reply button per option, random opaque ids; a tap counts only from the
+  number the card went to while still bound to its user; T3 approve asks for the PIN (next text within
+  300 s, one try per tap) and only then answers with `pin_verified=True`; typed text never answers; the
+  API emits `question.answered` / `approval.resolved`, channels only `channel.message_out` / `_in`.
+  Sent-card state is in memory (no store in the pinned API yet).
