@@ -3,7 +3,9 @@ name = "tilo-render"
 version = "0.1.0"
 description = "tilo_render: PDF and PPTX deliverables from templates with data-bound charts (PRD 12.4, FR-CON-09)"
 requires-python = "==3.12.*"
-dependencies = []
+dependencies = [
+    "pydantic>=2.13.5",
+]
 
 [build-system]
 requires = ["hatchling"]

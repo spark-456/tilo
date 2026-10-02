@@ -8,7 +8,7 @@ from __future__ import annotations
 import enum
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, TypedDict
 
 from pydantic import BaseModel, ConfigDict
 
@@ -80,9 +80,20 @@ class SearchProvider(ABC):  # PRD 6.1: grounded search
     def search(self, query: str, **kwargs: Any) -> Any: ...
 
 
-class SafetyProvider(ABC):  # PRD 10.4: safety screening, e.g. "no safety flags" conditions
+class SafetyResult(TypedDict):  # CC-SP-47: the one fixed SafetyProvider.check() result
+    flagged: bool
+    reason: str | None
+
+
+class SafetyProvider(ABC):  # PRD 10.4, 16.3 item 2: screens intake, tool output, mail and model output
     @abstractmethod
-    def check(self, text: str, **kwargs: Any) -> Any: ...
+    def check(self, text: str, *, content: bytes | None = None, mime_type: str | None = None) -> SafetyResult:
+        """Screens `text`, or a native file (`check("", content=..., mime_type=...)`,
+        no text extracted). A media type the adapter cannot screen must raise
+        `RequestError`, never return `flagged: False` (fails closed)."""
+
+    def redact(self, text: str) -> str:  # same role as ModelProvider.redact (PRD 16.1 rule 4)
+        return text
 
 
 class SpeechProvider(ABC):  # FR-INT-14, FR-CHN-16: voice intake transcription

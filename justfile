@@ -69,16 +69,16 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src services/render/src
+    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src services/render/src services/channels/src
     pnpm -r exec tsc --noEmit
 
 # Start the Firestore emulator and run the harness skeleton against it (P0-09).
 harness-skeleton:
     uv run --package tilo-harness python -m tilo_harness.skeleton --world w_harness_skeleton --run r_harness_skeleton
 
-# Run the eval harness (not built yet — ticket P3).
+# Replay the eval set (no paid calls) into the git-ignored evals/results.local.md (evals/results.md is the committed pass record); exit 0 all passed, 1 a case failed, 2 error, 3 stopped at the credit cap (EFF-07).
 eval:
-    python -c "print('eval harness not built yet (ticket P3); nothing to run')"
+    uv run python -m tilo_evals run --pass full --results-md evals/results.local.md
 
 # PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
 conformance:
