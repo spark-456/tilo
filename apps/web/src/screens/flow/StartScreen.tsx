@@ -7,6 +7,7 @@ import { SUGGESTED_TASKS } from "../../api/fixtures/suggestedTasks";
 // A circular import with FlowShell (which renders this): both are only used at render time.
 import { Primary, Summary } from "../FlowShell";
 import { useAction } from "../remote";
+import { rememberIntake } from "../s02/Understanding";
 import {
   ACCEPTED,
   ACCEPT_ATTR,
@@ -31,6 +32,7 @@ export function StartScreen() {
   const picker = useRef<HTMLInputElement>(null);
   const action = useAction("start the task", async () => {
     const result = await client.submitIntake(text, files);
+    rememberIntake(result); // S-02 shows this brief; the client has no "get intake" call
     return `/task/${encodeURIComponent(result.task_id)}/understanding`;
   });
 
