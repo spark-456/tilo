@@ -1178,3 +1178,54 @@ a.secondary {
     min-height: 3em;
   }
 }
+/* AGW-03 S-02 Understanding: brief chips, files, applied preferences and clarifying questions. */
+.flow-shell[data-screen="Understanding"] {
+  width: min(520px, calc(100vw - 464px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+@media (max-width: 767px) {
+  .flow-shell[data-screen="Understanding"] {
+    width: calc(100vw - 32px);
+    max-height: calc(100vh - 112px);
+  }
+}
+.brief-chips,
+.question-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.brief-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 700 0.875em var(--font-ui);
+}
+.brief-chip input,
+.brief-chip select,
+.question-input {
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 400 1em / 1.4 var(--font-ui);
+}
+.brief-chip [aria-invalid="true"] {
+  border-color: var(--color-signal-blocked);
+}
+.question-item {
+  margin: 0 0 10px;
+  padding: 8px;
+  border: 1px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  font-size: 0.875em;
+}
+.assumed-note {
+  margin: 6px 0 0;
+  color: var(--color-ink-2);
+  font-weight: 700;
+}
