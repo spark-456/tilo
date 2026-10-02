@@ -200,7 +200,7 @@ def test_FR_INT_03_a_director_failure_logs_a_category_not_the_error_text(clear_f
 
 def test_FR_INT_02_a_safety_failure_logs_a_category_not_the_error_text(clear_flow, caplog):
     class Failing(SafetyProvider):
-        def check(self, text: str, **kwargs: Any) -> Any:
+        def _check(self, text: str, **kwargs: Any) -> Any:
             raise ProviderError(f"upstream replied {ECHO}")
 
     clear_flow.app.dependency_overrides[intake_module.get_safety] = lambda: Failing()
