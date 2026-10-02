@@ -24,7 +24,9 @@ from fastapi import HTTPException
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
+from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router
+from tilo_providers.safety import build_safety_provider
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
 Channel = Literal["web", "mobile_web", "whatsapp", "email"]
@@ -105,6 +107,14 @@ class Store:
     # own per-world and per-policy locks; opaque to every route outside dispatch.py.
     tasks: dict[str, TaskRecord] = field(default_factory=dict)  # task_id -> record (CL-INT-1)
     memory: MemoryLookup = field(default_factory=InMemoryPreferenceStore)  # FR-INT-05 seam until P7
+    grant_locks: dict[str, threading.Lock] = field(default_factory=dict, repr=False, compare=False)
+    _grant_locks_guard: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+
+    def grant_lock(self, owner: str) -> threading.Lock:
+        """FR-INT-08: one owner's grants are decided one at a time, so a policy's daily limits count every
+        earlier grant (two concurrent approves could otherwise both read the same history)."""
+        with self._grant_locks_guard:
+            return self.grant_locks.setdefault(owner, threading.Lock())
 
 
 class EventRejected(Exception):
@@ -154,6 +164,18 @@ def get_router() -> Router:
     except ProviderConfigError as exc:
         logger.warning("model router unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model router is not configured.") from exc
+
+
+def get_safety() -> SafetyProvider:
+    """PRD 16.3 item 2: built from the `safety` role on every call; no role, or a provider the factory refuses
+    (the fake when live or deployed), closes the screened routes with 503."""
+    try:
+        return build_safety_provider(providers_config(), fixtures_dir=FIXTURES_DIR)
+    except ProviderConfigError as exc:
+        logger.warning("safety provider unavailable: %s", exc)
+        raise HTTPException(
+            status_code=503, detail="No safety provider is configured; nothing is screened, so nothing is accepted."
+        ) from exc
 
 
 def _dispatch_config(key: str, default: float) -> float:

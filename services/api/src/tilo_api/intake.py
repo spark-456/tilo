@@ -28,14 +28,13 @@ from tilo_planning.intake import (
     screen_task_text,
     submit_intake,
 )
-from tilo_providers.config import ProviderConfigError
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Router
-from tilo_providers.safety import build_safety_provider
 
 from tilo_api import deps
+from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.tasks import create_task
 
 router = APIRouter()
@@ -46,14 +45,6 @@ _store = InMemoryArtifactStore()
 
 def get_store() -> InMemoryArtifactStore:
     return _store
-
-
-def get_safety() -> SafetyProvider:
-    try:
-        return build_safety_provider(deps.providers_config(), fixtures_dir=deps.FIXTURES_DIR)
-    except ProviderConfigError as exc:
-        logger.warning("safety provider unavailable: %s", exc)
-        raise HTTPException(status_code=503, detail="No safety provider is configured; intake is closed.") from exc
 
 
 def _screen_and_store(request: IntakeRequest, safety: SafetyProvider, store: InMemoryArtifactStore) -> IntakeResult:

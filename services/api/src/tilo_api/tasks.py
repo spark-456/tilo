@@ -11,7 +11,7 @@ wired, and each task appends to it in strictly increasing `seq`.
 from __future__ import annotations
 
 import copy
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
 from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
@@ -23,6 +23,9 @@ from tilo_planning.approaches import ApproachProposalError, propose_approaches
 from tilo_planning.brief import BriefValidationError, edit_brief_field, extract_brief
 from tilo_planning.intake import IntakeResult
 from tilo_planning.questions import apply_answer, generate_questions, record_assumption
+from tilo_providers.errors import ProviderError
+from tilo_providers.interfaces import SafetyProvider
+from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Router
 
 from tilo_api import deps
@@ -124,20 +127,58 @@ def _brief(task: deps.TaskRecord, answers: dict[str, str | None], edits: dict[st
     return brief
 
 
+def _strings(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict | list):
+        for item in value.values() if isinstance(value, dict) else value:
+            yield from _strings(item)
+
+
+def _screen(safety: SafetyProvider, strings: list[str]) -> None:
+    """PRD 16.3 items 1-2: what a person adds to the brief reaches the Director, so it is screened first."""
+    if not strings:
+        return
+    try:
+        flagged = safety.check("\n".join(strings))["flagged"]
+    except (ProviderError, ReplayMissError) as exc:
+        raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing changed.") from exc
+    if flagged:
+        raise HTTPException(status_code=422, detail="The safety screen flagged this change; rephrase it.")
+
+
+def _foreign_sources(task: deps.TaskRecord, edits: dict[str, Any]) -> bool:
+    """PRD 10.1: a file, connector or memory source must already be this task's (its own uploads, or what code
+    applied); a person may add only url and web sources."""
+    sources = edits.get("sources")
+    if not isinstance(sources, list):
+        return False  # the brief's own validation refuses it
+    known = {(s["kind"], s["ref"]) for s in task.draft["sources"]}
+    added = [(s.get("kind"), s.get("ref")) for s in sources if isinstance(s, dict)]
+    return any(kind in ("file", "connector", "memory") and (kind, ref) not in known for kind, ref in added)
+
+
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 StoreDep = Annotated[deps.Store, Depends(deps.get_store)]
 
 
 @router.post("/tasks/{task_id}/answers")
 def answer_questions(
-    task_id: str, principal: Principal, body: Annotated[AnswersIn, Depends(_json_body(AnswersIn))], store: StoreDep
+    task_id: str,
+    principal: Principal,
+    body: Annotated[AnswersIn, Depends(_json_body(AnswersIn))],
+    store: StoreDep,
+    safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
 ) -> dict[str, Any]:
-    """FR-INT-03/04: answers, skips (`answer: null`, recorded as "Assumed: ...") and chip edits. No model call;
-    a refused request changes nothing."""
+    """FR-INT-03/04: answers, skips (`answer: null`, recorded as "Assumed: ...") and chip edits, every typed
+    string screened first (FR-INT-02). No model call; a refused request changes nothing."""
     task = _owned(store, task_id, principal)
     fields = [a.field for a in body.answers]
     if len(set(fields)) != len(fields) or not set(fields) <= {q.field for q in task.questions}:
         raise HTTPException(status_code=422, detail="Answer only the questions that were asked, each once.")
+    if _foreign_sources(task, body.brief_edits):
+        raise HTTPException(status_code=422, detail="Add only this task's files, or web and url sources.")
+    _screen(safety, [a.answer for a in body.answers if a.answer is not None] + list(_strings(body.brief_edits)))
     with task.lock:
         if task.granted:
             raise HTTPException(status_code=409, detail="The budget is approved; the brief is final.")
@@ -184,7 +225,7 @@ def approve(
     """FR-INT-08: the owner picks an approach and confirms a cap; the grant is exactly that cap (#106). An L3
     policy may grant it; otherwise the owner's own confirmation does (PRD 10.1, 10.4)."""
     task = _owned(store, task_id, principal)
-    with task.lock:
+    with store.grant_lock(task.owner), task.lock:  # always in this order: the owner's grants, then the task
         if task.granted:
             raise HTTPException(status_code=409, detail="This task's budget is already approved.")
         if task.approaches is None:
