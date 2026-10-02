@@ -131,3 +131,91 @@ body {
   color: var(--color-brand-primary);
   font: 700 0.875em var(--font-ui);
 }
+.nav-btn:focus-visible,
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.flow-shell {
+  position: fixed;
+  top: 16px;
+  left: 88px;
+  z-index: 500;
+  box-sizing: border-box;
+  width: 280px;
+  padding: 16px;
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+}
+@media (max-width: 767px) {
+  .flow-shell {
+    top: 56px; /* below the fixed fixture banner */
+    left: 16px;
+    width: calc(100vw - 32px);
+  }
+}
+.flow-heading {
+  margin: 0 0 6px;
+  font: 700 1.125em / 1.25 var(--font-ui);
+}
+.flow-summary {
+  margin: 0 0 12px;
+  color: var(--color-ink-2);
+  font: 400 0.875em / 1.4 var(--font-ui);
+}
+.primary {
+  min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--radius-controls);
+  background: var(--color-brand-primary);
+  color: var(--color-surface-1);
+  font: 700 0.875em / 1 var(--font-ui);
+  cursor: pointer;
+}
+.primary[aria-busy="true"] {
+  background: var(--color-brand-primary-lip);
+}
+.primary:disabled {
+  background: var(--color-surface-2);
+  color: var(--color-ink-2);
+  cursor: not-allowed;
+}
+.secondary {
+  min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  padding: 0 16px;
+  border: 2px solid var(--color-ink-1);
+  border-radius: var(--radius-controls);
+  background: transparent;
+  color: var(--color-ink-1);
+  font: 700 0.875em / 1 var(--font-ui);
+  cursor: pointer;
+}
+/* One box for loading, error, empty and ready, so a slow client never shifts the layout (CLS). */
+.flow-slot {
+  min-height: 11.5em;
+}
+.flow-loading {
+  display: block;
+  margin: 0 0 12px;
+  font: 400 0.875em / 1.4 var(--font-ui);
+}
+.flow-detail {
+  margin: 0 0 12px;
+  font: 400 0.875em / 1.4 var(--font-ui);
+}
+.flow-heading:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.flow-notice {
+  margin: 0 0 12px;
+  font: 600 0.875em / 1.4 var(--font-ui);
+}
+.flow-notice p {
+  margin: 0 0 8px;
+}
