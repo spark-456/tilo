@@ -9,6 +9,7 @@ import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
 import { type Frame, frameOf } from "./frame";
 import { applyEvent, createInitialState } from "./reducer";
 import { createLayer, renderAgents, renderSelection, renderStatic } from "./renderer";
+import { getReplayPoint, setReplayPoint, subscribeReplay } from "./replay";
 import { getSelection, subscribeSelection } from "./selection";
 import { createWorldStore } from "./store";
 
@@ -38,22 +39,48 @@ export function runWorld(opts: RunWorldOptions): () => void {
   const selected = () => getSelection(layout.world_id);
   const agentIds = layout.semantic.agents.map((a) => a.id);
 
-  if (seqParam !== null) {
+  // The state at one seq, drawn at once with nothing walking (P8/HR-6, FR-WLD-08): a jump to a
+  // recorded moment is a replay, never an event, so there is no motion to time. Built on first use.
+  function staticView() {
     const store = createWorldStore(layout);
     for (const event of events) store.apply(event);
-    const state = store.stateAt(seqParam);
-    const frame = frameOf(layout, state);
-    renderStatic(layer, frame);
-    const places = new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }]));
-    renderAgents(layer, frame, places);
+    let frame: Frame | undefined;
+    let places = new Map<string, Vec>();
     const ring = () => {
+      if (!frame) return;
       renderSelection(layer, frame, places, selected());
       requestRender();
     };
-    ring();
-    onSeq(state.seq);
-    onTrace(state.trace);
-    return subscribeSelection(ring);
+    const off = subscribeSelection(ring);
+    return {
+      show(seq: number) {
+        const state = store.stateAt(seq);
+        frame = frameOf(layout, state);
+        renderStatic(layer, frame);
+        places = new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }]));
+        renderAgents(layer, frame, places);
+        ring();
+        onSeq(state.seq);
+        onTrace(state.trace);
+        return state.seq;
+      },
+      off,
+    };
+  }
+
+  if (seqParam !== null) {
+    const view = staticView();
+    // The point is the stop the state landed on (a seq with no event rounds down), so the
+    // scrubber and the stage agree; later scrubs redraw through the same view.
+    setReplayPoint(layout.world_id, view.show(seqParam));
+    const unreplay = subscribeReplay(() => {
+      const point = getReplayPoint(layout.world_id);
+      if (point !== null) view.show(point);
+    });
+    return () => {
+      unreplay();
+      view.off();
+    };
   }
 
   let state = createInitialState(layout); // live playback folds events in one at a time
@@ -65,6 +92,7 @@ export function runWorld(opts: RunWorldOptions): () => void {
   const walkFrom = new Map<string, { seq: number; from: Vec }>(); // the in-flight move's start
   let lastFrame: Frame = frameOf(layout, state);
   let stopped = false;
+  let scrubbed: ReturnType<typeof staticView> | null = null; // FR-WLD-08: set once scrubbed
   let timer: ReturnType<typeof setTimeout> | undefined;
   let raf = 0;
 
@@ -111,7 +139,7 @@ export function runWorld(opts: RunWorldOptions): () => void {
 
   function tickAnim() {
     raf = 0;
-    if (stopped) return;
+    if (stopped || scrubbed) return;
     if (drawAgents(performance.now())) raf = requestAnimationFrame(tickAnim);
   }
 
@@ -170,11 +198,26 @@ export function runWorld(opts: RunWorldOptions): () => void {
   else window.addEventListener("load", startPlayback, { once: true });
 
   const unselect = subscribeSelection(() => {
-    if (!stopped) drawAgents(performance.now()); // a ring redraw: a frame, not an animation
+    if (!stopped && !scrubbed) drawAgents(performance.now()); // a ring redraw: a frame, not an animation
+  });
+  // FR-WLD-08: a finished run (every event applied) can be scrubbed; the scrubber is disabled
+  // until then, so a live run is never jumped around. From the first scrub the world shows
+  // stateAt(point) at once and nothing is left to play or walk.
+  const lastSeq = events[events.length - 1]?.seq ?? 0;
+  const unreplay = subscribeReplay(() => {
+    const point = getReplayPoint(layout.world_id);
+    if (stopped || point === null || state.seq < lastSeq) return;
+    if (timer) clearTimeout(timer);
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    scrubbed ??= staticView();
+    scrubbed.show(point);
   });
   return () => {
     stopped = true;
     unselect();
+    unreplay();
+    scrubbed?.off();
     window.removeEventListener("load", startPlayback);
     if (timer) clearTimeout(timer);
     if (raf) cancelAnimationFrame(raf);

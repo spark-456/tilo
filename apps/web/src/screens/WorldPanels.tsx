@@ -6,7 +6,8 @@ import type { Layout } from "@tilo/contracts";
 import type { ReactNode } from "react";
 import { useClient } from "../api/ClientProvider";
 import { reduce } from "../world/reducer";
-import { creditsUsed, useRunLog, waitingForYou } from "../world/runLog";
+import { useReplayedLog } from "../world/replay";
+import { creditsUsed, waitingForYou } from "../world/runLog";
 import {
   BUILDING_STATE,
   RUN_STATUS_LABEL,
@@ -44,7 +45,7 @@ function Pick({
  * them the same height stays reserved, so the rail does not jump between world screens. */
 export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: boolean }) {
   const client = useClient();
-  const events = useRunLog(client, worldId);
+  const { events } = useReplayedLog(client, worldId);
   const [selected, , toggle] = useSelection(worldId);
   const [layoutRemote] = useRemote("load the world", () => client.getLayout(worldId));
   const [deliveryRemote] = useRemote("load the delivery", () => client.getDelivery(worldId));

@@ -7,6 +7,7 @@ import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
 import { NotFound } from "./screens/NotFound";
 import { PrimaryNav } from "./screens/PrimaryNav";
+import { LoggedScrubber, ReplayScrubber } from "./screens/ReplayScrubber";
 import { WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
@@ -85,11 +86,24 @@ export function App() {
     : worldId !== null || runScreen
       ? speedBadgeText(replaySpeed)
       : null;
+  // FR-WLD-08: the Replay region (scrub + HR-4 banner) on every world route and in fixture mode:
+  // in the right rail on desktop, in the column above the tabs on mobile.
+  const dock = world.active ? (
+    <ReplayScrubber
+      worldId={world.worldId}
+      events={world.events}
+      finished={world.finished}
+      fixture
+    />
+  ) : worldId !== null ? (
+    <LoggedScrubber worldId={worldId} fixture={fixtureClient} />
+  ) : null;
   return (
     <div
       className="app-shell"
       data-stage-mode={stageMode ? "on" : "off"}
       data-replay-badge={speedBadge ? "on" : "off"}
+      data-replay-dock={dock ? "on" : "off"}
     >
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
@@ -129,6 +143,7 @@ export function App() {
       )}
       {mobile ? (
         <>
+          {dock}
           {hudWorld && (
             <details
               className="hud-sheet"
@@ -147,6 +162,7 @@ export function App() {
         </>
       ) : (
         <aside className="right-rail" data-testid="right-rail">
+          {dock}
           {railWorld ? (
             <WorldPanels key={railWorld} worldId={railWorld} tabs={hudWorld !== null} />
           ) : (

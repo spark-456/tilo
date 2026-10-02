@@ -4,7 +4,8 @@
 import type { Severity } from "@tilo/contracts";
 import { useClient, useIsFixtureClient } from "../api/ClientProvider";
 import { isKnownType } from "../world/registry";
-import { elapsed, useRunLog } from "../world/runLog";
+import { useReplayedLog } from "../world/replay";
+import { elapsed } from "../world/runLog";
 import { agentNames, worldStatus } from "../world/runSummary";
 import { involves, useSelection } from "../world/selection";
 import { LensTabs } from "./LensTabs";
@@ -23,7 +24,7 @@ export const SEVERITY_LABEL: Partial<Record<Severity, string>> = {
 export function S_10({ params }: ScreenProps) {
   const worldId = params[0] ?? "";
   const client = useClient();
-  const events = useRunLog(client, worldId);
+  const { events } = useReplayedLog(client, worldId);
   const fixture = useIsFixtureClient();
   const status = worldStatus(events);
   const story = events.filter((e) => isKnownType(e.type));

@@ -101,6 +101,7 @@ test("FR-WLD-08 keyboard and buttons move the world to stateAt(seq), labelled wi
   await expect.poll(() => stageSeq(page)).toBe(2);
   await scrubber(page).getByRole("button", { name: "Previous event" }).click();
   await expect.poll(() => stageSeq(page)).toBe(1);
+  await slider(page).focus();
   await page.keyboard.press("End");
   await expect.poll(() => stageSeq(page)).toBe(44);
   await expect(scrubber(page).getByRole("button", { name: "Next event" })).toBeDisabled();
@@ -115,6 +116,26 @@ test("FR-WLD-08 a scrubbed frame is the frame a direct ?seq= load draws (determi
   await page.goto(fixtureUrl("village-basic", { seq: 44 }));
   await slider(page).fill("20");
   await expect.poll(() => stageSeq(page)).toBe(20);
+  const direct = await context.newPage();
+  await direct.setViewportSize(DESKTOP);
+  await direct.goto(fixtureUrl("village-basic", { seq: 20 }));
+  await expect.poll(() => stageSeq(direct)).toBe(20);
+  expect(await canvasSnapshot(page)).toBe(await canvasSnapshot(direct));
+});
+
+test("FR-WLD-08 a run that played out live can then be scrubbed, and the banner appears with the end", async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await page.goto(fixtureUrl("village-basic", { speed: 100 }));
+  await expect(banner(page)).toHaveCount(0); // live: no replay banner, scrubber disabled
+  await expect(slider(page)).toBeEnabled({ timeout: 15_000 });
+  await expect(banner(page)).toHaveText(BANNER_TEXT);
+  await expect.poll(() => stageSeq(page)).toBe(44);
+  await slider(page).fill("20");
+  await expect.poll(() => stageSeq(page)).toBe(20);
+  await expect(banner(page)).toHaveText(BANNER_TEXT);
   const direct = await context.newPage();
   await direct.setViewportSize(DESKTOP);
   await direct.goto(fixtureUrl("village-basic", { seq: 20 }));
@@ -220,7 +241,7 @@ test(`FR-WLD-08 perf: scrub a ${BIG}-event run to any point in <= 500 ms`, async
   for (const target of [2_500, 0, 4_999, 1, 3_333, BIG]) {
     const ms = await page.evaluate(async (to) => {
       const input = document.querySelector<HTMLInputElement>(
-        '[data-testid="replay-scrubber"] [role="slider"]',
+        '[data-testid="replay-scrubber"] input[type="range"]',
       );
       const frame = document.querySelector('[data-testid="stage-frame"]');
       if (!input || !frame) throw new Error("scrubber or stage missing");
