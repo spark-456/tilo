@@ -18,6 +18,7 @@ import datetime
 import functools
 import hashlib
 import json
+import logging
 import re
 import threading
 from collections.abc import Callable
@@ -35,6 +36,7 @@ from referencing.jsonschema import DRAFT202012
 from tilo_api.deps import Principal, get_current_principal
 from tilo_api.redaction import _DISTRICT_RE, _safe_districts
 
+logger = logging.getLogger("tilo_api.cards")
 CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -485,14 +487,18 @@ def build_router(
             raise HTTPException(status_code=404)
         if not from_channels and (body.channel not in _WEB_CHANNELS or body.pin_verified):
             return JSONResponse(status_code=403, content={"outcome": "rejected", "reason": "channel_not_permitted"})
-        result = store.answer(
-            world_id,
-            card_id,
-            option=body.option,
-            channel=body.channel,
-            principal=principal,
-            pin_verified=body.pin_verified,
-        )
+        try:
+            result = store.answer(
+                world_id,
+                card_id,
+                option=body.option,
+                channel=body.channel,
+                principal=principal,
+                pin_verified=body.pin_verified,
+            )
+        except Exception as exc:  # the event write failed; the card stays open and the answer can be sent again
+            logger.warning("a card answer could not be written: %s", type(exc).__name__)
+            return JSONResponse(status_code=503, content={"outcome": "error", "reason": "event_write_failed"})
         if result.outcome == "answered":
             return JSONResponse(status_code=200, content={"outcome": "answered"})
         return JSONResponse(

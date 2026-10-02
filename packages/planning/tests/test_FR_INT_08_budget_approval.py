@@ -163,7 +163,7 @@ def _earlier(granted: float, *, by: str = "policy", ref: str = "pol_auto_budget_
     if by == "person":
         return grant_budget_by_person(granted, world_owner=ref, user=ref, now=at, base=sample_event_base(), seq=1)
     outcome = request_budget_grant(
-        granted, table=_table(), policies=[base_budget_policy(id_=ref, per_day=50, credits=None, created_at=SINCE)],
+        granted, table=_table(), policies=[base_budget_policy(id_=ref, per_day=50, credits=10_000, created_at=SINCE)],
         world_owner=OWNER, earlier_grants=[], now=at, base=sample_event_base(), seq=1,
         connector=CONNECTOR, district=DISTRICT,
     )  # fmt: skip
@@ -172,7 +172,7 @@ def _earlier(granted: float, *, by: str = "policy", ref: str = "pol_auto_budget_
 
 
 def test_FR_INT_08_per_day_limit_counts_earlier_policy_authorised_grants():
-    policy = base_budget_policy(per_day=2, credits=None)
+    policy = base_budget_policy(per_day=2, credits=1000)  # a grant policy needs a credit bound (#106)
     earlier = [_earlier(5, at="2026-09-29T08:00:00.000Z"), _earlier(5, at="2026-09-29T09:00:00.000Z")]
 
     outcome = _grant(5, policies=[policy], earlier_grants=earlier)

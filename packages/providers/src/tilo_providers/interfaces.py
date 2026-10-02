@@ -12,6 +12,8 @@ from typing import Any, TypedDict
 
 from pydantic import BaseModel, ConfigDict
 
+from tilo_providers.errors import RequestError
+
 
 class Capability(enum.StrEnum):
     """Exactly contracts/providers.schema.json $defs.capability's enum."""
@@ -85,12 +87,37 @@ class SafetyResult(TypedDict):  # CC-SP-47: the one fixed SafetyProvider.check()
     reason: str | None
 
 
+NATIVE_MIME_TYPES = frozenset({"application/pdf", "image/png", "image/jpeg"})  # issue #47 item 2
+
+
+def native_mime_type(content: bytes | None, mime_type: str | None) -> str | None:
+    """Validates the native-file arguments; returns the normalised media type,
+    or None for a text-only check. Raises `RequestError` for anything that
+    cannot be screened, so an unsupported file never passes as clean."""
+    if content is None and mime_type is None:
+        return None
+    if content is None or mime_type is None:
+        raise RequestError("FR-INT-02: a native-file safety check needs both content= and mime_type=")
+    if not isinstance(content, bytes):
+        raise RequestError("FR-INT-02: a native-file safety check needs content= as bytes")
+    normalised = mime_type.strip().lower()
+    if normalised not in NATIVE_MIME_TYPES:
+        raise RequestError(f"FR-INT-02: the safety provider cannot screen media type {mime_type!r}; refused")
+    return normalised
+
+
 class SafetyProvider(ABC):  # PRD 10.4, 16.3 item 2: screens intake, tool output, mail and model output
-    @abstractmethod
     def check(self, text: str, *, content: bytes | None = None, mime_type: str | None = None) -> SafetyResult:
         """Screens `text`, or a native file (`check("", content=..., mime_type=...)`,
-        no text extracted). A media type the adapter cannot screen must raise
-        `RequestError`, never return `flagged: False` (fails closed)."""
+        no text extracted). Template method: the media-type gate runs here, in
+        the base class, so no adapter can skip it. A media type that cannot be
+        screened raises `RequestError`, never `flagged: False` (fails closed).
+        Adapters implement `_check`, which receives the normalised media type."""
+        normalised = native_mime_type(content, mime_type)
+        return self._check(text, content=content, mime_type=normalised)
+
+    @abstractmethod
+    def _check(self, text: str, *, content: bytes | None, mime_type: str | None) -> SafetyResult: ...
 
     def redact(self, text: str) -> str:  # same role as ModelProvider.redact (PRD 16.1 rule 4)
         return text

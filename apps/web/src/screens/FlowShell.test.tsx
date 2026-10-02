@@ -42,6 +42,19 @@ async function show(path: string, client: TiloClient): Promise<void> {
 }
 const settle = (ms = PRESS_MS + 20) =>
   act(async () => void (await new Promise((r) => setTimeout(r, ms))));
+/** S-01 starts only with text in the box. */
+async function fillTask(text = "Triage my inbox") {
+  const box = container.querySelector("textarea");
+  const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+  await act(async () => {
+    set?.call(box, text);
+    box?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+const tryAgain = () =>
+  [...container.querySelectorAll<HTMLButtonElement>("button.secondary")].find(
+    (b) => b.textContent === "Try again",
+  );
 const button = (cls: string) => container.querySelector<HTMLButtonElement>(`button.${cls}`);
 
 beforeEach(() => {
@@ -80,6 +93,7 @@ describe("PRD-18.3 flow: a rejecting client shows the error and a retry, never a
     const consoleError = vi.spyOn(console, "error");
     const submit = vi.fn(fail);
     await show("/", { ...rejectingClient, submitIntake: submit });
+    await fillTask();
     await act(async () => button("primary")?.click());
     expect(button("primary")?.getAttribute("aria-busy")).toBe("true");
     await settle();
@@ -89,7 +103,7 @@ describe("PRD-18.3 flow: a rejecting client shows the error and a retry, never a
     );
     expect(window.location.pathname).toBe("/");
 
-    await act(async () => button("secondary")?.click());
+    await act(async () => tryAgain()?.click());
     await settle();
     expect(submit).toHaveBeenCalledTimes(2);
     expect(consoleError).not.toHaveBeenCalled();
@@ -136,6 +150,7 @@ describe("PRD-18.3 flow: loading and empty states", () => {
 
   it("moves focus to the new screen's heading after a route change", async () => {
     await show("/", new FixtureClient());
+    await fillTask();
     await act(async () => button("primary")?.click());
     await settle();
     expect(window.location.pathname).toContain("/understanding");
