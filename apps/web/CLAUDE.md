@@ -10,7 +10,7 @@ Trace lenses, cards and settings.
 
 ## Contracts
 - Reads `packages/contracts-ts` types and Firestore docs under security rules; writes only through
-  `tilo-api`, never to models, connectors or storage directly. Writes: none yet.
+  `tilo-api` (`src/api/http.ts`, chosen by `VITE_TILO_API_URL`, else the fixture client; polls events by seq).
 
 ## Config
 `config/themes/` (world themes), feature flags.
