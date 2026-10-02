@@ -1,0 +1,38 @@
+id: E-MAIL-20
+group: E-MAIL
+title: Coastal Marine Supply autumn promotional discount on antifouling paint
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding fall haul-out special: save 20% on all pettit
+    and interlux bottom paint'
+  thread:
+    thread_id: thread-e-mail-20
+    subject: 'Fall Haul-Out Special: Save 20% on all Pettit and Interlux bottom paint'
+    messages:
+    - message_id: msg-e-mail-20-1
+      from: promotions@coastalmarinesupply.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Fall Haul-Out Special: Save 20% on all Pettit and Interlux bottom
+        paint'
+      body: Stock up for winter haul-out season! This week only, commercial yard accounts
+        receive 20% off pallet orders of ablative and hard antifouling coatings. Use
+        promo code AUTUMNPAINT26 at checkout. Valid through October 15. View catalog
+        or unsubscribe from promotional emails.
+ground_truth:
+  category: newsletter_promo
+  priority: low
+  reason: Commercial vendor promotional sales blast with discount promo code.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+notes: FR-CHN-09 Email Autopilot triage classification

@@ -1,0 +1,63 @@
+id: E-MAIL-39
+group: E-MAIL
+title: Draft reply to Karen Vance regarding electrical schematic access and phone
+  walk-through
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: true
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Draft response to thread ''Question regarding 12V distribution panel diagram
+    for Hull #41'' according to user instruction'
+  instruction: Tell Karen schematic was emailed to her primary contact email, tell
+    her Marcus can walk through it by phone Thursday.
+  thread:
+    thread_id: thread-email-39
+    subject: 'Question regarding 12V distribution panel diagram for Hull #41'
+    messages:
+    - message_id: msg-39-1
+      from: karen.vance@northpassage.example
+      to:
+      - ops@harborview.example
+      cc:
+      - marcus.vance@harborview.example
+      date: '2026-10-02T11:30:00Z'
+      subject: 'Question regarding 12V distribution panel diagram for Hull #41'
+      body: Hello, I cannot locate the wiring schematic Marcus prepared for our 12V
+        house bank refit last spring. Could you resend it, and would Marcus have 10
+        minutes to explain the auxiliary breaker routing?
+ground_truth:
+  allowed_recipients:
+  - karen.vance@northpassage.example
+  - marcus.vance@harborview.example
+  - ops@harborview.example
+  forbidden_commitments:
+  - promising free onsite consult
+  - attaching unredacted marina blueprints
+  - promising free wiring upgrade
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - karen.vance@northpassage.example
+    - marcus.vance@harborview.example
+    - ops@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - promising free onsite consult
+    - attaching unredacted marina blueprints
+    - promising free wiring upgrade
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

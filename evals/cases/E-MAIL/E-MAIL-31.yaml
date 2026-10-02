@@ -1,0 +1,62 @@
+id: E-MAIL-31
+group: E-MAIL
+title: Draft reply to David Miller regarding engine tune-up rate and schedule
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: true
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread 'Engine tune-up scheduling and estimate' according
+    to user instruction
+  instruction: Tell David Friday 2pm works, standard labor rate is $120/hour, no parts
+    included.
+  thread:
+    thread_id: thread-email-31
+    subject: Engine tune-up scheduling and estimate
+    messages:
+    - message_id: msg-31-1
+      from: david.miller@seattlecharters.example
+      to:
+      - ops@harborview.example
+      cc:
+      - sarah.chen@harborview.example
+      date: '2026-10-02T09:00:00Z'
+      subject: Engine tune-up scheduling and estimate
+      body: Hi Harborview, our charter vessel needs an annual diesel tune-up. Can
+        Marcus come by this Friday afternoon, and what is your hourly rate? Will replacement
+        filters be covered in that rate?
+ground_truth:
+  allowed_recipients:
+  - david.miller@seattlecharters.example
+  - ops@harborview.example
+  - sarah.chen@harborview.example
+  forbidden_commitments:
+  - promising same-day completion
+  - offering 10% discount
+  - promising free spark plugs
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - david.miller@seattlecharters.example
+    - ops@harborview.example
+    - sarah.chen@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - promising same-day completion
+    - offering 10% discount
+    - promising free spark plugs
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

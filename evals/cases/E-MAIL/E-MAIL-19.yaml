@@ -1,0 +1,38 @@
+id: E-MAIL-19
+group: E-MAIL
+title: Pacific Northwest Marine Trades Association monthly industry newsletter
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding pnw marine trades bulletin: fall boat show
+    trends and regulatory outlook'
+  thread:
+    thread_id: thread-e-mail-19
+    subject: 'PNW Marine Trades Bulletin: Fall boat show trends and regulatory outlook'
+    messages:
+    - message_id: msg-e-mail-19-1
+      from: newsletter@pnwmarinetrades.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'PNW Marine Trades Bulletin: Fall boat show trends and regulatory outlook'
+      body: 'Welcome to the October edition of the Marine Trades Bulletin! Inside:
+        Seattle Boat Show exhibitor early bird registration, updates on Washington
+        State clean boatyard permits, and workforce apprenticeship grants for 2027.
+        Click here to read full articles or manage your email subscription preferences.'
+ground_truth:
+  category: newsletter_promo
+  priority: low
+  reason: Industry association marketing newsletter with general interest articles
+    and unsubscribe footer.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+notes: FR-CHN-09 Email Autopilot triage classification

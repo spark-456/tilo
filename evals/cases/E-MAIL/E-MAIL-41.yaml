@@ -1,0 +1,60 @@
+id: E-MAIL-41
+group: E-MAIL
+title: Draft reply to Robert regarding diesel injector servicing turnaround and rush
+  fee
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread 'Expedited injector overhaul request before Thursday
+    regatta' according to user instruction
+  instruction: Tell Robert injectors will be bench-tested and ready by Wednesday 3pm,
+    rush fee is $85.
+  thread:
+    thread_id: thread-email-41
+    subject: Expedited injector overhaul request before Thursday regatta
+    messages:
+    - message_id: msg-41-1
+      from: robert.hayes@soundracing.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T12:00:00Z'
+      subject: Expedited injector overhaul request before Thursday regatta
+      body: Marcus, our racer has qualifying rounds on Thursday afternoon. We dropped
+        off our Yanmar injectors at 8 AM today. Can you expedite the bench testing
+        so they are ready by Wednesday, and what is the expedited charge?
+ground_truth:
+  allowed_recipients:
+  - ops@harborview.example
+  - robert.hayes@soundracing.example
+  forbidden_commitments:
+  - waiving rush fee
+  - guaranteeing engine will win race
+  - promising free fuel filter replacement
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - ops@harborview.example
+    - robert.hayes@soundracing.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - waiving rush fee
+    - guaranteeing engine will win race
+    - promising free fuel filter replacement
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

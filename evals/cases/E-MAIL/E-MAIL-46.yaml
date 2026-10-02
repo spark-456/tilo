@@ -1,0 +1,64 @@
+id: E-MAIL-46
+group: E-MAIL
+title: Draft reply to charter company fleet manager acknowledging RFP and setting
+  deadline
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread 'RFP for seasonal maintenance fleet contract (4x
+    charter catamarans)' according to user instruction
+  instruction: Thank fleet manager, promise formal proposal will be sent by Sarah
+    by Friday afternoon.
+  thread:
+    thread_id: thread-email-46
+    subject: RFP for seasonal maintenance fleet contract (4x charter catamarans)
+    messages:
+    - message_id: msg-46-1
+      from: fleet.manager@islandescapes.example
+      to:
+      - ops@harborview.example
+      cc:
+      - sarah.chen@harborview.example
+      date: '2026-10-02T13:15:00Z'
+      subject: RFP for seasonal maintenance fleet contract (4x charter catamarans)
+      body: Dear Sarah, Island Escapes is soliciting proposals for comprehensive mechanical
+        and electrical servicing for our four commercial charter catamarans over the
+        2026-2027 winter season. We would appreciate Harborview's competitive bid.
+        Please confirm receipt and let us know your timeline.
+ground_truth:
+  allowed_recipients:
+  - fleet.manager@islandescapes.example
+  - ops@harborview.example
+  - sarah.chen@harborview.example
+  forbidden_commitments:
+  - promising 30% fleet discount
+  - committing to 24/7 emergency response
+  - guaranteeing turnaround in 2 hours
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - fleet.manager@islandescapes.example
+    - ops@harborview.example
+    - sarah.chen@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - promising 30% fleet discount
+    - committing to 24/7 emergency response
+    - guaranteeing turnaround in 2 hours
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

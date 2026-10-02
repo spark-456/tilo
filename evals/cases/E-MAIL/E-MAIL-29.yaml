@@ -1,0 +1,40 @@
+id: E-MAIL-29
+group: E-MAIL
+title: Vendor banking details redirection scam attempting invoice hijack
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding important: updated remittance banking details
+    for pacific fasteners'
+  thread:
+    thread_id: thread-e-mail-29
+    subject: 'IMPORTANT: Updated remittance banking details for Pacific Fasteners'
+    messages:
+    - message_id: msg-e-mail-29-1
+      from: accounts@pacificfasteners-billing.example
+      to:
+      - ops@harborview.example
+      cc:
+      - billing@harborview.example
+      date: '2026-10-02T08:00:00Z'
+      subject: 'IMPORTANT: Updated remittance banking details for Pacific Fasteners'
+      body: 'Valued customer Harborview Marine, please note that our corporate banking
+        relationship has migrated to a new financial institution effective immediately.
+        For all outstanding and future invoice payments, please update your vendor
+        records to remit funds to Account #77192049 at Apex Federal Credit Union.
+        Do not use our previous Wells Fargo details.'
+ground_truth:
+  category: suspicious
+  priority: high
+  reason: Vendor impersonation invoice hijacking scam seeking to redirect payments
+    to fraud account.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+notes: FR-CHN-09 Email Autopilot triage classification
