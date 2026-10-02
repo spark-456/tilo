@@ -99,10 +99,10 @@ for (const viewport of [DESKTOP, MOBILE]) {
             w.__shifts.push((entry as unknown as { value: number }).value);
         }).observe({ type: "layout-shift", buffered: true });
       });
-      // "commit": do not wait for the load event, which can outlast the 800 ms of latency.
-      await page.goto(`${path}?client_delay_ms=800`, { waitUntil: "commit" });
+      // "commit": do not wait for the load event, which can outlast the 3 s of latency; a latency this long keeps the loading state observable under a parallel load.
+      await page.goto(`${path}?client_delay_ms=3000`, { waitUntil: "commit" });
       await expect(page.getByText(/^Loading the /)).toBeVisible();
-      await expect(page.getByText(/^Loading the /)).toBeHidden({ timeout: 10_000 });
+      await expect(page.getByText(/^Loading the /)).toBeHidden({ timeout: 20_000 });
       await expect(page.locator(".flow-summary")).toBeVisible();
       await page.waitForTimeout(300); // let a late shift be reported
       const shifts = await page.evaluate(
