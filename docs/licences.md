@@ -111,6 +111,7 @@ No new licence.
 | firebase-tools (runs the Firestore emulator for `services/harness`, P0-09) | MIT | https://www.npmjs.com/package/firebase-tools |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
 | react, react-dom, pixi.js, vite, @vitejs/plugin-react, vitest, @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/ |
+| vite 6.4.x (#69, replaces 5.4.x; pulls esbuild 0.25, rollup, fdir, tinyglobby, all MIT; no licence change) | MIT | https://www.npmjs.com/package/vite |
 | @playwright/test | Apache-2.0 | https://www.npmjs.com/package/@playwright/test |
 | @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
 | @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT; fonts Nunito, Nunito Sans, JetBrains Mono are OFL-1.1 | https://fonts.google.com/ |
