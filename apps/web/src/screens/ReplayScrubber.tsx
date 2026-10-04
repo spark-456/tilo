@@ -51,6 +51,7 @@ export function ReplayScrubber({
         <button
           type="button"
           className="replay-step"
+          data-lens-control
           aria-label="Previous event"
           disabled={!finished || index <= 0}
           onClick={() => go(index - 1)}
@@ -71,6 +72,7 @@ export function ReplayScrubber({
         <button
           type="button"
           className="replay-step"
+          data-lens-control
           aria-label="Next event"
           disabled={!finished || index >= last}
           onClick={() => go(index + 1)}
