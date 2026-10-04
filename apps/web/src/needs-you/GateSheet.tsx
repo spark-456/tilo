@@ -33,6 +33,11 @@ const stricter = (a: string | null, b: string | null): string =>
     ? (a ?? "T1")
     : (b ?? "T1");
 
+/** "Reply draft, version 1". The label is optional in an artifact ref (an API-made card names the
+ * item by id only), so a missing one reads "The item", never "undefined". */
+const holds = (item: { label?: string | undefined; version?: number | undefined }): string =>
+  `${item.label ?? "The item"}${item.version ? `, version ${item.version}` : ""}`;
+
 /** What the gate holds: from its card and the request that opened it, the stricter of the two. */
 function factsOf(record: GateRecord, card: Card | null): Facts | null {
   const policy = record.outcome.state === "policy" ? record.outcome.event : null;
@@ -47,9 +52,9 @@ function factsOf(record: GateRecord, card: Card | null): Facts | null {
       action: g.action.exact,
       recipients: g.recipients,
       item: g.action.item
-        ? `${g.action.item.label}, version ${g.action.item.version}`
+        ? holds(g.action.item)
         : asked?.item
-          ? `${asked.item.label}`
+          ? holds({ label: asked.item.label })
           : null,
       irreversible: g.irreversible || askedIrreversible === true,
       tier: stricter(g.risk_tier, asked ? field(asked, "risk_tier") : null),
@@ -61,7 +66,7 @@ function factsOf(record: GateRecord, card: Card | null): Facts | null {
   return {
     action: words(field(e, "action_type") ?? "action"),
     recipients: null,
-    item: e.item ? `${e.item.label}${version ? `, version ${version}` : ""}` : null,
+    item: e.item ? holds({ label: e.item.label, version }) : null,
     irreversible: policy && !asked ? null : askedIrreversible === true,
     tier: field(e, "risk_tier") ?? "T1",
     sent: field(e, "action_type") === "send_email",

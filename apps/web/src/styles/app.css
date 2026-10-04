@@ -94,6 +94,34 @@ body {
   color: var(--color-ink-1);
   font: 600 0.875em var(--font-ui);
 }
+/* FR-WLD-05: what the stage cannot show yet (the live world is not built, or has no map). Fixed over
+   the stage's own corner, clear of the right rail, so it never shifts the layout. Neutral tokens. */
+.live-world-note {
+  position: fixed;
+  left: calc(72px + 16px);
+  bottom: 16px;
+  z-index: 900;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 600 0.875em var(--font-ui);
+}
+.live-world-note p {
+  margin: 0;
+}
+.live-world-note button {
+  margin-top: 8px;
+}
+@media (max-width: 767px) {
+  .live-world-note {
+    left: 16px;
+    bottom: auto;
+    top: 56px;
+  }
+}
 .speed-badge {
   position: fixed;
   top: 12px;

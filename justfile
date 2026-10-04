@@ -19,6 +19,11 @@ dev:
 dev-api:
     uv run --package tilo-api python -m tilo_api
 
+# CP2 browser walk on the real dev API (fake providers, no credentials, no live mode). Starts tilo-api
+# on 127.0.0.1:8080 and its own Vite on TILO_CP2_PORT (default 5391); local only, CI never runs it.
+e2e-cp2:
+    node apps/web/scripts/e2e-cp2.mjs
+
 # Regenerate apps/web design tokens from design/tokens.json (drift-tested).
 tokens:
     node apps/web/scripts/generate-tokens.mjs
