@@ -116,7 +116,7 @@ def _plan_reply(prompt: str) -> dict[str, Any]:
     ]  # fmt: skip
     if send := _first_approval_action(prompt):
         units.append({
-            "id": "U4", "unit_type": "deliver", "title": f"Hand over for approval {TAG}", "role": "writer",
+            "id": "U4", "unit_type": "deliver", "title": f"Draft deliverable {TAG}", "role": "writer",
             "district": "D1", "skills": [], "connectors": [send[0]], "actions": [send[1]], "depends_on": ["U3"],
         })  # fmt: skip
     return {"units": units}

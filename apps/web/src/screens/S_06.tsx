@@ -10,6 +10,7 @@ import { useClient } from "../api/ClientProvider";
 import { CardView, useAnswer } from "../needs-you/CardView";
 import { type QueueItem, askedBy, deriveQueue, rungOf } from "../needs-you/queue";
 import { elapsed } from "../world/runLog";
+import { alsoWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Chip, Page, Row, Section, Soon, useFixtureRun, words } from "./kit";
@@ -99,7 +100,10 @@ export function S_06() {
                     >
                       {item.kind === "gate" ? (
                         <AppLink
-                          to={`/needs-you/gate?run=${encodeURIComponent(item.runId)}&gate=${encodeURIComponent(item.gateId ?? "")}`}
+                          to={alsoWorld(
+                            `/needs-you/gate?run=${encodeURIComponent(item.runId)}&gate=${encodeURIComponent(item.gateId ?? "")}`,
+                            worldId,
+                          )}
                           className="pill"
                           aria-label={`Review the gate: ${name}`}
                         >

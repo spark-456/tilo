@@ -1,11 +1,24 @@
 """The default layout builder for a run (CL-INT-2, PRD 9.1, 9.3; services/api/tests/API_CL_INT_2.md): plain
 code, no model. One level; one Director; per district a Lead and a workshop holding its units; one worker per
 unit by role; one island per connector the plan uses; one gate per plan gate, between the guarded unit's
-workshop and its connector's island. Geometry is the solver's (null here)."""
+workshop and its connector's island. Geometry is the solver's (CL-INT-6, `tilo_world.solve`, FR-WLD-01): attached
+only after the whole layout validates against layout.schema.json; on any solver or schema failure it stays null."""
 
 from __future__ import annotations
 
+import functools
+import json
+import logging
+from pathlib import Path
 from typing import Any
+
+import jsonschema
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
+from tilo_world import SOLVER_VERSION, solve
+
+CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
+_log = logging.getLogger(__name__)
 
 _WORKER_PREFIX = {"specialist": "A_s", "writer": "A_w", "verifier": "A_v"}
 
@@ -69,6 +82,28 @@ def _visible_layout(layout: dict[str, Any], districts: tuple[str, ...]) -> dict[
     }
 
 
+@functools.cache
+def _validator() -> jsonschema.Draft202012Validator:
+    """layout.schema.json with every contracts/**/*.schema.json registered by its $id (cross-file $refs)."""
+    docs = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(CONTRACTS.glob("**/*.schema.json"))]
+    registry = Registry().with_resources([(d["$id"], Resource.from_contents(d, DRAFT202012)) for d in docs])
+    schema = json.loads((CONTRACTS / "layout.schema.json").read_text(encoding="utf-8"))
+    return jsonschema.Draft202012Validator(schema, registry=registry)
+
+
+def attach_geometry(layout: dict[str, Any], plan: dict[str, Any]) -> None:
+    """Set `layout["geometry"]` to the solver's result for `layout["semantic"]` and the plan's `depends_on` edges
+    (WE-06), if the whole layout then validates; otherwise leave it null and log only the exception class."""
+    try:
+        edges = [(dep, unit["id"]) for unit in plan["units"] for dep in unit["depends_on"]]
+        candidate = {**layout, "geometry": solve(layout["semantic"], SOLVER_VERSION, edges)}
+        if next(iter(_validator().iter_errors(candidate)), None) is not None:
+            raise ValueError("layout schema")
+        layout["geometry"] = candidate["geometry"]
+    except Exception as exc:  # fail closed: a world with no geometry is honest, a 500 is not
+        _log.warning("layout solver failed: %s", type(exc).__name__)
+
+
 def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
     units = plan["units"]
     agents: list[dict[str, str]] = [{"id": "A_director", "rank": "director"}]
@@ -110,7 +145,7 @@ def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
             gates.append(
                 {"id": gate["id"], "guards": gate["action_type"], "between": between, "policy_ref": gate["policy_ref"]}
             )
-    return {
+    layout: dict[str, Any] = {
         "v": "1.0",
         "world_id": world_id,
         "tier": "village",
@@ -123,3 +158,5 @@ def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
             "agents": agents,
         },
     }
+    attach_geometry(layout, plan)
+    return layout
