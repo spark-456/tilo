@@ -12,7 +12,7 @@ from .coverage import (
     add_seconds,
     covering_level,
     fail_closed,
-    instruction_counts,
+    l2_may_run,
     may_cover,
     readable,
     stamped_by,
@@ -116,7 +116,7 @@ def _decide(p: Proposal, table: RiskTable, policies: list[dict], owner: str, app
     if level == "L2" and not (  # PI-12: an L2 send never loses its undo window
         isinstance(window, int)
         and window >= 1
-        and instruction_counts(p.instruction, p.world_id, policy, p.destination, now, applied)
+        and l2_may_run(p.instruction, p.world_id, policy, p.destination, now, applied)
     ):
         return gate(tier, modifiers, level, policy_id, "l2_instruction_required")
     capped = over_limit(policy, applied, p.credits, now)
