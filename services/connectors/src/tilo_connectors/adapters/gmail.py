@@ -151,7 +151,7 @@ class GmailAdapter(GoogleAdapter):
         if thread_id is None:
             msg["Subject"] = subject
         else:
-            self._reply_headers(user, scopes, thread_id, msg)
+            self._reply_headers(user, scopes, thread_id, msg, item)
         try:  # final, not retried for ever: text the MIME writer cannot encode never becomes sendable
             msg.set_content(text)
             for f in files:
@@ -194,8 +194,20 @@ class GmailAdapter(GoogleAdapter):
         sent = self._get(user, scopes, "/messages", {"q": query + " in:sent"}, patient=False).get("messages") or []
         return _result(sent[0].get("id"), sent[0]) if sent else None
 
-    def _reply_headers(self, user: str, scopes: list[str], thread_id: str, msg: EmailMessage) -> None:
-        """Subject, In-Reply-To and References from the thread's last message; its Reply-To is ignored."""
+    def _reply_headers(
+        self, user: str, scopes: list[str], thread_id: str, msg: EmailMessage, item: Mapping[str, Any]
+    ) -> None:
+        """Subject, In-Reply-To and References. An item that names the message it answers (`in_reply_to`, FR-CHN-13,
+        BQ-185) gets exactly its own subject and headers, nothing read from the thread at send time; one that is not a
+        single message id is refused. Otherwise they come from the thread's last message; its Reply-To is ignored."""
+        if "in_reply_to" in item:
+            target = item["in_reply_to"]
+            if not isinstance(target, str) or _msg_ids(target) != [target]:
+                raise SideEffectRefused("the message this reply answers is not named")
+            msg["Subject"] = item["subject"]
+            msg["In-Reply-To"] = target
+            msg["References"] = " ".join(_msg_ids(str(item.get("references", "")))[-20:] or [target])  # bounded
+            return
         thread = self._get(user, scopes, f"/threads/{thread_id}", {"format": "metadata"}, patient=False)
         messages = [m for m in thread.get("messages") or [] if "DRAFT" not in (m.get("labelIds") or [])]
         if not messages:
@@ -237,6 +249,11 @@ def _to_round_trip(recipients: list[str]) -> list[str]:
     probe["To"] = ", ".join(recipients)
     parsed = email.message_from_bytes(probe.as_bytes(policy=email.policy.SMTP), policy=email.policy.default)
     return [a.addr_spec for a in parsed["To"].addresses]
+
+
+def _msg_ids(text: str) -> list[str]:
+    """The <id> tokens of a header value, printable ASCII only."""
+    return [i for i in _MSG_ID.findall(text) if i.isascii() and i.isprintable()]
 
 
 def _has_control(text: str) -> bool:
