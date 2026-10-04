@@ -43,7 +43,7 @@ PROMPTS_AUTOPILOT = REPO_ROOT / "prompts" / "autopilot"
 
 USER = "u_sarah"
 OTHER_USER = "u_marcus"
-FINDING_KINDS = ("number", "date", "contact", "commitment")
+FINDING_KINDS = ("number", "date", "contact", "commitment", "obfuscation")
 INJECTION_MARKER = "Ignore previous instructions"  # a FakeSafetyProvider marker (tilo_providers.safety)
 
 

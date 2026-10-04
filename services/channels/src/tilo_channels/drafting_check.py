@@ -3,11 +3,13 @@ Content; BQ-140). A heuristic gate: every rule fails toward a finding (needs_you
 
 The draft and every source are read the same way: NFKD (compatibility and canonical decomposition), then controls,
 format characters, combining marks and fillers dropped (so "refụnd" reads "refund"), single-script Cyrillic and
-Greek look-alikes mapped to Latin, lower case; hyphen-split words are also read joined. In the draft (and a model
-question) a text-direction control, or a word that mixes Latin with another script or holds a Latin small capital or
-IPA letter, is an "obfuscation" finding. A commitment word is allowed only when an instruction sentence holding it
-has no negator at all; a draft sentence with exactly one negator just before the word ("no refund", "cannot offer a
-refund", or the instruction's own words) is allowed when the instruction mentions the word.
+Greek look-alikes mapped to Latin, lower case, stroke letters read as their base ("refunđ" reads "refund");
+hyphen-split words are also read joined. In the draft (and a model question) a text-direction control is an
+"obfuscation" finding, and so is a word holding a letter of any script but Latin, Cyrillic and Greek, mixing those
+scripts, or holding a non-ASCII Latin letter other than the stroke letters (small capitals, IPA). A commitment word
+is allowed only when the instruction mentions it and holds no negator anywhere; a draft sentence with exactly one
+negator just before the word ("no refund", "cannot offer a refund", or the instruction's own words) is allowed when
+the instruction mentions the word.
 """
 
 from __future__ import annotations
@@ -25,7 +27,10 @@ _FILLERS = "".join(map(chr, (0x115F, 0x1160, 0x3164, 0xFFA0)))  # Hangul fillers
 _BIDI = "".join(map(chr, (*range(0x202A, 0x202F), *range(0x2066, 0x206A), 0x200E, 0x200F, 0x061C)))
 _BIDI_GAP = dict.fromkeys(map(ord, _BIDI), " ")
 _BIDI_SPAN = re.compile(f"\\S{{0,40}}[{_BIDI}]\\S{{0,40}}")
-_LATIN_OK = frozenset("ßøæœđłþðħı")  # Latin letters with no ASCII decomposition that are ordinary spelling
+# Latin letters with no ASCII decomposition that are ordinary spelling, read as their base letters
+_FOLD = str.maketrans({"ß": "ss", "ø": "o", "æ": "ae", "œ": "oe", "đ": "d", "ł": "l", "þ": "th", "ð": "d", "ħ": "h"})
+_FOLD |= str.maketrans({"ŧ": "t", "ı": "i", "ƀ": "b", "ƶ": "z", "ǥ": "g", "ɍ": "r", "ɇ": "e"})
+_SCRIPTS = ("LATIN", "CYRILLIC", "GREEK")
 _LOOKALIKES = str.maketrans(
     "АВСЕНІЈКМОРЅТХУҮԚԜӀЗасеһнвіјкмоѕртхуүԁԛԝӏпгьзΑΒΕΖΗΙΚΜΝΟΡΤΥΧϹαβγεικνορτυχωημϲϳςı",
     "ABCEHIJKMOPSTXYYQWI3acehhbijkmosptxyydqwlnrb3ABEZHIKMNOPTYXCabyeikvoptuxwnucjci",
@@ -70,7 +75,12 @@ _COMMITMENTS = [  # one family per pattern; a family in the draft must also be i
 _NEGATORS = frozenset(
     "no not never none nothing nobody neither nor without cannot unable impossible unavailable decline declines "
     "declined declining refuse refuses refused refusing deny denies denied denying avoid avoids avoided avoiding "
-    "withhold withholds withheld".split()
+    "withhold withholds withheld reject rejects rejected rejecting skip skips skipped skipping ignore ignores ignored "
+    "ignoring forgo forgoes forgone forgoing forego nope nah".split()
+)
+_NEGATING_PHRASES = re.compile(
+    r"\b(?:out of the question|(?:turn|turns|turned|turning) (?:\w+ ){0,3}?down|(?:rule|rules|ruled|ruling) "
+    r"(?:\w+ ){0,3}?out|(?:hold|holds|held|holding) off)\b"
 )
 _FILLER = frozenset("a an the any offer offering give giving provide providing issue full partial cash".split())
 
@@ -92,18 +102,21 @@ def _strip(text: str) -> str:
 def clean(text: str) -> str:
     """`text` as every check reads it (see the module docstring)."""
     text = _strip(text)
-    return text.lower() if text.isascii() else text.translate(_LOOKALIKES).lower().translate(_LOOKALIKES)
+    if text.isascii():
+        return text.lower()
+    return text.translate(_LOOKALIKES).lower().translate(_LOOKALIKES).translate(_FOLD)
 
 
 def _suspect(word: str) -> bool:
-    """True for a word mixing Latin with another script, or holding a Latin letter that is a look-alike trick."""
+    """True for a word holding a letter of a script other than Latin, Cyrillic or Greek, mixing scripts, or holding
+    a non-ASCII Latin letter that is not a stroke letter (fail closed)."""
     scripts = set()
     for c in word:
         script = "LATIN" if c.isascii() else unicodedata.name(c, "?").split(" ", 1)[0]
-        if script == "LATIN" and not c.isascii() and c.lower() not in _LATIN_OK:
+        if script not in _SCRIPTS or (script == "LATIN" and not c.isascii() and ord(c.lower()) not in _FOLD):
             return True
         scripts.add(script)
-    return "LATIN" in scripts and len(scripts) > 1
+    return len(scripts) > 1
 
 
 def _obfuscations(text: str) -> list[Finding]:
@@ -133,7 +146,7 @@ def _cue(word: str) -> bool:
 
 def _negators(sentence: str) -> int:
     sentence = re.sub(_NO_CHARGE, " ", sentence)
-    return sum(map(_cue, re.findall(r"[\w'’]+", sentence))) + sentence.count("out of the question")
+    return sum(map(_cue, re.findall(r"[\w'’]+", sentence))) + len(_NEGATING_PHRASES.findall(sentence))
 
 
 def _negation(text: str, start: int) -> str | None:
@@ -177,11 +190,13 @@ class Checker:
             budget -= len(pieces[-1])
         self._known = {(kind, value) for kind, value, _ in _read(clean("\n".join(pieces)), commitments=False)[0]}
         self._granted, self._mentioned, self._denied = set[int](), set[int](), set[tuple[int, str]]()
-        for family, _, phrase, count in _read(clean(instruction[:CHECK_CAP]))[1]:
+        text = clean(instruction[:CHECK_CAP])
+        negated = _negators(text) > 0  # a negator anywhere in the instruction: no commitment word is granted
+        for family, _, phrase, _count in _read(text)[1]:
             self._mentioned.add(family)
-            if count == 0:  # any negator anywhere in the instruction sentence: not granted
+            if not negated:
                 self._granted.add(family)
-            elif phrase is not None:
+            if phrase is not None:
                 self._denied.add((family, phrase))
 
     def find(self, body: str) -> list[Finding]:
