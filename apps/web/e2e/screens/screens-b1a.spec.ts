@@ -52,7 +52,7 @@ test("S_14 renders, no console errors, placeholders aria-disabled", async ({ pag
     "/world/w_village_basic",
   );
   await page.locator("button.primary").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "What should Tilo do?" })).toBeVisible();
   expect(problems).toEqual([]);
 });
 

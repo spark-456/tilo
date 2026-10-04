@@ -1376,16 +1376,15 @@ button.row {
 .flow-shell[data-screen="Approaches"] {
   width: min(520px, calc(100vw - 464px));
 }
-/* The slot reserves the ready height (cards, cap box, rule line, cost line), measured (before the
-   spacing scale added about 20 px): 588 px at 1440, 754 px at 768 (the stage rail leaves 304 px),
-   625 px at 390, 698 px at 360, 754 px at 320. */
+/* The slot reserves the ready height (cards, cap box, meter, rule line, cost line), measured: 572 px
+   at 1440, 727 px at 768 and 320, 640 px at 390, 676 px at 360, plus half a line of margin. */
 .flow-shell[data-screen="Approaches"] .flow-slot {
   display: flow-root;
-  min-height: 38.5em;
+  min-height: 37em;
 }
 @media (max-width: 1023px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 49.5em;
+    min-height: 46.5em;
   }
 }
 @media (max-width: 767px) {
@@ -1393,17 +1392,17 @@ button.row {
     width: calc(100vw - 32px);
   }
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 41.5em;
+    min-height: 41em;
   }
 }
 @media (max-width: 389px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 45.5em;
+    min-height: 43.5em;
   }
 }
 @media (max-width: 359px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 49.5em;
+    min-height: 46.5em;
   }
 }
 .approach-card {
@@ -1415,6 +1414,41 @@ button.row {
 }
 .approach-card[data-selected="true"] {
   border-color: var(--color-brand-primary);
+}
+/* The time and credit range is the number a person decides on, so it leads the muted detail. */
+.approach-meta[data-testid="approach-ranges"] {
+  color: var(--color-ink-1);
+  font-weight: 700;
+}
+.approach-meta[data-testid="approach-dimensions"],
+.approach-meta[data-testid="approach-risks"],
+.approach-meta[data-testid="approach-skips"] {
+  font-size: var(--text-12);
+}
+/* Budget meter: the estimated range as a band, the cap as a marker (a line plus a notch, not colour
+   alone). It sits above the cap rule and reserves its own height. */
+.budget-meter {
+  position: relative;
+  height: var(--space-16);
+  margin: var(--space-4) 0 var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+}
+.meter-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-2);
+}
+.meter-cap {
+  position: absolute;
+  top: calc(var(--space-4) * -1);
+  bottom: calc(var(--space-4) * -1);
+  width: var(--space-4);
+  margin-left: calc(var(--space-4) / -2);
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-primary);
 }
 .approach-head,
 .budget-cap-field {

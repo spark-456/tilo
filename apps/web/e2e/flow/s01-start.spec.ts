@@ -27,7 +27,9 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await page.setViewportSize(viewport);
     const errors = watchConsole(page);
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "What should Tilo do?" }),
+    ).toBeVisible();
     await expect(page.locator("button.primary")).toHaveCount(1);
     const start = page.getByRole("button", { name: "Start task", exact: true });
     await expect(start).toBeDisabled(); // an empty box has nothing to start
@@ -100,7 +102,9 @@ for (const viewport of [DESKTOP, MOBILE]) {
       "true",
     );
     await page.waitForTimeout(1500); // still waiting on the client
-    await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "What should Tilo do?" }),
+    ).toBeVisible();
     expect(await readShifts(page)).toEqual([]);
     await expect(page.getByRole("heading", { level: 1, name: "Understanding" })).toBeVisible({
       timeout: 20_000,
