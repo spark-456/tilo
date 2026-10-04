@@ -14,7 +14,7 @@ test("S_13 renders, no console errors, placeholders aria-disabled", async ({ pag
     });
     await expect(page.getByText("Deliverables", { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId("memory-empty")).toBeVisible();
-    await soon(page, "Search the library");
+    await expect(page.getByRole("searchbox", { name: "Search the library" })).toBeVisible();
   });
   await page.getByRole("link", { name: "Version history" }).click();
   await expect(page).toHaveURL(/\/library\/artifacts$/);
