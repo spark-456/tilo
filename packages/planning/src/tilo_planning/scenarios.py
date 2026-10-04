@@ -1,14 +1,16 @@
-"""Scenario configs (FR-INT-11, PRD 7.1, 4.3, 10.1, 10.4, BQ-202). A scenario is data: `config/scenarios/<id>.yaml`
-names the skills, connectors, seed data, autonomy policy and theme a world starts with, and this one generic loader
-reads every such file, so a new scenario needs no code (no scenario id appears in platform source). Fail closed: any
-bad id, file, key or reference is a `ScenarioError` before anything is returned; the file is data, never code
-(`yaml.safe_load`). Only the owner creates a policy (PRD 10.1), so `policies()` takes the owner from the caller, and a
-T3 action is never above L1 whatever the file says. The shape is checked here until `contracts/scenario.schema.json`
-exists (needs contract change, BQ-202)."""
+"""Scenario configs (FR-INT-11, PRD 7.1, 4.3, 10.1, 10.4, ADR-0014, BQ-202). A scenario is data:
+`config/scenarios/<id>.yaml` names the skills, connectors, seed data, autonomy policy and theme a world starts with,
+and this one generic loader reads every such file, so a new scenario needs no code (SN-09: no scenario id in platform
+source). Fail closed: any bad id, file, key or reference is a `ScenarioError` before anything is returned. The file is
+read with `yaml.safe_load`, validated against `contracts/scenario.schema.json` (the JSON Schema, not a model that
+would accept a null the schema refuses), then SN-01 and SN-03 to SN-07 are checked here (`contracts/scenario.rules.md`).
+Only the owner creates a policy (PRD 10.1, SN-08), so `policies()` takes the owner from the caller; a T3 action is never
+above L1 whatever the file says, and a `grant_budget` entry gets `limits.credits` null so the engine gates it."""
 
 from __future__ import annotations
 
 import csv
+import functools
 import io
 import json
 import re
@@ -18,20 +20,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import jsonschema
 import tilo_policy
 import yaml
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
+CONTRACTS = REPO_ROOT / "contracts"
 MAX_FILE_BYTES = 2_000_000
-_ID = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,31}")
-_SKILL = re.compile(r"[a-z][a-z0-9]*([_-][a-z0-9]+)*")  # common.schema.json skill_id
-_SLUG = re.compile(r"[a-z][a-z0-9_]{0,63}")
-_CONNECTOR = re.compile(r"[a-z][a-z0-9_]{1,31}")
-_ACTION = re.compile(r"[a-z][a-z0-9_]{1,47}")
-_LEVEL = re.compile(r"L[0-3]")
-_KEYS = {"id", "title", "skills", "connectors", "seed_data", "theme", "autonomy"}
-_ENTRY_KEYS = {"action_type", "level", "connectors", "per_day", "undo_window_s"}
+MAX_PROBLEMS = 3
 _INTERNAL = "internal"  # the reserved connector id of an action that goes through no connector
+_ID = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,31}")  # $defs/id of the schema; fullmatch, so no final line break
 
 
 class ScenarioError(Exception):
@@ -94,6 +94,25 @@ def _read_yaml(path: Path, what: str) -> Any:
         raise ScenarioError(f"{what} cannot be read: {type(error).__name__}") from error
 
 
+@functools.cache
+def _validator() -> jsonschema.protocols.Validator:
+    resources = []
+    for path in sorted(CONTRACTS.glob("*.schema.json")):  # common.schema.json is what scenario.schema.json refers to
+        data = json.loads(path.read_text(encoding="utf-8"))
+        resources.append((data["$id"], Resource.from_contents(data, default_specification=DRAFT202012)))
+    schema = json.loads((CONTRACTS / "scenario.schema.json").read_text(encoding="utf-8"))
+    return jsonschema.Draft202012Validator(schema, registry=Registry().with_resources(resources))
+
+
+def _schema_problems(data: Any) -> list[str]:
+    """SN-02: each way the file fails the schema, naming the key and the offending value (bounded)."""
+    try:
+        errors = sorted(_validator().iter_errors(data), key=lambda e: [str(p) for p in e.absolute_path])
+    except RecursionError:
+        return ["the file is nested too deeply"]
+    return [f"{'.'.join(map(str, e.absolute_path)) or 'file'}: {e.message}"[:160] for e in errors[:MAX_PROBLEMS]]
+
+
 def _connector_ids(repo_root: Path) -> set[str]:
     registry = _read_yaml(repo_root / "config" / "connectors.yaml", "config/connectors.yaml")
     if not isinstance(registry, list) or not all(
@@ -103,46 +122,25 @@ def _connector_ids(repo_root: Path) -> set[str]:
     return {c["id"] for c in registry}
 
 
-def _seed_path(entry: Any, repo_root: Path) -> Path:
-    where = f"seed_data entry {_show(entry)}"
-    if not isinstance(entry, str) or not entry.strip() or "\x00" in entry:
-        raise ScenarioError(f"{where} must be a repo-relative path")
-    parts = re.split(r"[\\/]", entry)
-    if entry[0] in "/\\" or ":" in entry or ".." in parts:
-        raise ScenarioError(f"{where} must stay inside the repository (no absolute path, no '..')")
+def _seed_file(entry: str, repo_root: Path) -> Path:
+    """SN-04: the schema already refused an absolute, dotted or hidden path; this resolves symlinks and needs an
+    existing regular file inside the repo root."""
     root = repo_root.resolve()
     path = (root / entry).resolve()
-    if root not in path.parents:
-        raise ScenarioError(f"{where} leaves the repository")
-    if not path.is_file():
-        raise ScenarioError(f"{where} does not exist")
+    if root not in path.parents or not path.is_file():
+        raise ScenarioError(f"seed_data {_show(entry)} is not an existing file inside the repository")
     return path
 
 
-def _check_entry(entry: Any, index: int, connectors: Collection[str], table: tilo_policy.RiskTable) -> None:
+def _check_entry(entry: dict[str, Any], index: int, connectors: Collection[str], table: tilo_policy.RiskTable) -> None:
+    """SN-06 (level within the tier's max, an unlisted action is T3) and SN-07 (connectors the scenario's own)."""
     where = f"autonomy[{index}]"
-    if not isinstance(entry, dict) or not {"action_type", "level", "connectors"} <= set(entry) <= _ENTRY_KEYS:
-        raise ScenarioError(f"{where} must have action_type, level, connectors and at most per_day, undo_window_s")
-    action, level, own = entry["action_type"], entry["level"], entry["connectors"]
-    if not isinstance(action, str) or not _ACTION.fullmatch(action):
-        raise ScenarioError(f"{where}.action_type is not an action type")
-    if not isinstance(level, str) or not _LEVEL.fullmatch(level):
-        raise ScenarioError(f"{where}.level must be L0, L1, L2 or L3")
+    action, level = entry["action_type"], entry["level"]
     tier = table.tier_of(action, [])  # an action the table does not list is T3 (BQ-44)
     if int(level[1]) > int(table.max_level[tier][1]):
         raise ScenarioError(f"{where}: {action} is {tier} and may not be above {table.max_level[tier]}")
-    per_day = entry.get("per_day")
-    if level in ("L2", "L3") and (not isinstance(per_day, int) or isinstance(per_day, bool) or per_day < 1):
-        raise ScenarioError(f"{where}: {level} needs a per_day limit of at least 1")
-    if "per_day" in entry and per_day is not None and (not isinstance(per_day, int) or isinstance(per_day, bool)):
-        raise ScenarioError(f"{where}.per_day must be a whole number")
-    undo = entry.get("undo_window_s", 60)
-    if not isinstance(undo, int) or isinstance(undo, bool) or not 0 <= undo <= 3600:
-        raise ScenarioError(f"{where}.undo_window_s must be 0 to 3600")
-    if not isinstance(own, list) or not own or len(set(map(str, own))) != len(own):
-        raise ScenarioError(f"{where}.connectors must be a non-empty list without repeats")
-    for connector in own:
-        if not isinstance(connector, str) or not (connector in connectors or connector == _INTERNAL):
+    for connector in entry["connectors"]:
+        if connector not in connectors and connector != _INTERNAL:
             raise ScenarioError(f"{where}: connector {_show(connector)} is not one of the scenario's own connectors")
 
 
@@ -153,53 +151,30 @@ def _load_table(repo_root: Path) -> tilo_policy.RiskTable:
         raise ScenarioError("config/autonomy.yaml is not a valid risk table") from error
 
 
-def _text_list(value: Any, name: str, pattern: re.Pattern[str]) -> list[str]:
-    if not isinstance(value, list) or not all(isinstance(v, str) and pattern.fullmatch(v) for v in value):
-        raise ScenarioError(f"{name} must be a list of valid ids")
-    if len(set(value)) != len(value):
-        raise ScenarioError(f"{name} has a repeated id")
-    return value
-
-
 def load_scenario(
     scenario_id: str, *, repo_root: Path = REPO_ROOT, skill_ids: Collection[str] | None = None
 ) -> Scenario:
     if not isinstance(scenario_id, str) or not _ID.fullmatch(scenario_id):
-        raise ScenarioError("not a scenario id")  # before any path is built
+        raise ScenarioError("not a scenario id")  # SN-01: before any path is built
     path = repo_root / "config" / "scenarios" / f"{scenario_id}.yaml"
     data = _read_yaml(path, f"scenario {scenario_id}")
-    if not isinstance(data, dict):
-        raise ScenarioError(f"scenario {scenario_id} must be a mapping")
-    unknown, missing = sorted(map(str, set(data) - _KEYS)), sorted(_KEYS - {"autonomy"} - set(data))
-    if unknown or missing:
-        raise ScenarioError(f"scenario {scenario_id}: unknown keys {unknown}, missing keys {missing}")
+    if problems := _schema_problems(data):
+        raise ScenarioError(f"scenario {scenario_id} does not fit scenario.schema.json: " + "; ".join(problems))
     if data["id"] != scenario_id:
         raise ScenarioError(f"scenario file {scenario_id}.yaml must have the id {scenario_id}")
-    title, theme = data["title"], data["theme"]
-    if not isinstance(title, str) or not title.strip() or len(title) > 120:
-        raise ScenarioError(f"scenario {scenario_id}: title must be text of 1 to 120 characters")
-    if not isinstance(theme, str) or not _SLUG.fullmatch(theme):
-        raise ScenarioError(f"scenario {scenario_id}: theme must be a lower-case slug")
-    skills = _text_list(data["skills"], "skills (skill ids)", _SKILL)
-    if not skills or any(len(s) > 64 for s in skills):
-        raise ScenarioError(f"scenario {scenario_id}: skills must name 1 or more skill ids")
-    if skill_ids is not None and (absent := [s for s in skills if s not in skill_ids]):
+    skills, connectors = data["skills"], data["connectors"]
+    if skill_ids is not None and (absent := [s for s in skills if s not in skill_ids]):  # SN-05
         raise ScenarioError(f"scenario {scenario_id}: skills not in the catalog: {absent}")
-    connectors = _text_list(data["connectors"], "connectors", _CONNECTOR)
-    registry = _connector_ids(repo_root)
+    registry = _connector_ids(repo_root)  # SN-03: `internal` is never declared there
     if unlisted := [c for c in connectors if c not in registry]:
         raise ScenarioError(f"scenario {scenario_id}: connectors not in config/connectors.yaml: {unlisted}")
-    seeds = data["seed_data"]
-    if not isinstance(seeds, list):
-        raise ScenarioError(f"scenario {scenario_id}: seed_data must be a list of paths")
-    seed_paths = [_seed_path(entry, repo_root) for entry in seeds]
-    autonomy = data.get("autonomy") or []
-    if not isinstance(autonomy, list):
-        raise ScenarioError(f"scenario {scenario_id}: autonomy must be a list")
-    table = _load_table(repo_root)
+    seed_paths = [_seed_file(entry, repo_root) for entry in data["seed_data"]]
+    table, autonomy = _load_table(repo_root), data.get("autonomy", [])
     for index, entry in enumerate(autonomy):
         _check_entry(entry, index, connectors, table)
-    return Scenario(scenario_id, title, tuple(skills), tuple(connectors), tuple(seed_paths), theme, tuple(autonomy))
+    return Scenario(
+        scenario_id, data["title"], tuple(skills), tuple(connectors), tuple(seed_paths), data["theme"], tuple(autonomy)
+    )
 
 
 def _parse_seed(path: Path) -> None:
