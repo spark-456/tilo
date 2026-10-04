@@ -19,6 +19,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, fields
 from typing import Any, Protocol
 
+from tilo_channels.autopilot_send import index_artifact
 from tilo_channels.autopilot_state import ACTION_TYPE, CancelPending, CardStore, Ledger, Outbox, timestamp, ulid
 from tilo_channels.autopilot_t3 import clean_text, t3_content_signal
 from tilo_channels.drafting import (
@@ -127,6 +128,7 @@ class Autopilot:
         doc = self._cards.get(user_id, card_id)
         if doc is None or doc["state"] != "open" or "send" not in doc["options"]:
             return Outcome("refused", None)
+        index_artifact(self._cards, user_id, doc)  # a preview that died before indexing is completed here
         if doc["level"] == "L2":  # the entry's real state; a stopped card never enqueues again
             entry = self._ledger.schedule(user_id, doc)
             state = entry["state"] if entry else "cancelled"
@@ -201,6 +203,7 @@ class Autopilot:
                 doc = self._cards.get(user_id, card_id)
                 if doc is None:
                     raise LookupError("card store refused a create but holds no card")
+        index_artifact(self._cards, user_id, doc)  # the text DraftArtifacts serves, before any enqueue (BQ-182)
         if doc["level"] == "L2" and doc["state"] == "open":  # the recorded decision, never worked out again
             entry = self._ledger.schedule(user_id, doc)  # the card's one entry, by its key; none once stopped
             doc = doc | {"scheduled_at": entry["scheduled_at"]} if entry else doc
@@ -243,10 +246,12 @@ class Autopilot:
             "mode": context.mode,
             "instruction": context.instruction,
             "item": {"artifact_id": draft.artifact_id, "version": draft.version} if draft else None,
+            "in_reply_to": draft.in_reply_to if draft else "",  # the message the draft answers (BQ-185)
+            "references": draft.references if draft else "",
         }
         if ready and draft is not None:
             modifiers = ["money_or_legal"] if t3_content_signal(draft.body) else []  # hidden characters too
-            modifiers += ["safety_flag"] if draft.safety_flag or result.flagged else []
+            modifiers += ["safety_flag"] if self._flagged(user_id, context, result) else []
             modifiers += ["new_recipients"] if self._adds_recipient(user_id, context, draft) else []
             modifiers += ["attachments"] if draft.attachments else []
             doc |= {"tier": "T3" if modifiers else "T2", "modifiers": modifiers}
@@ -257,6 +262,12 @@ class Autopilot:
                     doc |= {"level": "L2", "undo_window_s": UNDO_WINDOW_S, "policy_id": policy_id}
                     doc |= {"outbox_id": ulid(ms), "scheduled_at": timestamp(ms + UNDO_WINDOW_S * 1000)}
         return doc
+
+    def _flagged(self, user_id: str, context: DraftContext, result: DraftResult) -> bool:
+        """BQ-183: the passed result's flags or those of the draft FR-CHN-10 stored for the instruction, if any."""
+        stored = self._drafter.stored(user_id, context.instruction_id)
+        results = [result] + ([stored] if stored is not None else [])
+        return any(r.flagged or (r.draft is not None and r.draft.safety_flag) for r in results)
 
     def _adds_recipient(self, user_id: str, context: DraftContext, draft: Draft) -> bool:
         """FR-CHN-12: a forward, a new email, an unknown or mismatched format and any Bcc always add a recipient
