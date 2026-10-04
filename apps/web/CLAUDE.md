@@ -5,7 +5,7 @@ The Firebase-hosted web client (PRD 6.2): React UI, the PixiJS v8 isometric worl
 Trace lenses, cards and settings.
 
 ## Commands
-- `pnpm --filter @tilo/web run dev` / `build` / `test` / `test:e2e` — dev server / build / Vitest / Playwright
+- `pnpm --filter @tilo/web run dev` / `build` / `test` / `test:e2e` — dev server / build / Vitest / Playwright (always `TILO_WEB_PORT=<own port>`; a filtered run also runs the whole `timing` project unless `--no-deps`)
 - `just tokens` — regenerate token files from `design/tokens.json`; `just check` — full gate; `just e2e-cp2` — `@cp2` Playwright walk on the real dev API (starts `tilo-api` + its own Vite; local only, never CI)
 
 ## Contracts
