@@ -1214,7 +1214,96 @@ button.row {
   gap: var(--space-8);
 }
 .filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12) var(--space-16);
   margin: 0 0 var(--space-16);
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.search-field {
+  position: relative;
+  flex: 1 1 16rem;
+  max-width: 24rem;
+}
+.search-field input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-12);
+  border: 2px solid var(--color-ink-3);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+.search-field input:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.filter-chip {
+  position: relative;
+  display: inline-flex;
+}
+.filter-chip input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0; /* the chip is the label; the radio keeps keyboard and screen-reader behaviour */
+  cursor: pointer;
+}
+.filter-chip span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 0 var(--space-12);
+  border: 2px solid var(--color-ink-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) / 1 var(--font-ui);
+}
+.filter-chip span b {
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 767px) {
+  .filter-chip span {
+    min-height: 44px; /* a phone target: the chip and its radio's hit area */
+  }
+}
+.filter-chip input:checked + span {
+  border-color: var(--color-ink-1);
+  background: var(--color-ink-1);
+  color: var(--color-surface-1);
+}
+.filter-chip input:checked + span::before {
+  content: "✓";
+  content: "✓" / ""; /* a tick, hidden from the accessible name: the selected chip differs by shape, not colour alone */
+}
+.filter-chip input:focus-visible + span {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.world-grid .empty-state {
+  grid-column: 1 / -1;
+  min-height: 12rem; /* the room a card takes: choosing a filter moves nothing below */
 }
 .page .secondary.placeholder.compact {
   min-height: 36px;
@@ -1223,7 +1312,7 @@ button.row {
 }
 .world-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--space-16);
 }
 .world-grid .flow-slot {
@@ -1249,7 +1338,8 @@ button.row {
   background: var(--color-fog);
 }
 .world-thumb svg {
-  height: 5em;
+  width: 100%;
+  height: 6.5em; /* under the two chips, which take the top 36 px of the 9em box */
 }
 .world-thumb .btag {
   position: absolute;
@@ -1274,6 +1364,9 @@ button.row {
   margin: 0;
   min-height: 2.6em; /* two lines: the title arriving with the first event moves nothing */
   font: 900 var(--text-20) / 1.3 var(--font-display); /* 20 */
+}
+.world-card .needs-line {
+  min-height: 3em; /* "Nothing waits for you." or a decision and its link, on up to two lines */
 }
 .world-card [data-testid="replay-note"] {
   min-height: 4.2em; /* three lines of 14 px text at 1.5 */
