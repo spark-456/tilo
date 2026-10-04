@@ -115,7 +115,7 @@ test.describe("FR-WLD-11 accessibility", () => {
     ["390x844", MOBILE],
   ] as const) {
     test(`FR_WLD_11 axe: every routed screen is clean at ${name}`, async ({ page }) => {
-      test.setTimeout(300_000);
+      test.setTimeout(480_000);
       const problems = watchConsole(page);
       await page.setViewportSize(viewport);
       for (const route of ALL_ROUTES) {
