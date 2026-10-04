@@ -1,0 +1,29 @@
+# SC-01: competitor pricing analysis for a leadership meeting (PRD 4.3, FR-INT-11, BQ-202).
+# Read by the generic loader `tilo_planning.scenarios.load_scenario`; no code names this id.
+# skills: the v0 research and deck skills (PRD 12.4); they are checked against the skills/ catalog once FR-AGT-04
+#   merges (until then `skill_ids` is not passed).
+# connectors: ids in config/connectors.yaml. seed_data: repo-relative files, the Sandbox Web pricing seed.
+# autonomy: policy entries created as the owner's own at approve. Every level is within config/autonomy.yaml's
+#   max_level for the action's tier (a T3 action is never above L1); L2 and L3 need per_day.
+# theme: a slug only (config/themes/ does not exist yet).
+id: SC-01
+title: Competitor pricing analysis for a leadership meeting
+skills:
+  - web-research
+  - table-extraction
+  - price-comparison
+  - deck-writing
+  - executive-summary
+connectors:
+  - google_drive
+seed_data:
+  - services/sandbox-web/seed/beacontrack.yaml
+  - services/sandbox-web/seed/fluxpoint.yaml
+  - services/sandbox-web/seed/ledgerly.yaml
+theme: metropolis
+autonomy:
+  - action_type: save_file
+    level: L2
+    connectors: [google_drive]
+    per_day: 10
+    undo_window_s: 60
