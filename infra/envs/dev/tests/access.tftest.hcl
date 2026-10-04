@@ -164,3 +164,40 @@ run "SEC_12_deployer_project_roles_are_explicit_opt_in" {
     error_message = "An opted-in deployer role must appear in the bindings, visible to review."
   }
 }
+
+run "SEC_12_internet_facing_services_have_no_full_vertex_role" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for b in output.project_iam_bindings :
+      !(b.role == "roles/aiplatform.user" && (strcontains(b.member, "tilo-api@") || strcontains(b.member, "tilo-channels@")))
+    ])
+    error_message = "api and channels must not hold roles/aiplatform.user; they get the generate-only custom role."
+  }
+
+  assert {
+    condition = toset([
+      for b in output.project_iam_bindings : b.member if b.role == "projects/${var.project_id}/roles/tiloVertexGenerate"
+      ]) == toset([
+      "serviceAccount:tilo-api@${var.project_id}.iam.gserviceaccount.com",
+      "serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com",
+    ])
+    error_message = "The generate-only role belongs to api and channels."
+  }
+
+  assert {
+    condition     = [for b in output.project_iam_bindings : b.member if b.role == "roles/aiplatform.user"] == ["serviceAccount:tilo-harness@${var.project_id}.iam.gserviceaccount.com"]
+    error_message = "Only harness keeps roles/aiplatform.user (until its Sessions/Memory Bank calls exist)."
+  }
+}
+
+run "SEC_12_deployer_project_roles_allowlist_rejects_owner" {
+  command = plan
+
+  variables {
+    deployer_project_roles = ["roles/owner"]
+  }
+
+  expect_failures = [var.deployer_project_roles]
+}

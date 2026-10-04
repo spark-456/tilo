@@ -92,10 +92,12 @@ It adds the `gmail_push` module, a Model Armor template, bucket-scoped
 service grants and the optional `deployer_project_roles` (left empty for dev)
 and `model_armor_location` variables. The oauth-tokens key binding changes
 role (connectors may now encrypt too), which Terraform shows as one replace.
-Expect about 54 to add, 0 to change, 1 to destroy in total from the P0-07
+Expect about 55 to add, 0 to change, 2 to destroy in total from the P0-07
 state (17 APIs, 4 monitoring, 9 secret slots and accessors, 7 storage
-grants, 5 project grants, 6 Gmail push, 2 service accounts, 1 Model Armor
-template, 2 invokers, 1 KMS replace). Firebase deploys are manual: see
+grants, 5 project grants plus 1 custom Vertex role, 6 Gmail push, 2 service
+accounts, 1 Model Armor template, 2 invokers, 1 KMS replace). The 2 destroys
+are the old KMS decrypter binding and api's accessor on
+`email-action-link-signing-key` (moved to channels). Firebase deploys are manual: see
 `infra/ACCESS.md` section 7.
 
 ### What apply will change (P0-07b, on top of an already-applied P0-07)

@@ -88,4 +88,9 @@ variable "deployer_project_roles" {
   EOT
   type        = list(string)
   default     = []
+
+  validation {
+    condition     = alltrue([for r in var.deployer_project_roles : contains(["roles/cloudbuild.builds.editor", "roles/firebasehosting.admin", "roles/firebaserules.admin"], r)])
+    error_message = "deployer_project_roles may only contain roles/cloudbuild.builds.editor, roles/firebasehosting.admin or roles/firebaserules.admin."
+  }
 }

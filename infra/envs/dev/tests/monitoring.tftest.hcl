@@ -123,11 +123,14 @@ run "NFR_23_invalid_alert_email_rejected" {
   expect_failures = [var.alert_email]
 }
 
+# 8 secrets = the 4 pinned in security_iam.tftest.hcl plus the 4 slots added by
+# P0-07b (whatsapp-webhook-verify-token, channel-binding-hmac-key,
+# channel-number-encryption-key, webpush-vapid-private-key); one accessor each.
 run "P0_07b_secret_accessors_output_is_config_derived" {
   command = plan
 
   assert {
-    condition     = length(output.secret_accessors) == 8 && alltrue([for s, m in output.secret_accessors : length(m) == (s == "email-action-link-signing-key" ? 2 : 1)])
+    condition     = length(output.secret_accessors) == 8 && alltrue([for s, m in output.secret_accessors : length(m) == 1])
     error_message = "secret_accessors must list one accessor per secret, from config (stable across refresh)."
   }
 }

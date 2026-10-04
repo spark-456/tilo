@@ -31,10 +31,11 @@ resource "google_pubsub_topic_iam_member" "gmail_publisher" {
   member  = "serviceAccount:gmail-api-push@system.gserviceaccount.com"
 }
 
-# Pub/Sub signs the push OIDC token as the push service account.
+# Pub/Sub signs the push OIDC token as the push service account. Only the
+# OpenID-token role is needed (getOpenIdToken), not full token creation.
 resource "google_service_account_iam_member" "pubsub_signs_push_token" {
   service_account_id = var.push_service_account_name
-  role               = "roles/iam.serviceAccountTokenCreator"
+  role               = "roles/iam.serviceAccountOpenIdTokenCreator"
   member             = "serviceAccount:${var.pubsub_service_agent_email}"
 }
 

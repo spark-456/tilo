@@ -150,14 +150,20 @@ locals {
   # per secret (secret_accessors below), never project-wide. tilo-channels
   # is internet-facing and writes only through the API (PRD 6.1), so it holds
   # no data role; it only calls models (triage, drafting) and the safety
-  # provider. aiplatform.user and modelarmor.user cannot be scoped below the
-  # project (no resource-level IAM for publisher models or Model Armor
-  # templates); they go to exactly the services whose code calls the
-  # provider layer (api Router and intake screen, harness, channels).
+  # provider. The provider layer only generates, streams, embeds and counts
+  # tokens (google_adapter.py), so the two internet-facing callers (api,
+  # channels) get a custom role holding just aiplatform.endpoints.predict
+  # instead of roles/aiplatform.user (which also allows jobs, endpoint
+  # deployment and Agent Engine sessions/Memory Bank). Harness keeps
+  # aiplatform.user until its Sessions/Memory Bank/code-execution calls exist
+  # (then narrow it too). Neither Vertex publisher models nor Model Armor
+  # templates have resource-level IAM, so these stay project-level.
+  vertex_generate_role = "projects/${var.project_id}/roles/tiloVertexGenerate"
+
   service_project_roles = {
-    "api"         = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user", "roles/modelarmor.user"]
+    "api"         = ["roles/datastore.user", "roles/cloudtasks.enqueuer", local.vertex_generate_role, "roles/modelarmor.user"]
     "harness"     = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user", "roles/modelarmor.user"]
-    "channels"    = ["roles/aiplatform.user", "roles/modelarmor.user"]
+    "channels"    = [local.vertex_generate_role, "roles/modelarmor.user"]
     "connectors"  = ["roles/datastore.user"]
     "browser"     = []
     "render"      = ["roles/datastore.user"]
@@ -169,7 +175,7 @@ locals {
     "workspace-oauth-client"        = ["connectors"]
     "whatsapp-api-token"            = ["channels"]
     "channels-webhook-signing-key"  = ["channels"]
-    "email-action-link-signing-key" = ["api", "channels"] # channels signs/verifies links (links.py)
+    "email-action-link-signing-key" = ["channels"] # channels issues and verifies links (links.py); no api code uses it
     # Slots the PRD implies (names only; values are added by the user).
     "whatsapp-webhook-verify-token" = ["channels"] # Meta GET handshake (FR-CHN-02)
     "channel-binding-hmac-key"      = ["channels"] # binding.py HMAC (FR-CHN-03, SEC-06)
@@ -299,6 +305,19 @@ module "iam" {
 
   project_id = var.project_id
   bindings   = local.project_bindings
+
+  depends_on = [google_project_service.apis, google_project_iam_custom_role.vertex_generate]
+}
+
+# Minimal Vertex AI role for the callers of the provider layer: generate,
+# stream, embed and count tokens on publisher models need only
+# aiplatform.endpoints.predict (same pattern as modules/events bq_ledger_inserter).
+resource "google_project_iam_custom_role" "vertex_generate" {
+  project     = var.project_id
+  role_id     = "tiloVertexGenerate"
+  title       = "Tilo Vertex generate-only"
+  description = "Model calls only (generate, stream, embed, count tokens); no jobs, endpoint deployment or Agent Engine access."
+  permissions = ["aiplatform.endpoints.predict"]
 
   depends_on = [google_project_service.apis]
 }
@@ -582,6 +601,13 @@ resource "google_model_armor_template" "default" {
   project     = var.project_id
   location    = var.model_armor_location
   template_id = "tilo-default"
+
+  # PRD 16.5 (minimise): the screened text is mail and message content, so
+  # Model Armor must not write it to logs. Both log switches stay off.
+  template_metadata {
+    log_sanitize_operations = false
+    log_template_operations = false
+  }
 
   filter_config {
     pi_and_jailbreak_filter_settings {
