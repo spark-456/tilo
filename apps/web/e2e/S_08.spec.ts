@@ -24,8 +24,12 @@ test.describe("S_08 Connection consent sheet", () => {
           let cls = 0;
           new PerformanceObserver((list) => {
             for (const entry of list.getEntries()) {
-              if (!entry.hadRecentInput) {
-                cls += (entry as unknown as { value: number }).value;
+              const shift = entry as PerformanceEntry & {
+                hadRecentInput?: boolean;
+                value?: number;
+              };
+              if (!shift.hadRecentInput) {
+                cls += shift.value ?? 0;
               }
             }
           }).observe({ type: "layout-shift", buffered: true });
@@ -46,8 +50,12 @@ test.describe("S_08 Connection consent sheet", () => {
           let cls = 0;
           new PerformanceObserver((list) => {
             for (const entry of list.getEntries()) {
-              if (!entry.hadRecentInput) {
-                cls += (entry as unknown as { value: number }).value;
+              const shift = entry as PerformanceEntry & {
+                hadRecentInput?: boolean;
+                value?: number;
+              };
+              if (!shift.hadRecentInput) {
+                cls += shift.value ?? 0;
               }
             }
           }).observe({ type: "layout-shift", buffered: true });

@@ -15,6 +15,7 @@ const consentRequest: Event = {
   seq: 1,
   ts: "2026-09-29T09:30:00.000Z",
   world_id: "w_village_basic",
+  run_id: "r_village_1",
   type: "connection.requested",
   actor: "A_s1",
   target: "w_village_basic",
