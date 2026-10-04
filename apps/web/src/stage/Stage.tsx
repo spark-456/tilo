@@ -326,6 +326,7 @@ export function Stage({
               <button
                 type="button"
                 className="outline-item"
+                data-lens-control
                 tabIndex={i === active ? 0 : -1}
                 aria-pressed={selected === item.id}
                 onFocus={() => setActive(i)}
