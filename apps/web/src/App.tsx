@@ -108,7 +108,13 @@ export function App() {
       ) : (
         <Stage
           {...(world.active
-            ? { onWorld: world.onWorld, seq: world.seq, selected: world.selected }
+            ? {
+                onWorld: world.onWorld,
+                seq: world.seq,
+                selected: world.selected,
+                layout: world.layout,
+                worldId: FIXTURE_WORLD_ID,
+              }
             : {})}
           paused={stagePaused}
         />
@@ -176,7 +182,8 @@ export function App() {
           {world.active && (
             <>
               <h2>Trace</h2>
-              <ul className="trace-list" data-testid="trace-list">
+              {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region focusable for axe */}
+              <ul className="trace-list" data-testid="trace-list" tabIndex={0} aria-label="Trace">
                 {world.trace.map((row) => (
                   <TraceRow key={row.seq} seq={row.seq} type={row.type} />
                 ))}

@@ -1,7 +1,9 @@
+import type { Layout } from "@tilo/contracts";
 import { Application, Container, Graphics } from "pixi.js";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import tokens from "../design/tokens";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useSelection } from "../world/selection";
 import * as cam from "./camera";
 
 const { tileWidth: TW, tileHeight: TH } = tokens.stage;
@@ -51,7 +53,30 @@ export function Stage({
   seq,
   selected,
   paused = false,
-}: { onWorld?: WorldSeam; seq?: number; selected?: string | null; paused?: boolean }) {
+  layout,
+  worldId,
+}: {
+  onWorld?: WorldSeam;
+  seq?: number;
+  selected?: string | null;
+  paused?: boolean;
+  layout?: Layout | null;
+  worldId?: string;
+}) {
+  const [, , toggle] = useSelection(worldId ?? "");
+  const outlineItems = useMemo(() => {
+    if (!layout) return [];
+    const items: { id: string; name: string }[] = [];
+    for (const a of layout.semantic.agents) items.push({ id: a.id, name: a.id });
+    for (const l of layout.semantic.levels) {
+      for (const d of l.districts) {
+        for (const b of d.buildings) items.push({ id: b.id, name: b.name });
+      }
+    }
+    for (const g of layout.semantic.gates) items.push({ id: g.id, name: g.id });
+    return items;
+  }, [layout]);
+
   const frameRef = useRef<HTMLElement>(null);
   const [supported] = useState(() => !!document.createElement("canvas").getContext("webgl2"));
   const msRef = useRef(0);
@@ -239,6 +264,22 @@ export function Stage({
         <p className="stage-fallback" data-testid="stage-fallback">
           This browser can't render the isometric World. The Story lens will show the run instead.
         </p>
+      )}
+      {outlineItems.length > 0 && (
+        <ul className="stage-outline" aria-label="World objects">
+          {outlineItems.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className="outline-item"
+                aria-pressed={selected === item.id}
+                onClick={() => toggle(item.id)}
+              >
+                {item.name}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </main>
   );

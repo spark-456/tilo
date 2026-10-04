@@ -51,7 +51,7 @@ export function S_10({ params }: ScreenProps) {
       ) : story.length === 0 ? (
         <p>Nothing has happened yet. The story fills in as events arrive.</p>
       ) : (
-        <div role="log" aria-label="What happened, in order">
+        <div role="log" aria-label="What happened, in order" aria-live="polite">
           <ol className="story-list">
             {story.map((e) => (
               <li
@@ -59,6 +59,7 @@ export function S_10({ params }: ScreenProps) {
                 data-seq={e.seq}
                 data-severity={e.severity}
                 data-selected={selected !== null && involves(e, selected)}
+                aria-label={`Step ${e.seq}: ${e.summary}`}
               >
                 <span className="story-time">{elapsed(events, e)}</span>
                 <span>

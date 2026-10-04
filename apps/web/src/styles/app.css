@@ -1442,3 +1442,25 @@ button.row {
   color: var(--color-ink-1);
   font: 700 1em / 1.25 var(--font-ui);
 }
+.stage-outline {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+.stage-outline:focus-within {
+  position: static;
+  width: auto;
+  height: auto;
+  clip: auto;
+  white-space: normal;
+  overflow: visible;
+}
+.outline-item:focus {
+  outline: 2px solid var(--color-accent-primary);
+}

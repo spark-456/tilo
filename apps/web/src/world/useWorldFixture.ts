@@ -23,6 +23,7 @@ export interface WorldFixtureState {
   /** Set when the named fixture could not be loaded (or no name was given); shown as an alert. */
   readonly loadError: string | null;
   readonly onWorld: WorldSeam;
+  readonly layout: import("@tilo/contracts").Layout | null;
 }
 
 function parseParams(search: string) {
@@ -44,6 +45,7 @@ export function useWorldFixture(): WorldFixtureState {
     fixture === "" ? "No fixture name was given, so the fixture could not be loaded." : null,
   );
   const [worldId, setWorldId] = useState(""); // set once the layout is loaded
+  const [layout, setLayout] = useState<import("@tilo/contracts").Layout | null>(null);
   const [selected] = useSelection(worldId);
   const [trace, setTrace] = useState<ReadonlyArray<{ seq: number; type: string }>>([]);
   const stopRef = useRef<(() => void) | undefined>(undefined);
@@ -65,6 +67,7 @@ export function useWorldFixture(): WorldFixtureState {
         .then(({ layout, events }) => {
           if (cancelled) return;
           setWorldId(layout.world_id);
+          setLayout(layout);
           stopRef.current = runWorld({
             world,
             requestRender,
@@ -100,5 +103,6 @@ export function useWorldFixture(): WorldFixtureState {
     selected,
     loadError,
     onWorld,
+    layout,
   };
 }
