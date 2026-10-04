@@ -1,101 +1,115 @@
+// S-08 Connection consent sheet (FR-CON-03, PRD 18.4 "Access"). A request is a connection.requested
+// event of this run with no connection.consented for its card yet; what is asked (connector and
+// scopes) and what can be answered (the options) come from the consent card the event names, never
+// from the event itself or from a default. Contract: card.schema.json consent branch and CR-13 fix
+// the options to `connect` ("Connect") and `hold` ("Hold"); only `connect` grants the connection.
+import type { Card, ConnectionRequestedData, Event } from "@tilo/contracts";
 import { useClient } from "../api/ClientProvider";
 import { useAnswer } from "../needs-you/CardView";
-import { Placeholder } from "./Placeholder";
-import { Chip, Page, Row, Section, Soon, field, nameOf, useFixtureRun } from "./kit";
+import { Loaded } from "./FlowShell";
+import { Page, Section, nameOf, useFixtureRun } from "./kit";
+import { useRemote } from "./remote";
+
+const cardIdOf = (e: Event): string => (e.data as ConnectionRequestedData).card_id;
+const connectorOf = (e: Event): string => (e.data as ConnectionRequestedData).connector;
 
 export function S_08() {
-  const client = useClient();
   const { events } = useFixtureRun();
+  // Keyed by run: events of another run never open a request here.
+  const runId = events[0]?.run_id ?? null;
+  const runEvents = runId ? events.filter((e) => e.run_id === runId) : events;
 
-  const request = events.find(
+  const request = runEvents.find(
     (e) =>
       e.type === "connection.requested" &&
-      !events.some(
+      !runEvents.some(
         (x) =>
-          (x.type === "connection.consented" && field(x, "card_id") === field(e, "card_id")) ||
-          (x.type === "connection.revoked" &&
-            x.seq > e.seq &&
-            field(x, "connector") === field(e, "connector")),
+          (x.type === "connection.consented" && cardIdOf(x) === cardIdOf(e)) ||
+          (x.type === "connection.revoked" && x.seq > e.seq && connectorOf(x) === connectorOf(e)),
       ),
   );
-
-  const cardId = request ? String(field(request, "card_id") || "") : "";
-  const answer = useAnswer(client, cardId);
-
-  if (!request) {
-    return (
-      <Page
-        testid="consent-sheet-page"
-        title="Connection consent"
-        sub="Approve access to your accounts."
-      >
-        <Section title="No request waiting">
-          <p className="empty-note" data-testid="consent-empty">
-            No connection is asking for consent right now.
-          </p>
-        </Section>
-      </Page>
-    );
-  }
-
-  const connectorName = nameOf(String(field(request, "connector") || ""));
-  const scopes = (field(request, "scopes") as string[]) || [];
-  const writeActions = (field(request, "write_actions") as string[]) || [];
 
   return (
     <Page
       testid="consent-sheet-page"
-      title={`Connect ${connectorName}`}
-      sub="Review what Tilo can do before you approve."
+      title="Connection consent"
+      sub="Approve access to your accounts."
     >
-      <Section title="What Tilo will do" reserve={[8, 12]}>
-        <div className="gate-facts">
-          <div>
-            <dt>Why</dt>
-            <dd>{request.summary}</dd>
-          </div>
-          <div>
-            <dt>Scopes</dt>
-            <dd>{scopes.length > 0 ? scopes.join(", ") : "No specific scopes listed"}</dd>
-          </div>
-          {writeActions.length > 0 && (
-            <div>
-              <dt>Write actions</dt>
-              <dd>{writeActions.join(", ")}</dd>
-            </div>
-          )}
-          <div>
-            <dt>What Tilo never does</dt>
-            <dd>Tilo never sees your password. You sign in directly with the provider.</dd>
-          </div>
-          <div>
-            <dt>How to disconnect</dt>
-            <dd>
-              You can disconnect at any time from the Connections page, or revoke access from the
-              provider's security settings.
-            </dd>
-          </div>
+      {request ? (
+        // Keyed by the card so a second request starts with a fresh answer state.
+        <Request key={cardIdOf(request)} request={request} />
+      ) : (
+        <Section title="No request waiting" reserve={[8, 12]}>
+          <p className="empty-note" data-testid="consent-empty">
+            No connection is asking for consent right now.
+          </p>
+        </Section>
+      )}
+    </Page>
+  );
+}
+
+function Request({ request }: { request: Event }) {
+  const client = useClient();
+  const { worldId } = useFixtureRun();
+  const cardId = cardIdOf(request);
+  const [cards, retry] = useRemote("load the consent card", () => client.listCards(worldId));
+  return (
+    <Section title={`Connect ${nameOf(connectorOf(request))}`} reserve={[8, 12]}>
+      <Loaded what="the consent card" remote={cards} retry={retry} isEmpty={() => false}>
+        {(all) => (
+          <Sheet
+            request={request}
+            card={all.find((c) => c.id === cardId && c.kind === "consent") ?? null}
+          />
+        )}
+      </Loaded>
+    </Section>
+  );
+}
+
+function Sheet({ request, card }: { request: Event; card: Card | null }) {
+  const client = useClient();
+  const answer = useAnswer(client, cardIdOf(request));
+  const scopes = card?.consent?.scopes;
+  return (
+    <>
+      <dl className="gate-facts">
+        <div>
+          <dt>Why</dt>
+          <dd>{request.summary}</dd>
         </div>
+        <div>
+          <dt>Scopes</dt>
+          <dd>{scopes ? scopes.join(", ") : "Scopes are not available."}</dd>
+        </div>
+        <div>
+          <dt>What Tilo never does</dt>
+          <dd>Tilo never sees your password. You sign in directly with the provider.</dd>
+        </div>
+        <div>
+          <dt>How to disconnect</dt>
+          <dd>
+            You can disconnect at any time from the Connections page, or revoke access from the
+            provider's security settings.
+          </dd>
+        </div>
+      </dl>
+      {card ? (
         <div className="need-bar">
           <div className="need-actions">
-            <button
-              type="button"
-              className="primary"
-              disabled={answer.pending !== null}
-              aria-busy={answer.pending === "allow" ? "true" : undefined}
-              onClick={() => answer.send("allow", "")}
-            >
-              Allow
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              disabled={answer.pending !== null}
-              aria-busy={answer.pending === "not_now" ? "true" : undefined}
-              onClick={() => answer.send("not_now", "")}
-            >
-              Not now
-            </button>
+            {card.options.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className={o.id === "connect" ? "primary" : "secondary"}
+                disabled={answer.pending !== null}
+                aria-busy={answer.pending === o.id ? "true" : undefined}
+                onClick={() => answer.send(o.id, "")}
+              >
+                {o.label}
+              </button>
+            ))}
           </div>
           <div className="need-status" aria-live="polite">
             {answer.pending && <span>Waiting for confirmation…</span>}
@@ -106,12 +120,16 @@ export function S_08() {
             )}
           </div>
         </div>
-        {answer.error && (
-          <p className="need-error" role="alert">
-            {answer.error}
-          </p>
-        )}
-      </Section>
-    </Page>
+      ) : (
+        <p className="empty-note" data-testid="consent-no-card">
+          The consent card for this request has not arrived, so there is nothing to answer yet.
+        </p>
+      )}
+      {answer.error && (
+        <p className="need-error" role="alert">
+          {answer.error}
+        </p>
+      )}
+    </>
   );
 }

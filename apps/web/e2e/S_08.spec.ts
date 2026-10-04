@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { DESKTOP, MOBILE } from "./support/viewports";
 
 test.describe("S_08 Connection consent sheet", () => {
-  test("renders empty state, no console errors, placeholders aria-disabled", async ({ page }) => {
+  test("S_08 renders, no console errors, placeholders aria-disabled", async ({ page }) => {
     const errors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") errors.push(msg.text());
