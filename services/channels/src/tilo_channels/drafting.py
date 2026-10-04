@@ -17,6 +17,7 @@ import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from email.utils import getaddresses
+from functools import partial
 from typing import Any, Protocol
 
 from tilo_providers.interfaces import GenerateRequest, ModelProvider, SafetyProvider
@@ -180,7 +181,7 @@ def _result(instruction_id: str, doc: Mapping[str, Any]) -> DraftResult:
 
 def _thread(raws: list[dict[str, str]]) -> tuple[list[dict[str, str]], list[str]]:
     """Each message's fields rendered within THREAD_CAP (newest message first), and the raw rest past every cap."""
-    budget, fields, rests = THREAD_CAP, [], []
+    budget, fields, rests = THREAD_CAP, list[dict[str, str]](), list[str]()
     for raw in reversed(raws):
         caps = {}
         for k, text in raw.items():
@@ -273,8 +274,10 @@ class Drafter:
         if replied is None or not _addresses(replied.get("from")):  # no one to reply to: fail closed
             return {**doc, "status": "failed", "questions": []}
         envelope = _envelope(replied, own, ask["mode"])
-        check = {"instruction": ask["instruction"], "thread": [v for f in reversed(fields) for v in f.values()]}
-        check["trusted"] = list(settings.values())
+        thread_facts = [v for f in reversed(fields) for v in f.values()]  # newest first: read first
+        check = partial(
+            find_invented, instruction=ask["instruction"], thread=thread_facts, trusted=[*settings.values()]
+        )
         for _ in range(MAX_ATTEMPTS):
             request = GenerateRequest(
                 system=self._system, prompt=prompt, json_mode=True, max_output_tokens=MAX_OUTPUT_TOKENS
@@ -287,7 +290,7 @@ class Drafter:
                 return {**doc, "status": "failed", "questions": []}
             body, questions = parsed
             if questions:  # "unclear points are asked, not guessed"; one holding an unsupported fact is never shown
-                checked = [(q, [f for f in find_invented(q, **check) if f.kind != "commitment"]) for q in questions]
+                checked = [(q, [f for f in check(q) if f.kind != "commitment"]) for q in questions]
                 findings_doc = [{"kind": f.kind, "text": f.text} for _, found in checked for f in found]
                 return {
                     **doc,
@@ -295,7 +298,7 @@ class Drafter:
                     "findings": findings_doc,
                     "questions": [q for q, f in checked if not f],
                 }
-            findings = find_invented(body, **check)
+            findings = check(body)
             if not findings:
                 draft = {"artifact_id": "art_" + secrets.token_hex(12), "version": 1, "thread_id": ask["thread_id"]}
                 draft |= {"mode": ask["mode"], **envelope, "body": body, "safety_flag": flagged}
