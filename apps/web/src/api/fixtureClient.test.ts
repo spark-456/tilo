@@ -119,3 +119,34 @@ describe("HR_1 the fixture client knows exactly one world", () => {
     }
   });
 });
+
+describe("FR_WLD_07 the fixture client's Pause all (a stand-in for the server that records world.paused)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("FR_WLD_07 records one world.paused after the last event, then delivers nothing more", async () => {
+    vi.useFakeTimers();
+    const seen: Event[] = [];
+    const client = new FixtureClient({ speed: 100 });
+    client.subscribeEvents("w_village_basic", (e) => seen.push(e));
+    await vi.advanceTimersByTimeAsync(500);
+    const before = seen.length;
+    expect(before).toBeGreaterThan(1);
+    expect(before).toBeLessThan(44); // paused mid-run
+    const lastSeq = seen[before - 1]?.seq ?? 0;
+    await client.pauseWorld("w_village_basic");
+    const paused = seen[before];
+    expect(paused?.type).toBe("world.paused");
+    expect(paused?.seq).toBe(lastSeq + 1);
+    expect(paused?.data).toEqual({ reason: "pause_all", channel: "web" });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(seen).toHaveLength(before + 1); // no event after the pause except world.paused
+  });
+
+  it("FR_WLD_07 with nothing running there is nothing to pause and nothing is recorded", async () => {
+    const seen: Event[] = [];
+    const client = new FixtureClient();
+    await client.pauseWorld("w_village_basic");
+    client.subscribeEvents("w_village_basic", (e) => seen.push(e))();
+    expect(seen).toEqual([]);
+  });
+});

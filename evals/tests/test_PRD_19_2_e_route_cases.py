@@ -71,6 +71,7 @@ def test_PRD_19_2_e_route_twenty_cases_load_with_required_measures_and_checks() 
         assert case.inputs.get("context_fixture") == _ROUTE_FIXTURE_REL
         check_names = [c["check"] for c in case.checks]
         assert check_names == ["routed_domain", "answered_from_decision"]
+        assert case.notes and "routing_scenarios.yaml" in case.notes and "CL-EVID" in case.notes
 
 
 def test_PRD_19_2_e_route_domain_routing_and_owner_fallback_match_parsed_fixture() -> None:

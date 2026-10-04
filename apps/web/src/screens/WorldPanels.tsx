@@ -6,7 +6,8 @@ import type { Layout } from "@tilo/contracts";
 import type { ReactNode } from "react";
 import { useClient } from "../api/ClientProvider";
 import { reduce } from "../world/reducer";
-import { creditsUsed, useRunLog, waitingForYou } from "../world/runLog";
+import { useReplayedLog } from "../world/replay";
+import { creditsUsed, waitingForYou } from "../world/runLog";
 import {
   BUILDING_STATE,
   RUN_STATUS_LABEL,
@@ -15,8 +16,10 @@ import {
   worldStatus,
 } from "../world/runSummary";
 import { useSelection } from "../world/selection";
+import { withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
 import { LensTabs } from "./LensTabs";
+import { WorldPauseSlot } from "./PauseSlot";
 import { useRemote } from "./remote";
 
 /** One outline row: a toggle button that selects its object for every lens (FR-WLD-06). Rows keep
@@ -44,15 +47,21 @@ function Pick({
  * them the same height stays reserved, so the rail does not jump between world screens. */
 export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: boolean }) {
   const client = useClient();
-  const events = useRunLog(client, worldId);
+  const { events } = useReplayedLog(client, worldId);
   const [selected, , toggle] = useSelection(worldId);
   const [layoutRemote] = useRemote("load the world", () => client.getLayout(worldId));
-  const [deliveryRemote] = useRemote("load the delivery", () => client.getDelivery(worldId));
+  const status = worldStatus(events);
+  // The delivery exists only once world.completed is recorded: asking before that is a refusal
+  // the browser logs as an error, so the run's own events say when to ask.
+  const [deliveryRemote] = useRemote(
+    "load the delivery",
+    () => client.getDelivery(worldId),
+    status === "completed",
+  );
   const layout: Layout | null = layoutRemote.status === "ready" ? layoutRemote.value : null;
   const state = layout ? reduce(layout, events) : null;
   const names = layout ? agentNames(layout) : null;
   const acted = new Set(events.map((e) => e.actor));
-  const status = worldStatus(events);
   const cap = budgetCap(events);
   const waiting = waitingForYou(events);
   const saved =
@@ -83,9 +92,10 @@ export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: 
           </>
         )}
       </section>
+      <WorldPauseSlot worldId={worldId} />
       <div className="hud-count">
         <h2>Needs you</h2>
-        {waiting > 0 && <AppLink to="/needs-you">Open the queue</AppLink>}
+        {waiting > 0 && <AppLink to={withWorld("/needs-you", worldId)}>Open the queue</AppLink>}
         <span className={waiting > 0 ? "chip chip-needs" : "chip"} data-testid="needs-count">
           {waiting}
         </span>

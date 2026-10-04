@@ -49,6 +49,8 @@ def _status(name: str, provider: ModelProvider) -> str:
 
 
 def run_conformance_suite(profile_id: str, provider: ModelProvider, *, build: str, today: date | None = None) -> dict:
+    if getattr(provider, "dev_only", False):  # CL-INT-5: a dev fake never produces a result a role could use
+        raise ValueError(f"PL-05: profile {profile_id!r} is a dev-only fake; it is never run through conformance")
     checks = {name: _status(name, provider) for name in _CHECKS}
     result = "pass" if all(status == "pass" for status in checks.values()) else "fail"
     day = (today or date.today()).isoformat()
@@ -63,13 +65,16 @@ def write_conformance_result(result: dict[str, Any], conformance_dir: Path | str
 
 
 def main() -> int:  # pragma: no cover -- exercised via `just conformance`
-    from tilo_providers.config import load_providers_config, profiles_used_by, resolve_models_path
+    from tilo_providers.config import DEV_ONLY_MODELS, load_providers_config, profiles_used_by, resolve_models_path
     from tilo_providers.factory import build_provider
 
     root = Path(__file__).resolve().parents[4]
     config = load_providers_config(resolve_models_path(root), root / "config" / "prices.yaml")
     role_by_profile = {p: r for r, role in reversed(config.roles.items()) for p in profiles_used_by(role)}
     for profile_id, role_id in sorted(role_by_profile.items()):
+        if config.profiles[profile_id].model in DEV_ONLY_MODELS:
+            print(f"{profile_id}: skipped (dev-only fake, never conforms)")
+            continue
         provider = build_provider(role_id, config, fixtures_dir=root / "fixtures", profile_id=profile_id)
         result = run_conformance_suite(profile_id, provider, build="dev")
         print(f"{profile_id}: {result['result']} -> {write_conformance_result(result, root / 'config/conformance')}")

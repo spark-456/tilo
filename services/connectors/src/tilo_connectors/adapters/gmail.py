@@ -16,7 +16,7 @@ from typing import Any
 
 from ..outbox import Grant
 from ._google import RESOURCE_ID, GoogleAdapter, checked_id, side_effect_marker
-from ._transport import SideEffectRefused
+from ._transport import AdapterError, SideEffectRefused
 
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024  # total attachment bytes per message (Gmail's limit)
@@ -31,6 +31,7 @@ _MSG_ID = re.compile(r"<[^<>\s]+>")
 _MIME = re.compile(r"[A-Za-z0-9][\w.+-]*/[\w.+-]+")
 _RE_PREFIX = re.compile(r"^(\s*re\s*:\s*)+", re.I)
 _CHARSET = re.compile(r"charset=\"?([\w.:-]+)", re.I)
+_TOPIC = re.compile(r"projects/[a-z][a-z0-9.:-]{4,62}/topics/[A-Za-z][\w.~+%-]{2,254}")  # Pub/Sub resource names
 
 
 class GmailAdapter(GoogleAdapter):
@@ -63,6 +64,47 @@ class GmailAdapter(GoogleAdapter):
     def list_labels(self, user_id: str) -> list[dict[str, Any]]:
         labels = self._get(user_id, self._scopes("read"), "/labels").get("labels") or []
         return [{k: str(x.get(k, "")) for k in ("id", "name", "type")} for x in labels]
+
+    # FR-CHN-08 watch seam (tilo_channels.gmail_watch.Mailbox): reads of the user's own mailbox at the read
+    # scope; nothing leaves it, so no outbox entry, no grant and no event. Ids only, never message content.
+    def watch(self, user_id: str, *, topic_name: str, label_ids: Iterable[str]) -> dict[str, Any]:
+        if not isinstance(topic_name, str) or not _TOPIC.fullmatch(topic_name):
+            raise AdapterError("not a Pub/Sub topic name")
+        body = {"topicName": topic_name, "labelIds": [str(x) for x in label_ids], "labelFilterBehavior": "include"}
+        answer = self._json(user_id, self._scopes("read"), "POST", GMAIL_API + "/watch", json=body)
+        try:
+            return {"history_id": _history_id(answer.get("historyId")), "expiration": int(answer["expiration"]) / 1000}
+        except (KeyError, TypeError, ValueError):
+            raise AdapterError("Google answered an unexpected watch") from None
+
+    def stop_watch(self, user_id: str) -> None:
+        self._call(user_id, self._scopes("read"), "POST", GMAIL_API + "/stop")
+
+    def list_history(self, user_id: str, start_history_id: str, *, page_token: str | None = None) -> dict[str, Any]:
+        """INBOX messages added after `start_history_id`, oldest first. A 404 (the start id is older than
+        the history Gmail keeps) raises AdapterError with `.status == 404`, once, with no retry."""
+        params = {
+            "startHistoryId": _history_id(start_history_id),
+            "historyTypes": "messageAdded",
+            "labelId": "INBOX",
+            "pageToken": page_token,
+        }
+        body = self._get(user_id, self._scopes("read"), "/history", {k: v for k, v in params.items() if v is not None})
+        added = [a.get("message") or {} for h in body.get("history") or [] for a in h.get("messagesAdded") or []]
+        return {
+            "history_id": _history_id(body.get("historyId")),
+            "message_ids": [m["id"] for m in added if RESOURCE_ID.fullmatch(str(m.get("id", "")))],
+            "next_page_token": body.get("nextPageToken") or None,
+        }
+
+    def recent_inbox(self, user_id: str, *, max_results: int) -> dict[str, Any]:
+        """The current history id, read first, then the newest INBOX message ids (newest first)."""
+        scopes = self._scopes("read")
+        history_id = _history_id(self._get(user_id, scopes, "/profile").get("historyId"))
+        params = {"labelIds": ["INBOX"], "maxResults": self._batch(max_results)}
+        listed = self._get(user_id, scopes, "/messages", params).get("messages") or []
+        ids = [str(m.get("id", "")) for m in listed]
+        return {"history_id": history_id, "message_ids": [i for i in ids if RESOURCE_ID.fullmatch(i)]}
 
     def _threads(self, user_id: str, capability: str, params: dict[str, Any]) -> dict[str, Any]:
         query = {k: v for k, v in params.items() if v is not None}
@@ -163,6 +205,14 @@ class GmailAdapter(GoogleAdapter):
         if last_id := _MSG_ID.findall(headers.get("message-id", ""))[:1]:
             msg["In-Reply-To"] = last_id[0]
             msg["References"] = " ".join(_MSG_ID.findall(headers.get("references", ""))[-20:] + last_id)  # bounded
+
+
+def _history_id(value: Any) -> str:
+    """A Gmail history id: ASCII decimal digits (an unsigned 64-bit number), as a string."""
+    text = str(value) if isinstance(value, str | int) and not isinstance(value, bool) else ""
+    if not (0 < len(text) <= 20 and text.isascii() and text.isdigit() and int(text) < 2**64):
+        raise AdapterError("not a history id")
+    return text
 
 
 def _result(resource_id: Any, message: Any) -> dict[str, Any]:

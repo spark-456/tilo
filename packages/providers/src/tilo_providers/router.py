@@ -15,7 +15,7 @@ from tilo_providers.config import ProvidersConfig
 from tilo_providers.errors import ProviderError, RequestError, SafetyError
 from tilo_providers.factory import build_provider
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider
-from tilo_providers.prompts import load_prompt
+from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.schema_guard import first_error, short
 
 ProviderFor = Callable[[str], ModelProvider]
@@ -286,7 +286,11 @@ class Router:
                 if schema is not None and (problem := schema_error(response, schema)) is not None:
                     attempt.outcome, reason = "schema_invalid", "escalated after schema validation failed"
                     if not is_repair:  # one repair, on the same candidate
-                        prompt = load_prompt("router", "schema_repair.md", {"prompt": sent.prompt, "error": problem})
+                        prompt = load_prompt(
+                            "router",
+                            "schema_repair.md",
+                            {"prompt": sent.prompt, "error": neutralise_marker(problem, "ERROR")},
+                        )
                         reason = "repair attempt after schema validation failed"
                         continue
                 elif verify is not None and not verify(response):

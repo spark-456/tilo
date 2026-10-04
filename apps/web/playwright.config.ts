@@ -13,6 +13,15 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = Number(process.env.TILO_WEB_PORT ?? 5173);
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const BROWSER = { ...devices["Desktop Chrome"], channel: process.env.CI ? undefined : "msedge" };
+// CP2 (`just e2e-cp2`, TILO_CP2=1): the project "cp2" walks the real dev API (`just dev-api`
+// equivalent: fake Director and runner, in-memory store, no credentials) through its own Vite
+// server that has VITE_TILO_API_URL set. The API's address is fixed at 127.0.0.1:8080 (its Host
+// check). CI never sets TILO_CP2, so it starts neither server.
+const CP2 = process.env.TILO_CP2 === "1";
+const CP2_PORT = Number(process.env.TILO_CP2_PORT ?? 5391);
+const CP2_ORIGIN = `http://127.0.0.1:${CP2_PORT}`;
+const CP2_API = "http://127.0.0.1:8080";
+const CP2_SPECS = "**/cp2/**";
 const TIMING_SPECS = [
   "**/world-perf.spec.ts",
   "**/world-reduced-motion-toggle.spec.ts",
@@ -35,7 +44,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: TIMING_SPECS,
+      testIgnore: [...TIMING_SPECS, CP2_SPECS],
       use: BROWSER,
     },
     {
@@ -47,16 +56,40 @@ export default defineConfig({
       workers: 1,
       use: BROWSER,
     },
+    ...(CP2
+      ? [{ name: "cp2", testMatch: CP2_SPECS, use: { ...BROWSER, baseURL: CP2_ORIGIN } }]
+      : []),
   ],
-  webServer: {
-    command: `pnpm exec vite --host 127.0.0.1 --port ${PORT} --strictPort`,
-    // Vite's own client script, not "/": it 200s as soon as the dev server is
-    // up, even before apps/web has an index.html — so readiness reflects
-    // "the dev server started", and a missing app surfaces as each test's own
-    // failure (e.g. a selector not found) instead of one opaque global
-    // webServer timeout.
-    url: `${ORIGIN}/@vite/client`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
-  },
+  webServer: [
+    {
+      command: `pnpm exec vite --host 127.0.0.1 --port ${PORT} --strictPort`,
+      // Vite's own client script, not "/": it 200s as soon as the dev server is
+      // up, even before apps/web has an index.html — so readiness reflects
+      // "the dev server started", and a missing app surfaces as each test's own
+      // failure (e.g. a selector not found) instead of one opaque global
+      // webServer timeout.
+      url: `${ORIGIN}/@vite/client`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    ...(CP2
+      ? [
+          {
+            command: "uv run --package tilo-api python -m tilo_api",
+            cwd: "../..",
+            env: { TILO_API_DEV_ORIGINS: CP2_ORIGIN },
+            url: `${CP2_API}/healthz`,
+            reuseExistingServer: !process.env.CI,
+            timeout: 120_000,
+          },
+          {
+            command: `pnpm exec vite --host 127.0.0.1 --port ${CP2_PORT} --strictPort`,
+            env: { VITE_TILO_API_URL: CP2_API },
+            url: `${CP2_ORIGIN}/@vite/client`,
+            reuseExistingServer: false,
+            timeout: 30_000,
+          },
+        ]
+      : []),
+  ],
 });

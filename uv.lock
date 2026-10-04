@@ -19,6 +19,7 @@ members = [
     "tilo-providers",
     "tilo-render",
     "tilo-sandbox-web",
+    "tilo-world",
 ]
 
 [[package]]
@@ -1372,8 +1373,10 @@ dependencies = [
     { name = "referencing" },
     { name = "tilo-connectors" },
     { name = "tilo-harness" },
+    { name = "tilo-metering" },
     { name = "tilo-planning" },
     { name = "tilo-policy" },
+    { name = "tilo-world" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1386,8 +1389,10 @@ requires-dist = [
     { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-connectors", editable = "services/connectors" },
     { name = "tilo-harness", editable = "services/harness" },
+    { name = "tilo-metering", editable = "packages/metering" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tilo-world", editable = "packages/world" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
@@ -1415,6 +1420,12 @@ requires-dist = [
 name = "tilo-channels"
 version = "0.1.0"
 source = { editable = "services/channels" }
+dependencies = [
+    { name = "tilo-providers" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "tilo-providers", editable = "packages/providers" }]
 
 [[package]]
 name = "tilo-connectors"
@@ -1613,6 +1624,11 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
+
+[[package]]
+name = "tilo-world"
+version = "0.1.0"
+source = { editable = "packages/world" }
 
 [[package]]
 name = "typeguard"

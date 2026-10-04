@@ -38,6 +38,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
       if (screen === "World") {
         await expect(page.getByTestId("stage-frame")).toHaveAttribute("data-stage-ready", "true");
       }
+      if (screen === "Approaches") await page.getByTestId("select-approach-quick").click();
       const next = SCREENS[i + 1];
       if (!next) break;
       if (screen === "Start") await fillStart(page);
@@ -63,6 +64,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     for (const [i, screen] of SCREENS.entries()) {
       await expect(page.getByRole("heading", { level: 1, name: screen })).toBeVisible();
       if (screen === "Start") await fillStart(page);
+      if (screen === "Approaches") await page.getByTestId("select-approach-quick").click();
       await expect(page.locator("button.primary")).toBeEnabled();
       const ms = await page.evaluate(
         () =>
@@ -90,7 +92,9 @@ for (const viewport of [DESKTOP, MOBILE]) {
 // UX-1: a client with latency (?client_delay_ms) must not shift the layout when data arrives.
 // Loading, error, empty and ready occupy one reserved box in FlowShell.
 for (const viewport of [DESKTOP, MOBILE]) {
-  for (const path of ["/task/t/approaches", "/world/w_village_basic/delivery"]) {
+  // The delivery is asked for only once world.completed is recorded (no 409 on the console), so
+  // ?speed=1000 lets the replay finish at once and the slow client's answer is what is awaited.
+  for (const path of ["/task/t/approaches", "/world/w_village_basic/delivery?speed=1000"]) {
     test(`PRD-18.3 UX_1: ${path} has zero layout shifts while a slow client answers at ${viewport.width}x${viewport.height}`, async ({
       page,
     }) => {
@@ -106,8 +110,10 @@ for (const viewport of [DESKTOP, MOBILE]) {
       });
       // "commit": do not wait for the load event, which can outlast the latency. 3 s keeps the
       // loading state observable even when a parallel load delays the first poll.
-      await page.goto(`${path}?client_delay_ms=3000`, { waitUntil: "commit" });
-      await expect(page.getByText(/^Loading the /)).toBeVisible();
+      const join = path.includes("?") ? "&" : "?";
+      await page.goto(`${path}${join}client_delay_ms=3000`, { waitUntil: "commit" });
+      // The delivery's loading state starts once the (delayed) events say the run is finished.
+      await expect(page.getByText(/^Loading the /)).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText(/^Loading the /)).toBeHidden({ timeout: 20_000 });
       await expect(page.locator(".flow-summary")).toBeVisible();
       await page.waitForTimeout(300); // let a late shift be reported

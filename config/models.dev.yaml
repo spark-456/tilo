@@ -1,0 +1,28 @@
+# DEV-ONLY model profiles (CL-INT-5, EFF-01): the Director role is a deterministic fake, so `just dev-api` takes
+# any task text through intake, questions and approaches with no recordings and no paid call. `just dev-api`
+# selects this file when TILO_MODELS_FILE is unset (tilo_api.dev); set TILO_MODELS_FILE to override it.
+#
+# NEVER production. The provider layer refuses a `fake-director` profile when K_SERVICE or CLOUD_RUN_JOB is set
+# or LIVE=1, at config load and on every call. It never counts as conforming for a real role (PL-05).
+# Replies are synthetic: derived only from the task text, plus fixed demo constants, tagged "(dev)".
+# Shape mirrors config/models.yaml: contracts/providers.schema.json $defs.models.
+example: true
+
+profiles:
+  director-dev:
+    provider: fake
+    model: fake-director
+    context: 1000000
+    caps: [json]
+  safety-fake:
+    provider: fake
+    model: fake-safety
+    context: 1000000
+    caps: []
+
+roles:
+  director: { primary: director-dev, fallback: director-dev }
+  safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only
+
+rules:
+  deny: ["gemini-2.5-*", "*-preview*"]

@@ -9,8 +9,8 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: Triage incoming email regarding notice of scheduled water main maintenance
-    in marina district on sunday
+  task: Triage incoming email regarding notice of scheduled water main maintenance in marina district
+    on sunday
   thread:
     thread_id: thread-e-mail-17
     subject: Notice of scheduled water main maintenance in Marina District on Sunday
@@ -22,17 +22,18 @@ inputs:
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: Notice of scheduled water main maintenance in Marina District on Sunday
-      body: The Municipal Water District will conduct annual fire hydrant and water
-        main flushing on Sunday, October 4 between 11 PM and 4 AM in the Harbor Point
-        industrial zone. Customers may experience brief pressure drops or discoloration.
-        Normal service will resume by 5 AM.
+      body: The Municipal Water District will conduct annual fire hydrant and water main flushing on Sunday,
+        October 4 between 11 PM and 4 AM in the Harbor Point industrial zone. Customers may experience
+        brief pressure drops or discoloration. Normal service will resume by 5 AM.
 ground_truth:
   category: fyi
   priority: normal
-  reason: Public utility informational notice regarding planned overnight municipal
-    maintenance.
+  reason: Public utility informational notice regarding planned overnight municipal maintenance.
 checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

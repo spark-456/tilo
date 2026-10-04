@@ -1,0 +1,268 @@
+"""Test doubles for FR-CHN-11 (Email Autopilot preview with Send / Edit / Cancel and the L2 undo window). The API
+they drive is pinned in API_FR_CHN_11.md.
+
+Nothing here is production logic. `FakeOutbox` stands in for `tilo_connectors.outbox.Outbox` (same method names):
+it checks every entry against contracts/outbox.schema.json (so OB-04, T3 needs a person, is enforced) and OB-02
+(scheduled_at = created_at + undo_window_s), dedupes on (world_id, idempotency_key) like OB-03, cancels only a
+`scheduled` entry and sends an entry only once it is due by the fake clock. "Sending" only records the entry: no
+connector, no network, no real mail. Addresses are fictional `.example` domains.
+"""
+
+from __future__ import annotations
+
+import copy
+import functools
+import importlib
+import json
+import secrets
+import threading
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from _channels_lib import FakeClock
+from _chn10_lib import USER, MemoryDraftStore, Rig, Thread, answer, drafting_module, make_rig
+from _chn_0305_lib import CONTRACTS, _registry
+from jsonschema import Draft202012Validator
+
+MAILBOX = "ops@harborview.example"
+DAVID = "david.miller@harriercharters.example"
+SARAH = "sarah.chen@harborview.example"
+WORLD = "w_autopilot"
+RUN = "r_autopilot"
+POLICY_ID = "pol_autopilot_l2"
+INSTRUCTION = "Tell David Friday 2pm works."
+BENIGN = "Hi David,\n\nFriday 2pm works for us. See you then.\n\nBest,\nSarah"
+BENIGN_V2 = "Hi David,\n\nFriday 2pm works for us. Thanks again.\n\nBest,\nSarah"
+
+__all__ = ["USER", "Rig", "Thread", "answer", "make_rig"]
+
+
+def autopilot_module() -> Any:
+    """Imported at call time so a missing module fails the test, not collection."""
+    return importlib.import_module("tilo_channels.autopilot")
+
+
+def needs_autopilot(test: Callable[..., Any]) -> Callable[..., Any]:
+    """A missing `tilo_channels.autopilot` fails once, before Hypothesis generates or shrinks anything."""
+
+    @functools.wraps(test)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        autopilot_module()
+        return test(*args, **kwargs)
+
+    return wrapper
+
+
+def parse_ts(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def at(clock: FakeClock) -> datetime:
+    return datetime.fromtimestamp(clock(), UTC)
+
+
+@functools.cache
+def _outbox_validator() -> Draft202012Validator:
+    schema = json.loads((CONTRACTS / "outbox.schema.json").read_text(encoding="utf-8"))
+    return Draft202012Validator(schema, registry=_registry())
+
+
+class OutboxRefused(Exception):
+    pass
+
+
+class FakeOutbox:
+    """`enqueue(entry, evidence)`, `cancel(outbox_id)`, `dispatch_due()`, as `tilo_connectors.outbox.Outbox`."""
+
+    def __init__(self, clock: FakeClock) -> None:
+        self.clock = clock
+        self.entries: dict[str, dict] = {}
+        self._keys: dict[tuple[str, str], str] = {}
+        self.sent: list[tuple[str, datetime]] = []
+        self.enqueue_calls = 0
+        self._lock = threading.Lock()
+
+    def enqueue(self, entry: dict, evidence: dict) -> dict:
+        with self._lock:
+            self.enqueue_calls += 1
+            errors = [e.message for e in _outbox_validator().iter_errors(entry)]
+            if errors:
+                raise OutboxRefused(f"outbox.schema.json: {errors[0]}")
+            if not isinstance(evidence, dict):
+                raise OutboxRefused("evidence must be a dict")
+            window = entry["undo_window_s"]
+            if entry["state"] != ("queued" if window == 0 else "scheduled"):
+                raise OutboxRefused("OB-02: a new entry is 'queued' with no window, else 'scheduled'")
+            created = parse_ts(entry["created_at"])
+            if parse_ts(entry["scheduled_at"]) - created != timedelta(seconds=window):
+                raise OutboxRefused("OB-02: scheduled_at must be created_at + undo_window_s")
+            if abs((created - at(self.clock)).total_seconds()) > 1:
+                raise OutboxRefused("created_at must come from the injected clock")
+            key = (entry["world_id"], entry["idempotency_key"])
+            if key in self._keys:
+                return copy.deepcopy(self.entries[self._keys[key]])
+            if entry["id"] in self.entries:
+                raise OutboxRefused("id already stored under another idempotency_key")
+            self.entries[entry["id"]] = copy.deepcopy(entry)
+            self._keys[key] = entry["id"]
+            return copy.deepcopy(entry)
+
+    def cancel(self, outbox_id: str) -> dict:
+        with self._lock:
+            entry = self.entries.get(outbox_id)
+            if entry is None or entry["state"] != "scheduled":
+                raise OutboxRefused("not 'scheduled'")
+            entry["state"] = "cancelled"
+            return copy.deepcopy(entry)
+
+    def dispatch_due(self) -> list[dict]:
+        with self._lock:
+            now, out = at(self.clock), []
+            for entry in self.entries.values():
+                due = entry["state"] == "queued" or (
+                    entry["state"] == "scheduled" and parse_ts(entry["scheduled_at"]) <= now
+                )
+                if due:
+                    entry["state"] = "sent"
+                    self.sent.append((entry["id"], now))
+                    out.append(copy.deepcopy(entry))
+            return out
+
+    def state(self, outbox_id: str) -> str:
+        return self.entries[outbox_id]["state"]
+
+    def all(self) -> list[dict]:
+        return [copy.deepcopy(e) for e in self.entries.values()]
+
+    def sent_entries(self) -> list[dict]:
+        return [copy.deepcopy(self.entries[i]) for i, _ in self.sent]
+
+
+class FakePolicy:
+    """The autonomy-policy port: `level(user_id, action_type) -> (level, policy_id)`. With level "L2" it is
+    deliberately permissive for every send; the autopilot must still never auto-send T3."""
+
+    def __init__(self, level: str = "L1") -> None:
+        self._level = level
+        self.calls: list[tuple[str, str]] = []
+
+    def level(self, user_id: str, action_type: str) -> tuple[str, str | None]:
+        self.calls.append((user_id, action_type))
+        return (self._level, None if self._level == "L1" else POLICY_ID)
+
+
+class FakeContacts:
+    def __init__(self, known: Iterable[str] = ()) -> None:
+        self.known = {a.lower() for a in known}
+
+    def __call__(self, user_id: str) -> list[str]:
+        return sorted(self.known)
+
+
+class EventLog:
+    def __init__(self) -> None:
+        self.parts: list[dict[str, Any]] = []
+
+    def __call__(self, part: dict[str, Any]) -> None:
+        self.parts.append(copy.deepcopy(part))
+
+
+@dataclass
+class Bench:
+    rig: Rig
+    outbox: FakeOutbox
+    policy: FakePolicy
+    contacts: FakeContacts
+    cards: MemoryDraftStore
+    events: EventLog
+    ap: Any = None
+
+    def new_autopilot(self) -> Any:
+        """Another instance over the same stores and outbox (a restart, or a second Cloud Run instance)."""
+        return autopilot_module().Autopilot(
+            drafter=self.rig.svc,
+            reader=self.rig.reader,
+            contacts=self.contacts,
+            policy=self.policy,
+            outbox=self.outbox,
+            cards=self.cards,
+            clock=self.rig.clock,
+            emit=self.events,
+            world_id=WORLD,
+            run_id=RUN,
+        )
+
+
+def make_bench(level: str = "L2", contacts: Iterable[str] = ()) -> Bench:
+    rig = make_rig()
+    bench = Bench(rig, FakeOutbox(rig.clock), FakePolicy(level), FakeContacts(contacts), MemoryDraftStore(), EventLog())
+    bench.ap = bench.new_autopilot()
+    return bench
+
+
+def context(
+    thread: Thread, *, instruction: str = INSTRUCTION, instruction_id: str | None = None, mode: str = "reply"
+) -> Any:
+    return autopilot_module().DraftContext(
+        instruction_id=instruction_id or "ins-" + secrets.token_hex(6),
+        thread_id=thread.thread_id,
+        instruction=instruction,
+        mailbox=MAILBOX,
+        mode=mode,
+    )
+
+
+def ready(
+    thread: Thread,
+    body: str,
+    *,
+    to: tuple[str, ...] = (DAVID,),
+    cc: tuple[str, ...] = (),
+    safety_flag: bool = False,
+    flagged: bool = False,
+    instruction_id: str | None = None,
+) -> Any:
+    """A FR-CHN-10 `ready` DraftResult built directly: what the checker passed, with no findings."""
+    mod = drafting_module()
+    iid = instruction_id or "ins-" + secrets.token_hex(6)
+    draft = mod.Draft(
+        artifact_id="art_" + secrets.token_hex(6),
+        version=1,
+        thread_id=thread.thread_id,
+        mode="reply",
+        to=to,
+        cc=cc,
+        bcc=(),
+        subject="Re: Engine tune-up scheduling and estimate",
+        in_reply_to="<m@mail.example>",
+        references="<m@mail.example>",
+        body=body,
+        attachments=(),
+        safety_flag=safety_flag,
+    )
+    return mod.DraftResult(instruction_id=iid, status="ready", draft=draft, findings=(), questions=(), flagged=flagged)
+
+
+def pair(
+    thread: Thread, body: str, *, instruction: str = INSTRUCTION, mode: str = "reply", **ready_kw: Any
+) -> tuple[Any, Any]:
+    """(DraftContext, ready DraftResult) for the same instruction id."""
+    ctx = context(thread, instruction=instruction, mode=mode)
+    return ctx, ready(thread, body, instruction_id=ctx.instruction_id, **ready_kw)
+
+
+def drafted(bench: Bench, thread: Thread, instruction: str = INSTRUCTION) -> tuple[Any, Any]:
+    """Drafts through the real FR-CHN-10 Drafter; returns (DraftContext, DraftResult)."""
+    ctx = context(thread, instruction=instruction)
+    result = bench.rig.svc.draft(
+        USER, instruction_id=ctx.instruction_id, thread_id=thread.thread_id, instruction=instruction, mailbox=MAILBOX
+    )
+    assert result.status == "ready", "FR-CHN-11 test setup: the benign draft must pass the FR-CHN-10 checker"
+    return ctx, result
+
+
+def scripted_thread(bench: Bench, *bodies: str) -> Thread:
+    thread, _ = bench.rig.thread(answers=tuple(answer(b) for b in bodies))
+    return thread

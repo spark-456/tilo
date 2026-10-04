@@ -38,7 +38,9 @@ const GENERIC_4XX: Readonly<Record<number, string>> = {
   409: "That cannot be done right now.",
 };
 const OUT_OF_DATE = "This server is out of date for live runs.";
-const NO_ROUTE_YET = "This is not available from Tilo's server yet.";
+const NOT_BUILT = "Tilo has not built this world yet.";
+const NO_WORLD_BUILT = "This run ended before its world was built.";
+const SLOW_WORLD = "Tilo is taking longer than expected to build this world.";
 /** FastAPI's stock texts: not written for people, so the status sentence is used instead. */
 const STOCK = new Set(["Not Found", "Forbidden", "Unauthorized", "Conflict", "Bad Request"]);
 
@@ -104,6 +106,16 @@ const isEventView = (e: unknown): e is EventView =>
 
 const TERMINAL = new Set(["world.completed", "world.failed"]); // nothing is written after these
 const MAX_BACKOFF_MS = 10_000;
+/** How long `getLayout` waits for a run to build its world before it says so (a slow Director). */
+const LAYOUT_WAIT_MS = 120_000;
+/** Polls of a 404 from `/layout` after the run has started (the route reads the same run, so this is rare). */
+const LAYOUT_404_POLLS = 5;
+
+const isLayout = (l: unknown): l is Layout => {
+  const semantic = (l as Layout | null)?.semantic;
+  return typeof l === "object" && l !== null && Array.isArray(semantic?.agents);
+};
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export interface HttpClientOptions {
   /** The API origin, e.g. `http://localhost:8080`. */
@@ -118,6 +130,7 @@ export class HttpClient implements TiloClient {
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
   private readonly cardWorlds = new Map<string, string>(); // card -> world, from listCards
+  private readonly layouts = new Map<string, Promise<Layout>>(); // a run's layout never changes
 
   constructor(options: HttpClientOptions) {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
@@ -200,10 +213,46 @@ export class HttpClient implements TiloClient {
     return this.post(`/tasks/${encodeURIComponent(taskId)}/approve`, req);
   }
 
-  /** needs API route: a read of the world's Layout. services/api has none (the run builds the
-   * layout and keeps it in memory), and the web never invents a route. */
-  getLayout(_worldId: string): Promise<Layout> {
-    return Promise.reject(new TiloApiError(NO_ROUTE_YET, null, false));
+  /** `GET /worlds/{id}/layout` (FR-WLD-05): the run's own layout, built from its plan, never made up
+   * here. The route is a 404 until the run has built it, and a browser logs every 404 as an error, so
+   * the world's recorded events are read first and the layout is asked for only once `world.started`
+   * is on record (the run builds it before writing that). Until then the call stays pending (a loading
+   * state, not a failure); a run that failed first rejects with a plain reason. One call per world is
+   * shared and a successful layout is kept; a failure is not, so a retry asks again. */
+  getLayout(worldId: string): Promise<Layout> {
+    const known = this.layouts.get(worldId);
+    if (known) return known;
+    const pending = this.awaitLayout(worldId);
+    this.layouts.set(worldId, pending);
+    pending.catch(() => this.layouts.delete(worldId));
+    return pending;
+  }
+
+  private async awaitLayout(worldId: string): Promise<Layout> {
+    const id = encodeURIComponent(worldId);
+    const deadline = Date.now() + LAYOUT_WAIT_MS;
+    for (;;) {
+      const body = await this.request<{ events?: unknown }>(`/worlds/${id}/events`);
+      const types = new Set(
+        (Array.isArray(body.events) ? body.events.filter(isEventView) : []).map((e) => e.type),
+      );
+      if (types.has("world.started")) break;
+      if (types.has("world.failed")) throw new TiloApiError(NO_WORLD_BUILT, null, false);
+      if (Date.now() >= deadline) throw new TiloApiError(SLOW_WORLD, null, true);
+      await sleep(this.pollMs);
+    }
+    for (let tries = 1; ; tries += 1) {
+      try {
+        const layout = await this.request<unknown>(`/worlds/${id}/layout`);
+        if (!isLayout(layout)) throw new TiloApiError(BAD_REPLY, 200, true);
+        return layout;
+      } catch (error) {
+        const notYet = error instanceof TiloApiError && error.status === 404;
+        if (!notYet) throw error;
+        if (tries >= LAYOUT_404_POLLS) throw new TiloApiError(NOT_BUILT, 404, true);
+        await sleep(this.pollMs);
+      }
+    }
   }
 
   /** Polls `GET /worlds/{id}/events` (the API has no stream or cursor parameter) and hands over only
