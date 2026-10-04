@@ -1,0 +1,57 @@
+id: B-036
+domain: research
+shapes:
+- gated_save
+- held_at_gate
+title: A reading list held at the Drive save gate
+brief: Put together a reading list of ten accessible books on behavioural economics and keep it in Drive, but wait
+  for my say-so before saving anything.
+director:
+  brief:
+    goal: Compile a ten-book accessible reading list on behavioural economics.
+    deliverables:
+    - title: Reading list
+      format: google_docs
+    audience: General readers
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Find accessible titles
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Write the annotated list
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: deliver
+      title: Save the result to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U2
+expect:
+  outcome: held_at_gate
+gates: hold

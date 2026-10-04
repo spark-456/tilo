@@ -1,0 +1,43 @@
+id: B-015
+domain: legal
+shapes:
+- refused_plan
+title: A plan that sends mail from a unit with no mail connector
+brief: Write a polite reminder to our tenant about the overdue notice period and send it to them.
+director:
+  brief:
+    goal: Remind the tenant about the overdue notice period.
+    deliverables:
+    - title: Reminder email
+      format: email
+    audience: A tenant
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: draft
+      title: Draft the reminder
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: deliver
+      title: Send the reminder
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions:
+      - send_email
+      depends_on:
+      - U1
+expect:
+  outcome: refused

@@ -1,0 +1,47 @@
+id: B-018
+domain: personal_admin
+shapes:
+- gated_send
+title: A friendly boiler-service request, saved as a draft
+brief: Write to my landlord asking for the boiler to be serviced before winter. Keep it friendly. Save it as a draft
+  in my mail; I will send it myself.
+director:
+  brief:
+    goal: Draft a friendly request to the landlord for a boiler service before winter.
+    deliverables:
+    - title: Draft email
+      format: email
+    audience: My landlord
+    deadline: null
+    constraints:
+    - Friendly tone
+    - Draft only
+    sources: []
+    sensitivity: personal
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: draft
+      title: Write the request
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: deliver
+      title: Save the reply as a draft
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - gmail
+      actions:
+      - create_draft
+      depends_on:
+      - U1
+expect:
+  outcome: completed

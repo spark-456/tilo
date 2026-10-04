@@ -1,0 +1,48 @@
+id: B-006
+domain: operations
+shapes:
+- ambiguous
+- tiny_brief
+title: A one-line rota request that needs questions
+brief: Rota for next week.
+director:
+  brief:
+    goal: Make a rota for next week.
+    deliverables:
+    - title: Rota
+      format: xlsx
+    audience: Not stated
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields:
+    - deliverables
+    - audience
+    - deadline
+    - constraints
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: analyse
+      title: Lay out the rota
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Write the rota
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+expect:
+  outcome: needs_answers
+stop_after: questions

@@ -1,0 +1,57 @@
+id: B-026
+domain: support
+shapes:
+- gated_send
+title: Apologise for a late shipment and offer a credit
+brief: Order 4471 for the Okafor Bakery left the warehouse two days late. Write a short, warm email to the customer
+  explaining the delay and offering 10% off the next order, and send it from my account.
+director:
+  brief:
+    goal: Email the customer about the late shipment of order 4471 and offer 10% off the next order.
+    deliverables:
+    - title: Apology email
+      format: email
+    audience: A small-business customer
+    deadline: null
+    constraints:
+    - Warm tone
+    - Offer 10% off
+    sources: []
+    sensitivity: personal
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Look up the order and the delay
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Draft the apology email
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: deliver
+      title: Send the email
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - gmail
+      actions:
+      - send_email
+      depends_on:
+      - U2
+expect:
+  outcome: completed
