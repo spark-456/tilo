@@ -112,6 +112,12 @@ for (const viewport of VIEWPORTS) {
         expect(shell.y, "the shell starts below the strip").toBeGreaterThanOrEqual(
           strip.y + strip.height - 0.5,
         );
+        if (path === "/") {
+          const card = (await page.getByTestId("flow-shell").boundingBox()) as Rect;
+          expect(card.y, "the start card starts below the strip").toBeGreaterThanOrEqual(
+            strip.y + strip.height - 0.5,
+          );
+        }
         const hits = await overlappingControls(page, boxes);
         expect(hits, `controls under the pill on ${path}`).toEqual([]);
       }
