@@ -2,6 +2,7 @@
 # One line each: rule | file | what | reason. An entry that matches nothing fails the test.
 # rule `branch`: the function reads task-like text against a pattern. Each is a generic sanitiser, parser or format
 # check of untrusted text (PRD 16.3, 16.5); none chooses what a run does from the subject of a task.
+branch | packages/memory/src/tilo_memory/cache.py | _normalise | collapses whitespace in a cache key so two spellings of one text share an entry; every text gets the same treatment
 branch | packages/planning/src/tilo_planning/compiler.py | _data | neutralises prompt block delimiters in delimited task data (PRD 16.3 item 1)
 branch | packages/providers/src/tilo_providers/dev_director.py | _block | dev-only fake: reads the delimited TASK, BRIEF and CATALOGUE blocks of a prompt
 branch | packages/providers/src/tilo_providers/dev_director.py | _brief_reply | dev-only fake: takes an ISO date out of the task text and echoes the text; every task gets the same shape
