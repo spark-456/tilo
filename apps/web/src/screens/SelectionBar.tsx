@@ -23,7 +23,8 @@ export function SelectionBar({ worldId }: { worldId: string }) {
             {item && <small> {item.kind}</small>}
           </>
         ) : (
-          "Nothing selected"
+          // The Inspect hint (design: "Click anything in the world to inspect it"), not a status.
+          "Choose anything to inspect it"
         )}
       </span>
       {id && (
