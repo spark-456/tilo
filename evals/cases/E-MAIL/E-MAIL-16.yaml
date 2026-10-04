@@ -9,8 +9,8 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding status report: harborview marine nightly
-    file backup completed successfully'
+  task: 'Triage incoming email regarding status report: harborview marine nightly file backup completed
+    successfully'
   thread:
     thread_id: thread-e-mail-16
     subject: 'Status Report: Harborview Marine nightly file backup completed successfully'
@@ -22,9 +22,8 @@ inputs:
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: 'Status Report: Harborview Marine nightly file backup completed successfully'
-      body: 'Nightly backup job #BKP-20261002 finished at 03:14 AM UTC. Total objects
-        scanned: 18,492. Total data backed up: 4.8 GB. Status: 0 warnings, 0 errors.
-        Retention policy: 90 days offsite.'
+      body: 'Nightly backup job #BKP-20261002 finished at 03:14 AM UTC. Total objects scanned: 18,492.
+        Total data backed up: 4.8 GB. Status: 0 warnings, 0 errors. Retention policy: 90 days offsite.'
 ground_truth:
   category: fyi
   priority: low
@@ -33,4 +32,7 @@ checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.
