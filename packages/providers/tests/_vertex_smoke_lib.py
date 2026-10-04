@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import sys
+import tempfile
 import time
 import types as pytypes
 from collections.abc import Iterator, Mapping
@@ -185,6 +186,8 @@ def env(**overrides: str) -> Iterator[None]:
     with mock.patch.dict(os.environ, {}, clear=False):
         for key in ENV_KEYS_CLEARED:
             os.environ.pop(key, None)
+        # No gcloud config here: the smoke looks at gcloud's well-known ADC file, which tests must not read from home.
+        os.environ["CLOUDSDK_CONFIG"] = str(Path(tempfile.gettempdir()) / "tilo-test-no-gcloud-config")
         os.environ.update(overrides)
         yield
 

@@ -175,6 +175,20 @@ def test_PL_LIVE_12_a_service_account_key_file_is_refused_by_name_but_an_empty_o
         assert ok.code == 0, ok.err
 
 
+def test_PL_LIVE_12_the_gcloud_well_known_adc_file_is_checked_when_the_variable_is_unset(tmp_path: Path) -> None:
+    config_dir = tmp_path / "gcloud"
+    config_dir.mkdir()
+    adc = config_dir / "application_default_credentials.json"
+    adc.write_text(json.dumps({"type": "service" + "_account"}), encoding="utf-8")
+    sdk = FakeVertexSdk()
+    result, _, _ = live_run(tmp_path, sdk=sdk, extra_env={"CLOUDSDK_CONFIG": str(config_dir)})
+    _one_refusal(result, sdk, tmp_path, "service_account_key", "well-known", str(adc))
+
+    adc.write_text(json.dumps({"type": "authorized_user"}), encoding="utf-8")
+    ok, _, _ = live_run(tmp_path, extra_env={"CLOUDSDK_CONFIG": str(config_dir)}, fixtures=tmp_path / "f-ok")
+    assert ok.code == 0, ok.err
+
+
 def test_PL_LIVE_12_the_smoke_reads_the_environment_the_router_reads(tmp_path: Path) -> None:
     # a programmatic caller's own `environ` must not hide an API key or a project problem from the checks
     from tilo_providers.vertex_smoke import SmokeRefused, run_vertex_smoke  # noqa: PLC0415
@@ -221,7 +235,42 @@ def test_PL_LIVE_12_the_adapter_itself_refuses_a_base_url_override_before_buildi
 
 
 def _everywhere(error: BaseException) -> str:
-    return "\n".join([str(error), repr(error), "".join(traceback.format_exception(error))])
+    """str, repr and format_exception of the error and of everything on its `__cause__`/`__context__` chains."""
+    seen: list[BaseException] = []
+    todo: list[BaseException | None] = [error]
+    while todo:
+        link = todo.pop()
+        if link is not None and all(link is not other for other in seen):
+            seen.append(link)
+            todo += [link.__cause__, link.__context__]
+    return "\n".join(f"{link}\n{link!r}\n{''.join(traceback.format_exception(link))}" for link in seen)
+
+
+def test_PL_LIVE_06_a_mapped_error_keeps_no_raw_sdk_error_as_cause_or_context_in_any_method() -> None:
+    token = fake_secret("access_token")
+    sdk = FakeVertexSdk()
+    with sdk.installed():
+        provider = _provider(sdk)
+        models = provider._client.models
+
+        def boom(**_kwargs):
+            raise FakeAPIError(403, f"denied for {token} [PERMISSION_DENIED]")
+
+        models.generate_content = models.generate_content_stream = models.embed_content = models.count_tokens = boom
+        calls = {
+            "generate": lambda: provider.generate(GenerateRequest(prompt="hello")),
+            "stream": lambda: list(provider.stream(GenerateRequest(prompt="hello"))),
+            "embed": lambda: provider.embed({"input": "hello"}),
+            "count_tokens": lambda: provider.count_tokens("hello"),
+        }
+        for name, call in calls.items():
+            with pytest.raises(Exception) as info:
+                call()
+            assert info.value.__context__ is None, name  # raised after the except block
+            assert isinstance(info.value.__cause__, Exception) and info.value.__cause__.code == 403, name  # type: ignore[attr-defined]
+            text = _everywhere(info.value)
+            assert token not in text and token.split(".", 1)[1] not in text, name
+            assert "denied for" in text, name
 
 
 def test_PL_LIVE_06_a_403_echoing_a_token_never_shows_in_the_adapter_error() -> None:

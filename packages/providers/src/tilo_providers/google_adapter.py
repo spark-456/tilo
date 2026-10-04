@@ -18,7 +18,7 @@ import json
 import os
 import re
 from collections.abc import Iterator, Mapping
-from typing import Any, NoReturn
+from typing import Any
 
 from tilo_contracts import ProvidersProfile
 
@@ -67,17 +67,24 @@ def validate_google_settings(project: str, location: str, environ: Mapping[str, 
         )
     if not _PROJECT_RE.fullmatch(project):
         raise GoogleSettingsError("project_invalid", "GOOGLE_CLOUD_PROJECT is not a valid project id")
-    path = environ.get(_CREDENTIALS_VAR)
-    if path:
-        try:
-            with open(path, encoding="utf-8") as handle:  # only the `type` field is read; ADC reports anything else
-                content = json.load(handle)
-        except (OSError, ValueError):
-            content = None
-        if isinstance(content, dict) and content.get("type") == "service_account":
-            raise GoogleSettingsError(
-                "service_account_key", f"{_CREDENTIALS_VAR} names a service-account key file; use user ADC only"
-            )
+    explicit = environ.get(_CREDENTIALS_VAR)
+    path = explicit or _well_known_adc_path(environ)  # ADC reads the variable's file, else gcloud's well-known one
+    try:
+        with open(path, encoding="utf-8") as handle:  # only the `type` field is read; ADC reports anything else
+            content = json.load(handle)
+    except (OSError, ValueError):
+        content = None
+    if isinstance(content, dict) and content.get("type") == "service_account":
+        where = _CREDENTIALS_VAR if explicit else "the gcloud well-known ADC file"
+        raise GoogleSettingsError("service_account_key", f"{where} names a service-account key; use user ADC only")
+
+
+def _well_known_adc_path(environ: Mapping[str, str]) -> str:
+    config_dir = environ.get("CLOUDSDK_CONFIG")
+    if not config_dir:
+        base = environ.get("APPDATA", "") if os.name == "nt" else os.path.join(os.path.expanduser("~"), ".config")
+        config_dir = os.path.join(base, "gcloud")
+    return os.path.join(config_dir, "application_default_credentials.json")
 
 
 class _RedactedAPIError(Exception):
@@ -145,12 +152,16 @@ class GoogleModelProvider(ModelProvider):
         # openai_compat_adapter's (mapping must not depend on the adapter).
         return map_transport_error(error) or error
 
-    def _fail(self, error: Exception) -> NoReturn:
+    def _failure(self, error: Exception) -> Exception:
+        """The mapped error, ready to raise *after* the `except` block so the raw SDK error is not its `__context__`."""
         mapped = self._map_error(error)
-        if mapped is not error and isinstance(error, _genai_module("google.genai.errors").APIError):
-            # The raw SDK error carries the unredacted server message: keep only its status code and redacted text.
-            raise mapped from _RedactedAPIError(getattr(error, "code", None), str(mapped))
-        raise mapped from error
+        if mapped is not error:
+            if isinstance(error, _genai_module("google.genai.errors").APIError):
+                # The raw SDK error carries the unredacted server message: keep only its code and redacted text.
+                mapped.__cause__ = _RedactedAPIError(getattr(error, "code", None), str(mapped))
+            else:
+                mapped.__cause__ = error
+        return mapped
 
     def _map_response(self, response: Any) -> GenerateResponse:
         prompt_feedback = getattr(response, "prompt_feedback", None)
@@ -193,10 +204,13 @@ class GoogleModelProvider(ModelProvider):
                 model=self._profile.model, contents=request.prompt, config=self._config(request)
             )
         except Exception as error:
-            self._fail(error)
-        return self._map_response(response)
+            failure = self._failure(error)
+        else:
+            return self._map_response(response)
+        raise failure
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
+        failure: Exception | None = None
         try:
             chunks = self._client.models.generate_content_stream(
                 model=self._profile.model, contents=request.prompt, config=self._config(request)
@@ -204,24 +218,30 @@ class GoogleModelProvider(ModelProvider):
             for chunk in chunks:
                 yield self._map_response(chunk)
         except Exception as error:
-            self._fail(error)
+            failure = self._failure(error)
+        if failure is not None:
+            raise failure
 
     def embed(self, request: Any) -> Any:
         contents = request["input"] if isinstance(request, dict) else request
         try:
             response = self._client.models.embed_content(model=self._profile.model, contents=contents)
         except Exception as error:
-            self._fail(error)
-        # `.values` is the float vector; `list(item)` would iterate the
-        # pydantic model's *fields* instead.
-        return {"vectors": [item.values for item in response.embeddings], "profile_id": self._profile_id}
+            failure = self._failure(error)
+        else:
+            # `.values` is the float vector; `list(item)` would iterate the
+            # pydantic model's *fields* instead.
+            return {"vectors": [item.values for item in response.embeddings], "profile_id": self._profile_id}
+        raise failure
 
     def count_tokens(self, text: str) -> int:
         try:
             response = self._client.models.count_tokens(model=self._profile.model, contents=text)
         except Exception as error:
-            self._fail(error)
-        return response.total_tokens
+            failure = self._failure(error)
+        else:
+            return response.total_tokens  # type: ignore[no-any-return]
+        raise failure
 
     def redact(self, text: str) -> str:
         return _GOOGLE_SECRET_RE.sub("[redacted]", text)
