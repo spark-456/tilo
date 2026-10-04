@@ -5,7 +5,7 @@ import re
 import socket
 
 import pytest
-from conftest import REPO_ROOT
+from _evals_lib import REPO_ROOT
 from tilo_evals.bank import bank_digest, load_bank
 from tilo_evals.bank_checks import hard_findings
 from tilo_evals.bank_report import CLAIM, CaseResult, render, run_bank

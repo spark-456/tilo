@@ -3,7 +3,7 @@
 from collections import Counter
 
 import pytest
-from conftest import REPO_ROOT
+from _evals_lib import REPO_ROOT
 from tilo_evals.bank import BANK_SCHEMA_PATH, BankError, bank_digest, load_bank
 
 BANK = REPO_ROOT / "evals" / "bank"

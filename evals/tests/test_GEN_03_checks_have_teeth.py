@@ -8,7 +8,7 @@ import copy
 import dataclasses
 
 import pytest
-from conftest import REPO_ROOT
+from _evals_lib import REPO_ROOT
 from tilo_evals import bank_checks as bc
 from tilo_evals.bank import load_bank
 from tilo_evals.bank_run import Observation, run_case
