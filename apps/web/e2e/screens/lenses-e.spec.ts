@@ -140,3 +140,23 @@ for (const [name, viewport] of [
     }
   });
 }
+
+test("UX-1 E3 the Inspect facts block keeps one height from first paint to the end of the run", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  for (const viewport of [MOBILE, DESKTOP]) {
+    await page.setViewportSize(viewport);
+    for (const item of ["B1", "A_s1"]) {
+      await page.goto(`${W}/inspect/${item}?speed=100`);
+      const facts = page.getByTestId("inspect-facts");
+      await expect(facts).toBeVisible({ timeout: 20_000 });
+      const heights = new Set<number>();
+      for (let i = 0; i < 15; i++) {
+        heights.add(Math.round((await facts.boundingBox())?.height ?? 0));
+        await page.waitForTimeout(200);
+      }
+      expect([...heights], `${item} at ${viewport.width}`).toHaveLength(1);
+    }
+  }
+});
