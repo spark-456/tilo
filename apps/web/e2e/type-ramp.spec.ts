@@ -1,5 +1,7 @@
 // PRD 18.2 / 18.6 (issue #227 Bundle A): every text element on every routed screen uses a size on
 // the 12/14/16/20/24/32/40 px scale, and the page title is one role: 40 px desktop, 32 px mobile.
+// Not measured: ::before and ::after content, and text drawn on a canvas (the stage); neither is
+// in the DOM text, so a size set there is outside this spec.
 import { expect, test } from "@playwright/test";
 import { SCREENS } from "../src/screens/meta";
 import { DESKTOP, MOBILE } from "./support/viewports";
@@ -64,12 +66,10 @@ for (const [label, viewport, h1, top] of [
       });
     }
 
-    test("PRD-18.2 the page title is one role: every screen h1 is the display step, at one offset", async ({
-      page,
-    }) => {
-      test.setTimeout(180_000); // one visit per route
-      const problems: string[] = [];
-      for (const route of ROUTES) {
+    for (const route of ROUTES) {
+      test(`PRD-18.2 ${route.name}: the page title is the display step, at the page shell's offset`, async ({
+        page,
+      }) => {
         await page.goto(route.path);
         await page
           .locator("main, [data-testid='stage-frame'], [data-testid='screen-page']")
@@ -85,14 +85,14 @@ for (const [label, viewport, h1, top] of [
             ),
           })),
         );
+        // The Story, Trace and Inspect screens carry the lens bar and the selection bar above it.
+        const lens = ["S-05", "S-10", "S-11"].includes(route.name);
         for (const t of titles) {
-          if (t.size !== h1) problems.push(`${route.name} h1 ${t.size}px`);
-          // The Story, Trace and Inspect screens carry the lens bar and the selection bar above it.
-          const lens = ["S-05", "S-10", "S-11"].includes(route.name);
-          if (lens ? t.top <= top : t.top !== top) problems.push(`${route.name} h1 at y=${t.top}`);
+          expect(t.size, "h1 size").toBe(h1);
+          if (lens) expect(t.top, "h1 offset").toBeGreaterThan(top);
+          else expect(t.top, "h1 offset").toBe(top);
         }
-      }
-      expect(problems).toEqual([]);
-    });
+      });
+    }
   });
 }

@@ -686,7 +686,7 @@ button.row {
   color: var(--color-brand-primary);
 }
 .hud-card {
-  min-height: 7.6em;
+  min-height: 8.4em; /* the finished card in stage mode needs 8.2em of content */
   padding: var(--space-12);
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-cards);
@@ -1434,10 +1434,30 @@ button.row {
   font-weight: 700;
 }
 /* FR-WLD-08 Replay region (HR-4): one reserved box, so a run finishing, or a scrub, moves nothing
-   (CLS). Right rail on desktop; in the column above the tabs on mobile. Neutral tokens, no motion. */
+   (CLS). Right rail on desktop; in the column above the tabs on mobile. Neutral tokens, no motion.
+   The banner and the position line reserve the lines they wrap to (--bl, --pl: measured at 1440,
+   390 and 320 px, normal and stage mode); the box is 72 px of padding, borders, margins and the
+   44 px row, plus those lines at 1.4 times their (scaled) size, and the mobile sheet clears it. */
+.app-shell {
+  --bl: 2;
+  --pl: 2;
+  --dock-h: calc(72px + (19.6px * var(--bl) + 16.8px * var(--pl)) * var(--ui-scale, 1));
+}
+.app-shell[data-stage-mode="on"] {
+  --bl: 3;
+}
+@media (max-width: 767px) {
+  .app-shell {
+    --bl: 3;
+  }
+  .app-shell[data-stage-mode="on"] {
+    --bl: 4;
+    --pl: 3;
+  }
+}
 .replay-dock {
   box-sizing: border-box;
-  min-height: 148px; /* the banner and the position line at two lines each: 145 px */
+  min-height: var(--dock-h);
   margin: 0 0 var(--space-12);
   padding: var(--space-8) var(--space-12);
   border: 2px solid var(--color-surface-2);
@@ -1449,7 +1469,7 @@ button.row {
   margin: 0 0 var(--space-4);
 }
 .replay-banner {
-  min-height: 2.8em; /* two lines of 14 px */
+  min-height: calc(var(--bl) * 1.4em); /* the lines it wraps to */
   font-size: var(--text-14);
   font-weight: 700;
   line-height: 1.4;
@@ -1489,7 +1509,7 @@ button.row {
   outline-offset: 2px;
 }
 .replay-pos {
-  min-height: 2.4em; /* two lines of 12 px */
+  min-height: calc(var(--pl) * 1.4em); /* the lines it wraps to */
   color: var(--color-ink-2);
   font-size: var(--text-12);
   line-height: 1.4;
@@ -1501,7 +1521,7 @@ button.row {
   }
   /* The collapsed World status sheet sits above the tabs: it clears the replay region too. */
   .app-shell[data-replay-dock="on"] .hud-sheet {
-    bottom: calc(var(--button-height-desktop) + 156px);
+    bottom: calc(var(--button-height-desktop) + var(--dock-h) + 8px);
   }
 }
 /* FR-WLD-07: Pause all and the Paused banner share one fixed box, so no state moves what is around
