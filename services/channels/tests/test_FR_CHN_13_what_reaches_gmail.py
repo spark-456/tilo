@@ -28,7 +28,7 @@ from _chn13_lib import (
 )
 
 KATE = "kate.lin@harborview.example"
-KELVIN = "K"  # KELVIN SIGN: the one code point whose str.lower() is ASCII ("k")
+KELVIN = "\u212a"  # KELVIN SIGN: the one code point whose str.lower() is ASCII ("k")
 MALLORY = "mallory@evil.example"
 
 
@@ -43,7 +43,7 @@ def test_FR_CHN_13_sent_body_is_the_previewed_body_without_control_characters() 
     are removed. The person saw that text, and that text is what Gmail gets."""
     line = make_line("L1")
     thread = line.thread()
-    raw = "Hi David,\r\n\r\nFriday 2pm works\rfor us.​ See you\u0007 then. Best,\x0bSarah"
+    raw = "Hi David,\r\n\r\nFriday 2pm works\rfor us.\u200b See you\u0007 then.\u2028Best,\x0bSarah"
     expected = "Hi David,\n\nFriday 2pm works\nfor us. See you then.\nBest,\nSarah"
     ctx, result = pair(thread, raw)
     card = line.ap.preview(USER, ctx, result)
@@ -56,7 +56,7 @@ def test_FR_CHN_13_sent_body_is_the_previewed_body_without_control_characters() 
     mail = line.api.sent[0]
     assert mail.body().rstrip("\n") == expected
     assert re.search(rb"\r(?!\n)", mail.raw) is None, "no lone CR reaches Gmail"
-    assert not any(c in mail.body() for c in ("​", "\u0007", " ", "\x0b"))
+    assert not any(c in mail.body() for c in ("\u200b", "\u0007", "\u2028", "\x0b"))
 
 
 def test_FR_CHN_13_mail_text_is_served_from_the_card_the_person_saw() -> None:

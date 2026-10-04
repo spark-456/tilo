@@ -246,6 +246,8 @@ class Autopilot:
             "mode": context.mode,
             "instruction": context.instruction,
             "item": {"artifact_id": draft.artifact_id, "version": draft.version} if draft else None,
+            "in_reply_to": draft.in_reply_to if draft else "",  # the message the draft answers (BQ-185)
+            "references": draft.references if draft else "",
         }
         if ready and draft is not None:
             modifiers = ["money_or_legal"] if t3_content_signal(draft.body) else []  # hidden characters too
