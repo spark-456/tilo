@@ -28,3 +28,4 @@ both on `commit` and pre-emptively in `reserve` when a reservation alone would c
 - Every price, cap, limit and ratio goes through `errors.number` (int or float, not bool or string, finite).
 - Both loaders turn any unreadable, malformed or invalid file into `MeteringConfigError` naming the path.
 - `Treasury` validates amounts (`errors.number`) and `at` (timezone-aware); thread-safe; the ledger is append-only.
+- FR-MTR-06: `savings.credits_saved` sums `origin_cost - lookup_cost` over `memory.hit` events (id once, never `data.saved`).
