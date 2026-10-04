@@ -68,7 +68,7 @@ test("S_10 renders, no console errors, placeholders aria-disabled", async ({ pag
     "· Needs you",
   );
   await expect(page.getByTestId("story-lens")).not.toContainText("?speed");
-  await expect(page.getByRole("log")).toBeVisible(); // screen-reader Story
+  await expect(page.getByRole("list", { name: "What happened, in order" })).toBeVisible(); // screen-reader Story
   await expectNoDeadControls(page);
   await expectAxeClean(page);
   await page.setViewportSize(MOBILE);

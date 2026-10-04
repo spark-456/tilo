@@ -133,7 +133,13 @@ export function App() {
         <Stage
           key={world.active ? "fixture" : (hudWorld ?? "none")}
           {...(stageWorld.active
-            ? { onWorld: stageWorld.onWorld, seq: stageWorld.seq, selected: stageWorld.selected }
+            ? {
+                onWorld: stageWorld.onWorld,
+                seq: stageWorld.seq,
+                selected: stageWorld.selected,
+                layout: stageWorld.layout,
+                worldId: stageWorld.worldId,
+              }
             : {})}
           paused={stagePaused}
         />
