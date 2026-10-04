@@ -33,6 +33,11 @@ export interface DistrictState {
   readonly completed: boolean;
 }
 
+/** A layout gate as the recorded events leave it (the rules of needs-you/reduce.ts, CR-07): shut
+ * until approval.requested, open once a person or Team Lead approves, "policy" once the policy
+ * engine opened it (HR-7). Nothing says a gate is open until an event does. */
+export type GateState = "closed" | "waiting" | "open" | "policy";
+
 export type WorldStatus = "idle" | "started" | "paused" | "completed" | "failed";
 
 export interface WorldState {
@@ -45,6 +50,7 @@ export interface WorldState {
   readonly districts: Readonly<Record<string, DistrictState>>;
   readonly buildings: Readonly<Record<string, BuildingState>>;
   readonly agents: Readonly<Record<string, AgentState>>;
+  readonly gates: Readonly<Record<string, GateState>>;
 }
 
 function ids<T extends { id: string }>(items: readonly T[]): string[] {
@@ -68,7 +74,9 @@ export function createInitialState(layout: Layout): WorldState {
   for (const id of ids(layout.semantic.agents)) {
     agents[id] = { id, spawned: false, location: null };
   }
-  return { seq: 0, trace: [], status: "idle", levels, districts, buildings, agents };
+  const gates: Record<string, GateState> = {};
+  for (const gate of layout.semantic.gates) gates[gate.id] = "closed";
+  return { seq: 0, trace: [], status: "idle", levels, districts, buildings, agents, gates };
 }
 
 const BUILDING_STATUS_BY_VERB: Readonly<Record<string, BuildingStatus>> = {
@@ -78,6 +86,15 @@ const BUILDING_STATUS_BY_VERB: Readonly<Record<string, BuildingStatus>> = {
   completed: "completed",
   archived: "archived",
 };
+
+function gateAfter(event: Event, verb: string): GateState | null {
+  if (verb === "requested") return "waiting";
+  const by = event.authz?.by;
+  if (event.type === "policy.applied") return by === "policy" ? "policy" : null;
+  if (verb !== "resolved" || (by !== "person" && by !== "team_lead")) return null;
+  const option = (event.data as Record<string, unknown> | null)?.option;
+  return option === "approve" ? "open" : option === "edit" || option === "hold" ? "closed" : null;
+}
 
 /** Applies one known event's world effect. `state` is a fresh object already carrying the
  * bumped `seq` and `trace`; this only ever adds/replaces entries, never mutates nested maps. */
@@ -152,6 +169,13 @@ function applyKnown(state: WorldState, event: Event): WorldState {
         ...state,
         agents: { ...state.agents, [agent.id]: { ...agent, location: event.target } },
       };
+    }
+    case "approval":
+    case "policy": {
+      const gateId = (event.data as Record<string, unknown> | null)?.gate_id;
+      if (typeof gateId !== "string" || !(gateId in state.gates)) return state;
+      const next = gateAfter(event, verb);
+      return next ? { ...state, gates: { ...state.gates, [gateId]: next } } : state;
     }
     default:
       return state;
