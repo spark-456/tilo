@@ -44,6 +44,17 @@ def autopilot_module() -> Any:
     return importlib.import_module("tilo_channels.autopilot")
 
 
+def fake_evidence_kwargs() -> dict[str, Any]:
+    """CHN-WIRE-1 (API_CHN_WIRE_1.md, BQ-228): the FR-CHN-11/13 benches drive `Autopilot.send()` with no approval and
+    over a fake outbox (or a `check_entry` accept-all). Once `Autopilot` has the explicit `fake_evidence` mode, they
+    opt into it through this helper; production never does. Until the parameter exists this returns {}, so those
+    benches stay green before and after the ticket lands. Drop the `inspect` guard once CHN-WIRE-1 is merged."""
+    import inspect
+
+    cls = autopilot_module().Autopilot
+    return {"fake_evidence": True} if "fake_evidence" in inspect.signature(cls).parameters else {}
+
+
 def needs_autopilot(test: Callable[..., Any]) -> Callable[..., Any]:
     """A missing `tilo_channels.autopilot` fails once, before Hypothesis generates or shrinks anything."""
 
@@ -228,6 +239,7 @@ class Bench:
             emit=self.events,
             world_id=WORLD,
             run_id=RUN,
+            **fake_evidence_kwargs(),
         )
 
 

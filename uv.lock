@@ -1422,11 +1422,15 @@ name = "tilo-channels"
 version = "0.1.0"
 source = { editable = "services/channels" }
 dependencies = [
+    { name = "tilo-policy" },
     { name = "tilo-providers" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "tilo-providers", editable = "packages/providers" }]
+requires-dist = [
+    { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tilo-providers", editable = "packages/providers" },
+]
 
 [[package]]
 name = "tilo-connectors"

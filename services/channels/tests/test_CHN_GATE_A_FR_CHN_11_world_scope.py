@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from _chn11_lib import RUN, WORLD, autopilot_module
+from _chn11_lib import RUN, WORLD, autopilot_module, fake_evidence_kwargs
 from _chn13_lib import USER, Line, iso, make_line, outbox_skips_ob01_evidence
 from _chn_gate_a_lib import MemoryStopQueue
 from tilo_connectors import Outbox
@@ -57,6 +57,7 @@ def autopilot(line: Line, world: str, stops: MemoryStopQueue | None, outbox: Any
         world_id=world,
         run_id=RUN,
         stops=stops,
+        **fake_evidence_kwargs(),
     )
 
 
