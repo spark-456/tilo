@@ -24,7 +24,7 @@ service the web client and channels write through; the client reads live state f
   No cloud, no paid call; task routes read only `application/json` (415). Start-up and every dev dependency refuse when `K_SERVICE`, `CLOUD_RUN_JOB` or live is set.
   `dev_run` (CL-INT-5c/5d) wires the run seams only here: a unit runner (paced, one synthetic artifact, cost metered
   by `tilo_metering` from `config/prices.dev.yaml`, a dev-only price, on that artifact's event), one fake recipient, mock adapters.
-- `GET /worlds/{id}/layout` (FR-WLD-05): the run's layout, 404 until built; a non-owner gets an allowlisted view.
+- `GET /worlds/{id}/layout` (FR-WLD-05): the run's layout, 404 until built; owner gets `tilo_world` geometry (CL-INT-6, null if invalid); others an allowlisted view, geometry null.
 - `POST /intake` (FR-INT-01/02, `tilo_api.intake`): multipart `text` + `files` -> 201 task, `world.requested`
   and per-file status, or 422 `{"error": reason}` with nothing stored. Calls `tilo_planning.intake`.
 - CP2 flow (CL-INT-1, `tilo_api.tasks`): intake also returns the Director's `brief` and `questions`; then
