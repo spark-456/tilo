@@ -553,6 +553,24 @@ def _minutes_confirmed(meeting: dict, now: str) -> bool:
     return meeting["status"] == "minuted" and c is not None and c["by"] == meeting["owner"] and c["at"] <= now
 
 
+def _released_item(data: dict, record: dict, meeting: dict, now: str) -> bool:
+    """PE-08: a calendar proposal for an attendee cites an action item (`mt_x#aiN`) whose work item for
+    that attendee the meeting Owner confirmed, on minutes the Owner confirmed."""
+    ref, item = data["source"]["ref"], record.get("work_item")
+    return (
+        ref is not None
+        and "#" in ref
+        and item is not None
+        and item["owner"] == data["owner"]
+        and item["source"]["ref"] == ref
+        and item["status"] in ("open", "done")
+        and item["created_by"]["by"] == "tilo"
+        and (item["assigned_by"] or {}).get("by") == meeting["owner"]
+        and _confirmed(item, meeting["owner"], now)
+        and _minutes_confirmed(meeting, now)
+    )
+
+
 def _tilo_made_ok(kind: str, data: dict, record: dict, now: str) -> bool:
     """PE-08, PE-19: a Tilo-made record's source and stamps hold, checked on every request about it.
     A meeting source needs its meeting in the case (fail closed); another source needs its owner."""
@@ -577,12 +595,15 @@ def _tilo_made_ok(kind: str, data: dict, record: dict, now: str) -> bool:
     if kind == "calendar_entry":
         if source["kind"] == "manual":
             return False
-        if source["kind"] == "google":
-            return True
+        if source["kind"] == "google":  # a sync writes the connected person's own entries only
+            return source_owner == data["owner"]
         if source["from"] in ("meeting", "transcript"):
             if not _meeting_matches(source["ref"], data["org_id"], meeting):
                 return False
-            return meeting["owner"] == data["owner"] or _minutes_confirmed(meeting, now)
+            if meeting["owner"] == data["owner"]:
+                return True
+            # for another attendee: one action item the meeting Owner released, never a bare transcript
+            return source["from"] == "meeting" and _released_item(data, record, meeting, now)
         return source_owner == data["owner"]
     return True
 
@@ -776,7 +797,7 @@ def case_shape_problems(repo_root: pathlib.Path, registry: Any, case: dict) -> l
     record = case["record"]
     if (
         not isinstance(record, dict)
-        or set(record) - {"kind", "data", "pin", "mentions", "meeting", "source_owner"}
+        or set(record) - {"kind", "data", "pin", "mentions", "meeting", "source_owner", "work_item"}
         or {"kind", "data"} - set(record)
     ):
         return [*found, "record holds kind, data (pin and mentions for a mention, meeting for a Tilo-made record)"]
@@ -793,6 +814,8 @@ def case_shape_problems(repo_root: pathlib.Path, registry: Any, case: dict) -> l
         found += [f"record.mentions: {m}" for m in problems(repo_root, registry, "mention", other)]
     if "meeting" in record:
         found += [f"record.meeting: {m}" for m in problems(repo_root, registry, "meeting", record["meeting"])]
+    if "work_item" in record:
+        found += [f"record.work_item: {m}" for m in problems(repo_root, registry, "work_item", record["work_item"])]
     if "source_owner" in record:
         found += [
             f"record.source_owner: {m}"
@@ -1276,6 +1299,46 @@ def _person_made_item_with_another_assigner(case: dict) -> bool:
     )
 
 
+def _tilo_proposes_to_an_attendee_from_a_transcript(case: dict) -> bool:
+    d, m = case["record"]["data"], case["record"].get("meeting")
+    src = d.get("source") if _is(case, "calendar_entry") else None
+    return (
+        isinstance(src, dict)
+        and _kind(case) == "create"
+        and is_tilo(_actor(case))
+        and src.get("from") == "transcript"
+        and m is not None
+        and m["owner"] != d["owner"]
+    )
+
+
+def _tilo_proposes_without_a_released_item(case: dict) -> bool:
+    d, m = case["record"]["data"], case["record"].get("meeting")
+    src = d.get("source") if _is(case, "calendar_entry") else None
+    return (
+        isinstance(src, dict)
+        and _kind(case) == "create"
+        and is_tilo(_actor(case))
+        and src.get("from") == "meeting"
+        and m is not None
+        and m["owner"] != d["owner"]
+        and m.get("minutes_confirmed_by") is not None
+        and not _released_item(d, case["record"], m, case["now"])
+    )
+
+
+def _tilo_syncs_onto_another_persons_calendar(case: dict) -> bool:
+    d, owner = case["record"]["data"], case["record"].get("source_owner")
+    src = d.get("source") if _is(case, "calendar_entry") else None
+    return (
+        isinstance(src, dict)
+        and src.get("kind") == "google"
+        and owner is not None
+        and owner != d["owner"]
+        and is_tilo(_actor(case))
+    )
+
+
 REQUIRED_REFUSALS: dict[str, Callable[[dict], bool]] = {
     "a teammate reads a personal pin": _teammate_reads_personal_pin,
     "an org owner reads a personal pin": _owner_reads_personal_pin,
@@ -1324,6 +1387,9 @@ REQUIRED_REFUSALS: dict[str, Callable[[dict], bool]] = {
     "a calendar confirmation dated before creation": _calendar_confirmation_dated_before_creation,
     "a tag on a person of another org": _tag_a_person_of_another_org,
     "a person-made item with another person as assigner": _person_made_item_with_another_assigner,
+    "Tilo proposes to an attendee from a bare transcript": _tilo_proposes_to_an_attendee_from_a_transcript,
+    "Tilo proposes to an attendee without a released action item": _tilo_proposes_without_a_released_item,
+    "Tilo syncs a Google entry onto another person's calendar": _tilo_syncs_onto_another_persons_calendar,
 }
 
 
