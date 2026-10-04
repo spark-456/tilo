@@ -12,6 +12,9 @@ import { Approaches } from "./s03/Approaches";
 
 const enc = encodeURIComponent;
 
+/** What each flow screen calls itself. Start is the Home hero (artboard Tilo Home v2). */
+const HEADINGS: Readonly<Record<string, string>> = { Start: "What should Tilo do?" };
+
 function Notice({ message, onRetry }: { message: string; onRetry?: (() => void) | undefined }) {
   return (
     <div className="flow-notice" role="alert">
@@ -133,7 +136,7 @@ export function FlowShell() {
       aria-label="Task flow"
     >
       <h1 className="flow-heading" ref={heading} tabIndex={-1}>
-        {route.screen}
+        {HEADINGS[route.screen] ?? route.screen}
       </h1>
       <div key={key}>{screen}</div>
     </section>

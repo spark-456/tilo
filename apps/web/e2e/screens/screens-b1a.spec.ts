@@ -26,7 +26,7 @@ test("S_13 lists a deliverable only once artifact.delivered is recorded (HR-1)",
 }) => {
   await page.setViewportSize(DESKTOP);
   await page.goto("/library"); // recorded pace: artifact.delivered is about two minutes in
-  await expect(page.getByTestId("library-empty")).toHaveText("Nothing has been delivered yet.");
+  await expect(page.getByTestId("library-empty")).toContainText("Nothing delivered yet");
   await expect(page.getByTestId("library-rows")).toHaveCount(0);
 });
 
@@ -52,7 +52,7 @@ test("S_14 renders, no console errors, placeholders aria-disabled", async ({ pag
     "/world/w_village_basic",
   );
   await page.locator("button.primary").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "What should Tilo do?" })).toBeVisible();
   expect(problems).toEqual([]);
 });
 

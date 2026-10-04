@@ -8,6 +8,7 @@ import type { CSSProperties, ReactNode, Ref } from "react";
 import { useClient } from "../api/ClientProvider";
 import { elapsed, useRunLog } from "../world/runLog";
 import { useWorldContext } from "../world/worldContext";
+import { AppLink } from "./AppLink";
 import { Placeholder } from "./Placeholder";
 
 /** The recorded events of the screen's world as they arrive: the world its address names
@@ -84,6 +85,62 @@ export function Soon({
       {labels.map((l) => (
         <Placeholder key={l} label={l} compact />
       ))}
+    </div>
+  );
+}
+
+/** A static empty isometric tile, in neutral role tokens: a drawing, not a render of any world. */
+function EmptyGlyph() {
+  return (
+    <svg
+      className="empty-glyph"
+      viewBox="0 0 80 60"
+      width="56"
+      height="42"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polygon points="40,6 72,22 40,38 8,22" fill="var(--color-surface-2)" />
+      <polygon points="8,22 40,38 40,54 8,38" fill="var(--color-fog)" />
+      <polygon points="72,22 40,38 40,54 72,38" fill="var(--color-ink-3)" opacity="0.5" />
+      <polygon
+        points="40,14 58,22 40,30 22,22"
+        fill="none"
+        stroke="var(--color-brand-primary)"
+        strokeWidth="2"
+        strokeDasharray="4 3"
+      />
+    </svg>
+  );
+}
+
+/** What a screen shows when there is nothing to list yet: an isometric glyph, a title, one line that
+ * says what is true and why, and at most one action. It fills the reserved box it sits in, so
+ * loading, empty and ready never move what is around them (CLS, UX-1). `compact` drops the card
+ * for a short list inside another section. */
+export function EmptyState({
+  testid,
+  title,
+  line,
+  action,
+  compact = false,
+}: {
+  testid: string;
+  title: string;
+  line: string;
+  action?: { label: string; to: string };
+  compact?: boolean;
+}) {
+  return (
+    <div className="empty-state" data-testid={testid} data-compact={compact ? "true" : undefined}>
+      <EmptyGlyph />
+      <p className="empty-title">{title}</p>
+      <p className="empty-line">{line}</p>
+      {action && (
+        <AppLink className="secondary" to={action.to}>
+          {action.label}
+        </AppLink>
+      )}
     </div>
   );
 }

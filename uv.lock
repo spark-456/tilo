@@ -1494,6 +1494,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "referencing" },
     { name = "tilo-contracts" },
+    { name = "tilo-policy" },
     { name = "tilo-providers" },
 ]
 
@@ -1505,6 +1506,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-providers", editable = "packages/providers" },
 ]
 
