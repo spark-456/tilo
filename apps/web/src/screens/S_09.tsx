@@ -5,7 +5,7 @@
 import type { MeetingCalledData } from "@tilo/contracts";
 import { useClient } from "../api/ClientProvider";
 import { Loaded } from "./FlowShell";
-import { EventList, Page, Section, Soon, field, useFixtureRun } from "./kit";
+import { EventList, Page, Section, Soon, useFixtureRun } from "./kit";
 import { useRemote } from "./remote";
 
 export function S_09() {
@@ -21,9 +21,7 @@ export function S_09() {
 
   // Purpose comes ONLY from this run's meeting.called events — never from listCards directly.
   const calledEvent = meetingEvents.find((e) => e.type === "meeting.called");
-  const calledCardId = calledEvent
-    ? (field(calledEvent, "card_id") as string | undefined)
-    : undefined;
+  const calledCardId = calledEvent ? (calledEvent.data as MeetingCalledData).card_id : undefined;
 
   return (
     <Page
