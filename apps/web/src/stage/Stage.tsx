@@ -43,7 +43,8 @@ export type WorldSeam = (world: Container, requestRender: () => void) => (() => 
 /** PRD 18.3 S-04 stage. The camera is the Pixi world container's transform (PRD 9.7); a frame
  * is drawn only on input, an eased keyboard move, resize or visibility change. Readiness: the
  * stage frame gains `data-stage-ready="true"` and `data-camera-x/-y/-zoom` with the first drawn
- * frame (right after Pixi's init), never before; input listeners attach at mount and buffer input into that first frame. `seq`
+ * frame (right after Pixi's init), never before; input listeners attach at mount and buffer
+ * input into that first frame. `seq`
  * (P0-08b-player, FR-WLD-04) is purely a display attribute for a world-content consumer's own
  * highest applied seq; Stage itself never reads or produces it. */
 export function Stage({
