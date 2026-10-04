@@ -20,6 +20,7 @@ import {
 } from "./fixtures/derived";
 import { EVENTS_VILLAGE_BASIC } from "./fixtures/events";
 import { LAYOUT_VILLAGE_BASIC } from "./fixtures/layout";
+import type { StopResult } from "./stop";
 
 export interface FixtureClientOptions {
   /** Deterministic latency added to every request, so tests can observe loading states. */
@@ -177,6 +178,18 @@ export class FixtureClient implements TiloClient {
       clearTimeout(timer);
       this.playing.delete(pause);
     };
+  }
+
+  /** Every Stop all autopilot this client received, by world: a test reads what was sent. */
+  readonly stopRequests: string[] = [];
+
+  /** Stop all autopilot (FR-HIL-07), not on the TiloClient interface. The fixture world holds no
+   * rule that runs on its own (no policy is served), so the honest answer to the call is that
+   * nothing was stopped and nothing was already waiting; the call itself is recorded. */
+  async stopAutopilot(worldId: string): Promise<StopResult> {
+    await wait(this.delayMs);
+    this.stopRequests.push(worldId);
+    return { stopped: 0, already_l1: 0, confirmations: [], pending: 0 };
   }
 
   /** Pause all (FR-WLD-07), not on the TiloClient interface. Like the server it stops the run and
