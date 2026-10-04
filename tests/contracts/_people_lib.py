@@ -7,7 +7,7 @@ Not a test module (leading underscore), same convention as `_lib.py` and `_event
 - minimal VALID documents for every new contract, written here on purpose: the tests must not read
   the architect's fixtures to build their inputs, and a mutation named by a rule must fail the
   schema it targets;
-- `permits(case)`, the crossref oracle for people.rules.md PE-01 to PE-07 and PE-10 (the same shape
+- `permits(case)`, the crossref oracle for people.rules.md PE-01 to PE-07, PE-17 and PE-18 (the same shape
   `tilo-api` (CL-PEOPLE) tests run over `contracts/fixtures/person/crossref/`);
 - the list of refusals the crossref fixtures must at least contain.
 
@@ -193,6 +193,7 @@ def meeting(**ov: Any) -> dict:
         "source": "bot",
         "status": "scheduled",
         "ended_reason": None,
+        "minutes_confirmed_by": None,
         "transcript": None,
         "minutes": None,
         "delete_transcript_after": None,
@@ -251,6 +252,7 @@ def work_item(**ov: Any) -> dict:
         "assigned_by": assignment(),
         "confirmed_by": assignment(),
         "snoozed_until": None,
+        "flagged": False,
         "history": [history_entry()],
         "created_at": T0,
         "updated_at": T0,
@@ -275,6 +277,7 @@ def pin(**ov: Any) -> dict:
         "set_up_by": "u_owner",
         "source": None,
         "confirmed_by": None,
+        "flagged": False,
         "history": [history_entry(change="created", status="active")],
         "created_at": T0,
         "updated_at": T0,
@@ -321,6 +324,7 @@ def calendar_entry(**ov: Any) -> dict:
         "share": None,
         "created_by": maker_person(),
         "confirmed_by": None,
+        "flagged": False,
         "updated_at": T0,
     }
     return with_(base, **ov)
@@ -442,7 +446,7 @@ def data_model_name(type_: str) -> str:
 
 
 # ---------------------------------------------------------------------------------------------
-# Crossref oracle (people.rules.md PE-01 to PE-07, PE-10).
+# Crossref oracle (people.rules.md PE-01 to PE-07, PE-17, PE-18; PE-10 is ui_action's own tests).
 # ---------------------------------------------------------------------------------------------
 CASE_KEYS = {"rule", "note", "now", "persons", "record", "request"}
 RECORD_KINDS = {
@@ -457,19 +461,44 @@ REQUEST_KINDS = (
     "read_full",
     "read_status",
     "read_busy",
+    "read_directory",
+    "read_membership",
+    "create",
     "edit",
     "confirm",
     "mention",
     "untag",
+    "mark_done",
     "assign_membership",
     "set_org_role",
+    "start_capture",
 )
-RULES = ("PE-01", "PE-02", "PE-03", "PE-04", "PE-05", "PE-06", "PE-07", "PE-17")
+RULES = (
+    "PE-01",
+    "PE-02",
+    "PE-03",
+    "PE-04",
+    "PE-05",
+    "PE-06",
+    "PE-07",
+    "PE-08",
+    "PE-10",
+    "PE-17",
+    "PE-18",
+    "PE-19",
+    "PE-20",
+)
+READS = ("read_full", "read_status")
 
 
 def request_kind(request: dict) -> str:
     action = request["action"]
     return f"read_{request.get('view')}" if action == "read" else action
+
+
+def is_tilo(actor: str) -> bool:
+    """Tilo acts as an agent id (A_...); a person is a user id (u_...)."""
+    return actor.startswith("A_")
 
 
 def is_member(persons: dict, user: str, team: str, now: str) -> bool:
@@ -492,86 +521,180 @@ def is_member(persons: dict, user: str, team: str, now: str) -> bool:
     return False
 
 
-def _pin_permits(persons: dict, now: str, actor: str, kind: str, data: dict) -> bool:
-    scope = data["scope"]
-    if scope["kind"] == "personal":  # PE-01: the person alone; no confirm, mention or busy view
-        return actor == scope["user"] and kind in ("read_full", "read_status", "edit")
-    if data["status"] == "active":  # PE-02: members read, set_up_by edits
-        if kind in ("read_full", "read_status"):
-            return is_member(persons, actor, scope["team"], now)
-        return kind == "edit" and actor == data["set_up_by"]
-    if kind in ("read_full", "read_status", "edit"):  # proposed or removed: set_up_by only
-        return actor == data["set_up_by"]
-    return kind == "confirm" and data["status"] == "proposed" and actor == data["set_up_by"]
+def teammates(persons: dict, a: str, b: str, now: str) -> bool:
+    """Two people who are members of at least one team in common at `now`."""
+    pa = persons.get(a)
+    if pa is None or persons.get(b) is None:
+        return False
+    return any(
+        is_member(persons, a, m["team"], now) and is_member(persons, b, m["team"], now) for m in pa["memberships"]
+    )
 
 
-def _work_item_permits(actor: str, kind: str, data: dict) -> bool:
-    owner = data["owner"]
+def _confirmed(data: dict, confirmer: str | None, now: str) -> bool:
+    """PE-07: a Tilo-made record counts as confirmed only by the person who owns the decision,
+    dated between its creation and the request."""
+    c = data["confirmed_by"]
+    return c is not None and confirmer is not None and c["by"] == confirmer and data["created_at"] <= c["at"] <= now
+
+
+def _pin_stamps_ok(data: dict, meeting: dict | None) -> bool:
+    """PE-19: a person-made pin's set_up_by is its creator; a Tilo-made pin's is the owner of the
+    meeting its source names."""
+    created = data["created_by"]
+    if created["by"] == "person":
+        return data["set_up_by"] == created["ref"]
+    if meeting is not None:
+        return meeting["owner"] == data["set_up_by"]
+    return True
+
+
+def _pin_permits(persons: dict, now: str, actor: str, kind: str, data: dict, meeting: dict | None) -> bool:
+    scope, tilo_made = data["scope"], data["created_by"]["by"] == "tilo"
+    source = data["source"]
+    if scope["kind"] == "personal":  # PE-01, PE-08
+        if kind == "create":
+            if is_tilo(actor):
+                if not tilo_made:
+                    return False
+                if source is not None and source["kind"] == "meeting":
+                    return meeting is not None and meeting["owner"] == scope["user"]
+                return True
+            return actor == scope["user"] and not tilo_made
+        return actor == scope["user"] and kind in (*READS, "edit")
+    team = scope["team"]  # PE-02
+    member_actor = is_member(persons, actor, team, now)
+    owner_ok = data["owner"] is None or is_member(persons, data["owner"], team, now)
+    if kind == "create":
+        if tilo_made:
+            return is_tilo(actor) and data["status"] == "proposed" and owner_ok and _pin_stamps_ok(data, meeting)
+        return actor == data["set_up_by"] and member_actor and owner_ok and _pin_stamps_ok(data, meeting)
+    if is_tilo(actor):  # PE-07: Tilo never reads or confirms
+        return False
+    if data["status"] == "active":
+        if kind in READS:
+            ok = not tilo_made or _confirmed(data, data["set_up_by"], now)
+            return member_actor and ok and _pin_stamps_ok(data, meeting)
+        return kind == "edit" and actor == data["set_up_by"] and member_actor
+    if kind in (*READS, "edit"):  # proposed or removed
+        return actor == data["set_up_by"] and member_actor
+    return kind == "confirm" and data["status"] == "proposed" and actor == data["set_up_by"] and member_actor
+
+
+def _work_item_permits(now: str, actor: str, kind: str, data: dict) -> bool:
+    owner, status = data["owner"], data["status"]
     assigner = (data["assigned_by"] or {}).get("by")
-    if kind in ("read_full", "edit"):  # PE-03: the owner reads in full; nobody else
+    created = data["created_by"]
+    if kind == "create":  # PE-03: a person-made item is its creator's own; Tilo makes proposed ones
+        if created["by"] == "person":
+            return actor == owner == created["ref"] and status == "open"
+        return is_tilo(actor) and status == "proposed" and assigner is not None
+    if is_tilo(actor):
+        return False
+    if status == "proposed":  # nobody reads it; the meeting Owner confirms it
+        return kind == "confirm" and assigner is not None and actor == assigner
+    if created["by"] == "tilo" and not _confirmed(data, assigner, now):
+        return False
+    if kind in ("read_full", "edit"):
         return actor == owner
+    if kind == "mark_done":
+        return actor == owner and status == "open"
     if kind == "read_status":
-        return actor == owner or (assigner is not None and actor == assigner and data["status"] != "proposed")
-    return kind == "confirm" and assigner is not None and actor == assigner and data["status"] == "proposed"
+        return actor == owner or (assigner is not None and actor == assigner)
+    return False
 
 
 def _calendar_permits(persons: dict, now: str, actor: str, kind: str, data: dict) -> bool:
-    share = data["share"]  # null = private; {team} = shared with that team (brief change)
-    full = actor == data["owner"] or (share is not None and is_member(persons, actor, share["team"], now))
-    if kind in ("read_full", "read_status"):
-        return full
-    if kind == "read_busy":  # PE-04: everyone else sees the interval only (org owners no more)
-        return True
+    owner, share, created = data["owner"], data["share"], data["created_by"]
+    if kind == "create":  # the source gate for Tilo is PE-08, checked in permits()
+        return is_tilo(actor) if created["by"] == "tilo" else actor == owner
+    if is_tilo(actor):  # Tilo never reads or accepts
+        return False
+    src_kind = data["source"]["kind"]
+    needs_confirmation = src_kind == "tilo" or (created["by"] == "tilo" and src_kind == "manual")
+    if data["state"] == "accepted" and needs_confirmation and not _confirmed(data, owner, now):
+        return False
+    if kind == "confirm":
+        return actor == owner and data["state"] == "proposed"
+    owner_in_team = share is not None and is_member(persons, owner, share["team"], now)
     if kind == "edit":
-        return actor == data["owner"]
-    return kind == "confirm" and actor == data["owner"] and data["state"] == "proposed"
+        return actor == owner and (share is None or owner_in_team)  # sharing needs the owner in the team
+    if kind in READS:
+        shared = share is not None and data["state"] == "accepted" and owner_in_team
+        return actor == owner or (shared and is_member(persons, actor, share["team"], now))
+    if kind == "read_busy":  # PE-04: teammates, accepted entries, interval only
+        return data["state"] == "accepted" and teammates(persons, actor, owner, now)
+    return False
 
 
-def _person_permits(persons: dict, actor: str, kind: str, data: dict) -> bool:
-    # PE-17: directory changes (a membership, an org role) are an org owner's, of the same org
-    assigner = persons.get(actor)
-    owner = assigner is not None and assigner["org_id"] == data["org_id"] and assigner["org_role"] == "owner"
-    return kind in ("assign_membership", "set_org_role") and owner
-
-
-def _meeting_permits(actor: str, kind: str, data: dict) -> bool:
+def _meeting_permits(persons: dict, actor: str, kind: str, data: dict) -> bool:
     # PE-05: the meeting owner alone; attendees, assignees, teammates and org owners read nothing.
-    return kind in ("read_full", "read_status", "edit", "confirm") and actor == data["owner"]
+    # PE-18: capture starts only when the owner attested (attestation.by is the owner, a person of the org).
+    if kind == "start_capture":
+        attester = persons.get(data["attestation"]["by"])
+        return actor == data["owner"] and data["attestation"]["by"] == data["owner"] and attester is not None
+    return kind in (*READS, "edit", "confirm") and actor == data["owner"]
+
+
+def _person_permits(persons: dict, now: str, actor: str, kind: str, data: dict) -> bool:
+    me = persons.get(actor)
+    if me is None:
+        return False
+    owner = me["org_id"] == data["org_id"] and me["org_role"] == "owner"
+    if kind in ("assign_membership", "set_org_role"):  # PE-17: directory changes are an org owner's
+        return owner
+    if kind == "read_full":  # PE-20: your own record, in full
+        return actor == data["id"]
+    if kind == "read_membership":
+        return actor == data["id"] or owner
+    if kind == "read_directory":
+        return actor == data["id"] or owner or teammates(persons, actor, data["id"], now)
+    return False
 
 
 def _mention_permits(case: dict, kind: str) -> bool:
     persons, now, record, actor = case["persons"], case["now"], case["record"], case["request"]["actor"]
-    pin, mention_ = record.get("pin"), record["data"]
+    pin, tag, others = record.get("pin"), record["data"], record.get("mentions") or []
     if pin is None or pin["scope"]["kind"] != "team":  # PE-01/PE-06: a personal item takes no mention
         return False
-    if (
-        mention_["pin_id"] != pin["id"]
-        or mention_["team"] != pin["scope"]["team"]
-        or mention_["org_id"] != pin["org_id"]
-    ):
+    if tag["pin_id"] != pin["id"] or tag["team"] != pin["scope"]["team"] or tag["org_id"] != pin["org_id"]:
         return False
-    actor_person = persons.get(actor)
+    person = persons.get(actor)
     if kind == "mention":
-        tagged = persons.get(mention_["user"])
-        if mention_["removed"] is not None or tagged is None or tagged["org_id"] != pin["org_id"]:
-            return False  # a removed mention is never re-added
-        if not is_member(persons, mention_["user"], mention_["team"], now):
+        if pin["status"] != "active" or tag["removed"] is not None:  # only active pins take a tag
             return False
-        if actor_person is not None:
-            return actor == pin["set_up_by"] and actor_person["org_id"] == pin["org_id"]
-        confirmed = pin["confirmed_by"]  # Tilo, for an item the set_up_by person confirmed
-        return actor.startswith("A_") and confirmed is not None and confirmed["by"] == pin["set_up_by"]
+        if not is_member(persons, tag["user"], tag["team"], now):
+            return False
+        if any(o["user"] == tag["user"] and o["removed"] and o["removed"]["by"] == tag["user"] for o in others):
+            return False  # whoever removed themselves is not tagged on that pin again
+        if person is not None:
+            return (
+                actor == pin["set_up_by"]
+                and person["org_id"] == pin["org_id"]
+                and is_member(persons, actor, tag["team"], now)
+            )
+        return is_tilo(actor) and _confirmed(pin, pin["set_up_by"], now)  # Tilo, for an item the setter confirmed
     if kind == "untag":
-        return (
-            actor_person is not None
-            and actor_person["org_id"] == pin["org_id"]
-            and actor in (mention_["user"], pin["set_up_by"])
-        )
+        if tag["removed"] is not None:
+            return False
+        return person is not None and person["org_id"] == pin["org_id"] and actor in (tag["user"], pin["set_up_by"])
     return False
 
 
+def _tilo_create_ok(record_kind: str, data: dict, meeting: dict | None) -> bool:
+    """PE-08: Tilo writes for person P only from a source P owns, or after the meeting Owner confirmed."""
+    if record_kind == "calendar_entry":
+        src = data["source"]
+        if meeting is None or src.get("from") not in ("meeting", "transcript"):
+            return True
+        return meeting["owner"] == data["owner"] or meeting.get("minutes_confirmed_by") is not None
+    if record_kind == "work_item" and meeting is not None:
+        return (data["assigned_by"] or {}).get("by") == meeting["owner"]
+    return True
+
+
 def permits(case: dict) -> bool:
-    """True when people.rules.md PE-01 to PE-07 grant the request in `case`."""
+    """True when people.rules.md PE-01 to PE-08, PE-10 and PE-17 to PE-20 grant the request in `case`."""
     request, record = case["request"], case["record"]
     kind = request_kind(request)
     if kind not in REQUEST_KINDS:
@@ -579,19 +702,24 @@ def permits(case: dict) -> bool:
     if record["kind"] == "mention":
         return _mention_permits(case, kind)
     actor, persons, now, data = request["actor"], case["persons"], case["now"], record["data"]
-    actor_person = persons.get(actor)
-    if actor_person is None or actor_person["org_id"] != data["org_id"]:
-        return False  # also PE-17: another org's owner changes nothing here
+    meeting = record.get("meeting")
+    if is_tilo(actor):
+        if kind != "create" or not _tilo_create_ok(record["kind"], data, meeting):
+            return False
+    else:
+        me = persons.get(actor)
+        if me is None or me["org_id"] != data["org_id"]:
+            return False  # also PE-17: another org's owner changes nothing here
     if record["kind"] == "pinboard_item":
-        return _pin_permits(persons, now, actor, kind, data)
+        return _pin_permits(persons, now, actor, kind, data, meeting)
     if record["kind"] == "work_item":
-        return _work_item_permits(actor, kind, data)
+        return _work_item_permits(now, actor, kind, data)
     if record["kind"] == "calendar_entry":
         return _calendar_permits(persons, now, actor, kind, data)
     if record["kind"] == "meeting":
-        return _meeting_permits(actor, kind, data)
+        return _meeting_permits(persons, actor, kind, data)
     if record["kind"] == "person":
-        return _person_permits(persons, actor, kind, data)
+        return _person_permits(persons, now, actor, kind, data)
     return False
 
 
@@ -613,8 +741,12 @@ def case_shape_problems(repo_root: pathlib.Path, registry: Any, case: dict) -> l
         if isinstance(p, dict) and p.get("id") != key:
             found.append(f"persons.{key}: the key must equal the person's id")
     record = case["record"]
-    if not isinstance(record, dict) or set(record) - {"kind", "data", "pin"} or {"kind", "data"} - set(record):
-        return [*found, "record holds kind, data (and pin for a mention)"]
+    if (
+        not isinstance(record, dict)
+        or set(record) - {"kind", "data", "pin", "mentions", "meeting"}
+        or {"kind", "data"} - set(record)
+    ):
+        return [*found, "record holds kind, data (pin and mentions for a mention, meeting for a Tilo-made record)"]
     if record["kind"] not in RECORD_KINDS:
         return [*found, f"record.kind must be one of {sorted(RECORD_KINDS)}"]
     found += [f"record.data: {m}" for m in problems(repo_root, registry, RECORD_KINDS[record["kind"]], record["data"])]
@@ -622,6 +754,12 @@ def case_shape_problems(repo_root: pathlib.Path, registry: Any, case: dict) -> l
         found.append("record.pin is present exactly for a mention")
     if "pin" in record:
         found += [f"record.pin: {m}" for m in problems(repo_root, registry, "pinboard_item", record["pin"])]
+    if "mentions" in record and record["kind"] != "mention":
+        found.append("record.mentions is for a mention only")
+    for other in record.get("mentions", []):
+        found += [f"record.mentions: {m}" for m in problems(repo_root, registry, "mention", other)]
+    if "meeting" in record:
+        found += [f"record.meeting: {m}" for m in problems(repo_root, registry, "meeting", record["meeting"])]
     request = case["request"]
     if not isinstance(request, dict) or set(request) != {"actor", "action", "view"}:
         return [*found, "request holds actor, action and view"]
@@ -632,8 +770,8 @@ def case_shape_problems(repo_root: pathlib.Path, registry: Any, case: dict) -> l
         found.append("request.actor must be a user id or an agent id (Tilo)")
     if request["action"] not in (*REQUEST_KINDS, "read"):
         found.append(f"request.action must be one of {REQUEST_KINDS} (or read with a view)")
-    if request["action"] == "read" and request["view"] not in ("full", "status", "busy"):
-        found.append("a read request names its view: full, status or busy")
+    if request["action"] == "read" and request["view"] not in ("full", "status", "busy", "directory", "membership"):
+        found.append("a read request names its view: full, status, busy, directory or membership")
     return found
 
 
@@ -727,6 +865,22 @@ def _member_changes_the_directory(case: dict) -> bool:
     )
 
 
+def _assignee_reads_proposed_work_item(case: dict) -> bool:
+    d = case["record"]["data"]
+    return (
+        _is(case, "work_item") and d["status"] == "proposed" and _reads(case) and case["request"]["actor"] == d["owner"]
+    )
+
+
+def _capture_with_foreign_attestation(case: dict) -> bool:
+    d = case["record"]["data"]
+    return (
+        _is(case, "meeting")
+        and request_kind(case["request"]) == "start_capture"
+        and d["attestation"]["by"] != d["owner"]
+    )
+
+
 def _assigner_reads_proposed_work_item(case: dict) -> bool:
     d = case["record"]["data"]
     assigner = (d.get("assigned_by") or {}).get("by") if _is(case, "work_item") else None
@@ -780,6 +934,234 @@ def _untag_by_third_party(case: dict) -> bool:
     )
 
 
+def _kind(case: dict) -> str:
+    return request_kind(case["request"])
+
+
+def _actor(case: dict) -> str:
+    return case["request"]["actor"]
+
+
+def _data(case: dict) -> dict:
+    return case["record"]["data"]
+
+
+def _tilo_personal_pin_from_anothers_meeting(case: dict) -> bool:
+    d, m = _data(case), case["record"].get("meeting")
+    return (
+        _is(case, "pinboard_item")
+        and _kind(case) == "create"
+        and is_tilo(_actor(case))
+        and d["scope"]["kind"] == "personal"
+        and m is not None
+        and m["owner"] != d["scope"]["user"]
+    )
+
+
+def _tilo_calendar_proposal_before_confirmation(case: dict) -> bool:
+    d, m = _data(case), case["record"].get("meeting")
+    return (
+        _is(case, "calendar_entry")
+        and _kind(case) == "create"
+        and is_tilo(_actor(case))
+        and m is not None
+        and m["owner"] != d["owner"]
+        and m.get("minutes_confirmed_by") is None
+    )
+
+
+def _assignee_changes_proposed_work_item(case: dict) -> bool:
+    d = _data(case)
+    return (
+        _is(case, "work_item")
+        and d["status"] == "proposed"
+        and _actor(case) == d["owner"]
+        and _kind(case) in ("read_full", "edit")
+    )
+
+
+def _person_assigns_item_to_another(case: dict) -> bool:
+    d = _data(case)
+    return (
+        _is(case, "work_item")
+        and _kind(case) == "create"
+        and d["created_by"]["by"] == "person"
+        and _actor(case) != d["owner"]
+    )
+
+
+def _tilo_confirms_its_own_record(case: dict) -> bool:
+    return _kind(case) == "confirm" and is_tilo(_actor(case)) and _data(case)["created_by"]["by"] == "tilo"
+
+
+def _non_assigner_confirms_work_item(case: dict) -> bool:
+    d = _data(case)
+    return (
+        _is(case, "work_item")
+        and _kind(case) == "confirm"
+        and not is_tilo(_actor(case))
+        and _actor(case) != (d["assigned_by"] or {}).get("by")
+    )
+
+
+def _non_owner_accepts_calendar_entry(case: dict) -> bool:
+    return (
+        _is(case, "calendar_entry")
+        and _kind(case) == "confirm"
+        and not is_tilo(_actor(case))
+        and _actor(case) != _data(case)["owner"]
+    )
+
+
+def _non_teammate_reads_busy(case: dict) -> bool:
+    d = _data(case)
+    return (
+        _is(case, "calendar_entry")
+        and _kind(case) == "read_busy"
+        and not teammates(case["persons"], _actor(case), d["owner"], case["now"])
+    )
+
+
+def _busy_of_an_entry_not_accepted(case: dict) -> bool:
+    d = _data(case)
+    return _is(case, "calendar_entry") and _kind(case) == "read_busy" and d["state"] != "accepted"
+
+
+def _non_member_creates_team_pin(case: dict) -> bool:
+    d = _data(case)
+    return (
+        _is(case, "pinboard_item")
+        and _kind(case) == "create"
+        and d["scope"]["kind"] == "team"
+        and not is_tilo(_actor(case))
+        and not is_member(case["persons"], _actor(case), d["scope"]["team"], case["now"])
+    )
+
+
+def _former_member_edits_team_pin(case: dict) -> bool:
+    d = _data(case)
+    return (
+        _is(case, "pinboard_item")
+        and _kind(case) == "edit"
+        and d["scope"]["kind"] == "team"
+        and _actor(case) == d["set_up_by"]
+        and not is_member(case["persons"], _actor(case), d["scope"]["team"], case["now"])
+    )
+
+
+def _share_to_a_team_the_owner_is_not_in(case: dict) -> bool:
+    d = _data(case)
+    share = d.get("share") if _is(case, "calendar_entry") else None
+    return (
+        share is not None
+        and _kind(case) == "edit"
+        and not is_member(case["persons"], d["owner"], share["team"], case["now"])
+    )
+
+
+def _responsible_person_not_a_member(case: dict) -> bool:
+    d = _data(case)
+    return (
+        _is(case, "pinboard_item")
+        and _kind(case) == "create"
+        and d["scope"]["kind"] == "team"
+        and d["owner"] is not None
+        and not is_member(case["persons"], d["owner"], d["scope"]["team"], case["now"])
+    )
+
+
+def _tag_on_a_pin_not_active(case: dict) -> bool:
+    pin = case["record"].get("pin")
+    return _is(case, "mention") and _kind(case) == "mention" and pin is not None and pin["status"] != "active"
+
+
+def _retag_after_self_removal(case: dict) -> bool:
+    tag = _data(case)
+    return (
+        _is(case, "mention")
+        and _kind(case) == "mention"
+        and any(
+            o["user"] == tag["user"] and o["removed"] and o["removed"]["by"] == tag["user"]
+            for o in case["record"].get("mentions") or []
+        )
+    )
+
+
+def _untag_already_removed(case: dict) -> bool:
+    return _is(case, "mention") and _kind(case) == "untag" and _data(case)["removed"] is not None
+
+
+def _confirmation_names_another_person(case: dict) -> bool:
+    d = _data(case)
+    return (
+        _is(case, "pinboard_item")
+        and _kind(case) in READS
+        and d["created_by"]["by"] == "tilo"
+        and d["status"] == "active"
+        and d["confirmed_by"] is not None
+        and d["confirmed_by"]["by"] != d["set_up_by"]
+    )
+
+
+def _confirmation_in_the_future(case: dict) -> bool:
+    d = _data(case)
+    return (
+        _is(case, "pinboard_item")
+        and _kind(case) in READS
+        and d["created_by"]["by"] == "tilo"
+        and d["confirmed_by"] is not None
+        and d["confirmed_by"]["at"] > case["now"]
+    )
+
+
+def _tilo_pin_set_up_by_not_the_meeting_owner(case: dict) -> bool:
+    d, m = _data(case), case["record"].get("meeting")
+    return (
+        _is(case, "pinboard_item")
+        and d["created_by"]["by"] == "tilo"
+        and m is not None
+        and m["owner"] != d["set_up_by"]
+    )
+
+
+def _person_made_pin_set_up_by_someone_else(case: dict) -> bool:
+    d = _data(case)
+    return _is(case, "pinboard_item") and d["created_by"]["by"] == "person" and d["created_by"]["ref"] != d["set_up_by"]
+
+
+def _person_of_another_org_reads(case: dict) -> bool:
+    p = case["persons"].get(_actor(case))
+    return p is not None and _kind(case) in (*READS, "read_busy") and p["org_id"] != _data(case).get("org_id")
+
+
+def _non_owner_marks_item_done(case: dict) -> bool:
+    d = _data(case)
+    return _is(case, "work_item") and _kind(case) == "mark_done" and _actor(case) != d["owner"]
+
+
+def _owner_marks_proposed_item_done(case: dict) -> bool:
+    d = _data(case)
+    return (
+        _is(case, "work_item") and _kind(case) == "mark_done" and _actor(case) == d["owner"] and d["status"] != "open"
+    )
+
+
+def _teammate_reads_full_person_record(case: dict) -> bool:
+    return _is(case, "person") and _kind(case) == "read_full" and _actor(case) != _data(case)["id"]
+
+
+def _non_teammate_reads_directory(case: dict) -> bool:
+    d = _data(case)
+    p = case["persons"].get(_actor(case))
+    return (
+        _is(case, "person")
+        and _kind(case) == "read_directory"
+        and p is not None
+        and p["org_role"] != "owner"
+        and not teammates(case["persons"], _actor(case), d["id"], case["now"])
+    )
+
+
 REQUIRED_REFUSALS: dict[str, Callable[[dict], bool]] = {
     "a teammate reads a personal pin": _teammate_reads_personal_pin,
     "an org owner reads a personal pin": _owner_reads_personal_pin,
@@ -793,6 +1175,33 @@ REQUIRED_REFUSALS: dict[str, Callable[[dict], bool]] = {
     "a tag on a non-member": _tag_on_non_member,
     "a person other than the tagged or set-up person removes a tag": _untag_by_third_party,
     "a member assigns a membership or sets an org role": _member_changes_the_directory,
+    "an assignee reads a proposed work item": _assignee_reads_proposed_work_item,
+    "capture starts with an attestation by another person": _capture_with_foreign_attestation,
+    "Tilo adds a personal pin from another person's meeting": _tilo_personal_pin_from_anothers_meeting,
+    "Tilo proposes a calendar entry before the meeting Owner confirmed": _tilo_calendar_proposal_before_confirmation,
+    "an assignee reads or edits a proposed work item": _assignee_changes_proposed_work_item,
+    "a person assigns a work item to another person": _person_assigns_item_to_another,
+    "Tilo confirms its own record": _tilo_confirms_its_own_record,
+    "a non-assigner confirms a work item": _non_assigner_confirms_work_item,
+    "a non-owner accepts a proposed calendar entry": _non_owner_accepts_calendar_entry,
+    "a non-teammate reads busy intervals": _non_teammate_reads_busy,
+    "busy intervals of an entry that is not accepted": _busy_of_an_entry_not_accepted,
+    "a non-member creates a team pin": _non_member_creates_team_pin,
+    "a former member edits a team pin": _former_member_edits_team_pin,
+    "a calendar entry is shared with a team the owner is not in": _share_to_a_team_the_owner_is_not_in,
+    "a responsible person who is not a member": _responsible_person_not_a_member,
+    "a tag on a pin that is not active": _tag_on_a_pin_not_active,
+    "a tag after the person removed themselves": _retag_after_self_removal,
+    "an already removed mention is removed again": _untag_already_removed,
+    "a confirmation that names another person": _confirmation_names_another_person,
+    "a confirmation dated after the request": _confirmation_in_the_future,
+    "a Tilo pin whose setter is not the meeting owner": _tilo_pin_set_up_by_not_the_meeting_owner,
+    "a person-made pin set up by someone else": _person_made_pin_set_up_by_someone_else,
+    "a person of another org reads": _person_of_another_org_reads,
+    "a non-owner marks a work item done": _non_owner_marks_item_done,
+    "an owner marks a proposed work item done": _owner_marks_proposed_item_done,
+    "a teammate reads another person's full record": _teammate_reads_full_person_record,
+    "a non-teammate reads the directory view": _non_teammate_reads_directory,
 }
 
 

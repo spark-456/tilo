@@ -16,9 +16,13 @@
     "ref": "A_analyst",
     "at": "2026-10-05T10:30:00.000Z"
   },
-  "assigned_by": null,
+  "assigned_by": {
+    "by": "u_owner",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
   "confirmed_by": null,
   "snoozed_until": null,
+  "flagged": false,
   "history": [
     {
       "at": "2026-10-05T10:30:00.000Z",

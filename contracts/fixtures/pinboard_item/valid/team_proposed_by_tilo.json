@@ -24,6 +24,7 @@
     "evidence": ["u0012"]
   },
   "confirmed_by": null,
+  "flagged": false,
   "history": [
     {
       "at": "2026-10-05T10:30:00.000Z",

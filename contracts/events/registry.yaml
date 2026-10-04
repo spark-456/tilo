@@ -1010,7 +1010,7 @@ types:
     default_severity: info
     side_effect: false
     world_effect: "A small tag flutters onto the pin."
-    hud_effect: "The tagged person's plate gains a row."
+    hud_effect: "The pinboard row shows the tag."
     story_template: "Someone was tagged on a pin."
     trace_row: "mention={data.mention_id} pin={data.pin_id} user={data.user}"
     data_schema: events/data/mention.added.schema.json

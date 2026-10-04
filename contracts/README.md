@@ -30,7 +30,7 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `attention.schema.json` | One measured span of a person's steering or review time, subtracted from time saved | 1.0.0 |
 | `evals.schema.json` | `config/evals.yaml`: eval pass credit caps, deploy-gate repeats, cost-regression threshold, case counts per group | 1.0.0 |
 | `pilot.schema.json` | EV-G3 pilot records by pseudonymous tester id: consent, run and card tags, diary entries, survey responses | 1.0.0 |
-| `person.schema.json` | A person of an org: aliases, time zone, preferred channel, team memberships assigned by an org owner (ADR-0014); rules PE-01 to PE-17 in `people.rules.md` | 1.0.0 |
+| `person.schema.json` | A person of an org: aliases, time zone, preferred channel, team memberships assigned by an org owner (ADR-0014); rules PE-01 to PE-21 in `people.rules.md` | 1.0.0 |
 | `meeting.schema.json` | A meeting Tilo attended or took a transcript of: owner, agenda, attendees as said, attestation, retention; no field for a join link | 1.0.0 |
 | `minutes.schema.json` | The structured minutes of one meeting: summary, decisions, action items, agenda coverage, every item citing utterance ids | 1.0.0 |
 | `work_item.schema.json` | One thing a person has to do; proposed until the meeting Owner confirms an item Tilo made | 1.0.0 |

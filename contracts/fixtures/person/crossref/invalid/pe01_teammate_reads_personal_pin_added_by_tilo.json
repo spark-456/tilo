@@ -99,11 +99,11 @@
   "record": {
     "kind": "pinboard_item",
     "data": {
-      "id": "pb_priya_followup",
+      "id": "pb_owner_followup",
       "org_id": "org_example",
       "scope": {
         "kind": "personal",
-        "user": "u_priya"
+        "user": "u_owner"
       },
       "title": "Follow up on the rate sheet",
       "body": null,
@@ -117,13 +117,14 @@
         "ref": "A_analyst",
         "at": "2026-10-05T10:30:00.000Z"
       },
-      "set_up_by": "u_priya",
+      "set_up_by": "u_owner",
       "source": {
         "kind": "meeting",
         "ref": "mt_q4_plan",
         "evidence": ["u0012"]
       },
       "confirmed_by": null,
+      "flagged": false,
       "history": [
         {
           "at": "2026-10-05T10:30:00.000Z",

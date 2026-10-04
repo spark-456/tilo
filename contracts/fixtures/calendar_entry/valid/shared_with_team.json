@@ -22,5 +22,6 @@
     "at": "2026-10-05T10:30:00.000Z"
   },
   "confirmed_by": null,
+  "flagged": false,
   "updated_at": "2026-10-05T10:30:00.000Z"
 }

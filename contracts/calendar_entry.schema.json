@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/calendar_entry.schema.json",
   "x-version": "1.0.0",
   "title": "CalendarEntry",
-  "description": "One entry on a person's calendar that Tilo stores (FR-CAL-01, -03): a cached Google Calendar event, an entry the person made, or one Tilo proposed. Work-item due dates, pin deadlines and Tilo's meetings are not stored here: the agenda merges them at read time as `agenda_item` rows that cite their record. Private to `owner` unless `share` names a team (PE-04); teammates otherwise get `free_busy` only. What a Google event keeps is title, times, an all-day flag and a count of other attendees: no description, attendee names or addresses, conference link or location (PE-13). `attendee_count` above 0 makes a write to Google T3 (PE-14).",
+  "description": "One entry on a person's calendar that Tilo stores (FR-CAL-01, -03): a cached Google Calendar event, an entry the person made, or one Tilo proposed. Work-item due dates, pin deadlines and Tilo's meetings are not stored here: the agenda merges them at read time as `agenda_item` rows that cite their record. Private to `owner` unless `share` names a team (PE-04), which only an accepted entry may do; teammates otherwise get `free_busy` only. A Tilo-made entry (`created_by.by` tilo, source manual or tilo) is accepted only with `confirmed_by` (PE-07). What a Google event keeps is title, times, an all-day flag and a count of other attendees: no description, attendee names or addresses, conference link or location (PE-13). `attendee_count` above 0 makes a write to Google T3 (PE-14).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -20,6 +20,7 @@
     "share",
     "created_by",
     "confirmed_by",
+    "flagged",
     "updated_at"
   ],
   "properties": {
@@ -102,30 +103,73 @@
         }
       ]
     },
+    "flagged": {
+      "description": "True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).",
+      "type": "boolean"
+    },
     "updated_at": {
       "$ref": "common.schema.json#/$defs/timestamp"
     }
   },
   "if": {
     "properties": {
-      "source": {
-        "properties": {
-          "kind": {
-            "const": "tilo"
-          }
-        },
-        "required": ["kind"]
-      },
       "state": {
         "const": "accepted"
       }
     },
-    "required": ["source", "state"]
+    "required": ["state"]
   },
   "then": {
+    "if": {
+      "anyOf": [
+        {
+          "properties": {
+            "created_by": {
+              "properties": {
+                "by": {
+                  "const": "tilo"
+                }
+              },
+              "required": ["by"]
+            },
+            "source": {
+              "properties": {
+                "kind": {
+                  "enum": ["manual", "tilo"]
+                }
+              },
+              "required": ["kind"]
+            }
+          },
+          "required": ["created_by", "source"]
+        },
+        {
+          "properties": {
+            "source": {
+              "properties": {
+                "kind": {
+                  "const": "tilo"
+                }
+              },
+              "required": ["kind"]
+            }
+          },
+          "required": ["source"]
+        }
+      ]
+    },
+    "then": {
+      "properties": {
+        "confirmed_by": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "else": {
     "properties": {
-      "confirmed_by": {
-        "type": "object"
+      "share": {
+        "type": "null"
       }
     }
   },

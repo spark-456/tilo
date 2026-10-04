@@ -3,8 +3,8 @@
   "id": "01JB5VQ0000000000000000301",
   "seq": 301,
   "ts": "2026-10-05T09:05:01.000Z",
-  "world_id": "w_desk_priya",
-  "run_id": "r_desk_priya_1",
+  "world_id": "w_meeting_q4_plan",
+  "run_id": "r_meeting_q4_plan_1",
   "type": "meeting.minuted",
   "actor": "A_analyst",
   "target": "u_owner",
@@ -35,6 +35,6 @@
     "tokens_out": 1400,
     "tool": null,
     "latency_ms": 5200,
-    "archive_ref": "r_desk_priya_1/21"
+    "archive_ref": "r_meeting_q4_plan_1/21"
   }
 }

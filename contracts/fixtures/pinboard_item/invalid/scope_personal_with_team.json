@@ -9,7 +9,7 @@
   "body": null,
   "kind": "decision",
   "url": null,
-  "owner": "u_priya",
+  "owner": null,
   "due": "2026-10-17",
   "status": "active",
   "created_by": {
@@ -20,6 +20,7 @@
   "set_up_by": "u_priya",
   "source": null,
   "confirmed_by": null,
+  "flagged": false,
   "history": [
     {
       "at": "2026-10-05T10:30:00.000Z",

@@ -42,6 +42,10 @@
     "version": 1
   },
   "minutes": null,
+  "minutes_confirmed_by": {
+    "by": "u_owner",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
   "delete_transcript_after": "2026-11-05T10:00:00.000Z",
   "delete_minutes_after": "2027-01-04T10:00:00.000Z",
   "created_at": "2026-10-05T09:00:00.000Z"

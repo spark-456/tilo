@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/work_item.schema.json",
   "x-version": "1.0.0",
   "title": "WorkItem",
-  "description": "One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed` and leaves that state only with `confirmed_by`, the meeting Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).",
+  "description": "One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,6 +19,7 @@
     "assigned_by",
     "confirmed_by",
     "snoozed_until",
+    "flagged",
     "history",
     "created_at",
     "updated_at"
@@ -107,6 +108,10 @@
           "type": "null"
         }
       ]
+    },
+    "flagged": {
+      "description": "True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).",
+      "type": "boolean"
     },
     "history": {
       "type": "array",

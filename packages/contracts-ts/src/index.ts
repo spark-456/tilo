@@ -5,7 +5,7 @@
  * agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
  * attention.schema.json 1.0.0 sha256:f35cff84728304af
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
- * calendar_entry.schema.json 1.0.0 sha256:a4661ac939b2c18c
+ * calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
  * common.schema.json 1.1.0 sha256:f1559856c133da51
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
@@ -71,7 +71,7 @@
  * events/data/meeting.called.schema.json 1.0.0 sha256:af1b23d42d145e42
  * events/data/meeting.decision.schema.json 1.0.0 sha256:359fc3bc20f11676
  * events/data/meeting.ended.schema.json 1.1.0 sha256:9219b0e4934a318e
- * events/data/meeting.minuted.schema.json 1.0.0 sha256:ae6c7e7ab2bd83ae
+ * events/data/meeting.minuted.schema.json 1.0.0 sha256:f2a9c646721e5b64
  * events/data/meeting.started.schema.json 1.1.0 sha256:3ee754f6effc0b32
  * events/data/memory.hit.schema.json 1.0.0 sha256:ae1d0919f97240c5
  * events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
@@ -99,7 +99,7 @@
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
- * meeting.schema.json 1.0.0 sha256:c667823d720c3bcf
+ * meeting.schema.json 1.0.0 sha256:7af456df7fedb0bb
  * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -107,15 +107,15 @@
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * person.schema.json 1.0.0 sha256:f64181514f60c867
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
- * pinboard_item.schema.json 1.0.0 sha256:ba43210aa3a3c9fe
+ * pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
  * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
- * work_item.schema.json 1.0.0 sha256:6e8f9f08a9983066
- * events/registry.yaml 1.1.0 sha256:440ab1a107c5f4b1
+ * work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
+ * events/registry.yaml 1.1.0 sha256:2db78f63298c923a
  */
 
 /**
@@ -896,7 +896,7 @@ export interface BriefCitation {
   recorded_at: Timestamp;
 }
 /**
- * One entry on a person's calendar that Tilo stores (FR-CAL-01, -03): a cached Google Calendar event, an entry the person made, or one Tilo proposed. Work-item due dates, pin deadlines and Tilo's meetings are not stored here: the agenda merges them at read time as `agenda_item` rows that cite their record. Private to `owner` unless `share` names a team (PE-04); teammates otherwise get `free_busy` only. What a Google event keeps is title, times, an all-day flag and a count of other attendees: no description, attendee names or addresses, conference link or location (PE-13). `attendee_count` above 0 makes a write to Google T3 (PE-14).
+ * One entry on a person's calendar that Tilo stores (FR-CAL-01, -03): a cached Google Calendar event, an entry the person made, or one Tilo proposed. Work-item due dates, pin deadlines and Tilo's meetings are not stored here: the agenda merges them at read time as `agenda_item` rows that cite their record. Private to `owner` unless `share` names a team (PE-04), which only an accepted entry may do; teammates otherwise get `free_busy` only. A Tilo-made entry (`created_by.by` tilo, source manual or tilo) is accepted only with `confirmed_by` (PE-07). What a Google event keeps is title, times, an all-day flag and a count of other attendees: no description, attendee names or addresses, conference link or location (PE-13). `attendee_count` above 0 makes a write to Google T3 (PE-14).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "CalendarEntry".
@@ -915,6 +915,10 @@ export interface CalendarEntry {
   share: CalendarEntryShare | null;
   created_by: Maker;
   confirmed_by: TeamLeadAssignment | null;
+  /**
+   * True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+   */
+  flagged: boolean;
   updated_at: Timestamp;
 }
 /**
@@ -2279,11 +2283,19 @@ export interface MeetingEndedData {
  */
 export interface MeetingMinutedData {
   meeting_id: MeetingId;
-  minutes: ArtifactRef;
+  minutes: ArtifactRef1;
   decisions: number;
   action_items: number;
   unverified: number;
   flagged: boolean;
+}
+/**
+ * A pinned version of a stored artifact.
+ */
+export interface ArtifactRef1 {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
 }
 /**
  * data of meeting.started (PRD 9.5). 1.1.0: the optional meeting_id names the Meeting record of an external meeting a bot or an upload brought in (FR-MTG-01); absent for a meeting the agents called. Optional means absent, never null.
@@ -3003,6 +3015,7 @@ export interface Meeting {
   source: "bot" | "upload";
   status: "scheduled" | "joining" | "live" | "ended" | "minuted" | "discarded" | "deleted";
   ended_reason: ("completed" | "left_on_request" | "removed" | "timeout" | "failed") | null;
+  minutes_confirmed_by: TeamLeadAssignment | null;
   transcript: ArtifactRef | null;
   minutes: ArtifactRef | null;
   delete_transcript_after: Timestamp | null;
@@ -3036,7 +3049,7 @@ export interface MeetingAttendee {
   user: UserId | null;
 }
 /**
- * The Owner's attestation of the right to record or process this meeting (FR-MTG-01); by equals owner (validator).
+ * The Owner's attestation of the right to record or process this meeting (FR-MTG-01); by equals owner and is a person of the org (PE-18).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeetingAttestation".
@@ -3416,6 +3429,10 @@ export interface PinboardItem {
   set_up_by: UserId;
   source: PinboardItemSource | null;
   confirmed_by: TeamLeadAssignment | null;
+  /**
+   * True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+   */
+  flagged: boolean;
   /**
    * @minItems 1
    */
@@ -3886,7 +3903,7 @@ export interface TeamLead {
   assigned_by: TeamLeadAssignment;
 }
 /**
- * One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed` and leaves that state only with `confirmed_by`, the meeting Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).
+ * One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "WorkItem".
@@ -3904,6 +3921,10 @@ export interface WorkItem {
   assigned_by: TeamLeadAssignment | null;
   confirmed_by: TeamLeadAssignment | null;
   snoozed_until: Timestamp | null;
+  /**
+   * True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+   */
+  flagged: boolean;
   /**
    * @minItems 1
    */
@@ -5218,7 +5239,7 @@ export const EVENT_REGISTRY: EventRegistry & {
       "default_severity": "info",
       "side_effect": false,
       "world_effect": "A small tag flutters onto the pin.",
-      "hud_effect": "The tagged person's plate gains a row.",
+      "hud_effect": "The pinboard row shows the tag.",
       "story_template": "Someone was tagged on a pin.",
       "trace_row": "mention={data.mention_id} pin={data.pin_id} user={data.user}",
       "data_schema": "events/data/mention.added.schema.json",

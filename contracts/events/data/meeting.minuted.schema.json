@@ -12,7 +12,10 @@
       "$ref": "../../common.schema.json#/$defs/meeting_id"
     },
     "minutes": {
-      "$ref": "../../common.schema.json#/$defs/artifact_ref"
+      "$ref": "../../common.schema.json#/$defs/artifact_ref",
+      "not": {
+        "required": ["label"]
+      }
     },
     "decisions": {
       "type": "integer",

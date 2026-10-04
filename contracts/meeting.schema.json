@@ -19,6 +19,7 @@
     "source",
     "status",
     "ended_reason",
+    "minutes_confirmed_by",
     "transcript",
     "minutes",
     "delete_transcript_after",
@@ -41,7 +42,17 @@
       "maxLength": 120,
       "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
       "not": {
-        "pattern": "[\\n\\r]"
+        "anyOf": [
+          {
+            "pattern": "[\\n\\r]"
+          },
+          {
+            "pattern": "://"
+          },
+          {
+            "pattern": "meet\\.google\\.com|zoom\\.us|teams\\.microsoft\\.com"
+          }
+        ]
       }
     },
     "series": {
@@ -95,6 +106,16 @@
         {
           "type": "string",
           "enum": ["completed", "left_on_request", "removed", "timeout", "failed"]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "minutes_confirmed_by": {
+      "anyOf": [
+        {
+          "$ref": "team_lead.schema.json#/$defs/assignment"
         },
         {
           "type": "null"
@@ -212,7 +233,17 @@
           "maxLength": 120,
           "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
           "not": {
-            "pattern": "[\\n\\r]"
+            "anyOf": [
+              {
+                "pattern": "[\\n\\r]"
+              },
+              {
+                "pattern": "://"
+              },
+              {
+                "pattern": "meet\\.google\\.com|zoom\\.us|teams\\.microsoft\\.com"
+              }
+            ]
           }
         },
         "minutes": {
@@ -245,7 +276,17 @@
           "maxLength": 80,
           "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
           "not": {
-            "pattern": "[\\n\\r]"
+            "anyOf": [
+              {
+                "pattern": "[\\n\\r]"
+              },
+              {
+                "pattern": "://"
+              },
+              {
+                "pattern": "meet\\.google\\.com|zoom\\.us|teams\\.microsoft\\.com"
+              }
+            ]
           }
         },
         "user": {
@@ -261,7 +302,7 @@
       }
     },
     "attestation": {
-      "description": "The Owner's attestation of the right to record or process this meeting (FR-MTG-01); by equals owner (validator).",
+      "description": "The Owner's attestation of the right to record or process this meeting (FR-MTG-01); by equals owner and is a person of the org (PE-18).",
       "type": "object",
       "additionalProperties": false,
       "required": ["by", "at", "notice_version"],
