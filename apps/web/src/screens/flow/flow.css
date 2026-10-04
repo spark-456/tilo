@@ -16,7 +16,7 @@
 .flow-wide .flow-heading {
   flex: none;
   margin-bottom: 8px;
-  font: 900 1.5em / 1.25 var(--font-display);
+  font: 900 var(--text-24) / 1.25 var(--font-display);
 }
 .flow-wide > div {
   display: flex;
@@ -47,7 +47,7 @@
   flex: 1 1 160px;
   margin: 0;
   color: var(--color-ink-2);
-  font: 600 0.875em / 1.4 var(--font-ui);
+  font: 600 var(--text-14) / 1.4 var(--font-ui);
 }
 .flow-actions .primary {
   min-width: 200px;
@@ -67,7 +67,7 @@
   min-width: 0;
   min-height: 32px;
   padding: 0 12px;
-  font-size: 0.75em;
+  font-size: var(--text-12);
 }
 .flow-wide textarea:focus-visible,
 .flow-wide input:focus-visible,
@@ -119,7 +119,7 @@
   border: 0;
   background: transparent;
   color: var(--color-ink-1);
-  font: 600 1em / 1.4 var(--font-ui);
+  font: 600 var(--text-16) / 1.4 var(--font-ui);
   resize: none;
 }
 .task-box:focus-within {
@@ -138,7 +138,7 @@
   margin: 0;
   text-align: right;
   color: var(--color-ink-2);
-  font: 400 0.75em / 1.5 var(--font-ui);
+  font: 400 var(--text-12) / 1.5 var(--font-ui);
 }
 .task-chips {
   min-width: 0;
@@ -156,7 +156,7 @@
   border-radius: var(--radius-pill);
   background: var(--color-surface-1);
   color: var(--color-ink-1);
-  font: 700 0.875em / 1.3 var(--font-ui);
+  font: 700 var(--text-14) / 1.3 var(--font-ui);
   text-align: left;
   cursor: pointer;
 }
@@ -180,12 +180,12 @@
 }
 .file-drop p {
   margin: 0;
-  font: 700 0.875em / 1.4 var(--font-ui);
+  font: 700 var(--text-14) / 1.4 var(--font-ui);
 }
 .file-drop .hint,
 .file-meta {
   color: var(--color-ink-2);
-  font: 400 0.75em / 1.4 var(--font-ui);
+  font: 400 var(--text-12) / 1.4 var(--font-ui);
 }
 .file-list {
   margin: 8px 0 0;
@@ -205,7 +205,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font: 700 0.875em var(--font-ui);
+  font: 700 var(--text-14) var(--font-ui);
 }
 .file-meta {
   flex: none;
@@ -215,7 +215,7 @@
   display: grid;
   min-height: 2.8em;
   margin-top: 8px;
-  font: 600 0.875em / 1.4 var(--font-ui);
+  font: 600 var(--text-14) / 1.4 var(--font-ui);
 }
 .flow-msg > * {
   grid-area: 1 / 1;

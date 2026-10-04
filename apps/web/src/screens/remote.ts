@@ -24,10 +24,13 @@ export function describeError(doing: string, error: unknown): string {
   return `Could not ${doing}: ${reason}. Nothing was changed. You can try again.`;
 }
 
-/** Runs `load` on mount and on every retry. */
+/** Runs `load` on mount and on every retry. While `enabled` is false nothing is requested and the
+ * state stays "loading" (a call that can only fail until something is on record, such as the
+ * delivery of a run that has not completed, is not made at all: the browser logs each refusal). */
 export function useRemote<T>(
   doing: string,
   load: () => Promise<T>,
+  enabled = true,
 ): readonly [Remote<T>, () => void] {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<Remote<T>>({ status: "loading" });
@@ -37,6 +40,7 @@ export function useRemote<T>(
   useEffect(() => {
     let live = true;
     setState({ status: "loading" });
+    if (!enabled) return;
     Promise.resolve()
       .then(() => loadRef.current())
       .then(
@@ -46,7 +50,7 @@ export function useRemote<T>(
     return () => {
       live = false;
     };
-  }, [attempt, doing]);
+  }, [attempt, doing, enabled]);
   return [state, useCallback(() => setAttempt((n) => n + 1), [])];
 }
 

@@ -19,7 +19,9 @@ const LEAD_IN_MS = 1000; // hold at seq 0 after load before the first event (see
 export interface RunWorldOptions {
   readonly world: Container;
   readonly requestRender: () => void;
+  readonly size: () => { width: number; height: number };
   readonly layout: Layout;
+  /** The recorded events to play. A live run passes none and gives `live` instead. */
   readonly events: readonly Event[];
   readonly seqParam: number | null;
   readonly speed: number;
@@ -29,15 +31,19 @@ export interface RunWorldOptions {
   readonly onTrace: (trace: ReadonlyArray<{ seq: number; type: string }>) => void;
   /** The reducer's run status after each applied event (FR-WLD-07: the veil follows "paused"). */
   readonly onStatus?: (status: Frame["status"]) => void;
+  /** FR-WLD-05 live run: events are applied as they arrive (not on the recorded `ts` gaps, and
+   * with no lead-in), each through the same reducer and choreographer. `feed` gets the apply
+   * function and returns what stops it; a repeat or an older seq is ignored as always. */
+  readonly live?: (apply: (event: Event) => void) => () => void;
 }
 
 type Vec = { x: number; y: number };
 
 export function runWorld(opts: RunWorldOptions): () => void {
-  const { world, requestRender, layout, events, seqParam, speed, reducedMotion, onSeq, onTrace } =
-    opts;
+  const { world, requestRender, layout, seqParam, speed, reducedMotion, onSeq, onTrace } = opts;
+  const events: Event[] = [...opts.events]; // a live run appends to it as events arrive
   const onStatus = opts.onStatus ?? (() => undefined);
-  const layer = createLayer(world);
+  const layer = createLayer(world, opts.size);
   // FR-WLD-06: the ring follows the run's one selection; choosing redraws one frame, nothing more.
   const selected = () => getSelection(layout.world_id);
   const agentIds = layout.semantic.agents.map((a) => a.id);
@@ -217,7 +223,15 @@ export function runWorld(opts: RunWorldOptions): () => void {
   const startPlayback = () => {
     if (!stopped) timer = setTimeout(() => scheduleNext(0), LEAD_IN_MS);
   };
-  if (document.readyState === "complete") startPlayback();
+  // A live run has nothing recorded to play: each event is applied the moment it is received.
+  let stopLive: (() => void) | undefined;
+  if (opts.live) {
+    stopLive = opts.live((event) => {
+      if (stopped || scrubbed || event.seq <= (events[events.length - 1]?.seq ?? 0)) return;
+      events.push(event);
+      applyOne(event, performance.now());
+    });
+  } else if (document.readyState === "complete") startPlayback();
   else window.addEventListener("load", startPlayback, { once: true });
 
   const unselect = subscribeSelection(() => {
@@ -231,10 +245,10 @@ export function runWorld(opts: RunWorldOptions): () => void {
   // FR-WLD-08: a finished run (every event applied) can be scrubbed; the scrubber is disabled
   // until then, so a live run is never jumped around. From the first scrub the world shows
   // stateAt(point) at once and nothing is left to play or walk (also when it ended paused).
-  const lastSeq = events[events.length - 1]?.seq ?? 0;
+  const lastSeq = () => events[events.length - 1]?.seq ?? 0;
   const unreplay = subscribeReplay(() => {
     const point = getReplayPoint(layout.world_id);
-    if (stopped || point === null || state.seq < lastSeq) return;
+    if (stopped || point === null || state.seq < lastSeq()) return;
     if (timer) clearTimeout(timer);
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
@@ -246,6 +260,7 @@ export function runWorld(opts: RunWorldOptions): () => void {
     unselect();
     unreplay();
     scrubbed?.off();
+    stopLive?.();
     window.removeEventListener("load", startPlayback);
     if (timer) clearTimeout(timer);
     if (raf) cancelAnimationFrame(raf);

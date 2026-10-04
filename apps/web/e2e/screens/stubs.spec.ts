@@ -7,7 +7,6 @@ import { DESKTOP, MOBILE } from "../support/viewports";
 
 const STUBS: ReadonlyArray<readonly [string, string, string]> = [
   ["S_08", "/needs-you/consent", "Connection consent sheet"],
-  ["S_09", "/meeting", "Meeting"],
 ];
 
 for (const [id, path, name] of STUBS) {

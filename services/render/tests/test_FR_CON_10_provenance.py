@@ -67,14 +67,14 @@ def _assert_manifest_in_text(manifest: Manifest, text: str) -> None:
 def test_FR_CON_10_pptx_appendix_lists_every_source_skill_agent_and_approval() -> None:
     spec = _spec()
     for manifest in _valid_manifests():
-        prs = pptx.Presentation(io.BytesIO(render_pptx(spec, manifest)))
+        prs = pptx.Presentation(io.BytesIO(render_pptx(spec, manifest=manifest)))
         _assert_manifest_in_text(manifest, _pptx_slide_text(prs.slides[-1]))
 
 
 def test_FR_CON_10_pdf_appendix_lists_every_source_skill_agent_and_approval() -> None:
     spec = _spec()
     for manifest in _valid_manifests():
-        reader = PdfReader(io.BytesIO(render_pdf(spec, manifest)))
+        reader = PdfReader(io.BytesIO(render_pdf(spec, manifest=manifest)))
         _assert_manifest_in_text(manifest, reader.pages[-1].extract_text())
 
 
@@ -83,13 +83,13 @@ def test_FR_CON_10_no_manifest_adds_no_appendix() -> None:
     manifest = _valid_manifests()[0]
 
     prs_without = pptx.Presentation(io.BytesIO(render_pptx(spec)))
-    prs_none = pptx.Presentation(io.BytesIO(render_pptx(spec, None)))
-    prs_with = pptx.Presentation(io.BytesIO(render_pptx(spec, manifest)))
+    prs_none = pptx.Presentation(io.BytesIO(render_pptx(spec, manifest=None)))
+    prs_with = pptx.Presentation(io.BytesIO(render_pptx(spec, manifest=manifest)))
     assert len(prs_without.slides) == len(prs_none.slides) == len(prs_with.slides) - 1
     assert all("Sources and provenance" not in _pptx_slide_text(s) for s in prs_without.slides)
 
     pdf_without = _pdf_text(render_pdf(spec))
-    pdf_none = _pdf_text(render_pdf(spec, None))
+    pdf_none = _pdf_text(render_pdf(spec, manifest=None))
     assert "Sources and provenance" not in pdf_without
     assert "Sources and provenance" not in pdf_none
 
@@ -120,7 +120,7 @@ def test_FR_CON_10_source_refs_are_text_not_links() -> None:
         }
     )
 
-    prs = pptx.Presentation(io.BytesIO(render_pptx(spec, untrusted)))
+    prs = pptx.Presentation(io.BytesIO(render_pptx(spec, manifest=untrusted)))
     last_text = _pptx_slide_text(prs.slides[-1])
     assert "https://example.com/quarterly-report" in last_text
     assert '<a href="https://evil.invalid">click</a>' in last_text
@@ -135,7 +135,7 @@ def test_FR_CON_10_source_refs_are_text_not_links() -> None:
                     for run in para.runs:
                         assert run.hyperlink.address is None
 
-    raw_pdf = render_pdf(spec, untrusted)
+    raw_pdf = render_pdf(spec, manifest=untrusted)
     reader = PdfReader(io.BytesIO(raw_pdf))
     pdf_text = "\n".join(p.extract_text() for p in reader.pages)
     assert "https://example.com/quarterly-report" in pdf_text

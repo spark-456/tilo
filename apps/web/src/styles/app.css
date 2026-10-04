@@ -6,11 +6,32 @@ body {
   color: var(--color-ink-1);
   font-family: var(--font-ui);
 }
-/* PRD 9.6/18.2: stage mode is a display setting; type and targets scale by --ui-scale. */
+/* The browser gives controls their own 13.33 px; they take the size of what holds them. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+/* PRD 9.6/18.2: stage mode is a display setting; type and targets scale by --ui-scale.
+   Type: every size is one of the PRD 18.2 steps. tokens.css holds the steps in rem
+   (--font-size-N); --text-N is the same step times --ui-scale, declared here because --ui-scale
+   lives on this element. No em sizing, so a size never compounds inside a smaller parent.
+   Roles: page title 40 (32 on a phone); section title 24 (20); card title and the figure in a
+   rail card 20; item name 16; body, buttons and notes 14; labels, chips, state words, Trace 12.
+   Spacing: --space-4/8/12/16/24/32 (tokens.css) for every gap, margin and padding. */
 .app-shell {
+  --text-12: calc(var(--font-size-12) * var(--ui-scale, 1));
+  --text-14: calc(var(--font-size-14) * var(--ui-scale, 1));
+  --text-16: calc(var(--font-size-16) * var(--ui-scale, 1));
+  --text-20: calc(var(--font-size-20) * var(--ui-scale, 1));
+  --text-24: calc(var(--font-size-24) * var(--ui-scale, 1));
+  --text-32: calc(var(--font-size-32) * var(--ui-scale, 1));
+  --text-40: calc(var(--font-size-40) * var(--ui-scale, 1));
   display: flex;
   height: 100vh;
-  font-size: calc(16px * var(--ui-scale, 1));
+  font-size: var(--text-16);
 }
 .app-shell[data-stage-mode="on"] {
   --ui-scale: var(--font-stage-mode-scale);
@@ -29,7 +50,7 @@ body {
 }
 .left-rail {
   flex: 0 0 72px;
-  padding-top: 16px;
+  padding-top: var(--space-16);
 }
 .stage-frame {
   position: relative;
@@ -51,21 +72,21 @@ body {
   outline-offset: -3px;
 }
 .stage-fallback {
-  padding: 40vh 24px 0;
+  padding: 40vh var(--space-24) 0;
   text-align: center;
 }
 .right-rail {
-  flex: 0 0 320px; /* + 2 x 20px padding = 360px (PRD 18.3) */
-  padding: 52px 20px 20px; /* the top clears the fixed fixture banner */
-  font-size: calc(14px * var(--ui-scale, 1));
+  flex: 0 0 328px; /* + 2 x 16px padding = 360px (PRD 18.3) */
+  padding: 52px var(--space-16) var(--space-16); /* the top clears the fixed fixture banner */
+  font-size: var(--text-14);
   background: var(--color-surface-1);
 }
 .right-rail p {
   color: var(--color-ink-2);
 }
 .right-rail h2 {
-  margin: 16px 0 4px;
-  font-size: 1em;
+  margin: var(--space-16) 0 var(--space-4);
+  font-size: var(--text-14);
 }
 /* P0-08b-player fixture mode (HR-4/BQ-07, HR-6): fixed so no layout (mobile bottom tabs, stage
    mode's --ui-scale) can ever cover it or push it off-screen. */
@@ -74,11 +95,11 @@ body {
   top: 12px;
   right: 12px;
   z-index: 1000;
-  padding: 6px 14px;
+  padding: var(--space-8) var(--space-16);
   border-radius: var(--radius-pill);
   background: var(--color-ink-1);
   color: var(--color-surface-1);
-  font: 700 0.75em var(--font-ui);
+  font: 700 var(--text-12) var(--font-ui);
 }
 /* Fixed like the banner above it, so it never shifts the layout (P0-08b). Neutral tokens only. */
 .fixture-load-alert {
@@ -87,6 +108,21 @@ body {
   right: 12px;
   z-index: 1000;
   max-width: min(360px, calc(100vw - 24px));
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 600 var(--text-14) var(--font-ui);
+}
+/* FR-WLD-05: what the stage cannot show yet (the live world is not built, or has no map). Fixed over
+   the stage's own corner, clear of the right rail, so it never shifts the layout. Neutral tokens. */
+.live-world-note {
+  position: fixed;
+  left: calc(72px + 16px);
+  bottom: 16px;
+  z-index: 900;
+  max-width: min(420px, calc(100vw - 32px));
   padding: 10px 14px;
   border: 1px solid var(--color-ink-2);
   border-radius: var(--radius-controls);
@@ -94,17 +130,30 @@ body {
   color: var(--color-ink-1);
   font: 600 0.875em var(--font-ui);
 }
+.live-world-note p {
+  margin: 0;
+}
+.live-world-note button {
+  margin-top: 8px;
+}
+@media (max-width: 767px) {
+  .live-world-note {
+    left: 16px;
+    bottom: auto;
+    top: 56px;
+  }
+}
 .speed-badge {
   position: fixed;
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  padding: 4px 10px;
+  padding: var(--space-4) var(--space-12);
   border-radius: var(--radius-pill);
   background: var(--color-brand-primary);
   color: var(--color-surface-1);
-  font: 700 0.8125em var(--font-ui); /* words in the UI face: the mono zero reads as an 8 */
+  font: 700 var(--text-12) var(--font-ui); /* words in the UI face: the mono zero reads as an 8 */
   white-space: nowrap;
 }
 /* Below 768 px the badge sits under the fixture banner at the right (one column, so the two never
@@ -130,9 +179,9 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 240px;
+  height: 240px; /* reserved: rows arriving never move the Trace heading (CLS) */
   overflow-y: auto;
-  font: 400 0.75em var(--font-mono);
+  font: 400 var(--text-12) var(--font-mono);
   color: var(--color-ink-2);
 }
 .trace-list li {
@@ -153,7 +202,7 @@ body {
   border-radius: var(--radius-controls);
   background: var(--color-surface-0);
   color: var(--color-brand-primary);
-  font: 700 0.875em var(--font-ui);
+  font: 700 var(--text-14) var(--font-ui);
 }
 .nav-btn:focus-visible,
 .primary:focus-visible,
@@ -168,7 +217,7 @@ body {
   z-index: 500;
   box-sizing: border-box;
   width: 280px;
-  padding: 16px;
+  padding: var(--space-16);
   border-radius: var(--radius-cards);
   background: var(--color-surface-1);
   color: var(--color-ink-1);
@@ -181,23 +230,23 @@ body {
   }
 }
 .flow-heading {
-  margin: 0 0 6px;
-  font: 700 1.125em / 1.25 var(--font-ui);
+  margin: 0 0 var(--space-8);
+  font: 700 var(--text-20) / 1.25 var(--font-ui);
 }
 .flow-summary {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-12);
   color: var(--color-ink-2);
-  font: 400 0.875em / 1.4 var(--font-ui);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
 }
 .primary {
   min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
   min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
-  padding: 0 16px;
+  padding: 0 var(--space-16);
   border: none;
   border-radius: var(--radius-controls);
   background: var(--color-brand-primary);
   color: var(--color-surface-1);
-  font: 700 0.875em / 1 var(--font-ui);
+  font: 700 var(--text-14) / 1 var(--font-ui);
   cursor: pointer;
 }
 .primary[aria-busy="true"] {
@@ -211,12 +260,12 @@ body {
 .secondary {
   min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
   min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
-  padding: 0 16px;
+  padding: 0 var(--space-16);
   border: 2px solid var(--color-ink-1);
   border-radius: var(--radius-controls);
   background: transparent;
   color: var(--color-ink-1);
-  font: 700 0.875em / 1 var(--font-ui);
+  font: 700 var(--text-14) / 1 var(--font-ui);
   cursor: pointer;
 }
 /* One box for loading, error, empty and ready, so a slow client never shifts the layout (CLS). */
@@ -225,23 +274,23 @@ body {
 }
 .flow-loading {
   display: block;
-  margin: 0 0 12px;
-  font: 400 0.875em / 1.4 var(--font-ui);
+  margin: 0 0 var(--space-12);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
 }
 .flow-detail {
-  margin: 0 0 12px;
-  font: 400 0.875em / 1.4 var(--font-ui);
+  margin: 0 0 var(--space-12);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
 }
 .flow-heading:focus-visible {
   outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
 .flow-notice {
-  margin: 0 0 12px;
-  font: 600 0.875em / 1.4 var(--font-ui);
+  margin: 0 0 var(--space-12);
+  font: 600 var(--text-14) / 1.4 var(--font-ui);
 }
 .flow-notice p {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-8);
 }
 /* AGW-08 primary navigation: real links in the 72 px rail and the mobile bottom tabs. */
 .left-rail {
@@ -249,8 +298,8 @@ body {
   flex-direction: column;
   justify-content: flex-start;
   align-items: stretch;
-  gap: 4px;
-  padding: 16px 4px 0;
+  gap: var(--space-4);
+  padding: var(--space-16) var(--space-4) 0;
 }
 .bottom-tabs {
   align-items: stretch;
@@ -266,7 +315,7 @@ a.nav-btn {
   padding: 0 2px;
   text-align: center;
   text-decoration: none;
-  font-size: 0.75em;
+  font-size: var(--text-12);
 }
 a.nav-btn[aria-current="page"] {
   background: var(--color-surface-2);
@@ -287,7 +336,8 @@ a.secondary {
   overflow-y: auto;
   scrollbar-gutter: stable; /* a growing list never changes the width (CLS) */
   box-sizing: border-box;
-  padding: 24px;
+  /* One page-shell offset: every screen's first line sits --space-32 below the top edge. */
+  padding: var(--space-32) var(--space-24) var(--space-24);
 }
 @media (max-width: 767px) {
   .screen-page {
@@ -297,9 +347,10 @@ a.secondary {
 .screen-body {
   max-width: 720px;
 }
+/* The page title: one role on every screen, 40 px (32 on a phone). */
 .screen-body h1 {
-  margin: 0 0 8px;
-  font: 900 1.5em / 1.25 var(--font-display);
+  margin: 0 0 var(--space-8);
+  font: 900 var(--text-40) / 1.1 var(--font-display);
 }
 .screen-body h1:focus-visible {
   width: fit-content;
@@ -309,7 +360,7 @@ a.secondary {
 .screen-tag {
   color: var(--color-ink-2);
   font-weight: 700;
-  font-size: 0.875em;
+  font-size: var(--text-14);
 }
 .screen-list {
   padding: 0;
@@ -323,16 +374,16 @@ a.secondary {
 .screen-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875em;
+  font-size: var(--text-14);
 }
 .screen-table caption {
   text-align: left;
   color: var(--color-ink-2);
-  padding-bottom: 8px;
+  padding-bottom: var(--space-8);
 }
 .screen-table th,
 .screen-table td {
-  padding: 8px;
+  padding: var(--space-8);
   text-align: left;
   border-bottom: 1px solid var(--color-surface-2);
 }
@@ -348,8 +399,8 @@ a.secondary {
 }
 .lens-tabs {
   display: flex;
-  gap: 4px;
-  margin-bottom: 12px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-12);
 }
 .lens-space {
   height: 108px; /* the lens tabs and the selection bar (56 + 52 px), kept where the page shows its own */
@@ -360,11 +411,14 @@ a.secondary {
 .selection-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-12);
   box-sizing: border-box;
   height: 44px;
-  margin-bottom: 8px;
-  font-size: 0.875em;
+  margin-bottom: var(--space-8);
+  font-size: var(--text-14);
+}
+.selection-bar small {
+  font-size: var(--text-12); /* the browser's own small is 0.83em: 11.67 px */
 }
 .selection-text {
   flex: 1;
@@ -385,7 +439,7 @@ button.pick {
   box-sizing: border-box;
   min-width: 24px;
   min-height: 24px;
-  padding: 0 10px;
+  padding: 0 var(--space-12);
   border: 2px solid transparent;
   border-radius: var(--radius-pill);
 }
@@ -398,7 +452,7 @@ button.pick {
   cursor: pointer;
 }
 .story-list button.pick {
-  font-size: 0.875em;
+  font-size: var(--text-14);
 }
 button.pick:hover,
 button.row:hover {
@@ -441,12 +495,12 @@ button.row {
   align-items: center;
   box-sizing: border-box;
   min-height: 44px;
-  padding: 0 16px;
+  padding: 0 var(--space-16);
   border-radius: var(--radius-pill);
   background: var(--color-surface-2);
   color: var(--color-ink-1);
   font-weight: 700;
-  font-size: 0.875em;
+  font-size: var(--text-14);
   text-decoration: none;
 }
 .lens-tab[aria-current="page"] {
@@ -455,26 +509,26 @@ button.row {
 }
 .chip {
   display: inline-block;
-  padding: 2px 10px;
+  padding: var(--space-4) var(--space-12);
   border-radius: var(--radius-pill);
   background: var(--color-surface-2);
   color: var(--color-ink-1);
   font-weight: 800;
-  font-size: 0.75em;
+  font-size: var(--text-12);
 }
 .chip-needs {
   background: var(--color-signal-needs);
 }
 .story-list {
   max-width: 720px;
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-16);
   padding: 0;
   list-style: none;
 }
 .story-list li {
   display: flex;
-  gap: 12px;
-  padding: 8px 0 8px 12px;
+  gap: var(--space-12);
+  padding: var(--space-8) 0 var(--space-8) var(--space-12);
   border-left: 4px solid var(--color-surface-2);
   border-bottom: 1px solid var(--color-surface-2);
 }
@@ -490,17 +544,17 @@ button.row {
 .story-time {
   flex: 0 0 3em;
   color: var(--color-ink-2);
-  font: 500 0.875em var(--font-mono);
+  font: 500 var(--text-14) var(--font-mono);
 }
 /* Trace: two-line rows, so the record and the credits never leave the screen. */
 .trace-rows {
   margin: 0;
   padding: 0;
   list-style: none;
-  font: 500 0.75em / 1.5 var(--font-mono);
+  font: 500 var(--text-12) / 1.5 var(--font-mono);
 }
 .trace-rows li {
-  padding: 8px 0;
+  padding: var(--space-8) 0;
   border-bottom: 1px solid var(--color-surface-2);
 }
 .trace-top,
@@ -508,7 +562,7 @@ button.row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 12px;
+  gap: var(--space-4) var(--space-12);
 }
 .trace-seq,
 .trace-time,
@@ -524,7 +578,7 @@ button.row {
 .trace-record {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 .secondary.placeholder {
   min-height: 44px;
@@ -535,13 +589,13 @@ button.row {
 }
 .secondary.placeholder.compact {
   min-height: 32px;
-  padding: 0 10px;
+  padding: 0 var(--space-12);
   border-width: 1px;
-  font-size: 0.875em;
+  font-size: var(--text-14);
 }
 .soon {
   font-weight: 400;
-  font-size: 0.85em;
+  font-size: var(--text-12);
 }
 .delivery-done {
   font-weight: 700;
@@ -550,8 +604,8 @@ button.row {
 .stat-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px;
-  margin: 0 0 16px;
+  gap: var(--space-8);
+  margin: 0 0 var(--space-16);
   padding: 0;
   list-style: none;
 }
@@ -561,24 +615,24 @@ button.row {
 .stat-tiles li {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 12px;
+  gap: var(--space-4);
+  padding: var(--space-12);
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-cards);
 }
 .stat-tiles.three b {
-  font: 900 1.25em / 1.15 var(--font-display);
+  font: 900 var(--text-20) / 1.15 var(--font-display);
 }
 .stat-name {
   font-weight: 700;
-  font-size: 0.75em;
+  font-size: var(--text-12);
   color: var(--color-ink-2);
 }
 .action-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--space-8);
+  margin-bottom: var(--space-8);
 }
 .back-link {
   display: inline-flex;
@@ -593,13 +647,13 @@ button.row {
 @media (max-width: 767px) {
   .action-row.compact {
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 4px;
+    gap: var(--space-4);
   }
   .action-row.compact .secondary {
     min-width: 0;
     min-height: 44px; /* the mobile target size */
-    padding: 4px;
-    font-size: 0.75em;
+    padding: var(--space-4);
+    font-size: var(--text-12);
     line-height: 1.15;
   }
   /* Two-up, with the time-saved tile (the longest figure and its estimate link) across both
@@ -634,19 +688,34 @@ button.row {
     min-height: 15.25em; /* the two-up tiles and the 44 px estimate link: 244 px of finished content */
   }
 }
+/* The Trace is pinned to the bottom of the rail and the panels scroll above it: the team and the
+   levels arrive after the first paint, and in a plain column they pushed the Trace down (CLS). */
 .right-rail {
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
 }
+.right-rail > * {
+  flex: none;
+}
+.right-rail > .world-panels {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* room inside the scroller for the 3 px focus rings of the rows and links */
+  margin: 0 calc(var(--space-8) * -1);
+  padding: var(--space-4) var(--space-8);
+}
 .world-panels h2 {
-  margin: 16px 0 4px;
-  font-size: 1em;
+  margin: var(--space-16) 0 var(--space-4);
+  font-size: var(--text-14);
 }
 .world-panels a {
   color: var(--color-brand-primary);
 }
 .hud-card {
-  min-height: 7.6em;
-  padding: 12px;
+  min-height: 8.4em; /* the finished card in stage mode needs 8.2em of content */
+  padding: var(--space-12);
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-cards);
 }
@@ -656,22 +725,22 @@ button.row {
 .hud-figures {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin: 8px 0;
+  gap: var(--space-12);
+  margin: var(--space-8) 0;
 }
 .hud-figures b {
   display: block;
-  font: 900 1.5em / 1.1 var(--font-display);
+  font: 900 var(--text-20) / 1.1 var(--font-display);
   color: var(--color-ink-1);
 }
 .hud-figures span {
   color: var(--color-ink-2);
-  font-size: 0.75em;
+  font-size: var(--text-12);
 }
 .hud-count {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 .hud-count h2 {
   margin-right: auto;
@@ -682,16 +751,16 @@ button.row {
   list-style: none;
 }
 .rows li {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-4);
 }
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
   box-sizing: border-box;
   min-height: 40px;
-  padding: 4px 10px;
+  padding: var(--space-4) var(--space-12);
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-controls);
   color: var(--color-ink-1);
@@ -711,13 +780,13 @@ button.row {
 .row-name small {
   color: var(--color-ink-2);
   font-weight: 400;
-  font-size: 0.75em;
+  font-size: var(--text-12);
 }
 .row-state {
   flex: 0 0 7.5em; /* a fixed box, left-aligned: a new state word never moves its left edge (CLS) */
   color: var(--color-ink-2);
   font-weight: 700;
-  font-size: 0.75em;
+  font-size: var(--text-12);
 }
 @media (max-width: 767px) {
   .row {
@@ -733,7 +802,7 @@ button.row {
   box-sizing: border-box;
   max-height: 55vh;
   overflow-y: auto;
-  padding: 0 16px;
+  padding: 0 var(--space-16);
   background: var(--color-surface-1);
   border-top: 2px solid var(--color-surface-2);
 }
@@ -747,30 +816,26 @@ button.row {
    Neutral role tokens only. Every text size is on the PRD 18.2 scale (12/14/16/20/24/32/40 px,
    as em of the 16 px shell size). A reserved body has a fixed height inline, so recorded events
    arriving inside it never move what is around it (CLS). */
-.page {
-  padding-top: 24px; /* clears the fixed fixture banner at the top right */
-}
 .page-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--space-16);
+  margin-bottom: var(--space-24);
 }
 .page-head h1 {
   margin: 0;
-  font: 900 2.5em / 1.1 var(--font-display); /* 40: the display step */
 }
 .page-sub {
-  margin: 8px 0 0;
+  margin: var(--space-8) 0 0;
   max-width: 52ch;
   color: var(--color-ink-2);
-  font-size: 1em;
+  font-size: var(--text-16);
   line-height: 1.5;
 }
 .card {
-  margin: 0 0 16px;
-  padding: 20px 24px;
+  margin: 0 0 var(--space-16);
+  padding: var(--space-24);
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-cards);
   background: var(--color-surface-1);
@@ -780,18 +845,18 @@ button.row {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 12px;
-  margin-bottom: 4px;
+  gap: var(--space-8) var(--space-12);
+  margin-bottom: var(--space-4);
 }
 .screen-section h2 {
   margin: 0;
-  font: 900 1.5em / 1.25 var(--font-display); /* 24: one step below the title */
+  font: 900 var(--text-24) / 1.25 var(--font-display); /* 24: one step below the title */
 }
 .section-note,
 .empty-note {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-12);
   color: var(--color-ink-2);
-  font-size: 0.875em;
+  font-size: var(--text-14);
   line-height: 1.5;
 }
 .section-box.reserved {
@@ -817,8 +882,8 @@ button.row {
 .bitem {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
+  gap: var(--space-12);
+  padding: var(--space-12) 0;
   border-bottom: 1px solid var(--color-surface-2);
 }
 .bitem:last-child {
@@ -829,15 +894,15 @@ button.row {
   flex: 1;
   flex-direction: column;
   min-width: 0;
-  gap: 2px;
+  gap: var(--space-4);
   line-height: 1.4;
 }
 .bitem-main b {
-  font-size: 1em; /* 16: below the section title, above the muted line */
+  font-size: var(--text-16); /* below the section title, above the muted line */
 }
 .bitem-sub {
   color: var(--color-ink-2);
-  font-size: 0.875em;
+  font-size: var(--text-14);
 }
 .bitem .soon-row {
   margin: 0;
@@ -848,12 +913,12 @@ button.row {
   flex: none;
   box-sizing: border-box;
   min-height: 24px;
-  padding: 0 10px;
+  padding: 0 var(--space-12);
   border: 2px solid var(--color-ink-3);
   border-radius: var(--radius-pill);
   background: var(--color-surface-1);
   color: var(--color-ink-1);
-  font: 700 0.75em / 1 var(--font-ui);
+  font: 700 var(--text-12) / 1 var(--font-ui);
   white-space: nowrap;
 }
 .btag[data-tone="done"] {
@@ -882,34 +947,34 @@ button.row {
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); /* three figures fit one phone row */
 }
 .hero-stats b {
-  font: 900 2em / 1.2 var(--font-display); /* 32 */
+  font: 900 var(--text-32) / 1.2 var(--font-display); /* 32 */
 }
 @media (max-width: 767px) {
   .hero-stats b {
-    font-size: 1.5em; /* 24: the 32 px title stays the largest */
+    font-size: var(--text-24); /* 24: the 32 px title stays the largest */
   }
 }
 .hero-stats .stat-name {
-  font-size: 0.875em;
+  font-size: var(--text-14);
 }
 .soon-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 .filter-bar {
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-16);
 }
 .page .secondary.placeholder.compact {
   min-height: 36px;
-  padding: 0 12px;
-  font-size: 0.875em;
+  padding: 0 var(--space-12);
+  font-size: var(--text-14);
 }
 .world-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+  gap: var(--space-16);
 }
 .world-grid .flow-slot {
   min-height: 0;
@@ -930,7 +995,7 @@ button.row {
   justify-content: center;
   box-sizing: border-box;
   height: 9em;
-  padding-bottom: 8px;
+  padding-bottom: var(--space-8);
   background: var(--color-fog);
 }
 .world-thumb svg {
@@ -945,20 +1010,20 @@ button.row {
 }
 .world-thumb .btag:last-child {
   right: 12px;
-  min-width: 6.5em; /* "Recorded", "Replaying" and "Finished" take the same room */
+  min-width: 7.5em; /* "Recorded", "Replaying" and "Finished" take the same room */
   justify-content: center;
 }
 .world-body {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px;
+  gap: var(--space-8);
+  padding: var(--space-16);
 }
 .world-card h2 {
   margin: 0;
   min-height: 2.6em; /* two lines: the title arriving with the first event moves nothing */
-  font: 900 1.25em / 1.3 var(--font-display); /* 20 */
+  font: 900 var(--text-20) / 1.3 var(--font-display); /* 20 */
 }
 .world-card [data-testid="replay-note"] {
   min-height: 4.2em; /* three lines of 14 px text at 1.5 */
@@ -978,9 +1043,9 @@ button.row {
 .world-card .card-foot {
   display: grid;
   grid-template-columns: 1fr 7em; /* the date column has a fixed width: a changing text never moves it */
-  gap: 8px;
+  gap: var(--space-8);
   margin: 0;
-  font-size: 0.875em;
+  font-size: var(--text-14);
   font-weight: 700;
 }
 .world-card .soon-row {
@@ -990,10 +1055,10 @@ button.row {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: 12px 0;
+  gap: var(--space-4);
+  margin: var(--space-12) 0;
   font-weight: 700;
-  font-size: 0.875em;
+  font-size: var(--text-14);
 }
 .field textarea,
 .field input {
@@ -1001,12 +1066,12 @@ button.row {
   width: 100%;
   max-width: 480px;
   min-height: 44px;
-  padding: 8px 12px;
+  padding: var(--space-8) var(--space-12);
   border: 2px dashed var(--color-ink-3);
   border-radius: var(--radius-controls);
   background: var(--color-surface-0);
   color: var(--color-ink-1);
-  font: 400 1em / 1.4 var(--font-ui);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
   cursor: not-allowed;
 }
 .screen-body a.pill {
@@ -1014,23 +1079,23 @@ button.row {
   align-items: center;
   box-sizing: border-box;
   min-height: 36px;
-  padding: 0 14px;
+  padding: 0 var(--space-16);
   border: 2px solid var(--color-ink-1);
   border-radius: var(--radius-controls);
   color: var(--color-ink-1);
-  font: 700 0.875em / 1 var(--font-ui);
+  font: 700 var(--text-14) / 1 var(--font-ui);
   text-decoration: none;
 }
 @media (max-width: 767px) {
-  .page-head h1 {
-    font-size: 2em; /* 32 */
+  .screen-body h1 {
+    font-size: var(--text-32); /* the page title on a phone */
   }
   .screen-section h2 {
-    font-size: 1.25em; /* 20 */
+    font-size: var(--text-20); /* 20 */
   }
   .page-head {
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-12);
   }
   .bitem {
     flex-wrap: wrap;
@@ -1039,7 +1104,7 @@ button.row {
     flex-basis: 100%; /* the name gets the whole line; its state and control sit below it */
   }
   .card {
-    padding: 16px;
+    padding: var(--space-16);
   }
   .screen-body a.pill,
   .page .secondary.placeholder.compact,
@@ -1052,6 +1117,7 @@ button.row {
   height: 9em; /* fits one row and a half: the list scrolls, nothing below it moves */
   overflow-y: auto;
 }
+.trace-list:focus-visible,
 .rail-needs:focus-visible {
   outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
@@ -1065,10 +1131,10 @@ button.row {
 .gate-sheet {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-12);
   box-sizing: border-box;
   max-width: 560px;
-  padding: 20px;
+  padding: var(--space-24);
   border: 2px solid var(--color-surface-2);
   border-bottom-width: 4px;
   border-radius: var(--radius-cards);
@@ -1081,16 +1147,16 @@ button.row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
+  gap: var(--space-8) var(--space-12);
 }
 .need-where {
   color: var(--color-ink-2);
-  font-size: calc(14px * var(--ui-scale, 1));
+  font-size: var(--text-14);
   font-weight: 700;
 }
 .need-what {
   margin: 0;
-  font: 900 calc(20px * var(--ui-scale, 1)) / 1.25 var(--font-display);
+  font: 900 var(--text-20) / 1.25 var(--font-display);
 }
 .need-why {
   margin: 0;
@@ -1100,15 +1166,15 @@ button.row {
 .need-options {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-8);
 }
 .need-option {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--space-12);
   box-sizing: border-box;
   min-height: 44px;
-  padding: 10px 12px;
+  padding: var(--space-12) var(--space-12);
   border: 2px solid var(--color-surface-2);
   border-bottom-width: 4px;
   border-radius: var(--radius-controls);
@@ -1128,11 +1194,11 @@ button.row {
 .need-option-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-4);
   line-height: 1.35;
 }
 .need-option-text .btag {
-  margin-left: 8px;
+  margin-left: var(--space-8);
 }
 .btag[data-tone="suggested"] {
   border-color: var(--color-brand-primary);
@@ -1156,8 +1222,8 @@ button.row {
   bottom: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px 0 4px;
+  gap: var(--space-4);
+  padding: var(--space-8) 0 var(--space-4);
   border-top: 2px solid var(--color-surface-2);
   background: var(--color-surface-1);
 }
@@ -1165,12 +1231,12 @@ button.row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-12);
 }
 .need-status {
   min-height: 1.5em; /* "Waiting for confirmation…" arrives into reserved room */
   color: var(--color-ink-2);
-  font-size: calc(14px * var(--ui-scale, 1));
+  font-size: var(--text-14);
 }
 .need-error {
   margin: 0;
@@ -1178,17 +1244,17 @@ button.row {
 }
 .gate-facts {
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
   margin: 0;
 }
 .gate-facts div {
   display: grid;
   grid-template-columns: 9em 1fr;
-  gap: 8px;
+  gap: var(--space-8);
 }
 .gate-facts dt {
   color: var(--color-ink-2);
-  font-size: calc(14px * var(--ui-scale, 1));
+  font-size: var(--text-14);
   font-weight: 700;
 }
 .gate-facts dd {
@@ -1199,7 +1265,7 @@ button.row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
+  gap: var(--space-8) var(--space-12);
   margin: 0;
   font-weight: 700;
 }
@@ -1209,13 +1275,13 @@ button.row {
 .policy-stamp {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-8);
   box-sizing: border-box;
   min-height: 28px;
-  padding: 0 12px 0 6px;
+  padding: 0 var(--space-12) 0 var(--space-8);
   border: 2px solid var(--color-policy);
   border-radius: var(--radius-pill);
-  font: 800 calc(14px * var(--ui-scale, 1)) / 1 var(--font-ui);
+  font: 800 var(--text-14) / 1 var(--font-ui);
 }
 .gate-sheet a.pill {
   align-self: flex-start;
@@ -1235,7 +1301,7 @@ button.row {
 @media (max-width: 767px) {
   .need-card,
   .gate-sheet {
-    padding: 16px;
+    padding: var(--space-16);
   }
   .gate-facts div {
     grid-template-columns: 1fr;
@@ -1249,7 +1315,7 @@ button.row {
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
-  gap: 16px;
+  gap: var(--space-16);
   align-items: start;
 }
 .gate-slot {
@@ -1264,15 +1330,16 @@ button.row {
 .flow-shell[data-screen="Approaches"] {
   width: min(520px, calc(100vw - 464px));
 }
-/* The slot reserves the ready height (cards, cap box, rule line, cost line), measured: 588 px at
-   1440, 754 px at 768 (the stage rail leaves 304 px), 625 px at 390, 698 px at 360, 754 px at 320. */
+/* The slot reserves the ready height (cards, cap box, rule line, cost line), measured (before the
+   spacing scale added about 20 px): 588 px at 1440, 754 px at 768 (the stage rail leaves 304 px),
+   625 px at 390, 698 px at 360, 754 px at 320. */
 .flow-shell[data-screen="Approaches"] .flow-slot {
   display: flow-root;
-  min-height: 37em;
+  min-height: 38.5em;
 }
 @media (max-width: 1023px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 48em;
+    min-height: 49.5em;
   }
 }
 @media (max-width: 767px) {
@@ -1280,22 +1347,22 @@ button.row {
     width: calc(100vw - 32px);
   }
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 40em;
+    min-height: 41.5em;
   }
 }
 @media (max-width: 389px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 44em;
+    min-height: 45.5em;
   }
 }
 @media (max-width: 359px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 48em;
+    min-height: 49.5em;
   }
 }
 .approach-card {
-  margin: 0 0 6px;
-  padding: 8px 10px;
+  margin: 0 0 var(--space-8);
+  padding: var(--space-8);
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-controls);
   background: var(--color-surface-1);
@@ -1308,40 +1375,40 @@ button.row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin: 0 0 4px;
-  font: 700 0.875em var(--font-ui);
+  gap: var(--space-8);
+  margin: 0 0 var(--space-4);
+  font: 700 var(--text-14) var(--font-ui);
 }
 .approach-summary,
 .approach-meta {
-  margin: 0 0 2px;
+  margin: 0 0 var(--space-4);
   color: var(--color-ink-2);
-  font: 400 0.875em / 1.3 var(--font-ui); /* 14 px: the minimum type size */
+  font: 400 var(--text-14) / 1.3 var(--font-ui);
 }
 .approach-head {
-  font-size: 1em; /* the 14 px below must not compound with the shared 0.875em of this row */
+  font-size: var(--text-16); /* the name; its button and tag below are 14 */
 }
 .approach-head .secondary,
 .approach-head .btag {
-  font-size: 0.875rem; /* exactly 14 px: the minimum type size; .btag alone is 12 px */
+  font-size: var(--text-14); /* .btag alone is 12 */
 }
 .budget-cap-hint {
   display: block;
   min-height: 2.8em; /* two lines, reserved: the rule appears without moving what is below */
   margin: 0;
-  font: 700 0.875em / 1.4 var(--font-ui);
+  font: 700 var(--text-14) / 1.4 var(--font-ui);
 }
 .s03-approaches .flow-detail {
   min-height: 4.2em; /* three lines: the valid line and the neutral one take the same room */
 }
 .budget-cap-field input {
   width: 6em;
-  padding: 4px 8px;
+  padding: var(--space-4) var(--space-8);
   border: 1px solid var(--color-ink-2);
   border-radius: var(--radius-controls);
   background: var(--color-surface-1);
   color: var(--color-ink-1);
-  font: 700 1em var(--font-ui);
+  font: 700 var(--text-14) var(--font-ui);
 }
 /* AGW-03 S-02 Understanding: brief chips, files, applied preferences and clarifying questions. */
 .flow-shell[data-screen="Understanding"] {
@@ -1359,59 +1426,79 @@ button.row {
 .question-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 6px 0 10px;
+  gap: var(--space-8);
+  margin: var(--space-8) 0 var(--space-12);
 }
 .brief-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font: 700 0.875em var(--font-ui);
+  gap: var(--space-8);
+  font: 700 var(--text-14) var(--font-ui);
 }
 .brief-chip input,
 .brief-chip select,
 .question-input {
   box-sizing: border-box;
-  padding: 4px 6px;
+  padding: var(--space-4) var(--space-8);
   border: 1px solid var(--color-ink-2);
   border-radius: var(--radius-controls);
   background: var(--color-surface-1);
   color: var(--color-ink-1);
-  font: 400 1em / 1.4 var(--font-ui);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
 }
 .brief-chip [aria-invalid="true"] {
   border-color: var(--color-signal-blocked);
 }
 .question-item {
-  margin: 0 0 10px;
-  padding: 8px;
+  margin: 0 0 var(--space-12);
+  padding: var(--space-8);
   border: 1px solid var(--color-surface-2);
   border-radius: var(--radius-controls);
-  font-size: 0.875em;
+  font-size: var(--text-14);
 }
 .assumed-note {
-  margin: 6px 0 0;
+  margin: var(--space-8) 0 0;
   color: var(--color-ink-2);
   font-weight: 700;
 }
 /* FR-WLD-08 Replay region (HR-4): one reserved box, so a run finishing, or a scrub, moves nothing
-   (CLS). Right rail on desktop; in the column above the tabs on mobile. Neutral tokens, no motion. */
+   (CLS). Right rail on desktop; in the column above the tabs on mobile. Neutral tokens, no motion.
+   The banner and the position line reserve the lines they wrap to (--bl, --pl: measured at 1440,
+   390 and 320 px, normal and stage mode); the box is 72 px of padding, borders, margins and the
+   44 px row, plus those lines at 1.4 times their (scaled) size, and the mobile sheet clears it. */
+.app-shell {
+  --bl: 2;
+  --pl: 2;
+  --dock-h: calc(72px + (19.6px * var(--bl) + 16.8px * var(--pl)) * var(--ui-scale, 1));
+}
+.app-shell[data-stage-mode="on"] {
+  --bl: 3;
+}
+@media (max-width: 767px) {
+  .app-shell {
+    --bl: 3;
+  }
+  .app-shell[data-stage-mode="on"] {
+    --bl: 4;
+    --pl: 3;
+  }
+}
 .replay-dock {
   box-sizing: border-box;
-  min-height: 136px;
-  margin: 0 0 12px;
-  padding: 8px 12px;
+  min-height: var(--dock-h);
+  margin: 0 0 var(--space-12);
+  padding: var(--space-8) var(--space-12);
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-cards);
   background: var(--color-surface-1);
   color: var(--color-ink-1);
 }
 .replay-dock p {
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-4);
 }
 .replay-banner {
-  min-height: 2.8em; /* two lines of 14 px */
-  font-size: 0.875em;
+  min-height: calc(var(--bl) * 1.4em); /* the lines it wraps to */
+  font-size: var(--text-14);
   font-weight: 700;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -1419,7 +1506,7 @@ button.row {
 .replay-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
 }
 .replay-row input[type="range"] {
   flex: 1;
@@ -1436,7 +1523,7 @@ button.row {
   border-radius: var(--radius-controls);
   background: transparent;
   color: var(--color-ink-1);
-  font: 700 1.25em / 1 var(--font-ui);
+  font: 700 var(--text-20) / 1 var(--font-ui);
   cursor: pointer;
 }
 .replay-step:disabled {
@@ -1450,19 +1537,19 @@ button.row {
   outline-offset: 2px;
 }
 .replay-pos {
-  min-height: 2.4em; /* two lines of 12 px */
+  min-height: calc(var(--pl) * 1.4em); /* the lines it wraps to */
   color: var(--color-ink-2);
-  font-size: 0.75em;
+  font-size: var(--text-12);
   line-height: 1.4;
 }
 @media (max-width: 767px) {
   .replay-dock {
     flex: none;
-    margin: 4px 12px;
+    margin: var(--space-4) var(--space-12);
   }
   /* The collapsed World status sheet sits above the tabs: it clears the replay region too. */
   .app-shell[data-replay-dock="on"] .hud-sheet {
-    bottom: calc(var(--button-height-desktop) + 144px);
+    bottom: calc(var(--button-height-desktop) + var(--dock-h) + 8px);
   }
 }
 /* FR-WLD-07: Pause all and the Paused banner share one fixed box, so no state moves what is around
@@ -1470,15 +1557,15 @@ button.row {
 .pause-slot {
   box-sizing: border-box;
   height: 7em; /* a 48 px button row and a two-line note at 14 px */
-  margin: 8px 0;
+  margin: var(--space-8) 0;
   overflow: hidden;
 }
 .pause-row {
   display: flex;
-  gap: 8px;
+  gap: var(--space-8);
 }
 .pause-btn {
-  font-size: 1em; /* 14 px in the rail, 16 px in the mobile sheet: on the type scale */
+  font-size: var(--text-14);
 }
 .pause-btn[aria-disabled="true"] {
   border-style: dashed;
@@ -1487,8 +1574,8 @@ button.row {
   cursor: not-allowed;
 }
 .pause-note {
-  margin: 4px 0 0;
-  font-size: 1em;
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-14);
   line-height: 1.4;
   color: var(--color-ink-1);
 }
@@ -1507,9 +1594,9 @@ button.row {
   background: color-mix(in srgb, var(--color-ink-2) 45%, transparent);
 }
 .veil-label {
-  padding: 6px 16px;
+  padding: var(--space-8) var(--space-16);
   border-radius: var(--radius-pill);
   background: var(--color-surface-1);
   color: var(--color-ink-1);
-  font: 700 1em / 1.25 var(--font-ui);
+  font: 700 var(--text-16) / 1.25 var(--font-ui);
 }

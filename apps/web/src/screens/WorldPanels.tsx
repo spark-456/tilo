@@ -16,6 +16,7 @@ import {
   worldStatus,
 } from "../world/runSummary";
 import { useSelection } from "../world/selection";
+import { withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
 import { LensTabs } from "./LensTabs";
 import { WorldPauseSlot } from "./PauseSlot";
@@ -49,12 +50,18 @@ export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: 
   const { events } = useReplayedLog(client, worldId);
   const [selected, , toggle] = useSelection(worldId);
   const [layoutRemote] = useRemote("load the world", () => client.getLayout(worldId));
-  const [deliveryRemote] = useRemote("load the delivery", () => client.getDelivery(worldId));
+  const status = worldStatus(events);
+  // The delivery exists only once world.completed is recorded: asking before that is a refusal
+  // the browser logs as an error, so the run's own events say when to ask.
+  const [deliveryRemote] = useRemote(
+    "load the delivery",
+    () => client.getDelivery(worldId),
+    status === "completed",
+  );
   const layout: Layout | null = layoutRemote.status === "ready" ? layoutRemote.value : null;
   const state = layout ? reduce(layout, events) : null;
   const names = layout ? agentNames(layout) : null;
   const acted = new Set(events.map((e) => e.actor));
-  const status = worldStatus(events);
   const cap = budgetCap(events);
   const waiting = waitingForYou(events);
   const saved =
@@ -88,7 +95,7 @@ export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: 
       <WorldPauseSlot worldId={worldId} />
       <div className="hud-count">
         <h2>Needs you</h2>
-        {waiting > 0 && <AppLink to="/needs-you">Open the queue</AppLink>}
+        {waiting > 0 && <AppLink to={withWorld("/needs-you", worldId)}>Open the queue</AppLink>}
         <span className={waiting > 0 ? "chip chip-needs" : "chip"} data-testid="needs-count">
           {waiting}
         </span>

@@ -36,9 +36,14 @@ const KEYS: Record<string, (c: cam.CameraState) => cam.CameraState> = {
 /**
  * World content seam: called once the renderer is ready with the Pixi world container (the
  * camera's transform; the iso grid is its first child) and `requestRender`, which draws one
- * frame on demand (there is no always-on ticker, HR-2). May return a cleanup function.
+ * frame on demand (there is no always-on ticker, HR-2), and `size`, the stage's current pixel size
+ * (the world frames itself in it once). May return a cleanup function.
  */
-export type WorldSeam = (world: Container, requestRender: () => void) => (() => void) | undefined;
+export type WorldSeam = (
+  world: Container,
+  requestRender: () => void,
+  size: () => { width: number; height: number },
+) => (() => void) | undefined;
 
 /** PRD 18.3 S-04 stage. The camera is the Pixi world container's transform (PRD 9.7); a frame
  * is drawn only on input, an eased keyboard move, resize or visibility change. Readiness: the
@@ -201,7 +206,10 @@ export function Stage({
       ready = true;
       target.prepend(app.canvas);
       app.stage.addChild(world);
-      unplug = seamRef.current?.(world, requestRender);
+      unplug = seamRef.current?.(world, requestRender, () => ({
+        width: target.clientWidth,
+        height: target.clientHeight,
+      }));
       fit(); // the first frame, at once: input that arrived during init is already in `cur`
       const box = "devicePixelContentBoxSize" in ResizeObserverEntry.prototype;
       observer.observe(target, box ? { box: "device-pixel-content-box" } : {});

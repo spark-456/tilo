@@ -44,6 +44,27 @@ export function useRunLog(client: TiloClient, worldId: string): readonly Event[]
   );
 }
 
+/** Hands `onEvent` every event of the world already received, then each one as it arrives, in seq
+ * order, once each (the stage's live feed shares the page's one subscription). Returns a stop. */
+export function followRun(
+  client: TiloClient,
+  worldId: string,
+  onEvent: (event: Event) => void,
+): () => void {
+  const run = runFor(client, worldId);
+  let last = 0;
+  const flush = () => {
+    for (const event of run.events) {
+      if (event.seq <= last) continue;
+      last = event.seq;
+      onEvent(event);
+    }
+  };
+  run.listeners.add(flush);
+  flush();
+  return () => run.listeners.delete(flush);
+}
+
 /** The run's recorded status (FR-WLD-07: the stage veil follows it); "idle" with no world. Only
  * re-renders when the status word changes, not on every event. */
 export function useRunStatus(client: TiloClient, worldId: string | null): RunStatus {
