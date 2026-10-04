@@ -34,6 +34,10 @@ describe("FR-HIL-07 S-15: the page says only what the stop's answer says (HR-1)"
     expect(describeStop(result({ stopped: 2, pending: 4 }))).toContain(
       "4 changes are still being recorded.",
     );
+    // With nothing stopped here, the pending changes are other changes, not ours to count.
+    expect(describeStop(result({ pending: 2 }))).toBe(
+      "No rule was running on its own, so nothing needed stopping. Other changes are still being recorded.",
+    );
   });
 
   it("only a body of the documented shape is a result", () => {

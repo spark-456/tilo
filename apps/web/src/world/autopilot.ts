@@ -29,8 +29,11 @@ export function describeStop(r: StopResult): string {
     if (r.already_l1 > 0) parts.push(`${rules(r.already_l1)} already waited for you.`);
   }
   if (r.pending > 0) {
+    // With nothing stopped here, the pending changes are not ours to count: say they are others.
     parts.push(
-      `${r.pending} ${r.pending === 1 ? "change is" : "changes are"} still being recorded.`,
+      r.stopped === 0
+        ? "Other changes are still being recorded."
+        : `${r.pending} ${r.pending === 1 ? "change is" : "changes are"} still being recorded.`,
     );
   }
   return parts.join(" ");

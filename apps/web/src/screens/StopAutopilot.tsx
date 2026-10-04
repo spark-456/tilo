@@ -4,7 +4,7 @@
 // it. The page then says what the API answered and nothing before it (HR-1); a client that cannot
 // send it shows the control disabled with the reason, never a live-looking no-op.
 import { useEffect, useRef } from "react";
-import { useClient } from "../api/ClientProvider";
+import { useClient, useIsFixtureClient, useWorldKnown } from "../api/ClientProvider";
 import { canStopAutopilot, describeStop, useStopAutopilot } from "../world/autopilot";
 import { Placeholder } from "./Placeholder";
 import { nameOf } from "./kit";
@@ -12,7 +12,10 @@ import { nameOf } from "./kit";
 export function StopAutopilot({ worldId }: { worldId: string }) {
   const client = useClient();
   const stop = useStopAutopilot(client, worldId);
+  const fixture = useIsFixtureClient();
+  const known = useWorldKnown(worldId);
   const heading = useRef<HTMLHeadingElement>(null);
+  const status = useRef<HTMLParagraphElement>(null);
   const ask = useRef<HTMLButtonElement>(null);
   const asked = useRef(false);
   // Focus follows the step: to the question's heading when it opens (no button is pre-focused) and
@@ -21,14 +24,23 @@ export function StopAutopilot({ worldId }: { worldId: string }) {
     if (stop.view === "confirming") {
       asked.current = true;
       heading.current?.focus();
+    } else if (asked.current && stop.view === "done") {
+      asked.current = false;
+      status.current?.focus(); // the question is gone: focus goes to the answer, not to the page body
     } else if (asked.current && (stop.view === "ready" || stop.view === "error")) {
       asked.current = false;
       ask.current?.focus();
     }
   }, [stop.view]);
 
-  if (!canStopAutopilot(client)) {
-    return <Placeholder label="Stop all autopilot" compact danger />;
+  // Disabled for any reason, it looks disabled (muted outline, "Coming soon") and says why.
+  if (!canStopAutopilot(client) || !known) {
+    return (
+      <div className="stop-autopilot" data-testid="stop-autopilot" data-stop="unavailable">
+        <Placeholder label="Stop all autopilot" danger />
+        {!known && <p className="stop-note">There is no world to stop autopilot in yet.</p>}
+      </div>
+    );
   }
   const confirming = stop.view === "confirming" || stop.view === "sending";
   return (
@@ -80,12 +92,14 @@ export function StopAutopilot({ worldId }: { worldId: string }) {
         </button>
       )}
       {/* biome-ignore lint/a11y/useSemanticElements: a live status region, not a form result. */}
-      <p className="stop-note" role="status" data-testid="stop-result">
+      <p className="stop-note" role="status" data-testid="stop-result" tabIndex={-1} ref={status}>
         {stop.view === "done" && stop.result && (
           <>
             {describeStop(stop.result)}
             {stop.result.confirmations.length > 0 &&
               ` Confirmations go to: ${stop.result.confirmations.map((c) => nameOf(c.channel)).join(", ")}.`}
+            {fixture &&
+              " This recorded replay holds no live rule: the authorised actions on this page come from the recording."}
           </>
         )}
         {stop.view === "error" && stop.error}

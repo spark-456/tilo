@@ -49,6 +49,10 @@ for (const [name, viewport] of [
       "No rule was running on its own, so nothing needed stopping.",
     );
     await expect(page.getByTestId("stop-result")).not.toContainText("Stopped");
+    await expect(page.getByTestId("stop-result")).toContainText(
+      "This recorded replay holds no live rule",
+    );
+    await expect(page.getByTestId("stop-result")).toBeFocused(); // not the page body
 
     expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ClientProvider } from "../api/ClientProvider";
 import type { TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
+import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
 import type { StopResult } from "../api/stop";
 import { StopAutopilot } from "./StopAutopilot";
 
@@ -18,7 +19,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-async function draw(client: TiloClient, world = "w1"): Promise<HTMLElement> {
+async function draw(client: TiloClient, world = FIXTURE_WORLD_ID): Promise<HTMLElement> {
   const container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -66,11 +67,11 @@ describe("FR-HIL-07 S-15 Stop all autopilot", () => {
 
   it("sends once on the second press and says only what the answer says", async () => {
     const h = held();
-    const c = await draw(h.client, "w9");
+    const c = await draw(h.client);
     await act(async () => button(c, "Stop all autopilot").click());
     await act(async () => button(c, "Stop all autopilot").click());
     await act(async () => button(c, "Stopping…").click()); // a second press while sending does nothing
-    expect(h.calls).toEqual(["w9"]);
+    expect(h.calls).toEqual([FIXTURE_WORLD_ID]);
     expect(note(c)).toBe(""); // nothing is claimed before the answer
     await act(async () =>
       h.answer({ stopped: 2, already_l1: 0, confirmations: [{ channel: "whatsapp" }], pending: 0 }),
@@ -78,6 +79,18 @@ describe("FR-HIL-07 S-15 Stop all autopilot", () => {
     expect(note(c)).toContain("Stopped 2 rules");
     expect(note(c)).toContain("Confirmations go to: WhatsApp.");
     expect(c.querySelector("h3")).toBeNull();
+    // The question is gone: focus is on the answer, not on the page body.
+    expect(document.activeElement).toBe(c.querySelector('[data-testid="stop-result"]'));
+  });
+
+  it("on the recorded replay the answer says the replay holds no live rule", async () => {
+    const h = held();
+    const c = await draw(h.client);
+    await act(async () => button(c, "Stop all autopilot").click());
+    await act(async () => button(c, "Stop all autopilot").click());
+    await act(async () => h.answer({ stopped: 0, already_l1: 0, confirmations: [], pending: 0 }));
+    expect(note(c)).toContain("nothing needed stopping");
+    expect(note(c)).toContain("This recorded replay holds no live rule");
   });
 
   it("shows the failure in words and lets the person try again, claiming nothing stopped", async () => {
@@ -103,10 +116,19 @@ describe("FR-HIL-07 S-15 Stop all autopilot", () => {
 
   it("a client that cannot send it shows the control disabled, never a live no-op", async () => {
     const c = await draw({} as TiloClient);
-    const b = button(c, "Stop all autopilot");
+    const b = button(c, "Stop all autopilot Coming soon");
     expect(b.getAttribute("aria-disabled")).toBe("true");
     expect(b.title).toBe("Coming soon");
+    expect(c.textContent).toContain("Coming soon"); // a visible caption, not only a title
     await act(async () => b.click());
     expect(c.querySelector("h3")).toBeNull();
+  });
+
+  it("a world the client does not know disables it and says why", async () => {
+    const h = held();
+    const c = await draw(h.client, "w_unknown");
+    expect(button(c, "Stop all autopilot Coming soon").getAttribute("aria-disabled")).toBe("true");
+    expect(c.textContent).toContain("There is no world to stop autopilot in yet.");
+    expect(h.calls).toEqual([]);
   });
 });

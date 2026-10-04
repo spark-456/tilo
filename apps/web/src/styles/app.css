@@ -781,13 +781,23 @@ button.row {
   color: var(--color-ink-2);
   cursor: not-allowed;
 }
-.secondary.danger,
-.secondary.placeholder.danger {
+.secondary.danger {
   /* A kill switch is the one danger-styled control of a screen: solid red outline and word, so it
-     reads as the one that matters even while it is not available yet. */
+     reads as the one that matters. */
   border: 2px solid var(--color-signal-blocked);
   color: var(--color-signal-blocked);
   font-weight: 800;
+}
+.secondary.placeholder.danger {
+  /* The same control while it cannot be used: a muted red outline and a visible "Coming soon", so
+     it never looks live. */
+  border: 2px solid color-mix(in srgb, var(--color-signal-blocked) 40%, var(--color-surface-1));
+  color: var(--color-ink-2);
+  font-weight: 700;
+}
+.stop-note:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
 }
 .stop-autopilot {
   display: flex;
