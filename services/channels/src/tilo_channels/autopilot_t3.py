@@ -134,19 +134,31 @@ def _unlisted(cleaned: str) -> bool:
         return True
     lines = [_ITEM.findall(line) for line in cleaned.split("\n")]
     names = _names(lines)
-    for items in lines:
-        run: list[str] = []  # the last four name words in a row: every join of two to four of them is checked
+    filled = [i for i, items in enumerate(lines) if items]
+    signs = [i for i in filled if _sign_off(lines[i])]
+    sig = filled[-1] if signs and filled[-2:-1] == signs[-1:] else None  # the signature line
+    for li, items in enumerate(lines):
+        run: list[str] = []  # a name run: at most two words, every join of them is checked
+        prev: str | None = None
         for item in items:
             word = item.lower()
             if word in names:
-                run = [*run[-3:], word]
+                # a run starts right after a greeting word, or opens the signature line
+                if not run and not ((prev is not None and prev.lower() in _GREETING) or (prev is None and li == sig)):
+                    return True
+                run = [*run, word]
+                if len(run) > 2:
+                    return True
                 joins = ("".join(run[-n:]) for n in range(2, len(run) + 1))
                 if any(p.search(j) for j in joins for _, p in _FAMILIES):
                     return True
-            elif item[0].isalpha() and word not in _WORDS:
-                return True
             else:
+                if run and item[0].isalpha():
+                    return True  # a word right after a name: the name is a subject, not a vocative or a signature
+                if item[0].isalpha() and word not in _WORDS:
+                    return True
                 run = []
+            prev = item
     return False
 
 
