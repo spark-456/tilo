@@ -1,7 +1,7 @@
 # packages/memory — `tilo_memory`
 
 ## Purpose
-Pillar P7 memory layers (PRD 13.1). Today only the result cache: a web, file or email-body result is
+Pillar P7 memory layers (PRD 13.1, 13.2). The result cache (`cache.py`) and the event ledger (`ledger.py`). Cache: a web, file or email-body result is
 reused instead of refetched when it is fresh and a fit check and the Verifier both accept it. Every
 reuse is one `memory.hit` event and is the only thing credited as saved (PRD 14.3).
 
@@ -26,6 +26,10 @@ reuse is one `memory.hit` event and is the only thing credited as saved (PRD 14.
   `packages/providers` (PL-01, role `verifier`); no model id or model call lives here. Both must accept; a
   rejected entry is never served and the fresh result replaces it (BQ-193).
 - Time comes only from the injected clock; nothing sleeps and nothing touches the network.
+- Ledger (FR-MEM-03): `EventLedger.ingest(message)` keys on the event `id`, first write wins, a same-id message
+  with other content is `conflict` and never rewrites the row, an unreadable one is `rejected` (BQ-194). No
+  update or delete method on `EventLedger`. `insert_if_absent` is atomic on the table: the in-memory table
+  locks, `BigQueryLedgerTable` is one guarded DML insert (mock client only; BQ-198 for the infra gap).
 
 ## Requirement IDs
-FR-MEM-01, FR-MEM-02. (FR-MEM-03 to FR-MEM-09 are separate tickets.)
+FR-MEM-01, FR-MEM-02, FR-MEM-03. (FR-MEM-09 erasure/retention is a separate ticket.)
