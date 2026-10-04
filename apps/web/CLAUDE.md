@@ -9,8 +9,7 @@ Trace lenses, cards and settings.
 - `just tokens` — regenerate token files from `design/tokens.json`; `just check` — full gate; `just e2e-cp2` — `@cp2` Playwright walk on the real dev API (starts `tilo-api` + its own Vite; local only, never CI)
 
 ## Contracts
-- Reads `packages/contracts-ts` types and Firestore docs under security rules; writes only through
-  `tilo-api` (`src/api/http.ts`, chosen by `VITE_TILO_API_URL`, else the fixture client; polls events by seq).
+- Reads `packages/contracts-ts` types and Firestore docs under security rules; writes only through `tilo-api` (`src/api/http.ts`, chosen by `VITE_TILO_API_URL`, else the fixture client; polls events by seq).
 
 ## Config and requirement IDs
 `config/themes/` (world themes), feature flags. UX-1–UX-9 (18.1); FR-WLD-*; owned from P0-08.
@@ -38,3 +37,4 @@ Trace lenses, cards and settings.
 ## Local rules
 - Nothing animates without a recorded event (HR-1–HR-7, PRD 9.4); `src/honesty/` (FR-WLD-09) fails on animation APIs outside `choreographer.ts` (allowlist: `test-support/honestyScan.ts`).
 - One primary filled button per screen (UX-1); no streaks, hearts or fake urgency (UX-7).
+  Type and spacing are tokens (PRD 18.2): `var(--text-N)` 12/14/16/20/24/32/40, `--space-N` 4..32, no `em` sizing; `e2e/type-ramp.spec.ts` pins it.
