@@ -101,3 +101,42 @@ test("UX-1 E3 Inspect shows a building's and an agent's state as a chip, facts a
   await expect(facts).toContainText("Now at");
   expect(problems).toEqual([]);
 });
+
+// #296 r1: Inspect must not shift while the run's events arrive. The state chip, the facts and the
+// timeline sit in reserved boxes, so the heading and the controls below them stay where they are.
+for (const [name, viewport] of [
+  ["1440x900", DESKTOP],
+  ["390x844", MOBILE],
+] as const) {
+  test(`UX-1 E3 Inspect has zero layout shift while events arrive at ${name}`, async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize(viewport);
+    await page.addInitScript(() => {
+      const w = window as unknown as { __shifts: string[] };
+      w.__shifts = [];
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) {
+          const s = e as PerformanceEntry & {
+            value: number;
+            hadRecentInput: boolean;
+            sources?: Array<{ node?: Node }>;
+          };
+          if (s.hadRecentInput) continue;
+          const where = (s.sources ?? [])
+            .map((src) => (src.node as Element | undefined)?.className ?? src.node?.nodeName)
+            .join(",");
+          w.__shifts.push(`${s.value.toFixed(4)} ${where}`);
+        }
+      }).observe({ type: "layout-shift", buffered: true });
+    });
+    for (const item of ["B1", "A_s1"]) {
+      await page.goto(`${W}/inspect/${item}?speed=100`);
+      await expect(page.getByTestId("inspect-panel")).toContainText("State:", { timeout: 20_000 });
+      await page.waitForTimeout(3_000); // the whole recorded run has played by now
+      const shifts = await page.evaluate(
+        () => (window as unknown as { __shifts: string[] }).__shifts,
+      );
+      expect(shifts, `${item} at ${name}`).toEqual([]);
+    }
+  });
+}

@@ -647,6 +647,8 @@ button.row {
   display: flex;
   align-items: center;
   gap: var(--space-8);
+  box-sizing: border-box;
+  min-height: 32px; /* the chip's word changes as events arrive; the row does not */
   margin: var(--space-8) 0;
 }
 .inspect-facts {
@@ -658,6 +660,9 @@ button.row {
 .inspect-facts div {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
+  box-sizing: border-box;
+  min-height: calc(var(--space-16) + 4px + 3 * 1.5 * var(--text-14)); /* three lines: a value that grows or shrinks moves nothing */
   gap: var(--space-4) var(--space-16);
   padding: var(--space-8) var(--space-12);
   border: 2px solid var(--color-surface-2);
@@ -667,13 +672,13 @@ button.row {
 .inspect-facts dt {
   flex: 0 0 8em;
   color: var(--color-ink-2);
-  font-size: var(--text-14);
-  font-weight: 700;
+  font: 700 var(--text-14) / 1.5 var(--font-ui);
 }
 .inspect-facts dd {
   flex: 1 1 12em;
+  min-width: 0;
   margin: 0;
-  font-size: var(--text-14);
+  font: 400 var(--text-14) / 1.5 var(--font-ui);
 }
 /* A vertical line with a dot per event: the order of what happened to this one thing. */
 .mini-timeline {

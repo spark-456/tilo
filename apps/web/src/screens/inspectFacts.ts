@@ -18,7 +18,12 @@ export function stateTone(state: string): "done" | "soon" | "blocked" | "fyi" {
   return "fyi";
 }
 
-const list = (names: readonly string[]): string => names.join(", ");
+/** At most three names, then "and N more": a value of a bounded length, so the facts block keeps
+ * its height as events arrive (CLS). */
+const list = (names: readonly string[]): string =>
+  names.length <= 3
+    ? names.join(", ")
+    : `${names.slice(0, 3).join(", ")} and ${names.length - 3} more`;
 
 export function factsOf(layout: Layout, id: string, state: WorldState): Fact[] {
   const names = agentNames(layout);
