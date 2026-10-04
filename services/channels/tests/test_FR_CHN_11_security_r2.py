@@ -55,16 +55,21 @@ def test_FR_CHN_11_stop_while_the_outbox_is_down_then_replay_and_send_never_send
     state["down"] = True
     with pytest.raises(Down):
         bench.ap.preview(USER, ctx, result)  # the card is recorded at L2; its entry is not stored
+    with pytest.raises(autopilot_module().CancelPending):  # round 3: the enqueue may have landed; never "cancelled"
+        if op == "cancel":
+            bench.ap.cancel(USER, card_id(ctx))
+        else:
+            bench.ap.edit(USER, card_id(ctx), "add a thank you", instruction_id="ins-r2-edit")
+    state["down"] = False
+    if later in ("replay", "both"):
+        bench.new_autopilot().preview(USER, ctx, result)  # completes the recorded stop
+    if later in ("send", "both"):
+        assert bench.ap.send(USER, card_id(ctx)).status == "refused"
+    assert all(e["state"] == "cancelled" for e in bench.outbox.all())
     if op == "cancel":
         assert bench.ap.cancel(USER, card_id(ctx)).status == "cancelled"
     else:
         assert bench.ap.edit(USER, card_id(ctx), "add a thank you", instruction_id="ins-r2-edit") is not None
-    state["down"] = False
-    if later in ("replay", "both"):
-        bench.new_autopilot().preview(USER, ctx, result)
-    if later in ("send", "both"):
-        assert bench.ap.send(USER, card_id(ctx)).status == "refused"
-    assert bench.outbox.entries == {}, "no path enqueues once a stop is recorded"
     never_sent(bench)
 
 
@@ -78,7 +83,8 @@ def test_FR_CHN_11_cancel_the_outbox_cannot_confirm_raises_and_a_retry_completes
     state["down"] = True
     with pytest.raises(autopilot_module().CancelPending):
         bench.ap.cancel(USER, card.card_id)
-    assert bench.ap.send(USER, card.card_id).status == "refused", "a stopped card never enqueues again"
+    with pytest.raises(autopilot_module().CancelPending):  # Send settles the recorded stop first
+        bench.ap.send(USER, card.card_id)
     state["down"] = False
     bench.new_autopilot().preview(USER, ctx, result)  # any later touch completes the recorded stop
     assert bench.outbox.state(card.outbox_id) == "cancelled"
@@ -130,10 +136,12 @@ def test_FR_CHN_11_an_enqueue_racing_a_cancel_cancels_its_own_entry(op: str, ord
 
     def enqueue(entry, evidence):  # the owner's Cancel lands while this enqueue is in flight
         if order == "cancel_before_store" and not answers:
-            answers.append(other.cancel(USER, card_id(ctx)).status)
+            answers.append(None)
+            answers[0] = other.cancel(USER, card_id(ctx)).status
         stored = real(entry, evidence)
         if order == "cancel_after_store" and not answers:
-            answers.append(other.cancel(USER, card_id(ctx)).status)
+            answers.append(None)
+            answers[0] = other.cancel(USER, card_id(ctx)).status
         return stored
 
     bench.outbox.enqueue = enqueue

@@ -246,12 +246,7 @@ class Autopilot:
                 if level == "L2" and policy_id:  # only L2 rides the undo window; anything else waits (fail closed)
                     ms = round(self._clock() * 1000)
                     doc |= {"level": "L2", "undo_window_s": UNDO_WINDOW_S, "policy_id": policy_id}
-                    scheduled_ms = ms + UNDO_WINDOW_S * 1000
-                    doc |= {
-                        "outbox_id": ulid(ms),
-                        "scheduled_at": timestamp(scheduled_ms),
-                        "scheduled_ms": scheduled_ms,
-                    }
+                    doc |= {"outbox_id": ulid(ms), "scheduled_at": timestamp(ms + UNDO_WINDOW_S * 1000)}
         return doc
 
     def _known(self, user_id: str, context: DraftContext) -> set[str]:
