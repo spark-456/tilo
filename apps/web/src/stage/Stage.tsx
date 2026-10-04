@@ -1,8 +1,9 @@
 import type { Layout } from "@tilo/contracts";
 import { Application, Container, Graphics } from "pixi.js";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import tokens from "../design/tokens";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { AppLink } from "../screens/AppLink";
 import { agentNames, rankName } from "../world/runSummary";
 import { useSelection } from "../world/selection";
 import * as cam from "./camera";
@@ -64,24 +65,47 @@ export function Stage({
   layout?: Layout | null;
   worldId?: string;
 }) {
-  const [, , toggle] = useSelection(worldId ?? "");
+  const [, set, toggle] = useSelection(worldId ?? "");
   const outlineItems = useMemo(() => {
     if (!layout) return [];
     const names = agentNames(layout);
-    const items: { id: string; name: string }[] = [];
+    const items: { id: string; name: string; inspect: boolean }[] = [];
     for (const a of layout.semantic.agents) {
-      items.push({ id: a.id, name: names.get(a.id) ?? a.id });
+      items.push({ id: a.id, name: names.get(a.id) ?? a.id, inspect: true });
     }
     for (const l of layout.semantic.levels) {
       for (const d of l.districts) {
-        for (const b of d.buildings) items.push({ id: b.id, name: b.name });
+        for (const b of d.buildings) items.push({ id: b.id, name: b.name, inspect: true });
       }
     }
     for (const g of layout.semantic.gates) {
-      items.push({ id: g.id, name: `Gate ${g.id} (${rankName(g.guards)})` });
+      items.push({ id: g.id, name: `Gate ${g.id} (${rankName(g.guards)})`, inspect: false }); // a gate is not an Inspect object
     }
     return items;
   }, [layout]);
+
+  // Roving focus: one tab stop, arrows move within the list (FR-WLD-11). Escape clears the
+  // selection and leaves focus on the item, a real control.
+  const [active, setActive] = useState(0);
+  const outlineRef = useRef<HTMLUListElement>(null);
+  const onOutlineKey = (e: KeyboardEvent<HTMLUListElement>) => {
+    if (e.key === "Escape") return set(null);
+    const buttons = [...(outlineRef.current?.querySelectorAll<HTMLElement>(".outline-item") ?? [])];
+    const at = buttons.indexOf(document.activeElement as HTMLElement);
+    const next =
+      e.key === "ArrowDown" || e.key === "ArrowRight"
+        ? Math.min(at + 1, buttons.length - 1)
+        : e.key === "ArrowUp" || e.key === "ArrowLeft"
+          ? Math.max(at - 1, 0)
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? buttons.length - 1
+              : -1;
+    if (next < 0 || at < 0) return;
+    e.preventDefault();
+    buttons[next]?.focus();
+  };
 
   const frameRef = useRef<HTMLElement>(null);
   const [supported] = useState(() => !!document.createElement("canvas").getContext("webgl2"));
@@ -200,6 +224,7 @@ export function Stage({
     listen("keydown", (e) => {
       const move = KEYS[e.key];
       if (!move || e.ctrlKey || e.metaKey || e.altKey) return; // browser shortcuts pass
+      if ((e.target as Element).closest(".stage-outline")) return; // arrows belong to the list
       e.preventDefault();
       if (!pts.size) glide(move(goal)); // a drag or pinch in progress owns the camera
     });
@@ -272,17 +297,31 @@ export function Stage({
         </p>
       )}
       {outlineItems.length > 0 && (
-        <ul className="stage-outline" aria-label="World objects">
-          {outlineItems.map((item) => (
+        <ul
+          className="stage-outline"
+          aria-label="World objects"
+          ref={outlineRef}
+          onKeyDown={onOutlineKey}
+        >
+          {outlineItems.map((item, i) => (
             <li key={item.id}>
               <button
                 type="button"
                 className="outline-item"
+                tabIndex={i === active ? 0 : -1}
                 aria-pressed={selected === item.id}
+                onFocus={() => setActive(i)}
                 onClick={() => toggle(item.id)}
               >
                 {item.name}
               </button>
+              {selected === item.id && item.inspect && worldId && (
+                <AppLink
+                  to={`/world/${encodeURIComponent(worldId)}/inspect/${encodeURIComponent(item.id)}`}
+                >
+                  Inspect
+                </AppLink>
+              )}
             </li>
           ))}
         </ul>

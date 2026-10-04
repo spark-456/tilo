@@ -1558,21 +1558,61 @@ button.row {
 }
 .stage-outline:focus-within {
   z-index: 10;
-  width: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 16em;
+  max-width: calc(100% - 24px);
   height: auto;
+  max-height: calc(100% - 24px);
   margin: 0;
   padding: 8px;
   clip: auto;
   white-space: normal;
-  overflow: visible;
+  overflow-y: auto;
   background: var(--color-surface-1);
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-controls);
 }
+.stage-outline li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.outline-item {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font: inherit;
+  font-size: 0.875em;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.outline-item[aria-pressed="true"] {
+  border-color: var(--color-brand-primary);
+  background: var(--color-surface-1);
+}
 .row:focus,
 .row:focus-visible,
-.outline-item:focus,
-.outline-item:focus-visible {
-  outline: 2px solid var(--color-accent-primary, var(--color-brand-primary));
+.outline-item:focus-visible,
+.selection-bar:focus-visible,
+.stage-outline a:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

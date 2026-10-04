@@ -11,6 +11,7 @@ import { involves, useSelection } from "../world/selection";
 import { LensTabs } from "./LensTabs";
 import { useRemote } from "./remote";
 import type { ScreenProps } from "./routes";
+import { useStoryAnnouncement } from "./storyAnnounce";
 
 /** A text label for every severity that is not routine, so colour never carries it alone. */
 export const SEVERITY_LABEL: Partial<Record<Severity, string>> = {
@@ -34,6 +35,8 @@ export function S_10({ params }: ScreenProps) {
   // The rows wait for the layout (ready or failed) so the who-chips never arrive after them and
   // push the text about (CLS); a failed layout still shows the story, without chips.
   const settled = layout.status !== "loading";
+  // Replays are not new work, so only a real client announces, and only once the rows have loaded.
+  const announced = useStoryAnnouncement(story, settled && !fixture);
   return (
     <div className="screen-body wide" data-testid="story-lens">
       <LensTabs worldId={worldId} current="story" />
@@ -52,15 +55,17 @@ export function S_10({ params }: ScreenProps) {
       ) : story.length === 0 ? (
         <p>Nothing has happened yet. The story fills in as events arrive.</p>
       ) : (
-        <div role="log" aria-label="What happened, in order" aria-live="polite">
-          <ol className="story-list">
+        <div>
+          <output className="sr-only" aria-live="polite" aria-atomic="true">
+            {announced}
+          </output>
+          <ol className="story-list" aria-label="What happened, in order">
             {story.map((e) => (
               <li
                 key={e.seq}
                 data-seq={e.seq}
                 data-severity={e.severity}
                 data-selected={selected !== null && involves(e, selected)}
-                aria-label={`Step ${e.seq}: ${e.summary}`}
               >
                 <span className="story-time">{elapsed(events, e)}</span>
                 <span>
