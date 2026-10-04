@@ -91,6 +91,14 @@ describe("CP2 #258 a bare address with a live API and no started run says so", (
     });
   }
 
+  it("/needs-you?world=w_real: the empty-state action keeps the world (#286)", async () => {
+    const { client } = liveApi(["w_real"]);
+    const page = await visit("/needs-you?world=w_real", client);
+    const action = page.container.querySelector('[data-testid="needs-empty"] a');
+    expect(action?.getAttribute("href")).toBe("/worlds?world=w_real");
+    await page.stop();
+  });
+
   it("/worlds (S-14) is its own empty state with no run, and the API is not asked about any world", async () => {
     const { client, urls } = liveApi(["w_real"]);
     const page = await visit("/worlds", client);
