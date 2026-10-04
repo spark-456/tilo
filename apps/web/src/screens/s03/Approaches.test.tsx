@@ -114,6 +114,27 @@ describe("AGW-04 S-03 Approaches and budget", () => {
     }
   });
 
+  it("FR-INT-08 S-03: the budget meter shows the estimate and follows the cap, in words", async () => {
+    await openApproaches();
+    const meter = q("[data-testid=budget-meter]");
+    const rec = FIXTURE_APPROACHES.approaches.find((a) => a.id === FIXTURE_APPROACHES.recommended);
+    expect(meter?.getAttribute("role")).toBe("img");
+    expect(meter?.getAttribute("aria-label")).toBe(
+      `Estimated ${rec?.credits.min} to ${rec?.credits.max} credits; your cap is ${rec?.credits.max}`,
+    );
+    const input = q<HTMLInputElement>("[data-testid=budget-cap-input]");
+    await act(async () => input && setInputValue(input, "0"));
+    expect(q("[data-testid=budget-meter]")?.getAttribute("aria-label")).not.toContain("your cap");
+  });
+
+  it("FR-INT-06 S-03: no approaches says so and offers a way back to Start", async () => {
+    await openApproaches({ approaches: [], recommended: "" });
+    expect(container.textContent).toContain("Nothing came back for the approaches.");
+    expect(qa("button.secondary").map((b) => b.textContent)).toContain("Try again");
+    expect(q<HTMLAnchorElement>("a[href='/']")?.textContent).toBe("Describe the task again");
+    expect(q("[data-testid=budget-meter]")).toBeNull();
+  });
+
   it("FR-INT-06 S-03: surfaces a load error with retry and keeps Start disabled", async () => {
     const { load } = await openApproaches({}, () => Promise.reject(new Error("offline")));
     expect(q('[role="alert"]')?.textContent).toContain("Could not load the approaches: offline.");
