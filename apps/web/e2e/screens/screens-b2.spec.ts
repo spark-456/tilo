@@ -28,7 +28,10 @@ test("S_22 renders, no console errors, placeholders aria-disabled", async ({ pag
     await expect(page.getByText("Removed from every store within 30 days")).toBeVisible();
     await soon(page, "Export");
     await soon(page, "Delete");
-    await soon(page, "Review Gmail access");
+    await expect(page.getByRole("link", { name: "Review Gmail access" })).toHaveAttribute(
+      "href",
+      "/connections",
+    );
   });
   expect(problems).toEqual([]);
 });

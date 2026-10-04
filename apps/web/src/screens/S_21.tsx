@@ -9,7 +9,18 @@ import { useClient } from "../api/ClientProvider";
 import { withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
 import { Placeholder } from "./Placeholder";
-import { Chip, EmptyState, Page, Row, Section, Stats, field, useFixtureRun, words } from "./kit";
+import {
+  Chip,
+  EmptyState,
+  Page,
+  Row,
+  Section,
+  Stats,
+  doneState,
+  field,
+  useFixtureRun,
+  words,
+} from "./kit";
 import { useRemote } from "./remote";
 
 interface Ref {
@@ -45,9 +56,13 @@ export function S_21() {
     >
       <Stats
         items={[
-          ["Artifacts", ids.size],
-          ["Events", mine.length],
-          ["Delivered", mine.filter((e) => e.type === "artifact.delivered").length],
+          ["Artifacts", ids.size, doneState(ids.size, "Made")],
+          ["Events", mine.length, doneState(mine.length, "Recorded")],
+          [
+            "Delivered",
+            mine.filter((e) => e.type === "artifact.delivered").length,
+            doneState(mine.filter((e) => e.type === "artifact.delivered").length, "Delivered"),
+          ],
         ]}
       />
       <Section
