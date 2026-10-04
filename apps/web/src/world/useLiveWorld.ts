@@ -31,6 +31,7 @@ export interface LiveWorldState {
 interface Host {
   readonly world: Container;
   readonly requestRender: () => void;
+  readonly size: () => { width: number; height: number };
 }
 
 /** `worldId` is the live world to draw, or null (a fixture client, or no world in the address). */
@@ -45,15 +46,15 @@ export function useLiveWorld(client: TiloClient, worldId: string | null): LiveWo
   reducedMotion.current = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   // The stage hands its Pixi container over once, when its renderer is ready.
-  const onWorld = useCallback<WorldSeam>((world, requestRender) => {
-    setHost({ world, requestRender });
+  const onWorld = useCallback<WorldSeam>((world, requestRender, size) => {
+    setHost({ world, requestRender, size });
     return () => setHost(null);
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the retry trigger.
   useEffect(() => {
     if (worldId === null || host === null) return;
-    const { world, requestRender } = host;
+    const { world, requestRender, size } = host;
     const before = world.children.length;
     let cancelled = false;
     let stop: (() => void) | undefined;
@@ -69,6 +70,7 @@ export function useLiveWorld(client: TiloClient, worldId: string | null): LiveWo
         stop = runWorld({
           world,
           requestRender,
+          size,
           layout,
           events: [],
           seqParam: null,
