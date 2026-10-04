@@ -14,35 +14,32 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import secrets
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, fields
-from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from tilo_channels.autopilot_state import ACTION_TYPE, CancelPending, CardStore, Ledger, Outbox, timestamp, ulid
 from tilo_channels.autopilot_t3 import clean_text, t3_content_signal
 from tilo_channels.drafting import (
     MAX_INSTRUCTION,
     MAX_MESSAGES,
     Drafter,
     DraftResult,
-    DraftStore,
     ThreadReader,
     _address,
     _addresses,
     _base,
 )
 
-__all__ = ["Autopilot", "DraftContext", "Outcome", "Preview", "clean_text", "t3_content_signal"]
+__all__ = ["ACTION_TYPE", "Autopilot", "CancelPending", "DraftContext", "Outbox", "Outcome", "Preview", "clean_text"]
+__all__ += ["CardStore", "t3_content_signal"]
 
 OPTIONS = ("send", "edit", "cancel")
 UNDO_WINDOW_S = 60  # PRD 10.4 L2 default
 PREVIEW_CHARS = 600  # PRD 11.4 Preview
-ACTION_TYPE = "send_email"
 FINDING_CAP = 300  # characters of one finding's text shown on a card (issue #243)
 
 _LOG = logging.getLogger(__name__)
-_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _TUPLES = ("options", "to", "cc", "findings", "questions", "modifiers")
 
 
@@ -57,15 +54,6 @@ class DraftContext:
 
 class AutonomyPolicy(Protocol):
     def level(self, user_id: str, action_type: str) -> tuple[str, str | None]: ...
-
-
-class Outbox(Protocol):  # the names of tilo_connectors.outbox.Outbox, which tilo-channels never imports (BQ-158)
-    def enqueue(self, entry: dict, evidence: dict) -> dict: ...
-    def cancel(self, outbox_id: str) -> dict: ...
-
-
-class CardStore(DraftStore, Protocol):
-    def put(self, user_id: str, key: str, value: dict) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -96,15 +84,6 @@ class Outcome:
     outbox_id: str | None
 
 
-def _timestamp(ms: int) -> str:
-    return datetime.fromtimestamp(ms // 1000, UTC).strftime("%Y-%m-%dT%H:%M:%S") + f".{ms % 1000:03d}Z"
-
-
-def _ulid(ms: int) -> str:
-    value = (ms << 80) | secrets.randbits(80)
-    return "".join(_CROCKFORD[(value >> shift) & 31] for shift in range(125, -1, -5))
-
-
 def _card_id(user_id: str, instruction_id: str) -> str:
     return "apc_" + hashlib.sha256(f"{user_id}\n{instruction_id}".encode()).hexdigest()[:32]
 
@@ -131,8 +110,10 @@ class Autopilot:
         connector: str = "gmail",
     ) -> None:
         self._drafter, self._reader, self._contacts = drafter, reader, contacts
-        self._policy, self._outbox, self._cards, self._clock = policy, outbox, cards, clock
-        self._world_id, self._run_id, self._connector = world_id, run_id, connector
+        self._policy, self._cards, self._clock = policy, cards, clock
+        self._ledger = Ledger(
+            cards=cards, outbox=outbox, clock=clock, world_id=world_id, run_id=run_id, connector=connector
+        )
 
     def preview(self, user_id: str, context: DraftContext, result: DraftResult) -> Preview:
         """The card for a draft of the person's own instruction; at L2 a ready T2 draft is scheduled at once."""
@@ -142,15 +123,16 @@ class Autopilot:
         doc = self._cards.get(user_id, card_id)
         if doc is None or doc["state"] != "open" or "send" not in doc["options"]:
             return Outcome("refused", None)
-        if doc["level"] == "L2":  # the entry's real state: a cancelled or failed one is not sent again
-            entry = self._enqueue(doc)
-            gone = entry["state"] in ("cancelled", "failed")
-            return Outcome(
-                "refused" if gone else "scheduled" if entry["state"] == "scheduled" else "queued", entry["id"]
+        if doc["level"] == "L2":  # the entry's real state; a stopped card never enqueues again
+            entry = self._ledger.schedule(user_id, doc)
+            state = entry["state"] if entry else "cancelled"
+            status = (
+                "refused" if state in ("cancelled", "failed") else "scheduled" if state == "scheduled" else "queued"
             )
-        if not self._decide(user_id, card_id, "send"):
+            return Outcome(status, doc["outbox_id"])
+        if self._ledger.first(user_id, card_id, "decision", "send") != "send":
             return Outcome("refused", None)
-        entry = self._enqueue(doc)
+        entry = self._ledger.enqueue(doc)
         self._cards.put(user_id, card_id, doc | {"outbox_id": entry["id"]})
         _LOG.info("autopilot card %s: queued by its owner, %s", card_id, doc["tier"])
         return Outcome("queued", entry["id"])
@@ -159,9 +141,14 @@ class Autopilot:
         doc = self._cards.get(user_id, card_id)
         if doc is None or doc["state"] == "superseded":
             return Outcome("refused", None)
-        if doc["state"] == "open" and not self._close(user_id, doc, "close"):
-            return Outcome("too_late", doc["outbox_id"])
         if doc["state"] == "open":
+            if doc["level"] == "L2":  # cancels the entry whichever Cancel or Edit claimed the stop first
+                status = self._ledger.stop(user_id, doc, "cancel")  # raises CancelPending: retry
+            else:  # an L1 card is closed unless its owner's Send came first (a crashed Edit's claim closes it too)
+                send_first = self._ledger.first(user_id, card_id, "decision", "close") == "send"
+                status = "too_late" if send_first else "cancelled"
+            if status == "too_late":
+                return Outcome("too_late", doc["outbox_id"])
             self._cards.put(user_id, card_id, doc | {"state": "cancelled"})
             _LOG.info("autopilot card %s: cancelled", card_id)
         return Outcome("cancelled", doc["outbox_id"])
@@ -175,7 +162,13 @@ class Autopilot:
         instruction = f"{doc['instruction']}\nChange: {change}"
         if len(instruction) > MAX_INSTRUCTION or "#" in instruction_id:
             raise ValueError("edit too long or bad instruction id")
-        if doc["state"] == "open" and self._close(user_id, doc, f"edit:{instruction_id}"):
+        mine = f"edit:{instruction_id}"
+        if doc["state"] == "open" and doc["level"] == "L2":
+            closed = self._ledger.stop(user_id, doc, mine) == "cancelled"
+            closed = closed and self._ledger.first(user_id, card_id, "stop", mine) == mine
+        else:
+            closed = doc["state"] == "open" and self._ledger.first(user_id, card_id, "decision", mine) == mine
+        if closed:
             doc |= {"state": "superseded", "superseded_by": instruction_id}
             self._cards.put(user_id, card_id, doc)
         if doc["state"] != "superseded" or doc.get("superseded_by") != instruction_id:
@@ -205,7 +198,8 @@ class Autopilot:
                 if doc is None:
                     raise LookupError("card store refused a create but holds no card")
         if doc["level"] == "L2" and doc["state"] == "open":  # the recorded decision, never worked out again
-            doc = doc | {"scheduled_at": self._enqueue(doc)["scheduled_at"]}  # the card's one entry, by its key
+            entry = self._ledger.schedule(user_id, doc)  # the card's one entry, by its key; none once stopped
+            doc = doc | {"scheduled_at": entry["scheduled_at"]} if entry else doc
         _LOG.info("autopilot card %s: %s %s %s", card_id, doc["status"], doc["tier"], doc["level"])
         return _preview(doc)
 
@@ -252,7 +246,12 @@ class Autopilot:
                 if level == "L2" and policy_id:  # only L2 rides the undo window; anything else waits (fail closed)
                     ms = round(self._clock() * 1000)
                     doc |= {"level": "L2", "undo_window_s": UNDO_WINDOW_S, "policy_id": policy_id}
-                    doc |= {"outbox_id": _ulid(ms), "scheduled_at": _timestamp(ms + UNDO_WINDOW_S * 1000)}
+                    scheduled_ms = ms + UNDO_WINDOW_S * 1000
+                    doc |= {
+                        "outbox_id": ulid(ms),
+                        "scheduled_at": timestamp(scheduled_ms),
+                        "scheduled_ms": scheduled_ms,
+                    }
         return doc
 
     def _known(self, user_id: str, context: DraftContext) -> set[str]:
@@ -272,58 +271,3 @@ class Autopilot:
             if sender and _base(sender[0]) == own and isinstance(labels, list) and "SENT" in labels:
                 known.update(_addresses(message.get("to")) + _addresses(message.get("cc")))
         return known
-
-    def _decide(self, user_id: str, card_id: str, decision: str) -> bool:
-        """A card's one decision (send at L1, close, or one edit), claimed atomically; True when it is `decision`."""
-        key = f"{card_id}#decision"
-        if self._cards.create(user_id, key, {"by": decision}):
-            return True
-        return (self._cards.get(user_id, key) or {}).get("by") == decision
-
-    def _close(self, user_id: str, doc: dict[str, Any], decision: str) -> bool:
-        """Stops the card's send: claims the card, then cancels the entry an L2 card recorded. True only when no entry
-        of this card can still send."""
-        if not self._decide(user_id, doc["card_id"], decision):
-            return False
-        if doc["level"] != "L2":
-            return True
-        try:  # the card's one entry, found by its key (or created here only to be cancelled at once)
-            entry = self._enqueue(doc)
-        except Exception:  # the outbox may refuse a new policy entry (policy revoked): cancel by the recorded id
-            entry = {"id": doc["outbox_id"], "state": "scheduled"}
-        if entry["state"] != "scheduled":
-            return entry["state"] == "cancelled"
-        try:
-            self._outbox.cancel(entry["id"])
-        except Exception:  # the outbox raises once the entry is no longer scheduled
-            return False
-        return True
-
-    def _enqueue(self, doc: dict[str, Any]) -> dict:
-        """The card's entry under its idempotency key: a replay returns the stored entry and never adds one."""
-        ms = round(self._clock() * 1000)
-        created = _timestamp(ms)
-        window = doc["undo_window_s"]
-        policy = doc["level"] == "L2"
-        authority = {"by": "policy", "ref": doc["policy_id"]} if policy else {"by": "person", "ref": doc["user_id"]}
-        entry = {
-            "id": doc["outbox_id"] or _ulid(ms),
-            "idempotency_key": f"autopilot:{doc['card_id']}",
-            "world_id": self._world_id,
-            "run_id": self._run_id,
-            "action_type": ACTION_TYPE,
-            "connector": self._connector,
-            "recipients": list(dict.fromkeys(doc["to"] + doc["cc"])),
-            "attachments": [],
-            "item": doc["item"],
-            "destination": doc["thread_id"],
-            "modifiers": doc["modifiers"],
-            "risk_tier": doc["tier"],
-            "authz": authority | {"at": created},
-            "undo_window_s": window,
-            "scheduled_at": _timestamp(ms + window * 1000),
-            "state": "scheduled" if window else "queued",
-            "created_at": created,
-        }
-        evidence = {"instruction_id": doc["instruction_id"], "level": doc["level"]}
-        return self._outbox.enqueue(entry, evidence)

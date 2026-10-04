@@ -220,5 +220,6 @@ def test_FR_CHN_11_cancel_never_reports_cancelled_when_the_outbox_cannot_cancel(
         raise OutboxRefused("halted")
 
     bench.outbox.cancel = refuse
-    assert bench.ap.cancel(USER, card.card_id).status == "too_late"
+    with pytest.raises(autopilot_module().CancelPending):  # round 2: retryable, never "cancelled" or "too_late"
+        bench.ap.cancel(USER, card.card_id)
     assert bench.outbox.state(card.outbox_id) == "scheduled"
