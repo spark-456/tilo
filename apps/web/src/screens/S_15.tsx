@@ -33,6 +33,10 @@ const LEVELS: ReadonlyArray<readonly [string, string, string]> = [
   ["L3", "Standing rules", "Pre-authorised actions run within limits and appear in a digest."],
 ];
 
+/** PRD 10.4: every action starts here. No policy is served in this build, so it is the one level
+ * that can be named; it is marked by a tick and the word "Default", not by colour. */
+const DEFAULT_LEVEL = "L1";
+
 /** The approval that released an outgoing action (same outbox entry), else the event itself. */
 const authorisation = (events: readonly Event[], e: Event): Event =>
   events.find(
@@ -74,7 +78,18 @@ export function S_15() {
       >
         <ul className="blist">
           {LEVELS.map(([id, name, what]) => (
-            <Row key={id} name={name} sub={what} state={<Chip tone="none">{id}</Chip>} />
+            <Row
+              key={id}
+              name={name}
+              sub={what}
+              state={
+                id === DEFAULT_LEVEL ? (
+                  <Chip tone="done">✓ {id} · Default</Chip>
+                ) : (
+                  <Chip tone="none">{id}</Chip>
+                )
+              }
+            />
           ))}
         </ul>
       </Section>
