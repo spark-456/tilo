@@ -10,6 +10,7 @@ lets a token, code, header or secret reach an exception, a repr or the output. A
 from __future__ import annotations
 
 import contextlib
+import errno
 import hmac
 import http.client
 import http.server
@@ -44,6 +45,8 @@ ALLOWED_HOSTS: frozenset[str] = frozenset({"oauth2.googleapis.com", "gmail.googl
 DEFAULT_TIMEOUT_S = 30.0
 CALLBACK_PATH = "/oauth/google/callback"
 _MAX_BODY = 64 * 1024 * 1024
+_MAX_HANDLERS = 8  # concurrent callback connections; more are dropped
+_MAX_WAIT_S = 3600.0
 _CONFIG = Path(__file__).resolve().parents[4] / "config" / "connectors.yaml"
 _USER, _WORLD, _RUN = "u_live_smoke", "w_live_smoke", "r_live_smoke"
 _ADDRESS = re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63})+")
@@ -72,9 +75,11 @@ def _require_live(environ: Mapping[str, str] | None) -> None:
         raise LiveNotEnabled("live access is off: set LIVE=1 in the environment to use it")
 
 
-def _seconds(value: Any) -> float:
+def _seconds(value: Any, upper: float = math.inf) -> float:
     if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value) or value <= 0:
         raise ValueError("a timeout must be a finite number of seconds above 0")
+    if value > upper:
+        raise ValueError(f"a timeout can be at most {upper:g} seconds")
     return float(value)
 
 
@@ -130,6 +135,8 @@ class _LiveBase:
         _require_live(environ)
         self.timeout_s = _seconds(timeout_s)
         self.allowed_hosts = frozenset(str(h).lower() for h in allowed_hosts)
+        if not self.allowed_hosts <= ALLOWED_HOSTS:
+            raise ValueError("allowed_hosts can only be narrowed, never widened beyond the Google hosts")
         if endpoint_overrides and not allow_loopback_http:
             raise ValueError("endpoint overrides are a test seam: they need allow_loopback_http=True")
         self._overrides = {str(h).lower(): _loopback(b) for h, b in (endpoint_overrides or {}).items()}
@@ -209,6 +216,22 @@ class _Httpd(http.server.ThreadingHTTPServer):
     allow_reuse_address = os.name != "nt"  # on Windows reuse would let another process share the port
     owner: Any = None
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._slots = threading.BoundedSemaphore(_MAX_HANDLERS)
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request: Any, client_address: Any) -> None:
+        if self._slots.acquire(blocking=False):
+            super().process_request(request, client_address)
+        else:
+            self.shutdown_request(request)  # too many open connections: drop this one at once
+
+    def process_request_thread(self, request: Any, client_address: Any) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._slots.release()
+
     def server_bind(self) -> None:
         if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
@@ -220,7 +243,7 @@ class _Httpd(http.server.ThreadingHTTPServer):
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
-    timeout = 5  # a silent connection ends here and never holds up the redirect
+    timeout = 2  # a silent connection ends here and never holds up the redirect
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - the request line holds the code
         return
@@ -252,7 +275,7 @@ class CallbackServer:
             raise ValueError("expected_state is required")
         if isinstance(port, bool) or not isinstance(port, int) or not 0 <= port <= 65535:
             raise ValueError("port must be 0 to 65535")
-        self._timeout_s = _seconds(timeout_s)
+        self._timeout_s = _seconds(timeout_s, _MAX_WAIT_S)
         self._state = expected_state.encode("utf-8")
         self._lock, self._done = threading.Lock(), threading.Event()
         self._result: CallbackResult | None = None
@@ -364,7 +387,7 @@ def _check_options(
 ) -> tuple[OAuthSettings, int]:
     try:
         settings = OAuthSettings.from_env(environ)
-        _seconds(callback_timeout_s)
+        _seconds(callback_timeout_s, _MAX_WAIT_S)
         base = urlsplit(settings.redirect_base_url)
         local = base.scheme == "http" and base.hostname in ("127.0.0.1", "localhost") and base.path in ("", "/")
     except ValueError as error:
@@ -432,6 +455,8 @@ def run_smoke(
     except OSError:
         raise SmokeError(f"cannot listen on 127.0.0.1:{port} (is another program using it?)") from None
     try:  # the listener exists before the URL is shown, so a fast redirect cannot be missed
+        if _ipv6_taken(server.port):
+            raise SmokeError(f"another program listens on [::1]:{server.port}; stop it or pick another port")
         _say(out, f"Open this address in your browser and sign in with Google:\n{url}")
         _say(out, f"Waiting up to {callback_timeout_s:g} s for the redirect on 127.0.0.1:{server.port} ...")
         if on_consent_url is not None:
@@ -452,13 +477,30 @@ def run_smoke(
     )  # fmt: skip
     messages = _read(adapter, out)
     draft = _draft(adapter, draft_to, record, clock, out) if draft_to else None
+    _say(out, "Done. The sign-in grant stays at Google: remove it at myaccount.google.com/permissions when finished.")
     return SmokeResult(messages, draft, events)
+
+
+def _ipv6_taken(port: int) -> bool:
+    """True when another process already listens on [::1]:port, where a browser may send the code first."""
+    try:
+        probe = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    except OSError:
+        return False  # no IPv6 here
+    with probe:
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        try:
+            probe.bind(("::1", port))
+        except OSError as error:
+            return error.errno in (errno.EADDRINUSE, errno.EACCES)
+    return False
 
 
 def _read(adapter: GmailAdapter, out: TextIO) -> list[dict[str, str]]:
     try:
         ids = adapter.recent_inbox(_USER, max_results=5)["message_ids"][:5]
-        found = [adapter.get_message(_USER, message_id) for message_id in ids]
+        found = [adapter.get_message(_USER, i, headers=("Date", "From", "Subject")) for i in ids]
     except Exception as error:  # noqa: BLE001 - adapter and broker texts are fixed; only the kind is shown
         raise SmokeError(f"reading the mailbox failed ({type(error).__name__})") from None
     messages = [{k: _clean(m.get(k, "")) for k in ("date", "from", "subject")} for m in found]
