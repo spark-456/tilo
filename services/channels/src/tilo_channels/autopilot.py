@@ -3,8 +3,8 @@
 
 The tier is deterministic: `send_email` is T2 unless a modifier applies (`money_or_legal` from `t3_content_signal` on
 the raw body, which it cleans itself; `safety_flag`; `new_recipients` for an address that is neither a contact nor
-known from the thread, BQ-154, or any forward, new email, format mismatch or Bcc, FR-CHN-12; `attachments`), and
-any modifier makes it T3. Only a ready T2 draft of the person's own
+known from the thread, BQ-154, BQ-223, or any forward, new email, format mismatch or Bcc, FR-CHN-12; `attachments`),
+and any modifier makes it T3. Only a ready T2 draft of the person's own non-empty
 instruction, under an L2 answer from the injected policy port, is scheduled at once with the undo window; everything
 else waits for its owner's Send. A redraft after Edit is a new proposal and always waits for a person. Side effects
 go only through the injected outbox port, keyed so a replay never adds an entry. Cards hold mail text; no event, log
@@ -231,6 +231,8 @@ class Autopilot:
     def _card(self, user_id: str, context: DraftContext, result: DraftResult, *, instructed: bool) -> Preview:
         if result.instruction_id != context.instruction_id:
             raise ValueError("the draft is not of this instruction")
+        if result.draft is not None and result.draft.thread_id != context.thread_id:
+            raise ValueError("the draft is not of this thread")  # BQ-221: before anything is recorded
         card_id = _card_id(user_id, context.instruction_id)
         doc = self._cards.get(user_id, card_id)
         if doc is None:  # one atomic record fixes tier, level and entry id before any enqueue; first writer wins
@@ -292,7 +294,8 @@ class Autopilot:
             modifiers += ["new_recipients"] if self._adds_recipient(user_id, context, draft) else []
             modifiers += ["attachments"] if draft.attachments else []
             doc |= {"tier": "T3" if modifiers else "T2", "modifiers": modifiers}
-            if instructed and sendable and not modifiers:
+            blank = not clean_text(context.instruction).strip()  # BQ-222: nothing a person wrote never rides L2
+            if instructed and sendable and not modifiers and not blank:
                 level, policy_id = self._policy.level(user_id, ACTION_TYPE)
                 if level == "L2" and policy_id:  # only L2 rides the undo window; anything else waits (fail closed)
                     ms = round(self._clock() * 1000)
@@ -315,10 +318,12 @@ class Autopilot:
         return any(not a.isascii() or a.lower() not in known for a in draft.to + draft.cc)
 
     def _known(self, user_id: str, context: DraftContext) -> set[str]:
-        """BQ-154: contacts, every From in the thread, and To / Cc of the user's own messages: From the mailbox and
-        carrying Gmail's SENT label (a From header alone is sender-controlled). A thread that cannot be read adds
-        nothing (fail closed: more recipients are new)."""
+        """BQ-154, BQ-223: contacts, the From of the message the reply answers (the last one not from the mailbox; an
+        earlier From adds nothing), and To / Cc of the user's own messages: From the mailbox and carrying Gmail's
+        SENT label (a From header alone is sender-controlled). A thread that cannot be read adds nothing (fail
+        closed: more recipients are new)."""
         known = {a.lower() for a in self._contacts(user_id) if isinstance(a, str) and a.isascii()}
+        answered: list[str] = []
         mailbox = _address(context.mailbox)
         own = _base(mailbox) if mailbox else None  # a non-ASCII mailbox vouches for nothing
         try:
@@ -327,8 +332,9 @@ class Autopilot:
             listed = []
         for message in [m for m in (listed if isinstance(listed, list) else []) if isinstance(m, dict)][-MAX_MESSAGES:]:
             sender = _addresses(message.get("from"))[:1]
-            known.update(sender)
             labels = message.get("labelIds")
-            if sender and _base(sender[0]) == own and isinstance(labels, list) and "SENT" in labels:
+            if not sender or _base(sender[0]) != own:
+                answered = sender  # the last one wins; a sender that cannot be read leaves nothing known
+            elif isinstance(labels, list) and "SENT" in labels:
                 known.update(_addresses(message.get("to")) + _addresses(message.get("cc")))
-        return known
+        return known | set(answered)

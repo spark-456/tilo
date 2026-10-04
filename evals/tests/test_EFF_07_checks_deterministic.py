@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 import pytest
-from conftest import REPO_ROOT
+from _evals_lib import REPO_ROOT
 from tilo_evals import Case
 from tilo_evals.checks import CheckResult, Outcome, get, kind, register
 

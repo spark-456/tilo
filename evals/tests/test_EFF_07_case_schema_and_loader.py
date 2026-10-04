@@ -6,7 +6,7 @@ import time
 import jsonschema
 import pytest
 import yaml
-from conftest import REPO_ROOT, write_case
+from _evals_lib import REPO_ROOT, write_case
 from tilo_evals import CaseError, EvalsConfig, EvalsConfigError, load_cases
 
 

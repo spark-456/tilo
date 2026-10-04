@@ -1,0 +1,87 @@
+id: B-003
+domain: research
+shapes:
+- non_english
+- parallel_units
+title: Regulatory changes brief, asked in Portuguese
+brief: 'Resuma as principais mudanças regulatórias para pequenas empresas de logística em 2026: transporte, seguros
+  e proteção de dados. Quero a resposta em inglês para a diretoria.'
+director:
+  brief:
+    goal: 'Summarise 2026 regulatory changes for small logistics firms: transport, insurance, data protection.'
+    deliverables:
+    - title: Regulatory changes summary
+      format: markdown
+    audience: Board of directors
+    deadline: null
+    constraints:
+    - Write in English
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Transport rules
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: research
+      title: Insurance rules
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U3
+      unit_type: research
+      title: Data protection rules
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U4
+      unit_type: draft
+      title: Write the combined summary
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+      - U2
+      - U3
+    - id: U5
+      unit_type: verify
+      title: Check the summary against the sources
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U4
+    - id: U6
+      unit_type: deliver
+      title: Save the summary to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U5
+expect:
+  outcome: completed

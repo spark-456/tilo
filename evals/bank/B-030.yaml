@@ -1,0 +1,65 @@
+id: B-030
+domain: education
+shapes:
+- single_deliverable
+title: A quiz bank on the French Revolution
+brief: Write 20 multiple-choice questions on the French Revolution for a Year 9 class, with an answer key and one
+  sentence of explanation per answer.
+director:
+  brief:
+    goal: Write 20 multiple-choice questions on the French Revolution with an answer key and explanations.
+    deliverables:
+    - title: Quiz bank
+      format: docx
+    audience: Year 9 students
+    deadline: null
+    constraints:
+    - 20 questions
+    - One-sentence explanations
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Pick the key events
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Write the questions
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write the answer key
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+    - id: U4
+      unit_type: verify
+      title: Check the facts and dates
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U3
+expect:
+  outcome: completed

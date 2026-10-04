@@ -10,9 +10,12 @@ import { elapsed } from "../world/runLog";
 import { involves, select } from "../world/selection";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
+import { LevelChip, levelOf } from "./LevelChip";
 import { Placeholder } from "./Placeholder";
 import { SelectionBar } from "./SelectionBar";
 import { findItem } from "./findItem";
+import { factsOf, stateTone } from "./inspectFacts";
+import { Chip } from "./kit";
 import { useRemote } from "./remote";
 import type { ScreenProps } from "./routes";
 
@@ -22,7 +25,9 @@ export function S_05({ params }: ScreenProps) {
   const [worldId = "", itemId = ""] = params;
   const client = useClient();
   const { events } = useReplayedLog(client, worldId);
-  const [layout, retry] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layout, retry] = useRemote("load the world", (signal) =>
+    client.getLayout(worldId, signal),
+  );
   const found = layout.status === "ready" ? findItem(layout.value, itemId, events) : null;
   const exists = found !== null;
   // Inspecting an object selects it, so the lenses show the same one (FR-WLD-06).
@@ -43,26 +48,44 @@ export function S_05({ params }: ScreenProps) {
           const item = findItem(l, itemId, events);
           if (!item) return <p>There is nothing called {itemId} in this world.</p>;
           const mine = events.filter((e) => involves(e, itemId));
+          const now = reduce(l, events);
+          const state = item.state(now);
+          const facts = factsOf(l, itemId, now);
           return (
             <>
               <p className="screen-tag">
                 {item.kind} · {item.where}
               </p>
-              <p>
-                <b>State:</b> {item.state(reduce(l, events))}
+              <p className="inspect-state">
+                <b>State:</b> <Chip tone={stateTone(state)}>{state}</Chip>
               </p>
+              {facts.length > 0 && (
+                <dl className="inspect-facts" data-testid="inspect-facts">
+                  {facts.map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
               <Placeholder label="Follow in the world" />
               <h2>What happened here</h2>
               {mine.length === 0 ? (
                 <p>No event has named this yet.</p>
               ) : (
-                <ol className="story-list">
-                  {mine.map((e) => (
-                    <li key={e.seq}>
-                      <span className="story-time">{elapsed(events, e)}</span>
-                      <span>{e.summary}</span>
-                    </li>
-                  ))}
+                <ol className="mini-timeline" aria-label="Events that name this, in order">
+                  {mine.map((e) => {
+                    const lv = levelOf(l, e);
+                    return (
+                      <li key={e.seq}>
+                        <span className="story-time">{elapsed(events, e)}</span>
+                        <span>
+                          {e.summary} {lv && <LevelChip level={lv} />}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ol>
               )}
             </>

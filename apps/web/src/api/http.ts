@@ -115,7 +115,39 @@ const isLayout = (l: unknown): l is Layout => {
   const semantic = (l as Layout | null)?.semantic;
   return typeof l === "object" && l !== null && Array.isArray(semantic?.agents);
 };
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** Resolves after `ms`, or at once when `signal` aborts (the caller checks the signal after). */
+const sleep = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    if (signal.aborted) return resolve();
+    const done = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    signal.addEventListener("abort", done);
+  });
+const STOPPED = "This was stopped because the page no longer needs it.";
+
+/** One world's layout call, shared by every page asking for it while it is pending. */
+interface LayoutCall {
+  readonly promise: Promise<Layout>;
+  readonly stop: AbortController;
+  /** Callers that passed a signal and have not let go; the call stops when the last one does. */
+  holders: number;
+  settled: boolean;
+}
+
+/** What the event polls of one world have shown so far, for `getLayout` to wait on instead of
+ * polling on a timer of its own. */
+interface Feed {
+  readonly types: Set<string>;
+  /** The latest poll's failure, cleared by the next good poll. */
+  failure: TiloApiError | null;
+  /** Live `subscribeEvents` calls for the world. */
+  subs: number;
+  readonly waiters: Set<() => void>;
+}
 
 export interface HttpClientOptions {
   /** The API origin, e.g. `http://localhost:8080`. */
@@ -130,7 +162,11 @@ export class HttpClient implements TiloClient {
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
   private readonly cardWorlds = new Map<string, string>(); // card -> world, from listCards
-  private readonly layouts = new Map<string, Promise<Layout>>(); // a run's layout never changes
+  private readonly layouts = new Map<string, LayoutCall>(); // a run's layout never changes
+  private readonly approaches = new Map<string, Promise<ApproachesResult>>(); // in flight only
+  private readonly feeds = new Map<string, Feed>();
+  private readonly missing = new Set<string>(); // worlds whose events answered 404
+  private readonly missingListeners = new Set<() => void>();
 
   constructor(options: HttpClientOptions) {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
@@ -205,8 +241,16 @@ export class HttpClient implements TiloClient {
     });
   }
 
+  /** Calls for one task that overlap (React's dev double mount) share one request; it is not kept,
+   * so a later call sees the answers given since. */
   getApproaches(taskId: string): Promise<ApproachesResult> {
-    return this.request(`/tasks/${encodeURIComponent(taskId)}/approaches`);
+    const running = this.approaches.get(taskId);
+    if (running) return running;
+    const call = this.request<ApproachesResult>(`/tasks/${encodeURIComponent(taskId)}/approaches`);
+    this.approaches.set(taskId, call);
+    const done = () => this.approaches.delete(taskId);
+    call.then(done, done);
+    return call;
   }
 
   approve(taskId: string, req: ApprovalRequest): Promise<{ world_id: string }> {
@@ -219,38 +263,116 @@ export class HttpClient implements TiloClient {
    * is on record (the run builds it before writing that). Until then the call stays pending (a loading
    * state, not a failure); a run that failed first rejects with a plain reason. One call per world is
    * shared and a successful layout is kept; a failure is not, so a retry asks again. */
-  getLayout(worldId: string): Promise<Layout> {
-    const known = this.layouts.get(worldId);
-    if (known) return known;
-    const pending = this.awaitLayout(worldId);
-    this.layouts.set(worldId, pending);
-    pending.catch(() => this.layouts.delete(worldId));
-    return pending;
+  getLayout(worldId: string, signal?: AbortSignal): Promise<Layout> {
+    let call = this.layouts.get(worldId);
+    if (!call && signal?.aborted) return Promise.reject(new TiloApiError(STOPPED, null, false));
+    if (!call) {
+      const stop = new AbortController();
+      const made: LayoutCall = {
+        promise: this.awaitLayout(worldId, stop.signal),
+        stop,
+        holders: 0,
+        settled: false,
+      };
+      call = made;
+      this.layouts.set(worldId, made);
+      const done = (kept: boolean) => {
+        made.settled = true;
+        if (!kept && this.layouts.get(worldId) === made) this.layouts.delete(worldId);
+      };
+      made.promise.then(
+        () => done(true),
+        () => done(false),
+      );
+    }
+    // A caller with a signal holds the shared call; when the last one lets go (its page left) the
+    // call stops polling instead of running on to its deadline. A caller without one never lets go.
+    if (signal) {
+      const held = call;
+      held.holders += 1;
+      const release = () => {
+        held.holders -= 1;
+        if (held.holders > 0 || held.settled) return;
+        if (this.layouts.get(worldId) === held) this.layouts.delete(worldId);
+        held.stop.abort();
+      };
+      if (signal.aborted) release();
+      else signal.addEventListener("abort", release, { once: true });
+    }
+    return call.promise;
   }
 
-  private async awaitLayout(worldId: string): Promise<Layout> {
-    const id = encodeURIComponent(worldId);
-    const deadline = Date.now() + LAYOUT_WAIT_MS;
-    for (;;) {
-      const body = await this.request<{ events?: unknown }>(`/worlds/${id}/events`);
-      const types = new Set(
-        (Array.isArray(body.events) ? body.events.filter(isEventView) : []).map((e) => e.type),
-      );
-      if (types.has("world.started")) break;
-      if (types.has("world.failed")) throw new TiloApiError(NO_WORLD_BUILT, null, false);
-      if (Date.now() >= deadline) throw new TiloApiError(SLOW_WORLD, null, true);
-      await sleep(this.pollMs);
+  /** True once the server has answered 404 for this world's events: the world does not exist. The
+   * page says "Not found" on it (App's `useWorldKnown`); the client has stopped polling it. */
+  isWorldMissing(worldId: string): boolean {
+    return this.missing.has(worldId);
+  }
+
+  /** `useSyncExternalStore`'s subscribe for `isWorldMissing`. Returns the unsubscribe. */
+  onWorldMissing(listener: () => void): () => void {
+    this.missingListeners.add(listener);
+    return () => this.missingListeners.delete(listener);
+  }
+
+  private feed(worldId: string): Feed {
+    let feed = this.feeds.get(worldId);
+    if (!feed) {
+      feed = { types: new Set(), failure: null, subs: 0, waiters: new Set() };
+      this.feeds.set(worldId, feed);
     }
+    return feed;
+  }
+
+  /** Waits on what the event polls show: the page's own subscription when it has one, else one this
+   * call opens and closes itself. No timer of its own but the one deadline, cleared when it ends. */
+  private async awaitStarted(worldId: string, signal: AbortSignal): Promise<void> {
+    if (signal.aborted) throw new TiloApiError(STOPPED, null, false);
+    const feed = this.feed(worldId);
+    if (feed.subs === 0) feed.failure = null; // a failure of an earlier, closed subscription is stale
+    const own = feed.subs === 0 ? this.subscribeEvents(worldId, () => undefined) : null;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    let check: (() => void) | undefined;
+    let abort: (() => void) | undefined;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        abort = () => reject(new TiloApiError(STOPPED, null, false));
+        if (signal.aborted) return abort();
+        signal.addEventListener("abort", abort);
+        check = () => {
+          if (feed.types.has("world.started")) resolve();
+          else if (feed.types.has("world.failed"))
+            reject(new TiloApiError(NO_WORLD_BUILT, null, false));
+          else if (feed.failure) reject(feed.failure);
+        };
+        feed.waiters.add(check);
+        deadline = setTimeout(
+          () => reject(new TiloApiError(SLOW_WORLD, null, true)),
+          LAYOUT_WAIT_MS,
+        );
+        check();
+      });
+    } finally {
+      clearTimeout(deadline);
+      if (check) feed.waiters.delete(check);
+      if (abort) signal.removeEventListener("abort", abort);
+      own?.();
+    }
+  }
+
+  private async awaitLayout(worldId: string, signal: AbortSignal): Promise<Layout> {
+    const id = encodeURIComponent(worldId);
+    await this.awaitStarted(worldId, signal);
     for (let tries = 1; ; tries += 1) {
       try {
-        const layout = await this.request<unknown>(`/worlds/${id}/layout`);
+        if (signal.aborted) throw new TiloApiError(STOPPED, null, false);
+        const layout = await this.request<unknown>(`/worlds/${id}/layout`, { signal });
         if (!isLayout(layout)) throw new TiloApiError(BAD_REPLY, 200, true);
         return layout;
       } catch (error) {
         const notYet = error instanceof TiloApiError && error.status === 404;
         if (!notYet) throw error;
         if (tries >= LAYOUT_404_POLLS) throw new TiloApiError(NOT_BUILT, 404, true);
-        await sleep(this.pollMs);
+        await sleep(this.pollMs, signal);
       }
     }
   }
@@ -274,6 +396,13 @@ export class HttpClient implements TiloClient {
     let failures = 0;
     const seen = new Map<string, number>(); // id -> seq, only ids at or after the cursor
     const path = `/worlds/${encodeURIComponent(worldId)}/events`;
+    const feed = this.feed(worldId);
+    feed.subs += 1;
+    let open = true;
+    const note = (failure: TiloApiError | null) => {
+      feed.failure = failure;
+      for (const wake of [...feed.waiters]) wake();
+    };
 
     const poll = async () => {
       let delay = this.pollMs;
@@ -283,16 +412,32 @@ export class HttpClient implements TiloClient {
         const rows = Array.isArray(body.events) ? body.events.filter(isEventView) : [];
         fresh = rows.filter((e) => e.seq > cursor && !seen.has(e.id)).sort((a, b) => a.seq - b.seq);
         failures = 0;
+        for (const row of rows) feed.types.add(row.type);
+        if (this.missing.delete(worldId))
+          for (const listener of [...this.missingListeners]) listener();
+        note(null);
       } catch (error) {
-        if (!(error instanceof TiloApiError) || !error.retryable) stopped = true; // 4xx: it will not change
+        const known =
+          error instanceof TiloApiError ? error : new TiloApiError(UNREACHABLE, null, true);
+        if (!known.retryable) {
+          stopped = true; // 4xx (an unknown world is a 404): it will not change
+          if (known.status === 404 && !this.missing.has(worldId)) {
+            this.missing.add(worldId);
+            for (const listener of [...this.missingListeners]) listener();
+          }
+          onError?.(known);
+        }
         failures += 1;
         delay = Math.min(this.pollMs * 2 ** failures, MAX_BACKOFF_MS);
+        note(known);
       }
       for (const view of fresh) {
         if (stopped) return;
         if (!isComplete(view, worldId)) {
           stopped = true;
-          onError?.(new TiloApiError(OUT_OF_DATE, null, false));
+          const outOfDate = new TiloApiError(OUT_OF_DATE, null, false);
+          onError?.(outOfDate);
+          note(outOfDate);
           return;
         }
         seen.set(view.id, view.seq);
@@ -312,6 +457,8 @@ export class HttpClient implements TiloClient {
     };
     void poll();
     return () => {
+      if (open) feed.subs -= 1;
+      open = false;
       stopped = true;
       clearTimeout(timer);
     };

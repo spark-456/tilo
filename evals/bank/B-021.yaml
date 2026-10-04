@@ -1,0 +1,55 @@
+id: B-021
+domain: hr
+shapes:
+- single_deliverable
+title: A week-one checklist for a remote support agent
+brief: 'Draft an onboarding checklist for a remote customer-support agent starting on Monday: week one, day by day,
+  including accounts to set up and who they meet.'
+director:
+  brief:
+    goal: Draft a day-by-day week-one onboarding checklist for a remote support agent.
+    deliverables:
+    - title: Onboarding checklist
+      format: docx
+    audience: New hire and their manager
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: draft
+      title: Write the day-by-day checklist
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: verify
+      title: Check each day is covered
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: deliver
+      title: Save the result to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U2
+expect:
+  outcome: completed
