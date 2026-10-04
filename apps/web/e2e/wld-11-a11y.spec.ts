@@ -16,6 +16,7 @@ test.describe("FR-WLD-11 accessibility", () => {
   test("FR_WLD_11 keyboard outline: arrows move focus, Enter selects with Inspect, Escape clears", async ({
     page,
   }) => {
+    test.setTimeout(90_000); // a cold Vite start plus a dozen key presses, under a loaded machine
     await page.setViewportSize(DESKTOP);
     await gotoStage(page, "/?fixture=village-basic");
     const outline = page.getByRole("list", { name: "World objects" });
