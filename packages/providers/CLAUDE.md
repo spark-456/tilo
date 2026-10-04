@@ -23,8 +23,8 @@ The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `Search
 
 ## Local rules
 - Denylisted ids fail start-up loudly (PL-07); every role needs a fallback (NFR-25); `price()` never invents one (PL-06).
-- Dev Director (CL-INT-5): `model: fake-director` (`config/models.dev.yaml`) -> `DevDirectorProvider`, deterministic brief and
-  approaches replies from the input only, tagged "(dev)". Refused (load, build, every call) if `LIVE=1` or `K_SERVICE`/
+- Dev Director (CL-INT-5): `model: fake-director` (`config/models.dev.yaml`) -> `DevDirectorProvider`, deterministic brief, approaches and
+  plan-draft (`units`) replies from the input only, tagged "(dev)". Refused (load, build, every call) if `LIVE=1` or `K_SERVICE`/
   `CLOUD_RUN_JOB` is set; `dev_only`, so `run_conformance_suite` refuses it and no result file ever makes it conform (PL-05).
 - Adapters map SDK/HTTP errors onto `tilo_providers.errors`; `json_mode`/`.response_schema` map to `response_mime_type`/
   `response_schema` (google) or `response_format` (openai_compat). `openai_compat_adapter` rejects a dirty API key (names the

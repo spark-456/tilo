@@ -6,8 +6,8 @@ types and extracts files (`extraction`), screens them with a `SafetyProvider` an
 versioned artifacts with an origin record (`artifacts`). FR-INT-03/04/05: `brief.extract_brief` asks
 the `director` role (through `tilo_providers.router.Router`) for a brief and the ambiguous fields;
 `questions.generate_questions` checks `memory` first, then ranks and caps the questions in code.
-FR-INT-09: `plangraph.validate_plan` checks a plan against `plan.schema.json` and PG-01..PG-11
-(`plan.rules.md`) with no model, returning every `Violation` with its rule id.
+FR-INT-09: `plangraph.validate_plan` (plan schema, PG-01..PG-11, no model); `compiler.compile_plan`: the `director`
+drafts units, code adds gates and cap, one repair sends rule ids and pointers in data blocks (BQ-115).
 FR-INT-06/07/08: `approaches.propose_approaches` asks the `director` role for 2-3 approaches and checks
 PG-07/08/09 in code (one repair through the router, then reject); `estimate.estimate_units` sums
 historical unit costs (seed table `unit_cost_seed.json`, empty at launch, PRD 7.3); `budget` grants a

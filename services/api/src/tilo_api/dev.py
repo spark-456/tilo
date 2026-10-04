@@ -3,7 +3,8 @@ event writer and CORS for the Vite dev origin, so `just dev-api` can serve the f
 `TILO_API_DEV=1`; it refuses to start when deployed (`K_SERVICE` or `CLOUD_RUN_JOB` set, the rule the fake
 safety provider uses) or in live mode (`LIVE=1`), and every dev dependency re-checks that on each call. It makes
 no network or paid call, and it is a stand-in for sign-in and Firestore, never a second implementation of them.
-`main` (`just dev-api`) also selects `config/models.dev.yaml`, whose Director is a deterministic fake (CL-INT-5)."""
+`main` (`just dev-api`) also selects `config/models.dev.yaml`, whose Director is a deterministic fake (CL-INT-5);
+`dev_run` adds a fake unit runner, recipient and mock adapters, so a run reaches a gate and a fake send (5c)."""
 
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 from tilo_harness.validator import repo_validator
 
-from tilo_api import deps, events
+from tilo_api import deps, dev_run, events
 
 ENV_FLAG = "TILO_API_DEV"  # "1" turns dev mode on; nothing else does
 ENV_ORIGINS = "TILO_API_DEV_ORIGINS"  # comma-separated allowed browser origins
@@ -143,6 +144,7 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
         return writer
 
     app.dependency_overrides[deps.get_event_writer] = get_writer
+    app.dependency_overrides.update(dev_run.overrides())  # fake unit runner, recipient and send (CL-INT-5c)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
