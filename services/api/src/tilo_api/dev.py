@@ -2,7 +2,8 @@
 event writer and CORS for the Vite dev origin, so `just dev-api` can serve the flow to the web client. Selected by
 `TILO_API_DEV=1`; it refuses to start when deployed (`K_SERVICE` or `CLOUD_RUN_JOB` set, the rule the fake
 safety provider uses) or in live mode (`LIVE=1`), and every dev dependency re-checks that on each call. It makes
-no network or paid call, and it is a stand-in for sign-in and Firestore, never a second implementation of them."""
+no network or paid call, and it is a stand-in for sign-in and Firestore, never a second implementation of them.
+`main` (`just dev-api`) also selects `config/models.dev.yaml`, whose Director is a deterministic fake (CL-INT-5)."""
 
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ import os
 import re
 import threading
 from collections.abc import Mapping
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +24,8 @@ ENV_ORIGINS = "TILO_API_DEV_ORIGINS"  # comma-separated allowed browser origins
 DEFAULT_ORIGIN = "http://localhost:5173"  # the Vite dev server
 DEV_OWNER = "u_dev_owner"  # the one dev principal (common.schema.json user_id)
 PORT = 8080
+ENV_MODELS = "TILO_MODELS_FILE"  # `main` points it at the dev models file unless the user already chose one
+DEV_MODELS = Path(__file__).resolve().parents[4] / "config" / "models.dev.yaml"  # a fake Director, CL-INT-5
 
 _ORIGIN_RE = re.compile(r"^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$")
 _NULL_TRACE = dict.fromkeys(("model_role", "profile", "tokens_in", "tokens_out", "tool", "latency_ms", "archive_ref"))
@@ -129,6 +133,7 @@ def main() -> None:
     import uvicorn
 
     os.environ[ENV_FLAG] = "1"
+    os.environ.setdefault(ENV_MODELS, str(DEV_MODELS))
     refuse_if_unsafe()
     cors_origins()
     uvicorn.run("tilo_api:app", host="127.0.0.1", port=PORT, reload=True)

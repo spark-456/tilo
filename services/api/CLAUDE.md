@@ -6,14 +6,14 @@ service the web client and channels write through; the client reads live state f
 
 ## Commands
 - `uv sync --package tilo-api` — install; `uv run --package tilo-api pytest` — tests; `just check` — root gate
-- `just dev-api` — dev server on 127.0.0.1:8080 in dev mode (`python -m tilo_api`)
+- `just dev-api` — dev mode on 127.0.0.1:8080; `TILO_MODELS_FILE` defaults to `config/models.dev.yaml` (fake Director)
 
 ## Contracts
 - Reads/writes `packages/contracts-py` types; Firestore (worlds, events, cards, policies, grants); Cloud Tasks.
 
 ## Config
 - `config/autonomy.yaml`, `config/flags/`, `config/connectors.yaml` (RBAC and routing only).
-- Env: `TILO_API_DEV=1` dev mode (below); `TILO_API_DEV_ORIGINS` comma list, default `http://localhost:5173`.
+- Env: `TILO_API_DEV=1` dev mode (below); `TILO_API_DEV_ORIGINS`, default `http://localhost:5173`.
 
 ## Requirement IDs
 - Section 6.2 `tilo-api` row; SEC-05 through SEC-12 (auth, RBAC, redaction) as they land.
