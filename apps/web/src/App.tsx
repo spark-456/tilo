@@ -14,7 +14,7 @@ import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
 import { useRunStatus } from "./world/runLog";
 import { speedBadgeText } from "./world/speed";
-import { useLiveWorld } from "./world/useLiveWorld";
+import { useClientWorld } from "./world/useClientWorld";
 import { useWorldFixture } from "./world/useWorldFixture";
 
 // Stage mode is a display setting (PRD 9.6).
@@ -83,9 +83,11 @@ export function App() {
   const screen = unknownWorld ? NOT_FOUND : matched;
   const worldId = unknownWorld ? null : pathWorld;
   const hudWorld = screen ? null : worldId;
-  // FR-WLD-05: with a real client the stage draws the addressed world's live run (no fixture
-  // param, no fixture client); the hook reads nothing when there is no such world.
-  const live = useLiveWorld(client, world.active || fixtureClient ? null : hudWorld);
+  // The stage draws a ?fixture= replay if one was asked for, else the run of the world in the path
+  // (the same layout and events the HUD reads), through any client, the fixture client included
+  // (FR-WLD-05); anywhere else it keeps its bare grid.
+  const clientWorld = useClientWorld(client, world.active ? null : hudWorld);
+  const stageWorld = world.active ? world : clientWorld;
   // FR-WLD-07: the stage is veiled only while the recorded run status is "paused" (HR-1).
   const clientStatus = useRunStatus(client, hudWorld);
   const stagePaused = (world.active ? world.status : clientStatus) === "paused";
@@ -127,12 +129,12 @@ export function App() {
           />
         </main>
       ) : (
+        // Keyed by world: Stage hands its content seam over once, when Pixi is ready.
         <Stage
-          {...(world.active
-            ? { onWorld: world.onWorld, seq: world.seq, selected: world.selected }
-            : fixtureClient
-              ? {}
-              : { onWorld: live.onWorld, seq: live.seq, selected: live.selected })}
+          key={world.active ? "fixture" : (hudWorld ?? "none")}
+          {...(stageWorld.active
+            ? { onWorld: stageWorld.onWorld, seq: stageWorld.seq, selected: stageWorld.selected }
+            : {})}
           paused={stagePaused}
         />
       )}
@@ -146,17 +148,17 @@ export function App() {
           Fixture replay — dev data, not a real run
         </div>
       )}
-      {live.note && (
+      {clientWorld.note && (
         // Fixed like the fixture alerts, so it never shifts the layout. Says what is true: the world
         // is not drawn until the run has built one.
         <div
           className="live-world-note"
           data-testid="live-world-note"
-          role={live.retry ? "alert" : "status"}
+          role={clientWorld.retry ? "alert" : "status"}
         >
-          <p>{live.note}</p>
-          {live.retry && (
-            <button type="button" className="secondary" onClick={live.retry}>
+          <p>{clientWorld.note}</p>
+          {clientWorld.retry && (
+            <button type="button" className="secondary" onClick={clientWorld.retry}>
               Try again
             </button>
           )}

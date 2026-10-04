@@ -15,10 +15,10 @@ Trace lenses, cards and settings.
 `config/themes/` (world themes), feature flags. UX-1–UX-9 (18.1); FR-WLD-*; owned from P0-08.
 
 ## Stage and world (`src/stage/`, `src/world/`)
-- `Stage.tsx`: the camera is the Pixi world container's transform (`camera.ts`); no CSS transform,
-  no always-on ticker (HR-2). `data-stage-ready="true"` appears with the first frame.
+- `Stage.tsx`: the camera is the Pixi world container's transform (`camera.ts`); no CSS transform, no always-on ticker (HR-2). `data-stage-ready="true"` appears with the first frame.
 - FR-WLD-04: `registry` → `reducer` (HR-5) → `store` → `frame` → `renderer.ts` (art in `world/art/`, ported
-  from the design prototypes, ADR-0003); `choreographer.ts` (HR-3) alone animates. `?fixture=`, `?seq=N`, `?speed=N`. Live (HttpClient, FR-WLD-05): `useLiveWorld` draws `/world/:id` from `getLayout` (waits for `world.started`) + `followRun`; no solver geometry = empty stage and a note; Needs-you reads `?world=<id>` (`worldContext.ts`).
+  from the design prototypes, ADR-0003); `choreographer.ts` (HR-3) alone animates. The stage draws a `?fixture=` replay
+  (`runWorld`) or, on /world/:id, the client's own run: `useClientWorld` → `runClientWorld` (FR-WLD-05, any client; the one path). It waits for the layout via `getLayout` (until `world.started`); events held already fold in as a jump, later ones animate; no solver geometry = empty stage + a note; a failed load shows a note and retry. Needs-you reads `?world=<id>` (`worldContext.ts`). `?seq=N`, `?speed=N`.
 - FR-WLD-06: `selection.ts` keeps one selection per world (display state, never an event); the stage rings it.
 - FR-WLD-08: `replay.ts` holds one replay point per world (display state); `ReplayScrubber` (right rail, or above the mobile tabs) scrubs a finished run, disabled while live. Stage shows `stateAt(seq)`, Story/Trace/HUD the events up to it; the HR-4 banner ("Replay of run #… recorded …", fixtures add "dev fixture") shows once finished.
 
