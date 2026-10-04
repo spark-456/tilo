@@ -13,7 +13,7 @@ const SUMMARY = "The reply is ready. Sending it needs your approval.";
 for (const path of ["/needs-you", "/needs-you/gate"]) {
   test(`S_06 S_07 HR-6 shows the speed badge at ?speed=8 on ${path}`, async ({ page }) => {
     await page.goto(`${path}?speed=8`);
-    await expect(page.getByTestId("speed-badge")).toHaveText("8×");
+    await expect(page.getByTestId("speed-badge")).toHaveText("Replay at 8× speed");
   });
 }
 

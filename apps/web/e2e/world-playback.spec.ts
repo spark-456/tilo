@@ -36,13 +36,13 @@ test("HR-6 playback: no speed badge at 1x (?speed absent)", async ({ page }) => 
   await expect(speedBadge(page)).toHaveCount(0);
 });
 
-test("HR-6 playback: ?speed=10 compresses the seq 1 -> seq 2 gap well below 2s and shows a '10×' badge", async ({
+test("HR-6 playback: ?speed=10 compresses the seq 1 -> seq 2 gap well below 2s and says 'Replay at 10× speed'", async ({
   page,
 }) => {
   await page.goto(fixtureUrl("village-basic", { speed: 10 }));
   await expect(stageCanvas(page)).toBeVisible();
   await expect(speedBadge(page)).toBeVisible();
-  await expect(speedBadge(page)).toContainText("10×");
+  await expect(speedBadge(page)).toHaveText("Replay at 10× speed");
 
   await waitForSeq(page, 1);
   const t0 = Date.now();

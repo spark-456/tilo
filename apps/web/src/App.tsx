@@ -1,13 +1,18 @@
 import { memo, useEffect, useRef } from "react";
-import { useIsFixtureClient, useReplaySpeed } from "./api/ClientProvider";
+import { useClient, useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
+import { FIXTURE_WORLD_ID } from "./api/fixtures/derived";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { NeedsYouRail } from "./needs-you/NeedsYouRail";
 import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
+import { NotFound } from "./screens/NotFound";
+import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
 import { WorldPanels } from "./screens/WorldPanels";
-import { matchScreen } from "./screens/routes";
+import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
+import { useRunStatus } from "./world/runLog";
+import { speedBadgeText } from "./world/speed";
 import { useWorldFixture } from "./world/useWorldFixture";
 
 // Stage mode is a display setting (PRD 9.6).
@@ -18,7 +23,8 @@ const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
   </li>
 ));
 const WORLD_SCREENS: ReadonlySet<string> = new Set(["S-05", "S-10", "S-11", "S-12"]);
-/** Screens outside a world address that still read the replayed run (AGW-08 group B): HR-6 applies. */
+/** Screens outside a world address that still read the replayed run (AGW-08 group B): HR-6 applies,
+ * and the right rail describes that same run (the fixture world, the only one the client has). */
 const RUN_SCREENS: ReadonlySet<string> = new Set([
   "S-06",
   "S-07",
@@ -32,6 +38,9 @@ const RUN_SCREENS: ReadonlySet<string> = new Set([
   "S-21",
   "S-23",
 ]);
+/** The Needs-you screens keep their own rail (the cards queue); the badge still applies to them. */
+const NEEDS_YOU_SCREENS: ReadonlySet<string> = new Set(["S-06", "S-07"]);
+const NOT_FOUND: ScreenMatch = { id: "not-found", params: [], Component: NotFound };
 const stageMode = new URLSearchParams(window.location.search).get("display") === "stage";
 
 /** PRD 18.3 layout frame: desktop rails either side of the stage; mobile bottom tabs. */
@@ -39,32 +48,55 @@ export function App() {
   const mobile = useMediaQuery("(max-width: 767px)");
   const world = useWorldFixture();
   const fixtureClient = useIsFixtureClient();
+  const client = useClient();
   const replaySpeed = useReplaySpeed();
   const path = usePathname();
-  const screen = matchScreen(path); // null: the stage and the flow shell
+  const matched = matchScreen(path); // null: the stage and the flow shell
   const previousPath = useRef(path);
   // After a route change a full-page screen's heading takes focus, so keyboard and screen-reader
   // users keep their place (the flow shell does the same for its own heading).
   useEffect(() => {
     if (previousPath.current === path) return; // not the first render, nor StrictMode's second effect
     previousPath.current = path;
-    const h1 = document.querySelector<HTMLElement>(".screen-page h1");
+    // The World lens is the stage with the flow shell's heading, so it takes focus the same way.
+    const h1 = document.querySelector<HTMLElement>(".screen-page h1, .flow-heading");
     h1?.setAttribute("tabindex", "-1");
     h1?.focus();
   }, [path]);
   // The world a path belongs to: its S-04 panels fill the right rail on every world screen (S-04,
   // S-05, S-10, S-11, S-12) and, on mobile, a bottom sheet on S-04 itself.
   const flow = matchFlowRoute(path);
-  const worldId = screen
-    ? WORLD_SCREENS.has(screen.id)
-      ? (screen.params[0] ?? null)
+  const pathWorld = matched
+    ? WORLD_SCREENS.has(matched.id)
+      ? (matched.params[0] ?? null)
       : null
     : flow.screen === "World"
       ? flow.worldId
       : null;
+  // A world id the client does not know is "Not found", never another world's run in its place.
+  const unknownWorld = !useWorldKnown(pathWorld) && !world.active;
+  const screen = unknownWorld ? NOT_FOUND : matched;
+  const worldId = unknownWorld ? null : pathWorld;
   const hudWorld = screen ? null : worldId;
+  // FR-WLD-07: the stage is veiled only while the recorded run status is "paused" (HR-1).
+  const clientStatus = useRunStatus(client, hudWorld);
+  const stagePaused = (world.active ? world.status : clientStatus) === "paused";
+  const runScreen = screen !== null && RUN_SCREENS.has(screen.id);
+  const needsYouScreen = screen !== null && NEEDS_YOU_SCREENS.has(screen.id);
+  const railWorld = worldId ?? (runScreen && !needsYouScreen ? FIXTURE_WORLD_ID : null);
+  // HR-6: a replay that is not at its recorded pace always says so (after lens navigation drops
+  // ?speed the client keeps its speed), in words, in a status region.
+  const speedBadge = world.active
+    ? world.speedLabel
+    : worldId !== null || runScreen
+      ? speedBadgeText(replaySpeed)
+      : null;
   return (
-    <div className="app-shell" data-stage-mode={stageMode ? "on" : "off"}>
+    <div
+      className="app-shell"
+      data-stage-mode={stageMode ? "on" : "off"}
+      data-replay-badge={speedBadge ? "on" : "off"}
+    >
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
         <main className="screen-page" data-testid="screen-page" data-screen={screen.id}>
@@ -74,7 +106,12 @@ export function App() {
           />
         </main>
       ) : (
-        <Stage {...(world.active ? { onWorld: world.onWorld, seq: world.seq } : {})} />
+        <Stage
+          {...(world.active
+            ? { onWorld: world.onWorld, seq: world.seq, selected: world.selected }
+            : {})}
+          paused={stagePaused}
+        />
       )}
       {!screen && !world.active && <FlowShell />}
       {(world.active || fixtureClient) && (
@@ -91,30 +128,25 @@ export function App() {
           {world.loadError}
         </div>
       )}
-      {world.active && world.speedLabel && (
-        <div className="speed-badge" data-testid="speed-badge">
-          {world.speedLabel}
+      {speedBadge && (
+        // biome-ignore lint/a11y/useSemanticElements: same persistent status region as the banner above, not a form result.
+        <div className="speed-badge" data-testid="speed-badge" role="status">
+          {speedBadge}
         </div>
       )}
-      {(worldId || (screen && RUN_SCREENS.has(screen.id))) &&
-        replaySpeed !== 1 &&
-        !world.active && (
-          // HR-6: a replay that is not at its recorded pace always says so, on every world screen and
-          // after lens navigation drops ?speed (the client keeps its speed).
-          <div className="speed-badge client-speed" data-testid="speed-badge">
-            {replaySpeed}×
-          </div>
-        )}
       {mobile ? (
         <>
           {hudWorld && (
             <details
               className="hud-sheet"
               onKeyDown={(e) => {
-                if (e.key === "Escape") e.currentTarget.open = false;
+                if (e.key !== "Escape") return;
+                // Closing the sheet hides the focused control, so focus goes back to its summary.
+                e.currentTarget.open = false;
+                e.currentTarget.querySelector("summary")?.focus();
               }}
             >
-              <summary>World status</summary>
+              <summary>World status{clientStatus === "paused" ? " · Paused" : ""}</summary>
               <WorldPanels key={hudWorld} worldId={hudWorld} />
             </details>
           )}
@@ -122,13 +154,14 @@ export function App() {
         </>
       ) : (
         <aside className="right-rail" data-testid="right-rail">
-          {worldId ? (
-            <WorldPanels key={worldId} worldId={worldId} tabs={hudWorld !== null} />
+          {railWorld ? (
+            <WorldPanels key={railWorld} worldId={railWorld} tabs={hudWorld !== null} />
           ) : (
             <>
+              {world.active && <ReplayPauseSlot status={world.status} />}
               <h2>Activity</h2>
               <p data-testid="right-rail-meter">Nothing yet. This fills in once a run starts.</p>
-              {screen && RUN_SCREENS.has(screen.id) ? (
+              {needsYouScreen ? (
                 <NeedsYouRail />
               ) : (
                 <>

@@ -12,9 +12,13 @@ export function watchConsole(page: Page): string[] {
 }
 
 /** Every button on the screen is a placeholder (aria-disabled or disabled): never a dead click.
- * The one filled primary button navigates, and each screen's own test clicks it. */
+ * The one filled primary button navigates, and each screen's own test clicks it. A lens control
+ * (data-lens-control, FR-WLD-06) selects an object and is covered by lens-sync.spec.ts; Pause all
+ * (data-pause-control, FR-WLD-07) sends a request and is covered by world-pause.spec.ts. */
 export async function expectNoDeadControls(page: Page, scope = "main") {
-  const buttons = page.locator(`${scope} button:not(.primary)`);
+  const buttons = page.locator(
+    `${scope} button:not(.primary):not([data-lens-control]):not([data-pause-control])`,
+  );
   for (let i = 0; i < (await buttons.count()); i++) {
     const b = buttons.nth(i);
     const disabled = (await b.getAttribute("aria-disabled")) === "true" || (await b.isDisabled());

@@ -6,13 +6,20 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import type { WorldSeam } from "../stage/Stage";
 import { loadFixture } from "./fixtureLoader";
+import type { RunStatus } from "./runSummary";
 import { runWorld } from "./runWorld";
+import { useSelection } from "./selection";
+import { parseSpeed, speedBadgeText } from "./speed";
 
 export interface WorldFixtureState {
   readonly active: boolean;
   readonly seq: number;
   readonly trace: ReadonlyArray<{ seq: number; type: string }>;
   readonly speedLabel: string | null;
+  /** The replayed run's recorded status (FR-WLD-07: "paused" shows the veil). */
+  readonly status: RunStatus;
+  /** The run's selected object (FR-WLD-06), for the stage frame's data-selected. */
+  readonly selected: string | null;
   /** Set when the named fixture could not be loaded (or no name was given); shown as an alert. */
   readonly loadError: string | null;
   readonly onWorld: WorldSeam;
@@ -23,8 +30,7 @@ function parseParams(search: string) {
   const fixture = params.get("fixture");
   const seqRaw = params.get("seq");
   const seqParam = seqRaw !== null && Number.isFinite(Number(seqRaw)) ? Number(seqRaw) : null;
-  const speedRaw = Number(params.get("speed"));
-  const speed = Number.isFinite(speedRaw) && speedRaw > 0 ? speedRaw : 1;
+  const speed = parseSpeed(params.get("speed"));
   return { fixture, seqParam, speed };
 }
 
@@ -33,9 +39,12 @@ export function useWorldFixture(): WorldFixtureState {
   const reducedMotionRef = useRef(false);
   reducedMotionRef.current = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [seq, setSeq] = useState(0);
+  const [status, setStatus] = useState<RunStatus>("idle");
   const [loadError, setLoadError] = useState<string | null>(
     fixture === "" ? "No fixture name was given, so the fixture could not be loaded." : null,
   );
+  const [worldId, setWorldId] = useState(""); // set once the layout is loaded
+  const [selected] = useSelection(worldId);
   const [trace, setTrace] = useState<ReadonlyArray<{ seq: number; type: string }>>([]);
   const stopRef = useRef<(() => void) | undefined>(undefined);
   // P7/HR-2 ("nothing moves before the first event"): the fetch starts only once Stage's Pixi
@@ -55,6 +64,7 @@ export function useWorldFixture(): WorldFixtureState {
       dataRef.current
         .then(({ layout, events }) => {
           if (cancelled) return;
+          setWorldId(layout.world_id);
           stopRef.current = runWorld({
             world,
             requestRender,
@@ -65,6 +75,7 @@ export function useWorldFixture(): WorldFixtureState {
             reducedMotion: () => reducedMotionRef.current,
             onSeq: (n) => !cancelled && setSeq(n),
             onTrace: (t) => !cancelled && setTrace(t),
+            onStatus: (s) => !cancelled && setStatus(s),
           });
         })
         .catch(() => {
@@ -84,7 +95,9 @@ export function useWorldFixture(): WorldFixtureState {
     active: fixture !== null,
     seq,
     trace,
-    speedLabel: speed > 1 ? `${speed}×` : null,
+    speedLabel: speedBadgeText(speed),
+    status,
+    selected,
     loadError,
     onWorld,
   };

@@ -1,86 +1,47 @@
-// S-05 Inspect panel (PRD 18.3): one thing in the world (building, district, level or agent), what
-// it is, where it sits, its state and every recorded event that names it. State comes from the
-// reducer over the recorded events, never from a guess (HR-1, HR-5). Layout after the Inspect panel
-// in design/source "Tilo World Player.dc.html".
-import type { Event, Layout } from "@tilo/contracts";
+// S-05 Inspect panel (PRD 18.3): one thing in the world (agent, building, district, level, island
+// or artifact), what it is, where it sits, its state and every recorded event that names it. State
+// comes from the reducer over the recorded events, never from a guess (HR-1, HR-5). Layout after
+// the Inspect panel in design/source "Tilo World Player.dc.html".
+import { useEffect } from "react";
 import { useClient } from "../api/ClientProvider";
-import { type WorldState, reduce } from "../world/reducer";
+import { reduce } from "../world/reducer";
 import { elapsed, useRunLog } from "../world/runLog";
-import { BUILDING_STATE, agentNames } from "../world/runSummary";
+import { involves, select } from "../world/selection";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
+import { SelectionBar } from "./SelectionBar";
+import { findItem } from "./findItem";
 import { useRemote } from "./remote";
 import type { ScreenProps } from "./routes";
 
-interface Found {
-  readonly kind: string;
-  readonly name: string;
-  readonly where: string;
-  readonly state: (s: WorldState) => string;
-}
-
-/** The item with this id anywhere in the layout, with its place and its state text. */
-export function findItem(layout: Layout, id: string): Found | null {
-  for (const level of layout.semantic.levels) {
-    if (level.id === id) {
-      return {
-        kind: "Level",
-        name: level.name,
-        where: "Top of the world",
-        state: (s) => (s.levels[id]?.completed ? "Finished" : "In progress"),
-      };
-    }
-    for (const district of level.districts) {
-      if (district.id === id) {
-        return {
-          kind: "District",
-          name: district.name,
-          where: `Level ${level.name}, led by ${district.lead}`,
-          state: (s) => (s.districts[id]?.completed ? "Finished" : "In progress"),
-        };
-      }
-      for (const b of district.buildings) {
-        if (b.id === id) {
-          return {
-            kind: b.kind === "common" ? "Common building" : "Building",
-            name: b.name,
-            where: `District ${district.name}, level ${level.name}`,
-            state: (s) => BUILDING_STATE[s.buildings[id]?.status ?? "hidden"],
-          };
-        }
-      }
-    }
-  }
-  const agent = layout.semantic.agents.find((a) => a.id === id);
-  if (!agent) return null;
-  return {
-    kind: "Agent",
-    name: agentNames(layout).get(id) ?? agent.id,
-    where: agent.team_lead ? `Team of ${agent.team_lead}` : "Part of the team",
-    state: (s) => (s.agents[id]?.spawned ? "Joined the team" : "Not joined yet"),
-  };
-}
-
-const names = (e: Event, id: string): boolean => e.target === id || e.actor === id;
+export { findItem };
 
 export function S_05({ params }: ScreenProps) {
   const [worldId = "", itemId = ""] = params;
   const client = useClient();
   const events = useRunLog(client, worldId);
   const [layout, retry] = useRemote("load the world", () => client.getLayout(worldId));
-  const found = layout.status === "ready" ? findItem(layout.value, itemId) : null;
+  const found = layout.status === "ready" ? findItem(layout.value, itemId, events) : null;
+  const exists = found !== null;
+  // Inspecting an object selects it, so the lenses show the same one (FR-WLD-06).
+  useEffect(() => {
+    if (exists) select(worldId, itemId);
+  }, [exists, worldId, itemId]);
   return (
     <div className="screen-body wide" data-testid="inspect-panel">
       <p>
-        <AppLink to={`/world/${encodeURIComponent(worldId)}`}>Back to the world</AppLink>
+        <AppLink className="back-link" to={`/world/${encodeURIComponent(worldId)}`}>
+          Back to the world
+        </AppLink>
       </p>
       <h1>{layout.status === "ready" ? (found ? found.name : "Not found") : "Inspect"}</h1>
+      <SelectionBar worldId={worldId} />
       <Loaded what="the world" remote={layout} retry={retry} isEmpty={() => false}>
         {(l) => {
-          const item = findItem(l, itemId);
+          const item = findItem(l, itemId, events);
           if (!item) return <p>There is nothing called {itemId} in this world.</p>;
-          const mine = events.filter((e) => names(e, itemId));
+          const mine = events.filter((e) => involves(e, itemId));
           return (
             <>
               <p className="screen-tag">

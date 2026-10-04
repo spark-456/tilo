@@ -14,19 +14,16 @@ channel identity binding, Email Autopilot triage. Public ingress for signature-v
 - `config/connectors.yaml` (channel routing), feature flags.
 
 ## Requirement IDs
-- Section 11 (channels and Email Autopilot); SEC-06 (channel identity binding and T3 PIN),
-  SEC-08 (signed webhooks and signed email links). FR-CHN-02, -03, -05, -06, -07, -09 are built.
+- Section 11 (channels, Email Autopilot); SEC-06 (binding, T3 PIN), SEC-08 (signed webhooks and email links). Built: FR-CHN-02, -03, -05 to -09.
 
 ## Local rules
-- Webhooks signature-verified, idempotent, ordered per user; forged or replayed rejected. Never send real
-  email or WhatsApp from dev/CI. Never log bodies, secrets, tokens, nonces or full numbers (`mask_number`:
-  last 4); log exception types, not messages.
-- `whatsapp`: HMAC over raw bytes, dedupe via `DedupeStore.claim`, serialised per sender. Stale (older than
-  300 s, or over 60 s ahead) claims nothing. Duplicate 200 "duplicate"; forged/missing signature 401; signed
-  non-JSON 400; handler raises: claim kept (at-most-once), 200 "failed". App secret >= 32 bytes; wamids
-  never logged (`message_ref`); object, field and `phone_number_id` pinned.
-- `keywords`: whole-message, case-insensitive, bound numbers only; control-plane effect, then one confirmation or "Could not apply that".
-- `triage` (FR-CHN-09, BQ-130-138): flag > user label > model suspicious > rule/VIP/mute > model; mail only as prompt data, no tools.
+- Webhooks signature-verified, idempotent, ordered per user; forged or replayed rejected. Never send real email or
+  WhatsApp from dev/CI. Never log bodies, secrets, tokens, nonces or full numbers (`mask_number`: last 4); log exception types.
+- `whatsapp`: HMAC over raw bytes, dedupe via `DedupeStore.claim`, serialised per sender. Stale (> 300 s old or > 60 s ahead)
+  claims nothing. Duplicate 200 "duplicate"; forged/missing signature 401; signed non-JSON 400; handler raises: claim kept
+  (at-most-once), 200 "failed". App secret >= 32 B; wamids never logged (`message_ref`); object, field, `phone_number_id` pinned.
+- `keywords`: whole-message, case-insensitive, bound numbers only; control-plane effect, then one confirmation or one "Could not apply that".
+- `triage` (FR-CHN-09; BQ-130 to BQ-138): flag > user label > model suspicious > rule/VIP/mute > model; mail is prompt data only, no tools.
 - `links` (FR-CHN-07; BQ-76 to BQ-82): HMAC-SHA256 (`compare_digest`, prefix `tilo-link-v1|`), segments
   alphabet-checked before the MAC; key ring live; nonce consumed last. Answer only plain needs_you cards
   listing email (fail closed); gate, consent, meeting open signed in. HTTP: `answer` needs a POST confirm;
@@ -38,3 +35,6 @@ channel identity binding, Email Autopilot triage. Public ingress for signature-v
 - `cards` (FR-CHN-05; BQ-89): random button ids; a tap counts only from the card's bound number; T3 approve
   needs the PIN (next text within 300 s, one try; digits in the next 300 s are `pin_late`, never routed);
   Hold/Edit keep a gate open (repeats: one event); one send per card id; emits `channel.message_out`/`_in`.
+- `gmail_watch` (FR-CHN-08; BQ-121 to BQ-129): OIDC checked first (verifier, aud, iss, SA, `email_verified is True`): 401/403,
+  400 malformed, 2xx unknown address, 500 on failure. History read from the stored cursor, which never moves back; each id
+  claimed before triage (a failure keeps the claim); a 404 runs one resync (<= 50 ids). Ids only, never content.
