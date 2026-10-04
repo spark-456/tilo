@@ -45,8 +45,8 @@ PY_OUT = Path("packages/contracts-py/src/tilo_contracts")
 TS_OUT = Path("packages/contracts-ts/src")
 TS_PKG = ROOT / "packages/contracts-ts"
 BASE_URI = "https://contracts.tilo.example/"
-# config/ file -> the contract (or "<contract>#<$defs entry>") that owns its shape; a trailing
-# "[]" means the file is a list of such documents.
+# config/ file (or glob) -> the contract (or "<contract>#<$defs entry>") that owns its shape; a
+# trailing "[]" means the file is a list of such documents.
 CONFIG_SHAPES = {
     "config/models.yaml": "providers#models",
     "config/prices.yaml": "providers#prices",
@@ -55,6 +55,7 @@ CONFIG_SHAPES = {
     "config/teams.yaml": "team_lead[]",
     "config/metering.yaml": "metering",
     "config/evals.yaml": "evals",
+    "config/scenarios/*.yaml": "scenario",
 }
 # Contract roots whose generated name is not the PascalCase file name.
 ROOT_NAMES = {"events/registry": "EventRegistry", "agents": "AgentsConfig"}
@@ -182,21 +183,25 @@ def check_fixtures(schemas: dict[str, dict], validate: events.Validate) -> list[
 
 def check_config(validate: events.Validate) -> list[str]:
     """config/ files whose shape a contract owns must validate against it (when present; the
-    loaders in packages/providers and the policy engine require them)."""
+    loaders in packages/providers, packages/planning and the policy engine require them)."""
     errors = []
-    for relative, shape in CONFIG_SHAPES.items():
-        path = ROOT / relative
-        if not path.is_file():
-            continue
-        document, name = yaml.safe_load(path.read_text(encoding="utf-8")), shape.removesuffix("[]")
-        items = (document or []) if shape.endswith("[]") else [document]
-        if not isinstance(items, list):
-            errors.append(f"{relative} must be a list of {name} documents")
-            continue
-        for index, item in enumerate(items):
-            if found := validate(name, item):
-                errors.append(f"{relative} item {index} fails {name}: {found[:3]}")
+    for pattern, shape in CONFIG_SHAPES.items():
+        for path in sorted(p for p in ROOT.glob(pattern) if p.is_file()):
+            errors += check_config_file(path, shape, validate)
     return errors
+
+
+def check_config_file(path: Path, shape: str, validate: events.Validate) -> list[str]:
+    relative, name = path.relative_to(ROOT).as_posix(), shape.removesuffix("[]")
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    items = (document or []) if shape.endswith("[]") else [document]
+    if not isinstance(items, list):
+        return [f"{relative} must be a list of {name} documents"]
+    return [
+        f"{relative} item {index} fails {name}: {found[:3]}"
+        for index, item in enumerate(items)
+        if (found := validate(name, item))
+    ]
 
 
 def load_module(python: str) -> object:

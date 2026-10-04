@@ -30,8 +30,9 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `attention.schema.json` | One measured span of a person's steering or review time, subtracted from time saved | 1.0.0 |
 | `evals.schema.json` | `config/evals.yaml`: eval pass credit caps, deploy-gate repeats, cost-regression threshold, case counts per group | 1.0.0 |
 | `pilot.schema.json` | EV-G3 pilot records by pseudonymous tester id: consent, run and card tags, diary entries, survey responses | 1.0.0 |
+| `scenario.schema.json` | `config/scenarios/<id>.yaml` (FR-INT-11, ADR-0014): skills, connectors, seed data, theme and autonomy policy seeds, and nothing else; rules SN-01 to SN-09 in `scenario.rules.md` | 1.0.0 |
 
-Still to come: `scenario` (1 Oct), `appspec` (Could).
+Still to come: `appspec` (Could).
 
 - `fixtures/<name>/valid|invalid/*.json` exercise each schema root; `fixtures/<name>.<def>/`
   exercise one `$defs` entry. Invalid file names say which rule they break.

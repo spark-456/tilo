@@ -92,6 +92,7 @@
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
 # providers.schema.json 1.1.0 sha256:ece7537b584e69f8
+# scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # events/registry.yaml 1.0.0 sha256:29d7a2b0b4a0cef2
@@ -1888,6 +1889,48 @@ class ProvidersPrice(BaseModel):
     output: Annotated[float | None, Field(ge=0.0)]
 
 
+type ScenarioId = Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,31}$")]
+"""
+Scenario id: a letter, then up to 31 letters, digits, hyphens or underscores. Equals the file name without .yaml (SN-01). The not-pattern rejects a final line break, which a Python validator's $ lets through.
+"""
+
+
+type ScenarioSeedPath = Annotated[
+    str,
+    Field(
+        max_length=240,
+        pattern="^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$",
+    ),
+]
+"""
+A repo-relative file path with forward slashes. Each segment starts with a letter, digit or underscore, so there is no absolute path, drive letter, backslash, empty segment, . or .. segment, and no hidden file such as .env or .git. The not-pattern rejects a final line break, which a Python validator's $ lets through.
+"""
+
+
+class ScenarioAutonomyEntry(BaseModel):
+    """
+    One policy seed: the policy.schema.json fields a scenario may set. Everything else is fixed when the policy is created (SN-08): owner and stamps from the approving owner, scope recipients, domains and districts empty, limits.credits null, conditions all true, expiry null, notify_channel web, no Team Lead domains. A scenario never sets a tier: tiers come from config/autonomy.yaml and its modifiers.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    action_type: ActionType
+    level: AutonomyLevel
+    connectors: Annotated[list[ConnectorId], Field(min_length=1)]
+    """
+    The policy's scope.connectors: ids from the scenario's own connectors, or the reserved internal for an action that goes through no connector (SN-07).
+    """
+    per_day: Annotated[int | None, Field(ge=0)] = None
+    """
+    The policy's limits.per_day: most actions per UTC day. Required at L2 and L3 (policy.schema.json, BQ-30); left out at L0 and L1 means no daily cap (null in the policy).
+    """
+    undo_window_s: Annotated[int, Field(ge=0, le=3600)] = 60
+    """
+    The policy's undo_window_s: seconds an L2 action can still be undone; left out means the policy default, 60.
+    """
+
+
 class SkillEmbeddedSchema(BaseModel):
     """
     A JSON Schema (2020-12) for the skill's inputs or outputs. Deliberately open: the skill loader checks it against the 2020-12 meta-schema.
@@ -2664,6 +2707,38 @@ class ProvidersPrices(BaseModel):
     PRD 14.1: 1 credit = US$0.005.
     """
     profiles: Annotated[dict[ProvidersProfileId, ProvidersPrice], Field(min_length=1)]
+
+
+class Scenario(BaseModel):
+    """
+    A scenario config, config/scenarios/<id>.yaml (PRD 4.3, 7.1 FR-INT-11, ADR-0014): the skill set, connectors, seed data, autonomy policy and world theme a scenario preloads, and nothing else. Data only: no code, prompt, model id, brief text or plan, so a scenario that needs any of those becomes a pillar requirement first, and no platform source names a scenario id. The same shape serves any scenario, a demo, a held-out bank case or a generated brief. theme is the world theme, the same slug as layout.schema.json theme (config/themes/, FR-WLD-15; only its shape is checked until that folder exists, BQ-202). Rules that need other files (the id equals the file name, connectors in config/connectors.yaml, seed files exist inside the repo, each autonomy level within its risk tier's max_level, T3 at L1 only) are SN-01 to SN-09 in contracts/scenario.rules.md, checked by the loader.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: ScenarioId
+    title: Annotated[str, Field(max_length=120, min_length=1)]
+    """
+    Display name of the scenario, plain text.
+    """
+    skills: Annotated[list[SkillId], Field(min_length=1)]
+    """
+    Skill ids the scenario preloads (skills/<domain>/<skill-id>/skill.yaml, FR-AGT-04); at least one.
+    """
+    connectors: list[ConnectorId]
+    """
+    Connector ids the scenario uses, each declared in config/connectors.yaml (SN-03); may be empty. Preloading a connector never connects it: the person still grants it on a consent card (PRD 10.3, FR-HIL-08).
+    """
+    seed_data: list[ScenarioSeedPath]
+    """
+    Seed files the scenario loads, as repo-relative paths (SN-04); may be empty.
+    """
+    theme: Slug
+    autonomy: list[ScenarioAutonomyEntry] | None = None
+    """
+    Policy seeds (PRD 10.4). Each entry becomes one policy.schema.json record only when the owner approves the task, as the owner's own (SN-08); absent or empty preloads none. Each level is at most its action type's max_level in config/autonomy.yaml, so a T3 action never goes above L1 (SN-06).
+    """
 
 
 class Skill(BaseModel):

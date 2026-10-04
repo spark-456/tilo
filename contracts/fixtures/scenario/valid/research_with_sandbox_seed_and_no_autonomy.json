@@ -1,0 +1,11 @@
+{
+  "id": "vendor_review",
+  "title": "Fictional pricing review for a leadership meeting",
+  "skills": ["web-research", "pricing-table", "deck-drafting"],
+  "connectors": [],
+  "seed_data": [
+    "services/sandbox-web/seed/example-vendor-one.yaml",
+    "services/sandbox-web/seed/example-vendor-two.yaml"
+  ],
+  "theme": "metropolis"
+}
