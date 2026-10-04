@@ -93,6 +93,7 @@
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
  * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
+ * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * events/registry.yaml 1.0.0 sha256:29d7a2b0b4a0cef2
@@ -573,6 +574,20 @@ export type ProvidersCapability =
   | "computer_use"
   | "grounding"
   | "code_execution";
+/**
+ * Scenario id: a letter, then up to 31 letters, digits, hyphens or underscores. Equals the file name without .yaml (SN-01). The not-pattern rejects a final line break, which a Python validator's $ lets through.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ScenarioId".
+ */
+export type ScenarioId = string;
+/**
+ * A repo-relative file path with forward slashes. Each segment starts with a letter, digit or underscore, so there is no absolute path, drive letter, backslash, empty segment, . or .. segment, and no hidden file such as .env or .git. The not-pattern rejects a final line break, which a Python validator's $ lets through.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ScenarioSeedPath".
+ */
+export type ScenarioSeedPath = string;
 
 /**
  * Index of the generated contract types; not a document.
@@ -3038,6 +3053,62 @@ export interface ProvidersPrices {
 export interface ProvidersPrice {
   input: number | null;
   output: number | null;
+}
+/**
+ * A scenario config, config/scenarios/<id>.yaml (PRD 4.3, 7.1 FR-INT-11, ADR-0014): the skill set, connectors, seed data, autonomy policy and world theme a scenario preloads, and nothing else. Data only: no code, prompt, model id, brief text or plan, so a scenario that needs any of those becomes a pillar requirement first, and no platform source names a scenario id. The same shape serves any scenario, a demo, a held-out bank case or a generated brief. theme is the world theme, the same slug as layout.schema.json theme (config/themes/, FR-WLD-15; only its shape is checked until that folder exists, BQ-202). Rules that need other files (the id equals the file name, connectors in config/connectors.yaml, seed files exist inside the repo, each autonomy level within its risk tier's max_level, T3 at L1 only) are SN-01 to SN-09 in contracts/scenario.rules.md, checked by the loader.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Scenario".
+ */
+export interface Scenario {
+  id: ScenarioId;
+  /**
+   * Display name of the scenario, plain text.
+   */
+  title: string;
+  /**
+   * Skill ids the scenario preloads (skills/<domain>/<skill-id>/skill.yaml, FR-AGT-04); at least one.
+   *
+   * @minItems 1
+   */
+  skills: [SkillId, ...SkillId[]];
+  /**
+   * Connector ids the scenario uses, each declared in config/connectors.yaml (SN-03); may be empty. Preloading a connector never connects it: the person still grants it on a consent card (PRD 10.3, FR-HIL-08).
+   */
+  connectors: ConnectorId[];
+  /**
+   * Seed files the scenario loads, as repo-relative paths (SN-04); may be empty.
+   */
+  seed_data: ScenarioSeedPath[];
+  theme: Slug;
+  /**
+   * Policy seeds (PRD 10.4). Each entry becomes one policy.schema.json record only when the owner approves the task, as the owner's own (SN-08); absent or empty preloads none. Each level is at most its action type's max_level in config/autonomy.yaml, so a T3 action never goes above L1 (SN-06).
+   */
+  autonomy?: ScenarioAutonomyEntry[];
+}
+/**
+ * One policy seed: the policy.schema.json fields a scenario may set. Everything else is fixed when the policy is created (SN-08): owner and stamps from the approving owner, scope recipients, domains and districts empty, limits.credits null, conditions all true, expiry null, notify_channel web, no Team Lead domains. A scenario never sets a tier: tiers come from config/autonomy.yaml and its modifiers.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ScenarioAutonomyEntry".
+ */
+export interface ScenarioAutonomyEntry {
+  action_type: ActionType;
+  level: AutonomyLevel;
+  /**
+   * The policy's scope.connectors: ids from the scenario's own connectors, or the reserved internal for an action that goes through no connector (SN-07).
+   *
+   * @minItems 1
+   */
+  connectors: [ConnectorId, ...ConnectorId[]];
+  /**
+   * The policy's limits.per_day: most actions per UTC day. Required at L2 and L3 (policy.schema.json, BQ-30); left out at L0 and L1 means no daily cap (null in the policy).
+   */
+  per_day?: number;
+  /**
+   * The policy's undo_window_s: seconds an L2 action can still be undone; left out means the policy default, 60.
+   */
+  undo_window_s?: number;
 }
 /**
  * skill.yaml in skills/<domain>/<skill-id>/ (PRD 8.2). The planner sees only id and the one-line description; the executing agent loads the full skill.
