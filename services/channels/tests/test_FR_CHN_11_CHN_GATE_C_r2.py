@@ -1,4 +1,4 @@
-"""CHN-GATE-C round 2 (issue #256, FR-CHN-11, BQ-186): security-review findings. A name may only be the greeting's
+"""CHN-GATE-C round 2 (issue #256, FR-CHN-11, BQ-224): security-review findings. A name may only be the greeting's
 run, the signature's run, or a repeat of their words, so greeting and sign-off words no longer open new name slots;
 a time of day ends a run; and "do", "have" and "back" are off the list ("on it" is a commitment). The 157 pinned
 tests and the round 1 file stay as they are; this file only adds."""

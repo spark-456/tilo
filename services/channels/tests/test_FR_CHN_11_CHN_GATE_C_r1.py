@@ -1,4 +1,4 @@
-"""CHN-GATE-C round 1 (issue #256, FR-CHN-11, BQ-186): security-review findings. Run-on Title-case words must not pass
+"""CHN-GATE-C round 1 (issue #256, FR-CHN-11, BQ-224): security-review findings. Run-on Title-case words must not pass
 as names, allowlisted words that promise or price on their own are not on the list, and a link hidden next to a time
 of day is still a link. The 157 pinned tests stay as they are; this file only adds."""
 

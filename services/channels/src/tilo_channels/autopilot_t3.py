@@ -8,7 +8,7 @@ on any non-ASCII character after NFKC that is not punctuation, a space or a curr
 combining mark, a foreign digit, an emoji), and on text over SIGNAL_CAP. An accented name therefore also makes a
 draft T3: a safe false positive. Callers pass the raw body, so a hidden character the preview drops is itself T3.
 
-BQ-186 (issue #256): the families also run on a squeezed copy (separators `- . _ *` and line breaks between letters or
+BQ-224 (issue #256): the families also run on a squeezed copy (separators `- . _ *` and line breaks between letters or
 digits dropped, 0 o, 1 i, 3 e, 4 a, 5 s, 7 t, @ a), and L2 is an allowlist: a body over SHORT_BODY_MAX, a link, a digit
 that is not a time of day, or a word off the scheduling list gives "unlisted". Names are allowed only as the greeting's
 and the signature's run (two words each) and as repeats of those words. Every step is linear, no model.
@@ -26,7 +26,7 @@ _MONEY = re.compile(
     r"|pric\w*|cost\w*|fees?|charg\w*|discount\w*|quot(?:e|es|ed|ation)|estimat\w*|rates?|money|cash|billing"
     r"|budget\w*|dollars?|euros?|pounds?|rupees?|usd|eur|gbp|inr|sgd|aud|cad|jpy|chf"
     r"|transfer\w*|account\s+numbers?|sort\s+codes?|paypal|venmo|zelle|btc|bitcoin|owe[sd]?|owing|loans?|penalt\w*"
-    r"|bucks?|grand|quid|rs|rm|\d+k)\b"  # BQ-186 (b)
+    r"|bucks?|grand|quid|rs|rm|\d+k)\b"  # BQ-224 (b)
 )
 _LEGAL = re.compile(
     r"\b(?:contract\w*|liab\w*|lawsuits?|sue[sd]?|suing|legal\w*|lawyers?|attorneys?|courts?|nda|non-disclosure"
@@ -41,10 +41,10 @@ _COMMITMENT = re.compile(
     r"|leave\s+it\s+(?:with|to)\s+(?:me|us)|you\s+can\s+rely|(?:we|i)\s+(?:am|are|['\u2019]m|['\u2019]re)\s+going\s+to)\b"
 )
 _FAMILIES = (("money", _MONEY), ("legal", _LEGAL), ("commitment", _COMMITMENT))
-# BQ-186 (c): a separator or line break between two letters or digits is dropped, then digit look-alikes mapped back.
+# BQ-224 (c): a separator or line break between two letters or digits is dropped, then digit look-alikes mapped back.
 _SPLIT = re.compile(r"(?<=[a-z0-9])[-._*\n]+(?=[a-z0-9])")
 _LEET = str.maketrans("013457@", "oieasta")
-# BQ-186 (a): L2 auto-send is an allowlist. A time of day is the only digit shape that passes; a link, any other digit
+# BQ-224 (a): L2 auto-send is an allowlist. A time of day is the only digit shape that passes; a link, any other digit
 # or any word off the list is the signal "unlisted".
 SHORT_BODY_MAX = 2_000
 _TIME = re.compile(r"\b(?:(?:1[0-2]|0?[1-9])(?::[0-5][0-9])?\s?(?:am|pm)|(?:[01]?[0-9]|2[0-3]):[0-5][0-9])\b", re.I)
