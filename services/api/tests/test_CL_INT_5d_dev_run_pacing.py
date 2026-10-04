@@ -184,5 +184,5 @@ def test_CL_INT_5d_the_runner_refuses_when_deployed_or_live(dev_client, monkeypa
 
 def test_CL_INT_5d_the_real_price_file_is_untouched_and_the_dev_one_is_marked_dev(repo_root):
     real = (repo_root / "config" / "prices.yaml").read_text(encoding="utf-8")
-    assert "status: unset" in real and "dev-unit" not in real
+    assert "status: set" in real and "dev-unit" not in real  # PL-06: the real file is set; no dev stand-in leaks in
     assert "not a real price" in (repo_root / "config" / "prices.dev.yaml").read_text(encoding="utf-8")

@@ -6,6 +6,7 @@
 // `client.getLayout`, which waits, honestly, until the run has built one (world.started). Nothing
 // is drawn before it exists and nothing moves without an event (HR-1, HR-2); events held on
 // arrival fold in as a jump, later ones animate (runClientWorld).
+import type { Layout } from "@tilo/contracts";
 import type { Container } from "pixi.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TiloClient } from "../api/client";
@@ -27,6 +28,9 @@ export interface ClientWorldState {
   /** The world's selected object (FR-WLD-06), for the stage frame's data-selected. */
   readonly selected: string | null;
   readonly onWorld: WorldSeam;
+  /** The loaded layout and the world it belongs to, for the keyboard outline (FR-WLD-11). */
+  readonly layout: Layout | null;
+  readonly worldId: string;
   /** What a person reads while the world is not on the stage, or null once it is. */
   readonly note: string | null;
   /** Set when the world could not be loaded: asks again. */
@@ -44,6 +48,7 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
   const [host, setHost] = useState<Host | null>(null);
   const [seq, setSeq] = useState(0);
   const [note, setNote] = useState<string | null>(null);
+  const [layout, setLayout] = useState<Layout | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [selected] = useSelection(worldId ?? "");
@@ -64,11 +69,13 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
     let cancelled = false;
     let stop: (() => void) | undefined;
     setSeq(0);
+    setLayout(null);
     setFailed(false);
     setNote("Waiting for the run to build its world…");
     client.getLayout(worldId).then(
       (layout) => {
         if (cancelled) return;
+        setLayout(layout);
         // Geometry comes from the solver only (WE-09); a layout the server sent without it has
         // nothing to place, and nothing is invented here: the stage stays empty and says so.
         setNote(layout.geometry ? null : NO_MAP);
@@ -104,6 +111,8 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
     seq,
     selected: worldId === null ? null : selected,
     onWorld,
+    layout: worldId === null ? null : layout,
+    worldId: worldId ?? "",
     note: worldId === null ? null : note,
     retry: failed ? retry : null,
   };

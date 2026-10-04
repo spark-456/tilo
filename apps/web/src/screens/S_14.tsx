@@ -6,7 +6,7 @@
 // a title, progress and a footer. Search and filters work on the worlds the client has, and every
 // count is computed from them: nothing is scheduled in this build, so Scheduled says 0.
 import { useState } from "react";
-import { useClient } from "../api/ClientProvider";
+import { useClient, useWorldKnown } from "../api/ClientProvider";
 import { deriveQueue } from "../needs-you/queue";
 import { reduce } from "../world/reducer";
 import { creditsUsed } from "../world/runLog";
@@ -15,7 +15,7 @@ import { withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
 import { Loaded, Primary } from "./FlowShell";
 import { WorldThumb } from "./WorldThumb";
-import { Chip, Page, field, longDate, plural, useFixtureRun, words } from "./kit";
+import { Chip, EmptyState, Page, field, longDate, plural, useFixtureRun, words } from "./kit";
 import { useAction, useRemote } from "./remote";
 import {
   FILTERS,
@@ -37,6 +37,7 @@ const STATUS: Readonly<Record<WorldPhase, readonly [string, string]>> = {
 export function S_14() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
+  const known = useWorldKnown(worldId); // false: the client has no world to list
   const [layout, retry] = useRemote("load the worlds", () => client.getLayout(worldId));
   const newTask = useAction("start a new task", async () => "/");
   const [query, setQuery] = useState("");
@@ -54,7 +55,7 @@ export function S_14() {
   const [label, tone] = STATUS[phase];
   const waiting = deriveQueue(events).length;
   const title = first ? String(field(first, "title")) : "Waiting for the recording";
-  const worlds: readonly WorldRow[] = [{ title, phase, waiting }];
+  const worlds: readonly WorldRow[] = known ? [{ title, phase, waiting }] : [];
   const counts = countsOf(worlds, query);
   const shown = visible(worlds, filter, query);
   const cap = budgetCap(events);
@@ -97,14 +98,29 @@ export function S_14() {
         </fieldset>
       </div>
       <div className="world-grid">
-        {shown.length === 0 ? (
-          <p className="empty-note world-empty" data-testid="worlds-empty">
-            {filter === "scheduled" && query.trim() === ""
-              ? "Nothing is scheduled. Worlds that run on a schedule will be listed here."
-              : query.trim() !== ""
-                ? "No world matches that search. Clear it or pick All to see every world."
-                : `No world is ${FILTER_LABEL[filter].toLowerCase()} right now. Pick All to see every world.`}
-          </p>
+        {!known ? (
+          <EmptyState
+            testid="worlds-empty"
+            title="No worlds yet"
+            line="Tilo has no world to list yet. Start a task and its world appears here."
+            action={{ label: "Start a task", to: "/" }}
+          />
+        ) : shown.length === 0 ? (
+          <EmptyState
+            testid="worlds-filter-empty"
+            title={
+              query.trim() !== ""
+                ? "No world matches"
+                : `Nothing ${FILTER_LABEL[filter].toLowerCase()}`
+            }
+            line={
+              filter === "scheduled" && query.trim() === ""
+                ? "Nothing is scheduled. Worlds that run on a schedule will be listed here."
+                : query.trim() !== ""
+                  ? "No world matches that search. Clear it or pick All to see every world."
+                  : "No world is in this state right now. Pick All to see every world."
+            }
+          />
         ) : (
           <Loaded what="the worlds" remote={layout} retry={retry} isEmpty={() => false}>
             {(l) => {

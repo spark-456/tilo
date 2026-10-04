@@ -681,7 +681,7 @@ button.row {
   display: flow-root; /* a first child's margin stays inside, so ready never moves the slot (CLS) */
 }
 .delivery-slot .flow-slot {
-  min-height: 9em;
+  min-height: 14em; /* the empty state (about 209 px) and the three finished tiles both fit */
 }
 @media (max-width: 767px) {
   .delivery-slot .flow-slot {
@@ -858,6 +858,52 @@ button.row {
   color: var(--color-ink-2);
   font-size: var(--text-14);
   line-height: 1.5;
+}
+/* EmptyState (kit.tsx): fills the reserved box it sits in; the box, not this, holds the height. */
+.empty-state {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: 100%;
+  padding: var(--space-12) var(--space-16);
+  border: 2px dashed var(--color-fog);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+  text-align: center;
+}
+.empty-state .empty-title {
+  margin: 0;
+  color: var(--color-ink-1);
+  font: 900 var(--text-20) / 1.25 var(--font-display);
+}
+.empty-state .empty-line {
+  max-width: 22.5rem;
+  margin: 0;
+  color: var(--color-ink-2);
+  font: 400 var(--text-14) / 1.5 var(--font-ui);
+}
+.empty-state[data-compact="true"] {
+  min-height: 0;
+  border: 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-12);
+  padding: var(--space-8) 0 var(--space-12);
+  text-align: left;
+}
+.empty-state[data-compact="true"] .empty-glyph {
+  width: 40px;
+  height: 30px;
+}
+.empty-state[data-compact="true"] .empty-title {
+  font-size: var(--text-16);
+}
+.empty-state[data-compact="true"] .empty-line {
+  flex-basis: 100%;
+  max-width: none;
 }
 .section-box.reserved {
   overflow-y: auto;
@@ -1046,7 +1092,7 @@ button.row {
   outline: 3px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
-.world-empty {
+.world-grid .empty-state {
   grid-column: 1 / -1;
   min-height: 12rem; /* the room a card takes: choosing a filter moves nothing below */
 }
@@ -1418,16 +1464,15 @@ button.row {
 .flow-shell[data-screen="Approaches"] {
   width: min(520px, calc(100vw - 464px));
 }
-/* The slot reserves the ready height (cards, cap box, rule line, cost line), measured (before the
-   spacing scale added about 20 px): 588 px at 1440, 754 px at 768 (the stage rail leaves 304 px),
-   625 px at 390, 698 px at 360, 754 px at 320. */
+/* The slot reserves the ready height (cards, cap box, meter, rule line, cost line), measured: 572 px
+   at 1440, 727 px at 768 and 320, 640 px at 390, 676 px at 360, plus half a line of margin. */
 .flow-shell[data-screen="Approaches"] .flow-slot {
   display: flow-root;
-  min-height: 38.5em;
+  min-height: 37em;
 }
 @media (max-width: 1023px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 49.5em;
+    min-height: 46.5em;
   }
 }
 @media (max-width: 767px) {
@@ -1435,17 +1480,17 @@ button.row {
     width: calc(100vw - 32px);
   }
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 41.5em;
+    min-height: 41em;
   }
 }
 @media (max-width: 389px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 45.5em;
+    min-height: 43.5em;
   }
 }
 @media (max-width: 359px) {
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 49.5em;
+    min-height: 46.5em;
   }
 }
 .approach-card {
@@ -1457,6 +1502,41 @@ button.row {
 }
 .approach-card[data-selected="true"] {
   border-color: var(--color-brand-primary);
+}
+/* The time and credit range is the number a person decides on, so it leads the muted detail. */
+.approach-meta[data-testid="approach-ranges"] {
+  color: var(--color-ink-1);
+  font-weight: 700;
+}
+.approach-meta[data-testid="approach-dimensions"],
+.approach-meta[data-testid="approach-risks"],
+.approach-meta[data-testid="approach-skips"] {
+  font-size: var(--text-12);
+}
+/* Budget meter: the estimated range as a band, the cap as a marker (a line plus a notch, not colour
+   alone). It sits above the cap rule and reserves its own height. */
+.budget-meter {
+  position: relative;
+  height: var(--space-16);
+  margin: var(--space-4) 0 var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+}
+.meter-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-2);
+}
+.meter-cap {
+  position: absolute;
+  top: calc(var(--space-4) * -1);
+  bottom: calc(var(--space-4) * -1);
+  width: var(--space-4);
+  margin-left: calc(var(--space-4) / -2);
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-primary);
 }
 .approach-head,
 .budget-cap-field {
@@ -1687,4 +1767,79 @@ button.row {
   background: var(--color-surface-1);
   color: var(--color-ink-1);
   font: 700 var(--text-16) / 1.25 var(--font-ui);
+}
+.stage-outline {
+  position: absolute;
+  inset: auto;
+  top: 12px;
+  left: 12px;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+  list-style: none;
+}
+.stage-outline:focus-within {
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 16rem;
+  max-width: calc(100% - var(--space-24));
+  height: auto;
+  max-height: calc(100% - var(--space-24));
+  margin: 0;
+  padding: var(--space-8);
+  clip: auto;
+  white-space: normal;
+  overflow-y: auto;
+  background: var(--color-surface-1);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+}
+.stage-outline li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+.outline-item {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 var(--space-12);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font: inherit;
+  font-size: var(--text-14);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.outline-item[aria-pressed="true"] {
+  border-color: var(--color-brand-primary);
+  background: var(--color-surface-1);
+}
+.row:focus,
+.row:focus-visible,
+.outline-item:focus-visible,
+.selection-bar:focus-visible,
+.stage-outline a:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

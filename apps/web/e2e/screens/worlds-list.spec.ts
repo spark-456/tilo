@@ -22,7 +22,7 @@ test("S_14 G1 filter chips carry counts from the one recorded world, Scheduled i
   await expect(page.getByRole("radio", { name: /^All/ })).toBeChecked();
 
   await page.getByRole("radio", { name: /^Scheduled/ }).check({ force: true });
-  await expect(page.getByTestId("worlds-empty")).toContainText("Nothing is scheduled");
+  await expect(page.getByTestId("worlds-filter-empty")).toContainText("Nothing is scheduled");
   await expect(card).toHaveCount(0);
 
   await page.getByRole("radio", { name: /^Finished/ }).check({ force: true });
@@ -39,7 +39,9 @@ test("S_14 G1 search narrows the list and says so when nothing matches", async (
   await search.fill("supplier");
   await expect(card).toBeVisible();
   await search.fill("zzz");
-  await expect(page.getByTestId("worlds-empty")).toContainText("No world matches that search");
+  await expect(page.getByTestId("worlds-filter-empty")).toContainText(
+    "No world matches that search",
+  );
   await expect(page.getByTestId("count-all")).toHaveText("0");
   await search.fill("");
   await expect(card).toBeVisible();

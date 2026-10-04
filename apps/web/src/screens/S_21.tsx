@@ -8,7 +8,7 @@ import type { Event } from "@tilo/contracts";
 import { useClient } from "../api/ClientProvider";
 import { AppLink } from "./AppLink";
 import { Placeholder } from "./Placeholder";
-import { Chip, Page, Row, Section, Stats, field, useFixtureRun, words } from "./kit";
+import { Chip, EmptyState, Page, Row, Section, Stats, field, useFixtureRun, words } from "./kit";
 import { useRemote } from "./remote";
 
 interface Ref {
@@ -55,7 +55,12 @@ export function S_21() {
         reserve={[12, 27]}
       >
         {mine.length === 0 ? (
-          <p className="empty-note">No artifact has been recorded yet.</p>
+          <EmptyState
+            testid="history-empty"
+            title="No artifact yet"
+            line="No artifact has been recorded yet. Each version appears here as it is made."
+            action={{ label: "Open the library", to: "/library" }}
+          />
         ) : (
           <ul className="blist" data-testid="artifact-rows">
             {mine.map((e) => {
