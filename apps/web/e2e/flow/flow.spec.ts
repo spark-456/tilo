@@ -3,14 +3,16 @@ import { type Page, expect, test } from "@playwright/test";
 import { DESKTOP, MOBILE } from "../support/viewports";
 
 const SCREENS = ["Start", "Understanding", "Approaches", "World", "Delivery"] as const;
+/** The h1 each flow screen shows: Start is the Home hero. */
+const heading = (screen: string) => (screen === "Start" ? "What should Tilo do?" : screen);
 const BANNER = "Fixture replay — dev data, not a real run";
 
 /** S-01 starts only with text in the task box. */
 const fillStart = (page: Page) => page.getByLabel("Describe your task").fill("Triage my inbox");
 
 /** Asserts what every flow screen must show: heading, banner, one filled primary button, axe. */
-async function checkScreen(page: Page, heading: string) {
-  await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+async function checkScreen(page: Page, screen: string) {
+  await expect(page.getByRole("heading", { level: 1, name: heading(screen) })).toBeVisible();
   // HR-4, BQ-07: the fixture client is active, so the banner is on every screen.
   await expect(page.getByTestId("fixture-replay-banner")).toHaveText(BANNER);
   await expect(page.locator("button.primary")).toHaveCount(1); // UX-1
@@ -45,7 +47,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
       const primary = page.locator("button.primary");
       await expect(primary).toBeEnabled();
       await primary.click();
-      await expect(page.getByRole("heading", { level: 1, name: next })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: heading(next) })).toBeVisible();
     }
     expect(page.url()).toMatch(/\/world\/w_village_basic\/delivery$/);
     expect(errors).toEqual([]);
@@ -62,7 +64,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await page.setViewportSize(viewport);
     await page.goto("/?client_delay_ms=400");
     for (const [i, screen] of SCREENS.entries()) {
-      await expect(page.getByRole("heading", { level: 1, name: screen })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: heading(screen) })).toBeVisible();
       if (screen === "Start") await fillStart(page);
       if (screen === "Approaches") await page.getByTestId("select-approach-quick").click();
       await expect(page.locator("button.primary")).toBeEnabled();
@@ -84,7 +86,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
       );
       expect(ms, `${screen} busy feedback`).toBeLessThan(100);
       const next = SCREENS[i + 1] ?? "Start";
-      await expect(page.getByRole("heading", { level: 1, name: next })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: heading(next) })).toBeVisible();
     }
   });
 }

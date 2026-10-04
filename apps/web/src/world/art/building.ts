@@ -29,8 +29,8 @@ export interface BuildingArt {
 
 const INS = 0.1; // cells of margin round the footprint
 const PLINTH = 3;
-const BASE = 26; // wall height of a one-floor building, px
-const FLOOR = 20; // each further floor, px
+export const BASE = 26; // wall height of a one-floor building, px
+export const FLOOR = 20; // each further floor, px
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 function colours(tint: string) {

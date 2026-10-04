@@ -89,6 +89,20 @@ describe("S-01 Start", () => {
     expect(window.location.pathname).toBe("/");
   });
 
+  it("FR-UX-03 S-01 Home: the hero, the plan promise and a preview made only of product rules", async () => {
+    await show(new FixtureClient());
+    expect(container.querySelector("h1")?.textContent).toBe("What should Tilo do?");
+    expect(container.textContent).toContain(
+      "asks before anything spends, shares or can't be undone",
+    );
+    const preview = container.querySelector("aside[aria-label='What Tilo would build']");
+    const tiles = [...(preview?.querySelectorAll("dt") ?? [])].map((t) => t.textContent);
+    expect(tiles).toEqual(["Size", "You see", "You approve"]);
+    // Nothing is planned yet, so the preview states no figure for the task: only the PRD tier range.
+    expect(preview?.textContent?.match(/\d+/g)).toEqual(["1", "2", "16"]);
+    expect(container.querySelectorAll("button.primary")).toHaveLength(1);
+  });
+
   it("FR-INT-01 S-01: text plus 3 files submits once and lands on Understanding", async () => {
     const fixture = new FixtureClient({ delayMs: 60 });
     const submit = vi.spyOn(fixture, "submitIntake");

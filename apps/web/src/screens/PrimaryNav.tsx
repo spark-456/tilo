@@ -1,9 +1,14 @@
 // PRD 18.3 primary navigation: the desktop left rail and the mobile bottom tabs (World, Story,
 // Needs you, Library, More). Every other screen is reached from More. Real links only: each one
 // goes to a built screen or to a "Coming soon" screen, never to a dead click.
+import { useClient, useIsFixtureClient, useWorldKnown } from "../api/ClientProvider";
+import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
+import { deriveQueue } from "../needs-you/queue";
 import { usePathname } from "../router";
+import { useRunLog } from "../world/runLog";
 import { useAddressedWorld, withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
+import { NavIcon } from "./NavIcon";
 import { screenMeta } from "./meta";
 
 type Section = "home" | "world" | "story" | "needs" | "library" | "more";
@@ -13,7 +18,7 @@ const WORLD_ID = /^\/world\/([^/]+)/;
 export function sectionOf(path: string): Section {
   if (path === "/" || path.startsWith("/task/")) return "home";
   if (/^\/world\/[^/]+\/(story|trace)\/?$/.test(path)) return "story";
-  if (WORLD_ID.test(path)) return "world";
+  if (WORLD_ID.test(path) || path === "/worlds") return "world"; // S-14 lists worlds
   if (path.startsWith("/needs-you")) return "needs";
   if (path.startsWith("/library")) return "library";
   return "more";
@@ -34,11 +39,28 @@ export const TAB_SCREEN_IDS: ReadonlySet<string> = new Set(
   ITEMS.flatMap((i) => (i.screen ? [i.screen] : [])),
 );
 
+/** The Needs-you count: the queue S-06 lists, from this world's recorded events (HR-1). Nothing
+ * shows at zero; the hidden words give the count to assistive technology. */
+function NeedsBadge({ worldId }: { worldId: string }) {
+  const waiting = deriveQueue(useRunLog(useClient(), worldId)).length;
+  return waiting > 0 ? (
+    <span className="nav-badge" data-testid="nav-needs-badge">
+      {waiting}
+      <span className="visually-hidden"> waiting</span>
+    </span>
+  ) : null;
+}
+
 export function PrimaryNav({ id, mobile }: { id: string; mobile: boolean }) {
   const path = usePathname();
   const current = sectionOf(path);
   // The world of the path, else of `?world=` (the Needs-you screens): its links keep that world.
   const inWorld = useAddressedWorld();
+  // The queue to count: the addressed world, else the fixture world (fixture client only: a real
+  // client is never asked about a world nobody named).
+  const fixtureClient = useIsFixtureClient();
+  const countWorld = inWorld ?? (fixtureClient ? FIXTURE_WORLD_ID : null);
+  const counted = useWorldKnown(countWorld) ? countWorld : null;
   return (
     <nav className={id} data-testid={id} aria-label="Primary">
       {ITEMS.filter((i) => !(mobile && i.desktopOnly)).map((i) => {
@@ -55,7 +77,13 @@ export function PrimaryNav({ id, mobile }: { id: string; mobile: boolean }) {
             className="nav-btn"
             {...(current === i.section ? { "aria-current": "page" as const } : {})}
           >
-            {i.label}
+            {/* The label comes first in the source, so the link's name starts with it; the column is
+                reversed, so the icon shows above it. */}
+            <span className="nav-label">{i.label}</span>
+            <span className="nav-icon-box">
+              <NavIcon name={i.section} />
+              {i.section === "needs" && counted && <NeedsBadge worldId={counted} />}
+            </span>
           </AppLink>
         );
       })}
