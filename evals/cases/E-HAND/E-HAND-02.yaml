@@ -22,3 +22,6 @@ checks:
   args:
     field: rework
 recording: null
+notes: 'Skeleton: cited intranet.*.example sources are synthetic placeholders until harness context-handoff
+  recordings land (CL-EVID). Selected as one of the 5 E-HAND deploy_gate cases (E-HAND-01..05 spanning
+  5 distinct multi-step domains; BQ pending merger assignment).'
