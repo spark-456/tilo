@@ -32,7 +32,7 @@ from tilo_harness.config import AgentsConfig
 from tilo_harness.writer import format_ts, new_ulid
 
 ROLE = "specialist"  # prompts/specialist/must_ask_*.md
-QUESTION_TIMEOUT_S = 3600  # BQ-202: PRD 10.2 gives a card a timeout but no number
+QUESTION_TIMEOUT_S = 3600  # BQ-212: PRD 10.2 gives a card a timeout but no number
 _MODEL_REASONS = ("ambiguous_brief", "trade_off", "sensitive_step")
 _WHY_IT_MATTERS = {
     "ambiguous_brief": "A wrong guess would waste the run, so a person decides.",
@@ -229,7 +229,7 @@ class MustAsk:
             "answer_channels": ["web", "mobile_web", "whatsapp", "email"],
             "created_at": format_ts(now),
             "timeout": QUESTION_TIMEOUT_S,
-            "safe_default": options[ask.suggested]["id"],  # reversible by schema; BQ-202
+            "safe_default": options[ask.suggested]["id"],  # reversible by schema; BQ-212
             "gate": None,
             "consent": None,
         }

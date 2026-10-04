@@ -33,7 +33,7 @@ from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_harness.validator import repo_validator
 
 ROLE = "verifier"  # prompts/verifier/claim_*.md, providers["verifier"]
-MAX_SOURCE_CHARS = 30_000  # BQ-203: more than this across a claim's sources is refused, never cut
+MAX_SOURCE_CHARS = 30_000  # BQ-213: more than this across a claim's sources is refused, never cut
 _NUMBER = re.compile(r"\d+(?:,\d{3})*(?:\.\d+)?")
 _PROFILE = re.compile(r"[a-z][a-z0-9-]{0,31}")  # providers.schema.json profile_id
 
