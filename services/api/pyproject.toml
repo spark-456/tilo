@@ -14,6 +14,7 @@ dependencies = [
     "tilo-policy",
     "tilo-harness",
     "tilo-connectors",
+    "tilo-metering",
 ]
 
 [tool.uv.sources]
@@ -21,6 +22,7 @@ tilo-planning = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-harness = { workspace = true }
 tilo-connectors = { workspace = true }
+tilo-metering = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
