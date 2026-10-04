@@ -15,12 +15,13 @@ import {
   Page,
   Row,
   Section,
-  Soon,
   Stats,
   authzText,
+  doneState,
   field,
   stamp,
   useFixtureRun,
+  waitState,
   words,
 } from "./kit";
 import { useRemote } from "./remote";
@@ -62,15 +63,15 @@ export function S_15() {
     >
       <Stats
         items={[
-          ["Authorised actions", log.length],
-          ["Waiting for you", waitingForYou(events)],
+          ["Authorised actions", log.length, doneState(log.length, "Recorded")],
+          ["Waiting for you", waitingForYou(events), waitState(waitingForYou(events))],
         ]}
       />
       <Section
         title="Stop all autopilot"
-        note="Sets every rule to level L1 at once, so everything waits for you. Pause all also stops the agents."
+        note="Sets every rule to level L1 at once, so everything waits for you. Pause all also stops the agents. Nothing runs on its own in this build, so there is nothing to stop yet."
       >
-        <Placeholder label="Stop all autopilot" compact />
+        <Placeholder label="Stop all autopilot" compact danger />
       </Section>
       <Section
         title="Levels"
@@ -95,9 +96,8 @@ export function S_15() {
       </Section>
       <Section
         title="Rules"
-        note="A gate with no rule waits for a person."
+        note="A gate with no rule waits for a person. Writing a rule is not available yet."
         reserve={5}
-        action={<Soon labels={["New rule"]} />}
       >
         <Loaded what="the gates" remote={layout} retry={retry} isEmpty={() => false}>
           {(l) => (
