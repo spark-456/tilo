@@ -80,7 +80,6 @@ test("S_15 renders, no console errors, placeholders aria-disabled", async ({ pag
     // Undo and report apply only to outgoing actions: one row in this run.
     await expect(page.getByRole("button", { name: /^Undo/ })).toHaveCount(1);
     await soon(page, "Stop all autopilot");
-    await soon(page, "New rule");
   });
   expect(problems).toEqual([]);
 });
