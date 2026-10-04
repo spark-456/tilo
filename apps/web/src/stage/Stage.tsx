@@ -1,5 +1,5 @@
 import type { Layout } from "@tilo/contracts";
-import { Application, Container, Graphics } from "pixi.js";
+import type { Container, Graphics } from "pixi.js";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import tokens from "../design/tokens";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -9,6 +9,7 @@ import { useSelection } from "../world/selection";
 import * as cam from "./camera";
 
 const { tileWidth: TW, tileHeight: TH } = tokens.stage;
+const BARE_GRID_DELAY_MS = 1500;
 const PIXI = { autoDensity: true, autoStart: false, preserveDrawingBuffer: true } as const;
 
 // Iso lattice in world coordinates: lines of slope +-TH/TW, TH apart, through (0, -TH/2),
@@ -125,9 +126,28 @@ export function Stage({
   const seamRef = useRef(onWorld);
   seamRef.current = onWorld;
 
+  // Pixi is code-split off the landing route (NFR-01): the page is interactive without it. A world
+  // to draw loads it at once; the bare grid is decoration, so it waits until the first keystroke
+  // has had its turn (the Pixi script is the largest task on the page).
+  const [pixi, setPixi] = useState<typeof import("pixi.js") | null>(null);
+  const bare = onWorld === undefined;
+  useEffect(() => {
+    if (!supported) return;
+    let live = true;
+    const timer = setTimeout(
+      () => void import("pixi.js").then((m) => live && setPixi(m)),
+      bare ? BARE_GRID_DELAY_MS : 0,
+    );
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [supported, bare]);
+
   useEffect(() => {
     const target = frameRef.current;
-    if (!supported || !target) return;
+    if (!supported || !target || !pixi) return;
+    const { Application, Container, Graphics } = pixi;
     const app = new Application();
     const world = new Container();
     const grid = new Graphics();
@@ -288,7 +308,7 @@ export function Stage({
       // Pixi's destroy() throws before init() resolves, so it always waits for init.
       init.then(() => app.destroy({ removeView: true }, { children: true }));
     };
-  }, [supported]);
+  }, [supported, pixi]);
 
   return (
     <main
