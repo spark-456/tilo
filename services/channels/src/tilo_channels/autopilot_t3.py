@@ -7,6 +7,11 @@ closed with "obfuscated": on a format, control (newline, tab and CR aside) or li
 on any non-ASCII character after NFKC that is not punctuation, a space or a currency sign (a look-alike letter, a
 combining mark, a foreign digit, an emoji), and on text over SIGNAL_CAP. An accented name therefore also makes a
 draft T3: a safe false positive. Callers pass the raw body, so a hidden character the preview drops is itself T3.
+
+BQ-186 (issue #256): the families also run on a squeezed copy (separators `- . _ *` and line breaks between letters or
+digits dropped, 0 o, 1 i, 3 e, 4 a, 5 s, 7 t, @ a), and L2 is an allowlist: a body over SHORT_BODY_MAX, a link, a digit
+that is not a time of day, or a word off the scheduling list gives "unlisted". Names are allowed only as the greeting's
+and the signature's run (two words each) and as repeats of those words. Every step is linear, no model.
 """
 
 from __future__ import annotations
@@ -19,18 +24,53 @@ SIGNAL_CAP = 20_000  # the drafting checker's CHECK_CAP: a longer body is not re
 _MONEY = re.compile(
     r"\b(?:refund\w*|invoic\w*|pay|pays|paid|payment\w*|payable|wire[sd]?|wiring|bank\w*|iban|swift|deposit\w*"
     r"|pric\w*|cost\w*|fees?|charg\w*|discount\w*|quot(?:e|es|ed|ation)|estimat\w*|rates?|money|cash|billing"
-    r"|budget\w*|dollars?|euros?|pounds?|rupees?|usd|eur|gbp|inr|sgd|aud|cad|jpy|chf)\b"
+    r"|budget\w*|dollars?|euros?|pounds?|rupees?|usd|eur|gbp|inr|sgd|aud|cad|jpy|chf"
+    r"|transfer\w*|account\s+numbers?|sort\s+codes?|paypal|venmo|zelle|btc|bitcoin|owe[sd]?|owing|loans?|penalt\w*"
+    r"|bucks?|grand|quid|rs|rm|\d+k)\b"  # BQ-186 (b)
 )
 _LEGAL = re.compile(
     r"\b(?:contract\w*|liab\w*|lawsuits?|sue[sd]?|suing|legal\w*|lawyers?|attorneys?|courts?|nda|non-disclosure"
-    r"|terms|waiver\w*|waive[sd]?|indemn\w*|agreement\w*|clauses?|settlement\w*|breach\w*|warrant\w*)\b"
+    r"|terms|waiver\w*|waive[sd]?|indemn\w*|agreement\w*|clauses?|settlement\w*|breach\w*|warrant\w*"
+    r"|agree\w*|accept\w*|authori[sz]\w*|sign|signs|signed|signing|signature\w*|solicitors?|gdpr)\b"
 )
 _COMMITMENT = re.compile(
-    r"\b(?:we|i)\s+(?:will|shall)\b|\b(?:we|i)['’]ll\b"
-    r"|\b(?:guarant\w*|promis\w*|commit\w*|deadlines?|assur\w*|pledg\w*)\b"
+    r"\b(?:we|i)\s+(?:will|shall)\b|\b(?:we|i)['\u2019]ll\b"
+    r"|\b(?:guarant\w*|promis\w*|commit\w*|deadlines?|assur\w*|pledg\w*|hereby|deals?)\b"
+    r"|\b(?:yours|will\s+do|for\s+free|on\s+(?:us|me|it))\b"
+    r"|\b(?:consider\s+it\s+(?:done|settled|sorted)|my\s+word|count\s+on\s+(?:me|us)|rest\s+assured"
+    r"|leave\s+it\s+(?:with|to)\s+(?:me|us)|you\s+can\s+rely|(?:we|i)\s+(?:am|are|['\u2019]m|['\u2019]re)\s+going\s+to)\b"
 )
 _FAMILIES = (("money", _MONEY), ("legal", _LEGAL), ("commitment", _COMMITMENT))
-_BREAKS = re.compile("\r\n|[\r\x0b\x0c\x1c\x1d\x1e\x85  ]")
+# BQ-186 (c): a separator or line break between two letters or digits is dropped, then digit look-alikes mapped back.
+_SPLIT = re.compile(r"(?<=[a-z0-9])[-._*\n]+(?=[a-z0-9])")
+_LEET = str.maketrans("013457@", "oieasta")
+# BQ-186 (a): L2 auto-send is an allowlist. A time of day is the only digit shape that passes; a link, any other digit
+# or any word off the list is the signal "unlisted".
+SHORT_BODY_MAX = 2_000
+_TIME = re.compile(r"\b(?:(?:1[0-2]|0?[1-9])(?::[0-5][0-9])?\s?(?:am|pm)|(?:[01]?[0-9]|2[0-3]):[0-5][0-9])\b", re.I)
+_LINK = re.compile(r"://|[/@\\]|[a-z0-9][.\u3002\uff61][a-z]")
+_ITEM = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?|[^\sA-Za-z]")
+_STOP = "\0"  # stands in for a time of day: not a letter or a digit, so it ends a name run
+# Words that may come before the greeting's name run ("Hi", "Good morning", "Thank you"), and the only words a
+# sign-off line ("Best,", "Kind regards,", "Many thanks!") may hold.
+_GREETING = frozenset("hi hello hey dear good morning afternoon evening thanks thank you".split())
+_SIGN_OFF = frozenset("best regards kind warm wishes cheers thanks thank you many sincerely all the".split())
+_WORDS = frozenset(
+    (
+        "hi hello hey dear good morning afternoon evening night thanks thank you your very much so again for "
+        "the a an and it its is that this we us our i me my to be at on in by with from of or but then there here see "
+        "talk "
+        "soon next last week weekend month year tomorrow today tonight monday tuesday wednesday thursday friday "
+        "saturday sunday jan feb mar apr may jun jul aug sep oct nov dec january february march april june july "
+        "august september october november december works work fine great sounds sound happy glad meet meeting call "
+        "chat catch up time day date confirmed confirm let know looks look forward best regards cheers kind sincerely "
+        "warm wishes ok okay yes sure please can could would not no all also too just well "
+        "out are was were am what when where who how if any some more both available around about "
+        "after before late early noon lunch coffee hope perfect lovely nice enjoy safe travels office room slot "
+        "same sorry i'm it's that's don't doesn't can't let's you're we're we've i've you've isn't"
+    ).split()
+)
+_BREAKS = re.compile("\r\n|[\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029]")
 
 
 def clean_text(text: str) -> str:
@@ -51,15 +91,98 @@ def _suspicious(c: str) -> bool:
     return not c.isascii() and kind[0] not in "PZ" and kind != "Sc"
 
 
+def _sign_off(items: list[str]) -> bool:
+    words = [i.lower() for i in items if i[0].isalpha()]
+    return bool(words) and all(w in _SIGN_OFF for w in words) and all(i[0].isalpha() or i in ",.!" for i in items)
+
+
+def _names(lines: list[list[str]]) -> set[str]:
+    """The words of the body's two name runs: the greeting's, right after the greeting words that open the first line
+    ("Hi David,"), and the signature's, opening the last line when the non-empty line before it is the last sign-off
+    line ("Best," then "Sarah"). A run is at most two Title-case words of two letters or more; anything else ends it, a
+    time of day included."""
+    filled = [i for i, items in enumerate(lines) if items]
+    starts: dict[int, int] = {}
+    if filled:
+        first = lines[filled[0]]
+        lead = next((n for n in range(2) if n >= len(first) or first[n].lower() not in _GREETING), 2)
+        if lead:
+            starts[filled[0]] = lead
+        signs = [i for i in filled if _sign_off(lines[i])]
+        if signs and filled[-2:-1] == signs[-1:]:  # one line follows the last sign-off line, and it ends the body
+            starts[filled[-1]] = 0
+    names: set[str] = set()
+    for index, start in starts.items():
+        for item in lines[index][start : start + 2]:
+            if not (len(item) > 1 and item.istitle() and item.lower() not in _WORDS):
+                break
+            names.add(item.lower())
+    return names
+
+
+def _unlisted(cleaned: str) -> bool:
+    """True when the body is not plain scheduling talk: too long, a link, a digit that is not a time of day, or a word
+    that is neither on the list nor a word of the greeting's or the signature's name run (`_names`). A name elsewhere
+    ("Thanks David") must repeat one of those words. Name words in a row that join into a family word ("Re Fund") are
+    flagged. Linear, no backtracking."""
+    if len(cleaned) > SHORT_BODY_MAX:
+        return True
+    if _LINK.search(cleaned.lower()):  # before times are removed: "5pm.me" is a link
+        return True
+    cleaned = _TIME.sub(f" {_STOP} ", cleaned).replace("\u2019", "'")
+    if any(c.isdigit() for c in cleaned):
+        return True
+    lines = [_ITEM.findall(line) for line in cleaned.split("\n")]
+    names = _names(lines)
+    filled = [i for i, items in enumerate(lines) if items]
+    signs = [i for i in filled if _sign_off(lines[i])]
+    sig = filled[-1] if signs and filled[-2:-1] == signs[-1:] else None  # the signature line
+    for li, items in enumerate(lines):
+        run: list[str] = []  # a name run: at most two words, every join of them is checked
+        prev: str | None = None
+        for item in items:
+            word = item.lower()
+            if word in names:
+                # a run starts right after a greeting word, or opens the signature line
+                if not run and not ((prev is not None and prev.lower() in _GREETING) or (prev is None and li == sig)):
+                    return True
+                run = [*run, word]
+                if len(run) > 2:
+                    return True
+                joins = ("".join(run[-n:]) for n in range(2, len(run) + 1))
+                if any(p.search(j) for j in joins for _, p in _FAMILIES):
+                    return True
+            else:
+                if run and item[0].isalpha():
+                    return True  # a word right after a name: the name is a subject, not a vocative or a signature
+                if item[0].isalpha() and word not in _WORDS:
+                    return True
+                run = []
+            prev = item
+    return False
+
+
 def t3_content_signal(text: str) -> frozenset[str]:
-    """Subset of {"money", "legal", "commitment", "obfuscated"}; empty means no signal."""
+    """Subset of {"money", "legal", "commitment", "obfuscated", "unlisted"}; empty means no signal."""
     if len(text) > SIGNAL_CAP:
         return frozenset({"obfuscated"})
     signal = {"obfuscated"} if any(_hidden(c) for c in text) else set()
-    folded = unicodedata.normalize("NFKC", clean_text(text)).lower()
+    parts, size, raw = [], 0, clean_text(text)
+    for i in range(0, len(raw), 512):  # NFKC can expand a character 18-fold (U+FDFA): stop when the output is too big
+        parts.append(unicodedata.normalize("NFKC", raw[i : i + 512]))
+        size += len(parts[-1])
+        if size > SIGNAL_CAP:
+            return frozenset(signal | {"obfuscated"})
+    cleaned = "".join(parts)
+    folded = cleaned.lower()
     if any(_suspicious(c) for c in folded):
         signal.add("obfuscated")
     if any(unicodedata.category(c) == "Sc" for c in folded):
         signal.add("money")
-    signal.update(name for name, pattern in _FAMILIES if pattern.search(folded))
+    squeezed = _SPLIT.sub("", folded).translate(_LEET)
+    for name, pattern in _FAMILIES:
+        if pattern.search(folded) or pattern.search(squeezed):
+            signal.add(name)
+    if _unlisted(cleaned):
+        signal.add("unlisted")
     return frozenset(signal)
