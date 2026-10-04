@@ -16,8 +16,10 @@ import {
   Soon,
   Stats,
   authzText,
+  doneState,
   field,
   useFixtureRun,
+  waitState,
   words,
 } from "./kit";
 
@@ -37,9 +39,9 @@ export function S_18() {
     >
       <Stats
         items={[
-          ["Questions waiting", open.length],
-          ["Answers recorded", answered.length],
-          ["Answered by a Team Lead", byLead],
+          ["Questions waiting", open.length, waitState(open.length)],
+          ["Answers recorded", answered.length, doneState(answered.length, "Recorded")],
+          ["Answered by a Team Lead", byLead, doneState(byLead, "Team Lead")],
         ]}
       />
       <Section

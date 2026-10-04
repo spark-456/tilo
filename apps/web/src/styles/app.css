@@ -722,6 +722,9 @@ button.row {
 .stat-tiles.three b {
   font: 900 var(--text-20) / 1.15 var(--font-display);
 }
+.stat-tiles li .btag {
+  align-self: flex-start;
+}
 .stat-name {
   font-weight: 700;
   font-size: var(--text-12);
