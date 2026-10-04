@@ -471,6 +471,7 @@ module "budget" {
   project_number        = local.project_number
   display_name          = "tilo-${var.project_id}-monthly"
   amount_usd            = var.budget_amount_usd
+  currency_code         = var.budget_currency_code
   threshold_percentages = [0.5, 0.9, 1.0]
 
   # The budget needs billingbudgets.googleapis.com enabled first.
