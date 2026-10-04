@@ -37,4 +37,4 @@ channel identity binding. Public ingress for signature-verified webhooks only.
 - `cards` (FR-CHN-05; BQ-89): random button ids; a tap counts only from the card's bound number; T3 approve
   needs the PIN (next text within 300 s, one try; digits in the next 300 s are `pin_late`, never routed);
   Hold/Edit keep a gate open (repeats: one event); one send per card id; emits `channel.message_out`/`_in`.
-- `drafting` (FR-CHN-10; BQ-139-151): raw-capped thread as prompt data only, no tools; envelope from the thread; `find_invented` gate.
+- `drafting` (FR-CHN-10; BQ-139-151): thread raw-capped per field and in total, data only; `drafting_check` gates body and questions.
