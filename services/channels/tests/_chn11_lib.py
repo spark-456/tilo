@@ -73,19 +73,28 @@ class OutboxRefused(Exception):
     pass
 
 
+_PROBE: dict = {}  # what `FakeOutbox.revoke` passes through `enqueue`: stores nothing, counts nothing
+
+
 class FakeOutbox:
-    """`enqueue(entry, evidence)`, `cancel(outbox_id)`, `dispatch_due()`, as `tilo_connectors.outbox.Outbox`."""
+    """`enqueue(entry, evidence)`, `cancel(outbox_id)`, `dispatch_due()`, as `tilo_connectors.outbox.Outbox`, plus
+    CHN-GATE-A's read port (`get`, `get_by_idempotency_key`) and `revoke`."""
 
     def __init__(self, clock: FakeClock) -> None:
         self.clock = clock
         self.entries: dict[str, dict] = {}
         self._keys: dict[tuple[str, str], str] = {}
+        self.revoked: set[tuple[str, str]] = set()
         self.sent: list[tuple[str, datetime]] = []
         self.enqueue_calls = 0
         self._lock = threading.Lock()
 
     def enqueue(self, entry: dict, evidence: dict) -> dict:
+        if entry is _PROBE:
+            return {}
         with self._lock:
+            if (entry.get("world_id"), entry.get("idempotency_key")) in self.revoked:
+                raise OutboxRefused("the key was revoked: the outbox refuses to create it")
             self.enqueue_calls += 1
             errors = [e.message for e in _outbox_validator().iter_errors(entry)]
             if errors:
@@ -116,6 +125,33 @@ class FakeOutbox:
                 raise OutboxRefused("not 'scheduled'")
             entry["state"] = "cancelled"
             return copy.deepcopy(entry)
+
+    def get(self, outbox_id: str) -> dict | None:
+        with self._lock:
+            return copy.deepcopy(self.entries.get(outbox_id))
+
+    def get_by_idempotency_key(self, world_id: str, idempotency_key: str) -> dict | None:
+        with self._lock:
+            outbox_id = self._keys.get((world_id, idempotency_key))
+        return self.get(outbox_id) if outbox_id is not None else None
+
+    def revoke(self, world_id: str, idempotency_key: str) -> dict | None:
+        """Writes the key like an enqueue and cancels like a cancel, so it goes through this instance's `enqueue` (with
+        a probe that stores nothing) and `cancel`: an FR-CHN-11 bench that faults either one faults a revocation too."""
+        self.enqueue(_PROBE, {})
+        key = (world_id, idempotency_key)
+        with self._lock:
+            outbox_id = self._keys.get(key)
+            if outbox_id is None:
+                self.revoked.add(key)
+                return None
+            scheduled = self.entries[outbox_id]["state"] == "scheduled"
+        if scheduled:
+            try:
+                return self.cancel(outbox_id)
+            except OutboxRefused:  # no longer scheduled, or the bench refuses: answer what is stored
+                pass
+        return self.get(outbox_id)
 
     def dispatch_due(self) -> list[dict]:
         with self._lock:
