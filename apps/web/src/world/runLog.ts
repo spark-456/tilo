@@ -5,6 +5,7 @@
 import type { Event } from "@tilo/contracts";
 import { useSyncExternalStore } from "react";
 import type { TiloClient } from "../api/client";
+import { type RunStatus, worldStatus } from "./runSummary";
 
 interface Run {
   events: readonly Event[];
@@ -39,6 +40,20 @@ export function useRunLog(client: TiloClient, worldId: string): readonly Event[]
       return () => run.listeners.delete(onChange);
     },
     () => runs.get(client)?.get(worldId)?.events ?? EMPTY,
+  );
+}
+
+/** The run's recorded status (FR-WLD-07: the stage veil follows it); "idle" with no world. Only
+ * re-renders when the status word changes, not on every event. */
+export function useRunStatus(client: TiloClient, worldId: string | null): RunStatus {
+  return useSyncExternalStore(
+    (onChange) => {
+      if (worldId === null) return () => undefined;
+      const run = runFor(client, worldId);
+      run.listeners.add(onChange);
+      return () => run.listeners.delete(onChange);
+    },
+    () => worldStatus(worldId === null ? EMPTY : (runs.get(client)?.get(worldId)?.events ?? EMPTY)),
   );
 }
 

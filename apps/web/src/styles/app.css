@@ -1394,3 +1394,51 @@ button.row {
   color: var(--color-ink-2);
   font-weight: 700;
 }
+/* FR-WLD-07: Pause all and the Paused banner share one fixed box, so no state moves what is around
+   it (CLS). No animation or transition anywhere (HR-2, FR-WLD-09). Neutral role tokens only. */
+.pause-slot {
+  box-sizing: border-box;
+  height: 7em; /* a 48 px button row and a two-line note at 14 px */
+  margin: 8px 0;
+  overflow: hidden;
+}
+.pause-row {
+  display: flex;
+  gap: 8px;
+}
+.pause-btn {
+  font-size: 1em; /* 14 px in the rail, 16 px in the mobile sheet: on the type scale */
+}
+.pause-btn[aria-disabled="true"] {
+  border-style: dashed;
+  border-color: var(--color-ink-2);
+  color: var(--color-ink-2);
+  cursor: not-allowed;
+}
+.pause-note {
+  margin: 4px 0 0;
+  font-size: 1em;
+  line-height: 1.4;
+  color: var(--color-ink-1);
+}
+@media (max-width: 767px) {
+  .pause-btn {
+    min-height: 52px;
+  }
+}
+/* Grey over the stage while the record says paused; click-through so the camera still works. */
+.world-veil {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 72px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-ink-2) 45%, transparent);
+}
+.veil-label {
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 1em / 1.25 var(--font-ui);
+}

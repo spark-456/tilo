@@ -41,12 +41,50 @@ const wait = (ms: number): Promise<void> =>
     ? Promise.resolve()
     : new Promise((resolve) => setTimeout(resolve, Math.min(ms, MAX_TIMER_MS)));
 
+/** The world.paused a server would record after Pause all from the web (FR-WLD-07): shaped like
+ * contracts/fixtures/events/valid/world.paused.json, one second after the last recorded event. */
+function pausedAfter(last: Event): Event {
+  const seq = last.seq + 1;
+  return {
+    v: "1.0",
+    id: `01JB5VQ${String(seq).padStart(19, "0")}`,
+    seq,
+    ts: new Date(Date.parse(last.ts) + 1000).toISOString(),
+    world_id: last.world_id,
+    run_id: last.run_id,
+    type: "world.paused",
+    actor: "u_owner",
+    target: last.world_id,
+    level: null,
+    district: null,
+    item: null,
+    severity: "info",
+    credits: 0,
+    summary: "You paused all work.",
+    cause: last.id,
+    vis: "all",
+    authz: null,
+    data: { reason: "pause_all", channel: "web" },
+    trace: {
+      model_role: null,
+      profile: null,
+      tokens_in: null,
+      tokens_out: null,
+      tool: null,
+      latency_ms: null,
+      archive_ref: null,
+    },
+  };
+}
+
 /** TiloClient on the typed contract fixtures. Everything it returns is dev data (HR-4, BQ-07). */
 export class FixtureClient implements TiloClient {
   private readonly delayMs: number;
   private readonly speed: number;
   private brief: Brief = BRIEF_SUPPLIER_COMPARISON;
   private readonly answered = new Set<string>();
+  /** Replays still playing; Pause all stops each and records one world.paused (FR-WLD-07). */
+  private readonly playing = new Set<() => void>();
 
   constructor(options: FixtureClientOptions = {}) {
     this.delayMs = options.delayMs ?? 0;
@@ -110,6 +148,14 @@ export class FixtureClient implements TiloClient {
     const events: readonly Event[] = [...EVENTS_VILLAGE_BASIC].sort((a, b) => a.seq - b.seq);
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let last: Event | undefined;
+    const pause = () => {
+      if (stopped || !last || last.seq >= (events[events.length - 1]?.seq ?? 0)) return;
+      stopped = true; // the harness stops: nothing is delivered after the pause
+      clearTimeout(timer);
+      onEvent(pausedAfter(last));
+    };
+    this.playing.add(pause);
     const play = (i: number) => {
       const event = events[i];
       if (stopped || !event) return;
@@ -118,6 +164,7 @@ export class FixtureClient implements TiloClient {
       timer = setTimeout(
         () => {
           if (stopped) return;
+          last = event;
           onEvent(event);
           play(i + 1);
         },
@@ -128,7 +175,15 @@ export class FixtureClient implements TiloClient {
     return () => {
       stopped = true;
       clearTimeout(timer);
+      this.playing.delete(pause);
     };
+  }
+
+  /** Pause all (FR-WLD-07), not on the TiloClient interface. Like the server it stops the run and
+   * records world.paused; the screens still wait for that event before claiming anything. */
+  async pauseWorld(_worldId: string): Promise<void> {
+    await wait(this.delayMs);
+    for (const pause of this.playing) pause();
   }
 
   async listCards(worldId: string): Promise<Card[]> {

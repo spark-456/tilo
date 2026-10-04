@@ -17,6 +17,7 @@ import {
 import { useSelection } from "../world/selection";
 import { AppLink } from "./AppLink";
 import { LensTabs } from "./LensTabs";
+import { WorldPauseSlot } from "./PauseSlot";
 import { useRemote } from "./remote";
 
 /** One outline row: a toggle button that selects its object for every lens (FR-WLD-06). Rows keep
@@ -83,6 +84,7 @@ export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: 
           </>
         )}
       </section>
+      <WorldPauseSlot worldId={worldId} />
       <div className="hud-count">
         <h2>Needs you</h2>
         {waiting > 0 && <AppLink to="/needs-you">Open the queue</AppLink>}
