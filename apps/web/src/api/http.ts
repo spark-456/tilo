@@ -144,6 +144,8 @@ export class HttpClient implements TiloClient {
   private readonly layouts = new Map<string, Promise<Layout>>(); // a run's layout never changes
   private readonly approaches = new Map<string, Promise<ApproachesResult>>(); // in flight only
   private readonly feeds = new Map<string, Feed>();
+  private readonly missing = new Set<string>(); // worlds whose events answered 404
+  private readonly missingListeners = new Set<() => void>();
 
   constructor(options: HttpClientOptions) {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
@@ -249,6 +251,18 @@ export class HttpClient implements TiloClient {
     return pending;
   }
 
+  /** True once the server has answered 404 for this world's events: the world does not exist. The
+   * page says "Not found" on it (App's `useWorldKnown`); the client has stopped polling it. */
+  isWorldMissing(worldId: string): boolean {
+    return this.missing.has(worldId);
+  }
+
+  /** `useSyncExternalStore`'s subscribe for `isWorldMissing`. Returns the unsubscribe. */
+  onWorldMissing(listener: () => void): () => void {
+    this.missingListeners.add(listener);
+    return () => this.missingListeners.delete(listener);
+  }
+
   private feed(worldId: string): Feed {
     let feed = this.feeds.get(worldId);
     if (!feed) {
@@ -347,6 +361,10 @@ export class HttpClient implements TiloClient {
           error instanceof TiloApiError ? error : new TiloApiError(UNREACHABLE, null, true);
         if (!known.retryable) {
           stopped = true; // 4xx (an unknown world is a 404): it will not change
+          if (known.status === 404 && !this.missing.has(worldId)) {
+            this.missing.add(worldId);
+            for (const listener of [...this.missingListeners]) listener();
+          }
           onError?.(known);
         }
         failures += 1;

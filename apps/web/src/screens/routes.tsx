@@ -25,6 +25,7 @@ import { S_22 } from "./S_22";
 import { S_23 } from "./S_23";
 import { S_24 } from "./S_24";
 import { More, ScreensIndex } from "./ScreensIndex";
+import { inARun } from "./inARun";
 import { SCREENS } from "./meta";
 
 export interface ScreenProps {
@@ -32,10 +33,15 @@ export interface ScreenProps {
   readonly params: readonly string[];
 }
 
+// Screens that read one run from a bare address: no run yet, or an unknown world, is said, not fetched.
+const NeedsYou = inARun(S_06, { testid: "needs-you", title: "Needs you" });
+const GateSheet = inARun(S_07, { testid: "gate-sheet-page", title: "Approval gate" });
+const Library = inARun(S_13, { testid: "library", title: "Library" });
+
 // biome-ignore format: one line per screen keeps group edits to a single line.
 const COMPONENTS: Readonly<Record<string, ComponentType<ScreenProps>>> = {
-  "S-05": S_05, "S-06": S_06, "S-07": S_07, "S-08": S_08, "S-09": S_09, "S-10": S_10,
-  "S-11": S_11, "S-12": S_12, "S-13": S_13, "S-14": S_14, "S-15": S_15, "S-16": S_16, "S-17": S_17,
+  "S-05": S_05, "S-06": NeedsYou, "S-07": GateSheet, "S-08": S_08, "S-09": S_09, "S-10": S_10,
+  "S-11": S_11, "S-12": S_12, "S-13": Library, "S-14": S_14, "S-15": S_15, "S-16": S_16, "S-17": S_17,
   "S-18": S_18, "S-19": S_19, "S-21": S_21, "S-22": S_22, "S-23": S_23, "S-24": S_24,
 };
 

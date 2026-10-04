@@ -199,4 +199,43 @@ test.describe("@cp2 CP2 live run on the real dev API", () => {
     expect(seq).toBeGreaterThan(1);
     expect(problems).toEqual([]);
   });
+
+  test("CP2 #258: a bare /needs-you before any run says 'No run yet', with no request and no console error", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    const problems = watchConsole(page);
+    const asked: string[] = [];
+    page.on("request", (req) => {
+      if (req.url().includes("/worlds/")) asked.push(new URL(req.url()).pathname);
+    });
+    await page.goto("/needs-you");
+    await expect(page.getByRole("heading", { level: 1, name: "Needs you" })).toBeVisible();
+    await expect(page.getByTestId("no-run")).toContainText("No run yet");
+    expect(asked).toEqual([]);
+    expect(problems).toEqual([]);
+  });
+
+  // The Library says the same; its shell still fills the right rail from the fixture world (App.tsx),
+  // which is #253's to change, so only its words are checked here.
+  test("CP2 #258: a bare /library before any run says 'No run yet'", async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await page.goto("/library");
+    await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
+    await expect(page.getByTestId("no-run")).toContainText("No run yet");
+  });
+
+  test("CP2 #258: an unknown world says Not found and its events are asked for once, not on every poll", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    const events: string[] = [];
+    page.on("request", (req) => {
+      if (req.url().endsWith("/worlds/bogus/events")) events.push(req.url());
+    });
+    await page.goto("/world/bogus");
+    await expect(page.getByTestId("not-found")).toBeVisible();
+    await page.waitForTimeout(3_500); // longer than three poll gaps: a repeating poll would show here
+    expect(events).toHaveLength(1);
+  });
 });

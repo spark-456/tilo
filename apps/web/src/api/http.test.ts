@@ -159,12 +159,14 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
     run_id: "r1",
     item: null,
   });
-  const events = (...types: string[]) => json({ events: types.map((t, i) => row(t, i + 1)) });
+  const eventsOf = (world: string, ...types: string[]) =>
+    json({ events: types.map((t, i) => row(t, i + 1, world)) });
+  const events = (...types: string[]) => eventsOf("w1", ...types);
 
   it("FR-WLD-05 getLayout reads the events first and asks for the layout only once world.started is on record", async () => {
     const { calls, fetch } = script(
-      events("budget.granted"),
-      events("budget.granted", "world.started"),
+      eventsOf("w 1", "budget.granted"),
+      eventsOf("w 1", "budget.granted", "world.started"),
       json(LAYOUT_VILLAGE_BASIC),
     );
     const c = client(fetch, 1);
