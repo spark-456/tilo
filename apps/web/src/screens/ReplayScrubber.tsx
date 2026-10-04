@@ -44,7 +44,9 @@ export function ReplayScrubber({
         </p>
       ) : (
         <p className="replay-banner" data-testid="scrub-reason">
-          Replay opens once this run has finished. It is still going.
+          {finished
+            ? "This run recorded no events, so there is nothing to replay."
+            : "Replay opens once this run has finished. It is still going."}
         </p>
       )}
       <div className="replay-row">
@@ -66,7 +68,7 @@ export function ReplayScrubber({
           max={last}
           step={1}
           value={index}
-          disabled={!finished}
+          disabled={!finished || last === 0}
           onChange={(e) => go(Number(e.currentTarget.value))}
         />
         <button

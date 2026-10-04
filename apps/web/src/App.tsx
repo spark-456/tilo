@@ -1,16 +1,18 @@
 import { memo, useEffect, useRef } from "react";
-import { useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
+import { useClient, useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
 import { FIXTURE_WORLD_ID } from "./api/fixtures/derived";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { NeedsYouRail } from "./needs-you/NeedsYouRail";
 import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
 import { NotFound } from "./screens/NotFound";
+import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
 import { LoggedScrubber, ReplayScrubber } from "./screens/ReplayScrubber";
 import { WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
+import { useRunStatus } from "./world/runLog";
 import { speedBadgeText } from "./world/speed";
 import { useWorldFixture } from "./world/useWorldFixture";
 
@@ -21,6 +23,9 @@ const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
     {seq} {type}
   </li>
 ));
+/** The rail's Trace list holds the newest rows only: thousands of list items made a scrub across a
+ * long run cost hundreds of ms (FR-WLD-08). The Trace lens lists every event. */
+const TRACE_ROWS = 250;
 const WORLD_SCREENS: ReadonlySet<string> = new Set(["S-05", "S-10", "S-11", "S-12"]);
 /** Screens outside a world address that still read the replayed run (AGW-08 group B): HR-6 applies,
  * and the right rail describes that same run (the fixture world, the only one the client has). */
@@ -47,6 +52,7 @@ export function App() {
   const mobile = useMediaQuery("(max-width: 767px)");
   const world = useWorldFixture();
   const fixtureClient = useIsFixtureClient();
+  const client = useClient();
   const replaySpeed = useReplaySpeed();
   const path = usePathname();
   const matched = matchScreen(path); // null: the stage and the flow shell
@@ -76,6 +82,9 @@ export function App() {
   const screen = unknownWorld ? NOT_FOUND : matched;
   const worldId = unknownWorld ? null : pathWorld;
   const hudWorld = screen ? null : worldId;
+  // FR-WLD-07: the stage is veiled only while the recorded run status is "paused" (HR-1).
+  const clientStatus = useRunStatus(client, hudWorld);
+  const stagePaused = (world.active ? world.status : clientStatus) === "paused";
   const runScreen = screen !== null && RUN_SCREENS.has(screen.id);
   const needsYouScreen = screen !== null && NEEDS_YOU_SCREENS.has(screen.id);
   const railWorld = worldId ?? (runScreen && !needsYouScreen ? FIXTURE_WORLD_ID : null);
@@ -118,6 +127,7 @@ export function App() {
           {...(world.active
             ? { onWorld: world.onWorld, seq: world.seq, selected: world.selected }
             : {})}
+          paused={stagePaused}
         />
       )}
       {!screen && !world.active && <FlowShell />}
@@ -154,7 +164,7 @@ export function App() {
                 e.currentTarget.querySelector("summary")?.focus();
               }}
             >
-              <summary>World status</summary>
+              <summary>World status{clientStatus === "paused" ? " · Paused" : ""}</summary>
               <WorldPanels key={hudWorld} worldId={hudWorld} />
             </details>
           )}
@@ -167,6 +177,7 @@ export function App() {
             <WorldPanels key={railWorld} worldId={railWorld} tabs={hudWorld !== null} />
           ) : (
             <>
+              {world.active && <ReplayPauseSlot status={world.status} />}
               <h2>Activity</h2>
               <p data-testid="right-rail-meter">Nothing yet. This fills in once a run starts.</p>
               {needsYouScreen ? (
@@ -185,7 +196,12 @@ export function App() {
             <>
               <h2>Trace</h2>
               <ul className="trace-list" data-testid="trace-list">
-                {world.trace.map((row) => (
+                {world.trace.length > TRACE_ROWS && (
+                  <li>
+                    Showing the latest {TRACE_ROWS} of {world.trace.length} events.
+                  </li>
+                )}
+                {world.trace.slice(-TRACE_ROWS).map((row) => (
                   <TraceRow key={row.seq} seq={row.seq} type={row.type} />
                 ))}
               </ul>

@@ -1,70 +1,40 @@
-// FR-WLD-08 / PRD 9.4 HR-4: replay and scrub of a finished run. The scrub point is display state
-// (which moment of the recorded run the person is looking at): it records nothing, is never an
-// event and moves nothing by itself (HR-1, HR-3). It is held per world, so World, Story, Trace and
-// Inspect all show the same moment, and `null` means "the latest": the whole run.
-//
-// A scrubber has one stop per event: index 0 is before the first event, index i is just after the
-// i-th. A stop is addressed by the seq of its last event (0 for the start).
+// FR-WLD-08 / PRD 9.4 HR-4: replay and scrub of a finished run. The replay point and the stops it
+// falls on live in replayPoint.ts (re-exported here); this module words them for the screen and
+// reads the run log through them.
 import type { Event } from "@tilo/contracts";
 import { useMemo, useSyncExternalStore } from "react";
 import type { TiloClient } from "../api/client";
+import { eventsUpTo, getReplayPoint, subscribeReplay } from "./replayPoint";
 import { elapsed, useRunLog } from "./runLog";
 
-const points = new Map<string, number>();
-const listeners = new Set<() => void>();
-
-export const getReplayPoint = (worldId: string): number | null => points.get(worldId) ?? null;
-
-export function subscribeReplay(onChange: () => void): () => void {
-  listeners.add(onChange);
-  return () => listeners.delete(onChange);
-}
-
-/** Moves this world's replay point (null: the latest). The same point again changes nothing. */
-export function setReplayPoint(worldId: string, seq: number | null): void {
-  if (getReplayPoint(worldId) === seq) return;
-  if (seq === null) points.delete(worldId);
-  else points.set(worldId, seq);
-  for (const listener of [...listeners]) listener();
-}
-
-/** The seq a stop stands for: 0 for the start, else the seq of the event it follows. */
-export function indexToPoint(events: readonly Event[], index: number): number {
-  return index <= 0 ? 0 : (events[Math.min(index, events.length) - 1]?.seq ?? 0);
-}
-
-/** The stop a point falls on: the number of events at or before it (null: the last stop). */
-export function pointToIndex(events: readonly Event[], point: number | null): number {
-  if (point === null) return events.length;
-  let lo = 0;
-  let hi = events.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if ((events[mid] as Event).seq <= point) lo = mid + 1;
-    else hi = mid;
-  }
-  return lo;
-}
-
-/** The events a screen shows at this point: the whole run for null, else those up to the point. */
-export function eventsUpTo(events: readonly Event[], point: number | null): readonly Event[] {
-  return point === null ? events : events.slice(0, pointToIndex(events, point));
-}
+export {
+  eventsUpTo,
+  getReplayPoint,
+  indexToPoint,
+  pointToIndex,
+  setReplayPoint,
+  subscribeReplay,
+} from "./replayPoint";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** "29 Sep 2026" in UTC, so every viewer reads the same day (and no ICU build can spell it "Sept"). */
-const recordedDate = (ts: string): string => {
+/** "29 Sep 2026" in UTC, so every viewer reads the same day (and no ICU build can spell it "Sept");
+ * null for a timestamp that is not a date, so a banner never states a wrong one. */
+const recordedDate = (ts: string): string | null => {
   const d = new Date(ts);
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  return Number.isNaN(d.getTime())
+    ? null
+    : `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 };
 
 /** HR-4: "Replay of run #… recorded <date>". A dev fixture says what it is (BQ-07). Null while
- * there is no recorded event to name a run. */
+ * there is no recorded event to name a run; no date (rather than a wrong one) when the first
+ * event's timestamp is not a date. */
 export function replayBanner(events: readonly Event[], fixture: boolean): string | null {
   const first = events[0];
   if (!first) return null;
-  const text = `Replay of run #${first.run_id} recorded ${recordedDate(first.ts)}`;
+  const date = recordedDate(first.ts);
+  const text = `Replay of run #${first.run_id}${date ? ` recorded ${date}` : ""}`;
   return fixture ? `${text} · dev fixture, not a real run` : text;
 }
 
@@ -72,7 +42,8 @@ export function replayBanner(events: readonly Event[], fixture: boolean): string
 export function scrubText(events: readonly Event[], index: number): string {
   const event = events[index - 1];
   if (!event) return "Start of the run, before the first event";
-  return `Event ${index} of ${events.length}, seq ${event.seq}, ${elapsed(events, event)} into the run: ${event.type}`;
+  const time = Number.isNaN(Date.parse(event.ts)) ? "" : `, ${elapsed(events, event)} into the run`;
+  return `Event ${index} of ${events.length}, seq ${event.seq}${time}: ${event.type}`;
 }
 
 /** The world's replay point, for the controls. */

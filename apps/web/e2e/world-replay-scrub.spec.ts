@@ -41,6 +41,7 @@ const BIG = 5_000;
 const scrubber = (page: Page) => page.getByTestId("replay-scrubber");
 const slider = (page: Page) => scrubber(page).getByRole("slider", { name: "Replay position" });
 const banner = (page: Page) => page.getByTestId("replay-banner");
+const BANNER_TEXT_PAUSE = /^Replay of run #r_crowd_6_1 recorded 29 Sep 2026/;
 const BANNER_TEXT = /^Replay of run #r_village_basic_1 recorded 29 Sep 2026/;
 
 test("FR-WLD-08 a live run cannot be scrubbed: the control is disabled and says why", async ({
@@ -168,10 +169,10 @@ for (const viewport of [DESKTOP, MOBILE]) {
           w.__shifts.push((e as unknown as { value: number }).value);
       }).observe({ type: "layout-shift", buffered: true });
     });
-    await page.goto("/world/w_village_basic/trace?speed=100");
+    await page.goto("/world/w_village_basic/trace?speed=25");
     await expect(slider(page)).toBeDisabled(); // still running
     const live = await scrubber(page).boundingBox();
-    await expect(slider(page)).toBeEnabled({ timeout: 20_000 }); // finished
+    await expect(slider(page)).toBeEnabled({ timeout: 40_000 }); // finished
     await expect(banner(page)).toHaveText(BANNER_TEXT);
     const done = await scrubber(page).boundingBox();
     expect(done?.height, "the region is the same box live and finished").toBe(live?.height);
@@ -238,7 +239,10 @@ test(`FR-WLD-08 perf: scrub a ${BIG}-event run to any point in <= 500 ms`, async
   await page.goto(fixtureUrl("scrub-5000", { seq: BIG }));
   await expect.poll(() => stageSeq(page), { timeout: 20_000 }).toBe(BIG);
   await expect(slider(page)).toBeEnabled();
-  for (const target of [2_500, 0, 4_999, 1, 3_333, BIG]) {
+  // The slowest jump first: from the start to the end, with the whole Trace list to build.
+  const jumps = [0, 4_999, 2_500, 1, 3_333, BIG];
+  const measured: string[] = [];
+  for (const target of jumps) {
     const ms = await page.evaluate(async (to) => {
       const input = document.querySelector<HTMLInputElement>(
         '[data-testid="replay-scrubber"] input[type="range"]',
@@ -255,6 +259,64 @@ test(`FR-WLD-08 perf: scrub a ${BIG}-event run to any point in <= 500 ms`, async
       }
       return performance.now() - t0;
     }, target);
+    measured.push(`${target}: ${ms.toFixed(0)} ms`);
     expect(ms, `scrub to ${target} took ${ms.toFixed(0)} ms`).toBeLessThanOrEqual(500);
   }
+  test.info().annotations.push({ type: "scrub ms", description: measured.join(", ") });
+  console.log(`SCRUB MS ${measured.join(", ")}`);
+});
+
+// FR-WLD-07 + FR-WLD-08: pause-6 records world.paused at seq 24 with 15 stragglers after it, so it
+// ends paused. Once finished it can be scrubbed; the veil follows the recorded status at the scrub
+// point (HR-1), and the veil (in the stage) and the replay banner (in the rail or the column below
+// the stage) are both visible and never cover each other.
+for (const viewport of [DESKTOP, MOBILE]) {
+  test(`FR-WLD-08 a finished paused run scrubs; veil and replay banner both stay visible at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const problems = watchConsole(page);
+    await page.setViewportSize(viewport);
+    await page.goto(fixtureUrl("pause-6", { speed: 100 }));
+    await expect(slider(page)).toBeEnabled({ timeout: 20_000 });
+    await expect.poll(() => stageSeq(page)).toBe(39);
+    const veil = page.getByTestId("world-veil");
+    await expect(veil).toBeVisible();
+    await expect(banner(page)).toBeVisible();
+    const apart = async () => {
+      const [v, b] = await Promise.all([veil.boundingBox(), banner(page).boundingBox()]);
+      expect(v && b, "veil and banner both have a box").toBeTruthy();
+      if (!v || !b) return;
+      const overlap =
+        v.x < b.x + b.width && b.x < v.x + v.width && v.y < b.y + b.height && b.y < v.y + v.height;
+      expect(overlap, "the veil covers the replay banner").toBe(false);
+    };
+    await apart();
+    await slider(page).fill("10"); // before world.paused: the record had no pause yet
+    await expect.poll(() => stageSeq(page)).toBe(10);
+    await expect(veil).toHaveCount(0);
+    await expect(banner(page)).toBeVisible();
+    await slider(page).fill("30"); // after it: paused again
+    await expect.poll(() => stageSeq(page)).toBe(30);
+    await expect(veil).toBeVisible();
+    await expect(banner(page)).toHaveText(BANNER_TEXT_PAUSE);
+    await apart();
+    expect(problems.filter((p) => !/adblock|extension/i.test(p))).toEqual([]);
+  });
+}
+
+test("FR-WLD-08 an empty run opened at ?seq=0 says there is nothing to replay, not that it is still going", async ({
+  page,
+}) => {
+  await page.route("**/fixtures/scrub-empty.layout.json", (r) =>
+    r.fulfill({ contentType: "application/json", body: LAYOUT }),
+  );
+  await page.route("**/fixtures/scrub-empty.events.jsonl", (r) =>
+    r.fulfill({ contentType: "text/plain", body: "" }),
+  );
+  await page.setViewportSize(DESKTOP);
+  await page.goto(fixtureUrl("scrub-empty", { seq: 0 }));
+  await expect(page.getByTestId("scrub-reason")).toContainText(/no events/i);
+  await expect(page.getByTestId("scrub-reason")).not.toContainText(/still going/i);
+  await expect(slider(page)).toBeDisabled();
 });

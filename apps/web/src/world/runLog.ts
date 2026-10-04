@@ -5,6 +5,8 @@
 import type { Event } from "@tilo/contracts";
 import { useSyncExternalStore } from "react";
 import type { TiloClient } from "../api/client";
+import { eventsUpTo, getReplayPoint, subscribeReplay } from "./replayPoint";
+import { type RunStatus, worldStatus } from "./runSummary";
 
 interface Run {
   events: readonly Event[];
@@ -39,6 +41,31 @@ export function useRunLog(client: TiloClient, worldId: string): readonly Event[]
       return () => run.listeners.delete(onChange);
     },
     () => runs.get(client)?.get(worldId)?.events ?? EMPTY,
+  );
+}
+
+/** The run's recorded status (FR-WLD-07: the stage veil follows it); "idle" with no world. Only
+ * re-renders when the status word changes, not on every event. */
+export function useRunStatus(client: TiloClient, worldId: string | null): RunStatus {
+  return useSyncExternalStore(
+    (onChange) => {
+      if (worldId === null) return () => undefined;
+      const run = runFor(client, worldId);
+      run.listeners.add(onChange);
+      const unreplay = subscribeReplay(onChange);
+      return () => {
+        run.listeners.delete(onChange);
+        unreplay();
+      };
+    },
+    // FR-WLD-08: at a scrubbed moment the status is the one recorded by then, so the veil never
+    // claims a pause the run had not reached (HR-1).
+    () =>
+      worldId === null
+        ? worldStatus(EMPTY)
+        : worldStatus(
+            eventsUpTo(runs.get(client)?.get(worldId)?.events ?? EMPTY, getReplayPoint(worldId)),
+          ),
   );
 }
 

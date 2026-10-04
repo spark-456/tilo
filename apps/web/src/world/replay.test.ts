@@ -91,25 +91,58 @@ test("FR-WLD-08 replay point: held per world, null by default, listeners hear a 
   expect(heard).toBe(2);
 });
 
-test("FR-WLD-08 perf: scrubbing a 5,000-event run lands on every stop in <= 500 ms", () => {
-  const events = synthetic(5_000);
+// Builds the store the way a finished run does (once), then jumps to every kind of stop: the start,
+// just either side of a checkpoint, the middle, the end. Returns the build and the slowest jump.
+function sweep(count: number, stride: number) {
+  const events = synthetic(count);
+  let t0 = performance.now();
   const store = createWorldStore(layout);
   for (const event of events) store.apply(event);
-  let worst = 0;
-  for (let i = 0; i <= events.length; i += i < 300 ? 1 : 7) {
-    const t0 = performance.now();
-    const state = store.stateAt(indexToPoint(events, i));
-    worst = Math.max(worst, performance.now() - t0);
-    expect(state.seq).toBe(indexToPoint(events, i));
+  const buildMs = performance.now() - t0;
+  let worstMs = 0;
+  for (let i = 0; i <= count; i += i < 300 ? 1 : stride) {
+    const point = indexToPoint(events, i);
+    t0 = performance.now();
+    const state = store.stateAt(point);
+    worstMs = Math.max(worstMs, performance.now() - t0);
+    expect(state.seq).toBe(point);
   }
-  expect(worst, `slowest scrub took ${worst.toFixed(1)} ms`).toBeLessThanOrEqual(500);
+  return { events, store, buildMs, worstMs };
+}
+
+test("FR-WLD-08 perf: a 5,000-event run builds fast and every jump lands in <= 150 ms", () => {
+  const { buildMs, worstMs } = sweep(5_000, 7);
+  console.log(
+    `FR-WLD-08 5,000 events: build ${buildMs.toFixed(0)} ms, slowest jump ${worstMs.toFixed(1)} ms`,
+  );
+  expect(buildMs, "building the store").toBeLessThanOrEqual(500);
+  expect(worstMs, "slowest jump").toBeLessThanOrEqual(150);
 }, 30_000);
+
+test("FR-WLD-08 perf: a 20,000-event run still builds and scrubs in <= 500 ms", () => {
+  const { buildMs, worstMs } = sweep(20_000, 97);
+  console.log(
+    `FR-WLD-08 20,000 events: build ${buildMs.toFixed(0)} ms, slowest jump ${worstMs.toFixed(1)} ms`,
+  );
+  expect(buildMs, "building the store").toBeLessThanOrEqual(500);
+  expect(worstMs, "slowest jump").toBeLessThanOrEqual(500);
+}, 60_000);
 
 test("FR-WLD-08 determinism: the scrubbed state is the from-scratch replay, at any point", () => {
   const events = synthetic(5_000);
   const store = createWorldStore(layout);
   for (const event of events) store.apply(event);
-  for (const seq of [0, 1, 249, 250, 251, 2_500, 4_999, 5_000]) {
+  // The start, either side of every checkpoint boundary that matters, the middle and the end.
+  for (const seq of [0, 1, 249, 250, 251, 499, 500, 2_500, 4_749, 4_750, 4_999, 5_000]) {
     expect(store.stateAt(seq), `stateAt(${seq})`).toEqual(reduce(layout, events.slice(0, seq)));
   }
+});
+
+test("FR-WLD-08 banner: a first event with no usable timestamp shows no date, never a wrong one", () => {
+  const broken = [{ ...(village[0] as Event), ts: "not a date" }, ...village.slice(1)];
+  expect(replayBanner(broken, false)).toBe("Replay of run #r_village_basic_1");
+  expect(replayBanner(broken, true)).toBe(
+    "Replay of run #r_village_basic_1 · dev fixture, not a real run",
+  );
+  expect(scrubText(broken, 1)).not.toContain("NaN");
 });

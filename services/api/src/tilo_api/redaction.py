@@ -7,6 +7,7 @@ instead of a 500; the owner's view never walks `data` at all.
 
 from __future__ import annotations
 
+import copy
 import re
 from typing import Any
 
@@ -14,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_store
+from tilo_api.layout import visible_layout
 
 router = APIRouter()
 
@@ -145,9 +147,8 @@ def _redact_data(value: Any, key: str | None, id_map: dict[str, str]) -> Any:
 
 
 def _owner_event_view(event: dict) -> dict:
-    return {k: event[k] for k in _REQUIRED_EVENT_KEYS if k not in ("v", "world_id", "run_id", "item", "trace")} | {
-        "trace": event["trace"]
-    }
+    """The full record as stored (PRD 15.3), `v`, `world_id`, `run_id` and `item` included (CL-INT-4)."""
+    return {k: event[k] for k in _REQUIRED_EVENT_KEYS}
 
 
 def _allowlisted_trace(trace_value: Any) -> dict:
@@ -206,6 +207,26 @@ def get_world_events(
     id_map = {e["id"]: f"v{i + 1}" for i, e in enumerate(surviving)}
     events = [_scoped_event_view(e, i + 1, id_map, safe_districts) for i, e in enumerate(surviving)]
     return JSONResponse(content={"events": events})
+
+
+@router.get("/worlds/{world_id}/layout")
+def get_world_layout(
+    world_id: str,
+    principal: Principal = Depends(get_current_principal),
+    store: Store = Depends(get_store),
+) -> JSONResponse:
+    """FR-WLD-05, CL-INT-4: the run's layout, never invented: 404 until the run has built one. The owner gets all
+    of it; anyone else only what their districts show (`visible_layout`), and 404 when that is nothing."""
+    world = _require_member_world(principal, store, world_id)
+    run = store.runs.get(world_id)
+    layout = getattr(run, "layout", None)
+    if not isinstance(layout, dict) or not layout:
+        raise HTTPException(status_code=404)
+    if not _is_owner(principal, world.owner):
+        layout = visible_layout(layout, _safe_districts(principal.districts))
+        if layout is None:
+            raise HTTPException(status_code=404)
+    return JSONResponse(content=copy.deepcopy(layout))
 
 
 @router.get("/worlds/{world_id}")
