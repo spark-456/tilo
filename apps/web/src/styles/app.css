@@ -1580,9 +1580,21 @@ button.row {
 @media (max-width: 767px) {
   .flow-shell[data-screen="Approaches"] {
     width: calc(100vw - 32px);
+    /* Ends above the bottom tabs (their height token) and scrolls inside, like S-02. */
+    max-height: calc(100dvh - var(--strip-h) - var(--button-height-desktop) - 2 * var(--space-16));
+    overflow-y: auto;
   }
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 41em;
+    min-height: 41.5em; /* the 44 px cap field made the ready box 15 px taller */
+  }
+  .budget-cap-field input {
+    box-sizing: border-box;
+    min-height: 44px; /* the phone touch target */
+  }
+  /* The panel scrolls inside its cap, so the one action stays in view at the foot of it. */
+  .flow-shell[data-screen="Approaches"] .primary {
+    position: sticky;
+    bottom: 0;
   }
 }
 @media (max-width: 389px) {
