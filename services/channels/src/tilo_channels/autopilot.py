@@ -164,8 +164,8 @@ class Autopilot:
         if doc is None:
             return None
         instruction = f"{doc['instruction']}\nChange: {change}"
-        if len(instruction) > MAX_INSTRUCTION or "#" in instruction_id:
-            raise ValueError("edit too long or bad instruction id")
+        if len(instruction) > MAX_INSTRUCTION or "#" in instruction_id or doc["mode"] not in REPLY_FORMATS:
+            raise ValueError("edit too long, bad instruction id, or a format the drafter cannot redraft")
         mine = f"edit:{instruction_id}"
         if doc["state"] == "open" and doc["level"] == "L2":
             closed = self._ledger.stop(user_id, doc, mine) == "cancelled"
@@ -216,6 +216,7 @@ class Autopilot:
         # (the preview shows no format, Bcc or attachment), but it is still tiered so the card says why it waits
         sendable = ready and draft is not None and draft.mode == context.mode and draft.mode in FORMATS
         sendable = sendable and draft is not None and not draft.bcc and not draft.attachments
+        sendable = sendable and draft is not None and bool(draft.to + draft.cc)  # no recipient: nothing to send
         body = clean_text(draft.body) if draft is not None else ""
         doc: dict[str, Any] = {
             "card_id": card_id,
@@ -262,15 +263,16 @@ class Autopilot:
         (BQ-171, BQ-173); otherwise any To / Cc address not known after lower-casing alone (BQ-174)."""
         if draft.mode != context.mode or draft.mode not in REPLY_FORMATS or draft.bcc:
             return True
-        known = self._known(user_id, context)
-        return any(a.lower() not in known for a in draft.to + draft.cc)
+        known = self._known(user_id, context)  # ASCII only: str.lower() folds U+212A KELVIN SIGN to "k"
+        return any(not a.isascii() or a.lower() not in known for a in draft.to + draft.cc)
 
     def _known(self, user_id: str, context: DraftContext) -> set[str]:
         """BQ-154: contacts, every From in the thread, and To / Cc of the user's own messages: From the mailbox and
         carrying Gmail's SENT label (a From header alone is sender-controlled). A thread that cannot be read adds
         nothing (fail closed: more recipients are new)."""
-        known = {a.lower() for a in self._contacts(user_id)}
-        own = _base(_address(context.mailbox) or context.mailbox.lower())
+        known = {a.lower() for a in self._contacts(user_id) if isinstance(a, str) and a.isascii()}
+        mailbox = _address(context.mailbox)
+        own = _base(mailbox) if mailbox else None  # a non-ASCII mailbox vouches for nothing
         try:
             listed = self._reader.get_thread(user_id, context.thread_id).get("messages")
         except Exception:  # any read failure only narrows what is known
