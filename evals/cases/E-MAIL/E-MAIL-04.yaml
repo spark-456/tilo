@@ -9,8 +9,7 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding inquiry: winter dry storage rates for 45ft
-    catamaran'
+  task: 'Triage incoming email regarding inquiry: winter dry storage rates for 45ft catamaran'
   thread:
     thread_id: thread-e-mail-04
     subject: 'Inquiry: Winter dry storage rates for 45ft catamaran'
@@ -22,10 +21,9 @@ inputs:
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: 'Inquiry: Winter dry storage rates for 45ft catamaran'
-      body: Hello, we are planning to bring our Fontaine Pajot 45ft catamaran to Puget
-        Sound this October. Do you have yard space with appropriate beam width for
-        dry storage from November through April, and what are your seasonal rates?
-        Looking forward to your response.
+      body: Hello, we are planning to bring our Fontaine Pajot 45ft catamaran to Puget Sound this October.
+        Do you have yard space with appropriate beam width for dry storage from November through April,
+        and what are your seasonal rates? Looking forward to your response.
 ground_truth:
   category: needs_reply
   priority: normal
@@ -34,4 +32,7 @@ checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

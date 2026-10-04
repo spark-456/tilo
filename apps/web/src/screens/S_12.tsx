@@ -20,20 +20,33 @@ export function S_12({ params }: ScreenProps) {
   const client = useClient();
   const events = useRunLog(client, worldId);
   const finished = worldStatus(events) === "completed";
-  const [remote, retry] = useRemote("load the delivery", () => client.getDelivery(worldId));
+  // Asked for only once world.completed is recorded: before that the server refuses (409) and the
+  // browser logs each refusal as an error.
+  const [remote, retry] = useRemote(
+    "load the delivery",
+    () => client.getDelivery(worldId),
+    finished,
+  );
   const again = useAction("start a new task", async () => "/");
   const delivery = remote.status === "ready" && finished ? remote.value : null;
   return (
     <div className="screen-body wide delivery-slot" data-testid="delivery">
       <h1>Delivery</h1>
-      <Loaded
-        what="the delivery"
-        remote={remote}
-        retry={retry}
-        isEmpty={(d) => finished && d.artifacts.length === 0}
-      >
-        {(d) =>
-          finished ? (
+      {!finished && (
+        <div className="flow-slot">
+          <p className="flow-summary">
+            This run has not finished yet. The delivery appears here once it completes.
+          </p>
+        </div>
+      )}
+      {finished && (
+        <Loaded
+          what="the delivery"
+          remote={remote}
+          retry={retry}
+          isEmpty={(d) => d.artifacts.length === 0}
+        >
+          {(d) => (
             <>
               <p className="flow-summary delivery-done">
                 <span aria-hidden="true">&#10003; </span>
@@ -65,13 +78,9 @@ export function S_12({ params }: ScreenProps) {
                 </li>
               </ul>
             </>
-          ) : (
-            <p className="flow-summary">
-              This run has not finished yet. The delivery appears here once it completes.
-            </p>
-          )
-        }
-      </Loaded>
+          )}
+        </Loaded>
+      )}
       <Primary label="New task" action={again} />
       {delivery && (
         <>

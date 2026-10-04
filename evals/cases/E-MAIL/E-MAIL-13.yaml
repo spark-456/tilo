@@ -9,8 +9,7 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding delivered: tracking #qc-98214731 - left at
-    harborview front desk'
+  task: 'Triage incoming email regarding delivered: tracking #qc-98214731 - left at harborview front desk'
   thread:
     thread_id: thread-e-mail-13
     subject: 'Delivered: Tracking #QC-98214731 - Left at Harborview front desk'
@@ -22,16 +21,17 @@ inputs:
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: 'Delivered: Tracking #QC-98214731 - Left at Harborview front desk'
-      body: 'Your shipment containing order #MS-4410 from Coastal Marine Gaskets was
-        delivered today at 11:42 AM. Received and signed for by M. Vance at the front
-        service counter.'
+      body: 'Your shipment containing order #MS-4410 from Coastal Marine Gaskets was delivered today at
+        11:42 AM. Received and signed for by M. Vance at the front service counter.'
 ground_truth:
   category: fyi
   priority: normal
-  reason: Informational delivery notice with delivery location and recipient sign-off;
-    no action needed.
+  reason: Informational delivery notice with delivery location and recipient sign-off; no action needed.
 checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

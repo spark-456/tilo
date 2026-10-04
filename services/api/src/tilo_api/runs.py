@@ -21,6 +21,7 @@ from tilo_connectors import Outbox, OutboxRefused
 from tilo_harness.config import load_agents_config
 from tilo_harness.executor import UnitOutcome, run_plan
 from tilo_harness.validator import repo_validator
+from tilo_planning.compiler import PlanInputs
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps, events
@@ -43,6 +44,13 @@ class _WallClock:
 
 
 _CLOCK = _WallClock()
+
+
+@dataclass(frozen=True)
+class MeteredOutcome(UnitOutcome):
+    """A unit's outcome plus the credits its work metered (PRD 14.1); recorded on the unit's first artifact.created."""
+
+    credits: float = 0.0
 
 
 class RunStopped(Exception):
@@ -97,6 +105,7 @@ class Run:
     def __init__(self, store: deps.Store, task: deps.TaskRecord, approach: dict, cap: float, seams: Seams) -> None:
         self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)
         self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
+        self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
         self.plan: dict[str, Any] = {}
         self.layout: dict[str, Any] = {}
@@ -128,7 +137,7 @@ class Run:
             "id": kw.get("event_id") or events.new_part_id(), "type": type_, "actor": actor, "target": target,
             "level": self.levels.get(district) if district else None, "district": district, "item": None,
             "severity": kw.get("severity") or repo_validator().registry_types[type_]["default_severity"],
-            "credits": 0, "summary": summary[:140], "cause": kw.get("cause"), "vis": vis,
+            "credits": kw.get("credits", 0), "summary": summary[:140], "cause": kw.get("cause"), "vis": vis,
             "authz": kw.get("authz"), "data": data,
         }  # fmt: skip
         if not kw.get("event_id"):
@@ -149,6 +158,15 @@ class Run:
             if committed is None or all(committed[k] == event[k] for k in same):
                 raise
             raise AlreadyCommitted(committed) from None
+
+    def metered(self, outcome: Any) -> float:
+        """The credits a unit's outcome reports, finite and at least 0, and never more than the approved budget still
+        leaves (the sum of the run's event credits is the meter, HR-1)."""
+        credits = getattr(outcome, "credits", 0)
+        if isinstance(credits, bool) or not isinstance(credits, int | float) or not math.isfinite(credits):
+            return 0
+        spent = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))
+        return max(0, min(credits, self.cap - spent))
 
     def emit(self, *, type: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
         passed = {k: kw[k] for k in ("district", "cause", "vis") if k in kw}
@@ -217,16 +235,23 @@ class Run:
 
     def _prepare(self) -> Any:
         """Compile, validate, lay out. Returns the agents config, or None when no run may start."""
+        registry = self.seams.connectors
         try:
-            plan = self.seams.compiler(brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap)
-        except Exception:
+            context = PlanInputs(
+                approaches=copy.deepcopy(self.approaches), owner=self.owner, skills=dict(self.seams.skills.catalog()),
+                connectors={c: registry.get(c) for c in registry.ids()}, risk_table=tilo_policy.load_risk_table(),
+                policies=dict(self.store.policies),
+            )  # fmt: skip
+            plan = self.seams.compiler(
+                brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap, context=context
+            )
+        except Exception as exc:
+            logger.warning("run %s: no plan (%s)", self.run_id, type(exc).__name__)
             self._fail("the Director could not plan this task", None)
             return None
-        registry = self.seams.connectors
         violations = plangraph.validate_plan(
-            plan, risk_table=tilo_policy.load_risk_table(), connectors={c: registry.get(c) for c in registry.ids()},
-            skills=frozenset(skill_id for skill_id, _ in self.seams.skills.catalog()),
-            policies=dict(self.store.policies), owner=self.owner,
+            plan, risk_table=context.risk_table, connectors=context.connectors, skills=frozenset(context.skills),
+            policies=context.policies, owner=self.owner,
         )  # fmt: skip
         if violations:
             self._fail("the plan broke " + ", ".join(sorted({v.rule_id for v in violations})), None)
@@ -335,7 +360,8 @@ class Run:
             "event_id": events.new_part_id(),  # resent unchanged if the outbox retries the transfer
         }  # fmt: skip
         transfer = await self._send(entry, evidence)
-        data = {"artifact": item, "format": _FORMATS.get(action, "in_app"), "outbox_id": outbox_id}
+        format_ = _FORMATS.get(action, "in_app")  # artifact.delivered: a format kept in Tilo has outbox_id null
+        data = {"artifact": item, "format": format_, "outbox_id": outbox_id if format_ == "email" else None}
         self._deliver(unit, worker, item, data, transfer["id"])
 
     def _deliver(self, unit: dict, worker: str, item: dict, data: dict, cause: str) -> None:
@@ -444,13 +470,14 @@ class _GatedRunner:
             self._run.failure = "the unit named an item that belongs to another world"
             logger.warning("run %s: a unit named items of another world: %s", self._run.run_id, foreign)
             return UnitOutcome(success=False, summary="The unit named an artifact that does not belong to this world.")
-        made = {
-            ref["artifact_id"]: self._run.put(
+        credits = self._run.metered(outcome)  # the unit's cost rides on its first item
+        made = {}
+        for ref in refs:
+            made[ref["artifact_id"]] = self._run.put(
                 "artifact.created", context.agent_id, ref["artifact_id"], "The agent made an item.",
                 {"artifact": {"artifact_id": ref["artifact_id"], "version": ref["version"]}}, district=unit["district"],
-            )["id"]
-            for ref in refs
-        }  # fmt: skip
+                credits=credits if ref is refs[0] else 0,
+            )["id"]  # fmt: skip
         try:
             for action in unit["actions"]:  # the item to send is the unit's first artifact
                 if not refs:

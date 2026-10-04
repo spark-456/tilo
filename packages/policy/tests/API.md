@@ -168,7 +168,9 @@ def decide(
 
 ### L2 instruction check (PI-08, PI-09, PI-10, PI-12)
 
-`proposal.instruction` counts only when all of:
+While `coverage.L2_ACTION_RECORDED` is False (until ADR-0013 lands; BQ-57, PI-21), `decide` counts no
+instruction at all: every L2-covered send gates with reason `l2_instruction_required`. The OB-01
+validator keeps `instruction_counts`. Once the flag is True, `proposal.instruction` counts only when all of:
 - it is not None and its `type` is `"world.requested"` with `data["channel"]` in
   `("web", "mobile_web")`, or `"channel.message_in"` with `data["channel"] == "whatsapp"`
   (never `"email"`, whoever `actor` is — PI-09);

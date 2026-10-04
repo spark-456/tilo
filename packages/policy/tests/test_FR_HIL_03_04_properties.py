@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import pytest
 import tilo_policy
 from _policy_lib import OWNER, WORLD, base_facts, base_instruction, base_policy
 from hypothesis import given, settings
@@ -121,6 +122,7 @@ def test_FR_HIL_04_PI_01_open_gate_t3_never_runs_except_by_a_human_authz(ref):
     assert decision.authz is None
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_03_PI_13_revoking_the_covering_policy_gates_the_next_send_but_not_an_earlier_one(risk_table_path):
     """(c): a T2 policy covers a send at NOW; the owner then revokes it (an L1 history entry
     appended after NOW, PI-13 "revocable in one tap"). A send decided at NOW, from the record as it
@@ -164,6 +166,7 @@ def test_FR_HIL_03_PI_13_revoking_the_covering_policy_gates_the_next_send_but_no
     assert after.outcome == "gate", "the next send after a revocation waits at a gate (FR-HIL-03, FR-HIL-07)"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_03_PI_06_dropping_the_policy_from_the_list_also_gates(risk_table_path):
     """(c), the simpler half: the policy engine has no memory between calls — a policy that is
     simply not passed in `policies` covers nothing, the same as one that was revoked."""

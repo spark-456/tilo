@@ -6,11 +6,10 @@ Trace lenses, cards and settings.
 
 ## Commands
 - `pnpm --filter @tilo/web run dev` / `build` / `test` / `test:e2e` — dev server / build / Vitest / Playwright
-- `just tokens` — regenerate token files from `design/tokens.json`; `just check` — full gate
+- `just tokens` — regenerate token files from `design/tokens.json`; `just check` — full gate; `just e2e-cp2` — `@cp2` Playwright walk on the real dev API (starts `tilo-api` + its own Vite; local only, never CI)
 
 ## Contracts
-- Reads `packages/contracts-ts` types and Firestore docs under security rules; writes only through
-  `tilo-api` (`src/api/http.ts`, chosen by `VITE_TILO_API_URL`, else the fixture client; polls events by seq).
+- Reads `packages/contracts-ts` types and Firestore docs under security rules; writes only through `tilo-api` (`src/api/http.ts`, chosen by `VITE_TILO_API_URL`, else the fixture client; polls events by seq).
 
 ## Config and requirement IDs
 `config/themes/` (world themes), feature flags. UX-1–UX-9 (18.1); FR-WLD-*; owned from P0-08.
@@ -18,10 +17,10 @@ Trace lenses, cards and settings.
 ## Stage and world (`src/stage/`, `src/world/`)
 - `Stage.tsx`: the camera is the Pixi world container's transform (`camera.ts`); no CSS transform,
   no always-on ticker (HR-2). `data-stage-ready="true"` appears with the first frame.
-- FR-WLD-04 pipeline: `registry.ts` → `reducer.ts` (HR-5) → `store.ts` → `frame.ts` → `renderer.ts`;
-  `choreographer.ts` (HR-3) alone animates. `?fixture=<name>`, `?seq=N`, `?speed=N` control replay.
-- FR-WLD-06: `selection.ts` keeps one selection per world (display state, never an event).
-  `SelectionBar` is in every lens; `data-lens-control` buttons toggle it; the stage rings it.
+- FR-WLD-04: `registry` → `reducer` (HR-5) → `store` → `frame` → `renderer.ts` (art in `world/art/`, ported
+  from the design prototypes, ADR-0003); `choreographer.ts` (HR-3) alone animates. `?fixture=`, `?seq=N`, `?speed=N`. Live (HttpClient, FR-WLD-05): `useLiveWorld` draws `/world/:id` from `getLayout` (waits for `world.started`) + `followRun`; no solver geometry = empty stage and a note; Needs-you reads `?world=<id>` (`worldContext.ts`).
+- FR-WLD-06: `selection.ts` keeps one selection per world (display state, never an event); the stage rings it.
+- FR-WLD-08: `replay.ts` holds one replay point per world (display state); `ReplayScrubber` (right rail, or above the mobile tabs) scrubs a finished run, disabled while live. Stage shows `stateAt(seq)`, Story/Trace/HUD the events up to it; the HR-4 banner ("Replay of run #… recorded …", fixtures add "dev fixture") shows once finished.
 
 ## Screens (`src/screens/`, AGW-08)
 - `meta.ts` is the PRD 18.3 table (S-01..S-25, status, route pattern); `routes.tsx` maps each
@@ -38,3 +37,4 @@ Trace lenses, cards and settings.
 ## Local rules
 - Nothing animates without a recorded event (HR-1–HR-7, PRD 9.4); `src/honesty/` (FR-WLD-09) fails on animation APIs outside `choreographer.ts` (allowlist: `test-support/honestyScan.ts`).
 - One primary filled button per screen (UX-1); no streaks, hearts or fake urgency (UX-7).
+  Type and spacing are tokens (PRD 18.2): `var(--text-N)` 12/14/16/20/24/32/40, `--space-N` 4..32, no `em` sizing; `e2e/type-ramp.spec.ts` pins it.

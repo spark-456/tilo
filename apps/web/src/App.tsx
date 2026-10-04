@@ -8,11 +8,13 @@ import { FlowShell } from "./screens/FlowShell";
 import { NotFound } from "./screens/NotFound";
 import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
+import { LoggedScrubber, ReplayScrubber } from "./screens/ReplayScrubber";
 import { WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
 import { useRunStatus } from "./world/runLog";
 import { speedBadgeText } from "./world/speed";
+import { useLiveWorld } from "./world/useLiveWorld";
 import { useWorldFixture } from "./world/useWorldFixture";
 
 // Stage mode is a display setting (PRD 9.6).
@@ -22,6 +24,9 @@ const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
     {seq} {type}
   </li>
 ));
+/** The rail's Trace list holds the newest rows only: thousands of list items made a scrub across a
+ * long run cost hundreds of ms (FR-WLD-08). The Trace lens lists every event. */
+const TRACE_ROWS = 250;
 const WORLD_SCREENS: ReadonlySet<string> = new Set(["S-05", "S-10", "S-11", "S-12"]);
 /** Screens outside a world address that still read the replayed run (AGW-08 group B): HR-6 applies,
  * and the right rail describes that same run (the fixture world, the only one the client has). */
@@ -78,6 +83,9 @@ export function App() {
   const screen = unknownWorld ? NOT_FOUND : matched;
   const worldId = unknownWorld ? null : pathWorld;
   const hudWorld = screen ? null : worldId;
+  // FR-WLD-05: with a real client the stage draws the addressed world's live run (no fixture
+  // param, no fixture client); the hook reads nothing when there is no such world.
+  const live = useLiveWorld(client, world.active || fixtureClient ? null : hudWorld);
   // FR-WLD-07: the stage is veiled only while the recorded run status is "paused" (HR-1).
   const clientStatus = useRunStatus(client, hudWorld);
   const stagePaused = (world.active ? world.status : clientStatus) === "paused";
@@ -91,11 +99,24 @@ export function App() {
     : worldId !== null || runScreen
       ? speedBadgeText(replaySpeed)
       : null;
+  // FR-WLD-08: the Replay region (scrub + HR-4 banner) on every world route and in fixture mode:
+  // in the right rail on desktop, in the column above the tabs on mobile.
+  const dock = world.active ? (
+    <ReplayScrubber
+      worldId={world.worldId}
+      events={world.events}
+      finished={world.finished}
+      fixture
+    />
+  ) : worldId !== null ? (
+    <LoggedScrubber worldId={worldId} fixture={fixtureClient} />
+  ) : null;
   return (
     <div
       className="app-shell"
       data-stage-mode={stageMode ? "on" : "off"}
       data-replay-badge={speedBadge ? "on" : "off"}
+      data-replay-dock={dock ? "on" : "off"}
     >
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
@@ -109,7 +130,9 @@ export function App() {
         <Stage
           {...(world.active
             ? { onWorld: world.onWorld, seq: world.seq, selected: world.selected }
-            : {})}
+            : fixtureClient
+              ? {}
+              : { onWorld: live.onWorld, seq: live.seq, selected: live.selected })}
           paused={stagePaused}
         />
       )}
@@ -121,6 +144,22 @@ export function App() {
         // biome-ignore lint/a11y/useSemanticElements: <output> is for a form/calculation result; this is a persistent mode banner, so an explicit role="status" region fits better.
         <div className="fixture-replay-banner" data-testid="fixture-replay-banner" role="status">
           Fixture replay — dev data, not a real run
+        </div>
+      )}
+      {live.note && (
+        // Fixed like the fixture alerts, so it never shifts the layout. Says what is true: the world
+        // is not drawn until the run has built one.
+        <div
+          className="live-world-note"
+          data-testid="live-world-note"
+          role={live.retry ? "alert" : "status"}
+        >
+          <p>{live.note}</p>
+          {live.retry && (
+            <button type="button" className="secondary" onClick={live.retry}>
+              Try again
+            </button>
+          )}
         </div>
       )}
       {world.loadError && (
@@ -136,6 +175,7 @@ export function App() {
       )}
       {mobile ? (
         <>
+          {dock}
           {hudWorld && (
             <details
               className="hud-sheet"
@@ -154,6 +194,7 @@ export function App() {
         </>
       ) : (
         <aside className="right-rail" data-testid="right-rail">
+          {dock}
           {railWorld ? (
             <WorldPanels key={railWorld} worldId={railWorld} tabs={hudWorld !== null} />
           ) : (
@@ -176,8 +217,14 @@ export function App() {
           {world.active && (
             <>
               <h2>Trace</h2>
-              <ul className="trace-list" data-testid="trace-list">
-                {world.trace.map((row) => (
+              {/* biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be keyboard reachable (WCAG 2.1.1, axe scrollable-region-focusable). */}
+              <ul className="trace-list" data-testid="trace-list" aria-label="Trace" tabIndex={0}>
+                {world.trace.length > TRACE_ROWS && (
+                  <li>
+                    Showing the latest {TRACE_ROWS} of {world.trace.length} events.
+                  </li>
+                )}
+                {world.trace.slice(-TRACE_ROWS).map((row) => (
                   <TraceRow key={row.seq} seq={row.seq} type={row.type} />
                 ))}
               </ul>

@@ -69,5 +69,31 @@ def test_FR_INT_04_skipping_a_question_records_the_assumption(repo_root, registr
 
     updated = record_assumption(result.brief, question, "No firm deadline")
 
-    assert updated["assumptions"][-1] == {"question": question.text, "assumed": "No firm deadline"}
+    assert updated["assumptions"][-1] == {"question": question.text, "assumed": "Deadline: No firm deadline"}
     assert_valid_brief(repo_root, registry, updated)
+
+
+def test_FR_INT_04_skipping_with_the_guess_leaves_the_chip_and_uses_the_label_value_form():
+    brief = _clear_brief()
+    result = generate_questions(brief, ["audience"], memory=make_no_memory(), base=sample_event_base(), seq=2)
+    question = result.questions[0]
+
+    skipped = record_assumption(result.brief, question)
+
+    assert skipped["audience"] == result.brief["audience"]
+    assert skipped["assumptions"][-1]["assumed"] == f"Audience: {result.brief['audience']}"
+    # the same form the over-the-cap path records (BQ-97)
+    over = generate_questions(
+        brief, ["deliverables", "goal", "sources", "audience"], memory=make_no_memory(), base=sample_event_base(), seq=2
+    )
+    assert over.brief["assumptions"][-1]["assumed"].startswith("Audience: ")
+
+
+def test_FR_INT_04_skipping_with_another_value_writes_it_into_the_field_it_assumes():
+    brief = _clear_brief()
+    result = generate_questions(brief, ["audience"], memory=make_no_memory(), base=sample_event_base(), seq=2)
+
+    skipped = record_assumption(result.brief, result.questions[0], "An external client")
+
+    assert skipped["audience"] == "An external client"
+    assert skipped["assumptions"][-1]["assumed"] == "Audience: An external client"

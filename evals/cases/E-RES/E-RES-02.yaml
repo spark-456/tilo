@@ -32,4 +32,13 @@ checks:
   args:
     field: new_growth_monthly
     tolerance: 0
+- check: groundedness
+  kind: autorater
+  args:
+    field: citations
+    sources:
+    - http://sandbox-web.example/s/ledgerly/changelog
+    - http://sandbox-web.example/s/ledgerly/old-pricing
 recording: null
+notes: 'EV-05 groundedness check is declared as kind: autorater (reported as pending by the replay runner
+  until live autorater grading or recordings land).'

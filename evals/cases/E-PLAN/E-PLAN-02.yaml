@@ -2,21 +2,19 @@ id: E-PLAN-02
 group: E-PLAN
 title: Clear task — Monthly clinic equipment maintenance PPTX deck for Curlew Dental
 measures:
-  - EV-02
-  - EV-03
-  - FR-INT-03
-  - FR-INT-04
-  - FR-INT-06
+- EV-02
+- EV-03
+- FR-INT-03
+- FR-INT-04
+- FR-INT-06
 status: ready
 deploy_gate: false
 inputs:
   task_kind: clear
-  task: >-
-    Build a 6-slide PPTX presentation reviewing October autoclave and imaging
-    calibration logs for the clinic partners at Curlew Dental Practice
-    (partners@curlew-dental.example), due 2026-10-15. Pull service dates and
-    vendor quotes from https://ops.curlew-dental.example/maintenance-log and
-    exclude patient records so the deck stays business-sensitivity only.
+  task: Build a 6-slide PPTX presentation reviewing October autoclave and imaging calibration logs for
+    the clinic partners at Curlew Dental Practice (partners@curlew-dental.example), due 2026-10-15. Pull
+    service dates and vendor quotes from https://ops.curlew-dental.example/maintenance-log and exclude
+    patient records so the deck stays business-sensitivity only.
   files: []
 scripted_answers: []
 ground_truth:
@@ -24,23 +22,25 @@ ground_truth:
   approach_count: 2.5
   brief_valid: true
 checks:
-  - check: schema_valid
-    args:
-      field: brief
-      schema: brief.schema.json
-  - check: schema_valid
-    args:
-      field: plan
-      schema: plan.schema.json
-  - check: equals_ground_truth
-    args:
-      field: question_count
-      tolerance: 0
-  - check: equals_ground_truth
-    args:
-      field: approach_count
-      tolerance: 0.5
+- check: schema_valid
+  args:
+    field: brief
+    schema: brief.schema.json
+- check: schema_valid
+  args:
+    field: plan
+    schema: plan.schema.json
+- check: equals_ground_truth
+  args:
+    field: question_count
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: approach_count
+    tolerance: 0.5
+- check: equals_ground_truth
+  args:
+    field: brief_valid
 recording: null
-notes: >-
-  EV-03 estimate accuracy (median within +-25% of historical unit-type cost) is
-  evaluated once replay recordings exist.
+notes: EV-03 estimate accuracy (median within +-25% of historical unit-type cost) is evaluated once replay
+  recordings exist.
