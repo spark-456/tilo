@@ -46,6 +46,13 @@ class _WallClock:
 _CLOCK = _WallClock()
 
 
+@dataclass(frozen=True)
+class MeteredOutcome(UnitOutcome):
+    """A unit's outcome plus the credits its work metered (PRD 14.1); recorded on the unit's first artifact.created."""
+
+    credits: float = 0.0
+
+
 class RunStopped(Exception):
     """The world is paused: the run writes nothing more."""
 
@@ -130,7 +137,7 @@ class Run:
             "id": kw.get("event_id") or events.new_part_id(), "type": type_, "actor": actor, "target": target,
             "level": self.levels.get(district) if district else None, "district": district, "item": None,
             "severity": kw.get("severity") or repo_validator().registry_types[type_]["default_severity"],
-            "credits": 0, "summary": summary[:140], "cause": kw.get("cause"), "vis": vis,
+            "credits": kw.get("credits", 0), "summary": summary[:140], "cause": kw.get("cause"), "vis": vis,
             "authz": kw.get("authz"), "data": data,
         }  # fmt: skip
         if not kw.get("event_id"):
@@ -151,6 +158,15 @@ class Run:
             if committed is None or all(committed[k] == event[k] for k in same):
                 raise
             raise AlreadyCommitted(committed) from None
+
+    def metered(self, outcome: Any) -> float:
+        """The credits a unit's outcome reports, finite and at least 0, and never more than the approved budget still
+        leaves (the sum of the run's event credits is the meter, HR-1)."""
+        credits = getattr(outcome, "credits", 0)
+        if isinstance(credits, bool) or not isinstance(credits, int | float) or not math.isfinite(credits):
+            return 0
+        spent = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))
+        return max(0, min(credits, self.cap - spent))
 
     def emit(self, *, type: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
         passed = {k: kw[k] for k in ("district", "cause", "vis") if k in kw}
@@ -454,13 +470,14 @@ class _GatedRunner:
             self._run.failure = "the unit named an item that belongs to another world"
             logger.warning("run %s: a unit named items of another world: %s", self._run.run_id, foreign)
             return UnitOutcome(success=False, summary="The unit named an artifact that does not belong to this world.")
-        made = {
-            ref["artifact_id"]: self._run.put(
+        credits = self._run.metered(outcome)  # the unit's cost rides on its first item
+        made = {}
+        for ref in refs:
+            made[ref["artifact_id"]] = self._run.put(
                 "artifact.created", context.agent_id, ref["artifact_id"], "The agent made an item.",
                 {"artifact": {"artifact_id": ref["artifact_id"], "version": ref["version"]}}, district=unit["district"],
-            )["id"]
-            for ref in refs
-        }  # fmt: skip
+                credits=credits if ref is refs[0] else 0,
+            )["id"]  # fmt: skip
         try:
             for action in unit["actions"]:  # the item to send is the unit's first artifact
                 if not refs:
