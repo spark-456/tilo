@@ -31,7 +31,7 @@ from tilo_render.spec import (
     ParagraphBlock,
     TableBlock,
 )
-from tilo_render.text import PROVENANCE_HEADING, find_repo_root, lines, provenance_lines, sanitize_text
+from tilo_render.text import PROVENANCE_HEADING, find_repo_root, lines, provenance_lines, sanitize_text, wrap_long_token
 
 _PAGE_SIZES = {"A4": pagesizes.A4, "LETTER": pagesizes.LETTER}
 _CHART_H = 180
@@ -84,7 +84,7 @@ def _chart(ch: Any, data: ChartData, aw: float, fmt: Callable[[Any], str], th: d
         pie.x, pie.y, pie.width, pie.height = (aw - 130) / 2, 15, 130, 130
         values = data.series[ch.y_columns[0]]
         pie.data = values
-        pie.labels = [f"{_flat(c)}: {fmt(v)}" for c, v in zip(data.categories, values, strict=True)]
+        pie.labels = [f"{wrap_long_token(_flat(c))}: {fmt(v)}" for c, v in zip(data.categories, values, strict=True)]
         pie.slices.labelRadius, pie.slices.fontSize, pie.slices.fontColor = 1.05, size, col["chart_label"]
         for idx in range(len(values)):
             pie.slices[idx].fillColor = palette[idx % len(palette)]
@@ -94,7 +94,7 @@ def _chart(ch: Any, data: ChartData, aw: float, fmt: Callable[[Any], str], th: d
     chart: Any = VerticalBarChart() if is_bar else HorizontalLineChart()
     chart.x, chart.y, chart.width, chart.height = 40, 20, aw - 60, 130
     chart.data = [data.series[c] for c in ch.y_columns]
-    chart.categoryAxis.categoryNames = [_flat(c) for c in data.categories]
+    chart.categoryAxis.categoryNames = [wrap_long_token(_flat(c)) for c in data.categories]
     chart.categoryAxis.labels.fontSize = chart.valueAxis.labels.fontSize = size
     labels = chart.barLabels if is_bar else chart.lineLabels
     labels.fontSize, labels.fillColor = size, col["chart_label"]
@@ -113,12 +113,11 @@ def _chart(ch: Any, data: ChartData, aw: float, fmt: Callable[[Any], str], th: d
 
 def render_pdf(
     spec: DeliverableSpec,
-    manifest: Manifest | Path | str | None = None,
+    *,
+    manifest: Manifest | None = None,
     template_path: Path | str | None = None,
     tokens_path: Path | str | None = None,
 ) -> bytes:
-    if isinstance(manifest, Path | str):
-        template_path, manifest = manifest, None
     root = find_repo_root()
     tmpl = yaml.safe_load(Path(template_path or root / "templates" / "report" / "default.yaml").read_text("utf-8"))
     tokens = json.loads(Path(tokens_path or root / "design" / "tokens.json").read_text("utf-8"))
