@@ -13,6 +13,7 @@ members = [
     "tilo-contracts",
     "tilo-evals",
     "tilo-harness",
+    "tilo-memory",
     "tilo-metering",
     "tilo-planning",
     "tilo-policy",
@@ -1506,6 +1507,17 @@ requires-dist = [
     { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "tilo-providers", editable = "packages/providers" },
 ]
+
+[[package]]
+name = "tilo-memory"
+version = "0.1.0"
+source = { editable = "packages/memory" }
+dependencies = [
+    { name = "tilo-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "tilo-contracts", editable = "packages/contracts-py" }]
 
 [[package]]
 name = "tilo-metering"
