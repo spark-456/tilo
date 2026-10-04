@@ -230,7 +230,7 @@ def get_approaches(
     return {"task_id": task_id, "approaches": approaches, "recommended": recommended, "credit_usd": credit_usd}
 
 
-@router.post("/tasks/{task_id}/approve")
+@router.post("/tasks/{task_id}/approve", dependencies=[Depends(deps.require_live_work)])
 def approve(
     task_id: str,
     principal: Principal,

@@ -46,7 +46,7 @@ def get_store() -> InMemoryArtifactStore:
     return _store
 
 
-@router.post("/intake", status_code=201)
+@router.post("/intake", status_code=201, dependencies=[Depends(deps.require_live_work)])
 async def intake(
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     safety: Annotated[SafetyProvider, Depends(get_safety)],  # before any store: fail closed first

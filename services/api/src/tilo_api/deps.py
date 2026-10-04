@@ -20,13 +20,14 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol, cast
+from typing import Annotated, Any, Literal, Protocol, cast
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
 from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
+from tilo_metering.flags import FlagStore, InMemoryFlagStore
 from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
@@ -276,6 +277,21 @@ def get_connector_adapters() -> dict[str, Any]:
 @functools.cache
 def get_outbox_store() -> InMemoryOutboxStore:
     return InMemoryOutboxStore()  # the process's own until the Firestore store lands
+
+
+@functools.cache
+def get_flag_store() -> FlagStore:
+    return InMemoryFlagStore()  # the process's own until the Firestore store lands; the treasury sets the flag
+
+
+def require_live_work(flags: Annotated[FlagStore, Depends(get_flag_store)]) -> None:
+    """NFR-24 (PRD 17.2): with `replay_only` set the link starts no new live work. Routes that start it
+    (POST /intake, POST /tasks/{id}/approve) depend on this; reads of what exists are untouched."""
+    if flags.get("replay_only"):
+        raise HTTPException(
+            status_code=503,
+            detail="This link is replay-only right now: new work is paused; finished runs can still be replayed.",
+        )
 
 
 def _dispatch_config(key: str, default: float) -> float:
