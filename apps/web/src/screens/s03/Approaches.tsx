@@ -3,8 +3,10 @@ import { useState } from "react";
 import { useClient } from "../../api/ClientProvider";
 import type { ApproachesResult } from "../../api/client";
 import { rememberWorld } from "../../world/lastWorld";
+import { AppLink } from "../AppLink";
 import { Loaded, Primary } from "../FlowShell";
 import { useAction, useRemote } from "../remote";
+import { BudgetMeter } from "./BudgetMeter";
 
 // biome-ignore format: compact dimension tuple table
 const DIMS = [
@@ -66,7 +68,7 @@ export function Approaches({ taskId }: { taskId: string }) {
   // biome-ignore format: compact JSX
   return (
     <>
-      <Loaded what="the approaches" remote={remote} retry={retry} isEmpty={(v) => v.chosen === undefined}>
+      <Loaded what="the approaches" remote={remote} retry={retry} isEmpty={(v) => v.chosen === undefined} empty={<><p>Nothing came back for the approaches. No approach was priced, so nothing was started.</p><button type="button" className="secondary" onClick={retry}>Try again</button> <AppLink to="/" className="secondary">Describe the task again</AppLink></>}>
         {({ result, chosen }) => {
           const diff = DIMS.filter(([k]) => new Set(result.approaches.map((a) => a.dimensions[k])).size > 1);
           const dims = diff.length > 0 ? diff : DIMS;
@@ -92,6 +94,7 @@ export function Approaches({ taskId }: { taskId: string }) {
                 <span>Budget cap (credits)</span>
                 <input id="budget-cap-input" data-testid="budget-cap-input" type="number" min={1} max={MAX_BUDGET_CAP_CREDITS} step={1} aria-invalid={validCap === null} aria-describedby="budget-cap-hint" value={rawCap} onChange={(e) => setCapDraft(e.target.value)} />
               </label>
+              {active && <BudgetMeter min={active.credits.min} max={active.credits.max} cap={validCap} />}
               <output id="budget-cap-hint" className="budget-cap-hint" data-testid="budget-cap-hint">{validCap === null ? CAP_RULE : ""}</output>
               <p className="flow-detail" data-testid="budget-line">{validCap === null ? "The cost is shown once the cap is valid." : `This run can use up to ${validCap} credits (about US$${(validCap * result.credit_usd).toFixed(2)}). You can pause it any time.`}</p>
             </div>

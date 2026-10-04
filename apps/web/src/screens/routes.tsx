@@ -40,7 +40,6 @@ const GateSheet = inARun(S_07, { testid: "gate-sheet-page", title: "Approval gat
 const Consent = inARun(S_08, { testid: "consent-sheet-page", title: "Connection consent" });
 const Meeting = inARun(S_09, { testid: "meeting", title: "Meeting" });
 const Library = inARun(S_13, { testid: "library", title: "Library" });
-const Worlds = inARun(S_14, { testid: "worlds", title: "Worlds" });
 const Autonomy = inARun(S_15, { testid: "autonomy", title: "Autonomy" });
 const Channels = inARun(S_16, { testid: "channels", title: "Channels" });
 const Mail = inARun(S_17, { testid: "mail", title: "Email Autopilot" });
@@ -52,7 +51,7 @@ const Estimate = inARun(S_23, { testid: "estimate", title: "How we estimate" });
 // biome-ignore format: one line per screen keeps group edits to a single line.
 const COMPONENTS: Readonly<Record<string, ComponentType<ScreenProps>>> = {
   "S-05": S_05, "S-06": NeedsYou, "S-07": GateSheet, "S-08": Consent, "S-09": Meeting, "S-10": S_10,
-  "S-11": S_11, "S-12": S_12, "S-13": Library, "S-14": Worlds, "S-15": Autonomy, "S-16": Channels,
+  "S-11": S_11, "S-12": S_12, "S-13": Library, "S-14": S_14, "S-15": Autonomy, "S-16": Channels,
   "S-17": Mail, "S-18": Team, "S-19": Connections, "S-21": Artifacts, "S-22": S_22, "S-23": Estimate,
   "S-24": S_24,
 };

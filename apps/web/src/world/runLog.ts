@@ -50,15 +50,16 @@ export function watchRun(
   return () => run.listeners.delete(flush);
 }
 
-/** Every event received so far for the world, in seq order. */
-export function useRunLog(client: TiloClient, worldId: string): readonly Event[] {
+/** Every event received so far for the world, in seq order (none, and no subscription, for null). */
+export function useRunLog(client: TiloClient, worldId: string | null): readonly Event[] {
   return useSyncExternalStore(
     (onChange) => {
+      if (worldId === null) return () => undefined; // no run: nothing is subscribed
       const run = runFor(client, worldId);
       run.listeners.add(onChange);
       return () => run.listeners.delete(onChange);
     },
-    () => runs.get(client)?.get(worldId)?.events ?? EMPTY,
+    () => (worldId === null ? EMPTY : (runs.get(client)?.get(worldId)?.events ?? EMPTY)),
   );
 }
 

@@ -8,6 +8,10 @@ the plan uses and runs the units as asyncio tasks in one thread: a unit starts o
 unit it depends on has finished, and at most `limits.max_specialists` units run at once. A unit
 whose dependency failed is skipped. Every event goes through the one `WorldWriter`.
 
+With `must_ask` (FR-AGT-05) a unit is assessed right after it is assigned: when a must-ask rule fires,
+the question chain and card are written and the unit is parked (`RunResult.parked`): its work does not
+start, it does not retire, and its dependents are skipped. Answering is FR-AGT-06/07.
+
 Per unit: agent.spawned (Lead spawns the worker), agent.assigned, skill.loaded per pinned skill,
 agent.working, the `UnitRunner`'s work, agent.handoff (typed envelope, worker to Lead) when it
 succeeded with a contract-valid envelope, agent.retired. A pinned skill whose files changed,
@@ -28,6 +32,7 @@ from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.prompts import load_prompt
 
 from tilo_harness.config import AgentsConfig
+from tilo_harness.must_ask import MustAsk
 from tilo_harness.skills import LoadedSkill, Pins, SkillError, SkillRegistry
 from tilo_harness.validator import EventRejected, repo_validator
 
@@ -66,6 +71,7 @@ class RunResult:
     pins: Pins
     outcomes: dict[str, UnitOutcome] = field(default_factory=dict)
     skipped: list[str] = field(default_factory=list)
+    parked: list[str] = field(default_factory=list)  # waiting for a person's answer (FR-AGT-05)
 
     @property
     def failed(self) -> list[str]:
@@ -176,8 +182,11 @@ def _envelope(outcome: UnitOutcome, worker: str, lead: str, unit: dict[str, Any]
 
 
 class _Run:
-    def __init__(self, writer: Any, roster: _Roster, skills: SkillRegistry, pins: Pins, runner: Any) -> None:
+    def __init__(
+        self, writer: Any, roster: _Roster, skills: SkillRegistry, pins: Pins, runner: Any, must_ask: MustAsk | None
+    ) -> None:
         self.writer, self.roster, self.skills, self.pins, self.runner = writer, roster, skills, pins, runner
+        self.must_ask = must_ask
 
     def emit(self, type_: str, actor: str, target: str, summary: str, data: dict[str, Any], **kw: Any) -> str:
         district = kw.get("district")
@@ -207,7 +216,8 @@ class _Run:
                 cause=cause,
             )
 
-    async def work(self, unit: dict[str, Any]) -> UnitOutcome:
+    async def work(self, unit: dict[str, Any]) -> UnitOutcome | None:
+        """None when the unit was parked to ask a person first."""
         unit_id, district = unit["id"], unit["district"]
         lead, worker = self.roster.leads[district], self.roster.workers[unit_id]
         at = {"district": district}
@@ -215,6 +225,20 @@ class _Run:
         cause = self.emit(
             "agent.assigned", lead, worker, "The Lead gave it a unit.", {"unit": unit_id}, cause=cause, **at
         )
+        if self.must_ask is not None:
+            ask = await self.must_ask.assess(unit)  # no failure count yet: retries arrive with FR-AGT-13
+            if ask is not None:
+                self.must_ask.raise_question(
+                    ask,
+                    writer=self.writer,
+                    unit=unit,
+                    specialist=worker,
+                    lead=lead,
+                    director=self.roster.director,
+                    district=district,
+                    cause=cause,
+                )
+                return None
         try:
             loaded = tuple(self.skills.load_pinned(skill_id, self.pins) for skill_id in unit["skills"])
         except SkillError:
@@ -261,6 +285,7 @@ async def run_plan(
     config: AgentsConfig,
     skills: SkillRegistry,
     runner: UnitRunner,
+    must_ask: MustAsk | None = None,
 ) -> RunResult:
     validator = repo_validator()
     problems = validator.contract_problems("plan", plan) + validator.contract_problems("layout", layout)
@@ -274,7 +299,7 @@ async def run_plan(
         raise PlanRefused([f"PG-11: {error}"]) from error
 
     result = RunResult(pins=pins)
-    run = _Run(writer, roster, skills, pins, runner)
+    run = _Run(writer, roster, skills, pins, runner, must_ask)
     run.spawn_team()
     slots = asyncio.Semaphore(config.limits.max_specialists)
     loop = asyncio.get_running_loop()
@@ -288,6 +313,10 @@ async def run_plan(
             return
         async with slots:
             outcome = await run.work(unit)
+        if outcome is None:  # parked: a person must answer first, so its dependents wait (skipped)
+            result.parked.append(unit["id"])
+            finished[unit["id"]].set_result(False)
+            return
         result.outcomes[unit["id"]] = outcome
         finished[unit["id"]].set_result(outcome.success)
 

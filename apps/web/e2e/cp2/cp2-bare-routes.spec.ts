@@ -46,7 +46,9 @@ test.describe("@cp2 bare routes with a live API and no run", () => {
     for (const path of BARE) {
       await page.goto(path);
       await expect(page.getByTestId("fixture-replay-banner")).toHaveCount(0); // a real client
-      await expect(page.getByTestId("no-run"), path).toContainText("No run yet");
+      // S-14 lists worlds: with none it is its own empty state, the other screens say "No run yet"
+      if (path === "/worlds") await expect(page.getByTestId("worlds-empty"), path).toBeVisible();
+      else await expect(page.getByTestId("no-run"), path).toContainText("No run yet");
       await expect(page.getByTestId("not-found"), path).toHaveCount(0);
     }
     await page.waitForTimeout(1500); // two poll periods: a stray poll would show up now

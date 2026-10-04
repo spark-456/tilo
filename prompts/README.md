@@ -18,4 +18,5 @@ Provider-layer templates (`router/` EFF-02 repair, `conformance/` PL-05 probe) a
 brief extraction (FR-INT-03: `brief_system.md` instructions, `brief_task.md` the delimited task data).
 `autopilot/` is Email Autopilot triage (FR-CHN-09: `triage_system.md` instructions, `triage_task.md` the
 delimited, untrusted mail data) and drafting (FR-CHN-10: `draft_system.md` instructions, `draft_task.md` the
-delimited thread data).
+delimited thread data). `specialist/must_ask_*.md` is the must-ask check before a unit starts (FR-AGT-05:
+`must_ask_system.md` instructions, `must_ask_task.md` the delimited unit data).

@@ -1,0 +1,257 @@
+{
+  "_comment": "FR-AGT-05 scripted eval set (PRD 8.3, 8.6). 12 tasks with a planted ambiguity or must-ask trigger (kind ask) and 12 clear tasks (kind clear). model_reply is the recorded reply of the specialist-role model for that task title: {ask: false} or {ask: true, reason, question, options (2-3 labels), suggested (index), why}. Titles are unique, at most 80 characters (plan.schema.json), and no title contains another.",
+  "tasks": [
+    {
+      "id": "ASK-01",
+      "kind": "ask",
+      "title": "Update the pricing sheet with the new numbers",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "ambiguous_brief",
+        "question": "Which source holds the new numbers: the supplier email or the finance export?",
+        "options": ["Supplier email", "Finance export"],
+        "suggested": 1,
+        "why": "The finance export is the audited source."
+      }
+    },
+    {
+      "id": "ASK-02",
+      "kind": "ask",
+      "title": "Tidy the customer list before the review",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "ambiguous_brief",
+        "question": "Should duplicate customers be merged, or only flagged for you?",
+        "options": ["Flag only", "Merge them"],
+        "suggested": 0,
+        "why": "Flagging changes nothing and can be undone."
+      }
+    },
+    {
+      "id": "ASK-03",
+      "kind": "ask",
+      "title": "Write the quarterly highlights deck",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "ambiguous_brief",
+        "question": "Which quarter should the highlights cover?",
+        "options": ["The last quarter", "The current quarter"],
+        "suggested": 0,
+        "why": "Reviews usually look back."
+      }
+    },
+    {
+      "id": "ASK-04",
+      "kind": "ask",
+      "title": "Find the best laptop for the new hires",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "ambiguous_brief",
+        "question": "What matters most: price, weight or battery life?",
+        "options": ["Lowest price", "Lightest weight", "Longest battery"],
+        "suggested": 0,
+        "why": "Price is the usual first filter."
+      }
+    },
+    {
+      "id": "ASK-05",
+      "kind": "ask",
+      "title": "Translate the handbook for the Madrid and Mexico City offices",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "ambiguous_brief",
+        "question": "Should one Spanish version serve both offices, or one version each?",
+        "options": ["One version each", "One shared version"],
+        "suggested": 0,
+        "why": "Each office reads a different regional Spanish."
+      }
+    },
+    {
+      "id": "ASK-06",
+      "kind": "ask",
+      "title": "Compare the two vendor quotes",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "ambiguous_brief",
+        "question": "Compare on total cost or on delivery time?",
+        "options": ["Total cost", "Delivery time"],
+        "suggested": 0,
+        "why": "Total cost is the common basis."
+      }
+    },
+    {
+      "id": "ASK-07",
+      "kind": "ask",
+      "title": "Cut the research time in half",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "trade_off",
+        "question": "Halving the time means fewer sources. Accept fewer sources, or allow a later finish?",
+        "options": ["Fewer sources", "Later finish"],
+        "suggested": 1,
+        "why": "A later finish keeps the evidence intact."
+      }
+    },
+    {
+      "id": "ASK-08",
+      "kind": "ask",
+      "title": "Make the weekly report cheaper to produce",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "trade_off",
+        "question": "A cheaper run lowers the quality checks. Accept lower quality?",
+        "options": ["Lower quality", "Keep quality"],
+        "suggested": 1,
+        "why": "Quality is easy to lose and hard to restore."
+      }
+    },
+    {
+      "id": "ASK-09",
+      "kind": "ask",
+      "title": "Finish the market scan before Friday",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "trade_off",
+        "question": "Finishing by Friday skips the second verification pass. Skip it?",
+        "options": ["Skip the pass", "Finish later"],
+        "suggested": 1,
+        "why": "An unchecked scan could carry wrong numbers."
+      }
+    },
+    {
+      "id": "ASK-10",
+      "kind": "ask",
+      "title": "Pay the outstanding supplier invoice",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "sensitive_step",
+        "question": "This moves money. Which amount should be paid?",
+        "options": ["Hold the payment", "Pay the full amount"],
+        "suggested": 0,
+        "why": "Nothing is paid until you choose."
+      }
+    },
+    {
+      "id": "ASK-11",
+      "kind": "ask",
+      "title": "Email the signed contract to the client's legal team",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "sensitive_step",
+        "question": "This sends legal terms outside the company. Send the signed copy?",
+        "options": ["Hold it", "Send the signed copy"],
+        "suggested": 0,
+        "why": "A held draft can still be sent later."
+      }
+    },
+    {
+      "id": "ASK-12",
+      "kind": "ask",
+      "title": "Export the employee home addresses for the vendor",
+      "actions": [],
+      "model_reply": {
+        "ask": true,
+        "reason": "sensitive_step",
+        "question": "This shares personal data with a vendor. Share names only, or hold?",
+        "options": ["Hold the export", "Names only"],
+        "suggested": 0,
+        "why": "Home addresses are personal data."
+      }
+    },
+    {
+      "id": "CLR-01",
+      "kind": "clear",
+      "title": "Extract the five invoice totals from the attached CSV into a table",
+      "actions": [],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-02",
+      "kind": "clear",
+      "title": "Turn the attached meeting notes into a summary of at most ten lines",
+      "actions": [],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-03",
+      "kind": "clear",
+      "title": "List the file names in the shared folder, newest first",
+      "actions": [],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-04",
+      "kind": "clear",
+      "title": "Count the open support tickets per team from the attached export",
+      "actions": [],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-05",
+      "kind": "clear",
+      "title": "Draft a two-sentence reply declining the webinar invitation",
+      "actions": ["create_draft"],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-06",
+      "kind": "clear",
+      "title": "Proofread the attached two-page brief for spelling errors",
+      "actions": [],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-07",
+      "kind": "clear",
+      "title": "Rename the columns of the attached sheet to match the template",
+      "actions": [],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-08",
+      "kind": "clear",
+      "title": "Chart the monthly sales from the attached table as a bar chart",
+      "actions": [],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-09",
+      "kind": "clear",
+      "title": "Fetch the opening hours of the three listed branches",
+      "actions": [],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-10",
+      "kind": "clear",
+      "title": "Merge the two attached CSV files on the order id column",
+      "actions": [],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-11",
+      "kind": "clear",
+      "title": "Save the final deck to the project folder",
+      "actions": ["save_file"],
+      "model_reply": { "ask": false }
+    },
+    {
+      "id": "CLR-12",
+      "kind": "clear",
+      "title": "Summarise the attached article in one paragraph for a general reader",
+      "actions": [],
+      "model_reply": { "ask": false }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 # packages/memory — `tilo_memory`
 
 ## Purpose
-Pillar P7 memory layers (PRD 13.1, 13.2). The result cache (`cache.py`) and the event ledger (`ledger.py`). Cache: a web, file or email-body result is
+Pillar P7 memory layers (PRD 13.1, 13.2). The result cache (`cache.py`), event ledger (`ledger.py`), retention (`retention.py`), erasure (`erasure.py`). Cache: a web, file or email-body result is
 reused instead of refetched when it is fresh and a fit check and the Verifier both accept it. Every
 reuse is one `memory.hit` event and is the only thing credited as saved (PRD 14.3).
 
@@ -30,6 +30,11 @@ reuse is one `memory.hit` event and is the only thing credited as saved (PRD 14.
   with other content is `conflict` and never rewrites the row, an unreadable one is `rejected` (BQ-194). No
   update or delete method on `EventLedger`. `insert_if_absent` is atomic on the table: the in-memory table
   locks, `BigQueryLedgerTable` is one guarded DML insert (mock client only; BQ-206 for the infra gap).
+- Erasure (FR-MEM-09): `erase_user` takes a validated `ErasureRequest`; no endpoint or trigger here (authn is the
+  API ticket). Blank/None/wildcard ids refused, ownerless records never deleted, incomplete registry refused
+  before any delete, done = fresh re-read (`verify_erasure`, `python -m tilo_memory.erasure verify <user>`).
+  Output holds store names and counts only. `LedgerRetentionStore` is the only code that deletes ledger rows;
+  row owners come from an owner index written at ingest (BQ-211), so they outlive the World entity.
 
 ## Requirement IDs
-FR-MEM-01, FR-MEM-02, FR-MEM-03. (FR-MEM-09 erasure/retention is a separate ticket.)
+FR-MEM-01, FR-MEM-02, FR-MEM-03, FR-MEM-09.
