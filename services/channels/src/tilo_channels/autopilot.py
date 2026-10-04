@@ -13,12 +13,14 @@ line or key does.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, fields
 from typing import Any, Protocol
 
+from tilo_channels.autopilot_gate import evidence_for, opens, requested_part
 from tilo_channels.autopilot_send import index_artifact
 from tilo_channels.autopilot_state import (
     ACTION_TYPE,
@@ -119,13 +121,15 @@ class Autopilot:
         outbox: Outbox,
         cards: CardStore,
         clock: Callable[[], float],
-        emit: Callable[[dict], None] = lambda part: None,  # unused: no event here; the outbox emits data.transfer
+        emit: Callable[[dict], None] = lambda part: None,  # the gate's approval.requested only
         world_id: str,
         run_id: str,
         connector: str = "gmail",
         stops: StopQueue | None = None,  # None only for benches that never sweep; production passes one (BQ-187)
+        fake_evidence: bool = False,  # TESTS ONLY (BQ-228): the old unapproved Send; production never passes it
     ) -> None:
-        self._drafter, self._reader, self._contacts = drafter, reader, contacts
+        self._fake = fake_evidence
+        self._drafter, self._reader, self._contacts, self._emit = drafter, reader, contacts, emit
         self._policy, self._cards, self._clock, self._stops = policy, cards, clock, stops
         self._world_id = world_id
         self._ledger = Ledger(
@@ -136,7 +140,15 @@ class Autopilot:
         """The card for a draft of the person's own instruction; at L2 a ready T2 draft is scheduled at once."""
         return self._card(user_id, context, result, instructed=True)
 
-    def send(self, user_id: str, card_id: str) -> Outcome:
+    def approval_requested(self, user_id: str, card_id: str) -> dict | None:
+        """The card's stored `approval.requested` part (a copy), or None: the same from any instance (CHN-WIRE-1)."""
+        part = (self._cards.get(user_id, card_id) or {}).get("approval_requested")
+        return copy.deepcopy(part) if isinstance(part, dict) else None
+
+    def send(self, user_id: str, card_id: str, approval: dict | None = None) -> Outcome:
+        """L1 and T3: only with the `approval.resolved` that `tilo-api` recorded for the owner's tap, whose authz the
+        entry carries unchanged; its OB-01 / OB-05 check runs before the card's one decision is claimed, so a refusal
+        (never raised) leaves the card open. L2 is scheduled by the policy path (unchanged)."""
         doc = self._cards.get(user_id, card_id)
         if doc is None or doc["state"] != "open" or "send" not in doc["options"]:
             return Outcome("refused", None)
@@ -148,9 +160,18 @@ class Autopilot:
                 "refused" if state in ("cancelled", "failed") else "scheduled" if state == "scheduled" else "queued"
             )
             return Outcome(status, doc["outbox_id"])
+        built: dict[str, Any] = {}
+        if not self._fake:  # the gate path: nothing is built from the model, the card or the caller beyond the approval
+            evidence = evidence_for(doc, approval)
+            if evidence is None:
+                return Outcome("refused", None)
+            entry = self._ledger.entry_for(doc, evidence["authorised_by"]["authz"])  # copied, never re-stamped
+            if not opens(entry, evidence):
+                return Outcome("refused", None)
+            built = {"entry": entry, "evidence": evidence}
         if self._ledger.first(user_id, card_id, "decision", "send") != "send":
             return Outcome("refused", None)
-        entry = self._ledger.enqueue(doc)
+        entry = self._ledger.enqueue(doc, **built)
         self._cards.put(user_id, card_id, doc | {"outbox_id": entry["id"]})
         _LOG.info("autopilot card %s: queued by its owner, %s", card_id, doc["tier"])
         return Outcome("queued", entry["id"])
@@ -237,7 +258,10 @@ class Autopilot:
         doc = self._cards.get(user_id, card_id)
         if doc is None:  # one atomic record fixes tier, level and entry id before any enqueue; first writer wins
             doc = self._decision(user_id, card_id, context, result, instructed)
-            if not self._cards.create(user_id, card_id, doc):
+            if self._cards.create(user_id, card_id, doc):
+                if "approval_requested" in doc:  # once: only the instance whose create won emits the gate
+                    self._emit(copy.deepcopy(doc["approval_requested"]))
+            else:
                 doc = self._cards.get(user_id, card_id)
                 if doc is None:
                     raise LookupError("card store refused a create but holds no card")
@@ -294,6 +318,7 @@ class Autopilot:
             modifiers += ["new_recipients"] if self._adds_recipient(user_id, context, draft) else []
             modifiers += ["attachments"] if draft.attachments else []
             doc |= {"tier": "T3" if modifiers else "T2", "modifiers": modifiers}
+            reserved = sendable and not self._fake  # a gate at L1 or T3 reserves its entry's id (OB-01)
             blank = not clean_text(context.instruction).strip()  # BQ-222: nothing a person wrote never rides L2
             if instructed and sendable and not modifiers and not blank:
                 level, policy_id = self._policy.level(user_id, ACTION_TYPE)
@@ -301,6 +326,10 @@ class Autopilot:
                     ms = round(self._clock() * 1000)
                     doc |= {"level": "L2", "undo_window_s": UNDO_WINDOW_S, "policy_id": policy_id}
                     doc |= {"outbox_id": ulid(ms), "scheduled_at": timestamp(ms + UNDO_WINDOW_S * 1000)}
+                    reserved = False
+            if reserved:
+                doc["outbox_id"] = ulid(round(self._clock() * 1000))
+                doc["approval_requested"] = requested_part(doc, doc["outbox_id"])
         return doc
 
     def _flagged(self, user_id: str, context: DraftContext, result: DraftResult) -> bool:
