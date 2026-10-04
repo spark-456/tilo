@@ -118,7 +118,7 @@ for (const path of [...UNKNOWN_WORLDS, ...EXTRA_SEGMENTS]) {
 test("HR_1 Not found offers the way back, and the known world still works", async ({ page }) => {
   await page.goto("/world/nope/story");
   await page.getByRole("link", { name: "Back to Start" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "What should Tilo do?" })).toBeVisible();
   await page.goto(`${W}/story${FAST}`);
   await expect(page.getByRole("heading", { level: 1, name: "Story" })).toBeVisible();
   await expect(page.getByTestId("story-lens")).toContainText("Done: 1 reply sent", {

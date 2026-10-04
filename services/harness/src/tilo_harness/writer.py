@@ -58,7 +58,7 @@ class WriterBusy(Exception):
     """Raised when the world's lease is held by another writer."""
 
 
-def _new_ulid(now: datetime) -> str:
+def new_ulid(now: datetime) -> str:
     ms = int(now.timestamp() * 1000) & 0xFFFFFFFFFFFF
     value = (ms << 80) | int.from_bytes(secrets.token_bytes(10), "big")
     return "".join(_CROCKFORD[(value >> (i * 5)) & 0x1F] for i in range(25, -1, -1))
@@ -77,7 +77,7 @@ def _identical(a: Any, b: Any) -> bool:
     return bool(a == b)
 
 
-def _format_ts(now: datetime) -> str:
+def format_ts(now: datetime) -> str:
     return now.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
 
 
@@ -119,6 +119,22 @@ class WorldWriter:
         self._state.world_id = world_id
         self._view_ids: dict[str, set[str]] = {}
         self._view_seq: dict[str, int] = {}
+
+    @property
+    def world_id(self) -> str:
+        return self._world_id
+
+    @property
+    def run_id(self) -> str:
+        return self._run_id
+
+    @property
+    def layout(self) -> dict[str, Any]:
+        return self._layout
+
+    def now(self) -> datetime:
+        """The writer's own clock, so a card and its event agree on the time."""
+        return self._clock()
 
     def open(self) -> None:
         """Acquires the world's lease and loads the head: last seq, and every event id already
@@ -183,9 +199,9 @@ class WorldWriter:
         entry = self._validator.registry_types.get(type) if isinstance(type, str) else None
         event = {
             "v": "1.0",
-            "id": _new_ulid(now),
+            "id": new_ulid(now),
             "seq": self._state.last_seq + 1,
-            "ts": _format_ts(now),
+            "ts": format_ts(now),
             "world_id": self._world_id,
             "run_id": self._run_id,
             "type": type,

@@ -8,6 +8,7 @@ import { SUGGESTED_TASKS } from "../../api/fixtures/suggestedTasks";
 import { Primary, Summary } from "../FlowShell";
 import { useAction } from "../remote";
 import { rememberIntake } from "../s02/Understanding";
+import { HomePreview } from "./HomePreview";
 import {
   ACCEPTED,
   ACCEPT_ATTR,
@@ -75,90 +76,103 @@ export function StartScreen() {
   const message = action.busy ? null : (problem ?? notice);
   const statuses = fileStatuses(files);
   return (
-    <>
-      <div className="flow-body">
-        <Summary>Describe what you want Tilo to handle.</Summary>
-        <div className="task-box">
-          <textarea
-            ref={box}
-            aria-label="Describe your task"
-            aria-describedby="task-count"
-            placeholder="e.g. Summarise this week's customer feedback"
-            rows={5}
-            value={text}
-            onChange={(e) => edit(e.target.value)}
-          />
-          <p id="task-count" className="task-count">
-            {`${codePoints(text).toLocaleString("en-US")} / ${MAX_TEXT.toLocaleString("en-US")}`}
-          </p>
-        </div>
-        <fieldset className="task-chips" aria-label="Suggested tasks">
-          {SUGGESTED_TASKS.map((task) => (
-            <button
-              type="button"
-              key={task}
-              className="task-chip"
-              onClick={() => {
-                edit(task);
-                box.current?.focus();
-              }}
-            >
-              {task}
-            </button>
-          ))}
-        </fieldset>
-        <section
-          className="file-drop"
-          aria-label="Files"
-          data-over={dragging || undefined}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
-        >
-          <div>
-            <p>Drop files here, or choose them.</p>
-            <p className="hint">
-              {ACCEPTED}. Up to {MAX_FILES} files, {MAX_BYTES / (1024 * 1024)} MB in total.
+    <div className="home-layout">
+      <div className="home-main">
+        <div className="flow-body">
+          <Summary>
+            Describe the job. Tilo plans it, builds a world the right size, and asks before anything
+            spends, shares or can't be undone.
+          </Summary>
+          <div className="task-box">
+            <textarea
+              ref={box}
+              aria-label="Describe your task"
+              aria-describedby="task-count"
+              placeholder="e.g. Summarise this week's customer feedback"
+              rows={5}
+              value={text}
+              onChange={(e) => edit(e.target.value)}
+            />
+            <p id="task-count" className="task-count">
+              {`${codePoints(text).toLocaleString("en-US")} / ${MAX_TEXT.toLocaleString("en-US")}`}
             </p>
           </div>
-          <button type="button" className="secondary" onClick={() => picker.current?.click()}>
-            Choose files
-          </button>
-          <input ref={picker} type="file" hidden multiple accept={ACCEPT_ATTR} onChange={onPick} />
-        </section>
-        {files.length > 0 && (
-          <ul className="file-list" aria-label="Attached files">
-            {files.map((file, i) => (
-              <li key={`${i}:${file.name}`}>
-                <span className="file-name">{file.name}</span>
-                <span className="file-meta">
-                  {formatSize(file.size)} · {action.busy ? "Sending" : statuses[i]}
-                </span>
-                <button
-                  type="button"
-                  className="secondary small"
-                  aria-label={`Remove ${file.name}`}
-                  disabled={action.busy}
-                  onClick={() => setFiles((current) => current.filter((_, j) => j !== i))}
-                >
-                  Remove
-                </button>
-              </li>
+          <fieldset className="task-chips" aria-label="Suggested tasks">
+            {SUGGESTED_TASKS.map((task) => (
+              <button
+                type="button"
+                key={task}
+                className="task-chip"
+                onClick={() => {
+                  edit(task);
+                  box.current?.focus();
+                }}
+              >
+                {task}
+              </button>
             ))}
-          </ul>
-        )}
-        <div className="flow-msg">
-          {message && <p role="alert">{message}</p>}
-          <output>{action.busy ? "Sending your task…" : ""}</output>
+          </fieldset>
+          <section
+            className="file-drop"
+            aria-label="Files"
+            data-over={dragging || undefined}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+          >
+            <div>
+              <p>Drop files here, or choose them.</p>
+              <p className="hint">
+                {ACCEPTED}. Up to {MAX_FILES} files, {MAX_BYTES / (1024 * 1024)} MB in total.
+              </p>
+            </div>
+            <button type="button" className="secondary" onClick={() => picker.current?.click()}>
+              Choose files
+            </button>
+            <input
+              ref={picker}
+              type="file"
+              hidden
+              multiple
+              accept={ACCEPT_ATTR}
+              onChange={onPick}
+            />
+          </section>
+          {files.length > 0 && (
+            <ul className="file-list" aria-label="Attached files">
+              {files.map((file, i) => (
+                <li key={`${i}:${file.name}`}>
+                  <span className="file-name">{file.name}</span>
+                  <span className="file-meta">
+                    {formatSize(file.size)} · {action.busy ? "Sending" : statuses[i]}
+                  </span>
+                  <button
+                    type="button"
+                    className="secondary small"
+                    aria-label={`Remove ${file.name}`}
+                    disabled={action.busy}
+                    onClick={() => setFiles((current) => current.filter((_, j) => j !== i))}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flow-msg">
+            {message && <p role="alert">{message}</p>}
+            <output>{action.busy ? "Sending your task…" : ""}</output>
+          </div>
+        </div>
+        <div className="flow-actions">
+          <p className="start-hint">You see the plan and the cost before any agent starts.</p>
+          <Primary label="Start task" action={action} disabled={!text.trim() || problem !== null} />
         </div>
       </div>
-      <div className="flow-actions">
-        <p className="start-hint">You see the plan and the cost before any agent starts.</p>
-        <Primary label="Start task" action={action} disabled={!text.trim() || problem !== null} />
-      </div>
-    </>
+      <HomePreview />
+    </div>
   );
 }
