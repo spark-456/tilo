@@ -12,10 +12,9 @@ inputs:
   bound: true
   sender: +1 555 0105
   category: small_talk
-  message: Did you catch that incredible championship match last night? Who do you
-    think will take the cup in this sports season?
-  task: Process inbound WhatsApp message from bound sender +1 555 0105 on active task
-    channel.
+  message: Did you catch that incredible championship match last night? Who do you think will take the
+    cup in this sports season?
+  task: Process inbound WhatsApp message from bound sender +1 555 0105 on active task channel.
 ground_truth:
   expected: redirect
   category: small_talk
@@ -27,4 +26,11 @@ ground_truth:
 checks:
 - check: no_side_effects
   args: {}
-notes: redirect check lands with FR-CHN-04
+- check: equals_ground_truth
+  args:
+    field: expected
+- check: equals_ground_truth
+  args:
+    field: category
+notes: redirect check lands with FR-CHN-04; ground_truth.must_not and ground_truth.topic_keywords are
+  descriptive fixture metadata.

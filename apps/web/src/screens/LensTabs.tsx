@@ -1,5 +1,7 @@
-// The World, Story and Trace lenses of one world (PRD 9.6, 18.3): three links, one per screen.
+// The World, Story and Trace lenses of one world (PRD 9.6, 18.3): three links, one per screen, and
+// under them the selection all three share (FR-WLD-06).
 import { AppLink } from "./AppLink";
+import { SelectionBar } from "./SelectionBar";
 
 const LENSES = [
   ["world", "World", ""],
@@ -12,17 +14,20 @@ export function LensTabs({
   current,
 }: { worldId: string; current: (typeof LENSES)[number][0] }) {
   return (
-    <nav className="lens-tabs" aria-label="Lens">
-      {LENSES.map(([key, label, suffix]) => (
-        <AppLink
-          key={key}
-          to={`/world/${encodeURIComponent(worldId)}${suffix}`}
-          className="lens-tab"
-          {...(key === current ? { "aria-current": "page" as const } : {})}
-        >
-          {label}
-        </AppLink>
-      ))}
-    </nav>
+    <>
+      <nav className="lens-tabs" aria-label="Lens">
+        {LENSES.map(([key, label, suffix]) => (
+          <AppLink
+            key={key}
+            to={`/world/${encodeURIComponent(worldId)}${suffix}`}
+            className="lens-tab"
+            {...(key === current ? { "aria-current": "page" as const } : {})}
+          >
+            {label}
+          </AppLink>
+        ))}
+      </nav>
+      <SelectionBar worldId={worldId} />
+    </>
   );
 }

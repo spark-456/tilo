@@ -120,6 +120,28 @@ describe("FR-HIL-01 S-07: the gate sheet names the exact action, the recipient a
   });
 });
 
+describe("CL-INT-3 HR-1 FR-HIL-01: a gate that does not say what it holds is never answerable", () => {
+  it("draws no approve path when neither the card nor the request names the item", async () => {
+    const noItem: Card = {
+      ...GATE_REPLY,
+      gate: GATE_REPLY.gate && {
+        ...GATE_REPLY.gate,
+        action: { ...GATE_REPLY.gate.action, item: null },
+      },
+    };
+    const c = await draw(view(noItem, [{ ...requested(1), item: null }]));
+    expect(c.querySelector('[data-testid="gate-item-missing"]')).not.toBeNull();
+    expect(radio(c, "approve")).toBeUndefined();
+    expect(primary(c)).toBeNull();
+    expect(c.textContent).not.toContain("What it holds");
+  });
+  it("still answers a gate whose card names the item", async () => {
+    const c = await draw(view());
+    expect(c.textContent).toContain("What it holds");
+    expect(radio(c, "approve")).toBeDefined();
+  });
+});
+
 describe("FR-HIL-01 S-07: a T3 or irreversible gate preselects nothing", () => {
   it("leaves every option unchosen on an irreversible T3 gate, and the button says to choose", async () => {
     const { c, push } = await sheetPage([GATE_REPLY]);

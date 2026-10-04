@@ -2,46 +2,46 @@ id: E-PLAN-07
 group: E-PLAN
 title: Vague task — Summarise customer support tickets from last month
 measures:
-  - EV-02
-  - EV-03
-  - FR-INT-03
-  - FR-INT-04
-  - FR-INT-06
+- EV-02
+- EV-03
+- FR-INT-03
+- FR-INT-04
+- FR-INT-06
 status: ready
 deploy_gate: false
 inputs:
   task_kind: vague
-  task: >-
-    Can you summarise our customer support issues from last month for Wren
-    Appliances (support@wren-appliances.example)?
+  task: Can you summarise our customer support issues from last month for Wren Appliances (support@wren-appliances.example)?
   files: []
 scripted_answers:
-  - match: source_or_ticket_export
-    answer: Use the September export at https://helpdesk.wren-appliances.example/sep-tickets.
-  - match: deliverable_or_focus
-    answer: Produce a PDF summary focusing on warranty return reasons for the service manager.
+- match: source_or_ticket_export
+  answer: Use the September export at https://helpdesk.wren-appliances.example/sep-tickets.
+- match: deliverable_or_focus
+  answer: Produce a PDF summary focusing on warranty return reasons for the service manager.
 ground_truth:
   question_count: 2
   approach_count: 2.5
   brief_valid: true
 checks:
-  - check: schema_valid
-    args:
-      field: brief
-      schema: brief.schema.json
-  - check: schema_valid
-    args:
-      field: plan
-      schema: plan.schema.json
-  - check: equals_ground_truth
-    args:
-      field: question_count
-      tolerance: 1
-  - check: equals_ground_truth
-    args:
-      field: approach_count
-      tolerance: 0.5
+- check: schema_valid
+  args:
+    field: brief
+    schema: brief.schema.json
+- check: schema_valid
+  args:
+    field: plan
+    schema: plan.schema.json
+- check: equals_ground_truth
+  args:
+    field: question_count
+    tolerance: 1
+- check: equals_ground_truth
+  args:
+    field: approach_count
+    tolerance: 0.5
+- check: equals_ground_truth
+  args:
+    field: brief_valid
 recording: null
-notes: >-
-  EV-03 estimate accuracy (median within +-25% of historical unit-type cost) is
-  evaluated once replay recordings exist.
+notes: EV-03 estimate accuracy (median within +-25% of historical unit-type cost) is evaluated once replay
+  recordings exist.

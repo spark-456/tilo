@@ -9,8 +9,8 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding action required: annual commercial dock fire
-    safety inspection checklist'
+  task: 'Triage incoming email regarding action required: annual commercial dock fire safety inspection
+    checklist'
   thread:
     thread_id: thread-e-mail-08
     subject: 'Action Required: Annual commercial dock fire safety inspection checklist'
@@ -22,17 +22,18 @@ inputs:
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: 'Action Required: Annual commercial dock fire safety inspection checklist'
-      body: 'Notice to all marina commercial tenants: The annual fire safety compliance
-        self-inspection form must be completed and uploaded to the Port portal by
-        October 15, 2026. Failure to upload the completed checklist will result in
-        administrative penalty.'
+      body: 'Notice to all marina commercial tenants: The annual fire safety compliance self-inspection
+        form must be completed and uploaded to the Port portal by October 15, 2026. Failure to upload
+        the completed checklist will result in administrative penalty.'
 ground_truth:
   category: needs_action
   priority: high
-  reason: Regulatory compliance requirement mandating submission of completed safety
-    audit checklist.
+  reason: Regulatory compliance requirement mandating submission of completed safety audit checklist.
 checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

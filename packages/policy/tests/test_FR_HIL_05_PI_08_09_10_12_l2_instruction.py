@@ -8,6 +8,7 @@ kept: >= 1 s, scheduled_at = created_at (here `now`) + undo_window_s).
 
 from __future__ import annotations
 
+import pytest
 import tilo_policy
 from _policy_lib import OWNER, WORLD, applied_entry, base_facts, base_instruction, base_policy
 
@@ -38,6 +39,7 @@ def _l2_policy(**overrides):
     return base_policy(**{"id_": "pol_autopilot_l2", "level": "L2", "undo_window_s": 60, **overrides})
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_08_PI_12_whatsapp_instruction_runs_after_undo_window_default_60s(risk_table_path):
     table = _table(risk_table_path)
     instruction = base_instruction(channel="whatsapp", type_="channel.message_in")
@@ -51,6 +53,7 @@ def test_FR_HIL_05_PI_08_PI_12_whatsapp_instruction_runs_after_undo_window_defau
     assert decision.policy_id == "pol_autopilot_l2"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_09_web_signed_in_instruction_also_counts(risk_table_path):
     table = _table(risk_table_path)
     instruction = base_instruction(channel="web", type_="world.requested")
@@ -60,6 +63,7 @@ def test_FR_HIL_05_PI_09_web_signed_in_instruction_also_counts(risk_table_path):
     assert decision.outcome == "run_after_undo"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_09_mobile_web_instruction_also_counts(risk_table_path):
     table = _table(risk_table_path)
     instruction = base_instruction(channel="mobile_web", type_="world.requested")
@@ -131,6 +135,7 @@ def test_FR_HIL_05_PI_10_instruction_already_used_by_an_earlier_send_gates(risk_
     assert decision.outcome == "gate"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_12_undo_window_at_least_1s_is_kept_from_the_policy(risk_table_path):
     table = _table(risk_table_path)
     instruction = base_instruction()

@@ -3,13 +3,12 @@
 // Every client call has loading, empty and error states with a retry (PRD 18.4); one filled
 // primary button per screen (UX-1).
 import { type ReactNode, useEffect, useRef } from "react";
-import { useClient } from "../api/ClientProvider";
-import type { ApproachesResult } from "../api/client";
 import { useFlowRoute } from "../router";
 import { StartScreen } from "./flow/StartScreen";
 import "./flow/flow.css";
-import { type Action, type Remote, useAction, useRemote } from "./remote";
+import { type Action, type Remote, useAction } from "./remote";
 import { Understanding } from "./s02/Understanding";
+import { Approaches } from "./s03/Approaches";
 
 const enc = encodeURIComponent;
 
@@ -86,54 +85,6 @@ export function Primary({
       >
         {action.busy ? `${label}…` : label}
       </button>
-    </>
-  );
-}
-
-/** The recommended approach and its cap (its upper credit estimate), from getApproaches. */
-async function loadRecommendation(getApproaches: Promise<ApproachesResult>) {
-  const result = await getApproaches;
-  const chosen = result.approaches.find((a) => a.id === result.recommended);
-  if (result.approaches.length > 0 && !chosen) {
-    throw new Error("the recommended approach is not in the list");
-  }
-  return { result, chosen };
-}
-
-function Approaches({ taskId }: { taskId: string }) {
-  const client = useClient();
-  const [remote, retry] = useRemote("load the approaches", () =>
-    loadRecommendation(client.getApproaches(taskId)),
-  );
-  const ready = remote.status === "ready" ? remote.value : null;
-  const action = useAction("start the run", async () => {
-    if (!ready?.chosen) throw new Error("no approach is loaded");
-    const { world_id } = await client.approve(taskId, {
-      approach_id: ready.chosen.id,
-      budget_cap: ready.chosen.credits.max,
-    });
-    return `/world/${enc(world_id)}`;
-  });
-  return (
-    <>
-      <Loaded
-        what="the approaches"
-        remote={remote}
-        retry={retry}
-        isEmpty={(v) => v.chosen === undefined}
-      >
-        {({ result, chosen }) => (
-          <>
-            <Summary>Compare priced approaches and confirm your budget cap.</Summary>
-            <p className="flow-detail">
-              Recommended: {chosen?.label}. This run can use up to {chosen?.credits.max} credits
-              (about US${((chosen?.credits.max ?? 0) * result.credit_usd).toFixed(2)}). You can
-              pause it any time.
-            </p>
-          </>
-        )}
-      </Loaded>
-      <Primary label="Approve & start" action={action} disabled={!ready?.chosen} />
     </>
   );
 }

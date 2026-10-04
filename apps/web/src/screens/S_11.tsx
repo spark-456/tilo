@@ -5,14 +5,37 @@
 // placeholder. Layout after the Trace lens of design/source "Tilo World Player.dc.html".
 import { useClient } from "../api/ClientProvider";
 import { isKnownType } from "../world/registry";
-import { elapsed, useRunLog } from "../world/runLog";
+import { useReplayedLog } from "../world/replay";
+import { elapsed } from "../world/runLog";
+import { involves, objectIds, useSelection } from "../world/selection";
 import { LensTabs } from "./LensTabs";
 import { Placeholder } from "./Placeholder";
+import { useRemote } from "./remote";
 import type { ScreenProps } from "./routes";
 
 export function S_11({ params }: ScreenProps) {
   const worldId = params[0] ?? "";
-  const events = useRunLog(useClient(), worldId);
+  const client = useClient();
+  const { events } = useReplayedLog(client, worldId);
+  const [selected, , toggle] = useSelection(worldId);
+  const [layout] = useRemote("load the world", () => client.getLayout(worldId));
+  const ids = layout.status === "ready" ? objectIds(layout.value, events) : null;
+  // An actor or target that is an object of the world can be selected; any other id is just text
+  // in a box of the same size, so the layout arriving moves nothing (CLS).
+  const pick = (id: string) =>
+    ids?.has(id) ? (
+      <button
+        type="button"
+        className="pick"
+        data-lens-control
+        aria-pressed={selected === id}
+        onClick={() => toggle(id)}
+      >
+        {id}
+      </button>
+    ) : (
+      <span className="pick-box">{id}</span>
+    );
   return (
     <div className="screen-body wide" data-testid="trace-lens">
       <LensTabs worldId={worldId} current="trace" />
@@ -32,7 +55,13 @@ export function S_11({ params }: ScreenProps) {
               t.latency_ms !== null ? `${t.latency_ms} ms` : null,
             ].filter((part) => part !== null);
             return (
-              <li key={e.seq} data-testid="trace-lens-row" data-event-type={e.type}>
+              <li
+                key={e.seq}
+                data-testid="trace-lens-row"
+                data-event-type={e.type}
+                data-seq={e.seq}
+                data-selected={selected !== null && involves(e, selected)}
+              >
                 <div className="trace-top">
                   <span className="trace-seq">{e.seq}</span>
                   <span className="trace-time">{elapsed(events, e)}</span>
@@ -41,7 +70,7 @@ export function S_11({ params }: ScreenProps) {
                 </div>
                 <div className="trace-meta">
                   <span>
-                    {e.actor} → {e.target}
+                    {pick(e.actor)} → {pick(e.target)}
                   </span>
                   {call.length > 0 && <span>{call.join(" · ")}</span>}
                   <span>

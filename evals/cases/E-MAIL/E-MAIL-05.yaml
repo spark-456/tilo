@@ -9,8 +9,7 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding clarification needed: po #8821 grade 316
-    vs standard stainless'
+  task: 'Triage incoming email regarding clarification needed: po #8821 grade 316 vs standard stainless'
   thread:
     thread_id: thread-e-mail-05
     subject: 'Clarification needed: PO #8821 grade 316 vs standard stainless'
@@ -22,17 +21,19 @@ inputs:
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: 'Clarification needed: PO #8821 grade 316 vs standard stainless'
-      body: 'Good morning Harborview purchasing, on PO #8821 line item 4 you specified
-        200 units of 1/2-inch lag bolts. Our warehouse has both standard 304 and marine-grade
-        316 stainless in stock. 316 is recommended for saltwater submersion. Please
-        confirm which specification to pack so we can ship today.'
+      body: 'Good morning Harborview purchasing, on PO #8821 line item 4 you specified 200 units of 1/2-inch
+        lag bolts. Our warehouse has both standard 304 and marine-grade 316 stainless in stock. 316 is
+        recommended for saltwater submersion. Please confirm which specification to pack so we can ship
+        today.'
 ground_truth:
   category: needs_reply
   priority: high
-  reason: Supplier order hold requiring specification confirmation before shipment
-    can proceed.
+  reason: Supplier order hold requiring specification confirmation before shipment can proceed.
 checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

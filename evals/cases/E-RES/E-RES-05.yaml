@@ -34,4 +34,14 @@ checks:
   args:
     field: fluxpoint_team_monthly
     tolerance: 0
+- check: groundedness
+  kind: autorater
+  args:
+    field: citations
+    sources:
+    - http://sandbox-web.example/s/ledgerly/pricing
+    - http://sandbox-web.example/s/beacontrack/pricing
+    - http://sandbox-web.example/s/fluxpoint/pricing
 recording: null
+notes: 'EV-05 groundedness check is declared as kind: autorater (reported as pending by the replay runner
+  until live autorater grading or recordings land).'

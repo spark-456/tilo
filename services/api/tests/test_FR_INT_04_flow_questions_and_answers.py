@@ -45,7 +45,8 @@ def test_FR_INT_04_flow_answer_updates_the_brief_and_skip_records_the_assumption
     brief = response.json()["brief"]
     assert brief["audience"] == "The board"
     skipped = by_field["deadline"]
-    assert {"question": skipped["text"], "assumed": skipped["suggested_answers"][0]} in brief["assumptions"]
+    assumed = f"Deadline: {skipped['suggested_answers'][0]}"  # "Label: value", BQ-97
+    assert {"question": skipped["text"], "assumed": assumed} in brief["assumptions"]
     assert not errors_for(load_schema(repo_root, "brief"), brief, registry)
 
 
