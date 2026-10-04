@@ -223,8 +223,8 @@ export function App() {
           {world.active && (
             <>
               <h2>Trace</h2>
-              {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region focusable for axe */}
-              <ul className="trace-list" data-testid="trace-list" tabIndex={0} aria-label="Trace">
+              {/* biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be keyboard reachable (WCAG 2.1.1, axe scrollable-region-focusable). */}
+              <ul className="trace-list" data-testid="trace-list" aria-label="Trace" tabIndex={0}>
                 {world.trace.length > TRACE_ROWS && (
                   <li>
                     Showing the latest {TRACE_ROWS} of {world.trace.length} events.
