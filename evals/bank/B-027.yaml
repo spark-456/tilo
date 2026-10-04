@@ -1,0 +1,125 @@
+id: B-027
+domain: support
+shapes:
+- attachment
+- parallel_units
+title: Group support tickets by theme and propose fixes
+brief: The attached file has 12 support ticket summaries. Group them by theme, count each theme, and propose the
+  three fixes that would remove the most tickets.
+director:
+  brief:
+    goal: Group support tickets by theme with counts and propose the three highest-impact fixes.
+    deliverables:
+    - title: Theme report
+      format: markdown
+    audience: Support lead
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: analyse
+      title: Theme tickets 1 to 4
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: analyse
+      title: Theme tickets 5 to 8
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U3
+      unit_type: analyse
+      title: Theme tickets 9 to 12
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U4
+      unit_type: analyse
+      title: Merge the themes and count
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+      - U2
+      - U3
+    - id: U5
+      unit_type: draft
+      title: Write the report with three fixes
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U4
+    - id: U6
+      unit_type: verify
+      title: Check the counts
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U5
+    - id: U7
+      unit_type: deliver
+      title: Save the report to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U6
+expect:
+  outcome: completed
+files:
+- name: tickets.csv
+  text: 'id,summary
+
+    1,Cannot reset password
+
+    2,Invoice shows wrong VAT
+
+    3,App crashes on upload
+
+    4,Password reset email slow
+
+    5,Export missing columns
+
+    6,Cannot reset password
+
+    7,Invoice shows wrong VAT
+
+    8,Upload fails over 10MB
+
+    9,Reset link expired
+
+    10,Export missing columns
+
+    11,Invoice shows wrong VAT
+
+    12,Upload fails over 10MB
+
+    '

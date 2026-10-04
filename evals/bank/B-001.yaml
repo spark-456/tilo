@@ -1,0 +1,66 @@
+id: B-001
+domain: research
+shapes:
+- single_deliverable
+- deep_chain
+title: Summarise the licence terms of six dependencies
+brief: 'Our app depends on six open-source libraries (the list is below). For each one, summarise the licence in
+  plain words and flag anything that could restrict selling the app commercially. Libraries: lodash, left-pad, sqlite,
+  ffmpeg, openssl, a GPL-licensed PDF toolkit.'
+director:
+  brief:
+    goal: Summarise the licence of six dependencies and flag commercial-use restrictions.
+    deliverables:
+    - title: Licence summary
+      format: markdown
+    audience: Engineering lead
+    deadline: null
+    constraints:
+    - Plain language
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Find each library's licence text
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: analyse
+      title: Classify the terms and restrictions
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write the summary
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+    - id: U4
+      unit_type: verify
+      title: Check each claim against the licence
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U3
+expect:
+  outcome: completed

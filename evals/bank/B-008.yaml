@@ -1,0 +1,110 @@
+id: B-008
+domain: marketing
+shapes:
+- long_brief
+- multi_deliverable
+title: Repositioning pack for a textiles brand (long brief)
+brief: 'Background: Fennel & Co. sells reusable kitchen textiles, founded by two sisters in 2019, mostly through
+  its own site and two craft fairs a year. Our customers are home cooks aged 28 to 55 who care about waste. We are
+  repositioning from ''cute and handmade'' to ''built to last, repairable for life''. Background: Fennel & Co. sells
+  reusable kitchen textiles, founded by two sisters in 2019, mostly through its own site and two craft fairs a year.
+  Our customers are home cooks aged 28 to 55 who care about waste. We are repositioning from ''cute and handmade''
+  to ''built to last, repairable for life''. Background: Fennel & Co. sells reusable kitchen textiles, founded by
+  two sisters in 2019, mostly through its own site and two craft fairs a year. Our customers are home cooks aged
+  28 to 55 who care about waste. We are repositioning from ''cute and handmade'' to ''built to last, repairable
+  for life''. Background: Fennel & Co. sells reusable kitchen textiles, founded by two sisters in 2019, mostly through
+  its own site and two craft fairs a year. Our customers are home cooks aged 28 to 55 who care about waste. We are
+  repositioning from ''cute and handmade'' to ''built to last, repairable for life''. Background: Fennel & Co. sells
+  reusable kitchen textiles, founded by two sisters in 2019, mostly through its own site and two craft fairs a year.
+  Our customers are home cooks aged 28 to 55 who care about waste. We are repositioning from ''cute and handmade''
+  to ''built to last, repairable for life''. Please produce (1) a one-page positioning statement, (2) a messaging
+  grid with three audiences and three claims each, and (3) a list of ten proof points we can honestly make today.
+  Constraints: no superlatives we cannot back up, no claims about sustainability certifications we do not hold,
+  British spelling.'
+director:
+  brief:
+    goal: 'Reposition a reusable-textiles brand: positioning statement, messaging grid, ten honest proof points.'
+    deliverables:
+    - title: Positioning statement
+      format: docx
+    - title: Messaging grid
+      format: xlsx
+    - title: Proof points
+      format: markdown
+    audience: Founders
+    deadline: null
+    constraints:
+    - No unprovable superlatives
+    - No certification claims
+    - British spelling
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Read the brief and brand facts
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Write the positioning statement
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Build the messaging grid
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U4
+      unit_type: analyse
+      title: List the ten proof points
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U5
+      unit_type: verify
+      title: Check every claim is backed
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+      - U3
+      - U4
+    - id: U6
+      unit_type: deliver
+      title: Save the pack to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U5
+expect:
+  outcome: completed

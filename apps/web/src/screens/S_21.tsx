@@ -6,6 +6,7 @@
 // cards and rows after "Tilo Worlds.dc.html", neutral role tokens (design/source/INDEX.md, S-21).
 import type { Event } from "@tilo/contracts";
 import { useClient } from "../api/ClientProvider";
+import { withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
 import { Placeholder } from "./Placeholder";
 import { Chip, EmptyState, Page, Row, Section, Stats, field, useFixtureRun, words } from "./kit";
@@ -59,7 +60,7 @@ export function S_21() {
             testid="history-empty"
             title="No artifact yet"
             line="No artifact has been recorded yet. Each version appears here as it is made."
-            action={{ label: "Open the library", to: "/library" }}
+            action={{ label: "Open the library", to: withWorld("/library", worldId) }}
           />
         ) : (
           <ul className="blist" data-testid="artifact-rows">

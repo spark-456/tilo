@@ -149,11 +149,24 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
     expect(calls).toHaveLength(0);
   });
 
+  // A row as an up-to-date server stores it (CL-INT-4): the client hands on only whole rows.
+  const row = (type: string, seq: number, world = "w1") => ({
+    v: "1.0",
+    id: `e${seq}`,
+    seq,
+    type,
+    world_id: world,
+    run_id: "r1",
+    item: null,
+  });
+  const eventsOf = (world: string, ...types: string[]) =>
+    json({ events: types.map((t, i) => row(t, i + 1, world)) });
+  const events = (...types: string[]) => eventsOf("w1", ...types);
+
   it("FR-WLD-05 getLayout reads the events first and asks for the layout only once world.started is on record", async () => {
-    const started = { events: [{ id: "e1", seq: 1, type: "world.started" }] };
     const { calls, fetch } = script(
-      json({ events: [{ id: "e0", seq: 1, type: "budget.granted" }] }),
-      json(started),
+      eventsOf("w 1", "budget.granted"),
+      eventsOf("w 1", "budget.granted", "world.started"),
       json(LAYOUT_VILLAGE_BASIC),
     );
     const c = client(fetch, 1);
@@ -166,10 +179,7 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
   });
 
   it("FR-WLD-05 getLayout keeps a built layout and shares one call per world", async () => {
-    const { calls, fetch } = script(
-      json({ events: [{ id: "e1", seq: 1, type: "world.started" }] }),
-      json(LAYOUT_VILLAGE_BASIC),
-    );
+    const { calls, fetch } = script(events("world.started"), json(LAYOUT_VILLAGE_BASIC));
     const c = client(fetch, 1);
     const [a, b] = await Promise.all([c.getLayout("w1"), c.getLayout("w1")]);
     expect(a).toBe(b);
@@ -178,16 +188,15 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
   });
 
   it("FR-WLD-05 getLayout polls a 404 for a moment, then says the world is not built", async () => {
-    const started = json({ events: [{ id: "e1", seq: 1, type: "world.started" }] });
     const { calls, fetch } = script(
-      started,
+      events("world.started"),
       json({ detail: "Not Found" }, 404),
       json(LAYOUT_VILLAGE_BASIC),
     );
     await expect(client(fetch, 1).getLayout("w1")).resolves.toBeDefined();
     expect(calls).toHaveLength(3);
     const never = script(
-      json({ events: [{ id: "e1", seq: 1, type: "world.started" }] }),
+      events("world.started"),
       ...Array.from({ length: 5 }, () => json({ detail: "Not Found" }, 404)),
     );
     await expect(client(never.fetch, 1).getLayout("w1")).rejects.toMatchObject({
@@ -197,7 +206,7 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
   });
 
   it("FR-WLD-05 getLayout rejects plainly when the run failed before it built a world, and a retry asks again", async () => {
-    const failed = script(json({ events: [{ id: "e1", seq: 1, type: "world.failed" }] }));
+    const failed = script(events("world.failed"));
     const c = client(failed.fetch, 1);
     await expect(c.getLayout("w1")).rejects.toMatchObject({ retryable: false });
     expect(failed.calls).toHaveLength(1);
@@ -206,11 +215,173 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
   });
 
   it("FR-WLD-05 getLayout refuses a reply that is not a layout", async () => {
-    const { fetch } = script(
-      json({ events: [{ id: "e1", seq: 1, type: "world.started" }] }),
-      json({ nothing: true }),
-    );
+    const { fetch } = script(events("world.started"), json({ nothing: true }));
     await expect(client(fetch, 1).getLayout("w1")).rejects.toMatchObject({ retryable: true });
+  });
+
+  it("FR-WLD-05 an unknown world: one 404 from the events, polling stops, getLayout rejects without asking again", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, fetch } = script(json({ detail: "Not Found" }, 404));
+      const c = client(fetch, 1);
+      const errors: Array<number | null> = [];
+      const stop = c.subscribeEvents(
+        "nope",
+        () => undefined,
+        (e) => errors.push(e.status),
+      );
+      const layout = c.getLayout("nope").catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(errors).toEqual([404]);
+      expect(await layout).toMatchObject({ status: 404, retryable: false });
+      expect(calls).toHaveLength(1); // the page's subscription is the only request
+      expect(vi.getTimerCount()).toBe(0);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("FR-WLD-05 getLayout waits on the page's own subscription: no events request and no timer of its own", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, fetch } = script(
+        events("budget.granted"),
+        events("budget.granted", "world.started"),
+        json(LAYOUT_VILLAGE_BASIC),
+      );
+      const c = client(fetch, 1000);
+      const stop = c.subscribeEvents("w1", () => undefined);
+      const layout = c.getLayout("w1");
+      await vi.advanceTimersByTimeAsync(1000);
+      await expect(layout).resolves.toBeDefined();
+      expect(calls.map((x) => x.url.split("/").pop())).toEqual(["events", "events", "layout"]);
+      stop();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("FR-WLD-05 a getLayout nobody awaits leaves no timer behind once it ends", async () => {
+    vi.useFakeTimers();
+    try {
+      const { fetch } = script(events("world.started"), json(LAYOUT_VILLAGE_BASIC));
+      await client(fetch, 1000).getLayout("w1");
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  describe("#264 getLayout stops polling when the pages asking for it let go", () => {
+    /** A run that never starts: every events poll is empty, so getLayout waits on it. */
+    const stuck = () => {
+      const urls: string[] = [];
+      const fetch = vi.fn(async (url: string | URL | Request) => {
+        urls.push(String(url));
+        return json({ events: [] });
+      }) as unknown as typeof globalThis.fetch;
+      return { urls, fetch };
+    };
+
+    it("aborting the only caller ends the events polling and the wait", async () => {
+      vi.useFakeTimers();
+      try {
+        const { urls, fetch } = stuck();
+        const c = client(fetch, 1000);
+        const stop = new AbortController();
+        const layout = c.getLayout("w1", stop.signal).catch((e: unknown) => e);
+        await vi.advanceTimersByTimeAsync(3000);
+        const before = urls.length;
+        expect(before).toBeGreaterThan(1);
+        stop.abort();
+        await expect(layout).resolves.toBeInstanceOf(TiloApiError);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(urls).toHaveLength(before);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a second caller keeps the shared wait alive until it lets go too", async () => {
+      vi.useFakeTimers();
+      try {
+        const { urls, fetch } = stuck();
+        const c = client(fetch, 1000);
+        const first = new AbortController();
+        const second = new AbortController();
+        const a = c.getLayout("w1", first.signal);
+        const b = c.getLayout("w1", second.signal);
+        expect(a).toBe(b);
+        first.abort();
+        await vi.advanceTimersByTimeAsync(3000);
+        const mid = urls.length;
+        expect(mid).toBeGreaterThan(2); // still polling for the second
+        second.abort();
+        await expect(b).rejects.toBeInstanceOf(TiloApiError);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(urls).toHaveLength(mid);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a call after the last one let go starts afresh, and stopping the old one does not end it", async () => {
+      vi.useFakeTimers();
+      try {
+        const { fetch } = script(events(), events("world.started"), json(LAYOUT_VILLAGE_BASIC));
+        const c = client(fetch, 1000);
+        const gone = new AbortController();
+        const old = c.getLayout("w1", gone.signal).catch((e: unknown) => e);
+        gone.abort();
+        await old;
+        const fresh = c.getLayout("w1", new AbortController().signal);
+        await vi.advanceTimersByTimeAsync(1000);
+        await expect(fresh).resolves.toBeDefined();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a signal that is already aborted asks for nothing", async () => {
+      const { urls, fetch } = stuck();
+      const c = client(fetch, 1);
+      const stop = new AbortController();
+      stop.abort();
+      await expect(c.getLayout("w1", stop.signal)).rejects.toBeInstanceOf(TiloApiError);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(urls).toEqual([]);
+    });
+  });
+
+  it("#264 a world that answered 404 is known again once a later poll finds it", async () => {
+    const { fetch } = script(json({ detail: "Not Found" }, 404), events("world.started"));
+    const c = client(fetch, 1);
+    c.subscribeEvents(
+      "w1",
+      () => undefined,
+      () => undefined,
+    );
+    await vi.waitFor(() => expect(c.isWorldMissing("w1")).toBe(true));
+    const seen = vi.fn();
+    c.onWorldMissing(seen);
+    const stop = c.subscribeEvents("w1", () => undefined);
+    await vi.waitFor(() => expect(c.isWorldMissing("w1")).toBe(false));
+    expect(seen).toHaveBeenCalled();
+    stop();
+  });
+
+  it("#258 getApproaches calls that overlap share one request; a later call asks again", async () => {
+    const reply = { task_id: "t1", approaches: [], recommended: "a", credit_usd: 1 };
+    const { calls, fetch } = script(json(reply), json(reply));
+    const c = client(fetch);
+    const [a, b] = await Promise.all([c.getApproaches("t1"), c.getApproaches("t1")]);
+    expect(a).toBe(b);
+    expect(calls).toHaveLength(1);
+    await c.getApproaches("t1");
+    expect(calls).toHaveLength(2);
   });
 });
 

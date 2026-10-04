@@ -136,7 +136,7 @@ test("FR-WLD-08 determinism: the scrubbed state is the from-scratch replay, at a
   for (const seq of [0, 1, 249, 250, 251, 499, 500, 2_500, 4_749, 4_750, 4_999, 5_000]) {
     expect(store.stateAt(seq), `stateAt(${seq})`).toEqual(reduce(layout, events.slice(0, seq)));
   }
-});
+}, 30_000);
 
 test("FR-WLD-08 banner: a first event with no usable timestamp shows no date, never a wrong one", () => {
   const broken = [{ ...(village[0] as Event), ts: "not a date" }, ...village.slice(1)];

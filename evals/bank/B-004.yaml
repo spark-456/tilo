@@ -1,0 +1,106 @@
+id: B-004
+domain: operations
+shapes:
+- multi_deliverable
+- gated_save
+- parallel_units
+title: Saturday warehouse stock-count plan
+brief: 'Plan the Saturday inventory count for the east warehouse: who counts which aisles, the order of work, and
+  a printable checklist per team. 12 people, doors open 7 to 3. I want the plan and the checklists as separate files
+  in Drive.'
+director:
+  brief:
+    goal: Plan the Saturday east-warehouse stock count with aisle assignments and per-team checklists.
+    deliverables:
+    - title: Count plan
+      format: docx
+    - title: Team checklists
+      format: xlsx
+    audience: Warehouse supervisors
+    deadline: null
+    constraints:
+    - 12 people
+    - 7:00 to 15:00
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: analyse
+      title: Split the aisles between teams
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: analyse
+      title: Order the work by zone
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U3
+      unit_type: draft
+      title: Write the count plan
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+      - U2
+    - id: U4
+      unit_type: draft
+      title: Build the team checklists
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+      - U2
+    - id: U5
+      unit_type: verify
+      title: Check every aisle is covered once
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U3
+      - U4
+    - id: U6
+      unit_type: deliver
+      title: Save the plan to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U5
+    - id: U7
+      unit_type: deliver
+      title: Save the checklists to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U5
+expect:
+  outcome: completed

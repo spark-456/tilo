@@ -1,0 +1,42 @@
+id: B-012
+domain: finance
+shapes:
+- director_fails
+title: The Director cannot propose approaches
+brief: Estimate how many months of runway we have if revenue stays flat and payroll grows 4% a quarter.
+director:
+  brief:
+    goal: Estimate months of runway with flat revenue and payroll growing 4% a quarter.
+    deliverables:
+    - title: Runway estimate
+      format: markdown
+    audience: Not specified
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: null
+  plan:
+    units:
+    - id: U1
+      unit_type: analyse
+      title: Model the runway
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Write the estimate
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+expect:
+  outcome: refused
