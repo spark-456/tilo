@@ -9,8 +9,7 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding urgent: emergency haul out and hull repair
-    tomorrow morning'
+  task: 'Triage incoming email regarding urgent: emergency haul out and hull repair tomorrow morning'
   thread:
     thread_id: thread-e-mail-02
     subject: 'URGENT: Emergency haul out and hull repair tomorrow morning'
@@ -23,17 +22,19 @@ inputs:
       - sarah.chen@harborview.example
       date: '2026-10-02T08:00:00Z'
       subject: 'URGENT: Emergency haul out and hull repair tomorrow morning'
-      body: Sarah, we struck a submerged deadhead near the marina breakwater 30 minutes
-        ago. Bilge pumps are keeping up but hull has a hairline fracture near the
-        starboard transducer. Can you haul us out tomorrow morning at 07:00 before
-        the low tide window closes? Please call or reply immediately.
+      body: Sarah, we struck a submerged deadhead near the marina breakwater 30 minutes ago. Bilge pumps
+        are keeping up but hull has a hairline fracture near the starboard transducer. Can you haul us
+        out tomorrow morning at 07:00 before the low tide window closes? Please call or reply immediately.
 ground_truth:
   category: needs_reply
   priority: high
-  reason: Time-sensitive client emergency requiring immediate confirmation of haul-out
-    slot and repair availability.
+  reason: Time-sensitive client emergency requiring immediate confirmation of haul-out slot and repair
+    availability.
 checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

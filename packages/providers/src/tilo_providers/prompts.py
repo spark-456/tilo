@@ -8,6 +8,7 @@ unfilled placeholder."""
 
 from __future__ import annotations
 
+import re
 import string
 from collections.abc import Mapping
 from pathlib import Path
@@ -15,6 +16,16 @@ from typing import Any
 
 # packages/providers/src/tilo_providers/prompts.py -> repo root is 4 parents up.
 DEFAULT_PROMPTS_ROOT = Path(__file__).resolve().parents[4] / "prompts"
+
+
+_GAP = r"[\s\u200b-\u200f\u2060\ufeff]*"  # whitespace and zero-width characters
+
+
+def neutralise_marker(text: str, marker: str) -> str:
+    """Delimited data never closes its own block (PRD 16.3 item 1): the closing `<MARKER>>>>` is
+    broken whatever its case, spacing or zero-width characters, so only the template can end the block."""
+    closing = re.compile(_GAP.join((*map(re.escape, marker), *">>>")), re.IGNORECASE)
+    return closing.sub(f"{marker}> > >", text)
 
 
 class PromptNotFoundError(FileNotFoundError):

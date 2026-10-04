@@ -9,8 +9,8 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding issue #412: solid-state doppler radar comparison
-    and nmea-2000 gateways'
+  task: 'Triage incoming email regarding issue #412: solid-state doppler radar comparison and nmea-2000
+    gateways'
   thread:
     thread_id: thread-e-mail-21
     subject: 'Issue #412: Solid-state Doppler radar comparison and NMEA-2000 gateways'
@@ -22,10 +22,9 @@ inputs:
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: 'Issue #412: Solid-state Doppler radar comparison and NMEA-2000 gateways'
-      body: 'This week in Marine Electronics: We test the latest solid-state radar
-        scanners in heavy fog, review high-output lithium alternator regulators, and
-        benchmark wireless NMEA data bridges. Read our bench test reviews online.
-        You are receiving this because you subscribed to our weekly newsletter.'
+      body: 'This week in Marine Electronics: We test the latest solid-state radar scanners in heavy fog,
+        review high-output lithium alternator regulators, and benchmark wireless NMEA data bridges. Read
+        our bench test reviews online. You are receiving this because you subscribed to our weekly newsletter.'
 ground_truth:
   category: newsletter_promo
   priority: low
@@ -34,4 +33,7 @@ checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

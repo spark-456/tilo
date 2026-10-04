@@ -17,7 +17,7 @@ dev:
     pnpm --filter @tilo/web run dev
 
 dev-api:
-    uv run --package tilo-api uvicorn tilo_api:app --reload --port 8080
+    uv run --package tilo-api python -m tilo_api
 
 # Regenerate apps/web design tokens from design/tokens.json (drift-tested).
 tokens:

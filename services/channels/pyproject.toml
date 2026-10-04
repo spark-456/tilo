@@ -3,7 +3,10 @@ name = "tilo-channels"
 version = "0.1.0"
 description = "tilo_channels — WhatsApp webhook, keywords, channel adapters (PRD 6.2, 11)"
 requires-python = "==3.12.*"
-dependencies = []
+dependencies = ["tilo-providers"]
+
+[tool.uv.sources]
+tilo-providers = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

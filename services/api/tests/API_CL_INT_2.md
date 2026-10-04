@@ -14,7 +14,7 @@ Every route needs the signed-in `deps.Principal`; the world routes also need `pr
 **starts one run** for the task. The run may execute inline or on a background thread; the tests poll the stream,
 so both are fine. A run that cannot start never changes the approve response.
 
-1. Compile: `plan = compiler(brief=task.brief, approach=<the chosen approach dict>, budget_cap=<the cap>)`.
+1. Compile: `plan = compiler(brief=task.brief, approach=<the chosen approach dict>, budget_cap=<the cap>, context=<PlanInputs: approaches, owner, skills, connectors, risk table, policies; FR-INT-09>)`.
 2. Validate: `tilo_planning.plangraph.validate_plan(plan, risk_table=..., connectors={id: record}, skills=<set of
    skill ids>, policies=..., owner=<the world owner>)`. Any violation, or a compiler that raises: **no run starts**.
    Nothing is written except, at most, one `world.failed`; no agent, artifact or approval event; no outbox entry; no
@@ -81,7 +81,7 @@ install either, so `get_card_store`-style seams are the builder's choice. The Ca
 All callables are called with keyword arguments exactly as shown. Not set up in a CL-INT-1 test: approve must
 still work there (the run just does not start or fails alone).
 
-- `deps.get_plan_compiler()` -> `compile(*, brief: dict, approach: dict, budget_cap: float) -> dict` (a PlanGraph,
+- `deps.get_plan_compiler()` -> `compile(*, brief: dict, approach: dict, budget_cap: float, context: PlanInputs) -> dict` (a PlanGraph,
   `plan.schema.json`). Default: the Director through `deps.get_router`.
 - `deps.get_layout_builder()` -> `layout_for(plan: dict, *, world_id: str) -> dict`. Default: a deterministic
   builder (one Director, a Lead per district, workers by role, a workshop per district, an island per connector, a

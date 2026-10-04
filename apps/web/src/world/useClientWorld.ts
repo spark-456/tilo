@@ -17,12 +17,6 @@ export interface ClientWorldState {
   readonly onWorld: WorldSeam;
 }
 
-/** `?seq=N` shows the run as it stood at seq N, the same jump the fixture replay offers (HR-6). */
-function seqParam(): number | null {
-  const raw = new URLSearchParams(window.location.search).get("seq");
-  return raw !== null && Number.isFinite(Number(raw)) ? Number(raw) : null;
-}
-
 export function useClientWorld(worldId: string | null): ClientWorldState {
   const client = useClient();
   const reducedMotion = useRef(false);
@@ -45,7 +39,6 @@ export function useClientWorld(worldId: string | null): ClientWorldState {
             requestRender,
             size,
             layout,
-            seqParam: seqParam(),
             watch: (onEvent) => watchRun(client, worldId, onEvent),
             reducedMotion: () => reducedMotion.current,
             onSeq: (n) => !cancelled && setSeq(n),
