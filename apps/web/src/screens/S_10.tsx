@@ -4,13 +4,14 @@
 import type { Severity } from "@tilo/contracts";
 import { useClient, useIsFixtureClient } from "../api/ClientProvider";
 import { isKnownType } from "../world/registry";
-import { useReplayedLog } from "../world/replay";
-import { elapsed } from "../world/runLog";
-import { agentNames, worldStatus } from "../world/runSummary";
+import { useReplayPoint, useReplayedLog } from "../world/replay";
+import { elapsed, useRunLog } from "../world/runLog";
+import { agentNames, runEnded, worldStatus } from "../world/runSummary";
 import { involves, useSelection } from "../world/selection";
 import { LensTabs } from "./LensTabs";
 import { useRemote } from "./remote";
 import type { ScreenProps } from "./routes";
+import { useStoryAnnouncement } from "./storyAnnounce";
 
 /** A text label for every severity that is not routine, so colour never carries it alone. */
 export const SEVERITY_LABEL: Partial<Record<Severity, string>> = {
@@ -34,6 +35,14 @@ export function S_10({ params }: ScreenProps) {
   // The rows wait for the layout (ready or failed) so the who-chips never arrive after them and
   // push the text about (CLS); a failed layout still shows the story, without chips.
   const settled = layout.status !== "loading";
+  // Only events that arrive live are news. A fixture, a scrubbed moment (a replay point is set) and
+  // a run that has ended are replays of what is already recorded, so none of them announces.
+  const replayPoint = useReplayPoint(worldId);
+  const ended = runEnded(worldStatus(useRunLog(client, worldId)));
+  const announced = useStoryAnnouncement(
+    story,
+    settled && !fixture && replayPoint === null && !ended,
+  );
   return (
     <div className="screen-body wide" data-testid="story-lens">
       <LensTabs worldId={worldId} current="story" />
@@ -52,8 +61,11 @@ export function S_10({ params }: ScreenProps) {
       ) : story.length === 0 ? (
         <p>Nothing has happened yet. The story fills in as events arrive.</p>
       ) : (
-        <div role="log" aria-label="What happened, in order">
-          <ol className="story-list">
+        <div>
+          <output className="sr-only" aria-live="polite" aria-atomic="true">
+            {announced}
+          </output>
+          <ol className="story-list" aria-label="What happened, in order">
             {story.map((e) => (
               <li
                 key={e.seq}

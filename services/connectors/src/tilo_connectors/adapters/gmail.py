@@ -57,9 +57,12 @@ class GmailAdapter(GoogleAdapter):
         body = self._get(user_id, self._scopes("read"), f"/threads/{checked_id(thread_id)}", {"format": "full"})
         return {"id": str(body.get("id", thread_id)), "messages": [_message(m) for m in body.get("messages") or []]}
 
-    def get_message(self, user_id: str, message_id: str) -> dict[str, Any]:
-        path = f"/messages/{checked_id(message_id)}"
-        return _message(self._get(user_id, self._scopes("read"), path, {"format": "full"}))
+    def get_message(self, user_id: str, message_id: str, *, headers: Iterable[str] | None = None) -> dict[str, Any]:
+        """The message; with `headers`, only those headers come back (format=metadata: no body leaves Google)."""
+        params: dict[str, Any] = {"format": "full"}
+        if headers is not None:
+            params = {"format": "metadata", "metadataHeaders": [str(h) for h in headers]}
+        return _message(self._get(user_id, self._scopes("read"), f"/messages/{checked_id(message_id)}", params))
 
     def list_labels(self, user_id: str) -> list[dict[str, Any]]:
         labels = self._get(user_id, self._scopes("read"), "/labels").get("labels") or []
@@ -310,6 +313,7 @@ def _message(resource: Mapping[str, Any]) -> dict[str, Any]:
         "id": str(resource.get("id", "")),
         "thread_id": str(resource.get("threadId", "")),
         "from": headers.get("from", ""),
+        "date": headers.get("date", ""),
         "to": _addresses(headers.get("to", "")),
         "cc": _addresses(headers.get("cc", "")),
         "subject": headers.get("subject", ""),

@@ -36,6 +36,7 @@ class InMemoryOutboxStore:
         self._pending_alerts: dict[str, tuple[str, dict]] = {}  # outbox_id -> (world_id, alert part)
         self._retries: dict[str, dict] = {}  # id -> retry_state(); store-side, never in the contract entry
         self._alerted: set[str] = set()  # outbox ids whose alert.raised is already written: once per entry
+        self._revoked: set[tuple[str, str]] = set()  # (world_id, key) never to be created; never pruned (CHN-GATE-A)
 
     def get(self, outbox_id: str | None) -> dict | None:
         with self._lock:
@@ -61,7 +62,7 @@ class InMemoryOutboxStore:
     def _insert_if_absent(self, entry: dict) -> bool:  # OB-03: neither id nor key already stored
         with self._lock:
             key = (entry["world_id"], entry["idempotency_key"])
-            if entry["id"] in self._by_id or key in self._by_key:
+            if entry["id"] in self._by_id or key in self._by_key or key in self._revoked:
                 return False
             copied = deepcopy(entry)
             self._by_id[copied["id"]] = copied
@@ -73,6 +74,16 @@ class InMemoryOutboxStore:
             if (entry := self._by_id.get(outbox_id)) is None or entry["state"] != "scheduled":
                 return None
             entry["state"] = "cancelled"
+            return deepcopy(entry)
+
+    def _revoke(self, world_id: str, idempotency_key: str) -> dict | None:  # for Outbox.revoke; never creates an entry
+        with self._lock:
+            if (outbox_id := self._by_key.get((world_id, idempotency_key))) is None:
+                self._revoked.add((world_id, idempotency_key))  # _insert_if_absent refuses the key from now on
+                return None
+            entry = self._by_id[outbox_id]
+            if entry["state"] == "scheduled":
+                entry["state"] = "cancelled"
             return deepcopy(entry)
 
     def _abandon(self, outbox_id: str, now: str) -> dict | None:  # unsent, no live lease -> failed, for Outbox.abandon
