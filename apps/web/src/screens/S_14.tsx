@@ -4,13 +4,13 @@
 // design/source "Tilo Worlds.dc.html": title, primary "New task" top right, a filter bar, then
 // world cards with a preview, a size tag and a state pill on it, a title, progress and a footer.
 // The filters are placeholders. The preview is a static drawing, not the renderer.
-import { useClient } from "../api/ClientProvider";
+import { useClient, useWorldKnown } from "../api/ClientProvider";
 import { reduce } from "../world/reducer";
 import { creditsUsed } from "../world/runLog";
 import { budgetCap, worldStatus } from "../world/runSummary";
 import { AppLink } from "./AppLink";
 import { Loaded, Primary } from "./FlowShell";
-import { Chip, Page, Soon, field, longDate, plural, useFixtureRun, words } from "./kit";
+import { Chip, EmptyState, Page, Soon, field, longDate, plural, useFixtureRun, words } from "./kit";
 import { useAction, useRemote } from "./remote";
 
 /** A static isometric block, in neutral role tokens: a thumbnail, not a render of the world. */
@@ -34,6 +34,7 @@ const STATUS = {
 export function S_14() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
+  const known = useWorldKnown(worldId); // false: the client has no world to list
   const [layout, retry] = useRemote("load the worlds", () => client.getLayout(worldId));
   const newTask = useAction("start a new task", async () => "/");
   const first = events[0];
@@ -52,50 +53,61 @@ export function S_14() {
     >
       <Soon className="filter-bar" labels={["Search worlds", "Filter by status"]} />
       <div className="world-grid">
-        <Loaded what="the worlds" remote={layout} retry={retry} isEmpty={() => false}>
-          {(l) => {
-            const levels = l.semantic.levels.length;
-            const done = Object.values(reduce(l, events).levels).filter((v) => v.completed).length;
-            return (
-              <article className="world-card" data-testid="world-card">
-                <div className="world-thumb">
-                  <Thumb />
-                  <Chip tone="fyi">
-                    {words(l.tier)} · {plural(levels, "level")}
-                  </Chip>
-                  <Chip tone={tone}>{label}</Chip>
-                </div>
-                <div className="world-body">
-                  <h2>{first ? String(field(first, "title")) : "Waiting for the recording"}</h2>
-                  <p className="bitem-sub">
-                    {plural(l.semantic.agents.length, "agent")} on the team · {done} of{" "}
-                    {plural(levels, "level")} finished
-                  </p>
-                  <progress max={levels} value={done} aria-label="Levels finished" />
-                  <p className="card-foot">
-                    <span>
-                      {cap === null ? `${used} credits used` : `${used} of ${cap} credits used`}
-                    </span>
-                    <span>{first ? longDate(first.ts) : "Not started"}</span>
-                  </p>
-                  <p className="bitem-sub" data-testid="replay-note">
-                    {first
-                      ? `Replay of run #${first.run_id.replace(/^r_/, "")} recorded ${longDate(first.ts)}. Nothing here is live.`
-                      : "The recorded run has not started playing yet."}
-                  </p>
-                  <div className="soon-row">
-                    <AppLink to={w} className="pill">
-                      Open world
-                    </AppLink>
-                    <AppLink to={`${w}/story`} className="pill">
-                      Replay in Story
-                    </AppLink>
+        {!known ? (
+          <EmptyState
+            testid="worlds-empty"
+            title="No worlds yet"
+            line="Tilo has no world to list yet. Start a task and its world appears here."
+            action={{ label: "Start a task", to: "/" }}
+          />
+        ) : (
+          <Loaded what="the worlds" remote={layout} retry={retry} isEmpty={() => false}>
+            {(l) => {
+              const levels = l.semantic.levels.length;
+              const done = Object.values(reduce(l, events).levels).filter(
+                (v) => v.completed,
+              ).length;
+              return (
+                <article className="world-card" data-testid="world-card">
+                  <div className="world-thumb">
+                    <Thumb />
+                    <Chip tone="fyi">
+                      {words(l.tier)} · {plural(levels, "level")}
+                    </Chip>
+                    <Chip tone={tone}>{label}</Chip>
                   </div>
-                </div>
-              </article>
-            );
-          }}
-        </Loaded>
+                  <div className="world-body">
+                    <h2>{first ? String(field(first, "title")) : "Waiting for the recording"}</h2>
+                    <p className="bitem-sub">
+                      {plural(l.semantic.agents.length, "agent")} on the team · {done} of{" "}
+                      {plural(levels, "level")} finished
+                    </p>
+                    <progress max={levels} value={done} aria-label="Levels finished" />
+                    <p className="card-foot">
+                      <span>
+                        {cap === null ? `${used} credits used` : `${used} of ${cap} credits used`}
+                      </span>
+                      <span>{first ? longDate(first.ts) : "Not started"}</span>
+                    </p>
+                    <p className="bitem-sub" data-testid="replay-note">
+                      {first
+                        ? `Replay of run #${first.run_id.replace(/^r_/, "")} recorded ${longDate(first.ts)}. Nothing here is live.`
+                        : "The recorded run has not started playing yet."}
+                    </p>
+                    <div className="soon-row">
+                      <AppLink to={w} className="pill">
+                        Open world
+                      </AppLink>
+                      <AppLink to={`${w}/story`} className="pill">
+                        Replay in Story
+                      </AppLink>
+                    </div>
+                  </div>
+                </article>
+              );
+            }}
+          </Loaded>
+        )}
       </div>
     </Page>
   );

@@ -116,7 +116,7 @@ describe("AGW-08 S-19 consent requests come only from connection.requested event
 
 describe("AGW-08 S-13 the library follows artifact.delivered", () => {
   it("is empty before seq 41 and lists the deliverable from seq 41", async () => {
-    expect((await text(S_13, 40)).textContent).toContain("Nothing has been delivered yet.");
+    expect((await text(S_13, 40)).textContent).toContain("Nothing delivered yet");
     const after = await text(S_13, 41);
     expect(after.querySelector('[data-testid="library-rows"]')?.textContent).toContain(
       "Triage list",
