@@ -141,9 +141,27 @@ class Outbox:
             raise OutboxRefused(f"{verdict}: entry is not authorised")
         if self._store._insert_if_absent(snapshot):
             return deepcopy(snapshot)
-        winner = self._existing_or_conflict(entry)  # lost a race with a concurrent enqueue
-        assert winner is not None
+        if (winner := self._existing_or_conflict(entry)) is None:  # not a concurrent enqueue: the key was revoked
+            raise OutboxRefused("the idempotency_key was revoked: the outbox never creates it")
         return winner
+
+    def _ours(self, entry: dict | None) -> dict | None:
+        return entry if entry is not None and self._world_id in (None, entry["world_id"]) else None
+
+    def get(self, outbox_id: str) -> dict | None:
+        """Read port (CHN-GATE-A): a copy of the stored entry, or None (also for another world's); never writes."""
+        return self._ours(self._store.get(outbox_id))
+
+    def get_by_idempotency_key(self, world_id: str, idempotency_key: str) -> dict | None:
+        return self._ours(self._store.get_by_idempotency_key(world_id, idempotency_key))
+
+    def revoke(self, world_id: str, idempotency_key: str) -> dict | None:
+        """Never creates an entry (BQ-186). Stored under the key: a scheduled entry is cancelled and the entry returned
+        in whatever state it is in. Nothing stored: the key is recorded as revoked, so no enqueue ever creates it, and
+        None is returned. Atomic against a concurrent enqueue; idempotent; revocations are never pruned."""
+        if self._world_id not in (None, world_id):
+            raise OutboxRefused("cannot revoke a key of another world")
+        return self._store._revoke(world_id, idempotency_key)
 
     def _existing_or_conflict(self, entry: dict) -> dict | None:
         if (existing := self._store.get_by_idempotency_key(entry["world_id"], entry["idempotency_key"])) is not None:
