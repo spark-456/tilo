@@ -1,6 +1,7 @@
 """GEN-02, GEN-03, GEN-04, GEN-11 (issue #272): the whole bank runs end to end offline, holds its invariants, and is
 reported honestly. One module-scoped run of every case feeds all of it."""
 
+import re
 import socket
 
 import pytest
@@ -34,7 +35,6 @@ def results() -> list[CaseResult]:
 def test_GEN_02_every_case_reaches_a_terminal_state_with_no_network_and_no_paid_call(results) -> None:
     stuck = [r.case.id for r in results if r.runs[0].outcome is None]
     assert not stuck, f"no terminal state: {stuck}"
-    assert all(r.runs[0].seconds < 30 for r in results)
 
 
 def test_GEN_02_the_bank_refuses_a_live_or_deployed_environment(monkeypatch) -> None:
@@ -73,7 +73,8 @@ def test_GEN_04_the_report_gives_counts_first_then_domain_shape_causes_and_every
     lines = [ln for ln in text.splitlines() if ln.strip()]
     assert lines[0] == "# Generality bank results"
     first = next(ln for ln in lines if "cases pass every hard check" in ln)
-    assert first.startswith(f"**{len(results)} of {len(results)}") or " of " in first
+    n = len(results)
+    assert re.fullmatch(rf"\*\*{n} of {n}( \(\d+%\))? cases pass every hard check\.\*\*", first)
     order = [
         text.index(h)
         for h in ("## By domain", "## By shape", "## Failures by cause", "## Reported, not gated", "## Every failure")

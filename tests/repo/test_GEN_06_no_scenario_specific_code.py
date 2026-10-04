@@ -5,6 +5,7 @@ exceptions, one line each with a reason; an entry that no longer matches anythin
 """
 
 import ast
+import json
 import os
 import re
 from functools import cache
@@ -24,7 +25,18 @@ TEXT_SUFFIXES = {".py", ".md", ".yaml", ".yml", ".json", ".ts", ".tsx", ".toml"}
 SKIP_PARTS = {"node_modules", ".venv", "__pycache__", "dist", "build"}
 
 # PRD 4.3: a scenario may only use configuration: a skill set, connectors, an autonomy policy, seed data and a theme.
-SCENARIO_KEYS = {"skills", "connectors", "autonomy", "seed", "theme"}
+SCENARIO_SCHEMA = ROOT / "contracts" / "scenario.schema.json"
+# Until contracts/scenario.schema.json (ADR-0014) is on this branch: the keys PRD 4.3 names plus its id and title.
+_PRD_KEYS = {"id", "title", "skills", "connectors", "autonomy", "seed_data", "theme"}
+
+
+def scenario_keys() -> set[str]:
+    """The contract wins: the keys a scenario file may hold are the schema's own properties."""
+    if SCENARIO_SCHEMA.exists():
+        return set(json.loads(SCENARIO_SCHEMA.read_text(encoding="utf-8"))["properties"])
+    return _PRD_KEYS
+
+
 SCENARIO_NAMES = re.compile(r"\bSC-0[1-9]\b|\bscooter\b|\bK1\b|\bharrier\b|\bkestrel\b", re.IGNORECASE)
 CONTENT_NAME = re.compile(
     r"(^|_)(task|goal|text|brief|title|description|prompt|summary|body|subject)(_|$)", re.IGNORECASE
@@ -156,13 +168,13 @@ def bank_text_leaks(base: Path, bank_dir: Path, exempt: tuple[Path, ...] = ()) -
     return leaks
 
 
-def scenario_config_problems(config: object) -> list[str]:
-    """PRD 4.3: a scenario file holds a skill set, connectors, an autonomy policy, seed data and a theme only."""
+def scenario_config_problems(config: object, allowed: set[str] | None = None) -> list[str]:
+    """PRD 4.3: a scenario file holds only the keys of contracts/scenario.schema.json (ADR-0014)."""
     if not isinstance(config, dict):
         return ["a scenario file must be a mapping"]
+    keys = scenario_keys() if allowed is None else allowed
     return [
-        f"key {key!r} is not configuration (allowed: {sorted(SCENARIO_KEYS)})"
-        for key in sorted(set(config) - SCENARIO_KEYS, key=str)
+        f"key {key!r} is not configuration (allowed: {sorted(keys)})" for key in sorted(set(config) - keys, key=str)
     ]
 
 
@@ -282,6 +294,18 @@ def test_GEN_05_bank_rule_catches_a_quoted_brief(tmp_path) -> None:
 
 
 def test_GEN_06_config_rule_refuses_anything_that_is_not_configuration() -> None:
-    assert scenario_config_problems({"skills": [], "connectors": [], "autonomy": {}, "seed": {}, "theme": "city"}) == []
+    full = {
+        "id": "SC-01",
+        "title": "t",
+        "skills": [],
+        "connectors": [],
+        "seed_data": [],
+        "theme": "city",
+        "autonomy": [],
+    }
+    assert scenario_config_problems(full) == []
+    assert scenario_config_problems({"skills": [], "seed": {}}, allowed={"skills"}) == [
+        "key 'seed' is not configuration (allowed: ['skills'])"
+    ]
     assert scenario_config_problems({"skills": [], "run_special_code": "x"})
     assert scenario_config_problems(["not", "a", "mapping"])

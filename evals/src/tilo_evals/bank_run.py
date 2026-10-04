@@ -82,8 +82,8 @@ def _app(director: ScriptedDirector) -> Any:
     from tilo_providers.router import Router  # noqa: PLC0415
 
     app = FastAPI()
-    for router in (intake_router, dispatch_router, redaction_router, tasks_router, runs.router):
-        app.include_router(router)
+    for api_router in (intake_router, dispatch_router, redaction_router, tasks_router, runs.router):
+        app.include_router(api_router)
     app.include_router(build_router(runs.get_card_store, answer_guard=runs.answer_guard))
     dev.install(app, {})
     router = Router(deps.providers_config(), provider_for_profile=lambda _profile: director)

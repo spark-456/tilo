@@ -69,7 +69,7 @@ def plan_valid(obs: Observation) -> list[Finding]:
     from tilo_planning import plangraph  # noqa: PLC0415
 
     connectors = deps.get_connector_registry()
-    skills = frozenset(deps.get_skill_registry().catalog())
+    skills = frozenset(skill_id for skill_id, _ in deps.get_skill_registry().catalog())  # ids, not (id, description)
     violations = plangraph.validate_plan(
         obs.plan,
         risk_table=tilo_policy.load_risk_table(),

@@ -52,6 +52,21 @@ def test_GEN_03_plan_valid_sees_a_cycle(base: Observation) -> None:
     assert any("PG-03" in f.detail for f in bc.plan_valid(dataclasses.replace(base, plan=plan)))
 
 
+def test_GEN_03_plan_valid_checks_skill_ids_against_the_registry(base: Observation, monkeypatch) -> None:
+    from tilo_api import deps
+
+    class Registry:  # catalog() is (id, description) pairs, as the real registry's is
+        def catalog(self) -> list[tuple[str, str]]:
+            return [("s_known", "a known skill")]
+
+    monkeypatch.setattr(deps, "get_skill_registry", lambda: Registry())
+    plan = copy.deepcopy(base.plan)
+    plan["units"][0]["skills"] = ["s_known"]
+    assert not any("PG-11" in f.detail for f in bc.plan_valid(dataclasses.replace(base, plan=plan)))
+    plan["units"][0]["skills"] = ["s_unknown"]
+    assert any("PG-11" in f.detail for f in bc.plan_valid(dataclasses.replace(base, plan=plan)))
+
+
 def test_GEN_03_gates_as_policy_sees_a_low_tier_a_policy_resolved_t3_and_an_early_send(base: Observation) -> None:
     low = copy.deepcopy(base.events)
     for e in low:
