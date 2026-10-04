@@ -119,6 +119,11 @@ run "SEC_12_secrets_are_readable_only_by_their_owning_service" {
       "whatsapp-api-token"            = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
       "channels-webhook-signing-key"  = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
       "email-action-link-signing-key" = ["serviceAccount:tilo-api@${var.project_id}.iam.gserviceaccount.com"]
+      # Added by the P0-07b access audit (additive; the four above are unchanged).
+      "whatsapp-webhook-verify-token" = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
+      "channel-binding-hmac-key"      = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
+      "channel-number-encryption-key" = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
+      "webpush-vapid-private-key"     = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
     }
     error_message = "Each secret must be readable only by the service that owns it (SEC-12)."
   }

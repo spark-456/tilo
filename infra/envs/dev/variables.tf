@@ -69,3 +69,21 @@ variable "alert_email" {
     error_message = "alert_email must be a valid email address."
   }
 }
+
+variable "model_armor_location" {
+  description = "Location of the Model Armor template. Must be a Model Armor region; the default follows var.region. If apply rejects it, set a supported region and use the matching endpoint in the safety provider config."
+  type        = string
+  default     = "asia-southeast1"
+}
+
+variable "deployer_project_roles" {
+  description = <<-EOT
+    Optional PROJECT-level roles for the WIF deployer. Default [] keeps the
+    SEC-12 rule that the deployer holds no project role. CI needs these only
+    if it uses Cloud Build or deploys Firebase: roles/cloudbuild.builds.editor,
+    roles/firebasehosting.admin, roles/firebaserules.admin. Setting any is a
+    security decision; see infra/ACCESS.md.
+  EOT
+  type        = list(string)
+  default     = []
+}

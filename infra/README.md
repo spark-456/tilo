@@ -86,6 +86,17 @@ Optional thresholds live in `infra/modules/monitoring/variables.tf`
 backlog 600 s, each held 300 s). Alerts are metric-based, so nothing keeps a
 scale-to-zero service warm.
 
+The access audit (`infra/ACCESS.md`) lists every API, IAM grant, secret slot,
+OAuth scope and console step; read its section 7 and 8 before applying.
+It adds the `gmail_push` module, a Model Armor template, bucket-scoped
+service grants, a build identity and the optional `deployer_project_roles`
+and `model_armor_location` variables. The oauth-tokens key binding changes
+role (connectors may now encrypt too), which Terraform shows as one replace.
+Expect roughly 60 to add, 0 to change, 1 to destroy in total from the
+P0-07 state (about 17 APIs, 4 monitoring, 8 secret slots and accessors, 7
+storage grants, 6 project grants, 6 Gmail push, 5 build, 3 service accounts,
+1 Model Armor template, 2 invokers).
+
 ### What apply will change (P0-07b, on top of an already-applied P0-07)
 
 Expect **14 to add, 0 to change, 0 to destroy**: ten `google_project_service`

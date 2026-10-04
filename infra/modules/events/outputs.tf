@@ -21,3 +21,8 @@ output "ledger_write_role" {
   # `id` attribute, so this stays known at plan time under mock providers.
   value = "projects/${var.project_id}/roles/${google_project_iam_custom_role.bq_ledger_inserter.role_id}"
 }
+
+output "pubsub_service_agent_email" {
+  description = "Email of the Pub/Sub service agent."
+  value       = google_project_service_identity.pubsub.email
+}

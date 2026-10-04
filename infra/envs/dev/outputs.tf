@@ -127,3 +127,31 @@ output "vpc_egress_subnetwork" {
     private_ip_google_access = google_compute_subnetwork.run_egress.private_ip_google_access
   }
 }
+
+output "oauth_token_key_role" {
+  description = "The single role bound on the oauth-tokens key (connectors only)."
+  value       = module.kms.oauth_token_key_role
+}
+
+output "gmail_push" {
+  description = "Gmail push topic, subscription path and Scheduler jobs (FR-CHN-08)."
+  value = {
+    topic_name        = module.gmail_push.topic_name
+    topic_publishers  = module.gmail_push.topic_publishers
+    subscription_name = module.gmail_push.subscription_name
+    push_path         = module.gmail_push.push_path
+    scheduler_jobs    = module.gmail_push.scheduler_jobs
+  }
+}
+
+output "service_storage_grants" {
+  description = "bucket::service::role => member for the bucket-scoped service grants (PRD 13.2)."
+  value       = { for k, b in google_storage_bucket_iam_member.service_access : k => b.member }
+}
+
+output "model_armor_template" {
+  value = {
+    location    = google_model_armor_template.default.location
+    template_id = google_model_armor_template.default.template_id
+  }
+}

@@ -50,6 +50,15 @@ locals {
     "gmail.googleapis.com",
     "calendar-json.googleapis.com",
     "drive.googleapis.com",
+    # Access audit (infra/ACCESS.md): enabled here so nothing is enabled by
+    # hand later. No image, video or speech APIs: no profile names one.
+    "serviceusage.googleapis.com",
+    "firebaserules.googleapis.com",
+    "recaptchaenterprise.googleapis.com",
+    "docs.googleapis.com",
+    "sheets.googleapis.com",
+    "slides.googleapis.com",
+    "bigquerystorage.googleapis.com",
   ])
 
   # ALL_TRAFFIC: every request from api and harness leaves through the VPC
@@ -139,12 +148,16 @@ locals {
   # Pub/Sub publish is granted on the tilo-events topic to harness only
   # (PRD 15.3: harness is the only event writer), and Secret Manager access
   # per secret (secret_accessors below), never project-wide. tilo-channels
-  # is internet-facing and writes only through the API (PRD 6.1), so it
-  # holds no project role at all.
+  # is internet-facing and writes only through the API (PRD 6.1), so it holds
+  # no data role; it only calls models (triage, drafting) and the safety
+  # provider. aiplatform.user and modelarmor.user cannot be scoped below the
+  # project (no resource-level IAM for publisher models or Model Armor
+  # templates); they go to exactly the services whose code calls the
+  # provider layer (api Router and intake screen, harness, channels).
   service_project_roles = {
-    "api"         = ["roles/datastore.user", "roles/cloudtasks.enqueuer"]
-    "harness"     = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user"]
-    "channels"    = []
+    "api"         = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user", "roles/modelarmor.user"]
+    "harness"     = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user", "roles/modelarmor.user"]
+    "channels"    = ["roles/aiplatform.user", "roles/modelarmor.user"]
     "connectors"  = ["roles/datastore.user"]
     "browser"     = []
     "render"      = ["roles/datastore.user"]
@@ -157,6 +170,11 @@ locals {
     "whatsapp-api-token"            = ["channels"]
     "channels-webhook-signing-key"  = ["channels"]
     "email-action-link-signing-key" = ["api"]
+    # Slots the PRD implies (names only; values are added by the user).
+    "whatsapp-webhook-verify-token" = ["channels"] # Meta GET handshake (FR-CHN-02)
+    "channel-binding-hmac-key"      = ["channels"] # binding.py HMAC (FR-CHN-03, SEC-06)
+    "channel-number-encryption-key" = ["channels"] # binding.py number cipher (FR-CHN-03)
+    "webpush-vapid-private-key"     = ["channels"] # web push (FR-CHN-17)
   }
   secret_accessor_bindings = { for combo in flatten([
     for secret, services in local.secret_accessors : [
@@ -169,7 +187,9 @@ locals {
   # The WIF deployer holds no project role: run.developer is granted on the
   # seven services (module.service developers), serviceAccountUser per
   # runtime SA and Artifact Registry write on the tilo repository (below).
-  project_bindings = { for combo in flatten([
+  cloudbuild_member = "serviceAccount:${google_service_account.cloudbuild.account_id}@${var.project_id}.iam.gserviceaccount.com"
+
+  project_bindings = merge({ for combo in flatten([
     for name, roles in local.service_project_roles : [
       for role in roles : {
         key    = "${name}::${role}"
@@ -178,7 +198,12 @@ locals {
       }
     ]
     ]) : combo.key => { role = combo.role, member = combo.member }
-  }
+    },
+    { "cloudbuild::roles/logging.logWriter" = { role = "roles/logging.logWriter", member = local.cloudbuild_member } },
+    { for r in var.deployer_project_roles : "deployer::${r}" => {
+      role = r, member = "serviceAccount:${module.wif.deployer_service_account_email}"
+    } },
+  )
 
   # Secret Manager placeholders: names only. Values are added by the user
   # out of band, never in Terraform (PRD 16.1 rule 4).
@@ -217,6 +242,16 @@ module "service" {
 
   # Cloud Tasks delivers runs to harness with an OIDC token for this SA.
   extra_invokers = {
+    # Gmail push (Pub/Sub OIDC) and the watch renew/poll jobs call channels
+    # (FR-CHN-08); each SA holds run.invoker on that one service.
+    "channels::gmail-push" = {
+      service = "channels"
+      member  = "serviceAccount:${google_service_account.gmail_push.account_id}@${var.project_id}.iam.gserviceaccount.com"
+    }
+    "channels::gmail-scheduler" = {
+      service = "channels"
+      member  = "serviceAccount:${google_service_account.gmail_scheduler.account_id}@${var.project_id}.iam.gserviceaccount.com"
+    }
     "harness::cloud-tasks" = {
       service = "harness"
       member  = "serviceAccount:${google_service_account.tasks_invoker.account_id}@${var.project_id}.iam.gserviceaccount.com"
@@ -503,4 +538,167 @@ module "monitoring" {
   events_subscription_id  = module.events.subscription_name
 
   depends_on = [google_project_service.apis]
+}
+
+# ---------------------------------------------------------------------------
+# Storage ownership (PRD 13.2, FR-INT-02; assumptions in infra/ACCESS.md).
+# Bucket-scoped, create and read only: nobody but render may overwrite.
+# ---------------------------------------------------------------------------
+
+locals {
+  # bucket => service => roles
+  storage_grants = {
+    "artifacts" = {
+      api     = ["roles/storage.objectCreator", "roles/storage.objectViewer"] # uploads (FR-INT-02), downloads (PRD 6.2)
+      harness = ["roles/storage.objectCreator", "roles/storage.objectViewer"] # intermediate artifacts, masked screenshots
+    }
+    "snapshots" = {
+      harness = ["roles/storage.objectCreator", "roles/storage.objectViewer"] # world snapshots, checkpoints (PRD 13.2)
+    }
+    "archive" = {
+      harness = ["roles/storage.objectViewer"] # per-run hash-chain check (FR-MEM-04); create is granted above
+    }
+  }
+  storage_bindings = { for combo in flatten([
+    for bucket, svcs in local.storage_grants : [
+      for svc, roles in svcs : [
+        for role in roles : { key = "${bucket}::${svc}::${role}", bucket = bucket, svc = svc, role = role }
+      ]
+    ]
+  ]) : combo.key => combo }
+}
+
+resource "google_storage_bucket_iam_member" "service_access" {
+  for_each = local.storage_bindings
+
+  bucket = module.storage.buckets[each.value.bucket].name
+  role   = each.value.role
+  member = "serviceAccount:${module.service.service_accounts[each.value.svc]}"
+}
+
+# ---------------------------------------------------------------------------
+# Model Armor (PRD 6.3): the template the safety provider screens with.
+# ---------------------------------------------------------------------------
+
+resource "google_model_armor_template" "default" {
+  project     = var.project_id
+  location    = var.model_armor_location
+  template_id = "tilo-default"
+
+  filter_config {
+    pi_and_jailbreak_filter_settings {
+      filter_enforcement = "ENABLED"
+      confidence_level   = "MEDIUM_AND_ABOVE"
+    }
+    malicious_uri_filter_settings {
+      filter_enforcement = "ENABLED"
+    }
+    rai_settings {
+      dynamic "rai_filters" {
+        for_each = ["HATE_SPEECH", "HARASSMENT", "DANGEROUS", "SEXUALLY_EXPLICIT"]
+        content {
+          filter_type      = rai_filters.value
+          confidence_level = "MEDIUM_AND_ABOVE"
+        }
+      }
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+# ---------------------------------------------------------------------------
+# Gmail push (FR-CHN-08): topic, OIDC push subscription to tilo-channels and
+# the Scheduler jobs that renew and poll.
+# ---------------------------------------------------------------------------
+
+resource "google_service_account" "gmail_push" {
+  project      = var.project_id
+  account_id   = "tilo-gmail-push"
+  display_name = "Tilo Gmail push (Pub/Sub OIDC identity)"
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_service_account" "gmail_scheduler" {
+  project      = var.project_id
+  account_id   = "tilo-gmail-scheduler"
+  display_name = "Tilo Gmail watch renew/poll (Cloud Scheduler OIDC identity)"
+
+  depends_on = [google_project_service.apis]
+}
+
+module "gmail_push" {
+  source = "../../modules/gmail_push"
+
+  project_id                      = var.project_id
+  region                          = var.region
+  target_uri                      = module.service.uris["channels"]
+  push_service_account_name       = google_service_account.gmail_push.name
+  push_service_account_email      = google_service_account.gmail_push.email
+  scheduler_service_account_email = google_service_account.gmail_scheduler.email
+  pubsub_service_agent_email      = module.events.pubsub_service_agent_email
+
+  depends_on = [google_project_service.apis]
+}
+
+# ---------------------------------------------------------------------------
+# CI build identity (PRD 6.3 Cloud Build). Builds run as this account, never
+# the broad default one. Submitting a build needs cloudbuild.builds.editor on
+# the project, which the deployer does not hold unless the user opts in with
+# var.deployer_project_roles (see infra/ACCESS.md).
+# ---------------------------------------------------------------------------
+
+resource "google_service_account" "cloudbuild" {
+  project      = var.project_id
+  account_id   = "tilo-cloudbuild"
+  display_name = "Tilo Cloud Build runner"
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_artifact_registry_repository_iam_member" "cloudbuild_writer" {
+  project    = var.project_id
+  location   = google_artifact_registry_repository.containers.location
+  repository = google_artifact_registry_repository.containers.name
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${google_service_account.cloudbuild.email}"
+}
+
+resource "google_service_account_iam_member" "deployer_acts_as_cloudbuild" {
+  service_account_id = google_service_account.cloudbuild.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${module.wif.deployer_service_account_email}"
+}
+
+# Source staging for `gcloud builds submit --gcs-source-staging-dir`.
+resource "google_storage_bucket" "build_staging" {
+  project                     = var.project_id
+  name                        = "${var.project_id}-build-staging"
+  location                    = var.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  force_destroy               = true
+
+  lifecycle_rule {
+    action {
+      type = "Delete"
+    }
+    condition {
+      age = 7
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_storage_bucket_iam_member" "build_staging" {
+  for_each = {
+    deployer   = { role = "roles/storage.objectAdmin", member = "serviceAccount:${module.wif.deployer_service_account_email}" }
+    cloudbuild = { role = "roles/storage.objectViewer", member = "serviceAccount:${google_service_account.cloudbuild.email}" }
+  }
+
+  bucket = google_storage_bucket.build_staging.name
+  role   = each.value.role
+  member = each.value.member
 }
