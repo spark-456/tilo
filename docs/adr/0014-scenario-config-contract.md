@@ -92,7 +92,7 @@ generated briefs that need preloaded config must be expressible in this same sha
   invalid fixture).
 - **Cap scenario entries at L2.** Not done: the T4 property test expects every level up to the
   tier's max (L3 for T1 and T2) to load, and PRD 4.3 lets a scenario set its autonomy policy.
-  BQ-212 asks the user whether the person must see the policies before approving.
+  BQ-221 asks the user whether the person must see the policies before approving.
 - **A free-form `extra` or `notes` key.** Rejected because issue #272 needs a closed key set.
 
 ## Migration and fixture impact
@@ -104,7 +104,7 @@ generated briefs that need preloaded config must be expressible in this same sha
 - Generated types: `Scenario`, `ScenarioId`, `ScenarioSeedPath` and `ScenarioAutonomyEntry` in
   `packages/contracts-py` and `packages/contracts-ts`.
 - `contracts/README.md` lists the contract, `docs/security/p4-policy-invariants.md` gains PI-22,
-  and `docs/open-questions.md` gains BQ-212 and BQ-213.
+  and `docs/open-questions.md` gains BQ-221 and BQ-222.
 
 ## Consequences
 - The FR-INT-11 builder validates each file against this schema, then applies SN-01 and SN-03 to
