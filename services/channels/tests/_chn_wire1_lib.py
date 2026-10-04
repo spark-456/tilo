@@ -54,6 +54,7 @@ def new_real_autopilot(line: Line, spy: SpyOutbox) -> Any:
         emit=bench.events,
         world_id=WORLD,
         run_id=RUN,
+        world_owner=USER,  # the world's owner, as the connectors' `owner_of` gives it in the rig
     )
 
 

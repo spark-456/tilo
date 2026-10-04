@@ -54,16 +54,18 @@ def requested_part(doc: dict[str, Any], outbox_id: str) -> dict[str, Any]:
     }
 
 
-def evidence_for(doc: dict[str, Any], approval: Any) -> dict[str, Any] | None:
-    """The OB-01 evidence for `doc` answered by `approval`; None without a stored part or a dict approval. The world
-    owner is the card's own user, never the approval's."""
+def evidence_for(doc: dict[str, Any], approval: Any, world_owner: str | None) -> dict[str, Any] | None:
+    """The OB-01 evidence for `doc` answered by `approval`; None without a stored part, a dict approval or a trusted
+    world owner. The owner comes from the Autopilot's world, never from the card or the approval."""
     requested = doc.get("approval_requested")
     if not isinstance(requested, dict) or not isinstance(approval, dict) or not isinstance(approval.get("authz"), dict):
+        return None
+    if not world_owner or doc.get("user_id") != world_owner:
         return None
     return {
         "reserved_by": copy.deepcopy(requested),
         "authorised_by": copy.deepcopy(approval),
-        "world_owner": doc["user_id"],
+        "world_owner": world_owner,
         "policy": None,
         "team_lead": None,
         "instruction": None,
