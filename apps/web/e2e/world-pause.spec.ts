@@ -125,7 +125,8 @@ test.describe("FR_WLD_07 Pause all from the world screens (fixture client)", () 
     const figures = await hud.innerText();
     await page.waitForTimeout(2500);
     expect(await hud.innerText()).toBe(figures);
-    await expect(page.locator("button.primary")).toHaveCount(0); // UX-1: Pause all is not filled
+    await expect(button).not.toHaveClass(/primary/); // UX-1: Pause all is never the filled button
+    await expect(page.locator("button.primary")).toHaveCount(1);
     const axe = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
       .analyze();

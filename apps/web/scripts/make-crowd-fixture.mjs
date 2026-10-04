@@ -295,7 +295,9 @@ function buildEvents(agentCount, layout, moveList, pauseAfter = null) {
 function main() {
   const agentCount = Number.parseInt(process.argv[2] ?? "20", 10);
   if (!Number.isInteger(agentCount) || agentCount < 1) {
-    console.error("Usage: node scripts/make-crowd-fixture.mjs <agentCount> [--pause-after=<rounds>]");
+    console.error(
+      "Usage: node scripts/make-crowd-fixture.mjs <agentCount> [--pause-after=<rounds>]",
+    );
     process.exit(1);
   }
   // FR-WLD-07: `--pause-after=3` writes pause-<agentCount>.* instead of crowd-<agentCount>.*.
