@@ -223,6 +223,7 @@ def ready(
     safety_flag: bool = False,
     flagged: bool = False,
     instruction_id: str | None = None,
+    mode: str = "reply",
 ) -> Any:
     """A FR-CHN-10 `ready` DraftResult built directly: what the checker passed, with no findings."""
     mod = drafting_module()
@@ -231,7 +232,7 @@ def ready(
         artifact_id="art_" + secrets.token_hex(6),
         version=1,
         thread_id=thread.thread_id,
-        mode="reply",
+        mode=mode,
         to=to,
         cc=cc,
         bcc=(),
@@ -248,9 +249,9 @@ def ready(
 def pair(
     thread: Thread, body: str, *, instruction: str = INSTRUCTION, mode: str = "reply", **ready_kw: Any
 ) -> tuple[Any, Any]:
-    """(DraftContext, ready DraftResult) for the same instruction id."""
+    """(DraftContext, ready DraftResult) for the same instruction id and format (BQ-171: a mismatch is T3)."""
     ctx = context(thread, instruction=instruction, mode=mode)
-    return ctx, ready(thread, body, instruction_id=ctx.instruction_id, **ready_kw)
+    return ctx, ready(thread, body, instruction_id=ctx.instruction_id, mode=mode, **ready_kw)
 
 
 def drafted(bench: Bench, thread: Thread, instruction: str = INSTRUCTION) -> tuple[Any, Any]:
