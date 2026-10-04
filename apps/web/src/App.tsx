@@ -8,6 +8,7 @@ import { FlowShell } from "./screens/FlowShell";
 import { NotFound } from "./screens/NotFound";
 import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
+import { LoggedScrubber, ReplayScrubber } from "./screens/ReplayScrubber";
 import { WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
@@ -22,6 +23,9 @@ const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
     {seq} {type}
   </li>
 ));
+/** The rail's Trace list holds the newest rows only: thousands of list items made a scrub across a
+ * long run cost hundreds of ms (FR-WLD-08). The Trace lens lists every event. */
+const TRACE_ROWS = 250;
 const WORLD_SCREENS: ReadonlySet<string> = new Set(["S-05", "S-10", "S-11", "S-12"]);
 /** Screens outside a world address that still read the replayed run (AGW-08 group B): HR-6 applies,
  * and the right rail describes that same run (the fixture world, the only one the client has). */
@@ -91,11 +95,24 @@ export function App() {
     : worldId !== null || runScreen
       ? speedBadgeText(replaySpeed)
       : null;
+  // FR-WLD-08: the Replay region (scrub + HR-4 banner) on every world route and in fixture mode:
+  // in the right rail on desktop, in the column above the tabs on mobile.
+  const dock = world.active ? (
+    <ReplayScrubber
+      worldId={world.worldId}
+      events={world.events}
+      finished={world.finished}
+      fixture
+    />
+  ) : worldId !== null ? (
+    <LoggedScrubber worldId={worldId} fixture={fixtureClient} />
+  ) : null;
   return (
     <div
       className="app-shell"
       data-stage-mode={stageMode ? "on" : "off"}
       data-replay-badge={speedBadge ? "on" : "off"}
+      data-replay-dock={dock ? "on" : "off"}
     >
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
@@ -136,6 +153,7 @@ export function App() {
       )}
       {mobile ? (
         <>
+          {dock}
           {hudWorld && (
             <details
               className="hud-sheet"
@@ -154,6 +172,7 @@ export function App() {
         </>
       ) : (
         <aside className="right-rail" data-testid="right-rail">
+          {dock}
           {railWorld ? (
             <WorldPanels key={railWorld} worldId={railWorld} tabs={hudWorld !== null} />
           ) : (
@@ -177,7 +196,12 @@ export function App() {
             <>
               <h2>Trace</h2>
               <ul className="trace-list" data-testid="trace-list">
-                {world.trace.map((row) => (
+                {world.trace.length > TRACE_ROWS && (
+                  <li>
+                    Showing the latest {TRACE_ROWS} of {world.trace.length} events.
+                  </li>
+                )}
+                {world.trace.slice(-TRACE_ROWS).map((row) => (
                   <TraceRow key={row.seq} seq={row.seq} type={row.type} />
                 ))}
               </ul>

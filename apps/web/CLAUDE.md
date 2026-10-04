@@ -20,8 +20,8 @@ Trace lenses, cards and settings.
   no always-on ticker (HR-2). `data-stage-ready="true"` appears with the first frame.
 - FR-WLD-04 pipeline: `registry.ts` → `reducer.ts` (HR-5) → `store.ts` → `frame.ts` → `renderer.ts`;
   `choreographer.ts` (HR-3) alone animates. `?fixture=<name>`, `?seq=N`, `?speed=N` control replay.
-- FR-WLD-06: `selection.ts` keeps one selection per world (display state, never an event).
-  `SelectionBar` is in every lens; `data-lens-control` buttons toggle it; the stage rings it.
+- FR-WLD-06: `selection.ts` keeps one selection per world (display state, never an event); the stage rings it.
+- FR-WLD-08: `replay.ts` holds one replay point per world (display state); `ReplayScrubber` (right rail, or above the mobile tabs) scrubs a finished run, disabled while live. Stage shows `stateAt(seq)`, Story/Trace/HUD the events up to it; the HR-4 banner ("Replay of run #… recorded …", fixtures add "dev fixture") shows once finished.
 
 ## Screens (`src/screens/`, AGW-08)
 - `meta.ts` is the PRD 18.3 table (S-01..S-25, status, route pattern); `routes.tsx` maps each

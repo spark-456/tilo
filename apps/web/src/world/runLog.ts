@@ -5,6 +5,7 @@
 import type { Event } from "@tilo/contracts";
 import { useSyncExternalStore } from "react";
 import type { TiloClient } from "../api/client";
+import { eventsUpTo, getReplayPoint, subscribeReplay } from "./replayPoint";
 import { type RunStatus, worldStatus } from "./runSummary";
 
 interface Run {
@@ -51,9 +52,20 @@ export function useRunStatus(client: TiloClient, worldId: string | null): RunSta
       if (worldId === null) return () => undefined;
       const run = runFor(client, worldId);
       run.listeners.add(onChange);
-      return () => run.listeners.delete(onChange);
+      const unreplay = subscribeReplay(onChange);
+      return () => {
+        run.listeners.delete(onChange);
+        unreplay();
+      };
     },
-    () => worldStatus(worldId === null ? EMPTY : (runs.get(client)?.get(worldId)?.events ?? EMPTY)),
+    // FR-WLD-08: at a scrubbed moment the status is the one recorded by then, so the veil never
+    // claims a pause the run had not reached (HR-1).
+    () =>
+      worldId === null
+        ? worldStatus(EMPTY)
+        : worldStatus(
+            eventsUpTo(runs.get(client)?.get(worldId)?.events ?? EMPTY, getReplayPoint(worldId)),
+          ),
   );
 }
 

@@ -2,6 +2,7 @@
 // fixture (fixtureLoader.ts) and plays it into the Pixi world container Stage.tsx hands over
 // (runWorld.ts), exposing just enough state for App.tsx to render the Trace list, the speed
 // badge and the permanent "Fixture replay" label (HR-4/BQ-07).
+import type { Event } from "@tilo/contracts";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import type { WorldSeam } from "../stage/Stage";
@@ -16,6 +17,12 @@ export interface WorldFixtureState {
   readonly seq: number;
   readonly trace: ReadonlyArray<{ seq: number; type: string }>;
   readonly speedLabel: string | null;
+  /** FR-WLD-08: the loaded run's world id and recorded events, and whether it has finished (played
+   * out, or opened at a fixed ?seq=), which is when it can be scrubbed. Latched: scrubbing back
+   * never makes a finished run live again. */
+  readonly worldId: string;
+  readonly events: readonly Event[];
+  readonly finished: boolean;
   /** The replayed run's recorded status (FR-WLD-07: "paused" shows the veil). */
   readonly status: RunStatus;
   /** The run's selected object (FR-WLD-06), for the stage frame's data-selected. */
@@ -45,6 +52,8 @@ export function useWorldFixture(): WorldFixtureState {
   );
   const [worldId, setWorldId] = useState(""); // set once the layout is loaded
   const [selected] = useSelection(worldId);
+  const [loaded, setLoaded] = useState<readonly Event[]>([]);
+  const [finished, setFinished] = useState(false);
   const [trace, setTrace] = useState<ReadonlyArray<{ seq: number; type: string }>>([]);
   const stopRef = useRef<(() => void) | undefined>(undefined);
   // P7/HR-2 ("nothing moves before the first event"): the fetch starts only once Stage's Pixi
@@ -65,6 +74,9 @@ export function useWorldFixture(): WorldFixtureState {
         .then(({ layout, events }) => {
           if (cancelled) return;
           setWorldId(layout.world_id);
+          setLoaded(events);
+          const lastSeq = events[events.length - 1]?.seq ?? 0;
+          if (seqParam !== null) setFinished(true); // a fixed ?seq= shows a recorded run in full
           stopRef.current = runWorld({
             world,
             requestRender,
@@ -73,7 +85,11 @@ export function useWorldFixture(): WorldFixtureState {
             seqParam,
             speed,
             reducedMotion: () => reducedMotionRef.current,
-            onSeq: (n) => !cancelled && setSeq(n),
+            onSeq: (n) => {
+              if (cancelled) return;
+              setSeq(n);
+              if (n >= lastSeq) setFinished(true);
+            },
             onTrace: (t) => !cancelled && setTrace(t),
             onStatus: (s) => !cancelled && setStatus(s),
           });
@@ -96,6 +112,9 @@ export function useWorldFixture(): WorldFixtureState {
     seq,
     trace,
     speedLabel: speedBadgeText(speed),
+    worldId,
+    events: loaded,
+    finished,
     status,
     selected,
     loadError,

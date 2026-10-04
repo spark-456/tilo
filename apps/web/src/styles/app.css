@@ -1394,6 +1394,77 @@ button.row {
   color: var(--color-ink-2);
   font-weight: 700;
 }
+/* FR-WLD-08 Replay region (HR-4): one reserved box, so a run finishing, or a scrub, moves nothing
+   (CLS). Right rail on desktop; in the column above the tabs on mobile. Neutral tokens, no motion. */
+.replay-dock {
+  box-sizing: border-box;
+  min-height: 136px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+}
+.replay-dock p {
+  margin: 0 0 4px;
+}
+.replay-banner {
+  min-height: 2.8em; /* two lines of 14 px */
+  font-size: 0.875em;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.replay-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.replay-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  accent-color: var(--color-brand-primary);
+}
+.replay-step {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  border: 2px solid var(--color-ink-1);
+  border-radius: var(--radius-controls);
+  background: transparent;
+  color: var(--color-ink-1);
+  font: 700 1.25em / 1 var(--font-ui);
+  cursor: pointer;
+}
+.replay-step:disabled {
+  border-color: var(--color-surface-2);
+  color: var(--color-ink-2);
+  cursor: not-allowed;
+}
+.replay-step:focus-visible,
+.replay-row input[type="range"]:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.replay-pos {
+  min-height: 2.4em; /* two lines of 12 px */
+  color: var(--color-ink-2);
+  font-size: 0.75em;
+  line-height: 1.4;
+}
+@media (max-width: 767px) {
+  .replay-dock {
+    flex: none;
+    margin: 4px 12px;
+  }
+  /* The collapsed World status sheet sits above the tabs: it clears the replay region too. */
+  .app-shell[data-replay-dock="on"] .hud-sheet {
+    bottom: calc(var(--button-height-desktop) + 144px);
+  }
+}
 /* FR-WLD-07: Pause all and the Paused banner share one fixed box, so no state moves what is around
    it (CLS). No animation or transition anywhere (HR-2, FR-WLD-09). Neutral role tokens only. */
 .pause-slot {
