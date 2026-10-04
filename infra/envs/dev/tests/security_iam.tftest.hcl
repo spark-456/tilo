@@ -115,10 +115,12 @@ run "SEC_12_secrets_are_readable_only_by_their_owning_service" {
 
   assert {
     condition = output.secret_accessors == {
-      "workspace-oauth-client"        = ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
-      "whatsapp-api-token"            = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
-      "channels-webhook-signing-key"  = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
-      "email-action-link-signing-key" = ["serviceAccount:tilo-api@${var.project_id}.iam.gserviceaccount.com"]
+      "workspace-oauth-client"       = ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
+      "whatsapp-api-token"           = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
+      "channels-webhook-signing-key" = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
+      # Changed by P0-07b: channels also signs and verifies action links (links.py), so it
+      # needs read access as well as api. This is the only existing expectation edited.
+      "email-action-link-signing-key" = ["serviceAccount:tilo-api@${var.project_id}.iam.gserviceaccount.com", "serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
       # Added by the P0-07b access audit (additive; the four above are unchanged).
       "whatsapp-webhook-verify-token" = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
       "channel-binding-hmac-key"      = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]

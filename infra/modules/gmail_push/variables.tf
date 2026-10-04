@@ -8,8 +8,13 @@ variable "region" {
   type        = string
 }
 
-variable "target_uri" {
-  description = "run.app URL of the Cloud Run service that handles Gmail push, renew and poll (tilo-channels)."
+variable "push_target_uri" {
+  description = "run.app URL of the service that receives Gmail Pub/Sub pushes (tilo-channels)."
+  type        = string
+}
+
+variable "scheduler_target_uri" {
+  description = "run.app URL of the service the renew and poll jobs call (tilo-harness: the only caller of connectors)."
   type        = string
 }
 
@@ -24,7 +29,7 @@ variable "push_service_account_email" {
 }
 
 variable "scheduler_service_account_email" {
-  description = "Email of the service account Cloud Scheduler uses; it needs run.invoker on the target only."
+  description = "Email of the service account Cloud Scheduler uses; it needs run.invoker on the scheduler target only."
   type        = string
 }
 
@@ -34,19 +39,19 @@ variable "pubsub_service_agent_email" {
 }
 
 variable "push_path" {
-  description = "Path on the target that receives Pub/Sub pushes. Does not exist in services/channels yet (dependency)."
+  description = "Path on the push target (channels) that receives Pub/Sub pushes. Does not exist yet (dependency)."
   type        = string
   default     = "/internal/gmail/push"
 }
 
 variable "renew_path" {
-  description = "Path on the target that calls MailWatcher.renew_due(). Does not exist yet (dependency)."
+  description = "Path on the scheduler target (harness) that renews watches. Does not exist yet (dependency)."
   type        = string
   default     = "/internal/gmail/renew"
 }
 
 variable "poll_path" {
-  description = "Path on the target that calls MailWatcher.poll_due(). Does not exist yet (dependency)."
+  description = "Path on the scheduler target (harness) that polls Gmail history. Does not exist yet (dependency)."
   type        = string
   default     = "/internal/gmail/poll"
 }

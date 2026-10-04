@@ -4,8 +4,9 @@
 #
 #   Gmail users.watch --> topic (only gmail-api-push@system may publish)
 #     --> push subscription with an OIDC token --> <target>/<push_path>
-#   Cloud Scheduler (OIDC, run.invoker on the target only) --> POST renew_path
-#     (re-watch, daily) and poll_path (polling fallback).
+#   Cloud Scheduler (OIDC, run.invoker on the scheduler target only) --> POST
+#     renew_path (re-watch, daily) and poll_path (polling fallback) on the
+#     scheduler target (tilo-harness: only harness reaches connectors).
 #
 # The two service accounts are created by the caller (so the target service's
 # invoker bindings can name them without a dependency cycle).
@@ -46,10 +47,10 @@ resource "google_pubsub_subscription" "gmail_push" {
   message_retention_duration = "86400s"
 
   push_config {
-    push_endpoint = "${var.target_uri}${var.push_path}"
+    push_endpoint = "${var.push_target_uri}${var.push_path}"
     oidc_token {
       service_account_email = var.push_service_account_email
-      audience              = var.target_uri
+      audience              = var.push_target_uri
     }
   }
 
@@ -83,11 +84,11 @@ resource "google_cloud_scheduler_job" "gmail" {
 
   http_target {
     http_method = "POST"
-    uri         = "${var.target_uri}${each.value.path}"
+    uri         = "${var.scheduler_target_uri}${each.value.path}"
 
     oidc_token {
       service_account_email = var.scheduler_service_account_email
-      audience              = var.target_uri
+      audience              = var.scheduler_target_uri
     }
   }
 }

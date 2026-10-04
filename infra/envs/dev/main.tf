@@ -169,7 +169,7 @@ locals {
     "workspace-oauth-client"        = ["connectors"]
     "whatsapp-api-token"            = ["channels"]
     "channels-webhook-signing-key"  = ["channels"]
-    "email-action-link-signing-key" = ["api"]
+    "email-action-link-signing-key" = ["api", "channels"] # channels signs/verifies links (links.py)
     # Slots the PRD implies (names only; values are added by the user).
     "whatsapp-webhook-verify-token" = ["channels"] # Meta GET handshake (FR-CHN-02)
     "channel-binding-hmac-key"      = ["channels"] # binding.py HMAC (FR-CHN-03, SEC-06)
@@ -187,8 +187,6 @@ locals {
   # The WIF deployer holds no project role: run.developer is granted on the
   # seven services (module.service developers), serviceAccountUser per
   # runtime SA and Artifact Registry write on the tilo repository (below).
-  cloudbuild_member = "serviceAccount:${google_service_account.cloudbuild.account_id}@${var.project_id}.iam.gserviceaccount.com"
-
   project_bindings = merge({ for combo in flatten([
     for name, roles in local.service_project_roles : [
       for role in roles : {
@@ -199,7 +197,6 @@ locals {
     ]
     ]) : combo.key => { role = combo.role, member = combo.member }
     },
-    { "cloudbuild::roles/logging.logWriter" = { role = "roles/logging.logWriter", member = local.cloudbuild_member } },
     { for r in var.deployer_project_roles : "deployer::${r}" => {
       role = r, member = "serviceAccount:${module.wif.deployer_service_account_email}"
     } },
@@ -242,14 +239,15 @@ module "service" {
 
   # Cloud Tasks delivers runs to harness with an OIDC token for this SA.
   extra_invokers = {
-    # Gmail push (Pub/Sub OIDC) and the watch renew/poll jobs call channels
-    # (FR-CHN-08); each SA holds run.invoker on that one service.
+    # Gmail push (Pub/Sub OIDC) calls channels; the watch renew/poll jobs call
+    # harness (only harness reaches connectors, PRD 6.1). Each SA holds
+    # run.invoker on that one service (FR-CHN-08).
     "channels::gmail-push" = {
       service = "channels"
       member  = "serviceAccount:${google_service_account.gmail_push.account_id}@${var.project_id}.iam.gserviceaccount.com"
     }
-    "channels::gmail-scheduler" = {
-      service = "channels"
+    "harness::gmail-scheduler" = {
+      service = "harness"
       member  = "serviceAccount:${google_service_account.gmail_scheduler.account_id}@${var.project_id}.iam.gserviceaccount.com"
     }
     "harness::cloud-tasks" = {
@@ -633,72 +631,12 @@ module "gmail_push" {
 
   project_id                      = var.project_id
   region                          = var.region
-  target_uri                      = module.service.uris["channels"]
+  push_target_uri                 = module.service.uris["channels"]
+  scheduler_target_uri            = module.service.uris["harness"]
   push_service_account_name       = google_service_account.gmail_push.name
   push_service_account_email      = google_service_account.gmail_push.email
   scheduler_service_account_email = google_service_account.gmail_scheduler.email
   pubsub_service_agent_email      = module.events.pubsub_service_agent_email
 
   depends_on = [google_project_service.apis]
-}
-
-# ---------------------------------------------------------------------------
-# CI build identity (PRD 6.3 Cloud Build). Builds run as this account, never
-# the broad default one. Submitting a build needs cloudbuild.builds.editor on
-# the project, which the deployer does not hold unless the user opts in with
-# var.deployer_project_roles (see infra/ACCESS.md).
-# ---------------------------------------------------------------------------
-
-resource "google_service_account" "cloudbuild" {
-  project      = var.project_id
-  account_id   = "tilo-cloudbuild"
-  display_name = "Tilo Cloud Build runner"
-
-  depends_on = [google_project_service.apis]
-}
-
-resource "google_artifact_registry_repository_iam_member" "cloudbuild_writer" {
-  project    = var.project_id
-  location   = google_artifact_registry_repository.containers.location
-  repository = google_artifact_registry_repository.containers.name
-  role       = "roles/artifactregistry.writer"
-  member     = "serviceAccount:${google_service_account.cloudbuild.email}"
-}
-
-resource "google_service_account_iam_member" "deployer_acts_as_cloudbuild" {
-  service_account_id = google_service_account.cloudbuild.name
-  role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${module.wif.deployer_service_account_email}"
-}
-
-# Source staging for `gcloud builds submit --gcs-source-staging-dir`.
-resource "google_storage_bucket" "build_staging" {
-  project                     = var.project_id
-  name                        = "${var.project_id}-build-staging"
-  location                    = var.region
-  uniform_bucket_level_access = true
-  public_access_prevention    = "enforced"
-  force_destroy               = true
-
-  lifecycle_rule {
-    action {
-      type = "Delete"
-    }
-    condition {
-      age = 7
-    }
-  }
-
-  depends_on = [google_project_service.apis]
-}
-
-resource "google_storage_bucket_iam_member" "build_staging" {
-  for_each = {
-    deployer   = { role = "roles/storage.objectAdmin", member = "serviceAccount:${module.wif.deployer_service_account_email}" }
-    cloudbuild = { role = "roles/storage.objectViewer", member = "serviceAccount:${google_service_account.cloudbuild.email}" }
-  }
-
-  bucket = google_storage_bucket.build_staging.name
-  role   = each.value.role
-  member = each.value.member
 }

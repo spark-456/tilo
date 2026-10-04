@@ -30,8 +30,8 @@ listed only where Google offers no narrower scope.
 | Service | Calls | IAM granted | Secrets (accessor) | Status |
 | --- | --- | --- | --- | --- |
 | `tilo-api` | Firestore; Cloud Tasks enqueue; Vertex AI (Router: approaches, Director); Model Armor (intake screen); `artifacts` bucket (uploads FR-INT-02, downloads PRD 6.2); Firebase ID-token and App Check verification (public keys, no IAM) | project: `datastore.user`, `cloudtasks.enqueuer`, `aiplatform.user` (added), `modelarmor.user` (added). Bucket `artifacts`: `objectCreator`, `objectViewer` (added). `serviceAccountUser` on `tilo-tasks-invoker` | `email-action-link-signing-key` | mixed, see cells |
-| `tilo-harness` | Firestore; Cloud Tasks; Vertex AI; Model Armor (model output, tool output); Pub/Sub publish on `tilo-events`; buckets `archive`, `artifacts`, `snapshots`; connectors, browser, render | project: `datastore.user`, `cloudtasks.enqueuer`, `aiplatform.user`, `modelarmor.user` (added). Topic `tilo-events`: `pubsub.publisher`. `archive`: `objectCreator` (present), `objectViewer` (added). `artifacts` and `snapshots`: `objectCreator`, `objectViewer` (added). `run.invoker` on connectors, browser, render | none | mixed |
-| `tilo-channels` | Vertex AI (triage, drafting); Model Armor (inbound mail and WhatsApp text); `tilo-api`; Gmail push, renew and poll endpoints | project: `aiplatform.user`, `modelarmor.user` (added). Holds no Firestore, Pub/Sub or Storage role (writes through the API, SEC-12) | `whatsapp-api-token`, `channels-webhook-signing-key` (present); `whatsapp-webhook-verify-token`, `channel-binding-hmac-key`, `channel-number-encryption-key`, `webpush-vapid-private-key` (added) | mixed |
+| `tilo-harness` | Firestore; Cloud Tasks; Vertex AI; Model Armor (model output, tool output); Pub/Sub publish on `tilo-events`; buckets `archive`, `artifacts`, `snapshots`; connectors, browser, render | project: `datastore.user`, `cloudtasks.enqueuer`, `aiplatform.user`, `modelarmor.user` (added). Topic `tilo-events`: `pubsub.publisher`. `archive`: `objectCreator` (present), `objectViewer` (added). `artifacts` and `snapshots`: `objectCreator`, `objectViewer` (added). `run.invoker` on connectors, browser, render. Receives the Gmail renew and poll calls from Scheduler | none | mixed |
+| `tilo-channels` | Vertex AI (triage, drafting); Model Armor (inbound mail and WhatsApp text); `tilo-api`; the Gmail push endpoint (forwards to the API) | project: `aiplatform.user`, `modelarmor.user` (added). Holds no Firestore, Pub/Sub or Storage role (writes through the API, SEC-12) | `whatsapp-api-token`, `channels-webhook-signing-key`, `email-action-link-signing-key` (shared with api: links.py signs and verifies; changed in P0-07b) (present); `whatsapp-webhook-verify-token`, `channel-binding-hmac-key`, `channel-number-encryption-key`, `webpush-vapid-private-key` (added) | mixed |
 | `tilo-connectors` | Firestore (token store, outbox); Cloud KMS; Google Workspace APIs with the user's OAuth token (Gmail, Drive, Calendar, Docs, Sheets, Slides) | project: `datastore.user`. Key `oauth-tokens`: `cryptoKeyEncrypterDecrypter` (added: replaces `cryptoKeyDecrypter`, because `tokens.py` wraps a fresh data key per record). `run.invoker` for harness | `workspace-oauth-client` | mixed |
 | `tilo-browser` | Allowlist egress proxy only; model calls for computer use are made by the harness | none (SEC-12: no Firestore, Datastore or Storage) | none | present |
 | `tilo-render` | Firestore; `artifacts` bucket; Slides and Docs go through connectors | project: `datastore.user`. Bucket `artifacts`: `objectAdmin` (only service that may overwrite) | none | present |
@@ -43,12 +43,11 @@ Other identities:
 | --- | --- | --- |
 | `tilo-tasks-invoker` (Cloud Tasks OIDC) | `run.invoker` on harness | present |
 | `tilo-gmail-push` (Pub/Sub push OIDC) | `run.invoker` on channels; Pub/Sub service agent holds `serviceAccountTokenCreator` on it | added |
-| `tilo-gmail-scheduler` (Scheduler OIDC) | `run.invoker` on channels | added |
+| `tilo-gmail-scheduler` (Scheduler OIDC) | `run.invoker` on harness only | added |
 | `gmail-api-push@system.gserviceaccount.com` | `pubsub.publisher` on topic `tilo-gmail-notifications` only | added |
 | Pub/Sub service agent | custom insert-only role on dataset `tilo_ledger` | present |
 | Cloud Storage service agent | `cryptoKeyEncrypterDecrypter` on key `archive` | present |
-| `tilo-deployer` (WIF, `refs/heads/main` only) | `run.developer` per service; `serviceAccountUser` per runtime SA; Artifact Registry writer on repo `tilo`; (added) `serviceAccountUser` on `tilo-cloudbuild`, `objectAdmin` on the build staging bucket. No project role | present and added |
-| `tilo-cloudbuild` (build identity) | Artifact Registry writer on repo `tilo`; `objectViewer` on the staging bucket; project `logging.logWriter` | added |
+| `tilo-deployer` (WIF, `refs/heads/main` only) | `run.developer` per service; `serviceAccountUser` per runtime SA; Artifact Registry writer on repo `tilo`. No project role, and `deployer_project_roles` stays `[]` for dev | present |
 
 ## 3. Pub/Sub, Scheduler, Cloud Tasks
 
@@ -57,17 +56,24 @@ Other identities:
 | Topic `tilo-events` and subscription `tilo-events-to-bigquery` | Ledger (PRD 13.2) | present |
 | Topic `tilo-gmail-notifications` | Gmail `users.watch` target (FR-CHN-08) | added |
 | Subscription `tilo-gmail-push` | Push to `tilo-channels` `POST /internal/gmail/push`, OIDC as `tilo-gmail-push`, audience = channels URL, no inactivity expiry | added |
-| Scheduler `tilo-gmail-renew` (daily 03:00 UTC) | `POST /internal/gmail/renew` on channels (re-watch) | added |
-| Scheduler `tilo-gmail-poll` (every 5 min) | `POST /internal/gmail/poll` on channels (polling fallback) | added |
+| Scheduler `tilo-gmail-renew` (daily 03:00 UTC) | `POST /internal/gmail/renew` on **harness** (re-watch through connectors) | added |
+| Scheduler `tilo-gmail-poll` (every 5 min) | `POST /internal/gmail/poll` on **harness** (polling fallback) | added |
 | Cloud Tasks queue `runs` | api to harness | present |
 | Scheduler jobs for the sweeper and user schedules | PRD 6.3 | deferred: no sweeper endpoint exists; add with that ticket |
 
-Dependency: the three `/internal/gmail/*` paths do not exist in
-`services/channels` yet (`GmailPushEndpoint` and `MailWatcher` exist, but no
-HTTP routes). The service must verify the OIDC token itself (it does, in
-`GmailPushEndpoint.receive`); the audience is the channels service URL and the
-expected email is `tilo-gmail-push@<project>.iam.gserviceaccount.com`. Renew and
-poll must check the caller is `tilo-gmail-scheduler@<project>...`.
+Dependencies (none of these routes exist yet):
+
+- `tilo-channels`: `POST /internal/gmail/push`. `GmailPushEndpoint.receive`
+  already verifies the OIDC token (audience = channels URL, email =
+  `tilo-gmail-push@<project>.iam.gserviceaccount.com`); the route must call it
+  and forward the notification to the API (PRD 6.1: channels write only through
+  the API).
+- `tilo-harness`: `POST /internal/gmail/renew` and `POST /internal/gmail/poll`.
+  Each must check the caller is `tilo-gmail-scheduler@<project>...` (Cloud Run
+  already requires `run.invoker`, which only that identity holds besides api and
+  the Tasks identity), then call the mailbox through connectors
+  (`MailWatcher.renew_due()` / `poll_due()`). Cloud Scheduler may call an
+  internal-only service. Channels never reaches connectors.
 
 ## 4. Storage ownership (PRD 13.2, FR-INT-02)
 
@@ -76,12 +82,11 @@ poll must check the caller is `tilo-gmail-scheduler@<project>...`.
 | `artifacts` (versioned, 365 d) | render (`objectAdmin`), api and harness (`objectCreator`) | api, harness (`objectViewer`) | Uploads become new objects, never overwrites |
 | `archive` (CMEK, 30 d) | harness (`objectCreator` only) | harness (`objectViewer`, chain check) | Nobody can overwrite or delete |
 | `snapshots` (90 d) | harness (`objectCreator`) | harness (`objectViewer`) | |
-| `<project>-build-staging` (7 d) | deployer | `tilo-cloudbuild` | Source upload for `gcloud builds submit` |
 
 ## 5. Secret Manager slots (names only; values added by the user)
 
 Existing: `workspace-oauth-client`, `whatsapp-api-token`,
-`channels-webhook-signing-key`, `email-action-link-signing-key`. Added:
+`channels-webhook-signing-key`, `email-action-link-signing-key` (api and channels). Added:
 `whatsapp-webhook-verify-token`, `channel-binding-hmac-key`,
 `channel-number-encryption-key`, `webpush-vapid-private-key`. No version is
 ever created by Terraform (PRD 16.1 rule 4).
@@ -110,8 +115,18 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
    hosting domain to authorised domains.
 4. App Check: register the web app with a reCAPTCHA Enterprise key, then switch
    enforcement on for Firestore and Storage after the client sends tokens.
-5. Firestore security rules: `firebase deploy --only firestore:rules` (needs the
-   deployer decision in section 8, or run it yourself).
+5. Firebase deploys stay manual (the CI deployer holds no project role). From
+   the repo root, signed in as yourself (`firebase login`), with `<project>`
+   the real project id:
+
+   ```powershell
+   firebase deploy --only firestore:rules --project <project>
+   pnpm --filter ./apps/web build
+   firebase deploy --only hosting --project <project>
+   ```
+
+   Use the Hosting site `<project>-web` created by Terraform. Run the rules
+   deploy first, then the web build and hosting deploy.
 6. Vertex AI quotas: raise per-minute quotas for the Gemini models in use
    (IAM and Admin, Quotas); Terraform has no resource for them.
 7. Model Armor: check `var.model_armor_location` is a supported region the first
@@ -122,24 +137,21 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
 9. First Gmail watch: after the endpoints exist, each user's connect flow calls
    `users.watch` with topic `projects/<project>/topics/tilo-gmail-notifications`.
 
-## 8. Open decisions (need the user or a contract change)
+## 8. Decisions taken (orchestrator, on the user's behalf)
 
-1. **channels needs connectors.** `GmailPushEndpoint`, `MailWatcher` and the
-   autopilot send path call Gmail through "an RPC client to tilo-connectors",
-   but the tests (PRD 6.1) say connectors is invokable by harness only, and
-   channels has no VPC egress to reach an internal-only service. Either route
-   channels to connectors through the harness, or change the test (invoker
-   `channels` on connectors plus Direct VPC egress for channels). Not changed here.
-2. **email-action-link-signing-key accessor.** The secret is readable by api
-   only, but `links.py` (sign and verify) lives in `tilo-channels`. If channels
-   signs the links, it needs the accessor. Not changed here: an existing test
-   pins the exact set.
-3. **Deployer project roles.** CI that uses Cloud Build or deploys Firebase
-   needs project roles (`cloudbuild.builds.editor`, `firebasehosting.admin`,
-   `firebaserules.admin`; none can be scoped to a resource). The SEC-12 test
-   says the deployer holds none. Default is none; set
-   `deployer_project_roles` to opt in, or build with Docker on the runner and
-   push to Artifact Registry (already allowed) and deploy Firebase by hand.
+1. **channels and connectors.** Only the harness invokes connectors (test
+   unchanged); channels gets no VPC egress. Scheduler renew and poll jobs call
+   harness; the Gmail push subscription calls channels, which forwards to the
+   API. `tilo-gmail-scheduler` therefore holds `run.invoker` on harness, which
+   is the one expected invoker set that changed in `cloud_run.tftest.hcl`.
+2. **email-action-link-signing-key** is readable by api and channels (links.py
+   signs and verifies in channels). The one expectation edited in
+   `security_iam.tftest.hcl`.
+3. **Deployer roles.** None. `deployer_project_roles` defaults to `[]` and is
+   not set for dev. Images are built on the CI runner and pushed to Artifact
+   Registry through WIF with the repo-scoped writer role, then deployed with
+   the per-service `run.developer` grants. No Cloud Build identity or staging
+   bucket exists. Firebase deploys are manual (section 7, step 5).
 
 ## 9. Intentionally not granted
 
@@ -161,6 +173,6 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
 4. Harness may read `archive` to verify the hash chain; api cannot read it, so the Trace link to a raw record is served by harness (not yet decided in the PRD).
 5. Masked screenshots reach Storage through harness, because browser holds no Storage role.
 6. Channels binds numbers with an HMAC key and a cipher key held in Secret Manager (the `binding.py` design); the web-push VAPID key is a secret.
-7. The Gmail endpoints live on `tilo-channels` (where `GmailPushEndpoint` is), at `/internal/gmail/{push,renew,poll}`.
+7. The push route lives on `tilo-channels` (`/internal/gmail/push`, where `GmailPushEndpoint` is); renew and poll live on `tilo-harness` (`/internal/gmail/{renew,poll}`).
 8. `roles/modelarmor.user` and `roles/aiplatform.user` are project-level: neither product offers narrower IAM.
 9. The WhatsApp `channels-webhook-signing-key` slot holds the Meta app secret used by `verify_signature`.

@@ -127,7 +127,7 @@ run "P0_07b_secret_accessors_output_is_config_derived" {
   command = plan
 
   assert {
-    condition     = length(output.secret_accessors) == 8 && alltrue([for s, m in output.secret_accessors : length(m) == 1])
+    condition     = length(output.secret_accessors) == 8 && alltrue([for s, m in output.secret_accessors : length(m) == (s == "email-action-link-signing-key" ? 2 : 1)])
     error_message = "secret_accessors must list one accessor per secret, from config (stable across refresh)."
   }
 }

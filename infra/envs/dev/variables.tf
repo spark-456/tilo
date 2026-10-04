@@ -79,10 +79,12 @@ variable "model_armor_location" {
 variable "deployer_project_roles" {
   description = <<-EOT
     Optional PROJECT-level roles for the WIF deployer. Default [] keeps the
-    SEC-12 rule that the deployer holds no project role. CI needs these only
-    if it uses Cloud Build or deploys Firebase: roles/cloudbuild.builds.editor,
-    roles/firebasehosting.admin, roles/firebaserules.admin. Setting any is a
-    security decision; see infra/ACCESS.md.
+    SEC-12 rule that the deployer holds no project role, and it stays empty
+    for dev: images are built on the CI runner and pushed with the repo-scoped
+    Artifact Registry writer role, and Firebase deploys are manual. Only a
+    future Cloud Build or Firebase CI path would need project roles
+    (cloudbuild.builds.editor, firebasehosting.admin, firebaserules.admin);
+    that is a security decision, see infra/ACCESS.md.
   EOT
   type        = list(string)
   default     = []

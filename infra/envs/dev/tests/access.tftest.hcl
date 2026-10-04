@@ -95,18 +95,24 @@ run "FR_CHN_08_gmail_push_topic_publisher_and_jobs" {
     condition = toset(output.cloud_run_services["channels"].invokers) == toset([
       "allUsers",
       "serviceAccount:tilo-gmail-push@${var.project_id}.iam.gserviceaccount.com",
-      "serviceAccount:tilo-gmail-scheduler@${var.project_id}.iam.gserviceaccount.com",
     ])
-    error_message = "The push and scheduler identities hold run.invoker on tilo-channels."
+    error_message = "Only the push identity (and the public webhook) may invoke tilo-channels."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in ["api", "channels", "connectors", "browser", "render", "sandbox-web"] :
+      !contains(output.cloud_run_services[s].invokers, "serviceAccount:tilo-gmail-scheduler@${var.project_id}.iam.gserviceaccount.com")
+    ])
+    error_message = "The Scheduler identity may invoke tilo-harness only (only harness reaches connectors)."
   }
 
   assert {
     condition = alltrue([
       for s in ["api", "harness", "connectors", "browser", "render", "sandbox-web"] :
-      !contains(output.cloud_run_services[s].invokers, "serviceAccount:tilo-gmail-push@${var.project_id}.iam.gserviceaccount.com") &&
-      !contains(output.cloud_run_services[s].invokers, "serviceAccount:tilo-gmail-scheduler@${var.project_id}.iam.gserviceaccount.com")
+      !contains(output.cloud_run_services[s].invokers, "serviceAccount:tilo-gmail-push@${var.project_id}.iam.gserviceaccount.com")
     ])
-    error_message = "The Gmail identities may invoke tilo-channels only."
+    error_message = "The push identity may invoke tilo-channels only."
   }
 }
 
@@ -141,8 +147,8 @@ run "SEC_12_deployer_still_holds_no_project_role_by_default" {
   }
 
   assert {
-    condition     = length([for b in output.project_iam_bindings : b if strcontains(b.member, "tilo-cloudbuild@")]) == 1
-    error_message = "The build identity holds exactly one project role (logging.logWriter)."
+    condition     = alltrue([for b in output.project_iam_bindings : !strcontains(b.member, "tilo-cloudbuild@")]) && length(var.deployer_project_roles) == 0
+    error_message = "CI builds on the runner: no Cloud Build identity and no deployer project role for dev."
   }
 }
 
