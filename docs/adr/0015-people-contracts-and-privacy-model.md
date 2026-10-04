@@ -51,7 +51,22 @@ left to the builders.
 8. **ADR-0009 does not block.** Owner-only `vis` would be the clean way to keep transcript-derived
    events from a Viewer. Until it lands, PE-12 keeps these events in worlds with no viewer and
    refuses to share such a world; afterwards they carry `vis: []` where `district` is null.
-9. **Fixed counts are not hard-coded.** Team size and per-person team limits live in
+9. **Tilo writes only from sources the person owns.** Tilo adds a personal pin, work item or
+   calendar proposal for person P only from P's own meeting, mail or request. What it derives from
+   another person's meeting reaches P only after that meeting's Owner has confirmed the minutes
+   (`meeting.minutes_confirmed_by`), as a work item or calendar proposal, never as a personal pin.
+   Proposed items are read by no one but the Owner, in the minutes. A person cannot push an item
+   onto another plate. (PE-03, PE-08)
+10. **Free/busy is for teammates.** Busy intervals of accepted entries, over at most 31 days, go
+    to people who share a team with the owner and to no one else; titles never leave the owner
+    except in an entry the owner shared with a team they are in. (PE-04)
+11. **Stamps are written by `tilo-api`**, never from input, and are re-checked on read, confirm
+    and tag (a confirmation names the person who owns the decision and is dated in range; a
+    setter is the creator, or the owner of the source meeting for Tilo's entries). Directory
+    changes are an org owner's. (PE-17, PE-19)
+12. **Flagged content stays flagged.** `flagged` is required on work items, pins and calendar
+    entries; anything built from a flagged record is T3 with `safety_flag`. (PE-21)
+13. **Fixed counts are not hard-coded.** Team size and per-person team limits live in
    `config/personal.yaml`, not in the schemas, except `memberships` maxItems 8 as a safety bound.
 
 ## Alternatives considered
