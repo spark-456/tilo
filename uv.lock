@@ -19,6 +19,7 @@ members = [
     "tilo-providers",
     "tilo-render",
     "tilo-sandbox-web",
+    "tilo-world",
 ]
 
 [[package]]
@@ -1375,6 +1376,7 @@ dependencies = [
     { name = "tilo-metering" },
     { name = "tilo-planning" },
     { name = "tilo-policy" },
+    { name = "tilo-world" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1390,6 +1392,7 @@ requires-dist = [
     { name = "tilo-metering", editable = "packages/metering" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tilo-world", editable = "packages/world" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
@@ -1611,6 +1614,11 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
+
+[[package]]
+name = "tilo-world"
+version = "0.1.0"
+source = { editable = "packages/world" }
 
 [[package]]
 name = "typeguard"
