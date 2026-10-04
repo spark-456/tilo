@@ -50,7 +50,7 @@
             "pattern": "://"
           },
           {
-            "pattern": "meet\\.google\\.com|zoom\\.us|teams\\.microsoft\\.com"
+            "pattern": "[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]"
           }
         ]
       }
@@ -125,7 +125,10 @@
     "transcript": {
       "anyOf": [
         {
-          "$ref": "common.schema.json#/$defs/artifact_ref"
+          "$ref": "common.schema.json#/$defs/artifact_ref",
+          "not": {
+            "required": ["label"]
+          }
         },
         {
           "type": "null"
@@ -135,7 +138,10 @@
     "minutes": {
       "anyOf": [
         {
-          "$ref": "common.schema.json#/$defs/artifact_ref"
+          "$ref": "common.schema.json#/$defs/artifact_ref",
+          "not": {
+            "required": ["label"]
+          }
         },
         {
           "type": "null"
@@ -181,6 +187,9 @@
       },
       "minutes": {
         "type": "null"
+      },
+      "minutes_confirmed_by": {
+        "type": "null"
       }
     }
   },
@@ -197,6 +206,13 @@
       "properties": {
         "minutes": {
           "type": "object"
+        }
+      }
+    },
+    "else": {
+      "properties": {
+        "minutes_confirmed_by": {
+          "type": "null"
         }
       }
     }
@@ -241,7 +257,7 @@
                 "pattern": "://"
               },
               {
-                "pattern": "meet\\.google\\.com|zoom\\.us|teams\\.microsoft\\.com"
+                "pattern": "[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]"
               }
             ]
           }
@@ -284,7 +300,7 @@
                 "pattern": "://"
               },
               {
-                "pattern": "meet\\.google\\.com|zoom\\.us|teams\\.microsoft\\.com"
+                "pattern": "[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]"
               }
             ]
           }

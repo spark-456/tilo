@@ -99,7 +99,7 @@
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
- * meeting.schema.json 1.0.0 sha256:7af456df7fedb0bb
+ * meeting.schema.json 1.0.0 sha256:da49e396159870f5
  * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -3016,8 +3016,8 @@ export interface Meeting {
   status: "scheduled" | "joining" | "live" | "ended" | "minuted" | "discarded" | "deleted";
   ended_reason: ("completed" | "left_on_request" | "removed" | "timeout" | "failed") | null;
   minutes_confirmed_by: TeamLeadAssignment | null;
-  transcript: ArtifactRef | null;
-  minutes: ArtifactRef | null;
+  transcript: ArtifactRef2 | null;
+  minutes: ArtifactRef3 | null;
   delete_transcript_after: Timestamp | null;
   delete_minutes_after: Timestamp | null;
   created_at: Timestamp;
@@ -3058,6 +3058,22 @@ export interface MeetingAttestation {
   by: UserId;
   at: Timestamp;
   notice_version: Semver;
+}
+/**
+ * A pinned version of a stored artifact.
+ */
+export interface ArtifactRef2 {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
+}
+/**
+ * A pinned version of a stored artifact.
+ */
+export interface ArtifactRef3 {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
 }
 /**
  * An @mention of a team member on a team pinboard entry (FR-PB-04). It names a team because a personal entry cannot be tagged (PE-01, PE-06). The tagged person is a member of the team when tagged; they can always remove themselves, and the entry's `set_up_by` person can remove anyone (PE-06). A removed mention stays as a record; a new tag is a new mention.

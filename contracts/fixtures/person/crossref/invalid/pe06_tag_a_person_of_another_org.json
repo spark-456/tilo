@@ -1,0 +1,177 @@
+{
+  "rule": "PE-06",
+  "note": "The setter tags a person who belongs to another org.",
+  "now": "2026-10-06T10:00:00.000Z",
+  "persons": {
+    "u_owner": {
+      "id": "u_owner",
+      "org_id": "org_example",
+      "display_name": "Asha Rao",
+      "aliases": ["Asha"],
+      "email": "asha@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "email",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_priya": {
+      "id": "u_priya",
+      "org_id": "org_example",
+      "display_name": "Priya Nair",
+      "aliases": ["Priya", "PN"],
+      "email": "priya@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "whatsapp",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam": {
+      "id": "u_sam",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam"],
+      "email": "sam@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "mobile_web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam_launch": {
+      "id": "u_sam_launch",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam L"],
+      "email": "sam@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "mobile_web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_other": {
+      "id": "u_other",
+      "org_id": "org_other",
+      "display_name": "Omar Other",
+      "aliases": ["Asha"],
+      "email": "omar@example.org",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "email",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_other",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_other",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    }
+  },
+  "record": {
+    "kind": "mention",
+    "data": {
+      "id": "mn_other_org",
+      "org_id": "org_example",
+      "pin_id": "pb_launch_date",
+      "team": "tm_launch",
+      "user": "u_other",
+      "added_by": {
+        "by": "person",
+        "ref": "u_owner",
+        "at": "2026-10-05T10:30:00.000Z"
+      },
+      "removed": null
+    },
+    "pin": {
+      "id": "pb_launch_date",
+      "org_id": "org_example",
+      "scope": {
+        "kind": "team",
+        "team": "tm_launch"
+      },
+      "title": "Launch is 17 October",
+      "body": null,
+      "kind": "decision",
+      "url": null,
+      "owner": "u_priya",
+      "due": "2026-10-17",
+      "status": "active",
+      "created_by": {
+        "by": "person",
+        "ref": "u_priya",
+        "at": "2026-10-05T10:30:00.000Z"
+      },
+      "set_up_by": "u_priya",
+      "source": null,
+      "confirmed_by": null,
+      "flagged": false,
+      "history": [
+        {
+          "at": "2026-10-05T10:30:00.000Z",
+          "by": "u_priya",
+          "change": "created",
+          "status": "active"
+        }
+      ],
+      "created_at": "2026-10-05T10:30:00.000Z",
+      "updated_at": "2026-10-05T10:30:00.000Z"
+    }
+  },
+  "request": {
+    "actor": "u_priya",
+    "action": "mention",
+    "view": null
+  }
+}
