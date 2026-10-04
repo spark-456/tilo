@@ -4,6 +4,7 @@ import { chooseClient } from "./config";
 import { FixtureClient } from "./fixtureClient";
 import { CARDS_VALID } from "./fixtures/cards";
 import { EVENTS_VILLAGE_BASIC } from "./fixtures/events";
+import { LAYOUT_VILLAGE_BASIC } from "./fixtures/layout";
 import { HttpClient, TiloApiError } from "./http";
 
 const BASE = "https://api.test";
@@ -148,10 +149,68 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("getLayout has no API route yet: a plain, non-retryable error and no request", async () => {
-    const { calls, fetch } = script();
-    await expect(client(fetch).getLayout("w1")).rejects.toMatchObject({ retryable: false });
-    expect(calls).toHaveLength(0);
+  it("FR-WLD-05 getLayout reads the events first and asks for the layout only once world.started is on record", async () => {
+    const started = { events: [{ id: "e1", seq: 1, type: "world.started" }] };
+    const { calls, fetch } = script(
+      json({ events: [{ id: "e0", seq: 1, type: "budget.granted" }] }),
+      json(started),
+      json(LAYOUT_VILLAGE_BASIC),
+    );
+    const c = client(fetch, 1);
+    await expect(c.getLayout("w 1")).resolves.toMatchObject({ world_id: "w_village_basic" });
+    expect(calls.map((x) => x.url)).toEqual([
+      `${BASE}/worlds/w%201/events`,
+      `${BASE}/worlds/w%201/events`,
+      `${BASE}/worlds/w%201/layout`,
+    ]);
+  });
+
+  it("FR-WLD-05 getLayout keeps a built layout and shares one call per world", async () => {
+    const { calls, fetch } = script(
+      json({ events: [{ id: "e1", seq: 1, type: "world.started" }] }),
+      json(LAYOUT_VILLAGE_BASIC),
+    );
+    const c = client(fetch, 1);
+    const [a, b] = await Promise.all([c.getLayout("w1"), c.getLayout("w1")]);
+    expect(a).toBe(b);
+    await c.getLayout("w1");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("FR-WLD-05 getLayout polls a 404 for a moment, then says the world is not built", async () => {
+    const started = json({ events: [{ id: "e1", seq: 1, type: "world.started" }] });
+    const { calls, fetch } = script(
+      started,
+      json({ detail: "Not Found" }, 404),
+      json(LAYOUT_VILLAGE_BASIC),
+    );
+    await expect(client(fetch, 1).getLayout("w1")).resolves.toBeDefined();
+    expect(calls).toHaveLength(3);
+    const never = script(
+      json({ events: [{ id: "e1", seq: 1, type: "world.started" }] }),
+      ...Array.from({ length: 5 }, () => json({ detail: "Not Found" }, 404)),
+    );
+    await expect(client(never.fetch, 1).getLayout("w1")).rejects.toMatchObject({
+      status: 404,
+      retryable: true,
+    });
+  });
+
+  it("FR-WLD-05 getLayout rejects plainly when the run failed before it built a world, and a retry asks again", async () => {
+    const failed = script(json({ events: [{ id: "e1", seq: 1, type: "world.failed" }] }));
+    const c = client(failed.fetch, 1);
+    await expect(c.getLayout("w1")).rejects.toMatchObject({ retryable: false });
+    expect(failed.calls).toHaveLength(1);
+    const again = script(json({ events: [] }, 500));
+    await expect(client(again.fetch, 1).getLayout("w1")).rejects.toMatchObject({ retryable: true });
+  });
+
+  it("FR-WLD-05 getLayout refuses a reply that is not a layout", async () => {
+    const { fetch } = script(
+      json({ events: [{ id: "e1", seq: 1, type: "world.started" }] }),
+      json({ nothing: true }),
+    );
+    await expect(client(fetch, 1).getLayout("w1")).rejects.toMatchObject({ retryable: true });
   });
 });
 

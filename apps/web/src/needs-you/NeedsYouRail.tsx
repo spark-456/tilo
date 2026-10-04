@@ -3,10 +3,12 @@
 // while a card waits. Each row opens the queue.
 import { AppLink } from "../screens/AppLink";
 import { useFixtureRun } from "../screens/kit";
+import { withWorld } from "../world/worldContext";
 import { deriveQueue, rungOf } from "./queue";
 
 export function NeedsYouRail() {
-  const items = deriveQueue(useFixtureRun().events);
+  const { events, worldId } = useFixtureRun();
+  const items = deriveQueue(events);
   return (
     <>
       <h2>Needs you</h2>
@@ -19,7 +21,7 @@ export function NeedsYouRail() {
           <ul className="rows" data-testid="rail-needs">
             {items.map((item) => (
               <li key={item.cardId}>
-                <AppLink className="row" to="/needs-you">
+                <AppLink className="row" to={withWorld("/needs-you", worldId)}>
                   <span className="row-name">{item.opened.summary}</span>
                   <span className="row-state">{rungOf(item).label}</span>
                 </AppLink>

@@ -33,7 +33,8 @@ function runFor(client: TiloClient, worldId: string): Run {
 }
 
 /** Hands `onEvent` every event the run holds so far, at once and in seq order, then each new one
- * as it arrives (the stage draws the run the lenses and the HUD read). Returns stop. */
+ * as it arrives, once each in seq order (the stage draws the run the lenses and the HUD read,
+ * sharing the page's one subscription). Returns stop. */
 export function watchRun(
   client: TiloClient,
   worldId: string,

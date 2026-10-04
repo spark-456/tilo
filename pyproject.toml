@@ -20,7 +20,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["services/api", "services/harness", "services/sandbox-web", "packages/providers", "packages/contracts-py", "packages/policy", "packages/metering", "evals", "services/connectors", "packages/archive", "packages/planning", "services/render", "services/channels", "services/browser"]
+members = ["services/api", "services/harness", "services/sandbox-web", "packages/providers", "packages/contracts-py", "packages/policy", "packages/metering", "evals", "services/connectors", "packages/archive", "packages/planning", "packages/world", "services/render", "services/channels", "services/browser"]
 
 [tool.pytest.ini_options]
 markers = [

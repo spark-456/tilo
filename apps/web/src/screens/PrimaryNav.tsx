@@ -2,6 +2,7 @@
 // Needs you, Library, More). Every other screen is reached from More. Real links only: each one
 // goes to a built screen or to a "Coming soon" screen, never to a dead click.
 import { usePathname } from "../router";
+import { useAddressedWorld, withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
 import { screenMeta } from "./meta";
 
@@ -36,12 +37,17 @@ export const TAB_SCREEN_IDS: ReadonlySet<string> = new Set(
 export function PrimaryNav({ id, mobile }: { id: string; mobile: boolean }) {
   const path = usePathname();
   const current = sectionOf(path);
-  const inWorld = WORLD_ID.exec(path)?.[1];
+  // The world of the path, else of `?world=` (the Needs-you screens): its links keep that world.
+  const inWorld = useAddressedWorld();
   return (
     <nav className={id} data-testid={id} aria-label="Primary">
       {ITEMS.filter((i) => !(mobile && i.desktopOnly)).map((i) => {
         const base = (i.screen && screenMeta(i.screen)?.path) || "/more";
-        const to = inWorld ? base.replace(WORLD_ID, `/world/${inWorld}`) : base;
+        const to = !inWorld
+          ? base
+          : i.section === "needs"
+            ? withWorld(base, inWorld)
+            : base.replace(WORLD_ID, `/world/${encodeURIComponent(inWorld)}`);
         return (
           <AppLink
             key={i.section}

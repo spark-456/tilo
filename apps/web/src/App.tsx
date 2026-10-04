@@ -84,8 +84,9 @@ export function App() {
   const worldId = unknownWorld ? null : pathWorld;
   const hudWorld = screen ? null : worldId;
   // The stage draws a ?fixture= replay if one was asked for, else the run of the world in the path
-  // (the same layout and events the HUD reads); anywhere else it keeps its bare grid.
-  const clientWorld = useClientWorld(world.active ? null : hudWorld);
+  // (the same layout and events the HUD reads), through any client, the fixture client included
+  // (FR-WLD-05); anywhere else it keeps its bare grid.
+  const clientWorld = useClientWorld(client, world.active ? null : hudWorld);
   const stageWorld = world.active ? world : clientWorld;
   // FR-WLD-07: the stage is veiled only while the recorded run status is "paused" (HR-1).
   const clientStatus = useRunStatus(client, hudWorld);
@@ -145,6 +146,22 @@ export function App() {
         // biome-ignore lint/a11y/useSemanticElements: <output> is for a form/calculation result; this is a persistent mode banner, so an explicit role="status" region fits better.
         <div className="fixture-replay-banner" data-testid="fixture-replay-banner" role="status">
           Fixture replay — dev data, not a real run
+        </div>
+      )}
+      {clientWorld.note && (
+        // Fixed like the fixture alerts, so it never shifts the layout. Says what is true: the world
+        // is not drawn until the run has built one.
+        <div
+          className="live-world-note"
+          data-testid="live-world-note"
+          role={clientWorld.retry ? "alert" : "status"}
+        >
+          <p>{clientWorld.note}</p>
+          {clientWorld.retry && (
+            <button type="button" className="secondary" onClick={clientWorld.retry}>
+              Try again
+            </button>
+          )}
         </div>
       )}
       {world.loadError && (
