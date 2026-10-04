@@ -93,7 +93,10 @@
       "additionalProperties": false,
       "required": ["outcome"],
       "properties": {
-        "outcome": { "type": "string", "enum": ["completed", "held_at_gate", "refused", "needs_answers"] }
+        "outcome": {
+          "type": "string",
+          "enum": ["completed", "held_at_gate", "refused", "needs_answers"]
+        }
       }
     },
     "notes": { "type": "string" }
