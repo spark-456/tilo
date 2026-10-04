@@ -28,6 +28,7 @@ import type { Pt } from "./art/iso";
 import { buildingTag, districtTag, islandTag, makePill, policyTag } from "./art/labels";
 import { type PinKind, drawPin } from "./art/pins";
 import type { Frame, FrameRect } from "./frame";
+import { BUILDING_STATE, ISLAND_STATE } from "./runSummary";
 
 const { tileWidth: TW, tileHeight: TH } = tokens.stage;
 const RING = { width: 3, color: tokens.color.brand.primary };
@@ -35,20 +36,6 @@ const RING = { width: 3, color: tokens.color.brand.primary };
 const PRO_AGENT_SHARE = 0.7;
 const agentScale = (d: Density) =>
   d === "professional" ? AGENT_SCALE * PRO_AGENT_SHARE : AGENT_SCALE;
-/** The words a Professional tag adds, from the recorded state only (HR-1, UX-4). */
-const BUILDING_WORD: Readonly<Record<string, string>> = {
-  planned: "Planned",
-  constructing: "Being built",
-  operational: "Working",
-  completed: "Done",
-  archived: "Archived",
-};
-const ISLAND_WORD: Readonly<Record<string, string>> = {
-  locked: "Locked",
-  requested: "Waiting for access",
-  connected: "Connected",
-  failed: "Access lost",
-};
 const GATE_WORD: Readonly<Record<string, string>> = {
   closed: "Closed",
   waiting: "Needs you",
@@ -61,8 +48,14 @@ const RANK_WORD: Readonly<Record<string, string>> = {
   verifier: "Verifier",
   specialist: "Specialist",
 };
-const named = (name: string, word: string | undefined, d: Density) =>
-  d === "professional" && word ? `${name} · ${word}` : name;
+/** Below this on-screen tag height the state word is dropped: it is not readable (a phone's fit
+ * scale puts the 12 px tag at 6 px). The name stays; the Inspect panel carries the state. */
+const MIN_WORD_PX = 8;
+const TAG_PX = 12;
+/** State words are the shared map's (runSummary.ts), from the recorded state only (HR-1, UX-4). */
+const word = (words: Readonly<Record<string, string>>, state: string) => words[state];
+const named = (name: string, word: string | undefined, d: Density, narrow: boolean) =>
+  d === "professional" && !narrow && word ? `${name} · ${word}` : name;
 
 interface Item {
   readonly g: Graphics;
@@ -215,7 +208,15 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     frame.bridges,
   ]);
   const mode = layer.density();
-  const key = JSON.stringify([groundKey, frame.buildings, frame.islands, frame.gates, mode]);
+  const narrow = layer.content.scale.x * TAG_PX < MIN_WORD_PX;
+  const key = JSON.stringify([
+    groundKey,
+    frame.buildings,
+    frame.islands,
+    frame.gates,
+    mode,
+    narrow,
+  ]);
   if (key === layer.staticKey) return;
   layer.staticKey = key;
 
@@ -267,10 +268,14 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     });
     const kind = PIN[b.status];
     if (kind) pinned.push(() => drawPin(layer.pins, it.top, kind, { tint: b.tint }));
-    tag(layer, live, b.id, named(b.name, BUILDING_WORD[b.status], mode), buildingTag, [
-      it.top[0],
-      it.top[1] - (kind ? 50 : 14),
-    ]);
+    tag(
+      layer,
+      live,
+      b.id,
+      named(b.name, word(BUILDING_STATE, b.status), mode, narrow),
+      buildingTag,
+      [it.top[0], it.top[1] - (kind ? 50 : 14)],
+    );
   }
   for (const i of frame.islands) {
     seen.add(i.id);
@@ -281,7 +286,7 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     const [cx, cy] = P(x + w / 2, y + d / 2, i.lift);
     const pin = i.state === "locked" ? "lock" : i.state === "failed" ? "blocked" : null;
     if (pin) pinned.push(() => drawPin(layer.pins, [cx, cy + 18], pin, { lift: 0, r: 12 }));
-    tag(layer, live, i.id, named(i.name, ISLAND_WORD[i.state], mode), islandTag, [
+    tag(layer, live, i.id, named(i.name, word(ISLAND_STATE, i.state), mode, narrow), islandTag, [
       cx,
       cy + (pin ? 40 : 22),
     ]);
