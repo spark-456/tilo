@@ -2,12 +2,13 @@
 
 Every TiloEvent lands once. The key is the event `id`, never the Pub/Sub message id, and the first write wins: a later
 message with the same id never rewrites the row. `EventLedger` has no method that updates or deletes a row; removal
-for retention or erasure (FR-MEM-09) is a separate store on the same table. A message that cannot be read is
-`rejected` and acknowledged, so one poison message cannot make the stream loop (BQ-194).
+for retention or erasure (FR-MEM-09) is `LedgerRetentionStore`, the one path that deletes rows (BQ-195). A message
+that cannot be read is `rejected` and acknowledged, so one poison message cannot make the stream loop (BQ-194).
 
-Table protocol (what `EventLedger` needs, duck-typed): `insert_if_absent(row) -> dict | None` (atomic; None when
-inserted, else the row already there) and `rows() -> list[dict]`. Two table classes implement it: an in-memory one for
-dev and tests, and `BigQueryLedgerTable`, tested against a mock client only (no cloud calls here).
+Table protocol (duck-typed): `insert_if_absent(row) -> dict | None` (atomic; None when inserted, else the row already
+there), `rows() -> list[dict]`, and `delete_row(id)` (idempotent; only `LedgerRetentionStore` calls it). Two table
+classes implement it: an in-memory one for dev and tests, and `BigQueryLedgerTable`, tested against a mock client only
+(no cloud calls here).
 """
 
 from __future__ import annotations
@@ -16,8 +17,9 @@ import copy
 import json
 import re
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 REQUIRED = ("v", "id", "seq", "ts", "world_id", "type", "severity")
@@ -124,6 +126,10 @@ class InMemoryLedgerTable:
         with self._lock:
             return [copy.deepcopy(r) for r in self._rows.values()]
 
+    def delete_row(self, row_id: str) -> None:
+        with self._lock:
+            self._rows.pop(row_id, None)
+
 
 class BigQueryClient(Protocol):
     """The two calls the adapter needs; a thin wrapper over google-cloud-bigquery is wired at deploy time."""
@@ -168,6 +174,53 @@ class BigQueryLedgerTable:
     def rows(self) -> list[dict[str, Any]]:
         return [dict(r) for r in self._client.query(self._select(), {})]
 
+    def delete_row(self, row_id: str) -> None:
+        self._client.run_dml(f"DELETE FROM `{self._table}` WHERE id = @id", {"id": row_id})
+
     def _select(self) -> str:
         cols = ", ".join(_READ.get(c) or (f"TO_JSON_STRING({c}) AS {c}" if c in JSON_COLUMNS else c) for c in COLUMNS)
         return f"SELECT {cols} FROM `{self._table}`"
+
+
+_NEVER = datetime.max.replace(tzinfo=UTC)
+
+
+@dataclass(frozen=True)
+class LedgerRecord:
+    """A ledger row as the retention protocol sees it: ids and times only, never the event."""
+
+    record_id: str
+    created_at: datetime
+    user_id: str | None
+    entity: str = "event_ledger"
+
+
+def _event_time(ts: Any) -> datetime:
+    """The event `ts` as aware UTC. Ingest only checks that `ts` is a non-empty string, so an unreadable one is aged
+    as never expiring (retention must not delete a row early) but stays findable for erasure."""
+    try:
+        parsed = datetime.fromisoformat(ts)
+    except (TypeError, ValueError):
+        return _NEVER
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+
+
+class LedgerRetentionStore:
+    """The one sanctioned path that removes ledger rows (retention and user erasure, FR-MEM-09, BQ-195). A row belongs
+    to the owner of its world, `world_owner(world_id)`; a world with no known owner gives user_id None, which a user
+    erasure never touches. A failing `world_owner` raises, so the caller reports the store as unreadable."""
+
+    def __init__(self, table: Any, *, world_owner: Callable[[str], str | None]):
+        self._table, self._world_owner = table, world_owner
+
+    def records(self) -> list[LedgerRecord]:
+        records = []
+        for row in self._table.rows():
+            owner = self._world_owner(row["world_id"])
+            records.append(
+                LedgerRecord(row["id"], _event_time(row.get("ts")), owner if isinstance(owner, str) else None)
+            )
+        return records
+
+    def delete(self, record_id: str) -> None:
+        self._table.delete_row(record_id)
