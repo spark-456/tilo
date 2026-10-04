@@ -1,0 +1,85 @@
+id: B-032
+domain: engineering
+shapes:
+- single_deliverable
+- deep_chain
+title: A runbook for rotating staging database credentials
+brief: 'Write a runbook for rotating the staging database credentials without downtime: prerequisites, steps, verification,
+  rollback.'
+director:
+  brief:
+    goal: Write a runbook for zero-downtime rotation of staging database credentials.
+    deliverables:
+    - title: Runbook
+      format: markdown
+    audience: On-call engineers
+    deadline: null
+    constraints:
+    - Prerequisites, steps, verification, rollback
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: List the systems that use the credentials
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: analyse
+      title: Design the rotation order
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write prerequisites and steps
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+    - id: U4
+      unit_type: draft
+      title: Write verification and rollback
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U3
+    - id: U5
+      unit_type: verify
+      title: Walk the steps for gaps
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U4
+    - id: U6
+      unit_type: verify
+      title: Check rollback restores service
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U5
+expect:
+  outcome: completed
