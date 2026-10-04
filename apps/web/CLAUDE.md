@@ -25,7 +25,7 @@ Trace lenses, cards and settings.
 ## Screens (`src/screens/`, AGW-08)
 - `meta.ts` is the PRD 18.3 table (S-01..S-25, status, route pattern); `routes.tsx` maps each
   routed screen to its `S_NN.tsx`. Build one: replace the stub, flip its status. `/more`, `/screens`.
-- A control that does nothing yet is `aria-disabled="true"` with a "Coming soon" title.
+- A control that does nothing yet is `aria-disabled="true"` with a "Coming soon" title. Nothing to list yet is `EmptyState` (`kit.tsx`: glyph, title, line, one action), in the reserved box the loading state held.
 - `?speed=` is parsed in `world/speed.ts` (clamped 0.1..1000); the HR-6 badge says "Replay at N× speed"; it and the HR-4 pill sit in the fixed `.status-strip` (shell padded by `--strip-h`).
 - An unknown world id or an unowned path under `/world/` or `/task/` shows `NotFound`, not Start.
 
