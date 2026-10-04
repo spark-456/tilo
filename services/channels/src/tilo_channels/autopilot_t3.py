@@ -35,6 +35,7 @@ _LEGAL = re.compile(
 _COMMITMENT = re.compile(
     r"\b(?:we|i)\s+(?:will|shall)\b|\b(?:we|i)['’]ll\b"
     r"|\b(?:guarant\w*|promis\w*|commit\w*|deadlines?|assur\w*|pledg\w*|hereby|deals?)\b"
+    r"|\b(?:yours|will\s+do|for\s+free|on\s+(?:us|me))\b"
     r"|\b(?:consider\s+it\s+(?:done|settled|sorted)|my\s+word|count\s+on\s+(?:me|us)|rest\s+assured"
     r"|leave\s+it\s+(?:with|to)\s+(?:me|us)|you\s+can\s+rely|(?:we|i)\s+(?:am|are|['’]m|['’]re)\s+going\s+to)\b"
 )
@@ -46,22 +47,22 @@ _LEET = str.maketrans("013457@", "oieasta")
 # or any word off the list is the signal "unlisted".
 SHORT_BODY_MAX = 2_000
 _TIME = re.compile(r"\b(?:(?:1[0-2]|0?[1-9])(?::[0-5][0-9])?\s?(?:am|pm)|(?:[01]?[0-9]|2[0-3]):[0-5][0-9])\b", re.I)
-_LINK = re.compile(r"://|[/@\\]|[a-z]\.[a-z]")
-_TOKEN = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?")
+_LINK = re.compile(r"://|[/@\\]|[a-z0-9][.。｡][a-z]")
+_ITEM = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?|[^\sA-Za-z]")
 _NAME_LEADS = frozenset("hi hello hey dear thanks thank best regards cheers sincerely".split())
 _WORDS = frozenset(
     (
-        "hi hello hey dear good morning afternoon evening night thanks thank you your yours very much so again for "
+        "hi hello hey dear good morning afternoon evening night thanks thank you your very much so again for "
         "the a an and it its is that this we us our i me my to be at on in by with from of or but then there here see "
         "talk "
         "soon next last week weekend month year tomorrow today tonight monday tuesday wednesday thursday friday "
         "saturday sunday jan feb mar apr may jun jul aug sep oct nov dec january february march april june july "
         "august september october november december works work fine great sounds sound happy glad meet meeting call "
         "chat catch up time day date confirmed confirm let know looks look forward best regards cheers kind sincerely "
-        "warm wishes ok okay yes sure please can could would should will does do not no all also too just well back "
-        "out have has had are was were am what when where who how if any some more both free available around about "
+        "warm wishes ok okay yes sure please can could would does do not no all also too just well back "
+        "out have has had are was were am what when where who how if any some more both available around about "
         "after before late early noon lunch coffee hope perfect lovely nice enjoy safe travels office room slot "
-        "same sorry i'm it's that's don't doesn't can't let's you're we're we've i've you've isn't won't"
+        "same sorry i'm it's that's don't doesn't can't let's you're we're we've i've you've isn't"
     ).split()
 )
 _BREAKS = re.compile("\r\n|[\r\x0b\x0c\x1c\x1d\x1e\x85  ]")
@@ -87,19 +88,38 @@ def _suspicious(c: str) -> bool:
 
 def _unlisted(cleaned: str) -> bool:
     """True when the body is not plain scheduling talk: too long, a link, a digit that is not a time of day, or a word
-    that is neither on the list nor a name straight after a greeting or sign-off. One pass, no backtracking."""
+    that is neither on the list nor part of a name. A name is at most two Title-case words (two letters or more) right
+    after a greeting or sign-off word that starts a clause, or alone on a line within two lines of a line holding only
+    sign-off words; the run ends at the first punctuation, line break or listed word. One pass, no backtracking."""
     if len(cleaned) > SHORT_BODY_MAX:
         return True
-    cleaned = _TIME.sub(" ", cleaned)
-    if _LINK.search(cleaned.lower()) or any(c.isdigit() for c in cleaned):
+    if _LINK.search(cleaned.lower()):  # before times are removed: "5pm.me" is a link
         return True
-    names_ok = False  # the last word was a greeting, a sign-off or a name ("and" keeps it)
-    for token in _TOKEN.findall(cleaned.replace("’", "'")):
-        word = token.lower()
-        name = names_ok and word not in _WORDS and token.istitle()
-        if word not in _WORDS and not name:
+    cleaned = _TIME.sub(" ", cleaned).replace("’", "'")
+    if any(c.isdigit() for c in cleaned):
+        return True
+    sign = 0  # lines left in which a name-only line may follow a line of sign-off words
+    for line in cleaned.split("\n"):
+        items = _ITEM.findall(line)
+        words = [i.lower() for i in items if i[0].isalpha()]
+        run: list[str] = []
+        solo, slots, start = sign > 0, 2 if sign > 0 else 0, True
+        if solo and len(words) > 2:
             return True
-        names_ok = word in _NAME_LEADS or name or (names_ok and word == "and")
+        for item in items:
+            word = item.lower()
+            if not item[0].isalpha():
+                slots, run, start = 0, [], item in ".!?"
+            elif word in _WORDS:
+                slots, run, start = (2 if start and word in _NAME_LEADS else 0), [], False
+            elif slots > 0 and len(item) > 1 and item.istitle():
+                run.append(word)
+                slots, start = slots - 1, False
+                if len(run) > 1 and any(p.search("".join(run)) for _, p in _FAMILIES):  # "Re Fund"
+                    return True
+            else:
+                return True
+        sign = 2 if words and all(w in _NAME_LEADS for w in words) else max(sign - 1, 0)
     return False
 
 
@@ -108,7 +128,13 @@ def t3_content_signal(text: str) -> frozenset[str]:
     if len(text) > SIGNAL_CAP:
         return frozenset({"obfuscated"})
     signal = {"obfuscated"} if any(_hidden(c) for c in text) else set()
-    cleaned = unicodedata.normalize("NFKC", clean_text(text))
+    parts, size, raw = [], 0, clean_text(text)
+    for i in range(0, len(raw), 512):  # NFKC can expand a character 18-fold (U+FDFA): stop when the output is too big
+        parts.append(unicodedata.normalize("NFKC", raw[i : i + 512]))
+        size += len(parts[-1])
+        if size > SIGNAL_CAP:
+            return frozenset(signal | {"obfuscated"})
+    cleaned = "".join(parts)
     folded = cleaned.lower()
     if any(_suspicious(c) for c in folded):
         signal.add("obfuscated")
