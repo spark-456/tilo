@@ -20,6 +20,7 @@ from _chn11_lib import (
     OutboxRefused,
     autopilot_module,
     drafted,
+    fake_evidence_kwargs,
     make_bench,
     pair,
     scripted_thread,
@@ -48,6 +49,7 @@ def instance(bench, *, reader=None, policy=None):
         clock=bench.rig.clock,
         world_id=WORLD,
         run_id=RUN,
+        **fake_evidence_kwargs(),
     )
 
 
