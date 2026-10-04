@@ -20,3 +20,15 @@ class AdapterError(Exception):
 
 class SideEffectRefused(AdapterError):
     """Final: the side effect can never succeed as written. The outbox marks the entry failed."""
+
+
+class RateLimited(AdapterError):
+    """429 still answered after the attempts, or a Retry-After over 60 s. The outbox waits it out across ticks."""
+
+    def __init__(self, retry_after_s: int) -> None:
+        super().__init__(f"rate limited; retry after {retry_after_s} s")
+        self.retry_after_s = retry_after_s
+
+
+class ProviderUnavailable(AdapterError):
+    """5xx or a TransportError, still after the attempts: ambiguous, the provider may have acted."""

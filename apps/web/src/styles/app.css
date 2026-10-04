@@ -78,7 +78,7 @@ body {
   border-radius: var(--radius-pill);
   background: var(--color-ink-1);
   color: var(--color-surface-1);
-  font: 700 0.8125em var(--font-ui);
+  font: 700 0.75em var(--font-ui);
 }
 /* Fixed like the banner above it, so it never shifts the layout (P0-08b). Neutral tokens only. */
 .fixture-load-alert {
@@ -460,7 +460,7 @@ button.row {
   background: var(--color-surface-2);
   color: var(--color-ink-1);
   font-weight: 800;
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 .chip-needs {
   background: var(--color-signal-needs);
@@ -571,7 +571,7 @@ button.row {
 }
 .stat-name {
   font-weight: 700;
-  font-size: 0.8125em;
+  font-size: 0.75em;
   color: var(--color-ink-2);
 }
 .action-row {
@@ -666,7 +666,7 @@ button.row {
 }
 .hud-figures span {
   color: var(--color-ink-2);
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 .hud-count {
   display: flex;
@@ -711,13 +711,13 @@ button.row {
 .row-name small {
   color: var(--color-ink-2);
   font-weight: 400;
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 .row-state {
   flex: 0 0 7.5em; /* a fixed box, left-aligned: a new state word never moves its left edge (CLS) */
   color: var(--color-ink-2);
   font-weight: 700;
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 @media (max-width: 767px) {
   .row {
@@ -1260,6 +1260,89 @@ button.row {
     min-height: 3em;
   }
 }
+/* AGW-04 S-03 Approaches and budget: approach cards and editable budget cap. */
+.flow-shell[data-screen="Approaches"] {
+  width: min(520px, calc(100vw - 464px));
+}
+/* The slot reserves the ready height (cards, cap box, rule line, cost line), measured: 588 px at
+   1440, 754 px at 768 (the stage rail leaves 304 px), 625 px at 390, 698 px at 360, 754 px at 320. */
+.flow-shell[data-screen="Approaches"] .flow-slot {
+  display: flow-root;
+  min-height: 37em;
+}
+@media (max-width: 1023px) {
+  .flow-shell[data-screen="Approaches"] .flow-slot {
+    min-height: 48em;
+  }
+}
+@media (max-width: 767px) {
+  .flow-shell[data-screen="Approaches"] {
+    width: calc(100vw - 32px);
+  }
+  .flow-shell[data-screen="Approaches"] .flow-slot {
+    min-height: 40em;
+  }
+}
+@media (max-width: 389px) {
+  .flow-shell[data-screen="Approaches"] .flow-slot {
+    min-height: 44em;
+  }
+}
+@media (max-width: 359px) {
+  .flow-shell[data-screen="Approaches"] .flow-slot {
+    min-height: 48em;
+  }
+}
+.approach-card {
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+}
+.approach-card[data-selected="true"] {
+  border-color: var(--color-brand-primary);
+}
+.approach-head,
+.budget-cap-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 4px;
+  font: 700 0.875em var(--font-ui);
+}
+.approach-summary,
+.approach-meta {
+  margin: 0 0 2px;
+  color: var(--color-ink-2);
+  font: 400 0.875em / 1.3 var(--font-ui); /* 14 px: the minimum type size */
+}
+.approach-head {
+  font-size: 1em; /* the 14 px below must not compound with the shared 0.875em of this row */
+}
+.approach-head .secondary,
+.approach-head .btag {
+  font-size: 0.875rem; /* exactly 14 px: the minimum type size; .btag alone is 12 px */
+}
+.budget-cap-hint {
+  display: block;
+  min-height: 2.8em; /* two lines, reserved: the rule appears without moving what is below */
+  margin: 0;
+  font: 700 0.875em / 1.4 var(--font-ui);
+}
+.s03-approaches .flow-detail {
+  min-height: 4.2em; /* three lines: the valid line and the neutral one take the same room */
+}
+.budget-cap-field input {
+  width: 6em;
+  padding: 4px 8px;
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 1em var(--font-ui);
+}
 /* AGW-03 S-02 Understanding: brief chips, files, applied preferences and clarifying questions. */
 .flow-shell[data-screen="Understanding"] {
   width: min(520px, calc(100vw - 464px));
@@ -1310,4 +1393,52 @@ button.row {
   margin: 6px 0 0;
   color: var(--color-ink-2);
   font-weight: 700;
+}
+/* FR-WLD-07: Pause all and the Paused banner share one fixed box, so no state moves what is around
+   it (CLS). No animation or transition anywhere (HR-2, FR-WLD-09). Neutral role tokens only. */
+.pause-slot {
+  box-sizing: border-box;
+  height: 7em; /* a 48 px button row and a two-line note at 14 px */
+  margin: 8px 0;
+  overflow: hidden;
+}
+.pause-row {
+  display: flex;
+  gap: 8px;
+}
+.pause-btn {
+  font-size: 1em; /* 14 px in the rail, 16 px in the mobile sheet: on the type scale */
+}
+.pause-btn[aria-disabled="true"] {
+  border-style: dashed;
+  border-color: var(--color-ink-2);
+  color: var(--color-ink-2);
+  cursor: not-allowed;
+}
+.pause-note {
+  margin: 4px 0 0;
+  font-size: 1em;
+  line-height: 1.4;
+  color: var(--color-ink-1);
+}
+@media (max-width: 767px) {
+  .pause-btn {
+    min-height: 52px;
+  }
+}
+/* Grey over the stage while the record says paused; click-through so the camera still works. */
+.world-veil {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 72px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-ink-2) 45%, transparent);
+}
+.veil-label {
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 1em / 1.25 var(--font-ui);
 }

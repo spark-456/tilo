@@ -6,6 +6,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import type { WorldSeam } from "../stage/Stage";
 import { loadFixture } from "./fixtureLoader";
+import type { RunStatus } from "./runSummary";
 import { runWorld } from "./runWorld";
 import { useSelection } from "./selection";
 import { parseSpeed, speedBadgeText } from "./speed";
@@ -15,6 +16,8 @@ export interface WorldFixtureState {
   readonly seq: number;
   readonly trace: ReadonlyArray<{ seq: number; type: string }>;
   readonly speedLabel: string | null;
+  /** The replayed run's recorded status (FR-WLD-07: "paused" shows the veil). */
+  readonly status: RunStatus;
   /** The run's selected object (FR-WLD-06), for the stage frame's data-selected. */
   readonly selected: string | null;
   /** Set when the named fixture could not be loaded (or no name was given); shown as an alert. */
@@ -36,6 +39,7 @@ export function useWorldFixture(): WorldFixtureState {
   const reducedMotionRef = useRef(false);
   reducedMotionRef.current = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [seq, setSeq] = useState(0);
+  const [status, setStatus] = useState<RunStatus>("idle");
   const [loadError, setLoadError] = useState<string | null>(
     fixture === "" ? "No fixture name was given, so the fixture could not be loaded." : null,
   );
@@ -71,6 +75,7 @@ export function useWorldFixture(): WorldFixtureState {
             reducedMotion: () => reducedMotionRef.current,
             onSeq: (n) => !cancelled && setSeq(n),
             onTrace: (t) => !cancelled && setTrace(t),
+            onStatus: (s) => !cancelled && setStatus(s),
           });
         })
         .catch(() => {
@@ -91,6 +96,7 @@ export function useWorldFixture(): WorldFixtureState {
     seq,
     trace,
     speedLabel: speedBadgeText(speed),
+    status,
     selected,
     loadError,
     onWorld,

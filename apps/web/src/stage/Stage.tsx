@@ -50,7 +50,8 @@ export function Stage({
   onWorld,
   seq,
   selected,
-}: { onWorld?: WorldSeam; seq?: number; selected?: string | null }) {
+  paused = false,
+}: { onWorld?: WorldSeam; seq?: number; selected?: string | null; paused?: boolean }) {
   const frameRef = useRef<HTMLElement>(null);
   const [supported] = useState(() => !!document.createElement("canvas").getContext("webgl2"));
   const msRef = useRef(0);
@@ -221,11 +222,19 @@ export function Stage({
       data-testid="stage-frame"
       {...(seq !== undefined ? { "data-seq": seq } : {})}
       {...(selected ? { "data-selected": selected } : {})}
+      {...(paused ? { "data-paused": "true" } : {})}
       aria-label="World stage"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard pan and zoom (PRD 9.7).
       tabIndex={0}
       ref={frameRef}
     >
+      {paused && (
+        // FR-WLD-07: drawn only while the recorded status is "paused"; static (no animation) and
+        // click-through, so the camera still pans. Its word does not rely on colour.
+        <div className="world-veil" data-testid="world-veil">
+          <span className="veil-label">Paused</span>
+        </div>
+      )}
       {!supported && (
         <p className="stage-fallback" data-testid="stage-fallback">
           This browser can't render the isometric World. The Story lens will show the run instead.
