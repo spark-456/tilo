@@ -1,12 +1,12 @@
 """tilo_channels.autopilot_t3: the deterministic money / legal / commitment signal that keeps a draft off the L2 undo
 window (FR-CHN-11; PRD 10.4 T3 "money, contract or legal terms"; issue #243; BQ-153).
 
-It never depends on the drafting checker's `ready`. The text is cleaned (format and control characters removed),
-NFKC-normalised and lower-cased, then matched against fixed word families. It fails closed with "obfuscated": on a
-format or control character in the raw text (newline, tab and carriage return aside), on any non-ASCII character
-after NFKC that is not punctuation, a space or a currency sign (a look-alike letter, a combining mark, a foreign
-digit, an emoji), and on text over SIGNAL_CAP. An accented name therefore also makes a draft T3: a safe false
-positive. Callers pass the raw body, so a hidden character the cleaned preview would not show is itself T3.
+It never depends on the drafting checker's `ready`. The text is cleaned (line breaks as "\\n", other format and
+control characters removed), NFKC-normalised and lower-cased, then matched against fixed word families. It fails
+closed with "obfuscated": on a format, control (newline, tab and CR aside) or line-separator character in the raw text,
+on any non-ASCII character after NFKC that is not punctuation, a space or a currency sign (a look-alike letter, a
+combining mark, a foreign digit, an emoji), and on text over SIGNAL_CAP. An accented name therefore also makes a
+draft T3: a safe false positive. Callers pass the raw body, so a hidden character the preview drops is itself T3.
 """
 
 from __future__ import annotations
@@ -30,16 +30,20 @@ _COMMITMENT = re.compile(
     r"|\b(?:guarant\w*|promis\w*|commit\w*|deadlines?|assur\w*|pledg\w*)\b"
 )
 _FAMILIES = (("money", _MONEY), ("legal", _LEGAL), ("commitment", _COMMITMENT))
+_BREAKS = re.compile("\r\n|[\r\x0b\x0c\x1c\x1d\x1e\x85  ]")
 
 
 def clean_text(text: str) -> str:
-    """`text` without Unicode format (Cf) characters and without control (Cc) characters other than newline and tab."""
+    """`text` with every line break (CRLF, a lone CR as the MIME text encoder sends it, and the others
+    `str.splitlines` breaks on) as "\\n", then without Unicode format (Cf) characters and control (Cc) characters other
+    than newline and tab. A break between two words never joins them."""
+    text = _BREAKS.sub("\n", text)
     return "".join(c for c in text if c in "\n\t" or unicodedata.category(c) not in ("Cc", "Cf"))
 
 
 def _hidden(c: str) -> bool:
     kind = unicodedata.category(c)
-    return kind == "Cf" or (kind == "Cc" and c not in "\n\t\r")
+    return kind in ("Cf", "Zl", "Zp") or (kind == "Cc" and c not in "\n\t\r")
 
 
 def _suspicious(c: str) -> bool:
