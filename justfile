@@ -74,7 +74,7 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src services/render/src services/channels/src services/browser/src
+    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src packages/memory/src services/render/src services/channels/src services/browser/src
     pnpm -r exec tsc --noEmit
 
 # Start the Firestore emulator and run the harness skeleton against it (P0-09).

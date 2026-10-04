@@ -236,6 +236,11 @@ class Drafter:
         self._announce(user_id, instruction_id, doc)
         return _result(instruction_id, doc)
 
+    def stored(self, user_id: str, instruction_id: str) -> DraftResult | None:
+        """The result stored for the instruction, read only (BQ-183); None when nothing is stored."""
+        doc = None if "#" in instruction_id else self._drafts.get(user_id, instruction_id)
+        return _result(instruction_id, doc) if doc is not None else None
+
     def _announce(self, user_id: str, instruction_id: str, doc: Mapping[str, Any]) -> None:
         """One artifact.created per stored ready draft. An `#emitted` marker confirms it; while it is missing, one
         caller per EMIT_LEASE window (an atomic claim) emits, so an emit that failed after the store is not lost."""
