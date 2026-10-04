@@ -22,6 +22,12 @@ const CP2_PORT = Number(process.env.TILO_CP2_PORT ?? 5391);
 const CP2_ORIGIN = `http://127.0.0.1:${CP2_PORT}`;
 const CP2_API = "http://127.0.0.1:8080";
 const CP2_SPECS = "**/cp2/**";
+// NFR-01 (`TILO_NFR01=1`, local only): the landing-page budget is measured on the production build
+// served by `vite preview`, with the network and CPU throttled for the phone case. CI never sets it.
+const NFR01 = process.env.TILO_NFR01 === "1";
+const NFR01_PORT = Number(process.env.TILO_NFR01_PORT ?? 5393);
+const NFR01_ORIGIN = `http://127.0.0.1:${NFR01_PORT}`;
+const NFR01_SPECS = "**/nfr01/**";
 const TIMING_SPECS = [
   "**/world-perf.spec.ts",
   "**/world-reduced-motion-toggle.spec.ts",
@@ -44,7 +50,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: [...TIMING_SPECS, CP2_SPECS],
+      testIgnore: [...TIMING_SPECS, CP2_SPECS, NFR01_SPECS],
       // Runs the timing project after this one finishes, pass or fail. A `dependencies` link would
       // skip the C8 freeze and perf specs whenever any chromium test failed.
       teardown: "timing",
@@ -63,8 +69,21 @@ export default defineConfig({
     ...(CP2
       ? [{ name: "cp2", testMatch: CP2_SPECS, use: { ...BROWSER, baseURL: CP2_ORIGIN } }]
       : []),
+    ...(NFR01
+      ? [{ name: "nfr01", testMatch: NFR01_SPECS, use: { ...BROWSER, baseURL: NFR01_ORIGIN } }]
+      : []),
   ],
   webServer: [
+    ...(NFR01
+      ? [
+          {
+            command: `pnpm exec vite build && pnpm exec vite preview --host 127.0.0.1 --port ${NFR01_PORT} --strictPort`,
+            url: `${NFR01_ORIGIN}/`,
+            reuseExistingServer: false,
+            timeout: 240_000,
+          },
+        ]
+      : []),
     {
       command: `pnpm exec vite --host 127.0.0.1 --port ${PORT} --strictPort`,
       // Vite's own client script, not "/": it 200s as soon as the dev server is
