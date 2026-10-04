@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { DESKTOP, MOBILE } from "./support/viewports";
 
 test.describe("S_08 Connection consent sheet", () => {
@@ -25,7 +25,7 @@ test.describe("S_08 Connection consent sheet", () => {
           new PerformanceObserver((list) => {
             for (const entry of list.getEntries()) {
               if (!entry.hadRecentInput) {
-                cls += (entry as any).value;
+                cls += (entry as unknown as { value: number }).value;
               }
             }
           }).observe({ type: "layout-shift", buffered: true });
@@ -47,7 +47,7 @@ test.describe("S_08 Connection consent sheet", () => {
           new PerformanceObserver((list) => {
             for (const entry of list.getEntries()) {
               if (!entry.hadRecentInput) {
-                cls += (entry as any).value;
+                cls += (entry as unknown as { value: number }).value;
               }
             }
           }).observe({ type: "layout-shift", buffered: true });

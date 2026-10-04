@@ -1,10 +1,10 @@
+import type { Event } from "@tilo/contracts";
 // @vitest-environment happy-dom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
 import { ClientProvider } from "../api/ClientProvider";
 import { FixtureClient } from "../api/fixtureClient";
-import type { Event } from "@tilo/contracts";
 import { S_08 } from "./S_08";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
