@@ -141,12 +141,17 @@ class GoogleAdapter:
                     raise RateLimited(wait)
                 raise ProviderUnavailable(f"Google answered {status}")
             waited += self._wait(wait, waited)
-        raise AdapterError("Google refused the token")  # only reached when the last try was a 401
+        error = AdapterError("Google refused the token")  # only reached when the last try was a 401
+        error.status = 401  # a 4xx: Google did nothing
+        raise error
 
     def _json(self, user_id: str, scopes: list[str], method: str, url: str, **kw: Any) -> dict[str, Any]:
+        response = self._call(user_id, scopes, method, url, **kw)
         try:
-            body = self._call(user_id, scopes, method, url, **kw).json()
+            body = response.json()
         except ValueError:
+            if method != "GET":  # a side effect Google accepted: it may have happened (ambiguous, never failed)
+                raise ProviderUnavailable("Google accepted the call but its answer cannot be read") from None
             raise AdapterError("Google answered without JSON") from None
         return body if isinstance(body, dict) else {}
 
