@@ -319,7 +319,7 @@ class RunFlow:
 
     # the seam callables (keyword-only, as API_CL_INT_2.md fixes them)
 
-    def compile_plan(self, *, brief: dict, approach: dict, budget_cap: float) -> dict:
+    def compile_plan(self, *, brief: dict, approach: dict, budget_cap: float, context: Any = None) -> dict:
         self.timeline.append("compile")
         self.compile_calls.append(
             {"brief": copy.deepcopy(brief), "approach": copy.deepcopy(approach), "cap": budget_cap}

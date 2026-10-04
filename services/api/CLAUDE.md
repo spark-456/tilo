@@ -6,10 +6,8 @@ RBAC. The only service the web client and channels write through; the client rea
 from Firestore directly under security rules.
 
 ## Commands
-- `uv sync --package tilo-api` — install
-- `uv run --package tilo-api uvicorn tilo_api:app --reload --port 8080` — dev server
-- `uv run --package tilo-api pytest` — tests
-- `just dev` / `just check` — from the repo root
+- `uv sync --package tilo-api` — install; `uv run --package tilo-api pytest` — tests
+- `uv run --package tilo-api uvicorn tilo_api:app --reload --port 8080` — dev server; `just dev` / `just check`
 
 ## Contracts
 - Reads/writes: `packages/contracts-py` types; Firestore (worlds, events, cards, policies,
@@ -34,7 +32,8 @@ from Firestore directly under security rules.
 - Cards (FR-HIL-01/02, `tilo_api.cards`): `GET /worlds/{id}/cards`, `POST .../answer`. Identity is the verified
   `deps.Principal` only; `channel`/`pin_verified` only from a tilo-channels caller. Viewer 403; PRD 10.1 scope. First
   answer wins (400 `already_resolved`, 409 `busy`); one derived `event_id` each. `tests/API_ST3b.md` (Round 2), BQ-69..73.
-- Run (CL-INT-2, `tilo_api.runs`): approve starts one run on its own thread if the plan passes `validate_plan`;
+- Run (CL-INT-2, `tilo_api.runs`): approve starts one run on its own thread if the plan passes `validate_plan`
+  (`deps.get_plan_compiler`: the `director` drafts it, FR-INT-09; no such role, it refuses);
   the executor runs it through the run seams in `deps`; a send waits at a gate card in the world's `CardStore` and
   reaches the outbox only after the owner approves. Every event goes through `deps.get_event_writer`; a paused world
   gets nothing more. `GET /worlds/{id}/delivery`: 409 until `world.completed`. `tests/API_CL_INT_2.md`, BQ-90.

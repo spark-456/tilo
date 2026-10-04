@@ -21,6 +21,7 @@ from tilo_connectors import Outbox, OutboxRefused
 from tilo_harness.config import load_agents_config
 from tilo_harness.executor import UnitOutcome, run_plan
 from tilo_harness.validator import repo_validator
+from tilo_planning.compiler import PlanInputs
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps, events
@@ -97,6 +98,7 @@ class Run:
     def __init__(self, store: deps.Store, task: deps.TaskRecord, approach: dict, cap: float, seams: Seams) -> None:
         self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)
         self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
+        self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
         self.plan: dict[str, Any] = {}
         self.layout: dict[str, Any] = {}
@@ -217,16 +219,23 @@ class Run:
 
     def _prepare(self) -> Any:
         """Compile, validate, lay out. Returns the agents config, or None when no run may start."""
+        registry = self.seams.connectors
         try:
-            plan = self.seams.compiler(brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap)
-        except Exception:
+            context = PlanInputs(
+                approaches=copy.deepcopy(self.approaches), owner=self.owner, skills=dict(self.seams.skills.catalog()),
+                connectors={c: registry.get(c) for c in registry.ids()}, risk_table=tilo_policy.load_risk_table(),
+                policies=dict(self.store.policies),
+            )  # fmt: skip
+            plan = self.seams.compiler(
+                brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap, context=context
+            )
+        except Exception as exc:
+            logger.warning("run %s: no plan (%s)", self.run_id, type(exc).__name__)
             self._fail("the Director could not plan this task", None)
             return None
-        registry = self.seams.connectors
         violations = plangraph.validate_plan(
-            plan, risk_table=tilo_policy.load_risk_table(), connectors={c: registry.get(c) for c in registry.ids()},
-            skills=frozenset(skill_id for skill_id, _ in self.seams.skills.catalog()),
-            policies=dict(self.store.policies), owner=self.owner,
+            plan, risk_table=context.risk_table, connectors=context.connectors, skills=frozenset(context.skills),
+            policies=context.policies, owner=self.owner,
         )  # fmt: skip
         if violations:
             self._fail("the plan broke " + ", ".join(sorted({v.rule_id for v in violations})), None)
