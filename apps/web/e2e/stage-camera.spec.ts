@@ -23,6 +23,7 @@
 import { type Page, expect, test } from "@playwright/test";
 import { PAN_STEP_PX, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from "../src/stage/camera";
 import { gotoStage, readCamera, reloadStage } from "./support/camera";
+import { collectConsoleProblems } from "./support/console";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP, reducedMotion: "reduce" }); // instant moves: no easing to wait out
@@ -61,15 +62,6 @@ async function stageCenter(page: Page): Promise<{ x: number; y: number }> {
   const box = await page.getByTestId("stage-frame").boundingBox();
   if (!box) throw new Error("stage-frame has no layout box");
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-}
-
-function collectConsoleProblems(page: Page): string[] {
-  const problems: string[] = [];
-  page.on("console", (m) => {
-    if (m.type() === "error" || m.type() === "warning") problems.push(`[${m.type()}] ${m.text()}`);
-  });
-  page.on("pageerror", (e) => problems.push(`[pageerror] ${e.message}`));
-  return problems;
 }
 
 test("P0-08b camera C2 PRD-9.7 observable camera: stage-frame starts at the documented INITIAL_CAMERA", async ({
