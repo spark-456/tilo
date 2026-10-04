@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import re
 from collections.abc import Iterator
 from typing import Any
 
@@ -33,6 +34,9 @@ def _genai_module(name: str) -> Any:
 # before generation starts). Mirrors openai_compat_adapter's
 # `finish_reason == "content_filter"` handling.
 _SAFETY_FINISH_REASONS = frozenset({"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION"})
+
+# Google OAuth access tokens (ADC) and API keys: shapes the shared Authorization/Bearer scrub in `replay` misses.
+_GOOGLE_SECRET_RE = re.compile(r"ya29\.[\w.\-]+|AIza[\w\-]{35,}")
 
 
 class GoogleModelProvider(ModelProvider):
@@ -74,10 +78,13 @@ class GoogleModelProvider(ModelProvider):
             kwargs["response_schema"] = request.response_schema
         elif request.json_mode:
             kwargs["response_mime_type"] = "application/json"
-        if not kwargs:
+        if not kwargs and request.thinking_level is None:
             return None
         types_mod = _genai_module("google.genai.types")
-        return types_mod.GenerateContentConfig(**kwargs)
+        if request.thinking_level is not None and Capability.THINKING.value in self._profile.caps:
+            # A profile without the capability (e.g. a fallback) would answer a thinking config with a 400: omit it.
+            kwargs["thinking_config"] = types_mod.ThinkingConfig(thinking_level=request.thinking_level.upper())
+        return types_mod.GenerateContentConfig(**kwargs) if kwargs else None
 
     def _map_error(self, error: Exception) -> Exception:
         errors_mod = _genai_module("google.genai.errors")
@@ -112,9 +119,11 @@ class GoogleModelProvider(ModelProvider):
         usage: dict[str, int] | None = None
         usage_metadata = getattr(response, "usage_metadata", None)
         if usage_metadata is not None:
+            # Thinking tokens are billed as output, so metering counts them there (FR-MTR-01).
+            thoughts = getattr(usage_metadata, "thoughts_token_count", None) or 0
             usage = {
                 "input_tokens": usage_metadata.prompt_token_count,
-                "output_tokens": usage_metadata.candidates_token_count,
+                "output_tokens": usage_metadata.candidates_token_count + thoughts,
                 "total_tokens": usage_metadata.total_token_count,
             }
 
@@ -155,6 +164,9 @@ class GoogleModelProvider(ModelProvider):
         except Exception as error:
             raise self._map_error(error) from error
         return response.total_tokens
+
+    def redact(self, text: str) -> str:
+        return _GOOGLE_SECRET_RE.sub("[redacted]", text)
 
     def capabilities(self) -> set[Capability]:
         return {Capability(cap) for cap in self._profile.caps}

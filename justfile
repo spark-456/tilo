@@ -89,6 +89,10 @@ eval:
 conformance:
     uv run python -m tilo_providers.conformance
 
+# PL-02 live Vertex smoke: one capped call per role. Refuses unless the user sets the live switch; `just vertex-smoke --replay` is free.
+vertex-smoke *args:
+    uv run python packages/providers/scripts/live_vertex_smoke.py {{args}}
+
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated
 # as success so the recipe still passes with zero skills present.
