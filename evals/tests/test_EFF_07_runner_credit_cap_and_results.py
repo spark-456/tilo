@@ -8,7 +8,7 @@ import json
 import re
 
 import pytest
-from conftest import add_case, make_event, write_evals_config
+from _evals_lib import add_case, make_event, write_evals_config
 from tilo_evals.__main__ import main
 from tilo_evals.checks import Outcome
 from tilo_evals.config import EvalsConfig
