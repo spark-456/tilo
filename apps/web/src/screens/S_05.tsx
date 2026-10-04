@@ -5,7 +5,8 @@
 import { useEffect } from "react";
 import { useClient } from "../api/ClientProvider";
 import { reduce } from "../world/reducer";
-import { elapsed, useRunLog } from "../world/runLog";
+import { useReplayedLog } from "../world/replay";
+import { elapsed } from "../world/runLog";
 import { involves, select } from "../world/selection";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
@@ -20,7 +21,7 @@ export { findItem };
 export function S_05({ params }: ScreenProps) {
   const [worldId = "", itemId = ""] = params;
   const client = useClient();
-  const events = useRunLog(client, worldId);
+  const { events } = useReplayedLog(client, worldId);
   const [layout, retry] = useRemote("load the world", () => client.getLayout(worldId));
   const found = layout.status === "ready" ? findItem(layout.value, itemId, events) : null;
   const exists = found !== null;

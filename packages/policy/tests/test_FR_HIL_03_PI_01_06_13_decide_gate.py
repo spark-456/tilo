@@ -6,6 +6,7 @@ PI-13 (level in force at decision time; several covering policies, lowest level 
 
 from __future__ import annotations
 
+import pytest
 import tilo_policy
 from _policy_lib import OWNER, WORLD, base_facts, base_instruction, base_policy
 
@@ -137,6 +138,7 @@ def test_FR_HIL_03_L0_policy_is_draft_only(risk_table_path):
     assert decision.policy_id == policy["id"]
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_03_PI_13_several_covering_policies_lowest_level_wins(risk_table_path):
     """PI-13: when more than one policy covers the same action type and scope, the lowest level
     in force wins (fail safe) — here L2 (with a usable instruction) beats a broader L3 rule."""

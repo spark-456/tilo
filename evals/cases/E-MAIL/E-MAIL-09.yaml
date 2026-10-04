@@ -9,8 +9,7 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding timesheet submission: pay period ending oct
-    1 (8.5 hrs overtime)'
+  task: 'Triage incoming email regarding timesheet submission: pay period ending oct 1 (8.5 hrs overtime)'
   thread:
     thread_id: thread-e-mail-09
     subject: 'Timesheet submission: Pay period ending Oct 1 (8.5 hrs overtime)'
@@ -22,10 +21,9 @@ inputs:
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: 'Timesheet submission: Pay period ending Oct 1 (8.5 hrs overtime)'
-      body: Sarah, I submitted my hours for the pay period ending Oct 1 in the payroll
-        app. It includes 8.5 hours of emergency overtime on the slip 9 salvage pump
-        job last Saturday. Please review and approve before payroll processes at 4
-        PM.
+      body: Sarah, I submitted my hours for the pay period ending Oct 1 in the payroll app. It includes
+        8.5 hours of emergency overtime on the slip 9 salvage pump job last Saturday. Please review and
+        approve before payroll processes at 4 PM.
 ground_truth:
   category: needs_action
   priority: normal
@@ -34,4 +32,7 @@ checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

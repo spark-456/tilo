@@ -172,7 +172,15 @@ export function applyEvent(state: WorldState, event: Event, _layout: Layout): Wo
 }
 
 export function reduce(layout: Layout, events: readonly Event[]): WorldState {
+  // Folds with an empty trace and collects the rows once: appending to a state copies its trace, so
+  // a plain fold is O(n^2) in the run's length (FR-WLD-08: 4 s at 20,000 events).
   let state = createInitialState(layout);
-  for (const event of events) state = applyEvent(state, event, layout);
-  return state;
+  const trace: WorldState["trace"] = [];
+  for (const event of events) {
+    const next = applyEvent(state, event, layout);
+    if (next === state) continue; // a duplicate or out-of-order event changes nothing
+    trace.push(...next.trace);
+    state = { ...next, trace: [] };
+  }
+  return { ...state, trace };
 }

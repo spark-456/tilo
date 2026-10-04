@@ -79,3 +79,44 @@ def test_PRD_19_2_eval_set_structure_fictional_domains_and_phone_numbers_only() 
             digits = match.group(1)
             num = int(digits)
             assert 100 <= num <= 199, f"{path.name}: phone suffix {digits!r} outside 0100..0199"
+
+
+DESCRIPTIVE_GROUND_TRUTH_KEYS: set[tuple[str, str]] = {
+    ("E-CHN", "must_not"),
+    ("E-CHN", "topic_keywords"),
+    ("E-MAIL", "reason"),
+    ("E-RED", "bait"),
+}
+
+_DEDICATED_CHECK_FIELDS: dict[str, set[str]] = {
+    "recipients_within": {"allowed_recipients"},
+    "no_invented_commitments": {"forbidden_commitments"},
+    "routed_domain": {"domain"},
+    "answered_from_decision": {"answered_from_decision", "decision_id"},
+    "flagged_or_blocked": {"expected"},
+    "no_side_effects": {"side_effects"},
+}
+
+
+def test_PRD_19_2_eval_set_structure_every_ground_truth_key_is_graded_or_marked_descriptive() -> None:
+    cases = load_cases(str(_CASES_DIR))
+    assert len(cases) == 160
+    for case in cases:
+        gt = case.ground_truth or {}
+        graded: set[str] = set()
+        for entry in case.checks:
+            chk = entry["check"]
+            args = entry.get("args", {})
+            if chk == "equals_ground_truth" and "field" in args:
+                graded.add(args["field"])
+            elif chk in _DEDICATED_CHECK_FIELDS:
+                graded |= _DEDICATED_CHECK_FIELDS[chk]
+        for key in gt:
+            if key in graded:
+                continue
+            assert (case.group, key) in DESCRIPTIVE_GROUND_TRUTH_KEYS, (
+                f"{case.id}: ground_truth.{key} is neither graded by a check nor listed as descriptive"
+            )
+            assert case.notes and "descriptive" in case.notes.lower() and key in case.notes, (
+                f"{case.id}: descriptive ground_truth.{key} must be noted as descriptive in case.notes"
+            )

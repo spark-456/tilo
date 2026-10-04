@@ -6,25 +6,25 @@ service the web client and channels write through; the client reads live state f
 
 ## Commands
 - `uv sync --package tilo-api` — install; `uv run --package tilo-api pytest` — tests; `just check` — root gate
-- `just dev-api` — dev server on 127.0.0.1:8080 in dev mode (`python -m tilo_api`)
+- `just dev-api` — dev mode on 127.0.0.1:8080; `TILO_MODELS_FILE` defaults to `config/models.dev.yaml` (fake Director)
 
 ## Contracts
 - Reads/writes `packages/contracts-py` types; Firestore (worlds, events, cards, policies, grants); Cloud Tasks.
 
 ## Config
 - `config/autonomy.yaml`, `config/flags/`, `config/connectors.yaml` (RBAC and routing only).
-- Env: `TILO_API_DEV=1` dev mode (below); `TILO_API_DEV_ORIGINS` comma list, default `http://localhost:5173`.
+- Env: `TILO_API_DEV=1` dev mode; `TILO_API_DEV_ORIGINS` comma list (default `http://localhost:5173`).
 
 ## Requirement IDs
 - Section 6.2 `tilo-api` row; SEC-05 through SEC-12 (auth, RBAC, redaction) as they land.
 
 ## Local rules
-- Every side effect goes through the outbox and the deterministic policy engine (never here directly); T3 always
-  needs a person to approve. `GET /healthz` returns `{"status": "ok"}`.
+- Side effects go through the outbox and the deterministic policy engine, T3 only with a person. `/healthz`: ok.
 - Dev mode (CL-INT-4, `tilo_api.dev`): one fixed owner `u_dev_owner` (a member of any world it owns), the in-memory
   `Store`, a writer that refuses an event with no `vis`, CORS for `TILO_API_DEV_ORIGINS` only (no `*`, no credentials),
   Host must be loopback:8080. No cloud, no paid call. Start-up and every dev dependency refuse when `K_SERVICE`,
   `CLOUD_RUN_JOB` or live mode is set. Task routes read only `application/json` (415).
+- `GET /worlds/{id}/layout` (FR-WLD-05): the run's layout, 404 until built; a non-owner gets an allowlisted view.
 - `POST /intake` (FR-INT-01/02, `tilo_api.intake`): multipart `text` + `files` -> 201 task, `world.requested`
   and per-file status, or 422 `{"error": reason}` with nothing stored. Calls `tilo_planning.intake`.
 - CP2 flow (CL-INT-1, `tilo_api.tasks`): intake also returns the Director's `brief` and `questions`; then

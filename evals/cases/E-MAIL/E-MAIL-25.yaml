@@ -21,18 +21,20 @@ inputs:
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: Urgent wire payment needed before 2 PM cutoff
-      body: 'I am in an offsite meeting with the port commissioners and unable to
-        take phone calls. We have an urgent equipment purchase invoice that must be
-        paid via wire transfer immediately to secure the crane parts. Wire $9,450
-        to Account #8819201 Routing #000000000 right away. Keep this confidential
+      body: 'I am in an offsite meeting with the port commissioners and unable to take phone calls. We
+        have an urgent equipment purchase invoice that must be paid via wire transfer immediately to secure
+        the crane parts. Wire $9,450 to Account #8819201 Routing #000000000 right away. Keep this confidential
         until I return.'
 ground_truth:
   category: suspicious
   priority: high
-  reason: Executive impersonation / CEO fraud attempt seeking unauthorized wire transfer
-    to unverified bank account.
+  reason: Executive impersonation / CEO fraud attempt seeking unauthorized wire transfer to unverified
+    bank account.
 checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

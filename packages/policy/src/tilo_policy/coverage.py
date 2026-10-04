@@ -200,6 +200,21 @@ def instruction_counts(
     )
 
 
+# BQ-57, PI-21: an instruction records no action asked for and code does not read its words, so
+# until ADR-0013 records it without a model no instruction opens a send. Flip only with that ADR.
+L2_ACTION_RECORDED = False
+
+
+@fail_closed(False)
+def l2_may_run(
+    instruction: dict | None, world_id: str, policy: dict, destination: str | None, before: str, applied: list[dict]
+) -> bool:
+    """The engine's L2 rule (PI-21): False while `L2_ACTION_RECORDED` is False, so every L2-covered
+    send waits at a gate; afterwards `instruction_counts` stays as the extra check. The OB-01
+    validator keeps calling `instruction_counts` until ADR-0013 adds its own crossref cases."""
+    return L2_ACTION_RECORDED and instruction_counts(instruction, world_id, policy, destination, before, applied)
+
+
 @fail_closed("T3")
 def gate_tier(reserved: dict) -> str:
     """The tier of a contract-valid approval.requested, else T3 (fail closed, SEC-06)."""

@@ -30,6 +30,7 @@ profiles:
   flash-37: { input: null, output: null }
   lite-31: { input: null, output: null }
   safety-fake: { input: null, output: null } # the dev fake safety screen; makes no paid call
+  director-dev: { input: null, output: null } # config/models.dev.yaml's fake Director; makes no paid call
   # PL-02/ADR-0003: config/models.nim.yaml's profiles need a price entry too --
   # the loader's PL-06 start-up check (every profile has one) runs whichever
   # models file TILO_MODELS_FILE selects, against this same prices.yaml.

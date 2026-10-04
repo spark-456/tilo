@@ -2,7 +2,7 @@
 // proxy test (ticket P0-08b-player): apps/web/e2e/world-perf.spec.ts loads it via
 // `?fixture=crowd-<N>` and measures rAF frame times with CPU throttling while N agents move.
 //
-// Usage: node scripts/make-crowd-fixture.mjs <agentCount>   (defaults to 20)
+// Usage: node scripts/make-crowd-fixture.mjs <agentCount> [--pause-after=<rounds>]   (defaults to 20)
 // Writes apps/web/fixtures/crowd-<agentCount>.layout.json and
 // apps/web/fixtures/crowd-<agentCount>.events.jsonl.
 //
@@ -186,7 +186,13 @@ function buildLayout(agentCount, rng) {
   return { layout, moveList };
 }
 
-function buildEvents(agentCount, layout, moveList) {
+// `pauseAfter` (FR-WLD-07): after that many rounds a person's world.paused is recorded, then
+// STRAGGLER_ROUNDS more rounds of agent.moved follow and the run is left paused (no
+// world.completed). A real server sends nothing after world.paused; the stragglers exist so the
+// web app's "events after a pause are not animated" rule has a stream to be tested against.
+const STRAGGLER_ROUNDS = 3;
+
+function buildEvents(agentCount, layout, moveList, pauseAfter = null) {
   const events = [];
   let seq = 1;
   let tMs = 0;
@@ -248,7 +254,15 @@ function buildEvents(agentCount, layout, moveList) {
   // throughout"), each agent alternating between its district's buildings.
   const cursors = new Map(moveList.map((m) => [m.agentId, 0]));
   tMs += EVENT_GAP_MS;
-  for (let round = 0; round < MOVES_PER_AGENT; round++) {
+  const rounds = pauseAfter === null ? MOVES_PER_AGENT : pauseAfter + STRAGGLER_ROUNDS;
+  for (let round = 0; round < rounds; round++) {
+    if (round === pauseAfter) {
+      push("world.paused", "u_owner", worldId, null, null, "You paused all work.", {
+        reason: "pause_all",
+        channel: "web",
+      });
+      tMs += EVENT_GAP_MS;
+    }
     for (const mover of moveList) {
       const buildings = mover.buildingIds;
       const from = buildings[cursors.get(mover.agentId) % buildings.length];
@@ -268,10 +282,12 @@ function buildEvents(agentCount, layout, moveList) {
     }
   }
 
-  push("world.completed", "A_dir", worldId, null, null, "Crowd perf fixture finished.", {
-    credits_used: 0,
-    deliverable_count: 0,
-  });
+  if (pauseAfter === null) {
+    push("world.completed", "A_dir", worldId, null, null, "Crowd perf fixture finished.", {
+      credits_used: 0,
+      deliverable_count: 0,
+    });
+  }
 
   return events;
 }
@@ -279,20 +295,30 @@ function buildEvents(agentCount, layout, moveList) {
 function main() {
   const agentCount = Number.parseInt(process.argv[2] ?? "20", 10);
   if (!Number.isInteger(agentCount) || agentCount < 1) {
-    console.error("Usage: node scripts/make-crowd-fixture.mjs <agentCount>");
+    console.error(
+      "Usage: node scripts/make-crowd-fixture.mjs <agentCount> [--pause-after=<rounds>]",
+    );
     process.exit(1);
   }
+  // FR-WLD-07: `--pause-after=3` writes pause-<agentCount>.* instead of crowd-<agentCount>.*.
+  const pauseArg = process.argv.find((a) => a.startsWith("--pause-after="));
+  const pauseAfter = pauseArg ? Number.parseInt(pauseArg.split("=")[1] ?? "", 10) : null;
+  if (pauseAfter !== null && !(pauseAfter >= 1)) {
+    console.error("--pause-after needs a whole number of rounds, at least 1");
+    process.exit(1);
+  }
+  const prefix = pauseAfter === null ? "crowd" : "pause";
 
   const rng = mulberry32(SEED);
   const { layout, moveList } = buildLayout(agentCount, rng);
-  const events = buildEvents(agentCount, layout, moveList);
+  const events = buildEvents(agentCount, layout, moveList, pauseAfter);
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const outDir = path.resolve(__dirname, "..", "fixtures");
   fs.mkdirSync(outDir, { recursive: true });
 
-  const layoutPath = path.join(outDir, `crowd-${agentCount}.layout.json`);
-  const eventsPath = path.join(outDir, `crowd-${agentCount}.events.jsonl`);
+  const layoutPath = path.join(outDir, `${prefix}-${agentCount}.layout.json`);
+  const eventsPath = path.join(outDir, `${prefix}-${agentCount}.events.jsonl`);
   fs.writeFileSync(layoutPath, `${JSON.stringify(layout, null, 2)}\n`, "utf-8");
   fs.writeFileSync(eventsPath, `${events.map((e) => JSON.stringify(e)).join("\n")}\n`, "utf-8");
 

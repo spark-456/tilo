@@ -64,3 +64,12 @@ def crossref_valid_cases(repo_root: pathlib.Path) -> list[tuple[str, dict]]:
 @pytest.fixture()
 def crossref_invalid_cases(repo_root: pathlib.Path) -> list[tuple[str, dict]]:
     return [(p.name, load_json(p)) for p in list_fixtures(repo_root, "outbox/crossref/invalid")]
+
+
+@pytest.fixture()
+def l2_action_recorded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stands in for ADR-0013 (Proposed): tests of the L2 rules that run after it lands set
+    `L2_ACTION_RECORDED` True. Without this fixture the engine gates every L2 send (BQ-57, PI-21)."""
+    from tilo_policy import coverage
+
+    monkeypatch.setattr(coverage, "L2_ACTION_RECORDED", True)

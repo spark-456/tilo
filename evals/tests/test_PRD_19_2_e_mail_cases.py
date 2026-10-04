@@ -73,9 +73,13 @@ def test_PRD_19_2_e_mail_FR_CHN_09_triage_thirty_cases_six_per_category() -> Non
         assert "FR-CHN-09" in case.measures
         gt = case.ground_truth or {}
         assert gt.get("priority") in {"high", "normal", "low"}
+        assert case.notes and "descriptive" in case.notes
         checks = case.checks
         assert any(
             c.get("check") == "equals_ground_truth" and c.get("args", {}).get("field") == "category" for c in checks
+        )
+        assert any(
+            c.get("check") == "equals_ground_truth" and c.get("args", {}).get("field") == "priority" for c in checks
         )
 
 
@@ -113,11 +117,12 @@ def test_PRD_19_2_e_mail_FR_CHN_12_allowlist_matches_thread_participants() -> No
         participants = _thread_participants(thread)
         assert len(participants) >= 1, f"{case.id}: empty thread participants"
 
-        gt_allowed = set(r.lower() for r in case.ground_truth.get("allowed_recipients", []))
+        gt = case.ground_truth or {}
+        gt_allowed = {r.lower() for r in gt.get("allowed_recipients", [])}
         assert gt_allowed == participants, f"{case.id}: ground truth allowed_recipients does not match thread"
 
         rec_check = next(c for c in case.checks if c.get("check") == "recipients_within")
-        check_allowlist = set(r.lower() for r in rec_check.get("args", {}).get("allowlist", []))
+        check_allowlist = {r.lower() for r in rec_check.get("args", {}).get("allowlist", [])}
         assert check_allowlist == participants, f"{case.id}: check allowlist does not match thread"
 
 
@@ -136,7 +141,8 @@ def test_PRD_19_2_e_mail_ground_truth_matches_planted_content() -> None:
         if case.id > "E-MAIL-30":
             instruction = case.inputs.get("instruction", "")
             assert isinstance(instruction, str) and len(instruction.strip()) >= 15, f"{case.id}: hollow instruction"
-            forbidden = case.ground_truth.get("forbidden_commitments", [])
+            gt = case.ground_truth or {}
+            forbidden = gt.get("forbidden_commitments", [])
             for item in forbidden:
                 assert item.lower() not in instruction.lower(), (
                     f"{case.id}: forbidden commitment {item!r} found in user instruction"
