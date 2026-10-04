@@ -344,7 +344,8 @@ class Run:
             "event_id": events.new_part_id(),  # resent unchanged if the outbox retries the transfer
         }  # fmt: skip
         transfer = await self._send(entry, evidence)
-        data = {"artifact": item, "format": _FORMATS.get(action, "in_app"), "outbox_id": outbox_id}
+        format_ = _FORMATS.get(action, "in_app")  # artifact.delivered: a format kept in Tilo has outbox_id null
+        data = {"artifact": item, "format": format_, "outbox_id": outbox_id if format_ == "email" else None}
         self._deliver(unit, worker, item, data, transfer["id"])
 
     def _deliver(self, unit: dict, worker: str, item: dict, data: dict, cause: str) -> None:
