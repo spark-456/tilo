@@ -293,6 +293,7 @@ def _message(resource: Mapping[str, Any]) -> dict[str, Any]:
         "id": str(resource.get("id", "")),
         "thread_id": str(resource.get("threadId", "")),
         "from": headers.get("from", ""),
+        "date": headers.get("date", ""),
         "to": _addresses(headers.get("to", "")),
         "cc": _addresses(headers.get("cc", "")),
         "subject": headers.get("subject", ""),

@@ -1,11 +1,12 @@
 # services/connectors — `tilo-connectors`
 
 ## Purpose
-Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP client, and the
-outbox for every side effect. The only service that can decrypt user OAuth tokens.
+Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP client, outbox. Only it decrypts tokens.
 
 ## Commands
-- `uv run pytest services/connectors/tests -q` — public API pinned in `tests/API*.md` (FR-CON-10: `provenance.py`); `just check` is the full gate.
+- `uv run pytest services/connectors/tests -q` — API pinned in `tests/API*.md`; `just check` is the full gate.
+- Live Gmail smoke (FR-CON-04; user only): set `LIVE=1` + `GOOGLE_OAUTH_*`, run
+  `uv run python services/connectors/scripts/live_gmail_smoke.py [--draft ADDRESS] [--timeout S]`. Only `live.py` reaches Google.
 
 ## Contracts
 - Reads `contracts/outbox.schema.json` (+ cross-refs), `data.transfer.schema.json`, `contracts/fixtures/outbox/`;
@@ -32,8 +33,7 @@ outbox for every side effect. The only service that can decrypt user OAuth token
   already stored (OB-03), and the adapter dedupes its own send. `Outbox` may hand the same
   `data.transfer` to `emit` more than once; the event writer (PI-18) keeps one per `outbox_id`.
   Send order holds per `world_id` only; `Outbox(world_id=w)` sends and emits only w's; `abandon` fails an unsent entry.
-- Trust boundary: `InMemoryOutboxStore`'s mutators are underscored lock-guarded compare-and-set or
-  lease writers, so several instances sharing one store never both win a write.
+- Trust boundary: `InMemoryOutboxStore` mutators are underscored lock-guarded CAS/lease writers: no two instances both win.
 - Tokens: AES-GCM under a per-record data key wrapped by a `Kms` (`FakeKms` in dev; `CloudKms` is
   unexercised until billing). Only `tokens.py` and `adapters/` call `access_token_for_adapter`; no
   other service imports `tilo_connectors.tokens` (SEC-02). `delete_user` leaves no token in any store
