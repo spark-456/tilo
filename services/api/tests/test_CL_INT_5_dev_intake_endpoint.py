@@ -25,7 +25,7 @@ def dev_client(monkeypatch):
     app.include_router(intake_router)
     app.include_router(tasks_router)
     dev.install(app, {})
-    return TestClient(app)
+    return TestClient(app, base_url=f"http://localhost:{dev.PORT}")  # the Host dev mode accepts
 
 
 def _flow(client: TestClient, text: str) -> tuple[dict, dict]:
@@ -80,5 +80,21 @@ def test_CL_INT_5_dev_models_file_is_selected_by_just_dev_api(monkeypatch):
 
 def test_CL_INT_5_dev_intake_fails_closed_when_deployed(dev_client, monkeypatch):
     monkeypatch.setenv("K_SERVICE", "tilo-api")
-    response = TestClient(dev_client.app, raise_server_exceptions=False).post("/intake", data={"text": "Anything."})
+    client = TestClient(dev_client.app, base_url=dev_client.base_url, raise_server_exceptions=False)
+    response = client.post("/intake", data={"text": "Anything."})
     assert response.status_code >= 500 and response.status_code != 201
+
+
+def test_CL_INT_5_request_input_cannot_select_the_fake_director(dev_client, monkeypatch):
+    """The models file comes from config/environment only: with the default one, no form field, query parameter
+    or header names another, and nothing reaches the fake Director."""
+    monkeypatch.delenv("TILO_MODELS_FILE")
+    monkeypatch.setattr(
+        "tilo_providers.dev_director.DevDirectorProvider.generate",
+        lambda *a, **k: pytest.fail("a request reached the dev fake Director"),
+    )
+    client = TestClient(dev_client.app, base_url=dev_client.base_url, raise_server_exceptions=False)
+    selectors = {"models_file": str(dev.DEV_MODELS), "TILO_MODELS_FILE": str(dev.DEV_MODELS), "model": "fake-director"}
+    headers = {f"X-{name}": value for name, value in selectors.items()}
+    response = client.post("/intake", data={"text": "Anything.", **selectors}, params=selectors, headers=headers)
+    assert response.status_code != 201
