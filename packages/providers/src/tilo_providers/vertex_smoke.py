@@ -32,7 +32,7 @@ THINKING_MINIMUM = "minimal"
 DEFAULT_MAX_OUTPUT_TOKENS = 64
 HARD_MAX_OUTPUT_TOKENS = 256
 DEFAULT_MAX_TOTAL_CREDITS = 2.0  # US$0.01 at 1 credit = US$0.005 (PRD 14.1)
-HARD_MAX_TOTAL_CREDITS = 10.0
+HARD_MAX_TOTAL_CREDITS = 100.0  # US$0.50; orchestrator decision: the pinned live-run helper uses a 50 credit ceiling
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 
 

@@ -145,9 +145,21 @@ def test_PL_LIVE_04_thinking_is_minimal_for_every_profile_that_has_the_thinking_
 # ---------------------------------------------------------------------------------------------------------
 
 
-def test_PL_LIVE_05_unset_prices_refuse_before_any_request_and_list_exactly_what_to_confirm() -> None:
+def _unset_prices(tmp_path: Path) -> Path:
+    """A temporary copy of the prices file in the unset state (no price, date or source). The tests below use it
+    instead of config/prices.yaml, whose status changes when the user confirms real prices (ticket PL-06)."""
+    raw = yaml.safe_load(REAL_PRICES.read_text(encoding="utf-8"))
+    raw.update(status="unset", effective_date=None, source=None)
+    raw["profiles"] = {profile_id: {"input": None, "output": None} for profile_id in raw["profiles"]}
+    path = tmp_path / "prices.unset.yaml"
+    path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    return path
+
+
+def test_PL_LIVE_05_unset_prices_refuse_before_any_request_and_list_exactly_what_to_confirm(tmp_path: Path) -> None:
     cfg = real_config()
-    assert cfg.prices.status == "unset"  # the repo's real file; this test must never need it changed
+    unset = _unset_prices(tmp_path)
+    assert load_providers_config(REAL_MODELS, unset).prices.status == "unset"
     expected = ["status", "effective_date", "source"]
     for profile_id in used_profiles(cfg):
         expected += [f"{profile_id}.input", f"{profile_id}.output"]
@@ -155,8 +167,8 @@ def test_PL_LIVE_05_unset_prices_refuse_before_any_request_and_list_exactly_what
     with env(LIVE="1", GOOGLE_CLOUD_PROJECT=PROJECT), sdk.installed():
         module = smoke()
         with pytest.raises(module.SmokeRefused) as info:
-            module.run_vertex_smoke(models_path=REAL_MODELS, prices_path=REAL_PRICES, fixtures_dir=Path("unused"))
-        result = invoke_main(["--models-file", str(REAL_MODELS), "--prices-file", str(REAL_PRICES)])
+            module.run_vertex_smoke(models_path=REAL_MODELS, prices_path=unset, fixtures_dir=Path("unused"))
+        result = invoke_main(["--models-file", str(REAL_MODELS), "--prices-file", str(unset)])
     assert info.value.code == "prices_unset"
     assert list(info.value.missing) == expected
     assert sdk.client_inits == [] and sdk.calls == []  # nothing was sent
@@ -174,9 +186,10 @@ def test_PL_LIVE_05_unset_prices_refuse_before_any_request_and_list_exactly_what
     assert "$" not in result.err
 
 
-def test_PL_LIVE_05_unset_prices_do_not_touch_the_credential_libraries() -> None:
+def test_PL_LIVE_05_unset_prices_do_not_touch_the_credential_libraries(tmp_path: Path) -> None:
+    unset = _unset_prices(tmp_path)
     with env(LIVE="1", GOOGLE_CLOUD_PROJECT=PROJECT), vertex_imports_blocked() as blocker:
-        result = invoke_main(["--models-file", str(REAL_MODELS), "--prices-file", str(REAL_PRICES)])
+        result = invoke_main(["--models-file", str(REAL_MODELS), "--prices-file", str(unset)])
     assert result.code == 2 and blocker.hits == []
 
 
@@ -242,12 +255,12 @@ def test_PL_LIVE_05_usd_is_never_computed_from_a_hard_coded_price() -> None:
 
 
 def test_PL_LIVE_05_the_smoke_never_edits_the_prices_file(tmp_path: Path) -> None:
-    prices = write_prices(tmp_path)
-    before = prices.read_bytes()
-    real_before = REAL_PRICES.read_bytes()
-    live_run(tmp_path, prices=prices)
-    assert prices.read_bytes() == before and REAL_PRICES.read_bytes() == real_before
-    assert yaml.safe_load(REAL_PRICES.read_text(encoding="utf-8"))["status"] == "unset"
+    # a temporary set copy (a full run) and a temporary unset copy (a refusal): bytes and mtime unchanged by both
+    paths = [write_prices(tmp_path), _unset_prices(tmp_path)]
+    before = [(p.read_bytes(), p.stat().st_mtime_ns) for p in paths]
+    for prices in paths:
+        live_run(tmp_path, prices=prices)
+    assert [(p.read_bytes(), p.stat().st_mtime_ns) for p in paths] == before
 
 
 # ---------------------------------------------------------------------------------------------------------

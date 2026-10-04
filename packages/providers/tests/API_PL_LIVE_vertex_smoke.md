@@ -22,7 +22,7 @@ THINKING_MINIMUM = "minimal"
 DEFAULT_MAX_OUTPUT_TOKENS = 64
 HARD_MAX_OUTPUT_TOKENS: int  # 64 <= x <= 256; a flag above it (or below 1) is refused
 DEFAULT_MAX_TOTAL_CREDITS: float  # 0 < x <= 2.0 (<= US$0.01)
-HARD_MAX_TOTAL_CREDITS: float  # DEFAULT <= x <= 10.0; a flag above it (or <= 0) is refused
+HARD_MAX_TOTAL_CREDITS: float  # DEFAULT <= x <= 100.0 (US$0.50); a flag above it (or <= 0) is refused
 
 
 @dataclass

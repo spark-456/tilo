@@ -156,7 +156,7 @@ def test_PL_LIVE_02_default_caps_are_small_and_hard_limits_bound_the_flags() -> 
     assert module.DEFAULT_MAX_OUTPUT_TOKENS == 64
     assert 64 <= module.HARD_MAX_OUTPUT_TOKENS <= 256
     assert 0 < module.DEFAULT_MAX_TOTAL_CREDITS <= 2.0  # at most US$0.01: tiny by default
-    assert module.DEFAULT_MAX_TOTAL_CREDITS <= module.HARD_MAX_TOTAL_CREDITS <= 10.0
+    assert module.DEFAULT_MAX_TOTAL_CREDITS <= module.HARD_MAX_TOTAL_CREDITS <= 100.0
     assert module.SMOKE_ROLES == ROLES
     assert module.THINKING_MINIMUM == "minimal"
 
