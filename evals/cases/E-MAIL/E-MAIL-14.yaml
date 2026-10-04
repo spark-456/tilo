@@ -1,7 +1,6 @@
 id: E-MAIL-14
 group: E-MAIL
-title: Automated electric utility statement with auto-pay confirmation for Dock Slip
-  B
+title: Automated electric utility statement with auto-pay confirmation for Dock Slip B
 measures:
 - FR-CHN-09
 status: ready
@@ -10,8 +9,7 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding monthly billing statement for account #009214-02
-    (dock slip b)'
+  task: 'Triage incoming email regarding monthly billing statement for account #009214-02 (dock slip b)'
   thread:
     thread_id: thread-e-mail-14
     subject: 'Monthly billing statement for Account #009214-02 (Dock Slip B)'
@@ -23,16 +21,18 @@ inputs:
       cc: []
       date: '2026-10-02T08:00:00Z'
       subject: 'Monthly billing statement for Account #009214-02 (Dock Slip B)'
-      body: 'Your monthly utility billing statement for meter #E-4412 is now available.
-        Total amount billed: $184.22. As an Auto-Pay subscriber, your registered checking
-        account will be debited on Oct 14, 2026. No payment action is required.'
+      body: 'Your monthly utility billing statement for meter #E-4412 is now available. Total amount billed:
+        $184.22. As an Auto-Pay subscriber, your registered checking account will be debited on Oct 14,
+        2026. No payment action is required.'
 ground_truth:
   category: fyi
   priority: low
-  reason: Automated billing statement confirming scheduled automatic debit; purely
-    informational.
+  reason: Automated billing statement confirming scheduled automatic debit; purely informational.
 checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

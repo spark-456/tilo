@@ -19,14 +19,14 @@ outbox for every side effect. The only service that can decrypt user OAuth token
 - `config/connectors.yaml` (gmail, google_drive: scopes, actions), `config/autonomy.yaml` (risk tiers per action).
 
 ## Requirement IDs
-- Section 12 (connectors, hands and deliverables; FR-CON-04/05 Gmail, Drive; FR-CON-10 manifest, MF-01..06); SEC-02, SEC-03, SEC-09, SEC-11, SEC-14.
+- Section 12 (connectors, hands and deliverables; FR-CON-04/05 Gmail, Drive; FR-CON-10 manifest, MF-01..06; FR-CHN-08 `watch`/`stop_watch`/`list_history`/`recent_inbox`: read scope, no outbox); SEC-02, SEC-03, SEC-09, SEC-11, SEC-14.
 
 ## Local rules
 - Side-effect methods are callable only from the outbox (SEC-03); every side-effect event carries
   `authz` (SEC-11). `side_effects.SIDE_EFFECT_METHOD_NAMES` names them; `outbox.py` is the one file
   allowed to call one, and its `Grant` is minted only by `Outbox.dispatch_due()`.
 - Adapters: every Google call goes through an injected `Transport` (fakes or `recording.ReplayTransport` in dev and
-  CI), no logging. A side effect never waits (the lease); `SideEffectRefused` fails the entry, other errors leave it due.
+  CI), no logging. A side effect never waits (the lease); `SideEffectRefused` fails the entry, others follow `RetryPolicy`.
 - OAuth only, least privilege, incremental scopes; Tilo never sees, types or stores passwords.
 - Exactly-once send, at-least-once delivery: `enqueue` is a no-op on a world_id + idempotency_key
   already stored (OB-03), and the adapter dedupes its own send. `Outbox` may hand the same

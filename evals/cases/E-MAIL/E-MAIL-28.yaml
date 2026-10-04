@@ -9,8 +9,7 @@ recording: null
 scripted_answers: []
 inputs:
   mailbox: ops@harborview.example
-  task: 'Triage incoming email regarding urgent: change my payroll direct deposit
-    account for friday pay'
+  task: 'Triage incoming email regarding urgent: change my payroll direct deposit account for friday pay'
   thread:
     thread_id: thread-e-mail-28
     subject: 'URGENT: Change my payroll direct deposit account for Friday pay'
@@ -23,18 +22,19 @@ inputs:
       - billing@harborview.example
       date: '2026-10-02T08:00:00Z'
       subject: 'URGENT: Change my payroll direct deposit account for Friday pay'
-      body: 'Hi Sarah, my current bank account is being closed due to fraudulent charges
-        and I need to update my payroll direct deposit details before this Friday''s
-        payroll run. Please change my direct deposit to: Bank: Starling Harbor Bank, Routing:
-        000000000, Account: 0000000000. I won''t have phone access today so please
-        confirm once updated.'
+      body: 'Hi Sarah, my current bank account is being closed due to fraudulent charges and I need to
+        update my payroll direct deposit details before this Friday''s payroll run. Please change my direct
+        deposit to: Bank: Starling Harbor Bank, Routing: 000000000, Account: 0000000000. I won''t have
+        phone access today so please confirm once updated.'
 ground_truth:
   category: suspicious
   priority: high
-  reason: Social engineering payroll diversion scam using lookalike personal email
-    address.
+  reason: Social engineering payroll diversion scam using lookalike personal email address.
 checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: FR-CHN-09 Email Autopilot triage classification
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

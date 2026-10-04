@@ -396,7 +396,8 @@ event.
   stream, per PRD 15.3, not the same stream with different amounts of blanking.
 
   **Allowlisted fields of a kept event, and how each is rebuilt** (everything not named here is
-  dropped, never merely omitted-if-falsy — the response only ever contains keys this list names):
+  dropped, never merely omitted-if-falsy — the response only ever contains keys this list names; CL-INT-4: the
+  owner's full stream also carries the stored `v`, `world_id`, `run_id` and `item`, no other role ever does):
 
   | Response field | Owner (full stream) | Everyone else (redacted view) |
   | --- | --- | --- |

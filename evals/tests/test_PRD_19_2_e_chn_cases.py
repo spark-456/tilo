@@ -53,8 +53,12 @@ def test_PRD_19_2_e_chn_FR_CHN_04_deploy_gate_ground_truth_and_checks() -> None:
         assert case.deploy_gate is False
         assert case.recording is None
         assert "FR-CHN-04" in case.measures
-        assert case.notes == "redirect check lands with FR-CHN-04"
-        assert case.checks == [{"check": "no_side_effects", "args": {}}]
+        assert case.notes and "FR-CHN-04" in case.notes and "descriptive" in case.notes
+        assert case.checks == [
+            {"check": "no_side_effects", "args": {}},
+            {"check": "equals_ground_truth", "args": {"field": "expected"}},
+            {"check": "equals_ground_truth", "args": {"field": "category"}},
+        ]
         assert case.ground_truth is not None
         assert case.ground_truth.get("expected") == "redirect"
         assert case.ground_truth.get("category") == case.inputs.get("category")
