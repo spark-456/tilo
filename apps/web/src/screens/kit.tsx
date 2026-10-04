@@ -4,7 +4,7 @@
 // knows (HR-4: the shell's replay banner says so on every screen). Look after the card, chip and
 // row language of design/source "Tilo Worlds.dc.html" and "Tilo Team.dc.html".
 import type { Authz, Event } from "@tilo/contracts";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode, Ref } from "react";
 import { useClient } from "../api/ClientProvider";
 import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
 import { elapsed, useRunLog } from "../world/runLog";
@@ -119,13 +119,24 @@ export function Section({
   note,
   reserve,
   action,
+  headingRef,
   children,
-}: { title: string; note?: string; reserve?: Lines; action?: ReactNode; children: ReactNode }) {
+}: {
+  title: string;
+  note?: string;
+  reserve?: Lines;
+  action?: ReactNode;
+  /** Makes the heading focusable (tabindex -1) and hands it back, to move focus there. */
+  headingRef?: Ref<HTMLHeadingElement>;
+  children: ReactNode;
+}) {
   const [wide, narrow] = typeof reserve === "number" ? [reserve, reserve] : (reserve ?? []);
   return (
     <section className="screen-section card" aria-label={title}>
       <div className="card-head">
-        <h2>{title}</h2>
+        <h2 ref={headingRef} tabIndex={headingRef ? -1 : undefined}>
+          {title}
+        </h2>
         {action}
       </div>
       {note && <p className="section-note">{note}</p>}

@@ -8,7 +8,8 @@ import type { Container } from "pixi.js";
 import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
 import { type Frame, frameOf } from "./frame";
 import { applyEvent, createInitialState } from "./reducer";
-import { createLayer, renderAgents, renderStatic } from "./renderer";
+import { createLayer, renderAgents, renderSelection, renderStatic } from "./renderer";
+import { getSelection, subscribeSelection } from "./selection";
 import { createWorldStore } from "./store";
 
 const MOVE_DURATION_MS = 600; // a plausible walk; HR-3 caps it at MAX_DURATION_MS regardless
@@ -25,6 +26,8 @@ export interface RunWorldOptions {
   readonly reducedMotion: () => boolean;
   readonly onSeq: (seq: number) => void;
   readonly onTrace: (trace: ReadonlyArray<{ seq: number; type: string }>) => void;
+  /** The reducer's run status after each applied event (FR-WLD-07: the veil follows "paused"). */
+  readonly onStatus?: (status: Frame["status"]) => void;
 }
 
 type Vec = { x: number; y: number };
@@ -32,7 +35,10 @@ type Vec = { x: number; y: number };
 export function runWorld(opts: RunWorldOptions): () => void {
   const { world, requestRender, layout, events, seqParam, speed, reducedMotion, onSeq, onTrace } =
     opts;
+  const onStatus = opts.onStatus ?? (() => undefined);
   const layer = createLayer(world);
+  // FR-WLD-06: the ring follows the run's one selection; choosing redraws one frame, nothing more.
+  const selected = () => getSelection(layout.world_id);
   const agentIds = layout.semantic.agents.map((a) => a.id);
 
   if (seqParam !== null) {
@@ -41,11 +47,17 @@ export function runWorld(opts: RunWorldOptions): () => void {
     const state = store.stateAt(seqParam);
     const frame = frameOf(layout, state);
     renderStatic(layer, frame);
-    renderAgents(layer, frame, new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }])));
+    const places = new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }]));
+    renderAgents(layer, frame, places);
+    const ring = () => {
+      renderSelection(layer, frame, places, selected());
+      requestRender();
+    };
+    ring();
     onSeq(state.seq);
     onTrace(state.trace);
-    requestRender();
-    return () => {};
+    onStatus(state.status);
+    return subscribeSelection(ring);
   }
 
   let state = createInitialState(layout); // live playback folds events in one at a time
@@ -57,6 +69,10 @@ export function runWorld(opts: RunWorldOptions): () => void {
   const walkFrom = new Map<string, { seq: number; from: Vec }>(); // the in-flight move's start
   let lastFrame: Frame = frameOf(layout, state);
   let stopped = false;
+  // FR-WLD-07: while the recorded status is "paused" the world holds still: nothing is drawn or
+  // walked, and events that still arrive are only counted and traced (HR-1, HR-3).
+  let paused = false;
+  let lastDisplay = new Map<string, Vec>(); // what the agents were last drawn at
   let timer: ReturnType<typeof setTimeout> | undefined;
   let raf = 0;
 
@@ -95,23 +111,39 @@ export function runWorld(opts: RunWorldOptions): () => void {
         y: walk.from.y + (to.y - walk.from.y) * t,
       });
     }
+    lastDisplay = display;
     renderAgents(layer, lastFrame, display);
+    renderSelection(layer, lastFrame, display, selected());
     requestRender();
     return busy;
   }
 
   function tickAnim() {
     raf = 0;
-    if (stopped) return;
+    if (stopped || paused) return;
     if (drawAgents(performance.now())) raf = requestAnimationFrame(tickAnim);
   }
 
   function applyOne(event: Event, receivedAtMs: number) {
     if (event.seq <= state.seq) return; // duplicate or out of order: the reducer ignores it
+    const wasPaused = paused;
     state = applyEvent(state, event, layout);
+    paused = state.status === "paused";
+    onStatus(state.status);
+    if (paused) {
+      onSeq(state.seq);
+      onTrace(state.trace);
+      return;
+    }
     const frame = frameOf(layout, state);
     lastFrame = frame;
     renderStatic(layer, frame);
+    if (wasPaused) {
+      // Resumed: every agent goes straight to where the record says it is, no walk (HR-3).
+      choreo.advance(Number.POSITIVE_INFINITY);
+      for (const id of agentIds) completedCount.set(id, choreo.completed(id).length);
+      for (const a of frame.agents) agentPos.set(a.id, { x: a.cx, y: a.cy });
+    }
 
     for (const a of frame.agents) {
       if (!agentPos.has(a.id)) {
@@ -160,8 +192,17 @@ export function runWorld(opts: RunWorldOptions): () => void {
   if (document.readyState === "complete") startPlayback();
   else window.addEventListener("load", startPlayback, { once: true });
 
+  const unselect = subscribeSelection(() => {
+    if (stopped) return;
+    // A ring redraw is a frame, not an animation; paused, the agents stay where they were drawn.
+    if (paused) {
+      renderSelection(layer, lastFrame, lastDisplay, selected());
+      requestRender();
+    } else drawAgents(performance.now());
+  });
   return () => {
     stopped = true;
+    unselect();
     window.removeEventListener("load", startPlayback);
     if (timer) clearTimeout(timer);
     if (raf) cancelAnimationFrame(raf);

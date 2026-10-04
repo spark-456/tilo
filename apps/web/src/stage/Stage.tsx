@@ -46,7 +46,12 @@ export type WorldSeam = (world: Container, requestRender: () => void) => (() => 
  * frame (right after Pixi's init), never before; input listeners are live from then on. `seq`
  * (P0-08b-player, FR-WLD-04) is purely a display attribute for a world-content consumer's own
  * highest applied seq; Stage itself never reads or produces it. */
-export function Stage({ onWorld, seq }: { onWorld?: WorldSeam; seq?: number }) {
+export function Stage({
+  onWorld,
+  seq,
+  selected,
+  paused = false,
+}: { onWorld?: WorldSeam; seq?: number; selected?: string | null; paused?: boolean }) {
   const frameRef = useRef<HTMLElement>(null);
   const [supported] = useState(() => !!document.createElement("canvas").getContext("webgl2"));
   const msRef = useRef(0);
@@ -216,11 +221,20 @@ export function Stage({ onWorld, seq }: { onWorld?: WorldSeam; seq?: number }) {
       className="stage-frame"
       data-testid="stage-frame"
       {...(seq !== undefined ? { "data-seq": seq } : {})}
+      {...(selected ? { "data-selected": selected } : {})}
+      {...(paused ? { "data-paused": "true" } : {})}
       aria-label="World stage"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard pan and zoom (PRD 9.7).
       tabIndex={0}
       ref={frameRef}
     >
+      {paused && (
+        // FR-WLD-07: drawn only while the recorded status is "paused"; static (no animation) and
+        // click-through, so the camera still pans. Its word does not rely on colour.
+        <div className="world-veil" data-testid="world-veil">
+          <span className="veil-label">Paused</span>
+        </div>
+      )}
       {!supported && (
         <p className="stage-fallback" data-testid="stage-fallback">
           This browser can't render the isometric World. The Story lens will show the run instead.

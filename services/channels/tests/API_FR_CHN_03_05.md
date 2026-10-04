@@ -87,7 +87,7 @@ Invariants: one number binds to at most one user, one user has at most one bound
 ```python
 @dataclass(frozen=True)
 class RouteResult:
-    route: str   # "opt_in" | "keyword" | "card" | "unhandled"
+    route: str   # "opt_in" | "keyword" | "card" | "off_topic" (FR-CHN-04, API_FR_CHN_04.md)
 
 class InboundRouter:
     def __init__(self, *, bindings: Bindings, sender: Sender, web_url: str,
@@ -99,7 +99,7 @@ class InboundRouter:
 A sender with no valid binding gets exactly one reply, the opt-in instructions, which contain `web_url`,
 are the same for every unbound sender and message, and never echo the message; nothing else runs (no
 keyword effect, no card answer, no event). A bound sender goes to `keywords`, then `cards` (a result other
-than `ignored` is route `card`), else `unhandled` (FR-CHN-04 owns that reply; no opt-in text).
+than `ignored` is route `card`), else `off_topic` (FR-CHN-04 owns that reply; no opt-in text).
 
 ## `tilo_channels.cards` (FR-CHN-05)
 

@@ -1,6 +1,6 @@
 // PRD-18.3 flow: the typed fixture modules are copies of contracts/fixtures. The JSON is read
 // here, in the test only, never at runtime.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BRIEF_SUPPLIER_COMPARISON } from "./fixtures/brief";
@@ -14,6 +14,7 @@ import {
 import { EVENTS_VILLAGE_BASIC } from "./fixtures/events";
 import { LAYOUT_VILLAGE_BASIC } from "./fixtures/layout";
 import { PLAN_TWO_APPROACHES } from "./fixtures/plan";
+import { EVENT_POLICY_APPLIED } from "./fixtures/policy";
 
 const root = fileURLToPath(new URL("../../../../contracts/fixtures/", import.meta.url));
 const text = (path: string): string => readFileSync(`${root}${path}`, "utf8");
@@ -29,16 +30,17 @@ describe("PRD-18.3 flow: fixture modules deep-equal their contracts/fixtures sou
   it("layout", () => {
     expect(LAYOUT_VILLAGE_BASIC).toEqual(json("layout/valid/village_basic.json"));
   });
-  it("cards, all six valid fixtures", () => {
-    const names = [
-      "consent_drive_folder",
-      "gate_save_file_reversible",
-      "gate_send_reply",
-      "meeting_budget_split",
-      "needs_you_blocked",
-      "needs_you_compare_basis",
-    ];
-    expect(CARDS_VALID).toEqual(names.map((n) => json(`card/valid/${n}.json`)));
+  it("cards, every valid fixture in the directory, in file-name order", () => {
+    // Read from the directory, not a fixed list, so a new card/valid fixture cannot go unnoticed.
+    const files = readdirSync(`${root}card/valid`)
+      .filter((f) => f.endsWith(".json"))
+      .sort();
+    expect(files.length).toBeGreaterThan(0);
+    expect(CARDS_VALID).toEqual(files.map((f) => json(`card/valid/${f}`)));
+  });
+  it("the policy.applied event the dev gallery draws", () => {
+    expect(EVENT_POLICY_APPLIED).toEqual(json("events/valid/policy.applied.json"));
+    expect(EVENTS_VILLAGE_BASIC.map((e) => e.id)).not.toContain(EVENT_POLICY_APPLIED.id);
   });
   it("events, the full 44-event stream in file order", () => {
     const lines = text("streams/village-basic.jsonl")

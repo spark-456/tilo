@@ -1,23 +1,26 @@
-// PRD 18.3 flow screens S-01, S-02, S-03, S-04 and S-12 as placeholders (heading, one primary
-// button to the next step) that AGW-02 to AGW-05 fill in. Every client call has loading, empty
-// and error states with a retry (PRD 18.4); one filled primary button per screen (UX-1).
+// PRD 18.3 flow screens S-01, S-02, S-03 and S-04 as placeholders (heading, one primary button to
+// the next step) that AGW-02 to AGW-05 fill in. S-12 (Delivery) is S_12.tsx, routed by routes.tsx.
+// Every client call has loading, empty and error states with a retry (PRD 18.4); one filled
+// primary button per screen (UX-1).
 import { type ReactNode, useEffect, useRef } from "react";
-import { useClient } from "../api/ClientProvider";
-import type { ApproachesResult } from "../api/client";
 import { useFlowRoute } from "../router";
 import { StartScreen } from "./flow/StartScreen";
 import "./flow/flow.css";
-import { type Action, type Remote, useAction, useRemote } from "./remote";
+import { type Action, type Remote, useAction } from "./remote";
+import { Understanding } from "./s02/Understanding";
+import { Approaches } from "./s03/Approaches";
 
 const enc = encodeURIComponent;
 
-function Notice({ message, onRetry }: { message: string; onRetry: () => void }) {
+function Notice({ message, onRetry }: { message: string; onRetry?: (() => void) | undefined }) {
   return (
     <div className="flow-notice" role="alert">
       <p>{message}</p>
-      <button type="button" className="secondary" onClick={onRetry}>
-        Try again
-      </button>
+      {onRetry && (
+        <button type="button" className="secondary" onClick={onRetry}>
+          Try again
+        </button>
+      )}
     </div>
   );
 }
@@ -34,12 +37,16 @@ export function Loaded<T>({
   remote,
   retry,
   isEmpty,
+  empty,
   children,
 }: {
   what: string;
   remote: Remote<T>;
-  retry: () => void;
+  /** Omit it when a retry cannot change the outcome (the data is already in memory). */
+  retry?: (() => void) | undefined;
   isEmpty: (value: T) => boolean;
+  /** Replaces the generic empty notice, for an empty state that has its own next step. */
+  empty?: ReactNode;
   children: (value: T) => ReactNode;
 }) {
   let body: ReactNode;
@@ -48,7 +55,13 @@ export function Loaded<T>({
   } else if (remote.status === "error") {
     body = <Notice message={remote.message} onRetry={retry} />;
   } else if (isEmpty(remote.value)) {
-    body = <Notice message={`Nothing came back for ${what}. You can try again.`} onRetry={retry} />;
+    body = empty ? (
+      <div className="flow-notice" role="alert">
+        {empty}
+      </div>
+    ) : (
+      <Notice message={`Nothing came back for ${what}. You can try again.`} onRetry={retry} />
+    );
   } else {
     body = children(remote.value);
   }
@@ -76,94 +89,9 @@ export function Primary({
   );
 }
 
-function Understanding({ taskId }: { taskId: string }) {
-  const client = useClient();
-  const action = useAction("confirm the brief", async () => {
-    await client.answerQuestions(taskId, [], {});
-    return `/task/${enc(taskId)}/approaches`;
-  });
-  return <Primary label="Confirm understanding" action={action} />;
-}
-
-/** The recommended approach and its cap (its upper credit estimate), from getApproaches. */
-async function loadRecommendation(getApproaches: Promise<ApproachesResult>) {
-  const result = await getApproaches;
-  const chosen = result.approaches.find((a) => a.id === result.recommended);
-  if (result.approaches.length > 0 && !chosen) {
-    throw new Error("the recommended approach is not in the list");
-  }
-  return { result, chosen };
-}
-
-function Approaches({ taskId }: { taskId: string }) {
-  const client = useClient();
-  const [remote, retry] = useRemote("load the approaches", () =>
-    loadRecommendation(client.getApproaches(taskId)),
-  );
-  const ready = remote.status === "ready" ? remote.value : null;
-  const action = useAction("start the run", async () => {
-    if (!ready?.chosen) throw new Error("no approach is loaded");
-    const { world_id } = await client.approve(taskId, {
-      approach_id: ready.chosen.id,
-      budget_cap: ready.chosen.credits.max,
-    });
-    return `/world/${enc(world_id)}`;
-  });
-  return (
-    <>
-      <Loaded
-        what="the approaches"
-        remote={remote}
-        retry={retry}
-        isEmpty={(v) => v.chosen === undefined}
-      >
-        {({ result, chosen }) => (
-          <>
-            <Summary>Compare priced approaches and confirm your budget cap.</Summary>
-            <p className="flow-detail">
-              Recommended: {chosen?.label}. This run can use up to {chosen?.credits.max} credits
-              (about US${((chosen?.credits.max ?? 0) * result.credit_usd).toFixed(2)}). You can
-              pause it any time.
-            </p>
-          </>
-        )}
-      </Loaded>
-      <Primary label="Approve & start" action={action} disabled={!ready?.chosen} />
-    </>
-  );
-}
-
 function World({ worldId }: { worldId: string }) {
   const action = useAction("open the delivery", async () => `/world/${enc(worldId)}/delivery`);
   return <Primary label="View delivery" action={action} />;
-}
-
-function Delivery({ worldId }: { worldId: string }) {
-  const client = useClient();
-  const [remote, retry] = useRemote("load the delivery", () => client.getDelivery(worldId));
-  const action = useAction("start a new task", async () => "/");
-  return (
-    <>
-      <Loaded
-        what="the delivery"
-        remote={remote}
-        retry={retry}
-        isEmpty={(d) => d.artifacts.length === 0}
-      >
-        {(d) => (
-          <>
-            <Summary>Verified deliverables are ready at the Delivery Dock.</Summary>
-            <p className="flow-detail">
-              {d.artifacts.length} deliverable(s), {d.credits_used} credits used.
-              {d.time_saved &&
-                ` About ${d.time_saved.low_min} to ${d.time_saved.high_min} min saved (estimate).`}
-            </p>
-          </>
-        )}
-      </Loaded>
-      <Primary label="New task" action={action} />
-    </>
-  );
 }
 
 export function FlowShell() {
@@ -185,12 +113,7 @@ export function FlowShell() {
       case "Start":
         return <StartScreen />;
       case "Understanding":
-        return (
-          <>
-            <Summary>Review the extracted brief and clarifying questions.</Summary>
-            <Understanding taskId={route.taskId} />
-          </>
-        );
+        return <Understanding taskId={route.taskId} />;
       case "Approaches":
         return <Approaches taskId={route.taskId} />;
       case "World":
@@ -200,8 +123,6 @@ export function FlowShell() {
             <World worldId={route.worldId} />
           </>
         );
-      case "Delivery":
-        return <Delivery worldId={route.worldId} />;
     }
   })();
   return (
