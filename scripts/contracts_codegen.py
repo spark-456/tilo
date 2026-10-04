@@ -36,6 +36,7 @@ from urllib.parse import urljoin
 import contracts_events as events
 import jsonschema
 import yaml
+from pydantic import TypeAdapter
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
@@ -217,7 +218,13 @@ def check_models(schemas: dict[str, dict], module: object) -> list[str]:
         if kind == "valid":
             data, model = load(path), getattr(module, type_name(name, key or None))
             try:
-                dumped = model.model_validate(data).model_dump(mode="json", by_alias=True, exclude_unset=True)
+                if hasattr(model, "model_validate"):
+                    dumped = model.model_validate(data).model_dump(mode="json", by_alias=True, exclude_unset=True)
+                else:  # a root union (ui_action.schema.json) generates a type alias, not a model
+                    adapter = TypeAdapter(model)
+                    dumped = adapter.dump_python(
+                        adapter.validate_python(data), mode="json", by_alias=True, exclude_unset=True
+                    )
             except ValueError as error:
                 dumped = str(error)
             if dumped != data:

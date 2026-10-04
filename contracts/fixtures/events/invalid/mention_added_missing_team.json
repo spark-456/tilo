@@ -1,0 +1,34 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000306",
+  "seq": 306,
+  "ts": "2026-10-05T09:05:06.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "mention.added",
+  "actor": "u_owner",
+  "target": "u_priya",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "Priya was tagged on a pin of the launch team.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "mention_id": "mn_rate_sheet_priya",
+    "pin_id": "pb_launch_date",
+    "user": "u_priya"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

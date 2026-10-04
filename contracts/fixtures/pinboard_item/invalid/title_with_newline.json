@@ -1,0 +1,33 @@
+{
+  "id": "pb_launch_date",
+  "org_id": "org_example",
+  "scope": {
+    "kind": "team",
+    "team": "tm_launch"
+  },
+  "title": "Launch\nis 17 October",
+  "body": null,
+  "kind": "decision",
+  "url": null,
+  "owner": "u_priya",
+  "due": "2026-10-17",
+  "status": "active",
+  "created_by": {
+    "by": "person",
+    "ref": "u_priya",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
+  "set_up_by": "u_priya",
+  "source": null,
+  "confirmed_by": null,
+  "history": [
+    {
+      "at": "2026-10-05T10:30:00.000Z",
+      "by": "u_priya",
+      "change": "created",
+      "status": "active"
+    }
+  ],
+  "created_at": "2026-10-05T10:30:00.000Z",
+  "updated_at": "2026-10-05T10:30:00.000Z"
+}

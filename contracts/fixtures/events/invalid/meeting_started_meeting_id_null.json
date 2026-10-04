@@ -1,0 +1,32 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000316",
+  "seq": 316,
+  "ts": "2026-09-29T09:42:01.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "meeting.started",
+  "actor": "A_dir",
+  "target": "B6",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The meeting on the budget split started.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "meeting_id": null
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

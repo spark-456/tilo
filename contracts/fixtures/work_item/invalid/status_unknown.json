@@ -1,0 +1,32 @@
+{
+  "id": "wi_rate_sheet",
+  "org_id": "org_example",
+  "owner": "u_priya",
+  "title": "Send the rate sheet to Acme",
+  "due": "2026-10-09",
+  "due_text": "by Friday",
+  "status": "blocked",
+  "source": {
+    "kind": "meeting",
+    "ref": "mt_q4_plan#ai1",
+    "evidence": ["u0021", "u0022"]
+  },
+  "created_by": {
+    "by": "tilo",
+    "ref": "A_analyst",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
+  "assigned_by": null,
+  "confirmed_by": null,
+  "snoozed_until": null,
+  "history": [
+    {
+      "at": "2026-10-05T10:30:00.000Z",
+      "by": "A_analyst",
+      "change": "created",
+      "status": "proposed"
+    }
+  ],
+  "created_at": "2026-10-05T10:30:00.000Z",
+  "updated_at": "2026-10-05T10:30:00.000Z"
+}

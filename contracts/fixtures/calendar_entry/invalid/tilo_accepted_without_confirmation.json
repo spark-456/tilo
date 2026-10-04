@@ -1,0 +1,24 @@
+{
+  "id": "ce_followup_thu",
+  "org_id": "org_example",
+  "owner": "u_priya",
+  "title": "Follow up with Acme",
+  "start": "2026-10-07T09:30:00.000Z",
+  "end": "2026-10-07T10:00:00.000Z",
+  "all_day": false,
+  "attendee_count": 0,
+  "source": {
+    "kind": "tilo",
+    "from": "meeting",
+    "ref": "mt_q4_plan#ai1"
+  },
+  "state": "accepted",
+  "share": null,
+  "created_by": {
+    "by": "tilo",
+    "ref": "A_analyst",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
+  "confirmed_by": null,
+  "updated_at": "2026-10-05T10:30:00.000Z"
+}

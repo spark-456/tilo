@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/calendar.synced.schema.json",
+  "x-version": "1.0.0",
+  "title": "CalendarSyncedData",
+  "description": "data of calendar.synced (CC-PEOPLE, FR-CAL-02, -08). The cached Google events of a person were refreshed: incremental by sync token, or full after the token expired. A count, never a title (PE-13).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "changed"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["incremental", "full"]
+    },
+    "changed": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

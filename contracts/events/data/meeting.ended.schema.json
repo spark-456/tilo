@@ -1,11 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/events/data/meeting.ended.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "MeetingEndedData",
-  "description": "data of meeting.ended (PRD 9.5).",
+  "description": "data of meeting.ended (PRD 9.5). 1.1.0: optional meeting_id as on meeting.started, and the optional reason an external meeting ended (left_on_request is a participant's `Tilo leave`, FR-MTG-10). Optional means absent, never null.",
   "type": "object",
   "additionalProperties": false,
   "required": [],
-  "properties": {}
+  "properties": {
+    "meeting_id": {
+      "$ref": "../../common.schema.json#/$defs/meeting_id"
+    },
+    "reason": {
+      "type": "string",
+      "enum": ["completed", "left_on_request", "removed", "timeout", "failed"]
+    }
+  }
 }

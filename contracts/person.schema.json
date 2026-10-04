@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/person.schema.json",
+  "x-version": "1.0.0",
+  "title": "Person",
+  "description": "A person of an org (PRD 15.1 User entity, ADR-0014): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "org_id",
+    "display_name",
+    "aliases",
+    "email",
+    "time_zone",
+    "preferred_channel",
+    "org_role",
+    "memberships",
+    "created_by"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/user_id"
+    },
+    "org_id": {
+      "$ref": "common.schema.json#/$defs/org_id"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "aliases": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+        "not": {
+          "pattern": "[\\n\\r]"
+        }
+      }
+    },
+    "email": {
+      "$ref": "common.schema.json#/$defs/email_address"
+    },
+    "time_zone": {
+      "description": "IANA time zone name (Asia/Kolkata) or UTC: the zone of due dates and the reminder window.",
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(UTC|[A-Z][A-Za-z_+-]*(/[A-Za-z0-9_+-]+){1,2})$",
+      "not": {
+        "pattern": "\\n"
+      }
+    },
+    "preferred_channel": {
+      "$ref": "common.schema.json#/$defs/channel"
+    },
+    "org_role": {
+      "type": "string",
+      "enum": ["owner", "member"]
+    },
+    "memberships": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/membership"
+      }
+    },
+    "created_by": {
+      "$ref": "team_lead.schema.json#/$defs/assignment"
+    }
+  },
+  "$defs": {
+    "membership": {
+      "description": "Membership of a team, counted only as people.rules.md defines it (PE-02).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["team", "assigned_by"],
+      "properties": {
+        "team": {
+          "$ref": "common.schema.json#/$defs/team_id"
+        },
+        "assigned_by": {
+          "$ref": "team_lead.schema.json#/$defs/assignment"
+        }
+      }
+    }
+  }
+}

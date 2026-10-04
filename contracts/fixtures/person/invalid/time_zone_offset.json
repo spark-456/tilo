@@ -1,0 +1,23 @@
+{
+  "id": "u_priya",
+  "org_id": "org_example",
+  "display_name": "Priya Nair",
+  "aliases": ["Priya", "PN"],
+  "email": "priya@example.com",
+  "time_zone": "+05:30",
+  "preferred_channel": "whatsapp",
+  "org_role": "member",
+  "memberships": [
+    {
+      "team": "tm_launch",
+      "assigned_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    }
+  ],
+  "created_by": {
+    "by": "u_owner",
+    "at": "2026-10-05T09:00:00.000Z"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/common.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "Common",
   "description": "Definitions shared by every Tilo contract. The root is a sampler with one optional property per definition so that fixtures and generated types cover each one; no service sends a Common document.",
   "type": "object",
@@ -45,7 +45,17 @@
     "data_class": { "$ref": "#/$defs/data_class" },
     "deliverable_format": { "$ref": "#/$defs/deliverable_format" },
     "credit_range": { "$ref": "#/$defs/credit_range" },
-    "time_range": { "$ref": "#/$defs/time_range" }
+    "time_range": { "$ref": "#/$defs/time_range" },
+    "work_item_id": { "$ref": "#/$defs/work_item_id" },
+    "meeting_id": { "$ref": "#/$defs/meeting_id" },
+    "pin_id": { "$ref": "#/$defs/pin_id" },
+    "mention_id": { "$ref": "#/$defs/mention_id" },
+    "calendar_entry_id": { "$ref": "#/$defs/calendar_entry_id" },
+    "team_id": { "$ref": "#/$defs/team_id" },
+    "utterance_id": { "$ref": "#/$defs/utterance_id" },
+    "opaque_ref": { "$ref": "#/$defs/opaque_ref" },
+    "maker": { "$ref": "#/$defs/maker" },
+    "record_ref": { "$ref": "#/$defs/record_ref" }
   },
   "$defs": {
     "ulid": {
@@ -237,6 +247,58 @@
       "properties": {
         "min_s": { "type": "integer", "minimum": 0 },
         "max_s": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "work_item_id": { "type": "string", "pattern": "^wi_[0-9A-Za-z_]{1,48}$" },
+    "meeting_id": { "type": "string", "pattern": "^mt_[0-9A-Za-z_]{1,48}$" },
+    "pin_id": { "type": "string", "pattern": "^pb_[0-9A-Za-z_]{1,48}$" },
+    "mention_id": { "type": "string", "pattern": "^mn_[0-9A-Za-z_]{1,48}$" },
+    "calendar_entry_id": { "type": "string", "pattern": "^ce_[0-9A-Za-z_]{1,48}$" },
+    "team_id": { "type": "string", "pattern": "^tm_[0-9a-z_]{1,48}$" },
+    "utterance_id": { "type": "string", "pattern": "^u[0-9]{4,6}$" },
+    "opaque_ref": {
+      "description": "An opaque reference to a record or a place in one (for example mt_x#ai3): letters, digits, underscore, hash and hyphen only, so no URL, domain, path or address fits (the destination rule).",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_#-]{1,96}$"
+    },
+    "maker": {
+      "description": "Who made a record: a person (ref is a user id) or Tilo (ref is an agent id, or system for the sweeper and syncs), and when. Provenance, not authority: a record Tilo made starts proposed and leaves that state only with a person's confirmed_by (PE-07, PE-08).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "ref", "at"],
+      "properties": {
+        "by": { "type": "string", "enum": ["person", "tilo"] },
+        "ref": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "at": { "$ref": "#/$defs/timestamp" }
+      },
+      "if": { "properties": { "by": { "const": "person" } }, "required": ["by"] },
+      "then": { "properties": { "ref": { "$ref": "#/$defs/user_id" } } },
+      "else": {
+        "properties": {
+          "ref": { "anyOf": [{ "$ref": "#/$defs/agent_id" }, { "const": "system" }] }
+        }
+      }
+    },
+    "record_ref": {
+      "description": "A pointer to a record a claim rests on (assistant answers cite these, HR-1): its kind and id, never its content.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "work_item",
+            "calendar_entry",
+            "meeting",
+            "pinboard_item",
+            "mention",
+            "card",
+            "world",
+            "event"
+          ]
+        },
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_]{1,64}$" }
       }
     }
   }

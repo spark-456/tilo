@@ -1,0 +1,48 @@
+{
+  "id": "mt_q4_plan",
+  "org_id": "org_example",
+  "owner": "u_owner",
+  "title": "Q4 planning",
+  "series": "q4_planning_weekly",
+  "scheduled": {
+    "start": "2026-10-06T09:00:00.000Z",
+    "end": "2026-10-06T10:00:00.000Z"
+  },
+  "agenda": [
+    {
+      "title": "Launch date",
+      "minutes": 15
+    },
+    {
+      "title": "Rate sheet",
+      "minutes": null
+    }
+  ],
+  "attendees": [
+    {
+      "name": "Asha Rao",
+      "user": "u_owner"
+    },
+    {
+      "name": "Priya",
+      "user": "u_priya"
+    },
+    {
+      "name": "Dev from Acme",
+      "user": null
+    }
+  ],
+  "attestation": {
+    "by": "u_owner",
+    "at": "2026-10-05T09:00:00.000Z",
+    "notice_version": "1.0.0"
+  },
+  "source": "bot",
+  "status": "discarded",
+  "ended_reason": "left_on_request",
+  "transcript": null,
+  "minutes": null,
+  "delete_transcript_after": null,
+  "delete_minutes_after": null,
+  "created_at": "2026-10-05T09:00:00.000Z"
+}

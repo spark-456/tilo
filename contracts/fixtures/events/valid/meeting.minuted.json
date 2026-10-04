@@ -1,0 +1,40 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000301",
+  "seq": 301,
+  "ts": "2026-10-05T09:05:01.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "meeting.minuted",
+  "actor": "A_analyst",
+  "target": "u_owner",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "needs_you",
+  "credits": 12.5,
+  "summary": "The minutes are ready: 3 decisions and 5 action items, 1 unverified.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "meeting_id": "mt_q4_plan",
+    "minutes": {
+      "artifact_id": "art_minutes_q4_plan",
+      "version": 1
+    },
+    "decisions": 3,
+    "action_items": 5,
+    "unverified": 1,
+    "flagged": false
+  },
+  "trace": {
+    "model_role": "meeting_analyst",
+    "profile": "medium",
+    "tokens_in": 9200,
+    "tokens_out": 1400,
+    "tool": null,
+    "latency_ms": 5200,
+    "archive_ref": "r_desk_priya_1/21"
+  }
+}

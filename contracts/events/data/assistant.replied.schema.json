@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/assistant.replied.schema.json",
+  "x-version": "1.0.0",
+  "title": "AssistantRepliedData",
+  "description": "data of assistant.replied (CC-PEOPLE, FR-PA-13, -14, -19, PE-10, PE-11). The panel answered. decided_by says whether deterministic rules or the cheap model picked the read model or action; the answer text is a template over read-model rows and sits in the raw archive (message_ref). sources are the records every claim cites (HR-1): an answered outcome has at least one. ui_action is the one validated allow-list action the panel took or offers; a navigated outcome has one. cached is true when the answer was served from an unchanged-records cache.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "conversation_id",
+    "message_ref",
+    "outcome",
+    "decided_by",
+    "sources",
+    "ui_action",
+    "cached"
+  ],
+  "properties": {
+    "conversation_id": {
+      "$ref": "../../common.schema.json#/$defs/ulid"
+    },
+    "message_ref": {
+      "$ref": "../../event.schema.json#/$defs/archive_ref"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["answered", "navigated", "declined", "failed"]
+    },
+    "decided_by": {
+      "type": "string",
+      "enum": ["rules", "model"]
+    },
+    "sources": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "$ref": "../../common.schema.json#/$defs/record_ref"
+      }
+    },
+    "ui_action": {
+      "anyOf": [
+        {
+          "$ref": "../../ui_action.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cached": {
+      "type": "boolean"
+    }
+  },
+  "if": {
+    "properties": {
+      "outcome": {
+        "const": "answered"
+      }
+    },
+    "required": ["outcome"]
+  },
+  "then": {
+    "properties": {
+      "sources": {
+        "minItems": 1
+      }
+    }
+  },
+  "else": {
+    "if": {
+      "properties": {
+        "outcome": {
+          "const": "navigated"
+        }
+      },
+      "required": ["outcome"]
+    },
+    "then": {
+      "properties": {
+        "ui_action": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

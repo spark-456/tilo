@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/mention.added.schema.json",
+  "x-version": "1.0.0",
+  "title": "MentionAddedData",
+  "description": "data of mention.added (CC-PEOPLE, FR-PB-04). A team member was tagged on a team entry. The tagged person is told through their own plate, not this event.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mention_id", "pin_id", "team", "user"],
+  "properties": {
+    "mention_id": {
+      "$ref": "../../common.schema.json#/$defs/mention_id"
+    },
+    "pin_id": {
+      "$ref": "../../common.schema.json#/$defs/pin_id"
+    },
+    "team": {
+      "$ref": "../../common.schema.json#/$defs/team_id"
+    },
+    "user": {
+      "$ref": "../../common.schema.json#/$defs/user_id"
+    }
+  }
+}

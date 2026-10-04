@@ -1,0 +1,34 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000305",
+  "seq": 305,
+  "ts": "2026-10-05T09:05:05.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "pinboard.item_changed",
+  "actor": "u_owner",
+  "target": "u_owner",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The Owner accepted a proposed pin.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "pin_id": "pb_launch_date",
+    "change": "shared",
+    "status": "active"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

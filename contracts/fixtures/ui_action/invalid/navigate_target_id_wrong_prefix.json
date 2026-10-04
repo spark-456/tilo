@@ -1,0 +1,8 @@
+{
+  "kind": "navigate",
+  "route": "meeting",
+  "target": {
+    "kind": "meeting",
+    "id": "wi_rate_sheet"
+  }
+}

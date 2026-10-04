@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/assistant.asked.schema.json",
+  "x-version": "1.0.0",
+  "title": "AssistantAskedData",
+  "description": "data of assistant.asked (CC-PEOPLE, FR-PA-12). A person asked the assistant panel something. The text is in the redacted raw archive (message_ref), never here. screen is the route the panel was opened on.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["conversation_id", "message_ref", "screen"],
+  "properties": {
+    "conversation_id": {
+      "$ref": "../../common.schema.json#/$defs/ulid"
+    },
+    "message_ref": {
+      "$ref": "../../event.schema.json#/$defs/archive_ref"
+    },
+    "screen": {
+      "anyOf": [
+        {
+          "$ref": "../../ui_action.schema.json#/$defs/route"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

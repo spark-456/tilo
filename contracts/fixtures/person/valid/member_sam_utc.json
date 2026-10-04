@@ -1,0 +1,23 @@
+{
+  "id": "u_sam",
+  "org_id": "org_example",
+  "display_name": "Sam Iyer",
+  "aliases": ["Sam"],
+  "email": "sam@example.com",
+  "time_zone": "UTC",
+  "preferred_channel": "mobile_web",
+  "org_role": "member",
+  "memberships": [
+    {
+      "team": "tm_ops",
+      "assigned_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    }
+  ],
+  "created_by": {
+    "by": "u_owner",
+    "at": "2026-10-05T09:00:00.000Z"
+  }
+}

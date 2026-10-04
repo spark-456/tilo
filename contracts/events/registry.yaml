@@ -18,7 +18,7 @@
 # (PRD 10.4 Audit, HR-7). Such an event carries authz (EV-03) from one of authz_by (EV-04), and
 # event.schema.json lists the same types (contracts-check fails if the lists drift).
 
-version: 1.0.0
+version: 1.1.0
 unknown_types: trace_only
 types:
   world.requested:
@@ -937,3 +937,159 @@ types:
     trace_row: "spec={data.spec}"
     data_schema: events/data/app.refreshed.schema.json
     fixture: fixtures/events/valid/app.refreshed.json
+  meeting.minuted:
+    family: meeting
+    verb: minuted
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The minutes scroll goes from the Meeting Hall to the Town Hall."
+    hud_effect: "A minutes card opens for the Owner (S-26)."
+    story_template: "The minutes are ready: {data.decisions} decisions, {data.action_items} action items."
+    trace_row: "meeting={data.meeting_id} unverified={data.unverified} flagged={data.flagged}"
+    data_schema: events/data/meeting.minuted.schema.json
+    fixture: fixtures/events/valid/meeting.minuted.json
+  work_item.created:
+    family: work_item
+    verb: created
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A note lands on the owner's desk."
+    hud_effect: "The plate gains a row."
+    story_template: "A work item was added ({data.status})."
+    trace_row: "work_item={data.work_item_id} owner={data.owner} source={data.source_kind}"
+    data_schema: events/data/work_item.created.schema.json
+    fixture: fixtures/events/valid/work_item.created.json
+  work_item.changed:
+    family: work_item
+    verb: changed
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The note on the desk gets a stamp, a snooze tag or a check."
+    hud_effect: "The plate row updates."
+    story_template: "A work item changed: {data.change}."
+    trace_row: "work_item={data.work_item_id} change={data.change} status={data.status}"
+    data_schema: events/data/work_item.changed.schema.json
+    fixture: fixtures/events/valid/work_item.changed.json
+  pinboard.item_added:
+    family: pinboard
+    verb: item_added
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A pin appears on the board beside Your Desk."
+    hud_effect: "The pinboard table gains a row."
+    story_template: "A pin was added to the {data.scope_kind} board ({data.status})."
+    trace_row: "pin={data.pin_id} scope={data.scope_kind} made_by={data.made_by}"
+    data_schema: events/data/pinboard.item_added.schema.json
+    fixture: fixtures/events/valid/pinboard.item_added.json
+  pinboard.item_changed:
+    family: pinboard
+    verb: item_changed
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The pin is re-stamped, lifted off or taken down."
+    hud_effect: "The pinboard row updates."
+    story_template: "A pin changed: {data.change}."
+    trace_row: "pin={data.pin_id} change={data.change} status={data.status}"
+    data_schema: events/data/pinboard.item_changed.schema.json
+    fixture: fixtures/events/valid/pinboard.item_changed.json
+  mention.added:
+    family: mention
+    verb: added
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A small tag flutters onto the pin."
+    hud_effect: "The tagged person's plate gains a row."
+    story_template: "Someone was tagged on a pin."
+    trace_row: "mention={data.mention_id} pin={data.pin_id} user={data.user}"
+    data_schema: events/data/mention.added.schema.json
+    fixture: fixtures/events/valid/mention.added.json
+  mention.removed:
+    family: mention
+    verb: removed
+    priority: must
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The tag drops off the pin."
+    hud_effect: "The plate row clears."
+    story_template: "A tag was removed from a pin."
+    trace_row: "mention={data.mention_id} pin={data.pin_id} removed_by={data.removed_by}"
+    data_schema: events/data/mention.removed.schema.json
+    fixture: fixtures/events/valid/mention.removed.json
+  calendar.synced:
+    family: calendar
+    verb: synced
+    priority: must
+    pillar: P6
+    default_severity: info
+    side_effect: false
+    world_effect: "The Clock Tower bell rings once."
+    hud_effect: "The calendar refreshes."
+    story_template: "The calendar synced ({data.changed} changes)."
+    trace_row: "kind={data.kind} changed={data.changed}"
+    data_schema: events/data/calendar.synced.schema.json
+    fixture: fixtures/events/valid/calendar.synced.json
+  calendar.entry_proposed:
+    family: calendar
+    verb: entry_proposed
+    priority: must
+    pillar: P6
+    default_severity: info
+    side_effect: false
+    world_effect: "An unstamped dated card slides onto the calendar board."
+    hud_effect: "The calendar shows a proposed entry."
+    story_template: "A calendar entry was proposed from a {data.source_kind}."
+    trace_row: "entry={data.entry_id} source={data.source_kind}"
+    data_schema: events/data/calendar.entry_proposed.schema.json
+    fixture: fixtures/events/valid/calendar.entry_proposed.json
+  calendar.entry_changed:
+    family: calendar
+    verb: entry_changed
+    priority: must
+    pillar: P6
+    default_severity: info
+    side_effect: false
+    world_effect: "The dated card is stamped, crossed out or moved."
+    hud_effect: "The calendar row updates."
+    story_template: "A calendar entry changed: {data.change}."
+    trace_row: "entry={data.entry_id} change={data.change} state={data.state}"
+    data_schema: events/data/calendar.entry_changed.schema.json
+    fixture: fixtures/events/valid/calendar.entry_changed.json
+  assistant.asked:
+    family: assistant
+    verb: asked
+    priority: must
+    pillar: P5
+    default_severity: info
+    side_effect: false
+    world_effect: "The lamp on Your Desk lights."
+    hud_effect: "The panel shows the question."
+    story_template: "A question was asked in the assistant panel."
+    trace_row: "conversation={data.conversation_id}"
+    data_schema: events/data/assistant.asked.schema.json
+    fixture: fixtures/events/valid/assistant.asked.json
+  assistant.replied:
+    family: assistant
+    verb: replied
+    priority: must
+    pillar: P5
+    default_severity: info
+    side_effect: false
+    world_effect: "A sealed note returns to Your Desk."
+    hud_effect: "The panel streams the answer with its sources."
+    story_template: "The assistant answered ({data.outcome})."
+    trace_row: "conversation={data.conversation_id} outcome={data.outcome} decided_by={data.decided_by}"
+    data_schema: events/data/assistant.replied.schema.json
+    fixture: fixtures/events/valid/assistant.replied.json

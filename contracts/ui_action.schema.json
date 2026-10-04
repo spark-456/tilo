@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/ui_action.schema.json",
+  "x-version": "1.0.0",
+  "title": "UiAction",
+  "description": "The allow-list of what the assistant panel may do on the page (FR-PA-14, PE-10): a closed union on `kind`. The web app has one executor that maps each kind to a handler; a document that does not validate is dropped, so a model can never click, type, read the page or go anywhere outside these routes and targets. State-changing kinds act on the signed-in person's own records through the same API routes as the buttons; `draft_reply` makes a draft (T1) and sends nothing; no kind sends to another person.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/navigate"
+    },
+    {
+      "$ref": "#/$defs/mark_done"
+    },
+    {
+      "$ref": "#/$defs/snooze"
+    },
+    {
+      "$ref": "#/$defs/draft_reply"
+    },
+    {
+      "$ref": "#/$defs/tag"
+    },
+    {
+      "$ref": "#/$defs/untag"
+    }
+  ],
+  "$defs": {
+    "route": {
+      "description": "A screen of the web app (PRD 18.3), closed list.",
+      "type": "string",
+      "enum": [
+        "plate",
+        "calendar",
+        "meetings",
+        "meeting",
+        "pinboard_team",
+        "pinboard_personal",
+        "worlds",
+        "world",
+        "cards",
+        "connections",
+        "channels",
+        "autonomy",
+        "settings"
+      ]
+    },
+    "target": {
+      "description": "The record a route opens, if any.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/target_world"
+        },
+        {
+          "$ref": "#/$defs/target_meeting"
+        },
+        {
+          "$ref": "#/$defs/target_card"
+        },
+        {
+          "$ref": "#/$defs/target_pin"
+        },
+        {
+          "$ref": "#/$defs/target_work_item"
+        },
+        {
+          "$ref": "#/$defs/target_calendar_entry"
+        }
+      ]
+    },
+    "target_world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "const": "world"
+        },
+        "id": {
+          "$ref": "common.schema.json#/$defs/world_id"
+        }
+      }
+    },
+    "target_meeting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "const": "meeting"
+        },
+        "id": {
+          "$ref": "common.schema.json#/$defs/meeting_id"
+        }
+      }
+    },
+    "target_card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "const": "card"
+        },
+        "id": {
+          "$ref": "common.schema.json#/$defs/ulid"
+        }
+      }
+    },
+    "target_pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "const": "pin"
+        },
+        "id": {
+          "$ref": "common.schema.json#/$defs/pin_id"
+        }
+      }
+    },
+    "target_work_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "const": "work_item"
+        },
+        "id": {
+          "$ref": "common.schema.json#/$defs/work_item_id"
+        }
+      }
+    },
+    "target_calendar_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "const": "calendar_entry"
+        },
+        "id": {
+          "$ref": "common.schema.json#/$defs/calendar_entry_id"
+        }
+      }
+    },
+    "navigate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "route", "target"],
+      "properties": {
+        "kind": {
+          "const": "navigate"
+        },
+        "route": {
+          "$ref": "#/$defs/route"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "mark_done": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "work_item_id"],
+      "properties": {
+        "kind": {
+          "const": "mark_done"
+        },
+        "work_item_id": {
+          "$ref": "common.schema.json#/$defs/work_item_id"
+        }
+      }
+    },
+    "snooze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "work_item_id", "until"],
+      "properties": {
+        "kind": {
+          "const": "snooze"
+        },
+        "work_item_id": {
+          "$ref": "common.schema.json#/$defs/work_item_id"
+        },
+        "until": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        }
+      }
+    },
+    "draft_reply": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "thread"],
+      "properties": {
+        "kind": {
+          "const": "draft_reply"
+        },
+        "thread": {
+          "$ref": "common.schema.json#/$defs/destination"
+        }
+      }
+    },
+    "tag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pin_id", "user"],
+      "properties": {
+        "kind": {
+          "const": "tag"
+        },
+        "pin_id": {
+          "$ref": "common.schema.json#/$defs/pin_id"
+        },
+        "user": {
+          "$ref": "common.schema.json#/$defs/user_id"
+        }
+      }
+    },
+    "untag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pin_id", "user"],
+      "properties": {
+        "kind": {
+          "const": "untag"
+        },
+        "pin_id": {
+          "$ref": "common.schema.json#/$defs/pin_id"
+        },
+        "user": {
+          "$ref": "common.schema.json#/$defs/user_id"
+        }
+      }
+    }
+  }
+}
