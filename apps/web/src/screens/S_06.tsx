@@ -37,7 +37,7 @@ function QuestionCard({ item, layout }: { item: QueueItem; layout: Layout | null
 export function S_06() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
-  const [layoutRemote] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layoutRemote] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const [cards, retry] = useRemote("load the cards", () => client.listCards(worldId));
   const [openId, setOpenId] = useState<string | null>(null);
   const layout = layoutRemote.status === "ready" ? layoutRemote.value : null;
