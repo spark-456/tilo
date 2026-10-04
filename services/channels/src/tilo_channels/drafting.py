@@ -17,13 +17,14 @@ import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from email.utils import getaddresses
-from functools import partial
 from typing import Any, Protocol
 
 from tilo_providers.interfaces import GenerateRequest, ModelProvider, SafetyProvider
 from tilo_providers.prompts import load_prompt
 
-from tilo_channels.drafting_check import CHECK_CAP, Finding, find_invented
+from tilo_channels.drafting_check import CHECK_CAP, Checker, Finding, find_invented
+
+__all__ = ["Checker", "Drafter", "Finding", "find_invented"]
 
 MODES = ("reply", "reply_all")  # forward and new email add recipients: FR-CHN-12's T3 path (BQ-145)
 PRESETS = ("confirm", "decline", "follow_up", "reschedule", "formal_letter")
@@ -38,7 +39,7 @@ MAX_OUTPUT_TOKENS = 1_200
 FIELD_CAPS = {"from": 500, "to": 2_000, "cc": 2_000, "subject": 500, "body": 8_000}
 ADDRESS_CAP, MAX_ADDRESSES, HEADER_CAP, MAX_MESSAGES = 500, 50, 4_000, 50
 THREAD_CAP, SCREEN_CAP, MAX_RECIPIENTS = 30_000, 100_000, 20
-MAX_INSTRUCTION, MAX_STYLE_VALUE = 4_000, 2_000
+MAX_INSTRUCTION, MAX_STYLE_VALUE, MAX_QUESTIONS, QUESTION_CAP = 4_000, 2_000, 5, 300
 EMIT_LEASE = 60.0  # seconds before an unconfirmed artifact.created is emitted again
 
 _LOG = logging.getLogger(__name__)
@@ -167,8 +168,9 @@ def _parse(text: str | None) -> tuple[str, list[str]] | None:
     body, questions = (answer.get("body"), answer.get("questions") or []) if isinstance(answer, dict) else (None, [])
     if not isinstance(questions, list) or not all(isinstance(q, str) for q in questions):
         return None
-    if questions := [q.strip() for q in questions if q.strip()]:
-        return "", questions
+    if questions := [q.strip() for q in questions if q.strip()]:  # at most 5 kept; one over 300 characters dropped
+        kept = [q for q in questions if len(q) <= QUESTION_CAP][:MAX_QUESTIONS]
+        return ("", kept) if kept else None
     return (body.strip(), []) if isinstance(body, str) and body.strip() else None
 
 
@@ -275,9 +277,8 @@ class Drafter:
             return {**doc, "status": "failed", "questions": []}
         envelope = _envelope(replied, own, ask["mode"])
         thread_facts = [v for f in reversed(fields) for v in f.values()]  # newest first: read first
-        check = partial(
-            find_invented, instruction=ask["instruction"], thread=thread_facts, trusted=[*settings.values()]
-        )
+        checker = Checker(instruction=ask["instruction"], thread=thread_facts, trusted=[*settings.values()])
+        check = checker.find  # sources are read once per draft, for every attempt and question
         for _ in range(MAX_ATTEMPTS):
             request = GenerateRequest(
                 system=self._system, prompt=prompt, json_mode=True, max_output_tokens=MAX_OUTPUT_TOKENS

@@ -23,7 +23,7 @@ PRESETS: tuple[str, ...]   # contains "confirm", "decline", "follow_up", "resche
 
 @dataclass(frozen=True)
 class Finding:
-    kind: str    # "number" | "date" | "contact" | "commitment"
+    kind: str    # "number" | "date" | "contact" | "commitment" | "obfuscation" (direction control, mixed script)
     text: str    # the span of the draft that no source supports (shown to the user; never logged or emitted)
 
 def find_invented(body: str, *, instruction: str, thread: Sequence[str],
@@ -128,8 +128,10 @@ class Drafter:
 - **No side effects.** The module imports no connector, outbox, policy, sender, other channel module or network
   client. Drafting emits no event type marked `side_effect: true`, and no `data.transfer`,
   `channel.message_out`, `approval.requested`, `approval.resolved`, `policy.applied` or `reply_handled` unit.
-- **Events.** Each new ready draft emits exactly one `artifact.created` with `data.artifact` naming its
-  `artifact_id` and `version` 1; `needs_you` and `failed` emit none. Everything emitted is `{type, data, ...}`
+- **Events.** Each new ready draft emits one `artifact.created` with `data.artifact` naming its
+  `artifact_id` and `version` 1; `needs_you` and `failed` emit none. Delivery is at-least-once: an emit that fails
+  is retried after a 60 s lease, and a crash between emit and its marker can repeat it, so consumers dedupe on
+  `artifact_id`. Everything emitted is `{type, data, ...}`
   with a registered type and valid data, and carries no subject, body, address, display name, instruction,
   signature or draft text.
 - **Privacy.** Logs never hold the thread's subject, body, addresses or display names, the instruction, the
