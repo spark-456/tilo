@@ -218,3 +218,15 @@ def test_FR_INT_09_a_chosen_approach_that_was_not_offered_makes_no_model_call(tm
         )  # fmt: skip
 
     assert provider.calls == []
+
+
+def test_FR_INT_09_the_approach_in_the_prompt_is_the_one_offered_not_the_callers_variant(tmp_path):
+    inputs = _inputs()
+    offered = next(a for a in inputs.approaches if a["id"] == "quick")
+    provider = ScriptedModelProvider("large", [_reply(_units())])
+
+    compile_plan(
+        _brief(), {**offered, "summary": INJECTION}, CAP, inputs, router=build_test_router(tmp_path, provider)
+    )  # fmt: skip
+
+    assert INJECTION not in provider.calls[0].prompt and offered["summary"] in provider.calls[0].prompt

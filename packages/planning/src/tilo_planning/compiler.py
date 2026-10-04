@@ -150,8 +150,10 @@ def compile_plan(
     """The PlanGraph for `approach` (one of `inputs.approaches`) under `budget_cap`, valid by `validate_plan`
     for `inputs.owner`, or `PlanCompileError`."""
     approaches = copy.deepcopy(inputs.approaches)
-    if approach.get("id") not in {a.get("id") for a in approaches}:
+    offered = next((a for a in approaches if a.get("id") == approach.get("id")), None)
+    if offered is None:
         raise PlanCompileError("FR-INT-09: the chosen approach is not one of the approaches offered")
+    approach = offered  # the text the person saw, never a caller's variant of it
     variables = {
         "brief": _data(json.dumps(brief, ensure_ascii=False, indent=2)),
         "approach": _data(json.dumps(approach, ensure_ascii=False, indent=2)),
