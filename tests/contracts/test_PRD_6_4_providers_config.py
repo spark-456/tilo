@@ -99,34 +99,55 @@ def test_PRD_6_4_models_yaml_is_marked_as_an_example(repo_root, models_yaml):
     )
 
 
-def test_PRD_6_4_prices_yaml_status_is_unset(repo_root, prices_yaml):
+def test_PL_06_prices_yaml_status_is_set_with_date_and_source(repo_root, prices_yaml):
     _, data = prices_yaml
-    assert data.get("status") in (None, "unset"), (
-        'PRD 6.4: config/prices.yaml must have status unset ("never invent prices; the loader will '
-        'refuse live metering until set")'
-    )
+    assert data.get("status") == "set", "PL-06: config/prices.yaml carries the user-confirmed prices, status set"
+    assert data.get("effective_date") == "2026-09-24"
+    assert "ai.google.dev" in (data.get("source") or "") and "pricing" in data["source"]
 
 
-def test_PRD_6_4_prices_yaml_has_no_invented_prices(repo_root, prices_yaml):
+def test_PL_06_status_set_requires_every_value_date_and_source(repo_root, registry, prices_yaml):
+    """status set with a null price, date or source fails the contract (never invent a price)."""
     _, data = prices_yaml
+    for mutate in (
+        lambda d: d["profiles"]["flash-38"].update(input=None),
+        lambda d: d["profiles"]["lite-31"].update(output=None),
+        lambda d: d.update(effective_date=None),
+        lambda d: d.update(source=None),
+    ):
+        broken = copy.deepcopy(data)
+        mutate(broken)
+        ok, _ = _validates_against_any(repo_root, registry, "prices", broken)
+        assert not ok, "PL-06: a set prices file with a null value, date or source must be rejected"
 
-    def _all_price_leaves(node):
-        if isinstance(node, dict):
-            for key, value in node.items():
-                if key in ("input", "output") and not isinstance(value, dict | list):
-                    yield value
-                else:
-                    yield from _all_price_leaves(value)
-        elif isinstance(node, list):
-            for item in node:
-                yield from _all_price_leaves(item)
 
-    leaves = list(_all_price_leaves(data.get("profiles", data)))
-    assert leaves, "PRD 6.4: config/prices.yaml must have at least one per-profile input/output price field"
-    assert all(v is None for v in leaves), (
-        f"PRD 6.4: config/prices.yaml must never invent a price -- every input/output price must be "
-        f"null while status is unset, got: {leaves}"
-    )
+def test_PL_06_confirmed_prices_and_credit_rate(repo_root, prices_yaml):
+    """User-confirmed 2026-10-04: USD per 1M tokens, Standard paid tier, promotional where noted."""
+    _, data = prices_yaml
+    assert data["credit_usd"] == 0.005  # PRD 14.1: 1 credit = US$0.005
+    assert data["currency"] == "USD"
+    profiles = data["profiles"]
+    assert profiles["flash-38"] == {"input": 0.75, "output": 3.75}
+    assert profiles["flash-37"] == {"input": 0.75, "output": 3.75}
+    assert profiles["lite-31"] == {"input": 0.25, "output": 1.50}
+    # Free NVIDIA NIM trial profiles and the dev fakes make no paid call (read from config, not hard-coded here).
+    free_profiles = {"safety-fake"}
+    for name in ("models.dev.yaml", "models.nim.yaml"):
+        free_profiles |= set(yaml.safe_load((repo_root / "config" / name).read_text(encoding="utf-8"))["profiles"])
+    assert len(free_profiles) >= 4
+    for free in free_profiles:
+        assert profiles[free] == {"input": 0, "output": 0}, f"PL-06: {free} makes no paid call, price 0"
+
+
+def test_PL_06_every_profile_in_every_models_file_has_a_price(repo_root, prices_yaml):
+    _, data = prices_yaml
+    priced = set(data["profiles"])
+    files = sorted((repo_root / "config").glob("models*.yaml"))
+    assert files, "PL-06: expected config/models*.yaml"
+    for path in files:
+        profiles = yaml.safe_load(path.read_text(encoding="utf-8")).get("profiles", {})
+        missing = set(profiles) - priced
+        assert not missing, f"PL-06: {path.name} profiles without a price in config/prices.yaml: {sorted(missing)}"
 
 
 def test_PRD_6_4_providers_config_rejects_unknown_capability(repo_root, registry, models_yaml):
