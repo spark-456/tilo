@@ -51,11 +51,26 @@ output "events_topic_publishers" {
 
 output "secret_accessors" {
   description = "secret id => members granted secretAccessor on it."
+  # Built from the config map (not b.secret_id, which the API returns as a
+  # full resource path after refresh), so it is the same before and after.
   value = {
-    for s in local.secret_placeholders : s => [
-      for b in google_secret_manager_secret_iam_member.accessors : b.member if b.secret_id == s
+    for s, services in local.secret_accessors : s => [
+      for svc in services : google_secret_manager_secret_iam_member.accessors["${s}::${svc}"].member
     ]
   }
+}
+
+output "monitoring" {
+  description = "Alert email and alert policies (config values)."
+  value = {
+    notification_email = module.monitoring.notification_channel_email
+    alert_policies     = module.monitoring.alert_policies
+  }
+}
+
+output "enabled_apis" {
+  description = "Service APIs this environment enables (adopts if already enabled)."
+  value       = sort(keys(google_project_service.apis))
 }
 
 output "deployer_act_as_service_accounts" {

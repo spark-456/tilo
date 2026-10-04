@@ -59,3 +59,13 @@ variable "github_repository_owner_id" {
     error_message = "github_repository_owner_id must be the numeric GitHub owner id."
   }
 }
+
+variable "alert_email" {
+  description = "Address that receives Cloud Monitoring alerts (5xx ratio, latency, events backlog). No default: must be supplied by the user."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_email))
+    error_message = "alert_email must be a valid email address."
+  }
+}

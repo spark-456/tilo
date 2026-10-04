@@ -38,6 +38,18 @@ locals {
     "aiplatform.googleapis.com",
     "cloudbuild.googleapis.com",
     "compute.googleapis.com",
+    # PRD 6.3 services (P0-07b). The three Workspace APIs were enabled by
+    # hand first; listing them here adopts them (a no-op apply).
+    "modelarmor.googleapis.com",
+    "cloudscheduler.googleapis.com",
+    "identitytoolkit.googleapis.com",
+    "firebaseappcheck.googleapis.com",
+    "monitoring.googleapis.com",
+    "cloudtrace.googleapis.com",
+    "logging.googleapis.com",
+    "gmail.googleapis.com",
+    "calendar-json.googleapis.com",
+    "drive.googleapis.com",
   ])
 
   # ALL_TRAFFIC: every request from api and harness leaves through the VPC
@@ -475,5 +487,20 @@ module "budget" {
   threshold_percentages = [0.5, 0.9, 1.0]
 
   # The budget needs billingbudgets.googleapis.com enabled first.
+  depends_on = [google_project_service.apis]
+}
+
+# ---------------------------------------------------------------------------
+# Monitoring: email channel and SLO alerts (PRD 6.3, NFR-23).
+# ---------------------------------------------------------------------------
+
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project_id              = var.project_id
+  alert_email             = var.alert_email
+  cloud_run_service_names = [for k in keys(local.cloud_run_services) : "tilo-${k}"]
+  events_subscription_id  = module.events.subscription_name
+
   depends_on = [google_project_service.apis]
 }

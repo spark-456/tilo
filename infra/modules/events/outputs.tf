@@ -2,6 +2,11 @@ output "topic_name" {
   value = google_pubsub_topic.events.name
 }
 
+output "subscription_name" {
+  description = "Name of the events -> BigQuery subscription (monitored for backlog)."
+  value       = google_pubsub_subscription.events_to_bigquery.name
+}
+
 output "dataset_id" {
   value = google_bigquery_dataset.ledger.dataset_id
 }
