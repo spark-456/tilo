@@ -34,6 +34,12 @@ variable "budget_amount_usd" {
   default     = 150
 }
 
+variable "budget_currency_code" {
+  description = "Currency of the billing account (gcloud billing accounts describe ID --format='value(currencyCode)'), e.g. \"INR\". Then budget_amount_usd is in that currency."
+  type        = string
+  default     = "USD"
+}
+
 variable "github_repository_id" {
   description = "Numeric GitHub id of var.github_repository (gh api repos/OWNER/REPO --jq .id). Pinned in the WIF condition so a deleted-and-recreated repo with the same name cannot deploy. No default: must be supplied by the user."
   type        = string
