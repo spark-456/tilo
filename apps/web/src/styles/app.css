@@ -679,12 +679,48 @@ button.row {
   color: var(--color-ink-2);
   cursor: not-allowed;
 }
+.secondary.danger,
 .secondary.placeholder.danger {
   /* A kill switch is the one danger-styled control of a screen: solid red outline and word, so it
      reads as the one that matters even while it is not available yet. */
   border: 2px solid var(--color-signal-blocked);
   color: var(--color-signal-blocked);
   font-weight: 800;
+}
+.stop-autopilot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.stop-confirm {
+  padding: var(--space-16);
+  border: 2px solid var(--color-signal-blocked);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+}
+.stop-confirm h3 {
+  margin: 0 0 var(--space-8);
+  font: 900 var(--text-20) / 1.25 var(--font-display);
+}
+.stop-confirm h3:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.stop-confirm p {
+  margin: 0 0 var(--space-12);
+  font-size: var(--text-14);
+  line-height: 1.5;
+}
+.stop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+.stop-note {
+  min-height: 3em; /* the answer arrives here without moving what is below (CLS) */
+  margin: 0;
+  font-size: var(--text-14);
+  line-height: 1.5;
 }
 .secondary.placeholder.compact {
   min-height: 32px;

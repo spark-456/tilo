@@ -55,6 +55,7 @@ export function useStopAutopilot(client: TiloClient, worldId: string): StopContr
   const [error, setError] = useState<string | null>(null);
   const sending = useRef(false);
   const live = useRef(true);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: worldId is the key: a new world starts again.
   useEffect(() => {
     live.current = true;
     setView("ready");
