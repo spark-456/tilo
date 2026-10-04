@@ -13,6 +13,7 @@ members = [
     "tilo-contracts",
     "tilo-evals",
     "tilo-harness",
+    "tilo-memory",
     "tilo-metering",
     "tilo-planning",
     "tilo-policy",
@@ -1508,6 +1509,17 @@ requires-dist = [
 ]
 
 [[package]]
+name = "tilo-memory"
+version = "0.1.0"
+source = { editable = "packages/memory" }
+dependencies = [
+    { name = "tilo-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "tilo-contracts", editable = "packages/contracts-py" }]
+
+[[package]]
 name = "tilo-metering"
 version = "0.1.0"
 source = { editable = "packages/metering" }
@@ -1585,19 +1597,29 @@ version = "0.1.0"
 source = { editable = "services/render" }
 dependencies = [
     { name = "pydantic" },
-    { name = "pypdf" },
     { name = "python-pptx" },
     { name = "pyyaml" },
     { name = "reportlab" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pypdf" },
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "pydantic", specifier = ">=2.13.5" },
-    { name = "pypdf", specifier = ">=5.0.0" },
     { name = "python-pptx", specifier = ">=1.0.2" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "reportlab", specifier = ">=4.2.5" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pypdf", specifier = ">=5.0.0" },
+    { name = "pytest", specifier = ">=8.0.0" },
 ]
 
 [[package]]

@@ -82,6 +82,26 @@ export function speedBadge(page: Page) {
   return page.getByTestId("speed-badge");
 }
 
+/** How many distinct colours the canvas holds: a bare iso grid has a handful, drawn art hundreds. */
+export async function canvasColours(page: Page): Promise<number> {
+  return stageCanvas(page).evaluate(async (el: HTMLCanvasElement) => {
+    const img = new Image();
+    img.src = el.toDataURL();
+    await img.decode();
+    const c = document.createElement("canvas");
+    [c.width, c.height] = [img.width, img.height];
+    const ctx = c.getContext("2d");
+    if (!ctx) return 0;
+    ctx.drawImage(img, 0, 0);
+    const d = ctx.getImageData(0, 0, c.width, c.height).data;
+    const seen = new Set<number>();
+    for (let i = 0; i < d.length; i += 4) {
+      seen.add(((d[i] ?? 0) << 16) | ((d[i + 1] ?? 0) << 8) | (d[i + 2] ?? 0));
+    }
+    return seen.size;
+  });
+}
+
 /** HR-4/BQ-07: the permanent "Fixture replay" label, exposed to assistive tech. */
 export function fixtureReplayLabel(page: Page) {
   return page.getByTestId("fixture-replay-banner");

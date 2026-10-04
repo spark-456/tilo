@@ -3,7 +3,8 @@
 
 The tier is deterministic: `send_email` is T2 unless a modifier applies (`money_or_legal` from `t3_content_signal` on
 the raw body, which it cleans itself; `safety_flag`; `new_recipients` for an address that is neither a contact nor
-known from the thread, BQ-154), and any modifier makes it T3. Only a ready T2 draft of the person's own
+known from the thread, BQ-154, or any forward, new email, format mismatch or Bcc, FR-CHN-12; `attachments`), and
+any modifier makes it T3. Only a ready T2 draft of the person's own
 instruction, under an L2 answer from the injected policy port, is scheduled at once with the undo window; everything
 else waits for its owner's Send. A redraft after Edit is a new proposal and always waits for a person. Side effects
 go only through the injected outbox port, keyed so a replay never adds an entry. Cards hold mail text; no event, log
@@ -18,11 +19,13 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, fields
 from typing import Any, Protocol
 
+from tilo_channels.autopilot_send import index_artifact
 from tilo_channels.autopilot_state import ACTION_TYPE, CancelPending, CardStore, Ledger, Outbox, timestamp, ulid
 from tilo_channels.autopilot_t3 import clean_text, t3_content_signal
 from tilo_channels.drafting import (
     MAX_INSTRUCTION,
     MAX_MESSAGES,
+    Draft,
     Drafter,
     DraftResult,
     ThreadReader,
@@ -35,6 +38,8 @@ __all__ = ["ACTION_TYPE", "Autopilot", "CancelPending", "DraftContext", "Outbox"
 __all__ += ["CardStore", "t3_content_signal"]
 
 OPTIONS = ("send", "edit", "cancel")
+REPLY_FORMATS = ("reply", "reply_all")  # stay in the thread; everything else adds a recipient (BQ-145, BQ-171)
+FORMATS = REPLY_FORMATS + ("forward", "new")
 UNDO_WINDOW_S = 60  # PRD 10.4 L2 default
 PREVIEW_CHARS = 600  # PRD 11.4 Preview
 FINDING_CAP = 300  # characters of one finding's text shown on a card (issue #243)
@@ -123,6 +128,7 @@ class Autopilot:
         doc = self._cards.get(user_id, card_id)
         if doc is None or doc["state"] != "open" or "send" not in doc["options"]:
             return Outcome("refused", None)
+        index_artifact(self._cards, user_id, doc)  # a preview that died before indexing is completed here
         if doc["level"] == "L2":  # the entry's real state; a stopped card never enqueues again
             entry = self._ledger.schedule(user_id, doc)
             state = entry["state"] if entry else "cancelled"
@@ -160,8 +166,8 @@ class Autopilot:
         if doc is None:
             return None
         instruction = f"{doc['instruction']}\nChange: {change}"
-        if len(instruction) > MAX_INSTRUCTION or "#" in instruction_id:
-            raise ValueError("edit too long or bad instruction id")
+        if len(instruction) > MAX_INSTRUCTION or "#" in instruction_id or doc["mode"] not in REPLY_FORMATS:
+            raise ValueError("edit too long, bad instruction id, or a format the drafter cannot redraft")
         mine = f"edit:{instruction_id}"
         if doc["state"] == "open" and doc["level"] == "L2":
             closed = self._ledger.stop(user_id, doc, mine) == "cancelled"
@@ -197,6 +203,7 @@ class Autopilot:
                 doc = self._cards.get(user_id, card_id)
                 if doc is None:
                     raise LookupError("card store refused a create but holds no card")
+        index_artifact(self._cards, user_id, doc)  # the text DraftArtifacts serves, before any enqueue (BQ-182)
         if doc["level"] == "L2" and doc["state"] == "open":  # the recorded decision, never worked out again
             entry = self._ledger.schedule(user_id, doc)  # the card's one entry, by its key; none once stopped
             doc = doc | {"scheduled_at": entry["scheduled_at"]} if entry else doc
@@ -207,7 +214,12 @@ class Autopilot:
         self, user_id: str, card_id: str, context: DraftContext, result: DraftResult, instructed: bool
     ) -> dict[str, Any]:
         draft = result.draft
-        sendable = result.status == "ready" and draft is not None and not draft.bcc and not draft.attachments
+        ready = result.status == "ready" and draft is not None
+        # BQ-171 to BQ-173: an unknown format, a format mismatch, a Bcc or an attachment is never sent from this card
+        # (the preview shows no format, Bcc or attachment), but it is still tiered so the card says why it waits
+        sendable = ready and draft is not None and draft.mode == context.mode and draft.mode in FORMATS
+        sendable = sendable and draft is not None and not draft.bcc and not draft.attachments
+        sendable = sendable and draft is not None and bool(draft.to + draft.cc)  # no recipient: nothing to send
         body = clean_text(draft.body) if draft is not None else ""
         doc: dict[str, Any] = {
             "card_id": card_id,
@@ -234,14 +246,16 @@ class Autopilot:
             "mode": context.mode,
             "instruction": context.instruction,
             "item": {"artifact_id": draft.artifact_id, "version": draft.version} if draft else None,
+            "in_reply_to": draft.in_reply_to if draft else "",  # the message the draft answers (BQ-185)
+            "references": draft.references if draft else "",
         }
-        if sendable and draft is not None:
+        if ready and draft is not None:
             modifiers = ["money_or_legal"] if t3_content_signal(draft.body) else []  # hidden characters too
-            modifiers += ["safety_flag"] if draft.safety_flag or result.flagged else []
-            known = self._known(user_id, context)
-            modifiers += ["new_recipients"] if any(a.lower() not in known for a in draft.to + draft.cc) else []
+            modifiers += ["safety_flag"] if self._flagged(user_id, context, result) else []
+            modifiers += ["new_recipients"] if self._adds_recipient(user_id, context, draft) else []
+            modifiers += ["attachments"] if draft.attachments else []
             doc |= {"tier": "T3" if modifiers else "T2", "modifiers": modifiers}
-            if instructed and not modifiers:
+            if instructed and sendable and not modifiers:
                 level, policy_id = self._policy.level(user_id, ACTION_TYPE)
                 if level == "L2" and policy_id:  # only L2 rides the undo window; anything else waits (fail closed)
                     ms = round(self._clock() * 1000)
@@ -249,12 +263,27 @@ class Autopilot:
                     doc |= {"outbox_id": ulid(ms), "scheduled_at": timestamp(ms + UNDO_WINDOW_S * 1000)}
         return doc
 
+    def _flagged(self, user_id: str, context: DraftContext, result: DraftResult) -> bool:
+        """BQ-183: the passed result's flags or those of the draft FR-CHN-10 stored for the instruction, if any."""
+        stored = self._drafter.stored(user_id, context.instruction_id)
+        results = [result] + ([stored] if stored is not None else [])
+        return any(r.flagged or (r.draft is not None and r.draft.safety_flag) for r in results)
+
+    def _adds_recipient(self, user_id: str, context: DraftContext, draft: Draft) -> bool:
+        """FR-CHN-12: a forward, a new email, an unknown or mismatched format and any Bcc always add a recipient
+        (BQ-171, BQ-173); otherwise any To / Cc address not known after lower-casing alone (BQ-174)."""
+        if draft.mode != context.mode or draft.mode not in REPLY_FORMATS or draft.bcc:
+            return True
+        known = self._known(user_id, context)  # ASCII only: str.lower() folds U+212A KELVIN SIGN to "k"
+        return any(not a.isascii() or a.lower() not in known for a in draft.to + draft.cc)
+
     def _known(self, user_id: str, context: DraftContext) -> set[str]:
         """BQ-154: contacts, every From in the thread, and To / Cc of the user's own messages: From the mailbox and
         carrying Gmail's SENT label (a From header alone is sender-controlled). A thread that cannot be read adds
         nothing (fail closed: more recipients are new)."""
-        known = {a.lower() for a in self._contacts(user_id)}
-        own = _base(_address(context.mailbox) or context.mailbox.lower())
+        known = {a.lower() for a in self._contacts(user_id) if isinstance(a, str) and a.isascii()}
+        mailbox = _address(context.mailbox)
+        own = _base(mailbox) if mailbox else None  # a non-ASCII mailbox vouches for nothing
         try:
             listed = self._reader.get_thread(user_id, context.thread_id).get("messages")
         except Exception:  # any read failure only narrows what is known

@@ -6,6 +6,10 @@ from tilo_contracts import Manifest
 
 PROVENANCE_HEADING = "Sources and provenance"
 
+# Maximum characters in one unbroken token before we insert a soft wrap opportunity.
+# PPTX textboxes are ~11.3 in wide at body size, ≈90 chars at 14 pt Helvetica.
+_WRAP_WIDTH = 80
+
 
 def find_repo_root() -> Path:
     cur = Path(__file__).resolve()
@@ -33,21 +37,46 @@ def lines(text: str) -> list[str]:
     return sanitize_text(text).split("\n")
 
 
+def wrap_long_token(text: str, width: int = _WRAP_WIDTH) -> str:
+    """Break any run of non-space characters longer than *width* with a space.
+
+    Used to prevent very long unbroken refs (e.g. URLs) from overflowing PPTX
+    text-boxes or PDF chart labels.  Only plain-text is produced — no markup.
+    """
+    result: list[str] = []
+    for word in text.split(" "):
+        if len(word) <= width:
+            result.append(word)
+        else:
+            # Chunk the word at *width* boundaries.
+            chunks = [word[i : i + width] for i in range(0, len(word), width)]
+            result.append(" ".join(chunks))
+    return " ".join(result)
+
+
 def provenance_lines(manifest: Manifest) -> list[str]:
     """Format a provenance manifest as plain sanitised lines (FR-CON-10; PRD 12.4, 13.3)."""
     prod = manifest.produced_by
     skill = f"{prod.skill.id} v{prod.skill.version}" if prod.skill else "none"
     sources = (
-        [f"Source {s.id} ({s.kind}): {s.ref}" for s in manifest.sources] if manifest.sources else ["Sources: none"]
+        [f"Source {s.id} ({s.kind}): {wrap_long_token(s.ref)}" for s in manifest.sources]
+        if manifest.sources
+        else ["Sources: none"]
     )
     verified = sum(1 for c in manifest.claims if c.verified)
-    status = "verified" if manifest.claims and verified == len(manifest.claims) else "unverified"
+    n = len(manifest.claims)
+    if not manifest.claims:
+        verifier_line = "Verifier: unverified (no claims)"
+    elif verified == n:
+        verifier_line = f"Verifier: verified ({verified}/{n} claims verified)"
+    else:
+        verifier_line = f"Verifier: unverified ({verified}/{n} claims verified)"
     approval = f"{manifest.authz.ref} ({manifest.authz.by}) at {manifest.authz.at}" if manifest.authz else "none"
     raw = [
         f"Agent: {prod.agent_id} ({prod.role})",
         f"Skill: {skill}",
         *sources,
-        f"Verifier: {status} ({verified}/{len(manifest.claims)} claims verified)",
+        verifier_line,
         f"Approval: {approval}",
     ]
     return [sanitize_text(item).replace("\n", " ") for item in raw]

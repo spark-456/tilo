@@ -7,11 +7,10 @@ channel identity binding, Email Autopilot triage. Public ingress for signature-v
 - `uv run --package tilo-channels pytest services/channels`; `just check` from the repo root.
 
 ## Contracts and config
-- `packages/contracts-py` event types; writes to `tilo-api` only, never to Firestore business state.
-- `config/connectors.yaml` (channel routing), feature flags.
+- `packages/contracts-py` event types; writes to `tilo-api` only, never Firestore business state. `config/connectors.yaml`, flags.
 
 ## Requirement IDs
-- Section 11 (channels, Email Autopilot); SEC-06 (binding, T3 PIN), SEC-08 (signed webhooks and email links). Built: FR-CHN-02, -03, -05 to -11.
+- Section 11 (channels, Email Autopilot); SEC-06 (binding, T3 PIN), SEC-08 (signed webhooks and email links). Built: FR-CHN-02, -03, -05 to -13.
 
 ## Local rules
 - Webhooks signature-verified, idempotent, ordered per user; forged or replayed rejected. Never send real email or WhatsApp
@@ -33,8 +32,9 @@ channel identity binding, Email Autopilot triage. Public ingress for signature-v
   needs the PIN (next text within 300 s, one try; digits in the next 300 s are `pin_late`, never routed);
   Hold/Edit keep a gate open (repeats: one event); one send per card id; emits `channel.message_out`/`_in`.
 - `drafting` (FR-CHN-10; BQ-139 to BQ-151): thread raw-capped per field and in total, data only; `drafting_check` gates body, questions.
-  `autopilot` (FR-CHN-11; BQ-152 to BQ-158): outbox, policy are ports; any modifier (`autopilot_t3`, safety flag, new recipient) is T3,
+  `autopilot` (FR-CHN-11; BQ-152 to BQ-158): outbox, policy are ports; any modifier (`autopilot_t3`, safety flag, new recipient, attachment; FR-CHN-12) is T3,
   never scheduled; Edit redrafts at L1. `autopilot_state`: card record before enqueue; a stop is final; unconfirmed: `CancelPending`.
+  `autopilot_send` (FR-CHN-13; BQ-182 to BQ-185): `DraftArtifacts` serves the card's text and reply headers; stored flag counts.
 - `gmail_watch` (FR-CHN-08; BQ-121 to BQ-129): OIDC checked first (verifier, aud, iss, SA, `email_verified is True`): 401/403,
   400 malformed, 2xx unknown address, 500 on failure. History read from the stored cursor, which never moves back; each id
   claimed before triage (a failure keeps the claim); a 404 runs one resync (<= 50 ids). Ids only, never content.

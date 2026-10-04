@@ -13,7 +13,7 @@ import { S_06 } from "../screens/S_06";
 import { S_07 } from "../screens/S_07";
 import { S_12 } from "../screens/S_12";
 import { WorldPanels } from "../screens/WorldPanels";
-import { followRun } from "./runLog";
+import { watchRun } from "./runLog";
 import { alsoWorld, withWorld, worldOf } from "./worldContext";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -104,7 +104,7 @@ describe("FR-WLD-05 CP2: Needs you follows the world its address names", () => {
   });
 });
 
-describe("FR-WLD-05 CP2: the stage's live feed shares the page's one subscription", () => {
+describe("FR-WLD-05 CP2: the stage's feed (watchRun) shares the page's one subscription", () => {
   it("hands over events already received, then each new one, once, in seq order", () => {
     const client = new FixtureClient();
     let push: ((e: (typeof EVENTS_VILLAGE_BASIC)[number]) => void) | undefined;
@@ -117,11 +117,11 @@ describe("FR-WLD-05 CP2: the stage's live feed shares the page's one subscriptio
     );
     client.subscribeEvents = subscribe;
     const seen: number[] = [];
-    const stop = followRun(client, "w_feed", (e) => seen.push(e.seq));
+    const stop = watchRun(client, "w_feed", (e) => seen.push(e.seq));
     push?.(EVENTS_VILLAGE_BASIC[1] as (typeof EVENTS_VILLAGE_BASIC)[number]);
     push?.(EVENTS_VILLAGE_BASIC[1] as (typeof EVENTS_VILLAGE_BASIC)[number]); // a repeat
     const late: number[] = [];
-    followRun(client, "w_feed", (e) => late.push(e.seq)); // joins mid-run: replays what is known
+    watchRun(client, "w_feed", (e) => late.push(e.seq)); // joins mid-run: replays what is known
     stop();
     push?.(EVENTS_VILLAGE_BASIC[2] as (typeof EVENTS_VILLAGE_BASIC)[number]);
     expect(subscribe).toHaveBeenCalledTimes(1);
