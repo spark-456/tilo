@@ -1,15 +1,17 @@
 import { memo, useEffect, useRef } from "react";
-import { useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
+import { useClient, useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
 import { FIXTURE_WORLD_ID } from "./api/fixtures/derived";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { NeedsYouRail } from "./needs-you/NeedsYouRail";
 import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
 import { NotFound } from "./screens/NotFound";
+import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
 import { WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
+import { useRunStatus } from "./world/runLog";
 import { speedBadgeText } from "./world/speed";
 import { useWorldFixture } from "./world/useWorldFixture";
 
@@ -46,6 +48,7 @@ export function App() {
   const mobile = useMediaQuery("(max-width: 767px)");
   const world = useWorldFixture();
   const fixtureClient = useIsFixtureClient();
+  const client = useClient();
   const replaySpeed = useReplaySpeed();
   const path = usePathname();
   const matched = matchScreen(path); // null: the stage and the flow shell
@@ -75,6 +78,9 @@ export function App() {
   const screen = unknownWorld ? NOT_FOUND : matched;
   const worldId = unknownWorld ? null : pathWorld;
   const hudWorld = screen ? null : worldId;
+  // FR-WLD-07: the stage is veiled only while the recorded run status is "paused" (HR-1).
+  const clientStatus = useRunStatus(client, hudWorld);
+  const stagePaused = (world.active ? world.status : clientStatus) === "paused";
   const runScreen = screen !== null && RUN_SCREENS.has(screen.id);
   const needsYouScreen = screen !== null && NEEDS_YOU_SCREENS.has(screen.id);
   const railWorld = worldId ?? (runScreen && !needsYouScreen ? FIXTURE_WORLD_ID : null);
@@ -100,7 +106,12 @@ export function App() {
           />
         </main>
       ) : (
-        <Stage {...(world.active ? { onWorld: world.onWorld, seq: world.seq } : {})} />
+        <Stage
+          {...(world.active
+            ? { onWorld: world.onWorld, seq: world.seq, selected: world.selected }
+            : {})}
+          paused={stagePaused}
+        />
       )}
       {!screen && !world.active && <FlowShell />}
       {(world.active || fixtureClient) && (
@@ -135,7 +146,7 @@ export function App() {
                 e.currentTarget.querySelector("summary")?.focus();
               }}
             >
-              <summary>World status</summary>
+              <summary>World status{clientStatus === "paused" ? " · Paused" : ""}</summary>
               <WorldPanels key={hudWorld} worldId={hudWorld} />
             </details>
           )}
@@ -147,6 +158,7 @@ export function App() {
             <WorldPanels key={railWorld} worldId={railWorld} tabs={hudWorld !== null} />
           ) : (
             <>
+              {world.active && <ReplayPauseSlot status={world.status} />}
               <h2>Activity</h2>
               <p data-testid="right-rail-meter">Nothing yet. This fills in once a run starts.</p>
               {needsYouScreen ? (

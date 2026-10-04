@@ -78,7 +78,7 @@ body {
   border-radius: var(--radius-pill);
   background: var(--color-ink-1);
   color: var(--color-surface-1);
-  font: 700 0.8125em var(--font-ui);
+  font: 700 0.75em var(--font-ui);
 }
 /* Fixed like the banner above it, so it never shifts the layout (P0-08b). Neutral tokens only. */
 .fixture-load-alert {
@@ -352,7 +352,89 @@ a.secondary {
   margin-bottom: 12px;
 }
 .lens-space {
-  height: 56px; /* the lens tabs' height and margin, kept where the page shows its own tabs */
+  height: 108px; /* the lens tabs and the selection bar (56 + 52 px), kept where the page shows its own */
+}
+/* FR-WLD-06: one selection across World, Story and Trace. A selected thing gets a heavier outline
+   and the bar names it, so colour never carries it alone. Outlines sit inside the box: nothing
+   moves when something is chosen or cleared. */
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  height: 44px;
+  margin-bottom: 8px;
+  font-size: 0.875em;
+}
+.selection-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selection-bar a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+.pick-box,
+button.pick {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+}
+button.pick {
+  border-color: var(--color-surface-2);
+  background: transparent;
+  color: var(--color-ink-1);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.story-list button.pick {
+  font-size: 0.875em;
+}
+button.pick:hover,
+button.row:hover {
+  background: var(--color-surface-0);
+}
+button.pick:focus-visible,
+button.row:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+button.pick[aria-pressed="true"],
+button.row[aria-pressed="true"] {
+  border-color: var(--color-ink-1);
+  background: var(--color-surface-2);
+  box-shadow: inset 0 0 0 2px var(--color-ink-1);
+}
+button.row {
+  width: 100%;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.story-list li[data-selected="true"],
+.trace-rows li[data-selected="true"] {
+  background: var(--color-surface-2);
+  outline: 2px solid var(--color-ink-1);
+  outline-offset: -2px;
+}
+@media (max-width: 767px) {
+  .pick-box,
+  button.pick,
+  .selection-bar a {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 .lens-tab {
   display: inline-flex;
@@ -378,7 +460,7 @@ a.secondary {
   background: var(--color-surface-2);
   color: var(--color-ink-1);
   font-weight: 800;
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 .chip-needs {
   background: var(--color-signal-needs);
@@ -489,7 +571,7 @@ a.secondary {
 }
 .stat-name {
   font-weight: 700;
-  font-size: 0.8125em;
+  font-size: 0.75em;
   color: var(--color-ink-2);
 }
 .action-row {
@@ -584,7 +666,7 @@ a.secondary {
 }
 .hud-figures span {
   color: var(--color-ink-2);
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 .hud-count {
   display: flex;
@@ -629,13 +711,13 @@ a.secondary {
 .row-name small {
   color: var(--color-ink-2);
   font-weight: 400;
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 .row-state {
   flex: 0 0 7.5em; /* a fixed box, left-aligned: a new state word never moves its left edge (CLS) */
   color: var(--color-ink-2);
   font-weight: 700;
-  font-size: 0.8125em;
+  font-size: 0.75em;
 }
 @media (max-width: 767px) {
   .row {
@@ -1177,4 +1259,186 @@ a.secondary {
   .gate-slot {
     min-height: 3em;
   }
+}
+/* AGW-04 S-03 Approaches and budget: approach cards and editable budget cap. */
+.flow-shell[data-screen="Approaches"] {
+  width: min(520px, calc(100vw - 464px));
+}
+/* The slot reserves the ready height (cards, cap box, rule line, cost line), measured: 588 px at
+   1440, 754 px at 768 (the stage rail leaves 304 px), 625 px at 390, 698 px at 360, 754 px at 320. */
+.flow-shell[data-screen="Approaches"] .flow-slot {
+  display: flow-root;
+  min-height: 37em;
+}
+@media (max-width: 1023px) {
+  .flow-shell[data-screen="Approaches"] .flow-slot {
+    min-height: 48em;
+  }
+}
+@media (max-width: 767px) {
+  .flow-shell[data-screen="Approaches"] {
+    width: calc(100vw - 32px);
+  }
+  .flow-shell[data-screen="Approaches"] .flow-slot {
+    min-height: 40em;
+  }
+}
+@media (max-width: 389px) {
+  .flow-shell[data-screen="Approaches"] .flow-slot {
+    min-height: 44em;
+  }
+}
+@media (max-width: 359px) {
+  .flow-shell[data-screen="Approaches"] .flow-slot {
+    min-height: 48em;
+  }
+}
+.approach-card {
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+}
+.approach-card[data-selected="true"] {
+  border-color: var(--color-brand-primary);
+}
+.approach-head,
+.budget-cap-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 4px;
+  font: 700 0.875em var(--font-ui);
+}
+.approach-summary,
+.approach-meta {
+  margin: 0 0 2px;
+  color: var(--color-ink-2);
+  font: 400 0.875em / 1.3 var(--font-ui); /* 14 px: the minimum type size */
+}
+.approach-head {
+  font-size: 1em; /* the 14 px below must not compound with the shared 0.875em of this row */
+}
+.approach-head .secondary,
+.approach-head .btag {
+  font-size: 0.875rem; /* exactly 14 px: the minimum type size; .btag alone is 12 px */
+}
+.budget-cap-hint {
+  display: block;
+  min-height: 2.8em; /* two lines, reserved: the rule appears without moving what is below */
+  margin: 0;
+  font: 700 0.875em / 1.4 var(--font-ui);
+}
+.s03-approaches .flow-detail {
+  min-height: 4.2em; /* three lines: the valid line and the neutral one take the same room */
+}
+.budget-cap-field input {
+  width: 6em;
+  padding: 4px 8px;
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 1em var(--font-ui);
+}
+/* AGW-03 S-02 Understanding: brief chips, files, applied preferences and clarifying questions. */
+.flow-shell[data-screen="Understanding"] {
+  width: min(520px, calc(100vw - 464px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+@media (max-width: 767px) {
+  .flow-shell[data-screen="Understanding"] {
+    width: calc(100vw - 32px);
+    max-height: calc(100vh - 112px);
+  }
+}
+.brief-chips,
+.question-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.brief-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 700 0.875em var(--font-ui);
+}
+.brief-chip input,
+.brief-chip select,
+.question-input {
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 400 1em / 1.4 var(--font-ui);
+}
+.brief-chip [aria-invalid="true"] {
+  border-color: var(--color-signal-blocked);
+}
+.question-item {
+  margin: 0 0 10px;
+  padding: 8px;
+  border: 1px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  font-size: 0.875em;
+}
+.assumed-note {
+  margin: 6px 0 0;
+  color: var(--color-ink-2);
+  font-weight: 700;
+}
+/* FR-WLD-07: Pause all and the Paused banner share one fixed box, so no state moves what is around
+   it (CLS). No animation or transition anywhere (HR-2, FR-WLD-09). Neutral role tokens only. */
+.pause-slot {
+  box-sizing: border-box;
+  height: 7em; /* a 48 px button row and a two-line note at 14 px */
+  margin: 8px 0;
+  overflow: hidden;
+}
+.pause-row {
+  display: flex;
+  gap: 8px;
+}
+.pause-btn {
+  font-size: 1em; /* 14 px in the rail, 16 px in the mobile sheet: on the type scale */
+}
+.pause-btn[aria-disabled="true"] {
+  border-style: dashed;
+  border-color: var(--color-ink-2);
+  color: var(--color-ink-2);
+  cursor: not-allowed;
+}
+.pause-note {
+  margin: 4px 0 0;
+  font-size: 1em;
+  line-height: 1.4;
+  color: var(--color-ink-1);
+}
+@media (max-width: 767px) {
+  .pause-btn {
+    min-height: 52px;
+  }
+}
+/* Grey over the stage while the record says paused; click-through so the camera still works. */
+.world-veil {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 72px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-ink-2) 45%, transparent);
+}
+.veil-label {
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 1em / 1.25 var(--font-ui);
 }

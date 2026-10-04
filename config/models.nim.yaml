@@ -44,7 +44,7 @@ roles:
   verifier: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high }
   writer: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b }
   narrator: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
-  autopilot: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
+  autopilot: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b, max_input_tokens: 16000 }
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]
