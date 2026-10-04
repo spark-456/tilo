@@ -29,7 +29,7 @@ reuse is one `memory.hit` event and is the only thing credited as saved (PRD 14.
 - Ledger (FR-MEM-03): `EventLedger.ingest(message)` keys on the event `id`, first write wins, a same-id message
   with other content is `conflict` and never rewrites the row, an unreadable one is `rejected` (BQ-194). No
   update or delete method on `EventLedger`. `insert_if_absent` is atomic on the table: the in-memory table
-  locks, `BigQueryLedgerTable` is one guarded DML insert (mock client only; BQ-198 for the infra gap).
+  locks, `BigQueryLedgerTable` is one guarded DML insert (mock client only; BQ-206 for the infra gap).
 
 ## Requirement IDs
 FR-MEM-01, FR-MEM-02, FR-MEM-03. (FR-MEM-09 erasure/retention is a separate ticket.)
