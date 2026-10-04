@@ -8,10 +8,13 @@ is an error: it is never kept forever by default.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from types import MappingProxyType
 from typing import Protocol
+
+USER_ID_PATTERN = re.compile(r"u_[0-9A-Za-z_]{1,48}")  # contracts/common.schema.json user_id; use with fullmatch
 
 # PRD 15.1 "Retention (default)". None = life of account / until unbound / until disconnected.
 RETENTION_DAYS: Mapping[str, int | None] = MappingProxyType(
@@ -50,6 +53,8 @@ class Record(Protocol):
 
 
 class RetentionStore(Protocol):
+    """`record_id` is unique within one store (an adapter whose natural key is not must compose one)."""
+
     def records(self) -> Iterable[Record]: ...
 
     def delete(self, record_id: str) -> None: ...
@@ -59,7 +64,7 @@ def retention_days(entity: str) -> int | None:
     try:
         return RETENTION_DAYS[entity]
     except (KeyError, TypeError):
-        raise ValueError(f"unknown entity {entity!r}: no retention window") from None
+        raise ValueError("unknown entity: no retention window") from None
 
 
 def purge_expired(registry: Mapping[str, RetentionStore], *, now: datetime) -> dict[str, int]:

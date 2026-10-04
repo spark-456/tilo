@@ -16,14 +16,13 @@ Deleting a user removes their records from every store within 30 days. Rules tha
 from __future__ import annotations
 
 import json
-import re
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, TextIO
 
-from .retention import RetentionStore
+from .retention import USER_ID_PATTERN, RetentionStore
 
 ERASURE_DEADLINE_DAYS = 30
 UNREADABLE = -1
@@ -31,7 +30,6 @@ UNREADABLE = -1
 REQUIRED_STORES: frozenset[str] = frozenset(
     {"firestore", "bigquery_ledger", "memory_bank", "gcs_archive", "gcs_artifacts", "gcs_cache"}
 )
-_USER_ID = re.compile(r"u_[0-9A-Za-z_]{1,48}")  # contracts/common.schema.json user_id
 EXIT_OK, EXIT_DATA_REMAINS, EXIT_BAD_INPUT, EXIT_INCOMPLETE = 0, 1, 2, 3
 
 
@@ -40,7 +38,7 @@ class IncompleteRegistry(ValueError):
 
 
 def _check_user(user_id: object) -> str:
-    if not isinstance(user_id, str) or _USER_ID.fullmatch(user_id) is None:
+    if type(user_id) is not str or USER_ID_PATTERN.fullmatch(user_id) is None:  # exact str: no subclass with its own ==
         raise ValueError("user id must look like u_<letters, digits or _>")
     return user_id
 
@@ -106,31 +104,45 @@ def _owned_ids(store: RetentionStore, user_id: str) -> set[str]:
 
 
 def erase_user(registry: Mapping[str, RetentionStore], request: ErasureRequest, *, now: datetime) -> ErasureReport:
+    """Collect the user's ids from every store first, then delete, then re-read every store. Collecting before any
+    delete means no store's ownership lookup (for example a ledger row owned through a World record in another store)
+    can be erased out from under another store, whatever the registry order."""
     if not isinstance(request, ErasureRequest):
         raise ValueError("an ErasureRequest is required")
     user_id = _check_user(request.user_id)  # also catches a request mutated after construction
+    _check_aware(request.requested_at, "requested_at")
+    deadline = request.requested_at + timedelta(days=ERASURE_DEADLINE_DAYS)
     _check_aware(now, "now")
     _check_registry(registry)
+    failures: dict[str, str] = {}
+    unreadable: set[str] = set()
+    owned: dict[str, set[str]] = {}
+    for name, store in registry.items():  # phase 1: read everything before anything is deleted
+        try:
+            owned[name] = _owned_ids(store, user_id)
+        except Exception as exc:  # noqa: BLE001 - only the type name is kept
+            failures[name] = type(exc).__name__
+            unreadable.add(name)
+    for name, ids in owned.items():  # phase 2: delete
+        for record_id in sorted(ids):
+            try:
+                registry[name].delete(record_id)
+            except Exception as exc:  # noqa: BLE001 - keep going
+                failures[name] = type(exc).__name__
     removed: dict[str, int] = {}
     remaining: dict[str, int] = {}
-    failures: dict[str, str] = {}
-    for name, store in registry.items():
-        before: set[str] = set()
+    for name, store in registry.items():  # phase 3: the independent re-read decides, not the delete calls
         try:
-            before = _owned_ids(store, user_id)
-            for record_id in sorted(before):
-                try:
-                    store.delete(record_id)
-                except Exception as exc:  # noqa: BLE001 - keep going; the type name is the only thing kept
-                    failures[name] = type(exc).__name__
-            after = _owned_ids(store, user_id)  # the independent re-read decides, not the delete calls
+            after = _owned_ids(store, user_id) if name not in unreadable else None
         except Exception as exc:  # noqa: BLE001
             failures.setdefault(name, type(exc).__name__)
+            after = None
+        if after is None:
             removed[name], remaining[name] = 0, UNREADABLE
-            continue
-        removed[name], remaining[name] = len(before - after), len(after)
+        else:
+            removed[name], remaining[name] = len(owned[name] - after), len(after)
     complete = all(count == 0 for count in remaining.values())
-    return ErasureReport(complete, removed, remaining, failures, late=now > request.deadline)
+    return ErasureReport(complete, removed, remaining, failures, late=now > deadline)
 
 
 def verify_erasure(registry: Mapping[str, RetentionStore], user_id: str) -> Verification:

@@ -117,10 +117,10 @@ class DmlClient:
 
 def test_FR_MEM_09_bigquery_delete_is_one_parameterised_statement_by_event_id():
     client = DmlClient()
-    BigQueryLedgerTable(client, TABLE).delete_row("e1'; DROP TABLE x; --")
+    BigQueryLedgerTable(client, TABLE).delete_row("e1'; DROP TABLE x; --", "w_a")
     ((sql, params),) = client.statements
-    assert sql == f"DELETE FROM `{TABLE}` WHERE id = @id"
-    assert params == {"id": "e1'; DROP TABLE x; --"}
+    assert sql == f"DELETE FROM `{TABLE}` WHERE id = @id AND world_id = @world_id"
+    assert params == {"id": "e1'; DROP TABLE x; --", "world_id": "w_a"}
 
 
 def test_FR_MEM_09_ledger_row_with_an_unreadable_timestamp_is_kept_by_purge_but_erasable():

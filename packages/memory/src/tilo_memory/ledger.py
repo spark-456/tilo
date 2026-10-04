@@ -6,9 +6,9 @@ for retention or erasure (FR-MEM-09) is `LedgerRetentionStore`, the one path tha
 that cannot be read is `rejected` and acknowledged, so one poison message cannot make the stream loop (BQ-194).
 
 Table protocol (duck-typed): `insert_if_absent(row) -> dict | None` (atomic; None when inserted, else the row already
-there), `rows() -> list[dict]`, and `delete_row(id)` (idempotent; only `LedgerRetentionStore` calls it). Two table
-classes implement it: an in-memory one for dev and tests, and `BigQueryLedgerTable`, tested against a mock client only
-(no cloud calls here).
+there), `rows() -> list[dict]`, and `delete_row(id, world_id)` (idempotent; only `LedgerRetentionStore` calls it).
+Two table classes implement it: an in-memory one for dev and tests, and `BigQueryLedgerTable`, tested against a mock
+client only (no cloud calls here).
 """
 
 from __future__ import annotations
@@ -22,11 +22,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from .retention import USER_ID_PATTERN
+
 REQUIRED = ("v", "id", "seq", "ts", "world_id", "type", "severity")
 JSON_COLUMNS = ("item", "vis", "authz", "data", "trace")
 COLUMNS: tuple[str, ...] = ("v", "id", "seq", "ts", "world_id", "run_id", "type", "actor", "target", "level")
 COLUMNS += ("district", "item", "severity", "credits", "summary", "cause", "vis", "authz", "data", "trace")
-_TABLE_ID = re.compile(r"^[A-Za-z0-9_.-]{1,200}$")
+_TABLE_ID = re.compile(r"[A-Za-z0-9_.-]{1,200}")
 
 
 @dataclass(frozen=True)
@@ -83,13 +85,21 @@ def _parse(message: Any) -> dict[str, Any] | None:
 class EventLedger:
     """Append-only, deduplicating front for a ledger table. Safe to run in several instances on one table."""
 
-    def __init__(self, table: Any):
-        self._table = table
+    def __init__(self, table: Any, *, world_owner: Callable[[str], str | None] | None = None, owner_index: Any = None):
+        """`world_owner` and `owner_index` come together or not at all. With both, the owner of each world is written
+        to the index at ingest, so ledger ownership outlives the World entity (see `LedgerRetentionStore`)."""
+        if (world_owner is None) != (owner_index is None):
+            raise ValueError("world_owner and owner_index must be given together")
+        self._table, self._world_owner, self._owner_index = table, world_owner, owner_index
 
     def ingest(self, message: Any) -> IngestResult:
         event = _parse(message)
         if event is None:
             return IngestResult("rejected")
+        if self._world_owner is not None:  # a failing lookup raises, so Pub/Sub redelivers instead of losing the owner
+            owner = self._world_owner(event["world_id"])
+            if isinstance(owner, str) and USER_ID_PATTERN.fullmatch(owner):
+                self._owner_index.bind(event["world_id"], owner)
         row = _to_row(event)
         existing = self._table.insert_if_absent(row)
         if existing is None:
@@ -126,9 +136,36 @@ class InMemoryLedgerTable:
         with self._lock:
             return [copy.deepcopy(r) for r in self._rows.values()]
 
-    def delete_row(self, row_id: str) -> None:
+    def delete_row(self, row_id: str, world_id: str) -> None:
         with self._lock:
-            self._rows.pop(row_id, None)
+            if self._rows.get(row_id, {}).get("world_id") == world_id:
+                del self._rows[row_id]
+
+
+class InMemoryOwnerIndex:
+    """world id -> owner user id, first write wins. Stands for a durable index (Firestore or a BigQuery table, a
+    follow-up) that must live at least as long as the ledger rows it attributes (365 days) and, for an erased user,
+    until `release` after the verifying script passes. It holds ids only."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._owners: dict[str, str] = {}
+
+    def bind(self, world_id: str, user_id: str) -> None:
+        with self._lock:
+            self._owners.setdefault(world_id, user_id)
+
+    def owner_of(self, world_id: str) -> str | None:
+        with self._lock:
+            return self._owners.get(world_id)
+
+    def release(self, user_id: str) -> int:
+        """Drop the bindings of one user; returns how many. Call only after `verify_erasure` passes for that user."""
+        with self._lock:
+            gone = [w for w, u in self._owners.items() if u == user_id]
+            for world_id in gone:
+                del self._owners[world_id]
+            return len(gone)
 
 
 class BigQueryClient(Protocol):
@@ -152,7 +189,7 @@ class BigQueryLedgerTable:
     front of the topic is still needed there (follow-up; infra is not changed here)."""
 
     def __init__(self, client: BigQueryClient, table: str):
-        if not _TABLE_ID.match(table):  # identifiers cannot be query parameters
+        if not _TABLE_ID.fullmatch(table):  # identifiers cannot be query parameters
             raise ValueError("invalid table id")
         self._client, self._table = client, table
 
@@ -174,8 +211,9 @@ class BigQueryLedgerTable:
     def rows(self) -> list[dict[str, Any]]:
         return [dict(r) for r in self._client.query(self._select(), {})]
 
-    def delete_row(self, row_id: str) -> None:
-        self._client.run_dml(f"DELETE FROM `{self._table}` WHERE id = @id", {"id": row_id})
+    def delete_row(self, row_id: str, world_id: str) -> None:
+        sql = f"DELETE FROM `{self._table}` WHERE id = @id AND world_id = @world_id"
+        self._client.run_dml(sql, {"id": row_id, "world_id": world_id})
 
     def _select(self) -> str:
         cols = ", ".join(_READ.get(c) or (f"TO_JSON_STRING({c}) AS {c}" if c in JSON_COLUMNS else c) for c in COLUMNS)
@@ -196,31 +234,44 @@ class LedgerRecord:
 
 
 def _event_time(ts: Any) -> datetime:
-    """The event `ts` as aware UTC. Ingest only checks that `ts` is a non-empty string, so an unreadable one is aged
-    as never expiring (retention must not delete a row early) but stays findable for erasure."""
+    """The event `ts` as aware UTC. Ingest only checks that `ts` is a non-empty string, so an unreadable or
+    out-of-range one is aged as never expiring (retention never deletes early) but stays findable for erasure."""
     try:
         parsed = datetime.fromisoformat(ts)
-    except (TypeError, ValueError):
+        return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+    except (TypeError, ValueError, OverflowError):
         return _NEVER
-    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
 
 class LedgerRetentionStore:
-    """The one sanctioned path that removes ledger rows (retention and user erasure, FR-MEM-09, BQ-195). A row belongs
-    to the owner of its world, `world_owner(world_id)`; a world with no known owner gives user_id None, which a user
-    erasure never touches. A failing `world_owner` raises, so the caller reports the store as unreadable."""
+    """The one sanctioned path that removes ledger rows (retention and user erasure, FR-MEM-09, BQ-195).
 
-    def __init__(self, table: Any, *, world_owner: Callable[[str], str | None]):
-        self._table, self._world_owner = table, world_owner
+    A row belongs to the owner of its world. The owner is read from `owner_index` (written at ingest by `EventLedger`
+    and kept past the World entity, BQ-211) and only if the index has none from the live `world_owner(world_id)`. That
+    fallback is for rows ingested without an index: the World entity is erased with the user and purged at 90 days,
+    so production must wire the index, or those rows turn ownerless and a user erasure would skip them. A world with
+    no owner gives user_id None, which a user erasure never touches. A failing lookup raises, so the caller reports
+    the store as unreadable. Deletes are scoped by (id, world_id) as read by the last `records()`."""
+
+    def __init__(self, table: Any, *, world_owner: Callable[[str], str | None], owner_index: Any = None):
+        self._table, self._world_owner, self._owner_index = table, world_owner, owner_index
+        self._world_of: dict[str, str] = {}
+
+    def _owner(self, world_id: str) -> str | None:
+        owner = self._owner_index.owner_of(world_id) if self._owner_index is not None else None
+        if owner is None:
+            owner = self._world_owner(world_id)
+        return owner if isinstance(owner, str) else None
 
     def records(self) -> list[LedgerRecord]:
-        records = []
-        for row in self._table.rows():
-            owner = self._world_owner(row["world_id"])
-            records.append(
-                LedgerRecord(row["id"], _event_time(row.get("ts")), owner if isinstance(owner, str) else None)
-            )
-        return records
+        rows = self._table.rows()
+        self._world_of = {row["id"]: row["world_id"] for row in rows}
+        return [LedgerRecord(row["id"], _event_time(row.get("ts")), self._owner(row["world_id"])) for row in rows]
 
     def delete(self, record_id: str) -> None:
-        self._table.delete_row(record_id)
+        world_id = self._world_of.get(record_id)
+        if world_id is None:  # not read yet: find the row's world; a missing id is already gone (idempotent)
+            self._world_of = {row["id"]: row["world_id"] for row in self._table.rows()}
+            world_id = self._world_of.get(record_id)
+        if world_id is not None:
+            self._table.delete_row(record_id, world_id)

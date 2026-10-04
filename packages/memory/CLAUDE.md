@@ -33,7 +33,8 @@ reuse is one `memory.hit` event and is the only thing credited as saved (PRD 14.
 - Erasure (FR-MEM-09): `erase_user` takes a validated `ErasureRequest`; no endpoint or trigger here (authn is the
   API ticket). Blank/None/wildcard ids refused, ownerless records never deleted, incomplete registry refused
   before any delete, done = fresh re-read (`verify_erasure`, `python -m tilo_memory.erasure verify <user>`).
-  Output holds store names and counts only. `LedgerRetentionStore` is the only code that deletes ledger rows.
+  Output holds store names and counts only. `LedgerRetentionStore` is the only code that deletes ledger rows;
+  row owners come from an owner index written at ingest (BQ-211), so they outlive the World entity.
 
 ## Requirement IDs
 FR-MEM-01, FR-MEM-02, FR-MEM-03, FR-MEM-09.
