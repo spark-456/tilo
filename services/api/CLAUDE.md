@@ -23,7 +23,8 @@ service the web client and channels write through; the client reads live state f
 - Dev mode (CL-INT-4, `tilo_api.dev`): one fixed owner `u_dev_owner` (a member of any world it owns), the in-memory
   `Store`, a writer that refuses an event with no `vis`, CORS for `TILO_API_DEV_ORIGINS` only (no `*`, no credentials),
   Host must be loopback:8080. No cloud, no paid call. Start-up and every dev dependency refuse when `K_SERVICE`,
-  `CLOUD_RUN_JOB` or live mode is set. Task routes read only `application/json` (415).
+  `CLOUD_RUN_JOB` or live mode is set. Task routes read only `application/json` (415). `dev_run` (CL-INT-5c) overrides
+  the run seams only here: a synthetic-artifact unit runner, one fake recipient, recording mock adapters (fake send).
 - `GET /worlds/{id}/layout` (FR-WLD-05): the run's layout, 404 until built; a non-owner gets an allowlisted view.
 - `POST /intake` (FR-INT-01/02, `tilo_api.intake`): multipart `text` + `files` -> 201 task, `world.requested`
   and per-file status, or 422 `{"error": reason}` with nothing stored. Calls `tilo_planning.intake`.

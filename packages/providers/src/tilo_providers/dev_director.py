@@ -1,7 +1,8 @@
 """tilo_providers.dev_director — the deterministic dev fake for the Director role (CL-INT-5, EFF-01, PL-01).
 
 `config/models.dev.yaml`'s `director-dev` profile is served by this class, so `just dev-api` needs no recordings or
-paid call. It answers the brief and approaches requests (and their schema-repair re-asks), chosen by `response_schema`.
+paid call. It answers the brief, approaches and plan-draft (`units`, FR-INT-09) requests (and their schema-repair
+re-asks), chosen by `response_schema`.
 Replies are derived only from the task text or brief it is sent plus fixed demo constants, tagged "(dev)", and every
 guessed field is flagged ambiguous so questions appear (FR-INT-05). `dev_only`: never conforms (PL-05); refused when
 deployed or live (EFF-01). No network, clock or randomness."""
@@ -21,6 +22,7 @@ from tilo_providers.interfaces import Capability, GenerateRequest, GenerateRespo
 TAG = "(dev)"
 _TASK = re.compile(r"<<<TASK\n(.*?)\nTASK>>>", re.DOTALL)
 _BRIEF = re.compile(r"<<<BRIEF\n(.*?)\nBRIEF>>>", re.DOTALL)
+_CATALOGUE = re.compile(r"<<<CATALOGUE\n(.*?)\nCATALOGUE>>>", re.DOTALL)
 _DATE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 _GOAL_MAX = 500  # brief.schema.json goal.maxLength
 _FREE = PriceQuote(input=0.0, output=0.0)
@@ -91,6 +93,35 @@ def _approaches_reply(prompt: str) -> dict[str, Any]:
     }  # fmt: skip
 
 
+def _first_approval_action(prompt: str) -> tuple[str, str] | None:
+    """(connector id, action id) of the first catalogue action that needs an approval gate, or None."""
+    try:
+        connectors = json.loads(_block(_CATALOGUE, prompt))["connectors"]
+        return next(
+            (c["id"], a["id"]) for c in connectors for a in c["actions"] if a["gate_type"] == "approval"
+        )  # fmt: skip
+    except (ValueError, KeyError, TypeError, StopIteration):
+        return None  # an unreadable catalogue, or one with no gated action, gets a plan with nothing to send
+
+
+def _plan_reply(prompt: str) -> dict[str, Any]:
+    """Specialist -> writer -> verifier, then a final writer unit that performs the catalogue's first gated action.
+    Only units: the gates, the cap and every policy are added by code, never named here."""
+    steps = [("research", "Gather the facts", "specialist"), ("draft", "Draft the deliverable", "writer"),
+             ("verify", "Check the draft", "verifier")]  # fmt: skip
+    units = [
+        {"id": f"U{n}", "unit_type": kind, "title": f"{title} {TAG}", "role": role, "district": "D1", "skills": [],
+         "connectors": [], "actions": [], "depends_on": [f"U{n - 1}"] if n > 1 else []}
+        for n, (kind, title, role) in enumerate(steps, start=1)
+    ]  # fmt: skip
+    if send := _first_approval_action(prompt):
+        units.append({
+            "id": "U4", "unit_type": "deliver", "title": f"Hand over for approval {TAG}", "role": "writer",
+            "district": "D1", "skills": [], "connectors": [send[0]], "actions": [send[1]], "depends_on": ["U3"],
+        })  # fmt: skip
+    return {"units": units}
+
+
 class DevDirectorProvider(ModelProvider):
     dev_only = True  # PL-05: never counted as conforming for a real role
 
@@ -105,8 +136,12 @@ class DevDirectorProvider(ModelProvider):
             reply = _brief_reply(request.prompt)
         elif "approaches" in properties:
             reply = _approaches_reply(request.prompt)
+        elif "units" in properties:
+            reply = _plan_reply(request.prompt)
         else:
-            raise RequestError(f"CL-INT-5: the dev Director fake {TAG} only answers the brief and approaches requests")
+            raise RequestError(
+                f"CL-INT-5: the dev Director fake {TAG} only answers brief, approaches and plan requests"
+            )
         return GenerateResponse(text=json.dumps(reply, sort_keys=True), profile_id=self._profile_id)
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
