@@ -59,9 +59,12 @@ class ApproveIn(BaseModel):
 
 
 def _json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitable[Body]]:
-    """Strict JSON (no NaN or Infinity), and a 422 that never echoes the input back."""
+    """Strict JSON (no NaN or Infinity), and a 422 that never echoes the input back. Only `application/json` is
+    read (415 otherwise): a cross-site form or `text/plain` POST needs no CORS preflight, a JSON one does."""
 
     async def parse(request: Request) -> Body:
+        if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+            raise HTTPException(status_code=415, detail="Send application/json.")
         try:
             return model.model_validate_json(await request.body())
         except ValidationError as exc:

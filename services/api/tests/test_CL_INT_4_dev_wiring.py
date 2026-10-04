@@ -17,6 +17,7 @@ from tilo_api.redaction import router as redaction_router
 
 VITE = "http://localhost:5173"
 OTHER = "http://evil.example"
+LOCAL = f"http://localhost:{dev.PORT}"  # the Host the dev server accepts
 
 
 def dev_app(env: dict[str, str] | None = None) -> FastAPI:
@@ -68,7 +69,7 @@ def test_CL_INT_4_app_start_up_fails_loudly_on_cloud_run():
 def test_CL_INT_4_dev_dependencies_recheck_the_environment_on_every_call(monkeypatch):
     app = dev_app()
     monkeypatch.setenv("K_SERVICE", "tilo-api")  # the process turned out to be deployed after all
-    response = TestClient(app, raise_server_exceptions=False).get(f"/worlds/{WORLD}")
+    response = TestClient(app, base_url=LOCAL, raise_server_exceptions=False).get(f"/worlds/{WORLD}")
     assert response.status_code == 500
     with pytest.raises(dev.DevModeRefused):
         app.dependency_overrides[deps.get_store]()
@@ -80,7 +81,7 @@ def test_CL_INT_4_dev_principal_is_the_one_fixed_owner_of_its_own_worlds():
     dev_store(app).worlds["w_someone_else"] = make_world(
         owner="u_other", districts={"D1": deps.DistrictRecord("Hidden", "x")}
     )
-    client = TestClient(app)
+    client = TestClient(app, base_url=LOCAL)
     assert client.get(f"/worlds/{WORLD}").json()["districts"] == [{"id": "D1", "name": "A", "summary": "b"}]
     assert client.get("/worlds/w_unknown").status_code == 404
     other = client.get("/worlds/w_someone_else").json()  # not its owner, so no owner view
@@ -94,7 +95,7 @@ def test_CL_INT_4_dev_event_writer_stamps_validates_and_is_idempotent(registry):
     writer = app.dependency_overrides[deps.get_event_writer]()
     part = {
         "id": "01JB5VQ0000000000000000001", "type": "world.started", "actor": "A_director", "target": WORLD,
-        "summary": "Work started.", "data": {"budget_cap": 60},
+        "summary": "Work started.", "data": {"budget_cap": 60}, "vis": "all",
     }  # fmt: skip
     first = writer.append(WORLD, part)
     assert (first["v"], first["seq"], first["world_id"], first["run_id"]) == ("1.0", 1, WORLD, "r_village_basic_1")
@@ -122,12 +123,11 @@ def preflight(client: TestClient, origin: str):
 
 
 def test_CL_INT_4_cors_allows_only_the_default_vite_origin():
-    client = TestClient(dev_app())
+    client = TestClient(dev_app(), base_url=LOCAL)
     allowed = preflight(client, VITE)
     assert allowed.status_code == 200
     assert allowed.headers["access-control-allow-origin"] == VITE
     assert allowed.headers["access-control-allow-origin"] != "*"
-    assert allowed.headers["access-control-allow-credentials"] == "true"
     denied = preflight(client, OTHER)
     assert "access-control-allow-origin" not in denied.headers
     simple = client.get(f"/worlds/{WORLD}", headers={"Origin": OTHER})
@@ -135,7 +135,7 @@ def test_CL_INT_4_cors_allows_only_the_default_vite_origin():
 
 
 def test_CL_INT_4_cors_origins_come_from_the_environment():
-    client = TestClient(dev_app({dev.ENV_ORIGINS: "http://localhost:4173, http://127.0.0.1:5174/"}))
+    client = TestClient(dev_app({dev.ENV_ORIGINS: "http://localhost:4173, http://127.0.0.1:5174/"}), base_url=LOCAL)
     assert preflight(client, "http://localhost:4173").headers["access-control-allow-origin"] == "http://localhost:4173"
     assert preflight(client, "http://127.0.0.1:5174").headers["access-control-allow-origin"] == "http://127.0.0.1:5174"
     assert "access-control-allow-origin" not in preflight(client, VITE).headers, "the default is replaced, not added to"

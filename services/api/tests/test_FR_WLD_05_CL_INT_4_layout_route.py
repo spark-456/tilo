@@ -103,7 +103,7 @@ def test_FR_WLD_05_CL_INT_4_other_user_sees_only_their_districts(client, store, 
     assert [d["id"] for lv in sem["levels"] for d in lv["districts"]] == ["D2"]
     assert [g["id"] for g in sem["gates"]] == ["G2"]
     assert [i["id"] for i in sem["islands"]] == ["I2"]
-    assert "A_l2" in {a["id"] for a in sem["agents"]} and "A_l1" not in {a["id"] for a in sem["agents"]}
+    assert [(a["id"], a["rank"]) for a in sem["agents"]] == [("A_dir", "director"), ("A_l2", "lead")]  # no workers
     assert view["geometry"] is None
     assert schema_errors(repo_root, view) == []
     text = response.text
