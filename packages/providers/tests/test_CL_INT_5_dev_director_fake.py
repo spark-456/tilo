@@ -86,6 +86,30 @@ def test_CL_INT_5_approaches_reply_is_three_distinct_in_cap_and_follows_the_brie
             assert differing >= 2
 
 
+def _plan_request(catalogue: str) -> GenerateRequest:
+    prompt = f"Draft.\n\n<<<CATALOGUE\n{catalogue}\nCATALOGUE>>>"
+    return GenerateRequest(prompt=prompt, json_mode=True, response_schema={"properties": {"units": {}}})
+
+
+def test_CL_INT_5c_plan_reply_ends_with_the_first_approval_action_and_names_no_gate():
+    catalogue = json.dumps({"skills": [], "connectors": [
+        {"id": "mail", "actions": [{"id": "read", "gate_type": "none"}, {"id": "draft", "gate_type": "approval"}]},
+        {"id": "files", "actions": [{"id": "save", "gate_type": "approval"}]},
+    ]})  # fmt: skip
+
+    reply = _reply(_plan_request(catalogue))
+
+    assert set(reply) == {"units"}  # no gates, cap or policy: code adds those (FR-INT-09)
+    assert [u["role"] for u in reply["units"]] == ["specialist", "writer", "verifier", "writer"]
+    assert [(u["connectors"], u["actions"]) for u in reply["units"]] == [([], [])] * 3 + [(["mail"], ["draft"])]
+    assert all(u["title"].endswith("(dev)") for u in reply["units"])
+
+
+@pytest.mark.parametrize("catalogue", ["not json", "{}", '{"connectors": [{"id": "m", "actions": "x"}]}'])
+def test_CL_INT_5c_plan_reply_without_a_usable_gated_action_has_nothing_to_send(catalogue):
+    assert [u["actions"] for u in _reply(_plan_request(catalogue))["units"]] == [[], [], []]
+
+
 def test_CL_INT_5_a_repair_prompt_is_answered_from_the_same_blocks():
     request = _brief_request("Repair me")
     wrapped = request.model_copy(update={"prompt": f"{request.prompt}\n\nYour previous answer did not match: x"})
