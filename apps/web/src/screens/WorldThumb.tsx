@@ -55,15 +55,30 @@ function Building({ b }: { b: FrameBuilding }) {
 /** A still of the world, or nothing but its backdrop when the layout has no geometry. */
 export function WorldThumb({ layout, state }: { layout: Layout; state: WorldState }) {
   const frame = frameOf(layout, state);
-  const { x0, y0, x1, y1 } = frame.bounds;
-  if (x1 <= x0 || y1 <= y0) return null;
+  if (frame.plates.length === 0) return null;
   const order = [...frame.buildings].sort(
     (a, b) => a.lift - b.lift || a.rect.x + a.rect.y - (b.rect.x + b.rect.y),
   );
+  // A tight box round what is drawn (plates and the tops of the buildings), so the world fills the
+  // thumbnail instead of floating in the stage's padding.
+  const at = (r: { x: number; y: number; w: number; d: number }, z: number): Pt[] => [
+    P(r.x, r.y, z),
+    P(r.x + r.w, r.y, z),
+    P(r.x + r.w, r.y + r.d, z),
+    P(r.x, r.y + r.d, z),
+  ];
+  const drawn = [
+    ...frame.plates.flatMap((p) => at(p.rect, p.lift)),
+    ...frame.buildings.flatMap((b) => at(b.rect, b.lift + BASE + (b.floors - 1) * FLOOR)),
+  ];
+  const xs = drawn.map((q) => q[0]);
+  const ys = drawn.map((q) => q[1]);
+  const [x0, y0] = [Math.min(...xs) - 8, Math.min(...ys) - 8];
+  const [w, h] = [Math.max(...xs) + 8 - x0, Math.max(...ys) + 8 - y0];
   return (
     <svg
-      viewBox={`${x0} ${y0} ${x1 - x0} ${y1 - y0}`}
-      preserveAspectRatio="xMidYMid meet"
+      viewBox={`${x0} ${y0} ${w} ${h}`}
+      preserveAspectRatio="xMidYMax meet"
       aria-hidden="true"
       focusable="false"
     >
@@ -87,7 +102,9 @@ export function WorldThumb({ layout, state }: { layout: Layout; state: WorldStat
           <polygon
             key={dist.id}
             points={pts([corner(0, 0), corner(w, 0), corner(w, d), corner(0, d)])}
-            fill={lt(dist.tint, 0.7)}
+            fill={lt(dist.tint, 0.5)}
+            stroke={dist.tint}
+            strokeWidth={1.5}
           />
         );
       })}

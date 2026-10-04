@@ -84,3 +84,21 @@ for (const [name, viewport] of [
     expect(doc).toBeLessThanOrEqual(viewport.width);
   });
 }
+
+test("S_14 G1 the status chips are 44 px high on a phone and 36 px on a desktop", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  for (const [viewport, min] of [
+    [MOBILE, 44],
+    [DESKTOP, 36],
+  ] as const) {
+    await page.setViewportSize(viewport);
+    await page.goto("/worlds?speed=100");
+    await expect(page.getByTestId("world-card")).toBeVisible({ timeout: 20_000 });
+    for (const radio of await page.getByRole("radio").all()) {
+      const box = await radio.boundingBox(); // the radio fills its chip: this is the hit area
+      expect(box?.height).toBeGreaterThanOrEqual(min);
+    }
+  }
+});
