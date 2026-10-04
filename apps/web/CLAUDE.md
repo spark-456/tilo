@@ -26,7 +26,7 @@ Trace lenses, cards and settings.
 - `meta.ts` is the PRD 18.3 table (S-01..S-25, status, route pattern); `routes.tsx` maps each
   routed screen to its `S_NN.tsx`. Build one: replace the stub, flip its status. `/more`, `/screens`.
 - A control that does nothing yet is `aria-disabled="true"` with a "Coming soon" title. Nothing to list yet is `EmptyState` (`kit.tsx`: glyph, title, line, one action), in the reserved box the loading state held.
-- `?speed=` is parsed in `world/speed.ts` (clamped 0.1..1000); the HR-6 badge says "Replay at N× speed".
+- `?speed=` is parsed in `world/speed.ts` (clamped 0.1..1000); the HR-6 badge says "Replay at N× speed"; it and the HR-4 pill sit in the fixed `.status-strip` (shell padded by `--strip-h`).
 - An unknown world id or an unowned path under `/world/` or `/task/` shows `NotFound`, not Start.
 
 ## Needs you (`src/needs-you/`, AGW-05)
@@ -36,5 +36,5 @@ Trace lenses, cards and settings.
 
 ## Local rules
 - Nothing animates without a recorded event (HR-1–HR-7, PRD 9.4); `src/honesty/` (FR-WLD-09) fails on animation APIs outside `choreographer.ts` (allowlist: `test-support/honestyScan.ts`).
-- One primary filled button per screen (UX-1); no streaks, hearts or fake urgency (UX-7).
+- One primary filled button per screen (UX-1, iris + 4px lip; `.secondary` is quiet); no streaks, hearts or fake urgency (UX-7).
   Type and spacing are tokens (PRD 18.2): `var(--text-N)` 12/14/16/20/24/32/40, `--space-N` 4..32, no `em` sizing; `e2e/type-ramp.spec.ts` pins it.

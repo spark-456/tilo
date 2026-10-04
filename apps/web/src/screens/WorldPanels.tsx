@@ -79,16 +79,22 @@ export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: 
         ) : (
           <>
             <span className="chip">{RUN_STATUS_LABEL[status]}</span>
-            <div className="hud-figures">
-              <div>
-                <b>{creditsUsed(events)}</b>
-                <span>{cap === null ? "credits used" : `credits of ${cap} approved`}</span>
+            {status === "idle" ? (
+              // No world.* event yet: words, not a "0" figure, beside a screen that may already
+              // show a finished run (Bundle C3).
+              <p className="hud-idle">The run has not started. No credits used yet.</p>
+            ) : (
+              <div className="hud-figures">
+                <div>
+                  <b>{creditsUsed(events)}</b>
+                  <span>{cap === null ? "credits used" : `credits of ${cap} approved`}</span>
+                </div>
+                <div>
+                  <b>{saved ? `${saved.low_min} to ${saved.high_min} min` : "Not yet"}</b>
+                  <span>saved · estimate</span>
+                </div>
               </div>
-              <div>
-                <b>{saved ? `${saved.low_min} to ${saved.high_min} min` : "Not yet"}</b>
-                <span>saved · estimate</span>
-              </div>
-            </div>
+            )}
             {saved && <AppLink to="/estimate">How we estimate</AppLink>}
           </>
         )}

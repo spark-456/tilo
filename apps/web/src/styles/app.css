@@ -29,9 +29,17 @@ textarea {
   --text-24: calc(var(--font-size-24) * var(--ui-scale, 1));
   --text-32: calc(var(--font-size-32) * var(--ui-scale, 1));
   --text-40: calc(var(--font-size-40) * var(--ui-scale, 1));
+  /* Bundle C2: the reserved strip for the HR-4 banner and the HR-6 badge (one row; two on a phone
+     when both show). The shell starts below it, so neither covers a control. 0 without a banner. */
+  --strip-h: 0px;
   display: flex;
+  box-sizing: border-box;
   height: 100vh;
   font-size: var(--text-16);
+}
+.app-shell[data-strip="on"] {
+  --strip-h: calc((var(--space-32) + var(--space-8)) * var(--ui-scale, 1));
+  padding-top: var(--strip-h);
 }
 .app-shell[data-stage-mode="on"] {
   --ui-scale: var(--font-stage-mode-scale);
@@ -39,6 +47,16 @@ textarea {
 @media (max-width: 767px) {
   .app-shell {
     flex-direction: column;
+  }
+  /* A phone's strip is not scaled by stage mode: its words must fit the phone's width. */
+  .app-shell[data-strip="on"] {
+    --strip-h: calc(var(--space-32) + var(--space-8));
+  }
+  .app-shell[data-strip="on"][data-replay-badge="on"] {
+    --strip-h: calc(2 * (var(--space-32) + var(--space-8)));
+  }
+  .status-strip {
+    --text-12: var(--font-size-12);
   }
 }
 .left-rail,
@@ -77,7 +95,7 @@ textarea {
 }
 .right-rail {
   flex: 0 0 328px; /* + 2 x 16px padding = 360px (PRD 18.3) */
-  padding: 52px var(--space-16) var(--space-16); /* the top clears the fixed fixture banner */
+  padding: var(--space-16);
   font-size: var(--text-14);
   background: var(--color-surface-1);
 }
@@ -88,13 +106,26 @@ textarea {
   margin: var(--space-16) 0 var(--space-4);
   font-size: var(--text-14);
 }
-/* P0-08b-player fixture mode (HR-4/BQ-07, HR-6): fixed so no layout (mobile bottom tabs, stage
-   mode's --ui-scale) can ever cover it or push it off-screen. */
-.fixture-replay-banner {
+/* P0-08b-player fixture mode (HR-4/BQ-07, HR-6): the strip is fixed along the top edge so no layout
+   (mobile bottom tabs, stage mode's --ui-scale) can cover it or push it off-screen, and the shell
+   is padded by its height (Bundle C2). The banner and the speed badge sit in it, not over content. */
+.status-strip {
   position: fixed;
-  top: 12px;
-  right: 12px;
+  top: 0;
+  right: 0;
+  left: 0;
   z-index: 1000;
+  box-sizing: border-box;
+  height: var(--strip-h);
+  display: flex;
+  flex-flow: row wrap;
+  align-content: center;
+  align-items: center;
+  gap: var(--space-8);
+  padding: 0 var(--space-16);
+  background: var(--color-surface-2);
+}
+.fixture-replay-banner {
   padding: var(--space-8) var(--space-16);
   border-radius: var(--radius-pill);
   background: var(--color-ink-1);
@@ -104,7 +135,7 @@ textarea {
 /* Fixed like the banner above it, so it never shifts the layout (P0-08b). Neutral tokens only. */
 .fixture-load-alert {
   position: fixed;
-  top: 52px;
+  top: calc(var(--strip-h) + var(--space-12));
   right: 12px;
   z-index: 1000;
   max-width: min(360px, calc(100vw - 24px));
@@ -128,7 +159,7 @@ textarea {
   border-radius: var(--radius-controls);
   background: var(--color-surface-1);
   color: var(--color-ink-1);
-  font: 600 0.875em var(--font-ui);
+  font: 600 var(--text-14) var(--font-ui);
 }
 .live-world-note p {
   margin: 0;
@@ -140,15 +171,10 @@ textarea {
   .live-world-note {
     left: 16px;
     bottom: auto;
-    top: 56px;
+    top: calc(var(--strip-h) + var(--space-16));
   }
 }
 .speed-badge {
-  position: fixed;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
   padding: var(--space-4) var(--space-12);
   border-radius: var(--radius-pill);
   background: var(--color-brand-primary);
@@ -156,23 +182,9 @@ textarea {
   font: 700 var(--text-12) var(--font-ui); /* words in the UI face: the mono zero reads as an 8 */
   white-space: nowrap;
 }
-/* Below 768 px the badge sits under the fixture banner at the right (one column, so the two never
-   meet at 320 px), and what the banner clears moves down with it. */
 @media (max-width: 767px) {
-  .speed-badge {
-    top: 48px;
-    right: 12px;
-    left: auto;
-    transform: none;
-  }
-  .app-shell[data-replay-badge="on"] .screen-page {
-    padding-top: 88px;
-  }
-  .app-shell[data-replay-badge="on"] .flow-shell {
-    top: 88px;
-  }
-  .app-shell[data-replay-badge="on"] .fixture-load-alert {
-    top: 84px;
+  .fixture-replay-banner {
+    padding: var(--space-8) var(--space-12); /* the words fit one 320 px row */
   }
 }
 .trace-list {
@@ -212,7 +224,7 @@ textarea {
 }
 .flow-shell {
   position: fixed;
-  top: 16px;
+  top: calc(var(--strip-h) + var(--space-16));
   left: 88px;
   z-index: 500;
   box-sizing: border-box;
@@ -224,7 +236,6 @@ textarea {
 }
 @media (max-width: 767px) {
   .flow-shell {
-    top: 56px; /* below the fixed fixture banner */
     left: 16px;
     width: calc(100vw - 32px);
   }
@@ -238,11 +249,17 @@ textarea {
   color: var(--color-ink-2);
   font: 400 var(--text-14) / 1.4 var(--font-ui);
 }
+/* Bundle C5 button hierarchy. One filled primary per screen: iris with a 4 px lip. The secondary is
+   quiet: white, a 1 px line and a warm 4 px lip (the lip is border, so heights stay the same). A
+   disabled primary keeps its iris hue, paler, so the screen still shows where its primary action
+   is; its label is exempt from contrast (WCAG 1.4.3) and the cursor says it is not available. */
 .primary {
   min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
   min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  box-sizing: border-box;
   padding: 0 var(--space-16);
   border: none;
+  border-bottom: 4px solid var(--color-brand-primary-lip);
   border-radius: var(--radius-controls);
   background: var(--color-brand-primary);
   color: var(--color-surface-1);
@@ -253,17 +270,23 @@ textarea {
   background: var(--color-brand-primary-lip);
 }
 .primary:disabled {
-  background: var(--color-surface-2);
-  color: var(--color-ink-2);
+  border-bottom-color: color-mix(
+    in srgb,
+    var(--color-brand-primary-lip) 40%,
+    var(--color-surface-1)
+  );
+  background: color-mix(in srgb, var(--color-brand-primary) 40%, var(--color-surface-1));
   cursor: not-allowed;
 }
 .secondary {
   min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
   min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  box-sizing: border-box;
   padding: 0 var(--space-16);
-  border: 2px solid var(--color-ink-1);
+  border: 1px solid var(--color-ink-3);
+  border-bottom: 4px solid var(--color-fog);
   border-radius: var(--radius-controls);
-  background: transparent;
+  background: var(--color-surface-1);
   color: var(--color-ink-1);
   font: 700 var(--text-14) / 1 var(--font-ui);
   cursor: pointer;
@@ -292,35 +315,108 @@ textarea {
 .flow-notice p {
   margin: 0 0 var(--space-8);
 }
-/* AGW-08 primary navigation: real links in the 72 px rail and the mobile bottom tabs. */
+/* AGW-08 primary navigation: real links in the 72 px rail (PRD 18.3) and the mobile bottom tabs.
+   Bundle C1: an icon over a label (14 px on the rail, 12 px in the tabs), the Needs-you count on
+   the icon, and the current item marked by shape (a 4 px bar on the rail, a 3 px bar in the tabs)
+   as well as fill and weight. No transition: a state change is instant (FR-WLD-09). */
 .left-rail {
+  flex: 0 0 calc(72px * var(--ui-scale, 1));
   box-sizing: border-box;
   flex-direction: column;
   justify-content: flex-start;
   align-items: stretch;
   gap: var(--space-4);
-  padding: var(--space-16) var(--space-4) 0;
+  padding: var(--space-16) 0 0;
 }
 .bottom-tabs {
   align-items: stretch;
+  /* The tabs share the phone's width, so stage mode's --ui-scale does not enlarge their words. */
+  --text-12: var(--font-size-12);
 }
 .bottom-tabs .nav-btn {
   flex: 1;
+  min-width: 0;
+  height: var(--button-height-desktop); /* the sheets above the tabs clear this height */
+  font-size: var(--text-12);
 }
 a.nav-btn {
+  position: relative;
   display: flex;
+  flex-direction: column-reverse; /* the icon above its label; the label first in the source */
   align-items: center;
   justify-content: center;
+  gap: var(--space-4);
   box-sizing: border-box;
   padding: 0 2px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-ink-2);
   text-align: center;
   text-decoration: none;
-  font-size: var(--text-12);
+  font: 700 var(--text-14) / 1.1 var(--font-ui);
+}
+.left-rail a.nav-btn {
+  min-height: calc(64px * var(--ui-scale, 1));
+}
+.nav-label {
+  white-space: nowrap;
+  letter-spacing: -0.02em; /* "Needs you" at 14 px is 68 px: it fits the 72 px rail on one line */
+}
+.nav-icon-box {
+  position: relative;
+  display: flex;
+}
+.nav-icon {
+  display: block;
+}
+.nav-badge {
+  position: absolute;
+  top: -6px;
+  left: 14px;
+  box-sizing: border-box;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-signal-needs);
+  color: var(--color-ink-1);
+  font: 900 var(--text-12) / 20px var(--font-ui);
+  letter-spacing: 0;
+}
+a.nav-btn:hover {
+  background: var(--color-surface-0);
 }
 a.nav-btn[aria-current="page"] {
   background: var(--color-surface-2);
   color: var(--color-ink-1);
-  box-shadow: inset 0 -3px 0 var(--color-brand-primary);
+  font-weight: 900;
+}
+a.nav-btn[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  top: var(--space-8);
+  bottom: var(--space-8);
+  left: 0;
+  width: 4px;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: var(--color-brand-primary);
+}
+.bottom-tabs a.nav-btn[aria-current="page"]::before {
+  top: 0;
+  right: var(--space-8);
+  bottom: auto;
+  left: var(--space-8);
+  width: auto;
+  height: 3px;
+  border-radius: 0 0 var(--radius-pill) var(--radius-pill);
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 a.secondary {
   display: inline-flex;
@@ -338,11 +434,6 @@ a.secondary {
   box-sizing: border-box;
   /* One page-shell offset: every screen's first line sits --space-32 below the top edge. */
   padding: var(--space-32) var(--space-24) var(--space-24);
-}
-@media (max-width: 767px) {
-  .screen-page {
-    padding-top: 56px; /* below the fixed fixture banner */
-  }
 }
 .screen-body {
   max-width: 720px;
@@ -582,6 +673,7 @@ button.row {
 }
 .secondary.placeholder {
   min-height: 44px;
+  border-width: 1px;
   border-style: dashed;
   border-color: var(--color-ink-2);
   color: var(--color-ink-2);
@@ -711,6 +803,9 @@ button.row {
   font-size: var(--text-14);
 }
 .world-panels a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px; /* WCAG 2.5.8 */
   color: var(--color-brand-primary);
 }
 .hud-card {
@@ -1126,8 +1221,10 @@ button.row {
   box-sizing: border-box;
   min-height: 36px;
   padding: 0 var(--space-16);
-  border: 2px solid var(--color-ink-1);
+  border: 1px solid var(--color-ink-3); /* the quiet secondary (C5) */
+  border-bottom: 4px solid var(--color-fog);
   border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
   color: var(--color-ink-1);
   font: 700 var(--text-14) / 1 var(--font-ui);
   text-decoration: none;
@@ -1599,9 +1696,10 @@ button.row {
   flex: none;
   min-width: 44px;
   min-height: 44px;
-  border: 2px solid var(--color-ink-1);
+  border: 1px solid var(--color-ink-3);
+  border-bottom: 4px solid var(--color-fog);
   border-radius: var(--radius-controls);
-  background: transparent;
+  background: var(--color-surface-1);
   color: var(--color-ink-1);
   font: 700 var(--text-20) / 1 var(--font-ui);
   cursor: pointer;
