@@ -20,7 +20,16 @@ from dataclasses import dataclass, fields
 from typing import Any, Protocol
 
 from tilo_channels.autopilot_send import index_artifact
-from tilo_channels.autopilot_state import ACTION_TYPE, CancelPending, CardStore, Ledger, Outbox, timestamp, ulid
+from tilo_channels.autopilot_state import (
+    ACTION_TYPE,
+    CancelPending,
+    CardStore,
+    Ledger,
+    Outbox,
+    StopQueue,
+    timestamp,
+    ulid,
+)
 from tilo_channels.autopilot_t3 import clean_text, t3_content_signal
 from tilo_channels.drafting import (
     MAX_INSTRUCTION,
@@ -35,12 +44,13 @@ from tilo_channels.drafting import (
 )
 
 __all__ = ["ACTION_TYPE", "Autopilot", "CancelPending", "DraftContext", "Outbox", "Outcome", "Preview", "clean_text"]
-__all__ += ["CardStore", "t3_content_signal"]
+__all__ += ["CardStore", "StopQueue", "t3_content_signal"]
 
 OPTIONS = ("send", "edit", "cancel")
 REPLY_FORMATS = ("reply", "reply_all")  # stay in the thread; everything else adds a recipient (BQ-145, BQ-171)
 FORMATS = REPLY_FORMATS + ("forward", "new")
 UNDO_WINDOW_S = 60  # PRD 10.4 L2 default
+SWEEP_INTERVAL_S = 10  # how often production runs Autopilot.sweep(): several tries inside the window (BQ-187)
 PREVIEW_CHARS = 600  # PRD 11.4 Preview
 FINDING_CAP = 300  # characters of one finding's text shown on a card (issue #243)
 
@@ -113,11 +123,12 @@ class Autopilot:
         world_id: str,
         run_id: str,
         connector: str = "gmail",
+        stops: StopQueue | None = None,  # None only for benches that never sweep; production passes one (BQ-187)
     ) -> None:
         self._drafter, self._reader, self._contacts = drafter, reader, contacts
-        self._policy, self._cards, self._clock = policy, cards, clock
+        self._policy, self._cards, self._clock, self._stops = policy, cards, clock, stops
         self._ledger = Ledger(
-            cards=cards, outbox=outbox, clock=clock, world_id=world_id, run_id=run_id, connector=connector
+            cards=cards, outbox=outbox, clock=clock, world_id=world_id, run_id=run_id, connector=connector, stops=stops
         )
 
     def preview(self, user_id: str, context: DraftContext, result: DraftResult) -> Preview:
@@ -189,6 +200,30 @@ class Autopilot:
             mode=context.mode,
         )
         return self._card(user_id, context, result, instructed=False)
+
+    def sweep(self) -> dict[tuple[str, str], str]:
+        """Settles every queued stop (BQ-187): "cancelled", "too_late" or "pending" (stays queued for the next run).
+        Never enqueues; one card's failure is never raised. A stop queued by a tap that died before recording it is
+        left for that tap's retry: a card without a recorded stop is never touched."""
+        done: dict[tuple[str, str], str] = {}
+        for user_id, card_id in self._stops.pending() if self._stops is not None else []:
+            try:
+                if not self._ledger.holds(user_id, card_id, "stop"):
+                    continue
+                doc = self._cards.get(user_id, card_id)
+                if doc is None:
+                    raise LookupError("a recorded stop without its card")
+                done[(user_id, card_id)] = self._ledger.settle(user_id, doc)
+            except Exception as exc:  # CancelPending, or a store or outbox failure: the next sweep retries
+                _LOG.warning("autopilot card %s: stop not confirmed (%s)", card_id, type(exc).__name__)
+                done[(user_id, card_id)] = "pending"
+        return done
+
+    def stop_state(self, user_id: str, card_id: str) -> str | None:
+        """None (no stop recorded), "pending" (shown as "Not confirmed, retry"), "cancelled" or "too_late" (BQ-188)."""
+        if not self._ledger.holds(user_id, card_id, "stop"):
+            return None
+        return self._ledger.settled(user_id, card_id) or "pending"
 
     # -- internals ----------------------------------------------------------------------------------------------
 

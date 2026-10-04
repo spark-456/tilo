@@ -1,5 +1,4 @@
 # services/connectors — `tilo-connectors`
-
 ## Purpose
 Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP client, and the
 outbox for every side effect. The only service that can decrypt user OAuth tokens.
@@ -32,6 +31,7 @@ outbox for every side effect. The only service that can decrypt user OAuth token
   already stored (OB-03), and the adapter dedupes its own send. `Outbox` may hand the same
   `data.transfer` to `emit` more than once; the event writer (PI-18) keeps one per `outbox_id`.
   Send order holds per `world_id` only; `Outbox(world_id=w)` sends and emits only w's; `abandon` fails an unsent entry.
+  `get`/`get_by_idempotency_key` are pure reads (copies); `revoke` cancels a scheduled entry or bars its key, never prunes.
 - Trust boundary: `InMemoryOutboxStore`'s mutators are underscored lock-guarded compare-and-set or
   lease writers, so several instances sharing one store never both win a write.
 - Tokens: AES-GCM under a per-record data key wrapped by a `Kms` (`FakeKms` in dev; `CloudKms` is

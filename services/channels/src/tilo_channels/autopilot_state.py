@@ -8,19 +8,19 @@ reads the other's, so at least one side sees the other):
   ENQUEUE side, `schedule` (preview, replay, Send):
     E1 write `#enqueuing`. E2 read `#stop`: if set, enqueue nothing (when `#enqueuing` was already there, settle the
     stop as S3, which may raise). E3 enqueue under the key `autopilot:<card_id>` with the recorded entry id (a repeated
-    key returns the stored entry). E4 read `#stop` again: if set, settle the stop (S3); an unconfirmed cancel raises
-    CancelPending, so the caller retries; it is never swallowed.
-  STOP side, `stop` (Cancel, Edit):
-    S1 write `#stop` (any Cancel or Edit; from now on no entry of the card may send). S2 if `#cancelled` is there:
-    "cancelled". If `#enqueuing` is not there, no enqueue ever started and every later one stops at E2: write
-    `#cancelled`, "cancelled". S3 (settle) otherwise: cancel the recorded id; if the outbox refuses, look the entry up
-    by enqueueing the same key again (it returns the stored entry, or stores it now to be cancelled next) and cancel
-    it if it is scheduled. "cancelled" (and `#cancelled`) only when the outbox confirmed the cancel or showed the entry
-    cancelled; "too_late" only when it showed the entry sending, sent or failed; anything unconfirmed raises
-    CancelPending. Elapsed time is never evidence.
+    key returns the stored entry; a revoked key is refused). E4 read `#stop` again (also after E3 failed): if set,
+    settle the stop (S3); an unconfirmed cancel raises CancelPending, so the caller retries; it is never swallowed.
+  STOP side, `stop` (Cancel, Edit), never calling `enqueue` (CHN-GATE-A, BQ-186):
+    S0 queue the stop in `StopQueue` (BQ-187). S1 write `#stop` (from now on no entry of the card may send). S2 if
+    `#enqueuing` is not there, no enqueue ever started and every later one stops at E2: write `#cancelled`. S3 (settle,
+    also the sweeper's): revoke the key (cancels a stored scheduled entry, or makes the outbox refuse to create it),
+    else cancel the recorded id, else read the entry by key. "cancelled" (and `#cancelled`) only when the outbox
+    revoked the absent key, confirmed the cancel or showed the entry cancelled; "too_late" (and `#too_late`) only when
+    it showed the entry sending, sent or failed; anything unconfirmed raises CancelPending and stays queued. Elapsed
+    time is never evidence. A settled stop leaves the queue.
 
-`#cancelled` therefore means no entry of the card can ever send. A crash anywhere leaves either a stop that is not yet
-answered (the caller retries, and E2 or S3 completes it) or a confirmed one.
+`#cancelled` therefore means no entry of the card can ever send. A crash anywhere leaves either no recorded stop (the
+caller saw an error and retries) or a queued one that a retry, E2, E4 or the sweeper completes.
 """
 
 from __future__ import annotations
@@ -41,6 +41,15 @@ class CancelPending(RuntimeError):
 class Outbox(Protocol):  # the names of tilo_connectors.outbox.Outbox, which tilo-channels never imports (BQ-158)
     def enqueue(self, entry: dict, evidence: dict) -> dict: ...
     def cancel(self, outbox_id: str) -> dict: ...
+    def get(self, outbox_id: str) -> dict | None: ...  # read port: a copy or None; never writes
+    def get_by_idempotency_key(self, world_id: str, idempotency_key: str) -> dict | None: ...
+    def revoke(self, world_id: str, idempotency_key: str) -> dict | None: ...  # never creates an entry (BQ-186)
+
+
+class StopQueue(Protocol):  # stops not yet confirmed, shared by every instance (Firestore in production; BQ-187)
+    def add(self, user_id: str, card_id: str) -> None: ...
+    def pending(self) -> list[tuple[str, str]]: ...
+    def remove(self, user_id: str, card_id: str) -> None: ...
 
 
 class CardStore(Protocol):  # JSON-able documents keyed (user_id, key): get, atomic create-if-absent, put
@@ -68,8 +77,9 @@ class Ledger:
         world_id: str,
         run_id: str,
         connector: str,
+        stops: StopQueue | None = None,
     ) -> None:
-        self._cards, self._outbox, self._clock = cards, outbox, clock
+        self._cards, self._outbox, self._clock, self._stops = cards, outbox, clock, stops
         self._world_id, self._run_id, self._connector = world_id, run_id, connector
 
     def first(self, user_id: str, card_id: str, slot: str, by: str) -> str:
@@ -89,45 +99,60 @@ class Ledger:
         fresh = not claimed and self._cards.create(user_id, f"{card_id}#enqueuing", {})
         if self.holds(user_id, card_id, "stop"):  # E2
             if not fresh:  # an earlier enqueue may have stored the entry: complete the recorded stop
-                self._settle(user_id, doc)
+                self.settle(user_id, doc)
             return None
-        entry = self.enqueue(doc)  # E3
+        entry = None
+        try:
+            entry = self.enqueue(doc)  # E3
+        except Exception:
+            if not self.holds(user_id, card_id, "stop"):
+                raise  # a stop that revoked the key makes the outbox refuse it; E4 answers that
         if self.holds(user_id, card_id, "stop"):  # E4: a stop raced this enqueue
-            self._settle(user_id, doc)
+            self.settle(user_id, doc)
             return None
         return entry
 
     def stop(self, user_id: str, doc: dict[str, Any], by: str) -> str:
-        """Stops the L2 card's send, whichever Cancel or Edit holds `#stop` (S1 to S3): "cancelled" or "too_late"."""
+        """Stops the L2 card's send, whichever Cancel or Edit holds `#stop` (S0 to S3): "cancelled" or "too_late"."""
         card_id = doc["card_id"]
-        self.first(user_id, card_id, "stop", by)  # S1
-        if self.holds(user_id, card_id, "cancelled"):  # S2
-            return "cancelled"
-        if not self.holds(user_id, card_id, "enqueuing"):
+        if self._stops is not None:
+            self._stops.add(user_id, card_id)  # S0: queued before it is recorded, so no crash hides it from a sweep
+        self.first(user_id, card_id, "stop", by)  # S1, before the outbox is first called
+        if not self.holds(user_id, card_id, "enqueuing"):  # S2
             self._cards.create(user_id, f"{card_id}#cancelled", {})
-            return "cancelled"
-        return self._settle(user_id, doc)  # S3
+        return self.settle(user_id, doc)  # S3
 
-    def _settle(self, user_id: str, doc: dict[str, Any]) -> str:
+    def settled(self, user_id: str, card_id: str) -> str | None:
+        return next((s for s in ("cancelled", "too_late") if self.holds(user_id, card_id, s)), None)
+
+    def settle(self, user_id: str, doc: dict[str, Any]) -> str:
+        """S3 for a recorded stop: "cancelled" or "too_late", recorded and dequeued; raises CancelPending."""
         card_id = doc["card_id"]
-        if self.holds(user_id, card_id, "cancelled"):
-            return "cancelled"
-        try:
-            self._outbox.cancel(doc["outbox_id"])
-        except Exception:  # not stored, not scheduled, or the outbox is unavailable: look the entry up
+        status = self.settled(user_id, card_id)
+        if status is None:
+            status = self._confirm(doc)
+            self._cards.create(user_id, f"{card_id}#{status}", {})  # the outbox's answer, so any writer agrees
+        if self._stops is not None:
+            self._stops.remove(user_id, card_id)
+        return status
+
+    def _confirm(self, doc: dict[str, Any]) -> str:
+        """The outbox's word on the card's entry; never enqueues. None from `revoke` means the absent key is revoked;
+        None from a read proves nothing (an enqueue may be in flight)."""
+        key = f"autopilot:{doc['card_id']}"
+        asks: list[Callable[[], dict | None]] = [
+            lambda: self._outbox.revoke(self._world_id, key) or {"state": "cancelled"},
+            lambda: self._outbox.cancel(doc["outbox_id"]),
+            lambda: self._outbox.get_by_idempotency_key(self._world_id, key),
+        ]
+        for ask in asks:
             try:
-                entry = self.enqueue(doc)  # the stored entry under the card's key, or one stored now to be cancelled
-            except Exception as exc:
-                raise CancelPending("the outbox could not be read") from exc
-            if entry["state"] not in ("scheduled", "cancelled"):
-                return "too_late"  # sending, sent or failed: the outbox says it went
-            if entry["state"] == "scheduled":
-                try:
-                    self._outbox.cancel(entry["id"])
-                except Exception as exc:
-                    raise CancelPending("the outbox did not confirm the cancel") from exc
-        self._cards.create(user_id, f"{card_id}#cancelled", {})
-        return "cancelled"
+                state = (ask() or {}).get("state", "scheduled")
+            except Exception:  # unavailable, refused, or the answer was lost: ask the next way
+                continue
+            if state != "scheduled":
+                return "cancelled" if state == "cancelled" else "too_late"  # sending, sent or failed: it went
+        raise CancelPending("the outbox did not confirm the stop")
 
     def enqueue(self, doc: dict[str, Any]) -> dict:
         """The card's entry under its idempotency key: a replay returns the stored entry and never adds one."""
