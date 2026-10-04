@@ -162,22 +162,27 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
    custom role `tiloVertexGenerate` (permission `aiplatform.endpoints.predict`
    only), not `roles/aiplatform.user`. The provider layer calls
    `generate_content`, `generate_content_stream`, `embed_content` and
-   `count_tokens` (`google_adapter.py`). The permission was taken from Google's
-   Vertex AI IAM permissions reference; the page fetch in this session returned
-   only navigation, so confirm before the first live call with
-   `gcloud iam roles describe roles/aiplatform.user` and one smoke call as
-   `tilo-api`; if a call returns 403, add the permission named in the error to
-   the role in `main.tf`. Harness keeps `aiplatform.user`; narrow it to a custom
-   role once its Sessions, Memory Bank and code-execution calls exist.
+   `count_tokens` (`google_adapter.py`). The permission set is UNCONFIRMED: the
+   Google reference page could not be fetched in this session (security review:
+   it should cover all four calls). Confirm with one smoke call made as
+   `tilo-api`; if a call returns 403, add only the permission named in the error
+   to the role in `main.tf` and never re-grant `roles/aiplatform.user`. Context
+   caching (`aiplatform.cachedContents.*`), batch jobs and Agent Engine would
+   need more. Harness keeps `aiplatform.user`; narrow it to a custom role once
+   its Sessions, Memory Bank and code-execution calls exist.
 5. **Deployer allowlist.** `deployer_project_roles` only accepts
    `cloudbuild.builds.editor`, `firebasehosting.admin`, `firebaserules.admin`;
-   anything else fails validation (tested). Default `[]`.
+   anything else fails validation (tested). Default `[]`. Enabling any of them
+   needs a fresh security review: `firebaserules.admin` lets CI rewrite
+   Firestore rules (it could open all data) and `cloudbuild.builds.editor` can
+   run builds as the Cloud Build or default compute service account.
 6. **Pub/Sub push token.** The Pub/Sub service agent holds
    `serviceAccountOpenIdTokenCreator` (not full `serviceAccountTokenCreator`) on
    `tilo-gmail-push`.
 7. **Model Armor logging.** The template keeps `log_sanitize_operations` and
    `log_template_operations` off (PRD 16.5: screened mail text must not be logged).
-8. **Open question: where triage and drafting run.** `triage.py` and
+8. **Open question: where triage and drafting run (decide before the Gmail
+   routes are built).** `triage.py` and
    `drafting.py` live in `tilo-channels` today, so channels holds the model and
    Model Armor grants. If they move to harness, drop channels' model grants
    entirely (`tiloVertexGenerate` and `modelarmor.user`).
@@ -192,13 +197,24 @@ Hard requirements from the security review for the routes the infra points at:
   allowlist: `/internal/gmail/renew` and `/internal/gmail/poll` accept
   `tilo-gmail-scheduler` only; the Cloud Tasks run route accepts
   `tilo-tasks-invoker` only; 403 otherwise. Claims are read from the validated
-  Authorization token only. Renew and poll take no parameters.
+  Authorization token only. Renew and poll take no parameters. Why renew and
+  poll must refuse `tilo-tasks-invoker`: api holds `run.invoker` on harness and
+  can put `tilo-tasks-invoker` OIDC tokens on Cloud Tasks aimed at any harness
+  path. Renew and poll reach Gmail only through connectors and iterate the
+  stored watches only (`MailWatcher.renew_due` / `poll_due`).
+- `tilo-channels` is `allUsers`, so the `tilo-gmail-push` `run.invoker` binding
+  gives no protection: `/internal/gmail/push` is reachable from the internet and
+  no channels route under `/internal/` may rely on ingress or IAM.
 - Channels push route (`POST /internal/gmail/push`): full google-auth ID-token
-  verification before any parsing; the audience equals
-  `module.service.uris['channels']` with no path and no trailing slash;
-  `emailAddress` and `historyId` are only a hint; an unknown address gets 200 and
-  is ignored; there is a per-address rate limit and an alert on the volume of
-  ignored pushes.
+  verification before any parsing, with the claims checked explicitly: `iss` is
+  a Google issuer, `email` is `tilo-gmail-push@<project>`, `email_verified` is
+  true; the audience equals `module.service.uris['channels']` with no path and
+  no trailing slash. `emailAddress` and `historyId` are only a hint: an unknown
+  address gets 200 and is ignored, history is read from the stored cursor with
+  the user's own token, and there is a per-address rate limit and an alert on the
+  volume of ignored pushes. Why: `gmail-api-push@system.gserviceaccount.com` is
+  shared by every Gmail account, so anyone can point `users.watch` at our topic;
+  do not remove this rule.
 - Harness reads of the `archive` bucket stay in deterministic code and never
   become an agent tool.
 - Any route that returns a raw archive record enforces world membership and
