@@ -1,0 +1,44 @@
+id: B-019
+domain: personal_admin
+shapes:
+- non_english
+- tiny_brief
+title: A packing list asked in German
+brief: Erstelle eine Packliste für ein Wochenende im Schwarzwald im Oktober.
+director:
+  brief:
+    goal: Create a packing list for an October weekend in the Black Forest.
+    deliverables:
+    - title: Packing list
+      format: markdown
+    audience: Me
+    deadline: null
+    constraints:
+    - Write in English
+    sources: []
+    sensitivity: personal
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: draft
+      title: Write the packing list
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: verify
+      title: Check nothing obvious is missing
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+expect:
+  outcome: completed

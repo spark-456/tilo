@@ -10,7 +10,7 @@ import { useClient } from "../api/ClientProvider";
 import { CardView, useAnswer } from "../needs-you/CardView";
 import { type QueueItem, askedBy, deriveQueue, rungOf } from "../needs-you/queue";
 import { elapsed } from "../world/runLog";
-import { alsoWorld } from "../world/worldContext";
+import { alsoWorld, withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Chip, EmptyState, Page, Row, Section, Soon, useFixtureRun, words } from "./kit";
@@ -37,7 +37,7 @@ function QuestionCard({ item, layout }: { item: QueueItem; layout: Layout | null
 export function S_06() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
-  const [layoutRemote] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layoutRemote] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const [cards, retry] = useRemote("load the cards", () => client.listCards(worldId));
   const [openId, setOpenId] = useState<string | null>(null);
   const layout = layoutRemote.status === "ready" ? layoutRemote.value : null;
@@ -76,7 +76,7 @@ export function S_06() {
                 testid="needs-empty"
                 title="Nothing needs you"
                 line="Tilo asks here when it needs a decision."
-                action={{ label: "See your worlds", to: "/worlds" }}
+                action={{ label: "See your worlds", to: withWorld("/worlds", worldId) }}
               />
             ) : (
               <ul className="blist" data-testid="needs-queue">

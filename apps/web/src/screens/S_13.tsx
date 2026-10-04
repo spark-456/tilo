@@ -5,10 +5,21 @@
 // so). No design export covers this screen: cards and rows after "Tilo Worlds.dc.html", neutral
 // role tokens (design/source/INDEX.md, S-13).
 import type { Event } from "@tilo/contracts";
+import { useState } from "react";
 import { useClient } from "../api/ClientProvider";
 import type { DeliveredArtifact } from "../api/client";
 import { AppLink } from "./AppLink";
-import { EmptyState, Page, Row, Section, Soon, Stats, field, useFixtureRun, words } from "./kit";
+import {
+  EmptyState,
+  Page,
+  Row,
+  Section,
+  Stats,
+  doneState,
+  field,
+  useFixtureRun,
+  words,
+} from "./kit";
 import { useRemote } from "./remote";
 
 // PRD 13.1 memory layers: what each holds and when it may be reused.
@@ -31,7 +42,19 @@ export function S_13() {
   const known = new Map<string, DeliveredArtifact>(
     delivery.status === "ready" ? delivery.value.artifacts.map((a) => [a.id, a]) : [],
   );
+  const [query, setQuery] = useState("");
   const delivered = events.filter((e) => e.type === "artifact.delivered");
+  const rows = delivered.map((e) => {
+    const a = ref(e);
+    const meta = known.get(a.artifact_id);
+    return {
+      seq: e.seq,
+      name: a.label ?? meta?.title ?? words(a.artifact_id.replace(/^art_/, "")),
+      sub: `${words(meta?.kind ?? "artifact")} · version ${a.version}`,
+    };
+  });
+  const q = query.trim().toLowerCase();
+  const shown = rows.filter((r) => q === "" || r.name.toLowerCase().includes(q));
   const count = (type: string) => events.filter((e) => e.type === type).length;
   return (
     <Page
@@ -41,16 +64,27 @@ export function S_13() {
     >
       <Stats
         items={[
-          ["Deliverables", delivered.length],
-          ["Memory reuses", count("memory.hit")],
-          ["Items remembered", count("memory.saved")],
+          ["Deliverables", delivered.length, doneState(delivered.length, "Delivered")],
+          ["Memory reuses", count("memory.hit"), doneState(count("memory.hit"), "Reused")],
+          ["Items remembered", count("memory.saved"), doneState(count("memory.saved"), "Kept")],
         ]}
       />
       <Section
         title="Deliverables"
         note="Finished work, listed as each one is delivered."
         reserve={[9, 11]}
-        action={<Soon labels={["Search the library"]} />}
+        action={
+          <label className="search-field">
+            <span className="visually-hidden">Search the library</span>
+            <input
+              type="search"
+              value={query}
+              placeholder="Search the library"
+              autoComplete="off"
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+        }
       >
         {delivered.length === 0 ? (
           <EmptyState
@@ -61,28 +95,24 @@ export function S_13() {
           />
         ) : (
           <ul className="blist" data-testid="library-rows">
-            {delivered.map((e) => {
-              const a = ref(e);
-              const meta = known.get(a.artifact_id);
-              return (
-                <Row
-                  key={e.seq}
-                  name={a.label ?? meta?.title ?? words(a.artifact_id.replace(/^art_/, ""))}
-                  sub={`${words(meta?.kind ?? "artifact")} · version ${a.version}`}
-                >
-                  <AppLink to="/library/artifacts" className="pill">
-                    Version history
-                  </AppLink>
-                </Row>
-              );
-            })}
+            {shown.length === 0 && (
+              <li className="empty-note" data-testid="library-nomatch">
+                No deliverable matches that search.
+              </li>
+            )}
+            {shown.map((r) => (
+              <Row key={r.seq} name={r.name} sub={r.sub}>
+                <AppLink to="/library/artifacts" className="pill">
+                  Version history
+                </AppLink>
+              </Row>
+            ))}
           </ul>
         )}
       </Section>
       <Section
         title="Memory Vault"
-        note="Tilo reuses a result only after a check accepts it."
-        action={<Soon labels={["Forget a memory item"]} />}
+        note="Tilo reuses a result only after a check accepts it. Forgetting an item is not available yet."
       >
         {count("memory.hit") + count("memory.saved") === 0 && (
           <EmptyState

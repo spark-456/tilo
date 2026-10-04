@@ -154,19 +154,34 @@ export function Chip({ tone, children }: { tone: string; children: ReactNode }) 
   );
 }
 
-/** Key figures as labelled hero numbers. */
-export function Stats({ items }: { items: ReadonlyArray<readonly [string, string | number]> }) {
+/** A figure's state in words (tone, text), under it: "Needs you", "All clear", "None yet". */
+export type StatState = readonly [tone: string, text: string];
+
+/** Key figures as labelled hero numbers, each with an optional state chip: what the number means
+ * is said in words, never by the number or a colour alone. */
+export function Stats({
+  items,
+}: { items: ReadonlyArray<readonly [string, string | number, StatState?]> }) {
   return (
     <ul className="stat-tiles hero-stats">
-      {items.map(([label, value]) => (
+      {items.map(([label, value, state]) => (
         <li key={label}>
           <span className="stat-name">{label}</span>
           <b>{value}</b>
+          {state && <Chip tone={state[0]}>{state[1]}</Chip>}
         </li>
       ))}
     </ul>
   );
 }
+
+/** The state chip of a count that is waiting on a person: "Needs you" or "All clear". */
+export const waitState = (n: number): StatState =>
+  n > 0 ? ["needs", "Needs you"] : ["done", "All clear"];
+
+/** The state chip of a count of things made or done: `word` when there are some, else "None yet". */
+export const doneState = (n: number, word: string): StatState =>
+  n > 0 ? ["done", word] : ["soon", "None yet"];
 
 /** Lines of body height: one number, or [wide screens, narrow screens]. */
 export type Lines = number | readonly [number, number];

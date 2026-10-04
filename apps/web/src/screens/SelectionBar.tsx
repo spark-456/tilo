@@ -12,7 +12,7 @@ import { useRemote } from "./remote";
 export function SelectionBar({ worldId }: { worldId: string }) {
   const client = useClient();
   const events = useRunLog(client, worldId);
-  const [layout] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layout] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const [id, set] = useSelection(worldId);
   const bar = useRef<HTMLDivElement>(null);
   const item = id && layout.status === "ready" ? findItem(layout.value, id, events) : null;

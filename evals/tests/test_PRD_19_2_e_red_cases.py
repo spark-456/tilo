@@ -7,7 +7,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import yaml
-from conftest import REPO_ROOT
+from _evals_lib import REPO_ROOT
 from tilo_evals import Case, load_cases
 
 _CASES_DIR = REPO_ROOT / "evals" / "cases"
