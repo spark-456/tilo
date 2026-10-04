@@ -12,7 +12,8 @@ import { GateSheet } from "../needs-you/GateSheet";
 import { type GateRecord, gatesOf } from "../needs-you/gates";
 import { cardFor } from "../needs-you/queue";
 import { gateKey } from "../needs-you/reduce";
-import { Page, Section, useFixtureRun } from "./kit";
+import { withWorld } from "../world/worldContext";
+import { EmptyState, Page, Section, useFixtureRun } from "./kit";
 import { useRemote } from "./remote";
 
 /** Its own component, keyed by the request, so the answer state belongs to one request: after
@@ -90,13 +91,19 @@ export function S_07() {
               />
             </>
           ) : named === false ? (
-            <p className="empty-note" data-testid="gate-not-found">
-              That gate has not been recorded in this run.
-            </p>
+            <EmptyState
+              testid="gate-not-found"
+              title="Gate not found"
+              line="That gate has not been recorded in this run."
+              action={{ label: "Back to the queue", to: withWorld("/needs-you", worldId) }}
+            />
           ) : (
-            <p className="empty-note" data-testid="gate-empty">
-              No gate has come up in this run yet. Tilo asks here before anything leaves your hands.
-            </p>
+            <EmptyState
+              testid="gate-empty"
+              title="No gate yet"
+              line="No gate has come up in this run yet. Tilo asks here before anything leaves your hands."
+              action={{ label: "Back to the queue", to: withWorld("/needs-you", worldId) }}
+            />
           )}
         </div>
       </Section>
