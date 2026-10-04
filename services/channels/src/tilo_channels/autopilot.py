@@ -127,6 +127,7 @@ class Autopilot:
     ) -> None:
         self._drafter, self._reader, self._contacts = drafter, reader, contacts
         self._policy, self._cards, self._clock, self._stops = policy, cards, clock, stops
+        self._world_id = world_id
         self._ledger = Ledger(
             cards=cards, outbox=outbox, clock=clock, world_id=world_id, run_id=run_id, connector=connector, stops=stops
         )
@@ -202,17 +203,17 @@ class Autopilot:
         return self._card(user_id, context, result, instructed=False)
 
     def sweep(self) -> dict[tuple[str, str], str]:
-        """Settles every queued stop (BQ-187): "cancelled", "too_late" or "pending" (stays queued for the next run).
-        Never enqueues; one card's failure is never raised. A stop queued by a tap that died before recording it is
-        left for that tap's retry: a card without a recorded stop is never touched."""
+        """Settles every queued stop of this world's cards (BQ-187): "cancelled", "too_late" or "pending" (stays
+        queued for the next run). Another world's card is left queued for that world's sweeper. Never enqueues; one
+        card's failure is never raised. Only an owner's Cancel or Edit queues a stop, so a tap that died between
+        queueing and recording it is recorded here (fail safe: the send stops)."""
         done: dict[tuple[str, str], str] = {}
         for user_id, card_id in self._stops.pending() if self._stops is not None else []:
             try:
-                if not self._ledger.holds(user_id, card_id, "stop"):
-                    continue
                 doc = self._cards.get(user_id, card_id)
-                if doc is None:
-                    raise LookupError("a recorded stop without its card")
+                if doc is None or not self._ledger.ours(doc):
+                    continue
+                self._ledger.first(user_id, card_id, "stop", "sweep")
                 done[(user_id, card_id)] = self._ledger.settle(user_id, doc)
             except Exception as exc:  # CancelPending, or a store or outbox failure: the next sweep retries
                 _LOG.warning("autopilot card %s: stop not confirmed (%s)", card_id, type(exc).__name__)
@@ -259,6 +260,7 @@ class Autopilot:
         doc: dict[str, Any] = {
             "card_id": card_id,
             "user_id": user_id,
+            "world_id": self._world_id,  # its entry's world: only this world enqueues or settles a stop of it
             "instruction_id": context.instruction_id,
             "status": result.status,
             "options": list(OPTIONS if sendable else OPTIONS[1:]),

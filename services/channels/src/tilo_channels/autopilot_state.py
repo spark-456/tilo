@@ -125,11 +125,17 @@ class Ledger:
     def settled(self, user_id: str, card_id: str) -> str | None:
         return next((s for s in ("cancelled", "too_late") if self.holds(user_id, card_id, s)), None)
 
+    def ours(self, doc: dict[str, Any]) -> bool:
+        """The card was decided in this ledger's world, so its entry (if any) is under this world's key."""
+        return doc.get("world_id") == self._world_id
+
     def settle(self, user_id: str, doc: dict[str, Any]) -> str:
         """S3 for a recorded stop: "cancelled" or "too_late", recorded and dequeued; raises CancelPending."""
         card_id = doc["card_id"]
         status = self.settled(user_id, card_id)
         if status is None:
+            if not self.ours(doc):  # another world's key proves nothing about this card's entry
+                raise CancelPending("the card's entry is another world's: only that world can confirm the stop")
             status = self._confirm(doc)
             self._cards.create(user_id, f"{card_id}#{status}", {})  # the outbox's answer, so any writer agrees
         if self._stops is not None:
@@ -139,11 +145,11 @@ class Ledger:
     def _confirm(self, doc: dict[str, Any]) -> str:
         """The outbox's word on the card's entry; never enqueues. None from `revoke` means the absent key is revoked;
         None from a read proves nothing (an enqueue may be in flight)."""
-        key = f"autopilot:{doc['card_id']}"
+        key, world = f"autopilot:{doc['card_id']}", doc["world_id"]  # the card's own world (checked by settle)
         asks: list[Callable[[], dict | None]] = [
-            lambda: self._outbox.revoke(self._world_id, key) or {"state": "cancelled"},
+            lambda: self._outbox.revoke(world, key) or {"state": "cancelled"},
             lambda: self._outbox.cancel(doc["outbox_id"]),
-            lambda: self._outbox.get_by_idempotency_key(self._world_id, key),
+            lambda: self._outbox.get_by_idempotency_key(world, key),
         ]
         for ask in asks:
             try:
@@ -155,7 +161,10 @@ class Ledger:
         raise CancelPending("the outbox did not confirm the stop")
 
     def enqueue(self, doc: dict[str, Any]) -> dict:
-        """The card's entry under its idempotency key: a replay returns the stored entry and never adds one."""
+        """The card's entry under its idempotency key: a replay returns the stored entry and never adds one. Only in
+        the card's own world: an entry elsewhere is one no stop of this card would find."""
+        if not self.ours(doc):
+            raise PermissionError("the card belongs to another world: its entry is never created here")
         ms = round(self._clock() * 1000)
         created, window, policy = timestamp(ms), doc["undo_window_s"], doc["level"] == "L2"
         authority = {"by": "policy", "ref": doc["policy_id"]} if policy else {"by": "person", "ref": doc["user_id"]}
