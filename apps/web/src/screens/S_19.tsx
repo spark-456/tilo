@@ -9,7 +9,19 @@ import { useClient } from "../api/ClientProvider";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
-import { Chip, Page, Row, Section, Stats, field, nameOf, useFixtureRun, words } from "./kit";
+import {
+  Chip,
+  Page,
+  Row,
+  Section,
+  Stats,
+  doneState,
+  field,
+  nameOf,
+  useFixtureRun,
+  waitState,
+  words,
+} from "./kit";
 import { useRemote } from "./remote";
 
 const STATE = {
@@ -45,6 +57,7 @@ export function S_19() {
       ),
   );
   const islands = layout.status === "ready" ? layout.value.semantic.islands : [];
+  const connected = islands.filter((i) => i.state === "connected").length;
   return (
     <Page
       testid="connections"
@@ -55,9 +68,10 @@ export function S_19() {
         items={[
           [
             "Connected",
-            layout.status === "ready" ? islands.filter((i) => i.state === "connected").length : "-",
+            layout.status === "ready" ? connected : "-",
+            layout.status === "ready" ? doneState(connected, "Connected") : ["soon", "Loading"],
           ],
-          ["Waiting for consent", consent.length],
+          ["Waiting for consent", consent.length, waitState(consent.length)],
         ]}
       />
       <Section

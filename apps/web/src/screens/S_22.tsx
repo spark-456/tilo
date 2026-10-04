@@ -3,19 +3,27 @@
 // privacy lines are PRD 16.5's. No design export covers a unified Settings screen: cards and rows
 // after "Tilo Team.dc.html", neutral role tokens (design/source/INDEX.md, S-22).
 import { type Density, useDensity } from "../display/density";
+import { AppLink } from "./AppLink";
 import { Placeholder } from "./Placeholder";
 import { Page, Row, Section } from "./kit";
 
 // PRD 16.5 consent: each opt-in is explicit and revocable.
-const CONSENTS = [
+// `to` is where the access is shown and managed today; an opt-in with no screen of its own yet has
+// none, and no dead control stands in for it.
+const CONSENTS: ReadonlyArray<readonly [string, string, string | null]> = [
   [
     "Gmail access",
     "So Tilo can sort mail and send replies. You sign in with Google; Tilo never sees your password.",
+    "/connections",
   ],
-  ["Style profile", "Greetings and sign-offs learned from your sent mail. Stored as settings."],
-  ["WhatsApp", "Cards and replies on your phone, with a number you bind."],
-  ["Pilot diary", "A daily note and an exit survey. Results are aggregated only."],
-] as const;
+  [
+    "Style profile",
+    "Greetings and sign-offs learned from your sent mail. Stored as settings.",
+    null,
+  ],
+  ["WhatsApp", "Cards and replies on your phone, with a number you bind.", "/channels"],
+  ["Pilot diary", "A daily note and an exit survey. Results are aggregated only.", "/pilot"],
+];
 
 const MODES: ReadonlyArray<readonly [Density, string, string]> = [
   ["friendly", "Friendly", "The default look"],
@@ -55,9 +63,13 @@ export function S_22() {
       </Section>
       <Section title="Consent" note="Every one is explicit and can be taken back at any time.">
         <ul className="blist">
-          {CONSENTS.map(([name, what]) => (
+          {CONSENTS.map(([name, what, to]) => (
             <Row key={name} name={name} sub={what}>
-              <Placeholder label={`Review ${name}`} compact />
+              {to && (
+                <AppLink to={to} className="pill" aria-label={`Review ${name}`}>
+                  Review
+                </AppLink>
+              )}
             </Row>
           ))}
         </ul>

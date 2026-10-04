@@ -679,6 +679,13 @@ button.row {
   color: var(--color-ink-2);
   cursor: not-allowed;
 }
+.secondary.placeholder.danger {
+  /* A kill switch is the one danger-styled control of a screen: solid red outline and word, so it
+     reads as the one that matters even while it is not available yet. */
+  border: 2px solid var(--color-signal-blocked);
+  color: var(--color-signal-blocked);
+  font-weight: 800;
+}
 .secondary.placeholder.compact {
   min-height: 32px;
   padding: 0 var(--space-12);
