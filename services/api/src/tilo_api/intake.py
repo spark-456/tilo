@@ -63,7 +63,7 @@ async def intake(
         content = await upload.read(remaining + 1)  # never hold more than the limit in memory
         remaining -= len(content)
         if remaining < 0:
-            return _rejected(f"The files total more than {MAX_TOTAL_BYTES // (1024 * 1024)} MB.")
+            return _rejected(f"The files total more than {MAX_TOTAL_BYTES // 1_000_000} MB.")
         uploads.append(IntakeFile(filename=upload.filename or "", content=content))
     request = IntakeRequest(text=text, files=uploads, user_id=principal.user_id)
     try:

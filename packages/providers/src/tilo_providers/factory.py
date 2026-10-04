@@ -1,6 +1,6 @@
 """tilo_providers.factory — role -> `ModelProvider` factory (EFF-01, PRD
 6.6). `build_provider` resolves a role's primary profile: `provider: fake`
-always returns `FakeModelProvider` directly; every other profile returns a
+returns `FakeModelProvider` directly (the dev Director model, `DevDirectorProvider`); every other profile returns a
 `RecordReplayProvider`, whose real adapter is built lazily inside the
 `live_factory` closure only when a call actually goes live (`LIVE=1`).
 Nothing here imports an adapter module or builds a network client for a
@@ -13,7 +13,7 @@ from pathlib import Path
 
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.config import ProviderConfigError, ProvidersConfig
+from tilo_providers.config import DEV_DIRECTOR_MODEL, ProviderConfigError, ProvidersConfig
 from tilo_providers.interfaces import Capability, ModelProvider
 
 
@@ -22,6 +22,11 @@ def build_provider(
 ) -> ModelProvider:
     profile_id = profile_id or config.roles[role_id].primary  # the router passes any cascade profile
     profile = config.profiles[profile_id]
+
+    if profile.provider == "fake" and profile.model == DEV_DIRECTOR_MODEL:  # CL-INT-5: refused when deployed or live
+        from tilo_providers.dev_director import DevDirectorProvider  # noqa: PLC0415
+
+        return DevDirectorProvider(profile_id=profile_id)
 
     if profile.provider == "fake":
         from tilo_providers.fake import FakeModelProvider  # noqa: PLC0415

@@ -118,6 +118,7 @@ def _fixtures(repo_root, kind):
     return sorted((repo_root / "contracts" / "fixtures" / "policy" / kind).glob("*.json"))
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_03_PI_06_valid_l2_l3_policy_fixtures_run_for_their_own_proposal(repo_root, risk_table_path):
     """Keeps the invalid-fixture test below from passing vacuously: the same derivation runs
     for every valid L2/L3 fixture."""

@@ -37,6 +37,7 @@ ground_truth:
     WaterTreatment: 41000
   max_row_label: ORD-72
   max_row_value: 52000
+  files_open_cleanly: true
 checks:
 - check: equals_ground_truth
   args:
@@ -63,5 +64,9 @@ checks:
   args:
     field: max_row_value
     tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: files_open_cleanly
 recording: null
-notes: Files-open-cleanly check lands with the render service (FR-CON-09).
+notes: 'Deliverable output must report files_open_cleanly: true after opening the rendered PDF/PPTX cleanly
+  (FR-CON-09, PRD 19.2).'

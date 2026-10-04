@@ -403,3 +403,15 @@ def test_EFF_03_price_covers_system_and_tools_not_only_the_prompt(tmp_path):
     with pytest.raises(BudgetExceededError):
         _router(config, refused).generate("summariser", request, budget=budget)
     assert refused.calls == []
+
+
+@pytest.mark.parametrize("name", ["models.yaml", "models.gemini.yaml", "models.nim.yaml"])
+def test_EFF_03_the_director_role_has_an_input_cap_below_every_profile_context(name):
+    """#59 security follow-up: the Director takes the person's task text, so it is capped (BQ-97)."""
+    import pathlib  # noqa: PLC0415
+
+    import yaml  # noqa: PLC0415
+
+    config = yaml.safe_load((pathlib.Path(__file__).resolve().parents[3] / "config" / name).read_text("utf-8"))
+    cap = config["roles"]["director"]["max_input_tokens"]
+    assert isinstance(cap, int) and 0 < cap < min(p["context"] for p in config["profiles"].values() if p["context"])

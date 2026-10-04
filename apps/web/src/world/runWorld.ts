@@ -9,6 +9,7 @@ import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
 import { type Frame, frameOf } from "./frame";
 import { applyEvent, createInitialState } from "./reducer";
 import { createLayer, renderAgents, renderSelection, renderStatic } from "./renderer";
+import { getReplayPoint, setReplayPoint, subscribeReplay } from "./replayPoint";
 import { getSelection, subscribeSelection } from "./selection";
 import { createWorldStore } from "./store";
 
@@ -27,6 +28,8 @@ export interface RunWorldOptions {
   readonly reducedMotion: () => boolean;
   readonly onSeq: (seq: number) => void;
   readonly onTrace: (trace: ReadonlyArray<{ seq: number; type: string }>) => void;
+  /** The reducer's run status after each applied event (FR-WLD-07: the veil follows "paused"). */
+  readonly onStatus?: (status: Frame["status"]) => void;
 }
 
 type Vec = { x: number; y: number };
@@ -34,27 +37,55 @@ type Vec = { x: number; y: number };
 export function runWorld(opts: RunWorldOptions): () => void {
   const { world, requestRender, layout, events, seqParam, speed, reducedMotion, onSeq, onTrace } =
     opts;
+  const onStatus = opts.onStatus ?? (() => undefined);
   const layer = createLayer(world, opts.size);
   // FR-WLD-06: the ring follows the run's one selection; choosing redraws one frame, nothing more.
   const selected = () => getSelection(layout.world_id);
   const agentIds = layout.semantic.agents.map((a) => a.id);
 
-  if (seqParam !== null) {
+  // The state at one seq, drawn at once with nothing walking (P8/HR-6, FR-WLD-08): a jump to a
+  // recorded moment is a replay, never an event, so there is no motion to time. Built on first use.
+  function staticView() {
     const store = createWorldStore(layout);
     for (const event of events) store.apply(event);
-    const state = store.stateAt(seqParam);
-    const frame = frameOf(layout, state);
-    renderStatic(layer, frame);
-    const places = new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }]));
-    renderAgents(layer, frame, places);
+    let frame: Frame | undefined;
+    let places = new Map<string, Vec>();
     const ring = () => {
+      if (!frame) return;
       renderSelection(layer, frame, places, selected());
       requestRender();
     };
-    ring();
-    onSeq(state.seq);
-    onTrace(state.trace);
-    return subscribeSelection(ring);
+    const off = subscribeSelection(ring);
+    return {
+      show(seq: number) {
+        const state = store.stateAt(seq);
+        frame = frameOf(layout, state);
+        renderStatic(layer, frame);
+        places = new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }]));
+        renderAgents(layer, frame, places);
+        ring();
+        onSeq(state.seq);
+        onTrace(state.trace);
+        onStatus(state.status); // FR-WLD-07: the veil follows the recorded status at this point
+        return state.seq;
+      },
+      off,
+    };
+  }
+
+  if (seqParam !== null) {
+    const view = staticView();
+    // The point is the stop the state landed on (a seq with no event rounds down), so the
+    // scrubber and the stage agree; later scrubs redraw through the same view.
+    setReplayPoint(layout.world_id, view.show(seqParam));
+    const unreplay = subscribeReplay(() => {
+      const point = getReplayPoint(layout.world_id);
+      if (point !== null) view.show(point);
+    });
+    return () => {
+      unreplay();
+      view.off();
+    };
   }
 
   let state = createInitialState(layout); // live playback folds events in one at a time
@@ -66,6 +97,11 @@ export function runWorld(opts: RunWorldOptions): () => void {
   const walkFrom = new Map<string, { seq: number; from: Vec }>(); // the in-flight move's start
   let lastFrame: Frame = frameOf(layout, state);
   let stopped = false;
+  let scrubbed: ReturnType<typeof staticView> | null = null; // FR-WLD-08: set once scrubbed
+  // FR-WLD-07: while the recorded status is "paused" the world holds still: nothing is drawn or
+  // walked, and events that still arrive are only counted and traced (HR-1, HR-3).
+  let paused = false;
+  let lastDisplay = new Map<string, Vec>(); // what the agents were last drawn at
   let timer: ReturnType<typeof setTimeout> | undefined;
   let raf = 0;
 
@@ -104,6 +140,7 @@ export function runWorld(opts: RunWorldOptions): () => void {
         y: walk.from.y + (to.y - walk.from.y) * t,
       });
     }
+    lastDisplay = display;
     renderAgents(layer, lastFrame, display);
     renderSelection(layer, lastFrame, display, selected());
     requestRender();
@@ -112,16 +149,30 @@ export function runWorld(opts: RunWorldOptions): () => void {
 
   function tickAnim() {
     raf = 0;
-    if (stopped) return;
+    if (stopped || paused || scrubbed) return;
     if (drawAgents(performance.now())) raf = requestAnimationFrame(tickAnim);
   }
 
   function applyOne(event: Event, receivedAtMs: number) {
     if (event.seq <= state.seq) return; // duplicate or out of order: the reducer ignores it
+    const wasPaused = paused;
     state = applyEvent(state, event, layout);
+    paused = state.status === "paused";
+    onStatus(state.status);
+    if (paused) {
+      onSeq(state.seq);
+      onTrace(state.trace);
+      return;
+    }
     const frame = frameOf(layout, state);
     lastFrame = frame;
     renderStatic(layer, frame);
+    if (wasPaused) {
+      // Resumed: every agent goes straight to where the record says it is, no walk (HR-3).
+      choreo.advance(Number.POSITIVE_INFINITY);
+      for (const id of agentIds) completedCount.set(id, choreo.completed(id).length);
+      for (const a of frame.agents) agentPos.set(a.id, { x: a.cx, y: a.cy });
+    }
 
     for (const a of frame.agents) {
       if (!agentPos.has(a.id)) {
@@ -171,11 +222,31 @@ export function runWorld(opts: RunWorldOptions): () => void {
   else window.addEventListener("load", startPlayback, { once: true });
 
   const unselect = subscribeSelection(() => {
-    if (!stopped) drawAgents(performance.now()); // a ring redraw: a frame, not an animation
+    if (stopped || scrubbed) return; // a scrubbed run draws through its own static view
+    // A ring redraw is a frame, not an animation; paused, the agents stay where they were drawn.
+    if (paused) {
+      renderSelection(layer, lastFrame, lastDisplay, selected());
+      requestRender();
+    } else drawAgents(performance.now());
+  });
+  // FR-WLD-08: a finished run (every event applied) can be scrubbed; the scrubber is disabled
+  // until then, so a live run is never jumped around. From the first scrub the world shows
+  // stateAt(point) at once and nothing is left to play or walk (also when it ended paused).
+  const lastSeq = events[events.length - 1]?.seq ?? 0;
+  const unreplay = subscribeReplay(() => {
+    const point = getReplayPoint(layout.world_id);
+    if (stopped || point === null || state.seq < lastSeq) return;
+    if (timer) clearTimeout(timer);
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    scrubbed ??= staticView();
+    scrubbed.show(point);
   });
   return () => {
     stopped = true;
     unselect();
+    unreplay();
+    scrubbed?.off();
     window.removeEventListener("load", startPlayback);
     if (timer) clearTimeout(timer);
     if (raf) cancelAnimationFrame(raf);

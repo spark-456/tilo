@@ -27,6 +27,7 @@ from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
 from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
+from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
@@ -209,13 +210,21 @@ def get_safety() -> SafetyProvider:
 # --- the run seams (CL-INT-2, services/api/tests/API_CL_INT_2.md); each default is the production wiring (BQ-90) ---
 
 
-def _no_plan_compiler(*, brief: dict, approach: dict, budget_cap: float) -> dict:
-    raise NotImplementedError("the Director's plan compiler is not built yet (FR-INT-09), so no run starts")
+def _no_plan_compiler(*, brief: dict, approach: dict, budget_cap: float, context: Any = None) -> dict:
+    raise NotImplementedError("no `director` role is configured, so no plan can be compiled and no run starts")
 
 
 def get_plan_compiler() -> Callable[..., dict]:
-    """`compile(*, brief, approach, budget_cap) -> PlanGraph`."""
-    return _no_plan_compiler
+    """`compile(*, brief, approach, budget_cap, context) -> PlanGraph` (FR-INT-09). The Director drafts it through
+    the Router and `validate_plan` decides (BQ-90); with no `director` role in the provider config it refuses."""
+    if "director" not in providers_config().roles:
+        return _no_plan_compiler
+    router = get_router()
+
+    def compile_with_director(*, brief: dict, approach: dict, budget_cap: float, context: PlanInputs) -> dict:
+        return compile_plan(brief, approach, budget_cap, context, router=router).plan
+
+    return compile_with_director
 
 
 def get_layout_builder() -> Callable[..., dict]:

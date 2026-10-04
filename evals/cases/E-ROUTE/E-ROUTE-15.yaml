@@ -33,3 +33,5 @@ checks:
     expected: true
     decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E5
 recording: null
+notes: Context fixture evals/fixtures/route/routing_scenarios.yaml is exercised by acceptance tests; cases
+  report not runnable (no recording) in tilo_evals run until CL-EVID replay recordings land.
