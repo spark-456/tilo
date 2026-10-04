@@ -25,7 +25,10 @@ test("S_22 renders, no console errors, placeholders aria-disabled", async ({ pag
   test.setTimeout(90_000);
   const problems = watchConsole(page);
   await visit(page, "/settings", "Settings", async () => {
-    await expect(page.getByText("Removed from every store within 30 days")).toBeVisible();
+    await expect(page.getByText("removed from every store within 30 days")).toBeVisible();
+    // No export or deletion route exists yet (FR-MEM-09 has no endpoint, BQ-210): the card says so.
+    await expect(page.getByText("Not available in the app yet").first()).toBeVisible();
+    await expect(page.getByText("Not available in the app yet")).toHaveCount(2);
     await soon(page, "Export");
     await soon(page, "Delete");
     await expect(page.getByRole("link", { name: "Review Gmail access" })).toHaveAttribute(
