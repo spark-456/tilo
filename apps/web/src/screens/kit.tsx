@@ -6,13 +6,15 @@
 import type { Authz, Event } from "@tilo/contracts";
 import type { CSSProperties, ReactNode, Ref } from "react";
 import { useClient } from "../api/ClientProvider";
-import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
 import { elapsed, useRunLog } from "../world/runLog";
+import { useWorldContext } from "../world/worldContext";
 import { Placeholder } from "./Placeholder";
 
-/** The recorded events of the fixture world, as they arrive. */
+/** The recorded events of the screen's world as they arrive: the world its address names
+ * (`?world=`, world/worldContext.ts), else the fixture world. */
 export function useFixtureRun(): { events: readonly Event[]; worldId: string } {
-  return { events: useRunLog(useClient(), FIXTURE_WORLD_ID), worldId: FIXTURE_WORLD_ID };
+  const worldId = useWorldContext();
+  return { events: useRunLog(useClient(), worldId), worldId };
 }
 
 /** A payload field the event registry types per event type. */
