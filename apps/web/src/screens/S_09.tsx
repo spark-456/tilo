@@ -44,7 +44,11 @@ export function S_09() {
         </Loaded>
       </Section>
 
-      <Section title="Live notes and decisions" reserve={[10, 15]} action={<Soon labels={["Add note"]} />}>
+      <Section
+        title="Live notes and decisions"
+        reserve={[10, 15]}
+        action={<Soon labels={["Add note"]} />}
+      >
         <EventList
           events={meetingEvents}
           all={events}
