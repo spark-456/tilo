@@ -57,8 +57,25 @@ export const tokens = {
     "display": "Nunito",
     "ui": "Nunito Sans",
     "mono": "JetBrains Mono",
+    "sizes": [
+      12,
+      14,
+      16,
+      20,
+      24,
+      32,
+      40
+    ],
     "stageModeScale": 1.25
   },
+  "space": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32
+  ],
   "stage": {
     "tileWidth": 64,
     "tileHeight": 32
