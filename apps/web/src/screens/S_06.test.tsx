@@ -48,7 +48,7 @@ describe("PRD-18.3 AGW-05 S-06 the queue is empty before the request and after t
     ]).toEqual([0, 1, 1, 0, 0]);
   });
   it("says nothing needs you when nothing waits, and names the waiting gate when one does", async () => {
-    expect((await render(33)).textContent).toContain("Nothing needs you.");
+    expect((await render(33)).textContent).toContain("Nothing needs you");
     const page = (await render(34)).textContent ?? "";
     expect(page).toContain("The reply is ready. Sending it needs your approval.");
     expect(page).toContain("Approval gate");

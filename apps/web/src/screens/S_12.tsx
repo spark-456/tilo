@@ -10,6 +10,7 @@ import { worldStatus } from "../world/runSummary";
 import { AppLink } from "./AppLink";
 import { Loaded, Primary } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
+import { EmptyState } from "./kit";
 import { useAction, useRemote } from "./remote";
 import type { ScreenProps } from "./routes";
 
@@ -34,9 +35,12 @@ export function S_12({ params }: ScreenProps) {
       <h1>Delivery</h1>
       {!finished && (
         <div className="flow-slot">
-          <p className="flow-summary">
-            This run has not finished yet. The delivery appears here once it completes.
-          </p>
+          <EmptyState
+            testid="delivery-pending"
+            title="Nothing to deliver yet"
+            line="This run has not finished yet. The delivery appears here once it completes."
+            action={{ label: "Back to the world", to: `/world/${encodeURIComponent(worldId)}` }}
+          />
         </div>
       )}
       {finished && (

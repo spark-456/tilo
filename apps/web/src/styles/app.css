@@ -681,7 +681,7 @@ button.row {
   display: flow-root; /* a first child's margin stays inside, so ready never moves the slot (CLS) */
 }
 .delivery-slot .flow-slot {
-  min-height: 9em;
+  min-height: 14em; /* the empty state (about 209 px) and the three finished tiles both fit */
 }
 @media (max-width: 767px) {
   .delivery-slot .flow-slot {
@@ -858,6 +858,52 @@ button.row {
   color: var(--color-ink-2);
   font-size: var(--text-14);
   line-height: 1.5;
+}
+/* EmptyState (kit.tsx): fills the reserved box it sits in; the box, not this, holds the height. */
+.empty-state {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: 100%;
+  padding: var(--space-12) var(--space-16);
+  border: 2px dashed var(--color-fog);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+  text-align: center;
+}
+.empty-state .empty-title {
+  margin: 0;
+  color: var(--color-ink-1);
+  font: 900 var(--text-20) / 1.25 var(--font-display);
+}
+.empty-state .empty-line {
+  max-width: 22.5rem;
+  margin: 0;
+  color: var(--color-ink-2);
+  font: 400 var(--text-14) / 1.5 var(--font-ui);
+}
+.empty-state[data-compact="true"] {
+  min-height: 0;
+  border: 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-12);
+  padding: var(--space-8) 0 var(--space-12);
+  text-align: left;
+}
+.empty-state[data-compact="true"] .empty-glyph {
+  width: 40px;
+  height: 30px;
+}
+.empty-state[data-compact="true"] .empty-title {
+  font-size: var(--text-16);
+}
+.empty-state[data-compact="true"] .empty-line {
+  flex-basis: 100%;
+  max-width: none;
 }
 .section-box.reserved {
   overflow-y: auto;
