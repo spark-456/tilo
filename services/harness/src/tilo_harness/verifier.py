@@ -4,8 +4,11 @@ Every deliverable a unit hands over is reviewed once, by a verifier-rank agent t
 it, and one `artifact.reviewed` records the result. A claim is judged in this order, first rule wins:
 
 1. no `source_ids`, or the claim is past the first `max_claims` of its deliverable   -> unverified
-2. no cited source is usable (text missing, longer than `MAX_SOURCE_CHARS`, or its
-   SHA-256 differs from the manifest's fingerprint; each is noted in `Review.notes`)  -> unverified
+2. no cited source is usable (text missing, longer than `MAX_SOURCE_CHARS`, past the first
+   `MAX_SOURCES` sources of the review, a long run of combining characters, or its SHA-256
+   differs from the manifest's fingerprint; each is noted in `Review.notes`), the cited
+   texts are together longer than `MAX_SOURCE_CHARS` (summed before any is prepared), or
+   the review's `MAX_REVIEW_CHARS` budget for normalising text is spent              -> unverified
 3. a number in the claim that no usable cited source contains                         -> contradicted (no model call)
 4. otherwise the `verifier`-role model decides, one call per claim: exactly
    {"verdict": supported | contradicted | cannot_tell}; anything else, or an error   -> unverified.
@@ -33,16 +36,19 @@ from typing import Any
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelProvider
 from tilo_providers.prompts import load_prompt
 
-from tilo_harness.untrusted import has_long_mark_run, neutralise
+from tilo_harness.untrusted import Budget, BudgetSpent, has_long_mark_run, neutralise, nfkc
 from tilo_harness.validator import repo_validator
 
 ROLE = "verifier"  # prompts/verifier/claim_*.md, providers["verifier"]
 MAX_SOURCE_CHARS = 30_000  # BQ-213: a source (or the sources of one claim together) over this is refused, never cut
 MAX_CLAIMS = 200  # BQ-223: one model call per claim, so a deliverable's claims are bounded
+MAX_SOURCES = 20  # BQ-223: distinct sources prepared per review; any further source is refused as unusable
+MAX_REVIEW_CHARS = 3_000_000  # BQ-223: decomposed characters normalised per review, every call together
 MAX_CLAIM_CHARS = 300  # manifest.schema.json caps claim text at 280
 MAX_REPLY_CHARS = 200
 _NUMBER = re.compile(r"[0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?")
 _PROFILE = re.compile(r"[a-z][a-z0-9-]{0,31}")  # providers.schema.json profile_id
+_SPENT = "the review's budget for normalising text is spent"
 
 
 class VerifierNotIndependent(Exception):
@@ -65,10 +71,9 @@ class _Source:
 
     shown: str  # neutralised, as the model sees it
     numbers: frozenset[str]
-    size: int
 
 
-def _prepare(text: Any, fingerprint: str | None) -> tuple[_Source | None, str | None]:
+def _prepare(text: Any, fingerprint: str | None, budget: Budget) -> tuple[_Source | None, str | None]:
     """(source, None) when the text can be trusted as fetched, else (None, why not). The size and
     mark-run checks come first, so nothing too long or too slow to normalise is hashed or scanned."""
     if not isinstance(text, str):
@@ -79,7 +84,10 @@ def _prepare(text: Any, fingerprint: str | None) -> tuple[_Source | None, str | 
         return None, "holds a long run of combining characters"
     if fingerprint != "sha256:" + hashlib.sha256(text.encode("utf-8", "replace")).hexdigest():
         return None, "does not match its fingerprint"
-    return _Source(neutralise(text, limit=MAX_SOURCE_CHARS), frozenset(_numbers(text)), len(text)), None
+    try:
+        return _Source(neutralise(text, limit=MAX_SOURCE_CHARS, budget=budget), _numbers(text, budget)), None
+    except BudgetSpent:
+        return None, _SPENT
 
 
 @dataclass(frozen=True)
@@ -91,18 +99,18 @@ class Review:
     notes: dict[str, list[str]] = field(default_factory=dict)  # claim id -> why a cited source or claim was not used
 
 
-def _numbers(text: str) -> set[str]:
-    """The numbers in `text`, any script's decimal digits read as 0-9. Linear in len(text); callers
-    pass only text that is short or has no long run of combining marks."""
+def _numbers(text: str, budget: Budget) -> frozenset[str]:
+    """The numbers in the NFKC of `text` (capped to MAX_SOURCE_CHARS and stream-safe, `untrusted.nfkc`), any
+    script's decimal digits read as 0-9. Linear in len(text)."""
     out = set()
     folded = "".join(
         str(unicodedata.decimal(c)) if unicodedata.category(c) == "Nd" else c
-        for c in unicodedata.normalize("NFKC", text)
+        for c in nfkc(text, limit=MAX_SOURCE_CHARS, budget=budget)
     )
     for raw in _NUMBER.findall(folded):
         number = raw.replace(",", "")
         out.add(number.rstrip("0").rstrip(".") if "." in number else number)
-    return out
+    return frozenset(out)
 
 
 def _pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -163,37 +171,54 @@ class Verifier:
         status: dict[str, str] = {}
         notes: dict[str, list[str]] = {}
         prepared: dict[str, tuple[_Source | None, str | None]] = {}  # each source once per review
+        budget = Budget(MAX_REVIEW_CHARS)
         for index, row in enumerate(manifest["claims"]):
             claim_notes = notes.setdefault(row["id"], [])
+            status[row["id"]] = "unverified"
             if index >= self._max_claims:
                 claim_notes.append(f"past the first {self._max_claims} claims of this deliverable")
-                status[row["id"]] = "unverified"
+            elif len(row["text"]) > MAX_CLAIM_CHARS:
+                claim_notes.append("claim text too long to check")
             else:
+                cited = {sid: deliverable.sources.get(sid) for sid in row["source_ids"]}
+                sizes = [len(t) for t in cited.values() if isinstance(t, str) and len(t) <= MAX_SOURCE_CHARS]
+                if sum(sizes) > MAX_SOURCE_CHARS:  # summed before any of them is prepared
+                    claim_notes.append("cited sources together too long to check")
+                    cited = {}
                 usable = []
-                for sid in row["source_ids"]:
+                for sid, text in cited.items():
                     if sid not in prepared:
-                        prepared[sid] = await asyncio.to_thread(
-                            _prepare, deliverable.sources.get(sid), fingerprints.get(sid)
+                        prepared[sid] = (
+                            (None, f"past the first {MAX_SOURCES} sources of this review")
+                            if len(prepared) >= MAX_SOURCES
+                            else await asyncio.to_thread(_prepare, text, fingerprints.get(sid), budget)
                         )
                     source, why = prepared[sid]
                     if source is None:
                         claim_notes.append(f"source {sid}: {why}")
                     else:
                         usable.append(source)
-                status[row["id"]] = await self._judge(row["text"], usable, responses)
+                status[row["id"]] = await self._judge(row["text"], usable, responses, budget, claim_notes)
             row["verified"] = status[row["id"]] == "supported"
         values = set(status.values())
         result = "failed" if "contradicted" in values else "passed" if values == {"supported"} else "unverified"
         return Review(result, status, manifest, _trace(responses), {k: v for k, v in notes.items() if v})
 
-    async def _judge(self, text: str, sources: list[_Source], responses: list[GenerateResponse]) -> str:
-        if not sources or sum(source.size for source in sources) > MAX_SOURCE_CHARS:  # rules 1 and 2
+    async def _judge(
+        self, text: str, sources: list[_Source], responses: list[GenerateResponse], budget: Budget, notes: list[str]
+    ) -> str:
+        if not sources:  # rules 1 and 2
             return "unverified"
-        known = frozenset().union(*(source.numbers for source in sources))
-        if not _numbers(text) <= known:  # rule 3
+        try:
+            numbers = _numbers(text, budget)
+            claim = neutralise(text, limit=MAX_CLAIM_CHARS, budget=budget)
+        except BudgetSpent:
+            notes.append(f"claim: {_SPENT}")
+            return "unverified"
+        if not numbers <= frozenset().union(*(source.numbers for source in sources)):  # rule 3
             return "contradicted"
         shown = "\n\n".join(f"[source {i}]\n{source.shown}" for i, source in enumerate(sources, 1))
-        fields = {"claim": neutralise(text, limit=MAX_CLAIM_CHARS), "sources": shown}
+        fields = {"claim": claim, "sources": shown}
         request = GenerateRequest(
             system=self._system, prompt=load_prompt(ROLE, "claim_task.md", fields), json_mode=True, max_output_tokens=32
         )
