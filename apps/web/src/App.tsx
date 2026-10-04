@@ -11,6 +11,7 @@ import { WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
 import { speedBadgeText } from "./world/speed";
+import { useClientWorld } from "./world/useClientWorld";
 import { useWorldFixture } from "./world/useWorldFixture";
 
 // Stage mode is a display setting (PRD 9.6).
@@ -75,6 +76,10 @@ export function App() {
   const screen = unknownWorld ? NOT_FOUND : matched;
   const worldId = unknownWorld ? null : pathWorld;
   const hudWorld = screen ? null : worldId;
+  // The stage draws a ?fixture= replay if one was asked for, else the run of the world in the path
+  // (the same layout and events the HUD reads); anywhere else it keeps its bare grid.
+  const clientWorld = useClientWorld(world.active ? null : hudWorld);
+  const stageWorld = world.active ? world : clientWorld;
   const runScreen = screen !== null && RUN_SCREENS.has(screen.id);
   const needsYouScreen = screen !== null && NEEDS_YOU_SCREENS.has(screen.id);
   const railWorld = worldId ?? (runScreen && !needsYouScreen ? FIXTURE_WORLD_ID : null);
@@ -100,9 +105,11 @@ export function App() {
           />
         </main>
       ) : (
+        // Keyed by world: Stage hands its content seam over once, when Pixi is ready.
         <Stage
-          {...(world.active
-            ? { onWorld: world.onWorld, seq: world.seq, selected: world.selected }
+          key={world.active ? "fixture" : (hudWorld ?? "none")}
+          {...(stageWorld.active
+            ? { onWorld: stageWorld.onWorld, seq: stageWorld.seq, selected: stageWorld.selected }
             : {})}
         />
       )}

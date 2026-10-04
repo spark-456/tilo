@@ -30,6 +30,23 @@ function runFor(client: TiloClient, worldId: string): Run {
   return run;
 }
 
+/** Hands `onEvent` every event the run holds so far, at once and in seq order, then each new one
+ * as it arrives (the stage draws the run the lenses and the HUD read). Returns stop. */
+export function watchRun(
+  client: TiloClient,
+  worldId: string,
+  onEvent: (event: Event) => void,
+): () => void {
+  const run = runFor(client, worldId);
+  let delivered = 0;
+  const flush = () => {
+    for (; delivered < run.events.length; delivered++) onEvent(run.events[delivered] as Event);
+  };
+  run.listeners.add(flush);
+  flush();
+  return () => run.listeners.delete(flush);
+}
+
 /** Every event received so far for the world, in seq order. */
 export function useRunLog(client: TiloClient, worldId: string): readonly Event[] {
   return useSyncExternalStore(
