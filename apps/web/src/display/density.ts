@@ -42,12 +42,13 @@ export function setDensity(next: Density): void {
   for (const l of [...listeners]) l();
 }
 
-const subscribe = (onChange: () => void): (() => void) => {
+/** Calls `onChange` after every change of the mode; returns the unsubscribe. */
+export const subscribeDensity = (onChange: () => void): (() => void) => {
   listeners.add(onChange);
   return () => listeners.delete(onChange);
 };
 
 export const useDensity = (): readonly [Density, (d: Density) => void] => [
-  useSyncExternalStore(subscribe, getDensity),
+  useSyncExternalStore(subscribeDensity, getDensity),
   setDensity,
 ];
