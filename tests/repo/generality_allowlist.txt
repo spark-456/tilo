@@ -1,0 +1,18 @@
+# Exceptions to the "no scenario-specific code" static check (tests/repo/test_GEN_06_no_scenario_specific_code.py).
+# One line each: rule | file | what | reason. An entry that matches nothing fails the test.
+# rule `branch`: the function reads task-like text against a pattern. Each is a generic sanitiser, parser or format
+# check of untrusted text (PRD 16.3, 16.5); none chooses what a run does from the subject of a task.
+branch | packages/planning/src/tilo_planning/compiler.py | _data | neutralises prompt block delimiters in delimited task data (PRD 16.3 item 1)
+branch | packages/providers/src/tilo_providers/dev_director.py | _block | dev-only fake: reads the delimited TASK, BRIEF and CATALOGUE blocks of a prompt
+branch | packages/providers/src/tilo_providers/dev_director.py | _brief_reply | dev-only fake: takes an ISO date out of the task text and echoes the text; every task gets the same shape
+branch | packages/providers/src/tilo_providers/prompts.py | neutralise_marker | neutralises prompt block delimiters in untrusted text
+branch | packages/providers/src/tilo_providers/replay.py | _scrub_authorization_like | redacts credential-shaped strings from recordings (PRD 16.1 rule 4)
+branch | services/browser/src/tilo_browser/login.py | _asks_in_text | detects a page asking for a password or code, so the worker stops (Tilo never handles passwords)
+branch | services/browser/src/tilo_browser/masking.py | _mask | masks secrets in page text before it is stored or shown
+branch | services/browser/src/tilo_browser/masking.py | _mask_cards | masks Luhn-valid card numbers in page text
+branch | services/channels/src/tilo_channels/autopilot_t3.py | clean_text | strips control and format characters from message text
+branch | services/channels/src/tilo_channels/drafting_check.py | _obfuscations | finds direction controls and mixed-script words in model text (PRD 11.4 checks)
+branch | services/channels/src/tilo_channels/drafting_check.py | _read | reads contacts, numbers, dates and commitment words from a draft, to compare with its sources
+branch | services/channels/src/tilo_channels/links.py | _b64d | strict decoding of a signed link's parts
+branch | services/channels/src/tilo_channels/links.py | _verify | signed-link verification: signature before claims
+branch | services/connectors/src/tilo_connectors/adapters/gmail.py | _msg_ids | extracts Message-ID tokens from a mail header value
