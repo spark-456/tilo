@@ -34,7 +34,9 @@ const STATUS = {
 export function S_14() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
-  const [layout, retry] = useRemote("load the worlds", () => client.getLayout(worldId));
+  const [layout, retry] = useRemote("load the worlds", (signal) =>
+    client.getLayout(worldId, signal),
+  );
   const newTask = useAction("start a new task", async () => "/");
   const first = events[0];
   const status = worldStatus(events);

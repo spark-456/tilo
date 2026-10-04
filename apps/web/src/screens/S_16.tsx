@@ -17,7 +17,9 @@ const ISLAND_STATE = {
 export function S_16() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
-  const [layout, retry] = useRemote("load the channels", () => client.getLayout(worldId));
+  const [layout, retry] = useRemote("load the channels", (signal) =>
+    client.getLayout(worldId, signal),
+  );
   const messages = events.filter((e) => e.type.startsWith("channel."));
   return (
     <Page

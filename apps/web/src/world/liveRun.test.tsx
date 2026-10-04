@@ -74,7 +74,7 @@ describe("FR-WLD-05 CP2: Needs you follows the world its address names", () => {
     await render(queue.client, <S_06 />);
     expect(queue.asked).toEqual(["w_live_1"]);
     expect(queue.listCards).toHaveBeenCalledWith("w_live_1");
-    expect(queue.getLayout).toHaveBeenCalledWith("w_live_1");
+    expect(queue.getLayout).toHaveBeenCalledWith("w_live_1", expect.any(AbortSignal));
 
     window.history.pushState({}, "", "/needs-you/gate?world=w_live_2");
     const gate = spied(40);

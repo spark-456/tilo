@@ -274,6 +274,105 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
     }
   });
 
+  describe("#264 getLayout stops polling when the pages asking for it let go", () => {
+    /** A run that never starts: every events poll is empty, so getLayout waits on it. */
+    const stuck = () => {
+      const urls: string[] = [];
+      const fetch = vi.fn(async (url: string | URL | Request) => {
+        urls.push(String(url));
+        return json({ events: [] });
+      }) as unknown as typeof globalThis.fetch;
+      return { urls, fetch };
+    };
+
+    it("aborting the only caller ends the events polling and the wait", async () => {
+      vi.useFakeTimers();
+      try {
+        const { urls, fetch } = stuck();
+        const c = client(fetch, 1000);
+        const stop = new AbortController();
+        const layout = c.getLayout("w1", stop.signal).catch((e: unknown) => e);
+        await vi.advanceTimersByTimeAsync(3000);
+        const before = urls.length;
+        expect(before).toBeGreaterThan(1);
+        stop.abort();
+        await expect(layout).resolves.toBeInstanceOf(TiloApiError);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(urls).toHaveLength(before);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a second caller keeps the shared wait alive until it lets go too", async () => {
+      vi.useFakeTimers();
+      try {
+        const { urls, fetch } = stuck();
+        const c = client(fetch, 1000);
+        const first = new AbortController();
+        const second = new AbortController();
+        const a = c.getLayout("w1", first.signal);
+        const b = c.getLayout("w1", second.signal);
+        expect(a).toBe(b);
+        first.abort();
+        await vi.advanceTimersByTimeAsync(3000);
+        const mid = urls.length;
+        expect(mid).toBeGreaterThan(2); // still polling for the second
+        second.abort();
+        await expect(b).rejects.toBeInstanceOf(TiloApiError);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(urls).toHaveLength(mid);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a call after the last one let go starts afresh, and stopping the old one does not end it", async () => {
+      vi.useFakeTimers();
+      try {
+        const { fetch } = script(events(), events("world.started"), json(LAYOUT_VILLAGE_BASIC));
+        const c = client(fetch, 1000);
+        const gone = new AbortController();
+        const old = c.getLayout("w1", gone.signal).catch((e: unknown) => e);
+        gone.abort();
+        await old;
+        const fresh = c.getLayout("w1", new AbortController().signal);
+        await vi.advanceTimersByTimeAsync(1000);
+        await expect(fresh).resolves.toBeDefined();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a signal that is already aborted asks for nothing", async () => {
+      const { urls, fetch } = stuck();
+      const c = client(fetch, 1);
+      const stop = new AbortController();
+      stop.abort();
+      await expect(c.getLayout("w1", stop.signal)).rejects.toBeInstanceOf(TiloApiError);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(urls).toEqual([]);
+    });
+  });
+
+  it("#264 a world that answered 404 is known again once a later poll finds it", async () => {
+    const { fetch } = script(json({ detail: "Not Found" }, 404), events("world.started"));
+    const c = client(fetch, 1);
+    c.subscribeEvents(
+      "w1",
+      () => undefined,
+      () => undefined,
+    );
+    await vi.waitFor(() => expect(c.isWorldMissing("w1")).toBe(true));
+    const seen = vi.fn();
+    c.onWorldMissing(seen);
+    const stop = c.subscribeEvents("w1", () => undefined);
+    await vi.waitFor(() => expect(c.isWorldMissing("w1")).toBe(false));
+    expect(seen).toHaveBeenCalled();
+    stop();
+  });
+
   it("#258 getApproaches calls that overlap share one request; a later call asks again", async () => {
     const reply = { task_id: "t1", approaches: [], recommended: "a", credit_usd: 1 };
     const { calls, fetch } = script(json(reply), json(reply));

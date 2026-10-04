@@ -45,7 +45,9 @@ const authorisation = (events: readonly Event[], e: Event): Event =>
 export function S_15() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
-  const [layout, retry] = useRemote("load the gates", () => client.getLayout(worldId));
+  const [layout, retry] = useRemote("load the gates", (signal) =>
+    client.getLayout(worldId, signal),
+  );
   const log = events.filter((e) => e.authz !== null);
   const trace = `/world/${encodeURIComponent(worldId)}/trace`;
   return (

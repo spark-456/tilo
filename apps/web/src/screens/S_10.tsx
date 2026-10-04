@@ -29,7 +29,7 @@ export function S_10({ params }: ScreenProps) {
   const status = worldStatus(events);
   const story = events.filter((e) => isKnownType(e.type));
   const [selected, , toggle] = useSelection(worldId);
-  const [layout] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layout] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const names = layout.status === "ready" ? agentNames(layout.value) : null;
   // The rows wait for the layout (ready or failed) so the who-chips never arrive after them and
   // push the text about (CLS); a failed layout still shows the story, without chips.

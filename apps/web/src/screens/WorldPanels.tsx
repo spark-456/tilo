@@ -49,7 +49,7 @@ export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: 
   const client = useClient();
   const { events } = useReplayedLog(client, worldId);
   const [selected, , toggle] = useSelection(worldId);
-  const [layoutRemote] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layoutRemote] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const status = worldStatus(events);
   // The delivery exists only once world.completed is recorded: asking before that is a refusal
   // the browser logs as an error, so the run's own events say when to ask.

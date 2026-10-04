@@ -22,7 +22,9 @@ export function S_05({ params }: ScreenProps) {
   const [worldId = "", itemId = ""] = params;
   const client = useClient();
   const { events } = useReplayedLog(client, worldId);
-  const [layout, retry] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layout, retry] = useRemote("load the world", (signal) =>
+    client.getLayout(worldId, signal),
+  );
   const found = layout.status === "ready" ? findItem(layout.value, itemId, events) : null;
   const exists = found !== null;
   // Inspecting an object selects it, so the lenses show the same one (FR-WLD-06).

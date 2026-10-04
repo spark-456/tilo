@@ -10,6 +10,7 @@ import type { TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
 import { HttpClient } from "../api/http";
 import { forgetWorld, rememberWorld } from "../world/lastWorld";
+import { useRemote } from "./remote";
 import { matchScreen } from "./routes";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -62,7 +63,23 @@ afterEach(() => {
 });
 
 describe("CP2 #258 a bare address with a live API and no started run says so", () => {
-  for (const address of ["/needs-you", "/needs-you/gate", "/library"]) {
+  // Every screen that reads a run from a bare address (#264): none asks a live API about the fixture world.
+  const BARE = [
+    "/needs-you",
+    "/needs-you/gate",
+    "/needs-you/consent",
+    "/meeting",
+    "/library",
+    "/library/artifacts",
+    "/worlds",
+    "/autonomy",
+    "/channels",
+    "/mail",
+    "/team",
+    "/connections",
+    "/estimate",
+  ];
+  for (const address of BARE) {
     it(`${address}: "No run yet", and the API is not asked about any world`, async () => {
       const { client, urls } = liveApi(["w_real"]);
       const page = await visit(address, client);
@@ -114,5 +131,31 @@ describe("CP2 #258 an unknown world is Not found, and its events are asked for o
     expect(page.container.querySelector('[data-testid="no-run"]')).toBeNull();
     expect(page.container.querySelector('[data-testid="not-found"]')).toBeNull();
     await page.stop();
+  });
+});
+
+/** What S-05, S-06, S-07, S-10 and the selection bar do: load the layout through useRemote. The run's
+ * event log (runLog.ts) is a page-lifetime subscription of its own, so it is left out here. */
+function LayoutUser({ client }: { client: TiloClient }) {
+  const [layout] = useRemote("load the world", (signal) => client.getLayout("w_stuck", signal));
+  return <p>{layout.status}</p>;
+}
+
+describe("#264 a screen waiting on a run that has not started stops asking once it unmounts", () => {
+  it("useRemote + getLayout: no request follows the unmount", async () => {
+    const { client, urls } = liveApi(["w_stuck"]);
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(<LayoutUser client={client} />));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30)); // a few polls at 5 ms
+    });
+    expect(urls.length).toBeGreaterThan(1); // polling the stuck run's events
+    await act(async () => root.unmount());
+    const after = urls.length;
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 60)); // a dozen polls' worth
+    });
+    expect(urls).toHaveLength(after);
   });
 });
