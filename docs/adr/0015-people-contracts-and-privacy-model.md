@@ -53,8 +53,10 @@ left to the builders.
    refuses to share such a world; afterwards they carry `vis: []` where `district` is null.
 9. **Tilo writes only from sources the person owns.** Tilo adds a personal pin, work item or
    calendar proposal for person P only from P's own meeting, mail or request. What it derives from
-   another person's meeting reaches P only after that meeting's Owner has confirmed the minutes
-   (`meeting.minutes_confirmed_by`), as a work item or calendar proposal, never as a personal pin.
+   another person's meeting reaches P only as one action item the meeting's Owner released: a work
+   item the Owner confirmed on minutes the Owner confirmed (`meeting.minutes_confirmed_by`), and a
+   calendar proposal that cites that item (`mt_x#aiN`), never a bare transcript, a rejected item or
+   a personal pin. A Google sync writes only the connected person's own entries.
    Proposed items are read by no one but the Owner, in the minutes. A person cannot push an item
    onto another plate. (PE-03, PE-08)
 10. **Free/busy is for teammates.** Busy intervals of accepted entries, over at most 31 days, go
