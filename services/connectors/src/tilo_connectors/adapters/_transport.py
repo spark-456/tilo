@@ -11,6 +11,8 @@ from collections.abc import Mapping
 from typing import Any, Protocol
 
 from ..errors import AdapterError as AdapterError
+from ..errors import ProviderUnavailable as ProviderUnavailable
+from ..errors import RateLimited as RateLimited
 from ..errors import SideEffectRefused as SideEffectRefused
 
 MAX_ATTEMPTS = 3  # requests per HTTP call, the first one included
@@ -39,18 +41,6 @@ class Transport(Protocol):
         json: Any = None,
         content: bytes | None = None,
     ) -> ApiResponse: ...
-
-
-class RateLimited(AdapterError):
-    """429 still answered after the attempts, or a Retry-After over 60 s."""
-
-    def __init__(self, retry_after_s: int) -> None:
-        super().__init__(f"rate limited; retry after {retry_after_s} s")
-        self.retry_after_s = retry_after_s
-
-
-class ProviderUnavailable(AdapterError):
-    """5xx or a TransportError, still after the attempts."""
 
 
 class NotPicked(AdapterError):
