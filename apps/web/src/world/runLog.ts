@@ -32,6 +32,24 @@ function runFor(client: TiloClient, worldId: string): Run {
   return run;
 }
 
+/** Hands `onEvent` every event the run holds so far, at once and in seq order, then each new one
+ * as it arrives, once each in seq order (the stage draws the run the lenses and the HUD read,
+ * sharing the page's one subscription). Returns stop. */
+export function watchRun(
+  client: TiloClient,
+  worldId: string,
+  onEvent: (event: Event) => void,
+): () => void {
+  const run = runFor(client, worldId);
+  let delivered = 0;
+  const flush = () => {
+    for (; delivered < run.events.length; delivered++) onEvent(run.events[delivered] as Event);
+  };
+  run.listeners.add(flush);
+  flush();
+  return () => run.listeners.delete(flush);
+}
+
 /** Every event received so far for the world, in seq order. */
 export function useRunLog(client: TiloClient, worldId: string): readonly Event[] {
   return useSyncExternalStore(
@@ -42,27 +60,6 @@ export function useRunLog(client: TiloClient, worldId: string): readonly Event[]
     },
     () => runs.get(client)?.get(worldId)?.events ?? EMPTY,
   );
-}
-
-/** Hands `onEvent` every event of the world already received, then each one as it arrives, in seq
- * order, once each (the stage's live feed shares the page's one subscription). Returns a stop. */
-export function followRun(
-  client: TiloClient,
-  worldId: string,
-  onEvent: (event: Event) => void,
-): () => void {
-  const run = runFor(client, worldId);
-  let last = 0;
-  const flush = () => {
-    for (const event of run.events) {
-      if (event.seq <= last) continue;
-      last = event.seq;
-      onEvent(event);
-    }
-  };
-  run.listeners.add(flush);
-  flush();
-  return () => run.listeners.delete(flush);
 }
 
 /** The run's recorded status (FR-WLD-07: the stage veil follows it); "idle" with no world. Only

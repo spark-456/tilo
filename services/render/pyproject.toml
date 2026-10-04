@@ -7,8 +7,13 @@ dependencies = [
     "pydantic>=2.13.5",
     "python-pptx>=1.0.2",
     "pyyaml>=6.0.2",
-    "pypdf>=5.0.0",
     "reportlab>=4.2.5",
+]
+
+[dependency-groups]
+dev = [
+    "pypdf>=5.0.0",  # used only in tests to read back the generated PDF bytes
+    "pytest>=8.0.0",
 ]
 
 [build-system]

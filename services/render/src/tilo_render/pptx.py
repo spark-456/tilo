@@ -24,7 +24,7 @@ from tilo_render.spec import (
     Table,
     TableBlock,
 )
-from tilo_render.text import PROVENANCE_HEADING, provenance_lines, sanitize_text
+from tilo_render.text import PROVENANCE_HEADING, provenance_lines, sanitize_text, wrap_long_token
 from tilo_render.text import find_repo_root as _find_repo_root
 from tilo_render.text import lines as _lines
 
@@ -152,7 +152,7 @@ def _add_chart_slide(
     slide = _slide(prs, col["slide_background"], heading, col["slide_header"], typ["slide_title_size_pt"])
     cdata = CategoryChartData()
     cd = ChartData.from_spec(spec, chart_def.id)
-    cdata.categories = [sanitize_text(str(c)) for c in cd.categories]
+    cdata.categories = [wrap_long_token(sanitize_text(str(c))) for c in cd.categories]
     seen_names: set[str] = set()
     for s_name, s_vals in cd.series.items():
         name = sanitize_text(str(s_name))
@@ -177,12 +177,11 @@ def _add_chart_slide(
 
 def render_pptx(
     spec: DeliverableSpec,
-    manifest: Manifest | Path | str | None = None,
+    *,
+    manifest: Manifest | None = None,
     template_path: Path | str | None = None,
     tokens_path: Path | str | None = None,
 ) -> bytes:
-    if isinstance(manifest, Path | str):
-        template_path, manifest = manifest, None
     root = _find_repo_root()
     tmpl_p = Path(template_path) if template_path else root / "templates" / "deck" / "default.yaml"
     tok_p = Path(tokens_path) if tokens_path else root / "design" / "tokens.json"

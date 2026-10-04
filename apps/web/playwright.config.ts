@@ -45,14 +45,18 @@ export default defineConfig({
     {
       name: "chromium",
       testIgnore: [...TIMING_SPECS, CP2_SPECS],
+      // Runs the timing project after this one finishes, pass or fail. A `dependencies` link would
+      // skip the C8 freeze and perf specs whenever any chromium test failed.
+      teardown: "timing",
       use: BROWSER,
     },
     {
       // Frame-rate and frame-timing measurements run one at a time after everything else, so
-      // the parallel suite's own CPU load is not what they measure.
+      // the parallel suite's own CPU load is not what they measure. Chromium's `teardown` starts
+      // it, so `--project=timing` alone also works (CI can run it as its own step), and `--no-deps` runs
+      // just the filtered specs without it.
       name: "timing",
       testMatch: TIMING_SPECS,
-      dependencies: ["chromium"],
       workers: 1,
       use: BROWSER,
     },
