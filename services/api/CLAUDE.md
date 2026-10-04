@@ -6,7 +6,7 @@ service the web client and channels write through; the client reads live state f
 
 ## Commands
 - `uv sync --package tilo-api` — install; `uv run --package tilo-api pytest` — tests; `just check` — root gate
-- `just dev-api` — dev server on 127.0.0.1:8080 in dev mode (`python -m tilo_api`)
+- `just dev-api` — dev mode on 127.0.0.1:8080; `TILO_MODELS_FILE` defaults to `config/models.dev.yaml` (fake Director)
 
 ## Contracts
 - Reads/writes `packages/contracts-py` types; Firestore (worlds, events, cards, policies, grants); Cloud Tasks.
