@@ -110,8 +110,11 @@ generated briefs that need preloaded config must be expressible in this same sha
 - The FR-INT-11 builder validates each file against this schema, then applies SN-01 and SN-03 to
   SN-08. The builder also ships `config/scenarios/SC-01.yaml`, which `just contracts-check` then
   validates.
-- The generality harness (issue #272, GEN-06 rule 4) can check scenario files against this
-  schema, and a bank case that needs preloaded config writes a file of this shape.
+- The generality harness (issue #272, GEN-06 rule 4) should check scenario files against this
+  schema, or at least take its allowed keys from the schema's `properties`. On
+  `feat/GEN-bank`, `SCENARIO_KEYS` is `{skills, connectors, autonomy, seed, theme}`, which would
+  refuse `id`, `title` and `seed_data`, so it has to follow the contract. A bank case that needs
+  preloaded config writes a file of this shape.
 - A `grant_budget` entry has `limits.credits: null`, so the engine gates it (BQ-100). A scenario
   cannot pre-approve top-ups. Allowing it would add `credits` to the entry, an additive change.
 - `theme` is a slug only until `config/themes/` exists (FR-WLD-15, Could). A theme check then
