@@ -3,6 +3,7 @@ import { Application, Container, Graphics } from "pixi.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import tokens from "../design/tokens";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { agentNames, rankName } from "../world/runSummary";
 import { useSelection } from "../world/selection";
 import * as cam from "./camera";
 
@@ -66,14 +67,19 @@ export function Stage({
   const [, , toggle] = useSelection(worldId ?? "");
   const outlineItems = useMemo(() => {
     if (!layout) return [];
+    const names = agentNames(layout);
     const items: { id: string; name: string }[] = [];
-    for (const a of layout.semantic.agents) items.push({ id: a.id, name: a.id });
+    for (const a of layout.semantic.agents) {
+      items.push({ id: a.id, name: names.get(a.id) ?? a.id });
+    }
     for (const l of layout.semantic.levels) {
       for (const d of l.districts) {
         for (const b of d.buildings) items.push({ id: b.id, name: b.name });
       }
     }
-    for (const g of layout.semantic.gates) items.push({ id: g.id, name: g.id });
+    for (const g of layout.semantic.gates) {
+      items.push({ id: g.id, name: `Gate ${g.id} (${rankName(g.guards)})` });
+    }
     return items;
   }, [layout]);
 

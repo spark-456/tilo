@@ -12,6 +12,7 @@ import {
   RUN_STATUS_LABEL,
   agentNames,
   budgetCap,
+  rankName,
   worldStatus,
 } from "../world/runSummary";
 import { useSelection } from "../world/selection";
@@ -136,6 +137,24 @@ export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: 
                 </ul>
               </section>
             ))}
+            {layout.semantic.gates.length > 0 && (
+              <section>
+                <h2>Gates</h2>
+                <ul className="rows">
+                  {layout.semantic.gates.map((g) => (
+                    <li key={g.id}>
+                      <Pick id={g.id} selected={selected} toggle={toggle}>
+                        <span className="row-name">
+                          Gate {g.id}
+                          <small>{rankName(g.guards)}</small>
+                        </span>
+                        <span className="row-state">Approval gate</span>
+                      </Pick>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </>
         )}
       </div>

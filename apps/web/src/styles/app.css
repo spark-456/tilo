@@ -1444,6 +1444,9 @@ button.row {
 }
 .stage-outline {
   position: absolute;
+  inset: auto;
+  top: 12px;
+  left: 12px;
   width: 1px;
   height: 1px;
   padding: 0;
@@ -1452,15 +1455,25 @@ button.row {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+  list-style: none;
 }
 .stage-outline:focus-within {
-  position: static;
+  z-index: 10;
   width: auto;
   height: auto;
+  margin: 0;
+  padding: 8px;
   clip: auto;
   white-space: normal;
   overflow: visible;
+  background: var(--color-surface-1);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
 }
-.outline-item:focus {
-  outline: 2px solid var(--color-accent-primary);
+.row:focus,
+.row:focus-visible,
+.outline-item:focus,
+.outline-item:focus-visible {
+  outline: 2px solid var(--color-accent-primary, var(--color-brand-primary));
+  outline-offset: 2px;
 }
