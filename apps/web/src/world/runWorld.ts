@@ -18,6 +18,7 @@ const LEAD_IN_MS = 1000; // hold at seq 0 after load before the first event (see
 export interface RunWorldOptions {
   readonly world: Container;
   readonly requestRender: () => void;
+  readonly size: () => { width: number; height: number };
   readonly layout: Layout;
   readonly events: readonly Event[];
   readonly seqParam: number | null;
@@ -33,7 +34,7 @@ type Vec = { x: number; y: number };
 export function runWorld(opts: RunWorldOptions): () => void {
   const { world, requestRender, layout, events, seqParam, speed, reducedMotion, onSeq, onTrace } =
     opts;
-  const layer = createLayer(world);
+  const layer = createLayer(world, opts.size);
   // FR-WLD-06: the ring follows the run's one selection; choosing redraws one frame, nothing more.
   const selected = () => getSelection(layout.world_id);
   const agentIds = layout.semantic.agents.map((a) => a.id);
