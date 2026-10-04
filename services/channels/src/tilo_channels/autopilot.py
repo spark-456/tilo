@@ -3,7 +3,8 @@
 
 The tier is deterministic: `send_email` is T2 unless a modifier applies (`money_or_legal` from `t3_content_signal` on
 the raw body, which it cleans itself; `safety_flag`; `new_recipients` for an address that is neither a contact nor
-known from the thread, BQ-154), and any modifier makes it T3. Only a ready T2 draft of the person's own
+known from the thread, BQ-154, or any forward, new email, format mismatch or Bcc, FR-CHN-12; `attachments`), and
+any modifier makes it T3. Only a ready T2 draft of the person's own
 instruction, under an L2 answer from the injected policy port, is scheduled at once with the undo window; everything
 else waits for its owner's Send. A redraft after Edit is a new proposal and always waits for a person. Side effects
 go only through the injected outbox port, keyed so a replay never adds an entry. Cards hold mail text; no event, log
@@ -23,6 +24,7 @@ from tilo_channels.autopilot_t3 import clean_text, t3_content_signal
 from tilo_channels.drafting import (
     MAX_INSTRUCTION,
     MAX_MESSAGES,
+    Draft,
     Drafter,
     DraftResult,
     ThreadReader,
@@ -35,6 +37,8 @@ __all__ = ["ACTION_TYPE", "Autopilot", "CancelPending", "DraftContext", "Outbox"
 __all__ += ["CardStore", "t3_content_signal"]
 
 OPTIONS = ("send", "edit", "cancel")
+REPLY_FORMATS = ("reply", "reply_all")  # stay in the thread; everything else adds a recipient (BQ-145, BQ-171)
+FORMATS = REPLY_FORMATS + ("forward", "new")
 UNDO_WINDOW_S = 60  # PRD 10.4 L2 default
 PREVIEW_CHARS = 600  # PRD 11.4 Preview
 FINDING_CAP = 300  # characters of one finding's text shown on a card (issue #243)
@@ -207,7 +211,11 @@ class Autopilot:
         self, user_id: str, card_id: str, context: DraftContext, result: DraftResult, instructed: bool
     ) -> dict[str, Any]:
         draft = result.draft
-        sendable = result.status == "ready" and draft is not None and not draft.bcc and not draft.attachments
+        ready = result.status == "ready" and draft is not None
+        # BQ-171 to BQ-173: an unknown format, a format mismatch, a Bcc or an attachment is never sent from this card
+        # (the preview shows no format, Bcc or attachment), but it is still tiered so the card says why it waits
+        sendable = ready and draft is not None and draft.mode == context.mode and draft.mode in FORMATS
+        sendable = sendable and draft is not None and not draft.bcc and not draft.attachments
         body = clean_text(draft.body) if draft is not None else ""
         doc: dict[str, Any] = {
             "card_id": card_id,
@@ -235,19 +243,27 @@ class Autopilot:
             "instruction": context.instruction,
             "item": {"artifact_id": draft.artifact_id, "version": draft.version} if draft else None,
         }
-        if sendable and draft is not None:
+        if ready and draft is not None:
             modifiers = ["money_or_legal"] if t3_content_signal(draft.body) else []  # hidden characters too
             modifiers += ["safety_flag"] if draft.safety_flag or result.flagged else []
-            known = self._known(user_id, context)
-            modifiers += ["new_recipients"] if any(a.lower() not in known for a in draft.to + draft.cc) else []
+            modifiers += ["new_recipients"] if self._adds_recipient(user_id, context, draft) else []
+            modifiers += ["attachments"] if draft.attachments else []
             doc |= {"tier": "T3" if modifiers else "T2", "modifiers": modifiers}
-            if instructed and not modifiers:
+            if instructed and sendable and not modifiers:
                 level, policy_id = self._policy.level(user_id, ACTION_TYPE)
                 if level == "L2" and policy_id:  # only L2 rides the undo window; anything else waits (fail closed)
                     ms = round(self._clock() * 1000)
                     doc |= {"level": "L2", "undo_window_s": UNDO_WINDOW_S, "policy_id": policy_id}
                     doc |= {"outbox_id": ulid(ms), "scheduled_at": timestamp(ms + UNDO_WINDOW_S * 1000)}
         return doc
+
+    def _adds_recipient(self, user_id: str, context: DraftContext, draft: Draft) -> bool:
+        """FR-CHN-12: a forward, a new email, an unknown or mismatched format and any Bcc always add a recipient
+        (BQ-171, BQ-173); otherwise any To / Cc address not known after lower-casing alone (BQ-174)."""
+        if draft.mode != context.mode or draft.mode not in REPLY_FORMATS or draft.bcc:
+            return True
+        known = self._known(user_id, context)
+        return any(a.lower() not in known for a in draft.to + draft.cc)
 
     def _known(self, user_id: str, context: DraftContext) -> set[str]:
         """BQ-154: contacts, every From in the thread, and To / Cc of the user's own messages: From the mailbox and
