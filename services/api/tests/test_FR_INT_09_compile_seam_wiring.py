@@ -27,6 +27,9 @@ class PlanProvider:
         self.replies = [json.dumps({"units": units}) for units in replies]
         self.calls: list[Any] = []
 
+    def count_tokens(self, text: str) -> int:  # the `director` role has max_input_tokens (EFF-03, #206)
+        return len(text.split())
+
     def generate(self, request: Any) -> Any:
         from tilo_providers.interfaces import GenerateResponse  # noqa: PLC0415
 
