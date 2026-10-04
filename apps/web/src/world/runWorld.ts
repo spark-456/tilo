@@ -4,8 +4,11 @@
 // divided by `speed`; `runClientWorld` draws what a TiloClient delivers, as it arrives. Either way
 // an `agent.moved` on an actor already on screen is a walk the choreographer times (HR-3) and this
 // module lerps every frame; other location changes queue behind it and snap when their turn comes.
+// The display density (FR-WLD-14) is read at draw time: a switch redraws the frame in place, replays
+// and emits nothing, and Professional draws no walks (the same jump a reduced-motion setting gives).
 import type { Event, Layout } from "@tilo/contracts";
 import type { Container } from "pixi.js";
+import { subscribeDensity } from "../display/density";
 import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
 import { type Frame, frameOf } from "./frame";
 import { type WorldState, applyEvent, createInitialState } from "./reducer";
@@ -65,7 +68,14 @@ function staticView(layer: WorldLayer, o: WorldOptions, events: readonly Event[]
     renderSelection(layer, frame, places, getSelection(o.layout.world_id));
     o.requestRender();
   };
-  const off = subscribeSelection(ring);
+  const offSelection = subscribeSelection(ring);
+  // A density switch redraws what is shown, in place: no callback, no event, no replay.
+  const offDensity = subscribeDensity(() => {
+    if (!frame) return;
+    renderStatic(layer, frame);
+    renderAgents(layer, frame, places);
+    ring();
+  });
   return {
     show(seq: number) {
       const state = store.stateAt(seq);
@@ -79,7 +89,10 @@ function staticView(layer: WorldLayer, o: WorldOptions, events: readonly Event[]
       o.onStatus?.(state.status); // FR-WLD-07: the veil follows the recorded status at this point
       return state.seq;
     },
-    off,
+    off() {
+      offSelection();
+      offDensity();
+    },
   };
 }
 
@@ -102,7 +115,9 @@ function createLive(
   const selected = () => getSelection(layout.world_id);
   const agentIds = layout.semantic.agents.map((a) => a.id);
   let state = createInitialState(layout); // live playback folds events in one at a time
-  const choreo = createChoreographer({ reducedMotion });
+  // Professional density has no decorative motion: a walk is drawn as a jump, as under reduced motion.
+  const calm = () => reducedMotion() || layer.density() === "professional";
+  const choreo = createChoreographer({ reducedMotion: calm });
   const agentPos = new Map<string, Vec>(); // settled: where each actor's last completed move left it
   const pendingTo = new Map<number, Vec>(); // by seq: where a queued move lands once it finishes
   const queued = new Map<string, number>(); // moves enqueued per actor
@@ -145,8 +160,7 @@ function createLive(
         walkFrom.set(id, walk);
       }
       const span = act.finish - act.start;
-      const t =
-        span > 0 && !reducedMotion() ? Math.min(1, Math.max(0, (now - act.start) / span)) : 1;
+      const t = span > 0 && !calm() ? Math.min(1, Math.max(0, (now - act.start) / span)) : 1;
       display.set(id, {
         x: walk.from.x + (to.x - walk.from.x) * t,
         y: walk.from.y + (to.y - walk.from.y) * t,
@@ -169,6 +183,16 @@ function createLive(
     if (stopped || scrubbed) return; // a scrubbed run draws through its own static view
     // A ring redraw is a frame, not an animation; paused, the agents stay where they were drawn.
     if (paused) {
+      renderSelection(layer, lastFrame, lastDisplay, selected());
+      requestRender();
+    } else drawAgents(performance.now());
+  });
+  // FR-WLD-14: a density switch redraws the frame in place (a scrubbed run through its own view).
+  const undensity = subscribeDensity(() => {
+    if (stopped || scrubbed) return;
+    renderStatic(layer, lastFrame);
+    if (paused) {
+      renderAgents(layer, lastFrame, lastDisplay);
       renderSelection(layer, lastFrame, lastDisplay, selected());
       requestRender();
     } else drawAgents(performance.now());
@@ -235,6 +259,7 @@ function createLive(
     stop() {
       stopped = true;
       unselect();
+      undensity();
       unreplay();
       scrubbed?.off();
       if (raf) cancelAnimationFrame(raf);

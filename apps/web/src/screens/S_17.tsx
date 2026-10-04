@@ -97,7 +97,10 @@ export function S_17() {
           {done && saved.status === "ready" && saved.value.time_saved ? (
             <>
               About {saved.value.time_saved.low_min} to {saved.value.time_saved.high_min} min saved
-              (estimate) · <AppLink to="/estimate">How we estimate</AppLink>
+              (estimate) ·{" "}
+              <AppLink to="/estimate" className="tile-link">
+                How we estimate
+              </AppLink>
             </>
           ) : done && saved.status === "error" ? (
             saved.message
