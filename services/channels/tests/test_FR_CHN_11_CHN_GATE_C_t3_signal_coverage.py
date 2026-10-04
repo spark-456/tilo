@@ -2,7 +2,7 @@
 the deterministic money / legal / commitment signal must not let plain-ASCII commitments ride the L2 undo window.
 The policy port here always answers L2, so only the autopilot's own tiering can stop an auto-send.
 
-Defaults applied (BQ-186, the user delegated the decision):
+Defaults applied (BQ-224, the user delegated the decision):
  (a) L2 auto-send is an ALLOWLIST: a short body made only of ordinary scheduling talk (greeting, a sign-off, names,
      weekdays, thanks, "works for us", "see you then"), no digits other than a time of day (2pm, 3:30pm, 10am: the
      existing FR-CHN-11 benign bodies carry "2pm"), no commitment / money / legal word, no link. Anything else that
@@ -26,7 +26,7 @@ from _chn11_lib import USER, autopilot_module, make_bench, pair, scripted_thread
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-SHORT_BODY_MAX = 2_000  # BQ-186: the longest body that may ride L2; the existing test pins 1,560 characters at T2
+SHORT_BODY_MAX = 2_000  # BQ-224: the longest body that may ride L2; the existing test pins 1,560 characters at T2
 
 
 def wrap(line: str) -> str:
@@ -119,7 +119,7 @@ def test_CHN_GATE_C_FR_CHN_11_a_body_over_the_short_limit_never_rides_l2() -> No
 
 
 def test_CHN_GATE_C_FR_CHN_11_the_existing_1600_character_benign_preview_keeps_tier_t2() -> None:
-    # The existing preview test pins this at L1 / T2; the allowlist limit must sit above it (BQ-186).
+    # The existing preview test pins this at L1 / T2; the allowlist limit must sit above it (BQ-224).
     body = "Hi David,\n\n" + "Friday 2pm works for us. See you then. " * 40 + "\n\nBest,\nSarah"
     assert len(body) <= SHORT_BODY_MAX
     assert autopilot_module().t3_content_signal(body) == frozenset()

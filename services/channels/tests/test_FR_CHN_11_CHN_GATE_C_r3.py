@@ -1,4 +1,4 @@
-"""CHN-GATE-C round 3 (issue #256, FR-CHN-11, BQ-186): security-review finding. A name run is at most two words, starts
+"""CHN-GATE-C round 3 (issue #256, FR-CHN-11, BQ-224): security-review finding. A name run is at most two words, starts
 right after a greeting word or opens the signature line, and is followed by punctuation or the line end, never a word,
 so a run can only be a vocative or a signature and never the subject of a sentence made of listed words. The pinned
 tests and the round 1 and 2 files stay as they are; this file only adds."""
