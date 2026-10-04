@@ -10,7 +10,8 @@ draft T3: a safe false positive. Callers pass the raw body, so a hidden characte
 
 BQ-186 (issue #256): the families also run on a squeezed copy (separators `- . _ *` and line breaks between letters or
 digits dropped, 0 o, 1 i, 3 e, 4 a, 5 s, 7 t, @ a), and L2 is an allowlist: a body over SHORT_BODY_MAX, a link, a digit
-that is not a time of day, or a word off the scheduling list gives "unlisted". Every step is linear, no model.
+that is not a time of day, or a word off the scheduling list gives "unlisted". Names are allowed only as the greeting's
+and the signature's run (two words each) and as repeats of those words. Every step is linear, no model.
 """
 
 from __future__ import annotations
@@ -33,11 +34,11 @@ _LEGAL = re.compile(
     r"|agree\w*|accept\w*|authori[sz]\w*|sign|signs|signed|signing|signature\w*|solicitors?|gdpr)\b"
 )
 _COMMITMENT = re.compile(
-    r"\b(?:we|i)\s+(?:will|shall)\b|\b(?:we|i)['’]ll\b"
+    r"\b(?:we|i)\s+(?:will|shall)\b|\b(?:we|i)['\u2019]ll\b"
     r"|\b(?:guarant\w*|promis\w*|commit\w*|deadlines?|assur\w*|pledg\w*|hereby|deals?)\b"
-    r"|\b(?:yours|will\s+do|for\s+free|on\s+(?:us|me))\b"
+    r"|\b(?:yours|will\s+do|for\s+free|on\s+(?:us|me|it))\b"
     r"|\b(?:consider\s+it\s+(?:done|settled|sorted)|my\s+word|count\s+on\s+(?:me|us)|rest\s+assured"
-    r"|leave\s+it\s+(?:with|to)\s+(?:me|us)|you\s+can\s+rely|(?:we|i)\s+(?:am|are|['’]m|['’]re)\s+going\s+to)\b"
+    r"|leave\s+it\s+(?:with|to)\s+(?:me|us)|you\s+can\s+rely|(?:we|i)\s+(?:am|are|['\u2019]m|['\u2019]re)\s+going\s+to)\b"
 )
 _FAMILIES = (("money", _MONEY), ("legal", _LEGAL), ("commitment", _COMMITMENT))
 # BQ-186 (c): a separator or line break between two letters or digits is dropped, then digit look-alikes mapped back.
@@ -47,9 +48,13 @@ _LEET = str.maketrans("013457@", "oieasta")
 # or any word off the list is the signal "unlisted".
 SHORT_BODY_MAX = 2_000
 _TIME = re.compile(r"\b(?:(?:1[0-2]|0?[1-9])(?::[0-5][0-9])?\s?(?:am|pm)|(?:[01]?[0-9]|2[0-3]):[0-5][0-9])\b", re.I)
-_LINK = re.compile(r"://|[/@\\]|[a-z0-9][.。｡][a-z]")
+_LINK = re.compile(r"://|[/@\\]|[a-z0-9][.\u3002\uff61][a-z]")
 _ITEM = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?|[^\sA-Za-z]")
-_NAME_LEADS = frozenset("hi hello hey dear thanks thank best regards cheers sincerely".split())
+_STOP = "\0"  # stands in for a time of day: not a letter or a digit, so it ends a name run
+# Words that may come before the greeting's name run ("Hi", "Good morning", "Thank you"), and the only words a
+# sign-off line ("Best,", "Kind regards,", "Many thanks!") may hold.
+_GREETING = frozenset("hi hello hey dear good morning afternoon evening thanks thank you".split())
+_SIGN_OFF = frozenset("best regards kind warm wishes cheers thanks thank you many sincerely all the".split())
 _WORDS = frozenset(
     (
         "hi hello hey dear good morning afternoon evening night thanks thank you your very much so again for "
@@ -59,13 +64,13 @@ _WORDS = frozenset(
         "saturday sunday jan feb mar apr may jun jul aug sep oct nov dec january february march april june july "
         "august september october november december works work fine great sounds sound happy glad meet meeting call "
         "chat catch up time day date confirmed confirm let know looks look forward best regards cheers kind sincerely "
-        "warm wishes ok okay yes sure please can could would does do not no all also too just well back "
-        "out have has had are was were am what when where who how if any some more both available around about "
+        "warm wishes ok okay yes sure please can could would not no all also too just well "
+        "out are was were am what when where who how if any some more both available around about "
         "after before late early noon lunch coffee hope perfect lovely nice enjoy safe travels office room slot "
         "same sorry i'm it's that's don't doesn't can't let's you're we're we've i've you've isn't"
     ).split()
 )
-_BREAKS = re.compile("\r\n|[\r\x0b\x0c\x1c\x1d\x1e\x85  ]")
+_BREAKS = re.compile("\r\n|[\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029]")
 
 
 def clean_text(text: str) -> str:
@@ -86,40 +91,62 @@ def _suspicious(c: str) -> bool:
     return not c.isascii() and kind[0] not in "PZ" and kind != "Sc"
 
 
+def _sign_off(items: list[str]) -> bool:
+    words = [i.lower() for i in items if i[0].isalpha()]
+    return bool(words) and all(w in _SIGN_OFF for w in words) and all(i[0].isalpha() or i in ",.!" for i in items)
+
+
+def _names(lines: list[list[str]]) -> set[str]:
+    """The words of the body's two name runs: the greeting's, right after the greeting words that open the first line
+    ("Hi David,"), and the signature's, opening the last line when the non-empty line before it is the last sign-off
+    line ("Best," then "Sarah"). A run is at most two Title-case words of two letters or more; anything else ends it, a
+    time of day included."""
+    filled = [i for i, items in enumerate(lines) if items]
+    starts: dict[int, int] = {}
+    if filled:
+        first = lines[filled[0]]
+        lead = next((n for n in range(2) if n >= len(first) or first[n].lower() not in _GREETING), 2)
+        if lead:
+            starts[filled[0]] = lead
+        signs = [i for i in filled if _sign_off(lines[i])]
+        if signs and filled[-2:-1] == signs[-1:]:  # one line follows the last sign-off line, and it ends the body
+            starts[filled[-1]] = 0
+    names: set[str] = set()
+    for index, start in starts.items():
+        for item in lines[index][start : start + 2]:
+            if not (len(item) > 1 and item.istitle() and item.lower() not in _WORDS):
+                break
+            names.add(item.lower())
+    return names
+
+
 def _unlisted(cleaned: str) -> bool:
     """True when the body is not plain scheduling talk: too long, a link, a digit that is not a time of day, or a word
-    that is neither on the list nor part of a name. A name is at most two Title-case words (two letters or more) right
-    after a greeting or sign-off word that starts a clause, or alone on a line within two lines of a line holding only
-    sign-off words; the run ends at the first punctuation, line break or listed word. One pass, no backtracking."""
+    that is neither on the list nor a word of the greeting's or the signature's name run (`_names`). A name elsewhere
+    ("Thanks David") must repeat one of those words. Name words in a row that join into a family word ("Re Fund") are
+    flagged. Linear, no backtracking."""
     if len(cleaned) > SHORT_BODY_MAX:
         return True
     if _LINK.search(cleaned.lower()):  # before times are removed: "5pm.me" is a link
         return True
-    cleaned = _TIME.sub(" ", cleaned).replace("’", "'")
+    cleaned = _TIME.sub(f" {_STOP} ", cleaned).replace("\u2019", "'")
     if any(c.isdigit() for c in cleaned):
         return True
-    sign = 0  # lines left in which a name-only line may follow a line of sign-off words
-    for line in cleaned.split("\n"):
-        items = _ITEM.findall(line)
-        words = [i.lower() for i in items if i[0].isalpha()]
-        run: list[str] = []
-        solo, slots, start = sign > 0, 2 if sign > 0 else 0, True
-        if solo and len(words) > 2:
-            return True
+    lines = [_ITEM.findall(line) for line in cleaned.split("\n")]
+    names = _names(lines)
+    for items in lines:
+        run: list[str] = []  # the last four name words in a row: every join of two to four of them is checked
         for item in items:
             word = item.lower()
-            if not item[0].isalpha():
-                slots, run, start = 0, [], item in ".!?"
-            elif word in _WORDS:
-                slots, run, start = (2 if start and word in _NAME_LEADS else 0), [], False
-            elif slots > 0 and len(item) > 1 and item.istitle():
-                run.append(word)
-                slots, start = slots - 1, False
-                if len(run) > 1 and any(p.search("".join(run)) for _, p in _FAMILIES):  # "Re Fund"
+            if word in names:
+                run = [*run[-3:], word]
+                joins = ("".join(run[-n:]) for n in range(2, len(run) + 1))
+                if any(p.search(j) for j in joins for _, p in _FAMILIES):
                     return True
-            else:
+            elif item[0].isalpha() and word not in _WORDS:
                 return True
-        sign = 2 if words and all(w in _NAME_LEADS for w in words) else max(sign - 1, 0)
+            else:
+                run = []
     return False
 
 

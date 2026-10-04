@@ -39,8 +39,8 @@ NAME_RUNS = [
     "Hi David,\n\nThanks Prepayment Nonrefundable Upfront.\n\nBest,\nSarah",
     "Hi David,\n\nFifty Thousand works for us.\n\nBest,\nSarah",
     "Hi David,\n\nThanks R,E,F,U,N,D\n\nBest,\nSarah",
-    "Hi David,\n\nThanks R·E·F·U·N·D\n\nBest,\nSarah",
-    "Hi David,\n\nThanks Re–Fund\n\nBest,\nSarah",
+    "Hi David,\n\nThanks R\u00b7E\u00b7F\u00b7U\u00b7N\u00b7D\n\nBest,\nSarah",
+    "Hi David,\n\nThanks Re\u2013Fund\n\nBest,\nSarah",
     "Hi David,\n\nThanks Re Fund\n\nBest,\nSarah",
     "Hi David,\n\nThanks Re Fund. See you then.\n\nBest,\nSarah",
 ]
@@ -57,8 +57,8 @@ HIDDEN_LINKS = [
     "See you at 5pm.me",
     "See you at meet.10am.us",
     "Thanks David.10am.to",
-    "See you at example。com",
-    "See you at example｡com",
+    "See you at example\u3002com",
+    "See you at example\uff61com",
 ]
 
 
@@ -96,5 +96,5 @@ def test_CHN_GATE_C_R1_FR_CHN_11_names_after_greetings_and_sign_offs_still_ride_
 
 def test_CHN_GATE_C_R1_FR_CHN_11_a_huge_nfkc_expansion_is_cut_short() -> None:
     start = time.perf_counter()
-    assert "obfuscated" in signal("ﷺ" * 19_999)
+    assert "obfuscated" in signal("\ufdfa" * 19_999)
     assert time.perf_counter() - start < 2.0
