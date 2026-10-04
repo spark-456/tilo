@@ -9,16 +9,19 @@ import { useFlowRoute } from "../router";
 import { StartScreen } from "./flow/StartScreen";
 import "./flow/flow.css";
 import { type Action, type Remote, useAction, useRemote } from "./remote";
+import { Understanding } from "./s02/Understanding";
 
 const enc = encodeURIComponent;
 
-function Notice({ message, onRetry }: { message: string; onRetry: () => void }) {
+function Notice({ message, onRetry }: { message: string; onRetry?: (() => void) | undefined }) {
   return (
     <div className="flow-notice" role="alert">
       <p>{message}</p>
-      <button type="button" className="secondary" onClick={onRetry}>
-        Try again
-      </button>
+      {onRetry && (
+        <button type="button" className="secondary" onClick={onRetry}>
+          Try again
+        </button>
+      )}
     </div>
   );
 }
@@ -35,12 +38,16 @@ export function Loaded<T>({
   remote,
   retry,
   isEmpty,
+  empty,
   children,
 }: {
   what: string;
   remote: Remote<T>;
-  retry: () => void;
+  /** Omit it when a retry cannot change the outcome (the data is already in memory). */
+  retry?: (() => void) | undefined;
   isEmpty: (value: T) => boolean;
+  /** Replaces the generic empty notice, for an empty state that has its own next step. */
+  empty?: ReactNode;
   children: (value: T) => ReactNode;
 }) {
   let body: ReactNode;
@@ -49,7 +56,13 @@ export function Loaded<T>({
   } else if (remote.status === "error") {
     body = <Notice message={remote.message} onRetry={retry} />;
   } else if (isEmpty(remote.value)) {
-    body = <Notice message={`Nothing came back for ${what}. You can try again.`} onRetry={retry} />;
+    body = empty ? (
+      <div className="flow-notice" role="alert">
+        {empty}
+      </div>
+    ) : (
+      <Notice message={`Nothing came back for ${what}. You can try again.`} onRetry={retry} />
+    );
   } else {
     body = children(remote.value);
   }
@@ -75,15 +88,6 @@ export function Primary({
       </button>
     </>
   );
-}
-
-function Understanding({ taskId }: { taskId: string }) {
-  const client = useClient();
-  const action = useAction("confirm the brief", async () => {
-    await client.answerQuestions(taskId, [], {});
-    return `/task/${enc(taskId)}/approaches`;
-  });
-  return <Primary label="Confirm understanding" action={action} />;
 }
 
 /** The recommended approach and its cap (its upper credit estimate), from getApproaches. */
@@ -158,12 +162,7 @@ export function FlowShell() {
       case "Start":
         return <StartScreen />;
       case "Understanding":
-        return (
-          <>
-            <Summary>Review the extracted brief and clarifying questions.</Summary>
-            <Understanding taskId={route.taskId} />
-          </>
-        );
+        return <Understanding taskId={route.taskId} />;
       case "Approaches":
         return <Approaches taskId={route.taskId} />;
       case "World":

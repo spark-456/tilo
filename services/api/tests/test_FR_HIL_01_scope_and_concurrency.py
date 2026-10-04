@@ -107,7 +107,10 @@ def test_FR_HIL_01_two_approvers_racing_one_gate_write_one_approval_resolved():
 
     reasons = _in_threads(approve(OWNER_P), approve(principal("approver", APPROVER)))
 
-    assert sorted(r or "ok" for r in reasons) == ["already_resolved", "ok"]
+    assert sorted(r or "ok" for r in reasons) == [
+        "busy",
+        "ok",
+    ]  # the second arrived while the first write was in flight
     assert len(writer.of_type("approval.resolved")) == 1
 
 

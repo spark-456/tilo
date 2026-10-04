@@ -27,7 +27,8 @@ export const cardFor = (
   cards: readonly Card[],
   cardId: string | null,
   runId: string,
-): Card | null => cards.find((c) => c.id === cardId && c.run_id === runId) ?? null;
+): Card | null =>
+  runId ? (cards.find((c) => c.id === cardId && c.run_id === runId) ?? null) : null;
 
 /** Items still waiting after `events`, oldest first. `cards` are the client's. A gate a decision or
  * a policy closed is gone, and so is a question its answer closed. */

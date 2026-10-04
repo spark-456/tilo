@@ -123,6 +123,26 @@ describe("PRD-18.3 AGW-05 S-06 a question waits from question.routed until quest
   });
 });
 
+describe("CL-INT-3 HR-1: a run id is never invented, so the queue never mixes runs", () => {
+  const SECOND_CARD = "01JB5VQ0000000000000009004";
+  it("keeps two runs that reuse a gate id apart, and one run's answer closes only its own gate", () => {
+    const a = requested(1, GATE_REPLY.id, "G1", RUN_A);
+    const b = requested(2, SECOND_CARD, "G1", RUN_B);
+    expect(deriveQueue([a, b]).map((i) => [i.runId, i.cardId])).toEqual([
+      [RUN_A, GATE_REPLY.id],
+      [RUN_B, SECOND_CARD],
+    ]);
+    const closedA = deriveQueue([a, b, resolved(3, "hold", GATE_REPLY.id, "G1", RUN_A)]);
+    expect(closedA.map((i) => i.runId)).toEqual([RUN_B]);
+  });
+  it("never joins a card to an event that has no run id", () => {
+    for (const run_id of ["", undefined]) {
+      const bare = { ...requested(1), run_id } as unknown as Event;
+      expect(deriveQueue([bare], [{ ...GATE_REPLY, run_id: run_id as never }])).toEqual([]);
+    }
+  });
+});
+
 describe("PRD-18.3 AGW-05 S-06 only a card of this run is joined to an item", () => {
   it("joins the card with the same id and run id", () => {
     expect(deriveQueue([requested(1)], [GATE_REPLY])[0]?.card).toBe(GATE_REPLY);
