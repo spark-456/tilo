@@ -652,8 +652,23 @@ button.row {
   margin: var(--space-8) 0;
 }
 .inspect-facts {
+  /* The block holds its height once: one line per row plus three spare lines for whichever value
+     wraps, so a value that grows or shrinks as events arrive moves nothing (CLS). `--rows` is the
+     number of facts. */
+  --line: calc(1.5 * var(--text-14));
+  --row: calc(var(--space-16) + 4px + var(--line));
   display: grid;
+  align-content: start;
   gap: var(--space-8);
+  box-sizing: border-box;
+  min-height: calc(
+    var(--rows, 1) *
+    var(--row) +
+    (var(--rows, 1) - 1) *
+    var(--space-8) +
+    3 *
+    var(--line)
+  );
   max-width: 720px;
   margin: var(--space-12) 0 var(--space-16);
 }
@@ -662,7 +677,6 @@ button.row {
   flex-wrap: wrap;
   align-content: flex-start;
   box-sizing: border-box;
-  min-height: calc(var(--space-16) + 4px + 3 * 1.5 * var(--text-14)); /* three lines: a value that grows or shrinks moves nothing */
   gap: var(--space-4) var(--space-16);
   padding: var(--space-8) var(--space-12);
   border: 2px solid var(--color-surface-2);

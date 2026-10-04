@@ -68,3 +68,12 @@ test("UX-1 G2a sections follow their importance: S-17 Drafts before Triage, S-16
   const channels = await order("/channels");
   expect(channels.indexOf("Recent channel messages")).toBeLessThan(channels.indexOf("Email"));
 });
+
+test("UX-1 S-17 the How we estimate link is a 44 px target on a phone", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(MOBILE);
+  await page.goto("/mail?speed=100");
+  const link = page.getByRole("link", { name: "How we estimate" });
+  await expect(link).toBeVisible({ timeout: 20_000 });
+  expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+});

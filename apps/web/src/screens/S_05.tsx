@@ -2,7 +2,7 @@
 // or artifact), what it is, where it sits, its state and every recorded event that names it. State
 // comes from the reducer over the recorded events, never from a guess (HR-1, HR-5). Layout after
 // the Inspect panel in design/source "Tilo World Player.dc.html".
-import { useEffect } from "react";
+import { type CSSProperties, useEffect } from "react";
 import { useClient } from "../api/ClientProvider";
 import { reduce } from "../world/reducer";
 import { useReplayedLog } from "../world/replay";
@@ -60,7 +60,11 @@ export function S_05({ params }: ScreenProps) {
                 <b>State:</b> <Chip tone={stateTone(state)}>{state}</Chip>
               </p>
               {facts.length > 0 && (
-                <dl className="inspect-facts" data-testid="inspect-facts">
+                <dl
+                  className="inspect-facts"
+                  data-testid="inspect-facts"
+                  style={{ "--rows": facts.length } as CSSProperties}
+                >
                   {facts.map(([label, value]) => (
                     <div key={label}>
                       <dt>{label}</dt>
