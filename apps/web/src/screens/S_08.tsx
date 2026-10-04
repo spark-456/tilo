@@ -70,7 +70,10 @@ export function S_08() {
           </div>
           <div>
             <dt>How to disconnect</dt>
-            <dd>You can disconnect at any time from the Connections page, or revoke access from the provider's security settings.</dd>
+            <dd>
+              You can disconnect at any time from the Connections page, or revoke access from the
+              provider's security settings.
+            </dd>
           </div>
         </div>
         <div className="need-bar">
@@ -97,7 +100,9 @@ export function S_08() {
           <div className="need-status" aria-live="polite">
             {answer.pending && <span>Waiting for confirmation…</span>}
             {answer.unconfirmed && (
-              <span>No confirmation has been recorded for your answer yet. You can answer again.</span>
+              <span>
+                No confirmation has been recorded for your answer yet. You can answer again.
+              </span>
             )}
           </div>
         </div>
