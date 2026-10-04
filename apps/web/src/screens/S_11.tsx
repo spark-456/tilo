@@ -5,7 +5,8 @@
 // placeholder. Layout after the Trace lens of design/source "Tilo World Player.dc.html".
 import { useClient } from "../api/ClientProvider";
 import { isKnownType } from "../world/registry";
-import { elapsed, useRunLog } from "../world/runLog";
+import { useReplayedLog } from "../world/replay";
+import { elapsed } from "../world/runLog";
 import { involves, objectIds, useSelection } from "../world/selection";
 import { LensTabs } from "./LensTabs";
 import { Placeholder } from "./Placeholder";
@@ -15,7 +16,7 @@ import type { ScreenProps } from "./routes";
 export function S_11({ params }: ScreenProps) {
   const worldId = params[0] ?? "";
   const client = useClient();
-  const events = useRunLog(client, worldId);
+  const { events } = useReplayedLog(client, worldId);
   const [selected, , toggle] = useSelection(worldId);
   const [layout] = useRemote("load the world", () => client.getLayout(worldId));
   const ids = layout.status === "ready" ? objectIds(layout.value, events) : null;

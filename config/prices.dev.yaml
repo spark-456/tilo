@@ -1,0 +1,13 @@
+# DEV-ONLY price book for the dev run's fake unit runner (CL-INT-5d, EFF-01; PRD 14.1). Not a provider price list:
+# `dev-unit` is not a model, and these numbers come from no price page. They exist only so the dev API meters a small,
+# deterministic cost per unit through the real PriceBook (tilo_metering) and the credits meter moves in a demo.
+# Read only by tilo_api.dev_run, which refuses when deployed or live. config/prices.yaml stays unset (PL-06) and is the
+# only file a real or live run prices from. Shape: contracts/providers.schema.json $defs.prices.
+status: set
+effective_date: "2026-01-01"
+source: "Tilo dev stand-in (CL-INT-5d): not a real price, never used by a deployed or live run"
+currency: USD
+credit_usd: 0.005
+
+profiles:
+  dev-unit: { input: 1.0, output: 4.0 } # US$ per million tokens; a 2000-in, 600-out unit costs 0.88 credits

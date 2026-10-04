@@ -16,7 +16,7 @@ from typing import Annotated, Any
 import pydantic
 from tilo_contracts import PlanApproach
 from tilo_providers.interfaces import Capability, GenerateRequest
-from tilo_providers.prompts import load_prompt
+from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.router import Router, RouterError, RouterResult
 
 from tilo_planning.brief import DIRECTOR_ROLE
@@ -85,8 +85,7 @@ def problems(approaches: list[dict[str, Any]]) -> list[str]:
 
 def _data(text: str, marker: str) -> str:
     """Delimited data never closes its own block (PRD 16.3 item 1)."""
-    end = f"{marker}>>>"
-    return text.replace(end, f"{marker}> > >")
+    return neutralise_marker(text, marker)
 
 
 def _ask(router: Router, prompt: str, budget: float | None) -> tuple[RouterResult, list[dict[str, Any]]]:

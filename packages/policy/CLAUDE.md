@@ -32,5 +32,7 @@ Lead's approve; checking an outbox entry against what was authorised (OB-01, OB-
 - `decide` is live: a policy with any stamp dated after `now` covers nothing, and duplicate ids
   among the given policies gate. Reading a policy back to an earlier level is `check_entry`'s only.
 - `coverage.py` is the one copy of the coverage, stamping and answerer predicates.
+- `L2_ACTION_RECORDED` is False until ADR-0013 (BQ-57, PI-21): `decide` gates every L2 send; tests of the
+  L2 run path use the `l2_action_recorded` fixture. The OB-01 validator still uses `instruction_counts`.
 - A tier's `max_level` caps a covering policy's level. An L2 cap hit reuses the `l3_*_cap_reached`
   reason codes (API.md has no L2 cap code).

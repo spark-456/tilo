@@ -29,6 +29,12 @@ from tilo_api.intake import get_safety
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 
 
+@pytest.fixture(autouse=True)
+def _no_dev_unit_delay(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CL-INT-5d: the dev unit runner paces a dev run by default; the suite runs it unpaced unless a test sets it."""
+    monkeypatch.setenv("TILO_DEV_UNIT_DELAY_S", "0")
+
+
 @pytest.fixture(scope="session")
 def repo_root() -> pathlib.Path:
     return REPO_ROOT
