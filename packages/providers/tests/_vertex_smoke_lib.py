@@ -47,6 +47,7 @@ ENV_KEYS_CLEARED = (
     "GOOGLE_CLOUD_LOCATION",
     "GOOGLE_APPLICATION_CREDENTIALS",
     "GOOGLE_GENAI_USE_VERTEXAI",
+    "GOOGLE_VERTEX_BASE_URL",
     "TILO_MODELS_FILE",
     "K_SERVICE",
     "CLOUD_RUN_JOB",
@@ -90,7 +91,7 @@ class FakeThinkingConfig:
 @dataclass
 class FakeUsage:
     prompt_token_count: int
-    candidates_token_count: int
+    candidates_token_count: int | None
     total_token_count: int
     thoughts_token_count: int | None = None
 
@@ -99,7 +100,7 @@ class FakeUsage:
 class FakeVertexSdk:
     """Records every `genai.Client(...)` construction and every `models.generate_content(...)` call."""
 
-    usage: tuple[int, int] = (20, 30)  # (prompt tokens, candidate tokens) reported for every successful call
+    usage: tuple[int, int | None] = (20, 30)  # (prompt, candidate tokens) per call; None: Vertex left the count out
     thoughts: int | None = None
     text: str = "synthetic reply"
     delay_s: float = 0.0
@@ -146,7 +147,8 @@ class _FakeModels:
         if error is not None:
             raise error
         tokens_in, tokens_out = sdk.usage
-        usage = FakeUsage(tokens_in, tokens_out, tokens_in + tokens_out + (sdk.thoughts or 0), sdk.thoughts)
+        total = tokens_in + (tokens_out or 0) + (sdk.thoughts or 0)
+        usage = FakeUsage(tokens_in, tokens_out, total, sdk.thoughts)
         return FakeGenerateContentResponse(
             text=sdk.text,
             usage_metadata=usage,  # type: ignore[arg-type]

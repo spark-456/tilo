@@ -163,13 +163,22 @@ def run_vertex_smoke(
         raise SmokeRefused("live_not_enabled", "set LIVE to exactly 1 to make real (paid) calls; nothing was sent")
     _check_caps(max_output_tokens, max_total_credits)
     config = _load(models_path, prices_path, environ)
-    if not replay:
+    if not replay:  # the router and the SDK read os.environ, so these checks look there (and in `environ` for keys)
         for name in ("GOOGLE_API_KEY", "GEMINI_API_KEY"):
-            if environ.get(name):
+            if environ.get(name) or os.environ.get(name):
                 raise SmokeRefused("api_key_present", f"{name} is set; remove it, the smoke uses ADC only")
-        if not environ.get("GOOGLE_CLOUD_PROJECT"):
+        if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
             raise SmokeRefused("missing_project", "GOOGLE_CLOUD_PROJECT is not set")
     _check_prices(config)
+    if not replay:  # still before any client exists; imported late so replay and refusals never load the adapter
+        from tilo_providers.google_adapter import GoogleSettingsError, validate_google_settings  # noqa: PLC0415
+
+        try:
+            validate_google_settings(
+                os.environ["GOOGLE_CLOUD_PROJECT"], os.environ.get("GOOGLE_LOCATION", "global"), os.environ
+            )
+        except GoogleSettingsError as error:
+            raise SmokeRefused(error.code, str(error)) from None
 
     report = SmokeReport([], 0.0, float(max_total_credits), max_output_tokens, "replay" if replay else "live")
     router = Router(config, fixtures_dir=Path(fixtures_dir) if fixtures_dir else _REPO_ROOT / "fixtures")
