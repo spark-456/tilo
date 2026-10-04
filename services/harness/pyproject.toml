@@ -10,11 +10,13 @@ dependencies = [
     "jsonschema>=4.18",
     "referencing>=0.30",
     "tilo-contracts",
+    "tilo-policy",
     "tilo-providers",
 ]
 
 [tool.uv.sources]
 tilo-contracts = { workspace = true }
+tilo-policy = { workspace = true }
 tilo-providers = { workspace = true }
 
 [build-system]

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ALL_ROUTES } from "../../e2e/support/routes";
 import { matchFlowRoute } from "../router";
 import { sectionOf } from "./PrimaryNav";
 import { SCREENS } from "./meta";
@@ -25,6 +26,13 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
       }
     });
   }
+
+  it("FR-WLD-11: the accessibility sweep's route list holds every screen address", () => {
+    const missing = SCREENS.flatMap((s) => (s.path === null ? [] : [s.path])).filter(
+      (path) => !ALL_ROUTES.includes(path),
+    );
+    expect(missing).toEqual([]);
+  });
 
   it("passes URL-decoded captures to the screen, and unknown paths belong to the flow shell", () => {
     expect(matchScreen("/world/w%201/inspect/B1")?.params).toEqual(["w 1", "B1"]);
@@ -65,5 +73,6 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
     expect(sectionOf("/needs-you/gate")).toBe("needs");
     expect(sectionOf("/library/artifacts")).toBe("library");
     expect(sectionOf("/autonomy")).toBe("more");
+    expect(sectionOf("/worlds")).toBe("world"); // S-14 lists worlds (#227 C4)
   });
 });

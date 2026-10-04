@@ -8,7 +8,7 @@ import type { Event } from "@tilo/contracts";
 import { useClient } from "../api/ClientProvider";
 import type { DeliveredArtifact } from "../api/client";
 import { AppLink } from "./AppLink";
-import { Page, Row, Section, Soon, Stats, field, useFixtureRun, words } from "./kit";
+import { EmptyState, Page, Row, Section, Soon, Stats, field, useFixtureRun, words } from "./kit";
 import { useRemote } from "./remote";
 
 // PRD 13.1 memory layers: what each holds and when it may be reused.
@@ -49,13 +49,16 @@ export function S_13() {
       <Section
         title="Deliverables"
         note="Finished work, listed as each one is delivered."
-        reserve={[4, 6]}
+        reserve={[9, 11]}
         action={<Soon labels={["Search the library"]} />}
       >
         {delivered.length === 0 ? (
-          <p className="empty-note" data-testid="library-empty">
-            Nothing has been delivered yet.
-          </p>
+          <EmptyState
+            testid="library-empty"
+            title="Nothing delivered yet"
+            line="Finished work is listed here as each one is delivered."
+            action={{ label: "Start a task", to: "/" }}
+          />
         ) : (
           <ul className="blist" data-testid="library-rows">
             {delivered.map((e) => {
@@ -82,9 +85,12 @@ export function S_13() {
         action={<Soon labels={["Forget a memory item"]} />}
       >
         {count("memory.hit") + count("memory.saved") === 0 && (
-          <p className="empty-note" data-testid="memory-empty">
-            No memory event has been recorded for this run.
-          </p>
+          <EmptyState
+            compact
+            testid="memory-empty"
+            title="Nothing remembered yet"
+            line="No memory event has been recorded for this run."
+          />
         )}
         <ul className="blist">
           {LAYERS.map(([layer, what]) => (
