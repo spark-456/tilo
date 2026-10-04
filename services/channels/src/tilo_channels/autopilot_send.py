@@ -23,7 +23,7 @@ ARTIFACT_INDEX = "#artifacts"  # card store namespace for artifact -> card; user
 def index_artifact(cards: CardStore, user_id: str, doc: Mapping[str, Any]) -> None:
     """Records the card that holds `doc`'s artifact; the first record wins (create-if-absent)."""
     item = doc.get("item")
-    if isinstance(item, Mapping):
+    if isinstance(item, Mapping) and cards.get(ARTIFACT_INDEX, str(item["artifact_id"])) is None:
         cards.create(ARTIFACT_INDEX, str(item["artifact_id"]), {"user_id": user_id, "card_id": doc["card_id"]})
 
 
