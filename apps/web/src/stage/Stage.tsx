@@ -52,7 +52,8 @@ export type WorldSeam = (
 /** PRD 18.3 S-04 stage. The camera is the Pixi world container's transform (PRD 9.7); a frame
  * is drawn only on input, an eased keyboard move, resize or visibility change. Readiness: the
  * stage frame gains `data-stage-ready="true"` and `data-camera-x/-y/-zoom` with the first drawn
- * frame (right after Pixi's init), never before; input listeners are live from then on. `seq`
+ * frame (right after Pixi's init), never before; input listeners attach at mount and buffer
+ * input into that first frame. `seq`
  * (P0-08b-player, FR-WLD-04) is purely a display attribute for a world-content consumer's own
  * highest applied seq; Stage itself never reads or produces it. */
 export function Stage({
@@ -94,8 +95,13 @@ export function Stage({
   const [active, setActive] = useState(0);
   const outlineRef = useRef<HTMLUListElement>(null);
   const onOutlineKey = (e: KeyboardEvent<HTMLUListElement>) => {
-    if (e.key === "Escape") return set(null);
     const buttons = [...(outlineRef.current?.querySelectorAll<HTMLElement>(".outline-item") ?? [])];
+    if (e.key === "Escape") {
+      // Focus goes to the roving item first: the Inspect link, if that is where it was, leaves
+      // with the selection and would take focus to the page body with it.
+      buttons[active]?.focus();
+      return set(null);
+    }
     const at = buttons.indexOf(document.activeElement as HTMLElement);
     const next =
       e.key === "ArrowDown" || e.key === "ArrowRight"
@@ -208,8 +214,12 @@ export function Stage({
       ease = null; // direct manipulation takes over from an eased keyboard move
       goal = cur;
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      target.setPointerCapture?.(e.pointerId);
-      reanchor();
+      reanchor(); // before the capture: a throw below must not leave a stale anchor
+      try {
+        target.setPointerCapture?.(e.pointerId);
+      } catch {
+        // A synthetic or already-inactive pointer id has nothing to capture; the drag still pans.
+      }
     });
     listen("pointermove", (e) => {
       if (!pts.has(e.pointerId)) return;

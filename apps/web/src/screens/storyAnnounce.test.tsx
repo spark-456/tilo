@@ -62,6 +62,14 @@ describe("FR-WLD-11 Story announcements are batched, not per event", () => {
     expect(said()).toBe("");
   });
 
+  it("says nothing when the earlier rows are no longer a prefix of the log", async () => {
+    const { render, said, wait } = await setup(rows(5), true);
+    // A different run: same length plus three, but not the rows seen before.
+    await render([...rows(8)].map((r) => ({ ...r, seq: r.seq + 100 }) as Event));
+    await wait(ANNOUNCE_DEBOUNCE_MS * 2);
+    expect(said()).toBe("");
+  });
+
   it("says nothing when rows disappear (a scrub back)", async () => {
     const { render, said, wait } = await setup(rows(10), true);
     await render(rows(4));

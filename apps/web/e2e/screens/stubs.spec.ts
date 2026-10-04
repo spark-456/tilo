@@ -5,9 +5,7 @@ import { expect, test } from "@playwright/test";
 import { expectNoDeadControls, watchConsole } from "../support/screens";
 import { DESKTOP, MOBILE } from "../support/viewports";
 
-const STUBS: ReadonlyArray<readonly [string, string, string]> = [
-  ["S_08", "/needs-you/consent", "Connection consent sheet"],
-];
+const STUBS: ReadonlyArray<readonly [string, string, string]> = [];
 
 for (const [id, path, name] of STUBS) {
   test(`${id} renders, no console errors, placeholders aria-disabled`, async ({ page }) => {

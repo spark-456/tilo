@@ -46,7 +46,35 @@ test.describe("FR-WLD-11 accessibility", () => {
     await expect(items.first()).toHaveAttribute("aria-pressed", "true");
   });
 
-  test("FR_WLD_11 focus ring is a visible 2 px solid brand outline on the outline and on Clear", async ({
+  test("FR_WLD_11 Escape from the Inspect link clears the selection and keeps focus on the outline item", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await gotoStage(page, "/?fixture=village-basic");
+    const outline = page.getByRole("list", { name: "World objects" });
+    const first = outline.getByRole("button").first();
+    await first.focus();
+    await page.keyboard.press("Enter");
+    const inspect = outline.getByRole("link", { name: "Inspect" });
+    await expect(inspect).toBeVisible();
+    await page.keyboard.press("Tab"); // from the item to its Inspect link
+    await expect(inspect).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(outline.locator('[aria-pressed="true"]')).toHaveCount(0);
+    await expect(first).toBeFocused();
+  });
+
+  test("FR_WLD_11 the keyboard outline is on the world route too, not only in fixture mode", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await gotoStage(page, `${W}?${FAST}`);
+    const outline = page.getByRole("list", { name: "World objects" });
+    await expect(outline.getByRole("button", { name: /Mail Room/ })).toBeAttached();
+    await expect(outline.getByRole("button", { name: /Gate G1/ })).toBeAttached();
+  });
+
+  test("FR_WLD_11 focus ring is a visible 2 px solid brand outline on an outline item", async ({
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
@@ -83,6 +111,16 @@ test.describe("FR-WLD-11 accessibility", () => {
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
+    // Count every non-empty text the status ever holds: a replay must make none.
+    await page.addInitScript(() => {
+      const said: string[] = [];
+      (window as unknown as { __said: string[] }).__said = said;
+      new MutationObserver(() => {
+        for (const o of document.querySelectorAll("output.sr-only")) {
+          if (o.textContent) said.push(o.textContent);
+        }
+      }).observe(document, { subtree: true, childList: true, characterData: true });
+    });
     await page.goto(`${W}/story?${FAST}`);
     const list = page.getByRole("list", { name: "What happened, in order" });
     await expect(list.getByRole("listitem").first()).toBeVisible();
@@ -95,6 +133,10 @@ test.describe("FR-WLD-11 accessibility", () => {
     // A replay adds rows by the dozen; none of that is announced.
     await expect(list.getByRole("listitem")).not.toHaveCount(1);
     await expect(status).toHaveText("");
+    expect(
+      await page.evaluate(() => (window as unknown as { __said: string[] }).__said),
+      "announcements made during a replay",
+    ).toEqual([]);
   });
 
   test("FR_WLD_11 reduced motion: keyboard pan jumps at once", async ({ page }) => {

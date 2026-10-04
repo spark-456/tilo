@@ -129,9 +129,8 @@ test.describe("@cp2 CP2 live run on the real dev API", () => {
     // S-04 World: the layout loads (honest note until it does) and the events arrive
     const stage = page.getByTestId("stage-frame");
     await expect(stage).toHaveAttribute("data-stage-ready", "true");
-    await expect(page.getByTestId("live-world-note")).not.toContainText("Waiting for the run", {
-      timeout: 30_000,
-    });
+    // The API's solver (CL-INT-6) attaches the map, so the note ends as soon as the layout is read.
+    await expect(page.getByTestId("live-world-note")).toHaveCount(0, { timeout: 30_000 });
     await expect(stage).not.toHaveAttribute("data-seq", "0", { timeout: 30_000 });
     await expect(page.getByTestId("hud-meter")).toContainText("Working");
     await expect(page.getByRole("heading", { name: "Team" })).toBeVisible(); // the layout's agents

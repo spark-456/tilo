@@ -11,24 +11,34 @@ export const ANNOUNCE_DEBOUNCE_MS = 2000;
 export const announcement = (added: number, latest: string): string =>
   `${added} new ${added === 1 ? "event" : "events"}. Latest: ${latest}`;
 
-/** The sentence to announce, or "" for nothing. `enabled` is false while loading and on a replay. */
+/** The sentence to announce, or "" for nothing. `enabled` is false while loading, on a replay, at a
+ * replay point and once the run has ended. The first rows a client holds, and any change that is
+ * not a tail append of the rows seen before (a different run, a reset), set a new baseline and say
+ * nothing; only rows appended after that are news. */
 export function useStoryAnnouncement(story: readonly Event[], enabled: boolean): string {
   const [text, setText] = useState("");
-  const seen = useRef<number | null>(null);
+  const seen = useRef<{ count: number; seq: number } | null>(null);
   useEffect(() => {
     if (!enabled) {
       seen.current = null;
       setText("");
       return;
     }
-    if (seen.current === null || story.length < seen.current) {
-      seen.current = story.length; // the rows already there are not news
+    const mark = () => ({ count: story.length, seq: story[story.length - 1]?.seq ?? 0 });
+    const base = seen.current;
+    // The first rows a client holds are the log as it stood, not news: they set the baseline.
+    if (base === null || base.count === 0 || story.length < base.count) {
+      seen.current = mark();
       return;
     }
-    if (story.length === seen.current) return;
+    if (story[base.count - 1]?.seq !== base.seq) {
+      seen.current = mark(); // not a tail append of the rows seen: another run, or a reset
+      return;
+    }
+    if (story.length === base.count) return;
     const timer = setTimeout(() => {
-      const added = story.length - (seen.current ?? story.length);
-      seen.current = story.length;
+      const added = story.length - base.count;
+      seen.current = mark();
       const last = story[story.length - 1];
       if (added > 0 && last) setText(announcement(added, last.summary));
     }, ANNOUNCE_DEBOUNCE_MS);

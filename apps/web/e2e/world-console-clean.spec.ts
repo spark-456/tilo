@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { PAN_STEP_PX } from "../src/stage/camera";
 import { gotoStage } from "./support/camera";
+import { collectConsoleProblems } from "./support/console";
 import { DESKTOP, MOBILE } from "./support/viewports";
 import { fixtureUrl, stageCanvas, stageFrame } from "./support/world";
 
@@ -20,13 +21,7 @@ for (const [name, { viewport, extra }] of Object.entries(SIZES)) {
     test.use({ viewport });
 
     test(`P10 fixture mode: zero console errors or warnings at ${name} size`, async ({ page }) => {
-      const messages: string[] = [];
-      page.on("console", (msg) => {
-        if (msg.type() === "error" || msg.type() === "warning") {
-          messages.push(`[${msg.type()}] ${msg.text()}`);
-        }
-      });
-      page.on("pageerror", (err) => messages.push(`[pageerror] ${err.message}`));
+      const messages = collectConsoleProblems(page);
 
       await page.goto(fixtureUrl("village-basic", { seq: 20, ...extra }));
       await expect(stageCanvas(page)).toBeVisible();

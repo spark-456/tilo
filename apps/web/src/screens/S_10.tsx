@@ -4,9 +4,9 @@
 import type { Severity } from "@tilo/contracts";
 import { useClient, useIsFixtureClient } from "../api/ClientProvider";
 import { isKnownType } from "../world/registry";
-import { useReplayedLog } from "../world/replay";
-import { elapsed } from "../world/runLog";
-import { agentNames, worldStatus } from "../world/runSummary";
+import { useReplayPoint, useReplayedLog } from "../world/replay";
+import { elapsed, useRunLog } from "../world/runLog";
+import { agentNames, runEnded, worldStatus } from "../world/runSummary";
 import { involves, useSelection } from "../world/selection";
 import { LensTabs } from "./LensTabs";
 import { useRemote } from "./remote";
@@ -35,8 +35,14 @@ export function S_10({ params }: ScreenProps) {
   // The rows wait for the layout (ready or failed) so the who-chips never arrive after them and
   // push the text about (CLS); a failed layout still shows the story, without chips.
   const settled = layout.status !== "loading";
-  // Replays are not new work, so only a real client announces, and only once the rows have loaded.
-  const announced = useStoryAnnouncement(story, settled && !fixture);
+  // Only events that arrive live are news. A fixture, a scrubbed moment (a replay point is set) and
+  // a run that has ended are replays of what is already recorded, so none of them announces.
+  const replayPoint = useReplayPoint(worldId);
+  const ended = runEnded(worldStatus(useRunLog(client, worldId)));
+  const announced = useStoryAnnouncement(
+    story,
+    settled && !fixture && replayPoint === null && !ended,
+  );
   return (
     <div className="screen-body wide" data-testid="story-lens">
       <LensTabs worldId={worldId} current="story" />
