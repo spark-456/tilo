@@ -33,7 +33,7 @@ from typing import Any
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelProvider
 from tilo_providers.prompts import load_prompt
 
-from tilo_harness.untrusted import neutralise
+from tilo_harness.untrusted import has_long_mark_run, neutralise
 from tilo_harness.validator import repo_validator
 
 ROLE = "verifier"  # prompts/verifier/claim_*.md, providers["verifier"]
@@ -60,6 +60,29 @@ class Deliverable:
 
 
 @dataclass(frozen=True)
+class _Source:
+    """A cited source, checked and prepared once per review."""
+
+    shown: str  # neutralised, as the model sees it
+    numbers: frozenset[str]
+    size: int
+
+
+def _prepare(text: Any, fingerprint: str | None) -> tuple[_Source | None, str | None]:
+    """(source, None) when the text can be trusted as fetched, else (None, why not). The size and
+    mark-run checks come first, so nothing too long or too slow to normalise is hashed or scanned."""
+    if not isinstance(text, str):
+        return None, "text not held"
+    if len(text) > MAX_SOURCE_CHARS:
+        return None, "too long to check"
+    if has_long_mark_run(text):
+        return None, "holds a long run of combining characters"
+    if fingerprint != "sha256:" + hashlib.sha256(text.encode("utf-8", "replace")).hexdigest():
+        return None, "does not match its fingerprint"
+    return _Source(neutralise(text, limit=MAX_SOURCE_CHARS), frozenset(_numbers(text)), len(text)), None
+
+
+@dataclass(frozen=True)
 class Review:
     result: str  # passed | failed | unverified
     status: dict[str, str]  # claim id -> supported | contradicted | unverified
@@ -69,8 +92,14 @@ class Review:
 
 
 def _numbers(text: str) -> set[str]:
+    """The numbers in `text`, any script's decimal digits read as 0-9. Linear in len(text); callers
+    pass only text that is short or has no long run of combining marks."""
     out = set()
-    for raw in _NUMBER.findall(unicodedata.normalize("NFKC", text)):
+    folded = "".join(
+        str(unicodedata.decimal(c)) if unicodedata.category(c) == "Nd" else c
+        for c in unicodedata.normalize("NFKC", text)
+    )
+    for raw in _NUMBER.findall(folded):
         number = raw.replace(",", "")
         out.add(number.rstrip("0").rstrip(".") if "." in number else number)
     return out
@@ -133,45 +162,37 @@ class Verifier:
         responses: list[GenerateResponse] = []
         status: dict[str, str] = {}
         notes: dict[str, list[str]] = {}
+        prepared: dict[str, tuple[_Source | None, str | None]] = {}  # each source once per review
         for index, row in enumerate(manifest["claims"]):
             claim_notes = notes.setdefault(row["id"], [])
             if index >= self._max_claims:
                 claim_notes.append(f"past the first {self._max_claims} claims of this deliverable")
                 status[row["id"]] = "unverified"
             else:
-                usable = self._usable(row["source_ids"], fingerprints, deliverable.sources, claim_notes)
+                usable = []
+                for sid in row["source_ids"]:
+                    if sid not in prepared:
+                        prepared[sid] = await asyncio.to_thread(
+                            _prepare, deliverable.sources.get(sid), fingerprints.get(sid)
+                        )
+                    source, why = prepared[sid]
+                    if source is None:
+                        claim_notes.append(f"source {sid}: {why}")
+                    else:
+                        usable.append(source)
                 status[row["id"]] = await self._judge(row["text"], usable, responses)
             row["verified"] = status[row["id"]] == "supported"
         values = set(status.values())
         result = "failed" if "contradicted" in values else "passed" if values == {"supported"} else "unverified"
         return Review(result, status, manifest, _trace(responses), {k: v for k, v in notes.items() if v})
 
-    @staticmethod
-    def _usable(
-        ids: list[str], fingerprints: Mapping[str, str], held: Mapping[str, str], notes: list[str]
-    ) -> list[str]:
-        """The cited texts that can be trusted as fetched; each one that cannot is noted. The size check
-        comes first, so nothing is hashed or scanned that is too long to send."""
-        usable = []
-        for sid in ids:
-            text = held.get(sid)
-            if not isinstance(text, str):
-                notes.append(f"source {sid}: text not held")
-            elif len(text) > MAX_SOURCE_CHARS:
-                notes.append(f"source {sid}: too long to check")
-            elif fingerprints.get(sid) != "sha256:" + hashlib.sha256(text.encode("utf-8", "replace")).hexdigest():
-                notes.append(f"source {sid}: does not match its fingerprint")
-            else:
-                usable.append(text)
-        return usable
-
-    async def _judge(self, text: str, sources: list[str], responses: list[GenerateResponse]) -> str:
-        if not sources or sum(len(source) for source in sources) > MAX_SOURCE_CHARS:  # rules 1 and 2
+    async def _judge(self, text: str, sources: list[_Source], responses: list[GenerateResponse]) -> str:
+        if not sources or sum(source.size for source in sources) > MAX_SOURCE_CHARS:  # rules 1 and 2
             return "unverified"
-        known = set().union(*(_numbers(source) for source in sources))
+        known = frozenset().union(*(source.numbers for source in sources))
         if not _numbers(text) <= known:  # rule 3
             return "contradicted"
-        shown = "\n\n".join(f"[source {i}]\n{neutralise(s, limit=MAX_SOURCE_CHARS)}" for i, s in enumerate(sources, 1))
+        shown = "\n\n".join(f"[source {i}]\n{source.shown}" for i, source in enumerate(sources, 1))
         fields = {"claim": neutralise(text, limit=MAX_CLAIM_CHARS), "sources": shown}
         request = GenerateRequest(
             system=self._system, prompt=load_prompt(ROLE, "claim_task.md", fields), json_mode=True, max_output_tokens=32
