@@ -51,6 +51,16 @@ Other identities:
 | Pub/Sub service agent | custom insert-only role on dataset `tilo_ledger` | present |
 | Cloud Storage service agent | `cryptoKeyEncrypterDecrypter` on key `archive` | present |
 | `tilo-deployer` (WIF, `refs/heads/main` only) | `run.developer` per service; `serviceAccountUser` per runtime SA; Artifact Registry writer on repo `tilo`. No project role, and `deployer_project_roles` stays `[]` for dev | present |
+| `tilo-cloudbuild` (Cloud Build, `cloudbuild.yaml` runs as it; P0-07g) | Five roles, 17 bindings, no key: `roles/artifactregistry.writer` on repo `tilo`; `roles/run.developer` on each of the seven services; `roles/iam.serviceAccountUser` on each of the seven runtime SAs (not tasks-invoker, gmail, deployer or itself); `roles/logging.logWriter` at project level (the only project role); `roles/storage.objectViewer` on bucket `<project>-cloudbuild-staging` | added |
+
+Bucket `<project>-cloudbuild-staging` (P0-07g): source staging for
+`gcloud builds submit --gcs-source-staging-dir`. Regional (`asia-southeast1`),
+uniform bucket-level access, public access prevention enforced, one lifecycle
+rule deleting objects after 7 days. It is not one of the three PRD buckets
+(`storage_buckets` output); the runtime service accounts have no access to it.
+`tilo-cloudbuild` only reads it; the person who submits the build writes it
+(the project owner already can). Reported by the `cloudbuild_staging_bucket`
+output; the grants by `cloudbuild_grants`.
 
 ## 3. Pub/Sub, Scheduler, Cloud Tasks
 
@@ -159,8 +169,10 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
 3. **Deployer roles.** None. `deployer_project_roles` defaults to `[]` and is
    not set for dev. Images are built on the CI runner and pushed to Artifact
    Registry through WIF with the repo-scoped writer role, then deployed with
-   the per-service `run.developer` grants. No Cloud Build identity or staging
-   bucket exists. Firebase deploys are manual (section 7, step 5).
+   the per-service `run.developer` grants. The Cloud Build route (P0-07f) runs
+   as its own account `tilo-cloudbuild` with five scoped roles and a regional
+   staging bucket (P0-07g; section 2, Other identities). Firebase deploys are
+   manual (section 7, step 5).
 
 4. **Vertex access for the internet-facing callers.** api and channels hold the
    custom role `tiloVertexGenerate` (permission `aiplatform.endpoints.predict`

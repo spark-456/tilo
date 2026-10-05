@@ -12,3 +12,15 @@ output "buckets" {
     }
   }
 }
+
+output "lifecycle_rules" {
+  description = "Map of bucket key => its lifecycle rules as planned (action type, age in days)."
+  value = {
+    for k, b in google_storage_bucket.this : k => [
+      for r in b.lifecycle_rule : {
+        action_type = one(r.action).type
+        age_days    = one(r.condition).age
+      }
+    ]
+  }
+}
