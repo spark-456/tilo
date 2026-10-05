@@ -5,7 +5,8 @@
   proposes one new contract, an additive bump of a frozen event data schema and one event rule.
 - Deciders: user (decision), architect (proposal)
 - Requirement: FR-MEM-06, FR-CON-09, FR-CON-10, FR-AGT-12, FR-MEM-09, HR-1 (PRD 8.1, 9.4, 12.4,
-  13.1 to 13.4, 15.1, 15.3, 16.3, 16.5; S-12); open questions BQ-256 to BQ-262
+  13.1 to 13.4, 15.1, 15.3, 16.3, 16.5; S-12); issues #283 and #329, PR #332; open questions
+  BQ-256 to BQ-262
 
 ## Context
 1. Production `DefaultUnitRunner` (`services/harness/src/tilo_harness/executor.py:81`) calls the
@@ -22,8 +23,11 @@
 4. Consumers are waiting. The Verifier (#278) takes `load(ref) -> Deliverable(manifest, sources)`
    and records `unverified` without it. `build_manifest` (FR-CON-10) needs the version's bytes and
    the raw-archive records of its sources. `artifact.delivered` is written only on the gated path,
-   so research-and-report plans end with 0 deliverables (#283, BQ-218). The render lane refused to
-   mint empty artifacts. Erasure names `gcs_artifacts` in `REQUIRED_STORES` with no adapter.
+   so research-and-report plans end with 0 deliverables (#283, BQ-218). PR #332 (fixes #283) adds
+   a final `deliver` unit that delivers `in_app` only the items its upstream units really made, and
+   never mints one. With today's runner that is still 0, so #332 depends on the store this ADR
+   recommends. The render lane refused to mint empty artifacts and filed the gap as issue #329.
+   Erasure names `gcs_artifacts` in `REQUIRED_STORES` with no adapter.
 5. PRD: the Writer "produces deliverables from verified material" (8.1); every deliverable is
    versioned with a provenance manifest (12.4); artifact versions live in "Cloud Storage object
    versioning plus Firestore metadata" with content hashes (13.2); a restore is a new version
@@ -140,8 +144,8 @@ the store. Rules for a new `contracts/artifact.rules.md`:
 - **Render.** Reads a spec version (`application/json`, parsed by `DeliverableSpec`), puts the PDF
   or PPTX as a new artifact (`origin.kind` render, manifest `inputs` the spec, claims re-located to
   slide or cell). It never mints ids or writes to the bucket directly.
-- **Delivery and S-12.** At completion each deliverable version (BQ-259) gets one
-  `artifact.delivered` (`in_app`, `outbox_id` null), only if `head` finds it and `read` passes
+- **Delivery and S-12.** The `deliver` unit of #332 records one `artifact.delivered` (`in_app`,
+  `outbox_id` null) per deliverable version (BQ-259), only if `head` finds it and `read` passes
   AR-01. Its cause is the version's `artifact.reviewed`, or `artifact.created` with no Verifier.
   `GET /worlds/{id}/delivery` adds `media_type` and `size_bytes`. New
   `GET /worlds/{id}/artifacts/{artifact_id}/versions/{version}` (bytes) and `.../manifest`
@@ -199,8 +203,9 @@ Option A. The tickets run in this order. Each starts test-first (the test-writer
    synthetic Markdown; credits stay on the first `artifact.created`. About 250.
 5. **T5 FR-CON-10 / FR-AGT-12 (after #278).** `created` manifest at put; the Verifier's `load` from
    the store and archive; `reviewed` revision. About 250.
-6. **T6 BQ-218, ID per BQ-262 (CL-INT).** `in_app` delivery at completion (BQ-259, BQ-260),
-   content and manifest routes, `/delivery` fields. About 300. This closes #283 with T1 to T4.
+6. **T6 BQ-218, ID per BQ-262 (CL-INT, after #332).** #332's `deliver` unit checks each version
+   with `head` and `read` (BQ-259, BQ-260); content and manifest routes; `/delivery` fields. About
+   250. With T1 to T4, this makes #283 and #329 deliver real content.
 7. **T7 (world-builder).** S-12 shows the in-app deliverable (safe Markdown), Open and download,
    and empty-state wording. About 300.
 8. **T8 (reach-builder).** Firestore and GCS backends (fake clients in CI), every generation
