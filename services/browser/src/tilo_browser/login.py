@@ -224,7 +224,7 @@ def build_login_card(signal: LoginSignal, *, url: str, ctx: CardContext) -> dict
         "options": [_option(oid) for oid in LOGIN_CARD_OPTION_IDS],
         "add_context": False,
         "actions": ["show_me", "snooze"],
-        "answer_channels": ["web", "mobile_web", "whatsapp", "email"],
+        "answer_channels": ["web", "mobile_web", "email"],
         "created_at": ctx.now(),
         "timeout": ctx.timeout,
         "safe_default": "skip",

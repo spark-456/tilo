@@ -7,8 +7,9 @@ no randomness. A card is validated against contracts/card.schema.json plus the v
 CR-01 and CR-02 before it is stored; an invalid card is never shown and never times out. Gate and
 consent cards are authorisations: never merged, never delegated to the Director, and never resolved
 by a timeout. Who answers comes only from the verified `deps.Principal` (PRD 10.1), never from the
-request body; a channel other than web and a PIN flag are accepted only from an authenticated
-tilo-channels caller. Deciding whether an answer opens a gate stays with packages/policy.
+request body; a channel other than web and mobile web (email) is accepted only from an authenticated
+tilo-channels caller, and whatsapp never (SD-01, ADR-0019): no PIN path exists. Deciding whether an answer
+opens a gate stays with packages/policy.
 """
 
 from __future__ import annotations
@@ -48,6 +49,7 @@ _MERGEABLE = ("needs_you", "meeting")
 _ROLES = ("owner", "team_lead", "approver")  # any other role (a Viewer included) answers and lists nothing
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _WEB_CHANNELS = ("web", "mobile_web")
+_ANSWER_CHANNELS = (*_WEB_CHANNELS, "email")  # whatsapp opens nothing, whatever a stored card lists (CH-RM)
 _STATUS = {"card_not_found": 404, "forbidden": 403, "busy": 409}  # AnswerResult.reason -> HTTP; others are 400
 
 
@@ -407,7 +409,6 @@ class CardStore:
         option: str,
         channel: str,
         principal: Principal,
-        pin_verified: bool = False,
         console_domain: str | None = None,
     ) -> AnswerResult:
         """Rejections write nothing and leave the card open. A card outside the principal's scope
@@ -436,21 +437,19 @@ class CardStore:
             card = record.card
             if option not in {o["id"] for o in card["options"]}:
                 return AnswerResult("rejected", "invalid_option", ())
-            if channel not in card["answer_channels"]:
+            if channel not in card["answer_channels"] or channel not in _ANSWER_CHANNELS:
+                # SEC-06: a gate opens only in a signed-in session, so whatsapp is refused whatever the card lists
                 return AnswerResult("rejected", "invalid_channel", ())
-            tier_t3 = record.kind == "gate" and card["gate"]["risk_tier"] == "T3"
-            # SEC-06: the PIN guards the approval only; hold and edit write nothing and open no gate.
-            if tier_t3 and channel == "whatsapp" and option == "approve" and not pin_verified:
-                return AnswerResult("rejected", "pin_required", ())
 
-            who = (option, channel, principal.user_id, principal.role, pin_verified)
+            who = (option, channel, principal.user_id, principal.role)
             authz = {"by": "person", "ref": principal.user_id, "at": self._clock.now()}
             if record.attempt is not None and record.attempt[0] == who:
                 part: dict | None = record.attempt[1]  # this answer again after a write that raised: resend it as is
             elif record.kind == "gate":
                 # CR-07: only approve opens a gate and writes approval.resolved; edit and hold write nothing.
                 data = {"gate_id": card["gate"]["id"], "card_id": card_id, "outbox_id": record.outbox_id}
-                data |= {"option": option, "channel": channel, "pin_verified": pin_verified}
+                data |= {"option": option, "channel": channel}
+                data["pin_verified"] = False  # a required field that no rule reads (ADR-0019)
                 part = self._part(record, "approval.resolved", data, authz=authz) if option == "approve" else None
             elif record.kind == "consent":
                 # CR-13: only connect grants the connection; hold leaves it waiting.
@@ -550,8 +549,8 @@ class CardStore:
 
 
 class _AnswerBody(BaseModel):
-    """No identity field: who answers is the verified principal. `channel` and `pin_verified` are
-    honoured only from an authenticated tilo-channels caller."""
+    """No identity field: who answers is the verified principal. `channel` is honoured only from an
+    authenticated tilo-channels caller; `pin_verified` is refused (no PIN exists, SEC-06)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -600,7 +599,7 @@ def build_router(
     ) -> JSONResponse:
         if principal.world_id != world_id:
             raise HTTPException(status_code=404)
-        if not from_channels and (body.channel not in _WEB_CHANNELS or body.pin_verified):
+        if body.pin_verified or (not from_channels and body.channel not in _WEB_CHANNELS):
             return JSONResponse(status_code=403, content={"outcome": "rejected", "reason": "channel_not_permitted"})
         try:
             result = store.answer(
@@ -609,7 +608,6 @@ def build_router(
                 option=body.option,
                 channel=body.channel,
                 principal=principal,
-                pin_verified=body.pin_verified,
             )
         except Exception as exc:  # the event write failed; the card stays open and the answer can be sent again
             logger.warning("a card answer could not be written: %s", type(exc).__name__)

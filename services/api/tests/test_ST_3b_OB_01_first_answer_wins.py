@@ -45,7 +45,7 @@ def _store(kind: str, writer: FakeEventWriter | None = None) -> tuple[CardStore,
 
 
 def _answer(store: CardStore, card: dict, option: str, channel: str = "web"):
-    return store.answer(W, card["id"], option=option, channel=channel, principal=OWNER_P, pin_verified=True)
+    return store.answer(W, card["id"], option=option, channel=channel, principal=OWNER_P)
 
 
 @pytest.mark.parametrize("kind", CASES)

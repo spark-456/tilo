@@ -37,7 +37,7 @@ from tilo_providers.router import Router
 from tilo_providers.safety import build_safety_provider
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
-Channel = Literal["web", "mobile_web", "whatsapp", "email"]
+Channel = Literal["web", "mobile_web", "email"]  # no whatsapp: SD-01, ADR-0019
 
 logger = logging.getLogger("tilo_api.deps")
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -71,7 +71,7 @@ class WorldRecord:
     owner: str  # common.schema.json#/$defs/user_id
     districts: dict[str, DistrictRecord | None]  # district_id -> record; a malformed/None value
     # is a test proving the read routes fail closed (hidden) rather than raising
-    owner_channels: tuple[str, ...] = ("web", "whatsapp", "email")  # kill-switch confirmations
+    owner_channels: tuple[str, ...] = ("web", "email")  # kill-switch confirmations
     run_id: str = "r_village_basic_1"  # the world's current run; tilo-api reads this, never invents it
     paused: bool = False  # true once Pause all has actually paused this world (PRD 9.4 honesty:
     # only ever true together with a world.paused event queued or committed somewhere)

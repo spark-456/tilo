@@ -93,6 +93,7 @@ def test_FR_AGT_05_the_card_carries_context_options_suggestion_deadline_and_safe
     safe = next(option for option in card["options"] if option["id"] == card["safe_default"])
     assert safe["irreversible"] is False, "a safe default is always reversible (CR-03)"
     assert card["gate"] is None and card["consent"] is None
+    assert card["answer_channels"] == ["web", "mobile_web", "email"], "CH-RM: never whatsapp (SD-01)"
 
 
 def test_FR_AGT_05_a_repeated_failure_question_is_also_a_valid_card_with_the_failure_reason(tmp_path) -> None:

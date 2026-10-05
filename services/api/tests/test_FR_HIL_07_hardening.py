@@ -95,7 +95,7 @@ def test_FR_HIL_07_attempt_threads_are_daemon_so_a_hung_writer_cannot_block_exit
 
 def test_FR_HIL_07_pause_all_world_paused_actor_is_the_principals_user_id(client, store, writer):
     store.worlds[WORLD] = make_world(owner=OWNER)
-    as_principal(make_principal(user_id=OWNER, world_id=WORLD, channel="whatsapp"))
+    as_principal(make_principal(user_id=OWNER, world_id=WORLD, channel="mobile_web"))
     assert client.post(f"/worlds/{WORLD}/pause").status_code == 200
     paused = [e for e in store.events[WORLD] if e["type"] == "world.paused"]
     assert len(paused) == 1

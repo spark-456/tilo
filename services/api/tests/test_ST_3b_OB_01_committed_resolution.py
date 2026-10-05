@@ -56,16 +56,12 @@ def _commit_then_raise(run_flow, monkeypatch) -> None:
 
 @pytest.mark.parametrize(
     ("first", "second"),
-    [
-        ({"channel": "web"}, {"channel": "mobile_web"}),
-        ({"channel": "web"}, {"channel": "whatsapp", "pin_verified": True}),
-    ],
-    ids=["web_then_mobile_web", "web_then_whatsapp_with_pin"],
+    [({"channel": "web"}, {"channel": "mobile_web"})],
+    ids=["web_then_mobile_web"],
 )
 def test_ST_3b_OB_01_another_channel_after_a_commit_then_raise_resolves_under_the_committed_event(
     run_flow, monkeypatch, first, second
 ):
-    run_flow.flow.app.dependency_overrides[cards.get_channels_caller] = lambda: True
     _, card = run_flow.run_to_gate()
     _commit_then_raise(run_flow, monkeypatch)
     url = f"/worlds/{run_flow.world_id}/cards/{card['id']}/answer"
