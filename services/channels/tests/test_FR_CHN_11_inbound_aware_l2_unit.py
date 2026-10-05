@@ -212,8 +212,23 @@ def test_FR_CHN_11_inbound_signal_property_deterministic_and_within_its_four_nam
 def test_FR_CHN_11_inbound_signal_property_is_the_body_signal_without_the_allowlist_plus_money_shapes(
     text: str,
 ) -> None:
-    # "Same word families as t3_content_signal", obfuscation and cap included, never "unlisted"; the only addition
-    # is "money" for an amount shape or a number word (BQ-265 fix pass, round 1 finding 2).
+    # "Same word families as t3_content_signal", obfuscation and cap included, never "unlisted". Whatever the draft-side
+    # signal finds is still found. What the inbound side adds (an amount shape or number word is "money"; a separator
+    # or spread-out letters no longer hide a word, so "legal" or "commitment" can appear too: "s i g n", "con/tract")
+    # is only ever one of the four inbound family names. (Round 2, blocker E: the old `<= {"money"}` was false.)
+    body = t3_module().t3_content_signal(text) - {"unlisted"}
+    signal = inbound_signal(text)
+    assert body <= signal
+    assert signal - body <= ALLOWED
+    assert "unlisted" not in signal
+
+
+@needs_inbound_signal
+@given(text=st.text(alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", max_size=300))
+@_FAST
+def test_FR_CHN_11_inbound_signal_property_with_no_separator_the_only_addition_is_money(text: str) -> None:
+    # ASCII letters and digits only: there is nothing to drop or spread, so beyond the draft-side signal the only
+    # thing the inbound side can add is "money" (an amount shape or a number word). True by construction.
     body = t3_module().t3_content_signal(text) - {"unlisted"}
     signal = inbound_signal(text)
     assert body <= signal
