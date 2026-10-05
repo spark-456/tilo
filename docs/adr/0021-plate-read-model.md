@@ -1,6 +1,6 @@
 # ADR-0021: The plate read model
 
-- Status: Proposed (2026-10-05, architect; BQ-PPL40a-2). It adds a new contract, widens one
+- Status: Accepted by the user, 2026-10-05 ("accept all of #381": Option A with the new plate contract and `mail` added to `record_ref.kind`). Proposed earlier the same day by the architect (BQ-PPL40a-2). It adds a new contract, widens one
   shared enum and adds five rules to the people contracts, so it needs the user's approval before
   ticket CC-PEOPLE-3 makes it. This PR is docs only: nothing in `contracts/`, `config/` or code
   changes here. Lands with ADR-0020 (evidence quotes).

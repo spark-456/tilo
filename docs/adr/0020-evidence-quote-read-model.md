@@ -1,6 +1,6 @@
 # ADR-0020: The evidence-quote read model
 
-- Status: Proposed (2026-10-05, architect; BQ-PPL40a-1). It adds a new contract, an optional
+- Status: Accepted by the user, 2026-10-05 ("accept all of #381": Option A with the new transcript contract and optional `meeting.world_id`; an assignee sees exactly one quote, no meeting title, and nothing if the transcript is flagged). Proposed earlier the same day by the architect (BQ-PPL40a-1). It adds a new contract, an optional
   field on `meeting` and four rules to the people contracts (all additive), so it needs the user's
   approval before ticket CC-PEOPLE-3 makes it.
   This PR is docs only: nothing in `contracts/`, `config/` or code changes here. ADR-0019 is taken
