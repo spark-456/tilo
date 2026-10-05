@@ -1,4 +1,46 @@
-# Deploy to tilo-dev (P0-07a)
+# Deploy to tilo-dev (P0-07a, P0-07c)
+
+## User's one sitting (about 10 min)
+
+Copy and paste in this order, from the repository root, signed in to `gh` as yourself. Tilo's tooling
+runs none of these.
+
+1. Web app on Firebase Hosting (opens a browser for your own Google sign-in):
+
+   ```powershell
+   pnpm install
+   pnpm exec firebase login
+   just deploy-web
+   ```
+
+   Result: https://essential-wares-510320-f0.web.app (the default Hosting site).
+
+2. The three repository variables (variables, not secrets; no key file anywhere):
+
+   ```powershell
+   gh variable set GCP_PROJECT_ID --repo spark-456/tilo --body essential-wares-510320-f0
+   gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER --repo spark-456/tilo --body projects/379216745263/locations/global/workloadIdentityPools/tilo-github/providers/github
+   gh variable set GCP_DEPLOYER_SERVICE_ACCOUNT --repo spark-456/tilo --body tilo-deployer@essential-wares-510320-f0.iam.gserviceaccount.com
+   ```
+
+3. Get the deploy workflow onto `main` (the WIF provider trusts only `refs/heads/main`). Either:
+   - merge PR #356 (fast-forwards `main` to `phase0-stack`), or
+   - apply PR #353 (the WIF provider also trusts `phase0-stack`; you apply it per `infra/README.md`).
+
+4. Deploy the services, API first, check it, then everything:
+
+   ```powershell
+   gh workflow run deploy-dev.yml --ref main -f service=api
+   gh run watch
+   gh workflow run deploy-dev.yml --ref main -f service=all
+   ```
+
+5. What to expect: `tilo-api` fails closed without a principal (a request with no sign-in is refused;
+   that is correct, not a bug). Cloud Run may reserve `/healthz`, so the smoke step can fail after traffic
+   has already moved to the new revision; if so, see issue #355 (the service is up, the check is wrong).
+
+The web app and the services are independent: step 1 needs no workflow, no `main` and no repository
+variables.
 
 How the seven Cloud Run services and the web app reach `tilo-dev`. Region `asia-southeast1`. This
 runbook is for `tilo-dev` only: nothing here ever targets `tilo-demo` (that deploy is a separate,
@@ -84,7 +126,15 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
   step by you. Tilo's tooling never handles passwords or tokens; `firebase login` is yours.
 - `firebase.json` serves `apps/web/dist` with a single-page-app rewrite to `/index.html`, hashed files
   under `/assets/**` as `public, max-age=31536000, immutable`, and `index.html` as `no-cache` so a new
-  deploy is picked up on the next load.
+  deploy is picked up on the next load. Every route also gets `Content-Security-Policy` (self only,
+  `connect-src 'self'`, `frame-ancestors 'none'`, no `unsafe-eval`: the web app loads
+  `pixi.js/unsafe-eval`), `X-Content-Type-Options: nosniff` and
+  `Referrer-Policy: strict-origin-when-cross-origin`. A new backend origin for the web app must be
+  added to `connect-src` when the app is pointed at a deployed `tilo-api`.
+- Two Hosting sites exist in the project: the default site `essential-wares-510320-f0`
+  (https://essential-wares-510320-f0.web.app, the one this deploy targets, so `firebase.json` has no
+  `site` key) and the Terraform-created `essential-wares-510320-f0-web`
+  (https://essential-wares-510320-f0-web.web.app). The `-web` site is optional and unused.
 - Check before you deploy: `pnpm --filter @tilo/web run build` then `pnpm --filter @tilo/web exec vite preview`
   serves the same bundle locally.
 
