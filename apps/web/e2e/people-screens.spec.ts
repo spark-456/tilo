@@ -65,7 +65,9 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       await expect(page.getByTestId("plate-status")).toHaveText(
         "Marked done: Review the Q4 budget draft.",
       );
-      await expect(page.getByRole("button", { name: "Undo" })).toBeFocused();
+      // Focus stays in the list (the next group's box, as the only overdue row left); Undo is in the page.
+      await expect(page.locator("#plate-group-soon")).toBeFocused();
+      await expect(page.getByRole("button", { name: "Undo" })).not.toBeFocused();
       await expect(page.getByTestId("plate-done")).toContainText("Review the Q4 budget draft");
       await page.getByRole("button", { name: "Undo" }).click();
       await expect(page.getByTestId("plate-overdue")).toContainText("Review the Q4 budget draft");
@@ -126,6 +128,55 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       // The box is reserved at toast height before any toast shows, so nothing shifts.
       const box = await slot.boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(name === "mobile" ? 100 : 68);
+      await expect(slot).toHaveAttribute("data-used", "true");
+      expect(
+        await page.evaluate(() => (window as unknown as { __shifts: number[] }).__shifts),
+      ).toEqual([]);
+    });
+
+    test("PPL-40a S-27: acting on a row never scrolls the page, keeps focus in the list and announces it", async ({
+      page,
+    }) => {
+      await watchShifts(page);
+      await page.goto("/plate");
+      // The status is a polite live region that is in the page before anything is done, and no
+      // blank toast box is reserved yet.
+      const status = page.getByTestId("plate-status");
+      await expect(page.getByRole("status").and(status)).toHaveCount(1); // <output>: role status, polite
+      await expect(page.getByTestId("plate-toast")).toHaveAttribute("data-used", "false");
+      expect((await page.getByTestId("plate-toast").boundingBox())?.height ?? 0).toBeLessThan(2);
+      const scrolled = () =>
+        page.evaluate(
+          () =>
+            window.scrollY +
+            [...document.querySelectorAll("*")].reduce((n, el) => n + el.scrollTop, 0),
+        );
+      // First row of the first group: it is the only overdue row, so focus lands on the next
+      // group's box, exactly where the list now begins.
+      const first = page.getByRole("button", { name: "Done: Review the Q4 budget draft" });
+      await first.scrollIntoViewIfNeeded();
+      const before = await scrolled();
+      await first.click();
+      await expect(status).toHaveText("Marked done: Review the Q4 budget draft.");
+      expect(await scrolled()).toBe(before);
+      await expect(page.locator("#plate-group-soon")).toBeFocused();
+      // First row of a group with more rows: focus lands on the next row's same control.
+      const soon = page.getByRole("button", { name: "Done: Confirm the rate hold in writing" });
+      await soon.scrollIntoViewIfNeeded();
+      const mid = await scrolled();
+      await soon.click();
+      await expect(status).toHaveText("Marked done: Confirm the rate hold in writing.");
+      expect(await scrolled()).toBe(mid);
+      await expect(
+        page.getByRole("button", { name: "Done: Share the venue shortlist with the team" }),
+      ).toBeFocused();
+      // The toast's Undo is in the page, reachable by Tab, and a row put back is focused.
+      await page.getByRole("button", { name: "Undo" }).focus();
+      await page.keyboard.press("Enter");
+      await expect(status).toHaveText("Put back.");
+      await expect(
+        page.getByRole("button", { name: "Done: Confirm the rate hold in writing" }),
+      ).toBeFocused();
       expect(
         await page.evaluate(() => (window as unknown as { __shifts: number[] }).__shifts),
       ).toEqual([]);

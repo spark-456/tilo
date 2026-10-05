@@ -256,7 +256,9 @@
 .plate-toast-slot {
   display: block;
   box-sizing: border-box;
-  min-height: 68px; /* one line and Undo; the phone reserves more (below) */
+}
+.plate-toast-slot[data-used="true"] {
+  min-height: 68px; /* reserved once something was done: one line and Undo, more on a phone */
   margin-top: var(--space-16);
 }
 .source-icon {
@@ -265,16 +267,14 @@
   margin: 0 var(--space-8) -3px 0;
   color: var(--color-ink-2);
 }
-.plate-toast-slot:focus-visible {
-  outline: 2px solid var(--color-brand-primary);
-  outline-offset: 2px;
-}
 .plate-toast {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-12);
+}
+.plate-toast[data-on="true"] {
   padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-controls);
   background: var(--color-ink-1);
@@ -597,7 +597,7 @@
 }
 
 @media (max-width: 767px) {
-  .plate-toast-slot {
+  .plate-toast-slot[data-used="true"] {
     min-height: 100px;
   }
   .people-strip {

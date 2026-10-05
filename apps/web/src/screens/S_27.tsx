@@ -78,12 +78,27 @@ function Source({ item: i }: { item: WorkItem }) {
 export function S_27() {
   const [items, act] = useReducer(reducePlate, WORK_ITEMS);
   const [toast, setToast] = useState<{ text: string; undo: string | null } | null>(null);
-  const undo = useRef<HTMLButtonElement>(null);
-  const box = useRef<HTMLOutputElement>(null);
-  // The row leaves its list, so focus moves to what happened: the toast's Undo, else the toast.
+  // Where focus goes once the acted row has left its list. It stays where the person is looking:
+  // the next row's same control, else the group's own box (tabIndex -1). The toast is announced
+  // by its live region, never focused, so acting never scrolls the page.
+  const after = useRef<{ next: string | null; kind: string; group: Key } | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per change of the items
   useEffect(() => {
-    if (toast) (undo.current ?? box.current)?.focus();
-  }, [toast]);
+    const to = after.current;
+    after.current = null;
+    if (!to) return;
+    const row = to.next ? document.querySelector(`[data-row="${to.next}"]`) : null;
+    const control = row?.querySelector(`[data-kind="${to.kind}"]`) ?? row?.querySelector("button");
+    const target =
+      control ??
+      document.getElementById(`plate-group-${to.group}`) ??
+      document.querySelector(".plate-group");
+    if (!(target instanceof HTMLElement)) return;
+    target.focus({ preventScroll: true });
+    // Scroll only when focus would otherwise be out of sight (Undo of a row far above).
+    const r = target.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) target.scrollIntoView({ block: "nearest" });
+  }, [items]);
 
   const keyOf = (i: WorkItem): Key => {
     const lane = laneOf(i);
@@ -99,6 +114,13 @@ export function S_27() {
   };
 
   const run = (i: WorkItem, kind: PlateAction["kind"], says: string) => () => {
+    const group = keyOf(i);
+    const list = rows(group);
+    after.current = {
+      next: list[list.findIndex((r) => r.id === i.id) + 1]?.id ?? null,
+      kind,
+      group,
+    };
     act({ kind, id: i.id });
     setToast({ text: `${says}: ${i.title}.`, undo: kind === "put_back" ? null : i.id });
   };
@@ -117,7 +139,7 @@ export function S_27() {
         ]
       : [["Put back", "Put back", "Put back", "put_back"]];
     return (
-      <li key={i.id} className="prow" data-testid="plate-item">
+      <li key={i.id} className="prow" data-testid="plate-item" data-row={i.id}>
         <div className="prow-title">
           <b>{i.title}</b>
           <span className="prow-chips">
@@ -134,6 +156,7 @@ export function S_27() {
             <button
               key={kind}
               type="button"
+              data-kind={kind}
               className="secondary"
               aria-label={`${name}: ${i.title}`}
               onClick={run(i, kind, says)}
@@ -188,28 +211,28 @@ export function S_27() {
           </div>
         ),
       )}
-      {/* In the page's flow after the last group, in a box always as tall as a toast: it never
-          covers a button, and appearing moves nothing. */}
-      <output ref={box} tabIndex={-1} className="plate-toast-slot" data-testid="plate-toast">
-        {toast && (
-          <span className="plate-toast">
-            <span data-testid="plate-status">{toast.text}</span>
-            {toast.undo && (
-              <button
-                ref={undo}
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  act({ kind: "put_back", id: toast.undo ?? "" });
-                  setToast({ text: "Put back.", undo: null });
-                }}
-              >
-                Undo
-              </button>
-            )}
-          </span>
-        )}
-      </output>
+      {/* In the page's flow after the last group, so it never covers a button. The box is reserved
+          only once something has been done, and the text is a polite live region that is always
+          mounted, so the change is announced; focus stays on the list. */}
+      <div className="plate-toast-slot" data-testid="plate-toast" data-used={toast !== null}>
+        <div className="plate-toast" data-on={toast !== null}>
+          <output data-testid="plate-status">{toast?.text}</output>
+          {toast?.undo && (
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => {
+                const id = toast.undo ?? "";
+                after.current = { next: id, kind: "done", group: "done" };
+                act({ kind: "put_back", id });
+                setToast({ text: "Put back.", undo: null });
+              }}
+            >
+              Undo
+            </button>
+          )}
+        </div>
+      </div>
     </Page>
   );
 }
