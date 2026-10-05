@@ -114,7 +114,9 @@ code on `main`, and every job is guarded on `spark-456/tilo` and `refs/heads/mai
 The run: build each image on the runner, push to
 `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>:<commit sha>`, update `tilo-<svc>` to that image digest,
 then smoke test. Smoke reads each service's URL from `gcloud run services describe` and checks the Ready
-condition. Services with public ingress (api, channels, sandbox-web) also get `curl --fail` on `/healthz`.
+condition. Services with public ingress (api, channels, sandbox-web) also get `curl --fail` on `/health`
+(every service answers it with `{"status":"ok"}`; `/healthz` is kept for in-container probes only, because Cloud Run
+reserves it on `run.app` URLs and never forwards it to the container).
 Internal-only services (harness, connectors, browser, render) cannot be reached from a runner and the
 deployer holds no `run.invoker`, so they get the Ready check only. A real HTTP check of those needs an
 in-VPC probe or a wider role: your decision (docs/p0-07a-notes.md, item 7).

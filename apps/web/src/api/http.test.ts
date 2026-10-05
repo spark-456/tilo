@@ -158,6 +158,35 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
     await expect(c.stopAutopilot("w1")).rejects.toMatchObject({ status: 403, retryable: false });
   });
 
+  // FR-HIL-11: the answer records the channel it came from, so a phone answer reads "mobile_web".
+  describe("FR_HIL_11 answerCard names the channel", () => {
+    const phone = (matches: boolean) =>
+      vi.stubGlobal("window", { matchMedia: (q: string) => ({ matches, media: q }) });
+    afterEach(() => vi.unstubAllGlobals());
+    const sent = async (matches: boolean | null, channels: Card["answer_channels"]) => {
+      if (matches !== null) phone(matches);
+      const card: Card = { ...(CARDS_VALID[0] as Card), world_id: "w1", answer_channels: channels };
+      const { calls, fetch } = script(json([card]), json({ outcome: "answered" }));
+      const c = client(fetch);
+      await c.listCards("w1");
+      await c.answerCard(card.id, { option_id: "approve" });
+      return JSON.parse(String(calls[1]?.init?.body));
+    };
+    it("sends mobile_web from a phone-width window when the card lists it", async () => {
+      expect(await sent(true, ["web", "mobile_web"])).toEqual({
+        option: "approve",
+        channel: "mobile_web",
+      });
+    });
+    it("sends nothing extra (web) on a desktop-width window, or with no window", async () => {
+      expect(await sent(false, ["web", "mobile_web"])).toEqual({ option: "approve" });
+      expect(await sent(null, ["web", "mobile_web"])).toEqual({ option: "approve" });
+    });
+    it("stays web on a phone for a card that does not list mobile_web", async () => {
+      expect(await sent(true, ["web"])).toEqual({ option: "approve" });
+    });
+  });
+
   it("answerCard for a card it never listed says so, without calling the server", async () => {
     const { calls, fetch } = script();
     await expect(

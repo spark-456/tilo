@@ -3,6 +3,7 @@
 Only these modules and `tokens.py` call `access_token_for_adapter` (SEC-02).
 """
 
+from ._google import side_effect_marker as side_effect_marker
 from ._transport import MAX_ATTEMPTS as MAX_ATTEMPTS
 from ._transport import AdapterError as AdapterError
 from ._transport import ApiResponse as ApiResponse

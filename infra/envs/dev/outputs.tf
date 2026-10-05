@@ -65,6 +65,7 @@ output "monitoring" {
   value = {
     notification_email = module.monitoring.notification_channel_email
     alert_policies     = module.monitoring.alert_policies
+    cost_alert_policy  = module.monitoring.cost_alert_policy
   }
 }
 

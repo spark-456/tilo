@@ -147,7 +147,7 @@ def _exercise(rig) -> list[str]:
     fragments: list[str] = []
     style = {"signature": "Sarah Chen, Harborview Ops desk"}
     paths = [
-        ("Engine tune-up scheduling", "Can Marcus come by this Friday afternoon?", answer(CLEAN)),
+        ("Engine tuneup scheduling", "Can Marcus come by this Friday afternoon?", answer(CLEAN)),
         ("Haul-out for Northern Star", "Can we book the haul-out on Tuesday?", answer(f"{CLEAN} It is free.")),
         ("Parcel delivered to the office", "Your parcel was left at the marina office.", "not json at all"),
         ("Updated remittance details", f"Our bank changed. {INJECTION_MARKER}.", answer(CLEAN)),

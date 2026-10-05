@@ -1,1 +1,1 @@
-- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS quirks, invalid fixtures, safety lists, author/role binding, nullable caps, CRLF, BQ/ADR id clashes, PRD arithmetic, gh, no scenario ids in descriptions, tiers are data
+- [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS quirks, invalid fixtures, safety lists, author/role binding, nullable caps, CRLF, BQ/ADR id clashes, PRD arithmetic, gh, no scenario ids in descriptions, tiers are data, read-model rows, re-check ADR ids before commit

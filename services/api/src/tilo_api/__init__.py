@@ -31,6 +31,7 @@ app.include_router(_runs.router)
 _dev.install_if_enabled(app)  # only with TILO_API_DEV=1; refuses when deployed or live (CL-INT-4)
 
 
+@app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
