@@ -157,6 +157,21 @@ Third-party code run in CI (`.github/workflows/ci.yml`) or on developer machines
 | actions/setup-java (Firestore emulator's JRE, P0-09) | v4 | MIT | https://github.com/actions/setup-java |
 | pre-commit/pre-commit-hooks | v5.0.0 | MIT | https://github.com/pre-commit/pre-commit-hooks |
 
+## tilo-dev deploy: actions and container base images (P0-07a)
+
+Every action is pinned to a full commit SHA in `.github/workflows/deploy-dev.yml` (tag in the comment).
+
+| Component | Pinned ref | Licence | Source |
+| --- | --- | --- | --- |
+| actions/checkout (deploy-dev) | v6.1.0 (`d23441a48e51`) | MIT | https://github.com/actions/checkout |
+| google-github-actions/auth (Workload Identity Federation) | v3.0.0 (`7c6bc770dae8`) | Apache-2.0 | https://github.com/google-github-actions/auth |
+| google-github-actions/setup-gcloud | v3.0.1 (`aa5489c8933f`) | Apache-2.0 | https://github.com/google-github-actions/setup-gcloud |
+| ghcr.io/astral-sh/uv (builder stage of every `services/<svc>/Dockerfile`) | 0.12.18-python3.12-trixie-slim | MIT or Apache-2.0 | https://github.com/astral-sh/uv |
+| python (runtime stage; Docker Official Image, Debian trixie slim) | 3.12.15-slim-trixie | PSF-2.0 (Python); Debian packages under their own licences | https://hub.docker.com/_/python |
+
+`fastapi` (MIT) and `uvicorn` (BSD-3-Clause) are now direct dependencies of every service so each image runs
+`uvicorn <module>:app` (a `/healthz` ASGI app in `harness`, `channels`, `connectors`, `browser`, `render`).
+
 ## Fonts, icons and design assets
 
 None vendored yet. `design/source/` is read-only reference material, not a dependency; its
