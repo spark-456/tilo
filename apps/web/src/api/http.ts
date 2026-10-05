@@ -84,6 +84,10 @@ function reasonOf(status: number, text: string): string {
   return GENERIC_4XX[status] ?? "Tilo could not accept that.";
 }
 
+/** The window is phone-width: the one breakpoint the shell uses for mobile web (App.tsx). */
+const onPhone = (): boolean =>
+  typeof window !== "undefined" && window.matchMedia?.("(max-width: 767px)").matches === true;
+
 /** What `GET /worlds/{id}/events` returns: the stored event. An up-to-date server includes `v`,
  * `world_id`, `run_id` and `item` (CL-INT-4); the Event type minus those, never a copy. */
 type EventView = Omit<Event, "v" | "world_id" | "run_id" | "item"> &
@@ -163,6 +167,7 @@ export class HttpClient implements TiloClient {
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
   private readonly cardWorlds = new Map<string, string>(); // card -> world, from listCards
+  private readonly cardChannels = new Map<string, Card["answer_channels"]>(); // card -> channels it lists
   private readonly layouts = new Map<string, LayoutCall>(); // a run's layout never changes
   private readonly approaches = new Map<string, Promise<ApproachesResult>>(); // in flight only
   private readonly feeds = new Map<string, Feed>();
@@ -467,12 +472,17 @@ export class HttpClient implements TiloClient {
 
   async listCards(worldId: string): Promise<Card[]> {
     const cards = await this.request<Card[]>(`/worlds/${encodeURIComponent(worldId)}/cards`);
-    for (const card of cards) this.cardWorlds.set(card.id, worldId);
+    for (const card of cards) {
+      this.cardWorlds.set(card.id, worldId);
+      this.cardChannels.set(card.id, card.answer_channels);
+    }
     return cards;
   }
 
   /** The route is per world and `answerCard` is not given one, so the card must have come from
-   * `listCards`. The API takes `{option}` only: `answer.context` is not sent. */
+   * `listCards`. The API takes `{option}` and the channel it came from: `answer.context` is not
+   * sent. A phone-width window answers as "mobile_web" (FR-HIL-11) when the card lists it; every
+   * other answer is "web", the API's default, so no field is sent. */
   async answerCard(cardId: string, answer: CardAnswer): Promise<void> {
     const worldId = this.cardWorlds.get(cardId);
     if (worldId === undefined) {
@@ -480,7 +490,9 @@ export class HttpClient implements TiloClient {
     }
     await this.post(
       `/worlds/${encodeURIComponent(worldId)}/cards/${encodeURIComponent(cardId)}/answer`,
-      { option: answer.option_id },
+      this.cardChannels.get(cardId)?.includes("mobile_web") && onPhone()
+        ? { option: answer.option_id, channel: "mobile_web" }
+        : { option: answer.option_id },
     );
   }
 
