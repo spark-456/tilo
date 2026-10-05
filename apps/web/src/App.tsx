@@ -254,6 +254,7 @@ export function App() {
               key={railWorld}
               worldId={railWorld}
               tabs={hudWorld !== null}
+              space={worldId !== null}
               replayed={world.worldId === railWorld ? replayed : null}
             />
           ) : (

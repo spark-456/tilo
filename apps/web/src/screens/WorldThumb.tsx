@@ -58,19 +58,15 @@ function Building({ b }: { b: FrameBuilding }) {
 }
 
 /** An agent figure drawn with its feet at the origin: a body, a white face with two eyes, and a
- * rank mark. */
-function Agent({ a }: { a: FrameAgent }) {
-  const director = a.rank === "director";
-  const col = director ? tokens.color.brand.primary : a.tint;
+ * rank mark. The same figure stands in the thumbnail and beside a name in the crew strip. */
+export function AgentFigure({ rank, tint }: { rank: string; tint: string }) {
+  const director = rank === "director";
+  const col = director ? tokens.color.brand.primary : tint;
   const [w, h] = director ? [20, 28] : [18, 26];
   const [x, y] = [-w / 2, -h - 2];
   const edge = dk(col, 0.3);
   return (
-    <g
-      transform={`translate(${a.cx.toFixed(1)} ${a.cy.toFixed(1)}) scale(${AGENT_SCALE})`}
-      data-testid="thumb-agent"
-      data-rank={a.rank}
-    >
+    <>
       <ellipse rx={w * 0.7} ry={4} fill={PALETTE.ink} opacity={0.15} />
       {director && (
         <g fill={dk(col, 0.12)}>
@@ -79,14 +75,26 @@ function Agent({ a }: { a: FrameAgent }) {
           ))}
         </g>
       )}
-      {a.rank === "lead" && <rect x={-4} y={y - 5} width={8} height={6} fill={shade(col).l} />}
-      {a.rank === "verifier" && (
+      {rank === "lead" && <rect x={-4} y={y - 5} width={8} height={6} fill={shade(col).l} />}
+      {rank === "verifier" && (
         <rect x={x + w + 1} y={y + 8} width={5} height={10} fill={PALETTE.ink2} stroke={edge} />
       )}
       <rect x={x} y={y} width={w} height={h} rx={4} fill={col} stroke={edge} strokeWidth={1.2} />
       <rect x={x + 3} y={y + 4} width={w - 6} height={11} rx={2.5} fill={PALETTE.white} />
       <circle cx={-3.2} cy={y + 9} r={1.5} fill={PALETTE.ink} />
       <circle cx={3.2} cy={y + 9} r={1.5} fill={PALETTE.ink} />
+    </>
+  );
+}
+
+function Agent({ a }: { a: FrameAgent }) {
+  return (
+    <g
+      transform={`translate(${a.cx.toFixed(1)} ${a.cy.toFixed(1)}) scale(${AGENT_SCALE})`}
+      data-testid="thumb-agent"
+      data-rank={a.rank}
+    >
+      <AgentFigure rank={a.rank} tint={a.tint} />
     </g>
   );
 }

@@ -1859,6 +1859,82 @@ button.row {
     height: 100%;
   }
 }
+/* The hero card's extras (artboard "Tilo Worlds"): the state in words, the crew standing on the
+   card and every waiting decision. A grid card shows only its first decision and none of the rest. */
+.world-eyebrow,
+.crew {
+  display: none;
+}
+.world-decision .decision-list > :nth-child(n + 2) {
+  display: none;
+}
+@media (min-width: 1280px) {
+  .world-grid > .flow-slot:only-child > .world-card .world-eyebrow {
+    display: block;
+    margin: 0;
+    font: 800 var(--text-12) / 1.2 var(--font-ui);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-2);
+  }
+  .world-grid > .flow-slot:only-child > .world-card .world-eyebrow[data-tone="needs"] {
+    color: color-mix(in srgb, var(--color-signal-needs) 45%, var(--color-ink-1));
+  }
+  .world-grid > .flow-slot:only-child > .world-card .world-thumb > .btag:last-child {
+    display: none; /* the eyebrow says the state here */
+  }
+  .world-grid > .flow-slot:only-child > .world-card h2 {
+    font-size: var(--text-24);
+  }
+  .world-grid > .flow-slot:only-child > .world-card .crew {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4) var(--space-16);
+    margin: 0 0 var(--space-4);
+    padding: 0;
+    list-style: none;
+  }
+  .world-grid > .flow-slot:only-child > .world-card [data-testid="replay-note"] {
+    min-height: 2.8em; /* two lines at the hero's width */
+  }
+  .world-grid > .flow-slot:only-child > .world-card .world-decision {
+    min-height: 9.5rem; /* two decisions of one line each, and the link */
+  }
+  .world-grid
+    > .flow-slot:only-child
+    > .world-card
+    .world-decision
+    .decision-list
+    > :nth-child(n + 2) {
+    display: -webkit-box;
+  }
+  .world-grid > .flow-slot:only-child > .world-card .world-decision .decision-list .bitem-sub {
+    -webkit-line-clamp: 1;
+  }
+}
+.crew li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: 20px 16px; /* the state word has its row even when empty (CLS) */
+  column-gap: var(--space-8);
+  align-items: center;
+  min-width: 7rem;
+}
+.crew svg {
+  grid-row: 1 / 3;
+  width: 24px;
+  height: 40px;
+}
+.crew li[data-joined="false"] svg {
+  opacity: 0.45;
+}
+.crew-name {
+  font: 700 var(--text-14) / 1.2 var(--font-ui);
+}
+.crew-state {
+  color: var(--color-ink-2);
+  font: 600 var(--text-12) / 1.2 var(--font-ui);
+}
 .world-body {
   display: flex;
   flex: 1;

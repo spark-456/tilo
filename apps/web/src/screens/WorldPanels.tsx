@@ -62,14 +62,16 @@ export function HudGlance({
 }
 
 /** `tabs`: show the lens tabs (S-04 has no page header of its own; the lens screens do). Without
- * them the same height stays reserved, so the rail does not jump between world screens.
+ * them the same height stays reserved, so the rail does not jump between world screens; a screen
+ * that is not a world's (`space` false, S-14 and the other run screens) reserves nothing.
  * `replayed`: the events of a ?fixture= replay up to the stage's seq; they replace the client's own
  * log of the same world, which may not have started (HR-1: one run on screen, one story). */
 export function WorldPanels({
   worldId,
   tabs = true,
+  space = true,
   replayed = null,
-}: { worldId: string; tabs?: boolean; replayed?: readonly Event[] | null }) {
+}: { worldId: string; tabs?: boolean; space?: boolean; replayed?: readonly Event[] | null }) {
   const client = useClient();
   const log = useReplayedLog(client, worldId);
   const events = replayed ?? log.events;
@@ -96,7 +98,11 @@ export function WorldPanels({
   const base = `/world/${encodeURIComponent(worldId)}`;
   return (
     <div className="world-panels" data-testid="world-hud">
-      {tabs ? <LensTabs worldId={worldId} current="world" /> : <div className="lens-space" />}
+      {tabs ? (
+        <LensTabs worldId={worldId} current="world" />
+      ) : (
+        space && <div className="lens-space" />
+      )}
       <section className="hud-card" aria-label="Live meter" data-testid="hud-meter">
         {events.length === 0 ? (
           <p>Nothing yet. This fills in once a run starts.</p>

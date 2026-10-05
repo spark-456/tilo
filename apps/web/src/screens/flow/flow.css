@@ -24,6 +24,65 @@
   flex-direction: column;
   min-height: 0;
 }
+/* S-01 top line: the decisions banner or the greeting, in one box of a fixed height. */
+.flow-wide > .home-brief {
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-12);
+  box-sizing: border-box;
+  height: 56px;
+  margin-bottom: var(--space-16);
+}
+.home-brief[data-tone="needs"] {
+  padding: 0 var(--space-12);
+  border: 2px solid var(--color-signal-needs);
+  border-radius: var(--radius-cards);
+  background: color-mix(in srgb, var(--color-signal-needs) 12%, var(--color-surface-1));
+}
+.home-brief p {
+  margin: 0;
+}
+.brief-greeting {
+  color: var(--color-ink-2);
+  font: 800 var(--text-20) / 1.2 var(--font-display);
+}
+.brief-text {
+  flex: 1;
+  min-width: 0;
+}
+.brief-title,
+.brief-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.brief-title {
+  font: 800 var(--text-14) / 1.4 var(--font-ui);
+}
+.brief-sub {
+  color: var(--color-ink-2);
+  font: 400 var(--text-12) / 1.4 var(--font-ui);
+}
+.brief-review {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 0 var(--space-16);
+  border: 1px solid var(--color-ink-3);
+  border-bottom: 4px solid var(--color-fog);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) / 1 var(--font-ui);
+  text-decoration: none;
+}
+.brief-review:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
 .flow-body {
   flex: 0 1 auto;
   min-height: 0;

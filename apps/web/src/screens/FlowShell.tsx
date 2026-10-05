@@ -5,6 +5,7 @@
 import { type ReactNode, Suspense, lazy, useEffect, useRef } from "react";
 import { useFlowRoute } from "../router";
 import { ChunkBoundary } from "./ChunkBoundary";
+import { HomeBrief } from "./flow/HomeBrief";
 import { StartScreen } from "./flow/StartScreen";
 import "./flow/flow.css";
 import { type Action, type Remote, useAction } from "./remote";
@@ -165,6 +166,7 @@ export function FlowShell() {
       data-screen={route.screen}
       aria-label="Task flow"
     >
+      {route.screen === "Start" && <HomeBrief />}
       <h1 className="flow-heading" ref={heading} tabIndex={-1}>
         {HEADINGS[route.screen] ?? route.screen}
       </h1>

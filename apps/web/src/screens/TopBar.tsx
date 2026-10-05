@@ -63,7 +63,7 @@ export function placeOf(path: string, fixture = false): Place {
 }
 
 /** The world's recorded title (its first event carries it), else null. */
-function worldTitle(events: readonly { data: unknown }[]): string | null {
+export function worldTitle(events: readonly { data: unknown }[]): string | null {
   const first = events[0] as Parameters<typeof field>[0] | undefined;
   const title = first ? field(first, "title") : undefined;
   return typeof title === "string" && title.trim() !== "" ? title : null;

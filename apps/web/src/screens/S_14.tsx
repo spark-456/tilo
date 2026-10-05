@@ -13,6 +13,7 @@ import { creditsUsed, useRunLog } from "../world/runLog";
 import { budgetCap, worldStatus } from "../world/runSummary";
 import { alsoWorld, useAddressedWorld, useRunWorld, withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
+import { Crew } from "./Crew";
 import { Loaded, Primary } from "./FlowShell";
 import { NotFound } from "./NotFound";
 import { WorldThumb } from "./WorldThumb";
@@ -65,6 +66,7 @@ export function S_14() {
   };
   if (addressed !== null && !worldKnown) return <NotFound />; // a world the client does not know
   const first = events[0];
+  const latest = events[events.length - 1];
   const status = worldStatus(events);
   const phase: WorldPhase =
     events.length === 0
@@ -207,11 +209,17 @@ export function S_14() {
                     <Chip tone={tone}>{label}</Chip>
                   </div>
                   <div className="world-body">
+                    {/* The hero card's state in words (artboard "WAITING FOR YOU"); the grid card
+                        has the pill on its thumbnail instead, so this line is hidden there. */}
+                    <p className="world-eyebrow" data-tone={waiting > 0 ? "needs" : phase}>
+                      {waiting > 0 ? "Waiting for you" : label}
+                    </p>
                     <h2>{title}</h2>
                     <p className="bitem-sub">
                       {plural(l.semantic.agents.length, "agent")} on the team · {done} of{" "}
                       {plural(levels, "level")} finished
                     </p>
+                    <Crew layout={l} state={state} events={events} />
                     <div className="world-progress">
                       <progress max={levels} value={done} aria-label="Levels finished" />
                       <span aria-hidden="true">{`${Math.round((done / Math.max(levels, 1)) * 100)}%`}</span>
@@ -232,7 +240,16 @@ export function S_14() {
                           <p className="decision-head">
                             {plural(waiting, "decision")} waiting for you
                           </p>
-                          <p className="bitem-sub">{next.opened.summary}</p>
+                          <div className="decision-list">
+                            {queue.slice(0, 2).map((item) => (
+                              <p className="bitem-sub" key={`${item.runId}:${item.cardId}`}>
+                                {item.opened.summary}
+                              </p>
+                            ))}
+                          </div>
+                          {waiting > 2 && (
+                            <p className="bitem-sub">{`and ${plural(waiting - 2, "more decision")}`}</p>
+                          )}
                           <AppLink
                             to={
                               next.kind === "gate"
@@ -248,7 +265,12 @@ export function S_14() {
                           </AppLink>
                         </>
                       ) : (
-                        <p className="decision-head">Nothing waits for you.</p>
+                        <>
+                          <p className="decision-head">Nothing waits for you.</p>
+                          {latest?.summary && (
+                            <p className="bitem-sub">{`Latest: ${latest.summary}`}</p>
+                          )}
+                        </>
                       )}
                     </div>
                     <p className="bitem-sub" data-testid="replay-note">
