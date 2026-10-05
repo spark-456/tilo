@@ -9,7 +9,7 @@ links. Public ingress for signature-verified webhooks only. WhatsApp is out of s
 - `packages/contracts-py` event types; writes to `tilo-api` only, never Firestore business state. `config/connectors.yaml`, flags.
 
 ## Requirement IDs
-- Section 11 (channels, Email Autopilot); SEC-08 (signed webhooks and email links). Built: FR-CHN-07 to -13; FR-PA-07 (`plate_reply`, BQ-279 to BQ-284: the Draft reply tap is `Drafter` + `Autopilot.preview` with no instruction, so L1; no send path).
+- Section 11 (channels, Email Autopilot); SEC-08 (signed webhooks and email links). Built: FR-CHN-07 to -13; FR-PA-07 (`plate_reply`, BQ-279 to BQ-284: the Draft reply tap is `Drafter` + `Autopilot.preview` with no instruction, so L1; owner first, reply must answer that mail itself; no send path).
 
 ## Local rules
 - Webhooks signature-verified, idempotent, ordered per user; forged or replayed rejected. Never send real email

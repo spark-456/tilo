@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import _chn09_lib as triage_lib
-from _chn10_lib import INJECTION_MARKER, OTHER_USER, Msg, answer
+from _chn10_lib import INJECTION_MARKER, OTHER_USER, Msg, answer, message_id_header
 from _chn11_lib import DAVID, MAILBOX
 from _chn13_lib import USER, Line
 from _chn_wire1_lib import make_wire_line
@@ -86,6 +86,7 @@ class Plate:
         reply: str | None = PLAIN_REPLY,
         extra_answers: Sequence[str] = (),
         earlier: Sequence[Msg] = (),
+        later: Sequence[Msg] = (),
         triage_user: str = USER,
         corrected: str | None = None,
         triage_body: str | None = None,
@@ -93,12 +94,16 @@ class Plate:
     ) -> tuple[Any, str]:
         """A mail the triage store holds for `triage_user` under `category`, answering the last message of a thread
         that the drafter's reader and Gmail hold for USER. `reply` is what the scripted model drafts (and
-        `extra_answers` the redrafts after it). Returns (thread, mail id); the mail id is what a plate row's `ref`
-        carries."""
+        `extra_answers` the redrafts after it). `later` messages arrive in the thread after the plate mail (the
+        drafter's reader sees them; the triage store holds only the plate mail). The triage copy carries its own
+        Message-ID header, as the thread's copy does. Returns (thread, mail id); the mail id is what a plate row's
+        `ref` carries."""
         answers = [answer(reply), *map(answer, extra_answers)] if reply is not None else []
         thread = self.line.thread(answers=answers, earlier=earlier, **thread_kw)
         last = thread.messages[-1]
-        extra = {"body": triage_body} if triage_body is not None else {}
+        thread.messages.extend(later)
+        extra: dict[str, Any] = {"headers": {"Message-ID": message_id_header(last.message_id)}}
+        extra |= {"body": triage_body} if triage_body is not None else {}
         mail, _ = self.tr.mail(
             sender=last.sender,
             message_id=last.message_id,
