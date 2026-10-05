@@ -81,6 +81,20 @@ run "SEC_02_deployer_limited_to_main_and_runtime_service_accounts" {
   }
 
   assert {
+    condition = alltrue([
+      strcontains(output.wif_provider_attribute_condition, "assertion.workflow_ref == \"${var.github_repository}/.github/workflows/deploy-dev.yml@refs/heads/main\""),
+      strcontains(output.wif_provider_attribute_condition, "assertion.workflow_ref == \"${var.github_repository}/.github/workflows/deploy-dev.yml@refs/heads/phase0-stack\""),
+      length(regexall("assertion[.]workflow_ref == ", output.wif_provider_attribute_condition)) == 2,
+    ])
+    error_message = "The WIF provider must pin workflow_ref to exactly deploy-dev.yml on main or phase0-stack (P0-07d, SEC-02)."
+  }
+
+  assert {
+    condition     = strcontains(output.wif_provider_attribute_condition, "assertion.event_name == \"workflow_dispatch\"")
+    error_message = "The WIF provider must accept only workflow_dispatch events (P0-07d, SEC-02)."
+  }
+
+  assert {
     condition     = !strcontains(output.wif_provider_attribute_condition, "refs/tags")
     error_message = "The WIF provider must not accept tags: tags bypass branch protection (SEC-02, SEC-12)."
   }

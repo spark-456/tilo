@@ -3,7 +3,8 @@
 # rule 5: "no keys in the repo"). The attribute condition restricts token
 # exchange to var.github_repository (name, repository id and owner id) on
 # refs/heads/main or refs/heads/phase0-stack (temporary, P0-07d: revert to
-# main only once phase0-stack merges to main); the deployer service account
+# main only once phase0-stack merges to main), and only for the deploy-dev.yml
+# workflow on workflow_dispatch; the deployer service account
 # is the only identity the provider may impersonate, and project roles for
 # it are granted by the environment root through modules/iam.
 
@@ -36,12 +37,17 @@ resource "google_iam_workload_identity_pool_provider" "github" {
   # wildcards and no tags: exact ref strings only. Tags are not accepted:
   # anyone with push access can tag an unreviewed commit,
   # bypassing branch protection, and the deployer can act as tilo-connectors
-  # (PRD 6.5, SEC-02, SEC-12 least privilege).
+  # (PRD 6.5, SEC-02, SEC-12 least privilege). The token must also come from
+  # the one deploy workflow (workflow_ref, exact path on the same two refs)
+  # and a manual dispatch (event_name), so no other workflow or trigger in the
+  # repository can reach the deployer.
   attribute_condition = join(" && ", [
     "assertion.repository == \"${var.github_repository}\"",
     "assertion.repository_id == \"${var.github_repository_id}\"",
     "assertion.repository_owner_id == \"${var.github_repository_owner_id}\"",
     "(assertion.ref == \"refs/heads/main\" || assertion.ref == \"refs/heads/phase0-stack\")",
+    "(assertion.workflow_ref == \"${var.github_repository}/.github/workflows/deploy-dev.yml@refs/heads/main\" || assertion.workflow_ref == \"${var.github_repository}/.github/workflows/deploy-dev.yml@refs/heads/phase0-stack\")",
+    "assertion.event_name == \"workflow_dispatch\"",
   ])
 
   oidc {

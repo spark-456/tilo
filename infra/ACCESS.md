@@ -50,7 +50,7 @@ Other identities:
 | `gmail-api-push@system.gserviceaccount.com` | `pubsub.publisher` on topic `tilo-gmail-notifications` only | added |
 | Pub/Sub service agent | custom insert-only role on dataset `tilo_ledger` | present |
 | Cloud Storage service agent | `cryptoKeyEncrypterDecrypter` on key `archive` | present |
-| `tilo-deployer` (WIF, `refs/heads/main` or temporary `refs/heads/phase0-stack` only, P0-07d) | `run.developer` per service; `serviceAccountUser` per runtime SA; Artifact Registry writer on repo `tilo`. No project role, and `deployer_project_roles` stays `[]` for dev | present |
+| `tilo-deployer` (WIF, `refs/heads/main` or temporary `refs/heads/phase0-stack` only, and only from workflow `deploy-dev.yml` on `workflow_dispatch`, P0-07d) | `run.developer` per service; `serviceAccountUser` per runtime SA; Artifact Registry writer on repo `tilo`. No project role, and `deployer_project_roles` stays `[]` for dev | present |
 
 ## 3. Pub/Sub, Scheduler, Cloud Tasks
 

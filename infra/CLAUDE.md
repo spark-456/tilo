@@ -28,7 +28,8 @@ Full apply flow (with credentials): see `infra/README.md`.
 - CI/CD authenticates through Workload Identity Federation
   (`infra/modules/wif`), restricted to `var.github_repository` (name,
   repository id and owner id) on `refs/heads/main` or, temporarily (P0-07d, revert after merge),
-  `refs/heads/phase0-stack`; never tags. No keys. Grant roles per resource (topic, secret, key, bucket, service),
+  `refs/heads/phase0-stack`; never tags. Only the `deploy-dev.yml`
+  workflow (`workflow_ref`) on `workflow_dispatch` may exchange. No keys. Grant roles per resource (topic, secret, key, bucket, service),
   never project-wide, and keep `run.invoker` scoped to real callers.
 - Keep `infra/modules/*` reusable and DRY: a new Cloud Run service is a new
   entry in the `cloud_run_services` map in `infra/envs/dev/main.tf`, not a
