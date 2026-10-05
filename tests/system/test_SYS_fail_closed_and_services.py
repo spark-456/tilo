@@ -68,7 +68,7 @@ def test_SYS_SEC_05_a_service_route_that_is_not_public_by_design_refuses_an_anon
 
 def test_SYS_SEC_05_tilo_api_without_dev_mode_serves_nothing_that_needs_a_person(prod_api):
     ops = [(m, p) for m, p in _operations(prod_api.url) if p not in OPEN]
-    assert len(ops) >= 15
+    assert ("POST", "/intake") in ops and ("GET", "/worlds/{world_id}/events") in ops, "the route list was read"
     for method, path in ops:
         response = httpx.request(method, prod_api.url + _fill(path), json={} if method == "POST" else None, timeout=15)
         assert response.status_code == 401, f"{method} {path} answered {response.status_code} with no sign-in"
