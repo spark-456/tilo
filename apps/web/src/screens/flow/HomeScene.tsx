@@ -3,7 +3,8 @@
 // (P, poly, box, colorsFor, facade, roofEl, tree, label; ADR-0003) and from the Pixi art in
 // src/world/art, with SVG polygons in place of Graphics paths. Every colour is a design token or a
 // mix of one with black or white. It is a picture of the product, not of a task: nothing in it is
-// planned, nothing moves (HR-1, HR-2), and no figure or agent is drawn.
+// planned, nothing moves (HR-1, HR-2), and no figure or agent is drawn. The name tags are HTML over
+// the SVG (placed in % of its viewBox), so they stay 12 px however wide the picture is drawn.
 import type { ReactNode } from "react";
 import tokens from "../../design/tokens";
 import { PALETTE, type Shade, dk, lt } from "../../world/art/color";
@@ -162,41 +163,6 @@ function Tree({ at, pine }: { at: readonly [number, number]; pine: boolean }) {
   );
 }
 
-/** A name tag: white pill, ink text, 12 px (the ramp's smallest step). */
-function Tag({
-  at: [x, y],
-  text,
-  fill = PALETTE.white,
-  ink = PALETTE.ink,
-}: { at: Pt; text: string; fill?: string; ink?: string }) {
-  const w = text.length * 6.6 + 16;
-  return (
-    <g>
-      <rect
-        x={x - w / 2}
-        y={y - 10}
-        width={w}
-        height={20}
-        rx={10}
-        fill={fill}
-        stroke={PALETTE.pillLine}
-        strokeWidth={1.5}
-      />
-      <text
-        x={x}
-        y={y + 4}
-        textAnchor="middle"
-        fontFamily={tokens.font.ui}
-        fontSize={12}
-        fontWeight={700}
-        fill={ink}
-      >
-        {text}
-      </text>
-    </g>
-  );
-}
-
 const ROAD = dk(PALETTE.road, 0.1);
 const PLATE = { x0: -0.5, y0: -0.5, x1: 7.6, y1: 6.5 };
 const SPOTS: readonly Spot[] = [
@@ -274,40 +240,52 @@ export function HomeScene(): ReactNode {
       c={{ t: lt(tint, 0.78), l: lt(tint, 0.42), r: lt(tint, 0.3) }}
     />
   );
+  const [vx, vw, vh] = [left - 8, right - left + 16, bottom - top];
   const sorted = [...SPOTS].sort((a, b) => a.x + a.y - (b.x + b.y));
   return (
-    <svg
-      viewBox={`${left - 8} ${top} ${right - left + 16} ${bottom - top}`}
-      aria-hidden="true"
-      focusable="false"
-      className="home-scene"
-    >
-      <Slab b={[x0, y0, -8, x1 - x0, y1 - y0, 8]} c={PALETTE.slab} />
-      {patch({ x: 0.9, y: 0.1, w: 3.4, d: 2.7 }, tokens.color.district.hall)}
-      {patch({ x: 4.6, y: 0.1, w: 2.8, d: 2.7 }, tokens.color.district.research)}
-      {patch({ x: 0.3, y: 3.6, w: 2.8, d: 2.7 }, tokens.color.district.analysis)}
-      {patch({ x: 4.6, y: 3.6, w: 2.8, d: 2.7 }, tokens.color.district.delivery)}
-      {/* The roads: one along the plate, one across. */}
-      <Poly
-        a={[P(-0.3, 2.95, 3.2), P(7.4, 2.95, 3.2), P(7.4, 3.5, 3.2), P(-0.3, 3.5, 3.2)]}
-        c={ROAD}
-      />
-      <Poly
-        a={[P(4.28, -0.2, 3.2), P(4.62, -0.2, 3.2), P(4.62, 6.3, 3.2), P(4.28, 6.3, 3.2)]}
-        c={ROAD}
-      />
-      {TREES.filter(([, y]) => y < 3).map(([x, y, pine]) => (
-        <Tree key={`${x},${y}`} at={[x, y]} pine={pine} />
-      ))}
-      {sorted.map((s) => (
-        <Building key={s.name} s={s} />
-      ))}
-      {TREES.filter(([, y]) => y >= 3).map(([x, y, pine]) => (
-        <Tree key={`${x},${y}`} at={[x, y]} pine={pine} />
-      ))}
-      {SPOTS.map((s) => (
-        <Tag key={s.name} at={tag(s)} text={s.name} />
-      ))}
-    </svg>
+    <div className="home-scene" aria-hidden="true">
+      <svg
+        viewBox={`${vx} ${top} ${vw} ${vh}`}
+        aria-hidden="true"
+        focusable="false"
+        className="home-scene-art"
+      >
+        <Slab b={[x0, y0, -8, x1 - x0, y1 - y0, 8]} c={PALETTE.slab} />
+        {patch({ x: 0.9, y: 0.1, w: 3.4, d: 2.7 }, tokens.color.district.hall)}
+        {patch({ x: 4.6, y: 0.1, w: 2.8, d: 2.7 }, tokens.color.district.research)}
+        {patch({ x: 0.3, y: 3.6, w: 2.8, d: 2.7 }, tokens.color.district.analysis)}
+        {patch({ x: 4.6, y: 3.6, w: 2.8, d: 2.7 }, tokens.color.district.delivery)}
+        {/* The roads: one along the plate, one across. */}
+        <Poly
+          a={[P(-0.3, 2.95, 3.2), P(7.4, 2.95, 3.2), P(7.4, 3.5, 3.2), P(-0.3, 3.5, 3.2)]}
+          c={ROAD}
+        />
+        <Poly
+          a={[P(4.28, -0.2, 3.2), P(4.62, -0.2, 3.2), P(4.62, 6.3, 3.2), P(4.28, 6.3, 3.2)]}
+          c={ROAD}
+        />
+        {TREES.filter(([, y]) => y < 3).map(([x, y, pine]) => (
+          <Tree key={`${x},${y}`} at={[x, y]} pine={pine} />
+        ))}
+        {sorted.map((s) => (
+          <Building key={s.name} s={s} />
+        ))}
+        {TREES.filter(([, y]) => y >= 3).map(([x, y, pine]) => (
+          <Tree key={`${x},${y}`} at={[x, y]} pine={pine} />
+        ))}
+      </svg>
+      {SPOTS.map((s) => {
+        const [x, y] = tag(s);
+        return (
+          <span
+            key={s.name}
+            className="home-tag"
+            style={{ left: `${((x - vx) / vw) * 100}%`, top: `${((y - top) / vh) * 100}%` }}
+          >
+            {s.name}
+          </span>
+        );
+      })}
+    </div>
   );
 }

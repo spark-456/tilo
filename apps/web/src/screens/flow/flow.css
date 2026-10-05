@@ -92,6 +92,7 @@
   min-height: 0;
 }
 .home-preview {
+  container-type: inline-size; /* the facts go three across only when the card is wide enough */
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -132,9 +133,25 @@
   background: var(--color-surface-0);
 }
 .home-scene {
+  position: relative;
+  width: 100%;
+}
+.home-scene-art {
   display: block;
   width: 100%;
   height: auto; /* the viewBox gives the height from the width, so it is reserved from first paint */
+}
+/* A name tag: white pill, 12 px at every width (the picture scales, the tags do not). */
+.home-tag {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 0 8px;
+  border: 1.5px solid var(--color-surface-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-12) / 17px var(--font-ui);
+  white-space: nowrap;
 }
 @media (min-width: 768px) {
   .flow-wide .flow-summary {
@@ -160,6 +177,11 @@
   margin: 0;
   font: 700 var(--text-14) / 1.4 var(--font-ui);
 }
+@container (min-width: 480px) {
+  .home-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 @media (max-width: 1279px) {
   .home-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -171,16 +193,21 @@
   .home-scene {
     max-width: 360px;
   }
-  .home-tiles {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   /* One column, so the whole column scrolls (task first) instead of the task box alone. */
   .home-layout {
     overflow-y: auto;
     scrollbar-gutter: stable;
   }
+  .home-layout {
+    row-gap: 4px;
+  }
   .home-main {
     min-height: auto; /* the row keeps the whole task, which the column then scrolls */
+  }
+  /* The message line keeps one line (not two), so the gap above the preview reads as 24 px. */
+  .home-main .flow-msg {
+    min-height: 1.4em;
+    margin-top: 0;
   }
   .flow-body {
     flex: none;
@@ -191,9 +218,6 @@
 @media (max-width: 767px) {
   .home-stage {
     min-height: 0; /* compact: the picture's own height, about 150 px */
-  }
-  .home-tiles {
-    grid-template-columns: minmax(0, 1fr);
   }
   .flow-wide .flow-heading {
     font-size: var(--text-32);

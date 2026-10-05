@@ -69,7 +69,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     // #227 B1/B2: under 1280 the preview stacks under the task and the column scrolls; the task and
     // Start stay on the first screen, and the scene is a decorative static picture on every size.
     await expect(preview).toBeVisible();
-    await expect(preview.locator("svg.home-scene")).toHaveAttribute("aria-hidden", "true");
+    await expect(preview.locator(".home-scene")).toHaveAttribute("aria-hidden", "true");
     await expect(preview.getByText("Outpost to City")).toBeVisible();
     if (viewport.width < 1280) {
       expect(start.y + start.height).toBeLessThanOrEqual(viewport.height);
@@ -140,5 +140,43 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await expect(page.getByRole("heading", { level: 1, name: "Understanding" })).toBeVisible({
       timeout: 20_000,
     });
+  });
+}
+
+// #227 follow-ups: at every width the scene's tags are 12 px, the page does not scroll sideways, and
+// the stacked preview sits one 24 px gap under the drop zone, with the facts one per row while the
+// card's inside is under 480 px.
+for (const [width, height] of [
+  [390, 844],
+  [768, 1024],
+  [1024, 768],
+  [1280, 800],
+  [1440, 900],
+] as const) {
+  test(`UX-1 S_01 #227: preview tags are 12 px, no overflow, 24 px stack gap at ${width}x${height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height });
+    const errors = watchConsole(page);
+    await page.goto("/");
+    const tags = page.locator(".home-tag");
+    await expect(tags).toHaveCount(4);
+    for (const tag of await tags.all()) {
+      expect(await tag.evaluate((el) => getComputedStyle(el).fontSize)).toBe("12px");
+    }
+    const preview = await page.getByLabel("What Tilo would build").boundingBox();
+    const drop = await page.locator(".file-drop").boundingBox();
+    const rows = await page
+      .locator(".home-tiles > div")
+      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().y));
+    if (!(preview && drop)) throw new Error("S-01 parts are not on screen");
+    const inner = preview.width - 36; // padding and border: the card's own width, as the query reads it
+    expect(new Set(rows).size).toBe(inner < 480 ? 3 : 1);
+    if (width < 1280) expect(preview.y - (drop.y + drop.height)).toBeLessThanOrEqual(30);
+    const sideways = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    expect(sideways).toBe(false);
+    expect(errors).toEqual([]);
   });
 }
