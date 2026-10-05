@@ -4,7 +4,7 @@
 // layout and the recorded events up to the replay point (HR-1); before a layout there is no panel.
 import type { Event } from "@tilo/contracts";
 import { useClient } from "../api/ClientProvider";
-import { levelRows } from "../world/levels";
+import { buildingCount, levelRows } from "../world/levels";
 import { reduce } from "../world/reducer";
 import { useReplayedLog } from "../world/replay";
 import { AppLink } from "./AppLink";
@@ -22,10 +22,7 @@ export function LevelsPanel({
   if (layoutRemote.status !== "ready") return <aside className="levels-panel" aria-hidden="true" />;
   const layout = layoutRemote.value;
   const rows = levelRows(layout, reduce(layout, events), events);
-  const buildings = layout.semantic.levels.reduce(
-    (n, level) => n + level.districts.reduce((m, d) => m + d.buildings.length, 0),
-    0,
-  );
+  const buildings = buildingCount(layout);
   const gates = layout.semantic.gates.length;
   return (
     <aside className="levels-panel" aria-label="Levels" data-testid="levels-panel">

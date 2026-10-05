@@ -17,6 +17,13 @@ export interface LevelRow {
   readonly active: boolean;
 }
 
+/** How many buildings a layout plans, over all levels. */
+export const buildingCount = (layout: Layout): number =>
+  layout.semantic.levels.reduce(
+    (n, level) => n + level.districts.reduce((m, d) => m + d.buildings.length, 0),
+    0,
+  );
+
 /** The levels of a layout, top to bottom (the last level is the highest). */
 export function levelRows(
   layout: Layout,
@@ -73,7 +80,11 @@ export function scrubMarks(events: readonly Event[]): readonly ScrubMark[] {
   const marks: ScrubMark[] = [];
   events.forEach((e, i) => {
     const kind = MARK_KIND[e.type];
-    if (kind && isKnownType(e.type)) marks.push({ index: i + 1, kind });
+    if (!kind || !isKnownType(e.type)) return;
+    // A level finishing and the run finishing on the next event are one place on the track.
+    const prev = marks[marks.length - 1];
+    if (prev && prev.kind === kind && i + 1 - prev.index <= 1) marks.pop();
+    marks.push({ index: i + 1, kind });
   });
   return marks;
 }

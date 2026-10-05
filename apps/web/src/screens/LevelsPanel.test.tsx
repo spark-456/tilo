@@ -56,7 +56,7 @@ describe("PRD-18.3 S-04 scrubber marks: drawn only for a finished run", () => {
       <ReplayScrubber worldId="w_marks" events={EVENTS_VILLAGE_BASIC} finished fixture />,
     );
     const marks = [...finished.querySelectorAll('[data-testid="scrub-marks"] i')];
-    expect(marks.map((m) => m.getAttribute("data-kind"))).toEqual(["decision", "done", "done"]);
+    expect(marks.map((m) => m.getAttribute("data-kind"))).toEqual(["decision", "done"]);
     expect(marks.every((m) => (m as HTMLElement).style.getPropertyValue("--at") !== "")).toBe(true);
     const going = await mount(
       <ReplayScrubber worldId="w_marks2" events={EVENTS_VILLAGE_BASIC} finished={false} fixture />,

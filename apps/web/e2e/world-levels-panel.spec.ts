@@ -36,7 +36,7 @@ test("S-04 the replay track marks the decision and the finishes at their stops",
   await page.setViewportSize(DESKTOP);
   await page.goto(WORLD);
   const marks = page.getByTestId("scrub-marks").locator("i");
-  await expect(marks).toHaveCount(3);
+  await expect(marks).toHaveCount(2);
   const track = await page.getByRole("slider", { name: "Replay position" }).boundingBox();
   const first = await marks.first().boundingBox();
   expect(track && first && first.x > track.x && first.x < track.x + track.width).toBe(true);

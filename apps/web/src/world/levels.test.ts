@@ -2,7 +2,7 @@ import type { Layout } from "@tilo/contracts";
 import { describe, expect, it } from "vitest";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
 import { LAYOUT_VILLAGE_BASIC } from "../api/fixtures/layout";
-import { levelRows, scrubMarks } from "./levels";
+import { buildingCount, levelRows, scrubMarks } from "./levels";
 import { reduce } from "./reducer";
 
 const layout = LAYOUT_VILLAGE_BASIC as unknown as Layout;
@@ -58,8 +58,7 @@ describe("PRD-18.3 S-04 scrubber marks: one per registered decision, finish or p
   it("marks the decision asked for and the finishes, at the stop after each event", () => {
     expect(scrubMarks(EVENTS_VILLAGE_BASIC)).toEqual([
       { index: 34, kind: "decision" },
-      { index: 43, kind: "done" },
-      { index: 44, kind: "done" },
+      { index: 44, kind: "done" }, // level.completed (43) and world.completed (44) are one place
     ]);
   });
 
@@ -70,9 +69,16 @@ describe("PRD-18.3 S-04 scrubber marks: one per registered decision, finish or p
 
   it("marks a raised alert and a failed run as problems", () => {
     const at = (type: string) => ({ ...EVENTS_VILLAGE_BASIC[0], type });
-    expect(scrubMarks([at("alert.raised"), at("world.failed")] as never)).toEqual([
+    const quiet = at("agent.moved");
+    expect(
+      scrubMarks([at("alert.raised"), quiet, at("world.failed"), at("alert.raised")] as never),
+    ).toEqual([
       { index: 1, kind: "problem" },
-      { index: 2, kind: "problem" },
+      { index: 4, kind: "problem" }, // world.failed (3) and the alert after it are one place
     ]);
   });
+});
+
+it("PRD-18.3 S-04 counts the buildings the layout plans", () => {
+  expect(buildingCount(layout)).toBe(5);
 });
