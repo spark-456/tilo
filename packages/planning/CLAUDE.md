@@ -36,5 +36,5 @@ FR-INT-11/12: `scenarios` (`config/scenarios/`), `refusal` (`config/out_of_polic
   policy, no gate, no `policy.applied`); its daily limits count earlier policy grants.
 - Refusal (FR-INT-12): the Director only names a category; code raises `TaskRefused` with configured text, so no model
   or task text reaches a person; an unknown category is `BriefExtractionError`, a bad config `RefusalConfigError`.
-- Scenarios (FR-INT-11): one generic loader (`safe_load`, id regex before any path, seeds inside the repo, T3 at L1 only);
+- Scenarios (FR-INT-11): one generic loader (plain YAML: no anchors or tags; ECMA schema check; seeds under `seed/`; T3 at L1);
   no scenario id in `src`. `policies(owner, at)` makes the owner's records; the API creates them only at approve.

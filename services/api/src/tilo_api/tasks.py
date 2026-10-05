@@ -241,29 +241,30 @@ def _load_scenario(task: deps.TaskRecord) -> Any:
     try:
         return load_scenario(task.scenario)
     except ScenarioError as exc:
-        logger.warning("scenario %s no longer loads: %s", task.scenario, exc)
+        logger.warning("a task's scenario no longer loads")  # never the error's text: it can carry file values
         raise HTTPException(status_code=503, detail="The scenario could not be loaded; nothing changed.") from exc
 
 
-def _preload_policies(store: deps.Store, task: deps.TaskRecord, scenario: Any) -> None:
-    """FR-INT-11: the scenario's autonomy entries become the owner's own policies, one `policy.changed` each (only
-    the owner creates a policy, PRD 10.1). Called once, under the task lock, as the grant is recorded."""
+def _scenario_policies(
+    task: deps.TaskRecord, scenario: Any, first_seq: int
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """FR-INT-11: the scenario's autonomy entries as the owner's own policies with one `policy.changed` each (only
+    the owner creates a policy, PRD 10.1). Everything is built here and nothing is stored, so a failure leaves no
+    partial state and an approve can be retried."""
     if scenario is None:
-        return
+        return [], []
     at, owner = now_ts(), task.owner
-    events = []
-    for offset, policy in enumerate(scenario.policies(owner=owner, at=at)):
-        store.policies[policy["id"]] = policy
-        store.policy_worlds[policy["id"]] = task.world_id
-        events.append(
-            build_event(
-                _base(task, owner), seq=task.next_seq + offset, type="policy.changed", target=policy["id"], item=None,
-                severity="info", tool=None, cause=None, authz={"by": "person", "ref": owner, "at": at},
-                data={"policy_id": policy["id"], "change": "created", "level": policy["level"]},
-                summary=f"Scenario policy created: {policy['action_type']} at {policy['level']}.",
-            )
-        )  # fmt: skip
-    _append(store, task, events)
+    policies = scenario.policies(owner=owner, at=at)
+    events = [
+        build_event(
+            _base(task, owner), seq=first_seq + offset, type="policy.changed", target=policy["id"], item=None,
+            severity="info", tool=None, cause=None, authz={"by": "person", "ref": owner, "at": at},
+            data={"policy_id": policy["id"], "change": "created", "level": policy["level"]},
+            summary=f"Scenario policy created: {policy['action_type']} at {policy['level']}.",
+        )
+        for offset, policy in enumerate(policies)
+    ]  # fmt: skip
+    return policies, events
 
 
 @router.post("/tasks/{task_id}/approve")
@@ -302,9 +303,12 @@ def approve(
             )
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail="Only the world's owner sets budgets.") from exc
-        _append(store, task, [event])
+        policies, policy_events = _scenario_policies(task, preload, event["seq"] + 1)  # built before anything is stored
+        _append(store, task, [event, *policy_events])
+        for policy in policies:
+            store.policies[policy["id"]] = policy
+            store.policy_worlds[policy["id"]] = task.world_id
         task.granted = True
-        _preload_policies(store, task, preload)
         approach = next(a for a in task.approaches if a["id"] == body.approach_id)
     if seams is not None:
         try:

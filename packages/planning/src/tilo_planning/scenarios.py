@@ -25,11 +25,13 @@ import tilo_policy
 import yaml
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
+from tilo_policy.schemas import conforms
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 CONTRACTS = REPO_ROOT / "contracts"
 MAX_FILE_BYTES = 2_000_000
 MAX_PROBLEMS = 3
+SEED_DIR = "seed"  # SN-04: a seed file sits under a directory of this name (not any file in the repo)
 _INTERNAL = "internal"  # the reserved connector id of an action that goes through no connector
 _ID = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,31}")  # $defs/id of the schema; fullmatch, so no final line break
 
@@ -83,11 +85,25 @@ def _show(value: Any) -> str:
     return repr(value)[:80]  # a file's content never floods a message
 
 
-def _read_yaml(path: Path, what: str) -> Any:
+class _PlainLoader(yaml.SafeLoader):
+    """SN-02: a scenario is plain data. An anchor or alias (an alias bomb costs seconds) or an explicit tag
+    (`!!str`, `!!python/...`) is refused, so only what the schema describes can be written."""
+
+    def compose_node(self, parent: Any, index: Any) -> Any:
+        event = self.peek_event()
+        if isinstance(event, yaml.AliasEvent) or getattr(event, "anchor", None) or getattr(event, "tag", None):
+            raise yaml.MarkedYAMLError(
+                problem="anchors, aliases and tags are not allowed", problem_mark=event.start_mark
+            )
+        return super().compose_node(parent, index)
+
+
+def _read_yaml(path: Path, what: str, *, plain: bool = False) -> Any:
     try:
         if path.stat().st_size > MAX_FILE_BYTES:
             raise ScenarioError(f"{what} is larger than {MAX_FILE_BYTES} bytes")
-        return yaml.safe_load(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        return yaml.load(text, Loader=_PlainLoader) if plain else yaml.safe_load(text)  # noqa: S506 (safe subclass)
     except ScenarioError:
         raise
     except (OSError, yaml.YAMLError, UnicodeError, RecursionError) as error:
@@ -105,7 +121,16 @@ def _validator() -> jsonschema.protocols.Validator:
 
 
 def _schema_problems(data: Any) -> list[str]:
-    """SN-02: each way the file fails the schema, naming the key and the offending value (bounded)."""
+    """SN-02: each way the file fails the schema, naming the key and the offending value (bounded). The pass or fail
+    comes from the policy package's validator, where `$` ends the string (a final line break never passes, ECMA
+    rules); the stock validator only words the problems and may find none for such a value."""
+    if not conforms("scenario.schema.json", data):
+        problems = _described_problems(data)
+        return problems or ["the file does not fit the schema (a value ends in a line break)"]
+    return []
+
+
+def _described_problems(data: Any) -> list[str]:
     try:
         errors = sorted(_validator().iter_errors(data), key=lambda e: [str(p) for p in e.absolute_path])
     except RecursionError:
@@ -123,12 +148,15 @@ def _connector_ids(repo_root: Path) -> set[str]:
 
 
 def _seed_file(entry: str, repo_root: Path) -> Path:
-    """SN-04: the schema already refused an absolute, dotted or hidden path; this resolves symlinks and needs an
-    existing regular file inside the repo root."""
+    """SN-04: the schema refuses an absolute, dotted or hidden path. This resolves symlinks, then needs the resolved
+    path to be the entry itself (so `seed/x.` or a link elsewhere is refused, with no hidden segment) and an existing
+    regular file under a `seed` directory inside the repo root. Nothing is read here."""
     root = repo_root.resolve()
     path = (root / entry).resolve()
-    if root not in path.parents or not path.is_file():
-        raise ScenarioError(f"seed_data {_show(entry)} is not an existing file inside the repository")
+    inside = root in path.parents and path.relative_to(root).as_posix() == entry
+    parts = entry.split("/")
+    if not inside or SEED_DIR not in parts[:-1] or any(p.startswith(".") for p in parts) or not path.is_file():
+        raise ScenarioError(f"seed_data {_show(entry)} is not an existing seed file inside the repository")
     return path
 
 
@@ -157,7 +185,10 @@ def load_scenario(
     if not isinstance(scenario_id, str) or not _ID.fullmatch(scenario_id):
         raise ScenarioError("not a scenario id")  # SN-01: before any path is built
     path = repo_root / "config" / "scenarios" / f"{scenario_id}.yaml"
-    data = _read_yaml(path, f"scenario {scenario_id}")
+    scenarios_dir = (repo_root / "config" / "scenarios").resolve()
+    if path.resolve().parent != scenarios_dir:  # a link to a file elsewhere is not a scenario
+        raise ScenarioError(f"scenario {scenario_id} is not a file of config/scenarios")
+    data = _read_yaml(path, f"scenario {scenario_id}", plain=True)
     if problems := _schema_problems(data):
         raise ScenarioError(f"scenario {scenario_id} does not fit scenario.schema.json: " + "; ".join(problems))
     if data["id"] != scenario_id:
@@ -211,10 +242,12 @@ def smoke_test(scenario: Scenario, *, repo_root: Path = REPO_ROOT) -> list[str]:
         name = Path(seed).name
         try:
             resolved = Path(seed).resolve()
-            if root not in resolved.parents or not resolved.is_file():
-                problems.append(f"seed file {name} is missing or outside the repository")
-            else:
-                _parse_seed(resolved)
+            if root not in resolved.parents:
+                problems.append(f"seed file {name} is outside the repository")
+                continue
+            _parse_seed(_seed_file(resolved.relative_to(root).as_posix(), repo_root))
+        except ScenarioError:
+            problems.append(f"seed file {name} is missing or not a seed file inside the repository")
         except (OSError, ValueError, UnicodeError, yaml.YAMLError, csv.Error, RecursionError) as error:
             problems.append(f"seed file {name} does not parse: {type(error).__name__}")
     return problems

@@ -17,7 +17,7 @@ app.include_router(_dispatch_router)
 app.include_router(_redaction_router)
 app.include_router(_tasks_router)
 app.include_router(_build_cards_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
-app.include_router(_build_console_router(_runs.get_card_store))
+app.include_router(_build_console_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
 app.include_router(_runs.router)
 _dev.install_if_enabled(app)  # only with TILO_API_DEV=1; refuses when deployed or live (CL-INT-4)
 

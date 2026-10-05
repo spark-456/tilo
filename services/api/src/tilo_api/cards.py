@@ -193,7 +193,8 @@ def _can_see(p: Principal, world_id: str, owner: str | None, r: _Record) -> bool
     if p.role == "owner":
         return p.user_id == owner
     if p.role == "team_lead":
-        return r.district is not None and r.district in _safe_districts(p.districts)
+        # a question routed to a domain is the console's: only that domain's lead sees it (FR-HIL-10)
+        return r.domain is None and r.district is not None and r.district in _safe_districts(p.districts)
     return p.role == "approver" and r.assignee == p.user_id
 
 
@@ -330,6 +331,12 @@ class CardStore:
         if severity:
             part["severity"] = severity
         return part
+
+    def owner_of(self, world_id: str) -> str | None:
+        return self._world_owners.get(world_id)
+
+    def now(self) -> str:
+        return self._clock.now()
 
     # -- reads ------------------------------------------------------------
 
