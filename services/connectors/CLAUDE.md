@@ -3,7 +3,7 @@
 Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP client, outbox. Only it decrypts tokens.
 
 ## Commands
-- `uv run pytest services/connectors/tests -q` — API pinned in `tests/API*.md`; `just check` is the full gate. Image: `Dockerfile` runs `tilo_connectors.app:app` (`/healthz` only, P0-07a).
+- `uv run pytest services/connectors/tests -q` — API pinned in `tests/API*.md`; `just check` is the full gate. Image: `Dockerfile` runs `tilo_connectors.app:app` (`/health` for Cloud Run smoke checks, `/healthz` for in-container probes; P0-07a, P0-07h).
 - Live Gmail smoke (FR-CON-04; user only): set `LIVE=1` + `GOOGLE_OAUTH_*`, run
   `uv run python services/connectors/scripts/live_gmail_smoke.py [--draft ADDRESS] [--timeout S]`. Only `live.py` reaches Google.
 
