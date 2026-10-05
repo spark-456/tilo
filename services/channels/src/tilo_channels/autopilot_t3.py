@@ -19,6 +19,12 @@ money word around it, and punctuation inside a word (any run of non-letter, non-
 included, between two letters or digits) is dropped and single letters spread apart are joined, in both orders, before
 the families run. A risky inbound message ("please confirm the transfer of $5,000") keeps even a clean draft ("Yes,
 confirmed.") off L2. A draft's own `t3_content_signal` does not get these two: the allowlist already holds it.
+
+BQ-265 redesign (security round 3): a denylist cannot list every obfuscation, so `inbound_plain` adds an allowlist for
+the replied-to body and Subject: only ASCII letters, spaces, newlines, stop marks before a space, contractions and times
+of day are plain. Punctuation, underscore, glue and digit-suffix classes are closed by construction. L2 needs both
+`not inbound_signal` and `inbound_plain`; real mail with a link, a quoted line, a hyphen, a digit or a non-ASCII
+character waits for a person.
 """
 
 from __future__ import annotations
@@ -75,6 +81,13 @@ _TIME = re.compile(r"\b(?:(?:1[0-2]|0?[1-9])(?::[0-5][0-9])?\s?(?:am|pm)|(?:[01]
 _LINK = re.compile(r"://|[/@\\]|[a-z0-9][.\u3002\uff61][a-z]")
 _ITEM = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?|[^\sA-Za-z]")
 _STOP = "\0"  # stands in for a time of day: not a letter or a digit, so it ends a name run
+# BQ-265 `inbound_plain`: a time of day with a plain space only; a character off the list; a stop mark glued to what
+# follows; an apostrophe inside a contraction; a word, or a time of day, as one token.
+_PLAIN_TIME = re.compile(_TIME.pattern.replace(r"\s?", " ?"), re.I | re.A)
+_OFF_LIST = re.compile(r"[^A-Za-z \n.,?!:'\0]")
+_STOP_GLUED = re.compile(r"[.,?!:](?![ \n]|\Z)")
+_CONTRACTION = re.compile(r"(?<=[A-Za-z])'(?:re|ve|ll|[stdm])(?![A-Za-z])")
+_TOKEN = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)*|\0")
 # Words that may come before the greeting's name run ("Hi", "Good morning", "Thank you"), and the only words a
 # sign-off line ("Best,", "Kind regards,", "Many thanks!") may hold.
 _GREETING = frozenset("hi hello hey dear good morning afternoon evening thanks thank you".split())
@@ -195,9 +208,9 @@ def _join(match: re.Match[str]) -> str:
     return "".join(c for c in match.group() if c.isalnum())
 
 
-def _forms(text: str) -> list[str]:
-    """`text`, then punctuation dropped and spread letters joined, then the same two steps the other way round."""
-    return [text, _SPREAD.sub(_join, _DROP.sub("", text)), _DROP.sub("", _SPREAD.sub(_join, text))]
+def _forms(folded: str) -> list[str]:
+    """`folded`, then punctuation dropped and spread letters joined, then the same two steps the other way round."""
+    return [folded, _SPREAD.sub(_join, _DROP.sub("", folded)), _DROP.sub("", _SPREAD.sub(_join, folded))]
 
 
 def _amount(folded: str) -> bool:
@@ -236,6 +249,29 @@ def _signal(text: str, *, inbound: bool) -> frozenset[str]:
     if not inbound and _unlisted(cleaned):
         signal.add("unlisted")
     return frozenset(signal)
+
+
+def inbound_plain(text: str) -> bool:
+    """BQ-265 allowlist for the message a draft answers: True only when `text` is structurally plain talk. After
+    `clean_text` and NFKC, every character is an ASCII letter, a space, a newline, one of `. , ? ! :` or `'`, or a
+    digit that is part of a time of day (`_TIME`). A stop mark is followed only by a space, a newline or the end; `'`
+    stands only inside a contraction (suffix s, t, re, ve, ll, d, m); two or more single-letter tokens in a row ("w i r
+    e") are not plain, a lone "a" or "I" is. Over SIGNAL_CAP is not plain; empty text is. Linear, no model. Words split
+    by plain spaces into longer chunks ("trans fer") are an accepted gap; `inbound_signal` is the other half."""
+    if len(text) > SIGNAL_CAP:
+        return False
+    plain = _PLAIN_TIME.sub(_STOP, unicodedata.normalize("NFKC", clean_text(text)))
+    if len(plain) > SIGNAL_CAP or _OFF_LIST.search(plain) or _STOP_GLUED.search(plain):
+        return False
+    if "'" in _CONTRACTION.sub("", plain):
+        return False
+    single = False
+    for token in _TOKEN.findall(plain):
+        short = len(token) == 1 and token != _STOP
+        if short and single:
+            return False
+        single = short
+    return True
 
 
 def inbound_signal(text: str) -> frozenset[str]:
