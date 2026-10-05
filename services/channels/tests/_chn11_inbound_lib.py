@@ -1,5 +1,5 @@
 """Test doubles and builders for the inbound-aware L2 tests (FR-CHN-11; ADR-0013; issue #298 "CHN-GATE-C", first
-bullet; BQ-223). Nothing here is production logic.
+bullet; BQ-265). Nothing here is production logic.
 
 The autopilot used to look only at the draft's own body. These helpers build a thread with a chosen replied-to
 (inbound) message and a ready draft that answers exactly that message (`in_reply_to` is the replied-to message's
@@ -19,7 +19,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from _chn10_lib import USER, Msg, Thread, message_id_header
+from _chn10_lib import AUTH_PASS, CLEAN_SUBJECT, USER, Msg, Thread, message_id_header
 from _chn11_lib import DAVID, INSTRUCTION, MAILBOX, SARAH, context, make_bench, ready
 from _chn_wire4_lib import fresh_ulid, make_w4
 
@@ -50,6 +50,22 @@ COMMITMENT_INBOUND = [
     "Please assure me that nothing else is needed.",
 ]
 SIGNAL_INBOUND = MONEY_INBOUND + LEGAL_INBOUND + COMMITMENT_INBOUND
+
+# Money by an amount or a number word, with no money word in the sentence (BQ-265 fix pass, security review round 1).
+NUMBER_INBOUND = [
+    "Can you confirm the 5,000 to our account today?",
+    "Please confirm the five thousand for the boat by Friday.",
+    "Can you confirm we're square at 12000?",
+    "Please confirm you'll take care of the 3 lakh tomorrow.",
+    "Can you confirm you're on board with the 10% cut?",
+]
+
+# The replied-to message's Subject carries the signal and its body is clean scheduling talk (round 1, finding 1).
+SUBJECT_SIGNAL = {
+    "money": "Confirm the $5,000 wire transfer today",
+    "legal": "Please sign the contract and NDA",
+    "commitment": "We guarantee the Friday repair",
+}
 
 
 def t3_module() -> Any:
@@ -86,9 +102,31 @@ class L2Rig:
     clock: Any
     new_ap: Any  # another instance over the same stores (a restart or a second Cloud Run instance)
 
-    def thread(self, inbound: str = SCHEDULING_INBOUND, *, earlier: tuple[Msg, ...] = ()) -> Thread:
-        thread, _ = self.rig.thread(body=inbound, earlier=earlier)
+    def thread(
+        self,
+        inbound: str = SCHEDULING_INBOUND,
+        *,
+        earlier: tuple[Msg, ...] = (),
+        subject: str = CLEAN_SUBJECT,
+        headers: dict[str, str] | None = None,
+    ) -> Thread:
+        """`subject` and `headers` are the replied-to message's (`headers` is added to its default dmarc=pass
+        Authentication-Results, so a test overrides that one key to change it)."""
+        thread, _ = self.rig.thread(body=inbound, earlier=earlier, subject=subject, headers=headers)
         return thread
+
+    def tamper(self, edit: Callable[[dict[str, Any]], None]) -> None:
+        """Every later read of a thread through the reader hands `edit` the replied-to message (the thread's last
+        one) as the plain dict the reader returns, so a test can make a field missing, `None` or not text, the way a
+        malformed mail or a reader bug would."""
+        original = self.rig.reader.get_thread
+
+        def get_thread(user_id: str, thread_id: str) -> dict[str, Any]:
+            doc = original(user_id, thread_id)
+            edit(doc["messages"][-1])
+            return doc
+
+        self.rig.reader.get_thread = get_thread  # type: ignore[method-assign]
 
     def entries(self) -> list[dict]:
         return self.outbox.all()
@@ -123,7 +161,13 @@ def answering(thread: Thread, body: str, *, in_reply_to: str | None = None, **re
 
 def earlier_message(body: str, *, sender: str = DAVID, message_id: str = "m-earlier") -> Msg:
     """A message that came before the thread's last one."""
-    return Msg(message_id=message_id, sender=sender, subject="Engine tune-up scheduling", body=body)
+    return Msg(
+        message_id=message_id,
+        sender=sender,
+        subject=CLEAN_SUBJECT,
+        body=body,
+        headers={"Authentication-Results": AUTH_PASS},
+    )
 
 
 def assert_waits_for_a_person(h: L2Rig, p: Any, ctx: Any) -> None:
@@ -141,3 +185,13 @@ def assert_waits_for_a_person(h: L2Rig, p: Any, ctx: Any) -> None:
     assert h.new_ap().policy_applied(USER, p.card_id) is None  # a second instance agrees (card is recorded)
     if h.kind == "policy_port":  # production mode: the gate asks a person (OB-01)
         assert h.ap.approval_requested(USER, p.card_id) is not None, "the L1 card must request the owner's approval"
+
+
+def assert_rides_l2(h: L2Rig, p: Any) -> None:
+    """The card is on the 60 s undo window as a scheduled entry authorised by policy."""
+    assert p.level == "L2" and p.undo_window_s == 60 and p.scheduled_at is not None
+    (entry,) = h.entries()
+    assert entry["state"] == "scheduled" and entry["undo_window_s"] == 60
+    assert entry["authz"]["by"] == "policy"
+    if h.kind == "policy_port":
+        assert len(h.policy_events()) == 1

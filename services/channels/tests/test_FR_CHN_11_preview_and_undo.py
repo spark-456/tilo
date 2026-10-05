@@ -40,7 +40,7 @@ def test_FR_CHN_11_preview_card_has_send_edit_cancel_to_subject_and_600_char_exc
     card = bench.ap.preview(USER, *pair(thread, body))
     assert card.options == ("send", "edit", "cancel")
     assert card.to == (DAVID,) and card.cc == ()
-    assert card.subject == "Re: Engine tune-up scheduling and estimate"
+    assert card.subject == "Re: Engine tune-up scheduling"
     assert card.body == body and card.excerpt == body[:600] and len(card.excerpt) == 600
     assert (card.level, card.tier, card.undo_window_s, card.outbox_id) == ("L1", "T2", 0, None)
     assert bench.outbox.entries == {}, "L1: nothing is queued before a person taps Send"

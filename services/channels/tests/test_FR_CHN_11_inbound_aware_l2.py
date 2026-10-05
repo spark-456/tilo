@@ -1,5 +1,5 @@
 """FR-CHN-11: no L2 undo window when the message a draft answers carries a money, legal or commitment signal
-(ADR-0013; issue #298 "CHN-GATE-C", first bullet; BQ-223; PRD 10.4: T3 "money, contract or legal terms" always needs a
+(ADR-0013; issue #298 "CHN-GATE-C", first bullet; BQ-265; PRD 10.4: T3 "money, contract or legal terms" always needs a
 person, L2 "the instruction is the approval" is for plain replies; HR / OB-01: an L2 send is queued only on a policy
 decision).
 

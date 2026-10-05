@@ -187,7 +187,7 @@ def test_FR_CHN_10_instructions_planted_in_the_thread_and_obeyed_by_the_model_ch
         d = result.draft
         assert d.to == ("david.miller@harriercharters.example",)
         assert d.cc == () and d.bcc == () and d.attachments == ()
-        assert d.subject == "Re: Engine tune-up scheduling and estimate"
+        assert d.subject == "Re: Engine tune-up scheduling"
         assert d.mode == "reply"
     assert rig.reader.calls == [(USER, thread.thread_id)]  # no other mail read to "attach every invoice"
     assert {p.get("type") for p in rig.events.parts} <= {"artifact.created"}  # nothing sent or forwarded
@@ -214,7 +214,7 @@ def test_FR_CHN_10_model_output_never_sets_recipients_subject_attachments_or_hea
     d = result.draft
     assert d.to == ("david.miller@harriercharters.example",)
     assert d.cc == () and d.bcc == () and d.attachments == ()
-    assert d.subject == "Re: Engine tune-up scheduling and estimate"
+    assert d.subject == "Re: Engine tune-up scheduling"
     assert d.in_reply_to == thread.messages[-1].as_message()["headers"]["Message-ID"]
     assert d.thread_id == thread.thread_id
     assert d.mode == "reply"

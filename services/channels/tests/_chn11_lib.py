@@ -295,7 +295,7 @@ def ready(
         to=to,
         cc=cc,
         bcc=(),
-        subject="Re: Engine tune-up scheduling and estimate",
+        subject="Re: Engine tune-up scheduling",
         in_reply_to=target,
         references=target,
         body=body,

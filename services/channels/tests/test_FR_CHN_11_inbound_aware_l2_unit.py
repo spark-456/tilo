@@ -1,5 +1,5 @@
 """FR-CHN-11: the pure signal of the message a draft answers (ADR-0013; issue #298 "CHN-GATE-C", first bullet;
-BQ-223). Proposed API: `tilo_channels.autopilot_t3.inbound_signal(text: str) -> frozenset[str]`.
+BQ-265). Proposed API: `tilo_channels.autopilot_t3.inbound_signal(text: str) -> frozenset[str]`.
 
 Decided behaviour: the replied-to (inbound) message carries a signal when it has a word of the money, legal or
 commitment families (the same ones `t3_content_signal` uses) or is obfuscated or over SIGNAL_CAP (fail closed). Unlike
@@ -113,6 +113,80 @@ def test_FR_CHN_11_inbound_signal_an_expanding_character_run_fails_closed() -> N
 
 
 # ---------------------------------------------------------------------------
+# BQ-265 fix pass (security review round 1, finding 2): an amount or a number word is "money" in an inbound message
+# even with no money word around it. Only `inbound_signal` does this: a draft is held to the L2 allowlist already.
+
+# Pinned: each must signal "money". (The first has no money word; "account" alone is not one.)
+NUMBER_AMOUNT = [
+    "Can you confirm the 5,000 to our account today?",
+    "Please confirm the five thousand for the boat by Friday.",
+    "Can you confirm we're square at 12000?",
+    "Please confirm you'll take care of the 3 lakh tomorrow.",
+    "Can you confirm you're on board with the 10% cut?",
+]
+NUMBER_WORDS = ["hundred", "thousand", "million", "billion", "lakh", "crore"]
+AMOUNT_SHAPES = ["1,200", "12,50,000", "2.50", "0.5", "250", "12000", "1500000", "10%", "50 %"]
+# Digits that are still scheduling talk: small counts, a time of day, a 4-digit year.
+CLEAN_DIGITS = [
+    "Could Marcus bring the 2 tarps to dock 14 on Thursday at 3pm?",
+    "Let us meet at 14:30 on Friday.",
+    "Friday at 2:30pm works, room 7.",
+    "The inspection is on 12 Oct 2026.",
+    "See you in 2027.",
+]
+
+
+@pytest.mark.parametrize("text", NUMBER_AMOUNT)
+def test_FR_CHN_11_inbound_signal_an_amount_or_number_word_with_no_money_word_is_money(text: str) -> None:
+    assert "money" in inbound_signal(text)
+
+
+@pytest.mark.parametrize("word", NUMBER_WORDS)
+def test_FR_CHN_11_inbound_signal_each_number_word_is_money(word: str) -> None:
+    assert "money" in inbound_signal(f"Can you confirm the two {word} for the boat?")
+    assert "money" in inbound_signal(f"Please confirm the {word.upper()} by Friday.")  # case does not matter
+
+
+@pytest.mark.parametrize("shape", AMOUNT_SHAPES)
+def test_FR_CHN_11_inbound_signal_each_amount_shape_is_money(shape: str) -> None:
+    # A digit group with a thousands separator or a decimal part, a run of 3+ digits that is not a time of day or a
+    # 4-digit year, and "%".
+    assert "money" in inbound_signal(f"Can you confirm {shape} for the boat by Friday?")
+
+
+@pytest.mark.parametrize("text", CLEAN_DIGITS)
+def test_FR_CHN_11_inbound_signal_small_counts_times_and_years_stay_clean(text: str) -> None:
+    assert inbound_signal(text) == frozenset()
+
+
+@pytest.mark.parametrize("text", NUMBER_AMOUNT[1:4] + ["Sounds good, 10%.", "That is a hundred percent fine."])
+def test_FR_CHN_11_amount_shapes_are_an_inbound_only_signal_a_drafts_money_signal_is_unchanged(text: str) -> None:
+    # t3_content_signal (what a draft's own body is held to) is not widened: those words and digits only make a
+    # draft "unlisted" (already off L2), never "money".
+    assert "money" not in t3_module().t3_content_signal(text)
+
+
+# ASCII splits (round 1, finding 3): a separator inside a signal word hides it from the word families.
+TAB = chr(9)
+SPLIT_WORDS = {
+    "spaces_wire": "w i r e",
+    "spaces_transfer": "t r a n s f e r",
+    "middle_dot": f"re{chr(0xB7)}fund",
+    "pipe": "tr|ansfer",
+    "slash": "trans/fer",
+    "tilde": "trans~fer",
+    "plus": "trans+fer",
+    "apostrophe": "trans'fer",
+    "tab": f"trans{TAB}fer",
+}
+
+
+@pytest.mark.parametrize("word", list(SPLIT_WORDS.values()), ids=list(SPLIT_WORDS))
+def test_FR_CHN_11_inbound_signal_ascii_split_signal_words_still_signal(word: str) -> None:
+    assert inbound_signal(f"Please confirm the {word} today.")
+
+
+# ---------------------------------------------------------------------------
 # Invariants (Hypothesis)
 
 _TEXT = st.one_of(
@@ -135,10 +209,15 @@ def test_FR_CHN_11_inbound_signal_property_deterministic_and_within_its_four_nam
 @needs_inbound_signal
 @given(text=_TEXT)
 @_FAST
-def test_FR_CHN_11_inbound_signal_property_is_the_body_signal_without_the_allowlist(text: str) -> None:
-    # "Same word families as t3_content_signal", obfuscation and cap included, and nothing else.
-    expected = t3_module().t3_content_signal(text) - {"unlisted"}
-    assert inbound_signal(text) == expected
+def test_FR_CHN_11_inbound_signal_property_is_the_body_signal_without_the_allowlist_plus_money_shapes(
+    text: str,
+) -> None:
+    # "Same word families as t3_content_signal", obfuscation and cap included, never "unlisted"; the only addition
+    # is "money" for an amount shape or a number word (BQ-265 fix pass, round 1 finding 2).
+    body = t3_module().t3_content_signal(text) - {"unlisted"}
+    signal = inbound_signal(text)
+    assert body <= signal
+    assert signal - body <= {"money"}
 
 
 @needs_inbound_signal
