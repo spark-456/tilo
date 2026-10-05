@@ -129,9 +129,11 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
   deployed `tilo-api` is a later step (set the variable at build time), not part of this deploy.
 - The CI deployer has no Firebase role, so Hosting is never deployed from Actions: this is a manual
   step by you. Tilo's tooling never handles passwords or tokens; `firebase login` is yours.
-- `firebase.json` serves `apps/web/dist` with a single-page-app rewrite to `/index.html`, hashed files
-  under `/assets/**` as `public, max-age=31536000, immutable`, and `index.html` as `no-cache` so a new
-  deploy is picked up on the next load. Every route also gets `Content-Security-Policy` (self only,
+- `firebase.json` serves `apps/web/dist` with a single-page-app rewrite to `/index.html` for everything
+  except `/assets/**` (`!/assets/**`, so a stale tab asking for a removed hashed asset gets a plain 404
+  instead of `index.html`), hashed files under `/assets/**` as `public, max-age=31536000, immutable`, and
+  every other path as `no-cache` (the `**` default) so a new deploy is picked up on the next load. Every
+  route also gets `Content-Security-Policy` (self only, no inline styles, `base-uri 'none'`,
   `connect-src 'self'`, `frame-ancestors 'none'`, no `unsafe-eval`: the web app loads
   `pixi.js/unsafe-eval`), `X-Content-Type-Options: nosniff` and
   `Referrer-Policy: strict-origin-when-cross-origin`. A new backend origin for the web app must be
