@@ -172,3 +172,14 @@ Each is marked `# ASSUMPTION` in the test that makes it where it is a single tes
    (no index, counter or idempotency entry), so `MetaBackend.paths()` is empty (FR-MEM-09 "removes their data").
 9. Retention is one record per version (a 91-day-old v1 is purged while a 31-day-old v2 stays).
 10. Screening a file the provider cannot screen (it raises) is `unscreened`, like any other provider error.
+
+## Choices made in the builder's PR (security review rounds 1 and 2)
+
+11. `alert.raised` is deduped per version: one alert for a corrupt `(org, world, artifact, version)` until a clean read
+    of it re-arms it (a failed read still raises `ArtifactCorrupt` every time).
+12. A put writes the record first, then the blob. A failed blob create deletes the blob, and the record only if that
+    delete worked (else the record stays listed and purgeable, and reads as corrupt). A blob already at a version the
+    store holds the record for is accepted only if its SHA-256 matches; otherwise `ArtifactCorrupt`. Nothing is rewritten.
+13. An idempotency hit whose blob is not intact: `ArtifactBusy` (retryable) while the record is younger than `GRACE`
+    (5 minutes, injected clock); a missing blob after `GRACE` is an interrupted write, purged and redone; a bad blob is
+    `ArtifactCorrupt`, never repaired. Exact-key existence plus hash decides, never a listing.

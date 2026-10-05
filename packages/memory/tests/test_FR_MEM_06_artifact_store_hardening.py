@@ -26,6 +26,8 @@ from _artifact_testlib import (
 )
 from _memory_lib import build_registry
 from tilo_memory.artifacts import (
+    GRACE,
+    ArtifactBusy,
     ArtifactCorrupt,
     ArtifactError,
     ArtifactNotFound,
@@ -115,19 +117,36 @@ def test_FR_MEM_06_AR_02_an_interrupted_write_never_blocks_the_next_version_or_a
     assert rig.store.read(rig.scope, v3.ref) == b"three" and rig.store.read(rig.scope, restored.ref) == b"one"
 
 
-def test_FR_MEM_06_AR_02_an_orphan_blob_without_a_record_is_replaced_not_a_dead_end():
+def test_FR_MEM_06_AR_02_an_orphan_blob_without_a_record_is_never_deleted_or_rewritten():
     rig = make_rig("memory", None)
     v1 = rig.put(b"one")
     v2 = rig.put(b"two", parent=v1.ref)
     rig.meta.inner.delete(record_path(rig.scope, v2.ref))  # a record lost, its blob left behind
-    again = rig.put(b"two, again", parent=v1.ref)
-    assert again.version == 2
-    assert rig.store.read(rig.scope, again.ref) == b"two, again"
+    with pytest.raises(ArtifactCorrupt):  # the blob is not these bytes: it is reported, not replaced
+        rig.put(b"two, again", parent=v1.ref)
+    assert rig.blobs.inner.read(blob_key(rig.scope, v2.ref)) == b"two", "a committed blob is never rewritten"
+    assert rig.put(b"three", parent=v1.ref).version == 3, "and the version it holds does not block the next one"
+    (held,) = [r for r in rig.store.retention().records() if r.record_id == record_path(rig.scope, v2.ref)]
+    rig.store.retention().delete(held.record_id)  # the record we hold for it is listed, so it is purged and erased
+    assert blob_key(rig.scope, v2.ref) not in rig.blobs.inner.keys()
 
 
-def test_FR_MEM_06_AR_05_a_restarted_unit_redoes_an_interrupted_put_under_the_same_key(tmp_path):
+def test_FR_MEM_06_AR_02_an_orphan_blob_with_the_same_bytes_is_accepted_as_a_create_only_fill_in():
+    rig = make_rig("memory", None)
+    v1 = rig.put(b"one")
+    v2 = rig.put(b"two", parent=v1.ref)
+    rig.meta.inner.delete(record_path(rig.scope, v2.ref))
+    again = rig.put(b"two", parent=v1.ref)
+    assert again.version == 2 and rig.store.read(rig.scope, again.ref) == b"two"
+
+
+def test_FR_MEM_06_AR_05_a_restarted_unit_redoes_an_interrupted_put_once_the_grace_window_has_passed(tmp_path):
     rig, blobs, meta = _interrupted(tmp_path)
     _crash_put(rig, blobs, meta, b"first try", attempt=1)
+    with pytest.raises(ArtifactBusy):  # inside the window it may be another writer's: retry later, change nothing
+        rig.put(b"second try", attempt=1)
+    assert len(rig.meta.inner.paths()) == 1
+    rig.clock.advance(GRACE + timedelta(seconds=1))
     again = rig.put(b"second try", attempt=1)
     assert again.version == 1
     assert rig.store.read(rig.scope, again.ref) == b"second try"

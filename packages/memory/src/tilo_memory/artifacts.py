@@ -19,7 +19,7 @@ import secrets
 import threading
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 import jsonschema
@@ -43,6 +43,7 @@ MAX_TEXT, MAX_FILE, MAX_WORLD = 2_000_000, 50_000_000, 200_000_000  # BQ-257
 STAGES = ("created", "reviewed", "sent", "exported")
 _DIGEST_KEYS = frozenset({"content_sha256", "fingerprint"})  # hex digests are not shown to the redactor (MF-06)
 _RETRIES = 8
+GRACE = timedelta(minutes=5)  # a record without its blob may be another writer's write in flight until then
 
 _ORG, _WORLD, _OWNER = r"org_[0-9A-Za-z_]{1,48}", r"w_[0-9A-Za-z_]{1,48}", r"u_[0-9A-Za-z_]{1,48}"
 _ART, _RUN, _UNIT, _AGENT = r"art_[0-9A-Za-z_]{1,48}", r"r_[0-9A-Za-z_]{1,48}", r"U[0-9]{1,4}", r"A_[0-9A-Za-z_]{1,48}"
@@ -66,6 +67,12 @@ class ArtifactNotFound(ArtifactError, LookupError):
 
 class ArtifactCorrupt(ArtifactError):
     """The stored bytes do not match the record (AR-01)."""
+
+
+class ArtifactBusy(ArtifactError):
+    """Retryable: a record without its blob is younger than the grace window, so its writer may still be finishing."""
+
+    retryable = True
 
 
 class ArtifactRefused(ArtifactError, ValueError):
@@ -158,6 +165,10 @@ def _iso(moment: datetime) -> str:
         raise ValueError("the clock must return an aware datetime")
     moment = moment.astimezone(UTC)
     return moment.strftime("%Y-%m-%dT%H:%M:%S.") + f"{moment.microsecond // 1000:03d}Z"
+
+
+def _when(stamp: str) -> datetime:
+    return datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC)
 
 
 def _ulid() -> str:
@@ -464,22 +475,46 @@ class ArtifactStore:
             raise ArtifactNotFound(f"no artifact {parent['artifact_id']} version {parent['version']}")
         return None, max(have) + 1
 
-    def _live(self, scope: Scope, doc: dict[str, Any]) -> bool:
-        return bool(self._blobs.keys(_blob_key(scope, doc["artifact"])))
+    def _blob_state(self, scope: Scope, doc: dict[str, Any]) -> str:
+        """`ok` (exact key present and its hash matches), `missing`, or `bad`. An exact-key read, never a listing."""
+        try:
+            data = self._blobs.read(_blob_key(scope, doc["artifact"]))
+        except FileNotFoundError:
+            return "missing"
+        return "ok" if self._hash(data) == doc["content_sha256"] and len(data) == doc["size_bytes"] else "bad"
+
+    def _settle(self, scope: Scope, doc: dict[str, Any]) -> StoredVersion | None:
+        """An idempotency hit whose blob is not intact. `ok`: the version. Younger than GRACE: ArtifactBusy (its writer
+        may be mid-write, possibly in another process). A bad blob is corrupt, never repaired. Only a record whose
+        blob is still missing after GRACE is an interrupted write: it is purged and None is returned (redo it)."""
+        state = self._blob_state(scope, doc)
+        if state == "ok":
+            return StoredVersion(doc)
+        ref = doc["artifact"]
+        if self._clock() - _when(doc["created_at"]) <= GRACE:
+            raise ArtifactBusy(f"artifact {ref['artifact_id']} version {ref['version']} is still being written")
+        if state == "bad":
+            self._verified(scope, doc)  # announces and raises ArtifactCorrupt (AR-01)
+            return StoredVersion(doc)
+        path = _record_path(scope, ref)
+        if self._meta.get(path) == doc:  # still the record we judged
+            self._purge(path)
+        return None
 
     def _append(
         self, scope: Scope, parent: dict[str, Any] | None, data: bytes, fields: dict[str, Any]
     ) -> StoredVersion:
         """Record first, then blob: a blob always has a record that retention and erasure list. A record whose blob
-        is missing (an interrupted write) reads as corrupt, is purgeable, and never blocks the next version."""
+        is missing (an interrupted write) reads as corrupt, is purgeable, and never blocks the next version. Nothing
+        another writer may still be completing is deleted or overwritten."""
         for _ in range(_RETRIES):
             with self._lock:
                 existing, version = self._plan(scope, fields["idempotency_key"], parent, len(data))
                 if existing is not None:
-                    if self._live(scope, existing):
-                        return StoredVersion(existing)
-                    self._purge(_record_path(scope, existing["artifact"]))  # an interrupted write: redo it
-                    continue
+                    settled = self._settle(scope, existing)
+                    if settled is not None:
+                        return settled
+                    continue  # the stale record was purged: plan again
                 art = parent["artifact_id"] if parent else self._new_id()
                 if type(art) is not str or _ID["art"].fullmatch(art) is None:
                     raise ArtifactError("the id source returned a malformed artifact id")
@@ -506,15 +541,18 @@ class ArtifactStore:
                 except FileExistsError:
                     continue  # another writer took this version: plan again
                 try:
-                    try:
-                        self._blobs.create(key, data)
-                    except FileExistsError:
-                        self._blobs.delete(key)  # we own this version (the record create won): the blob is an orphan
-                        self._blobs.create(key, data)
+                    self._blobs.create(key, data)
+                except FileExistsError:
+                    # A blob is already at a version whose record we hold: accept it only if it is these bytes
+                    # (create-only fill-in); otherwise it is corrupt. Never delete or rewrite it.
+                    self._verified(scope, record)
                 except BaseException:
+                    # The create may have written some or all of the bytes before it raised. Delete the blob, and the
+                    # record only if that worked; otherwise the record stays listed (reads as corrupt) and purgeable.
                     try:
+                        self._blobs.delete(key)
                         self._meta.delete(path)
-                    except Exception:  # noqa: BLE001 - if even this fails the record stays listed and purgeable
+                    except Exception:  # noqa: BLE001
                         pass
                     raise
                 return StoredVersion(record)
@@ -525,7 +563,7 @@ class ArtifactStore:
         parent = self._check_new(new)
         size = len(new.content)  # the object's own length: caps come before any copy or hash
         existing, _ = self._plan(scope, new.idempotency_key, parent, size)
-        if existing is not None and self._live(scope, existing):
+        if existing is not None and self._blob_state(scope, existing) == "ok":
             return StoredVersion(existing)  # a restarted unit gets its version back; the first bytes win (AR-05)
         for source in new.sources:
             try:
@@ -764,8 +802,7 @@ class _Retention:
         for path in meta.paths("orgs/"):
             doc = meta.get(path) if _RECORD_PATH.fullmatch(path) else None
             if doc is not None:
-                created = datetime.strptime(doc["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC)
-                out.append(_Record("artifact", path, created, doc["owner"]))
+                out.append(_Record("artifact", path, _when(doc["created_at"]), doc["owner"]))
         return out
 
     def delete(self, record_id: str) -> None:
