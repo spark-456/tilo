@@ -120,11 +120,21 @@
   color: var(--color-ink-2);
   font: 500 var(--text-12) / 1.4 var(--font-mono);
 }
-.home-glyph {
+/* The scene's box: it takes what the task column leaves (so the two end together) and keeps a floor
+ * equal to the picture's own height, so nothing around it moves when it paints. */
+.home-stage {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 196px;
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+}
+.home-scene {
   display: block;
-  flex: 1 1 0; /* takes what the task column leaves, so the two columns end together */
   width: 100%;
-  min-height: 120px;
+  height: auto; /* the viewBox gives the height from the width, so it is reserved from first paint */
 }
 @media (min-width: 768px) {
   .flow-wide .flow-summary {
@@ -153,12 +163,38 @@
 @media (max-width: 1279px) {
   .home-layout {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
   }
-  .home-preview {
-    display: none; /* the task comes first where there is no room for both */
+  .home-stage {
+    flex: none; /* the preview sits under the task here, so the scene keeps its own height */
+  }
+  .home-scene {
+    max-width: 360px;
+  }
+  .home-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  /* One column, so the whole column scrolls (task first) instead of the task box alone. */
+  .home-layout {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+  .home-main {
+    min-height: auto; /* the row keeps the whole task, which the column then scrolls */
+  }
+  .flow-body {
+    flex: none;
+    overflow: visible;
+    scrollbar-gutter: auto;
   }
 }
 @media (max-width: 767px) {
+  .home-stage {
+    min-height: 0; /* compact: the picture's own height, about 150 px */
+  }
+  .home-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .flow-wide .flow-heading {
     font-size: var(--text-32);
   }

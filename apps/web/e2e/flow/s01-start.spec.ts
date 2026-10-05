@@ -66,7 +66,17 @@ for (const viewport of [DESKTOP, MOBILE]) {
     expect(start.y + start.height).toBeLessThanOrEqual(box.y + box.height);
     expect(chips.y).toBeGreaterThanOrEqual(box.y + box.height);
     const preview = page.getByLabel("What Tilo would build");
-    if (viewport.width < 1280) return await expect(preview).toBeHidden(); // no room for both
+    // #227 B1/B2: under 1280 the preview stacks under the task and the column scrolls; the task and
+    // Start stay on the first screen, and the scene is a decorative static picture on every size.
+    await expect(preview).toBeVisible();
+    await expect(preview.locator("svg.home-scene")).toHaveAttribute("aria-hidden", "true");
+    await expect(preview.getByText("Outpost to City")).toBeVisible();
+    if (viewport.width < 1280) {
+      expect(start.y + start.height).toBeLessThanOrEqual(viewport.height);
+      const under = await preview.boundingBox();
+      expect(under?.y ?? 0).toBeGreaterThanOrEqual(chips.y + chips.height);
+      return;
+    }
     const side = await preview.boundingBox();
     const main = await page.locator(".home-main").boundingBox();
     if (!(side && main)) throw new Error("S-01 columns are not on screen");
