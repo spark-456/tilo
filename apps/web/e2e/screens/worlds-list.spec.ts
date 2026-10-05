@@ -119,6 +119,41 @@ test("S_14 artboard size chips filter by the layout's tier, and All sizes lists 
   await expect(page.getByTestId("count-all")).toHaveText("1");
 });
 
+test("S_14 phone: a short filter bar, the first card's title above the bottom nav, size chips behind Filters", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(MOBILE);
+  await page.goto("/worlds?speed=100");
+  const card = page.getByTestId("world-card");
+  await expect(card).toContainText("Village · 1 level", { timeout: 20_000 });
+  const bar = await page.locator(".filter-bar").boundingBox();
+  expect(bar?.height).toBeLessThanOrEqual(130);
+  const title = await card.getByRole("heading", { level: 2 }).boundingBox();
+  const nav = await page.getByRole("navigation", { name: "Primary" }).boundingBox();
+  expect((title?.y ?? 0) + (title?.height ?? 0)).toBeLessThanOrEqual(nav?.y ?? 0);
+
+  const toggle = page.getByRole("button", { name: "Filters: All sizes" });
+  expect((await toggle.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("radio", { name: "Village" })).toBeHidden();
+  const before = (await card.boundingBox())?.y;
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("radio", { name: "Village" })).toBeVisible();
+  expect((await card.boundingBox())?.y).toBe(before); // the panel opens over the list: nothing moves
+  await page.keyboard.press("Escape");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(toggle).toBeFocused();
+  await toggle.click();
+  await page.getByRole("radio", { name: "Village" }).check({ force: true });
+  await expect(page.getByRole("button", { name: "Filters: Village" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await expect(card).toBeVisible();
+});
+
 for (const [name, viewport] of [
   ["desktop", DESKTOP],
   ["mobile", MOBILE],

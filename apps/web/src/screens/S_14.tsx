@@ -5,7 +5,7 @@
 // status filters with counts, then world cards with a thumbnail, a size tag and a state pill on it,
 // a title, progress and a footer. Search and filters work on the worlds the client has, and every
 // count is computed from them: nothing is scheduled in this build, so Scheduled says 0.
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useClient, useWorldKnown } from "../api/ClientProvider";
 import { deriveQueue } from "../needs-you/queue";
 import { reduce } from "../world/reducer";
@@ -54,6 +54,15 @@ export function S_14() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sizeFilter, setSizeFilter] = useState<Size>("all");
+  // On a phone the size chips sit behind a Filters button and open as a panel over the list (no
+  // shift); from 768 px up they are always shown and the button is hidden.
+  const [sizesOpen, setSizesOpen] = useState(false);
+  const sizesId = useId();
+  const toggle = useRef<HTMLButtonElement>(null);
+  const closeSizes = () => {
+    setSizesOpen(false);
+    toggle.current?.focus();
+  };
   if (addressed !== null && !worldKnown) return <NotFound />; // a world the client does not know
   const first = events[0];
   const status = worldStatus(events);
@@ -84,7 +93,12 @@ export function S_14() {
       sub="Every job Tilo is running, has scheduled or has finished for you."
       action={<Primary label="New task" action={newTask} />}
     >
-      <div className="filter-bar">
+      <div
+        className="filter-bar"
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && sizesOpen) closeSizes();
+        }}
+      >
         <fieldset className="filter-chips status-tabs">
           <legend className="visually-hidden">Filter by status</legend>
           {FILTERS.map((f) => (
@@ -116,7 +130,18 @@ export function S_14() {
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
-        <fieldset className="filter-chips size-chips">
+        <button
+          ref={toggle}
+          type="button"
+          className="size-toggle"
+          data-filter-control
+          aria-expanded={sizesOpen}
+          aria-controls={sizesId}
+          onClick={() => setSizesOpen(!sizesOpen)}
+        >
+          Filters: {SIZE_LABEL[sizeFilter]}
+        </button>
+        <fieldset id={sizesId} className="filter-chips size-chips" data-open={sizesOpen}>
           <legend className="visually-hidden">Filter by size</legend>
           {SIZES.map((s) => (
             <label key={s} className="filter-chip">
@@ -125,7 +150,10 @@ export function S_14() {
                 name="worlds-size"
                 value={s}
                 checked={sizeFilter === s}
-                onChange={() => setSizeFilter(s)}
+                onChange={() => {
+                  setSizeFilter(s);
+                  if (sizesOpen) closeSizes();
+                }}
               />
               <span>{SIZE_LABEL[s]}</span>
             </label>

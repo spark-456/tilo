@@ -1405,14 +1405,14 @@ button.row {
    white tile with the card lip and a tick (shape, not colour alone). */
 .filter-chips.status-tabs {
   flex-wrap: wrap;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 17px;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-controls);
   background: var(--color-surface-2);
 }
 .status-tabs .filter-chip span {
   border-color: transparent;
-  border-radius: 14px;
+  border-radius: var(--radius-controls);
   background: transparent;
 }
 .status-tabs .filter-chip span b {
@@ -1430,6 +1430,72 @@ button.row {
 }
 .size-chips .filter-chip span {
   border-color: color-mix(in srgb, var(--color-surface-2) 50%, var(--color-ink-3));
+}
+.size-toggle {
+  display: none; /* a phone control: from 768 px the size chips are always shown */
+}
+@media (max-width: 767px) {
+  /* The bar is two rows: the status tabs on one row (they scroll sideways if the words do not fit),
+     then the search and the Filters button. The size chips open as a panel over the list, so
+     opening them moves nothing. */
+  .filter-bar {
+    position: relative;
+    gap: var(--space-8);
+  }
+  .filter-chips.status-tabs {
+    flex: 1 1 100%;
+    min-width: 0; /* a fieldset would otherwise grow to its content and push the page sideways */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .status-tabs .filter-chip span {
+    padding: 0 var(--space-8);
+    white-space: nowrap;
+  }
+  .search-field {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+    margin-left: 0;
+  }
+  .size-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 0 var(--space-12);
+    border: 2px solid var(--color-ink-3);
+    border-radius: var(--radius-controls);
+    background: var(--color-surface-1);
+    color: var(--color-ink-1);
+    font: 700 var(--text-14) / 1 var(--font-ui);
+    cursor: pointer;
+  }
+  .size-toggle[aria-expanded="true"] {
+    border-color: var(--color-ink-1);
+  }
+  .size-toggle:focus-visible {
+    outline: 3px solid var(--color-brand-primary);
+    outline-offset: 2px;
+  }
+  .filter-chips.size-chips {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    z-index: 5;
+    padding: var(--space-12);
+    border: 2px solid var(--color-surface-2);
+    border-radius: var(--radius-controls);
+    background: var(--color-surface-1);
+    box-shadow: 0 4px 0 0 color-mix(in srgb, var(--color-surface-2) 70%, var(--color-ink-1));
+  }
+  .filter-chips.size-chips[data-open="true"] {
+    display: flex;
+  }
 }
 .world-grid .empty-state {
   grid-column: 1 / -1;
@@ -1468,6 +1534,12 @@ button.row {
 .world-card[data-tier="town"] .world-thumb {
   background: color-mix(in srgb, var(--color-district-research) 16%, var(--color-surface-1));
 }
+.world-card[data-tier="city"] .world-thumb {
+  background: color-mix(in srgb, var(--color-district-hall) 16%, var(--color-surface-1));
+}
+.world-card[data-tier="outpost"] .world-thumb {
+  background: color-mix(in srgb, var(--color-district-accounts) 16%, var(--color-surface-1));
+}
 .world-progress {
   display: flex;
   align-items: center;
@@ -1487,10 +1559,15 @@ button.row {
   align-items: flex-start;
   gap: var(--space-4);
   box-sizing: border-box;
-  min-height: 9.5rem; /* a decision (two lines at most) and its link, or the calm line: the card never changes height */
+  min-height: 7.75rem; /* measured: a decision (two lines at most) and its link is 121 px at 1440; the calm line fits too */
   padding: var(--space-12);
   border: 2px solid var(--color-surface-2);
-  border-radius: 16px;
+  border-radius: var(--radius-controls);
+}
+@media (max-width: 767px) {
+  .world-decision {
+    min-height: 9.5rem; /* measured: 150 px, the phone link is 44 px high */
+  }
 }
 .world-decision[data-tone="needs"] {
   border-color: var(--color-signal-needs);
