@@ -215,6 +215,8 @@ class Autopilot:
         if self._ledger.first(user_id, card_id, "decision", "send") != "send":
             return Outcome("refused", None)
         entry = self._ledger.enqueue(doc, **built)
+        if entry.get("state") in ("cancelled", "failed"):  # a repeated key returns the stored entry as it stands
+            return Outcome("refused", entry["id"])
         self._cards.put(user_id, card_id, doc | {"outbox_id": entry["id"]})
         _LOG.info("autopilot card %s: queued by its owner, %s", card_id, doc["tier"])
         return Outcome("queued", entry["id"])

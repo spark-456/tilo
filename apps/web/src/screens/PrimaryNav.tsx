@@ -53,16 +53,20 @@ function NeedsBadge({ worldId }: { worldId: string }) {
   ) : null;
 }
 
+/** The world whose Needs-you queue is counted: the addressed one, else the fixture world (fixture
+ * client only: a real client is never asked about a world nobody named); null when it is unknown. */
+export function useCountedWorld(): string | null {
+  const fixtureClient = useIsFixtureClient();
+  const countWorld = useAddressedWorld() ?? (fixtureClient ? FIXTURE_WORLD_ID : null);
+  return useWorldKnown(countWorld) ? countWorld : null;
+}
+
 export function PrimaryNav({ id, mobile }: { id: string; mobile: boolean }) {
   const path = usePathname();
   const current = sectionOf(path);
   // The world of the path, else of `?world=` (the Needs-you screens): its links keep that world.
   const inWorld = useAddressedWorld();
-  // The queue to count: the addressed world, else the fixture world (fixture client only: a real
-  // client is never asked about a world nobody named).
-  const fixtureClient = useIsFixtureClient();
-  const countWorld = inWorld ?? (fixtureClient ? FIXTURE_WORLD_ID : null);
-  const counted = useWorldKnown(countWorld) ? countWorld : null;
+  const counted = useCountedWorld();
   return (
     <nav className={id} data-testid={id} aria-label="Primary">
       {ITEMS.filter((i) => !(mobile && i.desktopOnly)).map((i) => {

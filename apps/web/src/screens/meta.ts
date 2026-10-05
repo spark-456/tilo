@@ -106,6 +106,11 @@ export const SCREENS: readonly ScreenMeta[] = [
   built(must("S-23", "How we estimate; status page", "P8", "/estimate", /^\/estimate\/?$/)),
   built(must("S-24", "Pilot diary and survey", "P8", "/pilot", /^\/pilot\/?$/)),
   later("S-25", "Stage mode overlay", "P3"),
+  // The people screens (docs/prd-addendum-people-agents.md, FR-PA-03): reached from More, on fixtures.
+  built(must("S-26", "Meetings", "P3", "/meetings", /^\/meetings(?:\/([^/]+))?\/?$/)),
+  built(must("S-27", "My plate", "P3", "/plate", /^\/plate\/?$/)),
+  built(must("S-28", "Pinboards", "P3", "/pinboards", /^\/pinboards\/?$/)),
+  built(must("S-29", "Calendar", "P3", "/calendar", /^\/calendar\/?$/)),
 ];
 
 export const screenMeta = (id: string): ScreenMeta | undefined => SCREENS.find((s) => s.id === id);

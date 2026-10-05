@@ -123,6 +123,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT; fonts Nunito, Nunito Sans, JetBrains Mono are OFL-1.1 | https://fonts.google.com/ |
 | fast-check (property tests, ticket P0-08b-player, FR-WLD-04) | MIT | https://www.npmjs.com/package/fast-check |
 | happy-dom (DOM for React component unit tests, AGW-01; dev only) | MIT | https://www.npmjs.com/package/happy-dom |
+| ajv (JSON Schema validator for the PPL-40a plate reducer test; dev only) | MIT | https://www.npmjs.com/package/ajv |
 | @tilo/contracts (`packages/contracts-ts`, internal workspace package, not third-party) | n/a | `packages/contracts-ts` |
 
 ## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)
@@ -185,3 +186,8 @@ Pinned in `cloudbuild.yaml`. They run only inside Google Cloud Build; nothing fr
 
 None vendored yet. `design/source/` is read-only reference material, not a dependency; its
 licence terms are tracked in `design/source/INDEX.md`, not here.
+
+## Python (`packages/memory`)
+
+`tilo-memory` declares `jsonschema` and `referencing` as runtime dependencies (FR-MEM-06 artifact store),
+both already listed above (MIT). No new licence.

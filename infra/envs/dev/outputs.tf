@@ -155,3 +155,58 @@ output "model_armor_template" {
     template_id = google_model_armor_template.default.template_id
   }
 }
+
+# Cloud Build identity (P0-07g, cloudbuild.tftest.hcl): its email, the one
+# list of every binding it holds (derived from the real IAM resources), the
+# runtime accounts it may act as and the source staging bucket.
+output "cloudbuild_service_account_email" {
+  # Built from the account id (the resource's computed email is unknown at plan time).
+  value = local.cloudbuild_service_account_email
+}
+
+output "cloudbuild_grants" {
+  description = "Every binding tilo-cloudbuild holds: scope, resource, role."
+  value = concat(
+    [{
+      scope    = "artifact_registry_repository"
+      resource = google_artifact_registry_repository_iam_member.cloudbuild_writer.repository
+      role     = google_artifact_registry_repository_iam_member.cloudbuild_writer.role
+    }],
+    [for g in module.service.developer_grants : {
+      scope    = "cloud_run_service"
+      resource = g.service
+      role     = g.role
+    } if g.member == "serviceAccount:${local.cloudbuild_service_account_email}"],
+    [for k, b in google_service_account_iam_member.cloudbuild_act_as : {
+      scope    = "service_account"
+      resource = module.service.service_accounts[k]
+      role     = b.role
+    }],
+    [for b in values(module.iam.bindings) : {
+      scope    = "project"
+      resource = var.project_id
+      role     = b.role
+    } if b.member == "serviceAccount:${local.cloudbuild_service_account_email}"],
+    [{
+      scope    = "storage_bucket"
+      resource = google_storage_bucket_iam_member.cloudbuild_staging_viewer.bucket
+      role     = google_storage_bucket_iam_member.cloudbuild_staging_viewer.role
+    }],
+  )
+}
+
+output "cloudbuild_act_as_service_accounts" {
+  description = "Service accounts tilo-cloudbuild may act as."
+  value       = [for b in google_service_account_iam_member.cloudbuild_act_as : b.service_account_id]
+}
+
+output "cloudbuild_staging_bucket" {
+  description = "The Terraform-managed source staging bucket (not one of storage_buckets)."
+  value = {
+    name                        = module.storage_cloudbuild_staging.buckets["cloudbuild-staging"].name
+    location                    = module.storage_cloudbuild_staging.buckets["cloudbuild-staging"].location
+    uniform_bucket_level_access = module.storage_cloudbuild_staging.buckets["cloudbuild-staging"].uniform_bucket_level_access
+    public_access_prevention    = module.storage_cloudbuild_staging.buckets["cloudbuild-staging"].public_access_prevention
+    lifecycle_rules             = module.storage_cloudbuild_staging.lifecycle_rules["cloudbuild-staging"]
+  }
+}

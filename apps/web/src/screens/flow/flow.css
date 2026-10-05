@@ -5,12 +5,12 @@
   --flow-w: 1000px; /* two columns: the task and the preview; never under the right rail */
   display: flex;
   flex-direction: column;
-  top: calc(var(--strip-h) + var(--space-24)); /* below the reserved status strip (C2) */
+  top: calc(var(--chrome-h) + var(--space-24)); /* below the reserved status strip (C2) */
   width: min(var(--flow-w), calc(100vw - 72px - 360px - 32px));
   left: 88px;
   /* S-01 has nothing to load, so the panel is as tall as its content (no empty gap above the
      button); the busy and error states reserve their own lines, so only an edit resizes it. */
-  max-height: min(720px, calc(100vh - var(--strip-h) - 2 * var(--space-24)));
+  max-height: min(720px, calc(100vh - var(--chrome-h) - 2 * var(--space-24)));
   padding: 24px;
 }
 .flow-wide .flow-heading {
@@ -223,13 +223,13 @@
     font-size: var(--text-32);
   }
   .flow-shell.flow-wide {
-    top: calc(var(--strip-h) + var(--space-16)); /* below the status strip, one row or two */
+    top: calc(var(--chrome-h) + var(--space-16)); /* below the status strip, one row or two */
     left: 16px;
     width: calc(100vw - 32px);
     /* Ends one gap above the bottom tabs (their height token). */
     max-height: calc(
       100dvh -
-      var(--strip-h) -
+      var(--chrome-h) -
       var(--button-height-desktop) -
       var(--space-16) -
       var(--space-8)

@@ -1,6 +1,6 @@
 # ADR-0019: WhatsApp leaves the contract rules (CH-RM)
 
-- Status: Proposed (authority: SD-01, PRD supplement 2026-10-05)
+- Status: Accepted by the user, 2026-10-05 ("accept ADR-0019, option A"; authority: SD-01, PRD supplement 2026-10-05)
 - Deciders: architect (proposal). This ADR and BQ-CHRM-2 need explicit acceptance at merge by the
   user, or by the supervisor under the user's recorded delegation; review passes are not acceptance.
 - Requirement: CH-RM (issue #379); SEC-06 and FR-HIL-05 as amended (supplement 2.1); PRD 10.1,
@@ -99,8 +99,12 @@ cannot tell who is sending.
 - **ADR-0013.** Decision 2 (a WhatsApp answer copies `action_type`) and its `channel.message_in`
   diff lapse. Decisions 1 and 3 stand: on the web, a fixed control sets `action_type`.
 - How a typed answer to "What should I say?" on the web becomes a `world.requested` is logged as
-  BQ-CHRM-2, with the default applied. That row also lists three points for the user or supervisor
-  to decide:
+  BQ-CHRM-2. **User decision, 2026-10-05: option A (defer).** No typed mid-run instruction path is
+  built for now. A `world.requested` is written only when a person starts a run on the web, and
+  every L2 send keeps waiting at a gate (PI-21). A dedicated mid-run instruction event, covering
+  its thread, where its words land and its effects (HR-1 to HR-7), gets its own ADR later. The
+  architect's earlier default (the mail card or panel writes a mid-run `world.requested`) is NOT
+  applied. The three points it raised stay open for that later ADR:
   - who sets a panel instruction's thread;
   - where the instruction's words land (events, Story, archive);
   - the `world.requested` registry effects for a mid-run instruction (HR-1 to HR-7).
