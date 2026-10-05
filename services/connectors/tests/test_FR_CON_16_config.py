@@ -18,7 +18,7 @@ import unicodedata
 import jsonschema
 import pytest
 import yaml
-from _handoff_lib import CONFIG, CONTRACTS, REPO_ROOT, default_partner_yaml, h, registry, write_partners
+from _handoff_lib import CONFIG, CONTRACTS, default_partner_yaml, h, registry, schema_registry, write_partners
 from _registry_lib import write_config
 from tilo_policy import Assessment, SideEffectFacts, load_risk_table
 
@@ -54,9 +54,7 @@ def test_FR_CON_16_lovable_declaration_is_the_pinned_link_route_connector():
 
 def test_FR_CON_16_lovable_declaration_validates_against_the_unchanged_connector_contract():
     schema = json.loads((CONTRACTS / "connector.schema.json").read_text(encoding="utf-8"))
-    from conftest import build_registry
-
-    validator = jsonschema.Draft202012Validator(schema, registry=build_registry(REPO_ROOT))
+    validator = jsonschema.Draft202012Validator(schema, registry=schema_registry())
     assert list(validator.iter_errors(_lovable())) == []
 
 
@@ -290,7 +288,7 @@ def test_FR_CON_16_loader_refuses_a_partner_the_registry_does_not_declare(tmp_pa
     "change",
     [
         {"risk_tier": "T2"},
-        {"risk_tier": "T1", "gate_type": "none"},
+        {"risk_tier": "T2", "irreversible": False},
         {"irreversible": False},
     ],
 )
@@ -304,6 +302,16 @@ def test_FR_CON_16_loader_refuses_a_partner_whose_action_is_not_t3_gated_and_irr
     reg = load_registry(write_config(tmp_path, [entry], "connectors.yaml"))
     with pytest.raises(BuildPartnerConfigError):
         h().load_build_partners(write_partners(tmp_path), registry=reg)
+
+
+def test_FR_CON_16_the_registry_itself_refuses_a_send_action_with_no_gate(tmp_path):
+    """A `send` action with gate_type none never loads (connector.schema.json), so the loader is not even reached."""
+    from tilo_connectors.registry import ConnectorConfigError, load_registry
+
+    entry = _lovable()
+    entry["actions"][0].update(risk_tier="T1", gate_type="none")
+    with pytest.raises(ConnectorConfigError):
+        load_registry(write_config(tmp_path, [entry], "connectors.yaml"))
 
 
 def test_FR_CON_16_loader_refuses_a_partner_whose_action_the_connector_does_not_declare(tmp_path):

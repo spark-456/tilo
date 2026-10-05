@@ -19,6 +19,7 @@ from _handoff_lib import (
     GOOD_FRAMING,
     OWNER,
     PLANT,
+    REPO_ROOT,
     RUN,
     STRANGER,
     UNIT,
@@ -32,6 +33,7 @@ from _handoff_lib import (
     everything_emitted,
     h,
     link_url,
+    load_json,
     lv,
     make_env,
     oracle_link,
@@ -167,7 +169,6 @@ def test_FR_CON_16_T3_a_person_who_is_neither_owner_nor_approver_cannot_approve(
 def test_FR_CON_16_T3_a_policy_never_opens_a_build_handoff():
     """PI-07: a standing policy never authorises T3; the entry is refused at enqueue (OB-01)."""
     from _connectors_lib import evidence_from_case
-    from conftest import REPO_ROOT, load_json
 
     fixture = load_json(
         REPO_ROOT / "contracts" / "fixtures" / "outbox" / "crossref" / "valid" / "policy_l3_status_update_waiting.json"

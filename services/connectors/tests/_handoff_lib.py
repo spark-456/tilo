@@ -31,7 +31,7 @@ from urllib.parse import quote
 
 import yaml
 from _connectors_lib import OWNER, RUN, WORLD, ManualClock
-from conftest import gate_case, load_json
+from conftest import gate_case
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 CONFIG = REPO_ROOT / "config"
@@ -47,6 +47,27 @@ APPROVER = "u_approver"
 T0 = "2026-10-05T09:30:00.000Z"
 T1 = "2026-10-05T09:45:00.000Z"
 LINK_PREFIX = "https://lovable.dev/#prompt="
+
+
+def load_json(path: pathlib.Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def schema_registry():
+    """A referencing Registry over every contracts/**/*.schema.json, keyed by $id (as conftest.build_registry)."""
+    from referencing import Registry, Resource
+    from referencing.jsonschema import DRAFT202012
+
+    resources = []
+    for path in sorted(CONTRACTS.glob("**/*.schema.json")):
+        data = load_json(path)
+        resources.append(
+            (
+                data.get("$id") or path.resolve().as_uri(),
+                Resource.from_contents(data, default_specification=DRAFT202012),
+            )
+        )
+    return Registry().with_resources(resources)
 
 
 def h():
