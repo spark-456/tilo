@@ -176,3 +176,20 @@ def test_NFR_27_docs_tell_the_owner_how_the_alert_is_wired(repo_root):
     assert any("NFR-27" in t and "cost_alert" in t and "alert_email" in t for t in texts), (
         "NFR-27: docs/deploy-dev.md or infra/README.md must mention NFR-27, the cost_alert event and alert_email"
     )
+
+
+def test_NFR_27_metric_filter_is_scoped_to_cloud_run_stdout_and_the_three_kinds(repo_root):
+    _path, _name, body = _cost_metric(repo_root)
+    flt = re.search(r"^\s*filter\s*=\s*(.+)$", body, re.M).group(1)
+    assert 'resource.type=\\"cloud_run_revision\\"' in flt, "NFR-27: scope the metric to Cloud Run revisions"
+    assert "run.googleapis.com%2Fstdout" in flt, "NFR-27: scope the metric to stdout"
+    for kind in ("uid_cap_80", "uid_cap_100", "global_daily"):
+        assert f'\\"{kind}\\"' in flt, f"NFR-27: filter must name kind {kind}"
+
+
+def test_NFR_27_policy_auto_closes_and_treats_missing_data_as_inactive(repo_root):
+    _path, _name, metric = _cost_metric(repo_root)
+    metric_name = re.search(r'^\s*name\s*=\s*"([^"]+)"', metric, re.M).group(1)
+    body = next(b for _p, _n, b in _all_blocks(repo_root, "google_monitoring_alert_policy") if metric_name in b)
+    assert re.search(r'auto_close\s*=\s*"1800s"', body), "NFR-27: an incident must auto-close (1800s)"
+    assert re.search(r'evaluation_missing_data\s*=\s*"EVALUATION_MISSING_DATA_INACTIVE"', body)

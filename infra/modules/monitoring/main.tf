@@ -137,7 +137,7 @@ resource "google_logging_metric" "cost_alert" {
   project     = var.project_id
   name        = "tilo_cost_alert"
   description = "Count of NFR-27 owner cost alert log lines, by kind."
-  filter      = "jsonPayload.event=\"cost_alert\""
+  filter      = "resource.type=\"cloud_run_revision\" AND logName:\"run.googleapis.com%2Fstdout\" AND jsonPayload.event=\"cost_alert\" AND jsonPayload.kind=(\"uid_cap_80\" OR \"uid_cap_100\" OR \"global_daily\")"
 
   metric_descriptor {
     metric_kind  = "DELTA"
@@ -177,6 +177,8 @@ resource "google_monitoring_alert_policy" "cost_alert" {
       threshold_value = 0
       duration        = "0s"
 
+      evaluation_missing_data = "EVALUATION_MISSING_DATA_INACTIVE"
+
       aggregations {
         alignment_period     = "300s"
         per_series_aligner   = "ALIGN_SUM"
@@ -191,6 +193,8 @@ resource "google_monitoring_alert_policy" "cost_alert" {
   }
 
   alert_strategy {
+    auto_close = "1800s"
+
     notification_rate_limit {
       period = "3600s"
     }
