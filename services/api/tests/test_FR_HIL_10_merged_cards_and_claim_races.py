@@ -1,28 +1,24 @@
-"""FR-HIL-10 through the API, issue #338 (found by the Opus review of PR #336; PRD 10.3 "Same-type cards from one
-district within 60 s merge", 10.6 FR-HIL-02 / FR-HIL-10 "answering resumes the agent in <= 2 s", BQ-74):
-cards that merge are one card to the person, and one answer to that card must resume every unit that asked, not only
-the unit of the card the answer happened to be filed under.
+"""FR-HIL-10 through the API, issue #338 (found by the Opus reviews of PRs #336 and #351; PRD 10.3 "Same-type cards from
+one district within 60 s merge", 10.6 FR-HIL-02 / FR-HIL-10 "answering resumes the agent in <= 2 s", BQ-74, BQ-239):
+a question a unit waits on is never merged. Each such card is listed on its own and its answer resumes its own unit
+only; no answer is ever mapped onto another card (a hidden card must never run a step nobody saw).
 
-Given two units of one district that ask within 60 s (the layout puts every unit of a district in one Workshop, so the
-cards always merge: two question.routed, one listed card) When the person answers the one listed card Then both units
-resume within 2.0 s; the same when the answer is sent under the other member's own card id. Cards of different districts
-do not merge and each answer resumes only its own unit. A group that is resolving or closed accepts no new member (the
+Given two units of one district that ask within 60 s (two question.routed, two listed cards) When the person answers
+one card Then only that unit resumes within 2.0 s, the other keeps waiting for its own answer or its own deadline
+default, whichever card id the answer is filed under. A group that is resolving or closed accepts no new member (the
 code-written confirmation card of a sensitive step, raised the moment the answer commits, must be listed and answerable,
 and its "Prepare it" runs the unit). Also the QuestionWait claim races: a commit-then-raise of one answer followed by a
 different answer resolves the wait, and a tick failure after a committed deadline default never fails the unit.
 
 Scripted models and runner, the in-process app, the real CardStore: no model, no network, no timer other than the
 1 to 6 s card timeouts the tests set through `must_ask.QUESTION_TIMEOUT_S` (a deadline in the test names).
-
-Defaults applied where the PRD and BQ-74 are silent (each also in the report): which option a merged-in waiter receives
-is not pinned (its own card's options may differ from the listed card's); the number of question.answered events for
-a merged answer is not pinned (BQ-74 says "one part", BQ-209 says one per card), only that no `default` answer follows.
 The harness half of the claim races is in services/harness/tests/test_FR_HIL_10_claim_races_and_option_ids.py.
 """
 
 from __future__ import annotations
 
 import copy
+import json
 import threading
 import time
 
@@ -31,6 +27,7 @@ from _agt05_lib import (
     ASK,
     CLEAR,
     RESUME_BUDGET_S,
+    ScriptedProvider,
     build_ask_flow,
     needs_you_cards,
     start_and_approve,
@@ -44,6 +41,18 @@ from _clint2_lib import wait_for
 ASK01 = task("ASK-01")  # "Update the pricing sheet with the new numbers": a model-written ambiguity card
 ASK10 = task("ASK-10")  # "Pay the outstanding supplier invoice": a model-raised sensitive_step card
 START = "2026-09-29T09:30:00.000Z"
+U1_TITLE = "Compare the two vendor quotes by hand"
+U2_TITLE = "Archive the old supplier folder quietly"
+U1_REPLY = json.dumps(
+    {
+        "ask": True,
+        "reason": "ambiguous_brief",
+        "question": "Should I use the newest quote only?",
+        "options": ["Go ahead", "Wait for me"],
+        "suggested": 1,
+        "why": "Waiting costs nothing.",
+    }
+)
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -79,71 +88,133 @@ def flows():
         rf.close()
 
 
-def _two_units_asked_in_one_district(repo_root, flows):
-    """U1 and U2 (both D1) ask; U3 is clear. Returns (rf, the one listed card, both question.routed card ids)."""
-    rf = _ask_flow(repo_root, (ASK, ASK01, CLEAR[2]))
+def _two_units_asked_in_one_district(repo_root, flows, *, timeout_s=None, monkeypatch=None):
+    """U1 and U2 (both D1) ask; U3 is clear. Returns (rf, U1's card, U2's card): two cards, listed separately."""
+    rf = _ask_flow(repo_root, (ASK, ASK01, CLEAR[2]), timeout_s=timeout_s, monkeypatch=monkeypatch)
     flows.append(rf)
     start_and_approve(rf)
     wait_for(lambda: len(rf.events("question.routed")) >= 2, what="two question.routed")
     rf.quiet_stream()
     routed = [e["data"]["card_id"] for e in rf.events("question.routed")]
     assert len(set(routed)) == 2, "each asking unit has a card of its own"
-    listed = needs_you_cards(rf)
-    assert len(listed) == 1, (
-        "precondition (PRD 10.3, FR-HIL-02): same-type cards of one district within 60 s are one card to the person"
-    )
-    return rf, listed[0], routed
+    listed = {c["id"]: c for c in needs_you_cards(rf)}
+    assert set(listed) == set(routed), "a question a unit waits on is never merged: both cards are listed"
+    return rf, listed[routed[0]], listed[routed[1]]
 
 
-def _assert_both_resume_within_2_s(rf, t0):
-    wait_for(
-        lambda: {"U1", "U2"} <= set(rf.runner.started_at), timeout=RESUME_BUDGET_S + 2, what="both units to resume"
-    )
-    late = {u: round(rf.runner.started_at[u] - t0, 2) for u in ("U1", "U2")}
-    assert max(late.values()) <= RESUME_BUDGET_S, (
-        f"FR-HIL-10: answering must resume every unit that asked in <= 2 s, took {late}"
-    )
-    for unit in ("U1", "U2"):
-        answer = rf.runner.answers[unit]
-        assert answer is not None, f"{unit} resumed without its answer"
-        assert answer.answered_by == "person", (unit, answer)
-    wait_for(lambda: rf.events("world.completed"), what="world.completed")
-    events = rf.quiet_stream()
-    types = [e["type"] for e in events]
-    assert types.count("world.completed") == 1 and "world.failed" not in types
-    assert rf.runner.ran.count("U1") == 1 and rf.runner.ran.count("U2") == 1, "each unit's work runs exactly once"
-    assert [e for e in events if e["type"] == "question.answered" and e["data"]["answered_by"] == "default"] == []
+def _resumes_only(rf, unit, other, t0):
+    wait_for(lambda: unit in rf.runner.started_at, timeout=RESUME_BUDGET_S + 2, what=f"{unit} to resume")
+    assert rf.runner.started_at[unit] - t0 <= RESUME_BUDGET_S, "FR-HIL-10: answering resumes its unit in <= 2 s"
+    assert rf.runner.answers[unit].answered_by == "person", rf.runner.answers[unit]
+    rf.quiet_stream()
+    assert other is None or other not in rf.runner.started_at, f"{other} waits for an answer of its own"
 
 
 # --------------------------------------------------------------------------------------------------------------------
-# 1. merged same-district cards
+# 1. same-district question cards are not merged
 
 
-def test_FR_HIL_10_one_answer_to_the_merged_card_resumes_every_unit_that_asked_within_2_s(repo_root, flows):
-    rf, card, _routed = _two_units_asked_in_one_district(repo_root, flows)
+def test_FR_HIL_10_each_question_card_of_one_district_is_answered_separately_and_resumes_only_its_own_unit_within_2_s(
+    repo_root, flows
+):
+    rf, first, second = _two_units_asked_in_one_district(repo_root, flows)
     assert rf.runner.started_at.keys().isdisjoint({"U1", "U2"}), "both asked units wait for a person"
 
     t0 = time.monotonic()
-    response = rf.answer(card["id"], card["options"][0]["id"])
+    response = rf.answer(first["id"], first["options"][0]["id"])
 
     assert response.status_code == 200 and response.json() == {"outcome": "answered"}, response.text
-    _assert_both_resume_within_2_s(rf, t0)
-    assert [c for c in rf.cards().json() if c["kind"] == "needs_you"] == [], "the merged card left the open list"
+    _resumes_only(rf, "U1", "U2", t0)
+    assert [c["id"] for c in needs_you_cards(rf)] == [second["id"]], "the other card is still open and listed"
+
+    t1 = time.monotonic()
+    chosen = second["options"][1]["id"]
+    assert rf.answer(second["id"], chosen).status_code == 200
+    _resumes_only(rf, "U2", None, t1)
+    assert rf.runner.answers["U2"].option == chosen, "U2 resumed with the option its own card was answered with"
+    assert rf.runner.answers["U1"].option == first["options"][0]["id"]
+    wait_for(lambda: rf.events("world.completed"), what="world.completed")
+    events = rf.quiet_stream()
+    answered = [e["data"]["answered_by"] for e in events if e["type"] == "question.answered"]
+    assert answered == ["person", "person"] and "world.failed" not in [e["type"] for e in events]
+    assert rf.runner.ran.count("U1") == 1 and rf.runner.ran.count("U2") == 1
+    assert [c for c in rf.cards().json() if c["kind"] == "needs_you"] == []
 
 
-def test_FR_HIL_10_an_answer_sent_under_the_other_members_card_id_also_resumes_every_unit(repo_root, flows):
-    rf, listed, routed = _two_units_asked_in_one_district(repo_root, flows)
-    member = next(card_id for card_id in routed if card_id != listed["id"])
+def test_FR_HIL_10_an_answer_filed_under_one_card_never_touches_the_other_units_card_or_wait(
+    repo_root, flows, monkeypatch
+):
+    """Answering U2's card resumes U2 only. U1's card stays open and unanswered, so U1 gets its own deadline default
+    (the Director's nudge), and a late answer to U1's card is refused as already resolved."""
+    rf, first, second = _two_units_asked_in_one_district(repo_root, flows, timeout_s=4, monkeypatch=monkeypatch)
 
     t0 = time.monotonic()
-    response = rf.answer(member, "o1")  # both ASK-06 and ASK-01 have an o1
+    assert rf.answer(second["id"], "o1").status_code == 200
+    _resumes_only(rf, "U2", "U1", t0)
+    assert [c["id"] for c in needs_you_cards(rf)] == [first["id"]], "U1's card is untouched and still listed"
 
-    assert response.status_code == 200 and response.json() == {"outcome": "answered"}, response.text
-    _assert_both_resume_within_2_s(rf, t0)
-    again = rf.answer(listed["id"], "o2")
-    assert again.status_code == 400 and again.json()["reason"] == "already_resolved", again.text
+    wait_for(lambda: "U1" in rf.runner.started_at, timeout=8, what="U1 to resume with its own deadline default")
+    assert rf.runner.answers["U1"].answered_by == "default", "U1 was never answered by U2's answer"
+    wait_for(lambda: rf.events("world.completed"), what="world.completed")
+    events = rf.quiet_stream()
+    answered = sorted(e["data"]["answered_by"] for e in events if e["type"] == "question.answered")
+    assert answered == ["default", "person"], answered
+    late = rf.answer(first["id"], "o2")
+    assert late.status_code == 400 and late.json()["reason"] == "already_resolved", late.text
     rf.quiet_stream()
-    assert rf.runner.ran.count("U1") == 1 and rf.runner.ran.count("U2") == 1, "a second answer resumes nobody twice"
+    assert rf.runner.ran.count("U1") == 1 and rf.runner.ran.count("U2") == 1
+
+
+class _SlowU2(ScriptedProvider):
+    def generate(self, request):
+        if U2_TITLE in request.prompt:
+            time.sleep(0.6)  # U1's card is the first one stored and listed
+        return super().generate(request)
+
+
+def test_FR_HIL_10_a_label_picked_on_one_card_never_runs_the_other_unit_whose_rule_card_nobody_has_seen(
+    repo_root, flows
+):
+    """The shape of the Opus review blocker (P1): U1's model card offers "Go ahead" and "Wait for me"; U2's reply is
+    unreadable, so code raises its rule card ("Hold this step" / "Go ahead", only the second runs the unit). The person
+    picks "Go ahead" on U1's card: U1 resumes, U2 must NOT start from that choice. Its card stays listed with its own
+    options, and only an answer to it decides U2."""
+    provider = _SlowU2({U1_TITLE: U1_REPLY, CLEAR[2]["title"]: json.dumps({"ask": False})})
+    rf = build_ask_flow(repo_root, provider, independent=True)
+    flows.append(rf)
+    original = rf.compile_plan
+
+    def compile_plan(*, brief, approach, budget_cap, context=None):
+        plan = original(brief=brief, approach=approach, budget_cap=budget_cap, context=context)
+        for unit, title in zip(plan["units"], (U1_TITLE, U2_TITLE, CLEAR[2]["title"]), strict=True):
+            unit["title"], unit["depends_on"] = title, []
+        rf.last_plan = plan
+        return copy.deepcopy(plan)
+
+    rf.compile_plan = compile_plan
+    start_and_approve(rf)
+    wait_for(lambda: len(rf.events("question.routed")) >= 2, what="two question.routed")
+    rf.quiet_stream()
+    cards = needs_you_cards(rf)
+    assert len(cards) == 2, "U2's rule card is listed beside U1's: nobody answers a card they cannot see"
+    mine = next(c for c in cards if c["what_happened"].startswith("Should I use"))
+    rule = next(c for c in cards if c["id"] != mine["id"])
+    assert {o["label"] for o in rule["options"]} >= {"Hold this step", "Go ahead"}
+    go = next(o["id"] for o in mine["options"] if o["label"] == "Go ahead")
+
+    assert rf.answer(mine["id"], go).status_code == 200
+
+    wait_for(lambda: "U1" in rf.runner.started_at, timeout=RESUME_BUDGET_S + 2, what="U1 to resume")
+    time.sleep(1.5)  # long enough for a wrongly mapped answer to start U2
+    rf.quiet_stream()
+    assert "U2" not in rf.runner.started_at, "U2 must not run on the label the person picked for U1"
+    assert [c["id"] for c in needs_you_cards(rf)] == [rule["id"]], "U2's rule card is still open"
+    hold = next(o["id"] for o in rule["options"] if o["label"] == "Hold this step")
+    assert rf.answer(rule["id"], hold).status_code == 200
+    wait_for(lambda: rf.events("agent.retired"), what="U2 held by its own answer")
+    rf.quiet_stream()
+    assert "U2" not in rf.runner.started_at
+    assert any("the answer held this step" in e["summary"] for e in rf.events("agent.retired"))
 
 
 def test_FR_HIL_10_cards_of_different_districts_are_answered_separately_and_each_resumes_only_its_own_unit(

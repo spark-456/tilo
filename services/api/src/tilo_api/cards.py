@@ -262,6 +262,7 @@ class CardStore:
         merged = (
             group is not None
             and not group.closed
+            and not group.resolving  # its answer is being written: this card must stay open for its own answer
             and abs((created - group.anchor).total_seconds()) <= self._merge_window_s
         )
         if not merged:
