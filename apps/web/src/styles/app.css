@@ -1319,14 +1319,25 @@ button.row {
 }
 .search-field {
   position: relative;
-  flex: 1 1 16rem;
-  max-width: 24rem;
+  flex: 1 1 14rem;
+  max-width: 20rem;
+  margin-left: auto; /* the artboard puts the search at the right end of the bar */
+}
+.search-field svg {
+  position: absolute;
+  top: 50%;
+  left: var(--space-12);
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  color: var(--color-ink-2);
+  pointer-events: none;
 }
 .search-field input {
   box-sizing: border-box;
   width: 100%;
   min-height: 44px;
-  padding: 0 var(--space-12);
+  padding: 0 var(--space-12) 0 var(--space-32);
   border: 2px solid var(--color-ink-3);
   border-radius: var(--radius-controls);
   background: var(--color-surface-1);
@@ -1390,6 +1401,102 @@ button.row {
   outline: 3px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
+/* The status filter after the artboard's segmented control: a quiet track, the chosen tab a raised
+   white tile with the card lip and a tick (shape, not colour alone). */
+.filter-chips.status-tabs {
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-2);
+}
+.status-tabs .filter-chip span {
+  border-color: transparent;
+  border-radius: var(--radius-controls);
+  background: transparent;
+}
+.status-tabs .filter-chip span b {
+  color: var(--color-ink-2);
+  font-size: var(--text-12);
+}
+.status-tabs .filter-chip input:checked + span {
+  border-color: transparent;
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  box-shadow: 0 2px 0 0 color-mix(in srgb, var(--color-surface-2) 70%, var(--color-ink-1));
+}
+.status-tabs .filter-chip input:focus-visible + span {
+  outline-offset: 0;
+}
+.size-chips .filter-chip span {
+  border-color: color-mix(in srgb, var(--color-surface-2) 50%, var(--color-ink-3));
+}
+.size-toggle {
+  display: none; /* a phone control: from 768 px the size chips are always shown */
+}
+@media (max-width: 767px) {
+  /* The bar is two rows: the status tabs on one row (they scroll sideways if the words do not fit),
+     then the search and the Filters button. The size chips open as a panel over the list, so
+     opening them moves nothing. */
+  .filter-bar {
+    position: relative;
+    gap: var(--space-8);
+  }
+  .filter-chips.status-tabs {
+    flex: 1 1 100%;
+    min-width: 0; /* a fieldset would otherwise grow to its content and push the page sideways */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .status-tabs .filter-chip span {
+    padding: 0 var(--space-8);
+    white-space: nowrap;
+  }
+  .search-field {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+    margin-left: 0;
+  }
+  .size-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 0 var(--space-12);
+    border: 2px solid var(--color-ink-3);
+    border-radius: var(--radius-controls);
+    background: var(--color-surface-1);
+    color: var(--color-ink-1);
+    font: 700 var(--text-14) / 1 var(--font-ui);
+    cursor: pointer;
+  }
+  .size-toggle[aria-expanded="true"] {
+    border-color: var(--color-ink-1);
+  }
+  .size-toggle:focus-visible {
+    outline: 3px solid var(--color-brand-primary);
+    outline-offset: 2px;
+  }
+  .filter-chips.size-chips {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    z-index: 5;
+    padding: var(--space-12);
+    border: 2px solid var(--color-surface-2);
+    border-radius: var(--radius-controls);
+    background: var(--color-surface-1);
+    box-shadow: 0 4px 0 0 color-mix(in srgb, var(--color-surface-2) 70%, var(--color-ink-1));
+  }
+  .filter-chips.size-chips[data-open="true"] {
+    display: flex;
+  }
+}
 .world-grid .empty-state {
   grid-column: 1 / -1;
   min-height: 12rem; /* the room a card takes: choosing a filter moves nothing below */
@@ -1412,8 +1519,81 @@ button.row {
   flex-direction: column;
   overflow: hidden;
   border: 2px solid var(--color-surface-2);
+  border-bottom: 5px solid color-mix(in srgb, var(--color-surface-2) 70%, var(--color-ink-1));
   border-radius: var(--radius-cards);
   background: var(--color-surface-1);
+}
+/* A world that waits for you takes the needs-you colour on its edge and lip (the artboard's K1). */
+.world-card[data-needs="true"] {
+  border-color: var(--color-signal-needs);
+  border-bottom-color: color-mix(in srgb, var(--color-signal-needs) 70%, var(--color-ink-1));
+}
+.world-card[data-tier="village"] .world-thumb {
+  background: color-mix(in srgb, var(--color-brand-primary) 12%, var(--color-surface-1));
+}
+.world-card[data-tier="town"] .world-thumb {
+  background: color-mix(in srgb, var(--color-district-research) 16%, var(--color-surface-1));
+}
+.world-card[data-tier="city"] .world-thumb {
+  background: color-mix(in srgb, var(--color-district-hall) 16%, var(--color-surface-1));
+}
+.world-card[data-tier="outpost"] .world-thumb {
+  background: color-mix(in srgb, var(--color-district-accounts) 16%, var(--color-surface-1));
+}
+.world-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+.world-progress span {
+  min-width: 5ch; /* "100%" fits; left-aligned, so the figure changing moves nothing */
+  text-align: left;
+  color: var(--color-ink-2);
+  font: 700 var(--text-12) / 1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+.world-decision {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start; /* both states start at the same line: nothing moves between them */
+  align-items: flex-start;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  min-height: 7.75rem; /* measured: a decision (two lines at most) and its link is 121 px at 1440; the calm line fits too */
+  padding: var(--space-12);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+}
+@media (max-width: 767px) {
+  .world-decision {
+    min-height: 9.5rem; /* measured: 150 px, the phone link is 44 px high */
+  }
+}
+.world-decision[data-tone="needs"] {
+  border-color: var(--color-signal-needs);
+  background: color-mix(in srgb, var(--color-signal-needs) 12%, var(--color-surface-1));
+}
+.world-decision[data-tone="clear"] {
+  border-color: color-mix(in srgb, var(--color-signal-done) 35%, var(--color-surface-1));
+  background: color-mix(in srgb, var(--color-signal-done) 8%, var(--color-surface-1));
+}
+.world-decision[data-tone="clear"] .decision-head::before {
+  content: "✓ " / ""; /* a tick: calm by shape as well as by colour */
+}
+.world-decision p {
+  margin: 0;
+}
+.world-decision .bitem-sub {
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* two lines at most: a long summary never grows the card; the sheet has all of it */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.world-decision .decision-head {
+  font: 800 var(--text-14) / 1.4 var(--font-ui);
+}
+.world-decision .pill {
+  margin-top: var(--space-8);
 }
 .world-thumb {
   position: relative;
@@ -1454,9 +1634,6 @@ button.row {
   min-height: 2.6em; /* two lines: the title arriving with the first event moves nothing */
   font: 900 var(--text-20) / 1.3 var(--font-display); /* 20 */
 }
-.world-card .needs-line {
-  min-height: 3em; /* "Nothing waits for you." or a decision and its link, on up to two lines */
-}
 .world-card [data-testid="replay-note"] {
   min-height: 4.2em; /* three lines of 14 px text at 1.5 */
 }
@@ -1465,9 +1642,29 @@ button.row {
   line-height: 1.5;
 }
 .world-card progress {
+  flex: 1;
   width: 100%;
   height: 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
   accent-color: var(--color-brand-primary);
+  appearance: none;
+  overflow: hidden;
+}
+.world-card progress::-webkit-progress-bar {
+  background: var(--color-surface-2);
+}
+.world-card progress::-webkit-progress-value {
+  background: var(--color-brand-primary);
+  border-radius: var(--radius-pill);
+}
+.world-card progress::-moz-progress-bar {
+  background: var(--color-brand-primary);
+}
+.world-thumb .btag:first-child {
+  border-color: var(--color-surface-2); /* the tier tag is a label, not a state */
+  color: var(--color-ink-2);
 }
 .world-card .card-foot span:first-child {
   white-space: nowrap;

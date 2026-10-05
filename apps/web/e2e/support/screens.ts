@@ -17,10 +17,11 @@ export function watchConsole(page: Page): string[] {
  * (data-pause-control, FR-WLD-07) sends a request and is covered by world-pause.spec.ts; Stop all
  * autopilot (data-stop-control, FR-HIL-07) asks first and is covered by autopilot-stop.spec.ts. The
  * Ask Tilo launcher (data-assistant-control, FR-PA-12) opens the assistant panel and is covered by
- * assistant-panel.spec.ts. */
+ * assistant-panel.spec.ts. The S-14 phone Filters button (data-filter-control) opens the size
+ * chips and is covered by worlds-list.spec.ts. */
 export async function expectNoDeadControls(page: Page, scope = "main") {
   const buttons = page.locator(
-    `${scope} button:not(.primary):not([data-lens-control]):not([data-pause-control]):not([data-stop-control]):not([data-assistant-control])`,
+    `${scope} button:not(.primary):not([data-lens-control]):not([data-pause-control]):not([data-stop-control]):not([data-assistant-control]):not([data-filter-control])`,
   );
   for (let i = 0; i < (await buttons.count()); i++) {
     const b = buttons.nth(i);
