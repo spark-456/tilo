@@ -3,7 +3,7 @@
 `MailWatcher` keeps one cursor (a Gmail history id) per watched user in the `WatchStore`. A push, a poll
 and a resync all read history from that cursor, never from the pushed id, so a lost, late or duplicated
 push loses nothing. Each message id is claimed in the `DedupeStore` before `triage` runs: at most once,
-across restarts and instances. A failed triage keeps its claim (at-most-once, like the WhatsApp handler,
+across restarts and instances. A failed triage keeps its claim (at-most-once,
 BQ-127); the rest of the batch still runs. The watcher handles ids only, never message content.
 
 `GmailPushEndpoint` authenticates Pub/Sub's OIDC token (verifier, then aud, iss, service account,
@@ -22,7 +22,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .whatsapp import DedupeStore
+from .dedupe import DedupeStore
 
 log = logging.getLogger("tilo_channels.gmail_watch")
 

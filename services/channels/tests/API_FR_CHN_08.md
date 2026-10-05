@@ -36,7 +36,7 @@ class WatchStore(Protocol):    # Firestore in production; JSON-able dicts
     def delete(self, user_id: str) -> None
     def user_ids(self) -> list[str]
 
-# DedupeStore is tilo_channels.whatsapp.DedupeStore: claim(key, ttl_s) -> bool (atomic set-if-absent).
+# DedupeStore is tilo_channels.dedupe.DedupeStore: claim(key, ttl_s) -> bool (atomic set-if-absent).
 
 class MailWatcher:
     def __init__(self, *, mailbox: Mailbox, store: WatchStore, dedupe: DedupeStore,
@@ -129,6 +129,6 @@ grant, no event.
 | BQ-TBD | How far does a resync after an expired history id go? | One page of the newest INBOX mail, at most `RESYNC_MAX_MESSAGES` (50 = gmail `batch_size`), oldest first, skipping mail already triaged. Older unseen mail is not triaged. | PRD 6.6 (bounded work), config/connectors.yaml |
 | BQ-TBD | How does the Pub/Sub push endpoint authenticate, and what does it answer? | An OIDC token from the push subscription's service account: aud = the endpoint URL, iss = Google, email and `email_verified` checked. 401/403 when unauthenticated, 400 when malformed, 2xx for an unknown address, 5xx when processing fails. | PRD 16.2, SEC-08 |
 | BQ-TBD | Are `users.watch` and `users.stop` side effects that need the outbox (SEC-03)? | No. They are read-scope reads of the user's own mailbox that send nothing outside Tilo, so there is no outbox entry and no grant. | PRD 10.4, SEC-03 |
-| BQ-TBD | What happens when triage itself fails for a message? | Not pinned by these tests. The builder chooses at-most-once (keep the claim, as the WhatsApp handler does) or retry, and documents the choice. | PRD 11.3, NFR-22 |
+| BQ-TBD | What happens when triage itself fails for a message? | Not pinned by these tests. The builder chooses at-most-once (keep the claim) or retry, and documents the choice. | PRD 11.3, NFR-22 |
 | BQ-TBD | Which event, if any, marks "mail triaged" or a watch failure? | None is required from FR-CHN-08. `mail_triaged` units are counted through `building.completed` (BQ-03) by FR-CHN-09. Anything emitted must be a registered type. | PRD 9.5, 14.2, BQ-03 |
 | BQ-TBD | Are Gmail addresses kept out of logs? | Yes. They are personal data, so they are treated like full phone numbers in the channels logging rule. | PRD 16.1, services/channels/CLAUDE.md |

@@ -24,7 +24,7 @@ from _chn08_lib import (
     push_body,
     run_scenario,
 )
-from _chn_0305_lib import data_errors, registered_types
+from _chn_contracts_lib import data_errors, registered_types
 
 SCENARIOS = {
     "healthy-push": Scenario(push_delay_s=(1.0, 10.0)),

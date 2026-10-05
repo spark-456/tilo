@@ -23,7 +23,7 @@ from _chn09_lib import (
     make_rig,
     triage_module,
 )
-from _chn_0305_lib import CONTRACTS
+from _chn_contracts_lib import CONTRACTS
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import GenerateResponse
 
@@ -256,11 +256,7 @@ def test_FR_CHN_09_safety_failure_fails_closed() -> None:
 FORBIDDEN_IMPORTS = (
     "tilo_connectors",
     "tilo_api",
-    "tilo_channels.cards",
-    "tilo_channels.keywords",
     "tilo_channels.links",
-    "tilo_channels.binding",
-    "tilo_channels.inbound",
     "httpx",
     "requests",
     "socket",
