@@ -130,8 +130,12 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
    firebase deploy --only hosting --project <project>
    ```
 
-   Use the Hosting site `<project>-web` created by Terraform. Run the rules
-   deploy first, then the web build and hosting deploy.
+   The hosting deploy targets the project's default Hosting site
+   (`https://<project>.web.app`; `firebase.json` has no `site` key). Terraform
+   also creates a second site `<project>-web`; nothing deploys to it, and using
+   it later means adding `site` to `firebase.json` and updating docs/deploy-dev.md.
+   For the dev project, `just deploy-web` runs the web build and hosting deploy
+   in one step (docs/deploy-dev.md). Run the rules deploy first.
 6. Vertex AI quotas: raise per-minute quotas for the Gemini models in use
    (IAM and Admin, Quotas); Terraform has no resource for them.
 7. Model Armor: check `var.model_armor_location` is a supported region the first
