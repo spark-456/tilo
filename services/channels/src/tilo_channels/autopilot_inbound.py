@@ -1,4 +1,4 @@
-"""tilo_channels.autopilot_inbound: may a draft ride L2 given the message it answers? (FR-CHN-11, ADR-0013, BQ-265).
+"""tilo_channels.autopilot_inbound: may a draft ride L2 given the message it answers? (FR-CHN-11, ADR-0013, BQ-274).
 
 The replied-to message is the thread message whose Message-ID header equals the draft's `in_reply_to`, compared the
 way the Drafter wrote it (`_reply_header`). Only that message counts, not earlier or quoted ones (a quote inside its

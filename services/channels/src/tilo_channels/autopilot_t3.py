@@ -13,18 +13,21 @@ digits dropped, 0 o, 1 i, 3 e, 4 a, 5 s, 7 t, @ a), and L2 is an allowlist: a bo
 that is not a time of day, or a word off the scheduling list gives "unlisted". Names are allowed only as the greeting's
 and the signature's run (two words each) and as repeats of those words. Every step is linear, no model.
 
-BQ-265 (issue #298): `inbound_signal` is the same check for the message a draft answers, minus the allowlist, plus
+BQ-274 (issue #298): `inbound_signal` is the same check for the message a draft answers, minus the allowlist, plus
 what an inbound message may hide: an amount, a magnitude suffix ("5m", "50 K") or a number word is "money" with no
 money word around it, and punctuation inside a word (any run of non-letter, non-digit characters, a tab or line break
 included, between two letters or digits) is dropped and single letters spread apart are joined, in both orders, before
 the families run. A risky inbound message ("please confirm the transfer of $5,000") keeps even a clean draft ("Yes,
 confirmed.") off L2. A draft's own `t3_content_signal` does not get these two: the allowlist already holds it.
 
-BQ-265 redesign (security round 3): a denylist cannot list every obfuscation, so `inbound_plain` adds an allowlist for
+BQ-274 redesign (security round 3): a denylist cannot list every obfuscation, so `inbound_plain` adds an allowlist for
 the replied-to body and Subject: only ASCII letters, spaces, newlines, stop marks before a space, contractions and times
 of day are plain. Punctuation, underscore, glue and digit-suffix classes are closed by construction. L2 needs both
 `not inbound_signal` and `inbound_plain`; real mail with a link, a quoted line, a hyphen, a digit or a non-ASCII
 character waits for a person.
+
+BQ-274 round 4: `inbound_plain` reads the raw text (no NFKC), `inbound_signal` also checks every join of pieces cut by
+line breaks or marks as a whole word (`_joins`), and a time of day between single letters keeps their run going.
 """
 
 from __future__ import annotations
@@ -61,13 +64,17 @@ _INSIDE = tuple((n, re.compile(p.pattern.replace(r"\b", "").replace(r"\d+k", r"\
 # BQ-224 (c): a separator or line break between two letters or digits is dropped, then digit look-alikes mapped back.
 _SPLIT = re.compile(r"(?<=[a-z0-9])[-._*\n]+(?=[a-z0-9])")
 _LEET = str.maketrans("013457@", "oieasta")
-# BQ-265 (inbound only): punctuation is a class, not a list. Any run of characters that are neither letters, digits nor
+# BQ-274 (inbound only): punctuation is a class, not a list. Any run of characters that are neither letters, digits nor
 # a plain space (a tab and a line break count) between two letters or digits is dropped ("trans,fer"), and single
 # letters or digits spread apart by spaces and/or any such run are joined ("w i r-e"). Each class is disjoint from the
 # letters and digits it sits between, so both patterns are linear.
 _DROP = re.compile(r"(?<=[a-z0-9])[^a-z0-9 ]+(?=[a-z0-9])")
 _SPREAD = re.compile(r"(?<![a-z0-9])[a-z0-9](?:[^a-z0-9]+[a-z0-9](?![a-z0-9]))+(?![a-z0-9])")
-# BQ-265: an amount with no money word. A decimal part or a thousands separator, a run of 3+ digits that is not a
+# Round 4: a chain is pieces cut by non-space runs (a line break, stop marks); each join of pieces is a word.
+_CHAIN = re.compile(r"(?<![a-z0-9])[a-z0-9]+(?:[^a-z0-9 ]+[a-z0-9]+)+")
+_PIECE = re.compile(r"[a-z0-9]+")
+_STEM_MAX = 10  # as long as the longest family stem ("settlement", "solicitors"): a join past it needs no more pieces
+# BQ-274: an amount with no money word. A decimal part or a thousands separator, a run of 3+ digits that is not a
 # 2020-2039 year, a percent sign, a number word, or a number with a magnitude suffix ("5m", "50 K", "10L"). Times of
 # day and small counts ("2 tarps", "dock 14", "2 kayaks") stay clean.
 _NUMBER_WORD = re.compile(r"\b(?:hundred|thousand|million|billion|lakh|crore|lacs?|mil|mn|bn|cr)s?\b")
@@ -81,7 +88,7 @@ _TIME = re.compile(r"\b(?:(?:1[0-2]|0?[1-9])(?::[0-5][0-9])?\s?(?:am|pm)|(?:[01]
 _LINK = re.compile(r"://|[/@\\]|[a-z0-9][.\u3002\uff61][a-z]")
 _ITEM = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?|[^\sA-Za-z]")
 _STOP = "\0"  # stands in for a time of day: not a letter or a digit, so it ends a name run
-# BQ-265 `inbound_plain`: a time of day with a plain space only; a character off the list; a stop mark glued to what
+# BQ-274 `inbound_plain`: a time of day with a plain space only; a character off the list; a stop mark glued to what
 # follows; an apostrophe inside a contraction; a word, or a time of day, as one token.
 _PLAIN_TIME = re.compile(_TIME.pattern.replace(r"\s?", " ?"), re.I | re.A)
 _OFF_LIST = re.compile(r"[^A-Za-z \n.,?!:'\0]")
@@ -208,13 +215,32 @@ def _join(match: re.Match[str]) -> str:
     return "".join(c for c in match.group() if c.isalnum())
 
 
+def _joins(folded: str) -> str:
+    """Round 4, inbound only: pieces of a word cut by marks or line breaks ("the\\ntrans\\nfer") with a neighbour glued
+    the same way lose their word edges once the cuts are dropped ("thetransfer"). So every join of 2 or more
+    consecutive pieces of a chain is emitted as a word of its own, and the families see it with edges. A join stops
+    growing once it holds a stem's worth of characters (_STEM_MAX), which keeps the work linear."""
+    out = []
+    for chain in _CHAIN.findall(folded):
+        pieces = _PIECE.findall(chain)
+        for i in range(len(pieces) - 1):
+            word = pieces[i]
+            for count, piece in enumerate(pieces[i + 1 : i + 1 + _STEM_MAX], 2):
+                if len(word) >= _STEM_MAX:
+                    break
+                word += piece
+                if len(word) > count:  # single letters only: `_SPREAD` already joins and searches them
+                    out.append(word)
+    return "\x01".join(out)  # not whitespace: a family phrase ("we will") cannot match across two joins
+
+
 def _forms(folded: str) -> list[str]:
     """`folded`, then punctuation dropped and spread letters joined, then the same two steps the other way round."""
     return [folded, _SPREAD.sub(_join, _DROP.sub("", folded)), _DROP.sub("", _SPREAD.sub(_join, folded))]
 
 
 def _amount(folded: str) -> bool:
-    """BQ-265: a decimal part or thousands separator, 3+ digits in a row (a recent 4-digit year aside), "%" or a number
+    """BQ-274: a decimal part or thousands separator, 3+ digits in a row (a recent 4-digit year aside), "%" or a number
     word."""
     return bool(_AMOUNT.search(folded) or _NUMBER_WORD.search(folded) or _DIGITS.search(_YEAR.sub(" ", folded)))
 
@@ -235,13 +261,14 @@ def _signal(text: str, *, inbound: bool) -> frozenset[str]:
         signal.add("obfuscated")
     if any(unicodedata.category(c) == "Sc" for c in folded):
         signal.add("money")
-    if inbound:  # BQ-265: punctuation as a class, both split orders, spread-out letters, amounts with no money word
+    if inbound:  # BQ-274: punctuation as a class, both split orders, spread-out letters, amounts with no money word
         spread = _SPREAD.sub(_join, folded)
         forms = _forms(folded) + _forms(folded.translate(_LEET))  # translated: "@" is an "a" before it can be dropped
-        if _amount(folded) or _amount(spread) or any(_NUMBER_WORD.search(f) for f in forms[:3]):
+        joins = [_joins(folded), _joins(folded.translate(_LEET))]
+        if _amount(folded) or _amount(spread) or any(_NUMBER_WORD.search(f) for f in [*forms[:3], *joins]):
             signal.add("money")
         runs = " ".join(_join(m) for t in forms[::3] for m in _SPREAD.finditer(t))
-        texts = list(dict.fromkeys([*forms, *(f.translate(_LEET) for f in forms[:3])]))
+        texts = list(dict.fromkeys([*forms, *(f.translate(_LEET) for f in forms[:3]), *joins]))
         signal |= {n for n, p in _INSIDE if p.search(runs)}
     else:
         texts = [folded, _SPLIT.sub("", folded).translate(_LEET)]
@@ -252,22 +279,23 @@ def _signal(text: str, *, inbound: bool) -> frozenset[str]:
 
 
 def inbound_plain(text: str) -> bool:
-    """BQ-265 allowlist for the message a draft answers: True only when `text` is structurally plain talk. After
-    `clean_text` and NFKC, every character is an ASCII letter, a space, a newline, one of `. , ? ! :` or `'`, or a
-    digit that is part of a time of day (`_TIME`). A stop mark is followed only by a space, a newline or the end; `'`
-    stands only inside a contraction (suffix s, t, re, ve, ll, d, m); two or more single-letter tokens in a row ("w i r
-    e") are not plain, a lone "a" or "I" is. Over SIGNAL_CAP is not plain; empty text is. Linear, no model. Words split
-    by plain spaces into longer chunks ("trans fer") are an accepted gap; `inbound_signal` is the other half."""
+    """BQ-274 allowlist for the message a draft answers: True only when `text` is structurally plain talk. After
+    `clean_text` (no NFKC: a raw non-ASCII character is never plain), every character is an ASCII letter, a space, a
+    newline, one of `. , ? ! :` or `'`, or a digit that is part of a time of day (`_TIME`). A stop mark is followed
+    only by a space, a newline or the end; `'` stands only inside a contraction (suffix s, t, re, ve, ll, d, m); two or
+    more single-letter tokens in a row ("w i r e", a time of day between them included) are not plain, a lone "a" or
+    "I" is. Over SIGNAL_CAP is not plain; empty text is. Linear, no model. Words split by plain spaces into longer
+    chunks ("trans fer") are an accepted gap; `inbound_signal` is the other half."""
     if len(text) > SIGNAL_CAP:
         return False
-    plain = _PLAIN_TIME.sub(_STOP, unicodedata.normalize("NFKC", clean_text(text)))
-    if len(plain) > SIGNAL_CAP or _OFF_LIST.search(plain) or _STOP_GLUED.search(plain):
-        return False
-    if "'" in _CONTRACTION.sub("", plain):
+    plain = _PLAIN_TIME.sub(_STOP, clean_text(text))  # no NFKC: a raw non-ASCII character is off the list
+    if _OFF_LIST.search(plain) or _STOP_GLUED.search(plain) or "'" in _CONTRACTION.sub("", plain):
         return False
     single = False
     for token in _TOKEN.findall(plain):
-        short = len(token) == 1 and token != _STOP
+        if token == _STOP:  # a time of day between single letters does not end their run ("w 5pm i 5pm r 5pm e")
+            continue
+        short = len(token) == 1
         if short and single:
             return False
         single = short
@@ -275,7 +303,7 @@ def inbound_plain(text: str) -> bool:
 
 
 def inbound_signal(text: str) -> frozenset[str]:
-    """The same signal for the message a draft answers (FR-CHN-11, ADR-0013, BQ-265): `t3_content_signal` without
+    """The same signal for the message a draft answers (FR-CHN-11, ADR-0013, BQ-274): `t3_content_signal` without
     "unlisted", because an inbound message is free text, not a draft held to the L2 allowlist, and with the two
     additions documented above (an amount or number word is "money"; wider separators are dropped). A subset of
     {"money", "legal", "commitment", "obfuscated"}; empty means clean. A hidden character or a body over SIGNAL_CAP is
