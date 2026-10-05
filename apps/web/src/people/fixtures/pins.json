@@ -1,0 +1,451 @@
+[
+  {
+    "id": "pb_rate_sheet",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "team",
+      "team": "tm_launch"
+    },
+    "title": "Rate sheet goes to Acme by 9 Oct",
+    "body": null,
+    "kind": "decision",
+    "url": null,
+    "owner": "u_priya",
+    "due": "2026-10-17",
+    "status": "active",
+    "created_by": {
+      "by": "tilo",
+      "ref": "A_analyst",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_owner",
+    "source": {
+      "kind": "meeting",
+      "ref": "mt_q4_plan",
+      "evidence": ["u0012"]
+    },
+    "confirmed_by": {
+      "by": "u_owner",
+      "at": "2026-10-06T10:00:00.000Z"
+    },
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "A_analyst",
+        "change": "created",
+        "status": "proposed"
+      },
+      {
+        "at": "2026-10-06T10:00:00.000Z",
+        "by": "u_owner",
+        "change": "accepted",
+        "status": "active"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-06T10:00:00.000Z"
+  },
+  {
+    "id": "pb_launch_date",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "team",
+      "team": "tm_launch"
+    },
+    "title": "Launch is 17 October",
+    "body": null,
+    "kind": "decision",
+    "url": null,
+    "owner": "u_priya",
+    "due": "2026-10-17",
+    "status": "active",
+    "created_by": {
+      "by": "person",
+      "ref": "u_priya",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_priya",
+    "source": null,
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "u_priya",
+        "change": "created",
+        "status": "active"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "pb_brief_link",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "team",
+      "team": "tm_launch"
+    },
+    "title": "Launch brief",
+    "body": null,
+    "kind": "link",
+    "url": "https://docs.example.com/launch/brief",
+    "owner": "u_priya",
+    "due": "2026-10-17",
+    "status": "active",
+    "created_by": {
+      "by": "person",
+      "ref": "u_priya",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_priya",
+    "source": null,
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "u_priya",
+        "change": "created",
+        "status": "active"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "pb_venue_open",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "team",
+      "team": "tm_launch"
+    },
+    "title": "Offsite venue still to be chosen",
+    "body": null,
+    "kind": "note",
+    "url": null,
+    "owner": null,
+    "due": null,
+    "status": "active",
+    "created_by": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_owner",
+    "source": null,
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "u_owner",
+        "change": "created",
+        "status": "active"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-06T08:00:00.000Z"
+  },
+  {
+    "id": "pb_acme_deadline",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "team",
+      "team": "tm_launch"
+    },
+    "title": "Acme rate hold runs out",
+    "body": null,
+    "kind": "deadline",
+    "url": null,
+    "owner": "u_owner",
+    "due": "2026-10-09",
+    "status": "active",
+    "created_by": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_owner",
+    "source": null,
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "u_owner",
+        "change": "created",
+        "status": "active"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-06T09:00:00.000Z"
+  },
+  {
+    "id": "pb_rollout_plan",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "team",
+      "team": "tm_launch"
+    },
+    "title": "Agree the rollout plan with Acme",
+    "body": null,
+    "kind": "decision",
+    "url": null,
+    "owner": null,
+    "due": "2026-10-14",
+    "status": "proposed",
+    "created_by": {
+      "by": "tilo",
+      "ref": "A_analyst",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_owner",
+    "source": {
+      "kind": "meeting",
+      "ref": "mt_q4_plan",
+      "evidence": ["u0012"]
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "A_analyst",
+        "change": "created",
+        "status": "proposed"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "pb_priya_draft",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "team",
+      "team": "tm_launch"
+    },
+    "title": "Draft the press note for launch",
+    "body": null,
+    "kind": "decision",
+    "url": null,
+    "owner": "u_priya",
+    "due": "2026-10-17",
+    "status": "proposed",
+    "created_by": {
+      "by": "tilo",
+      "ref": "A_analyst",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_priya",
+    "source": {
+      "kind": "meeting",
+      "ref": "mt_priya_sync",
+      "evidence": ["u0031"]
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "A_analyst",
+        "change": "created",
+        "status": "proposed"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "pb_old_removed",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "team",
+      "team": "tm_launch"
+    },
+    "title": "Old agenda for the offsite",
+    "body": null,
+    "kind": "decision",
+    "url": null,
+    "owner": null,
+    "due": "2026-10-17",
+    "status": "removed",
+    "created_by": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_owner",
+    "source": null,
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "u_owner",
+        "change": "created",
+        "status": "active"
+      },
+      {
+        "at": "2026-10-06T10:00:00.000Z",
+        "by": "u_owner",
+        "change": "removed",
+        "status": "removed"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "pb_owner_followup",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "personal",
+      "user": "u_owner"
+    },
+    "title": "Follow up on the rate sheet",
+    "body": null,
+    "kind": "note",
+    "url": null,
+    "owner": null,
+    "due": null,
+    "status": "active",
+    "created_by": {
+      "by": "tilo",
+      "ref": "A_analyst",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_owner",
+    "source": {
+      "kind": "meeting",
+      "ref": "mt_q4_plan",
+      "evidence": ["u0012"]
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "A_analyst",
+        "change": "created",
+        "status": "active"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "pb_owner_note",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "personal",
+      "user": "u_owner"
+    },
+    "title": "Ask Dev about the rate sheet",
+    "body": null,
+    "kind": "note",
+    "url": null,
+    "owner": null,
+    "due": "2026-10-08",
+    "status": "active",
+    "created_by": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_owner",
+    "source": null,
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "u_owner",
+        "change": "created",
+        "status": "active"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-06T07:30:00.000Z"
+  },
+  {
+    "id": "pb_owner_old",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "personal",
+      "user": "u_owner"
+    },
+    "title": "Book the lab slot",
+    "body": null,
+    "kind": "note",
+    "url": null,
+    "owner": null,
+    "due": null,
+    "status": "removed",
+    "created_by": {
+      "by": "tilo",
+      "ref": "A_analyst",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_owner",
+    "source": {
+      "kind": "meeting",
+      "ref": "mt_q4_plan",
+      "evidence": ["u0012"]
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "A_analyst",
+        "change": "created",
+        "status": "active"
+      },
+      {
+        "at": "2026-10-06T10:00:00.000Z",
+        "by": "u_priya",
+        "change": "undone",
+        "status": "removed"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "pb_priya_note",
+    "org_id": "org_example",
+    "scope": {
+      "kind": "personal",
+      "user": "u_priya"
+    },
+    "title": "Ask Dev about the venue",
+    "body": null,
+    "kind": "note",
+    "url": null,
+    "owner": null,
+    "due": null,
+    "status": "active",
+    "created_by": {
+      "by": "person",
+      "ref": "u_priya",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "set_up_by": "u_priya",
+    "source": null,
+    "confirmed_by": null,
+    "flagged": false,
+    "history": [
+      {
+        "at": "2026-10-05T10:30:00.000Z",
+        "by": "u_priya",
+        "change": "created",
+        "status": "active"
+      }
+    ],
+    "created_at": "2026-10-05T10:30:00.000Z",
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  }
+]

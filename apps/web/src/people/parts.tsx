@@ -2,7 +2,7 @@
 // (design/source/INDEX.md), so they follow the pills of "Tilo Worlds" and the avatar and name rows
 // of "Tilo Team" in the card, chip and row language of kit.tsx.
 import type { ReactNode } from "react";
-import { plural } from "../screens/kit";
+import { longDate, plural } from "../screens/kit";
 import "./people.css";
 import { QUOTES, displayName, personName } from "./data";
 
@@ -77,3 +77,24 @@ export const pillLabel = (word: string, count: number): ReactNode => (
     {word} <b>{count}</b>
   </>
 );
+
+/** "2026-10-09" or a timestamp -> "9 Oct". */
+export const shortDate = (when: string): string =>
+  longDate(when.length === 10 ? `${when}T00:00:00Z` : when).replace(/ \d{4}$/, "");
+
+/** A control that does nothing yet (apps/web/CLAUDE.md): visible, aria-disabled, "Coming soon". Its
+ * name says what it acts on, so a column of them is not a column of the same word. */
+export function SoonButton({ text, name }: { text: string; name: string }) {
+  return (
+    <button
+      type="button"
+      className="secondary placeholder compact"
+      aria-disabled="true"
+      aria-label={`${name}, coming soon`}
+      title="Coming soon"
+      onClick={(e) => e.preventDefault()}
+    >
+      {text}
+    </button>
+  );
+}

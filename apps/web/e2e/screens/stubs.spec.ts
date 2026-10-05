@@ -59,9 +59,9 @@ test("AGW-08 /screens lists every screen id with built or placeholder status and
   await page.goto("/screens");
   await expect(page.getByRole("heading", { level: 1, name: "Screens" })).toBeVisible();
   const rows = page.locator("tbody tr");
-  await expect(rows).toHaveCount(25);
+  await expect(rows).toHaveCount(29);
   await expect(rows.first()).toContainText("S-01");
-  await expect(rows.last()).toContainText("S-25");
+  await expect(rows.last()).toContainText("S-29");
   // Each linked screen opens: follow the S-13 link.
   await page.getByRole("link", { name: "Library and Memory Vault" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();

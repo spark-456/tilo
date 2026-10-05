@@ -1,4 +1,4 @@
-/* S-26 Meetings and S-27 My plate (PPL-40a): neutral role tokens, the type ramp steps only, no
+/* S-26 to S-29 (PPL-40a, PPL-40b): neutral role tokens, the type ramp steps only, no
    transition or animation (a state change is instant). */
 .people-preview {
   margin: 0 0 var(--space-16);
@@ -278,6 +278,320 @@
   pointer-events: auto;
 }
 
+/* S-28 pinboards: the two boards side by side when the room is wide (the team board takes two
+   thirds), one under the other when it is not, and in two tabs on a phone. A board that is narrower
+   than its table needs reads as stacked rows, one card per entry (container query below). */
+.pb-room {
+  container: pb-room / inline-size;
+}
+.pb-boards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-16);
+  align-items: start;
+}
+@container pb-room (min-width: 880px) {
+  .pb-boards {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+.pb-board {
+  container: pb / inline-size;
+}
+.pb-tabs {
+  display: none;
+}
+.pb-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--text-14);
+}
+.pb-table th,
+.pb-table td {
+  box-sizing: border-box;
+  padding: var(--space-12) var(--space-8);
+  border-bottom: 1px solid var(--color-surface-2);
+  text-align: left;
+  font-weight: 400;
+  vertical-align: top;
+}
+.pb-table th:first-child,
+.pb-table td:first-child {
+  padding-left: 0;
+}
+.pb-table th:last-child,
+.pb-table td:last-child {
+  padding-right: 0;
+}
+.pb-table tbody th[scope="row"] {
+  display: table-cell;
+}
+.pb-table .pb-resp {
+  width: 7.5rem;
+}
+.pb-table .pb-date {
+  width: 5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pb-table td.pb-date,
+.pb-table td.pb-resp {
+  line-height: 28px; /* the first line of every row is as tall as the title line and the avatar */
+}
+
+/* One header row, one look: every header is a 32 px box with its text centred, a button or not. */
+.pb-table thead th {
+  padding-top: 0;
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--color-fog);
+  color: var(--color-ink-2);
+  font: 700 var(--text-12) / 1 var(--font-ui);
+  vertical-align: bottom;
+}
+.pb-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+}
+.pb-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.pb-date .pb-sort {
+  flex-direction: row-reverse; /* the label ends where the dates below it end */
+}
+.pb-sort:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+  border-radius: var(--space-4);
+}
+/* The sort mark is always there (a sort never moves a header, CLS): two quiet triangles, the one
+   in the sorted direction dark. */
+.pb-arrow {
+  position: relative;
+  flex: none;
+  width: 8px;
+  height: 14px;
+}
+.pb-arrow::before,
+.pb-arrow::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 8px;
+  height: 5px;
+  background: var(--color-ink-3);
+}
+.pb-arrow::before {
+  top: 1px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.pb-arrow::after {
+  bottom: 1px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.pb-arrow[data-dir="1"]::before,
+.pb-arrow[data-dir="-1"]::after {
+  background: var(--color-ink-1);
+}
+
+/* An entry: title, then the kind chip on a line of its own, then who and what, then the one action. */
+.pb-head b {
+  display: block;
+  font: 700 var(--text-16) / 28px var(--font-ui);
+  overflow-wrap: anywhere;
+}
+.pb-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-8);
+  margin-top: var(--space-4);
+}
+.pb-table .bitem-sub {
+  display: block;
+  margin: var(--space-4) 0 0;
+  color: var(--color-ink-2);
+}
+.pb-table .person-tag {
+  white-space: nowrap;
+}
+.pb-url {
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+}
+.pb-tags .person-tag {
+  margin-right: var(--space-8);
+}
+/* Edit and Get in touch: one size, at the right end of the chip line; the coming-soon one a little
+   quieter (dashed, no lip) than the real one. */
+.pb-kinds > .secondary {
+  margin-left: auto;
+}
+.pb-table .pb-setup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+.page .pb-table .secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: fit-content;
+  min-height: 32px;
+  padding: 0 var(--space-12);
+  white-space: nowrap;
+}
+.page .pb-table .secondary.placeholder.compact {
+  min-height: 32px;
+  border: 1px dashed var(--color-ink-3);
+  background: none;
+}
+/* Lane: a heading like S-27's groups (display weight, a rule under it), not a run-on word. */
+.pb-lane th {
+  padding: var(--space-24) 0 var(--space-8);
+  border-bottom: 2px solid var(--color-fog);
+}
+.pb-lane-title {
+  margin-right: var(--space-12);
+  font: 800 var(--text-16) / 1.4 var(--font-display);
+  color: var(--color-ink-1);
+}
+.pb-lane-note {
+  color: var(--color-ink-2);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+/* The draft opens in a row of its own, right under the entry it is about. */
+.pb-table .pb-draft-row td {
+  padding: var(--space-8) 0 var(--space-12);
+}
+.pb-draft {
+  padding: var(--space-12);
+  border: 2px solid var(--color-fog);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+}
+.pb-draft:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.pb-draft .people-h3 {
+  margin-top: 0;
+}
+.pb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+/* S-29 calendar: one merged list; free/busy bars across 08:00 to 20:00. */
+.cal-bar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-16);
+  margin: 0 0 var(--space-16);
+}
+.cal-bar-controls .people-strip {
+  margin: 0;
+}
+.cal-nav {
+  display: flex;
+  gap: var(--space-8);
+}
+.cal-nav .secondary {
+  min-height: 36px;
+}
+.cal-day + .cal-day {
+  margin-top: var(--space-8);
+}
+.cal-when {
+  flex: 0 0 8.5rem;
+  color: var(--color-ink-2);
+  font: 700 var(--text-14) / 1.4 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+.cal-row .prow-title b {
+  flex: 1 1 12rem;
+}
+.cal-row {
+  display: block; /* chips end at the row's right edge, whatever the row holds */
+}
+.cal-row .prow-chips {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+.cal-row .plate-actions {
+  margin-top: var(--space-8);
+}
+.prow a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+.prow a:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+  border-radius: var(--space-4);
+}
+.cal-none {
+  padding: var(--space-8) 0;
+  list-style: none;
+}
+.cal-person + .cal-person {
+  margin-top: var(--space-16);
+}
+.cal-person-name {
+  margin: 0 0 var(--space-4);
+}
+.cal-free-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4) var(--space-16);
+  align-items: center;
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-surface-2);
+  list-style: none;
+}
+.cal-free-row[data-week="true"] {
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+}
+.cal-free-day {
+  grid-row: 1 / span 2;
+  align-self: start;
+  color: var(--color-ink-1);
+  font-size: var(--text-14);
+}
+.cal-bar,
+.cal-free-text {
+  grid-column: -2 / -1;
+}
+.cal-bar {
+  position: relative;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-fog);
+  overflow: hidden;
+}
+.cal-busy {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--color-ink-2);
+}
+
 @media (max-width: 767px) {
   .people-strip {
     flex-wrap: nowrap;
@@ -308,7 +622,8 @@
     flex-direction: column;
   }
   .mrow-text,
-  .prow-title b {
+  .prow-title b,
+  .cal-row .prow-title b {
     flex: 0 0 auto; /* in a column the basis would be a height */
   }
   .meeting-row {
@@ -318,5 +633,115 @@
   }
   .meeting-row .btag {
     margin-left: calc(var(--space-12) + 4px);
+  }
+}
+
+/* A board too narrow for its columns (a phone, or the third of a wide room): one card per entry, the
+   column names in front of their values, and the sort buttons in one row under "Sort by". */
+@container pb (max-width: 559px) {
+  .pb-table,
+  .pb-table tbody,
+  .pb-table tr,
+  .pb-table th,
+  .pb-table td {
+    display: block;
+    width: auto;
+  }
+  .pb-table tbody th[scope="row"] {
+    display: block;
+  }
+  .pb-table .pb-resp,
+  .pb-table .pb-date,
+  .pb-table td.pb-resp,
+  .pb-table td.pb-date {
+    width: auto;
+    text-align: left;
+    line-height: 1.4;
+  }
+  .pb-table thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 var(--space-12);
+    padding-bottom: var(--space-4);
+    border-bottom: 2px solid var(--color-fog);
+  }
+  .pb-table thead tr::before {
+    content: "Sort by";
+    color: var(--color-ink-2);
+    font: 700 var(--text-12) / 1 var(--font-ui);
+  }
+  .pb-table thead th {
+    padding: 0;
+    border: 0;
+  }
+  .pb-table thead th.pb-plain {
+    display: none;
+  }
+  .pb-date .pb-sort {
+    flex-direction: row;
+  }
+  .pb-table tbody tr {
+    padding: var(--space-8) 0;
+    border-bottom: 1px solid var(--color-fog);
+  }
+  .pb-table tbody th,
+  .pb-table tbody td {
+    padding: var(--space-4) 0;
+    border: 0;
+    text-align: left;
+  }
+  .pb-table tbody td {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4) var(--space-8);
+    line-height: 1.4;
+  }
+  .pb-table td::before {
+    content: attr(data-label) ":";
+    flex: 0 0 6rem;
+    color: var(--color-ink-2);
+    font-size: var(--text-12);
+  }
+  .pb-table .pb-draft-row td {
+    display: block;
+  }
+  .pb-table .pb-draft-row td::before {
+    content: none;
+  }
+  .pb-lane th {
+    padding-top: var(--space-16);
+  }
+}
+
+@media (max-width: 767px) {
+  .pb-tabs {
+    display: flex;
+  }
+  .pb-board[data-shown="false"] {
+    display: none;
+  }
+  .pb-sort,
+  .page .pb-table .secondary,
+  .page .pb-table .secondary.placeholder.compact,
+  .cal-nav .secondary {
+    min-height: 44px;
+  }
+  .pb-sort {
+    min-width: 44px;
+  }
+  .prow a {
+    min-height: 44px;
+  }
+  .cal-free-row,
+  .cal-free-row[data-week="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cal-free-day {
+    grid-row: auto;
+  }
+  .cal-when {
+    flex-basis: auto;
   }
 }
