@@ -19,3 +19,6 @@ branch | services/channels/src/tilo_channels/links.py | _verify | signed-link ve
 branch | services/connectors/src/tilo_connectors/adapters/gmail.py | _msg_ids | extracts Message-ID tokens from a mail header value
 branch | packages/providers/src/tilo_providers/google_adapter.py | redact | scrubs credentials (ya29./AIza) from provider and error text; never task text
 branch | packages/providers/src/tilo_providers/vertex_smoke.py | classify | maps provider error text to a fixed failure class; never task text
+branch | services/connectors/src/tilo_connectors/handoff.py | _fence | picks a Markdown fence longer than any backtick run in granted text, so an excerpt cannot close its own fence; no word of the text is read
+branch | services/connectors/src/tilo_connectors/handoff.py | record | compares the stored prompt's hash and ids with the prepared ones (BH-07); the prompt text is never read
+branch | services/connectors/src/tilo_connectors/grants.py | _excerpt | cuts a granted text to the requested part and checks its hash and size (DG-04); compares task text with the owner's own request and the file, never with a literal
