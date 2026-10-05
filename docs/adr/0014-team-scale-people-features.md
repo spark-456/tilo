@@ -35,8 +35,7 @@ everyone.
    (`person.memberships[].assigned_by`), checked at the time of each read, never inferred.
 4. **Free/busy, not titles.** A teammate's calendar shows busy intervals for scheduling, never
    titles; only entries the owner shares reach the team calendar.
-5. **Sending to another person stays T3** through the outbox, with a person's approval (PIN on
-   WhatsApp), whatever the feature ("get in touch", minutes, follow-ups, invites).
+5. **Sending to another person stays T3** through the outbox, with a person's approval, whatever the feature ("get in touch", minutes, follow-ups, invites).
 6. **Scope of this amendment.** PRD 3.4's non-goal is lifted only for these features. Staff
    scheduling, time tracking, performance review, org-wide analytics, and org-wide directories stay
    non-goals.

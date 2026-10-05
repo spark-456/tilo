@@ -85,5 +85,4 @@ left to the builders.
 - Builders in three lanes start from generated types and fixtures on day 1.
 - `tilo-api` must run `fixtures/person/crossref/` in its tests (CL-PEOPLE).
 - The web app regenerates `registry.generated.ts`; AG-WEB maps the new types.
-- Open: a `team` record with a display name; WhatsApp delivery for "get in touch" (needs an outbox
-  connector action).
+- Open: a `team` record with a display name.
