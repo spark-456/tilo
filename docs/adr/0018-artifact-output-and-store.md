@@ -255,3 +255,15 @@ Option A, chosen by the user on 2026-10-05. The tickets run in this order. Each 
   the record (BQ-264 asks for the matching outbox rule).
 - EV-15 also requires `versioned` and `rolled_back` to record the next version and rejects a
   second `artifact.created` of a recorded id.
+
+## T3 notes (executor, 2026-10-06; clarifications, no new decision)
+- An output with a `parent` is the next version of that artifact and is announced with
+  `artifact.versioned` (`previous_version` the parent's), not a second `artifact.created` (EV-15).
+  The unit's credits ride on its first announced item, whichever type.
+- Section 5's order is tightened so a manifest failure writes nothing: every put and its `created`
+  revision are committed first, then the events. The revision's `cause` is null.
+- Attempts in the idempotency key start at 0. Only `ArtifactCorrupt` starts a new attempt, at most
+  `retries.max_attempts` in all. An item `label` must be 1 to 80 printable characters the secret
+  redactor leaves unchanged, or the unit fails.
+- Until T4, tilo-api passes no store: `_GatedRunner` drops `outputs` (as before T3), and refs
+  without a store pass unchecked as before. A harness run with outputs and no store fails the unit.

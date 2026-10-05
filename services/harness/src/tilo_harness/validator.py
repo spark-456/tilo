@@ -1,7 +1,7 @@
-"""Event validator: contracts/event.schema.json plus contracts/event.rules.md's EV-01..EV-14
-(P0-09, D-11). A service must not import from scripts/ (root CLAUDE.md), so this is a fresh
-implementation that agrees with scripts/contracts_events.py on every fixture in contracts/, not
-a reuse of it.
+"""Event validator: contracts/event.schema.json plus contracts/event.rules.md's EV-01..EV-15
+(P0-09, D-11; EV-15, artifact versions the world recorded, is a stream rule like EV-10..EV-14).
+A service must not import from scripts/ (root CLAUDE.md), so this is a fresh implementation
+that agrees with scripts/contracts_events.py on every fixture in contracts/, not a reuse of it.
 
 `EventValidator.problems(event, state=None)` runs the checks that need only the event itself:
 finiteness and int64 range, D-11 UTF-8 round-trip (every string value and dict key, at any
@@ -265,6 +265,7 @@ class WorldState:
         self.last_seq = 0
         self.world_id: str | None = None
         self.seen: dict[str, dict[str, Any]] = {}
+        self.versions: dict[str, int] = {}  # artifact id -> the highest version this world recorded (EV-15)
 
     @property
     def seen_ids(self) -> set[str]:
@@ -273,6 +274,32 @@ class WorldState:
     def observe(self, event: dict[str, Any]) -> None:
         self.last_seq = event["seq"]
         self.seen[event["id"]] = event
+        if event["type"] in _RECORDS:
+            ref = event["data"]["artifact"]
+            self.versions[ref["artifact_id"]] = max(self.versions.get(ref["artifact_id"], 0), ref["version"])
+
+
+_CONTINUES = {"artifact.versioned": "previous_version", "artifact.rolled_back": "restored_version"}
+_RECORDS = ("artifact.created", *_CONTINUES)  # the artifact events that record a version
+
+
+def _version_problem(event: dict[str, Any], versions: dict[str, int]) -> str | None:
+    """EV-15: an artifact event names a version this world recorded; created starts an id at 1, versioned and
+    rolled_back continue a recorded version and record the next one (AR-02). A fresh implementation that agrees with
+    scripts/contracts_events.py's `_version_problems` on every fixture, not a reuse of it."""
+    type_, data = event["type"], event["data"]
+    if not type_.startswith("artifact."):
+        return None
+    art, version = data["artifact"]["artifact_id"], data["artifact"]["version"]
+    top = versions.get(art, 0)
+    if type_ == "artifact.created":
+        why = "" if (version, top) == (1, 0) else "created starts an id this world never recorded at version 1"
+    elif type_ in _CONTINUES:
+        ok = 1 <= data[_CONTINUES[type_]] <= top and version == top + 1
+        why = "" if ok else f"it must continue a recorded version as version {top + 1}"
+    else:
+        why = "" if 1 <= version <= top else "this world never recorded it"
+    return f"EV-15: {type_} names version {version} of {art}; {why}" if why else None
 
 
 class EventValidator:
@@ -403,4 +430,6 @@ class EventValidator:
             cause = state.seen.get(event["cause"] or "")
             if not _is_send_of(cause, event):
                 problems.append(f"EV-14: cause is not the data.transfer out of outbox {event['data']['outbox_id']}")
+        if (version_problem := _version_problem(event, state.versions)) is not None:
+            problems.append(version_problem)
         return problems

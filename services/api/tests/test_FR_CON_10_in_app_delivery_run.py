@@ -10,7 +10,7 @@ from typing import Any
 
 from _api_contracts_lib import assert_valid_event
 from _clint2_lib import UNIT_ARTIFACT, base_plan, wait_for
-from tilo_harness.executor import UnitOutcome
+from tilo_harness.executor import UnitOutcome, UnitOutput
 
 DELIVER_TITLE = "Deliver the finished work"
 
@@ -28,16 +28,17 @@ def report_plan(approach_id: str, budget_cap: float) -> dict[str, Any]:
 
 class _Runner:
     """The scripted runner for the work units; the deliver unit names no item itself (what the compiler's unit does).
-    `produce=False`: no unit names an item (what the production runner does today)."""
+    `produce=False`: no unit names an item. `outputs=True`: work units return Markdown, as `DefaultUnitRunner` does."""
 
-    def __init__(self, inner: Any, *, produce: bool = True, deliver_names: dict | None = None) -> None:
-        self.inner, self.produce, self.deliver_names = inner, produce, deliver_names
+    def __init__(self, inner: Any, *, produce: bool = True, deliver_names: dict | None = None, outputs=False) -> None:
+        self.inner, self.produce, self.deliver_names, self.outputs = inner, produce, deliver_names, outputs
         self.release = inner.release  # RunFlow.close() sets it
 
     async def run(self, unit: Any, context: Any) -> Any:
         if unit["unit_type"] == "deliver" or not self.produce:
             refs = (self.deliver_names,) if self.deliver_names and unit["unit_type"] == "deliver" else ()
-            return UnitOutcome(success=True, summary=f"Finished {unit['title']}.", artifact_refs=refs)
+            made = (UnitOutput("text/markdown", b"# Notes"),) if self.outputs and unit["unit_type"] != "deliver" else ()
+            return UnitOutcome(success=True, summary=f"Finished {unit['title']}.", artifact_refs=refs, outputs=made)
         return await self.inner.run(unit, context)
 
 
@@ -108,6 +109,14 @@ def test_FR_CON_10_a_run_whose_units_produced_nothing_delivers_nothing_and_makes
     assert completed["data"]["deliverable_count"] == 0
     assert run_flow.events("artifact.delivered") == [] and run_flow.events("artifact.created") == []
     assert run_flow.delivery().json()["artifacts"] == [], "S-12 says plainly that nothing was produced"
+
+
+def test_FR_AGT_02_until_T4_an_api_run_drops_unit_outputs_as_before_and_completes(run_flow):
+    """Stopgap until ADR-0018 T4: tilo-api passes run_plan no artifact store, so a unit's text (what DefaultUnitRunner
+    returns since T3) is dropped as before T3 instead of failing the unit; nothing is made up."""
+    start(run_flow, produce=False, outputs=True)
+    completed = wait_for(lambda: run_flow.events("world.completed"), what="world.completed")[0]
+    assert completed["data"]["deliverable_count"] == 0 and run_flow.events("artifact.created") == []
 
 
 def test_FR_CON_10_a_deliver_unit_that_names_its_own_item_has_it_delivered_too(run_flow):

@@ -12,7 +12,7 @@ import math
 import threading
 import unicodedata
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
@@ -556,6 +556,8 @@ class _GatedRunner:
         outcome = await self._inner.run(unit, context)
         if not isinstance(outcome, UnitOutcome) or outcome.success is not True:
             return outcome
+        if outcome.outputs:  # stopgap: api runs get the artifact store in ADR-0018 T4; until then, dropped as before T3
+            outcome = replace(outcome, outputs=())
         refs = list(outcome.artifact_refs) if isinstance(outcome.artifact_refs, list | tuple) else None
         if refs is None or not all(conforms("common.schema.json#/$defs/artifact_ref", ref) for ref in refs):
             return UnitOutcome(success=False, summary="The unit named an artifact that does not exist.")
