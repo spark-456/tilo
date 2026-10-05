@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { useClient, useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
 import { AssistantPanel } from "./assistant/AssistantPanel";
 import { useMediaQuery } from "./hooks/useMediaQuery";
@@ -10,7 +10,7 @@ import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
 import { LoggedScrubber, ReplayScrubber } from "./screens/ReplayScrubber";
 import { ScreenPage } from "./screens/ScreenPage";
-import { WorldPanels } from "./screens/WorldPanels";
+import { HudGlance, WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
 import { useRunStatus } from "./world/runLog";
@@ -94,6 +94,13 @@ export function App() {
   // FR-WLD-07: the stage is veiled only while the recorded run status is "paused" (HR-1).
   const clientStatus = useRunStatus(client, hudWorld);
   const stagePaused = (world.active ? world.status : clientStatus) === "paused";
+  // A ?fixture= replay's panels read what the stage has shown of it (the same run, HR-1).
+  const fixtureEvents = world.events;
+  const fixtureSeq = world.seq;
+  const replayed = useMemo(
+    () => (world.active ? fixtureEvents.filter((e) => e.seq <= fixtureSeq) : null),
+    [world.active, fixtureEvents, fixtureSeq],
+  );
   const runScreen = screen !== null && RUN_SCREENS.has(screen.id);
   const needsYouScreen = screen !== null && NEEDS_YOU_SCREENS.has(screen.id);
   const railWorld = worldId ?? (runScreen && !needsYouScreen ? runWorld : null);
@@ -201,8 +208,18 @@ export function App() {
                 e.currentTarget.querySelector("summary")?.focus();
               }}
             >
-              <summary>World status{clientStatus === "paused" ? " · Paused" : ""}</summary>
-              <WorldPanels key={hudWorld} worldId={hudWorld} />
+              <summary>
+                World status
+                <HudGlance
+                  worldId={hudWorld}
+                  replayed={world.worldId === hudWorld ? replayed : null}
+                />
+              </summary>
+              <WorldPanels
+                key={hudWorld}
+                worldId={hudWorld}
+                replayed={world.worldId === hudWorld ? replayed : null}
+              />
             </details>
           )}
           <PrimaryNav id="bottom-tabs" mobile />
@@ -211,7 +228,12 @@ export function App() {
         <aside className="right-rail" data-testid="right-rail">
           {dock}
           {railWorld ? (
-            <WorldPanels key={railWorld} worldId={railWorld} tabs={hudWorld !== null} />
+            <WorldPanels
+              key={railWorld}
+              worldId={railWorld}
+              tabs={hudWorld !== null}
+              replayed={world.worldId === railWorld ? replayed : null}
+            />
           ) : (
             <>
               {world.active && <ReplayPauseSlot status={world.status} />}

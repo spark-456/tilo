@@ -15,12 +15,12 @@ Trace lenses, cards and settings.
 `config/themes/` (world themes), feature flags. UX-1–UX-9 (18.1); FR-WLD-*; owned from P0-08.
 
 ## Stage and world (`src/stage/`, `src/world/`)
-- `Stage.tsx`: the camera is the Pixi world container's transform (`camera.ts`); no CSS transform, no always-on ticker (HR-2). `data-stage-ready="true"` appears with the first frame. `pixi.js` and `runWorld` load by dynamic import (NFR-01); keep them off the landing bundle.
+- `Stage.tsx`: the camera is the Pixi world container's transform (`camera.ts`); no CSS transform, no always-on ticker (HR-2). `data-stage-ready="true"` appears with the first frame. Zoom in/out buttons send the stage's own `+`/`-` keys (one camera path). `pixi.js` and `runWorld` load by dynamic import (NFR-01); keep them off the landing bundle.
 - FR-WLD-04: `registry` → `reducer` (HR-5) → `store` → `frame` → `renderer.ts` (art in `world/art/`, ported
   from the design prototypes, ADR-0003); `choreographer.ts` (HR-3) alone animates. The stage draws a `?fixture=` replay
   (`runWorld`) or, on /world/:id, the client's own run: `useClientWorld` → `runClientWorld` (FR-WLD-05, any client; the one path). It waits for the layout via `getLayout` (until `world.started`); events held already fold in as a jump, later ones animate; no solver geometry = empty stage + a note; a failed load shows a note and retry. Needs-you reads `?world=<id>`, else the run `approve` last started (`worldContext.ts`, `lastWorld.ts`); live with none, `inARun.tsx` says "No run yet". `?seq=N`, `?speed=N`.
 - FR-WLD-06: `selection.ts` keeps one selection per world (display state, never an event); the stage rings it.
-- FR-WLD-08: `replay.ts` holds one replay point per world (display state); `ReplayScrubber` (right rail, or above the mobile tabs) scrubs a finished run, disabled while live. Stage shows `stateAt(seq)`, Story/Trace/HUD the events up to it; the HR-4 banner ("Replay of run #… recorded …", fixtures add "dev fixture") shows once finished.
+- FR-WLD-08: `replay.ts` holds one replay point per world (display state); `ReplayScrubber` (right rail, or above the mobile tabs) scrubs a finished run, disabled while live. Stage shows `stateAt(seq)`, Story/Trace/HUD the events up to it (in `?fixture=` mode `WorldPanels` gets them as `replayed`; the HUD meter adds credits saved by memory, a phone's closed sheet shows `HudGlance`); the HR-4 banner ("Replay of run #… recorded …", fixtures add "dev fixture") shows once finished.
 
 ## Screens (`src/screens/`, AGW-08)
 - `meta.ts` is the PRD 18.3 table (S-01..S-25, status, route pattern); `routes.tsx` maps each
