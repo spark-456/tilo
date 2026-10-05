@@ -5,6 +5,7 @@ import { useMediaQuery } from "./hooks/useMediaQuery";
 import { NeedsYouRail } from "./needs-you/NeedsYouRail";
 import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
+import { LevelsPanel } from "./screens/LevelsPanel";
 import { NotFound } from "./screens/NotFound";
 import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
@@ -154,6 +155,13 @@ export function App() {
     >
       <TopBar fixture={world.active} />
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
+      {!screen && hudWorld && !mobile && (
+        <LevelsPanel
+          key={`levels:${hudWorld}`}
+          worldId={hudWorld}
+          replayed={world.worldId === hudWorld ? replayed : null}
+        />
+      )}
       {screen ? (
         <ScreenPage key={screen.id} screenId={screen.id}>
           <screen.Component
