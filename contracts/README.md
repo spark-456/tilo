@@ -6,13 +6,13 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 
 | File | Describes | Version |
 | --- | --- | --- |
-| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier; 1.1.0 adds the people ids (`wi_`, `mt_`, `pb_`, `mn_`, `ce_`, `tm_`, utterance), `opaque_ref`, `maker`, `record_ref` | 1.1.0 |
+| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier, artifact media types; 1.1.0 adds the people ids (`wi_`, `mt_`, `pb_`, `mn_`, `ce_`, `tm_`, utterance), `opaque_ref`, `maker`, `record_ref` | 1.1.0 |
 | `brief.schema.json` | Structured brief from intake (FR-INT-03 to 05) | 1.0.0 |
 | `plan.schema.json` | `PlanGraph`: approaches, units, dependencies, gates, budget cap; rules in `plan.rules.md` | 1.0.0 |
 | `layout.schema.json` | `WorldLayout` v1: semantic part and solver geometry; rules in `layout.rules.md` | 1.0.0 |
 | `event.schema.json` | `TiloEvent` v1; rules EV-01 to EV-15 in `event.rules.md` | 1.0.0 |
 | `events/registry.yaml` + `events/registry.schema.json` | Every registered event type (PRD 9.5, plus the CC-PEOPLE families `work_item`, `pinboard`, `mention`, `calendar`, `assistant` and `meeting.minuted`): world, HUD, Story and Trace effects, data schema, fixture, pillar | 1.1.0 |
-| `events/data/<type>.schema.json` | The `data` payload of each registered type (82 files); `question.answered` is 1.1.0 (`decision_id`), `budget.requested` is 1.1.0 (`remaining_units`, `estimate`); `meeting.started` and `meeting.ended` are 1.1.0 (optional `meeting_id`, `reason`); the 12 CC-PEOPLE types are 1.0.0 | 1.0.0 |
+| `events/data/<type>.schema.json` | The `data` payload of each registered type (82 files); `question.answered` is 1.1.0 (`decision_id`), `budget.requested` is 1.1.0 (`remaining_units`, `estimate`), `artifact.created` is 1.1.0 (`content_sha256`, `media_type`, `size_bytes`); `meeting.started` and `meeting.ended` are 1.1.0 (optional `meeting_id`, `reason`); the 12 CC-PEOPLE types are 1.0.0 | 1.0.0 |
 | `outbox.schema.json` | An authorised side effect waiting to run exactly once; rules in `outbox.rules.md` | 1.0.0 |
 | `card.schema.json` | Needs-you, gate, consent and meeting cards; safe-default rules in `card.rules.md` | 1.0.0 |
 | `policy.schema.json` | Autonomy policies and the risk-tier table shape (`config/autonomy.yaml`) | 1.0.0 |
