@@ -4,7 +4,7 @@ _Skeleton — filled in as pillars land. See `docs/prd/tilo-prd-v2.md` for the f
 
 Tilo is an agentic work platform: people describe work, a Director plans it, agent teams run it,
 and the work is shown as a living isometric world with Story and Trace lenses. People approve
-from web, phone, WhatsApp or email.
+from web, phone or email.
 
 ## Try it
 

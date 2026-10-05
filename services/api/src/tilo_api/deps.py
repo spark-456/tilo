@@ -37,7 +37,7 @@ from tilo_providers.router import Router
 from tilo_providers.safety import build_safety_provider
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
-Channel = Literal["web", "mobile_web", "email"]  # no whatsapp: SD-01, ADR-0019
+Channel = Literal["web", "mobile_web", "email"]  # WhatsApp removed: SD-01, ADR-0019
 
 logger = logging.getLogger("tilo_api.deps")
 _REPO_ROOT = Path(__file__).resolve().parents[4]
