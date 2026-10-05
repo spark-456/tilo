@@ -86,7 +86,8 @@ def test_FR_HIL_01_PRD_10_1_an_approver_answers_only_assigned_cards():
 
     assert _answer(answer_client(store, who), other).status_code == 404
     assert writer.parts == []
-    ok = _answer(answer_client(store, who), card, channel="mobile_web")
+    on_phone = principal("approver", APPROVER, channel="mobile_web")
+    ok = _answer(answer_client(store, on_phone), card, channel="mobile_web")
     assert ok.status_code == 200
     [part] = writer.of_type("approval.resolved")
     assert part["authz"]["ref"] == APPROVER
