@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import socket
 from pathlib import Path
+from typing import Any
 
 import pytest
 from _fake_genai_sdk import FakeAPIError
@@ -268,3 +269,109 @@ def test_PL_LIVE_07_a_failure_after_some_successes_keeps_the_rows_already_printe
     assert "autopilot" not in result.everything  # the run stopped; the last role never ran
     total = result.total()
     assert total is not None  # what was spent so far is still reported
+
+
+# ---------------------------------------------------------------------------------------------------------
+# (7b) A 400 is "rejected": the live smoke found Vertex answers 400 to a thinking level it does not support
+# ---------------------------------------------------------------------------------------------------------
+
+REJECTED_THINKING = (400, "Thinking level is unsupported: THINKING_LEVEL_MINIMAL")
+
+
+def _rejected_run(tmp_path: Path, status: int, message: str) -> tuple[Any, FakeVertexSdk]:
+    cfg = real_config()
+    sdk = FakeVertexSdk(errors_by_model={p.model: FakeAPIError(status, message) for p in cfg.profiles.values()})
+    result, _, _ = live_run(tmp_path, sdk=sdk)
+    return result, sdk
+
+
+def test_PL_LIVE_07_a_400_is_rejected_and_shows_the_servers_reason(tmp_path: Path) -> None:
+    result, sdk = _rejected_run(tmp_path, *REJECTED_THINKING)
+    assert result.code == 1 and len(sdk.calls) == 1
+    lines = result.err_lines()
+    assert len(lines) == 1, lines
+    match = FAIL_RE.match(lines[0])
+    assert match and match["role"] == "director" and match["code"] == "rejected", lines[0]
+    assert "THINKING_LEVEL_MINIMAL" in match["message"]  # the reason, so it is never "unknown"
+    assert "role or profile settings" in match["fix"]
+    assert "Traceback" not in result.everything
+
+
+def test_PL_LIVE_07_a_400_message_never_prints_a_token_or_an_authorization_header(tmp_path: Path) -> None:
+    token, bearer, key = fake_secret("access_token"), fake_secret("bearer"), fake_secret("api_key")
+    message = f"{REJECTED_THINKING[1]}. Authorization: {bearer} token={token} key={key}"
+    result, _ = _rejected_run(tmp_path, REJECTED_THINKING[0], message)
+    assert result.code == 1
+    lines = result.err_lines()
+    assert len(lines) == 1
+    match = FAIL_RE.match(lines[0])
+    assert match is not None and match["code"] == "rejected"
+    for secret in (token, bearer, bearer.split(" ", 1)[1], key, "Authorization"):
+        assert secret not in result.everything
+
+
+def test_PL_LIVE_07_a_400_reason_is_one_line_and_capped_at_200_characters(tmp_path: Path) -> None:
+    long_reason = "x" * 400 + "\nsecond line"
+    result, _ = _rejected_run(tmp_path, 400, long_reason)
+    lines = result.err_lines()
+    assert len(lines) == 1, lines
+    match = FAIL_RE.match(lines[0])
+    assert match and match["code"] == "rejected"
+    assert "x" * 200 in match["message"] and "x" * 201 not in match["message"]
+    assert "second line" not in result.everything
+
+
+def test_PL_LIVE_07_other_failure_codes_still_print_no_server_text(tmp_path: Path) -> None:
+    result, _ = _rejected_run(tmp_path, 403, "Permission denied: SERVER-TEXT-MARKER [PERMISSION_DENIED]")
+    match = FAIL_RE.match(result.err_lines()[0])
+    assert match is not None and match["code"] == "permission"
+    assert "SERVER-TEXT-MARKER" not in result.everything
+
+
+OPAQUE = "OpaqueValue" + "0123456789abcdef"  # not credential-shaped on purpose: only the label around it gives it away
+LEAKY_SHAPES = [
+    pytest.param(f'Authorization: "Bearer {OPAQUE}"', id="quoted-authorization"),
+    pytest.param('{\\"Authorization\\":\\"Bearer ' + OPAQUE + '\\"}', id="escaped-json-authorization"),
+    pytest.param(f"access_token={OPAQUE}", id="access_token"),
+    pytest.param(f"refresh_token: {OPAQUE}", id="refresh_token"),
+    pytest.param(f"api_key={OPAQUE}", id="api_key"),
+    pytest.param(f"apiKey={OPAQUE}", id="apiKey"),
+    pytest.param(f"client_secret={OPAQUE}", id="client_secret"),
+    pytest.param(f'{{"token": "{OPAQUE}"}}', id="json-token"),
+    pytest.param(f'{{"key": "{OPAQUE}"}}', id="json-key"),
+    pytest.param(f"X-Goog-Signature={OPAQUE}", id="signed-url-signature"),
+    pytest.param(f"Author\u200bization: Bearer {OPAQUE}", id="zero-width-in-label"),
+    pytest.param("ya\u200b" + "29." + OPAQUE, id="zero-width-in-token"),
+]
+
+
+@pytest.mark.parametrize("leak", LEAKY_SHAPES)
+def test_PL_LIVE_07_a_400_reason_scrubs_labelled_values_in_every_common_shape(leak: str, tmp_path: Path) -> None:
+    result, _ = _rejected_run(tmp_path, 400, f"Request rejected. {leak} End.")
+    lines = result.err_lines()
+    assert len(lines) == 1
+    match = FAIL_RE.match(lines[0])
+    assert match is not None and match["code"] == "rejected"
+    assert OPAQUE not in result.everything
+
+
+def test_PL_LIVE_07_a_400_reason_drops_terminal_control_and_format_characters(tmp_path: Path) -> None:
+    message = "Bad setting \x1b]52;c;ZGF0YQ==\x07 \x1b[2K \x08 \u202e reversed \u200b zero."
+    result, _ = _rejected_run(tmp_path, 400, message)
+    line = result.err_lines()[0]
+    assert FAIL_RE.match(line) and "Bad setting" in line
+    assert not any(ord(c) < 32 or 127 <= ord(c) < 160 or c in "\u202e\u200b" for c in result.err.rstrip("\n"))
+
+
+def test_PL_LIVE_07_a_rejected_request_with_no_server_reason_still_prints_a_clean_line() -> None:
+    module = smoke()
+    from tilo_providers.errors import RequestError  # noqa: PLC0415
+
+    assert module.classify(RequestError("plain")) == "rejected"
+    assert module._reason(RequestError("plain")) == ""
+
+
+def test_PL_LIVE_07_a_400_whose_text_looks_like_another_failure_is_still_rejected(tmp_path: Path) -> None:
+    result, _ = _rejected_run(tmp_path, 400, "The field is disabled. [NOT_FOUND] [PERMISSION_DENIED]")
+    match = FAIL_RE.match(result.err_lines()[0])
+    assert match is not None and match["code"] == "rejected"
