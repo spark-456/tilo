@@ -39,25 +39,28 @@ framing_words: [a, an, the, ...]   # lower-case single words, unique, at most 30
 ```python
 class BuildPartnerConfigError(ValueError): ...  # message at most 500 characters, names the key, never a value
 
+
 class HandoffRefused(ValueError):
     rule: str  # "BH-01".."BH-09" or "DG-01".."DG-05" (tables below)
     # The message names the rule and ids (artifact ids, grant id) only: never requirement, framing,
     # excerpt or prompt text, a URL, or anything the redactor would remove.
 
+
 @dataclass(frozen=True)
 class RouteOffer:
-    route: str        # "mcp"
-    available: bool   # False until FR-CON-18 ships
-    reason: str       # "unavailable until FR-CON-18"
+    route: str  # "mcp"
+    available: bool  # False until FR-CON-18 ships
+    reason: str  # "unavailable until FR-CON-18"
+
 
 class BriefTooLong(HandoffRefused):  # rule "BH-06"
-    prompt_chars: int                 # len(prompt), code points
-    link_length: int                  # link_length(prompt)
+    prompt_chars: int  # len(prompt), code points
+    link_length: int  # link_length(prompt)
     max_prompt_chars: int
     max_url_length: int
-    truncated: bool                   # always False: nothing is ever cut
+    truncated: bool  # always False: nothing is ever cut
     alternatives: tuple[RouteOffer, ...]  # exactly (RouteOffer("mcp", False, "unavailable until FR-CON-18"),)
-    message: str                      # person-facing, exactly as below
+    message: str  # person-facing, exactly as below
 ```
 
 `BriefTooLong.message` (no prompt text in it):
@@ -70,17 +73,19 @@ was cut and nothing was sent. Lovable's connected route can take longer briefs, 
 ```python
 DEFAULT_BUILD_PARTNERS: Path  # <repo>/config/build_partners.yaml
 
+
 @dataclass(frozen=True)
 class BuildPartnerConfig:
-    connector: str            # "lovable"
-    action: str               # "build_handoff"
-    route: str                # "link"
-    max_prompt_chars: int     # 1..50000
-    max_url_length: int       # 100..2_000_000
-    max_framing_chars: int    # 1..1000
-    max_excerpt_chars: int    # 1..max_prompt_chars
-    max_items: int            # 1..6
+    connector: str  # "lovable"
+    action: str  # "build_handoff"
+    route: str  # "link"
+    max_prompt_chars: int  # 1..50000
+    max_url_length: int  # 100..2_000_000
+    max_framing_chars: int  # 1..1000
+    max_excerpt_chars: int  # 1..max_prompt_chars
+    max_items: int  # 1..6
     framing_words: frozenset[str]
+
 
 def load_build_partners(
     path: str | os.PathLike[str] = DEFAULT_BUILD_PARTNERS, *, registry: ConnectorRegistry
@@ -95,11 +100,11 @@ a `framing_words` entry that is not one NFKC-casefolded word matching `[^\W_]+`,
 
 ```python
 @dataclass(frozen=True)
-class AcceptedRequirements:   # every text is whitespace-collapsed: " ".join(value.split())
+class AcceptedRequirements:  # every text is whitespace-collapsed: " ".join(value.split())
     world_id: str
     run_id: str
-    accepted_by: str          # the world's owner
-    accepted_at: str          # RFC 3339 time of the owner's approval
+    accepted_by: str  # the world's owner
+    accepted_at: str  # RFC 3339 time of the owner's approval
     goal: str
     deliverable_index: int
     deliverable_title: str
@@ -107,22 +112,23 @@ class AcceptedRequirements:   # every text is whitespace-collapsed: " ".join(val
     approach_id: str
     approach_label: str
     approach_summary: str
-    constraints: tuple[str, ...]   # brief.constraints, in order
-    assumptions: tuple[str, ...]   # brief.assumptions[].assumed, in order
-    skips: tuple[str, ...]         # the chosen approach's skips, in order
+    constraints: tuple[str, ...]  # brief.constraints, in order
+    assumptions: tuple[str, ...]  # brief.assumptions[].assumed, in order
+    skips: tuple[str, ...]  # the chosen approach's skips, in order
 
     def fields(self) -> tuple[str, ...]: ...  # every text above in render order
+
 
 def accepted_requirements(
     *,
     world_id: str,
     run_id: str,
     world_owner: str,
-    brief: Mapping[str, Any],        # the brief as the owner approved it (POST /tasks/{id}/approve)
-    approach: Mapping[str, Any],     # plan.schema.json approach the owner picked
-    chosen_approach_id: str,         # the approach_id of that approval
-    deliverable_index: int,          # 0-based index into brief["deliverables"]: ONE deliverable
-    approval: Mapping[str, Any],     # {"by": "person", "ref": <user id>, "at": <timestamp>}, exactly these keys
+    brief: Mapping[str, Any],  # the brief as the owner approved it (POST /tasks/{id}/approve)
+    approach: Mapping[str, Any],  # plan.schema.json approach the owner picked
+    chosen_approach_id: str,  # the approach_id of that approval
+    deliverable_index: int,  # 0-based index into brief["deliverables"]: ONE deliverable
+    approval: Mapping[str, Any],  # {"by": "person", "ref": <user id>, "at": <timestamp>}, exactly these keys
 ) -> AcceptedRequirements: ...
 ```
 
@@ -145,7 +151,7 @@ when they differ from the approved ones; each draft `constraints` item, `assumpt
 whose id is not `chosen_approach_id`.
 
 ```python
-def writer_brief(accepted: AcceptedRequirements) -> str: ...   # the requirements block below; all the writer sees
+def writer_brief(accepted: AcceptedRequirements) -> str: ...  # the requirements block below; all the writer sees
 def find_leaks(text: str, planted: Sequence[str]) -> tuple[str, ...]: ...
 ```
 
@@ -189,37 +195,39 @@ otherwise `DEFAULT_FRAMING.format(title=deliverable_title)`, with
 class Screen(Protocol):  # a tilo_providers SafetyProvider fits: check(text) -> {"flagged": bool, "reason": ...}
     def check(self, text: str) -> Mapping[str, Any]: ...
 
+
 @dataclass(frozen=True)
 class PreparedHandoff:
     world_id: str
     run_id: str
-    connector: str                 # "lovable"
-    action_type: str               # "build_handoff"
+    connector: str  # "lovable"
+    action_type: str  # "build_handoff"
     deliverable_index: int
-    prompt: str                    # the exact prompt (render_prompt output)
-    prompt_sha256: str             # sha256(prompt.encode("utf-8")), lower-case hex
-    framing_source: str            # "writer" | "default"
-    framing_rule: str | None       # None when the writer's framing was used, else one of
-                                   # "absent", "too_long", "secret", "flagged", "unknown_word", "declined"
+    prompt: str  # the exact prompt (render_prompt output)
+    prompt_sha256: str  # sha256(prompt.encode("utf-8")), lower-case hex
+    framing_source: str  # "writer" | "default"
+    framing_rule: str | None  # None when the writer's framing was used, else one of
+    # "absent", "too_long", "secret", "flagged", "unknown_word", "declined"
     grant_id: str | None
-    items: tuple[tuple[str, int], ...]           # (artifact_id, version) of the excerpts' items, first-use order, distinct
+    items: tuple[tuple[str, int], ...]  # (artifact_id, version) of the excerpts' items, first-use order, distinct
     redacted_items: tuple[tuple[str, int], ...]  # those whose excerpt the redactor changed
-    exact: str                     # gate.action.exact for the card (BH-08)
-    link_length: int               # adapters.lovable.link_length(prompt)
+    exact: str  # gate.action.exact for the card (BH-08)
+    link_length: int  # adapters.lovable.link_length(prompt)
+
 
 def prepare_handoff(
     *,
     accepted: AcceptedRequirements,
-    framing: str | None,           # the writer role's reply to writer_brief(accepted); None when there is none
-    excerpts: Sequence[Excerpt],   # from grants.granted_excerpts(); () when nothing is granted
-    grant_id: str | None,          # the grant the excerpts came from; required when excerpts is not empty
+    framing: str | None,  # the writer role's reply to writer_brief(accepted); None when there is none
+    excerpts: Sequence[Excerpt],  # from grants.granted_excerpts(); () when nothing is granted
+    grant_id: str | None,  # the grant the excerpts came from; required when excerpts is not empty
     grants: GrantStore,
-    declined: Sequence[str],       # declined_texts(...)
+    declined: Sequence[str],  # declined_texts(...)
     partner: BuildPartnerConfig,
     declaration: Mapping[str, Any],  # the connector entry of partner.connector (its name goes on the card)
     redact: Callable[[str], str],  # the shared SEC-01 redactor (FR-MEM-05; BQ-109: never identity in production)
     safety: Screen,
-) -> PreparedHandoff: ...          # or raises HandoffRefused / BriefTooLong
+) -> PreparedHandoff: ...  # or raises HandoffRefused / BriefTooLong
 ```
 
 Checks, in this order; the first failure raises and nothing is returned:
@@ -257,17 +265,20 @@ class HandoffRecord:
     attempt: int
     connector: str
     action_type: str
-    prompt: dict                 # {"artifact_id", "version"} of the stored prompt
+    prompt: dict  # {"artifact_id", "version"} of the stored prompt
     prompt_sha256: str
     grant_id: str | None
     items: tuple[tuple[str, int], ...]
     exact: str
-    link_idempotency_key: str    # f"{run_id}:{unit_id}:{attempt}:1" (the link is the unit's output 1)
+    link_idempotency_key: str  # f"{run_id}:{unit_id}:{attempt}:1" (the link is the unit's output 1)
 
-class HandoffStore:              # in memory, lock-guarded; a Firestore one later
-    def record(self, prepared: PreparedHandoff, stored: Mapping[str, Any], *, unit_id: str, agent_id: str,
-               attempt: int) -> HandoffRecord: ...
+
+class HandoffStore:  # in memory, lock-guarded; a Firestore one later
+    def record(
+        self, prepared: PreparedHandoff, stored: Mapping[str, Any], *, unit_id: str, agent_id: str, attempt: int
+    ) -> HandoffRecord: ...
     def get(self, world_id: str, ref: Mapping[str, Any]) -> HandoffRecord | None: ...
+
 
 def handoff_gate(record: HandoffRecord, declaration: Mapping[str, Any]) -> dict: ...
 ```
@@ -284,9 +295,19 @@ anything else under it refuses. `get` keys on `world_id` plus the ref's `artifac
 (CR-10 to CR-12, OB-05), refusing (BH-09) a declaration whose action is not T3, approval, irreversible:
 
 ```python
-{"action_type": "build_handoff", "connector": "lovable", "risk_tier": "T3", "irreversible": True,
- "modifiers": ["external_sharing"], "recipients": [], "attachments": [], "item": record.prompt,
- "destination": None, "exact": record.exact, "undo_window_s": 0}
+{
+    "action_type": "build_handoff",
+    "connector": "lovable",
+    "risk_tier": "T3",
+    "irreversible": True,
+    "modifiers": ["external_sharing"],
+    "recipients": [],
+    "attachments": [],
+    "item": record.prompt,
+    "destination": None,
+    "exact": record.exact,
+    "undo_window_s": 0,
+}
 ```
 
 ## `tilo_connectors.grants` (FR-CON-20)
@@ -294,52 +315,80 @@ anything else under it refuses. `get` keys on `world_id` plus the ref's `artifac
 ```python
 @dataclass(frozen=True)
 class GrantItem:
-    kind: str             # "artifact" | "folder" | "record"
-    ref: str              # artifact: an artifact_id; folder: a destination-shaped id; record: "<record_ref kind>:<opaque_ref>"
-    version: int | None   # artifact: the pinned version (>= 1, never bool); folder and record: None
-    label: str            # 1..80 characters after whitespace collapse, no control characters; the excerpt heading
+    kind: str  # "artifact" | "folder" | "record"
+    ref: str  # artifact: an artifact_id; folder: a destination-shaped id; record: "<record_ref kind>:<opaque_ref>"
+    version: int | None  # artifact: the pinned version (>= 1, never bool); folder and record: None
+    label: str  # 1..80 characters after whitespace collapse, no control characters; the excerpt heading
+
 
 @dataclass(frozen=True)
 class DataGrant:
-    id: str               # "dg_" + 26 Crockford base32 characters, minted by the store
+    id: str  # "dg_" + 26 Crockford base32 characters, minted by the store
     world_id: str
-    run_id: str           # the task: a grant lives and dies with this run
-    connector: str        # the one build partner it is for
+    run_id: str  # the task: a grant lives and dies with this run
+    connector: str  # the one build partner it is for
     items: tuple[GrantItem, ...]
-    granted_by: str       # the world's owner
+    granted_by: str  # the world's owner
     granted_at: str
-    state: str            # "active" | "revoked" | "expired"
+    state: str  # "active" | "revoked" | "expired"
     ended_at: str | None  # set exactly when not active
     ended_by: str | None  # the owner for revoked, None for expired
 
-class GrantStore:         # in memory, lock-guarded, copies out
+
+class GrantStore:  # in memory, lock-guarded, copies out
     def __init__(self, partners: Mapping[str, BuildPartnerConfig]) -> None: ...
-    def create(self, *, world_id: str, run_id: str, connector: str, items: Sequence[GrantItem], by: str,
-               world_owner: str, at: str) -> DataGrant: ...
+    def create(
+        self,
+        *,
+        world_id: str,
+        run_id: str,
+        connector: str,
+        items: Sequence[GrantItem],
+        by: str,
+        world_owner: str,
+        at: str,
+    ) -> DataGrant: ...
     def revoke(self, grant_id: str, *, by: str, world_owner: str, at: str) -> DataGrant: ...
     def end_run(self, world_id: str, run_id: str, *, at: str) -> tuple[DataGrant, ...]: ...
     def get(self, grant_id: str) -> DataGrant | None: ...
     def require_active(self, grant_id: str, *, world_id: str, run_id: str, connector: str) -> DataGrant: ...
 
-class TextArtifacts(Protocol):  # P7's ArtifactStore read side, scoped by world (tests: a dict-backed double that logs reads)
-    def head(self, world_id: str, ref: Mapping[str, Any]) -> Mapping[str, Any] | None: ...  # artifact.schema.json record
+
+class TextArtifacts(
+    Protocol
+):  # P7's ArtifactStore read side, scoped by world (tests: a dict-backed double that logs reads)
+    def head(
+        self, world_id: str, ref: Mapping[str, Any]
+    ) -> Mapping[str, Any] | None: ...  # artifact.schema.json record
     def read(self, world_id: str, ref: Mapping[str, Any]) -> bytes: ...  # hash-checked bytes (AR-01)
+
 
 @dataclass(frozen=True)
 class ExcerptRequest:
-    ref: str              # artifact id
+    ref: str  # artifact id
     version: int
-    text: str | None      # a contiguous part of that version's text; None = the whole text
+    text: str | None  # a contiguous part of that version's text; None = the whole text
+
 
 @dataclass(frozen=True)
 class Excerpt:
     item: GrantItem
-    text: str             # line endings normalised to LF, then the redactor's output
-    redacted: bool        # the redactor changed it
+    text: str  # line endings normalised to LF, then the redactor's output
+    redacted: bool  # the redactor changed it
+
 
 def granted_excerpts(
-    *, grants: GrantStore, artifacts: TextArtifacts, grant_id: str, world_id: str, run_id: str, connector: str,
-    requests: Sequence[ExcerptRequest], partner: BuildPartnerConfig, redact: Callable[[str], str], safety: Screen,
+    *,
+    grants: GrantStore,
+    artifacts: TextArtifacts,
+    grant_id: str,
+    world_id: str,
+    run_id: str,
+    connector: str,
+    requests: Sequence[ExcerptRequest],
+    partner: BuildPartnerConfig,
+    redact: Callable[[str], str],
+    safety: Screen,
 ) -> tuple[Excerpt, ...]: ...
 ```
 
@@ -356,9 +405,12 @@ def granted_excerpts(
 ```python
 LOVABLE_LINK_PREFIX = "https://lovable.dev/#prompt="
 
+
 def link_length(prompt: str) -> int: ...  # len(LOVABLE_LINK_PREFIX) + len(quote(prompt, safe=""))
-def decode_link(url: str) -> str: ...     # ValueError unless url == PREFIX + one percent-encoded value with no
-                                          # "&", "#" or "?", and it decodes as strict UTF-8 (unquote, errors="strict")
+def decode_link(url: str) -> str:
+    ...  # ValueError unless url == PREFIX + one percent-encoded value with no
+    # "&", "#" or "?", and it decodes as strict UTF-8 (unquote, errors="strict")
+
 
 @dataclass(frozen=True)
 class LinkArtifact:
@@ -366,20 +418,33 @@ class LinkArtifact:
     run_id: str
     unit_id: str
     agent_id: str
-    idempotency_key: str     # the record's link_idempotency_key (AR-05)
-    media_type: str          # "application/json"
-    content: bytes           # the link record, canonical JSON (below)
+    idempotency_key: str  # the record's link_idempotency_key (AR-05)
+    media_type: str  # "application/json"
+    content: bytes  # the link record, canonical JSON (below)
 
-class LinkStore(Protocol):   # production: the artifact store bound to world_id's Scope, origin unit
+
+class LinkStore(Protocol):  # production: the artifact store bound to world_id's Scope, origin unit
     def put(self, link: LinkArtifact) -> dict: ...  # artifact_ref; the same idempotency_key returns the same ref
 
-class InMemoryLinkStore:     # dev and tests; `.links` lists the LinkArtifacts it stored, one per key
+
+class InMemoryLinkStore:  # dev and tests; `.links` lists the LinkArtifacts it stored, one per key
     def put(self, link: LinkArtifact) -> dict: ...
 
+
 class LovableLinkAdapter:
-    def __init__(self, *, declaration: Mapping[str, Any], partner: BuildPartnerConfig, handoffs: HandoffStore,
-                 grants: GrantStore, artifacts: TextArtifacts, links: LinkStore) -> None: ...
-    id: str                  # property: declaration["id"]
+    def __init__(
+        self,
+        *,
+        declaration: Mapping[str, Any],
+        partner: BuildPartnerConfig,
+        handoffs: HandoffStore,
+        grants: GrantStore,
+        artifacts: TextArtifacts,
+        links: LinkStore,
+    ) -> None: ...
+
+    id: str  # property: declaration["id"]
+
     def execute_side_effect(self, entry: Mapping[str, Any], grant: Grant) -> dict: ...
 ```
 

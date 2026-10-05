@@ -20,13 +20,14 @@ partners:
     max_items: 6 # items one grant may name, and distinct items one handoff may carry (1..6, BQ-BUILD-5)
 
 # Words a writer framing may use besides the words of the accepted requirements (BH-03): function words and
-# generic build words only, never a feature, style or product word. Lower-case, one word each.
+# generic build words only, never a feature, style or product word. Lower-case, one word each. "on" and "no" are
+# quoted: unquoted, YAML 1.1 reads them as booleans.
 framing_words: [
-    a, an, the, and, or, of, for, to, in, on, at, by, with, from, as, that, this, these, those, it, its,
+    a, an, the, and, or, of, for, to, in, "on", at, by, with, from, as, that, this, these, those, it, its,
     is, are, be, will, should, must, can, please, here, there, also, into, than, then, so, who, which,
     what, where, when, how, they, them, their, we, our, you, your, client, build, create, make, develop,
     website, web, site, app, application, page, pages, front, end, frontend, user, users, use, using,
     below, above, described, following, listed, requirement, requirements, goal, audience, approach,
-    deliverable, each, every, all, only, exactly, follow, include, including, not, no, nothing, add,
+    deliverable, each, every, all, only, exactly, follow, include, including, not, "no", nothing, add,
     else, other, more,
   ]
