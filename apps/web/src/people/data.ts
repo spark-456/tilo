@@ -27,9 +27,11 @@ export interface EvidenceQuote {
 }
 export const QUOTES = quotes as Readonly<Record<string, Readonly<Record<string, EvidenceQuote>>>>;
 
-/** "You" for the signed-in person, else the directory view of a teammate: the display name only. */
-export const personName = (id: string): string =>
-  id === SIGNED_IN
-    ? "You"
-    : ((persons as unknown as readonly Person[]).find((p) => p.id === id)?.display_name ??
-      "A teammate");
+const PERSONS = persons as unknown as readonly Person[];
+
+/** The directory view of a person (PE-20): the display name, nothing else. */
+export const displayName = (id: string): string =>
+  PERSONS.find((p) => p.id === id)?.display_name ?? "A teammate";
+
+/** "You" for the signed-in person, else the teammate's display name. */
+export const personName = (id: string): string => (id === SIGNED_IN ? "You" : displayName(id));

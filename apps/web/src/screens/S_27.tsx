@@ -1,92 +1,135 @@
 // S-27 My plate (PRD addendum FR-PA-02, FR-PA-03; ADR-0016): the signed-in person's open work
-// items in one deterministic order, each with Done, Snooze and Not mine. Fixture data only
-// (src/people/data.ts) and a notice that says so; no design export covers it, so cards and rows
-// follow kit.tsx in neutral role tokens. Only the person's own items are read (PE-03): of anyone
-// else, a display name. Cards, mail, pins and the calendar join the plate when their sources are
-// connected; none is shown or counted here.
+// items in one deterministic order, each with Done, Snooze and Not mine, and a strip of jump pills
+// with the real counts. Fixture data only (src/people/data.ts) and a notice that says so; no design
+// export covers it, so it follows the pills of "Tilo Worlds" and the people rows of "Tilo Team" in
+// neutral role tokens. Only the person's own items are read (PE-03): of anyone else, a display
+// name. Cards, mail, pins and the calendar join the plate when their sources are connected; none
+// is shown or counted here.
 import type { WorkItem } from "@tilo/contracts";
-import { useReducer, useRef, useState } from "react";
-import { QUOTES, WORK_ITEMS, personName } from "../people/data";
-import { Evidence, PreviewNote } from "../people/parts";
-import { type Bucket, bucketOf, byDue, canReject, laneOf, reducePlate } from "../people/plate";
-import { Chip, EmptyState, Page, Row, Section, longDate, plural } from "./kit";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { QUOTES, WORK_ITEMS, displayName } from "../people/data";
+import { Evidence, PersonTag, PreviewNote, pillLabel } from "../people/parts";
+import {
+  type Bucket,
+  type PlateAction,
+  bucketOf,
+  byDue,
+  canReject,
+  laneOf,
+  reducePlate,
+} from "../people/plate";
+import { Chip, EmptyState, Page, Section, longDate, plural } from "./kit";
 
-/** The open groups, in plate order: bucket, section title, chip tone and chip word. */
-const BUCKETS: ReadonlyArray<readonly [Bucket, string, string, string]> = [
-  ["overdue", "Overdue", "blocked", "Overdue"],
-  ["soon", "Due in the next 48 hours", "needs", "Due soon"],
-  ["rest", "The rest", "fyi", "Later"],
+type Key = Bucket | "snoozed" | "asked" | "done";
+/** The groups in plate order: key, title, pill word. The first three are the open items. */
+const GROUPS: ReadonlyArray<readonly [Key, string, string]> = [
+  ["overdue", "Overdue", "Overdue"],
+  ["soon", "Due in the next 48 hours", "Soon"],
+  ["rest", "The rest", "Later"],
+  ["snoozed", "Snoozed", "Snoozed"],
+  ["asked", "Asked to be reassigned", "Reassigning"],
+  ["done", "Done", "Done"],
 ];
-const LANES = [
-  ["snoozed", "Snoozed"],
-  ["asked", "Asked to be reassigned"],
-  ["done", "Done"],
-] as const;
 
-const sourceOf = (i: WorkItem): string =>
-  i.source.kind === "meeting"
-    ? `From a meeting${i.assigned_by && i.assigned_by.by !== i.owner ? `, assigned by ${personName(i.assigned_by.by)}` : ""}`
-    : i.source.kind === "mail"
-      ? "From mail you marked to track"
-      : "Added by you";
+/** "2026-10-09" or a timestamp -> "9 Oct". */
+const short = (when: string): string =>
+  longDate(when.length === 10 ? `${when}T00:00:00Z` : when).replace(/ \d{4}$/, "");
 
-const dueOf = (i: WorkItem): string =>
-  i.due
-    ? `Due ${longDate(`${i.due}T00:00:00Z`)}${i.due_text ? ` (${i.due_text})` : ""}`
-    : "No due date";
+/** The state chip of an item in words, tinted by tone: the due date for an open item. */
+function chipOf(i: WorkItem, key: Key): readonly [string, string] {
+  if (key === "snoozed") return ["fyi", `Snoozed until ${short(i.snoozed_until ?? i.updated_at)}`];
+  if (key === "asked")
+    return ["fyi", `Waiting for ${displayName(i.assigned_by?.by ?? "")} to reassign`];
+  if (key === "done") return ["done", `Done ${short(i.updated_at)}`];
+  if (!i.due) return ["soon", "No due date"];
+  return key === "overdue"
+    ? ["blocked", `Overdue, ${short(i.due)}`]
+    : key === "soon"
+      ? ["needs", `Due soon, ${short(i.due)}`]
+      : ["fyi", `Due ${short(i.due)}`];
+}
+
+function Source({ item: i }: { item: WorkItem }) {
+  const by = i.assigned_by && i.assigned_by.by !== i.owner ? i.assigned_by.by : null;
+  const said = i.due_text ? ` Said “${i.due_text}”.` : "";
+  if (i.source.kind === "mail") return <>From mail you marked to track.{said}</>;
+  if (i.source.kind !== "meeting") return <>Added by you.{said}</>;
+  return (
+    <>
+      From a meeting{by && ", assigned by "}
+      {by && <PersonTag user={by} />}.{said}
+    </>
+  );
+}
 
 export function S_27() {
   const [items, act] = useReducer(reducePlate, WORK_ITEMS);
-  const [said, setSaid] = useState("");
-  const status = useRef<HTMLOutputElement>(null);
-  const inLane = (lane: string) => items.filter((i) => laneOf(i) === lane).sort(byDue);
-  const open = inLane("open");
+  const [toast, setToast] = useState<{ text: string; undo: string | null } | null>(null);
+  const undo = useRef<HTMLButtonElement>(null);
+  const box = useRef<HTMLOutputElement>(null);
+  // The row leaves its list, so focus moves to what happened: the toast's Undo, else the toast.
+  useEffect(() => {
+    if (toast) (undo.current ?? box.current)?.focus();
+  }, [toast]);
 
-  const row = (i: WorkItem, chip?: readonly [string, string]) => {
+  const keyOf = (i: WorkItem): Key => {
+    const lane = laneOf(i);
+    return lane === "open" ? bucketOf(i.due) : lane;
+  };
+  const rows = (key: Key) => items.filter((i) => keyOf(i) === key).sort(byDue);
+  const groups = GROUPS.map(([key, title, word]) => ({ key, title, word, rows: rows(key) }));
+  const empty = groups.slice(0, 3).every((g) => g.rows.length === 0);
+  const jump = (key: Key) => {
+    const el = document.getElementById(`plate-group-${key}`);
+    el?.scrollIntoView({ block: "start" });
+    el?.focus();
+  };
+
+  const run = (i: WorkItem, kind: PlateAction["kind"], says: string) => () => {
+    act({ kind, id: i.id });
+    setToast({ text: `${says}: ${i.title}.`, undo: kind === "put_back" ? null : i.id });
+  };
+
+  const item = (i: WorkItem, key: Key) => {
     const meeting = i.source.kind === "meeting" ? (i.source.ref ?? "").split("#")[0] : undefined;
-    const button = (kind: "done" | "snooze" | "not_mine", says: string) => () => {
-      act({ kind, id: i.id });
-      setSaid(`${says}: ${i.title}.`);
-      status.current?.focus(); // the row leaves the list, so focus moves to what happened
-    };
-    const actions: ReadonlyArray<
-      readonly [string, string, string, "done" | "snooze" | "not_mine"]
-    > = [
-      ["Done", "Done", "Marked done", "done"],
-      ["Snooze", "Snooze until tomorrow", "Snoozed until tomorrow", "snooze"],
-      ...(canReject(i)
-        ? ([["Not mine", "Not mine", "Asked for it to be reassigned", "not_mine"]] as const)
-        : []),
-    ];
+    const [tone, word] = chipOf(i, key);
+    const open = laneOf(i) === "open";
+    const buttons: ReadonlyArray<readonly [string, string, string, PlateAction["kind"]]> = open
+      ? [
+          ["Done", "Done", "Marked done", "done"],
+          ["Snooze", "Snooze until tomorrow", "Snoozed until tomorrow", "snooze"],
+          ...(canReject(i)
+            ? ([["Not mine", "Not mine", "Asked for it to be reassigned", "not_mine"]] as const)
+            : []),
+        ]
+      : [["Put back", "Put back", "Put back", "put_back"]];
     return (
-      <Row
-        key={i.id}
-        name={i.title}
-        sub={`${sourceOf(i)}. ${dueOf(i)}.`}
-        state={
-          <>
+      <li key={i.id} className="prow" data-testid="plate-item">
+        <div className="prow-title">
+          <b>{i.title}</b>
+          <span className="prow-chips">
             {i.flagged && <Chip tone="needs">Flagged: any follow-up needs you</Chip>}
-            {chip && <Chip tone={chip[0]}>{chip[1]}</Chip>}
-          </>
-        }
-      >
-        {laneOf(i) === "open" && (
-          <div className="plate-actions">
-            {actions.map(([text, name, says, kind]) => (
-              <button
-                key={kind}
-                type="button"
-                className="secondary"
-                aria-label={`${name}: ${i.title}`}
-                onClick={button(kind, says)}
-              >
-                {text}
-              </button>
-            ))}
-          </div>
-        )}
+            <Chip tone={tone}>{word}</Chip>
+          </span>
+        </div>
+        <p className="bitem-sub">
+          <Source item={i} />
+        </p>
         {meeting && QUOTES[meeting] && <Evidence meeting={meeting} ids={i.source.evidence} />}
-      </Row>
+        <div className="plate-actions">
+          {buttons.map(([text, name, says, kind]) => (
+            <button
+              key={kind}
+              type="button"
+              className="secondary"
+              aria-label={`${name}: ${i.title}`}
+              onClick={run(i, kind, says)}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      </li>
     );
   };
 
@@ -97,36 +140,61 @@ export function S_27() {
       sub="What is waiting on you, in one fixed order: overdue first, then due in the next 48 hours, then the rest."
     >
       <PreviewNote what="Your plate" />
-      <output ref={status} tabIndex={-1} className="plate-status" data-testid="plate-status">
-        {said}
-      </output>
-      {open.length === 0 && (
-        <EmptyState
-          testid="plate-empty"
-          title="Nothing is waiting on you"
-          line="Open work items show up here when there are some."
-        />
+      <nav className="people-strip" aria-label="Jump to a group" data-testid="plate-strip">
+        {groups
+          .filter((g) => g.rows.length > 0)
+          .map((g) => (
+            <button
+              key={g.key}
+              type="button"
+              className="people-pill"
+              data-testid={`pill-${g.key}`}
+              onClick={() => jump(g.key)}
+            >
+              {pillLabel(g.word, g.rows.length)}
+            </button>
+          ))}
+      </nav>
+      {empty && (
+        <div className="people-gap">
+          <EmptyState
+            testid="plate-empty"
+            title="Nothing is waiting on you"
+            line="Open work items show up here when there are some."
+          />
+        </div>
       )}
-      {BUCKETS.map(([bucket, title, tone, word]) => {
-        const rows = open.filter((i) => bucketOf(i.due) === bucket);
-        return rows.length === 0 ? null : (
-          <Section key={bucket} title={title} note={plural(rows.length, "item")}>
-            <ul className="blist plate-list" data-testid={`plate-${bucket}`}>
-              {rows.map((i) => row(i, [tone, word]))}
-            </ul>
-          </Section>
-        );
-      })}
-      {LANES.map(([lane, title]) => {
-        const rows = inLane(lane);
-        return rows.length === 0 ? null : (
-          <Section key={lane} title={title} note={plural(rows.length, "item")}>
-            <ul className="blist plate-list" data-testid={`plate-${lane}`}>
-              {rows.map((i) => row(i))}
-            </ul>
-          </Section>
-        );
-      })}
+      {groups.map((g) =>
+        g.rows.length === 0 ? null : (
+          <div key={g.key} id={`plate-group-${g.key}`} tabIndex={-1} className="plate-group">
+            <Section title={g.title} note={plural(g.rows.length, "item")}>
+              <ul className="blist plate-list" data-testid={`plate-${g.key}`}>
+                {g.rows.map((i) => item(i, g.key))}
+              </ul>
+            </Section>
+          </div>
+        ),
+      )}
+      <output ref={box} tabIndex={-1} className="plate-toast-slot" data-testid="plate-toast">
+        {toast && (
+          <span className="plate-toast">
+            <span data-testid="plate-status">{toast.text}</span>
+            {toast.undo && (
+              <button
+                ref={undo}
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  act({ kind: "put_back", id: toast.undo ?? "" });
+                  setToast({ text: "Put back.", undo: null });
+                }}
+              >
+                Undo
+              </button>
+            )}
+          </span>
+        )}
+      </output>
     </Page>
   );
 }

@@ -65,8 +65,10 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       await expect(page.getByTestId("plate-status")).toHaveText(
         "Marked done: Review the Q4 budget draft.",
       );
-      await expect(page.getByTestId("plate-status")).toBeFocused();
+      await expect(page.getByRole("button", { name: "Undo" })).toBeFocused();
       await expect(page.getByTestId("plate-done")).toContainText("Review the Q4 budget draft");
+      await page.getByRole("button", { name: "Undo" }).click();
+      await expect(page.getByTestId("plate-overdue")).toContainText("Review the Q4 budget draft");
       await page
         .getByRole("button", { name: "Snooze until tomorrow: Call Acme about the delivery date" })
         .click();
@@ -79,6 +81,16 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       expect(
         await page.evaluate(() => (window as unknown as { __shifts: number[] }).__shifts),
       ).toEqual([]);
+    });
+
+    test("PPL-40a S-27: the strip jumps to a group and the Evidence trigger shows quotes with line numbers", async ({
+      page,
+    }) => {
+      await page.goto("/plate");
+      await page.getByTestId("pill-rest").click();
+      await expect(page.locator("#plate-group-rest")).toBeFocused();
+      await page.getByText("Evidence (1 quote)").last().click();
+      await expect(page.getByText("line 31")).toBeVisible();
     });
 
     for (const path of ["/meetings", "/plate"]) {

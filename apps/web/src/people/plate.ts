@@ -6,7 +6,7 @@ import { PREVIEW_NOW, PREVIEW_TODAY, SIGNED_IN } from "./data";
 
 export type Bucket = "overdue" | "soon" | "rest";
 export type Lane = "open" | "snoozed" | "asked" | "done";
-export type PlateAction = { kind: "done" | "snooze" | "not_mine"; id: string };
+export type PlateAction = { kind: "done" | "snooze" | "not_mine" | "put_back"; id: string };
 
 const DAY = 86_400_000;
 const addDays = (date: string, n: number): string =>
@@ -37,18 +37,28 @@ export const canReject = (item: WorkItem): boolean =>
 
 export const SNOOZE_UNTIL = new Date(Date.parse(PREVIEW_NOW) + DAY).toISOString();
 
-const CHANGE = { done: "done", snooze: "snoozed", not_mine: "reassign_requested" } as const;
+const CHANGE = {
+  done: "done",
+  snooze: "snoozed",
+  not_mine: "reassign_requested",
+  put_back: "reopened",
+} as const;
 
-/** Apply one action to one item and record it in the item's history, as the contract defines it. */
+/** Apply one action to one item and record it in the item's history, as the contract defines it.
+ * Only the signed-in person's own item changes, and "not mine" only on an item someone else
+ * assigned (PE-03): the screen hides the button, and this refuses it too. "Put back" undoes done,
+ * snooze or a reassign request. */
 export function reducePlate(items: readonly WorkItem[], a: PlateAction): readonly WorkItem[] {
   return items.map((i) => {
     if (i.id !== a.id || i.owner !== SIGNED_IN) return i;
-    const status = a.kind === "done" ? "done" : i.status;
+    if (a.kind === "not_mine" && !canReject(i)) return i;
+    const status = a.kind === "done" ? "done" : a.kind === "put_back" ? "open" : i.status;
     const entry = { at: PREVIEW_NOW, by: SIGNED_IN, change: CHANGE[a.kind], status } as const;
     return {
       ...i,
       status,
-      snoozed_until: a.kind === "snooze" ? SNOOZE_UNTIL : i.snoozed_until,
+      snoozed_until:
+        a.kind === "snooze" ? SNOOZE_UNTIL : a.kind === "put_back" ? null : i.snoozed_until,
       history: [...i.history, entry],
       updated_at: PREVIEW_NOW,
     };

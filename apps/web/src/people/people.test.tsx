@@ -26,7 +26,7 @@ const click = (el: Element | null | undefined) =>
 const named = (box: Element, name: string) =>
   [...box.querySelectorAll("button")].find((b) => b.getAttribute("aria-label")?.startsWith(name));
 const titles = (box: Element, id: string) =>
-  [...box.querySelectorAll(`[data-testid="${id}"] .bitem-main b`)].map((b) => b.textContent);
+  [...box.querySelectorAll(`[data-testid="${id}"] .prow-title b`)].map((b) => b.textContent);
 
 describe("PPL-40a plate order (FR-PA-02)", () => {
   it("PPL_40a buckets a due date against the preview day: overdue, 48 hours, the rest", () => {
@@ -61,6 +61,21 @@ describe("PPL-40a plate order (FR-PA-02)", () => {
       expect(applied(kind).history).toHaveLength(before + 1);
     expect(reducePlate(WORK_ITEMS, { kind: "done", id: "wi_nobody" })).toEqual(WORK_ITEMS);
   });
+
+  it("PPL_40a not-mine is refused on an item the person made, and put-back undoes each action", () => {
+    expect(reducePlate(WORK_ITEMS, { kind: "not_mine", id: "wi_budget_review" })).toEqual(
+      WORK_ITEMS,
+    );
+    const id = "wi_venue_shortlist";
+    for (const kind of ["done", "snooze", "not_mine"] as const) {
+      const back = reducePlate(reducePlate(WORK_ITEMS, { kind, id }), {
+        kind: "put_back",
+        id,
+      }).find((i) => i.id === id);
+      expect(back && laneOf(back)).toBe("open");
+      expect(back?.snoozed_until).toBeNull();
+    }
+  });
 });
 
 describe("PPL-40a S-27 My plate", () => {
@@ -89,6 +104,30 @@ describe("PPL-40a S-27 My plate", () => {
     );
   });
 
+  it("PPL_40a the strip has a pill per group with the real count, and Undo in the toast puts the item back", async () => {
+    const box = await render(<S_27 />);
+    const pills = [...box.querySelectorAll('[data-testid="plate-strip"] button')].map((b) =>
+      b.textContent?.replace(/\s+/g, " "),
+    );
+    expect(pills).toEqual(["Overdue 1", "Soon 2", "Later 2", "Snoozed 1", "Done 1"]);
+    await click(named(box, "Done: Review the Q4 budget draft"));
+    expect(box.querySelector('[data-testid="pill-overdue"]')).toBeNull();
+    await click(
+      [...box.querySelectorAll(".plate-toast button")].find((b) => b.textContent === "Undo"),
+    );
+    expect(titles(box, "plate-overdue")).toEqual(["Review the Q4 budget draft"]);
+    expect(box.querySelector('[data-testid="plate-status"]')?.textContent).toBe("Put back.");
+  });
+
+  it("PPL_40a an item's state is a chip in words: its due date, Snoozed until, Waiting for", async () => {
+    const box = await render(<S_27 />);
+    expect(box.textContent).toContain("Overdue, 6 Oct");
+    expect(box.textContent).toContain("Due soon, 9 Oct");
+    expect(box.textContent).toContain("Snoozed until 8 Oct");
+    await click(named(box, "Not mine: Share the venue shortlist"));
+    expect(box.textContent).toContain("Waiting for Priya Nair to reassign");
+  });
+
   it("PPL_40a Not mine is offered only on an item someone else assigned", async () => {
     const box = await render(<S_27 />);
     expect(named(box, "Not mine: Share the venue shortlist")).toBeDefined();
@@ -106,9 +145,21 @@ describe("PPL-40a S-26 Meetings", () => {
       "Launch on 17 October.",
     );
     expect(box.textContent).toContain("Let's go with the 17th of October for launch.");
+    expect(box.textContent).toContain("Asha Rao, line 12"); // a line number, never an utterance id
+    expect(box.textContent).not.toMatch(/u00[0-9]{2}|@example[.]com/);
     expect(box.textContent).toContain("Unverified"); // never dropped, never shown as backed
     expect(box.textContent).toContain("No evidence cited.");
     expect(box.textContent).not.toMatch(/talk time|sentiment|ranking|https?:\/\//i);
+  });
+
+  it("PPL_40a the strip counts meetings by group and filters the list", async () => {
+    const box = await render(<S_26 params={[""]} />);
+    const strip = box.querySelector('[data-testid="meeting-strip"]');
+    const labels = [...(strip?.querySelectorAll("label") ?? [])].map((l) => l.textContent);
+    expect(labels).toEqual(["All 4", "Needs confirming 1", "Confirmed 1", "Other 2"]);
+    const radio = strip?.querySelectorAll("input")[1] as HTMLInputElement;
+    await click(radio);
+    expect(box.querySelectorAll('[data-testid="meeting-list"] li')).toHaveLength(1);
   });
 
   it("PPL_40a Confirm minutes swaps the button for the confirmed chip", async () => {

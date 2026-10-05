@@ -1,8 +1,12 @@
-/* S-26 Meetings and S-27 My plate (PPL-40a): neutral role tokens, the type ramp steps only. */
+/* S-26 Meetings and S-27 My plate (PPL-40a): neutral role tokens, the type ramp steps only, no
+   transition or animation (a state change is instant). */
 .people-preview {
   margin: 0 0 var(--space-16);
   color: var(--color-ink-2);
   font-size: var(--text-14);
+}
+.people-gap {
+  margin: 0 0 var(--space-16);
 }
 .people-h3 {
   margin: var(--space-16) 0 var(--space-4);
@@ -15,6 +19,80 @@
   border-radius: var(--radius-controls);
   font-size: var(--text-14);
 }
+
+/* The strip: the pills of "Tilo Worlds" (a quiet track, raised tiles with a real count). */
+.people-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 var(--space-16);
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-2);
+}
+.people-pill {
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 0 var(--space-12);
+  border: 0;
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) / 1 var(--font-ui);
+  cursor: pointer;
+  box-shadow: 0 2px 0 0 color-mix(in srgb, var(--color-surface-2) 70%, var(--color-ink-1));
+}
+.people-pill b {
+  color: var(--color-ink-2);
+  font-size: var(--text-12);
+  font-variant-numeric: tabular-nums;
+}
+.people-pill:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 0;
+}
+.plate-group:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-cards);
+}
+
+/* People as Tilo Team shows them: an initials disc and a name. */
+.person-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--color-ink-1);
+  font-size: var(--text-14);
+}
+.avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--color-fog);
+  border-radius: 50%;
+  background: var(--color-surface-2);
+  color: var(--color-ink-1);
+  font: 800 var(--text-12) / 1 var(--font-ui);
+}
+.people-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8) var(--space-16);
+  margin: 0 0 var(--space-12);
+  padding: 0;
+  list-style: none;
+}
+
+/* Meetings list. */
 .meeting-pick {
   display: flex;
   flex: 1;
@@ -40,6 +118,8 @@
 .meeting-pick .bitem-sub {
   color: var(--color-ink-2);
 }
+
+/* Minutes: the text and its chips on one row, the evidence trigger on the line under it. */
 .minutes-bar {
   display: flex;
   flex-wrap: wrap;
@@ -51,26 +131,99 @@
   margin: 0;
   font-size: var(--text-14);
 }
-.people-list .bitem,
-.plate-list .bitem {
-  flex-wrap: wrap;
+.mrow,
+.prow {
+  padding: var(--space-12) 0;
+  border-bottom: 1px solid var(--color-surface-2);
+  list-style: none;
 }
-.evidence {
-  flex-basis: 100%;
+.mrow:last-child,
+.prow:last-child {
+  border-bottom: 0;
+}
+.mrow-title,
+.prow-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-12);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.mrow-text,
+.prow-title b {
+  flex: 1 1 14em;
+  min-width: 0;
+  font: 700 var(--text-16) / 1.4 var(--font-ui);
+}
+.mrow-text[data-plain="true"] {
+  font-weight: 400;
+}
+.prow-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+.mrow-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-16);
+  min-height: 32px;
+  margin-top: var(--space-4);
+  color: var(--color-ink-2);
   font-size: var(--text-14);
 }
+.prow .bitem-sub {
+  margin: var(--space-4) 0 0;
+}
+
+/* Evidence: a compact trigger (a 32 px look inside a 44 px hit area) with a chevron that turns. */
+.evidence {
+  font-size: var(--text-14);
+}
+.evidence[open] {
+  flex-basis: 100%;
+}
 .evidence summary {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  gap: var(--space-8);
+  box-sizing: border-box;
   min-height: 44px;
+  margin: calc(-1 * var(--space-4)) 0;
+  padding: 0 var(--space-4);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) / 1 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  list-style: none;
   cursor: pointer;
 }
+.evidence summary::-webkit-details-marker {
+  display: none;
+}
+.evidence summary:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+  border-radius: var(--space-8);
+}
+.chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+.evidence[open] .chevron {
+  transform: rotate(45deg);
+}
 .evidence ul {
-  margin: 0;
+  margin: 0 0 var(--space-8);
   padding: 0 0 0 var(--space-16);
 }
 .evidence li {
   margin: 0 0 var(--space-8);
+  color: var(--color-ink-1);
 }
 .evidence q {
   display: block;
@@ -80,23 +233,90 @@
   color: var(--color-ink-2);
   font-size: var(--text-12);
 }
+
+/* The plate: a row is a grid, the actions at the right on a wide screen and one row under it on a phone. */
+.prow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-16);
+}
+.prow > * {
+  grid-column: 1;
+}
+.prow > .plate-actions {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+}
 .plate-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-8);
 }
-.plate-status {
+.plate-toast-slot {
   display: block;
-  min-height: calc(1.5 * var(--text-14));
-  margin: 0 0 var(--space-12);
-  font-size: var(--text-14);
+  position: sticky;
+  bottom: var(--space-16);
+  z-index: 5;
+  pointer-events: none;
 }
-.plate-status:focus-visible {
+.plate-toast-slot:focus-visible {
   outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
+.plate-toast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-controls);
+  background: var(--color-ink-1);
+  color: var(--color-surface-1);
+  font: 700 var(--text-14) / 1.4 var(--font-ui);
+  pointer-events: auto;
+}
+
 @media (max-width: 767px) {
-  .plate-actions {
-    flex-basis: 100%;
+  .people-strip {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .people-pill {
+    min-height: 44px;
+    padding: 0 var(--space-8);
+    white-space: nowrap;
+  }
+  .prow {
+    display: block;
+  }
+  .prow > .plate-actions {
+    margin-top: var(--space-8);
+  }
+  .plate-actions .secondary {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 var(--space-8);
+  }
+}
+@media (max-width: 479px) {
+  /* A chip never squeezes a title into a mid-word break: it goes under it. */
+  .mrow-title,
+  .prow-title {
+    flex-direction: column;
+  }
+  .mrow-text,
+  .prow-title b {
+    flex: 0 0 auto; /* in a column the basis would be a height */
+  }
+  .meeting-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+  .meeting-row .btag {
+    margin-left: calc(var(--space-12) + 4px);
   }
 }
