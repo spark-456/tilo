@@ -37,7 +37,7 @@ def _until(condition, *, within_s: float, what: str) -> float:
 def test_NFR_04_approval_to_a_visible_world_is_within_6_s_at_p95():
     samples = []
     for _ in range(RUNS):
-        rf = build_run_flow(REPO_ROOT)
+        rf = build_run_flow(REPO_ROOT, covered=True)
         try:
             rf.start()
             started = time.perf_counter()
@@ -60,7 +60,7 @@ def test_NFR_04_approval_to_a_visible_world_is_within_6_s_at_p95():
 def test_NFR_06_a_card_answered_resumes_the_agent_within_2_s_at_p95():
     samples = []
     for _ in range(RUNS):
-        rf = build_run_flow(REPO_ROOT)
+        rf = build_run_flow(REPO_ROOT, covered=True)
         try:
             _, card = rf.run_to_gate()
             answered = time.perf_counter()

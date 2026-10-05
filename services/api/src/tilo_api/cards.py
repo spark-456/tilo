@@ -127,8 +127,9 @@ class EventWriter(Protocol):
     unstamped part: {"type": str, "data": dict, "authz": dict | None, "severity"?: str} plus the
     scope the writer needs to stamp it: "world_id", "card_id" (question.answered data has no card
     field), "district", "vis" (["<district>"], or None for an owner-only card whose district is
-    unknown), "owner_only" and "event_id" (the event's own `id`, one per card resolution: the writer
-    must commit under it and resend it unchanged). The writer must not default a part without a vis
+    unknown), "owner_only", "event_id" (the event's own `id`, one per card resolution: the writer
+    must commit under it and resend it unchanged) and, for a person's answer to a question, "option" (the chosen
+    option id, for the agent waiting on it; not event data). The writer must not default a part without a vis
     to "all". If that id is already committed under other content, it raises AlreadyCommitted."""
 
 
@@ -396,7 +397,8 @@ class CardStore:
                 part = self._part(record, "connection.consented", data, authz=authz) if option == "connect" else None
             else:
                 by = "team_lead" if principal.role == "team_lead" else "person"
-                part = self._part(record, "question.answered", {"answered_by": by})
+                part = self._part(record, "question.answered", {"answered_by": by}) | {"option": option}
+                # `option` is scope for the waiting agent (BQ-207), not event data: the event stays {answered_by}
             if part is None:
                 return AnswerResult("answered", None, ())
             record.group.resolving = True  # exactly one resolution per card: later answers and tick see this

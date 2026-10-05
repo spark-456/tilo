@@ -17,7 +17,7 @@ import functools
 import logging
 import math
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Protocol, cast
@@ -244,11 +244,18 @@ class _RoleModel:
         return self._router.generate(self._role, request).response
 
 
-def get_unit_runner() -> Any:
+def _worker_models() -> Mapping[str, Any]:
     router = get_router()
-    return DefaultUnitRunner(
-        cast(Any, {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier")})
-    )
+    return {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier")}
+
+
+def get_unit_runner() -> Any:
+    return DefaultUnitRunner(cast(Any, _worker_models()))
+
+
+def get_must_ask_providers() -> Mapping[str, Any]:
+    """The models `MustAsk` judges a unit with (FR-AGT-05), keyed by the unit's role; always the Router's roles."""
+    return _worker_models()
 
 
 def _no_recipients(*, unit: dict, action_type: str, item: dict, brief: dict) -> dict:

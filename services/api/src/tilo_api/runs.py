@@ -10,8 +10,9 @@ import copy
 import logging
 import math
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 import tilo_planning.plangraph as plangraph
@@ -20,6 +21,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from tilo_connectors import Outbox, OutboxRefused
 from tilo_harness.config import load_agents_config
 from tilo_harness.executor import UnitOutcome, run_plan
+from tilo_harness.must_ask import MustAsk
+from tilo_harness.question_wait import AlreadyAnswered, QuestionWait
 from tilo_harness.validator import repo_validator
 from tilo_planning.compiler import PlanInputs
 from tilo_policy.schemas import conforms
@@ -72,13 +75,14 @@ class Seams:
     adapters: dict[str, Any]
     outbox_store: Any
     writer: deps.EventWriter
+    must_ask_providers: Mapping[str, Any]
 
 
 def run_seams(request: Request) -> Seams | None:
     """The seams as the app wires them, overrides included; if any cannot be built, no run starts."""
     overrides = request.app.dependency_overrides
     names = "plan_compiler layout_builder unit_runner action_resolver skill_registry connector_registry"
-    names += " connector_adapters outbox_store event_writer"
+    names += " connector_adapters outbox_store event_writer must_ask_providers"
     try:
         return Seams(*(overrides.get(seam, seam)() for seam in (getattr(deps, f"get_{n}") for n in names.split())))
     except Exception as exc:
@@ -107,6 +111,7 @@ class Run:
         self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
         self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
+        self.question_wait = QuestionWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)
         self.plan: dict[str, Any] = {}
         self.layout: dict[str, Any] = {}
         self.levels: dict[str, str] = {}
@@ -119,6 +124,9 @@ class Run:
         self._built: dict[str, dict] = {}  # event id -> the event as first built, resent as is on an exact retry
         self.failure: str | None = None
         self._failed = False
+
+    def now(self) -> datetime:
+        return datetime.now(UTC)
 
     def paused(self) -> bool:
         world = self.store.worlds.get(self.world_id)
@@ -169,11 +177,20 @@ class Run:
         return max(0, min(credits, self.cap - spent))
 
     def emit(self, *, type: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
-        passed = {k: kw[k] for k in ("district", "cause", "vis") if k in kw}
-        return self.put(type, actor, target, summary, data, **passed)
+        passed = {k: kw[k] for k in ("district", "cause", "vis", "severity", "event_id") if k in kw}
+        event = self.put(type, actor, target, summary, data, **passed)
+        if type == "question.answered" and data.get("answered_by") == "default":
+            self.cards.tick()  # the harness applied a deadline default: close that card here too (BQ-208)
+        return event
 
     def write(self, part: dict) -> None:
-        """The CardStore's part for a person's answer; an approve opens the waiting gate."""
+        """The CardStore's part for a person's answer; an approve opens the waiting gate, an answer resumes its unit."""
+        if part["type"] == "question.answered":
+            try:
+                self.question_wait.write(part)  # commits it through `emit` under the part's id, then resumes the unit
+            except AlreadyAnswered:
+                raise AlreadyCommitted from None  # the deadline default (or an earlier answer) won: the card closes
+            return
         data, card_id, authz = part["data"], part["card_id"], part["authz"]
         requested = self.requested.get(card_id)
         try:
@@ -275,9 +292,30 @@ class Run:
         summary = f"Work started with a budget of {self.cap:g} credits."
         self.put("world.started", self.director, self.world_id, summary, {"budget_cap": self.cap}, cause=granted)
         runner = _GatedRunner(self, self.seams.runner)
-        result = await run_plan(
-            self.plan, self.layout, writer=self, config=config, skills=self.seams.skills, runner=runner
+        must_ask = MustAsk(
+            self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
+            covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
+        )  # fmt: skip
+        planned = asyncio.ensure_future(
+            run_plan(
+                self.plan,
+                self.layout,
+                writer=self,
+                config=config,
+                skills=self.seams.skills,
+                runner=runner,
+                must_ask=must_ask,
+                question_wait=self.question_wait,
+            )  # fmt: skip
         )
+        while not planned.done():  # a unit waiting for a person must not outlive a pause
+            await asyncio.wait({planned}, timeout=_POLL_S)
+            if self.paused():
+                planned.cancel()
+                raise RunStopped
+        result = planned.result()
+        if result.parked:  # waiting for a person: neither done nor failed
+            return
         if stopped := result.failed + result.skipped:
             self._fail(self.failure or "a unit failed, so the work stopped", stopped[0])
             return
@@ -285,6 +323,15 @@ class Run:
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
         cause = self.delivered[-1] if self.delivered else None
         self.put("world.completed", self.director, self.world_id, "The work is done.", data, cause=cause)
+
+    def _store_card(self, card: dict) -> None:
+        """The question card goes to this run's CardStore with its unit's district, before anything names it."""
+        building = card["header"]["building"]
+        districts = (d["id"] for level in self.layout["semantic"]["levels"] for d in level["districts"]
+                     if any(b["id"] == building for b in d["buildings"]))  # fmt: skip
+        district = next(districts, None)
+        if district is None or self.cards.submit(card, district=district).outcome == "rejected":
+            raise RuntimeError("the question card was refused")
 
     async def gate(self, unit: dict, worker: str, action: str, ref: dict, made: str) -> None:
         """PRD 10.3/10.4: the policy engine assesses the send, a person approves it, the outbox sends it once."""

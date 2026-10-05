@@ -12,8 +12,8 @@ layers, in this order, and only the first is authority:
    a provider that fails, asks (`ambiguous_brief`): when the harness cannot tell, a person decides.
 
 `raise_question` writes the Specialist -> Lead -> Director chain and the Lead's question to a person
-through the one `WorldWriter`, and hands a `needs_you` card to `card_sink`. A question's answer never
-authorises a side effect: that stays with the outbox and the policy engine.
+through the one `WorldWriter`, and hands a `needs_you` card to `card_sink` before any of the chain is written.
+A question's answer never authorises a side effect: that stays with the outbox and the policy engine.
 """
 
 from __future__ import annotations
@@ -171,6 +171,7 @@ class MustAsk:
     ) -> dict[str, Any]:
         level, building = _site(writer.layout, unit["id"], district)
         card = self._card(ask, writer, specialist, building)
+        self._card_sink(card)  # first: a sink that fails emits no question, so no event names a card nobody holds
         at = {"level": level, "district": district}
         helped = writer.emit(
             type="agent.help_requested",
@@ -199,7 +200,6 @@ class MustAsk:
             cause=escalated["id"],
             **at,
         )
-        self._card_sink(card)
         return card
 
     def _card(self, ask: Ask, writer: Any, agent: str, building: str) -> dict[str, Any]:
