@@ -134,6 +134,22 @@ describe("PPL-40b S-28 Pinboards", () => {
     expect(box.textContent).not.toMatch(/@example\.com|Asia\/Kolkata|email|WhatsApp/);
   });
 
+  it("FR-PB-03 the draft opens in the row right under the entry it is about, and Escape closes it and returns focus", async () => {
+    const box = await render(<S_28 />);
+    const opener = button(box, "Get in touch with Priya Nair about Launch is 17 October");
+    await click(opener);
+    const draft = box.querySelector('[data-testid="pin-draft"]');
+    const row = draft?.closest("tr")?.previousElementSibling;
+    expect(row?.getAttribute("data-testid")).toBe("pin-row");
+    expect(row?.textContent).toContain("Launch is 17 October");
+    expect(row?.contains(opener ?? null)).toBe(true);
+    await act(async () => {
+      draft?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(box.querySelector('[data-testid="pin-draft"]')).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
+
   it("FR-PB-05 edit is offered only on entries you set up, and does nothing yet", async () => {
     const box = await render(<S_28 />);
     const edits = [...box.querySelectorAll("button")].filter((b) =>

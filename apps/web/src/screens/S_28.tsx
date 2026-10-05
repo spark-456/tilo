@@ -5,7 +5,7 @@
 // person only the display name shows (PE-20). "Get in touch" only drafts: sending is T3. No design
 // export covers it, so it follows the pills of "Tilo Worlds" and the people rows of "Tilo Team".
 import type { PinboardItem } from "@tilo/contracts";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { MENTIONS, PINS, displayName } from "../people/data";
 import { PersonTag, PreviewNote, SoonButton, pillLabel, shortDate } from "../people/parts";
 import {
@@ -34,17 +34,18 @@ const KINDS: ReadonlyArray<readonly [Kind | "all", string]> = [
 const team = teamBoard(PINS);
 const personal = personalBoard(PINS);
 
-function Entry({ pin, children }: { pin: PinboardItem; children?: ReactNode }) {
+function Entry({ pin, action, setUp }: { pin: PinboardItem; action?: ReactNode; setUp?: boolean }) {
   const tagged = taggedOn(pin, MENTIONS);
   return (
     <th scope="row" data-label="Entry">
-      <span className="prow-title">
+      <span className="pb-head">
         <b>{pin.title}</b>
-        <span className="prow-chips">
-          <Chip tone="fyi">{KIND_WORD[pin.kind]}</Chip>
-          {pin.status === "proposed" && <Chip tone="soon">Proposed, only you see it</Chip>}
-          {pin.flagged && <Chip tone="needs">Flagged: any follow-up needs you</Chip>}
-        </span>
+      </span>
+      <span className="pb-kinds">
+        <Chip tone="fyi">{KIND_WORD[pin.kind]}</Chip>
+        {pin.status === "proposed" && <Chip tone="soon">Proposed, only you see it</Chip>}
+        {pin.flagged && <Chip tone="needs">Flagged: any follow-up needs you</Chip>}
+        {action}
       </span>
       <span className="bitem-sub">{sourceLabel(pin)}.</span>
       {pin.url && <span className="bitem-sub pb-url">{pin.url.replace("https://", "")}</span>}
@@ -56,7 +57,11 @@ function Entry({ pin, children }: { pin: PinboardItem; children?: ReactNode }) {
           ))}
         </span>
       )}
-      {children}
+      {setUp && (
+        <span className="bitem-sub pb-setup">
+          Set up by <PersonTag user={pin.set_up_by} />
+        </span>
+      )}
     </th>
   );
 }
@@ -67,9 +72,15 @@ export function S_28() {
   const [sort, setSort] = useState<Sort>({ key: "updated", dir: -1 });
   const [draft, setDraft] = useState<PinboardItem | null>(null);
   const panel = useRef<HTMLElement>(null);
+  const opener = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     if (draft) panel.current?.focus();
   }, [draft]);
+  // Closing hands focus back to the button that opened the draft (if its row is still listed).
+  const closeDraft = () => {
+    setDraft(null);
+    if (opener.current?.isConnected) opener.current.focus();
+  };
 
   const shown = (pins: PinboardItem[]) =>
     sortPins(
@@ -83,9 +94,10 @@ export function S_28() {
   const unowned = rows.filter((p) => p.owner === null);
   const mine = shown(personal);
 
-  const head = (k: SortKey, label: string) => (
+  const head = (k: SortKey, label: string, cls?: string) => (
     <th
       scope="col"
+      className={cls}
       aria-sort={sort.key === k ? (sort.dir === 1 ? "ascending" : "descending") : undefined}
     >
       <button
@@ -93,36 +105,86 @@ export function S_28() {
         className="pb-sort"
         onClick={() => setSort({ key: k, dir: sort.key === k && sort.dir === 1 ? -1 : 1 })}
       >
-        {label}
+        <span className="pb-label">{label}</span>
         <span className="pb-arrow" data-dir={sort.key === k ? sort.dir : 0} aria-hidden="true" />
       </button>
     </th>
   );
 
   const teamRow = (p: PinboardItem) => (
-    <tr key={p.id} data-testid="pin-row">
-      <Entry pin={p} />
-      <td data-label="Responsible">
-        {p.owner ? <PersonTag user={p.owner} /> : <Chip tone="soon">Unowned</Chip>}
-      </td>
-      <td data-label="Set up by">
-        <PersonTag user={p.set_up_by} />
-        {canEdit(p) ? (
-          <SoonButton text="Edit" name={`Edit: ${p.title}`} />
-        ) : (
-          <button
-            type="button"
-            className="secondary"
-            aria-label={`Get in touch with ${displayName(p.set_up_by)} about ${p.title}`}
-            onClick={() => setDraft(p)}
-          >
-            Get in touch
-          </button>
-        )}
-      </td>
-      <td data-label="Due">{p.due ? shortDate(p.due) : "No date"}</td>
-      <td data-label="Updated">{shortDate(p.updated_at)}</td>
-    </tr>
+    <Fragment key={p.id}>
+      <tr data-testid="pin-row">
+        <Entry
+          pin={p}
+          setUp
+          action={
+            canEdit(p) ? (
+              <SoonButton text="Edit" name={`Edit: ${p.title}`} />
+            ) : (
+              <button
+                type="button"
+                className="secondary pb-act"
+                aria-label={`Get in touch with ${displayName(p.set_up_by)} about ${p.title}`}
+                onClick={(e) => {
+                  opener.current = e.currentTarget;
+                  setDraft(p);
+                }}
+              >
+                Get in touch
+              </button>
+            )
+          }
+        />
+        <td data-label="Responsible" className="pb-resp">
+          {p.owner ? (
+            <PersonTag user={p.owner} />
+          ) : (
+            <>
+              <span aria-hidden="true">&ndash;</span>
+              <span className="visually-hidden">Nobody yet</span>
+            </>
+          )}
+        </td>
+        <td data-label="Due" className="pb-date">
+          {p.due ? shortDate(p.due) : "No date"}
+        </td>
+        <td data-label="Updated" className="pb-date">
+          {shortDate(p.updated_at)}
+        </td>
+      </tr>
+      {draft?.id === p.id && (
+        <tr className="pb-draft-row">
+          <td colSpan={4}>
+            <section
+              ref={panel}
+              tabIndex={-1}
+              className="pb-draft"
+              aria-label="Draft message"
+              data-testid="pin-draft"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") closeDraft();
+              }}
+            >
+              <h3 className="people-h3">Draft to {displayName(draft.set_up_by)}</h3>
+              <label className="field">
+                <span>Message</span>
+                <textarea key={draft.id} rows={3} defaultValue={draftFor(draft)} />
+              </label>
+              <p className="section-note">
+                Nothing is sent from this preview. A message to another person goes only after you
+                approve it.
+              </p>
+              <div className="pb-actions">
+                <SoonButton text="Send for approval" name="Send for approval" />
+                <button type="button" className="secondary" onClick={closeDraft}>
+                  Close draft
+                </button>
+              </div>
+            </section>
+          </td>
+        </tr>
+      )}
+    </Fragment>
   );
 
   return (
@@ -167,112 +229,94 @@ export function S_28() {
           </label>
         ))}
       </fieldset>
-      <div className="pb-boards">
-        <div className="pb-board" data-shown={board === "team"} data-testid="team-board">
-          <Section title="Team board" note={plural(rows.length, "entry", "entries")}>
-            {rows.length === 0 ? (
-              <EmptyState
-                testid="team-empty"
-                compact
-                title="Nothing pinned for the team"
-                line={
-                  kind === "all"
-                    ? "Entries your team pins show up here."
-                    : "No entries of this kind. Choose All to see the rest."
-                }
-              />
-            ) : (
-              <table className="pb-table" data-testid="team-pins">
-                <caption className="visually-hidden">Team pinboard</caption>
-                <thead>
-                  <tr>
-                    {head("entry", "Entry")}
-                    <th scope="col" className="pb-plain">
-                      Responsible
-                    </th>
-                    <th scope="col" className="pb-plain">
-                      Set up by
-                    </th>
-                    {head("due", "Due")}
-                    {head("updated", "Updated")}
-                  </tr>
-                </thead>
-                <tbody>{owned.map(teamRow)}</tbody>
-                {unowned.length > 0 && (
-                  <tbody data-testid="pins-unowned">
-                    <tr className="pb-lane">
-                      <th scope="rowgroup" colSpan={5}>
-                        Unowned <span>Nobody is responsible yet.</span>
+      <div className="pb-room">
+        <div className="pb-boards">
+          <div className="pb-board" data-shown={board === "team"} data-testid="team-board">
+            <Section title="Team board" note={plural(rows.length, "entry", "entries")}>
+              {rows.length === 0 ? (
+                <EmptyState
+                  testid="team-empty"
+                  compact
+                  title="Nothing pinned for the team"
+                  line={
+                    kind === "all"
+                      ? "Entries your team pins show up here."
+                      : "No entries of this kind. Choose All to see the rest."
+                  }
+                />
+              ) : (
+                <table className="pb-table" data-testid="team-pins">
+                  <caption className="visually-hidden">Team pinboard</caption>
+                  <thead>
+                    <tr>
+                      {head("entry", "Entry")}
+                      <th scope="col" className="pb-resp pb-plain">
+                        <span className="pb-label">Responsible</span>
                       </th>
+                      {head("due", "Due", "pb-date")}
+                      {head("updated", "Updated", "pb-date")}
                     </tr>
-                    {unowned.map(teamRow)}
+                  </thead>
+                  <tbody>{owned.map(teamRow)}</tbody>
+                  {unowned.length > 0 && (
+                    <tbody data-testid="pins-unowned">
+                      <tr className="pb-lane">
+                        <th scope="rowgroup" colSpan={4}>
+                          <span className="pb-lane-title">Unowned</span>
+                          <span className="pb-lane-note">Nobody is responsible yet.</span>
+                        </th>
+                      </tr>
+                      {unowned.map(teamRow)}
+                    </tbody>
+                  )}
+                </table>
+              )}
+            </Section>
+          </div>
+          <div className="pb-board" data-shown={board === "personal"} data-testid="personal-board">
+            <Section
+              title="Your board"
+              note={`Only you see this. ${plural(mine.length, "entry", "entries")}`}
+            >
+              {mine.length === 0 ? (
+                <EmptyState
+                  testid="personal-empty"
+                  compact
+                  title="Nothing on your board"
+                  line="Notes you keep for yourself, and what Tilo adds for you, show up here."
+                />
+              ) : (
+                <table className="pb-table" data-testid="personal-pins">
+                  <caption className="visually-hidden">Your pinboard</caption>
+                  <thead>
+                    <tr>
+                      {head("entry", "Entry")}
+                      {head("due", "Due", "pb-date")}
+                      {head("updated", "Updated", "pb-date")}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mine.map((p) => (
+                      <tr key={p.id} data-testid="pin-row">
+                        <Entry
+                          pin={p}
+                          action={
+                            canEdit(p) && <SoonButton text="Edit" name={`Edit: ${p.title}`} />
+                          }
+                        />
+                        <td data-label="Due" className="pb-date">
+                          {p.due ? shortDate(p.due) : "No date"}
+                        </td>
+                        <td data-label="Updated" className="pb-date">
+                          {shortDate(p.updated_at)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
-                )}
-              </table>
-            )}
-            {draft && (
-              <section
-                ref={panel}
-                tabIndex={-1}
-                className="pb-draft"
-                aria-label="Draft message"
-                data-testid="pin-draft"
-              >
-                <h3 className="people-h3">Draft to {displayName(draft.set_up_by)}</h3>
-                <label className="field">
-                  <span>Message</span>
-                  <textarea key={draft.id} rows={3} defaultValue={draftFor(draft)} />
-                </label>
-                <p className="section-note">
-                  Nothing is sent from this preview. A message to another person goes only after you
-                  approve it.
-                </p>
-                <div className="pb-actions">
-                  <SoonButton text="Send for approval" name="Send for approval" />
-                  <button type="button" className="secondary" onClick={() => setDraft(null)}>
-                    Close draft
-                  </button>
-                </div>
-              </section>
-            )}
-          </Section>
-        </div>
-        <div className="pb-board" data-shown={board === "personal"} data-testid="personal-board">
-          <Section
-            title="Your board"
-            note={`Only you see this. ${plural(mine.length, "entry", "entries")}`}
-          >
-            {mine.length === 0 ? (
-              <EmptyState
-                testid="personal-empty"
-                compact
-                title="Nothing on your board"
-                line="Notes you keep for yourself, and what Tilo adds for you, show up here."
-              />
-            ) : (
-              <table className="pb-table" data-testid="personal-pins">
-                <caption className="visually-hidden">Your pinboard</caption>
-                <thead>
-                  <tr>
-                    {head("entry", "Entry")}
-                    {head("due", "Due")}
-                    {head("updated", "Updated")}
-                  </tr>
-                </thead>
-                <tbody>
-                  {mine.map((p) => (
-                    <tr key={p.id} data-testid="pin-row">
-                      <Entry pin={p}>
-                        {canEdit(p) && <SoonButton text="Edit" name={`Edit: ${p.title}`} />}
-                      </Entry>
-                      <td data-label="Due">{p.due ? shortDate(p.due) : "No date"}</td>
-                      <td data-label="Updated">{shortDate(p.updated_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Section>
+                </table>
+              )}
+            </Section>
+          </div>
         </div>
       </div>
     </Page>

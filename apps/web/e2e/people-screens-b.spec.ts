@@ -107,6 +107,75 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       expect(await shifts(page)).toEqual([]);
     });
 
+    test("PPL-40b S-28: the team table is aligned, the draft opens under its row, and Unowned is one heading", async ({
+      page,
+    }) => {
+      test.skip(name !== "desktop", "the table layout is the wide-room one");
+      await page.goto("/pinboards");
+      const table = page.getByTestId("team-pins");
+      // One header row on one baseline: the text of every header starts at the same height.
+      const tops = await table.locator("thead th .pb-label").evaluateAll((els) =>
+        els.map((el) => {
+          const r = document.createRange();
+          r.selectNodeContents(el);
+          return r.getBoundingClientRect().top;
+        }),
+      );
+      expect(tops).toHaveLength(4);
+      expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(2);
+      // Due and Updated: equal widths, right-aligned, the header text ending where the dates end.
+      const cols = await table.evaluate((t) => {
+        const right = (el: Element) => {
+          const r = document.createRange();
+          r.selectNodeContents(el);
+          return r.getBoundingClientRect().right;
+        };
+        return ["Due", "Updated"].map((label) => {
+          const th = [...t.querySelectorAll("thead th.pb-date")].find((h) =>
+            h.textContent?.includes(label),
+          ) as HTMLElement;
+          const i = [...(th.parentElement?.children ?? [])].indexOf(th);
+          const td = t.querySelector(
+            `tbody tr[data-testid="pin-row"] td:nth-child(${i + 1})`,
+          ) as HTMLElement;
+          return {
+            width: th.getBoundingClientRect().width,
+            thAlign: getComputedStyle(th).textAlign,
+            tdAlign: getComputedStyle(td).textAlign,
+            gap: Math.abs(right(th.querySelector(".pb-label") as Element) - right(td)),
+          };
+        });
+      });
+      expect(Math.abs((cols[0]?.width ?? 0) - (cols[1]?.width ?? 1))).toBeLessThanOrEqual(1);
+      for (const c of cols) {
+        expect(c.thAlign).toBe("right");
+        expect(c.tdAlign).toBe("right");
+        expect(c.gap).toBeLessThanOrEqual(2);
+      }
+      // The Unowned heading is one styled word, and no row repeats it.
+      const lane = table.getByText("Unowned", { exact: true });
+      await expect(lane).toHaveCount(1);
+      await expect(lane).toHaveCSS("font-weight", "800");
+      await expect(lane).toHaveCSS("font-size", "16px");
+      await expect(page.getByTestId("pins-unowned").locator("tr:not(.pb-lane)")).toHaveCount(2);
+      await expect(
+        page.getByTestId("pins-unowned").locator("tr:not(.pb-lane)").getByText("Unowned"),
+      ).toHaveCount(0);
+      // Get in touch opens the draft in the row under the entry; Esc closes it and gives focus back.
+      const touch = page.getByRole("button", {
+        name: /^Get in touch with Priya Nair about Launch is 17/,
+      });
+      await touch.click();
+      const row = await touch.evaluate((b) => b.closest("tr")?.getBoundingClientRect().bottom ?? 0);
+      const draft = page.getByTestId("pin-draft");
+      await expect(draft).toBeFocused();
+      const top = await draft.evaluate((d) => d.getBoundingClientRect().top);
+      expect(Math.abs(top - row)).toBeLessThanOrEqual(200);
+      await page.keyboard.press("Escape");
+      await expect(draft).toHaveCount(0);
+      await expect(touch).toBeFocused();
+    });
+
     test("PPL-40b S-28: axe clean and targets at least the size, on a board with nothing in it", async ({
       page,
     }) => {

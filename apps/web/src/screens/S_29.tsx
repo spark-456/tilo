@@ -14,6 +14,7 @@ import {
   MY_TIME_ZONE,
   PINS,
   PREVIEW_TODAY,
+  displayName,
 } from "../people/data";
 import { PersonTag, PreviewNote, SoonButton } from "../people/parts";
 import { AppLink } from "./AppLink";
@@ -49,38 +50,49 @@ function Cite({ row }: { row: CalendarEntryAgendaItem }) {
 }
 
 function Availability({ dates }: { dates: readonly string[] }) {
+  const week = dates.length > 1;
   return (
     <Section
       title="Teammates' availability"
       note="Busy times only, 08:00 to 20:00. A teammate's titles are never shown."
     >
-      <ul className="blist cal-free" data-testid="free-busy">
-        {FREE_BUSY.flatMap((fb) =>
-          dates.map((d) => {
-            const bars = barsOn(fb, d);
-            return (
-              <li key={`${fb.user}${d}`} className="cal-free-row">
-                <span className="cal-free-who">
-                  <PersonTag user={fb.user} />
-                  {dates.length > 1 && <span className="bitem-sub">{day(d)}</span>}
-                </span>
-                <span className="cal-bar" aria-hidden="true">
-                  {bars.map((b) => (
-                    <span
-                      key={b.label}
-                      className="cal-busy"
-                      style={{ left: `${b.left}%`, width: `${b.width}%` }}
-                    />
-                  ))}
-                </span>
-                <span className="bitem-sub cal-free-text">
-                  {bars.length === 0 ? "Free 08:00 to 20:00" : bars.map((b) => b.label).join(", ")}
-                </span>
-              </li>
-            );
-          }),
-        )}
-      </ul>
+      <div data-testid="free-busy">
+        {FREE_BUSY.map((fb) => (
+          <div key={fb.user} className="cal-person">
+            <h3 className="people-h3 cal-person-name">
+              <PersonTag user={fb.user} />
+            </h3>
+            <ul className="blist cal-free" aria-label={`${displayName(fb.user)}, busy times`}>
+              {dates.map((d) => {
+                const bars = barsOn(fb, d);
+                return (
+                  <li key={d} className="cal-free-row" data-week={week}>
+                    {week && (
+                      <span className="cal-free-day">
+                        {weekday(d)} {day(d)}
+                      </span>
+                    )}
+                    <span className="cal-bar" aria-hidden="true">
+                      {bars.map((b) => (
+                        <span
+                          key={b.label}
+                          className="cal-busy"
+                          style={{ left: `${b.left}%`, width: `${b.width}%` }}
+                        />
+                      ))}
+                    </span>
+                    <span className="bitem-sub cal-free-text">
+                      {bars.length === 0
+                        ? "Free 08:00 to 20:00"
+                        : bars.map((b) => b.label).join(", ")}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
     </Section>
   );
 }
@@ -114,7 +126,7 @@ function Prep({ meeting, onClose }: { meeting: Meeting; onClose: () => void }) {
         <ul className="people-tags" aria-label="People involved">
           {meeting.attendees.map((a) => (
             <li key={a.name}>
-              <PersonTag name={a.name} />
+              <PersonTag name={a.user ? displayName(a.user) : a.name} />
             </li>
           ))}
         </ul>
