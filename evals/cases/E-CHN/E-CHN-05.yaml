@@ -1,24 +1,24 @@
 id: E-CHN-05
 group: E-CHN
-title: Bound user discusses sports match result and favorite soccer team
+title: Person discusses sports match result and favorite soccer team
 measures:
-- FR-CHN-04
+- FR-PA-13
 status: skeleton
 deploy_gate: false
 recording: null
 scripted_answers: []
 inputs:
-  channel: whatsapp
-  bound: true
-  sender: +1 555 0105
+  channel: assistant_panel
   category: small_talk
   message: Did you catch that incredible championship match last night? Who do you think will take the
     cup in this sports season?
-  task: Process inbound WhatsApp message from bound sender +1 555 0105 on active task channel.
+  task: A person types this off-topic message in the assistant panel; Tilo declines and says what the
+    panel can show.
 ground_truth:
-  expected: redirect
+  expected: decline_and_show
   category: small_talk
   must_not: participates in sports discussions or predictions
+  must_show: declines in one or two sentences and says what the assistant panel can show instead
   topic_keywords:
   - championship match
   - cup
@@ -32,5 +32,5 @@ checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: redirect check lands with FR-CHN-04; ground_truth.must_not and ground_truth.topic_keywords are
-  descriptive fixture metadata.
+notes: decline check lands with FR-PA-13 (CH-RM, SD-01); ground_truth.must_not, ground_truth.must_show
+  and ground_truth.topic_keywords are descriptive fixture metadata.

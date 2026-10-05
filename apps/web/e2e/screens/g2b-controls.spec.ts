@@ -44,7 +44,7 @@ test("UX-1 G2b S-22 reviews are links to the screens that show the access", asyn
     "href",
     "/connections",
   );
-  await expect(page.getByRole("link", { name: "Review WhatsApp" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Review Email" })).toHaveAttribute(
     "href",
     "/channels",
   );

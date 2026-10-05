@@ -137,8 +137,10 @@ export function Stage({
     let live = true;
     const timer = setTimeout(
       () =>
-        void import("pixi.js").then(
-          (m) => live && setPixi(m),
+        // `pixi.js/unsafe-eval` swaps Pixi's shader-sync code generators for ones that do not call
+        // `new Function`, so the Hosting CSP (firebase.json, P0-07c) needs no 'unsafe-eval'.
+        void Promise.all([import("pixi.js"), import("pixi.js/unsafe-eval")]).then(
+          ([m]) => live && setPixi(m),
           () => live && setLoadFailed(true), // said below on a world; the bare grid just stays empty
         ),
       bare ? BARE_GRID_DELAY_MS : 0,

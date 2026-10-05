@@ -7,7 +7,7 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 ## Commands
 - `uv run pytest services/harness/tests -m "not emulator"` — fast suite
 - `uv run pytest services/harness/tests -m emulator` — Firestore-emulator suite (Java + firebase-tools)
-- `just harness-skeleton` — runs `python -m tilo_harness.skeleton` against the emulator; `just check` — full gate
+- `just harness-skeleton` — runs `python -m tilo_harness.skeleton` against the emulator; `just check` — full gate. Image: `services/harness/Dockerfile` runs `tilo_harness.app:app` (`/healthz` only, P0-07a).
 
 ## Contracts
 - Reads (read-only): `contracts/event*`, `common`, `events/{registry.yaml,data/*}`, `layout`, `plan`,

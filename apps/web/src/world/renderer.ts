@@ -52,6 +52,10 @@ const RANK_WORD: Readonly<Record<string, string>> = {
  * scale puts the 12 px tag at 6 px). The name stays; the Inspect panel carries the state. */
 const MIN_WORD_PX = 8;
 const TAG_PX = 12;
+/** On a phone the fit scale shrinks a 12 px tag to 6 px; tags are drawn this big on screen instead
+ * (the ramp's smallest step), and the ones that would then overlap a more important tag are left
+ * out. The Inspect panel and the Story lens carry every name. */
+const READABLE_TAG_PX = 12;
 const isNarrow = (layer: WorldLayer) => layer.content.scale.x * TAG_PX < MIN_WORD_PX;
 /** State words are the shared map's (runSummary.ts), from the recorded state only (HR-1, UX-4). */
 const word = (words: Readonly<Record<string, string>>, state: string) => words[state];
@@ -82,6 +86,8 @@ export interface WorldLayer {
   /** The display density, read when something is drawn. */
   readonly density: () => Density;
   readonly size: () => { width: number; height: number };
+  /** How much the name tags are enlarged so they read on a small screen (1 on a full-size stage). */
+  tagScale: number;
   staticKey: string;
   groundKey: string;
   fitted: boolean;
@@ -116,6 +122,7 @@ export function createLayer(
     agentTags: new Map(),
     density,
     size,
+    tagScale: 1,
     staticKey: "",
     groundKey: "",
     fitted: false,
@@ -163,6 +170,9 @@ function item(
 
 type Zone = { x0: number; x1: number; y0: number; y1: number };
 const TAG_GAP = 4;
+/** A tag slides at most this far to clear the figures; further and it would sit over another
+ * building, so it stays where it was. */
+const SLIDE_MAX = 40;
 /** What a resting figure covers in front of a building (Friendly's size, the larger): half its width
  * either side of its feet, its height up (the same 30 units the rank tag sits above). */
 const FIGURE_HALF_W = 18;
@@ -201,7 +211,9 @@ function tag(
   }
   t.c.visible = true;
   // A tag that would touch the figures that rest in front of a building slides left, clear of them.
-  const half = t.c.width / 2;
+  t.c.scale.set(1);
+  const half = (t.c.width * layer.tagScale) / 2;
+  t.c.scale.set(layer.tagScale);
   let x = at[0];
   for (let pass = 0; clear && pass <= clear.length; pass++) {
     const hit = clear.find(
@@ -210,8 +222,33 @@ function tag(
     if (!hit) break;
     x = hit.x0 - TAG_GAP - half;
   }
-  t.c.position.set(x, at[1]);
+  if (Math.abs(x - at[0]) > SLIDE_MAX) x = at[0];
+  // Enlarged tags (a phone) stay inside the stage the person sees: one whose building is in view
+  // is nudged in, one whose building is out of view is not drawn (a cut-off name is unreadable).
+  let y = at[1];
+  if (layer.tagScale > 1) {
+    const view = viewOf(layer);
+    const k = layer.tagScale;
+    if (at[0] < view.x0 || at[0] > view.x1 || at[1] < view.y0 || at[1] > view.y1) return;
+    if (2 * half > view.x1 - view.x0 - 2 * TAG_GAP) return;
+    x = Math.min(Math.max(x, view.x0 + TAG_GAP + half), view.x1 - TAG_GAP - half);
+    y = Math.min(Math.max(y, view.y0 + TAG_GAP + 10 * k), view.y1 - TAG_GAP - 10 * k);
+  }
+  t.c.position.set(x, y);
   live.add(id);
+}
+
+/** The stage, in content coordinates, as framed by the fit (the camera starts centred, unzoomed). */
+function viewOf(layer: WorldLayer): Zone {
+  const { width, height } = layer.size();
+  const s = layer.content.scale.x;
+  const { x, y } = layer.content.position;
+  return {
+    x0: (-width / 2 - x) / s,
+    x1: (width / 2 - x) / s,
+    y0: (-height / 2 - y) / s,
+    y1: (height / 2 - y) / s,
+  };
 }
 
 const PIN: Readonly<Record<string, PinKind | undefined>> = {
@@ -238,6 +275,7 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
   ]);
   const mode = layer.density();
   const narrow = isNarrow(layer);
+  layer.tagScale = narrow ? Math.max(1, READABLE_TAG_PX / (layer.content.scale.x * TAG_PX)) : 1;
   const key = JSON.stringify([
     groundKey,
     frame.buildings,
@@ -245,6 +283,7 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     frame.gates,
     mode,
     narrow,
+    layer.tagScale,
   ]);
   if (key === layer.staticKey) return;
   layer.staticKey = key;
@@ -351,6 +390,32 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     layer.items.delete(id);
   }
   for (const [id, t] of layer.tags) t.c.visible = live.has(id);
+  if (layer.tagScale > 1) leaveOutOverlapping(layer, live);
+}
+
+/** Enlarged tags would pile up: walking them in drawing order (buildings, islands, districts), a tag
+ * that overlaps one already kept is left out. From the layout alone, so the same tags stay every time. */
+function leaveOutOverlapping(layer: WorldLayer, live: ReadonlySet<string>) {
+  const kept: Zone[] = [];
+  const k = layer.tagScale;
+  for (const id of live) {
+    const t = layer.tags.get(id);
+    if (!t) continue;
+    t.c.scale.set(1);
+    const half = (t.c.width * k) / 2;
+    t.c.scale.set(k);
+    const box = {
+      x0: t.c.x - half,
+      x1: t.c.x + half,
+      y0: t.c.y - 10 * k,
+      y1: t.c.y + 10 * k,
+    };
+    if (kept.some((z) => box.x0 < z.x1 && box.x1 > z.x0 && box.y0 < z.y1 && box.y1 > z.y0)) {
+      t.c.visible = false;
+    } else {
+      kept.push(box);
+    }
+  }
 }
 
 /** Agents layer: one figure per spawned, placed agent, with its feet at `positions` (already

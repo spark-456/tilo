@@ -1,0 +1,37 @@
+# Build context for services/<svc>/Dockerfile is the repository root (P0-07a).
+# Keep out: VCS, caches, secrets, JS, design, docs, tests, infra. Keep in (do NOT list here): pyproject.toml,
+# uv.lock, packages, services, config, contracts, prompts, templates (the uv workspace install needs them).
+.git
+.gitattributes
+.github
+.claude
+.venv
+**/.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+node_modules
+**/node_modules
+.env*
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+service-account*.json
+*-credentials.json
+application_default_credentials.json
+design
+docs
+infra
+apps
+meet-bot
+scratch*
+*.log
+**/tests
+packages/contracts-ts
+evals/*
+!evals/pyproject.toml

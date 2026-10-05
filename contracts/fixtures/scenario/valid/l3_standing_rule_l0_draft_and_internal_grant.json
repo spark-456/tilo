@@ -1,0 +1,27 @@
+{
+  "id": "Weekly_Status",
+  "title": "Fictional weekly status update",
+  "skills": ["status-summary"],
+  "connectors": ["gmail"],
+  "seed_data": ["seed/status/example_tasks.csv"],
+  "theme": "harbour",
+  "autonomy": [
+    {
+      "action_type": "post_status_update",
+      "level": "L3",
+      "connectors": ["gmail"],
+      "per_day": 1
+    },
+    {
+      "action_type": "create_draft",
+      "level": "L0",
+      "connectors": ["gmail"],
+      "per_day": 3
+    },
+    {
+      "action_type": "grant_budget",
+      "level": "L1",
+      "connectors": ["internal"]
+    }
+  ]
+}
