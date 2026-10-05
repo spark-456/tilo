@@ -54,3 +54,20 @@
     - {id: build_handoff, capability: send, description: "Hand the accepted requirements to Lovable as a build prompt you send yourself.", risk_tier: T3, gate_type: approval, irreversible: true}
   limits: {per_minute: null, batch_size: null}
   data_class: {returns: [business], redact: []}
+# Google Calendar (FR-CAL-02, FR-CAL-08, FR-CON-14; services/connectors/tests/API_FR_CAL_08.md): read only in
+# this release. Events of the person's own primary calendar, synced with a sync token inside their working
+# window (config/personal.yaml). The request's field mask asks Google for no description, attendee address,
+# conference link or location, so there is nothing to redact (PE-13). Writing (FR-CAL-04, calendar.events)
+# is not declared until it is built. per_minute is per connected person; batch_size is the page size
+# (Google's maximum for events.list).
+- id: google_calendar
+  name: Google Calendar
+  icon: calendar
+  auth: oauth2
+  scopes:
+    read: ["https://www.googleapis.com/auth/calendar.readonly"]
+  capabilities: [read]
+  actions:
+    - {id: read_events, capability: read, description: "Read the events on your own calendar to show them in Tilo.", risk_tier: T1, gate_type: none, irreversible: false}
+  limits: {per_minute: 60, batch_size: 2500}
+  data_class: {returns: [personal, business], redact: []}
