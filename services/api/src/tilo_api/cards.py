@@ -43,6 +43,7 @@ CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
 _TS_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
 _ULID_RE = re.compile(r"^[0-7][0-9A-HJKMNP-TV-Z]{25}$")
 _USER_RE = re.compile(r"^u_[0-9A-Za-z_]{1,48}$")
+_DOMAIN_RE = re.compile(r"[a-z][a-z0-9_]{0,63}")  # common.schema.json slug
 _MERGEABLE = ("needs_you", "meeting")
 _ROLES = ("owner", "team_lead", "approver")  # any other role (a Viewer included) answers and lists nothing
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -174,6 +175,7 @@ class _Record:
     group: _Group
     status: str = "open"  # "open" | "resolved" -- a held gate/consent stays "open"
     attempt: tuple[tuple, dict] | None = None  # (who and what, part) of a write that raised: a retry resends it
+    domain: str | None = None  # the Team Lead domain the question was routed to; None is the owner fallback
 
     @property
     def kind(self) -> str:
@@ -188,8 +190,13 @@ def _can_see(p: Principal, world_id: str, owner: str | None, r: _Record) -> bool
     if p.role == "owner":
         return p.user_id == owner
     if p.role == "team_lead":
-        return r.district is not None and r.district in _safe_districts(p.districts)
+        # a question routed to a domain is the console's: only that domain's lead sees it (FR-HIL-10)
+        return r.domain is None and r.district is not None and r.district in _safe_districts(p.districts)
     return p.role == "approver" and r.assignee == p.user_id
+
+
+def _routed_to(r: _Record, world_id: str, domain: str) -> bool:
+    return r.world_id == world_id and r.kind in _MERGEABLE and r.domain == domain
 
 
 def _can_answer(p: Principal, r: _Record) -> bool:
@@ -218,6 +225,7 @@ class CardStore:
         self._seen: dict[tuple[str, str], tuple[str, SubmitResult]] = {}
         self._groups: dict[tuple, _Group] = {}
         self._pending: dict[tuple[str, str], _Record] = {}  # open and not yet nudged: tick's work set
+        self._answers_by_lead: list[dict[str, Any]] = []  # a Team Lead's own answers, in order (FR-HIL-10)
         self._lock = threading.RLock()  # guards every state change; a write happens outside it
 
     # -- submit ---------------------------------------------------------
@@ -229,34 +237,44 @@ class CardStore:
         outbox_id: str | None = None,
         district: str | None = None,
         assignee: str | None = None,
+        domain: str | None = None,
         merge: bool = True,
     ) -> SubmitResult:
         """`merge=False` keeps the card its own group: it neither joins nor anchors a batch (a question a unit waits on
         means something of its own, so one answer must never close it for another).
         `outbox_id` (gates only), `district` (a Team Lead sees only their districts' cards; none
-        means owner-only) and `assignee` (the Approver the owner assigned) are companion data the
-        harness already holds; a model never supplies them. Re-submitting identical content returns
-        the first result and changes nothing; a different card under a used id is rejected."""
+        means owner-only), `assignee` (the Approver the owner assigned) and `domain` (a question's routed Team
+        Lead domain, FR-HIL-10; none is the owner fallback) are companion data the harness already holds; a
+        model never supplies them. Re-submitting identical content returns the first result and changes
+        nothing; a different card under a used id is rejected."""
         with self._lock:
-            return self._submit(card, outbox_id, district, assignee, merge)
+            return self._submit(card, outbox_id, district, assignee, domain, merge)
 
     def _submit(
-        self, card: dict, outbox_id: str | None, district: str | None, assignee: str | None, merge: bool
+        self,
+        card: dict,
+        outbox_id: str | None,
+        district: str | None,
+        assignee: str | None,
+        domain: str | None,
+        merge: bool,
     ) -> SubmitResult:
         errors = _card_errors(card)
         if not errors:
-            errors = self._companion_errors(card["kind"], outbox_id, district, assignee)
+            errors = self._companion_errors(card["kind"], outbox_id, district, assignee, domain)
         if errors:
             return SubmitResult("rejected", None, tuple(errors))
 
         world_id, card_id, kind = card["world_id"], card["id"], card["kind"]
-        digest = hashlib.sha256(json.dumps([card, outbox_id, district, assignee], sort_keys=True).encode()).hexdigest()
+        digest = hashlib.sha256(
+            json.dumps([card, outbox_id, district, assignee, domain], sort_keys=True).encode()
+        ).hexdigest()
         seen = self._seen.get((world_id, card_id))
         if seen is not None:
             return seen[1] if seen[0] == digest else SubmitResult("rejected", None, ("card id already used",))
 
         created = _parse_ts(card["created_at"])
-        key = (world_id, kind, card["header"]["building"], district, assignee)
+        key = (world_id, kind, card["header"]["building"], district, assignee, domain)  # domain: never merge across
         batched = merge and kind in _MERGEABLE
         group = self._groups.get(key) if batched else None
         merged = (
@@ -271,6 +289,7 @@ class CardStore:
                 self._groups[key] = group
         assert group is not None
         record = _Record(world_id, copy.deepcopy(card), outbox_id, district, assignee, _deadline(card), group)
+        record.domain = domain
         group.members.append(record)
         self._records.setdefault(world_id, {})[card_id] = record
         self._pending[(world_id, card_id)] = record
@@ -279,8 +298,14 @@ class CardStore:
         return result
 
     @staticmethod
-    def _companion_errors(kind: str, outbox_id: str | None, district: str | None, assignee: str | None) -> list[str]:
+    def _companion_errors(
+        kind: str, outbox_id: str | None, district: str | None, assignee: str | None, domain: str | None
+    ) -> list[str]:
         errors = []
+        if domain is not None and (
+            kind not in _MERGEABLE or not isinstance(domain, str) or not _DOMAIN_RE.fullmatch(domain)
+        ):
+            errors.append("domain must be a slug, and only a question card is routed to one")
         if kind == "gate" and (not outbox_id or not _ULID_RE.match(outbox_id)):
             errors.append("outbox_id is required and must be a ulid for a gate card")
         if kind != "gate" and outbox_id is not None:
@@ -315,6 +340,12 @@ class CardStore:
             part["severity"] = severity
         return part
 
+    def owner_of(self, world_id: str) -> str | None:
+        return self._world_owners.get(world_id)
+
+    def now(self) -> str:
+        return self._clock.now()
+
     # -- reads ------------------------------------------------------------
 
     def get(self, world_id: str, card_id: str) -> dict | None:
@@ -346,6 +377,26 @@ class CardStore:
                     shown[id(record.group)] = record
             return sorted((copy.deepcopy(r.card) for r in shown.values()), key=lambda c: c["created_at"])
 
+    def list_for_domain(self, world_id: str, domain: str) -> list[dict]:
+        """FR-HIL-10: the open question cards routed to `domain`, oldest first, one per merged group. Gates,
+        consents and cards routed elsewhere (another domain or the owner) are never in it."""
+        with self._lock:
+            shown: dict[int, _Record] = {}
+            for record in self._records.get(world_id, {}).values():
+                if record.status == "open" and id(record.group) not in shown and _routed_to(record, world_id, domain):
+                    shown[id(record.group)] = record
+            return sorted((copy.deepcopy(r.card) for r in shown.values()), key=lambda c: c["created_at"])
+
+    def lead_answers(self, world_id: str, user_id: str) -> list[dict]:
+        """FR-HIL-10: this Team Lead's own answers (never a timeout default), each `{card_id, option, answered_at,
+        answer_time_s}`, with the time read from the injected clock."""
+        with self._lock:
+            return [
+                {k: v for k, v in h.items() if k not in ("world_id", "user_id")}
+                for h in self._answers_by_lead
+                if h["world_id"] == world_id and h["user_id"] == user_id
+            ]
+
     # -- answer -------------------------------------------------------------
 
     def answer(
@@ -357,15 +408,23 @@ class CardStore:
         channel: str,
         principal: Principal,
         pin_verified: bool = False,
+        console_domain: str | None = None,
     ) -> AnswerResult:
         """Rejections write nothing and leave the card open. A card outside the principal's scope
         is "card_not_found" (no existence oracle); a Viewer or a role that may not answer that
-        kind is "forbidden"."""
+        kind is "forbidden". `console_domain` (FR-HIL-10, set only by the Team Lead console after it
+        resolved the caller) scopes the answer to the questions routed to that domain instead of to districts."""
         with self._lock:
             record = self._records.get(world_id, {}).get(card_id)
             if principal.role not in _ROLES:
                 return AnswerResult("rejected", "forbidden", ())
-            if record is None or not _can_see(principal, world_id, self._world_owners.get(world_id), record):
+            if record is None:
+                seen = False
+            elif console_domain is not None:
+                seen = principal.world_id == world_id and _routed_to(record, world_id, console_domain)
+            else:
+                seen = _can_see(principal, world_id, self._world_owners.get(world_id), record)
+            if record is None or not seen:
                 return AnswerResult("rejected", "card_not_found", ())
             if not _can_answer(principal, record):
                 return AnswerResult("rejected", "forbidden", ())
@@ -407,7 +466,15 @@ class CardStore:
             record.group.resolving = True  # exactly one resolution per card: later answers and tick see this
         if not self._write_then_close(record, who, part):
             return AnswerResult("rejected", "already_resolved", ())  # an earlier answer committed: it won
+        if principal.role == "team_lead" and part["type"] == "question.answered":
+            self._note_answer(record, principal.user_id, option, authz["at"])
         return AnswerResult("answered", None, (part,))
+
+    def _note_answer(self, record: _Record, user_id: str, option: str, at: str) -> None:
+        seconds = (_parse_ts(at) - _parse_ts(record.card["created_at"])).total_seconds()
+        entry = {"world_id": record.world_id, "user_id": user_id, "card_id": record.card["id"], "option": option}
+        with self._lock:
+            self._answers_by_lead.append({**entry, "answered_at": at, "answer_time_s": seconds})
 
     def _write_then_close(self, record: _Record, who: tuple, part: dict) -> bool:
         """False when the resolution was already committed by an earlier answer (the card closes under it)."""

@@ -23,8 +23,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from tilo_metering.flags import FlagStore
 from tilo_planning.approaches import ApproachProposalError, propose_approaches
 from tilo_planning.brief import BriefValidationError, ExtractionResult, edit_brief_field
+from tilo_planning.events import build_event
 from tilo_planning.intake import IntakeResult
 from tilo_planning.questions import apply_answer, generate_questions, record_assumption
+from tilo_planning.scenarios import ScenarioError, load_scenario
 from tilo_providers.config import ProviderConfigError
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
@@ -89,7 +91,9 @@ def _append(store: deps.Store, task: deps.TaskRecord, events: list[dict[str, Any
     task.next_seq = max([task.next_seq - 1, *(e["seq"] for e in events)]) + 1
 
 
-def create_task(store: deps.Store, intake: IntakeResult, extraction: ExtractionResult) -> tuple[str, deps.TaskRecord]:
+def create_task(
+    store: deps.Store, intake: IntakeResult, extraction: ExtractionResult, scenario: str | None = None
+) -> tuple[str, deps.TaskRecord]:
     """FR-INT-03/04: the task from its intake and the Director's brief (extracted first, so a failed extraction
     stores nothing), then the questions, decided in code."""
     owner = intake.event["actor"]
@@ -101,6 +105,7 @@ def create_task(store: deps.Store, intake: IntakeResult, extraction: ExtractionR
     ]
     intake_events = [intake.event, *(e for f in intake.files for e in f.events)]
     task = deps.TaskRecord(owner, intake.world_id, intake.run_id, draft, draft, [], len(intake_events) + 1)
+    task.scenario = scenario
     asked = generate_questions(
         draft, extraction.ambiguous_fields, memory=store.memory, base=_base(task, DIRECTOR), seq=task.next_seq
     )
@@ -239,6 +244,38 @@ def get_approaches(
     return {"task_id": task_id, "approaches": approaches, "recommended": recommended, "credit_usd": credit_usd}
 
 
+def _load_scenario(task: deps.TaskRecord) -> Any:
+    if task.scenario is None:
+        return None
+    try:
+        return load_scenario(task.scenario)
+    except ScenarioError as exc:
+        logger.warning("a task's scenario no longer loads")  # never the error's text: it can carry file values
+        raise HTTPException(status_code=503, detail="The scenario could not be loaded; nothing changed.") from exc
+
+
+def _scenario_policies(
+    task: deps.TaskRecord, scenario: Any, first_seq: int
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """FR-INT-11: the scenario's autonomy entries as the owner's own policies with one `policy.changed` each (only
+    the owner creates a policy, PRD 10.1). Everything is built here and nothing is stored, so a failure leaves no
+    partial state and an approve can be retried."""
+    if scenario is None:
+        return [], []
+    at, owner = now_ts(), task.owner
+    policies = scenario.policies(owner=owner, at=at)
+    events = [
+        build_event(
+            _base(task, owner), seq=first_seq + offset, type="policy.changed", target=policy["id"], item=None,
+            severity="info", tool=None, cause=None, authz={"by": "person", "ref": owner, "at": at},
+            data={"policy_id": policy["id"], "change": "created", "level": policy["level"]},
+            summary=f"Scenario policy created: {policy['action_type']} at {policy['level']}.",
+        )
+        for offset, policy in enumerate(policies)
+    ]  # fmt: skip
+    return policies, events
+
+
 @router.post("/tasks/{task_id}/approve")
 def approve(
     task_id: str,
@@ -262,6 +299,7 @@ def approve(
             raise HTTPException(status_code=409, detail="Get the approaches first.")
         if body.approach_id not in {a["id"] for a in task.approaches}:
             raise HTTPException(status_code=422, detail="Pick one of the proposed approaches.")
+        preload = _load_scenario(task)  # before anything changes: a scenario that no longer loads stops the approval
         now, base, cap = now_ts(), _base(task, task.owner), body.budget_cap
         owned = {w for w, record in store.worlds.items() if record.owner == task.owner}
         earlier = [e for w in owned for e in store.events.get(w, []) if e.get("type") == "budget.granted"]
@@ -276,7 +314,11 @@ def approve(
             )
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail="Only the world's owner sets budgets.") from exc
-        _append(store, task, [event])
+        policies, policy_events = _scenario_policies(task, preload, event["seq"] + 1)  # built before anything is stored
+        _append(store, task, [event, *policy_events])
+        for policy in policies:
+            store.policies[policy["id"]] = policy
+            store.policy_worlds[policy["id"]] = task.world_id
         task.granted = True
         approach = next(a for a in task.approaches if a["id"] == body.approach_id)
     if seams is not None:

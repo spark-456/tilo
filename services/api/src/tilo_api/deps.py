@@ -93,6 +93,7 @@ class TaskRecord:
     edits: dict[str, Any] = field(default_factory=dict)
     approaches: list[dict] | None = None  # proposed for the current brief
     granted: bool = False
+    scenario: str | None = None  # FR-INT-11: the scenario id named at intake; its policies are created at approve
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
 

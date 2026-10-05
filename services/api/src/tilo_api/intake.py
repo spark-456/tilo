@@ -30,6 +30,7 @@ from tilo_planning.intake import (
     submit_intake,
 )
 from tilo_planning.refusal import RefusalConfigError, TaskRefused
+from tilo_planning.scenarios import ScenarioError, load_scenario
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
@@ -58,9 +59,15 @@ async def intake(
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: Annotated[FlagStore, Depends(deps.get_flag_store)],
     text: Annotated[str, Form()] = "",
+    scenario: Annotated[str | None, Form()] = None,
     files: Annotated[list[UploadFile], File()] = [],  # noqa: B006 (FastAPI copies defaults)
 ) -> Any:
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in, before any work
+    if scenario is not None:  # FR-INT-11: an unknown or hostile id stores nothing; nothing is created at intake
+        try:
+            await run_in_threadpool(load_scenario, scenario)
+        except ScenarioError:
+            return _rejected("That scenario is not available.")
     if len(files) > MAX_FILES:
         return _rejected(f"{len(files)} files attached; the limit is {MAX_FILES}.")
     uploads, remaining = [], MAX_TOTAL_BYTES
@@ -97,13 +104,13 @@ async def intake(
     except (ProviderError, ReplayMissError) as exc:
         logger.warning("safety screen failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing was stored.") from exc
-    task_id, task = create_task(tasks, result, extraction)
+    task_id, task = create_task(tasks, result, extraction, scenario=scenario)
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [
         {"field": q.field, "text": q.text, "suggested_answers": list(q.suggested_answers)} for q in task.questions
     ]
-    return {**body, "task_id": task_id, "brief": task.brief, "questions": questions}
+    return {**body, "task_id": task_id, "brief": task.brief, "questions": questions, "scenario": scenario}
 
 
 def _rejected(reason: str) -> JSONResponse:
