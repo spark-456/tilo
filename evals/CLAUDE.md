@@ -6,6 +6,7 @@ The eval harness (PRD 19, EFF-06, EFF-07). P8-06a/b: case schema/loader, `EvalsC
 ## Commands
 - `just eval` — replay every case under `evals/cases/` (full pass) into the git-ignored `evals/results.local.md`; `uv run python -m tilo_evals run --pass smoke|full|gate [--group G] [--case ID] [--results-md P] [--results-json P]`
 - `uv run python -m tilo_evals bank [--case B-007] [--repeat 3]` — the generality bank (`evals/bank/B-NNN.yaml`, own `bank.schema.json`) end to end on fakes into git-ignored `evals/bank-results.local.md`; exit 0 all hard checks pass, 1 any fails, 2 refused (LIVE, K_SERVICE or CLOUD_RUN_JOB set) or bad bank
+- `just live-e2e [--case B-007] [--dry-run|--replay]` (PL-LIVE-E2E, `live_e2e.py`, `docs/live-e2e.md`) — one bank case through the real pipeline on the real profiles; live only with the user's `LIVE=1` (never CI or Cloud Run), ADC only, capped (default 40, max 200 credits), `TILO_RECORD=1` records to `evals/bank/live/<case>/model-recordings/`; `--replay` is free and runs in CI
 - `uv run pytest "evals/tests" -q` — the tests (fake repos under `tmp_path`, never `evals/cases`)
 - Exit codes: 0 every case that ran passed (or none ran), 1 a case failed, 2 the pass could not run (bad config or case file, unknown `--case` or `--group`, `--live` refused), 3 stopped at the credit cap with no failure.
 
