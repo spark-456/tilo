@@ -49,33 +49,63 @@ class CostAlerts:
         credit_usd: float,
         sink: Callable[[str], None] | None = None,
     ) -> None:
+        for name, value in (
+            ("uid_cap_credits", uid_cap_credits),
+            ("daily_usd_threshold", daily_usd_threshold),
+            ("credit_usd", credit_usd),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be a finite number above 0")
         self._cap, self._daily_usd, self._credit_usd = uid_cap_credits, daily_usd_threshold, credit_usd
         self._sink = sink or _stdout_sink
         self._lock = threading.Lock()
         self._sent: set[tuple[str, str]] = set()  # (kind, uid_ref or ISO day) already delivered
+        self._inflight: set[tuple[str, str]] = set()  # claimed by a check whose sink call is running
 
     def check(self, ledger: Iterable[object]) -> tuple[dict, ...]:
         """Write a line for each threshold newly crossed; return those delivered. Never raises."""
         try:
             with self._lock:
-                return self._check(ledger)
+                pending = [
+                    (key, rec) for key, rec in self._due(ledger) if key not in self._sent and key not in self._inflight
+                ]
+                self._inflight.update(key for key, _ in pending)
+            raised: list[dict] = []
+            for key, record in pending:  # the sink runs off the lock: a slow sink never blocks other callers
+                delivered = False
+                try:
+                    self._sink(json.dumps(record, sort_keys=True, separators=(",", ":"), allow_nan=False))
+                    delivered = True
+                except Exception:  # not marked as sent: the next check retries
+                    pass
+                with self._lock:
+                    self._inflight.discard(key)
+                    if delivered:
+                        self._sent.add(key)
+                if delivered:
+                    raised.append(record)
+            return tuple(raised)
         except Exception:  # alert-only: this path must never break a caller
             return ()
 
-    def _check(self, ledger: Iterable[object]) -> tuple[dict, ...]:
+    def _due(self, ledger: Iterable[object]) -> list[tuple[tuple[str, str], dict]]:
         per_uid: dict[str, float] = {}
         per_day: dict[date, float] = {}
         for entry in ledger:
-            credits = _credits(entry)
-            if credits is None or not isinstance(entry, LedgerEntry):
+            try:  # one poisoned entry must not hide a crossing made by the others
+                credits = _credits(entry)
+                if credits is None or not isinstance(entry, LedgerEntry):
+                    continue
+                day = entry.day or entry.at.astimezone(UTC).date()
+                user = str(entry.user)
+            except Exception:
                 continue
-            per_uid[entry.user] = per_uid.get(entry.user, 0.0) + credits
-            day = entry.day or entry.at.astimezone(UTC).date()
+            per_uid[user] = per_uid.get(user, 0.0) + credits
             per_day[day] = per_day.get(day, 0.0) + credits
 
         records: list[tuple[tuple[str, str], dict]] = []
         for uid, spent in per_uid.items():
-            ref = _uid_ref(str(uid))
+            ref = _uid_ref(uid)
             for pct in (80, 100):
                 if spent >= self._cap * pct / 100 - _EPS:
                     kind = f"uid_cap_{pct}"
@@ -93,17 +123,7 @@ class CostAlerts:
                     )
                 )
 
-        raised: list[dict] = []
-        for key, record in records:
-            if key in self._sent:
-                continue
-            try:
-                self._sink(json.dumps(record, sort_keys=True, separators=(",", ":")))
-            except Exception:  # not marked as sent: the next check retries
-                continue
-            self._sent.add(key)
-            raised.append(record)
-        return tuple(raised)
+        return records
 
     @staticmethod
     def _record(kind: str, message: str, extra: dict) -> dict:
