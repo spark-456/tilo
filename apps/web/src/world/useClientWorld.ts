@@ -9,6 +9,7 @@
 import type { Layout } from "@tilo/contracts";
 import type { Container } from "pixi.js";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChunkLoadError } from "../api/chunkError";
 import type { TiloClient } from "../api/client";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { describeError } from "../screens/remote";
@@ -101,6 +102,7 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
       (error: unknown) => {
         if (cancelled) return;
         setFailed(true);
+        if (error instanceof ChunkLoadError) chunkFailed.current = true;
         setNote(chunkFailed.current ? NO_CHUNK : describeError("load the world", error));
       },
     );

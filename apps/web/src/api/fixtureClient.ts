@@ -1,5 +1,6 @@
 import type { Brief, Card, Event, Layout } from "@tilo/contracts";
 import { parseSpeed } from "../world/speed";
+import { ChunkLoadError } from "./chunkError";
 import type {
   ApproachesResult,
   ApprovalRequest,
@@ -34,8 +35,14 @@ export function replaySpeedFromSearch(search: string): number {
 
 // The recorded run and its layout are the bulk of the fixtures (NFR-01): imported when a call needs
 // them, so the landing route's bundle does not carry them.
-const loadEvents = () => import("./fixtures/events").then((m) => m.EVENTS_VILLAGE_BASIC);
-const loadLayout = () => import("./fixtures/layout").then((m) => m.LAYOUT_VILLAGE_BASIC);
+const chunk = <T>(what: string, load: () => Promise<T>) =>
+  load().catch(() => {
+    throw new ChunkLoadError(what);
+  });
+const loadEvents = () =>
+  chunk("The recorded run", () => import("./fixtures/events").then((m) => m.EVENTS_VILLAGE_BASIC));
+const loadLayout = () =>
+  chunk("The world layout", () => import("./fixtures/layout").then((m) => m.LAYOUT_VILLAGE_BASIC));
 
 /** The longest delay setTimeout honours; a larger one fires at once. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
@@ -143,7 +150,10 @@ export class FixtureClient implements TiloClient {
 
   async getLayout(_worldId: string): Promise<Layout> {
     await wait(this.delayMs);
-    return loadLayout();
+    // The run's events come with the layout, so a missing chunk is said here, where a person is
+    // waiting on it, and not as a silently empty stream later.
+    const [layout] = await Promise.all([loadLayout(), loadEvents()]);
+    return layout;
   }
 
   /** Replays the recorded stream in seq order, following the recorded `ts` gaps divided by the
@@ -180,7 +190,7 @@ export class FixtureClient implements TiloClient {
         events = [...recorded].sort((a, b) => a.seq - b.seq);
         play(0);
       },
-      () => undefined, // no recording, no events: nothing is invented in its place
+      () => undefined, // getLayout reports a missing recording; here nothing is invented in its place
     );
     return () => {
       stopped = true;
