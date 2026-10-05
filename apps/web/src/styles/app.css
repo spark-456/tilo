@@ -1188,6 +1188,12 @@ button.row {
   overflow-y: auto;
   height: calc(var(--lines) * 1.6em);
 }
+/* On a phone the same rows wrap onto more lines: the reserve's second number (kit.tsx Section). */
+@media (max-width: 767px) {
+  .section-box.reserved {
+    height: calc(var(--lines-narrow) * 1.6em);
+  }
+}
 .section-box.reserved:focus-visible,
 .screen-body a.pill:focus-visible,
 .field textarea:focus-visible,
