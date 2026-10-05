@@ -6,7 +6,7 @@ import sys
 from typing import Any
 
 import yaml
-from conftest import REPO_ROOT, make_event
+from _evals_lib import REPO_ROOT, make_event
 from test_PRD_19_2_eval_set_structure import DENYLIST_BRANDS_RE, REAL_ROUTING_RE
 from tilo_evals import Case, load_cases
 from tilo_evals.checks import Outcome, get

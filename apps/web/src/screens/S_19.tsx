@@ -6,11 +6,22 @@
 // provider and Tilo never sees your password. No design export lists connections
 // (design/source/INDEX.md, S-19): cards and rows after "Tilo Team.dc.html", neutral role tokens.
 import { useClient } from "../api/ClientProvider";
-import { FIXTURE_WORLD_ID as worldId } from "../api/fixtures/derived";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
-import { Chip, Page, Row, Section, Stats, field, nameOf, useFixtureRun, words } from "./kit";
+import {
+  Chip,
+  Page,
+  Row,
+  Section,
+  Stats,
+  doneState,
+  field,
+  nameOf,
+  useFixtureRun,
+  waitState,
+  words,
+} from "./kit";
 import { useRemote } from "./remote";
 
 const STATE = {
@@ -28,8 +39,10 @@ const KIND = {
 
 export function S_19() {
   const client = useClient();
-  const { events } = useFixtureRun();
-  const [layout, retry] = useRemote("load the connections", () => client.getLayout(worldId));
+  const { events, worldId } = useFixtureRun();
+  const [layout, retry] = useRemote("load the connections", (signal) =>
+    client.getLayout(worldId, signal),
+  );
   // A request is answered by a consent for its card, or by a later revocation of its connector
   // (connection.revoked carries the connector, not a card).
   const consent = events.filter(
@@ -44,6 +57,7 @@ export function S_19() {
       ),
   );
   const islands = layout.status === "ready" ? layout.value.semantic.islands : [];
+  const connected = islands.filter((i) => i.state === "connected").length;
   return (
     <Page
       testid="connections"
@@ -54,9 +68,10 @@ export function S_19() {
         items={[
           [
             "Connected",
-            layout.status === "ready" ? islands.filter((i) => i.state === "connected").length : "-",
+            layout.status === "ready" ? connected : "-",
+            layout.status === "ready" ? doneState(connected, "Connected") : ["soon", "Loading"],
           ],
-          ["Waiting for consent", consent.length],
+          ["Waiting for consent", consent.length, waitState(consent.length)],
         ]}
       />
       <Section

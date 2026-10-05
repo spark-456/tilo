@@ -1,0 +1,90 @@
+id: B-014
+domain: legal
+shapes:
+- attachment
+- parallel_units
+title: Compare termination-notice clauses in two agreements
+brief: Compare the termination-notice clauses in the two attached agreements and explain the differences in plain
+  words. I am not a lawyer; flag anything I should ask a lawyer about.
+director:
+  brief:
+    goal: Compare two termination-notice clauses and explain the differences plainly.
+    deliverables:
+    - title: Clause comparison
+      format: markdown
+    audience: A non-lawyer manager
+    deadline: null
+    constraints:
+    - Plain words
+    - Flag questions for a lawyer
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Read the first agreement's clause
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: research
+      title: Read the second agreement's clause
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U3
+      unit_type: analyse
+      title: Compare the clauses
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+      - U2
+    - id: U4
+      unit_type: draft
+      title: Write the comparison
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U3
+    - id: U5
+      unit_type: verify
+      title: Check each quote against the text
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U4
+expect:
+  outcome: completed
+files:
+- name: agreement_a.csv
+  text: 'clause,text
+
+    12 Termination,"Either party may terminate on 60 days'' written notice. Notice must be sent by post."
+
+    '
+- name: agreement_b.csv
+  text: 'clause,text
+
+    9 Termination,"Either party may end this agreement on 30 days'' notice by email, or immediately for material
+    breach."
+
+    '

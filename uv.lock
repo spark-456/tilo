@@ -1422,11 +1422,15 @@ name = "tilo-channels"
 version = "0.1.0"
 source = { editable = "services/channels" }
 dependencies = [
+    { name = "tilo-policy" },
     { name = "tilo-providers" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "tilo-providers", editable = "packages/providers" }]
+requires-dist = [
+    { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tilo-providers", editable = "packages/providers" },
+]
 
 [[package]]
 name = "tilo-connectors"
@@ -1469,18 +1473,26 @@ name = "tilo-evals"
 version = "0.1.0"
 source = { editable = "evals" }
 dependencies = [
+    { name = "httpx" },
     { name = "jsonschema" },
     { name = "pyyaml" },
     { name = "referencing" },
+    { name = "tilo-api" },
     { name = "tilo-contracts" },
+    { name = "tilo-planning" },
+    { name = "tilo-providers" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.18" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-api", editable = "services/api" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-planning", editable = "packages/planning" },
+    { name = "tilo-providers", editable = "packages/providers" },
 ]
 
 [[package]]

@@ -67,12 +67,13 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
     const { world, requestRender, size } = host;
     const before = world.children.length;
     let cancelled = false;
+    const abort = new AbortController();
     let stop: (() => void) | undefined;
     setSeq(0);
     setLayout(null);
     setFailed(false);
     setNote("Waiting for the run to build its world…");
-    client.getLayout(worldId).then(
+    client.getLayout(worldId, abort.signal).then(
       (layout) => {
         if (cancelled) return;
         setLayout(layout);
@@ -97,8 +98,10 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
     );
     return () => {
       cancelled = true;
+      abort.abort(); // the layout wait stops polling with the page
       stop?.();
-      if (!world.destroyed) {
+      // Nothing was added while the layout was pending: removeChildren(before) would throw a RangeError.
+      if (!world.destroyed && world.children.length > before) {
         for (const child of world.removeChildren(before)) child.destroy();
         requestRender();
       }

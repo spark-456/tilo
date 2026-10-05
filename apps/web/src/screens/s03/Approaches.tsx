@@ -2,6 +2,7 @@ import type { PlanApproach } from "@tilo/contracts";
 import { useState } from "react";
 import { useClient } from "../../api/ClientProvider";
 import type { ApproachesResult } from "../../api/client";
+import { rememberWorld } from "../../world/lastWorld";
 import { AppLink } from "../AppLink";
 import { Loaded, Primary } from "../FlowShell";
 import { useAction, useRemote } from "../remote";
@@ -60,6 +61,7 @@ export function Approaches({ taskId }: { taskId: string }) {
       approach_id: selected.id,
       budget_cap: validCap,
     });
+    rememberWorld(world_id); // a bare /needs-you or /library shows this run next
     return `/world/${encodeURIComponent(world_id)}`;
   });
 

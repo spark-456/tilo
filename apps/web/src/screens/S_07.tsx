@@ -39,7 +39,7 @@ function asked(records: readonly GateRecord[], run: string | null, gate: string 
 export function S_07() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
-  const [layout] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layout] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const [cards, retry] = useRemote("load the cards", () => client.listCards(worldId));
   const records = gatesOf(events);
   const [want] = useState(() => {

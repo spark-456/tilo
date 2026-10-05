@@ -1,0 +1,22 @@
+id: B-024
+domain: procurement
+shapes:
+- director_fails
+title: The Director cannot plan the work
+brief: Draft a request for proposals for office cleaning services covering three floors, with evaluation criteria.
+director:
+  brief:
+    goal: Draft an RFP for office cleaning of three floors with evaluation criteria.
+    deliverables:
+    - title: RFP
+      format: docx
+    audience: Vendors
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan: null
+expect:
+  outcome: refused

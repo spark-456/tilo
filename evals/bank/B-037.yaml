@@ -1,0 +1,84 @@
+id: B-037
+domain: finance
+shapes:
+- parallel_units
+title: A one-page comparison of four savings accounts
+brief: 'Compare four savings accounts on rate, access, and fees, and say which suits someone who may need the money
+  within a year. Accounts: Alder 4.1% instant access; Birch 4.6% 12-month notice; Cedar 4.3% with a 1% withdrawal
+  fee; Dune 3.9% no fees.'
+director:
+  brief:
+    goal: Compare four savings accounts and recommend one for a saver who may need the money within a year.
+    deliverables:
+    - title: Comparison
+      format: markdown
+    audience: A private saver
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: personal
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: analyse
+      title: Assess Alder
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: analyse
+      title: Assess Birch
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U3
+      unit_type: analyse
+      title: Assess Cedar
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U4
+      unit_type: analyse
+      title: Assess Dune
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U5
+      unit_type: draft
+      title: Write the comparison and pick one
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+      - U2
+      - U3
+      - U4
+    - id: U6
+      unit_type: verify
+      title: Check the figures
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U5
+expect:
+  outcome: completed

@@ -57,6 +57,7 @@ shared `uv` workspace venv by `uv sync --all-packages`.
 `tilo-policy` declares `pyyaml`, `jsonschema` and `referencing` as runtime dependencies (ticket
 P4-01); all three are already listed above under the root dev dependency group (MIT). No new
 licence.
+Ticket CHN-WIRE-1 makes `tilo-channels` depend on the in-workspace `tilo-policy` (`check_entry` before an L1/T3 Send); not external, no new licence.
 Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject.toml`):
 
 | Dependency | Licence | Source |

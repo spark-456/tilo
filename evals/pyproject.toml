@@ -3,10 +3,22 @@ name = "tilo-evals"
 version = "0.1.0"
 description = "tilo_evals — the eval harness: case schema, runner, deterministic checks, credit caps (EFF-07, PRD 19)"
 requires-python = "==3.12.*"
-dependencies = ["pyyaml>=6.0", "jsonschema>=4.18", "referencing>=0.30", "tilo-contracts"]
+dependencies = [
+    "pyyaml>=6.0",
+    "jsonschema>=4.18",
+    "referencing>=0.30",
+    "httpx>=0.27",
+    "tilo-contracts",
+    "tilo-api",
+    "tilo-planning",
+    "tilo-providers",
+]
 
 [tool.uv.sources]
 tilo-contracts = { workspace = true }
+tilo-api = { workspace = true }
+tilo-planning = { workspace = true }
+tilo-providers = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

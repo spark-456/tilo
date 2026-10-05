@@ -1,0 +1,67 @@
+id: B-007
+domain: marketing
+shapes:
+- single_deliverable
+- gated_save
+title: Subject lines and a launch note for a tea subscription relaunch
+brief: We are relaunching our loose-leaf tea subscription in November. Write three subject-line variants and a short
+  launch note (120 words max) for existing subscribers, and put it in a doc for the team.
+director:
+  brief:
+    goal: Write three subject lines and a 120-word launch note for the November tea subscription relaunch.
+    deliverables:
+    - title: Subject lines and launch note
+      format: google_docs
+    audience: Existing subscribers
+    deadline: null
+    constraints:
+    - 120 words max
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: draft
+      title: Write three subject-line variants
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Write the launch note
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: verify
+      title: Check the length and tone
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+    - id: U4
+      unit_type: deliver
+      title: Save the result to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U3
+expect:
+  outcome: completed
