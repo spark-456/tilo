@@ -24,7 +24,8 @@ async function boxes(page: Page): Promise<Box[]> {
   );
 }
 
-const seen: Record<string, number> = { wide: 0, narrow: 0 };
+// Routes that held a two-number reserve, per screen size: a retry of a route never counts it twice.
+const seen: Record<string, Set<string>> = { wide: new Set(), narrow: new Set() };
 
 // One worker walks the file in order, so the closing test sees every box the walk met.
 test.describe.configure({ mode: "serial" });
@@ -38,6 +39,7 @@ for (const viewport of VIEWPORTS) {
       await page.setViewportSize(viewport);
       await page.goto(`${path}?speed=100`); // warm the dev server before the shifts are watched
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      // Registered after the warm-up load on purpose: it watches the next navigation only.
       await page.addInitScript(() => {
         const w = window as unknown as { __shifts: number[] };
         w.__shifts = [];
@@ -59,7 +61,7 @@ for (const viewport of VIEWPORTS) {
         const lines = viewport.which === "narrow" ? box.narrow : box.wide;
         expect(box.height).toBeCloseTo(lines * 1.6 * box.font, 0);
         expect(box.sideways).toBeLessThanOrEqual(1);
-        if (box.narrow !== box.wide) seen[viewport.which] += 1;
+        if (box.narrow !== box.wide) seen[viewport.which]?.add(path);
       }
     });
   }
@@ -68,6 +70,6 @@ for (const viewport of VIEWPORTS) {
 test("UX_1 #352 the walk met two-number reserves on both screen sizes", () => {
   // Runs last in the file (one worker per file keeps the order): a sweep that never meets a
   // two-number reserve would pass without proving anything.
-  expect(seen.narrow).toBeGreaterThanOrEqual(8);
-  expect(seen.wide).toBeGreaterThanOrEqual(8);
+  expect(seen.narrow?.size).toBeGreaterThanOrEqual(8);
+  expect(seen.wide?.size).toBeGreaterThanOrEqual(8);
 });
