@@ -96,8 +96,6 @@ def test_FR_MEM_12_artifact_created_data_is_1_1_0_and_additive(repo_root, regist
     for missing in ("content_sha256", "media_type", "size_bytes"):
         partial = {k: v for k, v in STORED.items() if k != missing}
         assert errors_for(schema, partial, registry), f"all three or none, {missing} missing"
-    stored = load_json(repo_root / "contracts/fixtures/events/valid/artifact.created--stored.json")["data"]
-    assert {"content_sha256", "media_type", "size_bytes"} <= stored.keys()
 
 
 def _check(repo_root, path):
@@ -106,13 +104,15 @@ def _check(repo_root, path):
     registry = events.load_registry(repo_root / "contracts")
     assert [p for e in stream for p in events.event_problems(e, registry, validate)] == [], "passes the schemas"
     layout = load_json(repo_root / "contracts/fixtures/layout/valid/village_basic.json")
-    return {e["type"] for e in stream}, events.stream_problems(stream, events.layout_ids(layout))
+    return stream, events.stream_problems(stream, events.layout_ids(layout))
 
 
 def test_FR_MEM_12_EV_15_versions_restore_review_and_delivery_stream_is_valid(repo_root):
-    types, problems = _check(repo_root, repo_root / "contracts/fixtures/streams/artifact-versions.jsonl")
+    stream, problems = _check(repo_root, repo_root / "contracts/fixtures/streams/artifact-versions.jsonl")
     assert problems == []
-    assert types == {f"artifact.{v}" for v in ("created", "versioned", "rolled_back", "reviewed", "delivered")}
+    types = {f"artifact.{v}" for v in ("created", "versioned", "rolled_back", "reviewed", "delivered")}
+    assert {e["type"] for e in stream} == types
+    assert {"content_sha256", "media_type", "size_bytes"} <= stream[0]["data"].keys(), "a stored 1.1.0 created"
 
 
 @pytest.mark.parametrize("name", INVALID_STREAMS)
