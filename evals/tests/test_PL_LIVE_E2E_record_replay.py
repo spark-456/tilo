@@ -75,6 +75,7 @@ def test_PL_LIVE_E2E_18_recording_saves_every_reply_redacted_beside_the_case(tmp
         assert payload["role"] == path.parent.name and payload["key"] == path.stem and KEY_RE.match(path.stem)
         assert isinstance(payload["response"]["text"], str) and payload["response"]["text"]
         assert payload["response"]["usage"]["input_tokens"] == 1000  # the cost is replayable from the recording
+        assert b"\r" not in path.read_bytes()  # LF even on Windows (.gitattributes): write bytes, not text mode
     text = all_text(files)
     for kind in ("email", "phone", "access_token", "bearer"):
         assert fake_secret(kind) not in text, kind
