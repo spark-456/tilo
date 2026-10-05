@@ -282,6 +282,15 @@
 .plate-toast button {
   flex: none;
 }
+.plate-toast .plate-dismiss {
+  min-width: 44px;
+  padding: 0 var(--space-8);
+}
+/* The page scrolls clear of the toast (--toast-h: bottom of the view to the toast's top, measured
+   in S_27), so a tabbed-to control is never under it (WCAG 2.4.11). */
+.screen-page:has(.plate-toast[data-on="true"]) {
+  scroll-padding-bottom: calc(var(--toast-h, 100px) + var(--space-16));
+}
 .plate-toast[data-on="true"] {
   padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-controls);

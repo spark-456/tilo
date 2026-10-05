@@ -139,6 +139,66 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       ).toEqual([]);
     });
 
+    test("PPL-40a S-27: tabbing through the whole list never puts focus under the toast", async ({
+      page,
+    }) => {
+      await page.clock.install();
+      await page.goto("/plate");
+      await page.getByRole("button", { name: /^Done: Review the Q4/ }).click();
+      const slot = page.getByTestId("plate-toast");
+      await expect(slot).toHaveAttribute("data-on", "true");
+      // Start from the top of the page and Tab until focus reaches the toast's own buttons.
+      await page.evaluate(() => {
+        (document.activeElement as HTMLElement | null)?.blur();
+        for (const el of document.querySelectorAll("*")) el.scrollTop = 0;
+        window.scrollTo(0, 0);
+      });
+      const under = () =>
+        slot.evaluate((el) => {
+          const t = el.querySelector(".plate-toast")?.getBoundingClientRect();
+          const f = document.activeElement;
+          if (!t || !f || f === document.body || f.contains(el) || el.contains(f)) return null;
+          const r = f.getBoundingClientRect();
+          const hit = r.left < t.right && r.right > t.left && r.top < t.bottom && r.bottom > t.top;
+          return hit
+            ? `${f.textContent?.trim() ?? f.tagName} ${JSON.stringify([r.top, r.bottom, t.top, t.bottom])}`
+            : null;
+        });
+      const dismiss = page.getByRole("button", { name: "Dismiss" });
+      let steps = 0;
+      for (; steps < 80; steps++) {
+        await page.keyboard.press("Tab");
+        expect(await under(), `focus under the toast at Tab ${steps + 1}`).toBeNull();
+        if (await dismiss.evaluate((b) => b === document.activeElement)) break;
+      }
+      expect(steps).toBeGreaterThan(10); // it did walk the list, row by row
+      expect(steps).toBeLessThan(80);
+    });
+
+    test("PPL-40a S-27: Dismiss and Esc clear the toast and keep focus on the page", async ({
+      page,
+    }) => {
+      await page.goto("/plate");
+      const slot = page.getByTestId("plate-toast");
+      const status = page.getByTestId("plate-status");
+      await page.getByRole("button", { name: /^Snooze until tomorrow: Call Acme/ }).click();
+      await expect(slot).toHaveAttribute("data-on", "true");
+      await page.getByRole("button", { name: "Dismiss" }).click();
+      await expect(slot).toHaveAttribute("data-on", "false");
+      await expect(status).toHaveText("");
+      await expect(page.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
+      await page.getByRole("button", { name: /^Done: Review the Q4/ }).click();
+      await expect(slot).toHaveAttribute("data-on", "true");
+      await page.keyboard.press("Escape");
+      await expect(slot).toHaveAttribute("data-on", "false");
+      // Esc from inside the toast moves focus to the first group, not to nowhere.
+      await page.getByRole("button", { name: /^Done: Confirm the rate hold/ }).click();
+      await page.getByRole("button", { name: "Undo" }).focus();
+      await page.keyboard.press("Escape");
+      await expect(slot).toHaveAttribute("data-on", "false");
+      await expect(page.locator(".plate-group").first()).toBeFocused();
+    });
+
     test("PPL-40a S-27: the toast clears itself after 8 s, unless focus is in it, and one replaces the last", async ({
       page,
     }) => {
@@ -174,7 +234,7 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       // The status is a polite live region that is in the page before anything is done, and no
       // blank toast box is kept yet.
       const status = page.getByTestId("plate-status");
-      await expect(page.getByRole("status").and(status)).toHaveCount(1); // <output>: role status, polite
+      expect(await status.evaluate((el) => el.tagName)).toBe("OUTPUT"); // role status, polite
       await expect(page.getByTestId("plate-toast")).toHaveAttribute("data-on", "false");
       expect((await page.getByTestId("plate-toast").boundingBox())?.height ?? 0).toBeLessThan(2);
       const scrolled = () =>

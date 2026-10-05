@@ -93,6 +93,37 @@ export function S_27() {
     );
     return () => window.clearTimeout(timer);
   }, [toast, wait]);
+  // The toast covers the bottom of the view, so a control tabbed to must scroll clear of it
+  // (WCAG 2.4.11): the page keeps scroll-padding the height of the toast while it shows.
+  useEffect(() => {
+    const page = slot.current?.closest("main");
+    if (!toast || !page || !slot.current) return;
+    // From the bottom of the view up to the top of the toast: its height, its sticky offset and
+    // the page's own bottom padding (the toast stops that far above the edge).
+    const px = (v: string) => Number.parseFloat(v) || 0;
+    const room =
+      slot.current.offsetHeight +
+      px(getComputedStyle(slot.current).bottom) +
+      px(getComputedStyle(page).paddingBottom);
+    page.style.setProperty("--toast-h", `${room}px`);
+    return () => {
+      page.style.removeProperty("--toast-h");
+    };
+  }, [toast]);
+  // Dismiss (the button or Esc): focus in the toast would be lost, so it goes to the first group.
+  const dismiss = () => {
+    if (slot.current?.contains(document.activeElement))
+      document.querySelector<HTMLElement>(".plate-group")?.focus({ preventScroll: true });
+    setToast(null);
+  };
+  useEffect(() => {
+    if (!toast) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") dismiss();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
   // Where focus goes once the acted row has left its list. It stays where the person is looking:
   // the next row's same control, else the group's own box (tabIndex -1). The toast is announced
   // by its live region, never focused, so acting never scrolls the page.
@@ -250,6 +281,20 @@ export function S_27() {
               }}
             >
               Undo
+            </button>
+          )}
+          {toast && (
+            <button type="button" className="secondary plate-dismiss" onClick={dismiss}>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span className="visually-hidden">Dismiss</span>
             </button>
           )}
         </div>
