@@ -1,10 +1,15 @@
-import { Application, Container, Graphics } from "pixi.js";
-import { useEffect, useRef, useState } from "react";
+import type { Layout } from "@tilo/contracts";
+import type { Container, Graphics } from "pixi.js";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import tokens from "../design/tokens";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { AppLink } from "../screens/AppLink";
+import { agentNames, rankName } from "../world/runSummary";
+import { useSelection } from "../world/selection";
 import * as cam from "./camera";
 
 const { tileWidth: TW, tileHeight: TH } = tokens.stage;
+const BARE_GRID_DELAY_MS = 1500;
 const PIXI = { autoDensity: true, autoStart: false, preserveDrawingBuffer: true } as const;
 
 // Iso lattice in world coordinates: lines of slope +-TH/TW, TH apart, through (0, -TH/2),
@@ -57,7 +62,63 @@ export function Stage({
   seq,
   selected,
   paused = false,
-}: { onWorld?: WorldSeam; seq?: number; selected?: string | null; paused?: boolean }) {
+  layout,
+  worldId,
+}: {
+  onWorld?: WorldSeam;
+  seq?: number;
+  selected?: string | null;
+  paused?: boolean;
+  layout?: Layout | null;
+  worldId?: string;
+}) {
+  const [, set, toggle] = useSelection(worldId ?? "");
+  const outlineItems = useMemo(() => {
+    if (!layout) return [];
+    const names = agentNames(layout);
+    const items: { id: string; name: string; inspect: boolean }[] = [];
+    for (const a of layout.semantic.agents) {
+      items.push({ id: a.id, name: names.get(a.id) ?? a.id, inspect: true });
+    }
+    for (const l of layout.semantic.levels) {
+      for (const d of l.districts) {
+        for (const b of d.buildings) items.push({ id: b.id, name: b.name, inspect: true });
+      }
+    }
+    for (const g of layout.semantic.gates) {
+      items.push({ id: g.id, name: `Gate ${g.id} (${rankName(g.guards)})`, inspect: false }); // a gate is not an Inspect object
+    }
+    return items;
+  }, [layout]);
+
+  // Roving focus: one tab stop, arrows move within the list (FR-WLD-11). Escape clears the
+  // selection and leaves focus on the item, a real control.
+  const [active, setActive] = useState(0);
+  const outlineRef = useRef<HTMLUListElement>(null);
+  const onOutlineKey = (e: KeyboardEvent<HTMLUListElement>) => {
+    const buttons = [...(outlineRef.current?.querySelectorAll<HTMLElement>(".outline-item") ?? [])];
+    if (e.key === "Escape") {
+      // Focus goes to the roving item first: the Inspect link, if that is where it was, leaves
+      // with the selection and would take focus to the page body with it.
+      buttons[active]?.focus();
+      return set(null);
+    }
+    const at = buttons.indexOf(document.activeElement as HTMLElement);
+    const next =
+      e.key === "ArrowDown" || e.key === "ArrowRight"
+        ? Math.min(at + 1, buttons.length - 1)
+        : e.key === "ArrowUp" || e.key === "ArrowLeft"
+          ? Math.max(at - 1, 0)
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? buttons.length - 1
+              : -1;
+    if (next < 0 || at < 0) return;
+    e.preventDefault();
+    buttons[next]?.focus();
+  };
+
   const frameRef = useRef<HTMLElement>(null);
   const [supported] = useState(() => !!document.createElement("canvas").getContext("webgl2"));
   const msRef = useRef(0);
@@ -65,9 +126,36 @@ export function Stage({
   const seamRef = useRef(onWorld);
   seamRef.current = onWorld;
 
+  // Pixi is code-split off the landing route (NFR-01): the page is interactive without it. A world
+  // to draw loads it at once; the bare grid is decoration, so it waits until the first keystroke
+  // has had its turn (the Pixi script is the largest task on the page).
+  const [pixi, setPixi] = useState<typeof import("pixi.js") | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false); // the chunk did not arrive (offline, a new deploy)
+  const bare = onWorld === undefined;
+  useEffect(() => {
+    if (!supported) return;
+    let live = true;
+    const timer = setTimeout(
+      () =>
+        void import("pixi.js").then(
+          (m) => live && setPixi(m),
+          () => live && setLoadFailed(true), // said below on a world; the bare grid just stays empty
+        ),
+      bare ? BARE_GRID_DELAY_MS : 0,
+    );
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [supported, bare]);
+  // A browser keeps a failed dynamic import for the life of the page, so a second import() never
+  // reaches the network; a reload does, and also picks up a redeployed chunk's new name.
+  const retryLoad = () => window.location.reload();
+
   useEffect(() => {
     const target = frameRef.current;
-    if (!supported || !target) return;
+    if (!supported || !target || !pixi) return;
+    const { Application, Container, Graphics } = pixi;
     const app = new Application();
     const world = new Container();
     const grid = new Graphics();
@@ -179,6 +267,7 @@ export function Stage({
     listen("keydown", (e) => {
       const move = KEYS[e.key];
       if (!move || e.ctrlKey || e.metaKey || e.altKey) return; // browser shortcuts pass
+      if ((e.target as Element).closest(".stage-outline")) return; // arrows belong to the list
       e.preventDefault();
       if (!pts.size) glide(move(goal)); // a drag or pinch in progress owns the camera
     });
@@ -227,7 +316,7 @@ export function Stage({
       // Pixi's destroy() throws before init() resolves, so it always waits for init.
       init.then(() => app.destroy({ removeView: true }, { children: true }));
     };
-  }, [supported]);
+  }, [supported, pixi]);
 
   return (
     <main
@@ -248,10 +337,49 @@ export function Stage({
           <span className="veil-label">Paused</span>
         </div>
       )}
+      {loadFailed && !bare && (
+        <div className="stage-fallback" data-testid="stage-load-failed" role="alert">
+          <p>The world couldn't be drawn: its drawing code didn't load. Check your connection.</p>
+          <button type="button" className="secondary" onClick={retryLoad}>
+            Try again
+          </button>
+        </div>
+      )}
       {!supported && (
         <p className="stage-fallback" data-testid="stage-fallback">
           This browser can't render the isometric World. The Story lens will show the run instead.
         </p>
+      )}
+      {outlineItems.length > 0 && (
+        <ul
+          className="stage-outline"
+          aria-label="World objects"
+          ref={outlineRef}
+          onKeyDown={onOutlineKey}
+        >
+          {outlineItems.map((item, i) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className="outline-item"
+                data-lens-control
+                tabIndex={i === active ? 0 : -1}
+                aria-pressed={selected === item.id}
+                onFocus={() => setActive(i)}
+                onClick={() => toggle(item.id)}
+              >
+                {item.name}
+              </button>
+              {selected === item.id && item.inspect && worldId && (
+                <AppLink
+                  to={`/world/${encodeURIComponent(worldId)}/inspect/${encodeURIComponent(item.id)}`}
+                >
+                  Inspect
+                </AppLink>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </main>
   );

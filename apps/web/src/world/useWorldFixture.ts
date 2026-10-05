@@ -8,7 +8,6 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import type { WorldSeam } from "../stage/Stage";
 import { loadFixture } from "./fixtureLoader";
 import type { RunStatus } from "./runSummary";
-import { runWorld } from "./runWorld";
 import { useSelection } from "./selection";
 import { parseSpeed, speedBadgeText } from "./speed";
 
@@ -30,6 +29,7 @@ export interface WorldFixtureState {
   /** Set when the named fixture could not be loaded (or no name was given); shown as an alert. */
   readonly loadError: string | null;
   readonly onWorld: WorldSeam;
+  readonly layout: import("@tilo/contracts").Layout | null;
 }
 
 function parseParams(search: string) {
@@ -51,6 +51,7 @@ export function useWorldFixture(): WorldFixtureState {
     fixture === "" ? "No fixture name was given, so the fixture could not be loaded." : null,
   );
   const [worldId, setWorldId] = useState(""); // set once the layout is loaded
+  const [layout, setLayout] = useState<import("@tilo/contracts").Layout | null>(null);
   const [selected] = useSelection(worldId);
   const [loaded, setLoaded] = useState<readonly Event[]>([]);
   const [finished, setFinished] = useState(false);
@@ -70,10 +71,12 @@ export function useWorldFixture(): WorldFixtureState {
       if (!fixture) return undefined;
       if (!dataRef.current) dataRef.current = loadFixture(fixture);
       let cancelled = false;
-      dataRef.current
-        .then(({ layout, events }) => {
+      // runWorld.ts (and Pixi behind it) loads here, off the landing route's bundle (NFR-01).
+      Promise.all([dataRef.current, import("./runWorld")])
+        .then(([{ layout, events }, { runWorld }]) => {
           if (cancelled) return;
           setWorldId(layout.world_id);
+          setLayout(layout);
           setLoaded(events);
           const lastSeq = events[events.length - 1]?.seq ?? 0;
           if (seqParam !== null) setFinished(true); // a fixed ?seq= shows a recorded run in full
@@ -120,5 +123,6 @@ export function useWorldFixture(): WorldFixtureState {
     selected,
     loadError,
     onWorld,
+    layout,
   };
 }

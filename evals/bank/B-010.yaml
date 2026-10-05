@@ -1,0 +1,89 @@
+id: B-010
+domain: finance
+shapes:
+- attachment
+- single_deliverable
+title: Find overspends in March card expenses
+brief: Attached is a CSV of March card expenses with the budget line for each. List every budget line that was overspent
+  and by how much, largest first.
+director:
+  brief:
+    goal: List March budget lines that were overspent, by amount, largest first.
+    deliverables:
+    - title: Overspend list
+      format: markdown
+    audience: Finance manager
+    deadline: '2026-10-31'
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: analyse
+      title: Total spend per budget line
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: analyse
+      title: Rank the overspends
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write the overspend list
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+    - id: U4
+      unit_type: verify
+      title: Recompute the totals
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U3
+    - id: U5
+      unit_type: deliver
+      title: Save the result to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U4
+expect:
+  outcome: completed
+files:
+- name: march_cards.csv
+  text: 'line,budget,spent
+
+    Travel,1200,1710
+
+    Software,900,880
+
+    Training,500,640
+
+    Office,300,295
+
+    '

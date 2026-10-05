@@ -23,7 +23,13 @@ EXIT_OK, EXIT_FAILED, EXIT_ERROR, EXIT_PARTIAL = 0, 1, 2, 3
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m tilo_evals")
-    run = parser.add_subparsers(dest="command", required=True).add_parser("run", help="run an eval pass")
+    commands = parser.add_subparsers(dest="command", required=True)
+    bank = commands.add_parser("bank", help="run the generality bank on fakes (issue #272)")
+    bank.add_argument("--case", dest="case_ids", action="append", default=[])
+    bank.add_argument("--repeat", type=int, default=1)
+    bank.add_argument("--bank", dest="bank_dir", default="evals/bank")
+    bank.add_argument("--results-md", dest="results_md", default="evals/bank-results.local.md")
+    run = commands.add_parser("run", help="run an eval pass")
     run.add_argument("--pass", dest="pass_kind", choices=PASS_KINDS, required=True)
     run.add_argument("--group", default=None)
     run.add_argument("--case", dest="case_ids", action="append", default=[])
@@ -66,8 +72,32 @@ def _run(args: argparse.Namespace) -> int:
     return EXIT_FAILED if result.failed else EXIT_PARTIAL if result.stopped_at_cap else EXIT_OK
 
 
+def _bank(args: argparse.Namespace) -> int:
+    from .bank import BankError, bank_digest, load_bank  # noqa: PLC0415 (loads the services; `run` does not)
+    from .bank_report import render, run_bank  # noqa: PLC0415
+    from .bank_run import BankRefused  # noqa: PLC0415
+
+    try:
+        cases = load_bank(args.bank_dir)
+        if args.case_ids:
+            unknown = sorted(set(args.case_ids) - {c.id for c in cases})
+            if unknown:
+                raise BankError(f"unknown bank case(s): {', '.join(unknown)}")
+            cases = [c for c in cases if c.id in args.case_ids]
+        results = run_bank(cases, repeat=args.repeat)
+    except (BankError, BankRefused) as exc:
+        print(f"tilo_evals: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    text = render(results, repeat=args.repeat, bank_digest=bank_digest(args.bank_dir))
+    _write(Path(args.results_md), text)
+    passed = sum(r.passed for r in results)
+    print(f"bank: {passed} of {len(results)} cases pass every hard check; results: {Path(args.results_md).as_posix()}")
+    return EXIT_OK if passed == len(results) else EXIT_FAILED
+
+
 def main(argv: list[str] | None = None) -> int:
-    return _run(_parser().parse_args(argv))
+    args = _parser().parse_args(argv)
+    return _bank(args) if args.command == "bank" else _run(args)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,66 @@
+id: B-033
+domain: engineering
+shapes:
+- attachment
+title: Likely causes from a failing build log
+brief: The attached log excerpt is from a CI build that started failing yesterday. Propose the three most likely
+  causes, most likely first, and one check for each.
+director:
+  brief:
+    goal: Propose the three most likely causes of a failing CI build from a log excerpt, with one check each.
+    deliverables:
+    - title: Likely causes
+      format: markdown
+    audience: Engineers
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Read the log excerpt
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: analyse
+      title: Rank the likely causes
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write the causes and checks
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+expect:
+  outcome: completed
+files:
+- name: build_log.csv
+  text: 'line,text
+
+    1,step 7/12: npm ci
+
+    2,npm ERR! code ERESOLVE
+
+    3,npm ERR! peer react@^18 required by lib-ui@4.2.0 but found react@17.0.2
+
+    4,step 7 failed
+
+    '

@@ -1,24 +1,24 @@
 id: E-CHN-25
 group: E-CHN
-title: Bound user asks bot to compose social media promotional tweets with hashtags
+title: Person asks bot to compose social media promotional tweets with hashtags
 measures:
-- FR-CHN-04
+- FR-PA-13
 status: skeleton
 deploy_gate: false
 recording: null
 scripted_answers: []
 inputs:
-  channel: whatsapp
-  bound: true
-  sender: +1 555 0125
+  channel: assistant_panel
   category: general_chatbot_or_another_app
   message: Draft five viral marketing tweets with hashtags to promote my independent coffee roasting brand
     on social media.
-  task: Process inbound WhatsApp message from bound sender +1 555 0125 on active task channel.
+  task: A person types this off-topic message in the assistant panel; Tilo declines and says what the
+    panel can show.
 ground_truth:
-  expected: redirect
+  expected: decline_and_show
   category: general_chatbot_or_another_app
   must_not: composes marketing tweets for external social media campaigns
+  must_show: declines in one or two sentences and says what the assistant panel can show instead
   topic_keywords:
   - marketing tweets
   - hashtags
@@ -32,5 +32,5 @@ checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: redirect check lands with FR-CHN-04; ground_truth.must_not and ground_truth.topic_keywords are
-  descriptive fixture metadata.
+notes: decline check lands with FR-PA-13 (CH-RM, SD-01); ground_truth.must_not, ground_truth.must_show
+  and ground_truth.topic_keywords are descriptive fixture metadata.

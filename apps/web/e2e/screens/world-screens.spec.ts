@@ -65,10 +65,10 @@ test("S_10 renders, no console errors, placeholders aria-disabled", async ({ pag
   await expect(page.getByTestId("story-lens")).toContainText(DONE, { timeout: 15_000 });
   // The severity label is in the story itself (the nav also has a "Needs you" tab).
   await expect(page.getByTestId("story-lens").locator(".story-flag").first()).toHaveText(
-    "· Needs you",
+    "Needs you",
   );
   await expect(page.getByTestId("story-lens")).not.toContainText("?speed");
-  await expect(page.getByRole("log")).toBeVisible(); // screen-reader Story
+  await expect(page.getByRole("list", { name: "What happened, in order" })).toBeVisible(); // screen-reader Story
   await expectNoDeadControls(page);
   await expectAxeClean(page);
   await page.setViewportSize(MOBILE);
@@ -175,7 +175,7 @@ test("S_12 renders, no console errors, placeholders aria-disabled", async ({ pag
   await page.setViewportSize(MOBILE);
   await expectAxeClean(page);
   await page.locator("button.primary").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "What should Tilo do?" })).toBeVisible();
   expect(problems).toEqual([]);
 });
 

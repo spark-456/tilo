@@ -1,8 +1,11 @@
-// S-16 Channels (PRD 18.3, 11.1): WhatsApp binding, email and notification preferences. Binding
-// and preferences are placeholders; what is real is the state of the world's channel islands (from
-// client.getLayout, its starting state) and the channel messages recorded in the run. No design
-// export covers this screen: cards and rows after "Tilo Team.dc.html", neutral role tokens.
+// S-16 Channels (PRD 18.3, 11.1; WhatsApp removed by SD-01): email, notification preferences and
+// the connected Google accounts. Preferences are placeholders; what is real is the state of the
+// world's connections (from client.getLayout, their starting state) and the messages recorded in
+// the run that went by email or in the app. `whatsapp` stays a valid contract value but is never
+// offered, named or listed here. No design export covers this screen: cards and rows after
+// "Tilo Team.dc.html", neutral role tokens.
 import { useClient } from "../api/ClientProvider";
+import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Chip, EventList, Page, Row, Section, Soon, field, nameOf, useFixtureRun } from "./kit";
 import { useRemote } from "./remote";
@@ -14,11 +17,18 @@ const ISLAND_STATE = {
   failed: ["Access lost", "blocked"],
 } as const;
 
+/** Where Tilo's messages can have gone now: the app and email (the contracts hold more values). */
+const SHOWN_CHANNELS: ReadonlySet<string> = new Set(["web", "mobile_web", "email"]);
+
 export function S_16() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
-  const [layout, retry] = useRemote("load the channels", () => client.getLayout(worldId));
-  const messages = events.filter((e) => e.type.startsWith("channel."));
+  const [layout, retry] = useRemote("load the channels", (signal) =>
+    client.getLayout(worldId, signal),
+  );
+  const messages = events.filter(
+    (e) => e.type.startsWith("channel.") && SHOWN_CHANNELS.has(String(field(e, "channel"))),
+  );
   return (
     <Page
       testid="channels"
@@ -26,16 +36,20 @@ export function S_16() {
       sub="Where Tilo reaches you, and where you can answer it from."
     >
       <Section
-        title="WhatsApp"
-        note="You bind your number with a one-time code sent over WhatsApp, and confirm it again every 30 days. Tilo understands STOP AUTOPILOT, PAUSE and UNSUBSCRIBE."
+        title="Connected Google accounts"
+        note="The Google accounts this world uses, and where each stands. Sign-in and access are reviewed on Connections."
         reserve={4}
-        action={<Soon labels={["Bind a WhatsApp number"]} />}
+        action={
+          <AppLink to="/connections" className="pill">
+            Review connections
+          </AppLink>
+        }
       >
-        <Loaded what="the channels" remote={layout} retry={retry} isEmpty={() => false}>
+        <Loaded what="the accounts" remote={layout} retry={retry} isEmpty={() => false}>
           {(l) => (
-            <ul className="blist" data-testid="channel-islands">
+            <ul className="blist" data-testid="connected-accounts">
               {l.semantic.islands
-                .filter((i) => i.conn === "channel")
+                .filter((i) => i.conn !== "channel")
                 .map((i) => (
                   <Row
                     key={i.id}
@@ -48,20 +62,20 @@ export function S_16() {
           )}
         </Loaded>
       </Section>
+      <Section title="Recent channel messages" reserve={[7, 9]}>
+        <EventList
+          events={messages}
+          all={events}
+          empty="No email or in-app message has been recorded yet."
+          extra={(e) => <Chip tone="fyi">{nameOf(String(field(e, "channel")))}</Chip>}
+        />
+      </Section>
       <Section
         title="Email"
         note="Notifications, digests and question cards come from Tilo's sending domain, with a signed link to answer."
         action={<Soon labels={["Change notification email"]} />}
       >
         <p className="empty-note">Notification preferences will be set here.</p>
-      </Section>
-      <Section title="Recent channel messages" reserve={[7, 9]}>
-        <EventList
-          events={messages}
-          all={events}
-          empty="No channel message has been recorded yet."
-          extra={(e) => <Chip tone="fyi">{nameOf(String(field(e, "channel")))}</Chip>}
-        />
       </Section>
       <Section title="Notification preferences" note="Choose what reaches you, and where.">
         <Soon labels={["Choose channels", "Set quiet hours"]} />

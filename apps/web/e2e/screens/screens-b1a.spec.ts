@@ -14,7 +14,7 @@ test("S_13 renders, no console errors, placeholders aria-disabled", async ({ pag
     });
     await expect(page.getByText("Deliverables", { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId("memory-empty")).toBeVisible();
-    await soon(page, "Search the library");
+    await expect(page.getByRole("searchbox", { name: "Search the library" })).toBeVisible();
   });
   await page.getByRole("link", { name: "Version history" }).click();
   await expect(page).toHaveURL(/\/library\/artifacts$/);
@@ -26,7 +26,7 @@ test("S_13 lists a deliverable only once artifact.delivered is recorded (HR-1)",
 }) => {
   await page.setViewportSize(DESKTOP);
   await page.goto("/library"); // recorded pace: artifact.delivered is about two minutes in
-  await expect(page.getByTestId("library-empty")).toHaveText("Nothing has been delivered yet.");
+  await expect(page.getByTestId("library-empty")).toContainText("Nothing delivered yet");
   await expect(page.getByTestId("library-rows")).toHaveCount(0);
 });
 
@@ -52,7 +52,7 @@ test("S_14 renders, no console errors, placeholders aria-disabled", async ({ pag
     "/world/w_village_basic",
   );
   await page.locator("button.primary").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "What should Tilo do?" })).toBeVisible();
   expect(problems).toEqual([]);
 });
 
@@ -79,8 +79,7 @@ test("S_15 renders, no console errors, placeholders aria-disabled", async ({ pag
     await expect(rows.last().getByRole("link")).toHaveAttribute("href", /\/trace$/);
     // Undo and report apply only to outgoing actions: one row in this run.
     await expect(page.getByRole("button", { name: /^Undo/ })).toHaveCount(1);
-    await soon(page, "Stop all autopilot");
-    await soon(page, "New rule");
+    await expect(page.getByRole("button", { name: "Stop all autopilot" })).toBeVisible(); // live: autopilot-stop.spec.ts
   });
   expect(problems).toEqual([]);
 });
@@ -89,11 +88,14 @@ test("S_16 renders, no console errors, placeholders aria-disabled", async ({ pag
   test.setTimeout(90_000);
   const problems = watchConsole(page);
   await visit(page, "/channels", "Channels", async () => {
-    await expect(page.getByTestId("channel-islands")).toContainText("Connected");
-    await expect(page.getByText("Your WhatsApp answer arrived.")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("STOP AUTOPILOT")).toBeVisible();
-    await expect(page.getByText(/Whatsapp/)).toHaveCount(0);
-    await soon(page, "Bind a WhatsApp number");
+    await expect(page.getByTestId("connected-accounts")).toContainText("Gmail", {
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("connected-accounts")).toContainText("Connected");
+    // WhatsApp is out of scope (SD-01): nothing on the screen offers, names or lists it.
+    await expect(page.getByText(/whatsapp/i)).toHaveCount(0);
+    await expect(page.getByText("STOP AUTOPILOT")).toHaveCount(0);
+    await soon(page, "Change notification email");
   });
   expect(problems).toEqual([]);
 });
@@ -103,5 +105,5 @@ noLayoutShift([
   ["S_13", "/library", "Triage list"],
   ["S_14", "/worlds", "Replay of run #village_basic_1"],
   ["S_15", "/autonomy", "Authorised by you"],
-  ["S_16", "/channels", "Your WhatsApp answer arrived."],
+  ["S_16", "/channels", "Gmail"],
 ]);

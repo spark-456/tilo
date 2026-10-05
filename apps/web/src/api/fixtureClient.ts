@@ -1,5 +1,6 @@
 import type { Brief, Card, Event, Layout } from "@tilo/contracts";
 import { parseSpeed } from "../world/speed";
+import { ChunkLoadError } from "./chunkError";
 import type {
   ApproachesResult,
   ApprovalRequest,
@@ -18,8 +19,7 @@ import {
   FIXTURE_TASK_ID,
   FIXTURE_WORLD_ID,
 } from "./fixtures/derived";
-import { EVENTS_VILLAGE_BASIC } from "./fixtures/events";
-import { LAYOUT_VILLAGE_BASIC } from "./fixtures/layout";
+import type { StopResult } from "./stop";
 
 export interface FixtureClientOptions {
   /** Deterministic latency added to every request, so tests can observe loading states. */
@@ -32,6 +32,17 @@ export interface FixtureClientOptions {
 export function replaySpeedFromSearch(search: string): number {
   return parseSpeed(new URLSearchParams(search).get("speed"));
 }
+
+// The recorded run and its layout are the bulk of the fixtures (NFR-01): imported when a call needs
+// them, so the landing route's bundle does not carry them.
+const chunk = <T>(what: string, load: () => Promise<T>) =>
+  load().catch(() => {
+    throw new ChunkLoadError(what);
+  });
+const loadEvents = () =>
+  chunk("The recorded run", () => import("./fixtures/events").then((m) => m.EVENTS_VILLAGE_BASIC));
+const loadLayout = () =>
+  chunk("The world layout", () => import("./fixtures/layout").then((m) => m.LAYOUT_VILLAGE_BASIC));
 
 /** The longest delay setTimeout honours; a larger one fires at once. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
@@ -139,13 +150,16 @@ export class FixtureClient implements TiloClient {
 
   async getLayout(_worldId: string): Promise<Layout> {
     await wait(this.delayMs);
-    return LAYOUT_VILLAGE_BASIC;
+    // The run's events come with the layout, so a missing chunk is said here, where a person is
+    // waiting on it, and not as a silently empty stream later.
+    const [layout] = await Promise.all([loadLayout(), loadEvents()]);
+    return layout;
   }
 
   /** Replays the recorded stream in seq order, following the recorded `ts` gaps divided by the
    * speed (the world replay's timing, HR-6). The returned function stops it. */
   subscribeEvents(_worldId: string, onEvent: (e: Event) => void): () => void {
-    const events: readonly Event[] = [...EVENTS_VILLAGE_BASIC].sort((a, b) => a.seq - b.seq);
+    let events: readonly Event[] = [];
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let last: Event | undefined;
@@ -171,12 +185,30 @@ export class FixtureClient implements TiloClient {
         Math.min(Math.max(0, gap), MAX_TIMER_MS), // setTimeout overflows above 2^31-1 ms
       );
     };
-    play(0);
+    void loadEvents().then(
+      (recorded) => {
+        events = [...recorded].sort((a, b) => a.seq - b.seq);
+        play(0);
+      },
+      () => undefined, // getLayout reports a missing recording; here nothing is invented in its place
+    );
     return () => {
       stopped = true;
       clearTimeout(timer);
       this.playing.delete(pause);
     };
+  }
+
+  /** Every Stop all autopilot this client received, by world: a test reads what was sent. */
+  readonly stopRequests: string[] = [];
+
+  /** Stop all autopilot (FR-HIL-07), not on the TiloClient interface. The fixture world holds no
+   * rule that runs on its own (no policy is served), so the honest answer to the call is that
+   * nothing was stopped and nothing was already waiting; the call itself is recorded. */
+  async stopAutopilot(worldId: string): Promise<StopResult> {
+    await wait(this.delayMs);
+    this.stopRequests.push(worldId);
+    return { stopped: 0, already_l1: 0, confirmations: [], pending: 0 };
   }
 
   /** Pause all (FR-WLD-07), not on the TiloClient interface. Like the server it stops the run and

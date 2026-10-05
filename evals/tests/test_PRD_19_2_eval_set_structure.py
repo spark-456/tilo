@@ -6,7 +6,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from conftest import REPO_ROOT
+from _evals_lib import REPO_ROOT
 from tilo_evals import EvalsConfig, load_cases
 
 _CASES_DIR = REPO_ROOT / "evals" / "cases"
@@ -83,6 +83,7 @@ def test_PRD_19_2_eval_set_structure_fictional_domains_and_phone_numbers_only() 
 
 DESCRIPTIVE_GROUND_TRUTH_KEYS: set[tuple[str, str]] = {
     ("E-CHN", "must_not"),
+    ("E-CHN", "must_show"),
     ("E-CHN", "topic_keywords"),
     ("E-MAIL", "reason"),
     ("E-RED", "bait"),

@@ -3,12 +3,20 @@
 // while a card waits. Each row opens the queue.
 import { AppLink } from "../screens/AppLink";
 import { useFixtureRun } from "../screens/kit";
-import { withWorld } from "../world/worldContext";
-import { deriveQueue, rungOf } from "./queue";
+import { useRunWorld, withWorld } from "../world/worldContext";
+import { type QueueItem, deriveQueue, rungOf } from "./queue";
 
+/** With no run to read (a live API, nothing started), the rail says nothing needs you and asks for nothing. */
 export function NeedsYouRail() {
+  return useRunWorld() === null ? <RailBox items={[]} worldId="" /> : <RailOfRun />;
+}
+
+function RailOfRun() {
   const { events, worldId } = useFixtureRun();
-  const items = deriveQueue(events);
+  return <RailBox items={deriveQueue(events)} worldId={worldId} />;
+}
+
+function RailBox({ items, worldId }: { items: QueueItem[]; worldId: string }) {
   return (
     <>
       <h2>Needs you</h2>

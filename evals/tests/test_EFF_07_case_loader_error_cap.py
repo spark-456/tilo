@@ -2,7 +2,7 @@
 
 import jsonschema
 import pytest
-from conftest import write_case
+from _evals_lib import write_case
 from tilo_evals import CaseError, load_cases
 
 _MANY = 2_000  # far beyond the 20-error cap

@@ -8,6 +8,7 @@ import type { CSSProperties, ReactNode, Ref } from "react";
 import { useClient } from "../api/ClientProvider";
 import { elapsed, useRunLog } from "../world/runLog";
 import { useWorldContext } from "../world/worldContext";
+import { AppLink } from "./AppLink";
 import { Placeholder } from "./Placeholder";
 
 /** The recorded events of the screen's world as they arrive: the world its address names
@@ -28,11 +29,10 @@ export const words = (id: string): string =>
 export const plural = (n: number, one: string, many = `${one}s`): string =>
   `${n} ${n === 1 ? one : many}`;
 
-/** Brand and channel names as people write them ("WhatsApp", "Google Drive"). */
+/** Brand and channel names as people write them ("Google Drive", "Email"). */
 const NAMES: Readonly<Record<string, string>> = {
   gmail: "Gmail",
   google_drive: "Google Drive",
-  whatsapp: "WhatsApp",
   email: "Email",
 };
 export const nameOf = (id: string): string => NAMES[id] ?? words(id);
@@ -88,6 +88,62 @@ export function Soon({
   );
 }
 
+/** A static empty isometric tile, in neutral role tokens: a drawing, not a render of any world. */
+function EmptyGlyph() {
+  return (
+    <svg
+      className="empty-glyph"
+      viewBox="0 0 80 60"
+      width="56"
+      height="42"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polygon points="40,6 72,22 40,38 8,22" fill="var(--color-surface-2)" />
+      <polygon points="8,22 40,38 40,54 8,38" fill="var(--color-fog)" />
+      <polygon points="72,22 40,38 40,54 72,38" fill="var(--color-ink-3)" opacity="0.5" />
+      <polygon
+        points="40,14 58,22 40,30 22,22"
+        fill="none"
+        stroke="var(--color-brand-primary)"
+        strokeWidth="2"
+        strokeDasharray="4 3"
+      />
+    </svg>
+  );
+}
+
+/** What a screen shows when there is nothing to list yet: an isometric glyph, a title, one line that
+ * says what is true and why, and at most one action. It fills the reserved box it sits in, so
+ * loading, empty and ready never move what is around them (CLS, UX-1). `compact` drops the card
+ * for a short list inside another section. */
+export function EmptyState({
+  testid,
+  title,
+  line,
+  action,
+  compact = false,
+}: {
+  testid: string;
+  title: string;
+  line: string;
+  action?: { label: string; to: string };
+  compact?: boolean;
+}) {
+  return (
+    <div className="empty-state" data-testid={testid} data-compact={compact ? "true" : undefined}>
+      <EmptyGlyph />
+      <p className="empty-title">{title}</p>
+      <p className="empty-line">{line}</p>
+      {action && (
+        <AppLink className="secondary" to={action.to}>
+          {action.label}
+        </AppLink>
+      )}
+    </div>
+  );
+}
+
 /** A state in words, tinted by tone: the colour never carries the meaning alone. */
 export function Chip({ tone, children }: { tone: string; children: ReactNode }) {
   return (
@@ -97,19 +153,34 @@ export function Chip({ tone, children }: { tone: string; children: ReactNode }) 
   );
 }
 
-/** Key figures as labelled hero numbers. */
-export function Stats({ items }: { items: ReadonlyArray<readonly [string, string | number]> }) {
+/** A figure's state in words (tone, text), under it: "Needs you", "All clear", "None yet". */
+export type StatState = readonly [tone: string, text: string];
+
+/** Key figures as labelled hero numbers, each with an optional state chip: what the number means
+ * is said in words, never by the number or a colour alone. */
+export function Stats({
+  items,
+}: { items: ReadonlyArray<readonly [string, string | number, StatState?]> }) {
   return (
     <ul className="stat-tiles hero-stats">
-      {items.map(([label, value]) => (
+      {items.map(([label, value, state]) => (
         <li key={label}>
           <span className="stat-name">{label}</span>
           <b>{value}</b>
+          {state && <Chip tone={state[0]}>{state[1]}</Chip>}
         </li>
       ))}
     </ul>
   );
 }
+
+/** The state chip of a count that is waiting on a person: "Needs you" or "All clear". */
+export const waitState = (n: number): StatState =>
+  n > 0 ? ["needs", "Needs you"] : ["done", "All clear"];
+
+/** The state chip of a count of things made or done: `word` when there are some, else "None yet". */
+export const doneState = (n: number, word: string): StatState =>
+  n > 0 ? ["done", word] : ["soon", "None yet"];
 
 /** Lines of body height: one number, or [wide screens, narrow screens]. */
 export type Lines = number | readonly [number, number];

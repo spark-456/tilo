@@ -4,13 +4,16 @@
 import type { Severity } from "@tilo/contracts";
 import { useClient, useIsFixtureClient } from "../api/ClientProvider";
 import { isKnownType } from "../world/registry";
-import { useReplayedLog } from "../world/replay";
-import { elapsed } from "../world/runLog";
-import { agentNames, worldStatus } from "../world/runSummary";
+import { useReplayPoint, useReplayedLog } from "../world/replay";
+import { elapsed, useRunLog } from "../world/runLog";
+import { agentNames, runEnded, worldStatus } from "../world/runSummary";
 import { involves, useSelection } from "../world/selection";
 import { LensTabs } from "./LensTabs";
+import { LevelChip, levelOf } from "./LevelChip";
+import { Chip } from "./kit";
 import { useRemote } from "./remote";
 import type { ScreenProps } from "./routes";
+import { useStoryAnnouncement } from "./storyAnnounce";
 
 /** A text label for every severity that is not routine, so colour never carries it alone. */
 export const SEVERITY_LABEL: Partial<Record<Severity, string>> = {
@@ -21,6 +24,15 @@ export const SEVERITY_LABEL: Partial<Record<Severity, string>> = {
   gate: "Approval",
 };
 
+/** The tone of the state chip for a severity (btag tones, app.css). */
+const SEVERITY_TONE: Partial<Record<Severity, string>> = {
+  fyi: "fyi",
+  nudge: "fyi",
+  needs_you: "needs",
+  blocked: "blocked",
+  gate: "gate",
+};
+
 export function S_10({ params }: ScreenProps) {
   const worldId = params[0] ?? "";
   const client = useClient();
@@ -29,11 +41,19 @@ export function S_10({ params }: ScreenProps) {
   const status = worldStatus(events);
   const story = events.filter((e) => isKnownType(e.type));
   const [selected, , toggle] = useSelection(worldId);
-  const [layout] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layout] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const names = layout.status === "ready" ? agentNames(layout.value) : null;
   // The rows wait for the layout (ready or failed) so the who-chips never arrive after them and
   // push the text about (CLS); a failed layout still shows the story, without chips.
   const settled = layout.status !== "loading";
+  // Only events that arrive live are news. A fixture, a scrubbed moment (a replay point is set) and
+  // a run that has ended are replays of what is already recorded, so none of them announces.
+  const replayPoint = useReplayPoint(worldId);
+  const ended = runEnded(worldStatus(useRunLog(client, worldId)));
+  const announced = useStoryAnnouncement(
+    story,
+    settled && !fixture && replayPoint === null && !ended,
+  );
   return (
     <div className="screen-body wide" data-testid="story-lens">
       <LensTabs worldId={worldId} current="story" />
@@ -52,35 +72,50 @@ export function S_10({ params }: ScreenProps) {
       ) : story.length === 0 ? (
         <p>Nothing has happened yet. The story fills in as events arrive.</p>
       ) : (
-        <div role="log" aria-label="What happened, in order">
-          <ol className="story-list">
-            {story.map((e) => (
-              <li
-                key={e.seq}
-                data-seq={e.seq}
-                data-severity={e.severity}
-                data-selected={selected !== null && involves(e, selected)}
-              >
-                <span className="story-time">{elapsed(events, e)}</span>
-                <span>
-                  {e.summary}
-                  {SEVERITY_LABEL[e.severity] && (
-                    <b className="story-flag"> · {SEVERITY_LABEL[e.severity]}</b>
-                  )}{" "}
-                  {names?.has(e.actor) && (
-                    <button
-                      type="button"
-                      className="pick"
-                      data-lens-control
-                      aria-pressed={selected === e.actor}
-                      onClick={() => toggle(e.actor)}
-                    >
-                      {names.get(e.actor)}
-                    </button>
-                  )}
-                </span>
-              </li>
-            ))}
+        <div>
+          <output className="sr-only" aria-live="polite" aria-atomic="true">
+            {announced}
+          </output>
+          <ol className="story-list" aria-label="What happened, in order">
+            {story.map((e) => {
+              const lv = levelOf(layout.status === "ready" ? layout.value : null, e);
+              return (
+                <li
+                  key={e.seq}
+                  data-seq={e.seq}
+                  data-severity={e.severity}
+                  data-selected={selected !== null && involves(e, selected)}
+                >
+                  <span className="story-time">{elapsed(events, e)}</span>
+                  <div className="story-body">
+                    <p className="story-text">{e.summary}</p>
+                    {(lv || SEVERITY_LABEL[e.severity] || names?.has(e.actor)) && (
+                      <p className="story-meta">
+                        {lv && <LevelChip level={lv} />}
+                        {SEVERITY_LABEL[e.severity] && (
+                          <span className="story-flag">
+                            <Chip tone={SEVERITY_TONE[e.severity] ?? "fyi"}>
+                              {SEVERITY_LABEL[e.severity]}
+                            </Chip>
+                          </span>
+                        )}
+                        {names?.has(e.actor) && (
+                          <button
+                            type="button"
+                            className="pick"
+                            data-lens-control
+                            aria-pressed={selected === e.actor}
+                            onClick={() => toggle(e.actor)}
+                          >
+                            {names.get(e.actor)}
+                          </button>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         </div>
       )}

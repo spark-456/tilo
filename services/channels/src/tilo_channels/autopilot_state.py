@@ -8,39 +8,57 @@ reads the other's, so at least one side sees the other):
   ENQUEUE side, `schedule` (preview, replay, Send):
     E1 write `#enqueuing`. E2 read `#stop`: if set, enqueue nothing (when `#enqueuing` was already there, settle the
     stop as S3, which may raise). E3 enqueue under the key `autopilot:<card_id>` with the recorded entry id (a repeated
-    key returns the stored entry). E4 read `#stop` again: if set, settle the stop (S3); an unconfirmed cancel raises
-    CancelPending, so the caller retries; it is never swallowed.
-  STOP side, `stop` (Cancel, Edit):
-    S1 write `#stop` (any Cancel or Edit; from now on no entry of the card may send). S2 if `#cancelled` is there:
-    "cancelled". If `#enqueuing` is not there, no enqueue ever started and every later one stops at E2: write
-    `#cancelled`, "cancelled". S3 (settle) otherwise: cancel the recorded id; if the outbox refuses, look the entry up
-    by enqueueing the same key again (it returns the stored entry, or stores it now to be cancelled next) and cancel
-    it if it is scheduled. "cancelled" (and `#cancelled`) only when the outbox confirmed the cancel or showed the entry
-    cancelled; "too_late" only when it showed the entry sending, sent or failed; anything unconfirmed raises
-    CancelPending. Elapsed time is never evidence.
+    key returns the stored entry; a revoked key is refused). E4 read `#stop` again (also after E3 failed): if set,
+    settle the stop (S3); an unconfirmed cancel raises CancelPending, so the caller retries; it is never swallowed.
+  STOP side, `stop` (Cancel, Edit), never calling `enqueue` (CHN-GATE-A, BQ-186):
+    S0 queue the stop in `StopQueue` (BQ-187). S1 write `#stop` (from now on no entry of the card may send). S2 if
+    `#enqueuing` is not there, no enqueue ever started and every later one stops at E2: write `#cancelled`. S3 (settle,
+    also the sweeper's): revoke the key (cancels a stored scheduled entry, or makes the outbox refuse to create it),
+    else cancel the recorded id, else read the entry by key. "cancelled" (and `#cancelled`) only when the outbox
+    revoked the absent key, confirmed the cancel or showed the entry cancelled; "too_late" (and `#too_late`) only when
+    it showed the entry sending, sent or failed; anything unconfirmed raises CancelPending and stays queued. Elapsed
+    time is never evidence. A settled stop leaves the queue.
 
-`#cancelled` therefore means no entry of the card can ever send. A crash anywhere leaves either a stop that is not yet
-answered (the caller retries, and E2 or S3 completes it) or a confirmed one.
+`#cancelled` therefore means no entry of the card can ever send. A crash anywhere leaves either no recorded stop (the
+caller saw an error and retries) or a queued one that a retry, E2, E4 or the sweeper completes.
 """
 
 from __future__ import annotations
 
+import copy
 import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from tilo_policy.schemas import conforms
+
 ACTION_TYPE = "send_email"
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+DECISION_MAX_AGE_S = 30  # a stored decision authorises an entry at most this long after its `authz.at` (BQ-245, BQ-249)
+SKEW_S = 5  # a decision stamped this far ahead of our clock is still read as now
 
 
 class CancelPending(RuntimeError):
     """The outbox did not confirm the cancel of an entry that may still be scheduled: retry."""
 
 
+class StaleDecision(RuntimeError):
+    """The L2 entry would be created outside its decision's freshness bound: nothing is enqueued, decide again."""
+
+
 class Outbox(Protocol):  # the names of tilo_connectors.outbox.Outbox, which tilo-channels never imports (BQ-158)
     def enqueue(self, entry: dict, evidence: dict) -> dict: ...
     def cancel(self, outbox_id: str) -> dict: ...
+    def get(self, outbox_id: str) -> dict | None: ...  # read port: a copy or None; never writes
+    def get_by_idempotency_key(self, world_id: str, idempotency_key: str) -> dict | None: ...
+    def revoke(self, world_id: str, idempotency_key: str) -> dict | None: ...  # never creates an entry (BQ-186)
+
+
+class StopQueue(Protocol):  # stops not yet confirmed, shared by every instance (Firestore in production; BQ-187)
+    def add(self, user_id: str, card_id: str) -> None: ...
+    def pending(self) -> list[tuple[str, str]]: ...
+    def remove(self, user_id: str, card_id: str) -> None: ...
 
 
 class CardStore(Protocol):  # JSON-able documents keyed (user_id, key): get, atomic create-if-absent, put
@@ -51,6 +69,22 @@ class CardStore(Protocol):  # JSON-able documents keyed (user_id, key): get, ato
 
 def timestamp(ms: int) -> str:
     return datetime.fromtimestamp(ms // 1000, UTC).strftime("%Y-%m-%dT%H:%M:%S") + f".{ms % 1000:03d}Z"
+
+
+def parse_ms(stamp: Any) -> int | None:
+    """Epoch milliseconds of a contract timestamp (RFC 3339 UTC, three fractional digits); None for anything else."""
+    if type(stamp) is not str or not conforms("common.schema.json#/$defs/timestamp", stamp):
+        return None
+    try:
+        return round(datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC).timestamp() * 1000)
+    except (ValueError, OverflowError, OSError):  # the pattern allows dates that do not exist
+        return None
+
+
+def fresh(authz_at: Any, now_ms: int) -> bool:
+    """`authz_at` is no more than the skew ahead of `now_ms` and no more than the bound behind it."""
+    at = parse_ms(authz_at)
+    return at is not None and -SKEW_S * 1000 <= now_ms - at <= DECISION_MAX_AGE_S * 1000
 
 
 def ulid(ms: int) -> str:
@@ -68,8 +102,9 @@ class Ledger:
         world_id: str,
         run_id: str,
         connector: str,
+        stops: StopQueue | None = None,
     ) -> None:
-        self._cards, self._outbox, self._clock = cards, outbox, clock
+        self._cards, self._outbox, self._clock, self._stops = cards, outbox, clock, stops
         self._world_id, self._run_id, self._connector = world_id, run_id, connector
 
     def first(self, user_id: str, card_id: str, slot: str, by: str) -> str:
@@ -89,52 +124,85 @@ class Ledger:
         fresh = not claimed and self._cards.create(user_id, f"{card_id}#enqueuing", {})
         if self.holds(user_id, card_id, "stop"):  # E2
             if not fresh:  # an earlier enqueue may have stored the entry: complete the recorded stop
-                self._settle(user_id, doc)
+                self.settle(user_id, doc)
             return None
-        entry = self.enqueue(doc)  # E3
+        entry = None
+        try:
+            entry = self.enqueue(doc)  # E3
+        except Exception:
+            if not self.holds(user_id, card_id, "stop"):
+                raise  # a stop that revoked the key makes the outbox refuse it; E4 answers that
         if self.holds(user_id, card_id, "stop"):  # E4: a stop raced this enqueue
-            self._settle(user_id, doc)
+            self.settle(user_id, doc)
             return None
         return entry
 
     def stop(self, user_id: str, doc: dict[str, Any], by: str) -> str:
-        """Stops the L2 card's send, whichever Cancel or Edit holds `#stop` (S1 to S3): "cancelled" or "too_late"."""
+        """Stops the L2 card's send, whichever Cancel or Edit holds `#stop` (S0 to S3): "cancelled" or "too_late"."""
         card_id = doc["card_id"]
-        self.first(user_id, card_id, "stop", by)  # S1
-        if self.holds(user_id, card_id, "cancelled"):  # S2
-            return "cancelled"
-        if not self.holds(user_id, card_id, "enqueuing"):
+        if self._stops is not None:
+            self._stops.add(user_id, card_id)  # S0: queued before it is recorded, so no crash hides it from a sweep
+        self.first(user_id, card_id, "stop", by)  # S1, before the outbox is first called
+        if not self.holds(user_id, card_id, "enqueuing"):  # S2
             self._cards.create(user_id, f"{card_id}#cancelled", {})
-            return "cancelled"
-        return self._settle(user_id, doc)  # S3
+        return self.settle(user_id, doc)  # S3
 
-    def _settle(self, user_id: str, doc: dict[str, Any]) -> str:
+    def settled(self, user_id: str, card_id: str) -> str | None:
+        return next((s for s in ("cancelled", "too_late") if self.holds(user_id, card_id, s)), None)
+
+    def ours(self, doc: dict[str, Any]) -> bool:
+        """The card was decided in this ledger's world, so its entry (if any) is under this world's key."""
+        return doc.get("world_id") == self._world_id
+
+    def settle(self, user_id: str, doc: dict[str, Any]) -> str:
+        """S3 for a recorded stop: "cancelled" or "too_late", recorded and dequeued; raises CancelPending."""
         card_id = doc["card_id"]
-        if self.holds(user_id, card_id, "cancelled"):
-            return "cancelled"
-        try:
-            self._outbox.cancel(doc["outbox_id"])
-        except Exception:  # not stored, not scheduled, or the outbox is unavailable: look the entry up
-            try:
-                entry = self.enqueue(doc)  # the stored entry under the card's key, or one stored now to be cancelled
-            except Exception as exc:
-                raise CancelPending("the outbox could not be read") from exc
-            if entry["state"] not in ("scheduled", "cancelled"):
-                return "too_late"  # sending, sent or failed: the outbox says it went
-            if entry["state"] == "scheduled":
-                try:
-                    self._outbox.cancel(entry["id"])
-                except Exception as exc:
-                    raise CancelPending("the outbox did not confirm the cancel") from exc
-        self._cards.create(user_id, f"{card_id}#cancelled", {})
-        return "cancelled"
+        status = self.settled(user_id, card_id)
+        if status is None:
+            if not self.ours(doc):  # another world's key proves nothing about this card's entry
+                raise CancelPending("the card's entry is another world's: only that world can confirm the stop")
+            status = self._confirm(doc)
+            self._cards.create(user_id, f"{card_id}#{status}", {})  # the outbox's answer, so any writer agrees
+        if self._stops is not None:
+            self._stops.remove(user_id, card_id)
+        return status
 
-    def enqueue(self, doc: dict[str, Any]) -> dict:
-        """The card's entry under its idempotency key: a replay returns the stored entry and never adds one."""
+    def _confirm(self, doc: dict[str, Any]) -> str:
+        """The outbox's word on the card's entry; never enqueues. None from `revoke` means the absent key is revoked;
+        None from a read proves nothing (an enqueue may be in flight)."""
+        key, world = f"autopilot:{doc['card_id']}", doc["world_id"]  # the card's own world (checked by settle)
+        asks: list[Callable[[], dict | None]] = [
+            lambda: self._outbox.revoke(world, key) or {"state": "cancelled"},
+            lambda: self._outbox.cancel(doc["outbox_id"]),
+            lambda: self._outbox.get_by_idempotency_key(world, key),
+        ]
+        for ask in asks:
+            try:
+                state = (ask() or {}).get("state", "scheduled")
+            except Exception:  # unavailable, refused, or the answer was lost: ask the next way
+                continue
+            if state != "scheduled":
+                return "cancelled" if state == "cancelled" else "too_late"  # sending, sent or failed: it went
+        raise CancelPending("the outbox did not confirm the stop")
+
+    def stored(self, doc: dict[str, Any]) -> dict | None:
+        """The card's entry if the outbox holds one under its key (read only)."""
+        return self._outbox.get_by_idempotency_key(doc["world_id"], f"autopilot:{doc['card_id']}")
+
+    def entry_for(self, doc: dict[str, Any], authz: dict[str, Any] | None = None) -> dict:
+        """The card's entry. Only in the card's own world: an entry elsewhere is one no stop of this card would find.
+        A person's `authz` (the approval's, OB-01) is copied as given, never re-stamped; so is the authz of an L2
+        card's stored `policy.applied` (CHN-WIRE-4), whose time is the decision's, not now."""
+        if not self.ours(doc):
+            raise PermissionError("the card belongs to another world: its entry is never created here")
         ms = round(self._clock() * 1000)
         created, window, policy = timestamp(ms), doc["undo_window_s"], doc["level"] == "L2"
         authority = {"by": "policy", "ref": doc["policy_id"]} if policy else {"by": "person", "ref": doc["user_id"]}
-        entry = {
+        if authz is None and policy and isinstance(doc.get("policy_applied"), dict):
+            authz = doc["policy_applied"]["authz"]
+            if not fresh(authz.get("at"), ms):  # judged on the clock read that stamps created_at (BQ-245)
+                raise StaleDecision("the card's decision is outside its freshness bound")
+        return {
             "id": doc["outbox_id"] or ulid(ms),
             "idempotency_key": f"autopilot:{doc['card_id']}",
             "world_id": self._world_id,
@@ -147,10 +215,14 @@ class Ledger:
             "destination": doc["thread_id"],
             "modifiers": doc["modifiers"],
             "risk_tier": doc["tier"],
-            "authz": authority | {"at": created},
+            "authz": copy.deepcopy(authz) if authz is not None else authority | {"at": created},
             "undo_window_s": window,
             "scheduled_at": timestamp(ms + window * 1000),
             "state": "scheduled" if window else "queued",
             "created_at": created,
         }
-        return self._outbox.enqueue(entry, {"instruction_id": doc["instruction_id"], "level": doc["level"]})
+
+    def enqueue(self, doc: dict[str, Any], entry: dict | None = None, evidence: dict | None = None) -> dict:
+        """The card's entry under its idempotency key: a replay returns the stored entry and never adds one."""
+        entry = entry or self.entry_for(doc)
+        return self._outbox.enqueue(entry, evidence or {"instruction_id": doc["instruction_id"], "level": doc["level"]})

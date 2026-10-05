@@ -62,7 +62,7 @@ test("FR_WLD_06 a selection made in the World lens follows to Story and Trace", 
   await page.evaluate(() => {
     (window as unknown as { __kept: boolean }).__kept = true;
   });
-  await expect(page.getByTestId("selection-bar")).toContainText("Nothing selected");
+  await expect(page.getByTestId("selection-bar")).toContainText("Choose anything to inspect it");
   await hudRow(page, /Specialist 1/).click();
   await expect(hudRow(page, /Specialist 1/)).toHaveAttribute("aria-pressed", "true");
   await expect(hudRow(page, /Director/)).toHaveAttribute("aria-pressed", "false");
@@ -170,7 +170,7 @@ test("FR_WLD_06 selection works from the keyboard and Clear undoes it", async ({
   const clear = page.getByTestId("selection-bar").getByRole("button", { name: "Clear" });
   await clear.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("selection-bar")).toContainText("Nothing selected");
+  await expect(page.getByTestId("selection-bar")).toContainText("Choose anything to inspect it");
   await expect(page.locator('[aria-pressed="true"]')).toHaveCount(0);
   // Every control is at least 24 x 24 px.
   for (const control of await page.getByTestId("world-hud").getByRole("button").all()) {
@@ -202,7 +202,7 @@ test("FR_WLD_06 Inspect opens from the selection for every kind of object", asyn
   }
   await page.goto(`${W}/inspect/art_nope${FAST}`);
   await expect(page.getByRole("heading", { level: 1, name: "Not found" })).toBeVisible();
-  await expect(page.getByTestId("selection-bar")).toContainText("Nothing selected");
+  await expect(page.getByTestId("selection-bar")).toContainText("Choose anything to inspect it");
   // From the bar on a lens, Inspect opens the selected object.
   await page.goto(`${W}/story${FAST}`);
   await page.getByTestId("story-lens").getByRole("button", { name: "Director" }).first().click();
