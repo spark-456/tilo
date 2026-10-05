@@ -22,7 +22,7 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 - P0-09 (D-11): skeleton, writer, store. FR-AGT-01/02/03: `executor.run_plan` (PG-02/03/11
   pre-flight writes nothing; `max_specialists` semaphore; deps before start), skill pins.
 - FR-AGT-05: `must_ask.MustAsk` (rules in code; a model reply can only add a question; card stored first);
-  `run_plan(must_ask=)` parks the asked unit. FR-HIL-10: `question_wait=` (`QuestionWait`) waits (no slot) and `Ask.runs` decides: Hold/default leave it held.
+  `run_plan(must_ask=)` parks the asked unit. FR-HIL-10: `question_wait=` (`QuestionWait`) waits (no slot; a failed answer never strands the deadline, #338) and `Ask.runs` decides: Hold/default leave it held.
 - FR-AGT-12: `verifier.Verifier` (rules in code, then only the verifier-role model; `verified` recomputed); `run_plan(verifier=)` reviews every handed-over artifact.
 
 ## Local rules

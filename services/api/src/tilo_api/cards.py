@@ -32,6 +32,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
+from tilo_harness.question_wait import AlreadyCommitted  # raised by an event writer; one class for both sides
 
 from tilo_api.deps import Principal, get_current_principal
 from tilo_api.redaction import _DISTRICT_RE, _safe_districts
@@ -47,11 +48,6 @@ _ROLES = ("owner", "team_lead", "approver")  # any other role (a Viewer included
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _WEB_CHANNELS = ("web", "mobile_web")
 _STATUS = {"card_not_found": 404, "forbidden": 403, "busy": 409}  # AnswerResult.reason -> HTTP; others are 400
-
-
-class AlreadyCommitted(Exception):
-    """Raised by an event writer when this resolution's event id is already committed under other content (an
-    earlier answer won, though its caller saw a failure). The card then resolves as already answered."""
 
 
 def _derived_id(seed: str) -> str:
@@ -233,15 +229,20 @@ class CardStore:
         outbox_id: str | None = None,
         district: str | None = None,
         assignee: str | None = None,
+        merge: bool = True,
     ) -> SubmitResult:
-        """`outbox_id` (gates only), `district` (a Team Lead sees only their districts' cards; none
+        """`merge=False` keeps the card its own group: it neither joins nor anchors a batch (a question a unit waits on
+        means something of its own, so one answer must never close it for another).
+        `outbox_id` (gates only), `district` (a Team Lead sees only their districts' cards; none
         means owner-only) and `assignee` (the Approver the owner assigned) are companion data the
         harness already holds; a model never supplies them. Re-submitting identical content returns
         the first result and changes nothing; a different card under a used id is rejected."""
         with self._lock:
-            return self._submit(card, outbox_id, district, assignee)
+            return self._submit(card, outbox_id, district, assignee, merge)
 
-    def _submit(self, card: dict, outbox_id: str | None, district: str | None, assignee: str | None) -> SubmitResult:
+    def _submit(
+        self, card: dict, outbox_id: str | None, district: str | None, assignee: str | None, merge: bool
+    ) -> SubmitResult:
         errors = _card_errors(card)
         if not errors:
             errors = self._companion_errors(card["kind"], outbox_id, district, assignee)
@@ -256,15 +257,17 @@ class CardStore:
 
         created = _parse_ts(card["created_at"])
         key = (world_id, kind, card["header"]["building"], district, assignee)
-        group = self._groups.get(key) if kind in _MERGEABLE else None
+        batched = merge and kind in _MERGEABLE
+        group = self._groups.get(key) if batched else None
         merged = (
             group is not None
             and not group.closed
+            and not group.resolving  # its answer is being written: this card must stay open for its own answer
             and abs((created - group.anchor).total_seconds()) <= self._merge_window_s
         )
         if not merged:
             group = _Group(card_id, created)
-            if kind in _MERGEABLE:
+            if batched:
                 self._groups[key] = group
         assert group is not None
         record = _Record(world_id, copy.deepcopy(card), outbox_id, district, assignee, _deadline(card), group)

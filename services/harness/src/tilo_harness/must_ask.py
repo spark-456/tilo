@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
@@ -49,6 +50,7 @@ _SENSITIVE = (  # (question template, options, suggested index, reason for the s
     0,
     "Nothing outside Tilo changes until you decide; sending still needs approval.",
 )
+_OPTION_ID = re.compile(r"o([1-9][0-9]*)")  # the card builder's ids: exactly "o<n>", so "o01" names no option
 _CONFIRM_OPTIONS = ("Hold this step", "Prepare it")  # code's words, never the model's
 _CONFIRM_WHY = "Nothing outside Tilo changes until you decide; sending still needs approval."
 _FAILED = (
@@ -63,6 +65,12 @@ _UNREADABLE = (
     0,
     "When Tilo cannot tell, it asks instead of guessing.",
 )
+
+
+def option_index(option: Any, count: int) -> int | None:
+    """The 0-based index of a card option id such as "o2", or None when the id names none of the `count` options."""
+    found = _OPTION_ID.fullmatch(option) if isinstance(option, str) else None
+    return int(found[1]) - 1 if found and int(found[1]) <= count else None
 
 
 @dataclass(frozen=True)
@@ -93,7 +101,8 @@ class Ask:
             self.proceed is None
             and self.reason == "sensitive_step"
             and answer.answered_by != "default"
-            and answer.option != f"o{self.suggested + 1}"
+            and (index := option_index(answer.option, len(self.options))) is not None
+            and index != self.suggested
         )
 
 
@@ -182,8 +191,8 @@ class MustAsk:
         sensitive_step card), so Hold and the deadline default leave the unit unrun. None when the choice holds it."""
         if not ask.confirms(answer):
             return None
-        index = int(answer.option[1:]) - 1 if isinstance(answer.option, str) and answer.option[1:].isdigit() else -1
-        if not 0 <= index < len(ask.options):
+        index = option_index(answer.option, len(ask.options))
+        if index is None:
             return None  # an option the card never had: fail closed
         chosen = neutralise(ask.options[index], limit=40)
         question = _clip(f"You chose “{chosen}”. Prepare this step now?", 140)
