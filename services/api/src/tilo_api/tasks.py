@@ -20,6 +20,7 @@ import tilo_planning.budget as budget
 import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from tilo_metering.flags import FlagStore
 from tilo_planning.approaches import ApproachProposalError, propose_approaches
 from tilo_planning.brief import BriefValidationError, ExtractionResult, edit_brief_field
 from tilo_planning.events import build_event
@@ -170,6 +171,7 @@ def _foreign_sources(task: deps.TaskRecord, edits: dict[str, Any]) -> bool:
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 StoreDep = Annotated[deps.Store, Depends(deps.get_store)]
+FlagsDep = Annotated[FlagStore, Depends(deps.get_flag_store)]
 
 
 @router.post("/tasks/{task_id}/answers")
@@ -179,10 +181,12 @@ def answer_questions(
     body: Annotated[AnswersIn, Depends(_json_body(AnswersIn))],
     store: StoreDep,
     safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
+    flags: FlagsDep,
 ) -> dict[str, Any]:
     """FR-INT-03/04: answers, skips (`answer: null`, recorded as "Assumed: ...") and chip edits, every typed
     string screened first (FR-INT-02). No model call; a refused request changes nothing."""
     task = _owned(store, task_id, principal)
+    deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check
     fields = [a.field for a in body.answers]
     if len(set(fields)) != len(fields) or not set(fields) <= {q.field for q in task.questions}:
         raise HTTPException(status_code=422, detail="Answer only the questions that were asked, each once.")
@@ -209,10 +213,15 @@ def answer_questions(
 
 @router.get("/tasks/{task_id}/approaches")
 def get_approaches(
-    task_id: str, principal: Principal, store: StoreDep, model_router: Annotated[Router, Depends(deps.get_router)]
+    task_id: str,
+    principal: Principal,
+    store: StoreDep,
+    model_router: Annotated[Router, Depends(deps.get_router)],
+    flags: FlagsDep,
 ) -> dict[str, Any]:
     """FR-INT-06: the Director's 2-3 approaches for the confirmed brief, proposed once per brief."""
     task = _owned(store, task_id, principal)
+    deps.refuse_if_replay_only(flags)  # NFR-24: this reaches the Director
     try:
         credit_usd = deps.providers_config().prices.credit_usd  # before any model call is spent
     except ProviderConfigError as exc:
@@ -274,11 +283,13 @@ def approve(
     body: Annotated[ApproveIn, Depends(_json_body(ApproveIn))],
     store: StoreDep,
     seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
+    flags: FlagsDep,
 ) -> dict[str, Any]:
     """FR-INT-08: the owner picks an approach and confirms a cap; the grant is exactly that cap (#106). An L3
     policy may grant it; otherwise the owner's own confirmation does (PRD 10.1, 10.4). The grant then starts
     the task's one run (CL-INT-2); a run that cannot start never changes this answer."""
     task = _owned(store, task_id, principal)
+    deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check, before any grant
     if body.budget_cap > (ceiling := deps.budget_cap_ceiling()):  # finite already: the body refuses NaN and Infinity
         raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
     with store.grant_lock(task.owner), task.lock:  # always in this order: the owner's grants, then the task

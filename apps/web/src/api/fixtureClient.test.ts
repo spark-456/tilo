@@ -164,3 +164,20 @@ describe("FR-HIL-07 stopAutopilot on the fixture client", () => {
     expect(client.stopRequests).toEqual(["w_village_basic"]);
   });
 });
+
+describe("NFR-01 a fixture chunk that does not load is said, not left empty", () => {
+  afterEach(() => {
+    vi.doUnmock("./fixtures/events");
+    vi.resetModules();
+  });
+
+  it("getLayout rejects with a ChunkLoadError when the recorded run's chunk is missing", async () => {
+    vi.resetModules();
+    vi.doMock("./fixtures/events", () => {
+      throw new Error("Failed to fetch dynamically imported module");
+    });
+    const { FixtureClient: Fresh } = await import("./fixtureClient");
+    const { ChunkLoadError } = await import("./chunkError");
+    await expect(new Fresh().getLayout("w_village_basic")).rejects.toBeInstanceOf(ChunkLoadError);
+  });
+});
