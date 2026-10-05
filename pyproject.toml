@@ -24,6 +24,7 @@ members = ["services/api", "services/harness", "services/sandbox-web", "packages
 
 [tool.pytest.ini_options]
 markers = [
+    "system: starts real service processes and drives them over HTTP (tests/system); `just system-test`, not in `just test`.",
     "slow: exercises a real subprocess (e.g. `just contracts-check` on a temp copy); still runs in `just check`, just not instantaneous.",
 ]
 

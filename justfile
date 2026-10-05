@@ -24,6 +24,11 @@ dev-api:
 e2e-cp2:
     node apps/web/scripts/e2e-cp2.mjs
 
+# Whole-stack system test (tests/system): starts the real tilo-api (dev mode, fake providers) and the other
+# services as processes and drives them over HTTP; about 3 minutes, port 8080. Docs: docs/system-test.md.
+system-test:
+    uv run pytest tests/system -q -p no:cacheprovider
+
 # Regenerate apps/web design tokens from design/tokens.json (drift-tested).
 tokens:
     node apps/web/scripts/generate-tokens.mjs
@@ -48,13 +53,13 @@ check-fast:
     uv run ruff format --check .
     uv run ruff check .
     pnpm exec biome check .
-    uv run pytest -q -m "not emulator"
+    uv run pytest -q -m "not emulator and not system"
 
 # Run every test suite (Python + JS, once JS suites exist). Emulator-marked tests
 # (services/harness, P0-09) need Java + firebase-tools and run separately in CI
 # (see .github/workflows/ci.yml) and with `uv run pytest services/harness/tests -m emulator`.
 test:
-    uv run pytest -q -m "not emulator"
+    uv run pytest -q -m "not emulator and not system"
     pnpm -r run test
 
 # Format everything in place.
