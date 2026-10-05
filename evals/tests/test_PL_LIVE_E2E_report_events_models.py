@@ -108,7 +108,7 @@ def test_PL_LIVE_E2E_26_model_ids_appear_only_through_config_not_in_the_new_code
     tmp_path: Path,
 ) -> None:
     configured = {p["model"] for p in yaml.safe_load(REAL_MODELS.read_text(encoding="utf-8"))["profiles"].values()}
-    configured.discard("fake-safety")
+    configured = {m for m in configured if not m.startswith("fake-")}
     assert configured, "config/models.yaml names no model"
     new_code = [
         *sorted((REPO_ROOT / "evals" / "src" / "tilo_evals").glob("*.py")),
