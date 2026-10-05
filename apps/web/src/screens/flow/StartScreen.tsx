@@ -89,13 +89,22 @@ export function StartScreen() {
               aria-label="Describe your task"
               aria-describedby="task-count"
               placeholder="e.g. Summarise this week's customer feedback"
-              rows={5}
+              rows={4}
               value={text}
               onChange={(e) => edit(e.target.value)}
             />
             <p id="task-count" className="task-count">
               {`${codePoints(text).toLocaleString("en-US")} / ${MAX_TEXT.toLocaleString("en-US")}`}
             </p>
+            {/* The one action sits in the box it acts on (artboard Tilo Home v2). */}
+            <div className="flow-actions">
+              <p className="start-hint">You see the plan and the cost before any agent starts.</p>
+              <Primary
+                label="Start task"
+                action={action}
+                disabled={!text.trim() || problem !== null}
+              />
+            </div>
           </div>
           <fieldset className="task-chips" aria-label="Suggested tasks">
             {SUGGESTED_TASKS.map((task) => (
@@ -166,10 +175,6 @@ export function StartScreen() {
             {message && <p role="alert">{message}</p>}
             <output>{action.busy ? "Sending your task…" : ""}</output>
           </div>
-        </div>
-        <div className="flow-actions">
-          <p className="start-hint">You see the plan and the cost before any agent starts.</p>
-          <Primary label="Start task" action={action} disabled={!text.trim() || problem !== null} />
         </div>
       </div>
       <HomePreview />

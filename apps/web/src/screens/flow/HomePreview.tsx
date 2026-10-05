@@ -41,9 +41,17 @@ function Glyph() {
         points={pts([120, 14], [218, 62], [120, 110], [22, 62])}
         fill="var(--color-surface-1)"
       />
-      <Block x={92} y={76} w={26} h={30} c={BRAND} />
-      <Block x={150} y={80} w={20} h={18} c={PALE} />
-      <Block x={128} y={96} w={14} h={10} c={PALE} />
+      {/* A road between the blocks, then blocks back to front so nearer ones cover farther ones. */}
+      <polygon
+        points={pts([98, 80], [168, 62], [176, 66], [106, 84])}
+        fill="var(--color-surface-2)"
+      />
+      <Block x={150} y={64} w={18} h={22} c={PALE} />
+      <Block x={92} y={72} w={26} h={34} c={BRAND} />
+      <Block x={186} y={74} w={12} h={8} c={PALE} />
+      <Block x={52} y={78} w={14} h={12} c={PALE} />
+      <Block x={150} y={92} w={14} h={10} c={PALE} />
+      <Block x={120} y={100} w={10} h={6} c={PALE} />
     </svg>
   );
 }
@@ -51,7 +59,11 @@ function Glyph() {
 export function HomePreview() {
   return (
     <aside className="home-preview" aria-label="What Tilo would build">
-      <p className="home-preview-title">What Tilo would build</p>
+      <div className="home-preview-head">
+        {/* The sizes are the PRD 9.1 range; no figure here is about this task. */}
+        <span className="home-tier">Outpost to City</span>
+        <span className="home-preview-title">What Tilo would build</span>
+      </div>
       <Glyph />
       <dl className="home-tiles">
         {TILES.map(([term, text]) => (

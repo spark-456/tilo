@@ -51,5 +51,6 @@
   "time_range": {
     "min_s": 240,
     "max_s": 420
-  }
+  },
+  "media_type": "text/markdown"
 }

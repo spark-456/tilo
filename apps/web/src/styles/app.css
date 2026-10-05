@@ -335,11 +335,12 @@ textarea {
 }
 .bottom-tabs .nav-btn {
   flex: 1;
-  min-width: 0;
+  min-width: min-content; /* six tabs share 320 px: none is narrower than its one-line label */
   height: var(--button-height-desktop); /* the sheets above the tabs clear this height */
   font-size: var(--text-12);
 }
-a.nav-btn {
+a.nav-btn,
+button.nav-btn {
   position: relative;
   display: flex;
   flex-direction: column-reverse; /* the icon above its label; the label first in the source */
@@ -355,7 +356,8 @@ a.nav-btn {
   text-decoration: none;
   font: 700 var(--text-14) / 1.1 var(--font-ui);
 }
-.left-rail a.nav-btn {
+.left-rail a.nav-btn,
+.left-rail button.nav-btn {
   min-height: calc(64px * var(--ui-scale, 1));
 }
 .nav-label {
@@ -383,7 +385,8 @@ a.nav-btn {
   font: 900 var(--text-12) / 20px var(--font-ui);
   letter-spacing: 0;
 }
-a.nav-btn:hover {
+a.nav-btn:hover,
+button.nav-btn:hover {
   background: var(--color-surface-0);
 }
 a.nav-btn[aria-current="page"] {
@@ -1192,6 +1195,12 @@ button.row {
 .section-box.reserved {
   overflow-y: auto;
   height: calc(var(--lines) * 1.6em);
+}
+/* On a phone the same rows wrap onto more lines: the reserve's second number (kit.tsx Section). */
+@media (max-width: 767px) {
+  .section-box.reserved {
+    height: calc(var(--lines-narrow) * 1.6em);
+  }
 }
 .section-box.reserved:focus-visible,
 .screen-body a.pill:focus-visible,
@@ -2212,4 +2221,120 @@ html[data-density="professional"] .app-shell {
   --space-16: 0.75rem;
   --space-24: 1rem;
   --space-32: 1.5rem;
+}
+
+/* S-30 assistant panel (FR-PA-12): a modal dialog fixed over the page, so opening it moves nothing.
+   A side panel on desktop, a bottom sheet on a phone. Its launcher is a nav item (.nav-btn). No
+   transition or animation: it appears and disappears. */
+.assistant-panel::backdrop {
+  background: transparent;
+}
+.assistant-close:focus-visible,
+.assistant-log:focus-visible,
+.assistant-form input:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.assistant-panel {
+  position: fixed;
+  z-index: 850;
+  inset: var(--strip-h, 0px) 0 0 auto; /* below the fixed status strip, which stays readable */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  width: 22.5rem;
+  max-width: 100%;
+  height: auto;
+  max-height: none; /* the browser's modal-dialog cap would stop the panel short of the bottom */
+  margin: 0;
+  padding: var(--space-16);
+  border: 0;
+  border-left: 1px solid var(--color-surface-2);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+.assistant-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+.assistant-head h2 {
+  margin: 0;
+  font: 800 var(--text-20) / 1.2 var(--font-display);
+}
+.assistant-close {
+  min-height: 44px;
+  padding: 0 var(--space-16);
+  border: 1px solid var(--color-ink-3);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) / 1 var(--font-ui);
+  cursor: pointer;
+}
+.assistant-context {
+  align-self: flex-start;
+  margin: 0;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-ink-1);
+  font: 700 var(--text-12) / 1.4 var(--font-ui);
+}
+.assistant-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.assistant-log ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.assistant-log p {
+  margin: 0;
+}
+.assistant-empty {
+  color: var(--color-ink-2);
+}
+.assistant-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-8);
+  align-items: center;
+}
+.assistant-label {
+  grid-column: 1 / -1;
+  font: 700 var(--text-12) / 1.4 var(--font-ui);
+  color: var(--color-ink-2);
+}
+.assistant-form input {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 0 var(--space-12);
+  border: 1px solid var(--color-ink-3);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 400 var(--text-16) / 1.4 var(--font-ui);
+}
+.assistant-form .secondary {
+  min-height: 44px;
+}
+@media (max-width: 767px) {
+  .assistant-panel {
+    inset: auto 0 0 0;
+    width: auto;
+    max-width: none;
+    height: 75vh;
+    border-left: 0;
+    border-top: 1px solid var(--color-surface-2);
+    border-radius: var(--radius-cards) var(--radius-cards) 0 0;
+  }
 }

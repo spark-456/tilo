@@ -16,8 +16,7 @@ service the web client and channels write through; the client reads live state f
 - Env: `TILO_API_DEV=1`; `TILO_API_DEV_ORIGINS` (default `http://localhost:5173`); `TILO_DEV_UNIT_DELAY_S` (1.5, 0..10).
 
 ## Local rules
-- Side effects go through the outbox and the deterministic policy engine, T3 only with a person. `/healthz`: ok.
-  Task routes read only `application/json` (415).
+- Side effects go through the outbox and the deterministic policy engine, T3 only with a person. `/healthz`: ok. Task routes read only `application/json` (415).
 - Dev mode (CL-INT-4, `tilo_api.dev`): fixed owner `u_dev_owner`, in-memory `Store`, a writer that refuses an event with no
   `vis`, CORS for `TILO_API_DEV_ORIGINS` only, Host loopback:8080; no cloud, no paid call; refuses when `K_SERVICE`,
   `CLOUD_RUN_JOB` or live is set. `dev_run` (CL-INT-5c/5d): a paced unit runner (`config/prices.dev.yaml`), a fake recipient.
@@ -36,5 +35,6 @@ service the web client and channels write through; the client reads live state f
   `deps.Principal` only; `channel`/`pin_verified` only from a tilo-channels caller. Viewer 403; PRD 10.1 scope. First
   answer wins (400 `already_resolved`, 409 `busy`); one derived `event_id` each. `tests/API_ST3b.md` (Round 2), BQ-69..73.
 - Run (CL-INT-2, `tilo_api.runs`): approve starts a run if the Director's plan (`deps.get_plan_compiler`, FR-INT-09)
-  passes `validate_plan`; a send waits at a gate card, then the outbox after the owner approves. Events go through
-  `deps.get_event_writer`; paused gets none. A `deliver` unit delivers in_app, ungated. `replay_only` (NFR-24, process-wide flag, BQ-238) closes intake, answers, approaches, approve: 503 `replay_only: true`. `GET .../delivery`: 409 until `world.completed`. `tests/API_CL_INT_2.md`.
+  passes `validate_plan`; a unit may ask first (`MustAsk`, `deps.get_must_ask_providers`; `QuestionWait` holds it, no
+  `world.completed` while one waits, BQ-235..237; its card is never merged, #338); a send waits at a gate card, then the outbox after the owner approves.
+  Events via `deps.get_event_writer`; paused gets none. A `deliver` unit delivers in_app, ungated. `replay_only` (NFR-24, process-wide flag, BQ-238) closes intake, answers, approaches, approve: 503 `replay_only: true`. `GET .../delivery`: 409 until `world.completed`. `tests/API_CL_INT_2.md`.

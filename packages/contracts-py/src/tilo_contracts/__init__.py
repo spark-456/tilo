@@ -2,10 +2,11 @@
 # contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
+# artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.0.0 sha256:cdb1a1ceeeebb299
+# common.schema.json 1.1.0 sha256:b7307504495c9b61
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -34,7 +35,7 @@
 # events/data/app.tested.schema.json 1.0.0 sha256:7cc150abdade1ee3
 # events/data/approval.requested.schema.json 1.0.0 sha256:fa01c18f73338a6d
 # events/data/approval.resolved.schema.json 1.0.0 sha256:3c56d4ad96d63941
-# events/data/artifact.created.schema.json 1.0.0 sha256:1e70d4b7f7bc11a7
+# events/data/artifact.created.schema.json 1.1.0 sha256:e796f958760d0464
 # events/data/artifact.delivered.schema.json 1.0.0 sha256:a0e7a46e56965c1d
 # events/data/artifact.reviewed.schema.json 1.0.0 sha256:fee51f5f590c73c4
 # events/data/artifact.rolled_back.schema.json 1.0.0 sha256:4c4dac77a4b5c873
@@ -171,6 +172,14 @@ class AgentsConfigQuestions(BaseModel):
         extra="forbid",
     )
     hourly_cap_per_person: Annotated[int, Field(ge=1)]
+
+
+type ArtifactVersionIdempotencyKey = Annotated[
+    str, Field(pattern="^r_[0-9A-Za-z_]{1,48}:U[0-9]{1,4}:(0|[1-9][0-9]{0,3}):[0-9]$")
+]
+"""
+<run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257).
+"""
 
 
 type Constraint = Annotated[str, Field(max_length=300, min_length=1)]
@@ -428,6 +437,12 @@ Data class (PRD 12.1): personal, business or public.
 type DeliverableFormat = Literal["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app"]
 """
 Deliverable format (PRD 12.4), plus email for replies and in_app for answers shown in Tilo.
+"""
+
+
+type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg"]
+"""
+Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it from the role and the pinned skill, never a model, a file name or sniffing. Closed: no HTML or SVG.
 """
 
 
@@ -1969,6 +1984,31 @@ class AgentsConfig(BaseModel):
     questions: AgentsConfigQuestions
 
 
+class ArtifactVersionOrigin(BaseModel):
+    """
+    What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither) or a restore (FR-MEM-06; no unit). Set by the store from the run, never by a runner.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["unit", "render", "upload", "restore"]
+    unit: UnitId | None
+    agent: AgentId | None
+
+
+class ArtifactVersionSource(BaseModel):
+    """
+    Where one source's text is in the raw archive: id is the manifest source id, archive_ref the tool call record. A pointer, never content.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Slug
+    archive_ref: EventArchiveRef
+
+
 class Attention(BaseModel):
     """
     One measured span of a person's attention on a run (PRD 14.2, FR-MTR-05): steering (intake, a question, a card, a take-over) or review (a deliverable open before approval). apps/web measures it, as do the channel handlers for WhatsApp and email answers; tilo-api writes it, and packages/metering subtracts the minutes from time saved. Event timestamps cannot give this, because the gap between a question and its answer is waiting time, not attention. A span holds ids and times only, never content (PRD 16.5). Rules MT-07 and MT-08 in contracts/metering.rules.md.
@@ -2280,13 +2320,24 @@ class ApprovalRequestedDataApproverAssignment(BaseModel):
 
 class ArtifactCreatedData(BaseModel):
     """
-    data of artifact.created (PRD 9.5).
+    data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape).
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
     artifact: ArtifactRef
+    content_sha256: Annotated[
+        str | None, Field(max_length=64, min_length=64, pattern="^[0-9a-f]{64}$")
+    ] = None
+    """
+    SHA-256 of the stored bytes, lower-case hex, as the store recorded it (AR-01).
+    """
+    media_type: MediaType | None = None
+    size_bytes: Annotated[int | None, Field(ge=1, le=50000000)] = None
+    """
+    Stored size: at least 1 byte, at most 50,000,000 for a file and 2,000,000 for text or JSON (BQ-257).
+    """
 
 
 class ArtifactDeliveredData(BaseModel):
@@ -2782,6 +2833,59 @@ class TeamLead(BaseModel):
     assigned_by: TeamLeadAssignment
 
 
+class ArtifactVersion(BaseModel):
+    """
+    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-08 in artifact.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    artifact: ArtifactRef
+    org_id: OrgId
+    world_id: WorldId
+    run_id: RunId
+    owner: UserId
+    media_type: MediaType
+    size_bytes: Annotated[int, Field(ge=1, le=50000000)]
+    """
+    Stored size: at least 1 byte, at most 50,000,000 for a file and 2,000,000 for text or JSON (BQ-257, AR-04).
+    """
+    content_sha256: Annotated[
+        str, Field(max_length=64, min_length=64, pattern="^[0-9a-f]{64}$")
+    ]
+    """
+    SHA-256 of the stored bytes, lower-case hex; every read recomputes it (AR-01).
+    """
+    parents: Annotated[list[ArtifactRef], Field(max_length=1)]
+    """
+    The earlier version of the same artifact this one continues, or the version a restore copies (AR-02); empty for version 1.
+    """
+    origin: ArtifactVersionOrigin
+    sources: list[ArtifactVersionSource]
+    """
+    Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).
+    """
+    screening: Literal["clean", "flagged", "unscreened"]
+    """
+    The SafetyProvider verdict on the exact stored bytes (PRD 16.3 item 2), unscreened when there is none. A version that is not clean raises safety_flag in the policy engine (AR-07).
+    """
+    screened_at: Timestamp | None
+    """
+    When that verdict came back; null exactly when screening is unscreened (AR-07).
+    """
+    redacted: bool
+    """
+    true when the secret redactor changed text or JSON before it was stored (SEC-01, BQ-258). The redactor reads only text and JSON, so false on a file means it did not run (AR-07).
+    """
+    idempotency_key: ArtifactVersionIdempotencyKey | None
+    """
+    Set for unit and render outputs (AR-05); null for uploads and restores.
+    """
+    created_at: Timestamp
+
+
 class BriefAppliedPreference(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -2859,6 +2963,7 @@ class Common(BaseModel):
     channel: Channel | None = None
     data_class: DataClass | None = None
     deliverable_format: DeliverableFormat | None = None
+    media_type: MediaType | None = None
     credit_range: CreditRange | None = None
     time_range: TimeRange | None = None
 
@@ -3127,6 +3232,20 @@ class Providers(BaseModel):
     )
     models: ProvidersModels
     prices: ProvidersPrices
+
+
+class ArtifactVersionManifestRevision(BaseModel):
+    """
+    One append-only revision of a version's provenance manifest, at .../versions/{version:06d}/manifests/{n:04d} (AR-06): created at put, reviewed after the Verifier (cause its artifact.reviewed), sent (cause the data.transfer out) or exported when the version leaves Tilo. Readers take the highest n.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    n: Annotated[int, Field(ge=1, le=9999)]
+    stage: Literal["created", "reviewed", "sent", "exported"]
+    cause: Ulid | None
+    manifest: Manifest
 
 
 class Brief(BaseModel):

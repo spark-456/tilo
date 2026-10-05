@@ -130,12 +130,17 @@ _SECRET_RE = re.compile(
 )
 
 
-def _reason(error: BaseException) -> str:
-    """The adapter's redacted server text for a rejected request, made safe to print: one line, no control or format
-    characters (so none can hide a label or drive the terminal), scrubbed again, then capped (scrub before cap)."""
+def scrubbed_server_text(error: BaseException) -> str:
+    """The adapter's redacted server text for a rejected request, made safe to print but not yet capped: one line, no
+    control or format characters (so none can hide a label or drive the terminal), scrubbed again. A caller that
+    scrubs more (a project id, a path) does that, then caps with `MAX_REASON_CHARS` (scrub before cap)."""
     said = next((str(link) for link in _chain(error) if type(link).__name__ == "_RedactedAPIError"), "")
     said = "".join(c for c in " ".join(said.split()) if unicodedata.category(c) not in ("Cc", "Cf", "Co", "Cs"))
-    return _SECRET_RE.sub("[redacted]", _AUTHORIZATION_LIKE_RE.sub("[redacted]", said))[:MAX_REASON_CHARS]
+    return _SECRET_RE.sub("[redacted]", _AUTHORIZATION_LIKE_RE.sub("[redacted]", said))
+
+
+def _reason(error: BaseException) -> str:
+    return scrubbed_server_text(error)[:MAX_REASON_CHARS]
 
 
 def _check_caps(max_output_tokens: int, max_total_credits: float) -> None:

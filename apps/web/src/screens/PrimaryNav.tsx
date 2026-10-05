@@ -1,8 +1,10 @@
-// PRD 18.3 primary navigation: the desktop left rail and the mobile bottom tabs (World, Story,
-// Needs you, Library, More). Every other screen is reached from More. Real links only: each one
-// goes to a built screen or to a "Coming soon" screen, never to a dead click.
 import { useClient, useIsFixtureClient, useWorldKnown } from "../api/ClientProvider";
 import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
+// PRD 18.3 primary navigation: the desktop left rail and the mobile bottom tabs (World, Story,
+// Needs you, Library, More). Every other screen is reached from More. Real links only: each one
+// goes to a built screen or to a "Coming soon" screen, never to a dead click. The last item is the
+// Ask Tilo button, which opens the assistant panel.
+import { AssistantLauncher } from "../assistant/AssistantLauncher";
 import { deriveQueue } from "../needs-you/queue";
 import { usePathname } from "../router";
 import { useRunLog } from "../world/runLog";
@@ -87,6 +89,9 @@ export function PrimaryNav({ id, mobile }: { id: string; mobile: boolean }) {
           </AppLink>
         );
       })}
+      {/* Ask Tilo (FR-PA-12) is the last item: a button that opens the panel, in the flow, so it
+          never covers a control. */}
+      <AssistantLauncher />
     </nav>
   );
 }
