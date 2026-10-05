@@ -41,9 +41,9 @@ from tilo_harness.validator import repo_validator
 
 ROLE = "verifier"  # prompts/verifier/claim_*.md, providers["verifier"]
 MAX_SOURCE_CHARS = 30_000  # BQ-213: a source (or the sources of one claim together) over this is refused, never cut
-MAX_CLAIMS = 200  # BQ-223: one model call per claim, so a deliverable's claims are bounded
-MAX_SOURCES = 20  # BQ-223: distinct sources prepared per review; any further source is refused as unusable
-MAX_REVIEW_CHARS = 3_000_000  # BQ-223: decomposed characters normalised per review, every call together
+MAX_CLAIMS = 200  # BQ-232: one model call per claim, so a deliverable's claims are bounded
+MAX_SOURCES = 20  # BQ-232: distinct sources prepared per review; any further source is refused as unusable
+MAX_REVIEW_CHARS = 3_000_000  # BQ-232: decomposed characters normalised per review, every call together
 MAX_CLAIM_CHARS = 300  # manifest.schema.json caps claim text at 280
 MAX_REPLY_CHARS = 200
 _NUMBER = re.compile(r"[0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?")
