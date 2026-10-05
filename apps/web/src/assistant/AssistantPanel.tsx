@@ -112,6 +112,7 @@ export function AssistantPanel({ adapter = fixtureAdapter }: { adapter?: Assista
         type="button"
         className="assistant-open"
         data-testid="assistant-open"
+        data-assistant-control
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((o) => !o)}
