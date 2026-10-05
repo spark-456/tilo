@@ -11,13 +11,19 @@ dependencies = [
     "pyyaml>=6.0",
     "jsonschema>=4.18",
     "referencing>=0.30",
+    "tilo-archive",
+    "tilo-connectors",
     "tilo-contracts",
+    "tilo-memory",
     "tilo-policy",
     "tilo-providers",
 ]
 
 [tool.uv.sources]
+tilo-archive = { workspace = true }
+tilo-connectors = { workspace = true }
 tilo-contracts = { workspace = true }
+tilo-memory = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-providers = { workspace = true }
 
