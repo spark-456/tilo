@@ -28,3 +28,18 @@ class InMemoryFlagStore:
 
     def history(self, name: str) -> tuple[Change, ...]:
         return tuple(self._history.get(name, ()))
+
+
+_process_flags: FlagStore = InMemoryFlagStore()
+
+
+def process_flags() -> FlagStore:
+    """The one flag store of this process: whatever sets `replay_only` (the Treasury, once it is wired) and
+    whatever reads it (tilo-api) both go through here, so they see the same flag. Not shared across processes."""
+    return _process_flags
+
+
+def use_process_flags(store: FlagStore) -> None:
+    """Replaces the process's store (the Firestore-backed one, when it exists). Call once at start-up."""
+    global _process_flags
+    _process_flags = store

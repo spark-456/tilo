@@ -1,0 +1,92 @@
+id: B-029
+domain: education
+shapes:
+- multi_deliverable
+- gated_save
+title: A fractions lesson plan with a worksheet
+brief: Create a one-week lesson plan on fractions for 9-year-olds (five 40-minute lessons) and a printable worksheet
+  for each lesson.
+director:
+  brief:
+    goal: Create a five-lesson fractions plan for 9-year-olds with a printable worksheet per lesson.
+    deliverables:
+    - title: Lesson plan
+      format: docx
+    - title: Worksheets
+      format: pdf
+    audience: A primary-school teacher
+    deadline: null
+    constraints:
+    - Five lessons of 40 minutes
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Choose the progression of ideas
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Write the five lessons
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write one worksheet per lesson
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U4
+      unit_type: verify
+      title: Check the maths and the timing
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+      - U3
+    - id: U5
+      unit_type: deliver
+      title: Save the plan to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U4
+    - id: U6
+      unit_type: deliver
+      title: Save the worksheets to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U4
+expect:
+  outcome: completed

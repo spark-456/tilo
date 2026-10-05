@@ -3,10 +3,11 @@
  * contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
  * `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
  * agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
+ * artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
  * attention.schema.json 1.0.0 sha256:f35cff84728304af
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
- * common.schema.json 1.0.0 sha256:cdb1a1ceeeebb299
+ * common.schema.json 1.1.0 sha256:b7307504495c9b61
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
  * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -35,7 +36,7 @@
  * events/data/app.tested.schema.json 1.0.0 sha256:7cc150abdade1ee3
  * events/data/approval.requested.schema.json 1.0.0 sha256:fa01c18f73338a6d
  * events/data/approval.resolved.schema.json 1.0.0 sha256:3c56d4ad96d63941
- * events/data/artifact.created.schema.json 1.0.0 sha256:1e70d4b7f7bc11a7
+ * events/data/artifact.created.schema.json 1.1.0 sha256:e796f958760d0464
  * events/data/artifact.delivered.schema.json 1.0.0 sha256:a0e7a46e56965c1d
  * events/data/artifact.reviewed.schema.json 1.0.0 sha256:fee51f5f590c73c4
  * events/data/artifact.rolled_back.schema.json 1.0.0 sha256:4c4dac77a4b5c873
@@ -93,18 +94,22 @@
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
  * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
+ * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * events/registry.yaml 1.0.0 sha256:29d7a2b0b4a0cef2
  */
 
 /**
- * ULID in canonical upper-case Crockford base32 (26 characters).
- *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "Ulid".
+ * via the `definition` "ArtifactId".
  */
-export type Ulid = string;
+export type ArtifactId = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgId".
+ */
+export type OrgId = string;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "WorldId".
@@ -121,6 +126,46 @@ export type RunId = string;
  */
 export type UserId = string;
 /**
+ * Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it from the role and the pinned skill, never a model, a file name or sniffing. Closed: no HTML or SVG.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MediaType".
+ */
+export type MediaType =
+  | "text/markdown"
+  | "text/csv"
+  | "application/json"
+  | "application/pdf"
+  | "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  | "image/png"
+  | "image/jpeg";
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UnitId".
+ */
+export type UnitId = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AgentId".
+ */
+export type AgentId = string;
+/**
+ * Lower-case machine name.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Slug".
+ */
+export type Slug = string;
+/**
+ * Raw archive record (PRD 13.2): <run id>/<record seq in that run's archive>.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "EventArchiveRef".
+ */
+export type EventArchiveRef = string;
+/**
  * RFC 3339 timestamp in UTC with exactly three fractional digits, e.g. 2026-09-29T09:30:00.000Z.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -128,10 +173,43 @@ export type UserId = string;
  */
 export type Timestamp = string;
 /**
+ * <run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257).
+ *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "ArtifactId".
+ * via the `definition` "ArtifactVersionIdempotencyKey".
  */
-export type ArtifactId = string;
+export type ArtifactVersionIdempotencyKey = string;
+/**
+ * ULID in canonical upper-case Crockford base32 (26 characters).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Ulid".
+ */
+export type Ulid = string;
+/**
+ * Agent rank and model role (PRD 8.1).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AgentRole".
+ */
+export type AgentRole = "director" | "lead" | "specialist" | "verifier" | "writer" | "narrator";
+/**
+ * Skill id from skill.yaml (skills/<domain>/<skill-id>/).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillId".
+ */
+export type SkillId = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Semver".
+ */
+export type Semver = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ProvidersProfileId".
+ */
+export type ProvidersProfileId = string;
 /**
  * Deliverable format (PRD 12.4), plus email for replies and in_app for answers shown in Tilo.
  *
@@ -167,11 +245,6 @@ export type CardKind = "needs_you" | "gate" | "consent" | "meeting";
  * via the `definition` "BuildingId".
  */
 export type BuildingId = string;
-/**
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "AgentId".
- */
-export type AgentId = string;
 /**
  * 2-3 options, exactly one suggested.
  *
@@ -264,11 +337,6 @@ export type AutonomyLevel = "L0" | "L1" | "L2" | "L3";
 export type Tier = "outpost" | "village" | "town" | "city";
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "OrgId".
- */
-export type OrgId = string;
-/**
- * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "DistrictId".
  */
 export type DistrictId = string;
@@ -277,11 +345,6 @@ export type DistrictId = string;
  * via the `definition` "LevelId".
  */
 export type LevelId = string;
-/**
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "UnitId".
- */
-export type UnitId = string;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "IslandId".
@@ -298,25 +361,6 @@ export type PolicyId = string;
  */
 export type TeamLeadId = string;
 /**
- * Skill id from skill.yaml (skills/<domain>/<skill-id>/).
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "SkillId".
- */
-export type SkillId = string;
-/**
- * Lower-case machine name.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "Slug".
- */
-export type Slug = string;
-/**
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "Semver".
- */
-export type Semver = string;
-/**
  * Display name of 2-24 plain characters (PRD 9.2): letters, digits, spaces and & ' . , ( ) / + -, starting with a letter or digit.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -330,13 +374,6 @@ export type PlainName = string;
  * via the `definition` "IconName".
  */
 export type IconName = string;
-/**
- * Agent rank and model role (PRD 8.1).
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "AgentRole".
- */
-export type AgentRole = "director" | "lead" | "specialist" | "verifier" | "writer" | "narrator";
 /**
  * Data class (PRD 12.1): personal, business or public.
  *
@@ -424,18 +461,6 @@ export type EventVis = "all" | EventDistrictList;
  * via the `definition` "EventDistrictList".
  */
 export type EventDistrictList = [DistrictId, ...DistrictId[]];
-/**
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "ProvidersProfileId".
- */
-export type ProvidersProfileId = string;
-/**
- * Raw archive record (PRD 13.2): <run id>/<record seq in that run's archive>.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "EventArchiveRef".
- */
-export type EventArchiveRef = string;
 /**
  * Who answered a question or meeting (BQ-04): a person, a Team Lead, the card's safe default applied at timeout, or an earlier decision (FR-AGT-07). Never a model's own choice.
  *
@@ -573,6 +598,20 @@ export type ProvidersCapability =
   | "computer_use"
   | "grounding"
   | "code_execution";
+/**
+ * Scenario id: a letter, then up to 31 letters, digits, hyphens or underscores. Equals the file name without .yaml (SN-01). The not-pattern rejects a final line break, which a Python validator's $ lets through.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ScenarioId".
+ */
+export type ScenarioId = string;
+/**
+ * A repo-relative file path with forward slashes. Each segment starts with a letter, digit or underscore, so there is no absolute path, drive letter, backslash, empty segment, . or .. segment, and no hidden file such as .env or .git. The not-pattern rejects a final line break, which a Python validator's $ lets through.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ScenarioSeedPath".
+ */
+export type ScenarioSeedPath = string;
 
 /**
  * Index of the generated contract types; not a document.
@@ -649,6 +688,195 @@ export interface AgentsConfigRetries {
  */
 export interface AgentsConfigQuestions {
   hourly_cap_per_person: number;
+}
+/**
+ * One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-08 in artifact.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ArtifactVersion".
+ */
+export interface ArtifactVersion {
+  v: "1.0";
+  artifact: ArtifactRef;
+  org_id: OrgId;
+  world_id: WorldId;
+  run_id: RunId;
+  owner: UserId;
+  media_type: MediaType;
+  /**
+   * Stored size: at least 1 byte, at most 50,000,000 for a file and 2,000,000 for text or JSON (BQ-257, AR-04).
+   */
+  size_bytes: number;
+  /**
+   * SHA-256 of the stored bytes, lower-case hex; every read recomputes it (AR-01).
+   */
+  content_sha256: string;
+  /**
+   * The earlier version of the same artifact this one continues, or the version a restore copies (AR-02); empty for version 1.
+   *
+   * @maxItems 1
+   */
+  parents: ArtifactRef[];
+  origin: ArtifactVersionOrigin;
+  /**
+   * Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).
+   */
+  sources: ArtifactVersionSource[];
+  /**
+   * The SafetyProvider verdict on the exact stored bytes (PRD 16.3 item 2), unscreened when there is none. A version that is not clean raises safety_flag in the policy engine (AR-07).
+   */
+  screening: "clean" | "flagged" | "unscreened";
+  /**
+   * When that verdict came back; null exactly when screening is unscreened (AR-07).
+   */
+  screened_at: Timestamp | null;
+  /**
+   * true when the secret redactor changed text or JSON before it was stored (SEC-01, BQ-258). The redactor reads only text and JSON, so false on a file means it did not run (AR-07).
+   */
+  redacted: boolean;
+  /**
+   * Set for unit and render outputs (AR-05); null for uploads and restores.
+   */
+  idempotency_key: ArtifactVersionIdempotencyKey | null;
+  created_at: Timestamp;
+}
+/**
+ * A pinned version of a stored artifact.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ArtifactRef".
+ */
+export interface ArtifactRef {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
+}
+/**
+ * What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither) or a restore (FR-MEM-06; no unit). Set by the store from the run, never by a runner.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ArtifactVersionOrigin".
+ */
+export interface ArtifactVersionOrigin {
+  kind: "unit" | "render" | "upload" | "restore";
+  unit: UnitId | null;
+  agent: AgentId | null;
+}
+/**
+ * Where one source's text is in the raw archive: id is the manifest source id, archive_ref the tool call record. A pointer, never content.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ArtifactVersionSource".
+ */
+export interface ArtifactVersionSource {
+  id: Slug;
+  archive_ref: EventArchiveRef;
+}
+/**
+ * One append-only revision of a version's provenance manifest, at .../versions/{version:06d}/manifests/{n:04d} (AR-06): created at put, reviewed after the Verifier (cause its artifact.reviewed), sent (cause the data.transfer out) or exported when the version leaves Tilo. Readers take the highest n.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ArtifactVersionManifestRevision".
+ */
+export interface ArtifactVersionManifestRevision {
+  n: number;
+  stage: "created" | "reviewed" | "sent" | "exported";
+  cause: Ulid | null;
+  manifest: Manifest;
+}
+/**
+ * Provenance manifest of one artifact version (PRD 13.3, 15.2; FR-MEM-06, FR-MEM-07): the agent, skill version and model profile that produced it, its version parents, inputs and sources, the claims it makes with their sources, the events that caused it and who authorised it. Stored with the version and carried by exports, so the trail survives outside Tilo. 'Why is this here?' resolves a claim to its sources and to the first event in events. Rules the schema cannot express are MF-01 to MF-06 in manifest.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Manifest".
+ */
+export interface Manifest {
+  v: "1.0";
+  artifact: ArtifactRef;
+  /**
+   * SHA-256 of the version's stored bytes, lower-case hex (PRD 13.2: content hashes).
+   */
+  content_sha256: string;
+  /**
+   * Earlier versions this version was made from (FR-MEM-06); empty for a first version.
+   */
+  parents: ArtifactRef[];
+  produced_by: ManifestProducer;
+  /**
+   * Other artifact versions the producer read.
+   */
+  inputs: ArtifactRef[];
+  sources: ManifestSource[];
+  claims: ManifestClaim[];
+  /**
+   * Ids of the events that caused this version, oldest first.
+   */
+  events: Ulid[];
+  /**
+   * The person, policy or Team Lead that authorised the side effect this version went out with (BQ-01); null when it never left Tilo.
+   */
+  authz: Authz | null;
+}
+/**
+ * Who produced the version: the agent and its role, the pinned skill version (null without a skill), and the model role and profile from config/models.yaml (null when no model was called), never a model id.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ManifestProducer".
+ */
+export interface ManifestProducer {
+  agent_id: AgentId;
+  role: AgentRole;
+  skill: ManifestSkillVersion | null;
+  model_role: Slug | null;
+  profile: ProvidersProfileId | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ManifestSkillVersion".
+ */
+export interface ManifestSkillVersion {
+  id: SkillId;
+  version: Semver;
+}
+/**
+ * Where material came from. ref is the URL for web, the file name for file, <connector_id>:<item id> for connector, <artifact_id>@<version>#<cell> for cell and <artifact_id>@<version> for artifact. Every ref is one of four closed shapes, so none carries user info or a query, fragment or parameter token (PRD 16.1 rule 4, 16.2; MF-03): an http or https URL of host, optional port and path only (no user info, query, fragment, ; or =); an artifact ref with an optional cell after # of letters, digits and . _ ~ ! : $ - only; a connector ref whose item id has only letters, digits and . _ ~ -; or a file name with no / \ : ? # @ % or control character and no space at either end. A bare token can still look like a file name or an item id, so the secret redactor checks every manifest before it is written or exported (MF-06). fingerprint is the SHA-256 of the fetched content, the result cache key part (PRD 13.1).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ManifestSource".
+ */
+export interface ManifestSource {
+  id: Slug;
+  kind: "web" | "file" | "connector" | "cell" | "artifact";
+  ref: string;
+  fingerprint: string;
+  fetched_at: Timestamp;
+}
+/**
+ * A statement, number or cell in the artifact (PRD 13.3 claims ledger). location is its path in the artifact, e.g. slide3/cell:B2. A verified claim names at least one source.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ManifestClaim".
+ */
+export interface ManifestClaim {
+  id: Slug;
+  location: string;
+  text: string;
+  source_ids: Slug[];
+  verified: boolean;
+}
+/**
+ * Who authorised a side effect (BQ-01, ADR-0002): a person, a policy or a Team Lead, with the id of that authority and when. A model is never an authority. ref must match by: a user id for a person, a policy id for a policy, a Team Lead id for a Team Lead.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Authz".
+ */
+export interface Authz {
+  by: "person" | "policy" | "team_lead";
+  /**
+   * Id of the authority: a user id for a person, a policy id, or a Team Lead id.
+   */
+  ref: string;
+  at: Timestamp;
 }
 /**
  * One measured span of a person's attention on a run (PRD 14.2, FR-MTR-05): steering (intake, a question, a card, a take-over) or review (a deliverable open before approval). apps/web measures it, as do the channel handlers for WhatsApp and email answers; tilo-api writes it, and packages/metering subtracts the minutes from time saved. Event timestamps cannot give this, because the gap between a question and its answer is waiting time, not attention. A span holds ids and times only, never content (PRD 16.5). Rules MT-07 and MT-08 in contracts/metering.rules.md.
@@ -870,17 +1098,6 @@ export interface CardGateAction {
   destination: Destination | null;
 }
 /**
- * A pinned version of a stored artifact.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "ArtifactRef".
- */
-export interface ArtifactRef {
-  artifact_id: ArtifactId;
-  version: number;
-  label?: string;
-}
-/**
  * The connection a consent card asks for.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -939,22 +1156,9 @@ export interface Common {
   channel?: Channel;
   data_class?: DataClass;
   deliverable_format?: DeliverableFormat;
+  media_type?: MediaType;
   credit_range?: CreditRange;
   time_range?: TimeRange;
-}
-/**
- * Who authorised a side effect (BQ-01, ADR-0002): a person, a policy or a Team Lead, with the id of that authority and when. A model is never an authority. ref must match by: a user id for a person, a policy id for a policy, a Team Lead id for a Team Lead.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "Authz".
- */
-export interface Authz {
-  by: "person" | "policy" | "team_lead";
-  /**
-   * Id of the authority: a user id for a person, a policy id, or a Team Lead id.
-   */
-  ref: string;
-  at: Timestamp;
 }
 /**
  * Estimated credits as a range; min <= max is checked by validators.
@@ -1519,13 +1723,22 @@ export interface ApprovalResolvedData {
   pin_verified: boolean;
 }
 /**
- * data of artifact.created (PRD 9.5).
+ * data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactCreatedData".
  */
 export interface ArtifactCreatedData {
   artifact: ArtifactRef;
+  /**
+   * SHA-256 of the stored bytes, lower-case hex, as the store recorded it (AR-01).
+   */
+  content_sha256?: string;
+  media_type?: MediaType;
+  /**
+   * Stored size: at least 1 byte, at most 50,000,000 for a file and 2,000,000 for text or JSON (BQ-257).
+   */
+  size_bytes?: number;
 }
 /**
  * data of artifact.delivered (PRD 9.5): a deliverable reached the Delivery Dock. This event is the notice, not the side effect, so it carries no authz. A format that leaves Tilo (email, or google_docs, google_sheets or google_slides through the Drive connector, PRD 12.4) went through the outbox: outbox_id names the entry that sent it, and the event's cause is that entry's data.transfer out, which carries the authorisation (EV-14, HR-7). A format kept in Tilo (a file to download, or in_app) has outbox_id null.
@@ -2368,86 +2581,6 @@ export interface LayoutGateGeometry {
   cell: LayoutPoint;
 }
 /**
- * Provenance manifest of one artifact version (PRD 13.3, 15.2; FR-MEM-06, FR-MEM-07): the agent, skill version and model profile that produced it, its version parents, inputs and sources, the claims it makes with their sources, the events that caused it and who authorised it. Stored with the version and carried by exports, so the trail survives outside Tilo. 'Why is this here?' resolves a claim to its sources and to the first event in events. Rules the schema cannot express are MF-01 to MF-06 in manifest.rules.md.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "Manifest".
- */
-export interface Manifest {
-  v: "1.0";
-  artifact: ArtifactRef;
-  /**
-   * SHA-256 of the version's stored bytes, lower-case hex (PRD 13.2: content hashes).
-   */
-  content_sha256: string;
-  /**
-   * Earlier versions this version was made from (FR-MEM-06); empty for a first version.
-   */
-  parents: ArtifactRef[];
-  produced_by: ManifestProducer;
-  /**
-   * Other artifact versions the producer read.
-   */
-  inputs: ArtifactRef[];
-  sources: ManifestSource[];
-  claims: ManifestClaim[];
-  /**
-   * Ids of the events that caused this version, oldest first.
-   */
-  events: Ulid[];
-  /**
-   * The person, policy or Team Lead that authorised the side effect this version went out with (BQ-01); null when it never left Tilo.
-   */
-  authz: Authz | null;
-}
-/**
- * Who produced the version: the agent and its role, the pinned skill version (null without a skill), and the model role and profile from config/models.yaml (null when no model was called), never a model id.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "ManifestProducer".
- */
-export interface ManifestProducer {
-  agent_id: AgentId;
-  role: AgentRole;
-  skill: ManifestSkillVersion | null;
-  model_role: Slug | null;
-  profile: ProvidersProfileId | null;
-}
-/**
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "ManifestSkillVersion".
- */
-export interface ManifestSkillVersion {
-  id: SkillId;
-  version: Semver;
-}
-/**
- * Where material came from. ref is the URL for web, the file name for file, <connector_id>:<item id> for connector, <artifact_id>@<version>#<cell> for cell and <artifact_id>@<version> for artifact. Every ref is one of four closed shapes, so none carries user info or a query, fragment or parameter token (PRD 16.1 rule 4, 16.2; MF-03): an http or https URL of host, optional port and path only (no user info, query, fragment, ; or =); an artifact ref with an optional cell after # of letters, digits and . _ ~ ! : $ - only; a connector ref whose item id has only letters, digits and . _ ~ -; or a file name with no / \ : ? # @ % or control character and no space at either end. A bare token can still look like a file name or an item id, so the secret redactor checks every manifest before it is written or exported (MF-06). fingerprint is the SHA-256 of the fetched content, the result cache key part (PRD 13.1).
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "ManifestSource".
- */
-export interface ManifestSource {
-  id: Slug;
-  kind: "web" | "file" | "connector" | "cell" | "artifact";
-  ref: string;
-  fingerprint: string;
-  fetched_at: Timestamp;
-}
-/**
- * A statement, number or cell in the artifact (PRD 13.3 claims ledger). location is its path in the artifact, e.g. slide3/cell:B2. A verified claim names at least one source.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "ManifestClaim".
- */
-export interface ManifestClaim {
-  id: Slug;
-  location: string;
-  text: string;
-  source_ids: Slug[];
-  verified: boolean;
-}
-/**
  * The HUD meter's state for one run (PRD 14.4, FR-MTR-07): credits used (the sum of the run's event credits), credits saved (origin cost minus lookup cost over accepted reuses, PRD 14.3), time saved (estimate) and the run's budget. packages/metering computes it from the run's events up to last_seq, and apps/web renders it. Rules MT-05 and MT-06 in contracts/metering.rules.md.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -3038,6 +3171,62 @@ export interface ProvidersPrices {
 export interface ProvidersPrice {
   input: number | null;
   output: number | null;
+}
+/**
+ * A scenario config, config/scenarios/<id>.yaml (PRD 4.3, 7.1 FR-INT-11, ADR-0014): the skill set, connectors, seed data, autonomy policy and world theme a scenario preloads, and nothing else. Data only: no code, prompt, model id, brief text or plan, so a scenario that needs any of those becomes a pillar requirement first, and no platform source names a scenario id. The same shape serves any scenario, a demo, a held-out bank case or a generated brief. theme is the world theme, the same slug as layout.schema.json theme (config/themes/, FR-WLD-15; only its shape is checked until that folder exists, BQ-202). Rules that need other files (the id equals the file name, connectors in config/connectors.yaml, seed files exist inside the repo, each autonomy level within its risk tier's max_level, T3 at L1 only) are SN-01 to SN-09 in contracts/scenario.rules.md, checked by the loader.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Scenario".
+ */
+export interface Scenario {
+  id: ScenarioId;
+  /**
+   * Display name of the scenario, plain text.
+   */
+  title: string;
+  /**
+   * Skill ids the scenario preloads (skills/<domain>/<skill-id>/skill.yaml, FR-AGT-04); at least one.
+   *
+   * @minItems 1
+   */
+  skills: [SkillId, ...SkillId[]];
+  /**
+   * Connector ids the scenario uses, each declared in config/connectors.yaml (SN-03); may be empty. Preloading a connector never connects it: the person still grants it on a consent card (PRD 10.3, FR-HIL-08).
+   */
+  connectors: ConnectorId[];
+  /**
+   * Seed files the scenario loads, as repo-relative paths (SN-04); may be empty.
+   */
+  seed_data: ScenarioSeedPath[];
+  theme: Slug;
+  /**
+   * Policy seeds (PRD 10.4). Each entry becomes one policy.schema.json record only when the owner approves the task, as the owner's own (SN-08); absent or empty preloads none. Each level is at most its action type's max_level in config/autonomy.yaml, so a T3 action never goes above L1 (SN-06).
+   */
+  autonomy?: ScenarioAutonomyEntry[];
+}
+/**
+ * One policy seed: the policy.schema.json fields a scenario may set. Everything else is fixed when the policy is created (SN-08): owner and stamps from the approving owner, scope recipients, domains and districts empty, limits.credits null, conditions all true, expiry null, notify_channel web, no Team Lead domains. A scenario never sets a tier: tiers come from config/autonomy.yaml and its modifiers.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ScenarioAutonomyEntry".
+ */
+export interface ScenarioAutonomyEntry {
+  action_type: ActionType;
+  level: AutonomyLevel;
+  /**
+   * The policy's scope.connectors: ids from the scenario's own connectors, or the reserved internal for an action that goes through no connector (SN-07).
+   *
+   * @minItems 1
+   */
+  connectors: [ConnectorId, ...ConnectorId[]];
+  /**
+   * The policy's limits.per_day: most actions per UTC day. Required at L2 and L3 (policy.schema.json, BQ-30); left out at L0 and L1 means no daily cap (null in the policy).
+   */
+  per_day?: number;
+  /**
+   * The policy's undo_window_s: seconds an L2 action can still be undone; left out means the policy default, 60.
+   */
+  undo_window_s?: number;
 }
 /**
  * skill.yaml in skills/<domain>/<skill-id>/ (PRD 8.2). The planner sees only id and the one-line description; the executing agent loads the full skill.

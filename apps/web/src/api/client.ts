@@ -31,7 +31,7 @@ export interface TiloClient {
   answerQuestions(taskId: string, answers: QuestionAnswer[], briefEdits: Partial<Brief>): Promise<{ brief: Brief }>;
   getApproaches(taskId: string): Promise<ApproachesResult>;
   approve(taskId: string, req: ApprovalRequest): Promise<{ world_id: string }>;
-  getLayout(worldId: string): Promise<Layout>;
+  getLayout(worldId: string, signal?: AbortSignal): Promise<Layout>;
   subscribeEvents(worldId: string, onEvent: (e: Event) => void): () => void; // returns unsubscribe
   listCards(worldId: string): Promise<Card[]>;
   answerCard(cardId: string, answer: CardAnswer): Promise<void>;

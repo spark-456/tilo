@@ -1,0 +1,16 @@
+{
+  "id": "TS-91",
+  "title": "Fictional vendor comparison",
+  "skills": ["vendor-research", "deck-drafting"],
+  "connectors": ["google_drive"],
+  "theme": "metropolis",
+  "autonomy": [
+    {
+      "action_type": "save_file",
+      "level": "L2",
+      "connectors": ["google_drive"],
+      "per_day": 5,
+      "undo_window_s": 60
+    }
+  ]
+}

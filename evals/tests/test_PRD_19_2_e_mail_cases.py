@@ -6,7 +6,7 @@ import sys
 from collections import Counter
 from urllib.parse import urlparse
 
-from conftest import REPO_ROOT
+from _evals_lib import REPO_ROOT
 from test_PRD_19_2_eval_set_structure import DENYLIST_BRANDS_RE, REAL_ROUTING_RE
 from tilo_evals import Case, load_cases
 

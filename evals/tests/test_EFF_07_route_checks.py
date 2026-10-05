@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
-from conftest import REPO_ROOT, make_event
+from _evals_lib import REPO_ROOT, make_event
 from tilo_evals import Case
 from tilo_evals import checks as registry
 from tilo_evals.checks import Outcome, get, kind

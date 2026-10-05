@@ -12,7 +12,17 @@ import { useClient } from "../api/ClientProvider";
 import { waitingForYou } from "../world/runLog";
 import { worldStatus } from "../world/runSummary";
 import { AppLink } from "./AppLink";
-import { EventList, Page, Section, Soon, Stats, field, useFixtureRun } from "./kit";
+import {
+  EventList,
+  Page,
+  Section,
+  Soon,
+  Stats,
+  doneState,
+  field,
+  useFixtureRun,
+  waitState,
+} from "./kit";
 import { useRemote } from "./remote";
 
 const transfer = (e: Event, action: string, direction: "in" | "out"): boolean =>
@@ -44,6 +54,8 @@ export function S_17() {
     (e.type === "artifact.created" && e.seq > (readers.get(e.actor) ?? Number.POSITIVE_INFINITY));
   const drafts = events.filter(isDraft);
   const sent = events.filter((e) => transfer(e, "send_email", "out"));
+  const waiting = waitingForYou(events);
+  const written = drafts.filter((e) => e.type === "artifact.created").length;
   const list = (keep: (e: Event) => boolean, empty: string) => (
     <EventList events={events.filter(keep)} all={events} empty={empty} />
   );
@@ -55,19 +67,11 @@ export function S_17() {
     >
       <Stats
         items={[
-          ["Waiting for you", waitingForYou(events)],
-          ["Drafts written", drafts.filter((e) => e.type === "artifact.created").length],
-          ["Replies sent", sent.length],
+          ["Waiting for you", waiting, waitState(waiting)],
+          ["Drafts written", written, doneState(written, "Written")],
+          ["Replies sent", sent.length, doneState(sent.length, "Sent")],
         ]}
       />
-      <Section
-        title="Triage"
-        note="What came in, and what the agents made of it."
-        reserve={[6, 7]}
-        action={<Soon labels={["Add a VIP sender"]} />}
-      >
-        {list((e) => isTriage(e) && !isDraft(e), "No mail has been triaged yet.")}
-      </Section>
       <Section
         title="Drafts"
         note="Every reply waits for you unless one of your rules covers it."
@@ -79,13 +83,24 @@ export function S_17() {
       <Section title="Sent" note="Replies stay in their thread." reserve={4}>
         {list((e) => sent.includes(e), "Nothing has been sent yet.")}
       </Section>
+      <Section
+        title="Triage"
+        note="What came in, and what the agents made of it."
+        reserve={[6, 7]}
+        action={<Soon labels={["Add a VIP sender"]} />}
+      >
+        {list((e) => isTriage(e) && !isDraft(e), "No mail has been triaged yet.")}
+      </Section>
       <Section title="Digest" reserve={6}>
         {list((e) => e.type === "world.completed", "The digest appears when the run finishes.")}
         <p data-testid="time-saved">
           {done && saved.status === "ready" && saved.value.time_saved ? (
             <>
               About {saved.value.time_saved.low_min} to {saved.value.time_saved.high_min} min saved
-              (estimate) · <AppLink to="/estimate">How we estimate</AppLink>
+              (estimate) ·{" "}
+              <AppLink to="/estimate" className="tile-link">
+                How we estimate
+              </AppLink>
             </>
           ) : done && saved.status === "error" ? (
             saved.message

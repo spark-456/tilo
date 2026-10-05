@@ -10,17 +10,19 @@ import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
 import { findItem } from "./S_05";
+import { StopAutopilot } from "./StopAutopilot";
 import {
   Chip,
   Page,
   Row,
   Section,
-  Soon,
   Stats,
   authzText,
+  doneState,
   field,
   stamp,
   useFixtureRun,
+  waitState,
   words,
 } from "./kit";
 import { useRemote } from "./remote";
@@ -32,6 +34,10 @@ const LEVELS: ReadonlyArray<readonly [string, string, string]> = [
   ["L2", "Instruction is approval", "Acts on your explicit instruction, with an undo window."],
   ["L3", "Standing rules", "Pre-authorised actions run within limits and appear in a digest."],
 ];
+
+/** PRD 10.4: every action starts here. No policy is served in this build, so it is the one level
+ * that can be named; it is marked by a tick and the word "Default", not by colour. */
+const DEFAULT_LEVEL = "L1";
 
 /** The approval that released an outgoing action (same outbox entry), else the event itself. */
 const authorisation = (events: readonly Event[], e: Event): Event =>
@@ -45,7 +51,9 @@ const authorisation = (events: readonly Event[], e: Event): Event =>
 export function S_15() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
-  const [layout, retry] = useRemote("load the gates", () => client.getLayout(worldId));
+  const [layout, retry] = useRemote("load the gates", (signal) =>
+    client.getLayout(worldId, signal),
+  );
   const log = events.filter((e) => e.authz !== null);
   const trace = `/world/${encodeURIComponent(worldId)}/trace`;
   return (
@@ -56,15 +64,15 @@ export function S_15() {
     >
       <Stats
         items={[
-          ["Authorised actions", log.length],
-          ["Waiting for you", waitingForYou(events)],
+          ["Authorised actions", log.length, doneState(log.length, "Recorded")],
+          ["Waiting for you", waitingForYou(events), waitState(waitingForYou(events))],
         ]}
       />
       <Section
         title="Stop all autopilot"
         note="Sets every rule to level L1 at once, so everything waits for you. Pause all also stops the agents."
       >
-        <Placeholder label="Stop all autopilot" compact />
+        <StopAutopilot worldId={worldId} />
       </Section>
       <Section
         title="Levels"
@@ -72,15 +80,25 @@ export function S_15() {
       >
         <ul className="blist">
           {LEVELS.map(([id, name, what]) => (
-            <Row key={id} name={name} sub={what} state={<Chip tone="none">{id}</Chip>} />
+            <Row
+              key={id}
+              name={name}
+              sub={what}
+              state={
+                id === DEFAULT_LEVEL ? (
+                  <Chip tone="done">✓ {id} · Default</Chip>
+                ) : (
+                  <Chip tone="none">{id}</Chip>
+                )
+              }
+            />
           ))}
         </ul>
       </Section>
       <Section
         title="Rules"
-        note="A gate with no rule waits for a person."
+        note="A gate with no rule waits for a person. Writing a rule is not available yet."
         reserve={5}
-        action={<Soon labels={["New rule"]} />}
       >
         <Loaded what="the gates" remote={layout} retry={retry} isEmpty={() => false}>
           {(l) => (

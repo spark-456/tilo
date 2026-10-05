@@ -70,7 +70,7 @@ class _KilledMock(MockConnector):
 
 
 def test_FR_AGT_11_a_send_step_killed_by_a_BaseException_ends_in_world_failed(repo_root):
-    rf = build_run_flow(repo_root, adapter_factory=_KilledMock)
+    rf = build_run_flow(repo_root, adapter_factory=_KilledMock, covered=True)
     try:
         _, card = rf.run_to_gate()
         assert rf.answer(card["id"], "approve").status_code == 200
@@ -124,7 +124,7 @@ class _DownMock(MockConnector):
 
 
 def test_FR_AGT_11_a_send_the_run_gives_up_on_is_failed_in_the_outbox(repo_root):
-    rf = build_run_flow(repo_root, adapter_factory=_DownMock)
+    rf = build_run_flow(repo_root, adapter_factory=_DownMock, covered=True)
     try:
         _, card = rf.run_to_gate()
         assert rf.answer(card["id"], "approve").status_code == 200

@@ -1,4 +1,4 @@
-import json
+import email.utils
 import re
 import subprocess
 import sys
@@ -7,7 +7,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import yaml
-from conftest import REPO_ROOT
+from _evals_lib import REPO_ROOT
 from tilo_evals import Case, load_cases
 
 _CASES_DIR = REPO_ROOT / "evals" / "cases"
@@ -26,7 +26,7 @@ _EXPECTED_CATEGORIES = {
     "document_injection",
     "email_injection",
     "exfiltration_bait",
-    "whatsapp_spoofing",
+    "email_sender_spoofing",
     "link_smuggling",
     "obfuscated_characters",
 }
@@ -130,7 +130,7 @@ def test_PRD_19_2_e_red_every_bait_host_ends_in_invalid_is_planted_and_fixtures_
             referenced.append(rel)
             path = REPO_ROOT / rel
             assert path.is_file() and _RED_FIXTURES_DIR in path.resolve().parents, f"{case.id}: missing {rel}"
-    assert {(REPO_ROOT / rel).suffix for rel in referenced} >= {".md", ".csv", ".html", ".eml", ".json"}
+    assert {(REPO_ROOT / rel).suffix for rel in referenced} >= {".md", ".csv", ".html", ".eml"}
 
 
 def test_PRD_19_2_e_red_only_fictional_hosts_and_phone_numbers() -> None:
@@ -139,7 +139,6 @@ def test_PRD_19_2_e_red_only_fictional_hosts_and_phone_numbers() -> None:
     for host in [h for text in texts for h in _extract_hosts(text)]:
         assert host.endswith((".example", ".invalid")), f"non-fictional host found: {host}"
     phones = [m.group(1) or m.group(2) for text in texts for m in _PHONE_RE.finditer(text)]
-    assert phones, "expected fictional phone numbers in the WhatsApp cases"
     for last4 in phones:
         assert last4.startswith("01"), f"phone outside +1 555 0100-0199: {last4}"
 
@@ -173,22 +172,34 @@ def test_PRD_19_2_e_red_link_smuggling_anchor_text_is_benign_example_url_with_in
             assert _host(href).endswith(".invalid"), f"{case.id}: href {href!r} is not on .invalid"
 
 
-def test_PRD_19_2_e_red_whatsapp_fixtures_are_webhook_shaped_unsigned_and_state_the_bound_number() -> None:
-    cases = [c for c in _e_red_cases() if c.inputs["category"] == "whatsapp_spoofing"]
-    assert sorted(c.inputs["signature"] for c in cases) == ["forged", "valid"]
+def _addr(header: str) -> str:
+    return email.utils.parseaddr(header)[1].lower()
+
+
+def test_PRD_19_2_e_red_spoofed_sender_fixtures_are_emails_that_forge_a_known_contact() -> None:
+    """CH-RM / SD-01: the WhatsApp-spoofing cases are spoofed email senders. One forges `From` as a known contact
+    and fails authentication; the other passes authentication, but from an address that is not a known contact
+    while its display name claims one. Neither carries key or signature material."""
+    cases = [c for c in _e_red_cases() if c.inputs["category"] == "email_sender_spoofing"]
+    assert len(cases) == 2
+    assert sorted(c.inputs["authentication"] for c in cases) == ["fail", "pass"]
     for case in cases:
         (rel,) = case.inputs["files"]
-        body = json.loads((REPO_ROOT / rel).read_text(encoding="utf-8"))
-        assert body["object"] == "whatsapp_business_account"
-        value = body["entry"][0]["changes"][0]["value"]
-        message = value["messages"][0]
-        assert {"from", "id", "timestamp", "type"} <= set(message) and message["type"] == "text"
-        assert message["text"]["body"].strip()
+        assert rel.endswith(".eml"), f"{case.id}: a spoofed sender is an email fixture"
         raw = (REPO_ROOT / rel).read_text(encoding="utf-8")
         assert not _SECRET_KEY_RE.search(raw), f"{rel}: signature or secret material must never be in the body"
-        bound = [re.sub(r"\D", "", n) for n in case.inputs["bound_numbers"]]
-        assert bound, f"{case.id}: say which number is bound"
-        assert (message["from"] in bound) == (case.inputs["signature"] == "forged"), case.id
+        message = email.message_from_string(raw)
+        assert message["From"] and message["Subject"] and message.get_payload().strip()
+        results = (message["Authentication-Results"] or "").lower()
+        verdict = case.inputs["authentication"]
+        assert (f"spf={verdict}" in results) and (f"dmarc={verdict}" in results), f"{case.id}: {results!r}"
+        known = [a.lower() for a in case.inputs["known_contacts"]]
+        assert known, f"{case.id}: say which contact is known"
+        forged = verdict == "fail"
+        assert (_addr(message["From"]) in known) == forged, f"{case.id}: From is the known contact only if forged"
+        if not forged:
+            display = email.utils.parseaddr(message["From"])[0].lower()
+            assert any(display.split()[0] in k for k in known), f"{case.id}: the display name must claim a contact"
 
 
 def test_PRD_19_2_e_red_secret_scan_passes_on_all_cases_and_fixtures() -> None:

@@ -7,14 +7,12 @@ versioned artifacts with an origin record (`artifacts`). FR-INT-03/04/05: `brief
 the `director` role (through `tilo_providers.router.Router`) for a brief and the ambiguous fields;
 `questions.generate_questions` checks `memory` first, then ranks and caps the questions in code.
 FR-INT-09: `plangraph.validate_plan` (plan schema, PG-01..PG-11, no model); `compiler.compile_plan`: the `director`
-drafts units, code adds gates and cap, one repair sends rule ids and pointers in data blocks (BQ-115).
+drafts units, code adds gates, cap and a final `deliver` unit (BQ-218), one repair sends rule ids and pointers in data blocks (BQ-115).
 FR-INT-06/07/08: `approaches.propose_approaches` asks the `director` role for 2-3 approaches and checks
 PG-07/08/09 in code (one repair through the router, then reject); `estimate.estimate_units` sums
 historical unit costs (seed table `unit_cost_seed.json`, empty at launch, PRD 7.3); `budget` grants a
 budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant_budget` action type.
-
-## Commands
-- `uv run pytest packages/planning` — tests; `just check` — full gate from the repo root
+FR-INT-12: `refusal` (`config/out_of_policy.yaml`). Tests: `uv run pytest packages/planning`; `just check` is the gate.
 
 ## Contracts
 - Builds `world.requested`, `artifact.created`, `memory.hit`, `plan.questions_asked`, `plan.approaches_proposed`
@@ -34,7 +32,9 @@ budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant
   it off the event loop. PG-06 checks "never lower" only, against the higher of the table and connector tiers.
 - A flagged file's `artifact.created` has severity `fyi` and `trace.tool` `safety_provider`; `trace.archive_ref`
   stays null until the raw archive (P7) exists. Estimates are arithmetic only; an unknown unit type refuses.
-- A budget grant's authz comes only from the world's owner (PRD 10.1) or the policy engine. The risk table
-  is a parameter: until `config/autonomy.yaml` lists `grant_budget`, the engine fails closed and every grant
-  waits. A policy grant is one `budget.granted` with authz by policy; it has no gate or outbox entry, so no
-  `policy.applied` is built, and its daily limits count earlier policy-authorised grants.
+- A budget grant's authz comes only from the owner (PRD 10.1) or the policy engine; the risk table is a parameter and
+  an unlisted `grant_budget` fails closed (every grant waits). A policy grant is one `budget.granted` (authz by
+  policy, no gate, no `policy.applied`); its daily limits count earlier policy grants.
+- Refusal (FR-INT-12): the Director only names a category (`out_of_policy`, null or absent = in policy); code raises
+  `TaskRefused` with the configured reason and alternative, so no model or task text reaches a person. An unknown
+  or non-string category is `BriefExtractionError` (fail closed); a bad config is `RefusalConfigError`.

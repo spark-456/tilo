@@ -12,23 +12,27 @@ layers, in this order, and only the first is authority:
    a provider that fails, asks (`ambiguous_brief`): when the harness cannot tell, a person decides.
 
 `raise_question` writes the Specialist -> Lead -> Director chain and the Lead's question to a person
-through the one `WorldWriter`, and hands a `needs_you` card to `card_sink`. A question's answer never
-authorises a side effect: that stays with the outbox and the policy engine.
+through the one `WorldWriter`, and hands a `needs_you` card to `card_sink` before any of the chain is written.
+A question's answer never authorises a side effect: that stays with the outbox and the policy engine. An answer to a
+model-raised sensitive_step card only records a choice: code asks once more (`confirmation`) and only its
+"Prepare it" runs the unit.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
 
 from tilo_policy.tiers import RiskTable, load_risk_table
 from tilo_providers.interfaces import GenerateRequest, ModelProvider
-from tilo_providers.prompts import load_prompt, neutralise_marker
+from tilo_providers.prompts import load_prompt
 
 from tilo_harness.config import AgentsConfig
+from tilo_harness.untrusted import neutralise
 from tilo_harness.writer import format_ts, new_ulid
 
 ROLE = "specialist"  # prompts/specialist/must_ask_*.md
@@ -46,6 +50,9 @@ _SENSITIVE = (  # (question template, options, suggested index, reason for the s
     0,
     "Nothing outside Tilo changes until you decide; sending still needs approval.",
 )
+_OPTION_ID = re.compile(r"o([1-9][0-9]*)")  # the card builder's ids: exactly "o<n>", so "o01" names no option
+_CONFIRM_OPTIONS = ("Hold this step", "Prepare it")  # code's words, never the model's
+_CONFIRM_WHY = "Nothing outside Tilo changes until you decide; sending still needs approval."
 _FAILED = (
     "This step failed {count} times. How should it go on?",
     ("Try once more", "Skip this step", "Stop here"),
@@ -60,6 +67,12 @@ _UNREADABLE = (
 )
 
 
+def option_index(option: Any, count: int) -> int | None:
+    """The 0-based index of a card option id such as "o2", or None when the id names none of the `count` options."""
+    found = _OPTION_ID.fullmatch(option) if isinstance(option, str) else None
+    return int(found[1]) - 1 if found and int(found[1]) <= count else None
+
+
 @dataclass(frozen=True)
 class Ask:
     reason: str
@@ -67,15 +80,39 @@ class Ask:
     options: tuple[str, ...]
     suggested: int
     why: str
+    proceed: int | None = None  # a rule's card: the one option that lets the unit run; None: any answer runs it
+
+    def runs(self, answer: Any) -> bool:
+        """Whether this answer lets the unit run (decided here, never by the runner or a model). A rule's card
+        (sensitive_step, repeated_failure, an unreadable reply) runs the unit only on its proceed option: Hold, Stop,
+        Skip and its safe default at the deadline leave it unrun. A model-written ambiguity or trade-off card runs it on
+        any answer, the Director's default included (PRD 10.3, BQ-235). A model-raised sensitive_step card never runs
+        the unit on its own answer: that answer only records a choice (see `confirms`)."""
+        if self.proceed is not None:
+            return answer.option == f"o{self.proceed + 1}"
+        return self.reason != "sensitive_step"
+
+    def confirms(self, answer: Any) -> bool:
+        """A model-raised sensitive_step card's answer is a choice, never an authorisation. Picking the model's
+        suggested option, or the Director's default at the deadline, holds the unit. Any other choice from a person
+        makes code ask once more (`MustAsk.confirmation`, a card whose words and order code owns); the model's labels
+        and their order decide nothing, so the unit runs only on that card's proceed option."""
+        return (
+            self.proceed is None
+            and self.reason == "sensitive_step"
+            and answer.answered_by != "default"
+            and (index := option_index(answer.option, len(self.options))) is not None
+            and index != self.suggested
+        )
 
 
 def _clip(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def _canned(reason: str, template: tuple[Any, ...], **fields: Any) -> Ask:
+def _canned(reason: str, template: tuple[Any, ...], *, proceed: int, **fields: Any) -> Ask:
     question, options, suggested, why = template
-    return Ask(reason, _clip(question.format(**fields), 140), tuple(options), suggested, why)
+    return Ask(reason, _clip(question.format(**fields), 140), tuple(options), suggested, why, proceed)
 
 
 def _parse(text: Any) -> Ask | None:
@@ -138,15 +175,28 @@ class MustAsk:
 
     async def assess(self, unit: Mapping[str, Any], *, failures: int = 0) -> Ask | None:
         if failures >= self._max_attempts:
-            return _canned("repeated_failure", _FAILED, count=failures)
+            return _canned("repeated_failure", _FAILED, proceed=0, count=failures)
         uncovered = self._uncovered(unit)
         if uncovered:
-            return _canned("sensitive_step", _SENSITIVE, actions=_clip(", ".join(uncovered), 60))
+            return _canned("sensitive_step", _SENSITIVE, proceed=1, actions=_clip(", ".join(uncovered), 60))
         try:
             reply = await asyncio.to_thread(self._providers[unit["role"]].generate, self._request(unit))
             return _parse(reply.text)
         except Exception:  # unreadable reply, provider outage or missing role: ask rather than guess (BQ-199)
-            return _canned("ambiguous_brief", _UNREADABLE)
+            return _canned("ambiguous_brief", _UNREADABLE, proceed=1)
+
+    def confirmation(self, ask: Ask, answer: Any) -> Ask | None:
+        """The code-written card that follows a model-raised sensitive_step choice: it quotes the person's choice and
+        asks whether to prepare the step. Its labels, order and proceed option are fixed here (the same as a rule's
+        sensitive_step card), so Hold and the deadline default leave the unit unrun. None when the choice holds it."""
+        if not ask.confirms(answer):
+            return None
+        index = option_index(answer.option, len(ask.options))
+        if index is None:
+            return None  # an option the card never had: fail closed
+        chosen = neutralise(ask.options[index], limit=40)
+        question = _clip(f"You chose “{chosen}”. Prepare this step now?", 140)
+        return Ask("sensitive_step", question, _CONFIRM_OPTIONS, 0, _CONFIRM_WHY, proceed=1)
 
     def _request(self, unit: Mapping[str, Any]) -> GenerateRequest:
         fields = {
@@ -154,7 +204,7 @@ class MustAsk:
             "title": unit["title"],
             "actions": ", ".join(unit["actions"]) or "none",
         }
-        prompt = load_prompt(ROLE, "must_ask_task.md", {k: neutralise_marker(v, "TASK") for k, v in fields.items()})
+        prompt = load_prompt(ROLE, "must_ask_task.md", {k: neutralise(v, limit=200) for k, v in fields.items()})
         return GenerateRequest(system=self._system, prompt=prompt, json_mode=True, max_output_tokens=400)
 
     def raise_question(
@@ -171,6 +221,7 @@ class MustAsk:
     ) -> dict[str, Any]:
         level, building = _site(writer.layout, unit["id"], district)
         card = self._card(ask, writer, specialist, building)
+        self._card_sink(card)  # first: a sink that fails emits no question, so no event names a card nobody holds
         at = {"level": level, "district": district}
         helped = writer.emit(
             type="agent.help_requested",
@@ -199,7 +250,6 @@ class MustAsk:
             cause=escalated["id"],
             **at,
         )
-        self._card_sink(card)
         return card
 
     def _card(self, ask: Ask, writer: Any, agent: str, building: str) -> dict[str, Any]:

@@ -24,12 +24,12 @@ export function describeError(doing: string, error: unknown): string {
   return `Could not ${doing}: ${reason}. Nothing was changed. You can try again.`;
 }
 
-/** Runs `load` on mount and on every retry. While `enabled` is false nothing is requested and the
+/** Runs `load` on mount and on every retry; its signal aborts when the screen unmounts or reloads. While `enabled` is false nothing is requested and the
  * state stays "loading" (a call that can only fail until something is on record, such as the
  * delivery of a run that has not completed, is not made at all: the browser logs each refusal). */
 export function useRemote<T>(
   doing: string,
-  load: () => Promise<T>,
+  load: (signal: AbortSignal) => Promise<T>,
   enabled = true,
 ): readonly [Remote<T>, () => void] {
   const [attempt, setAttempt] = useState(0);
@@ -39,16 +39,18 @@ export function useRemote<T>(
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the retry trigger.
   useEffect(() => {
     let live = true;
+    const stop = new AbortController();
     setState({ status: "loading" });
     if (!enabled) return;
     Promise.resolve()
-      .then(() => loadRef.current())
+      .then(() => loadRef.current(stop.signal))
       .then(
         (value) => live && setState({ status: "ready", value }),
         (e: unknown) => live && setState({ status: "error", message: describeError(doing, e) }),
       );
     return () => {
       live = false;
+      stop.abort(); // a call that waits on the server (getLayout) stops with the page
     };
   }, [attempt, doing, enabled]);
   return [state, useCallback(() => setAttempt((n) => n + 1), [])];

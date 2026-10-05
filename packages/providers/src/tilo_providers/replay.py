@@ -217,7 +217,8 @@ class RecordReplayProvider(ModelProvider):
         # PRD 16.1 rule 4: redact every string value before serialising, not
         # the serialised text -- see the module docstring for why.
         redacted = redact_strings(payload, self._live_provider)
-        path.write_text(json.dumps(redacted, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        text = json.dumps(redacted, indent=2, sort_keys=True) + "\n"
+        path.write_text(text, encoding="utf-8", newline="\n")  # LF on Windows too (.gitattributes)
 
     def _write_embed_recording(self, path: Path, key: str, embedding: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -225,4 +226,5 @@ class RecordReplayProvider(ModelProvider):
         # PRD 16.1 rule 4: same redact-before-serialise rule as `_write_recording` -- an embedding vector
         # is numeric, but a provider may echo request metadata (e.g. a model name) back as a string.
         redacted = redact_strings(payload, self._live_provider)
-        path.write_text(json.dumps(redacted, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        text = json.dumps(redacted, indent=2, sort_keys=True) + "\n"
+        path.write_text(text, encoding="utf-8", newline="\n")

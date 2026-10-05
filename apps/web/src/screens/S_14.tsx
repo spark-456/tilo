@@ -9,13 +9,14 @@ import { useState } from "react";
 import { useClient, useWorldKnown } from "../api/ClientProvider";
 import { deriveQueue } from "../needs-you/queue";
 import { reduce } from "../world/reducer";
-import { creditsUsed } from "../world/runLog";
+import { creditsUsed, useRunLog } from "../world/runLog";
 import { budgetCap, worldStatus } from "../world/runSummary";
-import { withWorld } from "../world/worldContext";
+import { useAddressedWorld, useRunWorld, withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
 import { Loaded, Primary } from "./FlowShell";
+import { NotFound } from "./NotFound";
 import { WorldThumb } from "./WorldThumb";
-import { Chip, EmptyState, Page, field, longDate, plural, useFixtureRun, words } from "./kit";
+import { Chip, EmptyState, Page, field, longDate, plural, words } from "./kit";
 import { useAction, useRemote } from "./remote";
 import {
   FILTERS,
@@ -36,12 +37,20 @@ const STATUS: Readonly<Record<WorldPhase, readonly [string, string]>> = {
 
 export function S_14() {
   const client = useClient();
-  const { events, worldId } = useFixtureRun();
-  const known = useWorldKnown(worldId); // false: the client has no world to list
-  const [layout, retry] = useRemote("load the worlds", () => client.getLayout(worldId));
+  const worldId = useRunWorld(); // null: a live API and no run started
+  const addressed = useAddressedWorld();
+  const events = useRunLog(client, worldId);
+  const worldKnown = useWorldKnown(worldId);
+  const known = worldId !== null && worldKnown; // false: the client has no world to list
+  const [layout, retry] = useRemote(
+    "load the worlds",
+    (signal) => client.getLayout(worldId ?? "", signal),
+    known, // no run: nothing is asked of the API
+  );
   const newTask = useAction("start a new task", async () => "/");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  if (addressed !== null && !worldKnown) return <NotFound />; // a world the client does not know
   const first = events[0];
   const status = worldStatus(events);
   const phase: WorldPhase =
@@ -60,7 +69,7 @@ export function S_14() {
   const shown = visible(worlds, filter, query);
   const cap = budgetCap(events);
   const used = creditsUsed(events);
-  const w = `/world/${encodeURIComponent(worldId)}`;
+  const w = `/world/${encodeURIComponent(worldId ?? "")}`;
   return (
     <Page
       testid="worlds"
@@ -158,7 +167,9 @@ export function S_14() {
                       {waiting > 0 ? (
                         <>
                           {plural(waiting, "decision")} waiting for you.{" "}
-                          <AppLink to={withWorld("/needs-you", worldId)}>Open Needs you</AppLink>
+                          <AppLink to={withWorld("/needs-you", worldId ?? "")}>
+                            Open Needs you
+                          </AppLink>
                         </>
                       ) : (
                         "Nothing waits for you."

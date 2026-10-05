@@ -6,13 +6,13 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 
 | File | Describes | Version |
 | --- | --- | --- |
-| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier | 1.0.0 |
+| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier, artifact media types | 1.1.0 |
 | `brief.schema.json` | Structured brief from intake (FR-INT-03 to 05) | 1.0.0 |
 | `plan.schema.json` | `PlanGraph`: approaches, units, dependencies, gates, budget cap; rules in `plan.rules.md` | 1.0.0 |
 | `layout.schema.json` | `WorldLayout` v1: semantic part and solver geometry; rules in `layout.rules.md` | 1.0.0 |
-| `event.schema.json` | `TiloEvent` v1; rules EV-01 to EV-14 in `event.rules.md` | 1.0.0 |
+| `event.schema.json` | `TiloEvent` v1; rules EV-01 to EV-15 in `event.rules.md` | 1.0.0 |
 | `events/registry.yaml` + `events/registry.schema.json` | Every registered event type (PRD 9.5): world, HUD, Story and Trace effects, data schema, fixture, pillar | 1.0.0 |
-| `events/data/<type>.schema.json` | The `data` payload of each registered type (70 files); `question.answered` is 1.1.0 (`decision_id`), `budget.requested` is 1.1.0 (`remaining_units`, `estimate`) | 1.0.0 |
+| `events/data/<type>.schema.json` | The `data` payload of each registered type (70 files); `question.answered` is 1.1.0 (`decision_id`), `budget.requested` is 1.1.0 (`remaining_units`, `estimate`), `artifact.created` is 1.1.0 (`content_sha256`, `media_type`, `size_bytes`) | 1.0.0 |
 | `outbox.schema.json` | An authorised side effect waiting to run exactly once; rules in `outbox.rules.md` | 1.0.0 |
 | `card.schema.json` | Needs-you, gate, consent and meeting cards; safe-default rules in `card.rules.md` | 1.0.0 |
 | `policy.schema.json` | Autonomy policies and the risk-tier table shape (`config/autonomy.yaml`) | 1.0.0 |
@@ -25,13 +25,15 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `agents.schema.json` | `AgentsConfig`: `config/agents.yaml`, the harness's role limits, context thresholds, liveness, retries and question cap | 1.0.0 |
 | `decision.schema.json` | An answer kept to answer repeat questions (`orgs/{org}/decisions`); rules in `decision.rules.md` | 1.0.0 |
 | `manifest.schema.json` | Provenance manifest of an artifact version (frozen 1 Oct); rules in `manifest.rules.md` | 1.0.0 |
+| `artifact.schema.json` | `ArtifactVersion`: one stored artifact version and its manifest revisions (ADR-0018, FR-MEM-12); rules AR-01 to AR-08 in `artifact.rules.md` | 1.0.0 |
 | `metering.schema.json` | `config/metering.yaml`: reserve margin, budget-request threshold, credit caps, daily spend caps, reconciliation; rules for this and the next four in `metering.rules.md` | 1.0.0 |
 | `meter.schema.json` | The HUD meter's state for one run: credits used and saved, time saved with range and method link, budget | 1.0.0 |
 | `attention.schema.json` | One measured span of a person's steering or review time, subtracted from time saved | 1.0.0 |
 | `evals.schema.json` | `config/evals.yaml`: eval pass credit caps, deploy-gate repeats, cost-regression threshold, case counts per group | 1.0.0 |
 | `pilot.schema.json` | EV-G3 pilot records by pseudonymous tester id: consent, run and card tags, diary entries, survey responses | 1.0.0 |
+| `scenario.schema.json` | `config/scenarios/<id>.yaml` (FR-INT-11, ADR-0014): skills, connectors, seed data, theme and autonomy policy seeds, and nothing else; rules SN-01 to SN-09 in `scenario.rules.md` | 1.0.0 |
 
-Still to come: `scenario` (1 Oct), `appspec` (Could).
+Still to come: `appspec` (Could).
 
 - `fixtures/<name>/valid|invalid/*.json` exercise each schema root; `fixtures/<name>.<def>/`
   exercise one `$defs` entry. Invalid file names say which rule they break.

@@ -335,11 +335,12 @@ textarea {
 }
 .bottom-tabs .nav-btn {
   flex: 1;
-  min-width: 0;
+  min-width: min-content; /* six tabs share 320 px: none is narrower than its one-line label */
   height: var(--button-height-desktop); /* the sheets above the tabs clear this height */
   font-size: var(--text-12);
 }
-a.nav-btn {
+a.nav-btn,
+button.nav-btn {
   position: relative;
   display: flex;
   flex-direction: column-reverse; /* the icon above its label; the label first in the source */
@@ -355,7 +356,8 @@ a.nav-btn {
   text-decoration: none;
   font: 700 var(--text-14) / 1.1 var(--font-ui);
 }
-.left-rail a.nav-btn {
+.left-rail a.nav-btn,
+.left-rail button.nav-btn {
   min-height: calc(64px * var(--ui-scale, 1));
 }
 .nav-label {
@@ -383,7 +385,8 @@ a.nav-btn {
   font: 900 var(--text-12) / 20px var(--font-ui);
   letter-spacing: 0;
 }
-a.nav-btn:hover {
+a.nav-btn:hover,
+button.nav-btn:hover {
   background: var(--color-surface-0);
 }
 a.nav-btn[aria-current="page"] {
@@ -434,6 +437,11 @@ a.secondary {
   box-sizing: border-box;
   /* One page-shell offset: every screen's first line sits --space-32 below the top edge. */
   padding: var(--space-32) var(--space-24) var(--space-24);
+}
+/* Inset, like the stage frame's: the viewport edges can never clip it. */
+.screen-page:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: -3px;
 }
 .screen-body {
   max-width: 720px;
@@ -624,7 +632,117 @@ button.row {
   border-bottom: 1px solid var(--color-surface-2);
 }
 .story-list li[data-severity="needs_you"] {
-  border-left-color: var(--color-signal-needs);
+  padding-left: calc(var(--space-12) - var(--space-4) / 2); /* a 6 px amber bar, the text stays put */
+  border-left: 6px solid var(--color-signal-needs);
+}
+.story-body {
+  flex: 1;
+  min-width: 0;
+}
+.story-text {
+  margin: 0;
+  font: 400 var(--text-16) / 1.5 var(--font-ui);
+}
+.story-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-14);
+}
+.inspect-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  box-sizing: border-box;
+  min-height: 32px; /* the chip's word changes as events arrive; the row does not */
+  margin: var(--space-8) 0;
+}
+.inspect-facts {
+  /* The block holds its height once: one line per row plus three spare lines for whichever value
+     wraps, so a value that grows or shrinks as events arrive moves nothing (CLS). `--rows` is the
+     number of facts. */
+  --line: calc(1.5 * var(--text-14));
+  --row: calc(var(--space-16) + 4px + var(--line));
+  display: grid;
+  align-content: start;
+  gap: var(--space-8);
+  box-sizing: border-box;
+  min-height: calc(
+    var(--rows, 1) *
+    var(--row) +
+    (var(--rows, 1) - 1) *
+    var(--space-8) +
+    3 *
+    var(--line)
+  );
+  max-width: 720px;
+  margin: var(--space-12) 0 var(--space-16);
+}
+.inspect-facts div {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  box-sizing: border-box;
+  gap: var(--space-4) var(--space-16);
+  padding: var(--space-8) var(--space-12);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+}
+.inspect-facts dt {
+  flex: 0 0 8em;
+  color: var(--color-ink-2);
+  font: 700 var(--text-14) / 1.5 var(--font-ui);
+}
+.inspect-facts dd {
+  flex: 1 1 12em;
+  min-width: 0;
+  margin: 0;
+  font: 400 var(--text-14) / 1.5 var(--font-ui);
+}
+/* A vertical line with a dot per event: the order of what happened to this one thing. */
+.mini-timeline {
+  max-width: 720px;
+  margin: 0 0 var(--space-16);
+  padding: 0;
+  list-style: none;
+}
+.mini-timeline li {
+  position: relative;
+  display: flex;
+  gap: var(--space-12);
+  padding: var(--space-8) 0 var(--space-8) var(--space-24);
+  border-left: 2px solid var(--color-surface-2);
+  margin-left: var(--space-8);
+}
+.mini-timeline li::before {
+  content: "";
+  position: absolute;
+  top: var(--space-12);
+  left: calc(var(--space-8) * -1 - 1px);
+  width: var(--space-12);
+  height: var(--space-12);
+  box-sizing: border-box;
+  border: 2px solid var(--color-ink-1);
+  border-radius: 50%;
+  background: var(--color-surface-1);
+}
+.story-flag {
+  display: inline-flex;
+}
+.level-chip {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 24px;
+  padding: 0 var(--space-8);
+  border: 2px solid var(--level-tint);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--level-tint) 22%, var(--color-surface-1));
+  color: var(--color-ink-1);
+  font: 800 var(--text-12) / 1 var(--font-ui);
 }
 .story-list li[data-severity="blocked"] {
   border-left-color: var(--color-signal-blocked);
@@ -642,7 +760,7 @@ button.row {
   margin: 0;
   padding: 0;
   list-style: none;
-  font: 500 var(--text-12) / 1.5 var(--font-mono);
+  font: 500 var(--text-14) / 1.5 var(--font-mono);
 }
 .trace-rows li {
   padding: var(--space-8) 0;
@@ -665,11 +783,17 @@ button.row {
 }
 .trace-meta {
   padding-left: 2.5em;
+  font-size: var(--text-12); /* the call, credits and record: the label role; the row's type is 14 */
 }
 .trace-record {
   display: inline-flex;
   align-items: center;
   gap: var(--space-8);
+}
+.trace-record .secondary.placeholder.compact {
+  min-height: 28px; /* "Open record"; 44 px on a phone, below */
+  padding: 0 var(--space-12);
+  font-size: var(--text-14);
 }
 .secondary.placeholder {
   min-height: 44px;
@@ -678,6 +802,59 @@ button.row {
   border-color: var(--color-ink-2);
   color: var(--color-ink-2);
   cursor: not-allowed;
+}
+.secondary.danger {
+  /* A kill switch is the one danger-styled control of a screen: solid red outline and word, so it
+     reads as the one that matters. */
+  border: 2px solid var(--color-signal-blocked);
+  color: var(--color-signal-blocked);
+  font-weight: 800;
+}
+.secondary.placeholder.danger {
+  /* The same control while it cannot be used: a muted red outline and a visible "Coming soon", so
+     it never looks live. */
+  border: 2px solid color-mix(in srgb, var(--color-signal-blocked) 40%, var(--color-surface-1));
+  color: var(--color-ink-2);
+  font-weight: 700;
+}
+.stop-note:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.stop-autopilot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.stop-confirm {
+  padding: var(--space-16);
+  border: 2px solid var(--color-signal-blocked);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+}
+.stop-confirm h3 {
+  margin: 0 0 var(--space-8);
+  font: 900 var(--text-20) / 1.25 var(--font-display);
+}
+.stop-confirm h3:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.stop-confirm p {
+  margin: 0 0 var(--space-12);
+  font-size: var(--text-14);
+  line-height: 1.5;
+}
+.stop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+.stop-note {
+  min-height: 3em; /* the answer arrives here without moving what is below (CLS) */
+  margin: 0;
+  font-size: var(--text-14);
+  line-height: 1.5;
 }
 .secondary.placeholder.compact {
   min-height: 32px;
@@ -714,6 +891,9 @@ button.row {
 }
 .stat-tiles.three b {
   font: 900 var(--text-20) / 1.15 var(--font-display);
+}
+.stat-tiles li .btag {
+  align-self: flex-start;
 }
 .stat-name {
   font-weight: 700;
@@ -807,6 +987,18 @@ button.row {
   align-items: center;
   min-height: 24px; /* WCAG 2.5.8 */
   color: var(--color-brand-primary);
+}
+.world-panels a.lens-tab {
+  min-height: 44px; /* the tab's own height; the link rule above is more specific than .lens-tab */
+  color: var(--color-ink-1);
+}
+.world-panels a.lens-tab[aria-current="page"] {
+  color: var(--color-surface-1);
+}
+@media (max-width: 767px) {
+  .world-panels a {
+    min-height: 44px; /* a phone target: Level links, Open the queue, How we estimate */
+  }
 }
 .hud-card {
   min-height: 8.4em; /* the finished card in stage mode needs 8.2em of content */
@@ -1003,6 +1195,12 @@ button.row {
 .section-box.reserved {
   overflow-y: auto;
   height: calc(var(--lines) * 1.6em);
+}
+/* On a phone the same rows wrap onto more lines: the reserve's second number (kit.tsx Section). */
+@media (max-width: 767px) {
+  .section-box.reserved {
+    height: calc(var(--lines-narrow) * 1.6em);
+  }
 }
 .section-box.reserved:focus-visible,
 .screen-body a.pill:focus-visible,
@@ -1580,9 +1778,21 @@ button.row {
 @media (max-width: 767px) {
   .flow-shell[data-screen="Approaches"] {
     width: calc(100vw - 32px);
+    /* Ends above the bottom tabs (their height token) and scrolls inside, like S-02. */
+    max-height: calc(100dvh - var(--strip-h) - var(--button-height-desktop) - 2 * var(--space-16));
+    overflow-y: auto;
   }
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 41em;
+    min-height: 41.5em; /* the 44 px cap field made the ready box 15 px taller */
+  }
+  .budget-cap-field input {
+    box-sizing: border-box;
+    min-height: 44px; /* the phone touch target */
+  }
+  /* The panel scrolls inside its cap, so the one action stays in view at the foot of it. */
+  .flow-shell[data-screen="Approaches"] .primary {
+    position: sticky;
+    bottom: 0;
   }
 }
 @media (max-width: 389px) {
@@ -1945,4 +2155,186 @@ button.row {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+/* S-22 Display: a segmented control. The chosen segment is filled and ticked, so it differs by
+   shape and weight as well as colour. The radio fills its segment: the whole segment is the hit
+   area, 44 px high, and a keyboard moves between the two with the arrow keys. */
+.segmented {
+  display: inline-flex;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 2px solid var(--color-ink-3);
+  border-radius: var(--radius-controls);
+  overflow: hidden;
+}
+.segment {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.segment + .segment {
+  border-left: 2px solid var(--color-ink-3);
+}
+.segment input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.segment span {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: var(--space-4) var(--space-16);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) / 1.3 var(--font-ui);
+}
+.segment small {
+  color: var(--color-ink-2);
+  font: 400 var(--text-12) / 1.3 var(--font-ui);
+}
+.segment input:checked + span {
+  background: var(--color-ink-1);
+  color: var(--color-surface-1);
+}
+.segment input:checked + span small {
+  color: var(--color-surface-2);
+}
+.segment input:checked + span b::before {
+  content: "✓ ";
+  content: "✓ " / "";
+}
+.segment input:focus-visible + span {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: -3px;
+}
+/* Professional density: tighter spacing everywhere the space tokens are used. Type stays on the
+   ramp and targets keep their size; nothing here animates. */
+html[data-density="professional"] .app-shell {
+  --space-8: 0.375rem;
+  --space-12: 0.5rem;
+  --space-16: 0.75rem;
+  --space-24: 1rem;
+  --space-32: 1.5rem;
+}
+
+/* S-30 assistant panel (FR-PA-12): a modal dialog fixed over the page, so opening it moves nothing.
+   A side panel on desktop, a bottom sheet on a phone. Its launcher is a nav item (.nav-btn). No
+   transition or animation: it appears and disappears. */
+.assistant-panel::backdrop {
+  background: transparent;
+}
+.assistant-close:focus-visible,
+.assistant-log:focus-visible,
+.assistant-form input:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.assistant-panel {
+  position: fixed;
+  z-index: 850;
+  inset: var(--strip-h, 0px) 0 0 auto; /* below the fixed status strip, which stays readable */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  width: 22.5rem;
+  max-width: 100%;
+  height: auto;
+  max-height: none; /* the browser's modal-dialog cap would stop the panel short of the bottom */
+  margin: 0;
+  padding: var(--space-16);
+  border: 0;
+  border-left: 1px solid var(--color-surface-2);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+.assistant-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+.assistant-head h2 {
+  margin: 0;
+  font: 800 var(--text-20) / 1.2 var(--font-display);
+}
+.assistant-close {
+  min-height: 44px;
+  padding: 0 var(--space-16);
+  border: 1px solid var(--color-ink-3);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) / 1 var(--font-ui);
+  cursor: pointer;
+}
+.assistant-context {
+  align-self: flex-start;
+  margin: 0;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-ink-1);
+  font: 700 var(--text-12) / 1.4 var(--font-ui);
+}
+.assistant-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.assistant-log ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.assistant-log p {
+  margin: 0;
+}
+.assistant-empty {
+  color: var(--color-ink-2);
+}
+.assistant-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-8);
+  align-items: center;
+}
+.assistant-label {
+  grid-column: 1 / -1;
+  font: 700 var(--text-12) / 1.4 var(--font-ui);
+  color: var(--color-ink-2);
+}
+.assistant-form input {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 0 var(--space-12);
+  border: 1px solid var(--color-ink-3);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 400 var(--text-16) / 1.4 var(--font-ui);
+}
+.assistant-form .secondary {
+  min-height: 44px;
+}
+@media (max-width: 767px) {
+  .assistant-panel {
+    inset: auto 0 0 0;
+    width: auto;
+    max-width: none;
+    height: 75vh;
+    border-left: 0;
+    border-top: 1px solid var(--color-surface-2);
+    border-radius: var(--radius-cards) var(--radius-cards) 0 0;
+  }
 }

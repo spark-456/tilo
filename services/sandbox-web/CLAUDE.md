@@ -8,6 +8,7 @@ has safe, deterministic targets instead of the live internet.
 - `uv run pytest "services/sandbox-web/tests" -q` — acceptance tests (P8-07).
 - `uv run --package tilo-sandbox-web uvicorn tilo_sandbox_web:app --port 8090` — run the service locally.
 - `just check` — full gate from the repo root.
+- Image: `Dockerfile` runs `tilo_sandbox_web.app:app` (P0-07a); deploy: `docs/deploy-dev.md`.
 
 ## Contracts
 - Reads: `evals/cases/` and `evals/checks/` fixtures for the pages it must serve.

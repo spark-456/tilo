@@ -57,6 +57,7 @@ shared `uv` workspace venv by `uv sync --all-packages`.
 `tilo-policy` declares `pyyaml`, `jsonschema` and `referencing` as runtime dependencies (ticket
 P4-01); all three are already listed above under the root dev dependency group (MIT). No new
 licence.
+Ticket CHN-WIRE-1 makes `tilo-channels` depend on the in-workspace `tilo-policy` (`check_entry` before an L1/T3 Send); not external, no new licence.
 Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject.toml`):
 
 | Dependency | Licence | Source |
@@ -113,7 +114,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | @biomejs/biome | MIT | https://www.npmjs.com/package/@biomejs/biome |
-| firebase-tools (runs the Firestore emulator for `services/harness`, P0-09) | MIT | https://www.npmjs.com/package/firebase-tools |
+| firebase-tools (runs the Firestore emulator for `services/harness`, P0-09; also an `apps/web` devDependency at the same pinned 15.31.0 for `just deploy-web`, P0-07c) | MIT | https://www.npmjs.com/package/firebase-tools |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
 | react, react-dom, pixi.js, vite, @vitejs/plugin-react, vitest, @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/ |
 | vite 6.4.x (#69, replaces 5.4.x; pulls esbuild 0.25, rollup, fdir, tinyglobby, all MIT; no licence change) | MIT | https://www.npmjs.com/package/vite |
@@ -155,6 +156,21 @@ Third-party code run in CI (`.github/workflows/ci.yml`) or on developer machines
 | extractions/setup-just | v2 | MIT | https://github.com/extractions/setup-just |
 | actions/setup-java (Firestore emulator's JRE, P0-09) | v4 | MIT | https://github.com/actions/setup-java |
 | pre-commit/pre-commit-hooks | v5.0.0 | MIT | https://github.com/pre-commit/pre-commit-hooks |
+
+## tilo-dev deploy: actions and container base images (P0-07a)
+
+Every action is pinned to a full commit SHA in `.github/workflows/deploy-dev.yml` (tag in the comment).
+
+| Component | Pinned ref | Licence | Source |
+| --- | --- | --- | --- |
+| actions/checkout (deploy-dev) | v6.1.0 (`d23441a48e51`) | MIT | https://github.com/actions/checkout |
+| google-github-actions/auth (Workload Identity Federation) | v3.0.0 (`7c6bc770dae8`) | Apache-2.0 | https://github.com/google-github-actions/auth |
+| google-github-actions/setup-gcloud | v3.0.1 (`aa5489c8933f`) | Apache-2.0 | https://github.com/google-github-actions/setup-gcloud |
+| ghcr.io/astral-sh/uv (builder stage of every `services/<svc>/Dockerfile`) | 0.12.18-python3.12-trixie-slim | MIT or Apache-2.0 | https://github.com/astral-sh/uv |
+| python (runtime stage; Docker Official Image, Debian trixie slim) | 3.12.15-slim-trixie | PSF-2.0 (Python); Debian packages under their own licences | https://hub.docker.com/_/python |
+
+`fastapi` (MIT) and `uvicorn` (BSD-3-Clause) are now direct dependencies of every service so each image runs
+`uvicorn <module>:app` (a `/healthz` ASGI app in `harness`, `channels`, `connectors`, `browser`, `render`).
 
 ## Fonts, icons and design assets
 

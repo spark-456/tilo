@@ -222,7 +222,7 @@ def test_FR_HIL_04_a_T3_send_still_waits_for_a_person_with_an_owner_L3_policy_in
     failing=st.sets(st.sampled_from(["U1", "U2", "U3"])),
 )
 def test_FR_HIL_04_property_no_send_happens_before_a_person_approves(repo_root, recipients, known, failing):
-    rf = build_run_flow(repo_root)
+    rf = build_run_flow(repo_root, covered=True)
     try:
         rf.recipients, rf.known_recipients, rf.runner.fail = recipients, sorted(known), set(failing)
         rf.start()

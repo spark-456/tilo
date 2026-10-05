@@ -25,17 +25,26 @@ caller saw an error and retries) or a queued one that a retry, E2, E4 or the swe
 
 from __future__ import annotations
 
+import copy
 import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from tilo_policy.schemas import conforms
+
 ACTION_TYPE = "send_email"
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+DECISION_MAX_AGE_S = 30  # a stored decision authorises an entry at most this long after its `authz.at` (BQ-245, BQ-249)
+SKEW_S = 5  # a decision stamped this far ahead of our clock is still read as now
 
 
 class CancelPending(RuntimeError):
     """The outbox did not confirm the cancel of an entry that may still be scheduled: retry."""
+
+
+class StaleDecision(RuntimeError):
+    """The L2 entry would be created outside its decision's freshness bound: nothing is enqueued, decide again."""
 
 
 class Outbox(Protocol):  # the names of tilo_connectors.outbox.Outbox, which tilo-channels never imports (BQ-158)
@@ -60,6 +69,22 @@ class CardStore(Protocol):  # JSON-able documents keyed (user_id, key): get, ato
 
 def timestamp(ms: int) -> str:
     return datetime.fromtimestamp(ms // 1000, UTC).strftime("%Y-%m-%dT%H:%M:%S") + f".{ms % 1000:03d}Z"
+
+
+def parse_ms(stamp: Any) -> int | None:
+    """Epoch milliseconds of a contract timestamp (RFC 3339 UTC, three fractional digits); None for anything else."""
+    if type(stamp) is not str or not conforms("common.schema.json#/$defs/timestamp", stamp):
+        return None
+    try:
+        return round(datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC).timestamp() * 1000)
+    except (ValueError, OverflowError, OSError):  # the pattern allows dates that do not exist
+        return None
+
+
+def fresh(authz_at: Any, now_ms: int) -> bool:
+    """`authz_at` is no more than the skew ahead of `now_ms` and no more than the bound behind it."""
+    at = parse_ms(authz_at)
+    return at is not None and -SKEW_S * 1000 <= now_ms - at <= DECISION_MAX_AGE_S * 1000
 
 
 def ulid(ms: int) -> str:
@@ -160,15 +185,24 @@ class Ledger:
                 return "cancelled" if state == "cancelled" else "too_late"  # sending, sent or failed: it went
         raise CancelPending("the outbox did not confirm the stop")
 
-    def enqueue(self, doc: dict[str, Any]) -> dict:
-        """The card's entry under its idempotency key: a replay returns the stored entry and never adds one. Only in
-        the card's own world: an entry elsewhere is one no stop of this card would find."""
+    def stored(self, doc: dict[str, Any]) -> dict | None:
+        """The card's entry if the outbox holds one under its key (read only)."""
+        return self._outbox.get_by_idempotency_key(doc["world_id"], f"autopilot:{doc['card_id']}")
+
+    def entry_for(self, doc: dict[str, Any], authz: dict[str, Any] | None = None) -> dict:
+        """The card's entry. Only in the card's own world: an entry elsewhere is one no stop of this card would find.
+        A person's `authz` (the approval's, OB-01) is copied as given, never re-stamped; so is the authz of an L2
+        card's stored `policy.applied` (CHN-WIRE-4), whose time is the decision's, not now."""
         if not self.ours(doc):
             raise PermissionError("the card belongs to another world: its entry is never created here")
         ms = round(self._clock() * 1000)
         created, window, policy = timestamp(ms), doc["undo_window_s"], doc["level"] == "L2"
         authority = {"by": "policy", "ref": doc["policy_id"]} if policy else {"by": "person", "ref": doc["user_id"]}
-        entry = {
+        if authz is None and policy and isinstance(doc.get("policy_applied"), dict):
+            authz = doc["policy_applied"]["authz"]
+            if not fresh(authz.get("at"), ms):  # judged on the clock read that stamps created_at (BQ-245)
+                raise StaleDecision("the card's decision is outside its freshness bound")
+        return {
             "id": doc["outbox_id"] or ulid(ms),
             "idempotency_key": f"autopilot:{doc['card_id']}",
             "world_id": self._world_id,
@@ -181,10 +215,14 @@ class Ledger:
             "destination": doc["thread_id"],
             "modifiers": doc["modifiers"],
             "risk_tier": doc["tier"],
-            "authz": authority | {"at": created},
+            "authz": copy.deepcopy(authz) if authz is not None else authority | {"at": created},
             "undo_window_s": window,
             "scheduled_at": timestamp(ms + window * 1000),
             "state": "scheduled" if window else "queued",
             "created_at": created,
         }
-        return self._outbox.enqueue(entry, {"instruction_id": doc["instruction_id"], "level": doc["level"]})
+
+    def enqueue(self, doc: dict[str, Any], entry: dict | None = None, evidence: dict | None = None) -> dict:
+        """The card's entry under its idempotency key: a replay returns the stored entry and never adds one."""
+        entry = entry or self.entry_for(doc)
+        return self._outbox.enqueue(entry, evidence or {"instruction_id": doc["instruction_id"], "level": doc["level"]})

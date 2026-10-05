@@ -50,7 +50,7 @@ export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: 
   const client = useClient();
   const { events } = useReplayedLog(client, worldId);
   const [selected, , toggle] = useSelection(worldId);
-  const [layoutRemote] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layoutRemote] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const status = worldStatus(events);
   // The delivery exists only once world.completed is recorded: asking before that is a refusal
   // the browser logs as an error, so the run's own events say when to ask.
@@ -109,7 +109,11 @@ export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: 
       </div>
       <div className="hud-slot">
         {layout === null || names === null ? (
-          <p>{layoutRemote.status === "error" ? layoutRemote.message : "The team is loading…"}</p>
+          // The same first child as the loaded slot (an h2), so its top does not move on arrival.
+          <>
+            <h2>Team</h2>
+            <p>{layoutRemote.status === "error" ? layoutRemote.message : "The team is loading…"}</p>
+          </>
         ) : (
           <>
             <h2>Team</h2>

@@ -24,6 +24,7 @@ variables {
   github_repository_id       = "123456789"
   github_repository_owner_id = "987654321"
   budget_amount_usd          = 150
+  alert_email                = "alerts@example.com"
 }
 
 mock_provider "google" {}

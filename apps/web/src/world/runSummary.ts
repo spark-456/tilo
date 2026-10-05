@@ -50,6 +50,14 @@ export const BUILDING_STATE = {
   archived: "Archived",
 } as const;
 
+/** The words for a channel island's state, shared by the stage tags and the Inspect panel. */
+export const ISLAND_STATE = {
+  locked: "Locked",
+  requested: "Waiting for consent",
+  connected: "Connected",
+  failed: "Connection lost",
+} as const;
+
 /** "specialist" becomes "Specialist"; underscores become spaces. */
 export const rankName = (rank: string): string => {
   const words = rank.replaceAll("_", " ");

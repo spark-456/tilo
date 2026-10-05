@@ -11,6 +11,13 @@ whose dependency failed is skipped. Every event goes through the one `WorldWrite
 With `must_ask` (FR-AGT-05) a unit is assessed right after it is assigned: when a must-ask rule fires,
 the question chain and card are written and the unit is parked (`RunResult.parked`): its work does not
 start, it does not retire, and its dependents are skipped. Answering is FR-AGT-06/07.
+With `question_wait` as well (FR-HIL-10) the unit instead waits for its answer, holding no `max_specialists` slot,
+then runs once with it in `UnitContext.answer` only if `Ask.runs` says so; Hold, Stop, Skip and a default leave
+it held (`RunResult.held`, retired, nothing made) and its dependents skipped. The other units go on.
+
+With `verifier` (FR-AGT-12) the layout must hold that verifier-rank agent and it must not work a unit
+itself. Once a successful unit has handed over, each artifact it handed over gets one `artifact.reviewed`
+(caused by the handoff) before the unit's dependents start; the review result is recorded, not acted on.
 
 Per unit: agent.spawned (Lead spawns the worker), agent.assigned, skill.loaded per pinned skill,
 agent.working, the `UnitRunner`'s work, agent.handoff (typed envelope, worker to Lead) when it
@@ -32,9 +39,11 @@ from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.prompts import load_prompt
 
 from tilo_harness.config import AgentsConfig
-from tilo_harness.must_ask import MustAsk
+from tilo_harness.must_ask import Ask, MustAsk
+from tilo_harness.question_wait import Answer, QuestionWait
 from tilo_harness.skills import LoadedSkill, Pins, SkillError, SkillRegistry
 from tilo_harness.validator import EventRejected, repo_validator
+from tilo_harness.verifier import Verifier
 
 _WORKER_RANKS = ("specialist", "verifier", "writer")  # ranks that execute units (PRD 8.1)
 _LEVELS = 3  # Director -> Lead -> worker
@@ -60,6 +69,7 @@ class UnitOutcome:
 class UnitContext:
     agent_id: str
     skills: tuple[LoadedSkill, ...]
+    answer: Answer | None = None  # the answer to the question this unit asked before it started (FR-HIL-10)
 
 
 class UnitRunner(Protocol):
@@ -72,6 +82,7 @@ class RunResult:
     outcomes: dict[str, UnitOutcome] = field(default_factory=dict)
     skipped: list[str] = field(default_factory=list)
     parked: list[str] = field(default_factory=list)  # waiting for a person's answer (FR-AGT-05)
+    held: list[str] = field(default_factory=list)  # answered, and the answer leaves the unit unrun (FR-HIL-10)
 
     @property
     def failed(self) -> list[str]:
@@ -181,12 +192,45 @@ def _envelope(outcome: UnitOutcome, worker: str, lead: str, unit: dict[str, Any]
     return None if repo_validator().contract_problems("envelope", envelope) else envelope
 
 
+class _Slot:
+    """One of `max_specialists` places; a unit waiting for a person gives its place back and takes one again."""
+
+    def __init__(self, slots: asyncio.Semaphore) -> None:
+        self._slots, self._held = slots, False
+
+    async def __aenter__(self) -> _Slot:
+        await self.take()
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        self.give()
+
+    async def take(self) -> None:
+        await self._slots.acquire()
+        self._held = True
+
+    def give(self) -> None:
+        if self._held:
+            self._held = False
+            self._slots.release()
+
+
 class _Run:
     def __init__(
-        self, writer: Any, roster: _Roster, skills: SkillRegistry, pins: Pins, runner: Any, must_ask: MustAsk | None
+        self,
+        writer: Any,
+        roster: _Roster,
+        skills: SkillRegistry,
+        pins: Pins,
+        runner: Any,
+        must_ask: MustAsk | None,
+        verifier: Verifier | None,
+        question_wait: QuestionWait | None,
     ) -> None:
         self.writer, self.roster, self.skills, self.pins, self.runner = writer, roster, skills, pins, runner
-        self.must_ask = must_ask
+        self.must_ask, self.verifier, self.question_wait = must_ask, verifier, question_wait
+        self.held: set[str] = set()
+        self.handoffs: dict[str, str] = {}  # unit -> the agent.handoff event that carried its artifacts
 
     def emit(self, type_: str, actor: str, target: str, summary: str, data: dict[str, Any], **kw: Any) -> str:
         district = kw.get("district")
@@ -216,7 +260,7 @@ class _Run:
                 cause=cause,
             )
 
-    async def work(self, unit: dict[str, Any]) -> UnitOutcome | None:
+    async def work(self, unit: dict[str, Any], slot: _Slot) -> UnitOutcome | None:
         """None when the unit was parked to ask a person first."""
         unit_id, district = unit["id"], unit["district"]
         lead, worker = self.roster.leads[district], self.roster.workers[unit_id]
@@ -225,10 +269,11 @@ class _Run:
         cause = self.emit(
             "agent.assigned", lead, worker, "The Lead gave it a unit.", {"unit": unit_id}, cause=cause, **at
         )
+        answer: Answer | None = None
         if self.must_ask is not None:
             ask = await self.must_ask.assess(unit)  # no failure count yet: retries arrive with FR-AGT-13
             if ask is not None:
-                self.must_ask.raise_question(
+                card = self.must_ask.raise_question(
                     ask,
                     writer=self.writer,
                     unit=unit,
@@ -238,7 +283,41 @@ class _Run:
                     district=district,
                     cause=cause,
                 )
-                return None
+                if self.question_wait is None:
+                    return None
+                slot.give()  # that branch waits (PRD 10.2); the other units use its place
+                answer = await self.question_wait.wait_for(
+                    card, lead=lead, director=self.roster.director, district=district
+                )
+                # A stand-in ask that is not MustAsk's (the pinned FR-HIL-10 doubles) runs on any answer.
+                runs, held_by = not isinstance(ask, Ask) or ask.runs(answer), answer
+                if not runs and isinstance(ask, Ask) and (follow := self.must_ask.confirmation(ask, answer)):
+                    # A model-raised sensitive step: the answer only recorded a choice. Code asks once more.
+                    card = self.must_ask.raise_question(
+                        follow,
+                        writer=self.writer,
+                        unit=unit,
+                        specialist=worker,
+                        lead=lead,
+                        director=self.roster.director,
+                        district=district,
+                        cause=cause,
+                    )
+                    second = await self.question_wait.wait_for(  # still no slot: the card is raised and waited for
+                        card, lead=lead, director=self.roster.director, district=district
+                    )
+                    runs, held_by = follow.runs(second), second  # the runner still gets the person's first choice
+                await slot.take()
+                if not runs:
+                    self.held.add(unit_id)
+                    why = (
+                        "nobody answered in time, so the safe default"
+                        if held_by.answered_by == "default"
+                        else "the answer"
+                    )
+                    summary = f"The agent left without starting: {why} held this step."
+                    self.emit("agent.retired", lead, worker, summary, {}, cause=cause, **at)
+                    return UnitOutcome(success=False, summary="The step was held, so it did not run.")
         try:
             loaded = tuple(self.skills.load_pinned(skill_id, self.pins) for skill_id in unit["skills"])
         except SkillError:
@@ -254,7 +333,7 @@ class _Run:
             ran: object
             try:
                 # Its own task, so a runner that cancels the current task cancels only its work.
-                ran = await asyncio.ensure_future(self.runner.run(unit, UnitContext(worker, loaded)))
+                ran = await asyncio.ensure_future(self.runner.run(unit, UnitContext(worker, loaded, answer)))
             except asyncio.CancelledError:
                 task = asyncio.current_task()
                 if task is not None and task.cancelling():  # the run itself was cancelled
@@ -273,8 +352,18 @@ class _Run:
                 cause = self.emit("agent.handoff", worker, lead, summary, {"envelope": envelope}, cause=cause, **at)
             except EventRejected:  # the writer refused the handoff and wrote nothing: this unit fails
                 outcome = UnitOutcome(success=False, summary="The unit's result was not a valid handoff.")
+            else:
+                self.handoffs[unit_id] = cause
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         return outcome
+
+    async def review(self, unit: dict[str, Any], outcome: UnitOutcome) -> None:
+        if self.verifier is None or unit["id"] not in self.handoffs:
+            return
+        for ref in outcome.artifact_refs:
+            await self.verifier.review_and_record(
+                ref, writer=self.writer, cause=self.handoffs[unit["id"]], district=unit["district"]
+            )
 
 
 async def run_plan(
@@ -286,6 +375,8 @@ async def run_plan(
     skills: SkillRegistry,
     runner: UnitRunner,
     must_ask: MustAsk | None = None,
+    verifier: Verifier | None = None,
+    question_wait: QuestionWait | None = None,
 ) -> RunResult:
     validator = repo_validator()
     problems = validator.contract_problems("plan", plan) + validator.contract_problems("layout", layout)
@@ -293,13 +384,17 @@ async def run_plan(
         raise PlanRefused(problems)
     order = _dependency_order(plan["units"])
     roster = _roster(plan["units"], layout, config)
+    if verifier is not None:
+        ranks = {agent["id"]: agent["rank"] for agent in layout["semantic"]["agents"]}
+        if ranks.get(verifier.agent_id) != "verifier" or verifier.agent_id in roster.workers.values():
+            raise PlanRefused([f"layout: {verifier.agent_id} must be a verifier-rank agent that works no unit"])
     try:
         pins = skills.pin(sorted({skill_id for unit in order for skill_id in unit["skills"]}))
     except SkillError as error:
         raise PlanRefused([f"PG-11: {error}"]) from error
 
     result = RunResult(pins=pins)
-    run = _Run(writer, roster, skills, pins, runner, must_ask)
+    run = _Run(writer, roster, skills, pins, runner, must_ask, verifier, question_wait)
     run.spawn_team()
     slots = asyncio.Semaphore(config.limits.max_specialists)
     loop = asyncio.get_running_loop()
@@ -311,10 +406,15 @@ async def run_plan(
             result.skipped.append(unit["id"])
             finished[unit["id"]].set_result(False)
             return
-        async with slots:
-            outcome = await run.work(unit)
+        async with _Slot(slots) as slot:
+            outcome = await run.work(unit, slot)
         if outcome is None:  # parked: a person must answer first, so its dependents wait (skipped)
             result.parked.append(unit["id"])
+            finished[unit["id"]].set_result(False)
+            return
+        await run.review(unit, outcome)  # after the slot is free; dependents wait for it
+        if unit["id"] in run.held:  # a person's Hold (or the default) kept it from running: dependents are skipped
+            result.held.append(unit["id"])
             finished[unit["id"]].set_result(False)
             return
         result.outcomes[unit["id"]] = outcome

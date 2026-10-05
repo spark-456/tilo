@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from "react";
 import { useClient, useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
-import { FIXTURE_WORLD_ID } from "./api/fixtures/derived";
+import { AssistantPanel } from "./assistant/AssistantPanel";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { NeedsYouRail } from "./needs-you/NeedsYouRail";
 import { matchFlowRoute, usePathname } from "./router";
@@ -9,6 +9,7 @@ import { NotFound } from "./screens/NotFound";
 import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
 import { LoggedScrubber, ReplayScrubber } from "./screens/ReplayScrubber";
+import { ScreenPage } from "./screens/ScreenPage";
 import { WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
@@ -16,6 +17,7 @@ import { useRunStatus } from "./world/runLog";
 import { speedBadgeText } from "./world/speed";
 import { useClientWorld } from "./world/useClientWorld";
 import { useWorldFixture } from "./world/useWorldFixture";
+import { useRunWorld } from "./world/worldContext";
 
 // Stage mode is a display setting (PRD 9.6).
 // Memoised so each applied event adds one row instead of re-rendering the whole list.
@@ -54,6 +56,7 @@ export function App() {
   const world = useWorldFixture();
   const fixtureClient = useIsFixtureClient();
   const client = useClient();
+  const runWorld = useRunWorld(); // the remembered run; null with a live API and none (never the fixture)
   const replaySpeed = useReplaySpeed();
   const path = usePathname();
   const matched = matchScreen(path); // null: the stage and the flow shell
@@ -93,7 +96,7 @@ export function App() {
   const stagePaused = (world.active ? world.status : clientStatus) === "paused";
   const runScreen = screen !== null && RUN_SCREENS.has(screen.id);
   const needsYouScreen = screen !== null && NEEDS_YOU_SCREENS.has(screen.id);
-  const railWorld = worldId ?? (runScreen && !needsYouScreen ? FIXTURE_WORLD_ID : null);
+  const railWorld = worldId ?? (runScreen && !needsYouScreen ? runWorld : null);
   // HR-6: a replay that is not at its recorded pace always says so (after lens navigation drops
   // ?speed the client keeps its speed), in words, in a status region.
   const speedBadge = world.active
@@ -123,12 +126,12 @@ export function App() {
     >
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
-        <main className="screen-page" data-testid="screen-page" data-screen={screen.id}>
+        <ScreenPage key={screen.id} screenId={screen.id}>
           <screen.Component
             key={`${screen.id}:${screen.params.join("/")}`}
             params={screen.params}
           />
-        </main>
+        </ScreenPage>
       ) : (
         // Keyed by world: Stage hands its content seam over once, when Pixi is ready.
         <Stage
@@ -247,6 +250,7 @@ export function App() {
           )}
         </aside>
       )}
+      <AssistantPanel />
     </div>
   );
 }

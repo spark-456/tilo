@@ -11,7 +11,8 @@ variable "region" {
 variable "oauth_token_decrypters" {
   description = <<-EOT
     Map of statically-known key => IAM member (e.g. "serviceAccount:...")
-    allowed to decrypt the oauth-tokens key. Must contain only
+    allowed to encrypt and decrypt the oauth-tokens key
+    (cryptoKeyEncrypterDecrypter, on this key only). Must contain only
     tilo-connectors (PRD 6.5, SEC-02). Keyed statically (not by the member
     string itself) so terraform test can plan this against mock providers.
   EOT
