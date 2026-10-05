@@ -68,9 +68,28 @@ export function App() {
     if (previousPath.current === path) return; // not the first render, nor StrictMode's second effect
     previousPath.current = path;
     // The World lens is the stage with the flow shell's heading, so it takes focus the same way.
-    const h1 = document.querySelector<HTMLElement>(".screen-page h1, .flow-heading");
-    h1?.setAttribute("tabindex", "-1");
-    h1?.focus();
+    const focusHeading = (): boolean => {
+      const h1 = document.querySelector<HTMLElement>(".screen-page h1, .flow-heading");
+      if (!h1) return false;
+      h1.setAttribute("tabindex", "-1");
+      h1.focus();
+      return true;
+    };
+    if (focusHeading()) return;
+    // A screen is a code-split chunk (NFR-01): its heading arrives with it. Focus it then, unless
+    // the person has moved on in the meantime (focus is on the page body only while nothing has it).
+    const watch = new MutationObserver(() => {
+      if (document.activeElement !== document.body && document.activeElement !== null) {
+        return watch.disconnect();
+      }
+      if (focusHeading()) watch.disconnect();
+    });
+    watch.observe(document.body, { childList: true, subtree: true });
+    const giveUp = setTimeout(() => watch.disconnect(), 10_000);
+    return () => {
+      watch.disconnect();
+      clearTimeout(giveUp);
+    };
   }, [path]);
   // The world a path belongs to: its S-04 panels fill the right rail on every world screen (S-04,
   // S-05, S-10, S-11, S-12) and, on mobile, a bottom sheet on S-04 itself.
