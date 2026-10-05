@@ -68,6 +68,55 @@ SUBJECT_SIGNAL = {
 }
 
 
+# Redesign after security round 3 (decided 6 Oct under the user's standing delegation; stricter than the 5 Oct
+# decision): L2 needs the replied-to body AND Subject to be PLAIN (`autopilot_t3.inbound_plain`) as well as free of any
+# `inbound_signal`. A denylist cannot list every obfuscation, so only plain scheduling talk may ride L2.
+PLAIN_INBOUND = [
+    SCHEDULING_INBOUND,
+    "Can Marcus come by this Friday afternoon to look the engine over? Thanks, David",
+    "Hi Sarah, are you free at 3pm or 2:30pm tomorrow?",
+    "Don't worry, we're fine.",
+    "Hi Sarah,\n\nCan Marcus come by this Friday afternoon?\nLet us meet at 14:30 on Thursday.\n\nThanks,\nDavid",
+]
+PLAIN_SUBJECTS = [
+    "Engine tuneup scheduling",
+    "Re: Engine tuneup scheduling",
+    "Re: Dock on Thursday at 3pm",
+    "Friday afternoon",
+    "Re: Are you free at 2:30pm tomorrow?",
+]
+
+# The exact failures of the round-3 review: each is NOT clean (`inbound_signal` non-empty OR not `inbound_plain`).
+R3_BODY_FAILURES = [
+    "Please confirm the _transfer_ today.",
+    "Please _sign_ the _contract_ today.",
+    "_refund_",
+    "_wire_",
+    "the_transfer",
+    "Please confirm the/trans-fer today.",
+    "ok/re-fund today",
+    "1)trans-fer",
+    "si-gn/return",
+    "wi-re/send",
+    "the.trans.fer",
+    "5million",
+    "10lakh",
+    "10lakhs",
+    "2crore",
+    "50thousand",
+    "5hundred",
+    "5mil",
+    "5_million",
+    "50  K",
+    "25-M",
+    "10-L",
+    "12-b",
+    "10/L",
+    "10_m",
+]
+R3_SUBJECT_FAILURES = ["Re: _contract_ by Friday", "Re:con-tract", "Re:contract"]
+
+
 def t3_module() -> Any:
     """Imported at call time so a missing function fails the test, not collection."""
     return importlib.import_module("tilo_channels.autopilot_t3")
@@ -77,6 +126,28 @@ def inbound_signal(text: str) -> frozenset[str]:
     """The proposed pure function `tilo_channels.autopilot_t3.inbound_signal(text) -> frozenset[str]` (a subset of
     {"money", "legal", "commitment", "obfuscated"}; never "unlisted"). A missing name fails the test."""
     return t3_module().inbound_signal(text)
+
+
+def inbound_plain(text: str) -> bool:
+    """The proposed pure function `tilo_channels.autopilot_t3.inbound_plain(text) -> bool`. A missing name fails the
+    test."""
+    return t3_module().inbound_plain(text)
+
+
+def is_clean(text: str) -> bool:
+    """What `inbound_is_clean` requires of the body and of the Subject: no signal AND plain."""
+    return not inbound_signal(text) and inbound_plain(text)
+
+
+def needs_inbound_plain(test: Callable[..., Any]) -> Callable[..., Any]:
+    """A missing `inbound_plain` fails once, before Hypothesis generates or shrinks anything."""
+
+    @functools.wraps(test)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        inbound_plain("")
+        return test(*args, **kwargs)
+
+    return wrapper
 
 
 def needs_inbound_signal(test: Callable[..., Any]) -> Callable[..., Any]:

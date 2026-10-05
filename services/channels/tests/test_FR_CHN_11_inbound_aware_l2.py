@@ -40,6 +40,7 @@ from _chn11_inbound_lib import (
     assert_waits_for_a_person,
     earlier_message,
     make_l2,
+    t3_module,
 )
 from _chn11_lib import BENIGN, INSTRUCTION, MAILBOX, context
 from _chn_wire4_lib import fresh_ulid
@@ -186,12 +187,17 @@ def test_FR_CHN_11_inbound_aware_l2_a_scheduling_only_inbound_still_rides_l2(kin
 
 
 @pytest.mark.parametrize("kind", KINDS)
-def test_FR_CHN_11_inbound_aware_l2_digits_a_link_and_unlisted_words_in_the_inbound_are_no_signal(kind: str) -> None:
-    # The L2 allowlist is for the draft, not for the message it answers: only the three families, obfuscation and the
-    # cap count there.
+def test_FR_CHN_11_inbound_aware_l2_digits_and_a_link_in_the_inbound_are_no_signal_but_it_is_not_plain(
+    kind: str,
+) -> None:
+    # Redesign after security round 3 (decided 6 Oct under the user's standing delegation, stricter than the 5 Oct
+    # decision): `inbound_signal` is unchanged (the allowlist is for the draft; digits, a link and off-list words are
+    # no signal there), but L2 now also needs the inbound text to be PLAIN (`inbound_plain`): a digit that is not part
+    # of a time of day, or a link, keeps the card off L2 even though no signal word is present.
     inbound = "Hi Sarah, could Marcus bring the 2 tarps to dock 14 on Thursday at 3pm? Map: https://harriercharters.example/dock-14"
-    h, _, p, _ = _l2_card(kind, inbound, BENIGN)
-    _assert_rides_l2(h, p)
+    assert t3_module().inbound_signal(inbound) == frozenset()
+    h, _, p, ctx = _l2_card(kind, inbound, BENIGN)
+    assert_waits_for_a_person(h, p, ctx)
 
 
 @pytest.mark.parametrize("kind", KINDS)

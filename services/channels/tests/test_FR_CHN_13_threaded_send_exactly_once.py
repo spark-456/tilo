@@ -27,7 +27,7 @@ from _chn13_lib import (
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-SUBJECT = "Re: Engine tune-up scheduling"
+SUBJECT = "Re: Engine tuneup scheduling"
 
 
 @pytest.fixture(autouse=True, scope="module")

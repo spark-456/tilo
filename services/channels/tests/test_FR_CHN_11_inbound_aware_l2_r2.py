@@ -28,6 +28,7 @@ from _chn11_inbound_lib import (
     SCHEDULING_INBOUND,
     assert_rides_l2,
     assert_waits_for_a_person,
+    inbound_signal,
     make_l2,
 )
 
@@ -176,10 +177,19 @@ def test_FR_CHN_11_inbound_aware_l2_a_bare_four_digit_amount_never_rides_l2(kind
 # ---------------------------------------------------------------------------
 # Controls: plain scheduling talk still rides L2
 
+# Redesign after security round 3 (decided 6 Oct): L2 needs the inbound text to be PLAIN as well as signal-free, so the
+# round-2 controls that carried digits, hyphens, slashes or brackets moved to NOT_PLAIN_BUT_NO_SIGNAL below.
 CLEAN = [
+    "Could Marcus bring the tarps to the dock on Thursday at 3pm?",
+    "Hello Sarah, the rigging inspection moved to the harbour office. Cheers, David",
+    "Let us meet at 14:30 on Friday.",
+    "Could Marcus bring the kayaks and the buckets to the dock? Thanks, David",
+    "Re: Friday afternoon. See you there, David.",
+    "Okay: Thursday works, it's fine, we're on for Friday at 3pm. Thanks!",
+]
+NOT_PLAIN_BUT_NO_SIGNAL = [
     "Could Marcus bring the 2 tarps to dock 14 on Thursday at 3pm?",
     "Hello Sarah, the rigging inspection moved to room 7. Cheers, David",
-    "Let us meet at 14:30 on Friday.",
     "Could Marcus bring 2 kayaks and 3 buckets to dock 14?",
     "Friday, 2pm - dock 14 (north side); bring 2 tarps!",
     "Could we meet at the drop-off/pick-up point? Thanks - David",
@@ -195,6 +205,18 @@ def test_FR_CHN_11_inbound_aware_l2_plain_scheduling_talk_with_ordinary_punctuat
 ) -> None:
     h, p, _ = _card(kind, inbound)
     assert_rides_l2(h, p)
+
+
+@pytest.mark.parametrize("kind", KINDS)
+@pytest.mark.parametrize(
+    "inbound", NOT_PLAIN_BUT_NO_SIGNAL, ids=[f"notplain{i}" for i in range(len(NOT_PLAIN_BUT_NO_SIGNAL))]
+)
+def test_FR_CHN_11_inbound_aware_l2_ordinary_text_with_digits_hyphens_or_brackets_is_no_signal_but_not_plain(
+    kind: str, inbound: str
+) -> None:
+    assert inbound_signal(inbound) == frozenset()  # unchanged: signal-free
+    h, p, ctx = _card(kind, inbound)
+    assert_waits_for_a_person(h, p, ctx)  # but no longer plain, so no undo window
 
 
 @pytest.mark.parametrize("kind", KINDS)

@@ -158,7 +158,7 @@ def test_FR_CHN_11_inbound_aware_l2_a_subject_that_is_not_text_fails_closed(kind
 
 @pytest.mark.parametrize("kind", KINDS)
 @pytest.mark.parametrize(
-    "subject", ["Engine tune-up scheduling", "Re: Engine tune-up scheduling", "Re: Dock 14 on Thursday at 3pm"]
+    "subject", ["Engine tuneup scheduling", "Re: Engine tuneup scheduling", "Re: Dock on Thursday at 3pm"]
 )
 def test_FR_CHN_11_inbound_aware_l2_a_clean_subject_still_rides_l2(kind: str, subject: str) -> None:
     h, _, p, _ = _card(kind, subject=subject)
@@ -276,7 +276,7 @@ def test_FR_CHN_11_inbound_aware_l2_the_owner_can_still_send_a_reply_to_an_unaut
 # (3) More than one message with the replied-to Message-ID fails closed
 
 
-def _with_copies(kind: str, *copies: tuple[str, int], subject: str = "Engine tune-up scheduling"):
+def _with_copies(kind: str, *copies: tuple[str, int], subject: str = "Engine tuneup scheduling"):
     """A clean, authenticated thread whose last message is the replied-to one, plus copies sharing its Message-ID:
     `(body, index)` inserts a copy at that index (negative: appended after the last message)."""
     h = make_l2(kind)
@@ -408,7 +408,7 @@ def test_FR_CHN_11_inbound_aware_l2_a_body_that_is_not_text_is_never_read_as_tex
 # ---------------------------------------------------------------------------
 # Invariant (Hypothesis): the window needs a clean body, a clean subject and a dmarc pass together
 
-_SUBJECTS = ["Engine tune-up scheduling", "Re: Friday afternoon", *SUBJECT_SIGNAL.values()]
+_SUBJECTS = ["Engine tuneup scheduling", "Re: Friday afternoon", *SUBJECT_SIGNAL.values()]
 _RESULTS = [AUTH_PASS, FAILING_RESULTS["dmarc_fail"], FAILING_RESULTS["no_verdict"], FAILING_RESULTS["empty"]]
 _BODIES = [SCHEDULING_INBOUND, TRANSFER, *SIGNAL_INBOUND[:3], *NUMBER_INBOUND]
 
