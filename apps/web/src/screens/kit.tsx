@@ -29,11 +29,10 @@ export const words = (id: string): string =>
 export const plural = (n: number, one: string, many = `${one}s`): string =>
   `${n} ${n === 1 ? one : many}`;
 
-/** Brand and channel names as people write them ("WhatsApp", "Google Drive"). */
+/** Brand and channel names as people write them ("Google Drive", "Email"). */
 const NAMES: Readonly<Record<string, string>> = {
   gmail: "Gmail",
   google_drive: "Google Drive",
-  whatsapp: "WhatsApp",
   email: "Email",
 };
 export const nameOf = (id: string): string => NAMES[id] ?? words(id);
