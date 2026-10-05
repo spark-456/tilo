@@ -7,7 +7,9 @@ through the provider layer's `Router` by role; this module names no model and bu
 live provider (ADC only) is wrapped in `RecordReplayProvider`: with the user's `LIVE=1` it calls out, with
 `TILO_RECORD=1` it also saves each reply (redacted, LF), and `--replay` and `--dry-run` never build a live provider.
 Spend is bounded by the Router's budget (PL-03): nothing over the cap is ever sent. A provider's own error text is
-never printed or stored, because it can echo a credential.
+never stored or printed, because it can echo a credential; the one exception is a rejected request (HTTP 400), whose
+adapter-redacted reason is scrubbed again, cut to one line and 200 characters, as `vertex_smoke` does. Any other
+status prints its code only.
 """
 
 from __future__ import annotations
@@ -34,12 +36,13 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, Request
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
-from tilo_providers.errors import ProviderError
+from tilo_providers.errors import ProviderError, QuotaError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
 from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.replay import RecordReplayProvider, ReplayMissError, recording_key, redact_strings
 from tilo_providers.router import BudgetExceededError, Router
 from tilo_providers.safety import FakeSafetyProvider
+from tilo_providers.vertex_smoke import MAX_REASON_CHARS, classify, scrubbed_server_text
 
 from .bank import BankCase, BankError, load_bank
 from .bank_checks import CHECKS, Finding, check_case, terminal_honest
@@ -49,9 +52,18 @@ DEFAULT_MAX_CREDITS = 40.0  # credits (PRD 14.1); what a credit is worth in doll
 HARD_MAX_CREDITS = 200.0
 STAGES = ("intake", "approaches", "plan", "run", "narrate")
 OUTCOME_CLASSES = frozenset(
-    {"completed", "held_at_gate", "needs_answers", "refused", "failed", "stopped_at_cap", "replay_miss"}
+    {"completed", "held_at_gate", "needs_answers", "refused", "failed", "stopped_at_cap", "replay_miss", "rejected"}
 )
 SAFETY_NOTE = "trusted_bank_input (Model Armor not wired)"  # BQ-LE2E-5
+SYNTHETIC_MARKER = "SYNTHETIC"  # a file beside `model-recordings/`: a fake provider wrote them (BQ-LE2E-9)
+FAKED = (  # what a run never does for real, printed with every report (HR-1: say what is not real)
+    "safety screen: trusted bank input only (Model Armor not wired)",
+    "connectors and recipient: recording mocks; no real mailbox, chat or Drive write",
+    "Verifier verdict: recorded in the unit's summary, not acted on",
+    "must-ask judgement: a fixed 'nothing to ask' stand-in, no model call; the deterministic rules still ask",
+)
+PLANNING_NOTE = "planning credits come from this meter: the planning events carry 0 (#327)"
+SCOPE_NOTE = "claim scope: structural pass rate (GEN-11), not output quality"
 
 _REPO = Path(__file__).resolve().parents[3]
 _OWNER = "u_live_e2e"
@@ -64,6 +76,7 @@ _OUT = {
     "narrator": 600,
 }  # output caps of our own calls
 _DEFAULT_OUT = 1024  # the Router's default when neither the request nor the role gives one (BQ-63)
+_DIRECTOR_OUT = 4096  # the Director's floor when its role sets no cap: thinking tokens count against it (BQ-LE2E-9)
 _PROMPT_TOKENS, _UNITS, _DIRECTOR_RETRIES, _MAX_BEATS = 1500, (3, 8), 3, 8  # estimate assumptions; Narrator beats
 _ROLE: ContextVar[str] = ContextVar("live_e2e_role")
 _PERSONAL = re.compile(
@@ -134,6 +147,8 @@ class LiveE2EReport:
         "mock_only"  # the delivery and the gated send go to recording mocks, never a real mailbox or Drive
     )
     expected: str | None = None
+    recordings: str | None = None  # replay only: "synthetic" (a fake provider wrote them) or "unmarked"
+    story_note: str | None = None  # why the Narrator left no Story, as a code only
 
     @property
     def event_count(self) -> int:
@@ -147,6 +162,7 @@ class LiveE2EReport:
             "event_count": self.event_count, "rows": [dataclasses.asdict(r) for r in self.rows], "checks": checks,
             "questions": self.questions, "answered": self.answered, "estimate": dataclasses.asdict(self.estimate),
             "story_lines": [dataclasses.asdict(s) for s in self.story_lines], "side_effects": self.side_effects,
+            "faked": list(FAKED), "recordings": self.recordings, "story_note": self.story_note,
         }  # fmt: skip
 
 
@@ -164,9 +180,13 @@ def _gate(mode: str, env: Mapping[str, str], max_credits: float) -> None:
         raise LiveE2ERefused("live_not_enabled", "set LIVE to exactly 1 to make real (paid) calls; nothing was sent")
     if mode == "replay" and "1" in (env.get("LIVE"), os.environ.get("LIVE")):
         raise LiveE2ERefused("replay_with_live", "--replay never runs with the live switch on")
-    if live and (env.get("CI") or env.get("GITHUB_ACTIONS")):
+    both = (
+        env,
+        os.environ,
+    )  # the live decision itself reads os.environ, so a caller's own environ never hides a marker
+    if live and any(e.get("CI") or e.get("GITHUB_ACTIONS") for e in both):
         raise LiveE2ERefused("ci_refused", "a live run is refused in CI")
-    if live and ("K_SERVICE" in env or "CLOUD_RUN_JOB" in env):
+    if live and any("K_SERVICE" in e or "CLOUD_RUN_JOB" in e for e in both):
         raise LiveE2ERefused("deployed_refused", "a live run is refused when deployed (Cloud Run)")
     if not (math.isfinite(max_credits) and 0 < max_credits <= HARD_MAX_CREDITS):
         raise LiveE2ERefused("cap_out_of_range", f"--max-credits must be above 0 and at most {HARD_MAX_CREDITS:g}")
@@ -207,6 +227,16 @@ def _load_case(case_id: str, bank_dir: Path | None) -> BankCase:
 # --- the estimate (before any call): the case, the role caps and the prices file only -----------------------------
 
 
+def _output_cap(config: ProvidersConfig, role: str) -> int:
+    """The output cap a call of `role` is sent with when its request names none: our own call's cap, else the role's
+    configured one, else the Director's floor (the Router's 1024 includes thinking tokens and can cut a plan short)."""
+    return (
+        _OUT.get(role)
+        or config.roles[role].max_output_tokens
+        or (_DIRECTOR_OUT if role == "director" else _DEFAULT_OUT)
+    )
+
+
 def _estimate(config: ProvidersConfig, case: BankCase) -> Estimate:
     base = _PROMPT_TOKENS + (len(case.brief) + sum(len(f["text"]) for f in case.files)) // 3
 
@@ -215,7 +245,7 @@ def _estimate(config: ProvidersConfig, case: BankCase) -> Estimate:
         return calls * config.credits((tokens_in * quote.input + tokens_out * quote.output) / 1e6)
 
     def out(role: str) -> int:
-        return _OUT.get(role) or config.roles[role].max_output_tokens or _DEFAULT_OUT
+        return _output_cap(config, role)
 
     low = credits("director", 3, base, 400) + credits("writer", _UNITS[0], base, 250)
     low += credits("lead", 1, base, 100) + credits("narrator", 1, base, 200)
@@ -232,9 +262,10 @@ class _Meter:
     def __init__(self, config: ProvidersConfig, cap: float) -> None:
         self.config, self.cap = config, cap
         self.rows: dict[tuple[str, str, str], Row] = {}
-        self.stop: tuple[str, str, str] | None = (
-            None  # (outcome class, role, detail): the first thing that ended the run
+        self.stop: tuple[str, str, str, str] | None = (
+            None  # (outcome class, role, detail, stage): the first thing that ended the run
         )
+        self.failure: tuple[str, BaseException] | None = None  # (role, error): the first call the Router gave up on
         self.lock = threading.RLock()  # one model call at a time, so the cap is checked against what was really spent
 
     def cost(self, profile: str, tokens_in: int, tokens_out: int) -> float:
@@ -267,9 +298,27 @@ class _Meter:
             row.credits += self.cost(response.profile_id, tokens_in, tokens_out)
             row.latency_ms += latency_ms
 
-    def stopped(self, kind: str, role: str, detail: str = "") -> None:
+    def add_unreturned(
+        self, role: str, profile: str, request: GenerateRequest, tokens_in: int, latency_ms: float
+    ) -> None:
+        """A call that raised after it may have been billed (a blocked reply, a timeout): charged at the Router's own
+        pre-call quote, the input and the full output cap, because the provider reported no usage for it."""
         with self.lock:
-            self.stop = self.stop or (kind, role, detail)
+            key = (_stage(role, request), role, profile)
+            row = self.rows.setdefault(key, Row(*key))
+            tokens_out = request.max_output_tokens or 0
+            row.calls += 1
+            row.tokens_in, row.tokens_out = row.tokens_in + tokens_in, row.tokens_out + tokens_out
+            row.credits += self.cost(profile, tokens_in, tokens_out)
+            row.latency_ms += latency_ms
+
+    def stopped(self, kind: str, role: str, detail: str = "", stage: str = "") -> None:
+        with self.lock:
+            self.stop = self.stop or (kind, role, detail, stage)
+
+    def failed(self, role: str, error: BaseException) -> None:
+        with self.lock:
+            self.failure = self.failure or (role, error)
 
 
 def _stage(role: str, request: GenerateRequest) -> str:
@@ -321,7 +370,16 @@ class _Metered(_Redacting):
         try:
             response = self._inner.generate(request)
         except ReplayMissError:
-            self._meter.stopped("replay_miss", self._role, recording_key(self._role, self._profile, request))
+            key = recording_key(self._role, self._profile, request)
+            self._meter.stopped("replay_miss", self._role, key, _stage(self._role, request))
+            raise
+        except (RequestError, QuotaError):  # refused before any generation: never billed
+            raise
+        except Exception:
+            # Anything else may have been billed after it was sent (a blocked candidate, a timeout): count it.
+            tokens_in = len(f"{request.system or ''} {request.prompt}".split())
+            elapsed = (time.perf_counter() - started) * 1000
+            self._meter.add_unreturned(self._role, self._profile, request, tokens_in, elapsed)
             raise
         self._meter.add(self._role, request, response, (time.perf_counter() - started) * 1000)
         return response
@@ -355,9 +413,11 @@ class _MeteredRouter(Router):
 
     def __init__(self, config: ProvidersConfig, meter: _Meter, providers: _Providers) -> None:
         super().__init__(config, provider_for_profile=lambda profile: providers(_ROLE.get(), profile))
-        self.meter = meter
+        self.meter, self._cfg = meter, config
 
     def generate(self, role_id: str, request: GenerateRequest, *, budget: float | None = None, **kwargs: Any) -> Any:
+        if request.max_output_tokens is None:  # the Router's own default of 1024 would cut a Director plan short
+            request = request.model_copy(update={"max_output_tokens": _output_cap(self._cfg, role_id)})
         with self.meter.lock:
             left = self.meter.left()
             token = _ROLE.set(role_id)
@@ -367,6 +427,10 @@ class _MeteredRouter(Router):
                 )
             except BudgetExceededError:
                 self.meter.stopped("stopped_at_cap", role_id)
+                raise
+            except Exception as error:
+                if role_id != "narrator":  # a Narrator that fails leaves no Story; it never ends the run (see `_story`)
+                    self.meter.failed(role_id, error)
                 raise
             finally:
                 _ROLE.reset(token)
@@ -521,6 +585,14 @@ def _safe(text: str) -> str:
     return text
 
 
+class _ClearModel:
+    """The must-ask judge (FR-AGT-05) as a fixed stand-in: no model call, every unit judged clear. Only the
+    deterministic rules (a failed unit, a step above T1) can ask a person. Named in `FAKED`."""
+
+    def generate(self, request: Any) -> GenerateResponse:
+        return GenerateResponse(text='{"ask": false}', profile_id="live-e2e-clear")
+
+
 def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) -> FastAPI:
     from tilo_api import deps, dev_run, runs  # noqa: PLC0415
     from tilo_api.cards import build_router  # noqa: PLC0415
@@ -531,6 +603,9 @@ def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) ->
     from tilo_planning.compiler import compile_plan  # noqa: PLC0415
 
     app, store = FastAPI(), deps.Store()
+    store.policies["pol_dev_send"] = dev_run.dev_send_policy(
+        _OWNER
+    )  # L1 "ask each time": the run goes to its gate card
     for api_router in (intake_router, dispatch_router, redaction_router, tasks_router, runs.router):
         app.include_router(api_router)
     app.include_router(build_router(runs.get_card_store, answer_guard=runs.answer_guard))
@@ -544,6 +619,9 @@ def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) ->
 
         return compile_and_capture
 
+    def must_ask_providers() -> dict[str, _ClearModel]:
+        return {role: _ClearModel() for role in ("specialist", "writer", "verifier")}
+
     def resolve(**_: Any) -> dict:
         return {"destination": dev_run.DEV_DESTINATION, "recipients": [dev_run.DEV_RECIPIENT], "known_recipients": []}
 
@@ -555,7 +633,7 @@ def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) ->
             deps.get_current_principal: principal, deps.get_store: lambda: store, deps.get_event_writer: lambda: writer,
             deps.get_router: lambda: router, deps.get_safety: lambda: safety, deps.get_plan_compiler: compiler,
             deps.get_unit_runner: lambda: runner, deps.get_action_resolver: lambda: resolve,
-            deps.get_connector_adapters: lambda: adapters,
+            deps.get_connector_adapters: lambda: adapters, deps.get_must_ask_providers: must_ask_providers,
         }
     )  # fmt: skip
     return app
@@ -613,20 +691,78 @@ def _vertex(config: ProvidersConfig) -> Callable[[str, str], ModelProvider]:
     return lambda _role, profile: _build_live_provider(config.profiles[profile], profile)
 
 
-def _classify(obs: Observation, meter: _Meter, safety: SafetyProvider) -> tuple[str, str | None]:
+_PROJECT_PATH = re.compile(r"(?i)projects/[^/\s\"']+")
+_ADC_FILE = re.compile(r"[^\s\"']*application_default_credentials\.json")
+
+
+def _scrub_known(text: str, env: Mapping[str, str]) -> str:
+    """What a provider's text may echo about this machine and project: the project id, the ADC file and the gcloud
+    folder (from the environment, or by shape), and any email, phone number or token."""
+    for name in ("GOOGLE_CLOUD_PROJECT", "GOOGLE_APPLICATION_CREDENTIALS", "CLOUDSDK_CONFIG"):
+        for value in (env.get(name), os.environ.get(name)):
+            if value and len(value) >= 3:
+                text = text.replace(value, "[redacted]")
+    return _PERSONAL.sub("[redacted]", _ADC_FILE.sub("[redacted]", _PROJECT_PATH.sub("projects/[redacted]", text)))
+
+
+def _provider_failure(error: BaseException, env: Mapping[str, str]) -> tuple[str, str]:
+    """(code, reason) of a call the Router gave up on. Only a rejected request (HTTP 400) gives a reason: the adapter's
+    redacted server text, scrubbed again here, one line, scrubbed before it is capped. Any other status: code only."""
+    code = classify(error)
+    return code, (_scrub_known(scrubbed_server_text(error), env)[:MAX_REASON_CHARS] if code == "rejected" else "")
+
+
+def _classify(
+    obs: Observation, meter: _Meter, safety: SafetyProvider, env: Mapping[str, str]
+) -> tuple[str, str | None]:
     if meter.stop:
-        kind, role, detail = meter.stop
+        kind, role, detail, stage = meter.stop
         if kind == "replay_miss":
-            return kind, f"no recording for role {role} with key {detail}: a prompt, brief or config changed"
+            return kind, (
+                f"no recording for stage {stage} (role {role}) with key {detail}: a prompt, brief or config changed"
+            )
         return (
             kind,
             f"the run reached its credit cap of {meter.cap:.4f} credits before it could finish ({role} call refused)",
         )
+    code, said = _provider_failure(meter.failure[1], env) if meter.failure else ("", "")
+    if code == "rejected" and meter.failure:  # a 400 beats the route's generic text (it called the screen unavailable)
+        return "rejected", f"the provider rejected a request of the {meter.failure[0]} role" + (
+            f": {said}" if said else ""
+        )
     if refused := getattr(safety, "refused", None):  # the trusted screen's own words beat the route's generic 503 text
         return "refused", refused[-1]
-    if obs.crash or obs.timed_out:
-        return "failed", obs.crash or "no terminal state within the time budget"
-    return (obs.outcome or "failed"), obs.reason
+    outcome, reason = (
+        ("failed", obs.crash or "no terminal state within the time budget")
+        if obs.crash or obs.timed_out
+        else ((obs.outcome or "failed"), obs.reason)
+    )
+    if code and meter.failure and outcome not in ("completed", "held_at_gate", "needs_answers"):
+        reason = f"{reason or 'the run did not finish'}; provider call failed ({meter.failure[0]} role): {code}"
+    return outcome, reason
+
+
+def _story(
+    router: _MeteredRouter, events: list[dict[str, Any]], env: Mapping[str, str]
+) -> tuple[list[StoryLine], str | None]:
+    """The Narrator's Story, or why there is none (a code, never a provider's text): it never ends the run."""
+    try:
+        return _narrate(router, events), None
+    except Exception as error:  # noqa: BLE001
+        code, said = _provider_failure(error, env)
+        return [], f"the Narrator call failed: {code}" + (f" ({said})" if said else "")
+
+
+def _mark_recordings(recordings: Path, *, synthetic: bool) -> None:
+    """Say who wrote the recordings in this folder, so a replay never passes a fixture off as a real run (HR-1)."""
+    marker = recordings / SYNTHETIC_MARKER
+    if synthetic:
+        recordings.mkdir(parents=True, exist_ok=True)
+        marker.write_text(
+            "written by a fake provider for tests; not a real model run\n", encoding="utf-8", newline="\n"
+        )
+    else:
+        marker.unlink(missing_ok=True)
 
 
 def run_live_e2e(
@@ -658,9 +794,10 @@ def run_live_e2e(
     if mode == "dry-run":
         return report
     meter = _Meter(config, max_credits)
-    providers = _Providers(
-        config, meter, Path(recordings_dir) if recordings_dir else default_recordings_dir(case_id), factory
-    )
+    recordings = Path(recordings_dir) if recordings_dir else default_recordings_dir(case_id)
+    if live and os.environ.get("TILO_RECORD") == "1":
+        _mark_recordings(recordings, synthetic=live_provider_factory is not None)  # only a test injects a provider
+    providers = _Providers(config, meter, recordings, factory)
     router = _MeteredRouter(config, meter, providers)
     runner = _UnitRunner(router, meter)
     approve = {**(case.approve or {}), "cap": min(float((case.approve or {}).get("cap", max_credits)), max_credits)}
@@ -671,11 +808,12 @@ def run_live_e2e(
         except Exception as error:  # noqa: BLE001 - a crash is an observation; the error's text is never kept
             obs.crash = type(error).__name__
         if obs.events and not meter.stop:
-            try:
-                report.story_lines = _narrate(router, obs.events)
-            except Exception:  # noqa: BLE001 - a Narrator that could not run leaves no Story; a stop is in the meter
-                report.story_lines = []
-    report.outcome_class, report.reason = _classify(obs, meter, screen)
+            report.story_lines, report.story_note = _story(router, obs.events, env)
+    report.outcome_class, report.reason = _classify(obs, meter, screen, env)
+    if report.reason:  # a last line of defence: nothing printed names the project, an ADC path or a token
+        report.reason = _scrub_known(" ".join(report.reason.split()), env)
+    if not live:
+        report.recordings = "synthetic" if (recordings / SYNTHETIC_MARKER).is_file() else "unmarked"
     stopped = report.outcome_class in ("stopped_at_cap", "replay_miss")
     found = check_case(obs)
     report.findings = [f for f in found if not (stopped and f.check == terminal_honest.__name__)]
@@ -712,6 +850,12 @@ def _exit_code(report: LiveE2EReport) -> int:
 def _print_report(report: LiveE2EReport) -> None:
     print(f"mode={report.mode} case={report.case_id}")
     print(f"safety: {report.safety}")
+    for item in FAKED:
+        print(f"faked: {item}")
+    if report.recordings == "synthetic":
+        print("recordings: SYNTHETIC fixture written by a fake provider; this replay is not a real model run")
+    elif report.recordings:
+        print("recordings: not marked synthetic; they stand for what an earlier recorded run returned")
     for r in report.rows:
         print(
             f"stage={r.stage} role={r.role} profile={r.profile} calls={r.calls} tokens_in={r.tokens_in} "
@@ -721,6 +865,10 @@ def _print_report(report: LiveE2EReport) -> None:
     for name in report.checks_run:
         print(f"check={name} findings={sum(1 for f in report.findings if f.check == name)}")
     print(f"total credits={report.total_credits:.4f} cap={report.cap_credits:.4f}")
+    print(f"note: {PLANNING_NOTE}")
+    print(f"note: {SCOPE_NOTE}")
+    if report.story_note:
+        print(f"story: none ({report.story_note})")
     for line in report.story_lines:
         print(f"story: {line.text}")
 
