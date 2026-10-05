@@ -12,7 +12,7 @@ stable; a failing check names its rule.
 | EV-01 | The harness emits only types listed in `events/registry.yaml`. A consumer that meets a type it does not know (a newer harness, an old replay) shows it in the Trace only: no world animation, no HUD change, no Story line (`unknown_types: trace_only`). | validator; renderer | 9.4 HR-5, 9.5 |
 | EV-02 | `data` validates against `events/data/<type>.schema.json`. | validator | 9.3 |
 | EV-03 | A side-effect type (`side_effect: true` in the registry) carries `authz`, the `common.schema.json` shape (BQ-01). `event.schema.json` lists the same types; contracts-check fails if the lists differ. | schema | 10.4 Audit, FR-HIL-08 |
-| EV-04 | `authz.by` is one of the type's `authz_by`. A gate is resolved by a person or Team Lead (`approval.resolved`; which ones may open it, and the PIN a T3 answer on WhatsApp needs, are outbox OB-01's) and opened by a policy only through `policy.applied`; only a person grants a connection (`connection.consented`) or changes a policy (`policy.changed`, PRD 10.1), and that person is the policy's owner: `policy.changed`'s `authz.ref` equals the `owner` of the policy `data.policy_id` names (a Team Lead only proposes; the policy record's stamps are outbox OB-01's). | validator | 10.1, 10.4, HR-7 |
+| EV-04 | `authz.by` is one of the type's `authz_by`. A gate is resolved by a person or Team Lead (`approval.resolved`; which ones may open it, and the signed-in channel the answer needs, are outbox OB-01's) and opened by a policy only through `policy.applied`; only a person grants a connection (`connection.consented`) or changes a policy (`policy.changed`, PRD 10.1), and that person is the policy's owner: `policy.changed`'s `authz.ref` equals the `owner` of the policy `data.policy_id` names (a Team Lead only proposes; the policy record's stamps are outbox OB-01's). | validator | 10.1, 10.4, HR-7 |
 | EV-05 | Only side-effect types carry `authz`; every other event has `authz: null`. The schema accepts `authz` on any type so that a newer side-effect type still parses. | validator | 10.4 |
 | EV-06 | When `authz.by` is `policy` and `data` has a `policy_id`, `authz.ref` equals it, so the policy stamp links to the policy that acted. | validator | HR-7 |
 | EV-07 | A policy never authorises T3: when `authz.by` is `policy`, `data.risk_tier` (on types that have one) is T1 or T2. | schema | 10.4, FR-HIL-04 |
@@ -49,10 +49,9 @@ carry the pinned item (artifact id and version) the entry sends, so the Trace sh
 version was approved and sent (outbox rule OB-05). With no gate card on the policy path, `policy.applied` also names
 the connector, the destination (an opaque id) and the district the engine checked against the
 policy's scope, and the entry equals them (OB-01, OB-05). At L2 it also names the owner's
-instruction (`instruction_id`: an earlier `world.requested` from the web or mobile web or a
-`channel.message_in` the owner typed from their bound WhatsApp number (`option` null, `card_kind` null
-or `needs_you`, BQ-56), never an email or a tapped card option, with the same
-`destination`, used by no other `policy.applied`), which the Trace and HR-7's link show beside
+instruction (`instruction_id`: an earlier `world.requested` the owner made signed in on the web or
+mobile web, never one over email or WhatsApp and never a `channel.message_in` (ADR-0019), with the
+same `destination`, used by no other `policy.applied`), which the Trace and HR-7's link show beside
 the policy (OB-01).
 
 ## Fixtures
