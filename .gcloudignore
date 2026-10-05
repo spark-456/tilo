@@ -1,29 +1,36 @@
-# Source upload filter for `gcloud builds submit` (P0-07f). The upload is the repository root, so keep secrets,
-# VCS data and dependency trees out of it. Do NOT list services, packages, config, contracts, prompts,
-# templates, pyproject.toml, uv.lock or evals/pyproject.toml here: the Dockerfiles COPY them, and
-# .dockerignore does the trimming inside the build.
-.git/
-.gitattributes
-.github/
-.claude/
-.venv/
-**/.venv/
-node_modules/
-**/node_modules/
-**/__pycache__/
-*.pyc
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+# Source upload filter for `gcloud builds submit` (P0-07f). gcloud uploads the WORKING DIRECTORY (untracked and
+# ignored files included), and a custom .gcloudignore replaces .gitignore, so this is an allowlist: ignore
+# everything at the root, then re-include only what the Dockerfiles COPY plus .dockerignore (which trims the
+# build context). The nested denies below keep secrets and state files out even inside those roots; they come
+# last because the last matching pattern wins.
+/*
+!/pyproject.toml
+!/uv.lock
+!/.dockerignore
+!/evals/
+/evals/*
+!/evals/pyproject.toml
+!/packages/
+!/services/
+!/config/
+!/contracts/
+!/prompts/
+!/templates/
+
 .env
 .env.*
-**/.env
-**/.env.*
 *.pem
 *.key
 *.p12
 service-account*.json
 *-credentials.json
 application_default_credentials.json
-*.log
-scratch*
+client_secret*.json
+token*.json
+*.tfplan
+tfplan
+*.tfstate*
+node_modules/
+.venv/
+__pycache__/
+*.pyc

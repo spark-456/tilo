@@ -25,9 +25,10 @@ no GitHub variable, no merge to `main` and no `gh` sign-in is needed. Tilo's too
 
    Result: https://essential-wares-510320-f0.web.app (the default Hosting site).
 
-3. One-time, before the first service deploy: apply the separate Terraform PR that gives the Cloud Build service
-   account its access (see "Deploy with Cloud Build" below). Until it is applied the build fails closed with a
-   permission error and changes nothing.
+3. One-time, before the first service deploy: the separate Terraform PR that creates the `tilo-cloudbuild` service
+   account and its five roles (see "Deploy with Cloud Build" below) has to be in place. It does not exist yet, so
+   until you have put it in place the build fails before any step runs (the service account is missing) and
+   nothing is built or deployed.
 
 4. Deploy the services, API first, check it, then everything:
 
@@ -123,34 +124,50 @@ just deploy-dev-cloudbuild all     # then everything (the default)
 ```
 
 `just deploy-dev-cloudbuild service="all" env="dev"` refuses any env other than dev, then runs
-`gcloud builds submit --config cloudbuild.yaml --substitutions _SERVICE=<service> --region asia-southeast1 .`.
+`gcloud builds submit --config cloudbuild.yaml --project essential-wares-510320-f0 --substitutions "_SERVICE=<service>" --region asia-southeast1 .`.
+The tilo-dev project is pinned in the recipe (no parameter or `gcloud config` value can change it), `env` must be
+`dev`, and `service` must be `all` or one of the seven names: `just` checks both before any shell runs, so
+a flag or a shell command cannot be smuggled in through them.
 `cloudbuild.yaml` (repo root) has three steps: check `_SERVICE` (`all` or one of the seven short names, anything
 else fails with `unknown service`), build each image from `services/<svc>/Dockerfile` with the repo root as
 context and push it to `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>:<build id>`, then
-`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances 2..3`.
+`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances 2..3`,
+after refusing any image reference that is not `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>@sha256:...`.
+The upload is an allowlist (`.gcloudignore`): only `pyproject.toml`, `uv.lock`, `.dockerignore`, `evals/pyproject.toml`
+and the `packages`, `services`, `config`, `contracts`, `prompts` and `templates` trees leave your machine, and secret
+and state files (`.env*`, keys, `client_secret*.json`, `token*.json`, `*.tfplan`, `*.tfstate*`) are excluded inside them.
 The project id is Cloud Build's `$PROJECT_ID`, never written in the file. Nothing else is touched: no ingress, IAM,
-env vars, secrets or service account flag. The build times out at 2700 s (the 45 minute cap of the workflow), logs
+env vars or secrets. The build runs as the dedicated account `tilo-cloudbuild` (below). It times out at 2700 s (the 45 minute cap of the workflow), logs
 go to Cloud Logging only, and the builder images are pinned and listed in `docs/licences.md`.
 
 Rollback: send traffic to a previous revision in the Cloud Run console, or revert and run the recipe again.
 
 ### IAM the Cloud Build service account needs (a separate Terraform PR, put in place by you)
 
-The build runs as the project's Cloud Build service account (check which one with
-`gcloud builds get-default-service-account --region asia-southeast1`; a project created in 2024 or later uses the
-Compute Engine default account). It needs exactly this, scoped the way the deployer's access is, and no key:
+`cloudbuild.yaml` sets its top-level `serviceAccount` field to
+`projects/$PROJECT_ID/serviceAccounts/tilo-cloudbuild@$PROJECT_ID.iam.gserviceaccount.com`
+(`tilo-cloudbuild@<project id>.iam.gserviceaccount.com`), so every build runs as that dedicated account, which holds
+only the five roles below and has no key. Never grant them to the Compute Engine default service account or to the
+legacy Cloud Build account (`<project number>@cloudbuild.gserviceaccount.com`): those are shared identities that
+every other build, VM or function inherits, and on many projects the Compute Engine default account holds a broad
+editor role already (inferred from Google's defaults, not checked on this project). Pinning `tilo-cloudbuild` is what
+keeps the build to these five grants.
+
+`tilo-cloudbuild` does not exist yet. The build fails before any step runs until the separate Terraform PR creates
+the account and grants it the roles; the PR is written by Tilo's tooling and put in place by you
+(`infra/README.md`), and it needs its own security review. Nothing is built or deployed in the meantime.
+
+Roles for `tilo-cloudbuild`, scoped the way the deployer's access is:
 
 - `roles/artifactregistry.writer` on the Artifact Registry repository `tilo` (not project-wide).
-- `roles/run.developer` on each of the seven services `tilo-<svc>` (per service, never project-wide, and never
-  `roles/run.admin`). `run.developer` cannot set IAM, so invoker bindings stay with Terraform.
+- `roles/run.developer` on each of the seven services `tilo-<svc>` (per service, never project-wide). It cannot set
+  IAM, so invoker bindings stay with Terraform.
 - `roles/iam.serviceAccountUser` on each of the seven runtime service accounts (the updated revision runs as them).
 - `roles/logging.logWriter` at project level (Google offers no narrower scope), so `CLOUD_LOGGING_ONLY` works.
-- `roles/storage.objectViewer` on the source staging bucket `<project>_cloudbuild`, so the build can read the upload.
+- `roles/storage.objectViewer` on the source staging bucket, so the build can read the upload.
 
-The exact list is in the description of the separate Terraform PR; Tilo's tooling writes it and you run it
-(`infra/README.md`). Until it is in place, `just deploy-dev-cloudbuild` fails with a permission error and changes
-nothing. You, as the person running `gcloud builds submit`, need `roles/cloudbuild.builds.editor` and permission to
-act as the build account (the project owner has both).
+You, as the person running `gcloud builds submit`, need `roles/cloudbuild.builds.editor` and permission to act as
+`tilo-cloudbuild` (the project owner has both).
 
 ## Web app (Firebase Hosting, manual; P0-07c)
 

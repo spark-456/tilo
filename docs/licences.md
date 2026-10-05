@@ -179,7 +179,7 @@ Pinned in `cloudbuild.yaml`. They run only inside Google Cloud Build; nothing fr
 | Component | Pinned ref | Licence | Source |
 | --- | --- | --- | --- |
 | gcr.io/cloud-builders/docker (build and push the service images) | 20.10.24 | Apache-2.0 (the builder image; Docker Engine inside is Apache-2.0) | https://github.com/GoogleCloudPlatform/cloud-builders |
-| gcr.io/google.com/cloudsdktool/cloud-sdk (service selection and `gcloud run services update`) | 530.0.0 | Apache-2.0 (Google Cloud CLI) | https://github.com/GoogleCloudPlatform/cloud-sdk-docker |
+| gcr.io/google.com/cloudsdktool/cloud-sdk (service selection and `gcloud run services update`) | 587.0.0 | Apache-2.0 (Google Cloud CLI) | https://github.com/GoogleCloudPlatform/cloud-sdk-docker |
 
 ## Fonts, icons and design assets
 
