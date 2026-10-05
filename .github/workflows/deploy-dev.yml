@@ -1,0 +1,113 @@
+# tilo-dev deploy (P0-07a, PRD 6.5). Manual only: `just deploy-dev` dispatches this on main.
+# Builds the service images on the runner, pushes them to Artifact Registry repo `tilo`, swaps the image on
+# the seven Cloud Run services `tilo-<svc>` and smoke-tests them. Authenticates with Workload Identity
+# Federation (no keys). The deployer holds only run.developer per service, serviceAccountUser per runtime
+# account and Artifact Registry write on `tilo`, so this workflow never touches IAM, ingress, env or infra.
+# Firebase Hosting is deployed by hand (docs/deploy-dev.md). Setup and rollback: docs/deploy-dev.md.
+name: deploy-dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Service to deploy (all = the seven services)
+        type: choice
+        default: all
+        options: [all, api, harness, channels, connectors, browser, render, sandbox-web]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+env:
+  TILO_ENV: dev
+  REGION: asia-southeast1
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  SERVICES: api harness channels connectors browser render sandbox-web
+
+jobs:
+  deploy:
+    if: github.repository == 'spark-456/tilo' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out main
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Select services
+        env:
+          SELECTED: ${{ inputs.service }}
+        run: |
+          set -euo pipefail
+          if [ "$SELECTED" = "all" ]; then
+            list="$SERVICES"
+          else
+            case " $SERVICES " in
+              *" $SELECTED "*) list="$SELECTED" ;;
+              *) echo "unknown service" >&2; exit 1 ;;
+            esac
+          fi
+          echo "DEPLOY_SERVICES=$list" >> "$GITHUB_ENV"
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Build and push images
+        run: |
+          set -euo pipefail
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          : > "${RUNNER_TEMP}/images.txt"
+          for svc in $DEPLOY_SERVICES; do
+            image="${REGION}-docker.pkg.dev/${PROJECT_ID}/tilo/${svc}:${GITHUB_SHA}"
+            docker build --file "services/${svc}/Dockerfile" --tag "$image" .
+            docker push "$image"
+            digest_ref=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
+            echo "${svc} ${digest_ref}" >> "${RUNNER_TEMP}/images.txt"
+          done
+
+      - name: Deploy to Cloud Run
+        run: |
+          set -euo pipefail
+          update() {  # update <svc> <extra flags>: swap the image only; Terraform owns everything else
+            svc="$1"; shift
+            case " $DEPLOY_SERVICES " in *" $svc "*) ;; *) return 0 ;; esac
+            digest_ref=$(awk -v s="$svc" '$1 == s { print $2 }' "${RUNNER_TEMP}/images.txt")
+            gcloud run services update "tilo-${svc}" --project "$PROJECT_ID" --region "$REGION" \
+              --image "$digest_ref" --min-instances 0 "$@" --quiet
+          }
+          update api --max-instances 3
+          update harness --max-instances 3
+          update channels --max-instances 3
+          update connectors --max-instances 2
+          update browser --max-instances 2
+          update render --max-instances 2
+          update sandbox-web --max-instances 2
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          for svc in $DEPLOY_SERVICES; do
+            json=$(gcloud run services describe "tilo-${svc}" --project "$PROJECT_ID" --region "$REGION" --format json)
+            url=$(jq -r '.status.url' <<< "$json")
+            ingress=$(jq -r '.metadata.annotations["run.googleapis.com/ingress"] // "all"' <<< "$json")
+            ready=$(jq -r '[.status.conditions[] | select(.type == "Ready")][0].status' <<< "$json")
+            [ "$ready" = "True" ] || { echo "tilo-${svc}: not Ready" >&2; exit 1; }
+            if [ "$ingress" = "all" ]; then
+              curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --max-time 20 "${url}/healthz"
+              echo
+            else
+              echo "tilo-${svc}: Ready (ingress ${ingress}; /healthz is not reachable from a runner)"
+            fi
+          done
