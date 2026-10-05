@@ -68,6 +68,58 @@ for (const viewport of [DESKTOP, MOBILE]) {
     });
   }
 
+  test(`FR-PA-12 at ${at}: the launcher's box covers no button, link or input on any screen, and the panel is modal`, async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    await page.setViewportSize(viewport);
+    const paths = [
+      ...SCREENS.map(([p]) => p),
+      "/no-such-page",
+      "/more",
+      "/estimate",
+      "/team",
+      "/pilot",
+      "/needs-you/gate",
+      "/world/w_village_basic/story",
+      "/world/w_village_basic/trace",
+      "/world/w_village_basic/delivery",
+      "/world/w_village_basic/inspect/B1",
+    ];
+    for (const path of paths) {
+      await page.goto(`${path}${path.startsWith("/world/") ? "?speed=1000" : ""}`);
+      const launcher = page.getByTestId("assistant-open");
+      await expect(launcher).toBeVisible({ timeout: 30_000 });
+      await page.waitForTimeout(300);
+      const covered = await launcher.evaluate((el) => {
+        const me = el.getBoundingClientRect();
+        const hit: string[] = [];
+        for (const other of document.querySelectorAll(
+          "button, a[href], input, select, textarea, summary, [role='button']",
+        )) {
+          if (other === el || el.contains(other)) continue;
+          const r = other.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) continue; // not displayed
+          const w = Math.min(me.right, r.right) - Math.max(me.left, r.left);
+          const h = Math.min(me.bottom, r.bottom) - Math.max(me.top, r.top);
+          if (w <= 0.5 || h <= 0.5) continue;
+          // Content scrolled out of its own clipped region is not on screen there: only an element
+          // that is painted at the overlap counts.
+          const x = Math.max(me.left, r.left) + w / 2;
+          const y = Math.max(me.top, r.top) + h / 2;
+          if (document.elementsFromPoint(x, y).some((e) => other.contains(e))) {
+            hit.push(`${other.tagName} ${(other.textContent ?? "").trim()}`);
+          }
+        }
+        return hit;
+      });
+      expect(covered, `${path} at ${at}`).toEqual([]);
+    }
+    await page.getByTestId("assistant-open").click();
+    const dialog = page.getByRole("dialog", { name: "Assistant" });
+    expect(await dialog.evaluate((el) => el.matches(":modal"))).toBe(true);
+  });
+
   test(`FR-PA-18 at ${at}: axe clean with the panel open, the answer is a preview notice, the open state persists`, async ({
     page,
   }) => {

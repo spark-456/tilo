@@ -1,31 +1,16 @@
 // S-30 assistant panel shell (FR-PA-12, FR-PA-18). A launcher on every screen opens an overlay: a
-// side panel on desktop, a bottom sheet on a phone. It is fixed over the page, so opening it moves
-// nothing (CLS 0). It shows the screen's context as a chip, traps focus while open, closes on Esc and
-// hands focus back to the launcher, and keeps its open state for the browser session. Answers come
-// from an adapter (fixture for now). It never animates: no transition, no streaming effect.
+// side panel on desktop, a bottom sheet on a phone. It is a modal <dialog> (showModal), fixed over
+// the page, so opening it moves nothing (CLS 0) and the page behind it is inert. It shows the
+// screen's context as a chip, closes on Esc and hands focus back to the launcher (an item of the
+// primary navigation, AssistantLauncher), and keeps its open state for the browser session. Answers
+// come from an adapter (fixture for now). It never animates: no transition, no streaming effect.
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { usePathname } from "../router";
 import { useScrolls } from "../screens/kit";
 import { useSelection } from "../world/selection";
 import { type AssistantAdapter, type AssistantReply, fixtureAdapter } from "./adapter";
 import { contextOf, worldOf } from "./context";
-
-const OPEN_KEY = "tilo.assistant.open";
-const readOpen = (): boolean => {
-  try {
-    return window.sessionStorage.getItem(OPEN_KEY) === "1";
-  } catch {
-    return false; // storage can be blocked; the panel then simply starts closed
-  }
-};
-const writeOpen = (open: boolean) => {
-  try {
-    if (open) window.sessionStorage.setItem(OPEN_KEY, "1");
-    else window.sessionStorage.removeItem(OPEN_KEY);
-  } catch {
-    // not persisted
-  }
-};
+import { setAssistantOpen, useAssistantOpen } from "./openState";
 
 interface Turn {
   readonly id: number;
@@ -38,7 +23,8 @@ const FOCUSABLE =
   "button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href]";
 
 export function AssistantPanel({ adapter = fixtureAdapter }: { adapter?: AssistantAdapter }) {
-  const [open, setOpen] = useState(readOpen);
+  const open = useAssistantOpen();
+  const setOpen = setAssistantOpen;
   const [turns, setTurns] = useState<readonly Turn[]>([]);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
@@ -47,7 +33,6 @@ export function AssistantPanel({ adapter = fixtureAdapter }: { adapter?: Assista
   const [selected] = useSelection(world ?? "");
   const context = contextOf(path, world ? selected : null);
   const panel = useRef<HTMLDialogElement>(null);
-  const launcher = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const log = useRef<HTMLDivElement>(null);
   const scrolls = useScrolls(log); // a log that scrolls is a keyboard stop (WCAG 2.1.1)
@@ -55,9 +40,17 @@ export function AssistantPanel({ adapter = fixtureAdapter }: { adapter?: Assista
   const next = useRef(1);
 
   useEffect(() => {
-    writeOpen(open);
+    const el = panel.current;
+    if (open && el && !el.open) {
+      // showModal makes the page behind inert and traps focus; happy-dom and old browsers may lack it.
+      if (typeof el.showModal === "function") el.showModal();
+      else el.setAttribute("open", "");
+    }
     if (open) input.current?.focus();
-    else if (wasOpen.current) launcher.current?.focus(); // hand focus back, once, after a close
+    else if (wasOpen.current) {
+      // hand focus back, once, after a close
+      document.querySelector<HTMLElement>("[data-assistant-control]")?.focus();
+    }
     wasOpen.current = open;
   }, [open]);
 
@@ -107,27 +100,18 @@ export function AssistantPanel({ adapter = fixtureAdapter }: { adapter?: Assista
 
   return (
     <>
-      <button
-        ref={launcher}
-        type="button"
-        className="assistant-open"
-        data-testid="assistant-open"
-        data-assistant-control
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        onClick={() => setOpen((o) => !o)}
-      >
-        Ask Tilo
-      </button>
       {open && (
         <dialog
           ref={panel}
           className="assistant-panel"
           data-testid="assistant-panel"
-          open
           aria-modal="true"
           aria-label="Assistant"
           onKeyDown={onKeyDown}
+          onCancel={(e) => {
+            e.preventDefault(); // the native Esc would close it without our focus hand-back
+            setOpen(false);
+          }}
         >
           <div className="assistant-head">
             <h2>Assistant</h2>

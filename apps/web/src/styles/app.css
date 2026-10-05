@@ -335,11 +335,12 @@ textarea {
 }
 .bottom-tabs .nav-btn {
   flex: 1;
-  min-width: 0;
+  min-width: min-content; /* six tabs share 320 px: none is narrower than its one-line label */
   height: var(--button-height-desktop); /* the sheets above the tabs clear this height */
   font-size: var(--text-12);
 }
-a.nav-btn {
+a.nav-btn,
+button.nav-btn {
   position: relative;
   display: flex;
   flex-direction: column-reverse; /* the icon above its label; the label first in the source */
@@ -355,7 +356,8 @@ a.nav-btn {
   text-decoration: none;
   font: 700 var(--text-14) / 1.1 var(--font-ui);
 }
-.left-rail a.nav-btn {
+.left-rail a.nav-btn,
+.left-rail button.nav-btn {
   min-height: calc(64px * var(--ui-scale, 1));
 }
 .nav-label {
@@ -383,7 +385,8 @@ a.nav-btn {
   font: 900 var(--text-12) / 20px var(--font-ui);
   letter-spacing: 0;
 }
-a.nav-btn:hover {
+a.nav-btn:hover,
+button.nav-btn:hover {
   background: var(--color-surface-0);
 }
 a.nav-btn[aria-current="page"] {
@@ -2209,24 +2212,12 @@ html[data-density="professional"] .app-shell {
   --space-32: 1.5rem;
 }
 
-/* S-30 assistant panel (FR-PA-12): fixed over the page, so opening it moves nothing. A side panel on
-   desktop, a bottom sheet on a phone. No transition or animation: it appears and disappears. */
-.assistant-open {
-  position: fixed;
-  z-index: 800;
-  right: var(--space-16);
-  bottom: var(--space-16);
-  min-height: 44px;
-  padding: 0 var(--space-16);
-  border: 1px solid var(--color-ink-3);
-  border-bottom: 4px solid var(--color-fog);
-  border-radius: var(--radius-controls);
-  background: var(--color-surface-1);
-  color: var(--color-ink-1);
-  font: 700 var(--text-14) / 1 var(--font-ui);
-  cursor: pointer;
+/* S-30 assistant panel (FR-PA-12): a modal dialog fixed over the page, so opening it moves nothing.
+   A side panel on desktop, a bottom sheet on a phone. Its launcher is a nav item (.nav-btn). No
+   transition or animation: it appears and disappears. */
+.assistant-panel::backdrop {
+  background: transparent;
 }
-.assistant-open:focus-visible,
 .assistant-close:focus-visible,
 .assistant-log:focus-visible,
 .assistant-form input:focus-visible {
@@ -2244,6 +2235,7 @@ html[data-density="professional"] .app-shell {
   width: 22.5rem;
   max-width: 100%;
   height: auto;
+  max-height: none; /* the browser's modal-dialog cap would stop the panel short of the bottom */
   margin: 0;
   padding: var(--space-16);
   border: 0;
@@ -2325,9 +2317,6 @@ html[data-density="professional"] .app-shell {
   min-height: 44px;
 }
 @media (max-width: 767px) {
-  .assistant-open {
-    bottom: calc(var(--button-height-desktop) + var(--space-16)); /* clear the bottom tabs */
-  }
   .assistant-panel {
     inset: auto 0 0 0;
     width: auto;

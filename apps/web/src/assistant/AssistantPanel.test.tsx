@@ -7,6 +7,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AssistantLauncher } from "./AssistantLauncher";
 import { AssistantPanel } from "./AssistantPanel";
 import type { AssistantAdapter } from "./adapter";
 import { fixtureAdapter } from "./adapter";
@@ -18,7 +19,12 @@ let root: ReturnType<typeof createRoot>;
 
 async function mount(adapter?: AssistantAdapter) {
   await act(async () => {
-    root.render(<AssistantPanel {...(adapter ? { adapter } : {})} />);
+    root.render(
+      <>
+        <AssistantLauncher />
+        <AssistantPanel {...(adapter ? { adapter } : {})} />
+      </>,
+    );
   });
 }
 const launcher = () => document.querySelector<HTMLButtonElement>('[data-testid="assistant-open"]');
