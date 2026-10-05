@@ -589,6 +589,14 @@ a.secondary {
   box-sizing: border-box;
   text-decoration: none;
 }
+/* A screen's chunk is on its way: the page frame (the <main> below) is already drawn, so the words
+   sit where the screen's heading goes and nothing moves when the screen arrives (CLS). */
+.screen-loading {
+  display: block;
+  padding: var(--space-24);
+  color: var(--color-ink-2);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
 /* AGW-08 full-page screens replace the stage in the centre column. */
 .screen-page {
   flex: 1;
