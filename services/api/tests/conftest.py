@@ -125,7 +125,7 @@ def run_flow(repo_root: pathlib.Path):
     and action resolver, one mock connector, an in-memory outbox store and a stand-in for the single event writer."""
     from _clint2_lib import build_run_flow
 
-    rf = build_run_flow(repo_root)
+    rf = build_run_flow(repo_root, covered=True)
     yield rf
     rf.close()
     app.dependency_overrides.clear()
@@ -136,7 +136,7 @@ def crashing_run_flow(repo_root: pathlib.Path):
     """Same, but the mock connector records its first send and then raises (a send step that must be retried)."""
     from _clint2_lib import CrashAfterSendMock, build_run_flow
 
-    rf = build_run_flow(repo_root, adapter_factory=CrashAfterSendMock)
+    rf = build_run_flow(repo_root, adapter_factory=CrashAfterSendMock, covered=True)
     yield rf
     rf.close()
     app.dependency_overrides.clear()
