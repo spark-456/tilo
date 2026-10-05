@@ -19,7 +19,7 @@ Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP c
 - `config/connectors.yaml` (gmail, google_drive: scopes, actions), `config/autonomy.yaml` (risk tiers per action).
 
 ## Requirement IDs
-- Section 12 (connectors, hands and deliverables; FR-CON-04/05 Gmail, Drive; FR-CON-10 manifest, MF-01..06; FR-CHN-08 `watch`/`stop_watch`/`list_history`/`recent_inbox`: read scope, no outbox); SEC-02, SEC-03, SEC-09, SEC-11, SEC-14.
+- Section 12 (connectors, hands and deliverables; FR-CON-04/05 Gmail, Drive; FR-CON-11 `save_as_google_file` (`tests/API_FR_CON_11.md`); FR-CON-10 manifest, MF-01..06; FR-CHN-08 `watch`/`stop_watch`/`list_history`/`recent_inbox`: read scope, no outbox); SEC-02, SEC-03, SEC-09, SEC-11, SEC-14.
 
 ## Local rules
 - Side-effect methods are callable only from the outbox (SEC-03); every side-effect event carries
