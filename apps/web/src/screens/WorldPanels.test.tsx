@@ -6,7 +6,7 @@ import { ClientProvider } from "../api/ClientProvider";
 import type { TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
-import { WorldPanels } from "./WorldPanels";
+import { HudGlance, WorldPanels } from "./WorldPanels";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -41,5 +41,29 @@ describe("PRD-18.3 S-04 HUD: figures appear only once recorded events exist (HR-
     expect(meter?.textContent).toContain("Done");
     expect(meter?.textContent).toContain("credits of 40 approved");
     expect(meter?.textContent).toContain("13");
+    expect(meter?.querySelector('[data-testid="memory-saved"]')?.textContent).toContain(
+      "saved by memory",
+    );
+  });
+});
+
+describe("PRD-18.3 S-04 HUD in fixture mode: the panels read the replay on the stage (HR-1)", () => {
+  it("shows the replayed run's status and credits though the client's own log has not started", async () => {
+    const silent = new FixtureClient();
+    silent.subscribeEvents = () => () => undefined; // the client's own run: nothing recorded
+    const container = document.createElement("div");
+    document.body.append(container);
+    await act(async () => {
+      createRoot(container).render(
+        <ClientProvider client={silent}>
+          <WorldPanels worldId="w_village_basic" replayed={EVENTS_VILLAGE_BASIC} />
+          <HudGlance worldId="w_village_basic" replayed={EVENTS_VILLAGE_BASIC.slice(0, 20)} />
+        </ClientProvider>,
+      );
+    });
+    const meter = container.querySelector('[data-testid="hud-meter"]');
+    expect(meter?.textContent).toContain("Done");
+    expect(meter?.textContent).not.toContain("has not started");
+    expect(container.querySelector('[data-testid="hud-glance"]')?.textContent).toContain("Working");
   });
 });

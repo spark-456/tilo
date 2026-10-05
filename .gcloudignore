@@ -1,0 +1,36 @@
+# Source upload filter for `gcloud builds submit` (P0-07f). gcloud uploads the WORKING DIRECTORY (untracked and
+# ignored files included), and a custom .gcloudignore replaces .gitignore, so this is an allowlist: ignore
+# everything at the root, then re-include only what the Dockerfiles COPY plus .dockerignore (which trims the
+# build context). The nested denies below keep secrets and state files out even inside those roots; they come
+# last because the last matching pattern wins.
+/*
+!/pyproject.toml
+!/uv.lock
+!/.dockerignore
+!/evals/
+/evals/*
+!/evals/pyproject.toml
+!/packages/
+!/services/
+!/config/
+!/contracts/
+!/prompts/
+!/templates/
+
+.env
+.env.*
+*.pem
+*.key
+*.p12
+service-account*.json
+*-credentials.json
+application_default_credentials.json
+client_secret*.json
+token*.json
+*.tfplan
+tfplan
+*.tfstate*
+node_modules/
+.venv/
+__pycache__/
+*.pyc

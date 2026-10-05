@@ -89,6 +89,32 @@ textarea {
   outline: 3px solid var(--color-brand-primary);
   outline-offset: -3px;
 }
+/* Camera buttons (artboard "Tilo World Player"): bottom-right of the stage, quiet secondary style. */
+.stage-frame > .stage-controls {
+  inset: auto var(--space-16) var(--space-16) auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.stage-controls .secondary {
+  font-size: var(--text-20);
+}
+/* On a phone the stage runs under the bottom tabs, the replay region and the World status line, so
+   the buttons sit above them (tabs, 46 px sheet summary, the replay region when it is shown). */
+@media (max-width: 767px) {
+  .stage-frame > .stage-controls {
+    bottom: calc(var(--button-height-desktop) + 46px + var(--space-24));
+  }
+  .app-shell[data-replay-dock="on"] .stage-frame > .stage-controls {
+    bottom: calc(
+      var(--button-height-desktop) +
+      var(--dock-h) +
+      46px +
+      var(--space-24) +
+      var(--space-8)
+    );
+  }
+}
 .stage-fallback {
   padding: 40vh var(--space-24) 0;
   text-align: center;
@@ -1001,7 +1027,7 @@ button.row {
   }
 }
 .hud-card {
-  min-height: 8.4em; /* the finished card in stage mode needs 8.2em of content */
+  min-height: 14em; /* the finished card (status, three figures, estimate link) in stage mode needs 13.6em */
   padding: var(--space-12);
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-cards);
@@ -1097,7 +1123,39 @@ button.row {
   min-height: 44px;
   display: flex;
   align-items: center;
+  gap: var(--space-12);
   font-weight: 700;
+  white-space: nowrap; /* "World status" never wraps; the HUD line beside it is what gives way */
+}
+/* S-04 on a phone: the World card (heading and View delivery) is one slim row, so it no longer
+   covers a quarter of the stage (artboard 2-2 keeps the world framed). Scoped to the World screen;
+   the S-01..S-03 flow card keeps its own rules. */
+@media (max-width: 767px) {
+  .flow-shell[data-screen="World"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-12);
+    padding: var(--space-8) var(--space-12);
+  }
+  .flow-shell[data-screen="World"] .flow-heading {
+    margin: 0;
+  }
+  .flow-shell[data-screen="World"] .flow-summary {
+    display: none;
+  }
+}
+/* The collapsed sheet's HUD line (artboard 2-2): one fixed line, so a new figure never moves it. */
+.hud-glance {
+  flex: 1 1 0; /* its words never size the box or push the title (CLS) */
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-2);
+  font-size: var(--text-12);
+  font-weight: 400;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* AGW-08 group B: cards, chips and rows after design/source "Tilo Worlds.dc.html" and "Tilo Team.dc.html".
    Neutral role tokens only. Every text size is on the PRD 18.2 scale (12/14/16/20/24/32/40 px,
