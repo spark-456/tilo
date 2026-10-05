@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/transcript.schema.json",
+  "x-version": "1.0.0",
+  "title": "Transcript",
+  "description": "The content of a transcript artifact version (FR-MTG-02; ADR-0018 store, application/json, inside the 2,000,000-byte text cap; ADR-0020). Ingest writes it; utterance ids strictly increase (PE-22, validator). Owner-only (PE-05): another person gets at most one `evidence_quote`, cut per request by tilo-api (PE-23). Speaker labels and text are untrusted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "meeting_id", "utterances"],
+  "properties": {
+    "v": { "const": "1.0" },
+    "meeting_id": { "$ref": "common.schema.json#/$defs/meeting_id" },
+    "utterances": { "type": "array", "maxItems": 10000, "items": { "$ref": "#/$defs/utterance" } }
+  },
+  "$defs": {
+    "utterance": {
+      "description": "One utterance: the speaker label as captioned or uploaded (untrusted, not a person id) and the offset from the start of the meeting.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "speaker", "t_ms", "text"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/utterance_id" },
+        "speaker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": { "anyOf": [{ "pattern": "[\\n\\r]" }, { "pattern": "://" }] }
+        },
+        "t_ms": { "type": "integer", "minimum": 0 },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": { "pattern": "[\\n\\r]" }
+        }
+      }
+    },
+    "evidence_quote": {
+      "description": "One evidence quote as tilo-api serves it (ADR-0020): a read-model row computed per request from the pinned transcript version, never stored, logged, archived, sent or put in an event or a prompt (PE-22). Code removes control and format characters and cuts the text at 240 characters on a word boundary (`truncated`); for a viewer other than the meeting owner it masks addresses, phone numbers and links, and the speaker is a teammate's display name or null (PE-24). Only `shown` carries text (PE-25).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "meeting_id",
+        "transcript",
+        "utterance_id",
+        "state",
+        "speaker",
+        "text",
+        "truncated"
+      ],
+      "properties": {
+        "meeting_id": { "$ref": "common.schema.json#/$defs/meeting_id" },
+        "transcript": {
+          "$ref": "common.schema.json#/$defs/artifact_ref",
+          "not": { "required": ["label"] }
+        },
+        "utterance_id": { "$ref": "common.schema.json#/$defs/utterance_id" },
+        "state": { "type": "string", "enum": ["shown", "missing", "expired", "withheld"] },
+        "speaker": { "anyOf": [{ "$ref": "#/$defs/quote_line" }, { "type": "null" }] },
+        "text": { "anyOf": [{ "$ref": "#/$defs/quote_line" }, { "type": "null" }] },
+        "truncated": { "type": "boolean" }
+      },
+      "if": { "properties": { "state": { "const": "shown" } }, "required": ["state"] },
+      "then": { "properties": { "text": { "type": "string" }, "speaker": { "maxLength": 80 } } },
+      "else": {
+        "properties": {
+          "speaker": { "type": "null" },
+          "text": { "type": "null" },
+          "truncated": { "const": false }
+        }
+      }
+    },
+    "evidence_quotes": {
+      "description": "The answer of a quote request: one quote per requested utterance for the meeting owner, at most one for a work item's owner, none when the item cites nothing (PE-23).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quotes"],
+      "properties": {
+        "quotes": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/evidence_quote" } }
+      }
+    },
+    "quote_line": {
+      "description": "Quote text or speaker: one line of at most 240 characters with no control or format characters (no bidi override, no zero-width character).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u206F\\uFEFF]+$",
+      "not": { "pattern": "[\\n\\r]" }
+    }
+  }
+}

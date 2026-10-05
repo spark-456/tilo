@@ -126,3 +126,11 @@
 - BQ-268: length, speaker and masking. Default: 240 characters, a teammate's display name or
   null, emails, phone numbers and URLs masked for non-owners.
 - BQ-273: which world holds a meeting's transcript. Default: an optional `meeting.world_id`.
+
+## Implementation (CC-PEOPLE-3, 2026-10-06)
+- `transcript.schema.json` 1.0.0 (`utterance`, `evidence_quote`, `evidence_quotes`, `quote_line`),
+  `meeting.schema.json` 1.1.0 (`world_id`), rules PE-22 to PE-25 as above.
+- The crossref cases are `fixtures/transcript/crossref/`, a format of their own that states the
+  answer (`response`) and adds the transcript's `ArtifactVersion` (`version`, for `screening` and
+  the scope check), instead of the `read_quote` view on the person crossref (BQ-CCP3-3).
+- A discarded or deleted meeting answers a 404, not `expired` (BQ-CCP3-2).

@@ -8,7 +8,7 @@
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
  * calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
- * common.schema.json 1.2.0 sha256:f81fb58a52038818
+ * common.schema.json 1.3.0 sha256:f819a7e2e62bf60b
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
  * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -100,7 +100,7 @@
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
- * meeting.schema.json 1.0.0 sha256:da49e396159870f5
+ * meeting.schema.json 1.1.0 sha256:10547b42a2268966
  * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -110,11 +110,13 @@
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
  * pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
+ * plate.schema.json 1.0.0 sha256:e673350831b2ede6
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
  * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
+ * transcript.schema.json 1.0.0 sha256:b42dfd31a11ad2b5
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
  * work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
  * events/registry.yaml 1.1.0 sha256:2db78f63298c923a
@@ -713,6 +715,43 @@ export type PilotTesterId = string;
  */
 export type PlanApproachId = string;
 /**
+ * Why the row is here (PE-27): a gate, consent, blocked, question or meeting card; a blocked or running run (`blocked`, `run`); the person's work item; mail that needs a reply; a pin they own or are tagged on; today's calendar entry.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PlateReason".
+ */
+export type PlateReason =
+  | "gate"
+  | "consent"
+  | "blocked"
+  | "question"
+  | "meeting_card"
+  | "run"
+  | "work_item"
+  | "mail_reply"
+  | "pin_owner"
+  | "pin_tagged"
+  | "calendar";
+/**
+ * `attention`, `overdue`, `soon` and `rest` order `rows` (PE-28); `snoozed`, `asked` and `done` are the `parked` lanes, work items only.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PlateGroup".
+ */
+export type PlateGroup = "attention" | "overdue" | "soon" | "rest" | "snoozed" | "asked" | "done";
+/**
+ * The record's own title, cut to 140 characters: one line, untrusted, shown as plain text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PlateTitle".
+ */
+export type PlateTitle = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PlateAction".
+ */
+export type PlateAction = "open" | "done" | "snooze" | "not_mine" | "put_back" | "draft_reply";
+/**
  * structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -741,6 +780,13 @@ export type ScenarioId = string;
  * via the `definition` "ScenarioSeedPath".
  */
 export type ScenarioSeedPath = string;
+/**
+ * Quote text or speaker: one line of at most 240 characters with no control or format characters (no bidi override, no zero-width character).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TranscriptQuoteLine".
+ */
+export type TranscriptQuoteLine = string;
 
 /**
  * Index of the generated contract types; not a document.
@@ -1450,7 +1496,7 @@ export interface TimeRange {
   max_s: number;
 }
 /**
- * A pointer to a record a claim rests on (assistant answers cite these, HR-1): its kind and id, never its content.
+ * A pointer to a record a claim rests on (assistant answers cite these, HR-1): its kind and id, never its content. For mail the id is the triage message id (1.3.0, ADR-0021); no kind names a transcript (ADR-0020).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "RecordRef".
@@ -1464,7 +1510,8 @@ export interface RecordRef {
     | "mention"
     | "card"
     | "world"
-    | "event";
+    | "event"
+    | "mail";
   id: string;
 }
 /**
@@ -3124,7 +3171,7 @@ export interface LayoutGateGeometry {
   cell: LayoutPoint;
 }
 /**
- * A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days).
+ * A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Meeting".
@@ -3133,6 +3180,7 @@ export interface Meeting {
   id: MeetingId;
   org_id: OrgId;
   owner: UserId;
+  world_id?: WorldId;
   title: string;
   series: string | null;
   scheduled: MeetingScheduledWindow | null;
@@ -3757,6 +3805,59 @@ export interface PlanGate {
   policy_ref: PolicyId | null;
 }
 /**
+ * A person's plate (FR-PA-02, ADR-0021): a read model tilo-api builds per request for the signed-in person only, never stored and never an event (PE-26). S-27, the digest and the panel read the same `rows`; `parked` holds the person's own snoozed, reassign-asked and recently done work items for S-27 only (PE-27). Groups and order are code (PE-28): `today` is the date in the person's time zone at `as_of`. A row is a reference with at most a title (PE-29). `truncated` says rows beyond the caps exist; `fingerprint` is the SHA-256 of `rows` as JSON with sorted keys and no whitespace (PE-30).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Plate".
+ */
+export interface Plate {
+  v: "1.0";
+  user: UserId;
+  as_of: Timestamp;
+  today: CalendarDate;
+  /**
+   * @maxItems 200
+   */
+  rows: PlatePlateRow[];
+  /**
+   * @maxItems 100
+   */
+  parked: PlatePlateRow[];
+  truncated: boolean;
+  fingerprint: string;
+}
+/**
+ * One row: what it points at, why it is here, its group, and a title, due date, time and assigner at most; never a body, quote, address, link or transcript line (PE-29). `title` is null for mail (BQ-269). `evidence` is true for a work item from a meeting that cites an utterance, whose quote the person may ask for (PE-23). `actions` is a hint; tilo-api checks every action again at the write (PE-10).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PlatePlateRow".
+ */
+export interface PlatePlateRow {
+  ref: PlateRowRef;
+  reason: PlateReason;
+  group: PlateGroup;
+  title: PlateTitle | null;
+  due: CalendarDate | null;
+  at: Timestamp | null;
+  from: UserId | null;
+  flagged: boolean;
+  evidence: boolean;
+  /**
+   * @maxItems 6
+   */
+  actions: PlateAction[];
+}
+/**
+ * A common `record_ref` narrowed to the six plate sources (PE-27): a run row points at its world, a mail row at the triage message id.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PlateRowRef".
+ */
+export interface PlateRowRef {
+  kind: "work_item" | "card" | "world" | "mail" | "pinboard_item" | "calendar_entry";
+  id: string;
+}
+/**
  * Autonomy policy (PRD 10.4): a user's pre-authorisation of one action type within a scope and limits. Data only: the deterministic policy engine decides, a model never does, and a T3 action never runs above L1. $defs.risk_tier_table is the shape of the risk tiers in config/autonomy.yaml.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -4109,6 +4210,67 @@ export interface TeamLead {
   user: UserId;
   domain: Slug;
   assigned_by: TeamLeadAssignment;
+}
+/**
+ * The content of a transcript artifact version (FR-MTG-02; ADR-0018 store, application/json, inside the 2,000,000-byte text cap; ADR-0020). Ingest writes it; utterance ids strictly increase (PE-22, validator). Owner-only (PE-05): another person gets at most one `evidence_quote`, cut per request by tilo-api (PE-23). Speaker labels and text are untrusted.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Transcript".
+ */
+export interface Transcript {
+  v: "1.0";
+  meeting_id: MeetingId;
+  /**
+   * @maxItems 10000
+   */
+  utterances: TranscriptUtterance[];
+}
+/**
+ * One utterance: the speaker label as captioned or uploaded (untrusted, not a person id) and the offset from the start of the meeting.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TranscriptUtterance".
+ */
+export interface TranscriptUtterance {
+  id: UtteranceId;
+  speaker: string;
+  t_ms: number;
+  text: string;
+}
+/**
+ * One evidence quote as tilo-api serves it (ADR-0020): a read-model row computed per request from the pinned transcript version, never stored, logged, archived, sent or put in an event or a prompt (PE-22). Code removes control and format characters and cuts the text at 240 characters on a word boundary (`truncated`); for a viewer other than the meeting owner it masks addresses, phone numbers and links, and the speaker is a teammate's display name or null (PE-24). Only `shown` carries text (PE-25).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TranscriptEvidenceQuote".
+ */
+export interface TranscriptEvidenceQuote {
+  meeting_id: MeetingId;
+  transcript: ArtifactRef4;
+  utterance_id: UtteranceId;
+  state: "shown" | "missing" | "expired" | "withheld";
+  speaker: TranscriptQuoteLine | null;
+  text: TranscriptQuoteLine | null;
+  truncated: boolean;
+}
+/**
+ * A pinned version of a stored artifact.
+ */
+export interface ArtifactRef4 {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
+}
+/**
+ * The answer of a quote request: one quote per requested utterance for the meeting owner, at most one for a work item's owner, none when the item cites nothing (PE-23).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TranscriptEvidenceQuotes".
+ */
+export interface TranscriptEvidenceQuotes {
+  /**
+   * @maxItems 20
+   */
+  quotes: TranscriptEvidenceQuote[];
 }
 /**
  * One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).
