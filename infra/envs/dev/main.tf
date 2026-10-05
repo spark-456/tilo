@@ -614,9 +614,9 @@ resource "google_model_armor_template" "default" {
       filter_enforcement = "ENABLED"
       confidence_level   = "MEDIUM_AND_ABOVE"
     }
-    malicious_uri_filter_settings {
-      filter_enforcement = "ENABLED"
-    }
+    # No malicious_uri_filter_settings: asia-southeast1 rejects that capability
+    # (CAPABILITY_NOT_SUPPORTED, first apply 5 Oct 2026). Link checks on
+    # untrusted text are a follow-up issue, not this template's job.
     rai_settings {
       dynamic "rai_filters" {
         for_each = ["HATE_SPEECH", "HARASSMENT", "DANGEROUS", "SEXUALLY_EXPLICIT"]
