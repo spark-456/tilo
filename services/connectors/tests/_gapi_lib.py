@@ -194,6 +194,7 @@ class _File:
     content: bytes | None
     app_properties: dict[str, str] = field(default_factory=dict)
     trashed: bool = False
+    shared: bool = False
 
     def meta(self) -> dict:
         out: dict[str, Any] = {
@@ -201,6 +202,7 @@ class _File:
             "name": self.name,
             "mimeType": self.mime_type,
             "parents": list(self.parents),
+            "shared": self.shared,
         }
         if self.content is not None:
             out["size"] = str(len(self.content))
@@ -675,8 +677,12 @@ class FakeArtifacts:
         name: str = "report.pdf",
         mime_type: str = "application/pdf",
         content: bytes = b"%PDF-1.7 fake report",
+        origin_kind: str | None = None,
     ) -> dict:
-        self._items[(artifact_id, version)] = {"kind": "file", "name": name, "mime_type": mime_type, "content": content}
+        item = {"kind": "file", "name": name, "mime_type": mime_type, "content": content}
+        if origin_kind is not None:  # artifact.schema.json origin.kind: unit | render | upload | restore
+            item["origin"] = {"kind": origin_kind, "unit": None, "agent": None}
+        self._items[(artifact_id, version)] = item
         return {"artifact_id": artifact_id, "version": version}
 
     def get(self, artifact_id: str, version: int) -> dict:

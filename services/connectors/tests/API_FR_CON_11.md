@@ -9,7 +9,10 @@ matching OOXML type, as Drive does.
   `data.transfer` and retry path as `save_file`; the adapter gains no public method.
 - `item` is a `file` artifact (ArtifactSource shape of `API_FR_CON_04_05.md`) whose `mime_type` is PPTX
   (deck), DOCX (doc) or XLSX (sheet), made by tilo-render. Anything else is `SideEffectRefused` (final, no
-  request). `destination` is null or the Tilo folder id, as for `save_file`.
+  request). `item["origin"]["kind"]` (artifact.schema.json) must be `render`: an upload, a unit, a restore or
+  no origin is refused too, because a converted Sheet runs formulas (#415). Both save actions refuse, before the upload,
+  a Tilo folder whose Drive `shared` flag is not `false` (a save there is external sharing; the policy-side T3
+  escalation is a follow-up). An id Drive returns that fails `checked_id` is `SideEffectRefused`, never stored. `destination` is null or the Tilo folder id, as for `save_file`.
 - Drive's upload-with-conversion: one multipart upload, metadata `mimeType` the native type
   (`application/vnd.google-apps.presentation`, `.document`, `.spreadsheet`), media part the OOXML bytes. The
   OOXML extension is dropped from the name. Drive answering 400 or 404 is `SideEffectRefused`; 429, 5xx and a
