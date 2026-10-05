@@ -105,9 +105,9 @@ jobs:
             ready=$(jq -r '[.status.conditions[] | select(.type == "Ready")][0].status' <<< "$json")
             [ "$ready" = "True" ] || { echo "tilo-${svc}: not Ready" >&2; exit 1; }
             if [ "$ingress" = "all" ]; then
-              curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --max-time 20 "${url}/healthz"
+              curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --max-time 20 "${url}/health"
               echo
             else
-              echo "tilo-${svc}: Ready (ingress ${ingress}; /healthz is not reachable from a runner)"
+              echo "tilo-${svc}: Ready (ingress ${ingress}; health check is not reachable from a runner)"
             fi
           done

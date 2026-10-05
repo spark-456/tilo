@@ -10,6 +10,7 @@ from fastapi import FastAPI
 app = FastAPI(title="tilo-channels")
 
 
+@app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
