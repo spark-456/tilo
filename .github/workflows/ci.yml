@@ -2,14 +2,30 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    # Only paths no repo test, script or gate reads (checked against tests/, scripts/, justfile).
+    # Do NOT widen to docs/** or **/*.md: tests read CLAUDE.md, docs/prd, docs/adr, docs/licences.md, etc.
+    paths-ignore:
+      - "docs/screenshots/**"
+      - ".claude/agent-memory/**"
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/screenshots/**"
+      - ".claude/agent-memory/**"
+
+# A newer push to the same ref cancels the run still in flight (saves Actions minutes).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   check:
+    # Draft PRs are skipped; the run starts on ready_for_review.
+    if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,11 +43,19 @@ jobs:
         uses: astral-sh/setup-uv@v4
         with:
           version: "0.5.11"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # pnpm/action-setup must precede setup-node so `cache: pnpm` can find the pnpm binary.
+      # The version comes from package.json `packageManager`.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Install Node
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: pnpm
 
       - name: Enable corepack (pnpm)
         run: corepack enable
