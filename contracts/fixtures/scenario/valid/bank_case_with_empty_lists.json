@@ -1,0 +1,9 @@
+{
+  "id": "bank-case-1",
+  "title": "Fictional held-out case",
+  "skills": ["inbox-triage"],
+  "connectors": [],
+  "seed_data": [],
+  "theme": "harbour",
+  "autonomy": []
+}
