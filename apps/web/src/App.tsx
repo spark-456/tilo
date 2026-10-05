@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef } from "react";
 import { useClient, useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
+import { AssistantPanel } from "./assistant/AssistantPanel";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { NeedsYouRail } from "./needs-you/NeedsYouRail";
 import { matchFlowRoute, usePathname } from "./router";
@@ -249,6 +250,7 @@ export function App() {
           )}
         </aside>
       )}
+      <AssistantPanel />
     </div>
   );
 }
