@@ -61,7 +61,9 @@
       }
     },
     "preferred_channel": {
-      "$ref": "common.schema.json#/$defs/channel"
+      "description": "Where Tilo reaches the person: in the app (web, mobile_web) or by email (FR-PB-03). Narrower than the common channel list on purpose: no new record names a channel outside these three.",
+      "type": "string",
+      "enum": ["web", "mobile_web", "email"]
     },
     "org_role": {
       "type": "string",

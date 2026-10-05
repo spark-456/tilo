@@ -68,7 +68,7 @@ ROUTES = (
     "autonomy",
     "settings",
 )
-CHANNELS = ("web", "mobile_web", "whatsapp", "email")
+CHANNELS = ("web", "mobile_web", "email")
 BAD_LINES = ("a\nb", "a\rb", "a\n", "\n", "a\r\n", "a\tb", "a\x00b", "a\x1bb")
 VALID_ACTORS = ("u_riya", "A_notes", "tl_sales", "pol_autoreply", "system")
 INVALID_ACTORS = ("riya", "org_acme", "w_1", "https://evil.example/x", "", "System", "u_")

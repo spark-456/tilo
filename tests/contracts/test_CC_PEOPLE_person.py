@@ -84,11 +84,11 @@ def test_CC_PEOPLE_FR_MTG_05_time_zone_rejects_offsets_and_free_text(repo_root, 
 
 
 @pytest.mark.parametrize("channel", list(pl.CHANNELS))
-def test_CC_PEOPLE_FR_PA_01_preferred_channel_is_the_common_channel_enum(repo_root, registry, channel):
+def test_CC_PEOPLE_FR_PA_01_preferred_channel_is_in_app_or_email(repo_root, registry, channel):
     _valid(repo_root, registry, pl.person(preferred_channel=channel), channel)
 
 
-@pytest.mark.parametrize("channel", ["sms", "slack", "Web", "", None])
+@pytest.mark.parametrize("channel", ["whatsapp", "sms", "slack", "Web", "", None])
 def test_CC_PEOPLE_FR_PA_01_preferred_channel_rejects_anything_else(repo_root, registry, channel):
     _invalid(repo_root, registry, pl.person(preferred_channel=channel), f"channel={channel!r}")
 

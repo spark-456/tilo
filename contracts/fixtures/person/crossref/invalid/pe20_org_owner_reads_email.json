@@ -33,7 +33,7 @@
       "aliases": ["Priya", "PN"],
       "email": "priya@example.com",
       "time_zone": "Asia/Kolkata",
-      "preferred_channel": "whatsapp",
+      "preferred_channel": "email",
       "org_role": "member",
       "memberships": [
         {
@@ -105,7 +105,7 @@
       "aliases": ["Priya", "PN"],
       "email": "priya@example.com",
       "time_zone": "Asia/Kolkata",
-      "preferred_channel": "whatsapp",
+      "preferred_channel": "email",
       "org_role": "member",
       "memberships": [
         {

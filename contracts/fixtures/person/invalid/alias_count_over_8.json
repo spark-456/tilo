@@ -5,7 +5,7 @@
   "aliases": ["Pri0", "Pri1", "Pri2", "Pri3", "Pri4", "Pri5", "Pri6", "Pri7", "Pri8"],
   "email": "priya@example.com",
   "time_zone": "Asia/Kolkata",
-  "preferred_channel": "whatsapp",
+  "preferred_channel": "email",
   "org_role": "member",
   "memberships": [
     {

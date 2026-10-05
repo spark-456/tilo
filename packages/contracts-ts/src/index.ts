@@ -105,7 +105,7 @@
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
  * minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
- * person.schema.json 1.0.0 sha256:f64181514f60c867
+ * person.schema.json 1.0.0 sha256:1533492b42bcf31e
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
  * pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
@@ -3339,7 +3339,10 @@ export interface Person {
    * IANA time zone name (Asia/Kolkata) or UTC: the zone of due dates and the reminder window.
    */
   time_zone: string;
-  preferred_channel: Channel;
+  /**
+   * Where Tilo reaches the person: in the app (web, mobile_web) or by email (FR-PB-03). Narrower than the common channel list on purpose: no new record names a channel outside these three.
+   */
+  preferred_channel: "web" | "mobile_web" | "email";
   org_role: "owner" | "member";
   /**
    * @maxItems 8

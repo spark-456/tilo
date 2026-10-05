@@ -5,7 +5,7 @@
   "aliases": ["Priya", "PN"],
   "email": "priya@example.com",
   "time_zone": "+05:30",
-  "preferred_channel": "whatsapp",
+  "preferred_channel": "email",
   "org_role": "member",
   "memberships": [
     {
