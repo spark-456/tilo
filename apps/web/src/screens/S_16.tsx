@@ -62,7 +62,7 @@ export function S_16() {
           )}
         </Loaded>
       </Section>
-      <Section title="Recent channel messages" reserve={[7, 9]}>
+      <Section title="Recent channel messages" reserve={[3, 4]}>
         <EventList
           events={messages}
           all={events}
@@ -74,9 +74,7 @@ export function S_16() {
         title="Email"
         note="Notifications, digests and question cards come from Tilo's sending domain, with a signed link to answer."
         action={<Soon labels={["Change notification email"]} />}
-      >
-        <p className="empty-note">Notification preferences will be set here.</p>
-      </Section>
+      />
       <Section title="Notification preferences" note="Choose what reaches you, and where.">
         <Soon labels={["Choose channels", "Set quiet hours"]} />
       </Section>
