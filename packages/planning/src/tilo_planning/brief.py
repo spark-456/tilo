@@ -17,6 +17,8 @@ from tilo_providers.interfaces import Capability, GenerateRequest
 from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.router import Router, RouterError, RouterResult
 
+from tilo_planning.refusal import RefusalCategory, RefusalPolicy, TaskRefused, load_refusal_policy
+
 DIRECTOR_ROLE = "director"
 CHIP_FIELDS = ("goal", "deliverables", "audience", "deadline", "constraints", "sources", "sensitivity")
 
@@ -51,9 +53,9 @@ def validate_brief(data: Any) -> dict[str, Any]:
 
 
 def complete_brief(data: dict[str, Any]) -> dict[str, Any]:
-    """A brief from a brief or from the Director's output: `ambiguous_fields` is dropped, and assumptions
-    and applied preferences start empty when absent (only code fills them)."""
-    fields = {k: v for k, v in data.items() if k != "ambiguous_fields"}
+    """A brief from a brief or from the Director's output: `ambiguous_fields` and `out_of_policy` are dropped,
+    and assumptions and applied preferences start empty when absent (only code fills them)."""
+    fields = {k: v for k, v in data.items() if k not in ("ambiguous_fields", "out_of_policy")}
     return validate_brief({"assumptions": [], "applied_preferences": [], **fields})
 
 
@@ -71,13 +73,23 @@ def output_schema() -> dict[str, Any]:
         "items": {"type": "string", "enum": list(CHIP_FIELDS)},
     }
     schema["required"].append("ambiguous_fields")
+    # Optional (FR-INT-12): absent or null means in policy; a category id means refuse. Code checks the id.
+    schema["properties"]["out_of_policy"] = {"type": ["string", "null"]}
     return schema
 
 
-def extract_brief(task_text: str, *, router: Router, budget: float | None = None) -> ExtractionResult:
-    """PRD 16.3 item 1: the task text is passed only as delimited data, after the instructions."""
+def _refusal_menu(policy: RefusalPolicy) -> str:
+    return "\n".join(f"- {c.id}: {c.reason}" for c in policy.categories)
+
+
+def extract_brief(
+    task_text: str, *, router: Router, budget: float | None = None, refusal_policy: RefusalPolicy | None = None
+) -> ExtractionResult:
+    """PRD 16.3 item 1: the task text is passed only as delimited data, after the instructions. An out-of-policy
+    category from the Director raises `TaskRefused` carrying the configured text (FR-INT-12), never a brief."""
+    policy = load_refusal_policy() if refusal_policy is None else refusal_policy
     request = GenerateRequest(
-        system=load_prompt(DIRECTOR_ROLE, "brief_system.md"),
+        system=load_prompt(DIRECTOR_ROLE, "brief_system.md", {"categories": _refusal_menu(policy)}),
         prompt=load_prompt(DIRECTOR_ROLE, "brief_task.md", {"task": neutralise_marker(task_text, "TASK")}),
         json_mode=True,
         response_schema=output_schema(),
@@ -90,11 +102,27 @@ def extract_brief(task_text: str, *, router: Router, budget: float | None = None
         raise BriefExtractionError(f"FR-INT-03: the Director's reply was {run.outcome}")
     try:
         output = pydantic.TypeAdapter(dict[str, Any]).validate_json(run.response.text or "")
+    except pydantic.ValidationError as error:
+        raise BriefExtractionError(f"FR-INT-03: the Director's reply is not a valid brief: {error}") from error
+    category = _refusal_category(output.get("out_of_policy"), policy)
+    if category is not None:
+        raise TaskRefused(category.id, category.reason, category.alternative)
+    try:
         ambiguous = list(output["ambiguous_fields"])
         brief = complete_brief(output)
     except (pydantic.ValidationError, KeyError, TypeError, BriefValidationError) as error:
         raise BriefExtractionError(f"FR-INT-03: the Director's reply is not a valid brief: {error}") from error
     return ExtractionResult(brief, ambiguous, run)
+
+
+def _refusal_category(value: Any, policy: RefusalPolicy) -> RefusalCategory | None:
+    """None when in policy; the configured category when named; BriefExtractionError for anything else."""
+    if value is None:
+        return None
+    category = policy.get(value) if isinstance(value, str) else None
+    if category is None:
+        raise BriefExtractionError("FR-INT-12: out_of_policy is not a configured category")
+    return category
 
 
 def edit_brief_field(brief: dict[str, Any], field: str, value: Any) -> dict[str, Any]:
