@@ -224,5 +224,12 @@ class Ledger:
 
     def enqueue(self, doc: dict[str, Any], entry: dict | None = None, evidence: dict | None = None) -> dict:
         """The card's entry under its idempotency key: a replay returns the stored entry and never adds one."""
+        if entry is None:
+            try:
+                stored = self.stored(doc)
+            except Exception:  # a failed read proves nothing: build the entry as before (stale still fails closed)
+                stored = None
+            if stored is not None:
+                return stored  # the key is taken: that entry stands at any age, no fresh decision is needed (#343)
         entry = entry or self.entry_for(doc)
         return self._outbox.enqueue(entry, evidence or {"instruction_id": doc["instruction_id"], "level": doc["level"]})

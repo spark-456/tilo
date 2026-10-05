@@ -121,10 +121,16 @@ run "SEC_02_deployer_cannot_change_cloud_run_iam" {
   }
 
   assert {
+    # Changed by P0-07g (deliberate, narrow): the run.developer holder set per service was exactly
+    # { deployer }; it is now exactly { deployer, tilo-cloudbuild } (the Cloud Build identity of PR #373
+    # joins through the same `developers` map). Still nobody else, and still per service, never project-wide.
     condition = alltrue([
       for s in values(output.cloud_run_services) :
-      s.developers == ["serviceAccount:${output.deployer_service_account_email}"]
+      toset(s.developers) == toset([
+        "serviceAccount:${output.deployer_service_account_email}",
+        "serviceAccount:tilo-cloudbuild@${var.project_id}.iam.gserviceaccount.com",
+      ])
     ])
-    error_message = "The deployer must hold run.developer on each of the seven services, and nobody else (PRD 6.5, SEC-12)."
+    error_message = "run.developer on each of the seven services belongs to the deployer and tilo-cloudbuild only (PRD 6.5, SEC-12, P0-07g)."
   }
 }

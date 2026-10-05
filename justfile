@@ -115,6 +115,17 @@ deploy-dev env="dev":
     python -c "import sys; env='{{env}}'; env=env[4:] if env.startswith('env=') else env; sys.exit(sys.stderr.write(f'deploy-dev: only env=dev is allowed, got {env!r}\n') or 1) if env != 'dev' else None"
     gh workflow run deploy-dev.yml --ref main
 
+# Deploy the tilo-dev services with Google Cloud Build instead of GitHub Actions minutes (P0-07f): uploads the repo
+# (.gcloudignore allowlist), builds the images, pushes them to Artifact Registry and swaps them on Cloud Run by
+# digest (cloudbuild.yaml, run as the tilo-cloudbuild service account; source goes to the Terraform-managed regional
+# staging bucket, not the auto-created US one). Usage: `just deploy-dev-cloudbuild api`, then
+# `just deploy-dev-cloudbuild`. Pinned to the dev project like `deploy-web`: no parameter can change it. `env` must
+# be dev and `service` must be all or one of the seven names; both are checked by just itself (error()) before any
+# shell runs, so nothing in them can reach a shell or gcloud. Needs `gcloud auth login` (docs/deploy-dev.md).
+deploy-dev-cloudbuild service="all" env="dev":
+    python -c "print('deploy-dev-cloudbuild: env and service accepted')" {{ if env != 'dev' { error('deploy-dev-cloudbuild: only env=dev is allowed, got ' + env) } else { '' } }} {{ if service =~ '^(all|api|harness|channels|connectors|browser|render|sandbox-web)$' { '' } else { error('deploy-dev-cloudbuild: service must be all or one of api, harness, channels, connectors, browser, render, sandbox-web, got ' + service) } }}
+    gcloud builds submit --config cloudbuild.yaml --project essential-wares-510320-f0 --substitutions "_SERVICE={{service}}" --region asia-southeast1 --gcs-source-staging-dir gs://essential-wares-510320-f0-cloudbuild-staging/source .
+
 # Build the web app and deploy it to Firebase Hosting on the tilo-dev project (P0-07c). The build is given an empty
 # VITE_TILO_API_URL, so the deployed app runs the fixture / replay world with no backend. Pinned to the dev project:
 # no parameter, no other project, never tilo-demo. Needs your own `firebase login` first (the CI deployer has no
