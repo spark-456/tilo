@@ -15,7 +15,15 @@ import tilo_policy
 
 from ._schema import outbox_validator
 from ._time import add_seconds, parse_ts
-from .errors import AdapterError, MissingGrant, OutboxRefused, ProviderUnavailable, RateLimited, SideEffectRefused
+from .errors import (
+    AdapterError,
+    MissingGrant,
+    OutboxRefused,
+    PossiblySent,
+    ProviderUnavailable,
+    RateLimited,
+    SideEffectRefused,
+)
 from .registry import RESERVED_CONNECTOR_ID
 from .store import InMemoryOutboxStore
 from .tokens import ConnectionExpired, InsufficientScope, NotConnected
@@ -247,8 +255,9 @@ class Outbox:
                     claimed["idempotency_key"],
                     grant,
                 )
-        except SideEffectRefused:  # final: it can never succeed as written; nothing is emitted
-            return self._store._finalize_claim(outbox_id, holder, "failed")
+        except SideEffectRefused as exc:  # final: it can never succeed as written; nothing is emitted
+            alert = _alert_part(claimed) if isinstance(exc, PossiblySent) else None  # it may have acted: tell a person
+            return self._store._finalize_claim(outbox_id, holder, "failed", alert=alert)
         except Exception as exc:  # ambiguous or not final: retried later, within the policy's bounds
             try:
                 return self._retry_later(claimed, holder, exc)

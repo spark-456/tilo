@@ -7,7 +7,7 @@ allowlisted egress, masked secure fields, nothing persisted between runs.
 ## Commands
 - `uv run pytest services/browser -q` — FR-CON-07 and FR-CON-08 tests (fakes only, no browser, no network).
 - `uv run mypy services/browser/src`; `just check` — full gate from the repo root.
-- Image: `Dockerfile` runs `tilo_browser.app:app` (`/healthz` only, P0-07a); deploy: `docs/deploy-dev.md`.
+- Image: `Dockerfile` runs `tilo_browser.app:app` (`/health` for Cloud Run smoke checks, `/healthz` for in-container probes; P0-07a, P0-07h); deploy: `docs/deploy-dev.md`.
 
 ## Code (`src/tilo_browser/`)
 - `egress.py` — `EgressPolicy.check`: deterministic allowlist; logs every `Decision`, never a query or userinfo.

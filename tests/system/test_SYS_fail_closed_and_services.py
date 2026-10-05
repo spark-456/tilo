@@ -77,22 +77,16 @@ def test_SYS_SEC_05_tilo_api_without_dev_mode_serves_nothing_that_needs_a_person
     assert ("POST", "/intake") in ops and ("GET", "/worlds/{world_id}/events") in ops, "the route list was read"
     for method, path in ops:
         response = httpx.request(method, prod_api.url + _fill(path), json={} if method == "POST" else None, timeout=15)
-        assert not response.is_success, f"{method} {path} answered {response.status_code} with no sign-in"
+        assert response.status_code == 401, f"{method} {path} answered {response.status_code} with no sign-in"
         assert "Traceback" not in response.text and "NotImplementedError" not in response.text, (
             f"{method} {path} leaks a server error body"
         )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="tilo-api answers an anonymous call with a 500 and a traceback in its log (get_current_principal raises "
-    "NotImplementedError until sign-in lands; issue #410): fail-closed, but a 5xx that the run_5xx_ratio alert counts. "
-    "Expected: 401 (or 503 not_configured).",
-)
-def test_SYS_SEC_05_an_anonymous_call_to_tilo_api_is_a_clean_401_or_503_not_a_500(prod_api):
+def test_SYS_SEC_05_an_anonymous_call_to_tilo_api_is_a_clean_401_not_a_500(prod_api):
     for method, path in [("POST", "/intake"), ("GET", "/worlds/w_x/events"), ("POST", "/worlds/w_x/pause")]:
         response = httpx.request(method, prod_api.url + path, json={} if method == "POST" else None, timeout=15)
-        assert response.status_code in {401, 503}, f"{method} {path} answered {response.status_code}"
+        assert response.status_code == 401, f"{method} {path} answered {response.status_code}"
 
 
 def test_SYS_SEC_05_tilo_api_without_dev_mode_does_not_publish_its_route_list(prod_api):
