@@ -9,6 +9,7 @@
 import type { Layout } from "@tilo/contracts";
 import type { Container } from "pixi.js";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChunkLoadError } from "../api/chunkError";
 import type { TiloClient } from "../api/client";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { describeError } from "../screens/remote";
@@ -16,6 +17,8 @@ import type { WorldSeam } from "../stage/Stage";
 import { watchRun } from "./runLog";
 import { useSelection } from "./selection";
 
+const NO_CHUNK =
+  "The world couldn't be drawn: its drawing code didn't load. Check your connection.";
 const NO_MAP =
   "This world's map has not been laid out yet, so the stage stays empty. The team and every event show beside it and in the Story.";
 
@@ -50,6 +53,7 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
   const [layout, setLayout] = useState<Layout | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const chunkFailed = useRef(false); // runWorld.ts did not load
   const [selected] = useSelection(worldId ?? "");
   const reducedMotion = useRef(false);
   reducedMotion.current = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -68,12 +72,17 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
     let cancelled = false;
     const abort = new AbortController();
     let stop: (() => void) | undefined;
+    chunkFailed.current = false;
+    const chunk = import("./runWorld");
+    chunk.catch(() => {
+      chunkFailed.current = true; // set before the Promise.all below reports it
+    });
     setSeq(0);
     setLayout(null);
     setFailed(false);
     setNote("Waiting for the run to build its world…");
     // runWorld.ts (and Pixi behind it) loads here, off the landing route's bundle (NFR-01).
-    Promise.all([client.getLayout(worldId, abort.signal), import("./runWorld")]).then(
+    Promise.all([client.getLayout(worldId, abort.signal), chunk]).then(
       ([layout, { runClientWorld }]) => {
         if (cancelled) return;
         setLayout(layout);
@@ -93,7 +102,8 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
       (error: unknown) => {
         if (cancelled) return;
         setFailed(true);
-        setNote(describeError("load the world", error));
+        if (error instanceof ChunkLoadError) chunkFailed.current = true;
+        setNote(chunkFailed.current ? NO_CHUNK : describeError("load the world", error));
       },
     );
     return () => {
@@ -108,7 +118,12 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
     };
   }, [client, worldId, host, attempt]);
 
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  // A browser keeps a failed dynamic import for the life of the page, so importing again would not
+  // reach the network; a reload does (and picks up a redeployed chunk's new name).
+  const retry = useCallback(
+    () => (chunkFailed.current ? window.location.reload() : setAttempt((n) => n + 1)),
+    [],
+  );
   return {
     active: worldId !== null,
     seq,
