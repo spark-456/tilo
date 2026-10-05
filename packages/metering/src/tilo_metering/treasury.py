@@ -8,12 +8,16 @@ reserve() so a single large reservation cannot itself push the day over the top.
 import threading
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from .config import MeteringConfig
 from .errors import number
 from .flags import FlagStore
 from .prices import PriceBook, Usage
+
+if TYPE_CHECKING:
+    from .cost_alerts import CostAlerts
 
 _EPS = 1e-9
 
@@ -99,8 +103,11 @@ def _aware(value: object) -> datetime:
 class Treasury:
     """Thread-safe. Totals are summed from the ledger and the outstanding reservations, not cached."""
 
-    def __init__(self, config: MeteringConfig, prices: PriceBook, flags: FlagStore) -> None:
+    def __init__(
+        self, config: MeteringConfig, prices: PriceBook, flags: FlagStore, cost_alerts: "CostAlerts | None" = None
+    ) -> None:
         self._config, self._prices, self._flags = config, prices, flags
+        self._cost_alerts = cost_alerts  # NFR-27: alert-only owner alerts, checked after each commit
         self._lock = threading.Lock()
         self._runs: dict[str, _Run] = {}
         self._active: dict[str, Reservation] = {}
@@ -171,6 +178,12 @@ class Treasury:
             overrun = actual > active.amount + _EPS
             self._runs[active.run_id].halted |= overrun
             alerts = self._spend_alerts(active.day)
+            snapshot = tuple(self._ledger) if self._cost_alerts is not None else ()
+        if self._cost_alerts is not None:
+            try:  # outside the lock (the sink does I/O); alert-only, so it can never fail or block a commit
+                self._cost_alerts.check(snapshot)
+            except Exception:
+                pass
         return CommitResult(overrun=overrun, alerts=alerts)
 
     def release(self, reservation: Reservation) -> None:
