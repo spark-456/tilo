@@ -14,8 +14,14 @@ variable "display_name" {
 }
 
 variable "amount_usd" {
-  description = "Monthly budget ceiling in USD (PRD 17.3)."
+  description = "Monthly budget ceiling (PRD 17.3), in var.currency_code units despite the name."
   type        = number
+}
+
+variable "currency_code" {
+  description = "Currency of amount_usd. Must equal the billing account's currency or the API rejects the budget."
+  type        = string
+  default     = "USD"
 }
 
 variable "threshold_percentages" {

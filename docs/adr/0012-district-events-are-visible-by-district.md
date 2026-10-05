@@ -1,8 +1,10 @@
 # ADR-0012: An event in a district is visible by district (EV-13)
 
-- Status: Proposed — awaiting user approval (2026-10-02, architect; issue #29, BQ-28). It tightens
-  a frozen event rule and rewrites frozen fixtures, so nothing in `contracts/` changes until the
-  user approves (root `CLAUDE.md`, ADR-0002 decision 2).
+- Status: Accepted (2026-10-05, user decision: "yes to all as you think necessary", relayed by the supervisor;
+  proposed 2026-10-02 by the architect; issue #29, BQ-28). It tightens
+  a frozen event rule and rewrites frozen fixtures. The user's approval covers that change; this
+  status edit does not make it, so `contracts/` is changed by its own architect PR (root
+  `CLAUDE.md`, ADR-0002 decision 2).
 - Deciders: user (approval), architect (proposal)
 - Requirement: FR-HIL-09, SEC-07 (PRD 9.3, 10.1, 15.3)
 - Lands with: ADR-0009 (issue #125). Both change EV-13 and `vis`.
