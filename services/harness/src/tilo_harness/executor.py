@@ -39,7 +39,7 @@ from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.prompts import load_prompt
 
 from tilo_harness.config import AgentsConfig
-from tilo_harness.must_ask import MustAsk
+from tilo_harness.must_ask import Ask, MustAsk
 from tilo_harness.question_wait import Answer, QuestionWait
 from tilo_harness.skills import LoadedSkill, Pins, SkillError, SkillRegistry
 from tilo_harness.validator import EventRejected, repo_validator
@@ -290,8 +290,8 @@ class _Run:
                     card, lead=lead, director=self.roster.director, district=district
                 )
                 await slot.take()
-                check = getattr(ask, "runs", None)  # a stand-in ask without a rule runs on any answer
-                if check is not None and not check(answer):
+                # A stand-in ask that is not MustAsk's (the pinned FR-HIL-10 doubles) runs on any answer.
+                if isinstance(ask, Ask) and not ask.runs(answer):
                     self.held.add(unit_id)
                     self.emit("agent.retired", lead, worker, "The agent left without starting.", {}, cause=cause, **at)
                     return UnitOutcome(success=False, summary="The step was held, so it did not run.")

@@ -68,14 +68,13 @@ class Ask:
     options: tuple[str, ...]
     suggested: int
     why: str
-    proceed: int | None = None  # a rule's card: the one option that lets the unit run; None: a model-written card
+    proceed: int | None = None  # a rule's card: the one option that lets the unit run; None: any answer runs it
 
     def runs(self, answer: Any) -> bool:
-        """Whether this answer lets the unit run (decided here, never by the runner or a model). A rule's card runs
-        the unit only on its proceed option (Hold, Stop, Skip and the deadline's safe default leave it unrun); a
-        model-written card runs it on a person's or Team Lead's answer, never on the Director's default (BQ-235)."""
-        if answer.answered_by == "default":
-            return False
+        """Whether this answer lets the unit run (decided here, never by the runner or a model). A rule's card
+        (sensitive_step, repeated_failure, an unreadable reply) runs the unit only on its proceed option: Hold, Stop,
+        Skip and its safe default at the deadline leave it unrun. A model-written ambiguity or trade-off card runs it on
+        any answer, the Director's default included (PRD 10.3, BQ-235)."""
         return self.proceed is None or answer.option == f"o{self.proceed + 1}"
 
 

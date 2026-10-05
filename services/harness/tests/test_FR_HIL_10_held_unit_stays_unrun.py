@@ -152,15 +152,19 @@ def test_FR_HIL_10_a_model_written_card_runs_on_a_persons_answer_whichever_optio
     assert runner.answers["U1"].option == option and not result.held and runner.runs.count("U1") == 1
 
 
-def test_FR_HIL_10_a_model_written_card_s_default_at_the_deadline_leaves_the_unit_unrun(tmp_path) -> None:
+def test_FR_HIL_10_a_model_written_card_s_default_at_the_deadline_runs_the_unit_with_it(tmp_path) -> None:
     async def go():
         run, _wait, runner, cards, clock, store = _setup(
             tmp_path, actions=[], replies={SEND_TITLE: json.dumps(ASK_TASK["model_reply"])}
         )
-        await _asked(run, runner, cards)
+        card = await _asked(run, runner, cards)
         await until(lambda: clock.pending_sleepers() >= 1)
         clock.advance(3600 + 5)
-        return await asyncio.wait_for(run, 20), runner, store
+        return await asyncio.wait_for(run, 20), runner, store, card
 
-    result, runner, store = asyncio.run(go())
-    _assert_held(result, runner, store)
+    result, runner, store, card = asyncio.run(go())
+    answer = runner.answers["U1"]
+    assert (answer.option, answer.answered_by) == (card["safe_default"], "default")
+    assert runner.runs.count("U1") == 1 and not result.held and not result.skipped
+    (answered,) = events_of(store, "question.answered")
+    assert (answered["data"]["answered_by"], answered["severity"]) == ("default", "nudge")
