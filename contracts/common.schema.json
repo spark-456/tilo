@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/common.schema.json",
-  "x-version": "1.1.0",
+  "x-version": "1.2.0",
   "title": "Common",
   "description": "Definitions shared by every Tilo contract. The root is a sampler with one optional property per definition so that fixtures and generated types cover each one; no service sends a Common document.",
   "type": "object",
