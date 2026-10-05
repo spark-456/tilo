@@ -5,9 +5,10 @@ The tier is deterministic: `send_email` is T2 unless a modifier applies (`money_
 the raw body, which it cleans itself; `safety_flag`; `new_recipients` for an address that is neither a contact nor
 known from the thread, BQ-154, BQ-223, or any forward, new email, format mismatch or Bcc, FR-CHN-12; `attachments`),
 and any modifier makes it T3. Only a ready T2 draft of the person's own non-empty instruction, answering a message
-with no money, legal or commitment signal (BQ-223), under an L2 answer from the injected policy port, is scheduled at
-once with the undo window; everything else waits for its owner's Send. A redraft after Edit is a new proposal and
-always waits for a person. Side effects go only through the injected outbox port, keyed so a replay never adds an
+whose one replied-to message is clean (BQ-265: no money, legal or commitment signal in its body or Subject, a DMARC
+pass, no shared Message-ID), under an L2 answer from the injected policy port, is scheduled at once with the undo
+window; everything else waits for its owner's Send. A redraft after Edit is a new proposal and always waits for a
+person. Side effects go only through the injected outbox port, keyed so a replay never adds an
 entry. Cards hold mail text; no event, log line or key does.
 """
 
@@ -392,7 +393,7 @@ class Autopilot:
             reserved = sendable and not self._fake  # a gate at L1 or T3 reserves its entry's id (OB-01)
             blank = not clean_text(context.instruction).strip()  # BQ-222: nothing a person wrote never rides L2
             rides = instructed and sendable and not modifiers and not blank
-            # BQ-223: a risky or unknown replied-to message keeps even a clean draft at L1 (no window, no policy call)
+            # BQ-265: a risky, unauthenticated or unknown replied-to message keeps a clean draft at L1 (no window)
             if rides and inbound_is_clean(self._reader, user_id, context.thread_id, draft.in_reply_to):
                 ms = round(self._clock() * 1000)
                 if self._port.decides():  # CHN-WIRE-4: the engine's decision; only a clean one rides L2 (fail closed)

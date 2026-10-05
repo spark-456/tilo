@@ -13,8 +13,11 @@ digits dropped, 0 o, 1 i, 3 e, 4 a, 5 s, 7 t, @ a), and L2 is an allowlist: a bo
 that is not a time of day, or a word off the scheduling list gives "unlisted". Names are allowed only as the greeting's
 and the signature's run (two words each) and as repeats of those words. Every step is linear, no model.
 
-BQ-223 (issue #298): `inbound_signal` is the same check for the message a draft answers, minus the allowlist. A
-risky inbound message ("please confirm the transfer of $5,000") keeps even a clean draft ("Yes, confirmed.") off L2.
+BQ-265 (issue #298): `inbound_signal` is the same check for the message a draft answers, minus the allowlist, plus
+what an inbound message may hide: an amount or a number word is "money" with no money word around it, and a separator
+inside a word (spaces between single letters, `- . _ * | / ~ + '`, a middle dot or a tab) is dropped before the
+families run. A risky inbound message ("please confirm the transfer of $5,000") keeps even a clean draft ("Yes,
+confirmed.") off L2. A draft's own `t3_content_signal` does not get these two: the allowlist already holds it.
 """
 
 from __future__ import annotations
@@ -47,6 +50,17 @@ _FAMILIES = (("money", _MONEY), ("legal", _LEGAL), ("commitment", _COMMITMENT))
 # BQ-224 (c): a separator or line break between two letters or digits is dropped, then digit look-alikes mapped back.
 _SPLIT = re.compile(r"(?<=[a-z0-9])[-._*\n]+(?=[a-z0-9])")
 _LEET = str.maketrans("013457@", "oieasta")
+# BQ-265 (inbound only): more separators, and single letters or digits spread apart ("w i r e"). Each class is disjoint
+# from the letters and digits it sits between, so both patterns are linear.
+_SEP = r"\-._*\n\t|/~+'\xb7"
+_SPLIT_IN = re.compile(rf"(?<=[a-z0-9])[{_SEP}]+(?=[a-z0-9])")
+_SPREAD = re.compile(rf"(?<![a-z0-9])[a-z0-9](?:[ {_SEP}]+[a-z0-9](?![a-z0-9]))+(?![a-z0-9])")
+# BQ-265: an amount with no money word. A decimal part or a thousands separator, a run of 3+ digits that is not a
+# 20xx year, a percent sign, or a number word. Times of day and small counts ("2 tarps", "dock 14") stay clean.
+_NUMBER_WORD = re.compile(r"\b(?:hundred|thousand|million|billion|lakh|crore)s?\b")
+_AMOUNT = re.compile(r"\d[.,]\d|%")
+_DIGITS = re.compile(r"\d{3,}")
+_YEAR = re.compile(r"\b20[23]\d\b")
 # BQ-224 (a): L2 auto-send is an allowlist. A time of day is the only digit shape that passes; a link, any other digit
 # or any word off the list is the signal "unlisted".
 SHORT_BODY_MAX = 2_000
@@ -167,6 +181,20 @@ def _unlisted(cleaned: str) -> bool:
 
 def t3_content_signal(text: str) -> frozenset[str]:
     """Subset of {"money", "legal", "commitment", "obfuscated", "unlisted"}; empty means no signal."""
+    return _signal(text, inbound=False)
+
+
+def _join(match: re.Match[str]) -> str:
+    return "".join(c for c in match.group() if c.isalnum())
+
+
+def _amount(folded: str) -> bool:
+    """BQ-265: a decimal part or thousands separator, 3+ digits in a row (a recent 4-digit year aside), "%" or a number
+    word."""
+    return bool(_AMOUNT.search(folded) or _NUMBER_WORD.search(folded) or _DIGITS.search(_YEAR.sub(" ", folded)))
+
+
+def _signal(text: str, *, inbound: bool) -> frozenset[str]:
     if len(text) > SIGNAL_CAP:
         return frozenset({"obfuscated"})
     signal = {"obfuscated"} if any(_hidden(c) for c in text) else set()
@@ -182,18 +210,26 @@ def t3_content_signal(text: str) -> frozenset[str]:
         signal.add("obfuscated")
     if any(unicodedata.category(c) == "Sc" for c in folded):
         signal.add("money")
-    squeezed = _SPLIT.sub("", folded).translate(_LEET)
+    if inbound:  # BQ-265: more separators, spread-out letters, and amounts with no money word
+        spread = _SPREAD.sub(_join, folded)
+        dropped = _SPREAD.sub(_join, _SPLIT_IN.sub("", folded))
+        if _amount(folded) or _amount(spread) or _NUMBER_WORD.search(dropped):
+            signal.add("money")
+    else:
+        dropped = _SPLIT.sub("", folded)
+    squeezed = dropped.translate(_LEET)
     for name, pattern in _FAMILIES:
         if pattern.search(folded) or pattern.search(squeezed):
             signal.add(name)
-    if _unlisted(cleaned):
+    if not inbound and _unlisted(cleaned):
         signal.add("unlisted")
     return frozenset(signal)
 
 
 def inbound_signal(text: str) -> frozenset[str]:
-    """The same signal for the message a draft answers (FR-CHN-11, ADR-0013, BQ-223): `t3_content_signal` without
-    "unlisted", because an inbound message is free text, not a draft held to the L2 allowlist. A subset of {"money",
-    "legal", "commitment", "obfuscated"}; empty means clean. A hidden character or a body over SIGNAL_CAP is
+    """The same signal for the message a draft answers (FR-CHN-11, ADR-0013, BQ-265): `t3_content_signal` without
+    "unlisted", because an inbound message is free text, not a draft held to the L2 allowlist, and with the two
+    additions documented above (an amount or number word is "money"; wider separators are dropped). A subset of
+    {"money", "legal", "commitment", "obfuscated"}; empty means clean. A hidden character or a body over SIGNAL_CAP is
     "obfuscated" (fail closed)."""
-    return t3_content_signal(text) - {"unlisted"}
+    return _signal(text, inbound=True)

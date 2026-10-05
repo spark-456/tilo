@@ -32,7 +32,7 @@ channel identity binding, Email Autopilot triage. Public ingress for signature-v
   Hold/Edit keep a gate open (repeats: one event); one send per card id; emits `channel.message_out`/`_in`.
 - `drafting` (FR-CHN-10; BQ-139 to BQ-151): thread raw-capped per field and in total, data only; `drafting_check` gates body, questions.
   `autopilot` (FR-CHN-11; BQ-152 to BQ-158): outbox, policy are ports; any modifier (`autopilot_t3`, safety flag, new recipient, attachment; FR-CHN-12) is T3,
-  never scheduled; Edit redrafts at L1; L2 only if the replied-to message is clean (`autopilot_inbound`, BQ-265). `autopilot_state`: card record before enqueue; a stop is final, queued (`StopQueue`)
+  never scheduled; Edit redrafts at L1; L2 only if the replied-to message is clean, subject too, unique id, DMARC pass (`autopilot_inbound`, BQ-265). `autopilot_state`: card record before enqueue; a stop is final, queued (`StopQueue`)
   then recorded before any outbox call, never enqueues (revoke, cancel, read in the card's own world; CHN-GATE-A); else `CancelPending`, `sweep()`.
   `autopilot_send` (FR-CHN-13; BQ-182 to BQ-185): `DraftArtifacts` serves the card's text and reply headers; stored flag counts. `autopilot_gate` (CHN-WIRE-1; BQ-225 to BQ-230): L1/T3 `send` needs the owner's `approval.resolved`; authz copied, `check_entry` before the slot; owner = ctor `world_owner` (missing: refuse); `fake_evidence` tests only. `autopilot_policy` (CHN-WIRE-4; BQ-242 to BQ-249): `decide` port; only a clean `run_after_undo` bound to the card is L2; stale (`DECISION_MAX_AGE_S`) or unbound: decide again, else L1; no production adapter yet.
 - `gmail_watch` (FR-CHN-08; BQ-121 to BQ-129): OIDC checked first (verifier, aud, iss, SA, `email_verified is True`): 401/403,
