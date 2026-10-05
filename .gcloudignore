@@ -1,0 +1,29 @@
+# Source upload filter for `gcloud builds submit` (P0-07f). The upload is the repository root, so keep secrets,
+# VCS data and dependency trees out of it. Do NOT list services, packages, config, contracts, prompts,
+# templates, pyproject.toml, uv.lock or evals/pyproject.toml here: the Dockerfiles COPY them, and
+# .dockerignore does the trimming inside the build.
+.git/
+.gitattributes
+.github/
+.claude/
+.venv/
+**/.venv/
+node_modules/
+**/node_modules/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+service-account*.json
+*-credentials.json
+application_default_credentials.json
+*.log
+scratch*

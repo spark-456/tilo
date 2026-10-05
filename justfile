@@ -115,6 +115,14 @@ deploy-dev env="dev":
     python -c "import sys; env='{{env}}'; env=env[4:] if env.startswith('env=') else env; sys.exit(sys.stderr.write(f'deploy-dev: only env=dev is allowed, got {env!r}\n') or 1) if env != 'dev' else None"
     gh workflow run deploy-dev.yml --ref main
 
+# Deploy the tilo-dev services with Google Cloud Build instead of GitHub Actions minutes (P0-07f): uploads the repo
+# (.gcloudignore), builds the images, pushes them to Artifact Registry and swaps them on Cloud Run by digest
+# (cloudbuild.yaml). Usage: `just deploy-dev-cloudbuild api`, then `just deploy-dev-cloudbuild`. Refuses everything
+# but dev; needs `gcloud auth login` and `gcloud config set project <tilo-dev project>` first (docs/deploy-dev.md).
+deploy-dev-cloudbuild service="all" env="dev":
+    python -c "import sys; env='{{env}}'; env=env[4:] if env.startswith('env=') else env; sys.exit(sys.stderr.write(f'deploy-dev-cloudbuild: only env=dev is allowed, got {env!r}\n') or 1) if env != 'dev' else None"
+    gcloud builds submit --config cloudbuild.yaml --substitutions _SERVICE={{service}} --region asia-southeast1 .
+
 # Build the web app and deploy it to Firebase Hosting on the tilo-dev project (P0-07c). The build is given an empty
 # VITE_TILO_API_URL, so the deployed app runs the fixture / replay world with no backend. Pinned to the dev project:
 # no parameter, no other project, never tilo-demo. Needs your own `firebase login` first (the CI deployer has no

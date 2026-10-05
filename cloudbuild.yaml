@@ -1,0 +1,76 @@
+# tilo-dev deploy on Google Cloud Build (P0-07f, PRD 6.3, 6.5). Same job as .github/workflows/deploy-dev.yml,
+# run on Cloud Build instead of GitHub Actions minutes: build the service images from services/<svc>/Dockerfile
+# (repo root as context), push them to Artifact Registry repo `tilo`, then swap each Cloud Run service
+# `tilo-<svc>` to the pushed image BY DIGEST. Run it with `just deploy-dev-cloudbuild [service]`.
+#
+# Only the image, --min-instances 0 and --max-instances change here. Ingress, IAM, env vars, secrets and the
+# runtime service account stay with Terraform (infra/modules/service ignores image changes). No keys and no
+# secrets: the build runs as the Cloud Build service account (IAM: docs/deploy-dev.md). tilo-dev only.
+#
+# Substitutions: $PROJECT_ID, $BUILD_ID are built in; _SERVICE is the only user substitution (all, or one of
+# the seven short names). Shell variables are written $$name so Cloud Build leaves them to the shell.
+# Builder images are pinned; bump the tags on purpose and record them in docs/licences.md.
+timeout: 2700s # 45 minutes, the cost cap the Actions workflow uses
+options:
+  logging: CLOUD_LOGGING_ONLY # no logs bucket to create or pay for
+
+substitutions:
+  _SERVICE: all
+
+steps:
+  - id: select-services
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:530.0.0
+    entrypoint: bash
+    env:
+      - SELECTED=$_SERVICE # reaches the script as data, never spliced into it
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        all="api harness channels connectors browser render sandbox-web"
+        if [ "$$SELECTED" = "all" ]; then
+          list="$$all"
+        else
+          case " $$all " in
+            *" $$SELECTED "*) list="$$SELECTED" ;;
+            *) echo "unknown service" >&2; exit 1 ;;
+          esac
+        fi
+        echo "$$list" > /workspace/services.txt
+        echo "deploying: $$list"
+
+  - id: build-and-push
+    name: gcr.io/cloud-builders/docker:20.10.24
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        for svc in $$(cat /workspace/services.txt); do
+          image="asia-southeast1-docker.pkg.dev/$PROJECT_ID/tilo/$${svc}:$BUILD_ID"
+          docker build --file "services/$${svc}/Dockerfile" --tag "$$image" .
+          docker push "$$image"
+          docker inspect --format '{{index .RepoDigests 0}}' "$$image" > "/workspace/digest-$${svc}"
+        done
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:530.0.0
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        update() {  # update <svc> <extra flags>: swap the image only; Terraform owns everything else
+          svc="$$1"; shift
+          [ -f "/workspace/digest-$${svc}" ] || return 0
+          digest_ref=$$(cat "/workspace/digest-$${svc}")
+          gcloud run services update "tilo-$${svc}" --project "$PROJECT_ID" --region asia-southeast1 \
+            --image "$$digest_ref" --min-instances 0 "$$@" --quiet
+        }
+        update api --max-instances 3
+        update harness --max-instances 3
+        update channels --max-instances 3
+        update connectors --max-instances 2
+        update browser --max-instances 2
+        update render --max-instances 2
+        update sandbox-web --max-instances 2
