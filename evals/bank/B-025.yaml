@@ -1,0 +1,44 @@
+id: B-025
+domain: procurement
+shapes:
+- refused_plan
+title: A plan that names a connector Tilo does not have
+brief: Post the new supplier-onboarding steps to the procurement channel and keep a copy in Drive.
+director:
+  brief:
+    goal: Post the supplier-onboarding steps to a channel and keep a copy.
+    deliverables:
+    - title: Onboarding steps
+      format: markdown
+    audience: Procurement team
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: draft
+      title: Write the steps
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: deliver
+      title: Post to the channel
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - chatroom
+      actions:
+      - post_status_update
+      depends_on:
+      - U1
+expect:
+  outcome: refused

@@ -1,0 +1,87 @@
+id: B-035
+domain: operations
+shapes:
+- long_brief
+- multi_deliverable
+title: Conference schedule, run-of-show and volunteer briefing
+brief: 'I am organising a three-day regional conference for 300 people in March: two parallel tracks, a poster session,
+  a gala dinner, and travel grants for 20 students. I am organising a three-day regional conference for 300 people
+  in March: two parallel tracks, a poster session, a gala dinner, and travel grants for 20 students. I am organising
+  a three-day regional conference for 300 people in March: two parallel tracks, a poster session, a gala dinner,
+  and travel grants for 20 students. I am organising a three-day regional conference for 300 people in March: two
+  parallel tracks, a poster session, a gala dinner, and travel grants for 20 students. I am organising a three-day
+  regional conference for 300 people in March: two parallel tracks, a poster session, a gala dinner, and travel
+  grants for 20 students. I am organising a three-day regional conference for 300 people in March: two parallel
+  tracks, a poster session, a gala dinner, and travel grants for 20 students. I need a master schedule, a run-of-show
+  for day two, and a short volunteer briefing. Keep it realistic.'
+director:
+  brief:
+    goal: Produce a master schedule, a day-two run-of-show and a volunteer briefing for a 300-person conference.
+    deliverables:
+    - title: Master schedule
+      format: xlsx
+    - title: Run-of-show
+      format: docx
+    - title: Volunteer briefing
+      format: docx
+    audience: Organising committee
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: analyse
+      title: Fit tracks, sessions and breaks
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Write the master schedule
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write the day-two run-of-show
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U4
+      unit_type: draft
+      title: Write the volunteer briefing
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+      - U3
+    - id: U5
+      unit_type: verify
+      title: Check for room and time clashes
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U4
+expect:
+  outcome: completed

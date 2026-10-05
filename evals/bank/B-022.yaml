@@ -1,0 +1,54 @@
+id: B-022
+domain: hr
+shapes:
+- refused_plan
+- deep_chain
+title: A plan whose units wait on each other in a circle
+brief: Compile a short guide to our parental-leave policy for new managers.
+director:
+  brief:
+    goal: Compile a guide to the parental-leave policy for new managers.
+    deliverables:
+    - title: Policy guide
+      format: docx
+    audience: New managers
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Read the policy
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U3
+    - id: U2
+      unit_type: analyse
+      title: Pick the key rules
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write the guide
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+expect:
+  outcome: refused

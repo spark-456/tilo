@@ -73,5 +73,6 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
     expect(sectionOf("/needs-you/gate")).toBe("needs");
     expect(sectionOf("/library/artifacts")).toBe("library");
     expect(sectionOf("/autonomy")).toBe("more");
+    expect(sectionOf("/worlds")).toBe("world"); // S-14 lists worlds (#227 C4)
   });
 });

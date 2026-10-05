@@ -12,7 +12,7 @@ import { useRemote } from "./remote";
 export function SelectionBar({ worldId }: { worldId: string }) {
   const client = useClient();
   const events = useRunLog(client, worldId);
-  const [layout] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layout] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const [id, set] = useSelection(worldId);
   const bar = useRef<HTMLDivElement>(null);
   const item = id && layout.status === "ready" ? findItem(layout.value, id, events) : null;
@@ -34,7 +34,8 @@ export function SelectionBar({ worldId }: { worldId: string }) {
             {item && <small> {item.kind}</small>}
           </>
         ) : (
-          "Nothing selected"
+          // The Inspect hint (design: "Click anything in the world to inspect it"), not a status.
+          "Choose anything to inspect it"
         )}
       </span>
       {id && (

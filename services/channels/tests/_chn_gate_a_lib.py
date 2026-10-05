@@ -41,6 +41,7 @@ from _chn11_lib import (
     MemoryDraftStore,
     OutboxRefused,
     autopilot_module,
+    fake_evidence_kwargs,
     pair,
     scripted_thread,
 )
@@ -197,6 +198,7 @@ class Gate:
             world_id=WORLD,
             run_id=RUN,
             **extra,
+            **fake_evidence_kwargs(),
         )
 
     def new_card(self) -> tuple[Any, Any, str]:

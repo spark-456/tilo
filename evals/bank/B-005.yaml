@@ -1,0 +1,48 @@
+id: B-005
+domain: operations
+shapes:
+- gated_send
+- held_at_gate
+title: Remind the floor staff about shift-swap rules
+brief: Draft a short reminder for all floor staff that shift swaps must be agreed with the supervisor 48 hours ahead,
+  and email it to the floor-staff list. Do not send anything until I have read it.
+director:
+  brief:
+    goal: Remind floor staff that shift swaps need supervisor agreement 48 hours ahead.
+    deliverables:
+    - title: Shift-swap reminder email
+      format: email
+    audience: Floor staff
+    deadline: null
+    constraints:
+    - Do not send before review
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: draft
+      title: Draft the reminder
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: deliver
+      title: Send the email
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - gmail
+      actions:
+      - send_email
+      depends_on:
+      - U1
+expect:
+  outcome: held_at_gate
+gates: hold

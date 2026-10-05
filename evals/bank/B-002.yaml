@@ -1,0 +1,78 @@
+id: B-002
+domain: research
+shapes:
+- gated_save
+- single_deliverable
+title: Literature scan on remote-work productivity
+brief: I need a two-page briefing for the leadership offsite on what recent studies say about remote work and productivity.
+  Keep it neutral, cite the studies, and save it to our shared Drive folder.
+director:
+  brief:
+    goal: Brief leadership on recent studies of remote work and productivity.
+    deliverables:
+    - title: Two-page briefing
+      format: google_docs
+    audience: Leadership team
+    deadline: null
+    constraints:
+    - Neutral tone
+    - Cite studies
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Collect recent studies
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: analyse
+      title: Compare their findings
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write the two-page briefing
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+    - id: U4
+      unit_type: verify
+      title: Check each citation
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U3
+    - id: U5
+      unit_type: deliver
+      title: Save the result to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U4
+expect:
+  outcome: completed

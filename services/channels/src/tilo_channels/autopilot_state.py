@@ -25,6 +25,7 @@ caller saw an error and retries) or a queued one that a retry, E2, E4 or the swe
 
 from __future__ import annotations
 
+import copy
 import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -160,15 +161,15 @@ class Ledger:
                 return "cancelled" if state == "cancelled" else "too_late"  # sending, sent or failed: it went
         raise CancelPending("the outbox did not confirm the stop")
 
-    def enqueue(self, doc: dict[str, Any]) -> dict:
-        """The card's entry under its idempotency key: a replay returns the stored entry and never adds one. Only in
-        the card's own world: an entry elsewhere is one no stop of this card would find."""
+    def entry_for(self, doc: dict[str, Any], authz: dict[str, Any] | None = None) -> dict:
+        """The card's entry. Only in the card's own world: an entry elsewhere is one no stop of this card would find.
+        A person's `authz` (the approval's, OB-01) is copied as given, never re-stamped."""
         if not self.ours(doc):
             raise PermissionError("the card belongs to another world: its entry is never created here")
         ms = round(self._clock() * 1000)
         created, window, policy = timestamp(ms), doc["undo_window_s"], doc["level"] == "L2"
         authority = {"by": "policy", "ref": doc["policy_id"]} if policy else {"by": "person", "ref": doc["user_id"]}
-        entry = {
+        return {
             "id": doc["outbox_id"] or ulid(ms),
             "idempotency_key": f"autopilot:{doc['card_id']}",
             "world_id": self._world_id,
@@ -181,10 +182,14 @@ class Ledger:
             "destination": doc["thread_id"],
             "modifiers": doc["modifiers"],
             "risk_tier": doc["tier"],
-            "authz": authority | {"at": created},
+            "authz": copy.deepcopy(authz) if authz is not None else authority | {"at": created},
             "undo_window_s": window,
             "scheduled_at": timestamp(ms + window * 1000),
             "state": "scheduled" if window else "queued",
             "created_at": created,
         }
-        return self._outbox.enqueue(entry, {"instruction_id": doc["instruction_id"], "level": doc["level"]})
+
+    def enqueue(self, doc: dict[str, Any], entry: dict | None = None, evidence: dict | None = None) -> dict:
+        """The card's entry under its idempotency key: a replay returns the stored entry and never adds one."""
+        entry = entry or self.entry_for(doc)
+        return self._outbox.enqueue(entry, evidence or {"instruction_id": doc["instruction_id"], "level": doc["level"]})

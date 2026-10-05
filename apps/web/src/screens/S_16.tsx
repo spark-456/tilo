@@ -17,7 +17,9 @@ const ISLAND_STATE = {
 export function S_16() {
   const client = useClient();
   const { events, worldId } = useFixtureRun();
-  const [layout, retry] = useRemote("load the channels", () => client.getLayout(worldId));
+  const [layout, retry] = useRemote("load the channels", (signal) =>
+    client.getLayout(worldId, signal),
+  );
   const messages = events.filter((e) => e.type.startsWith("channel."));
   return (
     <Page
@@ -48,13 +50,6 @@ export function S_16() {
           )}
         </Loaded>
       </Section>
-      <Section
-        title="Email"
-        note="Notifications, digests and question cards come from Tilo's sending domain, with a signed link to answer."
-        action={<Soon labels={["Change notification email"]} />}
-      >
-        <p className="empty-note">Notification preferences will be set here.</p>
-      </Section>
       <Section title="Recent channel messages" reserve={[7, 9]}>
         <EventList
           events={messages}
@@ -62,6 +57,13 @@ export function S_16() {
           empty="No channel message has been recorded yet."
           extra={(e) => <Chip tone="fyi">{nameOf(String(field(e, "channel")))}</Chip>}
         />
+      </Section>
+      <Section
+        title="Email"
+        note="Notifications, digests and question cards come from Tilo's sending domain, with a signed link to answer."
+        action={<Soon labels={["Change notification email"]} />}
+      >
+        <p className="empty-note">Notification preferences will be set here.</p>
       </Section>
       <Section title="Notification preferences" note="Choose what reaches you, and where.">
         <Soon labels={["Choose channels", "Set quiet hours"]} />

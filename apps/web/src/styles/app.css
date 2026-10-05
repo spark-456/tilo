@@ -29,9 +29,17 @@ textarea {
   --text-24: calc(var(--font-size-24) * var(--ui-scale, 1));
   --text-32: calc(var(--font-size-32) * var(--ui-scale, 1));
   --text-40: calc(var(--font-size-40) * var(--ui-scale, 1));
+  /* Bundle C2: the reserved strip for the HR-4 banner and the HR-6 badge (one row; two on a phone
+     when both show). The shell starts below it, so neither covers a control. 0 without a banner. */
+  --strip-h: 0px;
   display: flex;
+  box-sizing: border-box;
   height: 100vh;
   font-size: var(--text-16);
+}
+.app-shell[data-strip="on"] {
+  --strip-h: calc((var(--space-32) + var(--space-8)) * var(--ui-scale, 1));
+  padding-top: var(--strip-h);
 }
 .app-shell[data-stage-mode="on"] {
   --ui-scale: var(--font-stage-mode-scale);
@@ -39,6 +47,16 @@ textarea {
 @media (max-width: 767px) {
   .app-shell {
     flex-direction: column;
+  }
+  /* A phone's strip is not scaled by stage mode: its words must fit the phone's width. */
+  .app-shell[data-strip="on"] {
+    --strip-h: calc(var(--space-32) + var(--space-8));
+  }
+  .app-shell[data-strip="on"][data-replay-badge="on"] {
+    --strip-h: calc(2 * (var(--space-32) + var(--space-8)));
+  }
+  .status-strip {
+    --text-12: var(--font-size-12);
   }
 }
 .left-rail,
@@ -77,7 +95,7 @@ textarea {
 }
 .right-rail {
   flex: 0 0 328px; /* + 2 x 16px padding = 360px (PRD 18.3) */
-  padding: 52px var(--space-16) var(--space-16); /* the top clears the fixed fixture banner */
+  padding: var(--space-16);
   font-size: var(--text-14);
   background: var(--color-surface-1);
 }
@@ -88,13 +106,26 @@ textarea {
   margin: var(--space-16) 0 var(--space-4);
   font-size: var(--text-14);
 }
-/* P0-08b-player fixture mode (HR-4/BQ-07, HR-6): fixed so no layout (mobile bottom tabs, stage
-   mode's --ui-scale) can ever cover it or push it off-screen. */
-.fixture-replay-banner {
+/* P0-08b-player fixture mode (HR-4/BQ-07, HR-6): the strip is fixed along the top edge so no layout
+   (mobile bottom tabs, stage mode's --ui-scale) can cover it or push it off-screen, and the shell
+   is padded by its height (Bundle C2). The banner and the speed badge sit in it, not over content. */
+.status-strip {
   position: fixed;
-  top: 12px;
-  right: 12px;
+  top: 0;
+  right: 0;
+  left: 0;
   z-index: 1000;
+  box-sizing: border-box;
+  height: var(--strip-h);
+  display: flex;
+  flex-flow: row wrap;
+  align-content: center;
+  align-items: center;
+  gap: var(--space-8);
+  padding: 0 var(--space-16);
+  background: var(--color-surface-2);
+}
+.fixture-replay-banner {
   padding: var(--space-8) var(--space-16);
   border-radius: var(--radius-pill);
   background: var(--color-ink-1);
@@ -104,7 +135,7 @@ textarea {
 /* Fixed like the banner above it, so it never shifts the layout (P0-08b). Neutral tokens only. */
 .fixture-load-alert {
   position: fixed;
-  top: 52px;
+  top: calc(var(--strip-h) + var(--space-12));
   right: 12px;
   z-index: 1000;
   max-width: min(360px, calc(100vw - 24px));
@@ -128,7 +159,7 @@ textarea {
   border-radius: var(--radius-controls);
   background: var(--color-surface-1);
   color: var(--color-ink-1);
-  font: 600 0.875em var(--font-ui);
+  font: 600 var(--text-14) var(--font-ui);
 }
 .live-world-note p {
   margin: 0;
@@ -140,15 +171,10 @@ textarea {
   .live-world-note {
     left: 16px;
     bottom: auto;
-    top: 56px;
+    top: calc(var(--strip-h) + var(--space-16));
   }
 }
 .speed-badge {
-  position: fixed;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
   padding: var(--space-4) var(--space-12);
   border-radius: var(--radius-pill);
   background: var(--color-brand-primary);
@@ -156,23 +182,9 @@ textarea {
   font: 700 var(--text-12) var(--font-ui); /* words in the UI face: the mono zero reads as an 8 */
   white-space: nowrap;
 }
-/* Below 768 px the badge sits under the fixture banner at the right (one column, so the two never
-   meet at 320 px), and what the banner clears moves down with it. */
 @media (max-width: 767px) {
-  .speed-badge {
-    top: 48px;
-    right: 12px;
-    left: auto;
-    transform: none;
-  }
-  .app-shell[data-replay-badge="on"] .screen-page {
-    padding-top: 88px;
-  }
-  .app-shell[data-replay-badge="on"] .flow-shell {
-    top: 88px;
-  }
-  .app-shell[data-replay-badge="on"] .fixture-load-alert {
-    top: 84px;
+  .fixture-replay-banner {
+    padding: var(--space-8) var(--space-12); /* the words fit one 320 px row */
   }
 }
 .trace-list {
@@ -212,7 +224,7 @@ textarea {
 }
 .flow-shell {
   position: fixed;
-  top: 16px;
+  top: calc(var(--strip-h) + var(--space-16));
   left: 88px;
   z-index: 500;
   box-sizing: border-box;
@@ -224,7 +236,6 @@ textarea {
 }
 @media (max-width: 767px) {
   .flow-shell {
-    top: 56px; /* below the fixed fixture banner */
     left: 16px;
     width: calc(100vw - 32px);
   }
@@ -238,11 +249,17 @@ textarea {
   color: var(--color-ink-2);
   font: 400 var(--text-14) / 1.4 var(--font-ui);
 }
+/* Bundle C5 button hierarchy. One filled primary per screen: iris with a 4 px lip. The secondary is
+   quiet: white, a 1 px line and a warm 4 px lip (the lip is border, so heights stay the same). A
+   disabled primary keeps its iris hue, paler, so the screen still shows where its primary action
+   is; its label is exempt from contrast (WCAG 1.4.3) and the cursor says it is not available. */
 .primary {
   min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
   min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  box-sizing: border-box;
   padding: 0 var(--space-16);
   border: none;
+  border-bottom: 4px solid var(--color-brand-primary-lip);
   border-radius: var(--radius-controls);
   background: var(--color-brand-primary);
   color: var(--color-surface-1);
@@ -253,17 +270,23 @@ textarea {
   background: var(--color-brand-primary-lip);
 }
 .primary:disabled {
-  background: var(--color-surface-2);
-  color: var(--color-ink-2);
+  border-bottom-color: color-mix(
+    in srgb,
+    var(--color-brand-primary-lip) 40%,
+    var(--color-surface-1)
+  );
+  background: color-mix(in srgb, var(--color-brand-primary) 40%, var(--color-surface-1));
   cursor: not-allowed;
 }
 .secondary {
   min-width: calc(var(--button-height-desktop) * var(--ui-scale, 1));
   min-height: calc(var(--button-height-desktop) * var(--ui-scale, 1));
+  box-sizing: border-box;
   padding: 0 var(--space-16);
-  border: 2px solid var(--color-ink-1);
+  border: 1px solid var(--color-ink-3);
+  border-bottom: 4px solid var(--color-fog);
   border-radius: var(--radius-controls);
-  background: transparent;
+  background: var(--color-surface-1);
   color: var(--color-ink-1);
   font: 700 var(--text-14) / 1 var(--font-ui);
   cursor: pointer;
@@ -292,35 +315,108 @@ textarea {
 .flow-notice p {
   margin: 0 0 var(--space-8);
 }
-/* AGW-08 primary navigation: real links in the 72 px rail and the mobile bottom tabs. */
+/* AGW-08 primary navigation: real links in the 72 px rail (PRD 18.3) and the mobile bottom tabs.
+   Bundle C1: an icon over a label (14 px on the rail, 12 px in the tabs), the Needs-you count on
+   the icon, and the current item marked by shape (a 4 px bar on the rail, a 3 px bar in the tabs)
+   as well as fill and weight. No transition: a state change is instant (FR-WLD-09). */
 .left-rail {
+  flex: 0 0 calc(72px * var(--ui-scale, 1));
   box-sizing: border-box;
   flex-direction: column;
   justify-content: flex-start;
   align-items: stretch;
   gap: var(--space-4);
-  padding: var(--space-16) var(--space-4) 0;
+  padding: var(--space-16) 0 0;
 }
 .bottom-tabs {
   align-items: stretch;
+  /* The tabs share the phone's width, so stage mode's --ui-scale does not enlarge their words. */
+  --text-12: var(--font-size-12);
 }
 .bottom-tabs .nav-btn {
   flex: 1;
+  min-width: 0;
+  height: var(--button-height-desktop); /* the sheets above the tabs clear this height */
+  font-size: var(--text-12);
 }
 a.nav-btn {
+  position: relative;
   display: flex;
+  flex-direction: column-reverse; /* the icon above its label; the label first in the source */
   align-items: center;
   justify-content: center;
+  gap: var(--space-4);
   box-sizing: border-box;
   padding: 0 2px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-ink-2);
   text-align: center;
   text-decoration: none;
-  font-size: var(--text-12);
+  font: 700 var(--text-14) / 1.1 var(--font-ui);
+}
+.left-rail a.nav-btn {
+  min-height: calc(64px * var(--ui-scale, 1));
+}
+.nav-label {
+  white-space: nowrap;
+  letter-spacing: -0.02em; /* "Needs you" at 14 px is 68 px: it fits the 72 px rail on one line */
+}
+.nav-icon-box {
+  position: relative;
+  display: flex;
+}
+.nav-icon {
+  display: block;
+}
+.nav-badge {
+  position: absolute;
+  top: -6px;
+  left: 14px;
+  box-sizing: border-box;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-signal-needs);
+  color: var(--color-ink-1);
+  font: 900 var(--text-12) / 20px var(--font-ui);
+  letter-spacing: 0;
+}
+a.nav-btn:hover {
+  background: var(--color-surface-0);
 }
 a.nav-btn[aria-current="page"] {
   background: var(--color-surface-2);
   color: var(--color-ink-1);
-  box-shadow: inset 0 -3px 0 var(--color-brand-primary);
+  font-weight: 900;
+}
+a.nav-btn[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  top: var(--space-8);
+  bottom: var(--space-8);
+  left: 0;
+  width: 4px;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: var(--color-brand-primary);
+}
+.bottom-tabs a.nav-btn[aria-current="page"]::before {
+  top: 0;
+  right: var(--space-8);
+  bottom: auto;
+  left: var(--space-8);
+  width: auto;
+  height: 3px;
+  border-radius: 0 0 var(--radius-pill) var(--radius-pill);
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 a.secondary {
   display: inline-flex;
@@ -338,11 +434,6 @@ a.secondary {
   box-sizing: border-box;
   /* One page-shell offset: every screen's first line sits --space-32 below the top edge. */
   padding: var(--space-32) var(--space-24) var(--space-24);
-}
-@media (max-width: 767px) {
-  .screen-page {
-    padding-top: 56px; /* below the fixed fixture banner */
-  }
 }
 .screen-body {
   max-width: 720px;
@@ -533,7 +624,117 @@ button.row {
   border-bottom: 1px solid var(--color-surface-2);
 }
 .story-list li[data-severity="needs_you"] {
-  border-left-color: var(--color-signal-needs);
+  padding-left: calc(var(--space-12) - var(--space-4) / 2); /* a 6 px amber bar, the text stays put */
+  border-left: 6px solid var(--color-signal-needs);
+}
+.story-body {
+  flex: 1;
+  min-width: 0;
+}
+.story-text {
+  margin: 0;
+  font: 400 var(--text-16) / 1.5 var(--font-ui);
+}
+.story-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-14);
+}
+.inspect-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  box-sizing: border-box;
+  min-height: 32px; /* the chip's word changes as events arrive; the row does not */
+  margin: var(--space-8) 0;
+}
+.inspect-facts {
+  /* The block holds its height once: one line per row plus three spare lines for whichever value
+     wraps, so a value that grows or shrinks as events arrive moves nothing (CLS). `--rows` is the
+     number of facts. */
+  --line: calc(1.5 * var(--text-14));
+  --row: calc(var(--space-16) + 4px + var(--line));
+  display: grid;
+  align-content: start;
+  gap: var(--space-8);
+  box-sizing: border-box;
+  min-height: calc(
+    var(--rows, 1) *
+    var(--row) +
+    (var(--rows, 1) - 1) *
+    var(--space-8) +
+    3 *
+    var(--line)
+  );
+  max-width: 720px;
+  margin: var(--space-12) 0 var(--space-16);
+}
+.inspect-facts div {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  box-sizing: border-box;
+  gap: var(--space-4) var(--space-16);
+  padding: var(--space-8) var(--space-12);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+}
+.inspect-facts dt {
+  flex: 0 0 8em;
+  color: var(--color-ink-2);
+  font: 700 var(--text-14) / 1.5 var(--font-ui);
+}
+.inspect-facts dd {
+  flex: 1 1 12em;
+  min-width: 0;
+  margin: 0;
+  font: 400 var(--text-14) / 1.5 var(--font-ui);
+}
+/* A vertical line with a dot per event: the order of what happened to this one thing. */
+.mini-timeline {
+  max-width: 720px;
+  margin: 0 0 var(--space-16);
+  padding: 0;
+  list-style: none;
+}
+.mini-timeline li {
+  position: relative;
+  display: flex;
+  gap: var(--space-12);
+  padding: var(--space-8) 0 var(--space-8) var(--space-24);
+  border-left: 2px solid var(--color-surface-2);
+  margin-left: var(--space-8);
+}
+.mini-timeline li::before {
+  content: "";
+  position: absolute;
+  top: var(--space-12);
+  left: calc(var(--space-8) * -1 - 1px);
+  width: var(--space-12);
+  height: var(--space-12);
+  box-sizing: border-box;
+  border: 2px solid var(--color-ink-1);
+  border-radius: 50%;
+  background: var(--color-surface-1);
+}
+.story-flag {
+  display: inline-flex;
+}
+.level-chip {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 24px;
+  padding: 0 var(--space-8);
+  border: 2px solid var(--level-tint);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--level-tint) 22%, var(--color-surface-1));
+  color: var(--color-ink-1);
+  font: 800 var(--text-12) / 1 var(--font-ui);
 }
 .story-list li[data-severity="blocked"] {
   border-left-color: var(--color-signal-blocked);
@@ -551,7 +752,7 @@ button.row {
   margin: 0;
   padding: 0;
   list-style: none;
-  font: 500 var(--text-12) / 1.5 var(--font-mono);
+  font: 500 var(--text-14) / 1.5 var(--font-mono);
 }
 .trace-rows li {
   padding: var(--space-8) 0;
@@ -574,18 +775,78 @@ button.row {
 }
 .trace-meta {
   padding-left: 2.5em;
+  font-size: var(--text-12); /* the call, credits and record: the label role; the row's type is 14 */
 }
 .trace-record {
   display: inline-flex;
   align-items: center;
   gap: var(--space-8);
 }
+.trace-record .secondary.placeholder.compact {
+  min-height: 28px; /* "Open record"; 44 px on a phone, below */
+  padding: 0 var(--space-12);
+  font-size: var(--text-14);
+}
 .secondary.placeholder {
   min-height: 44px;
+  border-width: 1px;
   border-style: dashed;
   border-color: var(--color-ink-2);
   color: var(--color-ink-2);
   cursor: not-allowed;
+}
+.secondary.danger {
+  /* A kill switch is the one danger-styled control of a screen: solid red outline and word, so it
+     reads as the one that matters. */
+  border: 2px solid var(--color-signal-blocked);
+  color: var(--color-signal-blocked);
+  font-weight: 800;
+}
+.secondary.placeholder.danger {
+  /* The same control while it cannot be used: a muted red outline and a visible "Coming soon", so
+     it never looks live. */
+  border: 2px solid color-mix(in srgb, var(--color-signal-blocked) 40%, var(--color-surface-1));
+  color: var(--color-ink-2);
+  font-weight: 700;
+}
+.stop-note:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.stop-autopilot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.stop-confirm {
+  padding: var(--space-16);
+  border: 2px solid var(--color-signal-blocked);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+}
+.stop-confirm h3 {
+  margin: 0 0 var(--space-8);
+  font: 900 var(--text-20) / 1.25 var(--font-display);
+}
+.stop-confirm h3:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.stop-confirm p {
+  margin: 0 0 var(--space-12);
+  font-size: var(--text-14);
+  line-height: 1.5;
+}
+.stop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+.stop-note {
+  min-height: 3em; /* the answer arrives here without moving what is below (CLS) */
+  margin: 0;
+  font-size: var(--text-14);
+  line-height: 1.5;
 }
 .secondary.placeholder.compact {
   min-height: 32px;
@@ -622,6 +883,9 @@ button.row {
 }
 .stat-tiles.three b {
   font: 900 var(--text-20) / 1.15 var(--font-display);
+}
+.stat-tiles li .btag {
+  align-self: flex-start;
 }
 .stat-name {
   font-weight: 700;
@@ -711,7 +975,22 @@ button.row {
   font-size: var(--text-14);
 }
 .world-panels a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px; /* WCAG 2.5.8 */
   color: var(--color-brand-primary);
+}
+.world-panels a.lens-tab {
+  min-height: 44px; /* the tab's own height; the link rule above is more specific than .lens-tab */
+  color: var(--color-ink-1);
+}
+.world-panels a.lens-tab[aria-current="page"] {
+  color: var(--color-surface-1);
+}
+@media (max-width: 767px) {
+  .world-panels a {
+    min-height: 44px; /* a phone target: Level links, Open the queue, How we estimate */
+  }
 }
 .hud-card {
   min-height: 8.4em; /* the finished card in stage mode needs 8.2em of content */
@@ -1010,7 +1289,96 @@ button.row {
   gap: var(--space-8);
 }
 .filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12) var(--space-16);
   margin: 0 0 var(--space-16);
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.search-field {
+  position: relative;
+  flex: 1 1 16rem;
+  max-width: 24rem;
+}
+.search-field input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-12);
+  border: 2px solid var(--color-ink-3);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+.search-field input:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.filter-chip {
+  position: relative;
+  display: inline-flex;
+}
+.filter-chip input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0; /* the chip is the label; the radio keeps keyboard and screen-reader behaviour */
+  cursor: pointer;
+}
+.filter-chip span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 0 var(--space-12);
+  border: 2px solid var(--color-ink-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) / 1 var(--font-ui);
+}
+.filter-chip span b {
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 767px) {
+  .filter-chip span {
+    min-height: 44px; /* a phone target: the chip and its radio's hit area */
+  }
+}
+.filter-chip input:checked + span {
+  border-color: var(--color-ink-1);
+  background: var(--color-ink-1);
+  color: var(--color-surface-1);
+}
+.filter-chip input:checked + span::before {
+  content: "✓";
+  content: "✓" / ""; /* a tick, hidden from the accessible name: the selected chip differs by shape, not colour alone */
+}
+.filter-chip input:focus-visible + span {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.world-grid .empty-state {
+  grid-column: 1 / -1;
+  min-height: 12rem; /* the room a card takes: choosing a filter moves nothing below */
 }
 .page .secondary.placeholder.compact {
   min-height: 36px;
@@ -1019,7 +1387,7 @@ button.row {
 }
 .world-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--space-16);
 }
 .world-grid .flow-slot {
@@ -1045,7 +1413,8 @@ button.row {
   background: var(--color-fog);
 }
 .world-thumb svg {
-  height: 5em;
+  width: 100%;
+  height: 6.5em; /* under the two chips, which take the top 36 px of the 9em box */
 }
 .world-thumb .btag {
   position: absolute;
@@ -1070,6 +1439,9 @@ button.row {
   margin: 0;
   min-height: 2.6em; /* two lines: the title arriving with the first event moves nothing */
   font: 900 var(--text-20) / 1.3 var(--font-display); /* 20 */
+}
+.world-card .needs-line {
+  min-height: 3em; /* "Nothing waits for you." or a decision and its link, on up to two lines */
 }
 .world-card [data-testid="replay-note"] {
   min-height: 4.2em; /* three lines of 14 px text at 1.5 */
@@ -1126,8 +1498,10 @@ button.row {
   box-sizing: border-box;
   min-height: 36px;
   padding: 0 var(--space-16);
-  border: 2px solid var(--color-ink-1);
+  border: 1px solid var(--color-ink-3); /* the quiet secondary (C5) */
+  border-bottom: 4px solid var(--color-fog);
   border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
   color: var(--color-ink-1);
   font: 700 var(--text-14) / 1 var(--font-ui);
   text-decoration: none;
@@ -1390,9 +1764,21 @@ button.row {
 @media (max-width: 767px) {
   .flow-shell[data-screen="Approaches"] {
     width: calc(100vw - 32px);
+    /* Ends above the bottom tabs (their height token) and scrolls inside, like S-02. */
+    max-height: calc(100dvh - var(--strip-h) - var(--button-height-desktop) - 2 * var(--space-16));
+    overflow-y: auto;
   }
   .flow-shell[data-screen="Approaches"] .flow-slot {
-    min-height: 41em;
+    min-height: 41.5em; /* the 44 px cap field made the ready box 15 px taller */
+  }
+  .budget-cap-field input {
+    box-sizing: border-box;
+    min-height: 44px; /* the phone touch target */
+  }
+  /* The panel scrolls inside its cap, so the one action stays in view at the foot of it. */
+  .flow-shell[data-screen="Approaches"] .primary {
+    position: sticky;
+    bottom: 0;
   }
 }
 @media (max-width: 389px) {
@@ -1599,9 +1985,10 @@ button.row {
   flex: none;
   min-width: 44px;
   min-height: 44px;
-  border: 2px solid var(--color-ink-1);
+  border: 1px solid var(--color-ink-3);
+  border-bottom: 4px solid var(--color-fog);
   border-radius: var(--radius-controls);
-  background: transparent;
+  background: var(--color-surface-1);
   color: var(--color-ink-1);
   font: 700 var(--text-20) / 1 var(--font-ui);
   cursor: pointer;
@@ -1754,4 +2141,70 @@ button.row {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+/* S-22 Display: a segmented control. The chosen segment is filled and ticked, so it differs by
+   shape and weight as well as colour. The radio fills its segment: the whole segment is the hit
+   area, 44 px high, and a keyboard moves between the two with the arrow keys. */
+.segmented {
+  display: inline-flex;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 2px solid var(--color-ink-3);
+  border-radius: var(--radius-controls);
+  overflow: hidden;
+}
+.segment {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.segment + .segment {
+  border-left: 2px solid var(--color-ink-3);
+}
+.segment input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.segment span {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: var(--space-4) var(--space-16);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) / 1.3 var(--font-ui);
+}
+.segment small {
+  color: var(--color-ink-2);
+  font: 400 var(--text-12) / 1.3 var(--font-ui);
+}
+.segment input:checked + span {
+  background: var(--color-ink-1);
+  color: var(--color-surface-1);
+}
+.segment input:checked + span small {
+  color: var(--color-surface-2);
+}
+.segment input:checked + span b::before {
+  content: "✓ ";
+  content: "✓ " / "";
+}
+.segment input:focus-visible + span {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: -3px;
+}
+/* Professional density: tighter spacing everywhere the space tokens are used. Type stays on the
+   ramp and targets keep their size; nothing here animates. */
+html[data-density="professional"] .app-shell {
+  --space-8: 0.375rem;
+  --space-12: 0.5rem;
+  --space-16: 0.75rem;
+  --space-24: 1rem;
+  --space-32: 1.5rem;
 }

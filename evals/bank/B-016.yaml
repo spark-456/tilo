@@ -1,0 +1,69 @@
+id: B-016
+domain: legal
+shapes:
+- ambiguous
+title: A vague contract review that gets answered
+brief: Review the contract.
+director:
+  brief:
+    goal: Review a contract.
+    deliverables:
+    - title: Review
+      format: markdown
+    audience: Not stated
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields:
+    - deliverables
+    - audience
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Read the contract
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: analyse
+      title: List the risks
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write the risk list
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+    - id: U4
+      unit_type: deliver
+      title: Save the result to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U3
+expect:
+  outcome: completed
+answers:
+  deliverables: A document I can edit
+  audience: null

@@ -18,7 +18,7 @@ export function S_11({ params }: ScreenProps) {
   const client = useClient();
   const { events } = useReplayedLog(client, worldId);
   const [selected, , toggle] = useSelection(worldId);
-  const [layout] = useRemote("load the world", () => client.getLayout(worldId));
+  const [layout] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const ids = layout.status === "ready" ? objectIds(layout.value, events) : null;
   // An actor or target that is an object of the world can be selected; any other id is just text
   // in a box of the same size, so the layout arriving moves nothing (CLS).

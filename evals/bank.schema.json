@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evals.tilo.example/bank.schema.json",
+  "title": "BankCase",
+  "description": "One generality-bank case (issue #272, GEN-01): evals/bank/<id>.yaml. The brief, the scripted Director replies and the outcome class the pipeline must reach. Expected gates, tiers and budgets are derived from policy and contracts, never typed here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "domain", "shapes", "brief", "director", "expect"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^B-[0-9]{3}$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "domain": {
+      "type": "string",
+      "enum": [
+        "research",
+        "operations",
+        "marketing",
+        "finance",
+        "legal",
+        "personal_admin",
+        "hr",
+        "procurement",
+        "support",
+        "education",
+        "engineering"
+      ]
+    },
+    "shapes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "single_deliverable",
+          "multi_deliverable",
+          "gated_send",
+          "gated_save",
+          "multi_connector",
+          "ambiguous",
+          "attachment",
+          "non_english",
+          "tiny_brief",
+          "long_brief",
+          "deep_chain",
+          "parallel_units",
+          "refused_intake",
+          "refused_plan",
+          "director_fails",
+          "held_at_gate"
+        ]
+      }
+    },
+    "brief": { "type": "string", "minLength": 1, "maxLength": 4000 },
+    "files": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "text"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,60}\\.csv$" },
+          "text": { "type": "string", "maxLength": 20000 }
+        }
+      }
+    },
+    "director": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "brief": { "type": ["object", "null"] },
+        "approaches": { "type": ["object", "string", "null"] },
+        "plan": { "type": ["object", "null"] }
+      }
+    },
+    "answers": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "null"] }
+    },
+    "stop_after": { "type": "string", "enum": ["questions"] },
+    "approve": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "approach": { "type": "string" },
+        "cap": { "type": "number", "exclusiveMinimum": 0, "maximum": 300 }
+      }
+    },
+    "gates": { "type": "string", "enum": ["approve_all", "hold"] },
+    "expect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome"],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": ["completed", "held_at_gate", "refused", "needs_answers"]
+        }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}

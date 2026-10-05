@@ -44,10 +44,10 @@ async function offScale(page: import("@playwright/test").Page) {
   }, SCALE);
 }
 
-// The title size and the page shell's top offset (32 px; 56 px on a phone, under the fixed banner).
+// The title size and the page shell's top offset: 32 px on both, since the dev banner has its own strip (#227 C2).
 for (const [label, viewport, h1, top] of [
   ["desktop 1440x900", DESKTOP, 40, 32],
-  ["mobile 390x844", MOBILE, 32, 56],
+  ["mobile 390x844", MOBILE, 32, 32],
 ] as const) {
   test.describe(`PRD-18.2 type ramp at ${label}`, () => {
     test.use({ viewport });

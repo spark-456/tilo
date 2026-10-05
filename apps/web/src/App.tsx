@@ -1,6 +1,5 @@
 import { memo, useEffect, useRef } from "react";
 import { useClient, useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
-import { FIXTURE_WORLD_ID } from "./api/fixtures/derived";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { NeedsYouRail } from "./needs-you/NeedsYouRail";
 import { matchFlowRoute, usePathname } from "./router";
@@ -16,6 +15,7 @@ import { useRunStatus } from "./world/runLog";
 import { speedBadgeText } from "./world/speed";
 import { useClientWorld } from "./world/useClientWorld";
 import { useWorldFixture } from "./world/useWorldFixture";
+import { useRunWorld } from "./world/worldContext";
 
 // Stage mode is a display setting (PRD 9.6).
 // Memoised so each applied event adds one row instead of re-rendering the whole list.
@@ -54,6 +54,7 @@ export function App() {
   const world = useWorldFixture();
   const fixtureClient = useIsFixtureClient();
   const client = useClient();
+  const runWorld = useRunWorld(); // the remembered run; null with a live API and none (never the fixture)
   const replaySpeed = useReplaySpeed();
   const path = usePathname();
   const matched = matchScreen(path); // null: the stage and the flow shell
@@ -93,7 +94,7 @@ export function App() {
   const stagePaused = (world.active ? world.status : clientStatus) === "paused";
   const runScreen = screen !== null && RUN_SCREENS.has(screen.id);
   const needsYouScreen = screen !== null && NEEDS_YOU_SCREENS.has(screen.id);
-  const railWorld = worldId ?? (runScreen && !needsYouScreen ? FIXTURE_WORLD_ID : null);
+  const railWorld = worldId ?? (runScreen && !needsYouScreen ? runWorld : null);
   // HR-6: a replay that is not at its recorded pace always says so (after lens navigation drops
   // ?speed the client keeps its speed), in words, in a status region.
   const speedBadge = world.active
@@ -117,6 +118,7 @@ export function App() {
     <div
       className="app-shell"
       data-stage-mode={stageMode ? "on" : "off"}
+      data-strip={world.active || fixtureClient ? "on" : "off"}
       data-replay-badge={speedBadge ? "on" : "off"}
       data-replay-dock={dock ? "on" : "off"}
     >
@@ -147,11 +149,20 @@ export function App() {
       {!screen && !world.active && <FlowShell />}
       {(world.active || fixtureClient) && (
         // HR-4/BQ-07: permanent (fixture mode, and whenever the fixture client is active), never
-        // dismissable, exposed to assistive tech; fixed so no layout (mobile bottom tabs,
-        // stage-mode scale) can ever cover or push it off-screen.
-        // biome-ignore lint/a11y/useSemanticElements: <output> is for a form/calculation result; this is a persistent mode banner, so an explicit role="status" region fits better.
-        <div className="fixture-replay-banner" data-testid="fixture-replay-banner" role="status">
-          Fixture replay — dev data, not a real run
+        // dismissable, exposed to assistive tech. It sits in a reserved strip along the top edge
+        // (Bundle C2): the shell starts below the strip, so it never covers a control, and the
+        // strip is fixed so no layout (mobile bottom tabs, stage-mode scale) can push it off-screen.
+        <div className="status-strip">
+          {/* biome-ignore lint/a11y/useSemanticElements: <output> is for a form/calculation result; this is a persistent mode banner, so an explicit role="status" region fits better. */}
+          <div className="fixture-replay-banner" data-testid="fixture-replay-banner" role="status">
+            Fixture replay — dev data, not a real run
+          </div>
+          {speedBadge && (
+            // biome-ignore lint/a11y/useSemanticElements: same persistent status region as the banner above, not a form result.
+            <div className="speed-badge" data-testid="speed-badge" role="status">
+              {speedBadge}
+            </div>
+          )}
         </div>
       )}
       {clientWorld.note && (
@@ -173,12 +184,6 @@ export function App() {
       {world.loadError && (
         <div className="fixture-load-alert" role="alert">
           {world.loadError}
-        </div>
-      )}
-      {speedBadge && (
-        // biome-ignore lint/a11y/useSemanticElements: same persistent status region as the banner above, not a form result.
-        <div className="speed-badge" data-testid="speed-badge" role="status">
-          {speedBadge}
         </div>
       )}
       {mobile ? (
@@ -208,8 +213,11 @@ export function App() {
           ) : (
             <>
               {world.active && <ReplayPauseSlot status={world.status} />}
-              <h2>Activity</h2>
-              <p data-testid="right-rail-meter">Nothing yet. This fills in once a run starts.</p>
+              {/* One rail contract on every route (Bundle C3): card, Needs you, Team. With no run
+                  the card is the same box with an honest empty line. */}
+              <section className="hud-card" aria-label="Live meter">
+                <p data-testid="right-rail-meter">Nothing yet. This fills in once a run starts.</p>
+              </section>
               {needsYouScreen ? (
                 <NeedsYouRail />
               ) : (
@@ -218,7 +226,7 @@ export function App() {
                   <p>Nothing needs you.</p>
                 </>
               )}
-              <h2>Roster</h2>
+              <h2>Team</h2>
               <p>No agents assigned.</p>
             </>
           )}
