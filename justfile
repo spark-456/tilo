@@ -93,6 +93,10 @@ conformance:
 vertex-smoke *args:
     uv run python packages/providers/scripts/live_vertex_smoke.py {{args}}
 
+# PL-LIVE-E2E (#340): one bank case through the real pipeline. Live only when the user sets LIVE=1; `--dry-run` and `--replay` are free.
+live-e2e *args:
+    uv run python evals/scripts/live_e2e.py {{args}}
+
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated
 # as success so the recipe still passes with zero skills present.
