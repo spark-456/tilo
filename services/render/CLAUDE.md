@@ -7,7 +7,7 @@ Cloud Run service (PRD 6.2): deliverables — PPTX, PDF, charts; Google Slides a
 ## Commands
 - `uv run pytest "services/render" -q` — render tests (built by the AG-RENDER lane, `docs/lanes.md`).
 - `just check` — full gate from the repo root.
-- Image: `Dockerfile` runs `tilo_render.app:app` (`/healthz` only, P0-07a); deploy: `docs/deploy-dev.md`.
+- Image: `Dockerfile` runs `tilo_render.app:app` (`/health` for Cloud Run smoke checks, `/healthz` for in-container probes; P0-07a, P0-07h); deploy: `docs/deploy-dev.md`.
 
 ## Contracts
 - Reads: `packages/contracts-py` deliverable-spec types; `templates/`.
