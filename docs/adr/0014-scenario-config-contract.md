@@ -1,9 +1,10 @@
 # ADR-0014: The scenario config contract (`config/scenarios/<id>.yaml`)
 
-- Status: Proposed. The orchestrator relayed the user's approval of the contract change
-  (2026-10-05). This ADR waits for the user's sign-off, and the PR is not merged before it.
+- Status: Accepted (2026-10-05, user decision: "yes to all as you think necessary", relayed by
+  the supervisor; architect proposal). The user approved the contract change and signed off this
+  ADR, and accepted the defaults for BQ-233 and BQ-234.
   `scenario.schema.json` is a new contract at 1.0.0, so no existing contract or fixture changes.
-- Deciders: user (sign-off), architect (proposal)
+- Deciders: user (sign-off 2026-10-05), architect (proposal)
 - Requirement: FR-INT-11 (PRD 4.3, 6.4 PR-7, 7.1, 15.2); inputs BQ-202 and the test-writer's
   interface on `tests/FR-INT-11-12-HIL-10` (`packages/planning/tests/API_FR_INT_11_12.md`), and
   issue #272 (generality harness)
@@ -28,11 +29,11 @@ one skill, a Sandbox Web seed, a slug theme, policies valid against `policy.sche
 satisfy it.
 
 Issue #272 (with the user's decisions in its comments) needs "handles any scenario" to be
-provable. No code may be keyed to a scenario. A static check (GEN-06) will allow only the
+provable. No code may be keyed to a scenario. A static check (GEN-06) allows only the
 scenario keys in scenario files and no scenario id in platform source. Held-out bank cases and
 generated briefs that need preloaded config must be expressible in this same shape.
 
-## Decision (proposed)
+## Decision
 1. **One closed shape for every scenario.** `contracts/scenario.schema.json` 1.0.0 (title
    `Scenario`) is the shape of `config/scenarios/<id>.yaml`. It has exactly seven keys, and
    `additionalProperties` is false at the root and in each autonomy entry:
@@ -92,7 +93,9 @@ generated briefs that need preloaded config must be expressible in this same sha
   invalid fixture).
 - **Cap scenario entries at L2.** Not done: the T4 property test expects every level up to the
   tier's max (L3 for T1 and T2) to load, and PRD 4.3 lets a scenario set its autonomy policy.
-  BQ-233 asks the user whether the person must see the policies before approving.
+  BQ-233 (policy preview) asked whether the person must see the policies before approving. The
+  user accepted the default: policies are created at approve and show in the Trace and the policy
+  list, and no pre-approval list is built (a new UI ticket if wanted).
 - **A free-form `extra` or `notes` key.** Rejected because issue #272 needs a closed key set.
 
 ## Migration and fixture impact
@@ -104,16 +107,18 @@ generated briefs that need preloaded config must be expressible in this same sha
 - Generated types: `Scenario`, `ScenarioId`, `ScenarioSeedPath` and `ScenarioAutonomyEntry` in
   `packages/contracts-py` and `packages/contracts-ts`.
 - `contracts/README.md` lists the contract, `docs/security/p4-policy-invariants.md` gains PI-22,
-  and `docs/open-questions.md` gains BQ-233 and BQ-234.
+  and `docs/open-questions.md` gains BQ-233 and BQ-234 (both resolved on the logged defaults,
+  2026-10-05: BQ-233 no pre-approval policy list; BQ-234 a scenario's fixture set is its
+  `seed_data` files).
 
 ## Consequences
 - The FR-INT-11 builder validates each file against this schema, then applies SN-01 and SN-03 to
   SN-08. The builder also ships `config/scenarios/SC-01.yaml`, which `just contracts-check` then
   validates.
-- The generality harness (issue #272, GEN-06 rule 4) should check scenario files against this
-  schema, or at least take its allowed keys from the schema's `properties`. On
-  `feat/GEN-bank`, `SCENARIO_KEYS` is `{skills, connectors, autonomy, seed, theme}`, which would
-  refuse `id`, `title` and `seed_data`, so it has to follow the contract. A bank case that needs
+- The generality harness (issue #272, GEN-06 rule 4) follows the contract, so there is no clash.
+  `tests/repo/test_GEN_06_no_scenario_specific_code.py` (merged) takes the keys a scenario file
+  may hold from this schema's `properties` (`scenario_keys()`), and falls back to PRD 4.3's keys
+  plus `id` and `title` only while the schema is not on the branch. A bank case that needs
   preloaded config writes a file of this shape.
 - A `grant_budget` entry has `limits.credits: null`, so the engine gates it (BQ-100). A scenario
   cannot pre-approve top-ups. Allowing it would add `credits` to the entry, an additive change.
