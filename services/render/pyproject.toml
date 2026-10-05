@@ -10,6 +10,7 @@ dependencies = [
     "reportlab>=4.2.5",
     "fastapi>=0.115",
     "uvicorn>=0.32",
+    "tilo-contracts",
 ]
 
 [dependency-groups]
@@ -17,6 +18,9 @@ dev = [
     "pypdf>=5.0.0",  # used only in tests to read back the generated PDF bytes
     "pytest>=8.0.0",
 ]
+
+[tool.uv.sources]
+tilo-contracts = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
