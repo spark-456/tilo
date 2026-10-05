@@ -34,7 +34,7 @@ def client(dev_api: str) -> Iterator[httpx.Client]:
 @pytest.fixture(scope="session")
 def prod_api() -> Iterator[Server]:
     """`tilo-api` exactly as its Dockerfile starts it: no dev mode, so no principal, store or writer."""
-    server = Server("tilo_api:app", free_port()).start()
+    server = Server("tilo_api:app", free_port()).start(ready_path="/health")
     try:
         yield server
     finally:

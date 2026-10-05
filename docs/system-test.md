@@ -14,11 +14,11 @@ Two halves. Neither makes a paid call, signs anyone in or sends anything real (E
 
 `just test` and `just check` skip the `system` mark (they need port 8080 and take minutes); run `just system-test` before a deploy.
 
-What the local run showed on 6 Oct 2026: the five services other than `tilo-api` and `sandbox-web` serve only `/health`, `/healthz`, `/docs` and `/openapi.json` today. The harness runs inside `tilo-api` (its writer and validator are libraries), so there is no separate harness HTTP surface to drive yet.
+What the local run showed on 6 Oct 2026: the five services other than `tilo-api` and `sandbox-web` serve only `/health` and `/healthz` today (no generated docs since #411). The harness runs inside `tilo-api` (its writer and validator are libraries), so there is no separate harness HTTP surface to drive yet.
 
 ## 2. Deployed `tilo-dev` (read-only, no sign-in)
 
-Region `asia-southeast1`. Commands used, all reads: `gcloud run services list` and `get-iam-policy`, then anonymous `curl`. `/healthz` is reserved by Cloud Run on `run.app` (Google answers 404), so liveness is checked through `/openapi.json` or a refusal.
+Region `asia-southeast1`. Commands used, all reads: `gcloud run services list` and `get-iam-policy`, then anonymous `curl`. `/healthz` is reserved by Cloud Run on `run.app` (Google answers 404), so liveness is checked through `/health` once #404 is deployed, or a refusal. Before #411 is deployed `/openapi.json` also answers on the public services.
 
 | Service | Ready | Ingress | Anonymous invoker | Anonymous probes (6 Oct) |
 | --- | --- | --- | --- | --- |
