@@ -16,6 +16,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+from tilo_metering.flags import FlagStore
 from tilo_planning.artifacts import InMemoryArtifactStore
 from tilo_planning.brief import BriefExtractionError, extract_brief
 from tilo_planning.intake import (
@@ -46,16 +47,18 @@ def get_store() -> InMemoryArtifactStore:
     return _store
 
 
-@router.post("/intake", status_code=201, dependencies=[Depends(deps.require_live_work)])
+@router.post("/intake", status_code=201)
 async def intake(
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     safety: Annotated[SafetyProvider, Depends(get_safety)],  # before any store: fail closed first
     store: Annotated[InMemoryArtifactStore, Depends(get_store)],
     tasks: Annotated[deps.Store, Depends(deps.get_store)],
     model_router: Annotated[Router, Depends(deps.get_router)],
+    flags: Annotated[FlagStore, Depends(deps.get_flag_store)],
     text: Annotated[str, Form()] = "",
     files: Annotated[list[UploadFile], File()] = [],  # noqa: B006 (FastAPI copies defaults)
 ) -> Any:
+    deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in, before any work
     if len(files) > MAX_FILES:
         return _rejected(f"{len(files)} files attached; the limit is {MAX_FILES}.")
     uploads, remaining = [], MAX_TOTAL_BYTES

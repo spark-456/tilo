@@ -20,14 +20,14 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Any, Literal, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
 from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
-from tilo_metering.flags import FlagStore, InMemoryFlagStore
+from tilo_metering.flags import FlagStore, process_flags
 from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
@@ -279,19 +279,25 @@ def get_outbox_store() -> InMemoryOutboxStore:
     return InMemoryOutboxStore()  # the process's own until the Firestore store lands
 
 
-@functools.cache
+REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."
+
+
+class ReplayOnly(Exception):
+    """NFR-24: the answer is 503 with `replay_only: true` beside the text (tilo_api.app's handler), the labelled
+    replay offer."""
+
+
 def get_flag_store() -> FlagStore:
-    return InMemoryFlagStore()  # the process's own until the Firestore store lands; the treasury sets the flag
+    """The process-wide flag store (`tilo_metering.flags.process_flags`). The Treasury and the Firestore-backed
+    store are not wired in production yet, so until they are nothing sets `replay_only` here (BQ-238)."""
+    return process_flags()
 
 
-def require_live_work(flags: Annotated[FlagStore, Depends(get_flag_store)]) -> None:
-    """NFR-24 (PRD 17.2): with `replay_only` set the link starts no new live work. Routes that start it
-    (POST /intake, POST /tasks/{id}/approve) depend on this; reads of what exists are untouched."""
+def refuse_if_replay_only(flags: FlagStore) -> None:
+    """NFR-24 (PRD 17.2): with `replay_only` set the link starts no new live work. Called by the routes that reach
+    the Director or start a run, after sign-in and the owner check; reads of what exists are untouched."""
     if flags.get("replay_only"):
-        raise HTTPException(
-            status_code=503,
-            detail="This link is replay-only right now: new work is paused; finished runs can still be replayed.",
-        )
+        raise ReplayOnly
 
 
 def _dispatch_config(key: str, default: float) -> float:
