@@ -6,11 +6,12 @@
 # Entry shape (every key required):
 #   - id: notes_hub                      # a connector-style id; never gmail, google_drive or internal
 #     name: Notes hub                    # shown on the island
-#     endpoint: https://mcp.example/v1   # https only
+#     endpoint: https://mcp.example/v1   # https to a public host; no query, no internal address
 #     tools:
 #       - {name: get_notes, action_type: read_notes, risk_tier: T1, side_effect: false}
 #       - {name: share_page, action_type: share_file, risk_tier: T3, side_effect: true}
 # `risk_tier` must equal config/autonomy.yaml for the action type (an action type not listed there
-# is T3, so list a read tool's action type there as T1 first). A tool with `side_effect: true`
-# runs only as an outbox entry; a person approves every T3 one.
+# is T3, so list a read tool's action type there as T1 first). A read is T1; a tool with
+# `side_effect: true` must be T3: it runs only as an outbox entry, a person approves every one,
+# and it runs at most once. No duplicate keys, aliases or `<<` merge keys.
 servers: []

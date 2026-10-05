@@ -14,6 +14,7 @@ from _gapi_lib import FakeArtifacts as _Artifacts
 from _gapi_lib import enqueue, next_outbox_id
 from _oauth_lib import OWNER
 from conftest import gate_case
+from tilo_connectors.adapters import side_effect_marker
 from tilo_connectors.errors import MissingGrant, SideEffectRefused
 from tilo_connectors.mcp import (
     DEFAULT_CONFIG,
@@ -44,7 +45,7 @@ servers:
     endpoint: https://mcp.notes.example/v1
     tools:
       - {name: get_notes, action_type: read_notes, risk_tier: T1, side_effect: false}
-      - {name: post_update, action_type: post_status_update, risk_tier: T2, side_effect: true}
+      - {name: post_update, action_type: publish_post, risk_tier: T3, side_effect: true}  # unlisted: T3
       - {name: share_page, action_type: share_file, risk_tier: T3, side_effect: true}
 """
 
@@ -106,7 +107,7 @@ def test_FR_CON_12_listed_server_connects_and_tools_carry_the_tier_from_config(t
     assert set(tools) == {"get_notes", "post_update", "share_page"}, "the server's unlisted tool is dropped"
     assert (tools["get_notes"].risk_tier, tools["post_update"].risk_tier, tools["share_page"].risk_tier) == (
         "T1",
-        "T2",
+        "T3",
         "T3",
     )
     assert tools["share_page"].action_type == "share_file" and tools["get_notes"].side_effect is False
@@ -126,7 +127,7 @@ def test_FR_CON_12_a_listed_tool_never_runs_directly_if_it_has_a_side_effect(tmp
     for name in ("post_update", "share_page"):
         with pytest.raises(McpSideEffectRefused):
             session.call_read(name, {"x": 1})
-    assert not [e for e in log if e[0] == "call_tool"], "T2 and T3 tools run only from the outbox"
+    assert not [e for e in log if e[0] == "call_tool"], "side-effect tools run only from the outbox"
     assert session.call_read("get_notes", {"q": "a"}).data == {"ok": True, "tool": "get_notes"}
 
 
@@ -138,9 +139,9 @@ def test_FR_CON_12_read_results_are_marked_untrusted(tmp_path):
 @pytest.mark.parametrize(
     ("old", "new"),
     [
-        ("action_type: post_status_update, risk_tier: T2", "action_type: post_status_update, risk_tier: T1"),
+        ("action_type: publish_post, risk_tier: T3", "action_type: publish_post, risk_tier: T2"),
         ("action_type: read_notes", "action_type: unlisted_action"),  # an unlisted action type is T3, not T1
-        ("risk_tier: T2, side_effect: true", "risk_tier: T2, side_effect: false"),  # gated, yet never run
+        ("risk_tier: T3, side_effect: true", "risk_tier: T3, side_effect: false"),  # gated, yet never run
     ],
 )
 def test_FR_CON_12_config_tier_must_equal_the_policy_table(tmp_path, old, new):
@@ -218,7 +219,7 @@ def test_FR_CON_12_a_t3_tool_runs_only_through_the_outbox_with_a_person_approvin
     (settled,) = outbox.dispatch_due()
     assert settled["state"] == "sent"
     calls = [e for e in log if e[0] == "call_tool"]
-    assert calls == [("call_tool", "notes_hub", "share_page", {"page": "p1"}, case["entry"]["idempotency_key"])]
+    assert calls == [("call_tool", "notes_hub", "share_page", {"page": "p1"}, side_effect_marker(case["entry"]))]
 
 
 def test_FR_CON_12_the_adapter_refuses_a_call_without_the_outbox_grant(tmp_path):
@@ -232,7 +233,7 @@ def test_FR_CON_12_the_adapter_refuses_a_call_without_the_outbox_grant(tmp_path)
 def test_FR_CON_12_an_entry_for_an_unlisted_tool_or_wrong_tier_fails_without_a_call(tmp_path):
     log, artifacts, adapter, outbox = _env(tmp_path)
     unlisted = _case(artifacts, "delete_file", "T3")  # a table action, but no listed tool maps to it
-    wrong_tier = _case(artifacts, "post_status_update", "T3")  # config says T2
+    wrong_tier = _case(artifacts, "post_status_update", "T3")  # no listed tool has that action type
     for case in (unlisted, wrong_tier):
         enqueue(outbox, case)
     states = {e["id"]: e["state"] for e in outbox.dispatch_due()}
