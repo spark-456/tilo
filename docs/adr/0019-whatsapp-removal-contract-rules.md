@@ -64,9 +64,11 @@ cannot tell who is sending.
   `login.py`; tilo-channels webhook, binding, cards and keywords. CH-RM PR 2 removes it.
 
 ## Consequences
-- Nothing over WhatsApp authorises a side effect. If a producer still wrote such an answer,
-  `open_gate` and `check_entry` would refuse it. tilo-api already answers `invalid_channel`,
-  because no contract card lists `whatsapp` now.
+- Nothing over WhatsApp authorises a side effect. tilo-api refuses a WhatsApp answer on any card
+  built from the contract fixtures (`invalid_channel`). It takes `channel` `whatsapp` only from an
+  authenticated tilo-channels caller, which is not wired. Cards still built with `whatsapp`
+  (`runs.py`, `must_ask.py`, `login.py`) are PR 2's. Until then, an answer recorded over
+  WhatsApp opens nothing: `open_gate` (runs.py) and `check_entry` (outbox, autopilot) refuse it.
 - **L2 sources for tilo-channels (PR 2).** The channels service no longer turns any inbound
   message into an instruction. The Email Autopilot's instruction is the owner's `world.requested`
   from the signed-in mail card or assistant panel (FR-CHN-14 as amended). Its

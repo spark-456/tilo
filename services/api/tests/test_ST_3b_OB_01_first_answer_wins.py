@@ -13,7 +13,6 @@ import time
 import pytest
 from _cards_lib import OWNER_P, FakeClock, FakeEventWriter, answer_client, load_valid_card, new_ulid
 from _clint2_lib import wait_for
-from tilo_api import cards
 from tilo_api.cards import CardStore
 
 W = "w_01"
@@ -116,8 +115,7 @@ def _count_sends(run_flow) -> tuple[int, int, int]:
     )
 
 
-def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_in_sequence_by_web_then_whatsapp(run_flow):
-    run_flow.flow.app.dependency_overrides[cards.get_channels_caller] = lambda: True  # tilo-channels is the caller
+def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_in_sequence_by_web_then_mobile_web(run_flow):
     _, card = run_flow.run_to_gate()
     url = f"/worlds/{run_flow.world_id}/cards/{card['id']}/answer"
     assert run_flow.answer(card["id"], "approve").status_code == 200
@@ -125,21 +123,20 @@ def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_in_sequence_by
 
     later = [
         run_flow.flow.client.post(url, json={"option": "approve", "channel": "web"}),
-        run_flow.flow.client.post(url, json={"option": "approve", "channel": "whatsapp", "pin_verified": True}),
-        run_flow.flow.client.post(url, json={"option": "hold", "channel": "whatsapp"}),
+        run_flow.flow.client.post(url, json={"option": "approve", "channel": "mobile_web"}),
+        run_flow.flow.client.post(url, json={"option": "hold", "channel": "mobile_web"}),
     ]
 
     assert [(r.status_code, r.json()) for r in later] == [(400, REFUSED)] * 3
     assert _count_sends(run_flow) == (1, 1, 1)
 
 
-def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_at_once_from_web_and_whatsapp(run_flow):
-    run_flow.flow.app.dependency_overrides[cards.get_channels_caller] = lambda: True
+def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_at_once_from_web_and_mobile_web(run_flow):
     _, card = run_flow.run_to_gate()
     url = f"/worlds/{run_flow.world_id}/cards/{card['id']}/answer"
     bodies = [
         {"option": "approve", "channel": "web"},
-        {"option": "approve", "channel": "whatsapp", "pin_verified": True},
+        {"option": "approve", "channel": "mobile_web"},
     ]
     replies: list = []
 
