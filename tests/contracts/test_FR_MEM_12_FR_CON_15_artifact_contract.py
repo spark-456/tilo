@@ -1,8 +1,8 @@
 """FR-MEM-12 and FR-CON-15 (docs/prd-supplement-2026-10-05.md), ADR-0018 ticket T1 (BQ-256 approved).
 
 The contract half of the artifact store: contracts/artifact.schema.json (ArtifactVersion 1.0.0 and its
-manifest revision), common.schema.json `media_type` (common 1.1.0), artifact.created data 1.1.0 (optional
-content_sha256, media_type and size_bytes, all or none) and event rule EV-15. Caps are BQ-257's
+manifest revision), common.schema.json `media_type` (common 1.1.0, now merged into 1.2.0), artifact.created
+data 1.1.0 (optional content_sha256, media_type and size_bytes, all or none) and event rule EV-15. Caps are BQ-257's
 (2,000,000 bytes text and structured, 50,000,000 a file, 10 outputs per unit); `redacted` is BQ-258's.
 """
 
@@ -75,7 +75,8 @@ def test_FR_MEM_12_artifact_schema_is_artifact_version_1_0_0(repo_root):
 
 def test_FR_MEM_12_media_type_is_a_closed_enum_of_nine(repo_root):
     common = load_schema(repo_root, "common")
-    assert common["x-version"] == "1.1.0", "an added $defs entry is a minor bump (ADR-0002)"
+    major, minor, _patch = (int(p) for p in common["x-version"].split("."))
+    assert (major, minor) >= (1, 2), "an added $defs entry is a minor bump (ADR-0002); 1.2.0 merges both 1.1.0s"
     enum = common["$defs"]["media_type"]["enum"]
     assert set(enum) == MEDIA_TYPES and len(enum) == 9 and "media_type" in common["properties"]
 
