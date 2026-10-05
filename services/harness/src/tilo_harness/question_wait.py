@@ -24,6 +24,11 @@ class AlreadyAnswered(Exception):
     """The card was already resolved by another answer, or by its deadline."""
 
 
+class AlreadyCommitted(Exception):
+    """Raised by an event writer when this resolution's event id is already committed under other content: an
+    earlier answer won, though its caller saw a failure. `args[0]` is the committed event, when the writer has it."""
+
+
 @dataclass(frozen=True)
 class Answer:
     card_id: str
@@ -52,6 +57,7 @@ class _Waiter:
     director: str
     district: str | None
     future: asyncio.Future[Answer]
+    released: asyncio.Event  # set when an answer's claim on the card is given back (its write failed)
 
 
 def _resolve(waiter: _Waiter, outcome: Answer | Exception) -> None:
@@ -62,8 +68,12 @@ def _resolve(waiter: _Waiter, outcome: Answer | Exception) -> None:
             else:
                 waiter.future.set_result(outcome)
 
+    _on_loop(waiter, settle)
+
+
+def _on_loop(waiter: _Waiter, call: Any) -> None:
     try:
-        waiter.future.get_loop().call_soon_threadsafe(settle)
+        waiter.future.get_loop().call_soon_threadsafe(call)
     except RuntimeError:  # the loop is closed: the run ended and nobody waits any more
         pass
 
@@ -75,12 +85,15 @@ class QuestionWait:
         self._waiting: dict[str, _Waiter] = {}
         self._claimed: dict[str, str] = {}  # card id -> event id of the resolution that won
         self._early: dict[str, tuple[str | None, str]] = {}  # resolved before anyone waited: (option, answered_by)
+        # Answers whose write raised: each may still have committed (commit-then-raise). card id -> by -> (event id,
+        # option). A committed event that wins later is matched to its attempt: the unit resumes with what was chosen.
+        self._tried: dict[str, dict[str, tuple[str, str | None]]] = {}
 
     async def wait_for(self, card: dict[str, Any], *, lead: str, director: str, district: str | None) -> Answer:
         card_id = card["id"]
         if district is None:
             raise ValueError("a question with no district has no safe visibility")  # never vis "all"
-        waiter = _Waiter(card, lead, director, district, asyncio.get_running_loop().create_future())
+        waiter = _Waiter(card, lead, director, district, asyncio.get_running_loop().create_future(), asyncio.Event())
         with self._lock:  # registered before the first suspension: a part that arrives next is never lost
             early = self._early.pop(card_id, None)
             if early is None:
@@ -114,35 +127,70 @@ class QuestionWait:
                 summary=f"The question was answered ({by}).", data={"answered_by": by}, district=part["district"],
                 severity=part.get("severity"), vis=part["vis"], event_id=event_id,
             )  # fmt: skip
+        except AlreadyCommitted as exc:  # an earlier answer of this card committed though its caller saw a failure
+            self._settle_committed(card_id, exc, by)
+            raise AlreadyAnswered(card_id) from None
         except BaseException:
             with self._lock:
-                del self._claimed[card_id]  # nothing committed: the same answer may be sent again
+                del self._claimed[card_id]  # the same answer may be sent again; it may still have committed
+                self._tried.setdefault(card_id, {})[by] = (event_id, part.get("option"))
+                waiter = self._waiting.get(card_id)
+            if waiter is not None:  # the deadline may have seen this claim and stood down: let it look again
+                _on_loop(waiter, waiter.released.set)
             raise
         with self._lock:
+            self._tried.pop(card_id, None)
             waiter = self._waiting.get(card_id)
             if waiter is None:
                 self._early[card_id] = (part.get("option"), by)
         if waiter is not None:
             _resolve(waiter, Answer(card_id, part.get("option") or waiter.card["safe_default"], by))
 
+    def _settle_committed(self, card_id: str, exc: AlreadyCommitted, fallback_by: str) -> None:
+        """The card's one event is already committed: the unit resumes with the answer that wrote it, never a second."""
+        committed = exc.args[0] if exc.args and isinstance(exc.args[0], dict) else {}
+        by = (committed.get("data") or {}).get("answered_by") or fallback_by
+        with self._lock:
+            tried = self._tried.pop(card_id, {})
+            attempt = tried.get(by)
+            option = attempt[1] if attempt else None  # unknown attempt: the card's safe default
+            waiter = self._waiting.get(card_id)
+            if waiter is None:
+                self._early[card_id] = (option, by)
+        if waiter is not None:
+            _resolve(waiter, Answer(card_id, option or waiter.card["safe_default"], by))
+
     async def _at_deadline(self, waiter: _Waiter) -> None:
         card = waiter.card
         deadline = datetime.fromisoformat(card["created_at"]) + timedelta(seconds=card["timeout"])
         while (left := (deadline - self._clock.now()).total_seconds()) > 0:
             await self._clock.sleep(left)
-        with self._lock:
-            if card["id"] in self._claimed:
-                return  # an answer is being written and resumes the unit
-            self._claimed[card["id"]] = _DEADLINE
+        while True:
+            with self._lock:
+                if card["id"] not in self._claimed:
+                    self._claimed[card["id"]] = _DEADLINE
+                    tried = self._tried.get(card["id"], {})
+                    again = next((event_id for event_id, _ in tried.values()), None)
+                    break
+            # An answer is being written. A success resumes the unit (and ends this wait); a failure gives it back.
+            await waiter.released.wait()
+            waiter.released.clear()
+        # After a write that raised, the default reuses its event id: if that answer did commit, the writer says so.
+        reuse = {"event_id": again} if again else {}
         try:
             self._writer.emit(
                 type="question.answered", actor=waiter.director, target=waiter.lead, data={"answered_by": "default"},
                 summary="Nobody answered in time, so the Director applied the safe default.", severity="nudge",
-                district=waiter.district, vis=[waiter.district],
+                district=waiter.district, vis=[waiter.district], **reuse,
             )  # fmt: skip
+        except AlreadyCommitted as exc:
+            self._settle_committed(card["id"], exc, "default")
+            return
         except Exception as error:
             with self._lock:
                 del self._claimed[card["id"]]
             _resolve(waiter, error)
             return
+        with self._lock:
+            self._tried.pop(card["id"], None)
         _resolve(waiter, Answer(card["id"], card["safe_default"], "default"))

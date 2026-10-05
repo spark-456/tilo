@@ -193,7 +193,10 @@ class Run:
         passed = {k: kw[k] for k in ("district", "cause", "vis", "severity", "event_id") if k in kw}
         event = self.put(type, actor, target, summary, data, **passed)
         if type == "question.answered" and data.get("answered_by") == "default":
-            self.cards.tick()  # the harness applied a deadline default: close that card here too (BQ-208)
+            try:
+                self.cards.tick()  # the harness applied a deadline default: close that card here too (BQ-208)
+            except Exception:  # the default is committed; a card that failed to close stays in tick's work set
+                logger.warning("a card could not be closed after its deadline default", exc_info=True)
         return event
 
     def write(self, part: dict) -> None:
@@ -339,13 +342,14 @@ class Run:
         self.put("world.completed", self.director, self.world_id, "The work is done.", data, cause=cause)
 
     def _store_card(self, card: dict) -> None:
-        """The question card goes to this run's CardStore with its unit's district, before anything names it."""
+        """The question card goes to this run's CardStore with its unit's district, before anything
+        names it. Never merged: its unit waits for an answer to this question (#338)."""
         building = card["header"]["building"]
         districts = (d["id"] for level in self.layout["semantic"]["levels"] for d in level["districts"]
                      if any(b["id"] == building for b in d["buildings"]))  # fmt: skip
         district = next(districts, None)
         card = _plain(card)
-        if district is None or self.cards.submit(card, district=district).outcome == "rejected":
+        if district is None or self.cards.submit(card, district=district, merge=False).outcome == "rejected":
             raise RuntimeError("the question card was refused")
 
     async def gate(self, unit: dict, worker: str, action: str, ref: dict, made: str) -> None:
