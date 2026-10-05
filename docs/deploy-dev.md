@@ -5,7 +5,8 @@
 Copy and paste in this order, from the repository root, signed in to `gh` as yourself. Tilo's tooling
 runs none of these.
 
-1. Web app on Firebase Hosting (opens a browser for your own Google sign-in):
+1. Web app on Firebase Hosting (opens a browser for your own Google sign-in; use the Google account that
+   has Firebase access on project `essential-wares-510320-f0`, any other account fails with a permission error):
 
    ```powershell
    pnpm install
@@ -23,9 +24,13 @@ runs none of these.
    gh variable set GCP_DEPLOYER_SERVICE_ACCOUNT --repo spark-456/tilo --body tilo-deployer@essential-wares-510320-f0.iam.gserviceaccount.com
    ```
 
-3. Get the deploy workflow onto `main` (the WIF provider trusts only `refs/heads/main`). Either:
-   - merge PR #356 (fast-forwards `main` to `phase0-stack`), or
-   - apply PR #353 (the WIF provider also trusts `phase0-stack`; you apply it per `infra/README.md`).
+3. Get the deploy workflow onto `main`: merge PR #356 (fast-forwards `main` to `phase0-stack`). The WIF
+   provider trusts only `refs/heads/main`, and `deploy-dev.yml` runs only from `main`, so this step is
+   required. (PR #353 is optional hardening of the WIF condition; it does not replace this step.)
+
+   Recommended once, in GitHub (Settings, Rules, Rulesets; Tilo changes no repository setting): a ruleset on
+   `main` and `phase0-stack` that requires a pull request, blocks force pushes and blocks deletion, with no
+   bypass. WIF trusts these branches, so whoever can push to them can deploy.
 
 4. Deploy the services, API first, check it, then everything:
 
