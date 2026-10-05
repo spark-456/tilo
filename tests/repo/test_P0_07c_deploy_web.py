@@ -152,8 +152,11 @@ def test_P0_07c_web_package_has_firebase_tools_as_a_dev_dependency(repo_root: pa
     assert "firebase-tools" not in pkg.get("dependencies", {}), "a deploy tool is a devDependency, not shipped"
     assert re.match(r"^\^?~?\d+\.\d+\.\d+$", dev["firebase-tools"]), "a concrete version, not latest/*"
     lock = (repo_root / "pnpm-lock.yaml").read_text(encoding="utf-8")
-    web_block = lock.split("apps/web:", 1)[1].split("\n  ", 1)[0] if "apps/web:" in lock else lock
-    assert "firebase-tools" in web_block, "pnpm-lock.yaml must record firebase-tools for apps/web"
+    # The apps/web importer block runs from "\n  apps/web:\n" to the next importer key (two-space indent).
+    block = re.search(r"\n  apps/web:\n(.*?)(?=\n  \S|\n\S|\Z)", lock, re.S)
+    assert block, "pnpm-lock.yaml must have an apps/web importer"
+    recorded = re.search(r"\n {6}firebase-tools:\n {8}specifier: \S+\n {8}version: (\d+\.\d+\.\d+)", block.group(1))
+    assert recorded, "pnpm-lock.yaml must record firebase-tools with a concrete version for apps/web"
 
 
 def test_P0_07c_runbook_documents_the_exact_web_deploy_commands(repo_root: pathlib.Path) -> None:
