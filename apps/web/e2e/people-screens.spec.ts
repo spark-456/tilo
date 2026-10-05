@@ -85,53 +85,85 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       ).toEqual([]);
     });
 
-    test("PPL-40a S-27: the toast never covers a visible button, at the top, middle or end of the page", async ({
+    test("PPL-40a S-27: after an action the toast is on screen above the nav and never covers the last rows", async ({
       page,
     }) => {
       await watchShifts(page);
       await page.goto("/plate");
-      await page.getByRole("button", { name: /^Snooze until tomorrow: Call Acme/ }).click();
-      await page.getByRole("button", { name: /^Done: Review the Q4/ }).click();
-      await expect(page.getByTestId("plate-status")).toBeVisible();
       const slot = page.getByTestId("plate-toast");
-      const covered = () =>
+      const scrolled = () =>
+        page.evaluate(
+          () =>
+            window.scrollY +
+            [...document.querySelectorAll("*")].reduce((n, el) => n + el.scrollTop, 0),
+        );
+      // What the toast overlaps: visible buttons, links and summaries under it, and the nav.
+      const overlaps = () =>
         slot.evaluate((el) => {
-          const toast = el.querySelector(".plate-toast")?.getBoundingClientRect();
-          if (!toast) return ["no toast"];
-          const vh = window.innerHeight;
-          return [...document.querySelectorAll("main button, main a, main summary")].flatMap(
+          const t = el.querySelector(".plate-toast")?.getBoundingClientRect();
+          if (!t) return { inView: false, under: ["no toast"], nav: false };
+          const hit = (r: DOMRect) =>
+            r.left < t.right && r.right > t.left && r.top < t.bottom && r.bottom > t.top;
+          const under = [...document.querySelectorAll("main button, main a, main summary")].flatMap(
             (b) => {
-              if (el.contains(b)) return [];
               const r = b.getBoundingClientRect();
-              const shown = r.bottom > 0 && r.top < vh && r.width > 0;
-              const hit =
-                r.left < toast.right &&
-                r.right > toast.left &&
-                r.top < toast.bottom &&
-                r.bottom > toast.top;
-              return shown && hit ? [`${b.textContent?.trim()}`] : [];
+              const shown = r.bottom > 0 && r.top < window.innerHeight && r.width > 0;
+              return el.contains(b) || !shown || !hit(r) ? [] : [b.textContent?.trim() ?? ""];
             },
           );
+          const nav = [...document.querySelectorAll("nav")].some((n) => {
+            const r = n.getBoundingClientRect();
+            return r.height > 0 && getComputedStyle(n).position === "fixed" && hit(r);
+          });
+          const inView = t.top >= 0 && t.bottom <= window.innerHeight && t.width > 0;
+          return { inView, under, nav };
         });
-      for (const to of [0, 0.5, 1]) {
-        await page.evaluate((f) => {
-          for (const el of document.querySelectorAll("*"))
-            if (
-              el.scrollHeight > el.clientHeight + 1 &&
-              getComputedStyle(el).overflowY !== "visible"
-            )
-              el.scrollTop = (el.scrollHeight - el.clientHeight) * f;
-          window.scrollTo(0, (document.documentElement.scrollHeight - innerHeight) * f);
-        }, to);
-        expect(await covered()).toEqual([]);
-      }
-      // The box is reserved at toast height before any toast shows, so nothing shifts.
-      const box = await slot.boundingBox();
-      expect(box?.height).toBeGreaterThanOrEqual(name === "mobile" ? 100 : 68);
-      await expect(slot).toHaveAttribute("data-used", "true");
+      const first = page.getByRole("button", { name: /^Done: Review the Q4/ });
+      await first.scrollIntoViewIfNeeded();
+      const before = await scrolled();
+      await first.click();
+      await expect(page.getByTestId("plate-status")).toHaveText(/^Marked done/);
+      expect(await scrolled()).toBe(before);
+      // A sticky toast sits over whatever scrolls under the bottom of the view; it is on screen,
+      // clear of the nav, and gone after 8 s (below).
+      const now = await overlaps();
+      expect([now.inView, now.nav]).toEqual([true, false]);
+      // At the end of the page it sits below the last row, not over it.
+      await page.evaluate(() => {
+        for (const el of document.querySelectorAll("*")) el.scrollTop = el.scrollHeight;
+        window.scrollTo(0, document.documentElement.scrollHeight);
+      });
+      expect(await overlaps()).toEqual({ inView: true, under: [], nav: false });
       expect(
         await page.evaluate(() => (window as unknown as { __shifts: number[] }).__shifts),
       ).toEqual([]);
+    });
+
+    test("PPL-40a S-27: the toast clears itself after 8 s, unless focus is in it, and one replaces the last", async ({
+      page,
+    }) => {
+      await page.clock.install();
+      await page.goto("/plate");
+      const slot = page.getByTestId("plate-toast");
+      const status = page.getByTestId("plate-status");
+      await page.getByRole("button", { name: /^Snooze until tomorrow: Call Acme/ }).click();
+      await expect(slot).toHaveAttribute("data-on", "true");
+      await page.getByRole("button", { name: /^Done: Review the Q4/ }).click();
+      await expect(status).toHaveText("Marked done: Review the Q4 budget draft."); // replaced, not stacked
+      await expect(slot.locator(".plate-toast")).toHaveCount(1);
+      await page.clock.fastForward(5000);
+      await expect(slot).toHaveAttribute("data-on", "true");
+      await page.clock.fastForward(4000);
+      await expect(slot).toHaveAttribute("data-on", "false");
+      await expect(status).toHaveText("");
+      // With focus on Undo it stays; once focus leaves, it goes.
+      await page.getByRole("button", { name: /^Done: Confirm the rate hold/ }).click();
+      await page.getByRole("button", { name: "Undo" }).focus();
+      await page.clock.fastForward(20_000);
+      await expect(slot).toHaveAttribute("data-on", "true");
+      await page.getByRole("button", { name: "Undo" }).blur();
+      await page.clock.fastForward(9000);
+      await expect(slot).toHaveAttribute("data-on", "false");
     });
 
     test("PPL-40a S-27: acting on a row never scrolls the page, keeps focus in the list and announces it", async ({
@@ -140,10 +172,10 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       await watchShifts(page);
       await page.goto("/plate");
       // The status is a polite live region that is in the page before anything is done, and no
-      // blank toast box is reserved yet.
+      // blank toast box is kept yet.
       const status = page.getByTestId("plate-status");
       await expect(page.getByRole("status").and(status)).toHaveCount(1); // <output>: role status, polite
-      await expect(page.getByTestId("plate-toast")).toHaveAttribute("data-used", "false");
+      await expect(page.getByTestId("plate-toast")).toHaveAttribute("data-on", "false");
       expect((await page.getByTestId("plate-toast").boundingBox())?.height ?? 0).toBeLessThan(2);
       const scrolled = () =>
         page.evaluate(
@@ -162,7 +194,8 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       await expect(page.locator("#plate-group-soon")).toBeFocused();
       // First row of a group with more rows: focus lands on the next row's same control.
       const soon = page.getByRole("button", { name: "Done: Confirm the rate hold in writing" });
-      await soon.scrollIntoViewIfNeeded();
+      // Centred, clear of the sticky toast, so the click itself needs no scroll.
+      await soon.evaluate((el) => el.scrollIntoView({ block: "center" }));
       const mid = await scrolled();
       await soon.click();
       await expect(status).toHaveText("Marked done: Confirm the rate hold in writing.");

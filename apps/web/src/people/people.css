@@ -256,10 +256,12 @@
 .plate-toast-slot {
   display: block;
   box-sizing: border-box;
+  position: sticky;
+  bottom: var(--space-16);
+  z-index: 5;
 }
-.plate-toast-slot[data-used="true"] {
-  min-height: 68px; /* reserved once something was done: one line and Undo, more on a phone */
-  margin-top: var(--space-16);
+.plate-toast-slot[data-on="true"] {
+  margin-top: var(--space-16); /* its own height is the room kept at the end of the page */
 }
 .source-icon {
   display: inline-block;
@@ -269,10 +271,16 @@
 }
 .plate-toast {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-12);
+}
+.plate-toast output {
+  flex: 1 1 0;
+  min-width: 0; /* the words wrap beside Undo, so the bar stays low over the rows under it */
+}
+.plate-toast button {
+  flex: none;
 }
 .plate-toast[data-on="true"] {
   padding: var(--space-12) var(--space-16);
@@ -597,9 +605,6 @@
 }
 
 @media (max-width: 767px) {
-  .plate-toast-slot[data-used="true"] {
-    min-height: 100px;
-  }
   .people-strip {
     flex-wrap: nowrap;
     overflow-x: auto;

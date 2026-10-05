@@ -20,6 +20,9 @@ import {
 } from "../people/plate";
 import { Chip, EmptyState, Page, Section, longDate, plural } from "./kit";
 
+/** How long the toast stays before it clears itself. */
+const TOAST_MS = 8000;
+
 type Key = Bucket | "snoozed" | "asked" | "done";
 /** The groups in plate order: key, title, pill word. The first three are the open items. */
 const GROUPS: ReadonlyArray<readonly [Key, string, string]> = [
@@ -78,6 +81,18 @@ function Source({ item: i }: { item: WorkItem }) {
 export function S_27() {
   const [items, act] = useReducer(reducePlate, WORK_ITEMS);
   const [toast, setToast] = useState<{ text: string; undo: string | null } | null>(null);
+  const slot = useRef<HTMLDivElement>(null);
+  // One toast at a time: the next action replaces it. It leaves after TOAST_MS, unless focus is in
+  // it (a keyboard user on Undo): then it waits and goes once focus has left.
+  const [wait, setWait] = useState(0); // counts the times the clock found focus in the toast
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(
+      () => (slot.current?.contains(document.activeElement) ? setWait(wait + 1) : setToast(null)),
+      TOAST_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [toast, wait]);
   // Where focus goes once the acted row has left its list. It stays where the person is looking:
   // the next row's same control, else the group's own box (tabIndex -1). The toast is announced
   // by its live region, never focused, so acting never scrolls the page.
@@ -211,10 +226,16 @@ export function S_27() {
           </div>
         ),
       )}
-      {/* In the page's flow after the last group, so it never covers a button. The box is reserved
-          only once something has been done, and the text is a polite live region that is always
-          mounted, so the change is announced; focus stays on the list. */}
-      <div className="plate-toast-slot" data-testid="plate-toast" data-used={toast !== null}>
+      {/* The last thing in the page, sticky to the bottom of the view so the result and Undo are
+          on screen without scrolling. While a toast shows, it also takes its own height at the end
+          of the page, so it never covers the last rows. The text is a polite live region that is
+          always mounted, so the change is announced; focus stays on the list. */}
+      <div
+        ref={slot}
+        className="plate-toast-slot"
+        data-testid="plate-toast"
+        data-on={toast !== null}
+      >
         <div className="plate-toast" data-on={toast !== null}>
           <output data-testid="plate-status">{toast?.text}</output>
           {toast?.undo && (

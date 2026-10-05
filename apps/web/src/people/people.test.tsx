@@ -116,17 +116,13 @@ describe("PPL-40a S-27 My plate", () => {
   it("PPL_40a acting leaves focus in the list: the next row's same control, else a group box", async () => {
     document.body.replaceChildren(); // the screen looks rows up by id in the document
     const box = await render(<S_27 />);
-    expect(box.querySelector('[data-testid="plate-toast"]')?.getAttribute("data-used")).toBe(
-      "false",
-    );
+    expect(box.querySelector('[data-testid="plate-toast"]')?.getAttribute("data-on")).toBe("false");
     await click(named(box, "Done: Confirm the rate hold in writing"));
     expect(document.activeElement).toBe(named(box, "Done: Share the venue shortlist"));
     await click(named(box, "Done: Review the Q4 budget draft")); // the only overdue row
     expect(document.activeElement?.id).toBe("plate-group-soon");
     expect(document.querySelector(".plate-toast button")).not.toBe(document.activeElement);
-    expect(box.querySelector('[data-testid="plate-toast"]')?.getAttribute("data-used")).toBe(
-      "true",
-    );
+    expect(box.querySelector('[data-testid="plate-toast"]')?.getAttribute("data-on")).toBe("true");
   });
 
   it("PPL_40a the strip has a pill per group with the real count, and Undo in the toast puts the item back", async () => {
