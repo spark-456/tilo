@@ -14,9 +14,10 @@ that is not a time of day, or a word off the scheduling list gives "unlisted". N
 and the signature's run (two words each) and as repeats of those words. Every step is linear, no model.
 
 BQ-265 (issue #298): `inbound_signal` is the same check for the message a draft answers, minus the allowlist, plus
-what an inbound message may hide: an amount or a number word is "money" with no money word around it, and a separator
-inside a word (spaces between single letters, `- . _ * | / ~ + '`, a middle dot or a tab) is dropped before the
-families run. A risky inbound message ("please confirm the transfer of $5,000") keeps even a clean draft ("Yes,
+what an inbound message may hide: an amount, a magnitude suffix ("5m", "50 K") or a number word is "money" with no
+money word around it, and punctuation inside a word (any run of non-letter, non-digit characters, a tab or line break
+included, between two letters or digits) is dropped and single letters spread apart are joined, in both orders, before
+the families run. A risky inbound message ("please confirm the transfer of $5,000") keeps even a clean draft ("Yes,
 confirmed.") off L2. A draft's own `t3_content_signal` does not get these two: the allowlist already holds it.
 """
 
@@ -47,18 +48,24 @@ _COMMITMENT = re.compile(
     r"|leave\s+it\s+(?:with|to)\s+(?:me|us)|you\s+can\s+rely|(?:we|i)\s+(?:am|are|['\u2019]m|['\u2019]re)\s+going\s+to)\b"
 )
 _FAMILIES = (("money", _MONEY), ("legal", _LEGAL), ("commitment", _COMMITMENT))
+# Inbound only: a joined spread run ("a w i r e" gives "awire") is searched without word edges, so a stray single
+# letter before or after the word ("a", "I") cannot glue it to its neighbour. Money and legal only (commitment needs
+# a space inside its phrases).
+_INSIDE = tuple((n, re.compile(p.pattern.replace(r"\b", "").replace(r"\d+k", r"\dk"))) for n, p in _FAMILIES[:2])
 # BQ-224 (c): a separator or line break between two letters or digits is dropped, then digit look-alikes mapped back.
 _SPLIT = re.compile(r"(?<=[a-z0-9])[-._*\n]+(?=[a-z0-9])")
 _LEET = str.maketrans("013457@", "oieasta")
-# BQ-265 (inbound only): more separators, and single letters or digits spread apart ("w i r e"). Each class is disjoint
-# from the letters and digits it sits between, so both patterns are linear.
-_SEP = r"\-._*\n\t|/~+'\xb7"
-_SPLIT_IN = re.compile(rf"(?<=[a-z0-9])[{_SEP}]+(?=[a-z0-9])")
-_SPREAD = re.compile(rf"(?<![a-z0-9])[a-z0-9](?:[ {_SEP}]+[a-z0-9](?![a-z0-9]))+(?![a-z0-9])")
+# BQ-265 (inbound only): punctuation is a class, not a list. Any run of characters that are neither letters, digits nor
+# a plain space (a tab and a line break count) between two letters or digits is dropped ("trans,fer"), and single
+# letters or digits spread apart by spaces and/or any such run are joined ("w i r-e"). Each class is disjoint from the
+# letters and digits it sits between, so both patterns are linear.
+_DROP = re.compile(r"(?<=[a-z0-9])[^a-z0-9 ]+(?=[a-z0-9])")
+_SPREAD = re.compile(r"(?<![a-z0-9])[a-z0-9](?:[^a-z0-9]+[a-z0-9](?![a-z0-9]))+(?![a-z0-9])")
 # BQ-265: an amount with no money word. A decimal part or a thousands separator, a run of 3+ digits that is not a
-# 20xx year, a percent sign, or a number word. Times of day and small counts ("2 tarps", "dock 14") stay clean.
-_NUMBER_WORD = re.compile(r"\b(?:hundred|thousand|million|billion|lakh|crore)s?\b")
-_AMOUNT = re.compile(r"\d[.,]\d|%")
+# 2020-2039 year, a percent sign, a number word, or a number with a magnitude suffix ("5m", "50 K", "10L"). Times of
+# day and small counts ("2 tarps", "dock 14", "2 kayaks") stay clean.
+_NUMBER_WORD = re.compile(r"\b(?:hundred|thousand|million|billion|lakh|crore|lacs?|mil|mn|bn|cr)s?\b")
+_AMOUNT = re.compile(r"\d[.,]\d|%|(?<!\d)\d+\s?(?:k|m|mn|b|bn|cr|l|lacs?)\b")
 _DIGITS = re.compile(r"\d{3,}")
 _YEAR = re.compile(r"\b20[23]\d\b")
 # BQ-224 (a): L2 auto-send is an allowlist. A time of day is the only digit shape that passes; a link, any other digit
@@ -188,6 +195,11 @@ def _join(match: re.Match[str]) -> str:
     return "".join(c for c in match.group() if c.isalnum())
 
 
+def _forms(text: str) -> list[str]:
+    """`text`, then punctuation dropped and spread letters joined, then the same two steps the other way round."""
+    return [text, _SPREAD.sub(_join, _DROP.sub("", text)), _DROP.sub("", _SPREAD.sub(_join, text))]
+
+
 def _amount(folded: str) -> bool:
     """BQ-265: a decimal part or thousands separator, 3+ digits in a row (a recent 4-digit year aside), "%" or a number
     word."""
@@ -210,17 +222,17 @@ def _signal(text: str, *, inbound: bool) -> frozenset[str]:
         signal.add("obfuscated")
     if any(unicodedata.category(c) == "Sc" for c in folded):
         signal.add("money")
-    if inbound:  # BQ-265: more separators, spread-out letters, and amounts with no money word
+    if inbound:  # BQ-265: punctuation as a class, both split orders, spread-out letters, amounts with no money word
         spread = _SPREAD.sub(_join, folded)
-        dropped = _SPREAD.sub(_join, _SPLIT_IN.sub("", folded))
-        if _amount(folded) or _amount(spread) or _NUMBER_WORD.search(dropped):
+        forms = _forms(folded) + _forms(folded.translate(_LEET))  # translated: "@" is an "a" before it can be dropped
+        if _amount(folded) or _amount(spread) or any(_NUMBER_WORD.search(f) for f in forms[:3]):
             signal.add("money")
+        runs = " ".join(_join(m) for t in forms[::3] for m in _SPREAD.finditer(t))
+        texts = list(dict.fromkeys([*forms, *(f.translate(_LEET) for f in forms[:3])]))
+        signal |= {n for n, p in _INSIDE if p.search(runs)}
     else:
-        dropped = _SPLIT.sub("", folded)
-    squeezed = dropped.translate(_LEET)
-    for name, pattern in _FAMILIES:
-        if pattern.search(folded) or pattern.search(squeezed):
-            signal.add(name)
+        texts = [folded, _SPLIT.sub("", folded).translate(_LEET)]
+    signal |= {name for name, pattern in _FAMILIES if any(pattern.search(t) for t in texts)}
     if not inbound and _unlisted(cleaned):
         signal.add("unlisted")
     return frozenset(signal)
