@@ -579,7 +579,7 @@ briefs: `BriefTooLong` with the MCP offer and `truncated is False`.
 - The writer's instructions belong in `prompts/writer/build_handoff.md` (intelligence-builder): one paragraph,
   at most `max_framing_chars`, only words of the requirements or `framing_words`.
 
-## Security rules added in the fix pass (BQ-BUILD-9)
+## Security rules added in the fix pass (BQ-BUILD-10)
 
 - **BH-03 (framing):** besides the word checks, the framing is refused (rule `unknown_word`) when it holds any code
   point that is neither part of a word (`[^\W_]+`) nor a space or one of `. , ; : ! ? ' " ( ) -`. Tag characters,
