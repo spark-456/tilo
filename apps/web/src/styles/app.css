@@ -32,14 +32,18 @@ textarea {
   /* Bundle C2: the reserved strip for the HR-4 banner and the HR-6 badge (one row; two on a phone
      when both show). The shell starts below it, so neither covers a control. 0 without a banner. */
   --strip-h: 0px;
+  /* Bundle C: the shared top bar sits under the strip; --chrome-h is everything fixed above the
+     content (strip + bar), the one offset every fixed layer starts below. */
+  --bar-h: calc(2 * var(--space-32) * var(--ui-scale, 1));
+  --chrome-h: calc(var(--strip-h) + var(--bar-h));
   display: flex;
   box-sizing: border-box;
   height: 100vh;
+  padding-top: var(--chrome-h);
   font-size: var(--text-16);
 }
 .app-shell[data-strip="on"] {
   --strip-h: calc((var(--space-32) + var(--space-8)) * var(--ui-scale, 1));
-  padding-top: var(--strip-h);
 }
 .app-shell[data-stage-mode="on"] {
   --ui-scale: var(--font-stage-mode-scale);
@@ -49,6 +53,10 @@ textarea {
     flex-direction: column;
   }
   /* A phone's strip is not scaled by stage mode: its words must fit the phone's width. */
+  /* The top bar is 56 px on a phone, and stage mode does not enlarge it. */
+  .app-shell {
+    --bar-h: calc(var(--space-32) + var(--space-24));
+  }
   .app-shell[data-strip="on"] {
     --strip-h: calc(var(--space-32) + var(--space-8));
   }
@@ -132,6 +140,134 @@ textarea {
   margin: var(--space-16) 0 var(--space-4);
   font-size: var(--text-14);
 }
+/* Bundle C (#227): the shared top bar every artboard has (Tilo Home v2, Worlds, World Player): the
+   logo, the current place, and the run's Needs-you count. Fixed under the status strip, so no
+   layout moves it; the shell is padded by --chrome-h. No user, plan or avatar: the client has none.
+   No transition: a state change is instant (FR-WLD-09). */
+.topbar {
+  position: fixed;
+  top: var(--strip-h);
+  right: 0;
+  left: 0;
+  z-index: 700;
+  box-sizing: border-box;
+  height: var(--bar-h);
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  padding: 0 var(--space-16);
+  border-bottom: 2px solid var(--color-fog);
+  background: var(--color-surface-1);
+}
+.topbar-logo {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-8);
+  border-radius: var(--radius-controls);
+  color: var(--color-brand-primary);
+  text-decoration: none;
+}
+.topbar-logo:focus-visible,
+.topbar-waiting:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.topbar-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(32px * var(--ui-scale, 1));
+  height: calc(32px * var(--ui-scale, 1));
+  margin-bottom: var(--space-4); /* room for the lip */
+  border-radius: var(--radius-controls);
+  background: var(--color-brand-primary);
+  box-shadow: 0 var(--space-4) 0 0 var(--color-brand-primary-lip);
+}
+.topbar-face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: calc(22px * var(--ui-scale, 1));
+  height: calc(12px * var(--ui-scale, 1));
+  border-radius: 5px;
+  background: var(--color-surface-1);
+}
+.topbar-eye {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-1);
+}
+.topbar-word {
+  font: 900 var(--text-24) / 1 var(--font-display);
+  letter-spacing: -0.02em;
+}
+.topbar-place {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 700 var(--text-16) / 1.25 var(--font-ui);
+  white-space: nowrap;
+}
+/* The lens or step comes first, so the title arriving after it never moves anything (CLS). */
+.topbar-place[data-has-sub]::before {
+  content: attr(data-sub) " \00b7  ";
+  color: var(--color-ink-2);
+  font-weight: 600;
+}
+.topbar-waiting {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-8);
+  box-sizing: border-box;
+  min-height: calc(40px * var(--ui-scale, 1));
+  padding: 0 var(--space-12);
+  border-bottom: 4px solid color-mix(in srgb, var(--color-signal-needs) 70%, var(--color-ink-1));
+  border-radius: var(--radius-controls);
+  background: var(--color-signal-needs);
+  color: var(--color-ink-1);
+  font: 900 var(--text-14) / 1 var(--font-display);
+  text-decoration: none;
+}
+.topbar-waiting-count {
+  box-sizing: border-box;
+  min-width: calc(22px * var(--ui-scale, 1));
+  height: calc(22px * var(--ui-scale, 1));
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-1);
+  color: var(--color-surface-1);
+  font: 900 var(--text-12) / calc(22px * var(--ui-scale, 1)) var(--font-ui);
+  text-align: center;
+}
+.topbar-waiting-short {
+  display: none;
+}
+@media (max-width: 767px) {
+  .topbar {
+    gap: var(--space-12);
+    --text-12: var(--font-size-12);
+    --text-14: var(--font-size-14);
+    --text-16: var(--font-size-16);
+    --text-24: var(--font-size-24);
+  }
+  /* A phone's touch targets are 44 px (PRD 17.5). */
+  .topbar-logo,
+  .topbar-waiting {
+    min-height: var(--button-height-desktop);
+  }
+  .topbar-waiting-long {
+    display: none;
+  }
+  .topbar-waiting-short {
+    display: inline;
+  }
+}
 /* P0-08b-player fixture mode (HR-4/BQ-07, HR-6): the strip is fixed along the top edge so no layout
    (mobile bottom tabs, stage mode's --ui-scale) can cover it or push it off-screen, and the shell
    is padded by its height (Bundle C2). The banner and the speed badge sit in it, not over content. */
@@ -161,7 +297,7 @@ textarea {
 /* Fixed like the banner above it, so it never shifts the layout (P0-08b). Neutral tokens only. */
 .fixture-load-alert {
   position: fixed;
-  top: calc(var(--strip-h) + var(--space-12));
+  top: calc(var(--chrome-h) + var(--space-12));
   right: 12px;
   z-index: 1000;
   max-width: min(360px, calc(100vw - 24px));
@@ -197,7 +333,7 @@ textarea {
   .live-world-note {
     left: 16px;
     bottom: auto;
-    top: calc(var(--strip-h) + var(--space-16));
+    top: calc(var(--chrome-h) + var(--space-16));
   }
 }
 .speed-badge {
@@ -250,7 +386,7 @@ textarea {
 }
 .flow-shell {
   position: fixed;
-  top: calc(var(--strip-h) + var(--space-16));
+  top: calc(var(--chrome-h) + var(--space-16));
   left: 88px;
   z-index: 500;
   box-sizing: border-box;
@@ -2034,7 +2170,7 @@ button.row {
   .flow-shell[data-screen="Approaches"] {
     width: calc(100vw - 32px);
     /* Ends above the bottom tabs (their height token) and scrolls inside, like S-02. */
-    max-height: calc(100dvh - var(--strip-h) - var(--button-height-desktop) - 2 * var(--space-16));
+    max-height: calc(100dvh - var(--chrome-h) - var(--button-height-desktop) - 2 * var(--space-16));
     overflow-y: auto;
   }
   .flow-shell[data-screen="Approaches"] .flow-slot {
@@ -2493,7 +2629,7 @@ html[data-density="professional"] .app-shell {
 .assistant-panel {
   position: fixed;
   z-index: 850;
-  inset: var(--strip-h, 0px) 0 0 auto; /* below the fixed status strip, which stays readable */
+  inset: var(--chrome-h, 0px) 0 0 auto; /* below the fixed status strip, which stays readable */
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
