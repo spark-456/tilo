@@ -14,3 +14,8 @@ output "oauth_token_key_decrypters" {
   description = "Echoes the members actually bound as decrypters on the oauth-tokens key."
   value       = [for m in google_kms_crypto_key_iam_member.oauth_tokens_decrypters : m.member]
 }
+
+output "oauth_token_key_role" {
+  description = "The one role bound on the oauth-tokens key."
+  value       = one(distinct([for m in google_kms_crypto_key_iam_member.oauth_tokens_decrypters : m.role]))
+}

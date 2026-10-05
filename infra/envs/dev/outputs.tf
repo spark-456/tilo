@@ -51,11 +51,26 @@ output "events_topic_publishers" {
 
 output "secret_accessors" {
   description = "secret id => members granted secretAccessor on it."
+  # Built from the config map (not b.secret_id, which the API returns as a
+  # full resource path after refresh), so it is the same before and after.
   value = {
-    for s in local.secret_placeholders : s => [
-      for b in google_secret_manager_secret_iam_member.accessors : b.member if b.secret_id == s
+    for s, services in local.secret_accessors : s => [
+      for svc in services : google_secret_manager_secret_iam_member.accessors["${s}::${svc}"].member
     ]
   }
+}
+
+output "monitoring" {
+  description = "Alert email and alert policies (config values)."
+  value = {
+    notification_email = module.monitoring.notification_channel_email
+    alert_policies     = module.monitoring.alert_policies
+  }
+}
+
+output "enabled_apis" {
+  description = "Service APIs this environment enables (adopts if already enabled)."
+  value       = sort(keys(google_project_service.apis))
 }
 
 output "deployer_act_as_service_accounts" {
@@ -110,5 +125,33 @@ output "vpc_egress_subnetwork" {
     network                  = google_compute_network.vpc.name
     region                   = google_compute_subnetwork.run_egress.region
     private_ip_google_access = google_compute_subnetwork.run_egress.private_ip_google_access
+  }
+}
+
+output "oauth_token_key_role" {
+  description = "The single role bound on the oauth-tokens key (connectors only)."
+  value       = module.kms.oauth_token_key_role
+}
+
+output "gmail_push" {
+  description = "Gmail push topic, subscription path and Scheduler jobs (FR-CHN-08)."
+  value = {
+    topic_name        = module.gmail_push.topic_name
+    topic_publishers  = module.gmail_push.topic_publishers
+    subscription_name = module.gmail_push.subscription_name
+    push_path         = module.gmail_push.push_path
+    scheduler_jobs    = module.gmail_push.scheduler_jobs
+  }
+}
+
+output "service_storage_grants" {
+  description = "bucket::service::role => member for the bucket-scoped service grants (PRD 13.2)."
+  value       = { for k, b in google_storage_bucket_iam_member.service_access : k => b.member }
+}
+
+output "model_armor_template" {
+  value = {
+    location    = google_model_armor_template.default.location
+    template_id = google_model_armor_template.default.template_id
   }
 }
