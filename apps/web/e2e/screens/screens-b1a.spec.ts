@@ -88,11 +88,14 @@ test("S_16 renders, no console errors, placeholders aria-disabled", async ({ pag
   test.setTimeout(90_000);
   const problems = watchConsole(page);
   await visit(page, "/channels", "Channels", async () => {
-    await expect(page.getByTestId("channel-islands")).toContainText("Connected");
-    await expect(page.getByText("Your WhatsApp answer arrived.")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("STOP AUTOPILOT")).toBeVisible();
-    await expect(page.getByText(/Whatsapp/)).toHaveCount(0);
-    await soon(page, "Bind a WhatsApp number");
+    await expect(page.getByTestId("connected-accounts")).toContainText("Gmail", {
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("connected-accounts")).toContainText("Connected");
+    // WhatsApp is out of scope (SD-01): nothing on the screen offers, names or lists it.
+    await expect(page.getByText(/whatsapp/i)).toHaveCount(0);
+    await expect(page.getByText("STOP AUTOPILOT")).toHaveCount(0);
+    await soon(page, "Change notification email");
   });
   expect(problems).toEqual([]);
 });
@@ -102,5 +105,5 @@ noLayoutShift([
   ["S_13", "/library", "Triage list"],
   ["S_14", "/worlds", "Replay of run #village_basic_1"],
   ["S_15", "/autonomy", "Authorised by you"],
-  ["S_16", "/channels", "Your WhatsApp answer arrived."],
+  ["S_16", "/channels", "Gmail"],
 ]);
