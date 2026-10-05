@@ -8,6 +8,7 @@ import { NotFound } from "./screens/NotFound";
 import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
 import { LoggedScrubber, ReplayScrubber } from "./screens/ReplayScrubber";
+import { ScreenPage } from "./screens/ScreenPage";
 import { WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
@@ -124,12 +125,12 @@ export function App() {
     >
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
-        <main className="screen-page" data-testid="screen-page" data-screen={screen.id}>
+        <ScreenPage key={screen.id} screenId={screen.id}>
           <screen.Component
             key={`${screen.id}:${screen.params.join("/")}`}
             params={screen.params}
           />
-        </main>
+        </ScreenPage>
       ) : (
         // Keyed by world: Stage hands its content seam over once, when Pixi is ready.
         <Stage
