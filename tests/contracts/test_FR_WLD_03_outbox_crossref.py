@@ -368,7 +368,7 @@ def _signed_in(case):
 
 
 @pytest.mark.parametrize("name", ["ob01_gate_approved_on_whatsapp", "ob01_l2_instruction_is_a_whatsapp_message"])
-def test_FR_WLD_03_OB_01_whatsapp_is_all_these_cases_break(repo_root, name):
+def test_FR_WLD_03_OB_01_whatsapp_alone_breaks_each_case(repo_root, name):
     """ADR-0019 (SD-01): each case is a path that once opened a send. WhatsApp alone breaks it now:
     the same answer or instruction from a signed-in session passes."""
     case = load_json(contracts_dir(repo_root) / f"fixtures/outbox/crossref/invalid/{name}.json")

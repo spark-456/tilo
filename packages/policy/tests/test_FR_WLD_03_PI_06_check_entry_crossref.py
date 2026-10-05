@@ -57,7 +57,7 @@ def test_FR_WLD_03_PI_06_named_valid_case_passes(crossref_valid_cases, name):
 
 
 @pytest.mark.parametrize("name", ["ob01_gate_approved_on_whatsapp", "ob01_l2_instruction_is_a_whatsapp_message"])
-def test_FR_WLD_03_PI_04_PI_09_whatsapp_is_all_these_cases_break(crossref_invalid_cases, name):
+def test_FR_WLD_03_PI_04_PI_09_whatsapp_alone_breaks_each_case(crossref_invalid_cases, name):
     """ADR-0019: the engine refuses WhatsApp itself; signed in on mobile web, the same case passes."""
     case = copy.deepcopy(dict(crossref_invalid_cases)[f"{name}.json"])
     assert tilo_policy.check_entry(case) == "OB-01"

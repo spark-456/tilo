@@ -1,7 +1,8 @@
 # ADR-0019: WhatsApp leaves the contract rules (CH-RM)
 
 - Status: Proposed (authority: SD-01, PRD supplement 2026-10-05)
-- Deciders: architect (proposal); the supervisor and the user accept it at merge
+- Deciders: architect (proposal). This ADR and BQ-CHRM-2 need explicit acceptance at merge by the
+  user, or by the supervisor under the user's recorded delegation; review passes are not acceptance.
 - Requirement: CH-RM (issue #379); SEC-06 and FR-HIL-05 as amended (supplement 2.1); PRD 10.1,
   10.3, 10.4
 - Supersedes in part: ADR-0005, ADR-0006, ADR-0007, ADR-0013 (one-line notes in each)
@@ -27,6 +28,25 @@ cannot tell who is sending.
    `card_kind` sub-rules only narrowed that path, so they go with it. The path they once let
    through, the owner's typed WhatsApp answer to a question card, becomes one invalid case. The
    email `channel.message_in` and email `world.requested` cases stay.
+
+   **Provenance replaces what BQ-56 protected.** A `world.requested` has no `card_id`, `card_kind`
+   or `option`, so the event cannot show whether the words were really typed as an instruction or
+   came from a card tap. The rule now lives in OB-01 and PI-09. A `world.requested` counts only if
+   tilo-api wrote it from a signed-in typed-instruction control (the mail card's instruction box or
+   the assistant panel), with these properties:
+   - `actor` is the session's principal.
+   - `channel` comes from the session, never from the client.
+   - `destination` is the thread the control is on, set by the UI.
+
+   It is never written from a card option, from text typed on a gate, consent or meeting card (Edit
+   first leads to a redraft, OB-05), by a model, or from an inbound mail body. The validator cannot
+   check this from the event alone, so the writer enforces it (CH-RM PR 2 adds that test). Nothing
+   may emit a mid-run `world.requested` as an instruction until that writer exists, and
+   `L2_ACTION_RECORDED` flips only after it (ADR-0013). Single use (PI-10) is unchanged.
+
+   **The owner** is the actor of the world's first `world.requested`. A later one, by anyone,
+   never changes it. The reference check and `tilo_policy` take the owner as a parameter
+   (`world_owner`), so a second `world.requested` cannot confuse them. Only the text changes.
 3. **No schema change.** No `x-version` bump and no regenerated types. The descriptions of
    `approval.resolved`, `channel.message_in`, `policy.applied` and `card` still mention WhatsApp
    paths. Where they disagree with OB-01, the rule and this ADR govern until each schema's next
@@ -79,4 +99,10 @@ cannot tell who is sending.
 - **ADR-0013.** Decision 2 (a WhatsApp answer copies `action_type`) and its `channel.message_in`
   diff lapse. Decisions 1 and 3 stand: on the web, a fixed control sets `action_type`.
 - How a typed answer to "What should I say?" on the web becomes a `world.requested` is logged as
-  BQ-CHRM-2, with the default applied.
+  BQ-CHRM-2, with the default applied. That row also lists three points for the user or supervisor
+  to decide:
+  - who sets a panel instruction's thread;
+  - where the instruction's words land (events, Story, archive);
+  - the `world.requested` registry effects for a mid-run instruction (HR-1 to HR-7).
+
+  No registry or schema change is made here.

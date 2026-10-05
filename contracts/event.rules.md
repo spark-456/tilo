@@ -50,8 +50,9 @@ version was approved and sent (outbox rule OB-05). With no gate card on the poli
 the connector, the destination (an opaque id) and the district the engine checked against the
 policy's scope, and the entry equals them (OB-01, OB-05). At L2 it also names the owner's
 instruction (`instruction_id`: an earlier `world.requested` the owner made signed in on the web or
-mobile web, never one over email or WhatsApp and never a `channel.message_in` (ADR-0019), with the
-same `destination`, used by no other `policy.applied`), which the Trace and HR-7's link show beside
+mobile web and tilo-api wrote from a typed-instruction control (OB-01 provenance), never one over
+email or WhatsApp and never a `channel.message_in` (ADR-0019), with the same `destination`, used by
+no other `policy.applied`), which the Trace and HR-7's link show beside
 the policy (OB-01).
 
 ## Fixtures
