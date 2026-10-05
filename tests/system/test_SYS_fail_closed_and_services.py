@@ -71,13 +71,13 @@ def test_SYS_SEC_05_tilo_api_without_dev_mode_serves_nothing_that_needs_a_person
     assert len(ops) >= 15
     for method, path in ops:
         response = httpx.request(method, prod_api.url + _fill(path), json={} if method == "POST" else None, timeout=15)
-        assert response.status_code in {401, 503}, f"{method} {path} answered {response.status_code} with no sign-in"
+        assert response.status_code == 401, f"{method} {path} answered {response.status_code} with no sign-in"
         assert "Traceback" not in response.text and "NotImplementedError" not in response.text, (
             f"{method} {path} leaks a server error body"
         )
 
 
-def test_SYS_SEC_05_an_anonymous_call_to_tilo_api_is_a_clean_401_or_503_not_a_500(prod_api):
+def test_SYS_SEC_05_an_anonymous_call_to_tilo_api_is_a_clean_401_not_a_500(prod_api):
     for method, path in [("POST", "/intake"), ("GET", "/worlds/w_x/events"), ("POST", "/worlds/w_x/pause")]:
         response = httpx.request(method, prod_api.url + path, json={} if method == "POST" else None, timeout=15)
-        assert response.status_code in {401, 503}, f"{method} {path} answered {response.status_code}"
+        assert response.status_code == 401, f"{method} {path} answered {response.status_code}"
