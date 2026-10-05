@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/mention.schema.json",
+  "x-version": "1.0.0",
+  "title": "Mention",
+  "description": "An @mention of a team member on a team pinboard entry (FR-PB-04). It names a team because a personal entry cannot be tagged (PE-01, PE-06). The tagged person is a member of the team when tagged; they can always remove themselves, and the entry's `set_up_by` person can remove anyone (PE-06). A removed mention stays as a record; a new tag is a new mention.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "org_id", "pin_id", "team", "user", "added_by", "removed"],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/mention_id"
+    },
+    "org_id": {
+      "$ref": "common.schema.json#/$defs/org_id"
+    },
+    "pin_id": {
+      "$ref": "common.schema.json#/$defs/pin_id"
+    },
+    "team": {
+      "$ref": "common.schema.json#/$defs/team_id"
+    },
+    "user": {
+      "$ref": "common.schema.json#/$defs/user_id"
+    },
+    "added_by": {
+      "$ref": "common.schema.json#/$defs/maker"
+    },
+    "removed": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/removal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "removal": {
+      "description": "Who removed the tag and when: the tagged person or the entry's setter (PE-06).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "at"],
+      "properties": {
+        "by": {
+          "$ref": "common.schema.json#/$defs/user_id"
+        },
+        "at": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "ce_budget_review",
+  "org_id": "org_example",
+  "owner": "u_priya",
+  "title": "Budget review",
+  "start": "2026-10-07T09:30:00.000Z",
+  "end": "2026-10-07T10:00:00.000Z",
+  "all_day": false,
+  "attendee_count": 3,
+  "source": {
+    "kind": "google",
+    "ref": "e7u3k2n9d8s6a1",
+    "synced_at": "2026-10-05T10:30:00.000Z"
+  },
+  "state": "accepted",
+  "share": null,
+  "created_by": {
+    "by": "tilo",
+    "ref": "system",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
+  "confirmed_by": null,
+  "updated_at": "2026-10-05T10:30:00.000Z"
+}

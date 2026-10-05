@@ -1,0 +1,338 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/meeting.schema.json",
+  "x-version": "1.0.0",
+  "title": "Meeting",
+  "description": "A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "org_id",
+    "owner",
+    "title",
+    "series",
+    "scheduled",
+    "agenda",
+    "attendees",
+    "attestation",
+    "source",
+    "status",
+    "ended_reason",
+    "minutes_confirmed_by",
+    "transcript",
+    "minutes",
+    "delete_transcript_after",
+    "delete_minutes_after",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/meeting_id"
+    },
+    "org_id": {
+      "$ref": "common.schema.json#/$defs/org_id"
+    },
+    "owner": {
+      "$ref": "common.schema.json#/$defs/user_id"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "[\\n\\r]"
+          },
+          {
+            "pattern": "://"
+          },
+          {
+            "pattern": "[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]"
+          }
+        ]
+      }
+    },
+    "series": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{1,64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "scheduled": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/scheduled_window"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "agenda": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/agenda_item"
+      }
+    },
+    "attendees": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "$ref": "#/$defs/attendee"
+      }
+    },
+    "attestation": {
+      "$ref": "#/$defs/attestation"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["bot", "upload"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["scheduled", "joining", "live", "ended", "minuted", "discarded", "deleted"]
+    },
+    "ended_reason": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": ["completed", "left_on_request", "removed", "timeout", "failed"]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "minutes_confirmed_by": {
+      "anyOf": [
+        {
+          "$ref": "team_lead.schema.json#/$defs/assignment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "transcript": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/artifact_ref",
+          "not": {
+            "required": ["label"]
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "minutes": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/artifact_ref",
+          "not": {
+            "required": ["label"]
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "delete_transcript_after": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "delete_minutes_after": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "created_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    }
+  },
+  "if": {
+    "properties": {
+      "status": {
+        "enum": ["discarded", "deleted"]
+      }
+    },
+    "required": ["status"]
+  },
+  "then": {
+    "properties": {
+      "transcript": {
+        "type": "null"
+      },
+      "minutes": {
+        "type": "null"
+      },
+      "minutes_confirmed_by": {
+        "type": "null"
+      }
+    }
+  },
+  "else": {
+    "if": {
+      "properties": {
+        "status": {
+          "const": "minuted"
+        }
+      },
+      "required": ["status"]
+    },
+    "then": {
+      "properties": {
+        "minutes": {
+          "type": "object"
+        }
+      }
+    },
+    "else": {
+      "properties": {
+        "minutes_confirmed_by": {
+          "type": "null"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "scheduled_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "agenda_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "minutes"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": {
+            "anyOf": [
+              {
+                "pattern": "[\\n\\r]"
+              },
+              {
+                "pattern": "://"
+              },
+              {
+                "pattern": "[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]"
+              }
+            ]
+          }
+        },
+        "minutes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/agenda_minutes"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "agenda_minutes": {
+      "description": "Planned minutes for an agenda item.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 240
+    },
+    "attendee": {
+      "description": "An attendee as the meeting named them; user is set when the name resolved to a person (PE-15).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "user"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": {
+            "anyOf": [
+              {
+                "pattern": "[\\n\\r]"
+              },
+              {
+                "pattern": "://"
+              },
+              {
+                "pattern": "[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]"
+              }
+            ]
+          }
+        },
+        "user": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/user_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "attestation": {
+      "description": "The Owner's attestation of the right to record or process this meeting (FR-MTG-01); by equals owner and is a person of the org (PE-18).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "at", "notice_version"],
+      "properties": {
+        "by": {
+          "$ref": "common.schema.json#/$defs/user_id"
+        },
+        "at": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        "notice_version": {
+          "$ref": "common.schema.json#/$defs/semver"
+        }
+      }
+    }
+  }
+}

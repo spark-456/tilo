@@ -1,0 +1,33 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000317",
+  "seq": 317,
+  "ts": "2026-10-05T09:05:17.000Z",
+  "world_id": "w_meeting_q4_plan",
+  "run_id": "r_meeting_q4_plan_1",
+  "type": "meeting.ended",
+  "actor": "system",
+  "target": "u_owner",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The external meeting ended: a participant asked Tilo to leave.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "meeting_id": "mt_q4_plan",
+    "reason": "bored"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

@@ -1,11 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/events/data/meeting.started.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "MeetingStartedData",
-  "description": "data of meeting.started (PRD 9.5).",
+  "description": "data of meeting.started (PRD 9.5). 1.1.0: the optional meeting_id names the Meeting record of an external meeting a bot or an upload brought in (FR-MTG-01); absent for a meeting the agents called. Optional means absent, never null.",
   "type": "object",
   "additionalProperties": false,
   "required": [],
-  "properties": {}
+  "properties": {
+    "meeting_id": {
+      "$ref": "../../common.schema.json#/$defs/meeting_id"
+    }
+  }
 }

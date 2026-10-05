@@ -1,0 +1,56 @@
+{
+  "id": "mt_q4_plan",
+  "org_id": "org_example",
+  "owner": "u_owner",
+  "title": "Q4 planning",
+  "series": "q4_planning_weekly",
+  "scheduled": null,
+  "agenda": [
+    {
+      "title": "Launch date",
+      "minutes": 15
+    },
+    {
+      "title": "Rate sheet",
+      "minutes": null
+    }
+  ],
+  "attendees": [
+    {
+      "name": "Asha Rao",
+      "user": "u_owner"
+    },
+    {
+      "name": "Priya",
+      "user": "u_priya"
+    },
+    {
+      "name": "Dev from Acme",
+      "user": null
+    }
+  ],
+  "attestation": {
+    "by": "u_owner",
+    "at": "2026-10-05T09:00:00.000Z",
+    "notice_version": "1.0.0"
+  },
+  "source": "upload",
+  "status": "minuted",
+  "ended_reason": "completed",
+  "transcript": {
+    "artifact_id": "art_t",
+    "version": 1,
+    "label": "https://meet.example.com/abc"
+  },
+  "minutes": {
+    "artifact_id": "art_minutes_q4_plan",
+    "version": 1
+  },
+  "minutes_confirmed_by": {
+    "by": "u_owner",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
+  "delete_transcript_after": "2026-11-05T10:00:00.000Z",
+  "delete_minutes_after": "2027-01-04T10:00:00.000Z",
+  "created_at": "2026-10-05T09:00:00.000Z"
+}

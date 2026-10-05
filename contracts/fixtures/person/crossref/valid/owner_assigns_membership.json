@@ -1,0 +1,137 @@
+{
+  "rule": null,
+  "note": "An org owner puts a member into a team.",
+  "now": "2026-10-06T10:00:00.000Z",
+  "persons": {
+    "u_owner": {
+      "id": "u_owner",
+      "org_id": "org_example",
+      "display_name": "Asha Rao",
+      "aliases": ["Asha"],
+      "email": "asha@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "email",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_priya": {
+      "id": "u_priya",
+      "org_id": "org_example",
+      "display_name": "Priya Nair",
+      "aliases": ["Priya", "PN"],
+      "email": "priya@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "email",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam": {
+      "id": "u_sam",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam"],
+      "email": "sam@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "mobile_web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam_launch": {
+      "id": "u_sam_launch",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam L"],
+      "email": "sam@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "mobile_web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    }
+  },
+  "record": {
+    "kind": "person",
+    "data": {
+      "id": "u_sam",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam"],
+      "email": "sam@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "mobile_web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        },
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-06T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    }
+  },
+  "request": {
+    "actor": "u_owner",
+    "action": "assign_membership",
+    "view": null
+  }
+}

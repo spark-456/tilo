@@ -1,0 +1,33 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000308",
+  "seq": 308,
+  "ts": "2026-10-05T09:05:08.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "calendar.synced",
+  "actor": "system",
+  "target": "u_priya",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The calendar synced: 3 changes.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "kind": "incremental",
+    "changed": 3
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

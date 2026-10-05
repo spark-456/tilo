@@ -1,0 +1,37 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000315",
+  "seq": 315,
+  "ts": "2026-10-05T09:05:15.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "pinboard.item_added",
+  "actor": "A_analyst",
+  "target": "u_priya",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "Tilo added a pin to Priya's personal board from her request.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "pin_id": "pb_priya_followup",
+    "scope_kind": "personal",
+    "team": null,
+    "status": "active",
+    "made_by": "tilo",
+    "source_kind": "request"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

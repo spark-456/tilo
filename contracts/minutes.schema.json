@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/minutes.schema.json",
+  "x-version": "1.0.0",
+  "title": "Minutes",
+  "description": "The structured minutes of one meeting, the content of a `minutes` artifact (FR-MTG-03, -04). Every item cites utterance ids of the pinned transcript version; a `verified` item cites at least one (the evidence check by code, then the Verifier model for failures). Owner and due are resolved by code, never by a model (PE-15). Owner-only (PE-05).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "meeting_id",
+    "transcript",
+    "generated_at",
+    "flagged",
+    "summary",
+    "decisions",
+    "action_items",
+    "agenda"
+  ],
+  "properties": {
+    "meeting_id": {
+      "$ref": "common.schema.json#/$defs/meeting_id"
+    },
+    "transcript": {
+      "$ref": "common.schema.json#/$defs/artifact_ref"
+    },
+    "generated_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "flagged": {
+      "description": "The safety provider flagged the transcript: any draft from these minutes is T3.",
+      "type": "boolean"
+    },
+    "summary": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/summary_point"
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "action_items": {
+      "type": "array",
+      "maxItems": 60,
+      "items": {
+        "$ref": "#/$defs/action_item"
+      }
+    },
+    "agenda": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/agenda_point"
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "description": "Utterance ids of the pinned transcript version that support the item.",
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "common.schema.json#/$defs/utterance_id"
+      }
+    },
+    "summary_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "evidence"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "state", "evidence"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "state": {
+          "type": "string",
+          "enum": ["verified", "unverified"]
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "verified"
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "action_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "text",
+        "state",
+        "evidence",
+        "owner_text",
+        "owner",
+        "due_text",
+        "due",
+        "work_item_id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^ai[0-9]{1,3}$"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "state": {
+          "type": "string",
+          "enum": ["verified", "unverified"]
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "owner_text": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+              "not": {
+                "pattern": "[\\n\\r]"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/user_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "due_text": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+              "not": {
+                "pattern": "[\\n\\r]"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "due": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/calendar_date"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "work_item_id": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/work_item_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "verified"
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "agenda_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "coverage", "evidence"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "coverage": {
+          "type": "string",
+          "enum": ["covered", "partial", "not_discussed"]
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    }
+  }
+}

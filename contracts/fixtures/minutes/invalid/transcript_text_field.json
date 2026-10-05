@@ -1,0 +1,59 @@
+{
+  "meeting_id": "mt_q4_plan",
+  "transcript": {
+    "artifact_id": "art_transcript_q4_plan",
+    "version": 1
+  },
+  "generated_at": "2026-10-05T10:30:00.000Z",
+  "flagged": false,
+  "summary": [
+    {
+      "text": "Launch moved to 17 October; the rate sheet is the blocker.",
+      "evidence": ["u0012", "u0014"]
+    }
+  ],
+  "decisions": [
+    {
+      "text": "Launch on 17 October.",
+      "state": "verified",
+      "evidence": ["u0012"]
+    }
+  ],
+  "action_items": [
+    {
+      "id": "ai1",
+      "text": "Send the rate sheet to Acme.",
+      "state": "verified",
+      "evidence": ["u0021", "u0022"],
+      "owner_text": "Priya",
+      "owner": "u_priya",
+      "due_text": "by Friday",
+      "due": "2026-10-09",
+      "work_item_id": null
+    },
+    {
+      "id": "ai2",
+      "text": "Book the venue.",
+      "state": "unverified",
+      "evidence": [],
+      "owner_text": "Sam",
+      "owner": null,
+      "due_text": null,
+      "due": null,
+      "work_item_id": null
+    }
+  ],
+  "agenda": [
+    {
+      "title": "Launch date",
+      "coverage": "covered",
+      "evidence": ["u0010"]
+    },
+    {
+      "title": "Rate sheet",
+      "coverage": "not_discussed",
+      "evidence": []
+    }
+  ],
+  "transcript_text": "Priya: I will send it"
+}

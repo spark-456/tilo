@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/meeting.minuted.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingMinutedData",
+  "description": "data of meeting.minuted (CC-PEOPLE, FR-MTG-03). The minutes artifact is ready for the Owner to review; the counts let the HUD say what is waiting without carrying any text. unverified counts items whose evidence check failed (FR-MTG-04). flagged is the safety provider's verdict on the transcript.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["meeting_id", "minutes", "decisions", "action_items", "unverified", "flagged"],
+  "properties": {
+    "meeting_id": {
+      "$ref": "../../common.schema.json#/$defs/meeting_id"
+    },
+    "minutes": {
+      "$ref": "../../common.schema.json#/$defs/artifact_ref",
+      "not": {
+        "required": ["label"]
+      }
+    },
+    "decisions": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "action_items": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unverified": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "flagged": {
+      "type": "boolean"
+    }
+  }
+}

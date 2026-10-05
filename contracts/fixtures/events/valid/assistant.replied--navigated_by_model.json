@@ -1,0 +1,42 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000313",
+  "seq": 313,
+  "ts": "2026-10-05T09:05:13.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "assistant.replied",
+  "actor": "A_assistant",
+  "target": "u_priya",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0.4,
+  "summary": "The assistant opened the team pinboard.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "conversation_id": "01JB5VQ0000000000000009313",
+    "message_ref": "r_desk_priya_1/35",
+    "outcome": "navigated",
+    "decided_by": "model",
+    "sources": [],
+    "ui_action": {
+      "kind": "navigate",
+      "route": "pinboard_team",
+      "target": null
+    },
+    "cached": false
+  },
+  "trace": {
+    "model_role": "assistant",
+    "profile": "medium",
+    "tokens_in": 900,
+    "tokens_out": 120,
+    "tool": null,
+    "latency_ms": 900,
+    "archive_ref": "r_desk_priya_1/33"
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "id": "mt_q4_plan",
+  "org_id": "org_example",
+  "owner": "u_owner",
+  "title": "Q4 planning",
+  "series": "q4_planning_weekly",
+  "scheduled": {
+    "start": "2026-10-06T09:00:00.000Z",
+    "end": "2026-10-06T10:00:00.000Z"
+  },
+  "agenda": [
+    {
+      "title": "Item 0",
+      "minutes": null
+    },
+    {
+      "title": "Item 1",
+      "minutes": null
+    },
+    {
+      "title": "Item 2",
+      "minutes": null
+    },
+    {
+      "title": "Item 3",
+      "minutes": null
+    },
+    {
+      "title": "Item 4",
+      "minutes": null
+    },
+    {
+      "title": "Item 5",
+      "minutes": null
+    },
+    {
+      "title": "Item 6",
+      "minutes": null
+    },
+    {
+      "title": "Item 7",
+      "minutes": null
+    },
+    {
+      "title": "Item 8",
+      "minutes": null
+    },
+    {
+      "title": "Item 9",
+      "minutes": null
+    },
+    {
+      "title": "Item 10",
+      "minutes": null
+    },
+    {
+      "title": "Item 11",
+      "minutes": null
+    },
+    {
+      "title": "Item 12",
+      "minutes": null
+    },
+    {
+      "title": "Item 13",
+      "minutes": null
+    },
+    {
+      "title": "Item 14",
+      "minutes": null
+    },
+    {
+      "title": "Item 15",
+      "minutes": null
+    },
+    {
+      "title": "Item 16",
+      "minutes": null
+    },
+    {
+      "title": "Item 17",
+      "minutes": null
+    },
+    {
+      "title": "Item 18",
+      "minutes": null
+    },
+    {
+      "title": "Item 19",
+      "minutes": null
+    },
+    {
+      "title": "Item 20",
+      "minutes": null
+    }
+  ],
+  "attendees": [
+    {
+      "name": "Asha Rao",
+      "user": "u_owner"
+    },
+    {
+      "name": "Priya",
+      "user": "u_priya"
+    },
+    {
+      "name": "Dev from Acme",
+      "user": null
+    }
+  ],
+  "attestation": {
+    "by": "u_owner",
+    "at": "2026-10-05T09:00:00.000Z",
+    "notice_version": "1.0.0"
+  },
+  "source": "bot",
+  "status": "live",
+  "ended_reason": null,
+  "transcript": null,
+  "minutes": null,
+  "minutes_confirmed_by": null,
+  "delete_transcript_after": null,
+  "delete_minutes_after": null,
+  "created_at": "2026-10-05T09:00:00.000Z"
+}

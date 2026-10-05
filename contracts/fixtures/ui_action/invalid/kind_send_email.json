@@ -1,0 +1,4 @@
+{
+  "kind": "send_email",
+  "to": "sam@example.com"
+}

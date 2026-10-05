@@ -1,0 +1,8 @@
+{
+  "kind": "navigate",
+  "route": "world",
+  "target": {
+    "kind": "district",
+    "id": "D1"
+  }
+}

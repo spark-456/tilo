@@ -6,8 +6,9 @@
  * artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
  * attention.schema.json 1.0.0 sha256:f35cff84728304af
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
+ * calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
- * common.schema.json 1.1.0 sha256:b7307504495c9b61
+ * common.schema.json 1.1.0 sha256:a843c4274305fd64
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
  * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -41,6 +42,8 @@
  * events/data/artifact.reviewed.schema.json 1.0.0 sha256:fee51f5f590c73c4
  * events/data/artifact.rolled_back.schema.json 1.0.0 sha256:4c4dac77a4b5c873
  * events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
+ * events/data/assistant.asked.schema.json 1.0.0 sha256:8775120b73c4ed38
+ * events/data/assistant.replied.schema.json 1.0.0 sha256:48fb513dadef290d
  * events/data/budget.granted.schema.json 1.0.0 sha256:34e26044aeb0114d
  * events/data/budget.requested.schema.json 1.1.0 sha256:abda889558ab1c91
  * events/data/building.archived.schema.json 1.0.0 sha256:638f47ef89001f58
@@ -49,6 +52,9 @@
  * events/data/building.operational.schema.json 1.0.0 sha256:9fcf73cb4c895c6f
  * events/data/building.planned.schema.json 1.0.0 sha256:b44f9bbe889e72d7
  * events/data/building.scaled.schema.json 1.0.0 sha256:6acdd4fb4e291cd1
+ * events/data/calendar.entry_changed.schema.json 1.0.0 sha256:b7fd2ebc2311bf4b
+ * events/data/calendar.entry_proposed.schema.json 1.0.0 sha256:88f4a35ac61e77bf
+ * events/data/calendar.synced.schema.json 1.0.0 sha256:4cdf1d3efc5170be
  * events/data/channel.message_in.schema.json 1.0.0 sha256:2b052fa89605631c
  * events/data/channel.message_out.schema.json 1.0.0 sha256:dd42d2db8385a110
  * events/data/connection.consented.schema.json 1.0.0 sha256:6664b8f2558850bd
@@ -65,10 +71,15 @@
  * events/data/level.created.schema.json 1.0.0 sha256:f404c2d35df9da17
  * events/data/meeting.called.schema.json 1.0.0 sha256:af1b23d42d145e42
  * events/data/meeting.decision.schema.json 1.0.0 sha256:359fc3bc20f11676
- * events/data/meeting.ended.schema.json 1.0.0 sha256:2f486a0b840fe431
- * events/data/meeting.started.schema.json 1.0.0 sha256:1c39ad9c6da3e04d
+ * events/data/meeting.ended.schema.json 1.1.0 sha256:9219b0e4934a318e
+ * events/data/meeting.minuted.schema.json 1.0.0 sha256:f2a9c646721e5b64
+ * events/data/meeting.started.schema.json 1.1.0 sha256:3ee754f6effc0b32
  * events/data/memory.hit.schema.json 1.0.0 sha256:ae1d0919f97240c5
  * events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
+ * events/data/mention.added.schema.json 1.0.0 sha256:6872181c4b6047f1
+ * events/data/mention.removed.schema.json 1.0.0 sha256:fa5d648280a1518c
+ * events/data/pinboard.item_added.schema.json 1.0.0 sha256:f36dccb547318b08
+ * events/data/pinboard.item_changed.schema.json 1.0.0 sha256:2db181d1a51c6c84
  * events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
  * events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
  * events/data/policy.applied.schema.json 1.0.0 sha256:3ca104f308b12dce
@@ -76,6 +87,8 @@
  * events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
  * events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
  * events/data/skill.loaded.schema.json 1.0.0 sha256:acddc05d7bde55d2
+ * events/data/work_item.changed.schema.json 1.0.0 sha256:8740c0c65f424dc5
+ * events/data/work_item.created.schema.json 1.0.0 sha256:a9fbffc5d3854c81
  * events/data/world.completed.schema.json 1.0.0 sha256:0370652b0ac84eea
  * events/data/world.failed.schema.json 1.0.0 sha256:17a50a9c70ba8ae1
  * events/data/world.paused.schema.json 1.0.0 sha256:1b190f91f08a918c
@@ -83,21 +96,28 @@
  * events/data/world.requested.schema.json 1.0.0 sha256:d59a584d7d9b0cf8
  * events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
  * events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
- * events/registry.schema.json 1.0.0 sha256:42c04358933101ef
+ * events/registry.schema.json 1.1.0 sha256:22ae30d4e99499c8
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
+ * meeting.schema.json 1.0.0 sha256:da49e396159870f5
+ * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
+ * minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
+ * person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
+ * pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
  * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
- * events/registry.yaml 1.0.0 sha256:29d7a2b0b4a0cef2
+ * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
+ * work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
+ * events/registry.yaml 1.1.0 sha256:2db78f63298c923a
  */
 
 /**
@@ -235,6 +255,23 @@ export type DeliverableFormat =
  * via the `definition` "CalendarDate".
  */
 export type CalendarDate = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntryId".
+ */
+export type CalendarEntryId = string;
+/**
+ * An opaque reference to a record or a place in one (for example mt_x#ai3): letters, digits, underscore, hash and hyphen only, so no URL, domain, path or address fits (the destination rule).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OpaqueRef".
+ */
+export type OpaqueRef = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TeamId".
+ */
+export type TeamId = string;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "CardKind".
@@ -383,6 +420,31 @@ export type IconName = string;
 export type DataClass = "personal" | "business" | "public";
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorkItemId".
+ */
+export type WorkItemId = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingId".
+ */
+export type MeetingId = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinId".
+ */
+export type PinId = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionId".
+ */
+export type MentionId = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UtteranceId".
+ */
+export type UtteranceId = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ConnectorScopeList".
  */
 export type ConnectorScopeList = string[];
@@ -469,7 +531,53 @@ export type EventDistrictList = [DistrictId, ...DistrictId[]];
  */
 export type EventAnswerSource = "person" | "team_lead" | "default" | "decision";
 /**
- * Event families of PRD 9.5.
+ * A screen of the web app (PRD 18.3), closed list.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionRoute".
+ */
+export type UiActionRoute =
+  | "plate"
+  | "calendar"
+  | "meetings"
+  | "meeting"
+  | "pinboard_team"
+  | "pinboard_personal"
+  | "worlds"
+  | "world"
+  | "cards"
+  | "connections"
+  | "channels"
+  | "autonomy"
+  | "settings";
+/**
+ * The allow-list of what the assistant panel may do on the page (FR-PA-14, PE-10): a closed union on `kind`. The web app has one executor that maps each kind to a handler; a document that does not validate is dropped, so a model can never click, type, read the page or go anywhere outside these routes and targets. State-changing kinds act on the signed-in person's own records through the same API routes as the buttons; `draft_reply` makes a draft (T1) and sends nothing; no kind sends to another person.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiAction".
+ */
+export type UiAction =
+  | UiActionNavigate
+  | UiActionMarkDone
+  | UiActionSnooze
+  | UiActionDraftReply
+  | UiActionTag
+  | UiActionUntag;
+/**
+ * The record a route opens, if any.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionTarget".
+ */
+export type UiActionTarget =
+  | UiActionTargetWorld
+  | UiActionTargetMeeting
+  | UiActionTargetCard
+  | UiActionTargetPin
+  | UiActionTargetWorkItem
+  | UiActionTargetCalendarEntry;
+/**
+ * Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "EventRegistryFamily".
@@ -493,7 +601,12 @@ export type EventRegistryFamily =
   | "policy"
   | "alert"
   | "memory"
-  | "app";
+  | "app"
+  | "work_item"
+  | "pinboard"
+  | "mention"
+  | "calendar"
+  | "assistant";
 /**
  * One plain-language effect.
  *
@@ -531,6 +644,13 @@ export type LayoutCommonType =
   | "mail_room"
   | "expert_office";
 /**
+ * Planned minutes for an agenda item.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingAgendaMinutes".
+ */
+export type MeetingAgendaMinutes = number;
+/**
  * An https URL of host, optional port and path, with no user info, query or fragment. The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -558,6 +678,15 @@ export type MeteringOrgCap = number | null;
  * via the `definition` "MeteringBillingService".
  */
 export type MeteringBillingService = string;
+/**
+ * Utterance ids of the pinned transcript version that support the item.
+ *
+ * @maxItems 20
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MinutesEvidence".
+ */
+export type MinutesEvidence = UtteranceId[];
 /**
  * A PRD 10.4 context condition that raises any action to T3; also listed on the outbox entry it applies to (outbox.schema.json modifiers).
  *
@@ -995,6 +1124,136 @@ export interface BriefCitation {
   recorded_at: Timestamp;
 }
 /**
+ * One entry on a person's calendar that Tilo stores (FR-CAL-01, -03): a cached Google Calendar event, an entry the person made, or one Tilo proposed. Work-item due dates, pin deadlines and Tilo's meetings are not stored here: the agenda merges them at read time as `agenda_item` rows that cite their record. Private to `owner` unless `share` names a team (PE-04), which only an accepted entry may do; teammates otherwise get `free_busy` only. A Tilo-made entry (`created_by.by` tilo, source manual or tilo) is accepted only with `confirmed_by` (PE-07). What a Google event keeps is title, times, an all-day flag and a count of other attendees: no description, attendee names or addresses, conference link or location (PE-13). `attendee_count` above 0 makes a write to Google T3 (PE-14).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntry".
+ */
+export interface CalendarEntry {
+  id: CalendarEntryId;
+  org_id: OrgId;
+  owner: UserId;
+  title: string;
+  start: Timestamp;
+  end: Timestamp | null;
+  all_day: boolean;
+  attendee_count: number;
+  source: CalendarEntrySourceGoogle | CalendarEntrySourceManual | CalendarEntrySourceTilo;
+  state: "proposed" | "accepted" | "declined" | "cancelled";
+  share: CalendarEntryShare | null;
+  created_by: Maker;
+  confirmed_by: TeamLeadAssignment | null;
+  /**
+   * True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+   */
+  flagged: boolean;
+  updated_at: Timestamp;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntrySourceGoogle".
+ */
+export interface CalendarEntrySourceGoogle {
+  kind: "google";
+  ref: string;
+  synced_at: Timestamp;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntrySourceManual".
+ */
+export interface CalendarEntrySourceManual {
+  kind: "manual";
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntrySourceTilo".
+ */
+export interface CalendarEntrySourceTilo {
+  kind: "tilo";
+  from: "meeting" | "transcript" | "request" | "mail";
+  ref: OpaqueRef | null;
+}
+/**
+ * The team the owner shared this entry with (PE-04); no sharing is null.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntryShare".
+ */
+export interface CalendarEntryShare {
+  team: TeamId;
+}
+/**
+ * Who made a record: a person (ref is a user id) or Tilo (ref is an agent id, or system for the sweeper and syncs), and when. Provenance, not authority: a record Tilo made starts proposed and leaves that state only with a person's confirmed_by (PE-07, PE-08).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Maker".
+ */
+export interface Maker {
+  by: "person" | "tilo";
+  ref: string;
+  at: Timestamp;
+}
+/**
+ * Who made an assignment and when: only the world's owner assigns a Team Lead's domain (PRD 16.2) or a gate's Approver (PRD 10.1; approval.requested approver). OB-01 requires by to be the owner and at to be no later than the answer.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TeamLeadAssignment".
+ */
+export interface TeamLeadAssignment {
+  by: UserId;
+  at: Timestamp;
+}
+/**
+ * One row of the merged agenda read model (FR-CAL-01): never stored.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntryAgendaItem".
+ */
+export interface CalendarEntryAgendaItem {
+  start: Timestamp;
+  end: Timestamp | null;
+  all_day: boolean;
+  title: string;
+  kind: "event" | "due" | "reminder" | "meeting" | "deadline";
+  source: CalendarEntryAgendaSource;
+  state: "proposed" | "confirmed";
+  shared: boolean;
+}
+/**
+ * The record an agenda row cites (FR-CAL-01).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntryAgendaSource".
+ */
+export interface CalendarEntryAgendaSource {
+  kind: "calendar_entry" | "work_item" | "meeting" | "pinboard_item";
+  id: string;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntryBusyInterval".
+ */
+export interface CalendarEntryBusyInterval {
+  start: Timestamp;
+  end: Timestamp;
+}
+/**
+ * What a teammate gets of another person's calendar (PE-04): intervals only, no title, source or count.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntryFreeBusy".
+ */
+export interface CalendarEntryFreeBusy {
+  user: UserId;
+  from: Timestamp;
+  to: Timestamp;
+  /**
+   * @maxItems 200
+   */
+  busy: CalendarEntryBusyInterval[];
+}
+/**
  * One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout; it names one of the options and that option is reversible (contracts/card.rules.md CR-01 to CR-03). A gate's or consent card's is always hold, so a gate never times out to go and a consent card never times out to a grant; every hold option is reversible, only a gate may offer an irreversible option, and neither a gate nor a consent card is delegated to the Director. A gate's option ids are the closed set approve, edit, hold, each with a fixed label (Approve, Edit first, Hold); only approve opens the gate, and its irreversible flag equals the gate's (CR-07, CR-08). A consent card's option ids are the closed set connect, hold with fixed labels Connect, Hold; only connect grants (CR-13). The deterministic card builder writes a gate card's gate details and options, never a model, and the card validator checks them against the plan gate, the connector action and the outbox entry the gate releases (CR-09 to CR-12).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -1159,6 +1418,16 @@ export interface Common {
   media_type?: MediaType;
   credit_range?: CreditRange;
   time_range?: TimeRange;
+  work_item_id?: WorkItemId;
+  meeting_id?: MeetingId;
+  pin_id?: PinId;
+  mention_id?: MentionId;
+  calendar_entry_id?: CalendarEntryId;
+  team_id?: TeamId;
+  utterance_id?: UtteranceId;
+  opaque_ref?: OpaqueRef;
+  maker?: Maker;
+  record_ref?: RecordRef;
 }
 /**
  * Estimated credits as a range; min <= max is checked by validators.
@@ -1179,6 +1448,24 @@ export interface CreditRange {
 export interface TimeRange {
   min_s: number;
   max_s: number;
+}
+/**
+ * A pointer to a record a claim rests on (assistant answers cite these, HR-1): its kind and id, never its content.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "RecordRef".
+ */
+export interface RecordRef {
+  kind:
+    | "work_item"
+    | "calendar_entry"
+    | "meeting"
+    | "pinboard_item"
+    | "mention"
+    | "card"
+    | "world"
+    | "event";
+  id: string;
 }
 /**
  * Connector declaration (PRD 12.1), one entry of config/connectors.yaml. Every action declares a risk tier and a gate type (FR-CON-06); write, send, share and delete actions are gated and deletes are always T3; an action with gate_type none is never T3 or irreversible.
@@ -1689,16 +1976,6 @@ export interface ApprovalRequestedDataApproverAssignment {
   assigned_by: TeamLeadAssignment;
 }
 /**
- * Who made an assignment and when: only the world's owner assigns a Team Lead's domain (PRD 16.2) or a gate's Approver (PRD 10.1; approval.requested approver). OB-01 requires by to be the owner and at to be no later than the answer.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "TeamLeadAssignment".
- */
-export interface TeamLeadAssignment {
-  by: UserId;
-  at: Timestamp;
-}
-/**
  * A Team Lead may answer this gate: one whose owner-assigned domain (team_lead.schema.json) is domain, while policy_id names the owner's policy for this action type that lists domain in team_lead_domains (PRD 10.1: 'in their domain, if the policy allows'; OB-01).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -1780,6 +2057,135 @@ export interface ArtifactRolledBackData {
 export interface ArtifactVersionedData {
   artifact: ArtifactRef;
   previous_version: number;
+}
+/**
+ * data of assistant.asked (CC-PEOPLE, FR-PA-12). A person asked the assistant panel something. The text is in the redacted raw archive (message_ref), never here. screen is the route the panel was opened on.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AssistantAskedData".
+ */
+export interface AssistantAskedData {
+  conversation_id: Ulid;
+  message_ref: EventArchiveRef;
+  screen: UiActionRoute | null;
+}
+/**
+ * data of assistant.replied (CC-PEOPLE, FR-PA-13, -14, -19, PE-10, PE-11). The panel answered. decided_by says whether deterministic rules or the cheap model picked the read model or action; the answer text is a template over read-model rows and sits in the raw archive (message_ref). sources are the records every claim cites (HR-1): an answered outcome has at least one. ui_action is the one validated allow-list action the panel took or offers; a navigated outcome has one. cached is true when the answer was served from an unchanged-records cache.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AssistantRepliedData".
+ */
+export interface AssistantRepliedData {
+  conversation_id: Ulid;
+  message_ref: EventArchiveRef;
+  outcome: "answered" | "navigated" | "declined" | "failed";
+  decided_by: "rules" | "model";
+  /**
+   * @maxItems 20
+   */
+  sources: RecordRef[];
+  ui_action: UiAction | null;
+  cached: boolean;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionNavigate".
+ */
+export interface UiActionNavigate {
+  kind: "navigate";
+  route: UiActionRoute;
+  target: UiActionTarget | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionTargetWorld".
+ */
+export interface UiActionTargetWorld {
+  kind: "world";
+  id: WorldId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionTargetMeeting".
+ */
+export interface UiActionTargetMeeting {
+  kind: "meeting";
+  id: MeetingId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionTargetCard".
+ */
+export interface UiActionTargetCard {
+  kind: "card";
+  id: Ulid;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionTargetPin".
+ */
+export interface UiActionTargetPin {
+  kind: "pin";
+  id: PinId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionTargetWorkItem".
+ */
+export interface UiActionTargetWorkItem {
+  kind: "work_item";
+  id: WorkItemId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionTargetCalendarEntry".
+ */
+export interface UiActionTargetCalendarEntry {
+  kind: "calendar_entry";
+  id: CalendarEntryId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionMarkDone".
+ */
+export interface UiActionMarkDone {
+  kind: "mark_done";
+  work_item_id: WorkItemId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionSnooze".
+ */
+export interface UiActionSnooze {
+  kind: "snooze";
+  work_item_id: WorkItemId;
+  until: Timestamp;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionDraftReply".
+ */
+export interface UiActionDraftReply {
+  kind: "draft_reply";
+  thread: Destination;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionTag".
+ */
+export interface UiActionTag {
+  kind: "tag";
+  pin_id: PinId;
+  user: UserId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UiActionUntag".
+ */
+export interface UiActionUntag {
+  kind: "untag";
+  pin_id: PinId;
+  user: UserId;
 }
 /**
  * data of budget.granted (PRD 9.5). A person, or a policy under its threshold, approved spending (FR-INT-08); spending credits is a T1 side effect (PRD 10.4), so the event carries authz.
@@ -1869,6 +2275,37 @@ export interface BuildingPlannedData {
  */
 export interface BuildingScaledData {
   floors: number;
+}
+/**
+ * data of calendar.entry_changed (CC-PEOPLE, FR-CAL-03, FR-CAL-06). A calendar entry was accepted, declined, edited, removed, shared with a team or made private again. A write to Google is a data.transfer through the outbox, not this event.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntryChangedData".
+ */
+export interface CalendarEntryChangedData {
+  entry_id: CalendarEntryId;
+  change: "accepted" | "declined" | "edited" | "removed" | "shared" | "unshared";
+  state: "proposed" | "accepted" | "declined" | "cancelled";
+}
+/**
+ * data of calendar.entry_proposed (CC-PEOPLE, FR-CAL-03). Tilo proposed a calendar entry from a meeting, a transcript, a request or a mail; it stays proposed and private until the person accepts.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarEntryProposedData".
+ */
+export interface CalendarEntryProposedData {
+  entry_id: CalendarEntryId;
+  source_kind: "meeting" | "transcript" | "request" | "mail";
+}
+/**
+ * data of calendar.synced (CC-PEOPLE, FR-CAL-02, -08). The cached Google events of a person were refreshed: incremental by sync token, or full after the token expired. A count, never a title (PE-13).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "CalendarSyncedData".
+ */
+export interface CalendarSyncedData {
+  kind: "incremental" | "full";
+  changed: number;
 }
 /**
  * data of channel.message_in (PRD 9.5). A message from a bound WhatsApp number or to Tilo's email address. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message answers a card; card_kind is then that card's kind, copied by the channels service from the card, and null otherwise. option is the id of the card option the person tapped (a WhatsApp reply button), taken from the button's payload; null when the person typed the message. destination is the thread or folder the message was sent about (an email thread forwarded to Tilo, or the one the card it answers showed), as an opaque id set by the channel, never read out of the text by a model; null otherwise (BQ-29). For whatsapp, actor is the user whose number is bound and confirmed (FR-CHN-03), looked up after the webhook signature check. An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is whatsapp, option is null (the owner's own typed words) and card_kind is null or needs_you (BQ-56): a tapped option, such as Hold on a gate card, and any answer to a gate, consent or meeting card is recorded by its own answering event and is never an instruction. An email's sender is not authenticated, so an email is never an instruction, whoever its actor is.
@@ -2042,19 +2479,46 @@ export interface MeetingDecisionData {
   option: CardOptionId;
 }
 /**
- * data of meeting.ended (PRD 9.5).
+ * data of meeting.ended (PRD 9.5). 1.1.0: optional meeting_id as on meeting.started, and the optional reason an external meeting ended (left_on_request is a participant's `Tilo leave`, FR-MTG-10). Optional means absent, never null.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeetingEndedData".
  */
-export interface MeetingEndedData {}
+export interface MeetingEndedData {
+  meeting_id?: MeetingId;
+  reason?: "completed" | "left_on_request" | "removed" | "timeout" | "failed";
+}
 /**
- * data of meeting.started (PRD 9.5).
+ * data of meeting.minuted (CC-PEOPLE, FR-MTG-03). The minutes artifact is ready for the Owner to review; the counts let the HUD say what is waiting without carrying any text. unverified counts items whose evidence check failed (FR-MTG-04). flagged is the safety provider's verdict on the transcript.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingMinutedData".
+ */
+export interface MeetingMinutedData {
+  meeting_id: MeetingId;
+  minutes: ArtifactRef1;
+  decisions: number;
+  action_items: number;
+  unverified: number;
+  flagged: boolean;
+}
+/**
+ * A pinned version of a stored artifact.
+ */
+export interface ArtifactRef1 {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
+}
+/**
+ * data of meeting.started (PRD 9.5). 1.1.0: the optional meeting_id names the Meeting record of an external meeting a bot or an upload brought in (FR-MTG-01); absent for a meeting the agents called. Optional means absent, never null.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeetingStartedData".
  */
-export interface MeetingStartedData {}
+export interface MeetingStartedData {
+  meeting_id?: MeetingId;
+}
 /**
  * data of memory.hit (PRD 9.5). A cached result passed the fit check and the Verifier (FR-MEM-02); saved equals origin_cost minus lookup_cost (PRD 14.3, FR-MTR-06, EV-09).
  *
@@ -2075,6 +2539,54 @@ export interface MemoryHitData {
 export interface MemorySavedData {
   layer: "result_cache" | "artifact_memory" | "decisions" | "preferences";
   item_count: number;
+}
+/**
+ * data of mention.added (CC-PEOPLE, FR-PB-04). A team member was tagged on a team entry. The tagged person is told through their own plate, not this event.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionAddedData".
+ */
+export interface MentionAddedData {
+  mention_id: MentionId;
+  pin_id: PinId;
+  team: TeamId;
+  user: UserId;
+}
+/**
+ * data of mention.removed (CC-PEOPLE, FR-PB-04). A tag was removed by the tagged person themselves or by the entry's setter (PE-06).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionRemovedData".
+ */
+export interface MentionRemovedData {
+  mention_id: MentionId;
+  pin_id: PinId;
+  removed_by: UserId;
+}
+/**
+ * data of pinboard.item_added (CC-PEOPLE, FR-PB-01, -02, -06). An entry was added to a personal board (team null) or a team board (team set). made_by tilo with status proposed is a Tilo entry awaiting the meeting Owner's confirmation (PE-07).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemAddedData".
+ */
+export interface PinboardItemAddedData {
+  pin_id: PinId;
+  scope_kind: "personal" | "team";
+  team: TeamId | null;
+  status: "proposed" | "active";
+  made_by: "person" | "tilo";
+  source_kind: ("meeting" | "mail" | "call" | "request" | "manual") | null;
+}
+/**
+ * data of pinboard.item_changed (CC-PEOPLE, FR-PB-05, -06). An entry was edited, accepted (proposed to active by the meeting Owner), removed, undone (a person took back what Tilo added) or given another owner.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemChangedData".
+ */
+export interface PinboardItemChangedData {
+  pin_id: PinId;
+  change: "edited" | "accepted" | "removed" | "undone" | "owner_changed";
+  status: "proposed" | "active" | "removed";
 }
 /**
  * data of plan.approaches_proposed (PRD 9.5). Two or three priced approaches (FR-INT-06); the approaches themselves are in the PlanGraph.
@@ -2155,6 +2667,37 @@ export interface QuestionRoutedData {
 export interface SkillLoadedData {
   skill: SkillId;
   version: Semver;
+}
+/**
+ * data of work_item.changed (CC-PEOPLE, FR-PA-01, FR-PA-05). A work item moved: confirmed (proposed to open), edited, snoozed, done, dropped, reopened, reassign_requested, or reminded (the sweeper nudged the owner).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorkItemChangedData".
+ */
+export interface WorkItemChangedData {
+  work_item_id: WorkItemId;
+  change:
+    | "confirmed"
+    | "edited"
+    | "snoozed"
+    | "done"
+    | "dropped"
+    | "reopened"
+    | "reassign_requested"
+    | "reminded";
+  status: "proposed" | "open" | "done" | "dropped";
+}
+/**
+ * data of work_item.created (CC-PEOPLE, FR-PA-01). A work item exists: proposed (Tilo made it, awaiting the meeting Owner) or open (a person made it). No title: the record holds it (PE-03). actor is who made it; the world is the maker's.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorkItemCreatedData".
+ */
+export interface WorkItemCreatedData {
+  work_item_id: WorkItemId;
+  owner: UserId;
+  status: "proposed" | "open";
+  source_kind: "meeting" | "mail" | "manual" | "pinboard" | "request";
 }
 /**
  * data of world.completed (PRD 9.5).
@@ -2581,6 +3124,116 @@ export interface LayoutGateGeometry {
   cell: LayoutPoint;
 }
 /**
+ * A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Meeting".
+ */
+export interface Meeting {
+  id: MeetingId;
+  org_id: OrgId;
+  owner: UserId;
+  title: string;
+  series: string | null;
+  scheduled: MeetingScheduledWindow | null;
+  /**
+   * @maxItems 20
+   */
+  agenda: MeetingAgendaItem[];
+  /**
+   * @maxItems 50
+   */
+  attendees: MeetingAttendee[];
+  attestation: MeetingAttestation;
+  source: "bot" | "upload";
+  status: "scheduled" | "joining" | "live" | "ended" | "minuted" | "discarded" | "deleted";
+  ended_reason: ("completed" | "left_on_request" | "removed" | "timeout" | "failed") | null;
+  minutes_confirmed_by: TeamLeadAssignment | null;
+  transcript: ArtifactRef2 | null;
+  minutes: ArtifactRef3 | null;
+  delete_transcript_after: Timestamp | null;
+  delete_minutes_after: Timestamp | null;
+  created_at: Timestamp;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingScheduledWindow".
+ */
+export interface MeetingScheduledWindow {
+  start: Timestamp;
+  end: Timestamp | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingAgendaItem".
+ */
+export interface MeetingAgendaItem {
+  title: string;
+  minutes: MeetingAgendaMinutes | null;
+}
+/**
+ * An attendee as the meeting named them; user is set when the name resolved to a person (PE-15).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingAttendee".
+ */
+export interface MeetingAttendee {
+  name: string;
+  user: UserId | null;
+}
+/**
+ * The Owner's attestation of the right to record or process this meeting (FR-MTG-01); by equals owner and is a person of the org (PE-18).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingAttestation".
+ */
+export interface MeetingAttestation {
+  by: UserId;
+  at: Timestamp;
+  notice_version: Semver;
+}
+/**
+ * A pinned version of a stored artifact.
+ */
+export interface ArtifactRef2 {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
+}
+/**
+ * A pinned version of a stored artifact.
+ */
+export interface ArtifactRef3 {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
+}
+/**
+ * An @mention of a team member on a team pinboard entry (FR-PB-04). It names a team because a personal entry cannot be tagged (PE-01, PE-06). The tagged person is a member of the team when tagged; they can always remove themselves, and the entry's `set_up_by` person can remove anyone (PE-06). A removed mention stays as a record; a new tag is a new mention.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Mention".
+ */
+export interface Mention {
+  id: MentionId;
+  org_id: OrgId;
+  pin_id: PinId;
+  team: TeamId;
+  user: UserId;
+  added_by: Maker;
+  removed: MentionRemoval | null;
+}
+/**
+ * Who removed the tag and when: the tagged person or the entry's setter (PE-06).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionRemoval".
+ */
+export interface MentionRemoval {
+  by: UserId;
+  at: Timestamp;
+}
+/**
  * The HUD meter's state for one run (PRD 14.4, FR-MTR-07): credits used (the sum of the run's event credits), credits saved (origin cost minus lookup cost over accepted reuses, PRD 14.3), time saved (estimate) and the run's budget. packages/metering computes it from the run's events up to last_seq, and apps/web renders it. Rules MT-05 and MT-06 in contracts/metering.rules.md.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -2678,6 +3331,78 @@ export interface MeteringReconciliation {
   billing_services: MeteringBillingService[];
 }
 /**
+ * The structured minutes of one meeting, the content of a `minutes` artifact (FR-MTG-03, -04). Every item cites utterance ids of the pinned transcript version; a `verified` item cites at least one (the evidence check by code, then the Verifier model for failures). Owner and due are resolved by code, never by a model (PE-15). Owner-only (PE-05).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Minutes".
+ */
+export interface Minutes {
+  meeting_id: MeetingId;
+  transcript: ArtifactRef;
+  generated_at: Timestamp;
+  /**
+   * The safety provider flagged the transcript: any draft from these minutes is T3.
+   */
+  flagged: boolean;
+  /**
+   * @maxItems 8
+   */
+  summary: MinutesSummaryPoint[];
+  /**
+   * @maxItems 30
+   */
+  decisions: MinutesClaim[];
+  /**
+   * @maxItems 60
+   */
+  action_items: MinutesActionItem[];
+  /**
+   * @maxItems 20
+   */
+  agenda: MinutesAgendaPoint[];
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MinutesSummaryPoint".
+ */
+export interface MinutesSummaryPoint {
+  text: string;
+  evidence: MinutesEvidence;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MinutesClaim".
+ */
+export interface MinutesClaim {
+  text: string;
+  state: "verified" | "unverified";
+  evidence: MinutesEvidence;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MinutesActionItem".
+ */
+export interface MinutesActionItem {
+  id: string;
+  text: string;
+  state: "verified" | "unverified";
+  evidence: MinutesEvidence;
+  owner_text: string | null;
+  owner: UserId | null;
+  due_text: string | null;
+  due: CalendarDate | null;
+  work_item_id: WorkItemId | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MinutesAgendaPoint".
+ */
+export interface MinutesAgendaPoint {
+  title: string;
+  coverage: "covered" | "partial" | "not_discussed";
+  evidence: MinutesEvidence;
+}
+/**
  * One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set, equal to the authz of the approval.resolved that answered approve on its gate or of the policy.applied that opened it, never of approval.requested, and the data.transfer it emits carries the same authz (OB-01, HR-7); a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -2727,6 +3452,46 @@ export interface Outbox {
    */
   state: "queued" | "scheduled" | "sending" | "sent" | "cancelled" | "failed";
   created_at: Timestamp;
+}
+/**
+ * A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Person".
+ */
+export interface Person {
+  id: UserId;
+  org_id: OrgId;
+  display_name: string;
+  /**
+   * @maxItems 8
+   */
+  aliases: string[];
+  email: EmailAddress;
+  /**
+   * IANA time zone name (Asia/Kolkata) or UTC: the zone of due dates and the reminder window.
+   */
+  time_zone: string;
+  /**
+   * Where Tilo reaches the person: in the app (web, mobile_web) or by email (FR-PB-03). Narrower than the common channel list on purpose: no new record names a channel outside these three.
+   */
+  preferred_channel: "web" | "mobile_web" | "email";
+  org_role: "owner" | "member";
+  /**
+   * @maxItems 8
+   */
+  memberships: PersonMembership[];
+  created_by: TeamLeadAssignment;
+}
+/**
+ * Membership of a team, counted only as people.rules.md defines it (PE-02).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PersonMembership".
+ */
+export interface PersonMembership {
+  team: TeamId;
+  assigned_by: TeamLeadAssignment;
 }
 /**
  * Records of the EV-G3 pilot (PRD 2.4, 14.4 'Pilot instrumentation', FR-MTR-09): consent, run and card tags, daily diary entries and exit-survey responses, each keyed by a pseudonymous tester id. S-24 and tilo-api write them; packages/metering reads them for the pilot report, which shows aggregates only. They hold the tester id, numbers and the tester's own short answers, never a name, an email address or task content (PRD 16.5). Each record is written on its own, so the root is a sampler with one optional property per definition, like common's; nothing sends a Pilot document. Rules MT-12 to MT-14 in contracts/metering.rules.md.
@@ -2794,6 +3559,78 @@ export interface PilotSurveyResponse {
   reinvested_how: string;
   quote: string | null;
   quote_consent: boolean;
+}
+/**
+ * One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItem".
+ */
+export interface PinboardItem {
+  id: PinId;
+  org_id: OrgId;
+  scope: PinboardItemScopePersonal | PinboardItemScopeTeam;
+  title: string;
+  body: string | null;
+  kind: "note" | "decision" | "deadline" | "link";
+  url: string | null;
+  owner: UserId | null;
+  due: CalendarDate | null;
+  status: "proposed" | "active" | "removed";
+  created_by: Maker;
+  set_up_by: UserId;
+  source: PinboardItemSource | null;
+  confirmed_by: TeamLeadAssignment | null;
+  /**
+   * True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+   */
+  flagged: boolean;
+  /**
+   * @minItems 1
+   */
+  history: [PinboardItemHistoryEntry, ...PinboardItemHistoryEntry[]];
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemScopePersonal".
+ */
+export interface PinboardItemScopePersonal {
+  kind: "personal";
+  user: UserId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemScopeTeam".
+ */
+export interface PinboardItemScopeTeam {
+  kind: "team";
+  team: TeamId;
+}
+/**
+ * Where the entry came from: shown as added by Tilo from the source when Tilo made it (PE-08).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemSource".
+ */
+export interface PinboardItemSource {
+  kind: "meeting" | "mail" | "call" | "request" | "manual";
+  ref: OpaqueRef | null;
+  /**
+   * @maxItems 5
+   */
+  evidence: UtteranceId[];
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemHistoryEntry".
+ */
+export interface PinboardItemHistoryEntry {
+  at: Timestamp;
+  by: EventActor;
+  change: "created" | "edited" | "accepted" | "removed" | "undone" | "owner_changed";
+  status: "proposed" | "active" | "removed";
 }
 /**
  * PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.
@@ -3273,6 +4110,69 @@ export interface TeamLead {
   domain: Slug;
   assigned_by: TeamLeadAssignment;
 }
+/**
+ * One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorkItem".
+ */
+export interface WorkItem {
+  id: WorkItemId;
+  org_id: OrgId;
+  owner: UserId;
+  title: string;
+  due: CalendarDate | null;
+  due_text: string | null;
+  status: "proposed" | "open" | "done" | "dropped";
+  source: WorkItemSource;
+  created_by: Maker;
+  assigned_by: TeamLeadAssignment | null;
+  confirmed_by: TeamLeadAssignment | null;
+  snoozed_until: Timestamp | null;
+  /**
+   * True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+   */
+  flagged: boolean;
+  /**
+   * @minItems 1
+   */
+  history: [WorkItemHistoryEntry, ...WorkItemHistoryEntry[]];
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+/**
+ * Where the item came from; evidence lists the utterances of a meeting transcript.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorkItemSource".
+ */
+export interface WorkItemSource {
+  kind: "meeting" | "mail" | "manual" | "pinboard" | "request";
+  ref: OpaqueRef | null;
+  /**
+   * @maxItems 5
+   */
+  evidence: UtteranceId[];
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorkItemHistoryEntry".
+ */
+export interface WorkItemHistoryEntry {
+  at: Timestamp;
+  by: EventActor;
+  change:
+    | "created"
+    | "confirmed"
+    | "edited"
+    | "snoozed"
+    | "done"
+    | "dropped"
+    | "reopened"
+    | "reassign_requested"
+    | "reminded";
+  status: "proposed" | "open" | "done" | "dropped";
+}
 
 /** Event registry constants from contracts/events/registry.yaml (FR-WLD-03). */
 export const EVENT_TYPES = [
@@ -3346,6 +4246,18 @@ export const EVENT_TYPES = [
   "app.tested",
   "app.deployed",
   "app.refreshed",
+  "meeting.minuted",
+  "work_item.created",
+  "work_item.changed",
+  "pinboard.item_added",
+  "pinboard.item_changed",
+  "mention.added",
+  "mention.removed",
+  "calendar.synced",
+  "calendar.entry_proposed",
+  "calendar.entry_changed",
+  "assistant.asked",
+  "assistant.replied",
 ] as const;
 export type RegisteredEventType = (typeof EVENT_TYPES)[number];
 
@@ -3430,6 +4342,18 @@ export interface EventDataByType {
   "app.tested": AppTestedData;
   "app.deployed": AppDeployedData;
   "app.refreshed": AppRefreshedData;
+  "meeting.minuted": MeetingMinutedData;
+  "work_item.created": WorkItemCreatedData;
+  "work_item.changed": WorkItemChangedData;
+  "pinboard.item_added": PinboardItemAddedData;
+  "pinboard.item_changed": PinboardItemChangedData;
+  "mention.added": MentionAddedData;
+  "mention.removed": MentionRemovedData;
+  "calendar.synced": CalendarSyncedData;
+  "calendar.entry_proposed": CalendarEntryProposedData;
+  "calendar.entry_changed": CalendarEntryChangedData;
+  "assistant.asked": AssistantAskedData;
+  "assistant.replied": AssistantRepliedData;
 }
 
 /** A registered TiloEvent, discriminated on `type`. */
@@ -3440,7 +4364,7 @@ export type RegisteredEvent = {
 export const EVENT_REGISTRY: EventRegistry & {
   types: { readonly [T in RegisteredEventType]: EventRegistryEntry };
 } = {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "unknown_types": "trace_only",
   "types": {
     "world.requested": {
@@ -4444,6 +5368,174 @@ export const EVENT_REGISTRY: EventRegistry & {
       "trace_row": "spec={data.spec}",
       "data_schema": "events/data/app.refreshed.schema.json",
       "fixture": "fixtures/events/valid/app.refreshed.json"
+    },
+    "meeting.minuted": {
+      "family": "meeting",
+      "verb": "minuted",
+      "priority": "must",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The minutes scroll goes from the Meeting Hall to the Town Hall.",
+      "hud_effect": "A minutes card opens for the Owner (S-26).",
+      "story_template": "The minutes are ready: {data.decisions} decisions, {data.action_items} action items.",
+      "trace_row": "meeting={data.meeting_id} unverified={data.unverified} flagged={data.flagged}",
+      "data_schema": "events/data/meeting.minuted.schema.json",
+      "fixture": "fixtures/events/valid/meeting.minuted.json"
+    },
+    "work_item.created": {
+      "family": "work_item",
+      "verb": "created",
+      "priority": "must",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A note lands on the owner's desk.",
+      "hud_effect": "The plate gains a row.",
+      "story_template": "A work item was added ({data.status}).",
+      "trace_row": "work_item={data.work_item_id} owner={data.owner} source={data.source_kind}",
+      "data_schema": "events/data/work_item.created.schema.json",
+      "fixture": "fixtures/events/valid/work_item.created.json"
+    },
+    "work_item.changed": {
+      "family": "work_item",
+      "verb": "changed",
+      "priority": "must",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The note on the desk gets a stamp, a snooze tag or a check.",
+      "hud_effect": "The plate row updates.",
+      "story_template": "A work item changed: {data.change}.",
+      "trace_row": "work_item={data.work_item_id} change={data.change} status={data.status}",
+      "data_schema": "events/data/work_item.changed.schema.json",
+      "fixture": "fixtures/events/valid/work_item.changed.json"
+    },
+    "pinboard.item_added": {
+      "family": "pinboard",
+      "verb": "item_added",
+      "priority": "must",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A pin appears on the board beside Your Desk.",
+      "hud_effect": "The pinboard table gains a row.",
+      "story_template": "A pin was added to the {data.scope_kind} board ({data.status}).",
+      "trace_row": "pin={data.pin_id} scope={data.scope_kind} made_by={data.made_by}",
+      "data_schema": "events/data/pinboard.item_added.schema.json",
+      "fixture": "fixtures/events/valid/pinboard.item_added.json"
+    },
+    "pinboard.item_changed": {
+      "family": "pinboard",
+      "verb": "item_changed",
+      "priority": "must",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The pin is re-stamped, lifted off or taken down.",
+      "hud_effect": "The pinboard row updates.",
+      "story_template": "A pin changed: {data.change}.",
+      "trace_row": "pin={data.pin_id} change={data.change} status={data.status}",
+      "data_schema": "events/data/pinboard.item_changed.schema.json",
+      "fixture": "fixtures/events/valid/pinboard.item_changed.json"
+    },
+    "mention.added": {
+      "family": "mention",
+      "verb": "added",
+      "priority": "must",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A small tag flutters onto the pin.",
+      "hud_effect": "The pinboard row shows the tag.",
+      "story_template": "Someone was tagged on a pin.",
+      "trace_row": "mention={data.mention_id} pin={data.pin_id} user={data.user}",
+      "data_schema": "events/data/mention.added.schema.json",
+      "fixture": "fixtures/events/valid/mention.added.json"
+    },
+    "mention.removed": {
+      "family": "mention",
+      "verb": "removed",
+      "priority": "must",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The tag drops off the pin.",
+      "hud_effect": "The plate row clears.",
+      "story_template": "A tag was removed from a pin.",
+      "trace_row": "mention={data.mention_id} pin={data.pin_id} removed_by={data.removed_by}",
+      "data_schema": "events/data/mention.removed.schema.json",
+      "fixture": "fixtures/events/valid/mention.removed.json"
+    },
+    "calendar.synced": {
+      "family": "calendar",
+      "verb": "synced",
+      "priority": "must",
+      "pillar": "P6",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The Clock Tower bell rings once.",
+      "hud_effect": "The calendar refreshes.",
+      "story_template": "The calendar synced ({data.changed} changes).",
+      "trace_row": "kind={data.kind} changed={data.changed}",
+      "data_schema": "events/data/calendar.synced.schema.json",
+      "fixture": "fixtures/events/valid/calendar.synced.json"
+    },
+    "calendar.entry_proposed": {
+      "family": "calendar",
+      "verb": "entry_proposed",
+      "priority": "must",
+      "pillar": "P6",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "An unstamped dated card slides onto the calendar board.",
+      "hud_effect": "The calendar shows a proposed entry.",
+      "story_template": "A calendar entry was proposed from a {data.source_kind}.",
+      "trace_row": "entry={data.entry_id} source={data.source_kind}",
+      "data_schema": "events/data/calendar.entry_proposed.schema.json",
+      "fixture": "fixtures/events/valid/calendar.entry_proposed.json"
+    },
+    "calendar.entry_changed": {
+      "family": "calendar",
+      "verb": "entry_changed",
+      "priority": "must",
+      "pillar": "P6",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The dated card is stamped, crossed out or moved.",
+      "hud_effect": "The calendar row updates.",
+      "story_template": "A calendar entry changed: {data.change}.",
+      "trace_row": "entry={data.entry_id} change={data.change} state={data.state}",
+      "data_schema": "events/data/calendar.entry_changed.schema.json",
+      "fixture": "fixtures/events/valid/calendar.entry_changed.json"
+    },
+    "assistant.asked": {
+      "family": "assistant",
+      "verb": "asked",
+      "priority": "must",
+      "pillar": "P5",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The lamp on Your Desk lights.",
+      "hud_effect": "The panel shows the question.",
+      "story_template": "A question was asked in the assistant panel.",
+      "trace_row": "conversation={data.conversation_id}",
+      "data_schema": "events/data/assistant.asked.schema.json",
+      "fixture": "fixtures/events/valid/assistant.asked.json"
+    },
+    "assistant.replied": {
+      "family": "assistant",
+      "verb": "replied",
+      "priority": "must",
+      "pillar": "P5",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A sealed note returns to Your Desk.",
+      "hud_effect": "The panel streams the answer with its sources.",
+      "story_template": "The assistant answered ({data.outcome}).",
+      "trace_row": "conversation={data.conversation_id} outcome={data.outcome} decided_by={data.decided_by}",
+      "data_schema": "events/data/assistant.replied.schema.json",
+      "fixture": "fixtures/events/valid/assistant.replied.json"
     }
   }
 };

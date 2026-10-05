@@ -1,0 +1,16 @@
+{
+  "id": "mn_launch_priya",
+  "org_id": "org_example",
+  "pin_id": "pb_launch_date",
+  "team": "tm_launch",
+  "user": "u_priya",
+  "added_by": {
+    "by": "person",
+    "ref": "u_owner",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
+  "removed": {
+    "by": "u_priya",
+    "at": "2026-10-06T10:00:00.000Z"
+  }
+}

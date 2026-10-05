@@ -1,0 +1,19 @@
+{
+  "work_item_id": "wi_rate_sheet",
+  "meeting_id": "mt_q4_plan",
+  "pin_id": "pb_launch_date",
+  "mention_id": "mn_launch_priya",
+  "calendar_entry_id": "ce_budget_review",
+  "team_id": "tm_launch",
+  "utterance_id": "u0042",
+  "opaque_ref": "mt_q4_plan#ai1",
+  "maker": {
+    "by": "tilo",
+    "ref": "A_analyst",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
+  "record_ref": {
+    "kind": "work_item",
+    "id": "wi_rate_sheet"
+  }
+}

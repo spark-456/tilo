@@ -1,0 +1,177 @@
+{
+  "rule": "PE-05",
+  "note": "A person of another org reads a meeting.",
+  "now": "2026-10-06T10:00:00.000Z",
+  "persons": {
+    "u_owner": {
+      "id": "u_owner",
+      "org_id": "org_example",
+      "display_name": "Asha Rao",
+      "aliases": ["Asha"],
+      "email": "asha@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "email",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_priya": {
+      "id": "u_priya",
+      "org_id": "org_example",
+      "display_name": "Priya Nair",
+      "aliases": ["Priya", "PN"],
+      "email": "priya@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "email",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam": {
+      "id": "u_sam",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam"],
+      "email": "sam@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "mobile_web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam_launch": {
+      "id": "u_sam_launch",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam L"],
+      "email": "sam@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "mobile_web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_other": {
+      "id": "u_other",
+      "org_id": "org_other",
+      "display_name": "Omar Other",
+      "aliases": ["Asha"],
+      "email": "omar@example.org",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "email",
+      "org_role": "owner",
+      "memberships": [],
+      "created_by": {
+        "by": "u_other",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    }
+  },
+  "record": {
+    "kind": "meeting",
+    "data": {
+      "id": "mt_q4_plan",
+      "org_id": "org_example",
+      "owner": "u_owner",
+      "title": "Q4 planning",
+      "series": "q4_planning_weekly",
+      "scheduled": null,
+      "agenda": [
+        {
+          "title": "Launch date",
+          "minutes": 15
+        },
+        {
+          "title": "Rate sheet",
+          "minutes": null
+        }
+      ],
+      "attendees": [
+        {
+          "name": "Asha Rao",
+          "user": "u_owner"
+        },
+        {
+          "name": "Priya",
+          "user": "u_priya"
+        },
+        {
+          "name": "Dev from Acme",
+          "user": null
+        }
+      ],
+      "attestation": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z",
+        "notice_version": "1.0.0"
+      },
+      "source": "upload",
+      "status": "minuted",
+      "ended_reason": "completed",
+      "transcript": {
+        "artifact_id": "art_transcript_q4_plan",
+        "version": 1
+      },
+      "minutes": {
+        "artifact_id": "art_minutes_q4_plan",
+        "version": 1
+      },
+      "minutes_confirmed_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T10:30:00.000Z"
+      },
+      "delete_transcript_after": "2026-11-05T10:00:00.000Z",
+      "delete_minutes_after": "2027-01-04T10:00:00.000Z",
+      "created_at": "2026-10-05T09:00:00.000Z"
+    }
+  },
+  "request": {
+    "actor": "u_other",
+    "action": "read_full",
+    "view": "full"
+  }
+}

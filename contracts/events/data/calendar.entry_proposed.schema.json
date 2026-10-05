@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/calendar.entry_proposed.schema.json",
+  "x-version": "1.0.0",
+  "title": "CalendarEntryProposedData",
+  "description": "data of calendar.entry_proposed (CC-PEOPLE, FR-CAL-03). Tilo proposed a calendar entry from a meeting, a transcript, a request or a mail; it stays proposed and private until the person accepts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entry_id", "source_kind"],
+  "properties": {
+    "entry_id": {
+      "$ref": "../../common.schema.json#/$defs/calendar_entry_id"
+    },
+    "source_kind": {
+      "type": "string",
+      "enum": ["meeting", "transcript", "request", "mail"]
+    }
+  }
+}
