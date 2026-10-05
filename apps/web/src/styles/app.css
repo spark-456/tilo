@@ -155,7 +155,8 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--space-16);
-  padding: 0 var(--space-16);
+  /* The row is capped at 1440 px and centred, so a wide screen keeps the logo and the chip near each other (the artboards cap at 1240); the bar and its rule stay full width. */
+  padding: 0 max(var(--space-16), calc((100% - 1440px) / 2));
   border-bottom: 2px solid var(--color-fog);
   background: var(--color-surface-1);
 }
@@ -1171,13 +1172,28 @@ button.row {
   }
 }
 .hud-card {
-  min-height: 14em; /* the finished card (status, three figures, estimate link) in stage mode needs 13.6em */
   padding: var(--space-12);
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-cards);
 }
 .hud-card p {
   margin: 0;
+}
+/* Only the world's card changes state in place (idle, running, finished), so only it reserves the
+   finished height (CLS); the empty card on the other screens is as tall as its line. */
+.world-panels .hud-card {
+  min-height: 9.6em; /* the finished card (status chip, a 2 x 2 grid of figures) at 14 px */
+}
+.app-shell[data-stage-mode="on"] .world-panels .hud-card {
+  min-height: 11.8em; /* larger type wraps the labels onto more lines */
+}
+@media (max-width: 767px) {
+  .world-panels .hud-card {
+    min-height: 8.8em; /* 16 px type in the full-width sheet */
+  }
+}
+.hud-figures a {
+  align-self: end;
 }
 .hud-figures {
   display: grid;
@@ -1823,6 +1839,25 @@ button.row {
   right: 12px;
   min-width: 7.5em; /* "Recorded", "Replaying" and "Finished" take the same room */
   justify-content: center;
+}
+/* One world fills the row as the artboard's hero card (thumbnail left, the card's words right), so
+   the page is not a lone card beside empty tracks. Several worlds go back to the grid of cards. */
+@media (min-width: 1100px) {
+  .world-grid:has(> .flow-slot:only-child > .world-card) {
+    grid-template-columns: 1fr;
+  }
+  .world-grid > .flow-slot:only-child > .world-card {
+    flex-direction: row;
+  }
+  .world-grid > .flow-slot:only-child > .world-card .world-thumb {
+    flex: 0 0 48%;
+    height: auto;
+    min-height: 21em;
+    padding: calc(var(--space-32) + var(--space-16)) var(--space-16) var(--space-16);
+  }
+  .world-grid > .flow-slot:only-child > .world-card .world-thumb svg {
+    height: 100%;
+  }
 }
 .world-body {
   display: flex;
