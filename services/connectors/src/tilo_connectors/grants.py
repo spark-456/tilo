@@ -19,7 +19,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
-from ._text import collapse, flagged, safe_id
+from ._text import collapse, flagged, has_hidden, safe_id
 from .errors import HandoffRefused
 
 if TYPE_CHECKING:
@@ -120,13 +120,17 @@ class GrantStore:
             pass
         return grant_id
 
-    def revoke(self, grant_id: str, *, by: str, world_owner: str, at: str) -> DataGrant:
+    def revoke(self, grant_id: str, *, by: str, world_owner: str, at: str, world_id: str | None = None) -> DataGrant:
+        """Only the person who made the grant, as the world's owner, revokes it (DG-01). The caller's `world_owner`
+        is a claim: `by` must also be the grant's own `granted_by`, and the grant's world the caller's `world_id`."""
         if by != world_owner:
             raise HandoffRefused("DG-01", "only the world's owner revokes a grant")
         with self._lock:
             grant = self._grants.get(grant_id)
             if grant is None:
                 raise HandoffRefused("DG-03", f"grant {safe_id(grant_id)} is not known")
+            if by != grant.granted_by or (world_id is not None and world_id != grant.world_id):
+                raise HandoffRefused("DG-01", f"grant {grant.id} is not this owner's to revoke")
             if grant.state != "active":
                 return grant
             self._grants[grant_id] = grant = dataclasses.replace(grant, state="revoked", ended_at=at, ended_by=by)
@@ -244,10 +248,14 @@ def _excerpt(
     part = part.replace("\r\n", "\n").replace("\r", "\n")
     if len(part) > partner.max_excerpt_chars:
         raise HandoffRefused("DG-04", f"the excerpt of {shown} is over {partner.max_excerpt_chars} characters")
+    whole = whole.replace("\r\n", "\n").replace("\r", "\n")
     try:
-        clean = redact(part)
+        clean, clean_whole = redact(part), redact(whole)
     except Exception:
-        clean = ""
-    if not isinstance(clean, str) or not clean or flagged(safety, clean):  # DG-05: the screen sees redacted text
+        clean = clean_whole = ""
+    ok = isinstance(clean, str) and isinstance(clean_whole, str) and clean != "" and clean in clean_whole
+    # DG-05: whatever the cut, the excerpt holds no part of a secret the redactor finds in the whole text
+    # (a cut inside a secret leaves a fragment that is not in the redacted whole); the screen sees redacted text.
+    if not ok or has_hidden(clean) or flagged(safety, clean):
         raise HandoffRefused("DG-05", f"the excerpt of {shown} did not pass the redactor and the safety screen")
     return Excerpt(item=item, text=clean, redacted=clean != part)

@@ -578,3 +578,23 @@ briefs: `BriefTooLong` with the MCP offer and `truncated is False`.
   build handoff into a run needs its own branch there (later ticket, with step 11).
 - The writer's instructions belong in `prompts/writer/build_handoff.md` (intelligence-builder): one paragraph,
   at most `max_framing_chars`, only words of the requirements or `framing_words`.
+
+## Security rules added in the fix pass (BQ-BUILD-9)
+
+- **BH-03 (framing):** besides the word checks, the framing is refused (rule `unknown_word`) when it holds any code
+  point that is neither part of a word (`[^\W_]+`) nor a space or one of `. , ; : ! ? ' " ( ) -`. Tag characters,
+  enclosed and regional-indicator letters, symbols, emoji, bidi controls and combining marks all fall back to
+  `DEFAULT_FRAMING`.
+- **BH-05 (prompt):** a prompt holding a Unicode tag character (U+E0000 to U+E007F), a bidi embedding, override or
+  isolate (U+202A to U+202E, U+2066 to U+2069), a deprecated format control (U+206A to U+206F) or an interlinear
+  annotation mark (U+FFF9 to U+FFFB) is refused, wherever it came from (accepted text, label, excerpt, framing).
+  Zero-width space, joiner and non-joiner, symbols and emoji stay allowed. `granted_excerpts` refuses the same in an
+  excerpt (DG-05).
+- **BH-04 (labels):** an item label is checked like an excerpt against the declined texts.
+- **DG-05 (cut inside a secret):** with line endings normalised, both the requested part and the whole text go
+  through the redactor, and the part's redacted form must be a substring of the whole text's redacted form; a cut
+  that starts or ends inside a secret (alone, or as two requests that split one secret) leaves a fragment that is
+  not, and is refused. DG-04 keeps its raw-text match.
+- **DG-01 (revoke):** `revoke` also requires `by == grant.granted_by` and, when the optional `world_id` keyword is
+  given, `world_id == grant.world_id`; the caller's `world_owner` is only a claim.
+- **Dispatch:** the adapter re-checks the grant immediately before `links.put` (DG-03) and fails the entry.

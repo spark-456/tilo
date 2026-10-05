@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 import yaml
 
 from ._schema import approach_validator, brief_validator
-from ._text import collapse, flagged, redacted_unchanged, safe_id
+from ._text import collapse, flagged, has_hidden, redacted_unchanged, safe_id
 from .adapters.lovable import link_length
 from .errors import BriefTooLong, BuildPartnerConfigError, HandoffRefused
 from .registry import ConnectorRegistry, _NoAliasLoader
@@ -45,6 +45,7 @@ _PARTNER_KEYS = {
     "max_excerpt_chars",
     "max_items",
 }
+_PLAIN_PUNCTUATION = frozenset(" .,;:!?'\"()-")
 _MAX_EXACT = 500  # card.schema.json gate.action.exact
 _MAX_FRAMING_WORDS = 300
 
@@ -351,11 +352,17 @@ def _framing_rule(
     if flagged(safety, text):
         return "", "flagged"
     known = partner.framing_words.union(*(words(f) for f in accepted.fields()))
-    if not set(words(text)) <= known:
+    if _stray(text) or not set(words(text)) <= known:  # any code point outside a word and plain punctuation counts
         return "", "unknown_word"
     if find_leaks(text, banned):
         return "", "declined"
     return text, None
+
+
+def _stray(value: str) -> bool:
+    """True when `value` holds a code point that is neither part of a word nor a space or plain ASCII punctuation
+    (tag characters, enclosed or regional-indicator letters, symbols, direction controls, combining marks)."""
+    return any(c not in _PLAIN_PUNCTUATION for c in _WORD.sub("", value))
 
 
 def _declaration_ok(declaration: Mapping[str, Any], connector: str, action: str) -> bool:
@@ -392,13 +399,13 @@ def prepare_handoff(
         raise HandoffRefused("DG-04", f"at most {partner.max_items} distinct items per handoff")
     banned = _unaccepted(declined, accepted)
     for e in excerpts:  # BH-04
-        if find_leaks(e.text, banned):
+        if find_leaks(e.text, banned) or find_leaks(e.item.label, banned):
             raise HandoffRefused("BH-04", f"{safe_id(e.item.ref)} holds text the owner did not accept")
     used, rule = _framing_rule(framing, accepted, partner, banned, redact, safety)
     if rule is not None:
         used = DEFAULT_FRAMING.format(title=accepted.deliverable_title)
     prompt = render_prompt(accepted, used, excerpts)
-    if not redacted_unchanged(redact, prompt) or flagged(safety, prompt):  # BH-05
+    if has_hidden(prompt) or not redacted_unchanged(redact, prompt) or flagged(safety, prompt):  # BH-05
         raise HandoffRefused("BH-05", "the prompt did not pass the redactor and the safety screen")
     try:
         sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()

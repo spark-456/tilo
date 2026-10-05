@@ -110,13 +110,7 @@ class LovableLinkAdapter:
             raise MissingGrant("grant not minted by Outbox.dispatch_due()")
         grant.verify(entry["idempotency_key"])
         record = self._checked_record(entry)
-        if record.grant_id is not None:  # DG-03: a revoked or expired grant stops a handoff made under it
-            try:
-                self._grants.require_active(
-                    record.grant_id, world_id=record.world_id, run_id=record.run_id, connector=self._id
-                )
-            except HandoffRefused as exc:
-                raise SideEffectRefused(str(exc)) from None
+        self._require_grant(record)  # DG-03: a revoked or expired grant stops a handoff made under it
         raw = self._artifacts.read(record.world_id, record.prompt)
         if hashlib.sha256(raw).hexdigest() != record.prompt_sha256:  # BH-07: sent = shown, byte for byte
             raise SideEffectRefused("BH-07: the stored prompt is not the prompt that was shown")
@@ -142,6 +136,7 @@ class LovableLinkAdapter:
             separators=(",", ":"),
             ensure_ascii=True,
         ).encode("ascii")
+        self._require_grant(record)  # again, right before the link is stored: a revoke in between still stops it
         ref = self._links.put(
             LinkArtifact(
                 world_id=record.world_id,
@@ -154,6 +149,16 @@ class LovableLinkAdapter:
             )
         )
         return {"link": ref, "status": "link_ready"}
+
+    def _require_grant(self, record: Any) -> None:
+        if record.grant_id is None:
+            return
+        try:
+            self._grants.require_active(
+                record.grant_id, world_id=record.world_id, run_id=record.run_id, connector=self._id
+            )
+        except HandoffRefused as exc:
+            raise SideEffectRefused(str(exc)) from None
 
     def _checked_record(self, entry: Mapping[str, Any]) -> Any:  # BH-09: exactly a gated, recipientless handoff
         shaped = (
