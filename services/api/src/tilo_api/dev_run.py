@@ -1,5 +1,6 @@
-"""Local dev stand-ins for the run's seams (CL-INT-5c, 5d, EFF-01; PRD 10.3, 10.4, 14.1): a unit runner that makes one
-synthetic artifact per unit, paced by a delay and metered through the real PriceBook with a dev price file, an action
+"""Local dev stand-ins for the run's seams (CL-INT-5c, 5d, EFF-01; PRD 10.3, 10.4, 14.1): a unit runner that writes one
+synthetic Markdown output per unit, paced by a delay and metered through the real PriceBook with a dev price file, one
+in-memory artifact store with a stand-in secret redactor and an empty raw archive (ADR-0018 T4), an action
 resolver with one fixed fake recipient, and mock connector adapters that only record. They let a dev run reach its gate
 card and, once the owner approves, a FAKE send through the real outbox and policy engine; nothing leaves the machine.
 `tilo_api.dev.install` wires them as dependency overrides, so request input never selects them, and each one refuses
@@ -8,20 +9,26 @@ when deployed or live (the rule dev mode itself uses)."""
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import os
-import uuid
+import re
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from functools import cache
 from typing import Any
 
+from tilo_archive import RunArchive
 from tilo_connectors.mock import MockConnector
+from tilo_harness.outputs import UnitOutput
+from tilo_memory.artifacts import ArtifactStore, MemoryBlobBackend, MemoryMetaBackend
 from tilo_metering.prices import PriceBook, Usage
 from tilo_providers.interfaces import GenerateResponse
 
 from tilo_api import deps
 from tilo_api.runs import MeteredOutcome
+
+logger = logging.getLogger("tilo_api.dev_run")
 
 DEV_DESTINATION = "thread-dev-1"  # destination.schema: letters, digits, underscore and hyphen only
 DEV_RECIPIENT = "dev.recipient@example.com"  # never a known recipient, so the policy engine sees a new one (T3)
@@ -58,17 +65,59 @@ def unit_credits() -> float:
 
 class DevUnitRunner:
     """No model call: each unit waits `unit_delay_s()` (an asyncio sleep on the run's own thread, so cancelling the run
-    ends it and no other request waits), then succeeds with one synthetic artifact (a fresh id per call, so two dev
-    worlds never claim the same item) and the metered cost of the unit."""
+    ends it and no other request waits), then succeeds with one synthetic Markdown output, which the executor puts on
+    the dev artifact store (the store mints its id, ADR-0018), and the metered cost of the unit."""
 
     async def run(self, unit: Mapping[str, Any], context: Any) -> MeteredOutcome:
         _refuse()
         if (delay := unit_delay_s()) > 0:
             await asyncio.sleep(delay)
-        ref = {"artifact_id": f"art_dev_{uuid.uuid4().hex[:20]}", "version": 1}
+        text = f"# {unit['title']}\n\nA synthetic dev draft: no model wrote this.\n"
+        output = UnitOutput(media_type="text/markdown", content=text.encode("utf-8"))
         return MeteredOutcome(
-            success=True, summary=f"Finished {unit['title']}.", artifact_refs=(ref,), credits=unit_credits()
+            success=True, summary=f"Finished {unit['title']}.", outputs=(output,), credits=unit_credits()
         )
+
+
+_DEV_SECRET = re.compile(r"(?:sk-|AIza|ghp_|xox[abp]-)[0-9A-Za-z_-]{16,}")  # a few well-known API key shapes
+
+
+def dev_redact(text: str) -> str:
+    """Dev mode's stand-in for the shared secret redactor, which is not built yet (FR-MEM-05, BQ-109): masks a few
+    well-known key shapes. Dev units write synthetic text only; production has no redactor and starts no run."""
+    _refuse()
+    return _DEV_SECRET.sub("[REDACTED]", text)
+
+
+class _NoArchiveLines:
+    """The dev run's raw-archive store: dev units read no source, so it holds nothing and takes nothing."""
+
+    def append_line(self, org_id: str, run_id: str, line: str) -> None:
+        raise RuntimeError("the dev run archives nothing")
+
+    def read_lines(self, org_id: str, run_id: str) -> list[str]:
+        return []
+
+
+def _no_payloads(payload: Any) -> Any:
+    raise RuntimeError("the dev run archives nothing")  # never an identity redactor (BQ-109)
+
+
+def open_dev_archive(*, org_id: str, run_id: str) -> RunArchive:
+    _refuse()
+    return RunArchive(_NoArchiveLines(), org_id=org_id, run_id=run_id, redactor=_no_payloads)
+
+
+def dev_artifact_store() -> ArtifactStore:
+    """One in-memory store (ADR-0018 T4, dev mode): unscreened, no archive sources, alerts logged."""
+    return ArtifactStore(
+        MemoryMetaBackend(),
+        MemoryBlobBackend(),
+        clock=lambda: datetime.now(UTC),
+        redactor=dev_redact,
+        archive_lookup=lambda scope, archive_ref: None,
+        alert_sink=lambda alert: logger.warning("dev artifact store: %s", alert["summary"]),
+    )
 
 
 class DevClearModel:
@@ -106,8 +155,21 @@ def mock_adapters() -> dict[str, MockConnector]:
 
 
 def overrides() -> dict[Callable[..., Any], Callable[[], Any]]:
-    """The `app.dependency_overrides` entries for the run seams, built once so the adapters keep what they record."""
-    runner, adapters = DevUnitRunner(), mock_adapters()
+    """The `app.dependency_overrides` entries for the run seams, built once so the adapters keep what they record and
+    the run and a reader share one artifact store."""
+    runner, adapters, artifacts = DevUnitRunner(), mock_adapters(), dev_artifact_store()
+
+    def get_artifacts() -> ArtifactStore:
+        _refuse()
+        return artifacts
+
+    def get_redactor() -> Callable[[str], str]:
+        _refuse()
+        return dev_redact
+
+    def get_archive() -> Callable[..., RunArchive]:
+        _refuse()
+        return open_dev_archive
 
     def get_runner() -> DevUnitRunner:
         _refuse()
@@ -130,4 +192,7 @@ def overrides() -> dict[Callable[..., Any], Callable[[], Any]]:
         deps.get_action_resolver: get_resolver,
         deps.get_connector_adapters: get_adapters,
         deps.get_must_ask_providers: get_must_ask,
+        deps.get_artifact_store: get_artifacts,
+        deps.get_redactor: get_redactor,
+        deps.get_run_archive: get_archive,
     }
