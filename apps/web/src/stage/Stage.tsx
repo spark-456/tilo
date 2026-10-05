@@ -130,12 +130,17 @@ export function Stage({
   // to draw loads it at once; the bare grid is decoration, so it waits until the first keystroke
   // has had its turn (the Pixi script is the largest task on the page).
   const [pixi, setPixi] = useState<typeof import("pixi.js") | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false); // the chunk did not arrive (offline, a new deploy)
   const bare = onWorld === undefined;
   useEffect(() => {
     if (!supported) return;
     let live = true;
     const timer = setTimeout(
-      () => void import("pixi.js").then((m) => live && setPixi(m)),
+      () =>
+        void import("pixi.js").then(
+          (m) => live && setPixi(m),
+          () => live && setLoadFailed(true), // said below on a world; the bare grid just stays empty
+        ),
       bare ? BARE_GRID_DELAY_MS : 0,
     );
     return () => {
@@ -143,6 +148,9 @@ export function Stage({
       clearTimeout(timer);
     };
   }, [supported, bare]);
+  // A browser keeps a failed dynamic import for the life of the page, so a second import() never
+  // reaches the network; a reload does, and also picks up a redeployed chunk's new name.
+  const retryLoad = () => window.location.reload();
 
   useEffect(() => {
     const target = frameRef.current;
@@ -327,6 +335,14 @@ export function Stage({
         // click-through, so the camera still pans. Its word does not rely on colour.
         <div className="world-veil" data-testid="world-veil">
           <span className="veil-label">Paused</span>
+        </div>
+      )}
+      {loadFailed && !bare && (
+        <div className="stage-fallback" data-testid="stage-load-failed" role="alert">
+          <p>The world couldn't be drawn: its drawing code didn't load. Check your connection.</p>
+          <button type="button" className="secondary" onClick={retryLoad}>
+            Try again
+          </button>
         </div>
       )}
       {!supported && (
