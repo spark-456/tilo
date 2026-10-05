@@ -11,7 +11,7 @@ import { deriveQueue } from "../needs-you/queue";
 import { reduce } from "../world/reducer";
 import { creditsUsed, useRunLog } from "../world/runLog";
 import { budgetCap, worldStatus } from "../world/runSummary";
-import { useAddressedWorld, useRunWorld, withWorld } from "../world/worldContext";
+import { alsoWorld, useAddressedWorld, useRunWorld, withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
 import { Loaded, Primary } from "./FlowShell";
 import { NotFound } from "./NotFound";
@@ -22,6 +22,9 @@ import {
   FILTERS,
   FILTER_LABEL,
   type Filter,
+  SIZES,
+  SIZE_LABEL,
+  type Size,
   type WorldPhase,
   type WorldRow,
   countsOf,
@@ -50,6 +53,7 @@ export function S_14() {
   const newTask = useAction("start a new task", async () => "/");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [sizeFilter, setSizeFilter] = useState<Size>("all");
   if (addressed !== null && !worldKnown) return <NotFound />; // a world the client does not know
   const first = events[0];
   const status = worldStatus(events);
@@ -62,11 +66,14 @@ export function S_14() {
           ? "failed"
           : "running";
   const [label, tone] = STATUS[phase];
-  const waiting = deriveQueue(events).length;
+  const queue = deriveQueue(events);
+  const waiting = queue.length;
+  const next = queue[0];
   const title = first ? String(field(first, "title")) : "Waiting for the recording";
-  const worlds: readonly WorldRow[] = known ? [{ title, phase, waiting }] : [];
-  const counts = countsOf(worlds, query);
-  const shown = visible(worlds, filter, query);
+  const size = layout.status === "ready" ? layout.value.tier : null;
+  const worlds: readonly WorldRow[] = known ? [{ title, phase, waiting, size }] : [];
+  const counts = countsOf(worlds, query, sizeFilter);
+  const shown = visible(worlds, filter, query, sizeFilter);
   const cap = budgetCap(events);
   const used = creditsUsed(events);
   const w = `/world/${encodeURIComponent(worldId ?? "")}`;
@@ -78,17 +85,7 @@ export function S_14() {
       action={<Primary label="New task" action={newTask} />}
     >
       <div className="filter-bar">
-        <label className="search-field">
-          <span className="visually-hidden">Search worlds</span>
-          <input
-            type="search"
-            value={query}
-            placeholder="Search worlds"
-            autoComplete="off"
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-        <fieldset className="filter-chips">
+        <fieldset className="filter-chips status-tabs">
           <legend className="visually-hidden">Filter by status</legend>
           {FILTERS.map((f) => (
             <label key={f} className="filter-chip">
@@ -102,6 +99,35 @@ export function S_14() {
               <span>
                 {FILTER_LABEL[f]} <b data-testid={`count-${f}`}>{counts[f]}</b>
               </span>
+            </label>
+          ))}
+        </fieldset>
+        <label className="search-field">
+          <span className="visually-hidden">Search worlds</span>
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" />
+            <path d="M13 13l4.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input
+            type="search"
+            value={query}
+            placeholder="Search worlds"
+            autoComplete="off"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
+        <fieldset className="filter-chips size-chips">
+          <legend className="visually-hidden">Filter by size</legend>
+          {SIZES.map((s) => (
+            <label key={s} className="filter-chip">
+              <input
+                type="radio"
+                name="worlds-size"
+                value={s}
+                checked={sizeFilter === s}
+                onChange={() => setSizeFilter(s)}
+              />
+              <span>{SIZE_LABEL[s]}</span>
             </label>
           ))}
         </fieldset>
@@ -127,7 +153,9 @@ export function S_14() {
                 ? "Nothing is scheduled. Worlds that run on a schedule will be listed here."
                 : query.trim() !== ""
                   ? "No world matches that search. Clear it or pick All to see every world."
-                  : "No world is in this state right now. Pick All to see every world."
+                  : sizeFilter !== "all"
+                    ? `No ${SIZE_LABEL[sizeFilter].toLowerCase()} world here. Pick All sizes to see every world.`
+                    : "No world is in this state right now. Pick All to see every world."
             }
           />
         ) : (
@@ -137,7 +165,12 @@ export function S_14() {
               const state = reduce(l, events);
               const done = Object.values(state.levels).filter((v) => v.completed).length;
               return (
-                <article className="world-card" data-testid="world-card">
+                <article
+                  className="world-card"
+                  data-testid="world-card"
+                  data-tier={l.tier}
+                  data-needs={waiting > 0}
+                >
                   <div className="world-thumb">
                     <WorldThumb layout={l} state={state} />
                     <Chip tone="fyi">
@@ -151,29 +184,49 @@ export function S_14() {
                       {plural(l.semantic.agents.length, "agent")} on the team · {done} of{" "}
                       {plural(levels, "level")} finished
                     </p>
-                    <progress max={levels} value={done} aria-label="Levels finished" />
+                    <div className="world-progress">
+                      <progress max={levels} value={done} aria-label="Levels finished" />
+                      <span aria-hidden="true">{`${Math.round((done / Math.max(levels, 1)) * 100)}%`}</span>
+                    </div>
                     <p className="card-foot">
                       <span>
                         {cap === null ? `${used} credits used` : `${used} of ${cap} credits used`}
                       </span>
                       <span>{first ? longDate(first.ts) : "Not started"}</span>
                     </p>
+                    <div
+                      className="world-decision"
+                      data-testid="world-needs"
+                      data-tone={next ? "needs" : "clear"}
+                    >
+                      {next ? (
+                        <>
+                          <p className="decision-head">
+                            {plural(waiting, "decision")} waiting for you
+                          </p>
+                          <p className="bitem-sub">{next.opened.summary}</p>
+                          <AppLink
+                            to={
+                              next.kind === "gate"
+                                ? alsoWorld(
+                                    `/needs-you/gate?run=${encodeURIComponent(next.runId)}&gate=${encodeURIComponent(next.gateId ?? "")}`,
+                                    worldId ?? "",
+                                  )
+                                : withWorld("/needs-you", worldId ?? "")
+                            }
+                            className="pill"
+                          >
+                            {next.kind === "gate" ? "Review the gate" : "Open Needs you"}
+                          </AppLink>
+                        </>
+                      ) : (
+                        <p className="decision-head">Nothing waits for you.</p>
+                      )}
+                    </div>
                     <p className="bitem-sub" data-testid="replay-note">
                       {first
                         ? `Replay of run #${first.run_id.replace(/^r_/, "")} recorded ${longDate(first.ts)}. Nothing here is live.`
                         : "The recorded run has not started playing yet."}
-                    </p>
-                    <p className="bitem-sub needs-line" data-testid="world-needs">
-                      {waiting > 0 ? (
-                        <>
-                          {plural(waiting, "decision")} waiting for you.{" "}
-                          <AppLink to={withWorld("/needs-you", worldId ?? "")}>
-                            Open Needs you
-                          </AppLink>
-                        </>
-                      ) : (
-                        "Nothing waits for you."
-                      )}
                     </p>
                     <div className="soon-row">
                       <AppLink to={w} className="pill">
