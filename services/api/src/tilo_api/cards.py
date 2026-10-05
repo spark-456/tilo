@@ -7,9 +7,9 @@ no randomness. A card is validated against contracts/card.schema.json plus the v
 CR-01 and CR-02 before it is stored; an invalid card is never shown and never times out. Gate and
 consent cards are authorisations: never merged, never delegated to the Director, and never resolved
 by a timeout. Who answers comes only from the verified `deps.Principal` (PRD 10.1), never from the
-request body; a channel other than web and mobile web (email) is accepted only from an authenticated
-tilo-channels caller, and whatsapp never (SD-01, ADR-0019): no PIN path exists. Deciding whether an answer
-opens a gate stays with packages/policy.
+request body: the body's channel must equal the principal's. A user answers on web or mobile web; an authenticated
+tilo-channels caller claims only email, and only on a needs_you card, never a gate (CH-RM, SEC-06). WhatsApp was removed
+(SD-01, ADR-0019): no PIN path exists. Deciding whether an answer opens a gate stays with packages/policy.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ _MERGEABLE = ("needs_you", "meeting")
 _ROLES = ("owner", "team_lead", "approver")  # any other role (a Viewer included) answers and lists nothing
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _WEB_CHANNELS = ("web", "mobile_web")
-_ANSWER_CHANNELS = (*_WEB_CHANNELS, "email")  # whatsapp opens nothing, whatever a stored card lists (CH-RM)
+_ANSWER_CHANNELS = (*_WEB_CHANNELS, "email")  # the only channels that answer, whatever a card lists (CH-RM)
 _STATUS = {"card_not_found": 404, "forbidden": 403, "busy": 409}  # AnswerResult.reason -> HTTP; others are 400
 
 
@@ -264,6 +264,10 @@ class CardStore:
         errors = _card_errors(card)
         if not errors:
             errors = self._companion_errors(card["kind"], outbox_id, district, assignee, domain)
+        if not errors:
+            usable = _WEB_CHANNELS if card["kind"] in ("gate", "consent") else _ANSWER_CHANNELS
+            if not set(card["answer_channels"]) & set(usable):  # a card nobody can answer is never stored (CH-RM)
+                errors = ["answer_channels: no listed channel can answer this card"]
         if errors:
             return SubmitResult("rejected", None, tuple(errors))
 
@@ -438,8 +442,10 @@ class CardStore:
             if option not in {o["id"] for o in card["options"]}:
                 return AnswerResult("rejected", "invalid_option", ())
             if channel not in card["answer_channels"] or channel not in _ANSWER_CHANNELS:
-                # SEC-06: a gate opens only in a signed-in session, so whatsapp is refused whatever the card lists
+                # SEC-06: a gate opens only in a signed-in session; any other channel is refused, whatever a card lists
                 return AnswerResult("rejected", "invalid_channel", ())
+            if channel == "email" and record.kind != "needs_you":
+                return AnswerResult("rejected", "invalid_channel", ())  # email answers a plain question only (CH-RM)
 
             who = (option, channel, principal.user_id, principal.role)
             authz = {"by": "person", "ref": principal.user_id, "at": self._clock.now()}
@@ -601,6 +607,11 @@ def build_router(
             raise HTTPException(status_code=404)
         if body.pin_verified or (not from_channels and body.channel not in _WEB_CHANNELS):
             return JSONResponse(status_code=403, content={"outcome": "rejected", "reason": "channel_not_permitted"})
+        # The channel is the session's, never the body's (CH-RM, SEC-06): a user answers on web or mobile web, and
+        # tilo-channels claims only email. Refused before the store sees it, so nothing is resolved or written.
+        allowed = ("email",) if from_channels else _WEB_CHANNELS
+        if body.channel != principal.channel or body.channel not in allowed:
+            return JSONResponse(status_code=400, content={"outcome": "rejected", "reason": "invalid_channel"})
         try:
             result = store.answer(
                 world_id,
