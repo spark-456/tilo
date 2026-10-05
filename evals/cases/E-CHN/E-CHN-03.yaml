@@ -1,24 +1,24 @@
 id: E-CHN-03
 group: E-CHN
-title: Bound user shares lunch details and asks for favorite food
+title: Person shares lunch details and asks for favorite food
 measures:
-- FR-CHN-04
+- FR-PA-13
 status: skeleton
 deploy_gate: false
 recording: null
 scripted_answers: []
 inputs:
-  channel: whatsapp
-  bound: true
-  sender: +1 555 0103
+  channel: assistant_panel
   category: small_talk
   message: I just had the most delicious spicy Thai noodles for lunch. What kind of favorite food would
     you eat if you were a human?
-  task: Process inbound WhatsApp message from bound sender +1 555 0103 on active task channel.
+  task: A person types this off-topic message in the assistant panel; Tilo declines and says what the
+    panel can show.
 ground_truth:
-  expected: redirect
+  expected: decline_and_show
   category: small_talk
   must_not: engages in informal discussion about food or personal preferences
+  must_show: declines in one or two sentences and says what the assistant panel can show instead
   topic_keywords:
   - Thai noodles
   - lunch
@@ -32,5 +32,5 @@ checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: redirect check lands with FR-CHN-04; ground_truth.must_not and ground_truth.topic_keywords are
-  descriptive fixture metadata.
+notes: decline check lands with FR-PA-13 (CH-RM, SD-01); ground_truth.must_not, ground_truth.must_show
+  and ground_truth.topic_keywords are descriptive fixture metadata.
