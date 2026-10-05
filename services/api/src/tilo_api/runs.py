@@ -191,13 +191,26 @@ class Run:
 
     def emit(self, *, type: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
         passed = {k: kw[k] for k in ("district", "cause", "vis", "severity", "event_id") if k in kw}
-        event = self.put(type, actor, target, summary, data, **passed)
-        if type == "question.answered" and data.get("answered_by") == "default":
-            try:
-                self.cards.tick()  # the harness applied a deadline default: close that card here too (BQ-208)
-            except Exception:  # the default is committed; a card that failed to close stays in tick's work set
-                logger.warning("a card could not be closed after its deadline default", exc_info=True)
+        defaulted = type == "question.answered" and data.get("answered_by") == "default"
+        try:
+            event = self.put(type, actor, target, summary, data, **passed)
+        except AlreadyCommitted:
+            if defaulted:  # an answer already committed this card's question: the deadline closes the card as well
+                self._close_defaulted()
+            raise
+        if defaulted:
+            self._close_defaulted()  # the harness applied a deadline default: close that card here too (BQ-208)
         return event
+
+    def _close_defaulted(self) -> None:
+        try:
+            self.cards.tick()
+        except Exception:  # the resolution is committed; a card that failed to close stays in tick's work set
+            logger.warning("a card could not be closed after its deadline default", exc_info=True)
+
+    def committed(self, event_id: str) -> dict | None:
+        """The event of this run already committed under `event_id`, if any (QuestionWait asks, #338)."""
+        return next((e for e in self.store.events.get(self.world_id, []) if e["id"] == event_id), None)
 
     def write(self, part: dict) -> None:
         """The CardStore's part for a person's answer; an approve opens the waiting gate, an answer resumes its unit."""

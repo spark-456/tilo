@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
+from tilo_harness.writer import new_ulid
+
 _DEADLINE = "deadline"  # who claimed a card's resolution when nobody answered
 
 
@@ -86,8 +88,9 @@ class QuestionWait:
         self._claimed: dict[str, str] = {}  # card id -> event id of the resolution that won
         self._early: dict[str, tuple[str | None, str]] = {}  # resolved before anyone waited: (option, answered_by)
         # Answers whose write raised: each may still have committed (commit-then-raise). card id -> by -> (event id,
-        # option). A committed event that wins later is matched to its attempt: the unit resumes with what was chosen.
-        self._tried: dict[str, dict[str, tuple[str, str | None]]] = {}
+        # options tried). An event id carries no option, so a committed event is matched to its attempt only when one
+        # option was tried under it: the unit resumes with what was chosen, else with the card's safe default.
+        self._tried: dict[str, dict[str, tuple[str, set[str | None]]]] = {}
 
     async def wait_for(self, card: dict[str, Any], *, lead: str, director: str, district: str | None) -> Answer:
         card_id = card["id"]
@@ -120,6 +123,15 @@ class QuestionWait:
                     return  # a resend of the resolution already written
                 raise AlreadyAnswered(card_id)
             self._claimed[card_id] = event_id
+            earlier = self._tried.get(card_id, {}).get(by)
+            differs = earlier is not None and bool(earlier[1] - {part.get("option")})
+        if differs:  # an earlier attempt under this id chose another option: did it commit? (the id has no option)
+            found = self._committed(event_id)
+            if found is not None:  # it did: that answer resolved the question; this one is refused and writes nothing
+                self._settle_committed(card_id, AlreadyCommitted(found), by)
+                raise AlreadyAnswered(card_id)
+            with self._lock:
+                self._tried.get(card_id, {}).pop(by, None)  # none of those attempts committed
         director, lead = (waiter.director, waiter.lead) if waiter else ("system", part["district"] or part["world_id"])
         try:
             self._writer.emit(
@@ -133,7 +145,7 @@ class QuestionWait:
         except BaseException:
             with self._lock:
                 del self._claimed[card_id]  # the same answer may be sent again; it may still have committed
-                self._tried.setdefault(card_id, {})[by] = (event_id, part.get("option"))
+                self._tried.setdefault(card_id, {}).setdefault(by, (event_id, set()))[1].add(part.get("option"))
                 waiter = self._waiting.get(card_id)
             if waiter is not None:  # the deadline may have seen this claim and stood down: let it look again
                 _on_loop(waiter, waiter.released.set)
@@ -153,12 +165,17 @@ class QuestionWait:
         with self._lock:
             tried = self._tried.pop(card_id, {})
             attempt = tried.get(by)
-            option = attempt[1] if attempt else None  # unknown attempt: the card's safe default
+            options = attempt[1] if attempt else set()
+            option = next(iter(options)) if len(options) == 1 else None  # unknown or several: the safe default
             waiter = self._waiting.get(card_id)
             if waiter is None:
                 self._early[card_id] = (option, by)
         if waiter is not None:
             _resolve(waiter, Answer(card_id, option or waiter.card["safe_default"], by))
+
+    def _committed(self, event_id: str) -> dict[str, Any] | None:
+        lookup = getattr(self._writer, "committed", None)  # the writer's own record of a committed event id
+        return lookup(event_id) if lookup else None
 
     async def _at_deadline(self, waiter: _Waiter) -> None:
         card = waiter.card
@@ -176,21 +193,24 @@ class QuestionWait:
             await waiter.released.wait()
             waiter.released.clear()
         # After a write that raised, the default reuses its event id: if that answer did commit, the writer says so.
-        reuse = {"event_id": again} if again else {}
+        # Else it has an id of its own, so a default that committed and then raised is found and counts as written.
+        default_id = again or new_ulid(self._clock.now())
         try:
             self._writer.emit(
                 type="question.answered", actor=waiter.director, target=waiter.lead, data={"answered_by": "default"},
                 summary="Nobody answered in time, so the Director applied the safe default.", severity="nudge",
-                district=waiter.district, vis=[waiter.district], **reuse,
+                district=waiter.district, vis=[waiter.district], event_id=default_id,
             )  # fmt: skip
         except AlreadyCommitted as exc:
             self._settle_committed(card["id"], exc, "default")
             return
         except Exception as error:
-            with self._lock:
-                del self._claimed[card["id"]]
-            _resolve(waiter, error)
-            return
+            found = self._committed(default_id)
+            if not found or (found.get("data") or {}).get("answered_by") != "default":
+                with self._lock:
+                    del self._claimed[card["id"]]
+                _resolve(waiter, error)
+                return
         with self._lock:
             self._tried.pop(card["id"], None)
         _resolve(waiter, Answer(card["id"], card["safe_default"], "default"))

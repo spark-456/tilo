@@ -98,6 +98,11 @@ class ScriptedWriter:
         assert committed is not None, "a mode that never raises must commit"
         return committed
 
+    def committed(self, event_id: str) -> dict[str, Any] | None:
+        """The event committed under `event_id`, if any (the lookup `QuestionWait` asks of a writer, #338)."""
+        with self._lock:
+            return next((e for e in self.events if e["id"] == event_id), None)
+
     def answered(self) -> list[dict[str, Any]]:
         return [e for e in self.events if e["type"] == "question.answered"]
 

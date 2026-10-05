@@ -172,13 +172,10 @@ class _SlowU2(ScriptedProvider):
         return super().generate(request)
 
 
-def test_FR_HIL_10_a_label_picked_on_one_card_never_runs_the_other_unit_whose_rule_card_nobody_has_seen(
-    repo_root, flows
-):
-    """The shape of the Opus review blocker (P1): U1's model card offers "Go ahead" and "Wait for me"; U2's reply is
-    unreadable, so code raises its rule card ("Hold this step" / "Go ahead", only the second runs the unit). The person
-    picks "Go ahead" on U1's card: U1 resumes, U2 must NOT start from that choice. Its card stays listed with its own
-    options, and only an answer to it decides U2."""
+def _model_card_and_rule_card(repo_root, flows):
+    """U1 asks with a model-written card ("Go ahead" / "Wait for me", runs on any answer); U2's reply is unreadable, so
+    code raises its rule card (o1 "Hold this step", o2 "Go ahead"; only o2 runs the unit, the safe default is o1).
+    Returns (rf, U1's card, U2's rule card), both listed."""
     provider = _SlowU2({U1_TITLE: U1_REPLY, CLEAR[2]["title"]: json.dumps({"ask": False})})
     rf = build_ask_flow(repo_root, provider, independent=True)
     flows.append(rf)
@@ -200,6 +197,17 @@ def test_FR_HIL_10_a_label_picked_on_one_card_never_runs_the_other_unit_whose_ru
     mine = next(c for c in cards if c["what_happened"].startswith("Should I use"))
     rule = next(c for c in cards if c["id"] != mine["id"])
     assert {o["label"] for o in rule["options"]} >= {"Hold this step", "Go ahead"}
+    return rf, mine, rule
+
+
+def test_FR_HIL_10_a_label_picked_on_one_card_never_runs_the_other_unit_whose_rule_card_nobody_has_seen(
+    repo_root, flows
+):
+    """The shape of the Opus review blocker (P1): U1's model card offers "Go ahead" and "Wait for me"; U2's reply is
+    unreadable, so code raises its rule card ("Hold this step" / "Go ahead", only the second runs the unit). The person
+    picks "Go ahead" on U1's card: U1 resumes, U2 must NOT start from that choice. Its card stays listed with its own
+    options, and only an answer to it decides U2."""
+    rf, mine, rule = _model_card_and_rule_card(repo_root, flows)
     go = next(o["id"] for o in mine["options"] if o["label"] == "Go ahead")
 
     assert rf.answer(mine["id"], go).status_code == 200
@@ -215,6 +223,98 @@ def test_FR_HIL_10_a_label_picked_on_one_card_never_runs_the_other_unit_whose_ru
     rf.quiet_stream()
     assert "U2" not in rf.runner.started_at
     assert any("the answer held this step" in e["summary"] for e in rf.events("agent.retired"))
+
+
+def _commit_then_raise_first_answer(monkeypatch, rf, *, fail_next=False):
+    """The first question.answered the writer sees is committed and then raises (its caller sees a 503). With
+    `fail_next` the second one fails outright, nothing committed."""
+    original, seen = rf.writer.append, {"n": 0}
+
+    def append(world_id, event):
+        if event["type"] != "question.answered":
+            return original(world_id, event)
+        seen["n"] += 1
+        if seen["n"] == 1:
+            original(world_id, event)
+            raise RuntimeError("the connection dropped after the event was committed")
+        if fail_next and seen["n"] == 2:
+            raise RuntimeError("the writer is down")
+        return original(world_id, event)
+
+    monkeypatch.setattr(rf.writer, "append", append)
+
+
+def _hold_and_go(rule):
+    return (
+        next(o["id"] for o in rule["options"] if o["label"] == "Hold this step"),
+        next(o["id"] for o in rule["options"] if o["label"] == "Go ahead"),
+    )
+
+
+def test_FR_HIL_10_a_rule_card_whose_committed_answer_is_hold_stays_held_when_the_same_answerer_then_says_go_ahead(
+    repo_root, flows, monkeypatch
+):
+    """Review r1 of #359: the owner picks Hold on U2's rule card, it commits and then the request fails (503). The
+    owner changes their mind and sends Go ahead. An event id carries no option, so the writer cannot tell the two
+    apart; the committed answer is Hold and U2 must stay held (never agent.working), whoever sends the second answer."""
+    rf, _mine, rule = _model_card_and_rule_card(repo_root, flows)
+    hold, go = _hold_and_go(rule)
+    _commit_then_raise_first_answer(monkeypatch, rf)
+
+    first = rf.answer(rule["id"], hold)
+    assert first.status_code == 503, first.text
+    second = rf.answer(rule["id"], go)
+
+    assert second.status_code == 400 and second.json()["reason"] == "already_resolved", second.text
+    wait_for(lambda: rf.events("agent.retired"), what="U2 held")
+    time.sleep(1.0)
+    rf.quiet_stream()
+    assert "U2" not in rf.runner.started_at, "the unit ran on an option that never committed"
+    assert [e["data"]["answered_by"] for e in rf.events("question.answered")] == ["person"], "one event, Hold's"
+    assert rule["id"] not in [c["id"] for c in needs_you_cards(rf)], "the card closed with the committed answer"
+
+
+def test_FR_HIL_10_a_rule_card_held_by_a_committed_answer_stays_held_when_a_second_team_lead_says_go_ahead(
+    repo_root, flows, monkeypatch
+):
+    rf, _mine, rule = _model_card_and_rule_card(repo_root, flows)
+    hold, go = _hold_and_go(rule)
+    district = rf.events("question.routed")[0]["district"]
+    _commit_then_raise_first_answer(monkeypatch, rf)
+    rf.as_member("u_lead_one", "team_lead", districts=(district,))
+    assert rf.answer(rule["id"], hold).status_code == 503
+    rf.as_member("u_lead_two", "team_lead", districts=(district,))
+
+    second = rf.answer(rule["id"], go)
+
+    assert second.status_code == 400, f"a second Team Lead's other option is refused: {second.text}"
+    wait_for(lambda: rf.events("agent.retired"), what="U2 held")
+    time.sleep(1.0)
+    rf.as_member()
+    rf.quiet_stream()
+    assert "U2" not in rf.runner.started_at, "the unit ran on an option that never committed"
+    assert [e["data"]["answered_by"] for e in rf.events("question.answered")] == ["team_lead"]
+
+
+def test_FR_HIL_10_a_held_rule_card_stays_held_at_its_deadline_after_a_failed_go_ahead(repo_root, flows, monkeypatch):
+    """Review r1 of #359 (P2): Hold commits then raises; Go ahead then fails too; nobody retries. At the deadline the
+    unit resumes with what committed (Hold), never with the Go ahead that was only attempted."""
+    import tilo_harness.must_ask as must_ask  # noqa: PLC0415
+
+    monkeypatch.setattr(must_ask, "QUESTION_TIMEOUT_S", 3)
+    rf, _mine, rule = _model_card_and_rule_card(repo_root, flows)
+    hold, go = _hold_and_go(rule)
+    _commit_then_raise_first_answer(monkeypatch, rf, fail_next=True)
+
+    assert rf.answer(rule["id"], hold).status_code == 503
+    assert rf.answer(rule["id"], go).status_code in (400, 503)
+
+    wait_for(lambda: rf.events("agent.retired"), timeout=8, what="U2 held")
+    time.sleep(4.0)  # past the card's deadline
+    rf.quiet_stream()
+    assert "U2" not in rf.runner.started_at, "the held step ran on an option that never committed"
+    assert [e["data"]["answered_by"] for e in rf.events("question.answered")] == ["person"], "one event for the card"
+    assert rule["id"] not in [c["id"] for c in needs_you_cards(rf)], "the card does not stay listed"
 
 
 def test_FR_HIL_10_cards_of_different_districts_are_answered_separately_and_each_resumes_only_its_own_unit(
