@@ -1,1 +1,1 @@
-"""tilo_channels: WhatsApp webhook and keyword handling (PRD 11, FR-CHN-02, FR-CHN-06)."""
+"""tilo_channels: email triage, drafting, Email Autopilot, signed links and Gmail watch (PRD 11)."""

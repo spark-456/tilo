@@ -40,7 +40,7 @@ from _chn11_lib import (
     scripted_thread,
 )
 from _chn13_lib import iso
-from _chn_0305_lib import CONTRACTS, data_errors
+from _chn_contracts_lib import CONTRACTS, data_errors
 
 DISTRICT = "D3"
 OMIT = object()

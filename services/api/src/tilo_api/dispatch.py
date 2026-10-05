@@ -361,7 +361,7 @@ def stop_autopilot(
 
 
 class PauseRequest(BaseModel):
-    channel: Literal["web", "mobile_web", "whatsapp", "email"] | None = None
+    channel: Literal["web", "mobile_web", "email"] | None = None
 
 
 @router.post("/worlds/{world_id}/pause")

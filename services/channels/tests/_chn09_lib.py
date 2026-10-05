@@ -25,7 +25,7 @@ from typing import Any
 
 import yaml
 from _channels_lib import FakeClock
-from _chn_0305_lib import REPO_ROOT
+from _chn_contracts_lib import REPO_ROOT
 from tilo_providers.interfaces import (
     Capability,
     GenerateRequest,

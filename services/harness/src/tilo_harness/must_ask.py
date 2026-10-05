@@ -276,7 +276,7 @@ class MustAsk:
             "options": options,
             "add_context": True,
             "actions": ["show_me", "snooze", "delegate"],
-            "answer_channels": ["web", "mobile_web", "whatsapp", "email"],
+            "answer_channels": ["web", "mobile_web", "email"],
             "created_at": format_ts(now),
             "timeout": QUESTION_TIMEOUT_S,
             "safe_default": options[ask.suggested]["id"],  # reversible by schema; BQ-212

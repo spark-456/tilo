@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for services/channels acceptance tests (FR-CHN-02, FR-CHN-06).
+"""Shared pytest fixtures for services/channels acceptance tests.
 
 No business logic lives here (root CLAUDE.md test-writer rule): every fixture returns a test
 double from `_channels_lib.py`, which is kept under a package-unique module name because every
@@ -10,20 +10,7 @@ mode puts it on sys.path (the same pattern services/api/tests uses).
 from __future__ import annotations
 
 import pytest
-from _channels_lib import (
-    FakeBindings,
-    FakeClock,
-    FakeControls,
-    FakeSender,
-    MemoryDedupeStore,
-    Recorder,
-    make_app_secret,
-)
-
-
-@pytest.fixture()
-def app_secret() -> bytes:
-    return make_app_secret()
+from _channels_lib import FakeClock, MemoryDedupeStore
 
 
 @pytest.fixture()
@@ -34,23 +21,3 @@ def clock() -> FakeClock:
 @pytest.fixture()
 def store(clock: FakeClock) -> MemoryDedupeStore:
     return MemoryDedupeStore(clock)
-
-
-@pytest.fixture()
-def recorder() -> Recorder:
-    return Recorder()
-
-
-@pytest.fixture()
-def bindings() -> FakeBindings:
-    return FakeBindings()
-
-
-@pytest.fixture()
-def controls(clock: FakeClock) -> FakeControls:
-    return FakeControls(clock)
-
-
-@pytest.fixture()
-def sender(clock: FakeClock) -> FakeSender:
-    return FakeSender(clock)

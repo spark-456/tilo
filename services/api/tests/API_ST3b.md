@@ -11,7 +11,7 @@ Kept in a new module family so this ticket never touches `services/api/tests/_ap
 
 ## Round 2 (issue #32 review findings): this section supersedes the shapes and ambiguities below
 
-- **Identity.** `answer(world_id, card_id, *, option, channel, principal, pin_verified=False)` and
+- **Identity.** `answer(world_id, card_id, *, option, channel, principal)` (no PIN argument since CH-RM) and
   `list_for_world(world_id, *, principal)` take the verified `deps.Principal`; `actor` and `as_user`
   are gone and the HTTP body forbids extra fields (a body naming an actor is a 422). Roles follow
   PRD 10.1: the owner answers everything; a Viewer gets 403 (also on GET); a Team Lead sees and
@@ -23,9 +23,10 @@ Kept in a new module family so this ticket never touches `services/api/tests/_ap
   (card.schema.json has none; none means owner-only) and `assignee` (the Approver the owner assigned,
   `approval.requested` approver.user) are data the harness holds. District and assignee are part of
   the merge key, so a merge never crosses a visibility scope.
-- **Channel and PIN.** The route accepts `channel` other than web/mobile_web and `pin_verified` only
-  when `cards.get_channels_caller()` is true (an authenticated tilo-channels call; false until
-  service auth lands), else 403 `channel_not_permitted`.
+- **Channel and PIN.** The route accepts `channel` other than web/mobile_web only when
+  `cards.get_channels_caller()` is true (an authenticated tilo-channels call; false until service auth
+  lands), else 403 `channel_not_permitted`. `pin_verified` is always 403 and the event writes `false`
+  (SD-01, ADR-0019). `whatsapp` is refused with `invalid_channel` whatever the card lists (CH-RM).
 - **submit** is idempotent: identical content returns the first result and changes nothing; a
   different card under a used id is rejected; a resolved record is never reopened. CR-01 (safe
   default names an option), CR-02 (unique option ids), a real calendar `created_at` and a
@@ -186,8 +187,7 @@ class CardStore:
         `channel` must be in the stored card's answer_channels, else "invalid_channel" — this is
         the whole of PI-04 (structural: a gate card's answer_channels schema-excludes email, a
         consent card's excludes whatsapp and email). When the card's kind is "gate" and its
-        gate.risk_tier == "T3" and channel == "whatsapp", pin_verified must be true (SEC-06),
-        else "pin_required". A card that is not open (already answered, or a non-gate/consent
+        (CH-RM: whatsapp is refused with "invalid_channel" and there is no PIN path.) A card that is not open (already answered, or a non-gate/consent
         card already resolved by timeout) -> "already_resolved". Unknown card -> "card_not_found".
         On success: writes {"type": "question.answered", "data": {"answered_by": "person"},
         "authz": None} for a needs_you/meeting card (closing it, chosen option = `option`);

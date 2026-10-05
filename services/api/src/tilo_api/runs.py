@@ -513,7 +513,7 @@ class Run:
                  "reason": "Check the draft and who it goes to once before it is sent."},
                 {"id": "hold", "label": "Hold", "suggested": False, "irreversible": False},
             ],
-            "add_context": False, "actions": ["show_me"], "answer_channels": ["web", "mobile_web", "whatsapp"],
+            "add_context": False, "actions": ["show_me"], "answer_channels": ["web", "mobile_web"],
             "created_at": events.now(), "timeout": _GATE_TIMEOUT_S, "safe_default": "hold",
             "gate": {"id": gate_id, "action": {"type": action, "connector": connector, "exact": ""},
                      "irreversible": irreversible, "risk_tier": tier},
