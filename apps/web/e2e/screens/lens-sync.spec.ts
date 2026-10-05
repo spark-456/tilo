@@ -224,6 +224,9 @@ test("FR_WLD_06 selecting shifts nothing on the page and passes axe", async ({ p
           "[data-testid=selection-bar], [data-testid=world-hud] .row, .story-list li, .trace-rows li",
         )
         .evaluateAll((els) => els.slice(0, 40).map((el) => el.getBoundingClientRect().top));
+    // The rail scrolls: a row below the fold is brought into view first, so the click itself
+    // scrolls nothing and only a selection's own shift would show.
+    await hudRow(page, /Specialist 1/).scrollIntoViewIfNeeded();
     const before = await tops();
     await hudRow(page, /Specialist 1/).click();
     await expect(page.getByTestId("selection-bar")).toHaveAttribute("data-selected-id", "A_s1");

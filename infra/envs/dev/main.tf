@@ -17,6 +17,10 @@ data "google_storage_project_service_account" "gcs" {
 locals {
   project_number = data.google_project.current.number
 
+  # Dedicated Cloud Build identity (P0-07g; cloudbuild.yaml runs as it). Built
+  # from the account id like the other non-runtime service accounts below.
+  cloudbuild_service_account_email = "${google_service_account.cloudbuild.account_id}@${var.project_id}.iam.gserviceaccount.com"
+
   required_apis = toset([
     "run.googleapis.com",
     "artifactregistry.googleapis.com",
@@ -206,6 +210,14 @@ locals {
     { for r in var.deployer_project_roles : "deployer::${r}" => {
       role = r, member = "serviceAccount:${module.wif.deployer_service_account_email}"
     } },
+    # tilo-cloudbuild's one project role: builds log to Cloud Logging only.
+    # Everything else it holds is scoped to a resource (below).
+    {
+      "cloudbuild::roles/logging.logWriter" = {
+        role   = "roles/logging.logWriter"
+        member = "serviceAccount:${local.cloudbuild_service_account_email}"
+      }
+    },
   )
 
   # Secret Manager placeholders: names only. Values are added by the user
@@ -239,8 +251,10 @@ module "service" {
   # CI deploys revisions of these services only (run.developer per service,
   # never project-wide). run.developer cannot set IAM, so CI can never make
   # an internal service public.
+  # tilo-cloudbuild (cloudbuild.yaml) gets the same per-service grant.
   developers = {
-    deployer = "serviceAccount:${module.wif.deployer_service_account_email}"
+    deployer   = "serviceAccount:${module.wif.deployer_service_account_email}"
+    cloudbuild = "serviceAccount:${local.cloudbuild_service_account_email}"
   }
 
   # Cloud Tasks delivers runs to harness with an OIDC token for this SA.
@@ -329,6 +343,25 @@ resource "google_service_account_iam_member" "deployer_act_as" {
   service_account_id = "projects/${var.project_id}/serviceAccounts/${module.service.service_accounts[each.key]}"
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${module.wif.deployer_service_account_email}"
+}
+
+# Cloud Build identity (P0-07g): the build runs `gcloud run services update`
+# (a new revision as the runtime SA), so it may act as each of the seven
+# runtime SAs, and nothing else (not tasks-invoker, gmail, deployer or itself).
+resource "google_service_account" "cloudbuild" {
+  project      = var.project_id
+  account_id   = "tilo-cloudbuild"
+  display_name = "Tilo Cloud Build (cloudbuild.yaml deploy identity)"
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_service_account_iam_member" "cloudbuild_act_as" {
+  for_each = local.cloud_run_services
+
+  service_account_id = "projects/${var.project_id}/serviceAccounts/${module.service.service_accounts[each.key]}"
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${local.cloudbuild_service_account_email}"
 }
 
 # ---------------------------------------------------------------------------
@@ -482,6 +515,17 @@ resource "google_artifact_registry_repository_iam_member" "deployer_writer" {
   member     = "serviceAccount:${module.wif.deployer_service_account_email}"
 }
 
+# Cloud Build pushes images to the tilo repository only.
+resource "google_artifact_registry_repository_iam_member" "cloudbuild_writer" {
+  project  = var.project_id
+  location = google_artifact_registry_repository.containers.location
+  # repository_id (configured), not name (computed): the grant list output is
+  # asserted at plan time (cloudbuild.tftest.hcl).
+  repository = google_artifact_registry_repository.containers.repository_id
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${local.cloudbuild_service_account_email}"
+}
+
 resource "google_secret_manager_secret" "placeholders" {
   for_each = local.secret_placeholders
 
@@ -591,6 +635,40 @@ resource "google_storage_bucket_iam_member" "service_access" {
   bucket = module.storage.buckets[each.value.bucket].name
   role   = each.value.role
   member = "serviceAccount:${module.service.service_accounts[each.value.svc]}"
+}
+
+# ---------------------------------------------------------------------------
+# Cloud Build source staging (P0-07g): the bucket `gcloud builds submit
+# --gcs-source-staging-dir` uploads source tarballs to. A second instance of
+# modules/storage, so it is regional (gcloud would otherwise auto-create a US
+# multi-region bucket) and stays out of output.storage_buckets (the three PRD
+# buckets). Uploaded source is disposable: deleted after 7 days. The build
+# identity only reads it; the submitting user writes it.
+# ---------------------------------------------------------------------------
+
+module "storage_cloudbuild_staging" {
+  source = "../../modules/storage"
+
+  project_id = var.project_id
+
+  buckets = {
+    "cloudbuild-staging" = {
+      location           = var.region
+      versioning_enabled = false
+      kms_key_name       = ""
+      lifecycle_rules = [
+        { action_type = "Delete", age_days = 7 },
+      ]
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_storage_bucket_iam_member" "cloudbuild_staging_viewer" {
+  bucket = module.storage_cloudbuild_staging.buckets["cloudbuild-staging"].name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${local.cloudbuild_service_account_email}"
 }
 
 # ---------------------------------------------------------------------------

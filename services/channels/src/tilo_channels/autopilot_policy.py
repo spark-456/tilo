@@ -60,6 +60,7 @@ def _usable(d: Any, now_ms: int) -> dict[str, str] | None:
     if (
         not _is(by, "policy")
         or type(ref) is not str
+        or type(d.policy_id) is not str
         or ref != d.policy_id
         or at is None
         or not conforms(_POLICY_ID, ref)
@@ -159,9 +160,9 @@ class PolicyPort:
             if self._ledger.stored(card) is not None:  # an enqueue landed while the engine was asked
                 return card
             if self._cards.create(user_id, f"{card['card_id']}#pol{n + 1}", {"part": part} if part else {"drop": True}):
+                if part is None and self._ledger.stored(card) is not None:  # an enqueue raced the drop: stop it first,
+                    self._ledger.stop(user_id, card, "dropped")  # so the gate is never shown over a scheduled entry
                 self._emit(copy.deepcopy(part) if part else requested_part(card, card["outbox_id"]))
-                if part is None and self._ledger.stored(card) is not None:  # an enqueue raced the drop: stop it
-                    self._ledger.stop(user_id, card, "dropped")
         raise RuntimeError("the card's policy decision did not settle: retry")
 
     def _head(self, user_id: str, doc: dict[str, Any]) -> tuple[int, dict | None]:
