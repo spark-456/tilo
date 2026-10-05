@@ -94,7 +94,7 @@ and the "Tilo owner cost alert" policy emails `alert_email`, at most once an
 hour. It is alert-only: spend is never blocked. This change is Terraform in a
 PR; it takes effect when you run the apply step above. The uid cap and daily
 USD threshold are constructor arguments until the caps move into
-`config/metering.yaml` (BQ-274); the lines carry the figures.
+`config/metering.yaml` (BQ-276); the lines carry the figures.
 
 The access audit (`infra/ACCESS.md`) lists every API, IAM grant, secret slot,
 OAuth scope and console step; read its section 7 and 8 before applying.
