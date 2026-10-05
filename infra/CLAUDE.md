@@ -27,8 +27,8 @@ Full apply flow (with credentials): see `infra/README.md`.
   `tilo-browser` holds no Firestore/Datastore or Storage IAM role (SEC-12).
 - CI/CD authenticates through Workload Identity Federation
   (`infra/modules/wif`), restricted to `var.github_repository` (name,
-  repository id and owner id) on `refs/heads/main` only, never tags. No
-  keys. Grant roles per resource (topic, secret, key, bucket, service),
+  repository id and owner id) on `refs/heads/main` or, temporarily (P0-07d, revert after merge),
+  `refs/heads/phase0-stack`; never tags. No keys. Grant roles per resource (topic, secret, key, bucket, service),
   never project-wide, and keep `run.invoker` scoped to real callers.
 - Keep `infra/modules/*` reusable and DRY: a new Cloud Run service is a new
   entry in the `cloud_run_services` map in `infra/envs/dev/main.tf`, not a

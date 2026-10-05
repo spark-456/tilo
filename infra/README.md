@@ -60,7 +60,8 @@ terraform -chdir=infra/envs/dev init -backend-config=backend.hcl
 
 # 8. Plan. Supply the variables that have no default. The WIF provider
 #    pins the GitHub repository's numeric id and owner id as well as its
-#    name, and accepts tokens from refs/heads/main only (no tags). Look the
+#    name, and accepts tokens from refs/heads/main or, temporarily (P0-07d),
+#    refs/heads/phase0-stack (no tags). Look the
 #    ids up with the GitHub CLI (or the repo's API page):
 gh api repos/owner/tilo --jq '.id, .owner.id'
 terraform -chdir=infra/envs/dev plan `

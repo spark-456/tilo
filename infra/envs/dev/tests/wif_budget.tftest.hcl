@@ -76,8 +76,18 @@ run "SEC_02_deployer_limited_to_main_and_runtime_service_accounts" {
   }
 
   assert {
-    condition     = !strcontains(output.wif_provider_attribute_condition, "refs/tags") && !strcontains(output.wif_provider_attribute_condition, "||")
-    error_message = "The WIF provider must not accept tags or any alternative ref: tags bypass branch protection (SEC-02, SEC-12)."
+    condition     = strcontains(output.wif_provider_attribute_condition, "assertion.ref == \"refs/heads/phase0-stack\"")
+    error_message = "The WIF provider must accept refs/heads/phase0-stack while the deploy workflow runs from it (P0-07d; remove after merge to main)."
+  }
+
+  assert {
+    condition     = !strcontains(output.wif_provider_attribute_condition, "refs/tags")
+    error_message = "The WIF provider must not accept tags: tags bypass branch protection (SEC-02, SEC-12)."
+  }
+
+  assert {
+    condition     = !strcontains(output.wif_provider_attribute_condition, "*") && !strcontains(output.wif_provider_attribute_condition, "startsWith") && length(regexall("assertion[.]ref == ", output.wif_provider_attribute_condition)) == 2
+    error_message = "The ref clause must list exactly two exact refs (main, phase0-stack): no wildcard, no startsWith, no other alternative (P0-07d, SEC-02, SEC-12)."
   }
 
   assert {
