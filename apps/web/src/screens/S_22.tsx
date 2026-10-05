@@ -21,7 +21,7 @@ const CONSENTS: ReadonlyArray<readonly [string, string, string | null]> = [
     "Greetings and sign-offs learned from your sent mail. Stored as settings.",
     null,
   ],
-  ["WhatsApp", "Cards and replies on your phone, with a number you bind.", "/channels"],
+  ["Email", "Notifications and question cards, with the preferences you set.", "/channels"],
   ["Pilot diary", "A daily note and an exit survey. Results are aggregated only.", "/pilot"],
 ];
 

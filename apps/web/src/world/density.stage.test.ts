@@ -3,7 +3,7 @@
 // redraws the stage in place: characters get smaller and every tag carries its recorded state,
 // and nothing is emitted or replayed (HR-1..HR-3, FR-WLD-09: no event, no new animation).
 import type { Event, Layout } from "@tilo/contracts";
-import { Container } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { villageBasicEvents, villageBasicLayout } from "../../test-support/worldFixtures";
 import { setDensity } from "../display/density";
@@ -16,9 +16,15 @@ const invert = (m: Record<string, string>) =>
 
 // Pixi's Text needs a canvas the test runtime does not have, so a tag is a bare container whose
 // label is its text: what matters here is which words the renderer asks for.
+const pillWidth = vi.hoisted(() => ({ w: 130 }));
 vi.mock("./art/labels", async () => {
-  const { Container: C } = await import("pixi.js");
-  const pill = (text: string) => Object.assign(new C(), { label: text });
+  const { Container: C, Graphics: G } = await import("pixi.js");
+  // 130 px wide, about a name and its state word at 12 px: tag placement needs a width to work with.
+  const pill = (text: string) => {
+    const c = Object.assign(new C(), { label: text });
+    c.addChild(new G().rect(-pillWidth.w / 2, -10, pillWidth.w, 20).fill(0));
+    return c;
+  };
   return {
     makePill: (text: string) => pill(text),
     buildingTag: pill,
@@ -63,11 +69,18 @@ function stage(width = 900) {
       .filter((c) => c.visible)
       .map((c) => c.label)
       .sort();
-  return { stop, calls, scales, tags };
+  const layers = () => {
+    const [, objects, , labels] = content.children as Container[];
+    return { objects, labels };
+  };
+  return { stop, calls, scales, tags, layers };
 }
 
 beforeEach(() => setDensity("friendly"));
-afterEach(() => setDensity("friendly"));
+afterEach(() => {
+  setDensity("friendly");
+  pillWidth.w = 130;
+});
 
 describe("FR-WLD-14 the stage follows the density mode, read at draw time", () => {
   it("Professional draws smaller characters and puts the recorded state in every tag", () => {
@@ -102,8 +115,83 @@ describe("FR-WLD-14 the stage follows the density mode, read at draw time", () =
         /^(Town Hall|[A-Z][\w ]+) · (At work|Finished|Planned|Being built)$/.test(t),
       ),
     ).toBe(false);
-    expect(tags.some((t) => t.startsWith("Gate · "))).toBe(true); // gate and rank tags are unchanged
+    // Gate states and rank words are the same 6 px type: they go too, and the Policy tag keeps its word.
+    expect(tags.some((t) => t.startsWith("Gate · "))).toBe(false);
+    expect(tags.some((t) => /^(Director|Lead|Verifier|Specialist)$/.test(t))).toBe(false);
     phone.stop();
+    const wide = stage();
+    expect(wide.tags().some((t) => t.startsWith("Gate · "))).toBe(true); // a full-size stage keeps them
+    wide.stop();
+  });
+
+  it("a building's tag keeps clear of the figures resting in front of any building (FR-WLD-14, 1920 stage)", () => {
+    setDensity("professional");
+    const s = stage(1400);
+    const { objects, labels } = s.layers();
+    const names = new Set(
+      layout.semantic.levels.flatMap((l) =>
+        l.districts.flatMap((d) => d.buildings.map((b) => b.name)),
+      ),
+    );
+    const figures = (objects?.children ?? []).filter((c) => c.scale.x !== 1);
+    const tags = (labels?.children ?? []).filter(
+      (c) => c.visible && names.has(c.label.split(" · ")[0] ?? ""),
+    );
+    expect(figures.length).toBeGreaterThan(0);
+    expect(tags.length).toBeGreaterThan(0);
+    for (const t of tags) {
+      for (const f of figures) {
+        const across = Math.abs(t.x - f.x) < 65 + 18;
+        const down = f.y - 30 * AGENT_SCALE < t.y + 10 && f.y + 6 > t.y - 10;
+        expect(across && down, `${t.label} touches a figure at ${f.x},${f.y}`).toBe(false);
+      }
+    }
+    s.stop();
+  });
+
+  it("on a phone the name tags are drawn at a readable size, and the ones that would overlap are left out", () => {
+    pillWidth.w = 250; // long names: enlarged, they cannot all fit
+    for (const mode of ["friendly", "professional"] as const) {
+      setDensity(mode);
+      const phone = stage(390);
+      const { labels } = phone.layers();
+      const shown = (labels?.children ?? []).filter((c) => c.visible && c.scale.x > 1);
+      expect(shown.length, `${mode}: some tags stay`).toBeGreaterThan(0);
+      // 12 px on screen: the fit scale times the enlargement times the 12 px tag.
+      const fit = (labels?.parent as Container).scale.x;
+      for (const t of shown) expect(fit * t.scale.x * 12).toBeCloseTo(12, 5);
+      for (const [i, a] of shown.entries()) {
+        for (const b of shown.slice(i + 1)) {
+          const apart =
+            Math.abs(a.x - b.x) >= 65 * a.scale.x + 65 * b.scale.x ||
+            Math.abs(a.y - b.y) >= 10 * a.scale.x + 10 * b.scale.x;
+          expect(apart, `${a.label} overlaps ${b.label}`).toBe(true);
+        }
+      }
+      // Nothing drawn is cut off by the stage's edge (390 x 600 here; the camera starts centred).
+      const content = labels?.parent as Container;
+      for (const t of shown) {
+        const half = (pillWidth.w / 2) * t.scale.x;
+        const [left, right] = [(t.x - half) * content.scale.x, (t.x + half) * content.scale.x];
+        expect(left + content.x, `${t.label} crosses the left edge`).toBeGreaterThanOrEqual(-195);
+        expect(right + content.x, `${t.label} crosses the right edge`).toBeLessThanOrEqual(195);
+        const [top, bottom] = [
+          (t.y - 10 * t.scale.x) * content.scale.x,
+          (t.y + 10 * t.scale.x) * content.scale.x,
+        ];
+        expect(top + content.y).toBeGreaterThanOrEqual(-300);
+        expect(bottom + content.y).toBeLessThanOrEqual(300);
+      }
+      const all = (labels?.children ?? []).filter((c) => c.scale.x > 1);
+      expect(all.length, `${mode}: a crowded phone stage leaves tags out`).toBeGreaterThan(
+        shown.length,
+      );
+      phone.stop();
+      const wide = stage(1400);
+      const sizes = new Set((wide.layers().labels?.children ?? []).map((c) => c.scale.x));
+      expect([...sizes]).toEqual([1]); // a full-size stage keeps the tags as drawn
+      wide.stop();
+    }
   });
 
   it("a tag's state words are the Inspect panel's: one shared map", () => {

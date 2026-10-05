@@ -115,6 +115,16 @@ function standAt(r: Rect, kind: "building" | "district" | "level", lift: number,
   return { cx: x, cy: y };
 }
 
+/** The ground in front of a building where agents rest (the first row of `standAt`'s four slots),
+ * in world px: feet only, so a caller pads it by a figure's size. From the layout alone, so a
+ * building's tag can keep clear of it whoever is standing there (nothing here moves). */
+export function standZone(r: Rect, lift: number) {
+  const feet = [0, 1, 2, 3].map((slot) => standAt(r, "building", lift, slot));
+  const xs = feet.map((f) => f.cx);
+  const ys = feet.map((f) => f.cy);
+  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+}
+
 export function frameOf(layout: Layout, state: WorldState): Frame {
   const geometry = layout.geometry;
   const levelIndex = new Map(geometry?.levels.map((l) => [l.id, l.index]));

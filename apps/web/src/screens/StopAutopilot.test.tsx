@@ -74,10 +74,10 @@ describe("FR-HIL-07 S-15 Stop all autopilot", () => {
     expect(h.calls).toEqual([FIXTURE_WORLD_ID]);
     expect(note(c)).toBe(""); // nothing is claimed before the answer
     await act(async () =>
-      h.answer({ stopped: 2, already_l1: 0, confirmations: [{ channel: "whatsapp" }], pending: 0 }),
+      h.answer({ stopped: 2, already_l1: 0, confirmations: [{ channel: "email" }], pending: 0 }),
     );
     expect(note(c)).toContain("Stopped 2 rules");
-    expect(note(c)).toContain("Confirmations go to: WhatsApp.");
+    expect(note(c)).toContain("Confirmations go to: Email.");
     expect(c.querySelector("h3")).toBeNull();
     // The question is gone: focus is on the answer, not on the page body.
     expect(document.activeElement).toBe(c.querySelector('[data-testid="stop-result"]'));

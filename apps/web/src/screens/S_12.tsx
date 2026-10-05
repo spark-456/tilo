@@ -23,11 +23,7 @@ export function S_12({ params }: ScreenProps) {
   const finished = worldStatus(events) === "completed";
   // Asked for only once world.completed is recorded: before that the server refuses (409) and the
   // browser logs each refusal as an error.
-  const [remote, retry] = useRemote(
-    "load the delivery",
-    () => client.getDelivery(worldId),
-    finished,
-  );
+  const [remote] = useRemote("load the delivery", () => client.getDelivery(worldId), finished);
   const again = useAction("start a new task", async () => "/");
   const delivery = remote.status === "ready" && finished ? remote.value : null;
   return (
@@ -47,8 +43,13 @@ export function S_12({ params }: ScreenProps) {
         <Loaded
           what="the delivery"
           remote={remote}
-          retry={retry}
           isEmpty={(d) => d.artifacts.length === 0}
+          empty={
+            <p data-testid="delivery-none">
+              This run finished, but none of its steps produced anything to deliver. Nothing is
+              missing from your screen.
+            </p>
+          }
         >
           {(d) => (
             <>

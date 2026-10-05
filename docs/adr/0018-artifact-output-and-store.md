@@ -1,12 +1,17 @@
-# ADR-0017: Unit output and the artifact store
+# ADR-0018: Unit output and the artifact store
 
-- Status: Proposed. Awaiting the user's decision (2026-10-05, architect; issue #283, BQ-218).
-  Docs only: nothing in `contracts/`, `config/` or code changes until the user approves. It
-  proposes one new contract, an additive bump of a frozen event data schema and one event rule.
-- Deciders: user (decision), architect (proposal)
+- Status: Accepted (2026-10-05, user decision: "yes to all as you think necessary", relayed by
+  the supervisor; architect proposal; issue #283, BQ-218). Option A is chosen. The user approved
+  the contract change (BQ-256) and the logged defaults BQ-257 to BQ-261. This ADR was first
+  numbered ADR-0017 and was renumbered to ADR-0018 in approval order. This PR is docs only:
+  `contracts/`, `config/`, `infra/` and code are changed by the tickets below (T1 for the
+  contracts), not here. The ADR covers one new contract, an additive bump of a frozen event data
+  schema and one event rule.
+- Deciders: user (decision 2026-10-05), architect (proposal)
 - Requirement: FR-MEM-06, FR-CON-09, FR-CON-10, FR-AGT-12, FR-MEM-09, HR-1 (PRD 8.1, 9.4, 12.4,
-  13.1 to 13.4, 15.1, 15.3, 16.3, 16.5; S-12); issues #283 and #329, PR #332; open questions
-  BQ-256 to BQ-262
+  13.1 to 13.4, 15.1, 15.3, 16.3, 16.5; S-12); FR-MEM-12 and FR-CON-15
+  (`docs/prd-supplement-2026-10-05.md`); issues #283 and #329, PR #332; open questions
+  BQ-256 to BQ-262 (all resolved, see the end)
 
 ## Context
 1. Production `DefaultUnitRunner` (`services/harness/src/tilo_harness/executor.py:81`) calls the
@@ -26,7 +31,7 @@
    so research-and-report plans end with 0 deliverables (#283, BQ-218). PR #332 (fixes #283) adds
    a final `deliver` unit that delivers `in_app` only the items its upstream units really made, and
    never mints one. With today's runner that is still 0, so #332 depends on the store this ADR
-   recommends. The render lane refused to mint empty artifacts and filed the gap as issue #329.
+   decides. The render lane refused to mint empty artifacts and filed the gap as issue #329.
    Erasure names `gcs_artifacts` in `REQUIRED_STORES` with no adapter.
 5. PRD: the Writer "produces deliverables from verified material" (8.1); every deliverable is
    versioned with a provenance manifest (12.4); artifact versions live in "Cloud Storage object
@@ -35,7 +40,7 @@
    90 days (15.1); 15.3 has no artifact path. HR-1: a parcel at the Delivery Dock must stand for
    content that exists.
 
-## Decision (proposed)
+## Decision
 ### 1. A unit's output
 - **Runners return content, never ids.** `UnitOutcome.outputs: tuple[UnitOutput, ...]`, where
   `UnitOutput(media_type, content: bytes, label, parent: artifact_ref | None, sources, claims)`.
@@ -103,7 +108,7 @@ the store. Rules for a new `contracts/artifact.rules.md`:
 | AR-07 | A version records `screening` (`clean`, `flagged`, `unscreened`; model output is screened, PRD 16.3 item 2) and `redacted` (secret redactor before put, SEC-01, BQ-258). Only `clean` versions leave Tilo. |
 | AR-08 | Retention entity `artifact`, 90 days (PRD 15.1), `user_id` is the owner. A delete removes every blob generation, the record and its manifests. |
 
-### 4. Contracts (needs contract change, BQ-256)
+### 4. Contracts (contract change approved by the user 2026-10-05, BQ-256; made by T1)
 - **New `contracts/artifact.schema.json` 1.0.0, title `ArtifactVersion`**, the record above (read
   by the harness, tilo-api, tilo-render and erasure). Required, `additionalProperties: false`:
   `v` (`"1.0"`), `artifact` (`artifact_ref`), `org_id`, `world_id`, `run_id`, `owner` (`user_id`),
@@ -177,19 +182,20 @@ the store. Rules for a new `contracts/artifact.rules.md`:
   artifact returns 404, never 403.
 - **IAM (BQ-261).** The harness, API and render get `objectCreator` and `objectViewer` on
   `artifacts`; only the retention and erasure identity deletes. Infra today gives render
-  `objectAdmin`.
+  `objectAdmin`. The user applies this infra change (with the 90-day lifecycle); no builder or
+  agent applies it.
 
 ## Options
 | Option | What | Effort | Main files | Why or why not |
 | --- | --- | --- | --- | --- |
-| **A (recommended)** | One P7 store: bytes in local dir or GCS, metadata in Firestore, the contracts above | 8 tickets, about 2,300 hand-written lines | `contracts/artifact*`, `common`, `artifact.created`, `event.rules.md`; `packages/memory/.../artifacts*.py`; `executor.py`, `validator.py`; `runs.py`, `dev_run.py`, new routes; S-12 | One place for hashes, caps, scope, versions and erasure; matches PRD 13.2 and 15.1 |
+| **A (chosen)** | One P7 store: bytes in local dir or GCS, metadata in Firestore, the contracts above | 8 tickets, about 2,300 hand-written lines | `contracts/artifact*`, `common`, `artifact.created`, `event.rules.md`; `packages/memory/.../artifacts*.py`; `executor.py`, `validator.py`; `runs.py`, `dev_run.py`, new routes; S-12 | One place for hashes, caps, scope, versions and erasure; matches PRD 13.2 and 15.1 |
 | B | Content inside events or Firestore docs (`artifact.created.data.content`) | 2 tickets, about 500 lines | `artifact.created` (breaking), `runs.py`, S-12 | Rejected: 1 MiB doc limit, no PDF or PPTX, content kept 365 days in the ledger instead of 90, copied into every redacted view, no versions or restore |
 | C | Each producer keeps its own store (today's pattern, extended) | 4 tickets, about 1,200 lines | `runs.py`, `dev_run.py`, render, planning, channels | Rejected: four copies of hashing and scoping, four erasure adapters, one Verifier loader per producer, cross-world checks stay event scans |
 
-## Recommendation and tickets
-Option A. The tickets run in this order. Each starts test-first (the test-writer writes
+## Option chosen and tickets
+Option A, chosen by the user on 2026-10-05. The tickets run in this order. Each starts test-first (the test-writer writes
 `tests/<ID>`) and stays under 400 hand-written lines, not counting fixtures and generated types.
-1. **T1 (architect, after BQ-256).** `artifact.schema.json`, `artifact.rules.md` AR-01 to AR-08,
+1. **T1 (architect; BQ-256 approved).** `artifact.schema.json`, `artifact.rules.md` AR-01 to AR-08,
    fixtures, `common` `media_type`, `artifact.created` 1.1.0, EV-15 with its fixtures, regenerated
    types. About 250 lines.
 2. **T2 FR-MEM-06 (intelligence-builder).** `tilo_memory.artifacts`: `ArtifactStore` with memory
@@ -203,13 +209,13 @@ Option A. The tickets run in this order. Each starts test-first (the test-writer
    synthetic Markdown; credits stay on the first `artifact.created`. About 250.
 5. **T5 FR-CON-10 / FR-AGT-12 (after #278).** `created` manifest at put; the Verifier's `load` from
    the store and archive; `reviewed` revision. About 250.
-6. **T6 BQ-218, ID per BQ-262 (CL-INT, after #332).** #332's `deliver` unit checks each version
+6. **T6 BQ-218, FR-CON-15 (BQ-262; CL-INT, after #332).** #332's `deliver` unit checks each version
    with `head` and `read` (BQ-259, BQ-260); content and manifest routes; `/delivery` fields. About
    250. With T1 to T4, this makes #283 and #329 deliver real content.
 7. **T7 (world-builder).** S-12 shows the in-app deliverable (safe Markdown), Open and download,
    and empty-state wording. About 300.
 8. **T8 (reach-builder).** Firestore and GCS backends (fake clients in CI), every generation
-   deleted on erase, wired as `gcs_artifacts`; infra change (BQ-261) held for the user. Later:
+   deleted on erase, wired as `gcs_artifacts`; the infra change (BQ-261) is applied by the user, never by a builder or an agent. Later:
    render on spec artifacts, and intake moved off `tilo_planning.artifacts`. About 300.
 
 ## Consequences
@@ -225,7 +231,15 @@ Option A. The tickets run in this order. Each starts test-first (the test-writer
 - Not covered: signed download URLs, cross-world artifact memory (13.1 "offered as a starting
   point"), DOCX and XLSX rendering, and Google Docs output.
 
-## Open questions (logged in `docs/open-questions.md`)
-BQ-256 approve the contract changes; BQ-257 size caps; BQ-258 secrets found in model output;
-BQ-259 which outputs are deliverables; BQ-260 delivering a failed or unverified review; BQ-261
-bucket retention and IAM; BQ-262 the requirement ID for "every completed run delivers in app".
+## Open questions (logged in `docs/open-questions.md`, all resolved 2026-10-05)
+- BQ-256 contract changes: approved by the user (new `artifact.schema.json`, `common`
+  `media_type`, `artifact.created` 1.1.0, EV-15). The architect makes them under T1.
+- BQ-257 size caps: 2 MB text, 50 MB file, 10 outputs per unit, 200 MB per world.
+- BQ-258 secrets in model output: redacted before put and marked `redacted`.
+- BQ-259 which outputs are deliverables: the deliver unit delivers its upstream units' stored
+  versions.
+- BQ-260 failed or unverified review: delivered in-app with the Verifier's result.
+- BQ-261 bucket retention and IAM: lifecycle Delete at 90 days per PRD 15.1. The infra change is
+  applied by the user, not by a builder or an agent; until then the retention adapter deletes at
+  90 days in code.
+- BQ-262 requirement ID: FR-CON-15 (`docs/prd-supplement-2026-10-05.md`).
