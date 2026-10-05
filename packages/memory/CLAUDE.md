@@ -33,7 +33,8 @@ email-body result is reused when fresh and a fit check and the Verifier accept i
 - Artifacts (FR-MEM-06/12): `ArtifactStore` over create-only `MetaBackend`/`BlobBackend` (memory, local dir
   `TILO_ARTIFACT_DIR`). Ids matched whole (`fullmatch`) before any key; other scope reads as absent; caps
   before hashing; redactor error fails the put; screening only from the screener verdict; restore = exact
-  copy; `retention()` is the `gcs_artifacts` adapter. Firestore/GCS backends are ticket T8.
+  copy; record is written before its blob (a blob always has a listed record); `retention()` is the
+  `gcs_artifacts` adapter. Firestore/GCS backends are ticket T8.
 
 ## Requirement IDs
 FR-MEM-01, FR-MEM-02, FR-MEM-03, FR-MEM-06, FR-MEM-09, FR-MEM-12.

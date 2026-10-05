@@ -51,6 +51,7 @@ _RUN_ID, _UNIT_ID, _AGENT_ID = re.compile(_RUN), re.compile(_UNIT), re.compile(_
 _SLUG = re.compile(r"[a-z][a-z0-9_]{0,63}")
 _ARCHIVE_REF = re.compile(r"(r_[0-9A-Za-z_]{1,48})/[0-9]{1,9}")
 _KEY = re.compile(rf"({_RUN}):({_UNIT}):(?:0|[1-9][0-9]{{0,3}}):[0-9]")
+_SEGMENT = re.compile(r"[0-9A-Za-z_]+")
 _ULID = re.compile(r"[0-7][0-9A-HJKMNP-TV-Z]{25}")
 _RECORD_PATH = re.compile(rf"orgs/({_ORG})/worlds/({_WORLD})/artifacts/({_ART})/versions/([0-9]{{6}})")
 
@@ -282,8 +283,8 @@ class LocalDirBlobBackend:
         return cls(environ.get("TILO_ARTIFACT_DIR") or ".tilo/artifacts/")  # touches no disk
 
     def _path(self, key: str) -> pathlib.Path:
-        parts = key.split("/")
-        if not key or "\\" in key or ":" in key or "\0" in key or any(p in ("", ".", "..") for p in parts):
+        parts = key.split("/") if type(key) is str else []
+        if not parts or any(_SEGMENT.fullmatch(p) is None for p in parts):  # id charset only: no `.`, `\\`, `:`
             raise ValueError("unsafe blob key")
         return self.root.joinpath(*parts)
 
@@ -360,6 +361,7 @@ class ArtifactStore:
         self._validate_record = record_validator or validate_record
         self._new_id = new_id or (lambda: "art_" + _ulid())
         self._lock = threading.RLock()
+        self._alerted: set[tuple[str, str, str, int]] = set()  # corrupt versions already announced
 
     # -- reads ---------------------------------------------------------------------------------------------------
 
@@ -393,8 +395,20 @@ class ArtifactStore:
             data: bytes | None = self._blobs.read(_blob_key(scope, ref))
         except FileNotFoundError:
             data = None
+        seen = (scope.org_id, scope.world_id, ref["artifact_id"], ref["version"])
         if data is not None and self._hash(data) == doc["content_sha256"] and len(data) == doc["size_bytes"]:
+            with self._lock:
+                self._alerted.discard(seen)
             return data
+        with self._lock:  # one alert.raised per corrupt version, not one per failed read
+            first = seen not in self._alerted
+            self._alerted.add(seen)
+        if first:
+            self._announce(scope, doc)
+        raise ArtifactCorrupt(f"AR-01: {ref['artifact_id']} version {ref['version']} does not match its hash")
+
+    def _announce(self, scope: Scope, doc: dict[str, Any]) -> None:
+        ref = doc["artifact"]
         alert = {
             "type": "alert.raised",
             "world_id": scope.world_id,
@@ -407,7 +421,6 @@ class ArtifactStore:
             self._alert(alert)
         except Exception:  # noqa: BLE001 - a failing sink must not turn corruption into a different error
             pass
-        raise ArtifactCorrupt(f"AR-01: {ref['artifact_id']} version {ref['version']} does not match its hash")
 
     def versions(self, scope: Scope, artifact_id: str) -> list[StoredVersion]:
         _check_scope(scope)
@@ -451,15 +464,26 @@ class ArtifactStore:
             raise ArtifactNotFound(f"no artifact {parent['artifact_id']} version {parent['version']}")
         return None, max(have) + 1
 
+    def _live(self, scope: Scope, doc: dict[str, Any]) -> bool:
+        return bool(self._blobs.keys(_blob_key(scope, doc["artifact"])))
+
     def _append(
         self, scope: Scope, parent: dict[str, Any] | None, data: bytes, fields: dict[str, Any]
     ) -> StoredVersion:
+        """Record first, then blob: a blob always has a record that retention and erasure list. A record whose blob
+        is missing (an interrupted write) reads as corrupt, is purgeable, and never blocks the next version."""
         for _ in range(_RETRIES):
             with self._lock:
                 existing, version = self._plan(scope, fields["idempotency_key"], parent, len(data))
                 if existing is not None:
-                    return StoredVersion(existing)
-                ref = {"artifact_id": parent["artifact_id"] if parent else self._new_id(), "version": version}
+                    if self._live(scope, existing):
+                        return StoredVersion(existing)
+                    self._purge(_record_path(scope, existing["artifact"]))  # an interrupted write: redo it
+                    continue
+                art = parent["artifact_id"] if parent else self._new_id()
+                if type(art) is not str or _ID["art"].fullmatch(art) is None:
+                    raise ArtifactError("the id source returned a malformed artifact id")
+                ref = {"artifact_id": art, "version": version}
                 record = {
                     "v": "1.0",
                     "artifact": ref,
@@ -470,18 +494,28 @@ class ArtifactStore:
                     "created_at": _iso(self._clock()),
                     **fields,
                 }
+                if record["screened_at"] is not None and record["screened_at"] > record["created_at"]:
+                    raise _refuse("AR-07", "screened_at is after created_at")
                 try:
                     self._validate_record(record)
                 except Exception:  # noqa: BLE001 - any validator failure refuses the call; its text may echo values
                     raise _refuse("schema", "the record does not validate") from None
+                path, key = _record_path(scope, ref), _blob_key(scope, ref)
                 try:
-                    self._blobs.create(_blob_key(scope, ref), data)
+                    self._meta.create(path, record)
                 except FileExistsError:
                     continue  # another writer took this version: plan again
                 try:
-                    self._meta.create(_record_path(scope, ref), record)
+                    try:
+                        self._blobs.create(key, data)
+                    except FileExistsError:
+                        self._blobs.delete(key)  # we own this version (the record create won): the blob is an orphan
+                        self._blobs.create(key, data)
                 except BaseException:
-                    self._blobs.delete(_blob_key(scope, ref))
+                    try:
+                        self._meta.delete(path)
+                    except Exception:  # noqa: BLE001 - if even this fails the record stays listed and purgeable
+                        pass
                     raise
                 return StoredVersion(record)
         raise ArtifactError("AR-02: could not take the next version")
@@ -491,7 +525,7 @@ class ArtifactStore:
         parent = self._check_new(new)
         size = len(new.content)  # the object's own length: caps come before any copy or hash
         existing, _ = self._plan(scope, new.idempotency_key, parent, size)
-        if existing is not None:
+        if existing is not None and self._live(scope, existing):
             return StoredVersion(existing)  # a restarted unit gets its version back; the first bytes win (AR-05)
         for source in new.sources:
             try:
@@ -602,6 +636,7 @@ class ArtifactStore:
         doc = self._require(scope, ref)
         if not isinstance(by, Origin) or (by.kind, by.unit, by.agent) != ("restore", None, None):
             raise _refuse("AR-02", "a restore is made by Origin(kind='restore')")
+        self._plan(scope, None, _ref(doc["artifact"]), doc["size_bytes"])  # the world cap, before any hashing
         data = self._verified(scope, doc)
         copied = {k: copy.deepcopy(doc[k]) for k in _RESTORE_COPIED}
         fields = {**copied, "origin": {"kind": "restore", "unit": None, "agent": None}, "idempotency_key": None}
@@ -622,6 +657,8 @@ class ArtifactStore:
         self._check_manifest(doc, revision["manifest"])
         prefix = _record_path(scope, doc["artifact"]) + "/manifests/"
         with self._lock:
+            if self._require(scope, ref)["content_sha256"] != doc["content_sha256"]:  # re-read: still there, unchanged
+                raise _refuse("AR-06", "the version changed")
             revision["n"] = len(self._meta.paths(prefix)) + 1  # append-only, no gaps
             validate_revision(revision)
             self._meta.create(f"{prefix}{revision['n']:04d}", revision)
@@ -677,6 +714,18 @@ class ArtifactStore:
     def manifest(self, scope: Scope, ref: Mapping[str, Any]) -> dict[str, Any]:
         return self.manifest_revisions(scope, ref)[-1]["manifest"]
 
+    def _purge(self, record_id: str) -> None:
+        """Remove one version: every blob generation, its manifest revisions, then its record (last, so a crash
+        leaves it listed for the next purge)."""
+        match = _RECORD_PATH.fullmatch(record_id)
+        assert match is not None
+        org, world, art, version = match.groups()
+        with self._lock:
+            self._blobs.delete(f"orgs/{org}/worlds/{world}/artifacts/{art}/v{version}")
+            for path in self._meta.paths(record_id + "/manifests/"):
+                self._meta.delete(path)
+            self._meta.delete(record_id)
+
     def retention(self) -> _Retention:
         return _Retention(self)
 
@@ -722,12 +771,6 @@ class _Retention:
     def delete(self, record_id: str) -> None:
         """Idempotent. Removes every blob generation, the manifest revisions and the record (record last, so a
         crash leaves it listed for the next purge)."""
-        match = _RECORD_PATH.fullmatch(record_id) if type(record_id) is str else None
-        if match is None:
+        if type(record_id) is not str or _RECORD_PATH.fullmatch(record_id) is None:
             return
-        org, world, art, version = match.groups()
-        with self._store._lock:
-            self._store._blobs.delete(f"orgs/{org}/worlds/{world}/artifacts/{art}/v{version}")
-            for path in self._store._meta.paths(record_id + "/manifests/"):
-                self._store._meta.delete(path)
-            self._store._meta.delete(record_id)
+        self._store._purge(record_id)
