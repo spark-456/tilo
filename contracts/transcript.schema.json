@@ -38,7 +38,7 @@
       }
     },
     "evidence_quote": {
-      "description": "One evidence quote as tilo-api serves it (ADR-0020): a read-model row computed per request from the pinned transcript version, never stored, logged, archived, sent or put in an event or a prompt (PE-22). Code removes control and format characters and cuts the text at 240 characters on a word boundary (`truncated`); for a viewer other than the meeting owner it masks addresses, phone numbers and links, and the speaker is a teammate's display name or null (PE-24). Only `shown` carries text (PE-25).",
+      "description": "One evidence quote as tilo-api serves it (ADR-0020): a read-model row computed per request from the pinned transcript version, never stored, logged, archived, sent or put in an event or a prompt (PE-22). Code removes control and format characters and cuts the text at 240 characters on a word boundary (`truncated`); for a viewer other than the meeting owner it masks addresses, phone numbers and links, and the speaker is a teammate's display name or null (PE-24). Only `shown` carries text (PE-25). An `expired` quote has `transcript` null: it is the one answer for a swept transcript, a missing, discarded or deleted meeting and a refused owner-route request, so it never shows whether a meeting exists (PE-22, PE-23).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -53,8 +53,10 @@
       "properties": {
         "meeting_id": { "$ref": "common.schema.json#/$defs/meeting_id" },
         "transcript": {
-          "$ref": "common.schema.json#/$defs/artifact_ref",
-          "not": { "required": ["label"] }
+          "anyOf": [
+            { "$ref": "common.schema.json#/$defs/artifact_ref", "not": { "required": ["label"] } },
+            { "type": "null" }
+          ]
         },
         "utterance_id": { "$ref": "common.schema.json#/$defs/utterance_id" },
         "state": { "type": "string", "enum": ["shown", "missing", "expired", "withheld"] },
@@ -63,13 +65,22 @@
         "truncated": { "type": "boolean" }
       },
       "if": { "properties": { "state": { "const": "shown" } }, "required": ["state"] },
-      "then": { "properties": { "text": { "type": "string" }, "speaker": { "maxLength": 80 } } },
+      "then": {
+        "properties": {
+          "text": { "type": "string" },
+          "speaker": { "maxLength": 80 },
+          "transcript": { "type": "object" }
+        }
+      },
       "else": {
         "properties": {
           "speaker": { "type": "null" },
           "text": { "type": "null" },
           "truncated": { "const": false }
-        }
+        },
+        "if": { "properties": { "state": { "const": "expired" } }, "required": ["state"] },
+        "then": { "properties": { "transcript": { "type": "null" } } },
+        "else": { "properties": { "transcript": { "type": "object" } } }
       }
     },
     "evidence_quotes": {

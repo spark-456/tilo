@@ -361,6 +361,7 @@
   },
   "request": {
     "actor": "u_ext",
+    "meeting": null,
     "work_item": "wi_rate_sheet",
     "ids": []
   },

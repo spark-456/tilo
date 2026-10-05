@@ -43,7 +43,10 @@ REQUIRED = {  # ADR-0020 and ADR-0021, "Crossref cases"
         "owner_reads_quotes assignee_reads_one_quote assignee_withheld_for_a_flagged_transcript "
         "assignee_expired_after_the_sweep pe23_assignee_gets_a_second_quote pe23_proposed_work_item "
         "pe23_unconfirmed_minutes pe23_utterance_the_minutes_item_does_not_cite pe23_assigner_on_the_work_item_route "
-        "pe23_attendee pe23_teammate pe23_org_owner pe23_another_orgs_meeting".split()
+        "pe23_attendee pe23_teammate pe23_org_owner pe23_another_orgs_meeting owner_reads_quotes_of_a_deleted_meeting "
+        "someone_asks_about_a_meeting_that_never_existed attendee_gets_the_answer_a_missing_meeting_gets "
+        "assignee_item_from_a_deleted_meeting assignee_item_from_a_discarded_meeting "
+        "assignee_item_whose_meeting_is_missing pe22_deleted_meeting_answered_with_a_404".split()
     ),
     "plate": set(
         "own_open_work_item_joins_rows pe27_proposed_work_item pe27_teammates_personal_pin "
@@ -76,12 +79,33 @@ def _read(case: dict, kind: str, data: dict, actor: str, meeting: dict | None) -
     return pl.permits({"now": case["now"], "persons": case["persons"], "record": record, "request": request})
 
 
+def _num(utterance_id: str) -> int:
+    return int(utterance_id[1:])
+
+
+def _expired(meeting_id: str, ids: list[str]) -> dict:
+    """PE-22, PE-23: one answer for a swept transcript, a missing, discarded or deleted meeting and a refused
+    owner-route request: every id `expired`, no transcript ref, so it never shows whether or whose a meeting is."""
+    quote = {**QUOTE, "meeting_id": meeting_id, "transcript": None, "state": "expired"}
+    return {"quotes": [{**quote, "utterance_id": u} for u in ids]}
+
+
+def _own_item(case: dict, wi: dict | None) -> bool:
+    """PE-03, PE-07 on the item alone: the actor's own Tilo-made meeting item, confirmed by its assigner."""
+    req, me = case["request"], case["persons"].get(case["request"]["actor"])
+    if wi is None or wi["id"] != req["work_item"] or req["ids"] or wi["owner"] != req["actor"]:
+        return False
+    a, c = wi["assigned_by"], wi["confirmed_by"]
+    if me is None or me["org_id"] != wi["org_id"] or wi["status"] not in ("open", "done", "dropped") or not (a and c):
+        return False
+    made = wi["created_by"]["by"] == "tilo" and wi["source"]["kind"] == "meeting"
+    return made and c["by"] == a["by"] and wi["created_by"]["at"] <= c["at"] <= case["now"]
+
+
 def _assignee_ids(case: dict, present: set[str]) -> list[str] | None:
     """PE-23: the owner of a confirmed item from confirmed minutes gets the lowest utterance both the item and its
     minutes action item cite, present in the pinned version if any is; None refuses."""
     m, mins, wi, req = case["meeting"], case["minutes"], case["work_item"], case["request"]
-    if wi is None or req["work_item"] != wi["id"] or req["ids"] or wi["created_by"]["by"] != "tilo":
-        return None
     confirmed = m["minutes_confirmed_by"]
     if not _read(case, "work_item", wi, req["actor"], m) or confirmed is None or confirmed["by"] != m["owner"]:
         return None
@@ -89,7 +113,7 @@ def _assignee_ids(case: dict, present: set[str]) -> list[str] | None:
     ai = next((a for a in mins["action_items"] if a["id"] == item and a["work_item_id"] == wi["id"]), None)
     if ai is None or ai["owner"] != wi["owner"] or confirmed["at"] > case["now"]:
         return None
-    shared = sorted(set(wi["source"]["evidence"]) & set(ai["evidence"]), key=lambda u: int(u[1:]))
+    shared = sorted(set(wi["source"]["evidence"]) & set(ai["evidence"]), key=_num)
     return [next((u for u in shared if u in present), shared[0])] if shared else []
 
 
@@ -104,32 +128,45 @@ def _speaker(case: dict, label: str) -> str | None:
 
 
 def expected_quotes(case: dict) -> dict | None:
-    """The `evidence_quotes` tilo-api answers (PE-22 to PE-25), or None for a 404 (PE-19, PE-23)."""
+    """The `evidence_quotes` tilo-api answers (PE-22 to PE-25), or None for a 404 (PE-19, PE-23). The owner route
+    names `request.meeting`, the item route `request.work_item`; `meeting` and `minutes` are null when missing."""
     m, mins, tr, ver, req = (case[k] for k in ("meeting", "minutes", "transcript", "version", "request"))
-    me, ref = case["persons"].get(req["actor"]), {k: mins["transcript"][k] for k in ("artifact_id", "version")}
-    if me is None or me["org_id"] != m["org_id"] or "world_id" not in m or m["status"] != "minuted":
+    me, wi = case["persons"].get(req["actor"]), case["work_item"]
+    if me is None or (req["meeting"] is None) == (req["work_item"] is None):
         return None
-    if mins["meeting_id"] != m["id"] or m["transcript"] not in (None, ref):
+    if req["meeting"] is not None:  # owner route: anyone but the owner of a live meeting gets the gone answer
+        if not 1 <= len(req["ids"]) <= 20:
+            return None
+        if m is None or m["status"] in ("discarded", "deleted") or m["id"] != req["meeting"]:
+            return _expired(req["meeting"], req["ids"])
+        if (req["actor"], me["org_id"]) != (m["owner"], m["org_id"]):
+            return _expired(req["meeting"], req["ids"])
+        owner = True
+    else:  # item route: the item's own owner only (PE-03); a gone meeting gives the item's lowest cited id
+        if not _own_item(case, wi):
+            return None
+        meeting_id = wi["source"]["ref"].partition("#")[0]
+        if m is None or m["status"] in ("discarded", "deleted") or m["id"] != meeting_id:
+            return _expired(meeting_id, sorted(wi["source"]["evidence"], key=_num)[:1])
+        owner = False
+    if mins is None or "world_id" not in m or m["status"] != "minuted" or mins["meeting_id"] != m["id"]:
         return None
-    gone = tr is None or m["transcript"] is None or case["now"] >= (m["delete_transcript_after"] or "9")
-    if not gone:  # PE-19: the store reads the version only in the meeting's own scope (org, world, owner)
+    ref = {k: mins["transcript"][k] for k in ("artifact_id", "version")}
+    if m["transcript"] not in (None, ref):
+        return None
+    swept = tr is None or m["transcript"] is None or case["now"] >= (m["delete_transcript_after"] or "9")
+    if not swept:  # PE-19: the store reads the version only in the meeting's own scope (org, world, owner)
         pinned = ver and {k: ver["artifact"][k] for k in ref} == ref and tr["meeting_id"] == m["id"]
         if not pinned or (ver["org_id"], ver["world_id"], ver["owner"]) != (m["org_id"], m["world_id"], m["owner"]):
             return None
-    utterances = {} if gone else {u["id"]: u for u in tr["utterances"]}
-    owner = req["actor"] == m["owner"]
-    if owner:
-        ids = req["ids"] if req["work_item"] is None and 1 <= len(req["ids"]) <= 20 else None
-    else:
-        ids = _assignee_ids(case, set(utterances))
-    if ids is None:
-        return None
+    utterances = {} if swept else {u["id"]: u for u in tr["utterances"]}
+    ids = req["ids"] if owner else _assignee_ids(case, set(utterances))
+    if ids is None or swept:
+        return None if ids is None else _expired(m["id"], ids)
     quotes = []
     for uid in ids:
         q = {"meeting_id": m["id"], "transcript": ref, "utterance_id": uid, **QUOTE}
-        if gone:
-            q["state"] = "expired"
-        elif uid not in utterances:
+        if uid not in utterances:
             q["state"] = "missing"
         elif not owner and (ver["screening"] != "clean" or mins["flagged"]):
             q["state"] = "withheld"
@@ -224,7 +261,10 @@ def _shape(repo_root, registry, folder: str, case: dict) -> list[str]:
         for part, target in PARTS.items():
             contract, _, def_ = target.partition("#")
             found += [] if case[part] is None else check(contract, case[part], def_ or None)
-        found += [] if set(req) == {"actor", "work_item", "ids"} else ["request holds actor, work_item and ids"]
+        if set(req) != {"actor", "meeting", "work_item", "ids"}:
+            return [*found, "request holds actor, meeting, work_item and ids"]
+        found += check("common", req["meeting"], "meeting_id") if req["meeting"] is not None else []
+        found += check("common", req["work_item"], "work_item_id") if req["work_item"] is not None else []
         users, ids = [req["actor"]], req["ids"]
         return (
             found

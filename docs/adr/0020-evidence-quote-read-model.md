@@ -133,5 +133,8 @@
 - The crossref cases are `fixtures/transcript/crossref/`, a format of their own that states the
   answer (`response`) and adds the transcript's `ArtifactVersion` (`version`, for `screening` and
   the scope check), instead of the `read_quote` view on the person crossref (BQ-CCP3-3).
-- A discarded or deleted meeting answers a 404, not `expired`, until the user decides whether to
-  amend decision 2 (BQ-CCP3-2).
+- Decision 2 stands with no tombstone change (BQ-CCP3-2, decided by default, the user may
+  override): a missing, discarded or deleted meeting answers `expired` for every viewer, and an
+  `expired` quote carries `transcript` null (`transcript` became nullable, still 1.0.0, unreleased).
+  The owner route gives the same answer to anyone but the owner of a live meeting, so it is no
+  existence oracle; the item route keeps the work item's own 404 for anyone who may not read it.

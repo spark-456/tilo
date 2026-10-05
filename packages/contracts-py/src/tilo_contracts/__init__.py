@@ -115,7 +115,7 @@
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
-# transcript.schema.json 1.0.0 sha256:56ff45f9814edc77
+# transcript.schema.json 1.0.0 sha256:6be28d42dd5dfdc4
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
 # work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
 # events/registry.yaml 1.1.0 sha256:2db78f63298c923a
@@ -3652,14 +3652,14 @@ class Transcript(BaseModel):
 
 class TranscriptEvidenceQuote(BaseModel):
     """
-    One evidence quote as tilo-api serves it (ADR-0020): a read-model row computed per request from the pinned transcript version, never stored, logged, archived, sent or put in an event or a prompt (PE-22). Code removes control and format characters and cuts the text at 240 characters on a word boundary (`truncated`); for a viewer other than the meeting owner it masks addresses, phone numbers and links, and the speaker is a teammate's display name or null (PE-24). Only `shown` carries text (PE-25).
+    One evidence quote as tilo-api serves it (ADR-0020): a read-model row computed per request from the pinned transcript version, never stored, logged, archived, sent or put in an event or a prompt (PE-22). Code removes control and format characters and cuts the text at 240 characters on a word boundary (`truncated`); for a viewer other than the meeting owner it masks addresses, phone numbers and links, and the speaker is a teammate's display name or null (PE-24). Only `shown` carries text (PE-25). An `expired` quote has `transcript` null: it is the one answer for a swept transcript, a missing, discarded or deleted meeting and a refused owner-route request, so it never shows whether a meeting exists (PE-22, PE-23).
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
     meeting_id: MeetingId
-    transcript: ArtifactRef
+    transcript: ArtifactRef | None
     utterance_id: UtteranceId
     state: Literal["shown", "missing", "expired", "withheld"]
     speaker: TranscriptQuoteLine | None
