@@ -38,7 +38,7 @@ export function S_16() {
       <Section
         title="Connected Google accounts"
         note="The Google accounts this world uses, and where each stands. Sign-in and access are reviewed on Connections."
-        reserve={4}
+        reserve={5}
         action={
           <AppLink to="/connections" className="pill">
             Review connections
