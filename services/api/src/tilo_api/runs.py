@@ -193,16 +193,22 @@ class Run:
         passed = {k: kw[k] for k in ("district", "cause", "vis", "severity", "event_id") if k in kw}
         event = self.put(type, actor, target, summary, data, **passed)
         if type == "question.answered" and data.get("answered_by") == "default":
-            self.cards.tick()  # the harness applied a deadline default: close that card here too (BQ-208)
+            try:
+                self.cards.tick()  # the harness applied a deadline default: close that card here too (BQ-208)
+            except Exception:  # the default is committed: a failing store must not fail the unit it resumes
+                logger.warning("run %s: the card store could not close a defaulted card", self.run_id)
         return event
 
     def write(self, part: dict) -> None:
         """The CardStore's part for a person's answer; an approve opens the waiting gate, an answer resumes its unit."""
         if part["type"] == "question.answered":
             try:
-                self.question_wait.write(part)  # commits it through `emit` under the part's id, then resumes the unit
-            except AlreadyAnswered:
-                raise AlreadyCommitted from None  # the deadline default (or an earlier answer) won: the card closes
+                self._answer(part)  # commits it through `emit` under the part's id, then resumes the unit
+            except AlreadyCommitted as exc:
+                if exc.args:  # an earlier answer committed: it resolved the question, and the batch it belongs to
+                    self._answer_merged(part)
+                raise
+            self._answer_merged(part)
             return
         data, card_id, authz = part["data"], part["card_id"], part["authz"]
         requested = self.requested.get(card_id)
@@ -220,6 +226,24 @@ class Run:
             raise
         if part["type"] == "approval.resolved":
             self.resolved[card_id] = committed
+
+    def _answer(self, part: dict) -> None:
+        try:
+            self.question_wait.write(part)
+        except AlreadyAnswered:  # the deadline default (or an earlier answer) won: the card closes
+            raise AlreadyCommitted from None
+        except AlreadyCommitted as exc:  # another answer holds this id (a commit-then-raise): it resolved the question
+            if exc.args:
+                self.question_wait.committed(part, exc.args[0])
+            raise
+
+    def _answer_merged(self, part: dict) -> None:
+        """The same answer for every card that merged into the answered one: each of their units resumes (BQ-74)."""
+        for merged in self.cards.merged_answers(part):
+            try:
+                self._answer(merged)
+            except AlreadyCommitted:  # that card is already resolved, by its deadline or an earlier answer
+                pass
 
     def _fail(self, reason: str, unit: str | None) -> None:
         try:

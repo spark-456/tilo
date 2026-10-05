@@ -260,6 +260,7 @@ class CardStore:
         merged = (
             group is not None
             and not group.closed
+            and not group.resolving  # its answer is being written: this card must stay open for its own answer
             and abs((created - group.anchor).total_seconds()) <= self._merge_window_s
         )
         if not merged:
@@ -422,6 +423,26 @@ class CardStore:
         with self._lock:
             self._resolve_group(record.group)
         return True
+
+    def merged_answers(self, part: dict) -> list[dict]:
+        """The `question.answered` parts for the other cards that merged into the answered card's group, each under its
+        own derived event id (BQ-74: one answer resolves the whole batch, so every unit that asked resumes). A person's
+        answer only: a deadline default is each card's own. The option is the one of that card with the same label as
+        the chosen one, else that card's safe default (the answer did not speak to its choice)."""
+        if part["type"] != "question.answered" or part["data"].get("answered_by") == "default":
+            return []
+        with self._lock:
+            record = self._records.get(part["world_id"], {}).get(part["card_id"])
+            if record is None:
+                return []
+            chosen = next((o["label"] for o in record.card["options"] if o["id"] == part.get("option")), None)
+            parts = []
+            for member in record.group.members:
+                if member is not record:
+                    options = member.card["options"]
+                    option = next((o["id"] for o in options if o["label"] == chosen), member.card["safe_default"])
+                    parts.append(self._part(member, "question.answered", part["data"]) | {"option": option})
+            return parts
 
     # -- timeouts -------------------------------------------------------------
 

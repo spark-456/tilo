@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
@@ -52,6 +52,7 @@ class _Waiter:
     director: str
     district: str | None
     future: asyncio.Future[Answer]
+    released: asyncio.Event = field(default_factory=asyncio.Event)  # a claim on the card was released (write failed)
 
 
 def _resolve(waiter: _Waiter, outcome: Answer | Exception) -> None:
@@ -75,6 +76,7 @@ class QuestionWait:
         self._waiting: dict[str, _Waiter] = {}
         self._claimed: dict[str, str] = {}  # card id -> event id of the resolution that won
         self._early: dict[str, tuple[str | None, str]] = {}  # resolved before anyone waited: (option, answered_by)
+        self._tried: dict[tuple[str, str], str | None] = {}  # (card, answered_by) -> option of a write that raised
 
     async def wait_for(self, card: dict[str, Any], *, lead: str, director: str, district: str | None) -> Answer:
         card_id = card["id"]
@@ -117,6 +119,10 @@ class QuestionWait:
         except BaseException:
             with self._lock:
                 del self._claimed[card_id]  # nothing committed: the same answer may be sent again
+                self._tried[(card_id, by)] = part.get("option")
+                waiter = self._waiting.get(card_id)
+            if waiter is not None:
+                self._wake(waiter)  # a deadline that passed while this write was in flight may now apply the default
             raise
         with self._lock:
             waiter = self._waiting.get(card_id)
@@ -125,15 +131,44 @@ class QuestionWait:
         if waiter is not None:
             _resolve(waiter, Answer(card_id, part.get("option") or waiter.card["safe_default"], by))
 
+    def committed(self, part: dict[str, Any], event: dict[str, Any]) -> None:
+        """`event` (an answer's `question.answered`) is already committed under the id of `part`, a different answer
+        (the writer refuses an id reused under other content): that earlier answer resolved the question although its
+        caller saw a failure. The wait resumes with it (its own option if its write is remembered, else the card's
+        safe default) and the deadline writes nothing more. Thread-safe."""
+        card_id, by = part["card_id"], event["data"]["answered_by"]
+        with self._lock:
+            if card_id in self._claimed:
+                return  # resolved already: by that answer, or by the deadline
+            self._claimed[card_id] = event["id"]
+            option = self._tried.get((card_id, by))
+            waiter = self._waiting.get(card_id)
+            if waiter is None:
+                self._early[card_id] = (option, by)
+        if waiter is not None:
+            _resolve(waiter, Answer(card_id, option or waiter.card["safe_default"], by))
+
+    @staticmethod
+    def _wake(waiter: _Waiter) -> None:
+        try:
+            waiter.future.get_loop().call_soon_threadsafe(waiter.released.set)
+        except RuntimeError:  # the loop is closed: nobody waits any more
+            pass
+
     async def _at_deadline(self, waiter: _Waiter) -> None:
         card = waiter.card
         deadline = datetime.fromisoformat(card["created_at"]) + timedelta(seconds=card["timeout"])
-        while (left := (deadline - self._clock.now()).total_seconds()) > 0:
-            await self._clock.sleep(left)
-        with self._lock:
-            if card["id"] in self._claimed:
-                return  # an answer is being written and resumes the unit
-            self._claimed[card["id"]] = _DEADLINE
+        while True:
+            while (left := (deadline - self._clock.now()).total_seconds()) > 0:
+                await self._clock.sleep(left)
+            with self._lock:
+                if card["id"] not in self._claimed:
+                    self._claimed[card["id"]] = _DEADLINE
+                    break
+            # An answer is being written and resumes the unit; if that write fails its claim is released and the
+            # default is still the card's safe net, so wait for the release (a success ends this task instead).
+            await waiter.released.wait()
+            waiter.released.clear()
         try:
             self._writer.emit(
                 type="question.answered", actor=waiter.director, target=waiter.lead, data={"answered_by": "default"},

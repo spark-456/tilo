@@ -289,9 +289,8 @@ class _Run:
                 answer = await self.question_wait.wait_for(
                     card, lead=lead, director=self.roster.director, district=district
                 )
-                await slot.take()
                 # A stand-in ask that is not MustAsk's (the pinned FR-HIL-10 doubles) runs on any answer.
-                runs = not isinstance(ask, Ask) or ask.runs(answer)
+                runs, held_by = not isinstance(ask, Ask) or ask.runs(answer), answer
                 if not runs and isinstance(ask, Ask) and (follow := self.must_ask.confirmation(ask, answer)):
                     # A model-raised sensitive step: the answer only recorded a choice. Code asks once more.
                     card = self.must_ask.raise_question(
@@ -304,15 +303,20 @@ class _Run:
                         district=district,
                         cause=cause,
                     )
-                    slot.give()
-                    second = await self.question_wait.wait_for(
+                    second = await self.question_wait.wait_for(  # still no slot: the card is raised and waited for
                         card, lead=lead, director=self.roster.director, district=district
                     )
-                    await slot.take()
-                    runs = follow.runs(second)  # the runner still gets the person's first choice as its answer
+                    runs, held_by = follow.runs(second), second  # the runner still gets the person's first choice
+                await slot.take()
                 if not runs:
                     self.held.add(unit_id)
-                    self.emit("agent.retired", lead, worker, "The agent left without starting.", {}, cause=cause, **at)
+                    why = (
+                        "nobody answered in time, so the safe default"
+                        if held_by.answered_by == "default"
+                        else "the answer"
+                    )
+                    summary = f"The agent left without starting: {why} held this step."
+                    self.emit("agent.retired", lead, worker, summary, {}, cause=cause, **at)
                     return UnitOutcome(success=False, summary="The step was held, so it did not run.")
         try:
             loaded = tuple(self.skills.load_pinned(skill_id, self.pins) for skill_id in unit["skills"])
