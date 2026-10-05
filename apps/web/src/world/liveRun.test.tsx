@@ -67,6 +67,24 @@ describe("FR-WLD-05 CP2: the delivery is asked for only once world.completed is 
   });
 });
 
+describe("FR-CON-10: S-12 for a finished run that produced nothing", () => {
+  it("says plainly that nothing was produced, with no retry that could not change it", async () => {
+    const done = spied(COMPLETED);
+    done.getDelivery.mockResolvedValue({
+      world_id: "w_none",
+      artifacts: [],
+      credits_used: 0,
+      time_saved: null,
+    });
+    const page = await render(done.client, <S_12 params={["w_none"]} />);
+    expect(page.querySelector('[data-testid="delivery-none"]')?.textContent).toContain(
+      "none of its steps produced anything to deliver",
+    );
+    expect(page.textContent).not.toContain("You can try again");
+    expect(page.textContent).not.toContain("Finished:");
+  });
+});
+
 describe("FR-WLD-05 CP2: Needs you follows the world its address names", () => {
   it("S-06 and S-07 read ?world=<id>: its events and its cards, not the fixture world's", async () => {
     window.history.pushState({}, "", "/needs-you?world=w_live_1");

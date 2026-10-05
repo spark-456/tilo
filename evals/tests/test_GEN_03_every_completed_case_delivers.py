@@ -21,3 +21,18 @@ def test_GEN_03_no_completed_case_finishes_with_zero_deliverables(results) -> No
 def test_GEN_03_the_bank_still_has_completing_cases_to_prove_it_on(results) -> None:
     completed = [r for r in results if r.runs[0].outcome == "completed"]
     assert len(completed) >= 20
+
+
+def _done(count: int, *types: str):
+    from types import SimpleNamespace
+
+    events = [{"type": t} for t in types] + [{"type": "world.completed", "data": {"deliverable_count": count}}]
+    return SimpleNamespace(events=events)
+
+
+def test_GEN_03_made_items_with_nothing_delivered_is_a_finding_but_nothing_made_is_not() -> None:
+    from tilo_evals.bank_checks import delivers_something
+
+    assert delivers_something(_done(0, "artifact.created")), "items were made and none delivered"
+    assert not delivers_something(_done(0)), "nothing was made: nothing is invented to fill the count (HR-1)"
+    assert not delivers_something(_done(1, "artifact.created", "artifact.delivered"))

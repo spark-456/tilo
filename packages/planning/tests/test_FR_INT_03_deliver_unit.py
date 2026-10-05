@@ -45,6 +45,7 @@ def test_FR_INT_03_a_report_plan_ends_in_one_deliver_unit_that_adds_no_gate(tmp_
     assert (deliver["unit_type"], deliver["role"]) == ("deliver", "writer")
     assert (deliver["actions"], deliver["connectors"], deliver["skills"]) == ([], [], [])
     assert deliver["depends_on"] == ["U3"], "it waits for the units nothing else waits for"
+    assert deliver["title"] == "Competitor Pricing Summary", "titled after what the brief asked for"
     assert deliver["district"] in {u["district"] for u in directors}
     assert plan["gates"] == [], "delivering in Tilo is no side effect: no gate"
     assert _valid(plan) == []
@@ -61,14 +62,13 @@ def test_FR_INT_03_the_deliver_unit_waits_for_every_leaf_of_a_branching_plan(tmp
     assert _valid(result.plan) == []
 
 
-def test_FR_INT_03_a_plan_with_a_send_keeps_its_gate_and_still_delivers_in_tilo(tmp_path):
+def test_FR_INT_03_a_plan_with_a_send_keeps_its_gate_and_gets_no_second_delivery(tmp_path):
     result, _ = _compile(tmp_path, [_reply(_units())])  # U1..U4, U4 sends by email
 
     plan = result.plan
     (gate,) = plan["gates"]
     assert (gate["action_type"], gate["guards"]) == ("send_email", ["U4"])
-    *_, deliver = plan["units"]
-    assert deliver["unit_type"] == "deliver" and deliver["depends_on"] == ["U4"] and deliver["actions"] == []
+    assert plan["units"] == _units(), "a send delivers through its gate; no deliver unit duplicates it"
     assert _valid(plan) == []
 
 
