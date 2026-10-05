@@ -44,6 +44,20 @@ def _sent_kwargs(cause: str) -> dict:
     }
 
 
+def _created_kwargs(cause: str) -> dict:
+    return {
+        "type": "artifact.created",
+        "actor": "A_s2",
+        "target": "art_reply_draft",
+        "level": "L1",
+        "district": "D1",
+        "item": {"kind": "document", "artifact_id": "art_reply_draft", "label": "Reply to supplier"},
+        "summary": "The agent drafted the reply.",
+        "cause": cause,
+        "data": {"artifact": ARTIFACT},
+    }
+
+
 def _delivered_kwargs(cause: str | None) -> dict:
     return {
         "type": "artifact.delivered",
@@ -78,11 +92,13 @@ def test_D_11_stream_rejects_an_email_delivery_whose_cause_is_not_the_matching_t
 def test_D_11_stream_accepts_an_email_delivery_caused_by_its_matching_transfer_out(writer_and_store) -> None:
     writer, store = writer_and_store
     requested = writer.emit(**world_requested_kwargs())
-    sent = writer.emit(**_sent_kwargs(cause=requested["id"]))
+    # EV-15 (ADR-0018): a delivery names a version the world recorded, so the artifact is created first.
+    created = writer.emit(**_created_kwargs(cause=requested["id"]))
+    sent = writer.emit(**_sent_kwargs(cause=created["id"]))
 
     delivered = writer.emit(**_delivered_kwargs(cause=sent["id"]))
-    assert delivered["seq"] == 3
-    assert [e["seq"] for e in store.read_events("org_demo", "w_village_basic")] == [1, 2, 3]
+    assert delivered["seq"] == 4
+    assert [e["seq"] for e in store.read_events("org_demo", "w_village_basic")] == [1, 2, 3, 4]
 
 
 def test_D_11_stream_rejects_an_email_delivery_caused_by_a_transfer_of_a_different_outbox_entry(
