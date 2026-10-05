@@ -27,7 +27,7 @@ import { P } from "./art/iso";
 import type { Pt } from "./art/iso";
 import { buildingTag, districtTag, islandTag, makePill, policyTag } from "./art/labels";
 import { type PinKind, drawPin } from "./art/pins";
-import type { Frame, FrameRect } from "./frame";
+import { type Frame, type FrameBuilding, type FrameRect, standZone } from "./frame";
 import { BUILDING_STATE, ISLAND_STATE } from "./runSummary";
 
 const { tileWidth: TW, tileHeight: TH } = tokens.stage;
@@ -52,6 +52,7 @@ const RANK_WORD: Readonly<Record<string, string>> = {
  * scale puts the 12 px tag at 6 px). The name stays; the Inspect panel carries the state. */
 const MIN_WORD_PX = 8;
 const TAG_PX = 12;
+const isNarrow = (layer: WorldLayer) => layer.content.scale.x * TAG_PX < MIN_WORD_PX;
 /** State words are the shared map's (runSummary.ts), from the recorded state only (HR-1, UX-4). */
 const word = (words: Readonly<Record<string, string>>, state: string) => words[state];
 const named = (name: string, word: string | undefined, d: Density, narrow: boolean) =>
@@ -160,6 +161,23 @@ function item(
   return it;
 }
 
+type Zone = { x0: number; x1: number; y0: number; y1: number };
+const TAG_GAP = 4;
+/** What a resting figure covers in front of a building (Friendly's size, the larger): half its width
+ * either side of its feet, its height up (the same 30 units the rank tag sits above). */
+const FIGURE_HALF_W = 18;
+const FIGURE_UP = 30 * AGENT_SCALE;
+const FIGURE_DOWN = 6; // its shadow
+function figureZone(rect: FrameBuilding["rect"], lift: number): Zone {
+  const z = standZone(rect, lift);
+  return {
+    x0: z.x0 - FIGURE_HALF_W,
+    x1: z.x1 + FIGURE_HALF_W,
+    y0: z.y0 - FIGURE_UP,
+    y1: z.y1 + FIGURE_DOWN,
+  };
+}
+
 /** Shows the tag `id` reading `text` at `at`, making it (again, if its text changed) when needed;
  * `live` collects what is shown. */
 function tag(
@@ -169,6 +187,7 @@ function tag(
   text: string,
   make: (text: string) => Container,
   at: Pt,
+  clear?: readonly Zone[],
 ) {
   let t = layer.tags.get(id);
   if (t && t.text !== text) {
@@ -181,7 +200,17 @@ function tag(
     layer.tags.set(id, t);
   }
   t.c.visible = true;
-  t.c.position.set(at[0], at[1]);
+  // A tag that would touch the figures that rest in front of a building slides left, clear of them.
+  const half = t.c.width / 2;
+  let x = at[0];
+  for (let pass = 0; clear && pass <= clear.length; pass++) {
+    const hit = clear.find(
+      (z) => x + half > z.x0 && x - half < z.x1 && at[1] + 10 > z.y0 && at[1] - 10 < z.y1,
+    );
+    if (!hit) break;
+    x = hit.x0 - TAG_GAP - half;
+  }
+  t.c.position.set(x, at[1]);
   live.add(id);
 }
 
@@ -208,7 +237,7 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     frame.bridges,
   ]);
   const mode = layer.density();
-  const narrow = layer.content.scale.x * TAG_PX < MIN_WORD_PX;
+  const narrow = isNarrow(layer);
   const key = JSON.stringify([
     groundKey,
     frame.buildings,
@@ -251,6 +280,7 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
       });
     }
   }
+  const restZones = frame.buildings.map((b) => figureZone(b.rect, b.lift));
   for (const b of frame.buildings) {
     seen.add(b.id);
     const { x, y, w, d } = b.rect;
@@ -275,6 +305,7 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
       named(b.name, word(BUILDING_STATE, b.status), mode, narrow),
       buildingTag,
       [it.top[0], it.top[1] - (kind ? 50 : 14)],
+      restZones,
     );
   }
   for (const i of frame.islands) {
@@ -300,7 +331,7 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     pinned.push(() =>
       drawPin(layer.pins, [gx, gy - 22], GATE_PIN[gt.state] ?? "lock", { lift: 12, r: 9 }),
     );
-    if (mode === "professional")
+    if (mode === "professional" && !narrow)
       tag(layer, live, `${gt.id}:state`, `Gate · ${GATE_WORD[gt.state] ?? gt.state}`, buildingTag, [
         gx,
         gy - 62,
@@ -333,6 +364,7 @@ export function renderAgents(
   const shown = new Set<string>();
   const mode = layer.density();
   const scale = agentScale(mode);
+  const rankTags = mode === "professional" && !isNarrow(layer);
   for (const agent of frame.agents) {
     const p = positions.get(agent.id);
     if (!p) continue;
@@ -352,7 +384,7 @@ export function renderAgents(
     fig.g.zIndex = p.y + agent.level * LEVEL_RISE + agent.level * 4000 + 16;
     fig.g.visible = true;
     shown.add(agent.id);
-    if (mode === "professional") {
+    if (rankTags) {
       const text = RANK_WORD[agent.rank] ?? agent.rank;
       let rank = layer.agentTags.get(agent.id);
       if (rank && rank.text !== text) {
@@ -372,8 +404,7 @@ export function renderAgents(
     }
   }
   for (const [id, fig] of layer.figures) if (!shown.has(id)) fig.g.visible = false;
-  for (const [id, rank] of layer.agentTags)
-    rank.c.visible = mode === "professional" && shown.has(id);
+  for (const [id, rank] of layer.agentTags) rank.c.visible = rankTags && shown.has(id);
 }
 
 /** FR-WLD-06: outlines the selected agent (an ellipse at its drawn place), building, district or
