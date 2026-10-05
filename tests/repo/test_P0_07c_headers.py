@@ -52,7 +52,8 @@ def test_P0_07c_csp_forbids_framing_and_off_origin_loads(repo_root: pathlib.Path
     assert csp["script-src"] == ["'self'"]
     assert csp["connect-src"] == ["'self'"]
     assert csp["object-src"] == ["'none'"]
-    assert csp["base-uri"] == ["'self'"]
+    # P0-07e (documented test change): base-uri tightened from 'self' to 'none'; the app has no <base> tag.
+    assert csp["base-uri"] == ["'none'"]
     for name, sources in csp.items():
         assert "*" not in sources, f"{name}: wildcard source"
         assert not any(re.match(r"https?:", s) for s in sources), f"{name}: off-origin source {sources}"

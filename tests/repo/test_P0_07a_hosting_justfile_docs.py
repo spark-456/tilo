@@ -28,7 +28,8 @@ def test_P0_07a_firebase_hosting_serves_the_vite_build_as_a_spa(repo_root: pathl
     assert hosting["public"] == f"apps/web/{out_dir}", "hosting.public must be apps/web's real Vite output dir"
     pkg = json.loads((repo_root / "apps" / "web" / "package.json").read_text(encoding="utf-8"))
     assert "vite build" in pkg["scripts"]["build"], "apps/web build script must run vite build"
-    assert {"source": "**", "destination": "/index.html"} in hosting["rewrites"], "SPA rewrite to /index.html"
+    # P0-07e (documented test change): the catch-all `**` became `!/assets/**`; exact source pinned in the 07e tests.
+    assert any(r.get("destination") == "/index.html" for r in hosting["rewrites"]), "SPA rewrite to /index.html"
     assert not re.search(r"tilo-demo|apiKey|secret|token|essential-wares", text, re.I), "no project id or secrets here"
 
 

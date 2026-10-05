@@ -108,7 +108,9 @@ def test_P0_07c_deploy_web_recipe_is_cross_platform_and_secret_free(repo_root: p
 def test_P0_07c_firebase_json_serves_dist_as_spa_with_rewrite_to_index(repo_root: pathlib.Path) -> None:
     hosting = _hosting(repo_root)
     assert hosting["public"] == "apps/web/dist"
-    assert {"source": "**", "destination": "/index.html"} in hosting["rewrites"]
+    # P0-07e (documented test change): the catch-all `**` became `!/assets/**` so a missing asset 404s. That the
+    # source excludes /assets and still covers every route is pinned in test_P0_07e_hosting_routing.py.
+    assert any(r.get("destination") == "/index.html" for r in hosting["rewrites"])
 
 
 def test_P0_07c_firebase_json_caches_hashed_assets_forever_and_never_caches_index_html(
