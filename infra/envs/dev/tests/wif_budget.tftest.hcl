@@ -70,6 +70,21 @@ run "PRD_17_3_billing_budget_matches_ceiling_with_three_alerts" {
 run "SEC_02_deployer_limited_to_main_and_runtime_service_accounts" {
   command = plan
 
+  # Pins the whole expression byte for byte, so any widening edit (dropped
+  # parentheses, an appended `|| true`, an extra alternative) fails here even
+  # when each substring assertion below still passes (P0-07d, SEC-02).
+  assert {
+    condition = output.wif_provider_attribute_condition == join(" && ", [
+      "assertion.repository == \"${var.github_repository}\"",
+      "assertion.repository_id == \"${var.github_repository_id}\"",
+      "assertion.repository_owner_id == \"${var.github_repository_owner_id}\"",
+      "(assertion.ref == \"refs/heads/main\" || assertion.ref == \"refs/heads/phase0-stack\")",
+      "(assertion.workflow_ref == \"${var.github_repository}/.github/workflows/deploy-dev.yml@refs/heads/main\" || assertion.workflow_ref == \"${var.github_repository}/.github/workflows/deploy-dev.yml@refs/heads/phase0-stack\")",
+      "assertion.event_name == \"workflow_dispatch\"",
+    ])
+    error_message = "The WIF attribute condition must equal the exact six-clause expression (P0-07d, SEC-02, SEC-12)."
+  }
+
   assert {
     condition     = strcontains(output.wif_provider_attribute_condition, "refs/heads/main")
     error_message = "The WIF provider must only accept tokens from main, not any branch (SEC-02, SEC-12)."

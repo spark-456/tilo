@@ -35,8 +35,10 @@ resource "google_iam_workload_identity_pool_provider" "github" {
   # Google credential. The phase0-stack ref is temporary (P0-07d): the deploy
   # workflow must run from it until it merges to main, then remove it. No
   # wildcards and no tags: exact ref strings only. Tags are not accepted:
-  # anyone with push access can tag an unreviewed commit,
-  # bypassing branch protection, and the deployer can act as tilo-connectors
+  # anyone with push access can tag an unreviewed commit, and the deployer can
+  # act as tilo-connectors. Trust in the allowed refs relies on repository
+  # branch rules (protection or rulesets on main and phase0-stack) that the
+  # user must set in GitHub; Terraform does not create them.
   # (PRD 6.5, SEC-02, SEC-12 least privilege). The token must also come from
   # the one deploy workflow (workflow_ref, exact path on the same two refs)
   # and a manual dispatch (event_name), so no other workflow or trigger in the
