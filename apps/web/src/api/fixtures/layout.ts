@@ -72,7 +72,7 @@ export const LAYOUT_VILLAGE_BASIC = {
       },
       {
         id: "I2",
-        name: "WhatsApp",
+        name: "Email",
         conn: "channel",
         bridge: "pier",
         state: "connected",

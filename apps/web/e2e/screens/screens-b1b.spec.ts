@@ -31,7 +31,7 @@ test("S_18 renders, no console errors, placeholders aria-disabled", async ({ pag
   await visit(page, "/team", "Team Lead console", async () => {
     // The run's one question is answered at the end: nothing is waiting, one answer is recorded.
     await expect(page.getByTestId("lead-empty")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("You approved sending the reply on WhatsApp.")).toBeVisible();
+    await expect(page.getByText("You approved sending the reply.")).toBeVisible();
     await expect(page.getByTestId("lead-stats")).toContainText("No Team Lead has answered");
     await soon(page, "Promote an answer to a skill");
   });
@@ -78,6 +78,6 @@ test("S_19 shows one loading box, then the data, with a slow client", async ({ p
 // UX-1: with a slow client and events arriving, nothing on S-17..S-19 moves.
 noLayoutShift([
   ["S_17", "/mail", "About 8 to 18 min saved"],
-  ["S_18", "/team", "You approved sending the reply on WhatsApp."],
+  ["S_18", "/team", "You approved sending the reply."],
   ["S_19", "/connections", "Send email needs a gate"],
 ]);

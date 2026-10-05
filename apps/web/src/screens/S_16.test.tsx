@@ -2,6 +2,7 @@
 // CH-RM (SD-01, docs/prd-supplement-2026-10-05.md): WhatsApp is out of scope, so S-16 is email,
 // notification preferences and the connected Google accounts. `whatsapp` stays a valid enum value in
 // the contracts, but the screen never offers, names or lists it, even when a recorded run holds it.
+import type { Event } from "@tilo/contracts";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
@@ -12,10 +13,21 @@ import { S_16 } from "./S_16";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+// The village run now carries no WhatsApp message (its seq 35 and 36 went by email), so one is
+// built here from seq 35: a recorded run may still hold the value, and the screen must not list it.
+const [CARD_OUT] = EVENTS_VILLAGE_BASIC.filter((e) => e.seq === 35);
+const RETIRED_CHANNEL_MESSAGE: Event = {
+  ...(CARD_OUT as Event),
+  id: "01JB5VQ0000000000000000099",
+  seq: 99,
+  summary: "A message went by the retired channel.",
+  data: { ...(CARD_OUT?.data as object), channel: "whatsapp" } as Event["data"],
+};
+
 async function render() {
   const client = new FixtureClient();
   client.subscribeEvents = (_world, onEvent) => {
-    for (const e of EVENTS_VILLAGE_BASIC) onEvent(e); // the village run, WhatsApp messages included
+    for (const e of [...EVENTS_VILLAGE_BASIC, RETIRED_CHANNEL_MESSAGE]) onEvent(e);
     return () => undefined;
   };
   const container = document.createElement("div");
@@ -57,6 +69,10 @@ describe("CH-RM S-16 Channels without WhatsApp", () => {
 
   it("lists only the messages that went by email or in the app", async () => {
     const page = await render();
-    expect(page.textContent).toContain("No email or in-app message has been recorded yet.");
+    const text = page.textContent ?? "";
+    expect(text).toContain("Tilo sent the approval card to your inbox.");
+    expect(text).toContain("Your answer arrived.");
+    expect(text).not.toContain("A message went by the retired channel.");
+    expect(text).not.toContain("No email or in-app message has been recorded yet.");
   });
 });
