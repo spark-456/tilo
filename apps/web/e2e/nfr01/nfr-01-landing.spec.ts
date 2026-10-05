@@ -18,7 +18,7 @@ async function msToInteractive(page: Page): Promise<number> {
   await page.goto("/", { waitUntil: "commit" });
   const box = page.getByLabel("Describe your task");
   await box.fill("x");
-  await expect(page.locator(".task-count")).toContainText("1"); // the input went through React
+  await expect(page.locator(".task-count")).toHaveText(/^1 \/ 4,000$/); // the input went through React
   return performance.now() - start;
 }
 

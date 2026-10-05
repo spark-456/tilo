@@ -27,6 +27,8 @@ from tilo_planning.plangraph import SCHEMA_RULE, Violation, _floor_tier, validat
 
 MAX_ATTEMPTS = 2  # the first draft and one repair, as for approaches (PL-03, PRD 6.6)
 MAX_UNITS = 30  # BQ-115: the schema allows 200; the Director drafts a plan a person reads
+DELIVER = "deliver"  # BQ-218: the unit type code appends so every run delivers in Tilo (FR-CON-10)
+DELIVER_TITLE = "Deliver the finished work"
 MAX_PREVIOUS_CHARS = 20_000  # how much of a failed reply goes back, inside its block
 _ZERO_WIDTH = re.compile("[​-‏⁠﻿]")
 _MARKERS = "BRIEF|APPROACH|CATALOGUE|PROBLEMS|PREVIOUS"  # the blocks of plan.md and plan_repair.md
@@ -43,7 +45,9 @@ class _Unit(PlanUnit):
 
 class _Reply(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="forbid")
-    units: Annotated[list[_Unit], pydantic.Field(min_length=1, max_length=MAX_UNITS)]
+    units: Annotated[
+        list[_Unit], pydantic.Field(min_length=1, max_length=MAX_UNITS - 1)
+    ]  # one place is left for the deliver unit
 
 
 @dataclass(frozen=True)
@@ -122,6 +126,30 @@ def _gates(units: list[dict[str, Any]], inputs: PlanInputs) -> list[dict[str, An
     return gates
 
 
+def _deliver_title(brief: dict[str, Any]) -> str:
+    """The brief's first deliverable title (what the person asked for), else a plain default."""
+    deliverables = brief.get("deliverables")
+    first = deliverables[0].get("title") if isinstance(deliverables, list) and deliverables else None
+    return first.strip()[:80] if isinstance(first, str) and first.strip() else DELIVER_TITLE
+
+
+def _with_deliver(units: list[dict[str, Any]], brief: dict[str, Any]) -> list[dict[str, Any]]:
+    """BQ-218: a final unit that waits for every unit nothing else waits for and delivers in Tilo, ungated (no
+    action, so no gate). Code adds it, never the model, and only to a plan with no action of its own: a send or
+    save already delivers through its gate. A plan that already has a deliver unit (by type) keeps its own."""
+    if any(unit["unit_type"] == DELIVER or unit["actions"] for unit in units):
+        return units
+    needed = {dep for unit in units for dep in unit["depends_on"]}
+    leaves = [unit for unit in units if unit["id"] not in needed]
+    number = max(int(unit["id"][1:]) for unit in units) + 1
+    deliver = {
+        "id": f"U{number}", "unit_type": DELIVER, "title": _deliver_title(brief), "role": "writer",
+        "district": leaves[-1]["district"] if leaves else units[-1]["district"], "skills": [], "connectors": [],
+        "actions": [], "depends_on": [unit["id"] for unit in leaves],
+    }  # fmt: skip
+    return [*units, deliver]
+
+
 def _ask(router: Router, prompt: str) -> RouterResult:
     request = GenerateRequest(
         system=load_prompt(DIRECTOR_ROLE, "plan_system.md"),
@@ -169,6 +197,7 @@ def compile_plan(
         except pydantic.ValidationError as error:
             found = [f"schema: {_pointer(e['loc'])} does not match the units schema" for e in error.errors()[:20]]
         else:
+            units = _with_deliver(units, brief)
             plan = {
                 "approaches": approaches, "chosen_approach": approach["id"], "units": units,
                 "gates": _gates(units, inputs), "budget_cap": budget_cap,

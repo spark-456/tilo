@@ -8,7 +8,6 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import type { WorldSeam } from "../stage/Stage";
 import { loadFixture } from "./fixtureLoader";
 import type { RunStatus } from "./runSummary";
-import { runWorld } from "./runWorld";
 import { useSelection } from "./selection";
 import { parseSpeed, speedBadgeText } from "./speed";
 
@@ -72,8 +71,9 @@ export function useWorldFixture(): WorldFixtureState {
       if (!fixture) return undefined;
       if (!dataRef.current) dataRef.current = loadFixture(fixture);
       let cancelled = false;
-      dataRef.current
-        .then(({ layout, events }) => {
+      // runWorld.ts (and Pixi behind it) loads here, off the landing route's bundle (NFR-01).
+      Promise.all([dataRef.current, import("./runWorld")])
+        .then(([{ layout, events }, { runWorld }]) => {
           if (cancelled) return;
           setWorldId(layout.world_id);
           setLayout(layout);

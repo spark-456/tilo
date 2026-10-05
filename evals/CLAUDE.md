@@ -18,7 +18,7 @@ The eval harness (PRD 19, EFF-06, EFF-07). P8-06a/b: case schema/loader, `EvalsC
 ## Generality bank (#272)
 - Runs the real `tilo-api` in process (intake to delivery); only the Director is scripted per case (`scripted.py`, through the provider layer's Router), the unit runner and connectors are the dev stand-ins. It tests the pipeline's mechanics across plan shapes, never model judgement, and its report says so (GEN-11).
 - Frozen and held out: `evals/bank/MANIFEST.sha256` pins the set; a change needs the user's approval. A failing case is fixed in code in general, never by naming its brief anywhere outside `evals/bank/`.
-- Hard checks (GEN-03): no crash, events valid, plan valid, gates as policy, honest terminal state, budget. `delivers_something` is reported, not gated (a plan with no gated action completes with 0 deliverables).
+- Hard checks (GEN-03): no crash, events valid, plan valid, gates as policy, honest terminal state, budget. `delivers_something` is reported, not gated (items made but none delivered; the plan's `deliver` unit delivers them, BQ-218).
 
 ## Requirement IDs
 - EFF-07 (a to d); GEN-01 to GEN-05, GEN-11 (bank, issue #272). Supports EFF-06 (nightly cost regression, later) and the PRD 19.2 case set.
