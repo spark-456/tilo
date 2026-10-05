@@ -85,6 +85,28 @@ function Logo() {
   );
 }
 
+/** The "N decisions waiting" chip. On the queue's own page it is text, not a link to itself. */
+export function Waiting({ count, here, to }: { count: number; here: boolean; to: string }) {
+  const inner = (
+    <>
+      <span className="topbar-waiting-count">{count}</span>
+      <span className="topbar-waiting-long">
+        {count === 1 ? "decision waiting" : "decisions waiting"}
+      </span>
+      <span className="topbar-waiting-short">waiting</span>
+    </>
+  );
+  return here ? (
+    <span className="topbar-waiting" data-testid="top-bar-waiting" aria-current="page">
+      {inner}
+    </span>
+  ) : (
+    <AppLink to={to} className="topbar-waiting" data-testid="top-bar-waiting">
+      {inner}
+    </AppLink>
+  );
+}
+
 export function TopBar({ fixture }: { fixture: boolean }) {
   const path = usePathname();
   const client = useClient();
@@ -96,6 +118,8 @@ export function TopBar({ fixture }: { fixture: boolean }) {
   const title = place.world !== null && place.world === counted ? worldTitle(events) : null;
   const waiting = deriveQueue(events).length;
   const name = title ?? place.name;
+  const onQueue = matchScreen(path)?.id === "S-06";
+  const queueTo = inWorld ? withWorld("/needs-you", inWorld) : "/needs-you";
   return (
     <header className="topbar" data-testid="top-bar">
       <Logo />
@@ -109,19 +133,7 @@ export function TopBar({ fixture }: { fixture: boolean }) {
       >
         {name}
       </p>
-      {waiting > 0 && (
-        <AppLink
-          to={inWorld ? withWorld("/needs-you", inWorld) : "/needs-you"}
-          className="topbar-waiting"
-          data-testid="top-bar-waiting"
-        >
-          <span className="topbar-waiting-count">{waiting}</span>
-          <span className="topbar-waiting-long">
-            {waiting === 1 ? "decision waiting" : "decisions waiting"}
-          </span>
-          <span className="topbar-waiting-short">waiting</span>
-        </AppLink>
-      )}
+      {waiting > 0 && <Waiting count={waiting} here={onQueue} to={queueTo} />}
     </header>
   );
 }

@@ -101,8 +101,10 @@ test("UX-227-C1 the Needs-you count is the queue S-06 lists, links to it, and is
   const rows = page.getByTestId("needs-queue").locator("li");
   await expect(rows).toHaveCount(1, { timeout: 30_000 });
   const waiting = page.getByTestId("top-bar-waiting");
-  await expect(waiting).toHaveAccessibleName("1 decision waiting");
-  await expect(waiting).toHaveAttribute("href", /^\/needs-you/);
+  await expect(waiting).toHaveText(/1\s*decision waiting/);
+  // On the queue's own page the chip is text for the page you are on, not a link to itself.
+  await expect(waiting).not.toHaveAttribute("href", /.*/);
+  await expect(waiting).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("top-bar-waiting")).toHaveCount(0, { timeout: 30_000 }); // answered
 });
 
@@ -137,4 +139,15 @@ test("UX-227-C1 the bar names a ?fixture= replay's world and keeps the HR-4 bann
   const banner = await page.getByTestId("fixture-replay-banner").boundingBox();
   const bar = await page.getByTestId("top-bar").boundingBox();
   expect((banner?.y ?? 0) + (banner?.height ?? 0)).toBeLessThanOrEqual(bar?.y ?? 0);
+});
+
+test("UX-227-C1 at 1920 the bar's row is capped at 1440 px and centred, the bar stays full width", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/worlds?speed=1000");
+  const bar = await page.getByTestId("top-bar").boundingBox();
+  expect(bar?.width).toBe(1920);
+  const logo = await page.getByRole("link", { name: "Tilo home" }).boundingBox();
+  expect(logo?.x, "logo starts at the row's left edge").toBeCloseTo(240, 0);
 });

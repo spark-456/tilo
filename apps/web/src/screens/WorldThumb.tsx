@@ -2,14 +2,19 @@
 // ported iso projection, palette and building styles of src/world/art), as SVG, from the layout
 // and the events recorded so far (HR-1). A building not planned yet is not drawn; a planned one is
 // a dashed outline and a one under construction is a low wall, so the state reads from the shape
-// and not from colour alone (PRD 18.6). No new assets: this is a view of the world, not an icon.
+// and not from colour alone (PRD 18.6). Agents stand where the run has put them, drawn larger than
+// life so a figure still reads in a card (a rank shows by shape: director crest, lead cap, verifier
+// clipboard). No new assets: this is a view of the world, not an icon.
 import type { Layout } from "@tilo/contracts";
+import tokens from "../design/tokens";
 import { BASE, FLOOR } from "../world/art/building";
 import { PALETTE, dk, lt, shade } from "../world/art/color";
 import { P, type Pt } from "../world/art/iso";
-import { type FrameBuilding, frameOf } from "../world/frame";
+import { type FrameAgent, type FrameBuilding, frameOf } from "../world/frame";
 import type { WorldState } from "../world/reducer";
 
+/** Larger than life: at a card's scale a true-size figure is a few pixels. */
+const AGENT_SCALE = 2.4;
 const pts = (ps: readonly Pt[]): string =>
   ps.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
 
@@ -52,6 +57,40 @@ function Building({ b }: { b: FrameBuilding }) {
   );
 }
 
+/** An agent figure drawn with its feet at the origin: a body, a white face with two eyes, and a
+ * rank mark. */
+function Agent({ a }: { a: FrameAgent }) {
+  const director = a.rank === "director";
+  const col = director ? tokens.color.brand.primary : a.tint;
+  const [w, h] = director ? [20, 28] : [18, 26];
+  const [x, y] = [-w / 2, -h - 2];
+  const edge = dk(col, 0.3);
+  return (
+    <g
+      transform={`translate(${a.cx.toFixed(1)} ${a.cy.toFixed(1)}) scale(${AGENT_SCALE})`}
+      data-testid="thumb-agent"
+      data-rank={a.rank}
+    >
+      <ellipse rx={w * 0.7} ry={4} fill={PALETTE.ink} opacity={0.15} />
+      {director && (
+        <g fill={dk(col, 0.12)}>
+          {[-6, -1, 4].map((dx, i) => (
+            <rect key={dx} x={dx} y={y - (i === 1 ? 7 : 5)} width={4} height={6} />
+          ))}
+        </g>
+      )}
+      {a.rank === "lead" && <rect x={-4} y={y - 5} width={8} height={6} fill={shade(col).l} />}
+      {a.rank === "verifier" && (
+        <rect x={x + w + 1} y={y + 8} width={5} height={10} fill={PALETTE.ink2} stroke={edge} />
+      )}
+      <rect x={x} y={y} width={w} height={h} rx={4} fill={col} stroke={edge} strokeWidth={1.2} />
+      <rect x={x + 3} y={y + 4} width={w - 6} height={11} rx={2.5} fill={PALETTE.white} />
+      <circle cx={-3.2} cy={y + 9} r={1.5} fill={PALETTE.ink} />
+      <circle cx={3.2} cy={y + 9} r={1.5} fill={PALETTE.ink} />
+    </g>
+  );
+}
+
 /** A still of the world, or nothing but its backdrop when the layout has no geometry. */
 export function WorldThumb({ layout, state }: { layout: Layout; state: WorldState }) {
   const frame = frameOf(layout, state);
@@ -70,6 +109,10 @@ export function WorldThumb({ layout, state }: { layout: Layout; state: WorldStat
   const drawn = [
     ...frame.plates.flatMap((p) => at(p.rect, p.lift)),
     ...frame.buildings.flatMap((b) => at(b.rect, b.lift + BASE + (b.floors - 1) * FLOOR)),
+    ...frame.agents.flatMap((a): Pt[] => [
+      [a.cx - 14 * AGENT_SCALE, a.cy - 40 * AGENT_SCALE],
+      [a.cx + 14 * AGENT_SCALE, a.cy + 6 * AGENT_SCALE],
+    ]),
   ];
   const xs = drawn.map((q) => q[0]);
   const ys = drawn.map((q) => q[1]);
@@ -111,6 +154,11 @@ export function WorldThumb({ layout, state }: { layout: Layout; state: WorldStat
       {order.map((b) => (
         <Building key={b.id} b={b} />
       ))}
+      {[...frame.agents]
+        .sort((a, b) => a.level - b.level || a.cy - b.cy)
+        .map((a) => (
+          <Agent key={a.id} a={a} />
+        ))}
     </svg>
   );
 }
