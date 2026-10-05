@@ -19,7 +19,7 @@ test("S_14 G1 filter chips carry counts from the one recorded world, Scheduled i
   await expect(page.getByTestId("count-finished")).toHaveText("1");
   await expect(page.getByTestId("count-running")).toHaveText("0");
   await expect(page.getByTestId("count-scheduled")).toHaveText("0");
-  await expect(page.getByRole("radio", { name: /^All/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /^All \d/ })).toBeChecked();
 
   await page.getByRole("radio", { name: /^Scheduled/ }).check({ force: true });
   await expect(page.getByTestId("worlds-filter-empty")).toContainText("Nothing is scheduled");
@@ -102,3 +102,91 @@ test("S_14 G1 the status chips are 44 px high on a phone and 36 px on a desktop"
     }
   }
 });
+
+test("S_14 artboard size chips filter by the layout's tier, and All sizes lists everything", async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await page.goto("/worlds?speed=100");
+  const card = page.getByTestId("world-card");
+  await expect(card).toContainText("Village · 1 level", { timeout: 15_000 });
+  await expect(page.getByRole("radio", { name: "All sizes" })).toBeChecked();
+  await page.getByRole("radio", { name: "City" }).check({ force: true });
+  await expect(page.getByTestId("worlds-filter-empty")).toContainText("No city world here");
+  await expect(page.getByTestId("count-all")).toHaveText("0");
+  await page.getByRole("radio", { name: "Village" }).check({ force: true });
+  await expect(card).toBeVisible();
+  await expect(page.getByTestId("count-all")).toHaveText("1");
+});
+
+test("S_14 phone: a short filter bar, the first card's title above the bottom nav, size chips behind Filters", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(MOBILE);
+  await page.goto("/worlds?speed=100");
+  const card = page.getByTestId("world-card");
+  await expect(card).toContainText("Village · 1 level", { timeout: 20_000 });
+  const bar = await page.locator(".filter-bar").boundingBox();
+  expect(bar?.height).toBeLessThanOrEqual(130);
+  const title = await card.getByRole("heading", { level: 2 }).boundingBox();
+  const nav = await page.getByRole("navigation", { name: "Primary" }).boundingBox();
+  expect((title?.y ?? 0) + (title?.height ?? 0)).toBeLessThanOrEqual(nav?.y ?? 0);
+
+  const toggle = page.getByRole("button", { name: "Filters: All sizes" });
+  expect((await toggle.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("radio", { name: "Village" })).toBeHidden();
+  const before = (await card.boundingBox())?.y;
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("radio", { name: "Village" })).toBeVisible();
+  expect((await card.boundingBox())?.y).toBe(before); // the panel opens over the list: nothing moves
+  await page.keyboard.press("Escape");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(toggle).toBeFocused();
+  await toggle.click();
+  await page.getByRole("radio", { name: "Village" }).check({ force: true });
+  await expect(page.getByRole("button", { name: "Filters: Village" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await expect(card).toBeVisible();
+});
+
+for (const [name, viewport] of [
+  ["desktop", DESKTOP],
+  ["mobile", MOBILE],
+] as const) {
+  test(`S_14 artboard: a waiting decision shows in the card with its gate link, then the card calms with no shift (${name})`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize(viewport);
+    await page.addInitScript(() => {
+      const w = window as unknown as { __cls: number };
+      w.__cls = 0;
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) {
+          const s = e as PerformanceEntry & { value: number; hadRecentInput: boolean };
+          if (!s.hadRecentInput) w.__cls += s.value;
+        }
+      }).observe({ type: "layout-shift", buffered: true });
+    });
+    await page.goto("/worlds?speed=5", { waitUntil: "commit" }); // replay starts at mount
+    const card = page.getByTestId("world-card");
+    const needs = page.getByTestId("world-needs");
+    await expect(needs).toHaveAttribute("data-tone", "needs", { timeout: 30_000 });
+    await expect(card).toHaveAttribute("data-needs", "true");
+    await expect(needs).toContainText("The reply is ready. Sending it needs your approval.");
+    await expect(needs.getByRole("link", { name: "Review the gate" })).toHaveAttribute(
+      "href",
+      /\/needs-you\/gate\?run=r_village_basic_1&gate=G1/,
+    );
+    const during = (await card.boundingBox())?.height;
+    await expect(needs).toHaveAttribute("data-tone", "clear", { timeout: 30_000 });
+    await expect(needs).toContainText("Nothing waits for you.");
+    expect((await card.boundingBox())?.height).toBe(during); // the box is the same size either way
+    expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBe(0);
+  });
+}

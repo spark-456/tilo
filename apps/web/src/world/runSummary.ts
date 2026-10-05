@@ -33,6 +33,18 @@ export function budgetCap(events: readonly Event[]): number | null {
   return cap;
 }
 
+/** Credits saved by reuse so far (PRD 14.3, FR-MTR-06): the sum of `saved` on every memory.hit
+ * event, which the event records as origin cost minus lookup cost. Never an estimate. */
+export function memorySaved(events: readonly Event[]): number {
+  let total = 0;
+  for (const e of events) {
+    if (e.type !== "memory.hit") continue;
+    const saved = (e.data as { saved?: unknown }).saved;
+    if (typeof saved === "number" && Number.isFinite(saved)) total += saved;
+  }
+  return Math.round(total * 10) / 10;
+}
+
 export const RUN_STATUS_LABEL: Readonly<Record<RunStatus, string>> = {
   idle: "Getting ready",
   started: "Working",
@@ -40,6 +52,20 @@ export const RUN_STATUS_LABEL: Readonly<Record<RunStatus, string>> = {
   completed: "Done",
   failed: "Stopped with an error",
 };
+
+/** The one-line HUD a phone shows while the status sheet is closed (artboard 2-2): the run's status
+ * in words, the credits used and the approvals waiting, all from the recorded events (HR-1). */
+export function hudGlance(
+  status: RunStatus,
+  events: readonly Event[],
+  credits: number,
+  waiting: number,
+): string {
+  if (events.length === 0) return "Nothing yet";
+  if (status === "idle") return RUN_STATUS_LABEL.idle;
+  const asks = waiting === 0 ? "nothing waiting" : `${waiting} waiting for you`;
+  return `${RUN_STATUS_LABEL[status]} · ${credits} credits · ${asks}`;
+}
 
 export const BUILDING_STATE = {
   hidden: "Not planned yet",
