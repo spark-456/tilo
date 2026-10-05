@@ -23,7 +23,7 @@ from typing import Any
 
 from _channels_lib import FakeClock
 from _chn10_lib import USER, MemoryDraftStore, Rig, Thread, answer, drafting_module, make_rig, message_id_header
-from _chn_0305_lib import CONTRACTS, _registry
+from _chn_contracts_lib import CONTRACTS, _registry
 from jsonschema import Draft202012Validator
 
 MAILBOX = "ops@harborview.example"

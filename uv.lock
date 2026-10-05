@@ -1518,7 +1518,10 @@ dependencies = [
     { name = "jsonschema" },
     { name = "pyyaml" },
     { name = "referencing" },
+    { name = "tilo-archive" },
+    { name = "tilo-connectors" },
     { name = "tilo-contracts" },
+    { name = "tilo-memory" },
     { name = "tilo-policy" },
     { name = "tilo-providers" },
     { name = "uvicorn" },
@@ -1532,7 +1535,10 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.18" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-archive", editable = "packages/archive" },
+    { name = "tilo-connectors", editable = "services/connectors" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-providers", editable = "packages/providers" },
     { name = "uvicorn", specifier = ">=0.32" },
@@ -1543,11 +1549,17 @@ name = "tilo-memory"
 version = "0.1.0"
 source = { editable = "packages/memory" }
 dependencies = [
+    { name = "jsonschema" },
+    { name = "referencing" },
     { name = "tilo-contracts" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "tilo-contracts", editable = "packages/contracts-py" }]
+requires-dist = [
+    { name = "jsonschema", specifier = ">=4.18" },
+    { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
+]
 
 [[package]]
 name = "tilo-metering"

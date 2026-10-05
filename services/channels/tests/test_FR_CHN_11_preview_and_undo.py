@@ -23,7 +23,7 @@ from _chn11_lib import (
     parse_ts,
     scripted_thread,
 )
-from _chn_0305_lib import data_errors, registered_types
+from _chn_contracts_lib import data_errors, registered_types
 
 
 def _l2_scheduled(**kw):

@@ -186,3 +186,8 @@ Pinned in `cloudbuild.yaml`. They run only inside Google Cloud Build; nothing fr
 
 None vendored yet. `design/source/` is read-only reference material, not a dependency; its
 licence terms are tracked in `design/source/INDEX.md`, not here.
+
+## Python (`packages/memory`)
+
+`tilo-memory` declares `jsonschema` and `referencing` as runtime dependencies (FR-MEM-06 artifact store),
+both already listed above (MIT). No new licence.

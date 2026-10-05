@@ -140,7 +140,7 @@ export function S_26({ params }: ScreenProps) {
           <ul className="people-tags" aria-label="Attendees">
             {picked.attendees.map((a) => (
               <li key={a.name}>
-                <PersonTag name={a.name} />
+                <PersonTag name={a.name} plain={a.user === null} />
               </li>
             ))}
           </ul>

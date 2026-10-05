@@ -54,7 +54,7 @@ from _chn11_lib import (
     autopilot_module,
     context,
 )
-from _chn_0305_lib import REPO_ROOT
+from _chn_contracts_lib import REPO_ROOT
 from tilo_connectors import InMemoryOutboxStore, Outbox
 from tilo_connectors.adapters import GMAIL_API, GmailAdapter, TransportError
 

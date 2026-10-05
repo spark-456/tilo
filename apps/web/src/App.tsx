@@ -10,6 +10,7 @@ import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
 import { LoggedScrubber, ReplayScrubber } from "./screens/ReplayScrubber";
 import { ScreenPage } from "./screens/ScreenPage";
+import { TopBar } from "./screens/TopBar";
 import { HudGlance, WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
@@ -67,9 +68,29 @@ export function App() {
     if (previousPath.current === path) return; // not the first render, nor StrictMode's second effect
     previousPath.current = path;
     // The World lens is the stage with the flow shell's heading, so it takes focus the same way.
-    const h1 = document.querySelector<HTMLElement>(".screen-page h1, .flow-heading");
-    h1?.setAttribute("tabindex", "-1");
-    h1?.focus();
+    const focusHeading = (): boolean => {
+      const h1 = document.querySelector<HTMLElement>(".screen-page h1, .flow-heading");
+      if (!h1 || h1.getClientRects().length === 0) return false; // not there yet, or hidden
+      h1.setAttribute("tabindex", "-1");
+      h1.focus();
+      return true;
+    };
+    if (focusHeading()) return;
+    // A screen is a code-split chunk (NFR-01): its heading arrives with it. Focus it then, unless
+    // the person has moved focus somewhere else in the meantime (it is still where the navigation
+    // left it: the link they used, or the page body).
+    const left = document.activeElement;
+    const root = document.getElementById("root") ?? document.body;
+    const watch = new MutationObserver(() => {
+      if (document.activeElement !== left) return watch.disconnect();
+      if (focusHeading()) watch.disconnect();
+    });
+    watch.observe(root, { childList: true, subtree: true });
+    const giveUp = setTimeout(() => watch.disconnect(), 10_000);
+    return () => {
+      watch.disconnect();
+      clearTimeout(giveUp);
+    };
   }, [path]);
   // The world a path belongs to: its S-04 panels fill the right rail on every world screen (S-04,
   // S-05, S-10, S-11, S-12) and, on mobile, a bottom sheet on S-04 itself.
@@ -131,6 +152,7 @@ export function App() {
       data-replay-badge={speedBadge ? "on" : "off"}
       data-replay-dock={dock ? "on" : "off"}
     >
+      <TopBar fixture={world.active} />
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
         <ScreenPage key={screen.id} screenId={screen.id}>

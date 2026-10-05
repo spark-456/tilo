@@ -103,6 +103,15 @@ def _writer():
     return make_memory_writer(layout, world_id="w_bind")
 
 
+def _record_victim_versions(writer, upto: int = 3) -> None:
+    """EV-15 (ADR-0018): a review names a version the world recorded, so versions 1 to `upto` are recorded first."""
+    base = {"actor": "A_s0", "target": "art_victim", "level": "L1", "district": "D1", "summary": "The agent made it."}
+    writer.emit(type="artifact.created", data={"artifact": {"artifact_id": "art_victim", "version": 1}}, **base)
+    for version in range(2, upto + 1):
+        data = {"artifact": {"artifact_id": "art_victim", "version": version}, "previous_version": version - 1}
+        writer.emit(type="artifact.versioned", data=data, **base)
+
+
 def _deliverable(artifact_id: str, version: int = 1, *, claims=None, **manifest_extra):
     manifest = build_manifest(
         artifact_id=artifact_id, sources={"src_a": SOURCE}, claims=claims or [claim("cl_1", TRUE_CLAIM, ["src_a"])]
@@ -118,11 +127,12 @@ def _deliverable(artifact_id: str, version: int = 1, *, claims=None, **manifest_
 def test_FR_AGT_12_a_manifest_for_another_artifact_or_version_is_recorded_unverified(served) -> None:
     ref = {"artifact_id": "art_victim", "version": 3}
     writer, store = _writer()
+    _record_victim_versions(writer)
     verifier, _ = make_verifier(ScriptedProvider(default=LENIENT), load=lambda _ref: _deliverable(*served))
 
     review = asyncio.run(verifier.review_and_record(ref, writer=writer, district="D1"))
 
-    (event,) = store.read_events("org_demo", "w_bind")
+    event = store.read_events("org_demo", "w_bind")[-1]
     assert review.result == "unverified" and event["data"] == {"artifact": ref, "result": "unverified"}
     assert all(row["verified"] is False for row in review.manifest["claims"])
 
@@ -130,9 +140,10 @@ def test_FR_AGT_12_a_manifest_for_another_artifact_or_version_is_recorded_unveri
 def test_FR_AGT_12_the_matching_manifest_is_still_reviewed() -> None:
     ref = {"artifact_id": "art_victim", "version": 3, "label": "final"}
     writer, store = _writer()
+    _record_victim_versions(writer)
     verifier, _ = make_verifier(ScriptedProvider(default=LENIENT), load=lambda _ref: _deliverable("art_victim", 3))
     asyncio.run(verifier.review_and_record(ref, writer=writer, district="D1"))
-    assert store.read_events("org_demo", "w_bind")[0]["data"]["result"] == "passed"
+    assert store.read_events("org_demo", "w_bind")[-1]["data"]["result"] == "passed"
 
 
 # --- a manifest that cannot be reviewed keeps no author flag -----------------------------------

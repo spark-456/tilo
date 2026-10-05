@@ -8,7 +8,7 @@ import type { Card, Layout } from "@tilo/contracts";
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import type { TiloClient } from "../api/client";
 import { Placeholder } from "../screens/Placeholder";
-import { findItem } from "../screens/S_05";
+import { findItem } from "../screens/findItem";
 import { Chip, Soon } from "../screens/kit";
 import { describeError } from "../screens/remote";
 import { agentNames } from "../world/runSummary";

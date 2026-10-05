@@ -30,5 +30,7 @@ export const ALL_ROUTES: readonly string[] = [
   "/pilot",
   "/meetings",
   "/plate",
+  "/pinboards",
+  "/calendar",
   "/more",
 ];

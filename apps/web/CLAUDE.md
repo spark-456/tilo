@@ -15,7 +15,7 @@ Trace lenses, cards and settings.
 `config/themes/` (world themes), feature flags. UX-1–UX-9 (18.1); FR-WLD-*; owned from P0-08.
 
 ## Stage and world (`src/stage/`, `src/world/`)
-- `Stage.tsx`: the camera is the Pixi world container's transform (`camera.ts`); no CSS transform, no always-on ticker (HR-2). `data-stage-ready="true"` appears with the first frame. Zoom in/out buttons send the stage's own `+`/`-` keys (one camera path). `pixi.js` and `runWorld` load by dynamic import (NFR-01); keep them off the landing bundle.
+- `Stage.tsx`: the camera is the Pixi world container's transform (`camera.ts`); no CSS transform, no always-on ticker (HR-2). `data-stage-ready="true"` appears with the first frame. Zoom in/out buttons send the stage's own `+`/`-` keys (one camera path). `pixi.js`, `runWorld`, every `S_NN` screen (`routes.tsx`) and S-02/S-03 load by dynamic import (NFR-01) under `ChunkBoundary` + Suspense; keep them off the landing bundle.
 - FR-WLD-04: `registry` → `reducer` (HR-5) → `store` → `frame` → `renderer.ts` (art in `world/art/`, ported
   from the design prototypes, ADR-0003); `choreographer.ts` (HR-3) alone animates. The stage draws a `?fixture=` replay
   (`runWorld`) or, on /world/:id, the client's own run: `useClientWorld` → `runClientWorld` (FR-WLD-05, any client; the one path). It waits for the layout via `getLayout` (until `world.started`); events held already fold in as a jump, later ones animate; no solver geometry = empty stage + a note; a failed load shows a note and retry. Needs-you reads `?world=<id>`, else the run `approve` last started (`worldContext.ts`, `lastWorld.ts`); live with none, `inARun.tsx` says "No run yet". `?seq=N`, `?speed=N`.
@@ -23,10 +23,10 @@ Trace lenses, cards and settings.
 - FR-WLD-08: `replay.ts` holds one replay point per world (display state); `ReplayScrubber` (right rail, or above the mobile tabs) scrubs a finished run, disabled while live. Stage shows `stateAt(seq)`, Story/Trace/HUD the events up to it (in `?fixture=` mode `WorldPanels` gets them as `replayed`; the HUD meter adds credits saved by memory, a phone's closed sheet shows `HudGlance`); the HR-4 banner ("Replay of run #… recorded …", fixtures add "dev fixture") shows once finished.
 
 ## Screens (`src/screens/`, AGW-08)
-- `meta.ts` is the PRD 18.3 table (S-01..S-25, status, route pattern); `routes.tsx` maps each
+- `meta.ts` is the PRD 18.3 table (S-01..S-29, status, route pattern); `routes.tsx` maps each
   routed screen to its `S_NN.tsx`. Build one: replace the stub, flip its status. `/more`, `/screens`. `ScreenPage` (the routed `<main>`) is tabbable and named only while it scrolls (#361).
 - A control that does nothing yet is `aria-disabled="true"` with a "Coming soon" title. Nothing to list yet is `EmptyState` (`kit.tsx`: glyph, title, line, one action), in the reserved box the loading state held.
-- `?speed=` is parsed in `world/speed.ts` (clamped 0.1..1000); the HR-6 badge says "Replay at N× speed"; it and the HR-4 pill sit in the fixed `.status-strip` (shell padded by `--strip-h`).
+- `?speed=` is parsed in `world/speed.ts` (clamped 0.1..1000); the HR-6 badge says "Replay at N× speed"; it and the HR-4 pill sit in the fixed `.status-strip`; under it the shared `TopBar` (logo, place, real Needs-you count; no user/plan data, none exists) — fixed layers start below `--chrome-h`; keep its text from moving (CLS).
 - An unknown world id or an unowned path under `/world/` or `/task/` shows `NotFound`, not Start.
 
 ## Needs you (`src/needs-you/`, AGW-05)

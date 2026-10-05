@@ -47,11 +47,12 @@ const CHANGE = {
 /** Apply one action to one item and record it in the item's history, as the contract defines it.
  * Only the signed-in person's own item changes, and "not mine" only on an item someone else
  * assigned (PE-03): the screen hides the button, and this refuses it too. "Put back" undoes done,
- * snooze or a reassign request. */
+ * snooze or a reassign request, and does nothing to an item that is already open. */
 export function reducePlate(items: readonly WorkItem[], a: PlateAction): readonly WorkItem[] {
   return items.map((i) => {
     if (i.id !== a.id || i.owner !== SIGNED_IN) return i;
     if (a.kind === "not_mine" && !canReject(i)) return i;
+    if (a.kind === "put_back" && laneOf(i) === "open") return i; // already open: nothing to undo
     const status = a.kind === "done" ? "done" : a.kind === "put_back" ? "open" : i.status;
     const entry = { at: PREVIEW_NOW, by: SIGNED_IN, change: CHANGE[a.kind], status } as const;
     return {

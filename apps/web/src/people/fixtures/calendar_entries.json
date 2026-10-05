@@ -1,0 +1,201 @@
+[
+  {
+    "id": "ce_budget_review",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Budget review",
+    "start": "2026-10-07T09:30:00.000Z",
+    "end": "2026-10-07T10:00:00.000Z",
+    "all_day": false,
+    "attendee_count": 3,
+    "source": {
+      "kind": "google",
+      "ref": "e7u3k2n9d8s6a1",
+      "synced_at": "2026-10-05T10:30:00.000Z"
+    },
+    "state": "accepted",
+    "share": null,
+    "created_by": {
+      "by": "tilo",
+      "ref": "system",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "ce_launch_sync",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Launch sync",
+    "start": "2026-10-07T05:30:00.000Z",
+    "end": "2026-10-07T06:00:00.000Z",
+    "all_day": false,
+    "attendee_count": 3,
+    "source": {
+      "kind": "google",
+      "ref": "e7u3k2n9d8s6a1",
+      "synced_at": "2026-10-05T10:30:00.000Z"
+    },
+    "state": "accepted",
+    "share": {
+      "team": "tm_launch"
+    },
+    "created_by": {
+      "by": "tilo",
+      "ref": "system",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "ce_rate_prep",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Prepare the rate sheet for Acme",
+    "start": "2026-10-07T11:30:00.000Z",
+    "end": "2026-10-07T12:00:00.000Z",
+    "all_day": false,
+    "attendee_count": 0,
+    "source": {
+      "kind": "tilo",
+      "from": "meeting",
+      "ref": "mt_q4_plan#ai1"
+    },
+    "state": "proposed",
+    "share": null,
+    "created_by": {
+      "by": "tilo",
+      "ref": "A_analyst",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "ce_followup_thu",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Follow up with Acme",
+    "start": "2026-10-08T09:30:00.000Z",
+    "end": "2026-10-08T10:00:00.000Z",
+    "all_day": false,
+    "attendee_count": 0,
+    "source": {
+      "kind": "tilo",
+      "from": "meeting",
+      "ref": "mt_q4_plan#ai1"
+    },
+    "state": "accepted",
+    "share": null,
+    "created_by": {
+      "by": "tilo",
+      "ref": "A_analyst",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "confirmed_by": {
+      "by": "u_owner",
+      "at": "2026-10-06T10:00:00.000Z"
+    },
+    "flagged": false,
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "ce_owner_dentist",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Dentist",
+    "start": "2026-10-09T04:30:00.000Z",
+    "end": "2026-10-09T05:00:00.000Z",
+    "all_day": false,
+    "attendee_count": 0,
+    "source": {
+      "kind": "manual"
+    },
+    "state": "accepted",
+    "share": null,
+    "created_by": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "ce_holiday",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Office closed",
+    "start": "2026-10-08T18:30:00.000Z",
+    "end": null,
+    "all_day": true,
+    "attendee_count": 0,
+    "source": {
+      "kind": "google",
+      "ref": "e7u3k2n9d8s6a1",
+      "synced_at": "2026-10-05T10:30:00.000Z"
+    },
+    "state": "accepted",
+    "share": null,
+    "created_by": {
+      "by": "tilo",
+      "ref": "system",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "ce_vendor_call",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Vendor call",
+    "start": "2026-10-08T07:00:00.000Z",
+    "end": "2026-10-08T07:30:00.000Z",
+    "all_day": false,
+    "attendee_count": 0,
+    "source": {
+      "kind": "manual"
+    },
+    "state": "cancelled",
+    "share": null,
+    "created_by": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  },
+  {
+    "id": "ce_dentist",
+    "org_id": "org_example",
+    "owner": "u_priya",
+    "title": "Dentist",
+    "start": "2026-10-07T09:30:00.000Z",
+    "end": "2026-10-07T10:00:00.000Z",
+    "all_day": false,
+    "attendee_count": 0,
+    "source": {
+      "kind": "manual"
+    },
+    "state": "accepted",
+    "share": null,
+    "created_by": {
+      "by": "person",
+      "ref": "u_priya",
+      "at": "2026-10-05T10:30:00.000Z"
+    },
+    "confirmed_by": null,
+    "flagged": false,
+    "updated_at": "2026-10-05T10:30:00.000Z"
+  }
+]

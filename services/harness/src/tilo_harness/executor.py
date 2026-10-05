@@ -19,6 +19,13 @@ With `verifier` (FR-AGT-12) the layout must hold that verifier-rank agent and it
 itself. Once a successful unit has handed over, each artifact it handed over gets one `artifact.reviewed`
 (caused by the handoff) before the unit's dependents start; the review result is recorded, not acted on.
 
+With `artifacts` and `scope` (FR-AGT-02, FR-MEM-06; ADR-0018 s5) a successful unit's `outputs` are stored with their
+`created` manifests (`outputs.keep`) after the runner returns and before `agent.handoff`, then announced: one
+`artifact.created` (or `artifact.versioned` for an output with a `parent`) per version, its data from the store's
+record, the unit's credits on the first. Its `artifact_refs` must be versions the store holds in `scope`. The envelope
+names the stored refs, then those. Any refusal fails the unit with no artifact event. Without a store, a unit that
+returns outputs fails (nowhere to put them) and its refs pass unchecked as before (tilo-api until ADR-0018 T4).
+
 Per unit: agent.spawned (Lead spawns the worker), agent.assigned, skill.loaded per pinned skill,
 agent.working, the `UnitRunner`'s work, agent.handoff (typed envelope, worker to Lead) when it
 succeeded with a contract-valid envelope, agent.retired. A pinned skill whose files changed,
@@ -31,7 +38,9 @@ skipped, the other units go on. Only a cancel of `run_plan` itself or any other 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping
+import dataclasses
+import math
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -40,6 +49,7 @@ from tilo_providers.prompts import load_prompt
 
 from tilo_harness.config import AgentsConfig
 from tilo_harness.must_ask import Ask, MustAsk
+from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
 from tilo_harness.skills import LoadedSkill, Pins, SkillError, SkillRegistry
 from tilo_harness.validator import EventRejected, repo_validator
@@ -61,8 +71,9 @@ class PlanRefused(Exception):
 class UnitOutcome:
     success: bool
     summary: str = ""
-    artifact_refs: tuple[dict[str, Any], ...] = ()
+    artifact_refs: tuple[dict[str, Any], ...] = ()  # versions that already exist, which the unit selects
     provenance_ids: tuple[str, ...] = ()
+    outputs: tuple[UnitOutput, ...] = ()  # what the unit made; the executor stores it (ADR-0018)
 
 
 @dataclass(frozen=True)
@@ -107,7 +118,11 @@ class DefaultUnitRunner:
             },
         )
         response = await asyncio.to_thread(provider.generate, GenerateRequest(prompt=prompt))
-        return UnitOutcome(success=bool(response.text), summary=f"Finished {unit['title']}.")
+        if not response.text:
+            return UnitOutcome(success=False, summary=f"No result for {unit['title']}.")
+        # Code picks the media type; a model never names one (ADR-0018 s1).
+        output = UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))
+        return UnitOutcome(success=True, summary=f"Finished {unit['title']}.", outputs=(output,))
 
 
 @dataclass(frozen=True)
@@ -226,9 +241,11 @@ class _Run:
         must_ask: MustAsk | None,
         verifier: Verifier | None,
         question_wait: QuestionWait | None,
+        store: dict[str, Any],
     ) -> None:
         self.writer, self.roster, self.skills, self.pins, self.runner = writer, roster, skills, pins, runner
         self.must_ask, self.verifier, self.question_wait = must_ask, verifier, question_wait
+        self.store = store  # artifacts, scope, archive, redact, max_attempts (ADR-0018); empty without a store
         self.held: set[str] = set()
         self.handoffs: dict[str, str] = {}  # unit -> the agent.handoff event that carried its artifacts
 
@@ -243,7 +260,10 @@ class _Run:
             level=self.roster.levels.get(district) if district else None,
             district=district,
             cause=kw.get("cause"),
+            **{k: kw[k] for k in ("item", "credits") if k in kw},
         )
+        if (trail := kw.get("trail")) is not None:  # the unit's own events, for its manifest (MF-04, MF-05)
+            trail.append(event)
         return str(event["id"])
 
     def spawn_team(self) -> None:
@@ -264,7 +284,8 @@ class _Run:
         """None when the unit was parked to ask a person first."""
         unit_id, district = unit["id"], unit["district"]
         lead, worker = self.roster.leads[district], self.roster.workers[unit_id]
-        at = {"district": district}
+        trail: list[dict[str, Any]] = []
+        at = {"district": district, "trail": trail}
         cause = self.emit("agent.spawned", lead, worker, "An agent joined the team.", {"role": unit["role"]}, **at)
         cause = self.emit(
             "agent.assigned", lead, worker, "The Lead gave it a unit.", {"unit": unit_id}, cause=cause, **at
@@ -343,10 +364,16 @@ class _Run:
                 ran = None
             failed = UnitOutcome(success=False, summary="The unit's work failed.")
             outcome = ran if isinstance(ran, UnitOutcome) else failed
+        made: list[Kept] = []
+        if outcome.success is True:
+            outcome, made = await self.keep(unit, worker, outcome, trail)
         envelope = _envelope(outcome, worker, lead, unit) if outcome.success is True else None
         if envelope is None and outcome.success is not False:
             outcome = UnitOutcome(success=False, summary="The unit's result was not a valid handoff.")
         if envelope is not None:
+            credits = getattr(outcome, "credits", 0)  # the unit's credits ride on its first item (HR-1: the meter)
+            for index, item in enumerate(made):
+                self.announce(item, worker, cause, district, credits if index == 0 else 0)
             summary = "The agent handed its result to the Lead."
             try:
                 cause = self.emit("agent.handoff", worker, lead, summary, {"envelope": envelope}, cause=cause, **at)
@@ -356,6 +383,42 @@ class _Run:
                 self.handoffs[unit_id] = cause
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         return outcome
+
+    async def keep(
+        self, unit: dict[str, Any], worker: str, outcome: UnitOutcome, trail: list[dict[str, Any]]
+    ) -> tuple[UnitOutcome, list[Kept]]:
+        """Stores the outputs and checks the refs (ADR-0018 s5), writing nothing; a failed outcome on any refusal."""
+        if not self.store:  # nowhere to put outputs: fail closed; refs pass unchecked as before (tilo-api until T4)
+            no_store = UnitOutcome(success=False, summary="The unit made items, but this run has no artifact store.")
+            return (no_store if outcome.outputs else outcome), []
+        store = self.store
+        try:
+            credits = getattr(outcome, "credits", 0)
+            if isinstance(credits, bool) or not isinstance(credits, int | float) or not 0 <= credits < math.inf:
+                raise ValueError("the unit's credits are not a finite number of at least 0")
+            selected = existing(store["artifacts"], store["scope"], outcome.artifact_refs)
+            made = await asyncio.to_thread(
+                keep, outcome.outputs, run_id=self.writer.run_id, unit=unit, worker=worker, events=list(trail), **store
+            )
+            stored = [item.version.ref for item in made]
+            return dataclasses.replace(outcome, artifact_refs=(*stored, *selected)), made
+        except Exception:  # a refused put, manifest or ref, or a backend error: no artifact event for this unit
+            return UnitOutcome(success=False, summary="The unit's result could not be stored."), []
+
+    def announce(self, item: Kept, worker: str, cause: str, district: str, credits: float) -> None:
+        """One event per stored version, its data from the store's record (ADR-0018 s6): no runner-named id or hash."""
+        record, ref = item.version.record, item.version.ref
+        if record["parents"]:  # EV-15: created names version 1 only; a later version is recorded as versioned
+            type_, summary = "artifact.versioned", "The agent made a new version of an item."
+            data = {"artifact": ref, "previous_version": record["parents"][0]["version"]}
+        else:
+            type_, summary = "artifact.created", "The agent made an item."
+            data = {"artifact": ref} | {k: record[k] for k in ("content_sha256", "media_type", "size_bytes")}
+        labelled = {"item": {"kind": "document", "artifact_id": ref["artifact_id"], "label": item.label}}
+        extra = labelled if item.label is not None else {}
+        self.emit(
+            type_, worker, ref["artifact_id"], summary, data, cause=cause, district=district, credits=credits, **extra
+        )
 
     async def review(self, unit: dict[str, Any], outcome: UnitOutcome) -> None:
         if self.verifier is None or unit["id"] not in self.handoffs:
@@ -377,7 +440,15 @@ async def run_plan(
     must_ask: MustAsk | None = None,
     verifier: Verifier | None = None,
     question_wait: QuestionWait | None = None,
+    artifacts: Any = None,
+    scope: Any = None,
+    archive: Any = None,
+    redact: Callable[[str], str] | None = None,
 ) -> RunResult:
+    """`artifacts` (a `tilo_memory.artifacts.ArtifactStore`) comes with the run's `scope` and the shared secret
+    `redact`or the store also got; `archive` (`tilo_archive.RunArchive`) is the run's raw archive, for manifests."""
+    if artifacts is not None and (scope is None or redact is None):
+        raise PlanRefused(["run_plan: an artifact store needs the run's scope and the secret redactor"])
     validator = repo_validator()
     problems = validator.contract_problems("plan", plan) + validator.contract_problems("layout", layout)
     if problems:
@@ -394,7 +465,11 @@ async def run_plan(
         raise PlanRefused([f"PG-11: {error}"]) from error
 
     result = RunResult(pins=pins)
-    run = _Run(writer, roster, skills, pins, runner, must_ask, verifier, question_wait)
+    store = {"artifacts": artifacts, "scope": scope, "archive": archive, "redact": redact}
+    store |= {"max_attempts": config.retries.max_attempts}
+    run = _Run(
+        writer, roster, skills, pins, runner, must_ask, verifier, question_wait, store if artifacts is not None else {}
+    )
     run.spawn_team()
     slots = asyncio.Semaphore(config.limits.max_specialists)
     loop = asyncio.get_running_loop()

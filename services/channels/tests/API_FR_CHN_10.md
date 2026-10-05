@@ -76,7 +76,7 @@ class Drafter:
     def draft(self, user_id: str, *, instruction_id: str, thread_id: str, instruction: str, mailbox: str,
               mode: str = "reply", preset: str | None = None,
               style: Mapping[str, Any] | None = None) -> DraftResult
-        # instruction_id: the id of the user's instruction (e.g. the channel.message_in it came in), the
+        # instruction_id: the id of the user's instruction (the owner's world.requested, BQ-CHRM-2), the
         #   idempotency key; mailbox: the user's own connected address; style: structured style-profile settings
         #   {"greeting", "sign_off", "formality", "language", "signature"} (PRD 11.4 Style profile; FR-CHN-15)
 ```
@@ -156,5 +156,5 @@ class Drafter:
 | BQ-TBD | What does drafting do with a thread the safety provider flags? | It still drafts if asked (the user gave the instruction), but marks the result `flagged` and the draft `safety_flag`, so a send of it is T3 and it can never be auto-sent. | PRD 11.4 Injection, 16.2, `config/autonomy.yaml` |
 | BQ-TBD | Is the user's signature a source of facts? | Yes, for facts (its phone number is not invented); never for commitments. | PRD 11.4 Inputs |
 | BQ-TBD | Is a drafted reply a `reply_handled` unit? | No; a reply is handled when it is sent (FR-CHN-13). PRD 14.2 counts unverified units as zero. | PRD 14.2, BQ-03 |
-| BQ-TBD | What is the idempotency key? | `(user_id, instruction_id)`, the id of the user's instruction (the `channel.message_in` it came in on WhatsApp). Redrafting after Edit is a new instruction. | PRD 11.4 Preview, `contracts/outbox.rules.md` OB-01 `instruction_id` |
+| BQ-TBD | What is the idempotency key? | `(user_id, instruction_id)`, the id of the user's instruction (the owner's `world.requested`, typed in the mail card or assistant panel on web or mobile web; BQ-CHRM-2). Redrafting after Edit is a new instruction. | PRD 11.4 Preview, `contracts/outbox.rules.md` OB-01 `instruction_id` |
 | BQ-TBD | How are user-added presets stored? | Not pinned; only the five PRD presets are. | PRD 11.4 Presets, FR-CHN-15 |

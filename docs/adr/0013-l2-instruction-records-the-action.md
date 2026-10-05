@@ -6,6 +6,8 @@
   `events/data/world.requested`) and tightens outbox rule OB-01. The user's approval covers that
   change; this status edit does not make it, so `contracts/` is changed by its own architect PR
   (root `CLAUDE.md`). The interim engine rule in BQ-57 is decided and did not wait for this ADR.
+- Superseded in part by ADR-0019 (SD-01): decision 2 (a WhatsApp answer copies `action_type`)
+  lapses; decisions 1 and 3 stand.
 - Deciders: user (approval), architect (proposal)
 - Requirement: FR-HIL-05, FR-CHN-11 (PRD 10.4, 11.2, 11.4); follows ADR-0007
 

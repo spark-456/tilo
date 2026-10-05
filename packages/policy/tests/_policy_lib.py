@@ -60,7 +60,7 @@ def base_policy(
         "level": level,
         "undo_window_s": undo_window_s,
         "expiry": expiry,
-        "notify_channel": "whatsapp",
+        "notify_channel": "email",
         "team_lead_domains": list(team_lead_domains),
         "created_by": stamp(created_at, owner),
         "changed_by": None,
@@ -87,8 +87,8 @@ def base_facts(**overrides: Any) -> dict:
 def base_instruction(
     *,
     id_: str = "01JB5VQ0000000000000000131",
-    type_: str = "channel.message_in",
-    channel: str = "whatsapp",
+    type_: str = "world.requested",
+    channel: str = "web",
     actor: str = OWNER,
     ts: str = "2026-09-29T09:41:50.000Z",
     destination: str = "thread-supplier-1",
@@ -100,8 +100,8 @@ def base_instruction(
         "actor": actor,
         "ts": ts,
         "world_id": world_id,
-        # A full, schema-valid data shape. ADR-0007: a channel.message_in instruction is typed
-        # words answering no card; a world.requested carries its title.
+        # A full, schema-valid data shape. ADR-0019: only a signed-in world.requested is an
+        # instruction; a channel.message_in (typed, answering no card) is built to show it is refused.
         "data": {"channel": channel, "destination": destination}
         | (
             {"message_ref": "r_village_basic_1/118", "card_id": None, "card_kind": None, "option": None}

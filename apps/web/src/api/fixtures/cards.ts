@@ -91,7 +91,7 @@ const GATE_SAVE_FILE_REVERSIBLE = {
     },
   ],
   actions: ["show_me", "snooze"],
-  answer_channels: ["web", "mobile_web", "whatsapp"],
+  answer_channels: ["web", "mobile_web"],
   safe_default: "hold",
 } satisfies Card;
 
@@ -150,7 +150,7 @@ const GATE_SEND_REPLY = {
     },
   ],
   actions: ["show_me", "snooze"],
-  answer_channels: ["web", "mobile_web", "whatsapp"],
+  answer_channels: ["web", "mobile_web"],
   safe_default: "hold",
 } satisfies Card;
 
@@ -187,7 +187,7 @@ const MEETING_BUDGET_SPLIT = {
     },
   ],
   actions: ["show_me", "snooze", "delegate"],
-  answer_channels: ["web", "whatsapp"],
+  answer_channels: ["web"],
   safe_default: "even",
 } satisfies Card;
 
@@ -224,7 +224,7 @@ const NEEDS_YOU_BLOCKED = {
     },
   ],
   actions: ["show_me", "snooze", "delegate"],
-  answer_channels: ["web", "mobile_web", "whatsapp", "email"],
+  answer_channels: ["web", "mobile_web", "email"],
   safe_default: "per_kwh",
 } satisfies Card;
 
@@ -261,7 +261,7 @@ const NEEDS_YOU_COMPARE_BASIS = {
     },
   ],
   actions: ["show_me", "snooze", "delegate"],
-  answer_channels: ["web", "mobile_web", "whatsapp", "email"],
+  answer_channels: ["web", "mobile_web", "email"],
   safe_default: "per_kwh",
 } satisfies Card;
 
