@@ -23,6 +23,7 @@ stable; a failing check names its rule.
 | EV-12 | `level`, `district`, and an `actor` or `target` that is an agent, level, district, building, gate or island id, exist in the world's layout. | validator | 9.2, 9.5 |
 | EV-13 | `vis` is tied to where the event renders: when `district` is set and `vis` lists districts, the list includes `district`, so that district's viewers see what happens in it; every district `vis` lists exists in the world's layout (BQ-28). | validator | 9.3, 10.1, FR-HIL-09 |
 | EV-14 | An `artifact.delivered` in a format that leaves Tilo (`email`, `google_docs`, `google_sheets`, `google_slides`) went through the outbox: its `data.outbox_id` names the entry (schema), and its `cause` is that entry's `data.transfer` out with the same `artifact`, which carries the `authz` (validator). A format kept in Tilo has `outbox_id` null (schema). `artifact.delivered` itself is the notice, not the side effect, and carries no `authz`. | schema; validator | 10.4, 12.4, HR-7 |
+| EV-15 | Artifact events name versions the world recorded (ADR-0018). An `artifact.created` names version 1 of an `artifact_id` the world has not recorded. An `artifact.reviewed` or `artifact.delivered` names, and an `artifact.versioned` (by `previous_version`) or `artifact.rolled_back` (by `restored_version`) continues, a version that an earlier `artifact.created`, `artifact.versioned` or `artifact.rolled_back` of the same world recorded, same `artifact_id`. A `versioned` or `rolled_back` records the next version (the highest recorded plus 1, AR-02). So no stamp, parcel, version badge or rewind shows for a version never created. (Not PRD 3.5's metric EV-15.) | validator (stream) | 9.4 HR-1, 13.4, FR-MEM-12, FR-CON-15 |
 
 ## Registry checks (contracts-check)
 
@@ -69,3 +70,7 @@ the policy (OB-01).
   per line, matching `fixtures/layout/valid/village_basic.json` (EV-10 to EV-14). It is the
   renderer fixture player's (P0-08b) and the harness skeleton's (P0-09) input. It is fixture
   data, never shown as a replay of a real run.
+- `fixtures/streams/artifact-versions.jsonl`: a short stream of the same world in which an
+  artifact is created, versioned, restored, reviewed and delivered (EV-15).
+- `fixtures/streams/invalid/evNN_*.jsonl`: each event passes both schemas and the stream breaks
+  only rule EV-NN.
