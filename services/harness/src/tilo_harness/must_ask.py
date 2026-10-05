@@ -68,15 +68,24 @@ class Ask:
     options: tuple[str, ...]
     suggested: int
     why: str
+    proceed: int | None = None  # a rule's card: the one option that lets the unit run; None: a model-written card
+
+    def runs(self, answer: Any) -> bool:
+        """Whether this answer lets the unit run (decided here, never by the runner or a model). A rule's card runs
+        the unit only on its proceed option (Hold, Stop, Skip and the deadline's safe default leave it unrun); a
+        model-written card runs it on a person's or Team Lead's answer, never on the Director's default (BQ-235)."""
+        if answer.answered_by == "default":
+            return False
+        return self.proceed is None or answer.option == f"o{self.proceed + 1}"
 
 
 def _clip(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def _canned(reason: str, template: tuple[Any, ...], **fields: Any) -> Ask:
+def _canned(reason: str, template: tuple[Any, ...], *, proceed: int, **fields: Any) -> Ask:
     question, options, suggested, why = template
-    return Ask(reason, _clip(question.format(**fields), 140), tuple(options), suggested, why)
+    return Ask(reason, _clip(question.format(**fields), 140), tuple(options), suggested, why, proceed)
 
 
 def _parse(text: Any) -> Ask | None:
@@ -139,15 +148,15 @@ class MustAsk:
 
     async def assess(self, unit: Mapping[str, Any], *, failures: int = 0) -> Ask | None:
         if failures >= self._max_attempts:
-            return _canned("repeated_failure", _FAILED, count=failures)
+            return _canned("repeated_failure", _FAILED, proceed=0, count=failures)
         uncovered = self._uncovered(unit)
         if uncovered:
-            return _canned("sensitive_step", _SENSITIVE, actions=_clip(", ".join(uncovered), 60))
+            return _canned("sensitive_step", _SENSITIVE, proceed=1, actions=_clip(", ".join(uncovered), 60))
         try:
             reply = await asyncio.to_thread(self._providers[unit["role"]].generate, self._request(unit))
             return _parse(reply.text)
         except Exception:  # unreadable reply, provider outage or missing role: ask rather than guess (BQ-199)
-            return _canned("ambiguous_brief", _UNREADABLE)
+            return _canned("ambiguous_brief", _UNREADABLE, proceed=1)
 
     def _request(self, unit: Mapping[str, Any]) -> GenerateRequest:
         fields = {

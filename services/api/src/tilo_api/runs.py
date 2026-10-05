@@ -10,6 +10,7 @@ import copy
 import logging
 import math
 import threading
+import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -96,6 +97,17 @@ def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budge
             return
         run = store.runs[task.world_id] = Run(store, task, approach, budget_cap, seams)
     threading.Thread(target=run.main, name=f"run-{task.world_id}", daemon=True).start()
+
+
+def _plain(card: dict) -> dict:
+    """The card without control, format and surrogate characters in the text a model may have written."""
+
+    def clean(text: str) -> str:
+        return "".join(c for c in text if unicodedata.category(c) not in ("Cc", "Cf", "Cs"))
+
+    options = [{**o, **{k: clean(o[k]) for k in ("label", "reason") if k in o}} for o in card["options"]]
+    return {**card, "what_happened": clean(card["what_happened"]), "why_it_matters": clean(card["why_it_matters"]),
+            "options": options}  # fmt: skip
 
 
 class _NoCards:
@@ -317,8 +329,9 @@ class Run:
         result = planned.result()
         if result.parked:  # waiting for a person: neither done nor failed
             return
-        if stopped := result.failed + result.skipped:
-            self._fail(self.failure or "a unit failed, so the work stopped", stopped[0])
+        if stopped := result.failed + result.held + result.skipped:
+            reason = "a step was held, so the work stopped" if result.held and not result.failed else None
+            self._fail(self.failure or reason or "a unit failed, so the work stopped", stopped[0])
             return
         credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
@@ -331,6 +344,7 @@ class Run:
         districts = (d["id"] for level in self.layout["semantic"]["levels"] for d in level["districts"]
                      if any(b["id"] == building for b in d["buildings"]))  # fmt: skip
         district = next(districts, None)
+        card = _plain(card)
         if district is None or self.cards.submit(card, district=district).outcome == "rejected":
             raise RuntimeError("the question card was refused")
 

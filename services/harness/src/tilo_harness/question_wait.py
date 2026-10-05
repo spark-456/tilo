@@ -78,6 +78,8 @@ class QuestionWait:
 
     async def wait_for(self, card: dict[str, Any], *, lead: str, director: str, district: str | None) -> Answer:
         card_id = card["id"]
+        if district is None:
+            raise ValueError("a question with no district has no safe visibility")  # never vis "all"
         waiter = _Waiter(card, lead, director, district, asyncio.get_running_loop().create_future())
         with self._lock:  # registered before the first suspension: a part that arrives next is never lost
             early = self._early.pop(card_id, None)
@@ -136,7 +138,7 @@ class QuestionWait:
             self._writer.emit(
                 type="question.answered", actor=waiter.director, target=waiter.lead, data={"answered_by": "default"},
                 summary="Nobody answered in time, so the Director applied the safe default.", severity="nudge",
-                district=waiter.district, vis=[waiter.district] if waiter.district else "all",
+                district=waiter.district, vis=[waiter.district],
             )  # fmt: skip
         except Exception as error:
             with self._lock:

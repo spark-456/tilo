@@ -12,7 +12,8 @@ With `must_ask` (FR-AGT-05) a unit is assessed right after it is assigned: when 
 the question chain and card are written and the unit is parked (`RunResult.parked`): its work does not
 start, it does not retire, and its dependents are skipped. Answering is FR-AGT-06/07.
 With `question_wait` as well (FR-HIL-10) the unit instead waits for its answer, holding no `max_specialists` slot,
-then runs once with it in `UnitContext.answer`; its dependents stay behind it and the other units go on.
+then runs once with it in `UnitContext.answer` only if `Ask.runs` says so; Hold, Stop, Skip and a default leave
+it held (`RunResult.held`, retired, nothing made) and its dependents skipped. The other units go on.
 
 With `verifier` (FR-AGT-12) the layout must hold that verifier-rank agent and it must not work a unit
 itself. Once a successful unit has handed over, each artifact it handed over gets one `artifact.reviewed`
@@ -81,6 +82,7 @@ class RunResult:
     outcomes: dict[str, UnitOutcome] = field(default_factory=dict)
     skipped: list[str] = field(default_factory=list)
     parked: list[str] = field(default_factory=list)  # waiting for a person's answer (FR-AGT-05)
+    held: list[str] = field(default_factory=list)  # answered, and the answer leaves the unit unrun (FR-HIL-10)
 
     @property
     def failed(self) -> list[str]:
@@ -227,6 +229,7 @@ class _Run:
     ) -> None:
         self.writer, self.roster, self.skills, self.pins, self.runner = writer, roster, skills, pins, runner
         self.must_ask, self.verifier, self.question_wait = must_ask, verifier, question_wait
+        self.held: set[str] = set()
         self.handoffs: dict[str, str] = {}  # unit -> the agent.handoff event that carried its artifacts
 
     def emit(self, type_: str, actor: str, target: str, summary: str, data: dict[str, Any], **kw: Any) -> str:
@@ -287,6 +290,11 @@ class _Run:
                     card, lead=lead, director=self.roster.director, district=district
                 )
                 await slot.take()
+                check = getattr(ask, "runs", None)  # a stand-in ask without a rule runs on any answer
+                if check is not None and not check(answer):
+                    self.held.add(unit_id)
+                    self.emit("agent.retired", lead, worker, "The agent left without starting.", {}, cause=cause, **at)
+                    return UnitOutcome(success=False, summary="The step was held, so it did not run.")
         try:
             loaded = tuple(self.skills.load_pinned(skill_id, self.pins) for skill_id in unit["skills"])
         except SkillError:
@@ -382,6 +390,10 @@ async def run_plan(
             finished[unit["id"]].set_result(False)
             return
         await run.review(unit, outcome)  # after the slot is free; dependents wait for it
+        if unit["id"] in run.held:  # a person's Hold (or the default) kept it from running: dependents are skipped
+            result.held.append(unit["id"])
+            finished[unit["id"]].set_result(False)
+            return
         result.outcomes[unit["id"]] = outcome
         finished[unit["id"]].set_result(outcome.success)
 
