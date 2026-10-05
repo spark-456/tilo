@@ -1,4 +1,4 @@
-/* S-26 Meetings and S-27 My plate (PPL-40a): neutral role tokens, the type ramp steps only, no
+/* S-26 to S-29 (PPL-40a, PPL-40b): neutral role tokens, the type ramp steps only, no
    transition or animation (a state change is instant). */
 .people-preview {
   margin: 0 0 var(--space-16);
@@ -278,6 +278,198 @@
   pointer-events: auto;
 }
 
+/* S-28 pinboards: a table, two boards side by side on a wide screen. */
+.pb-boards {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+  gap: var(--space-16);
+  align-items: start;
+}
+.pb-tabs {
+  display: none;
+}
+.pb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-14);
+}
+.pb-table th,
+.pb-table td {
+  padding: var(--space-8) var(--space-8) var(--space-8) 0;
+  border-bottom: 1px solid var(--color-surface-2);
+  text-align: left;
+  font-weight: 400;
+  vertical-align: top;
+}
+.pb-table thead th {
+  padding-bottom: var(--space-4);
+  color: var(--color-ink-2);
+  font: 700 var(--text-12) / 1.4 var(--font-ui);
+}
+.pb-table tbody th[scope="row"] {
+  display: table-cell;
+}
+.pb-table .prow-title {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.pb-table .prow-title b {
+  flex: 0 1 auto;
+}
+.pb-table .bitem-sub {
+  display: block;
+  margin: var(--space-4) 0 0;
+  color: var(--color-ink-2);
+}
+.pb-table .secondary {
+  min-height: 36px;
+  margin-top: var(--space-4);
+  white-space: nowrap;
+}
+.pb-table .person-tag {
+  white-space: nowrap;
+}
+.pb-table .secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+}
+.pb-url {
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+}
+.pb-tags .person-tag {
+  margin-right: var(--space-8);
+}
+.pb-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 0 var(--space-4);
+  border: 0;
+  background: none;
+  color: var(--color-ink-1);
+  font: 700 var(--text-12) / 1 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.pb-sort:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.pb-arrow {
+  width: 8px; /* always there, so a sort never moves the header (CLS) */
+  height: 6px;
+}
+.pb-arrow[data-dir="1"] {
+  background: var(--color-ink-1);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.pb-arrow[data-dir="-1"] {
+  background: var(--color-ink-1);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.pb-lane th {
+  padding-top: var(--space-16);
+  border-bottom: 2px solid var(--color-fog);
+  font: 800 var(--text-14) / 1.4 var(--font-ui);
+}
+.pb-lane span {
+  color: var(--color-ink-2);
+  font-weight: 400;
+}
+.pb-draft {
+  margin-top: var(--space-16);
+  padding: var(--space-12);
+  border: 2px solid var(--color-fog);
+  border-radius: var(--radius-controls);
+}
+.pb-draft:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.pb-draft .people-h3 {
+  margin-top: 0;
+}
+.pb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+/* S-29 calendar: one merged list; free/busy bars across 08:00 to 20:00. */
+.cal-bar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-16);
+  margin: 0 0 var(--space-16);
+}
+.cal-bar-controls .people-strip {
+  margin: 0;
+}
+.cal-nav {
+  display: flex;
+  gap: var(--space-8);
+}
+.cal-nav .secondary {
+  min-height: 36px;
+}
+.cal-day + .cal-day {
+  margin-top: var(--space-8);
+}
+.cal-when {
+  flex: 0 0 8.5rem;
+  color: var(--color-ink-2);
+  font: 700 var(--text-14) / 1.4 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+.cal-row .prow-title b {
+  flex: 1 1 12rem;
+}
+.prow a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+.cal-none {
+  padding: var(--space-8) 0;
+  list-style: none;
+}
+.cal-free-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
+  gap: var(--space-4) var(--space-16);
+  align-items: center;
+  padding: var(--space-8) 0;
+  list-style: none;
+}
+.cal-free-who {
+  display: flex;
+  flex-direction: column;
+}
+.cal-free-text {
+  grid-column: 2;
+}
+.cal-bar {
+  position: relative;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-fog);
+  overflow: hidden;
+}
+.cal-busy {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--color-ink-2);
+}
+
 @media (max-width: 767px) {
   .people-strip {
     flex-wrap: nowrap;
@@ -308,7 +500,8 @@
     flex-direction: column;
   }
   .mrow-text,
-  .prow-title b {
+  .prow-title b,
+  .cal-row .prow-title b {
     flex: 0 0 auto; /* in a column the basis would be a height */
   }
   .meeting-row {
@@ -318,5 +511,80 @@
   }
   .meeting-row .btag {
     margin-left: calc(var(--space-12) + 4px);
+  }
+}
+
+@media (max-width: 767px) {
+  .pb-boards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pb-tabs {
+    display: flex;
+  }
+  .pb-board[data-shown="false"] {
+    display: none;
+  }
+  .pb-table,
+  .pb-table tbody,
+  .pb-table tr,
+  .pb-table th,
+  .pb-table td {
+    display: block;
+  }
+  .pb-table thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+  .pb-table thead th {
+    padding: 0;
+    border: 0;
+  }
+  .pb-table thead th.pb-plain {
+    display: none;
+  }
+  .pb-sort,
+  .pb-table .secondary,
+  .cal-nav .secondary {
+    min-height: 44px;
+  }
+  .pb-sort {
+    min-width: 44px;
+  }
+  .prow a {
+    min-height: 44px;
+  }
+  .pb-table tbody tr {
+    padding: var(--space-8) 0;
+    border-bottom: 1px solid var(--color-fog);
+  }
+  .pb-table tbody th,
+  .pb-table tbody td {
+    padding: var(--space-4) 0;
+    border: 0;
+  }
+  .pb-table tbody td {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4) var(--space-8);
+  }
+  .pb-table td::before {
+    content: attr(data-label) ":";
+    flex: 0 0 6rem;
+    color: var(--color-ink-2);
+    font-size: var(--text-12);
+  }
+  .pb-lane th {
+    padding-top: var(--space-16);
+  }
+  .cal-free-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cal-free-text {
+    grid-column: 1;
+  }
+  .cal-when {
+    flex-basis: auto;
   }
 }
