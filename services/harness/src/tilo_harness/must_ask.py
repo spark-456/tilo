@@ -13,7 +13,9 @@ layers, in this order, and only the first is authority:
 
 `raise_question` writes the Specialist -> Lead -> Director chain and the Lead's question to a person
 through the one `WorldWriter`, and hands a `needs_you` card to `card_sink` before any of the chain is written.
-A question's answer never authorises a side effect: that stays with the outbox and the policy engine.
+A question's answer never authorises a side effect: that stays with the outbox and the policy engine. An answer to a
+model-raised sensitive_step card only records a choice: code asks once more (`confirmation`) and only its
+"Prepare it" runs the unit.
 """
 
 from __future__ import annotations
@@ -47,6 +49,8 @@ _SENSITIVE = (  # (question template, options, suggested index, reason for the s
     0,
     "Nothing outside Tilo changes until you decide; sending still needs approval.",
 )
+_CONFIRM_OPTIONS = ("Hold this step", "Prepare it")  # code's words, never the model's
+_CONFIRM_WHY = "Nothing outside Tilo changes until you decide; sending still needs approval."
 _FAILED = (
     "This step failed {count} times. How should it go on?",
     ("Try once more", "Skip this step", "Stop here"),
@@ -74,8 +78,23 @@ class Ask:
         """Whether this answer lets the unit run (decided here, never by the runner or a model). A rule's card
         (sensitive_step, repeated_failure, an unreadable reply) runs the unit only on its proceed option: Hold, Stop,
         Skip and its safe default at the deadline leave it unrun. A model-written ambiguity or trade-off card runs it on
-        any answer, the Director's default included (PRD 10.3, BQ-235)."""
-        return self.proceed is None or answer.option == f"o{self.proceed + 1}"
+        any answer, the Director's default included (PRD 10.3, BQ-235). A model-raised sensitive_step card never runs
+        the unit on its own answer: that answer only records a choice (see `confirms`)."""
+        if self.proceed is not None:
+            return answer.option == f"o{self.proceed + 1}"
+        return self.reason != "sensitive_step"
+
+    def confirms(self, answer: Any) -> bool:
+        """A model-raised sensitive_step card's answer is a choice, never an authorisation. Picking the model's
+        suggested option, or the Director's default at the deadline, holds the unit. Any other choice from a person
+        makes code ask once more (`MustAsk.confirmation`, a card whose words and order code owns); the model's labels
+        and their order decide nothing, so the unit runs only on that card's proceed option."""
+        return (
+            self.proceed is None
+            and self.reason == "sensitive_step"
+            and answer.answered_by != "default"
+            and answer.option != f"o{self.suggested + 1}"
+        )
 
 
 def _clip(text: str, limit: int) -> str:
@@ -156,6 +175,19 @@ class MustAsk:
             return _parse(reply.text)
         except Exception:  # unreadable reply, provider outage or missing role: ask rather than guess (BQ-199)
             return _canned("ambiguous_brief", _UNREADABLE, proceed=1)
+
+    def confirmation(self, ask: Ask, answer: Any) -> Ask | None:
+        """The code-written card that follows a model-raised sensitive_step choice: it quotes the person's choice and
+        asks whether to prepare the step. Its labels, order and proceed option are fixed here (the same as a rule's
+        sensitive_step card), so Hold and the deadline default leave the unit unrun. None when the choice holds it."""
+        if not ask.confirms(answer):
+            return None
+        index = int(answer.option[1:]) - 1 if isinstance(answer.option, str) and answer.option[1:].isdigit() else -1
+        if not 0 <= index < len(ask.options):
+            return None  # an option the card never had: fail closed
+        chosen = neutralise(ask.options[index], limit=40)
+        question = _clip(f"You chose “{chosen}”. Prepare this step now?", 140)
+        return Ask("sensitive_step", question, _CONFIRM_OPTIONS, 0, _CONFIRM_WHY, proceed=1)
 
     def _request(self, unit: Mapping[str, Any]) -> GenerateRequest:
         fields = {

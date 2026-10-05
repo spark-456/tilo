@@ -291,7 +291,26 @@ class _Run:
                 )
                 await slot.take()
                 # A stand-in ask that is not MustAsk's (the pinned FR-HIL-10 doubles) runs on any answer.
-                if isinstance(ask, Ask) and not ask.runs(answer):
+                runs = not isinstance(ask, Ask) or ask.runs(answer)
+                if not runs and isinstance(ask, Ask) and (follow := self.must_ask.confirmation(ask, answer)):
+                    # A model-raised sensitive step: the answer only recorded a choice. Code asks once more.
+                    card = self.must_ask.raise_question(
+                        follow,
+                        writer=self.writer,
+                        unit=unit,
+                        specialist=worker,
+                        lead=lead,
+                        director=self.roster.director,
+                        district=district,
+                        cause=cause,
+                    )
+                    slot.give()
+                    second = await self.question_wait.wait_for(
+                        card, lead=lead, director=self.roster.director, district=district
+                    )
+                    await slot.take()
+                    runs = follow.runs(second)  # the runner still gets the person's first choice as its answer
+                if not runs:
                     self.held.add(unit_id)
                     self.emit("agent.retired", lead, worker, "The agent left without starting.", {}, cause=cause, **at)
                     return UnitOutcome(success=False, summary="The step was held, so it did not run.")
