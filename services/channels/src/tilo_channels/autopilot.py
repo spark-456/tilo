@@ -20,7 +20,10 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, fields
 from typing import Any, Protocol
 
+import tilo_policy
+
 from tilo_channels.autopilot_gate import evidence_for, opens, requested_part
+from tilo_channels.autopilot_policy import DECISION_MAX_AGE_S, PolicyPort
 from tilo_channels.autopilot_send import index_artifact
 from tilo_channels.autopilot_state import (
     ACTION_TYPE,
@@ -46,7 +49,7 @@ from tilo_channels.drafting import (
 )
 
 __all__ = ["ACTION_TYPE", "Autopilot", "CancelPending", "DraftContext", "Outbox", "Outcome", "Preview", "clean_text"]
-__all__ += ["CardStore", "StopQueue", "t3_content_signal"]
+__all__ += ["CardStore", "StopQueue", "t3_content_signal", "DECISION_MAX_AGE_S"]
 
 OPTIONS = ("send", "edit", "cancel")
 REPLY_FORMATS = ("reply", "reply_all")  # stay in the thread; everything else adds a recipient (BQ-145, BQ-171)
@@ -70,6 +73,7 @@ class DraftContext:
 
 
 class AutonomyPolicy(Protocol):
+    def decide(self, user_id: str, proposal: tilo_policy.Proposal) -> tilo_policy.Decision: ...  # CHN-WIRE-4
     def level(self, user_id: str, action_type: str) -> tuple[str, str | None]: ...
 
 
@@ -128,6 +132,7 @@ class Autopilot:
         stops: StopQueue | None = None,  # None only for benches that never sweep; production passes one (BQ-187)
         fake_evidence: bool = False,  # TESTS ONLY (BQ-228): the old unapproved Send; production never passes it
         world_owner: str | Callable[[], str | None] | None = None,  # the world's owner, from the world record (BQ-226)
+        district: str = "D1",  # the district the policy is asked about (BQ-242)
     ) -> None:
         self._fake, self._owner = fake_evidence, world_owner
         self._drafter, self._reader, self._contacts, self._emit = drafter, reader, contacts, emit
@@ -135,6 +140,16 @@ class Autopilot:
         self._world_id = world_id
         self._ledger = Ledger(
             cards=cards, outbox=outbox, clock=clock, world_id=world_id, run_id=run_id, connector=connector, stops=stops
+        )
+        self._port = PolicyPort(
+            policy=policy,
+            cards=cards,
+            ledger=self._ledger,
+            clock=clock,
+            emit=emit,
+            world_id=world_id,
+            connector=connector,
+            district=district,
         )
 
     def preview(self, user_id: str, context: DraftContext, result: DraftResult) -> Preview:
@@ -153,21 +168,32 @@ class Autopilot:
     def _owns(self, user_id: str) -> bool:
         return self._fake or (self._world_owner() is not None and user_id == self._world_owner())
 
+    def _get(self, user_id: str, card_id: str) -> dict[str, Any] | None:
+        """The stored card as it stands: an L2 card's newest decision, or L1 once its decision was dropped."""
+        return self._port.view(user_id, self._cards.get(user_id, card_id))
+
     def approval_requested(self, user_id: str, card_id: str) -> dict | None:
         """The card's stored `approval.requested` part (a copy), or None: the same from any instance (CHN-WIRE-1)."""
-        part = (self._cards.get(user_id, card_id) or {}).get("approval_requested")
+        part = (self._get(user_id, card_id) or {}).get("approval_requested")
+        return copy.deepcopy(part) if isinstance(part, dict) else None
+
+    def policy_applied(self, user_id: str, card_id: str) -> dict | None:
+        """The card's live `policy.applied` part (a copy), the same from any instance; None for an L1 card, a dropped
+        one or one decided by the legacy `level()` hint (CHN-WIRE-4; BQ-243)."""
+        part = (self._get(user_id, card_id) or {}).get("policy_applied")
         return copy.deepcopy(part) if isinstance(part, dict) else None
 
     def send(self, user_id: str, card_id: str, approval: dict | None = None) -> Outcome:
         """L1 and T3: only with the `approval.resolved` that `tilo-api` recorded for the owner's tap, whose authz the
         entry carries unchanged; its OB-01 / OB-05 check runs before the card's one decision is claimed, so a refusal
         (never raised) leaves the card open. L2 is scheduled by the policy path (unchanged)."""
-        doc = self._cards.get(user_id, card_id)
+        doc = self._get(user_id, card_id)
         if doc is None or doc["state"] != "open" or "send" not in doc["options"]:
             return Outcome("refused", None)
         if not self._owns(user_id) or doc.get("user_id") != user_id:  # only the world's owner's own card
             return Outcome("refused", None)
         index_artifact(self._cards, user_id, doc)  # a preview that died before indexing is completed here
+        doc = self._port.resolve(user_id, doc)  # a stale L2 decision is made again; dropped, it is an L1 card below
         if doc["level"] == "L2":  # the entry's real state; a stopped card never enqueues again
             entry = self._ledger.schedule(user_id, doc)
             state = entry["state"] if entry else "cancelled"
@@ -192,7 +218,7 @@ class Autopilot:
         return Outcome("queued", entry["id"])
 
     def cancel(self, user_id: str, card_id: str) -> Outcome:
-        doc = self._cards.get(user_id, card_id)
+        doc = self._get(user_id, card_id)
         if doc is None or doc["state"] == "superseded":
             return Outcome("refused", None)
         if doc["state"] == "open":
@@ -210,7 +236,7 @@ class Autopilot:
     def edit(self, user_id: str, card_id: str, change: str, *, instruction_id: str) -> Preview | None:
         """Cancels the pending send, then redrafts with the original instruction plus `change` (BQ-155). The new
         card always waits for a person (OB-01, OB-05). None when the card is closed or its send already went."""
-        doc = self._cards.get(user_id, card_id)
+        doc = self._get(user_id, card_id)
         if doc is None or not self._owns(user_id):
             return None
         instruction = f"{doc['instruction']}\nChange: {change}"
@@ -278,11 +304,14 @@ class Autopilot:
             if self._cards.create(user_id, card_id, doc):
                 if "approval_requested" in doc:  # once: only the instance whose create won emits the gate
                     self._emit(copy.deepcopy(doc["approval_requested"]))
+                if "policy_applied" in doc:  # and the decision's event, before any entry (OB-01, HR-7)
+                    self._emit(copy.deepcopy(doc["policy_applied"]))
             else:
                 doc = self._cards.get(user_id, card_id)
                 if doc is None:
                     raise LookupError("card store refused a create but holds no card")
         index_artifact(self._cards, user_id, doc)  # the text DraftArtifacts serves, before any enqueue (BQ-182)
+        doc = self._port.resolve(user_id, doc)  # the stored decision, kept only while fresh and bound to this card
         if doc["level"] == "L2" and doc["state"] == "open":  # the recorded decision, never worked out again
             entry = self._ledger.schedule(user_id, doc)  # the card's one entry, by its key; none once stopped
             doc = doc | {"scheduled_at": entry["scheduled_at"]} if entry else doc
@@ -338,12 +367,23 @@ class Autopilot:
             reserved = sendable and not self._fake  # a gate at L1 or T3 reserves its entry's id (OB-01)
             blank = not clean_text(context.instruction).strip()  # BQ-222: nothing a person wrote never rides L2
             if instructed and sendable and not modifiers and not blank:
-                level, policy_id = self._policy.level(user_id, ACTION_TYPE)
-                if level == "L2" and policy_id:  # only L2 rides the undo window; anything else waits (fail closed)
-                    ms = round(self._clock() * 1000)
-                    doc |= {"level": "L2", "undo_window_s": UNDO_WINDOW_S, "policy_id": policy_id}
-                    doc |= {"outbox_id": ulid(ms), "scheduled_at": timestamp(ms + UNDO_WINDOW_S * 1000)}
-                    reserved = False
+                ms = round(self._clock() * 1000)
+                if self._port.decides():  # CHN-WIRE-4: the engine's decision; only a clean one rides L2 (fail closed)
+                    doc["outbox_id"] = ulid(ms)
+                    part = self._port.first(user_id, doc, ms)
+                    if part is not None:
+                        window, policy_id = part["data"]["undo_window_s"], part["data"]["policy_id"]
+                        doc |= {"level": "L2", "undo_window_s": window, "policy_id": policy_id, "policy_applied": part}
+                        doc["scheduled_at"] = timestamp(ms + window * 1000)
+                        reserved = False
+                    else:
+                        doc["outbox_id"] = None
+                else:
+                    level, policy_id = self._policy.level(user_id, ACTION_TYPE)
+                    if level == "L2" and policy_id:  # only L2 rides the undo window; anything else waits
+                        doc |= {"level": "L2", "undo_window_s": UNDO_WINDOW_S, "policy_id": policy_id}
+                        doc |= {"outbox_id": ulid(ms), "scheduled_at": timestamp(ms + UNDO_WINDOW_S * 1000)}
+                        reserved = False
             if reserved:
                 doc["outbox_id"] = ulid(round(self._clock() * 1000))
                 doc["approval_requested"] = requested_part(doc, doc["outbox_id"])

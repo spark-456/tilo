@@ -161,14 +161,21 @@ class Ledger:
                 return "cancelled" if state == "cancelled" else "too_late"  # sending, sent or failed: it went
         raise CancelPending("the outbox did not confirm the stop")
 
+    def stored(self, doc: dict[str, Any]) -> dict | None:
+        """The card's entry if the outbox holds one under its key (read only)."""
+        return self._outbox.get_by_idempotency_key(doc["world_id"], f"autopilot:{doc['card_id']}")
+
     def entry_for(self, doc: dict[str, Any], authz: dict[str, Any] | None = None) -> dict:
         """The card's entry. Only in the card's own world: an entry elsewhere is one no stop of this card would find.
-        A person's `authz` (the approval's, OB-01) is copied as given, never re-stamped."""
+        A person's `authz` (the approval's, OB-01) is copied as given, never re-stamped; so is the authz of an L2
+        card's stored `policy.applied` (CHN-WIRE-4), whose time is the decision's, not now."""
         if not self.ours(doc):
             raise PermissionError("the card belongs to another world: its entry is never created here")
         ms = round(self._clock() * 1000)
         created, window, policy = timestamp(ms), doc["undo_window_s"], doc["level"] == "L2"
         authority = {"by": "policy", "ref": doc["policy_id"]} if policy else {"by": "person", "ref": doc["user_id"]}
+        if authz is None and policy and isinstance(doc.get("policy_applied"), dict):
+            authz = doc["policy_applied"]["authz"]
         return {
             "id": doc["outbox_id"] or ulid(ms),
             "idempotency_key": f"autopilot:{doc['card_id']}",
