@@ -147,8 +147,15 @@ run "SEC_12_deployer_still_holds_no_project_role_by_default" {
   }
 
   assert {
-    condition     = alltrue([for b in output.project_iam_bindings : !strcontains(b.member, "tilo-cloudbuild@")]) && length(var.deployer_project_roles) == 0
-    error_message = "CI builds on the runner: no Cloud Build identity and no deployer project role for dev."
+    # Changed by P0-07g (deliberate, narrow): this used to forbid ANY tilo-cloudbuild@ project binding. The
+    # dedicated Cloud Build identity of PR #373 needs exactly one project-level role, roles/logging.logWriter
+    # (Google offers no narrower scope), so that single role is allowed and every other project-level role for
+    # it is still forbidden. cloudbuild.tftest.hcl pins that the logWriter binding exists exactly once.
+    condition = alltrue([
+      for b in output.project_iam_bindings :
+      !strcontains(b.member, "tilo-cloudbuild@") || b.role == "roles/logging.logWriter"
+    ]) && length(var.deployer_project_roles) == 0
+    error_message = "tilo-cloudbuild may hold roles/logging.logWriter at project level and no other project role; the deployer holds none (SEC-12)."
   }
 }
 
