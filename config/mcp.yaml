@@ -1,0 +1,17 @@
+# MCP server allowlist (FR-CON-12, PRD 12.2). Loaded by tilo_connectors.mcp.load_allowlist, which
+# validates it in code; there is no contracts/ schema for it. A server that is not listed here
+# cannot connect, and a tool that is not listed for it does not exist. Empty until a server is
+# approved: add one only with a reviewer.
+#
+# Entry shape (every key required):
+#   - id: notes_hub                      # a connector-style id; never gmail, google_drive or internal
+#     name: Notes hub                    # shown on the island
+#     endpoint: https://mcp.example/v1   # https to a public host; no query, no internal address
+#     tools:
+#       - {name: get_notes, action_type: read_notes, risk_tier: T1, side_effect: false}
+#       - {name: share_page, action_type: share_file, risk_tier: T3, side_effect: true}
+# `risk_tier` must equal config/autonomy.yaml for the action type (an action type not listed there
+# is T3, so list a read tool's action type there as T1 first). A read is T1; a tool with
+# `side_effect: true` must be T3: it runs only as an outbox entry, a person approves every one,
+# and it runs at most once. No duplicate keys, aliases or `<<` merge keys.
+servers: []

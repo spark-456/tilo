@@ -48,16 +48,40 @@ class ConnectorConfigError(ValueError):
         super().__init__(text)
 
 
-class _NoAliasLoader(yaml.SafeLoader):  # no aliases: a few hundred bytes of chained ones expand without bound
+class StrictYamlLoader(yaml.SafeLoader):
+    """Safe YAML for config: no aliases (a few hundred bytes of chained ones expand without bound), no `<<`
+    merge keys and no duplicate keys (both let what a reviewer reads differ from what loads)."""
+
     def compose_node(self, parent: Any, index: Any) -> Any:
         if self.check_event(yaml.AliasEvent):
             raise yaml.YAMLError("YAML aliases are not allowed")
         return super().compose_node(parent, index)
 
+    def construct_mapping(self, node: Any, deep: bool = False) -> Any:
+        if isinstance(node, yaml.MappingNode):
+            seen: set[Any] = set()
+            for key_node, _ in node.value:
+                if key_node.tag == "tag:yaml.org,2002:merge":
+                    raise yaml.YAMLError("YAML merge keys are not allowed")
+                key = self.construct_object(key_node, deep=True)
+                try:
+                    duplicate = key in seen
+                    seen.add(key)
+                except TypeError:
+                    raise yaml.YAMLError("YAML mapping keys must be plain values") from None
+                if duplicate:
+                    raise yaml.YAMLError("a YAML key is repeated")
+        return super().construct_mapping(node, deep)
+
+
+def load_strict_yaml(text: str) -> Any:
+    """Parse config YAML with `StrictYamlLoader`; raises yaml.YAMLError on any refused construct."""
+    return yaml.load(text, Loader=StrictYamlLoader)  # noqa: S506
+
 
 def _read_entries(path: str | os.PathLike[str]) -> list[Any]:
     try:
-        raw = yaml.load(Path(path).read_text(encoding="utf-8"), Loader=_NoAliasLoader)  # noqa: S506
+        raw = load_strict_yaml(Path(path).read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError, RecursionError, ValueError) as exc:
         raise ConnectorConfigError(f"{path}: not a readable UTF-8 YAML file: {exc}") from exc
     if raw is None:

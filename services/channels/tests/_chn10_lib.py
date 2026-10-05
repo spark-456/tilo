@@ -45,6 +45,11 @@ USER = "u_sarah"
 OTHER_USER = "u_marcus"
 FINDING_KINDS = ("number", "date", "contact", "commitment", "obfuscation")
 INJECTION_MARKER = "Ignore previous instructions"  # a FakeSafetyProvider marker (tilo_providers.safety)
+# FR-CHN-11 (BQ-265): inbound-aware L2 reads the replied-to message's Subject (it must hold no money, legal or
+# commitment word, so no "estimate") and its Authentication-Results header (dmarc=pass), so a clean test thread
+# carries both by default.
+CLEAN_SUBJECT = "Engine tuneup scheduling"
+AUTH_PASS = "mx.example; spf=pass; dkim=pass; dmarc=pass header.from=harriercharters.example"
 
 
 def drafting_module() -> Any:
@@ -325,8 +330,8 @@ class Rig:
         sender: str = "David Miller <david.miller@harriercharters.example>",
         to: Sequence[str] = ("ops@harborview.example",),
         cc: Sequence[str] = ("sarah.chen@harborview.example",),
-        subject: str = "Engine tune-up scheduling and estimate",
-        body: str = "Can Marcus come by this Friday afternoon, and what is your hourly rate?",
+        subject: str = CLEAN_SUBJECT,
+        body: str = "Can Marcus come by this Friday afternoon to look at the engine?",
         headers: dict[str, str] | None = None,
         earlier: Sequence[Msg] = (),
         answers: Sequence[Scripted] = (),
@@ -342,7 +347,7 @@ class Rig:
             body=f"{body}\n\n{key}",
             to=list(to),
             cc=list(cc),
-            headers=dict(headers or {}),
+            headers={"Authentication-Results": AUTH_PASS, **(headers or {})},
         )
         thread = Thread(thread_id="t-" + secrets.token_hex(5), messages=[*earlier, last])
         self.reader.add(user_id, thread)
