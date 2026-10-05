@@ -17,6 +17,7 @@ import threading
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from ..errors import PossiblySent
 from ..outbox import Grant
 from ._google import GoogleAdapter, checked_id, side_effect_marker
 from ._transport import AdapterError, FileTooLarge, NotPicked, SideEffectRefused
@@ -169,12 +170,14 @@ class DriveAdapter(GoogleAdapter):
                     f"\r\n--{boundary}--\r\n".encode(),
                 ]
             )
-            params = {"uploadType": "multipart", "fields": "id"}
+            params = {"uploadType": "multipart", "fields": "id,shared"}
             headers = {"content-type": f"multipart/related; boundary={boundary}"}
             saved = self._json(
                 user, scopes, "POST", DRIVE_UPLOAD_API, params=params, headers=headers, content=body, patient=False
             )
-            file_id = _final_id(saved.get("id"))  # the file exists, so a bad id is final, never retried
+            file_id = _final_id(saved.get("id"))  # the file exists, so a bad id is final, never retried (alerts)
+            if saved.get("shared") is not False:  # it was shared between the check and the upload (or Drive said
+                raise PossiblySent("the saved file is shared; a person checks who can see it")  # nothing): fail closed
         self._remember(self._created, user, [i for i in (folder, file_id) if i])
         if native:  # the editor link is built from the checked id, never taken from an answer
             url = f"https://docs.google.com/{native[1]}/d/{checked_id(file_id)}/edit"
@@ -206,10 +209,12 @@ class DriveAdapter(GoogleAdapter):
 
 
 def _final_id(value: Any) -> str:
+    """The id of a file that exists (just uploaded, or found by an earlier attempt). A bad id cannot be used or
+    retried, but the file is there: PossiblySent, so the outbox alerts a person instead of failing quietly."""
     try:
         return checked_id(value)
     except AdapterError:
-        raise SideEffectRefused("Drive answered with an id that is not a valid id") from None
+        raise PossiblySent("Drive answered with an id that is not a valid id; the file may exist") from None
 
 
 def _meta(raw: Mapping[str, Any]) -> dict[str, Any]:
