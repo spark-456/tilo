@@ -150,7 +150,7 @@ describe("FR-WLD-14 the stage follows the density mode, read at draw time", () =
   });
 
   it("on a phone the name tags are drawn at a readable size, and the ones that would overlap are left out", () => {
-    pillWidth.w = 400; // long names: enlarged, they cannot all fit
+    pillWidth.w = 250; // long names: enlarged, they cannot all fit
     for (const mode of ["friendly", "professional"] as const) {
       setDensity(mode);
       const phone = stage(390);
@@ -167,6 +167,20 @@ describe("FR-WLD-14 the stage follows the density mode, read at draw time", () =
             Math.abs(a.y - b.y) >= 10 * a.scale.x + 10 * b.scale.x;
           expect(apart, `${a.label} overlaps ${b.label}`).toBe(true);
         }
+      }
+      // Nothing drawn is cut off by the stage's edge (390 x 600 here; the camera starts centred).
+      const content = labels?.parent as Container;
+      for (const t of shown) {
+        const half = (pillWidth.w / 2) * t.scale.x;
+        const [left, right] = [(t.x - half) * content.scale.x, (t.x + half) * content.scale.x];
+        expect(left + content.x, `${t.label} crosses the left edge`).toBeGreaterThanOrEqual(-195);
+        expect(right + content.x, `${t.label} crosses the right edge`).toBeLessThanOrEqual(195);
+        const [top, bottom] = [
+          (t.y - 10 * t.scale.x) * content.scale.x,
+          (t.y + 10 * t.scale.x) * content.scale.x,
+        ];
+        expect(top + content.y).toBeGreaterThanOrEqual(-300);
+        expect(bottom + content.y).toBeLessThanOrEqual(300);
       }
       const all = (labels?.children ?? []).filter((c) => c.scale.x > 1);
       expect(all.length, `${mode}: a crowded phone stage leaves tags out`).toBeGreaterThan(

@@ -170,6 +170,9 @@ function item(
 
 type Zone = { x0: number; x1: number; y0: number; y1: number };
 const TAG_GAP = 4;
+/** A tag slides at most this far to clear the figures; further and it would sit over another
+ * building, so it stays where it was. */
+const SLIDE_MAX = 40;
 /** What a resting figure covers in front of a building (Friendly's size, the larger): half its width
  * either side of its feet, its height up (the same 30 units the rank tag sits above). */
 const FIGURE_HALF_W = 18;
@@ -219,8 +222,33 @@ function tag(
     if (!hit) break;
     x = hit.x0 - TAG_GAP - half;
   }
-  t.c.position.set(x, at[1]);
+  if (Math.abs(x - at[0]) > SLIDE_MAX) x = at[0];
+  // Enlarged tags (a phone) stay inside the stage the person sees: one whose building is in view
+  // is nudged in, one whose building is out of view is not drawn (a cut-off name is unreadable).
+  let y = at[1];
+  if (layer.tagScale > 1) {
+    const view = viewOf(layer);
+    const k = layer.tagScale;
+    if (at[0] < view.x0 || at[0] > view.x1 || at[1] < view.y0 || at[1] > view.y1) return;
+    if (2 * half > view.x1 - view.x0 - 2 * TAG_GAP) return;
+    x = Math.min(Math.max(x, view.x0 + TAG_GAP + half), view.x1 - TAG_GAP - half);
+    y = Math.min(Math.max(y, view.y0 + TAG_GAP + 10 * k), view.y1 - TAG_GAP - 10 * k);
+  }
+  t.c.position.set(x, y);
   live.add(id);
+}
+
+/** The stage, in content coordinates, as framed by the fit (the camera starts centred, unzoomed). */
+function viewOf(layer: WorldLayer): Zone {
+  const { width, height } = layer.size();
+  const s = layer.content.scale.x;
+  const { x, y } = layer.content.position;
+  return {
+    x0: (-width / 2 - x) / s,
+    x1: (width / 2 - x) / s,
+    y0: (-height / 2 - y) / s,
+    y1: (height / 2 - y) / s,
+  };
 }
 
 const PIN: Readonly<Record<string, PinKind | undefined>> = {
