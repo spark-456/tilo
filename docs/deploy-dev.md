@@ -131,7 +131,9 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
   step by you. Tilo's tooling never handles passwords or tokens; `firebase login` is yours.
 - `firebase.json` serves `apps/web/dist` with a single-page-app rewrite to `/index.html` for everything
   except `/assets/**` (`!/assets/**`, so a stale tab asking for a removed hashed asset gets a plain 404
-  instead of `index.html`), hashed files under `/assets/**` as `public, max-age=31536000, immutable`, and
+  instead of `index.html`; any path with a dot segment such as `/.x` or `/.well-known/x` is rewritten to the
+  non-existent `/404.html` and so also 404s, because a `**` glob skips dot segments and would leave the shell
+  without security headers), hashed files under `/assets/**` as `public, max-age=31536000, immutable`, and
   every other path as `no-cache` (the `**` default) so a new deploy is picked up on the next load. Every
   route also gets `Content-Security-Policy` (self only, no inline styles, `base-uri 'none'`,
   `connect-src 'self'`, `frame-ancestors 'none'`, no `unsafe-eval`: the web app loads

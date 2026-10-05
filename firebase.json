@@ -2,7 +2,10 @@
   "hosting": {
     "public": "apps/web/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [{ "source": "!/assets/**", "destination": "/index.html" }],
+    "rewrites": [
+      { "regex": ".*/\\..*", "destination": "/404.html" },
+      { "source": "!/assets/**", "destination": "/index.html" }
+    ],
     "headers": [
       {
         "source": "**",
