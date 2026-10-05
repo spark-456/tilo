@@ -2,11 +2,20 @@
 
 ## User's one sitting (about 10 min)
 
-Copy and paste in this order, from the repository root, signed in to `gh` as yourself. Tilo's tooling
-runs none of these.
+Copy and paste in this order, from the repository root. Services deploy with Google Cloud Build (P0-07f), so
+no GitHub variable, no merge to `main` and no `gh` sign-in is needed. Tilo's tooling runs none of these.
 
-1. Web app on Firebase Hosting (opens a browser for your own Google sign-in; use the Google account that
-   has Firebase access on project `essential-wares-510320-f0`, any other account fails with a permission error):
+1. Sign in to Google Cloud as yourself (opens a browser) and point `gcloud` at the tilo-dev project:
+
+   ```powershell
+   gcloud auth login
+   gcloud config set project essential-wares-510320-f0
+   ```
+
+   Use the Google account that owns the project. If `gcloud` is not installed, install the Google Cloud CLI first.
+
+2. Web app on Firebase Hosting (opens a browser for your own Google sign-in; use the account that has Firebase
+   access on project `essential-wares-510320-f0`, any other account fails with a permission error):
 
    ```powershell
    pnpm install
@@ -16,36 +25,27 @@ runs none of these.
 
    Result: https://essential-wares-510320-f0.web.app (the default Hosting site).
 
-2. The three repository variables (variables, not secrets; no key file anywhere):
-
-   ```powershell
-   gh variable set GCP_PROJECT_ID --repo spark-456/tilo --body essential-wares-510320-f0
-   gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER --repo spark-456/tilo --body projects/379216745263/locations/global/workloadIdentityPools/tilo-github/providers/github
-   gh variable set GCP_DEPLOYER_SERVICE_ACCOUNT --repo spark-456/tilo --body tilo-deployer@essential-wares-510320-f0.iam.gserviceaccount.com
-   ```
-
-3. Get the deploy workflow onto `main`: merge PR #356 (fast-forwards `main` to `phase0-stack`). The WIF
-   provider trusts only `refs/heads/main`, and `deploy-dev.yml` runs only from `main`, so this step is
-   required. (PR #353 is optional hardening of the WIF condition; it does not replace this step.)
-
-   Recommended once, in GitHub (Settings, Rules, Rulesets; Tilo changes no repository setting): a ruleset on
-   `main` and `phase0-stack` that requires a pull request, blocks force pushes and blocks deletion, with no
-   bypass. WIF trusts these branches, so whoever can push to them can deploy.
+3. One-time, before the first service deploy: the separate Terraform PR that creates the `tilo-cloudbuild` service
+   account and its five roles (see "Deploy with Cloud Build" below) has to be in place. It does not exist yet, so
+   until you have put it in place the build fails before any step runs (the service account is missing) and
+   nothing is built or deployed.
 
 4. Deploy the services, API first, check it, then everything:
 
    ```powershell
-   gh workflow run deploy-dev.yml --ref main -f service=api
-   gh run watch
-   gh workflow run deploy-dev.yml --ref main -f service=all
+   just deploy-dev-cloudbuild api
+   just deploy-dev-cloudbuild all
    ```
 
-5. What to expect: `tilo-api` fails closed without a principal (a request with no sign-in is refused;
-   that is correct, not a bug). Cloud Run may reserve `/healthz`, so the smoke step can fail after traffic
-   has already moved to the new revision; if so, see issue #355 (the service is up, the check is wrong).
+   Each call uploads the repo (`.gcloudignore` keeps secrets and VCS data out), builds in `asia-southeast1`
+   and prints the build log. The seven services are `api`, `harness`, `channels`, `connectors`, `browser`,
+   `render`, `sandbox-web`.
 
-The web app and the services are independent: step 1 needs no workflow, no `main` and no repository
-variables.
+5. What to expect: `tilo-api` fails closed without a principal (a request with no sign-in is refused;
+   that is correct, not a bug). Cloud Build does not smoke test: look at the services in the Cloud Run console, or
+   run `gcloud run services describe tilo-api --region asia-southeast1` and check the Ready condition.
+
+The web app and the services are independent: step 2 needs no build, and the services need no Hosting deploy.
 
 How the seven Cloud Run services and the web app reach `tilo-dev`. Region `asia-southeast1`. This
 runbook is for `tilo-dev` only: nothing here ever targets `tilo-demo` (that deploy is a separate,
@@ -55,15 +55,19 @@ user-approved step, never from this workflow or recipe).
 
 | Piece | How | Where it is defined |
 | --- | --- | --- |
-| Services `tilo-api`, `tilo-harness`, `tilo-channels`, `tilo-connectors`, `tilo-browser`, `tilo-render`, `tilo-sandbox-web` | `.github/workflows/deploy-dev.yml` (`workflow_dispatch` only), built from `services/<svc>/Dockerfile` with the repo root as context | PRD 6.2, 6.5 |
+| Services `tilo-api`, `tilo-harness`, `tilo-channels`, `tilo-connectors`, `tilo-browser`, `tilo-render`, `tilo-sandbox-web` | Google Cloud Build: `just deploy-dev-cloudbuild` runs `cloudbuild.yaml` (P0-07f). Alternative: `.github/workflows/deploy-dev.yml` (`workflow_dispatch` only). Both build `services/<svc>/Dockerfile` with the repo root as context | PRD 6.2, 6.5 |
 | Web app (`apps/web`) | Firebase Hosting, by hand (below). The CI deployer has no Firebase role by design | `firebase.json` |
 | Infrastructure (services, IAM, ingress, env, secrets) | Terraform, applied by you (`infra/README.md`) | `infra/` |
 
-The workflow only swaps the image (pinned by digest) and passes `--min-instances 0` and
+Cloud Build and the workflow only swap the image (pinned by digest) and passes `--min-instances 0` and
 `--max-instances 2..3` on an existing service. It never sets ingress, IAM, env vars or secrets;
 Terraform owns those and ignores image changes (`infra/modules/service`).
 
-## One-time setup (you do this once, after `terraform apply`)
+## Alternative: GitHub Actions workflow (one-time setup)
+
+Only needed if you prefer the Actions route to Cloud Build. The sections up to "Web app" describe it.
+
+Setup, once, after the infrastructure is in place:
 
 1. In the GitHub repository `spark-456/tilo`, open Settings, Secrets and variables, Actions, Variables
    (repository variables, not secrets) and add:
@@ -89,7 +93,7 @@ The deployer (`tilo-deployer`) holds exactly: `roles/run.developer` on each of t
 `roles/iam.serviceAccountUser` on each runtime service account, and `roles/artifactregistry.writer` on
 the Artifact Registry repository `tilo`. No project-level role. See `infra/ACCESS.md`.
 
-## Deploy
+## Deploy with the Actions workflow
 
 ```powershell
 just deploy-dev          # refuses any env other than dev; needs `gh` signed in
@@ -109,6 +113,61 @@ in-VPC probe or a wider role: your decision (docs/p0-07a-notes.md, item 7).
 
 To roll back, revert on `main` and dispatch again (the workflow always runs `main`), or send traffic to a
 previous revision in the Cloud Run console.
+
+## Deploy with Cloud Build (P0-07f)
+
+```powershell
+gcloud auth login
+gcloud config set project essential-wares-510320-f0
+just deploy-dev-cloudbuild api     # one service first
+just deploy-dev-cloudbuild all     # then everything (the default)
+```
+
+`just deploy-dev-cloudbuild service="all" env="dev"` refuses any env other than dev, then runs
+`gcloud builds submit --config cloudbuild.yaml --project essential-wares-510320-f0 --substitutions "_SERVICE=<service>" --region asia-southeast1 .`.
+The tilo-dev project is pinned in the recipe (no parameter or `gcloud config` value can change it), `env` must be
+`dev`, and `service` must be `all` or one of the seven names: `just` checks both before any shell runs, so
+a flag or a shell command cannot be smuggled in through them.
+`cloudbuild.yaml` (repo root) has three steps: check `_SERVICE` (`all` or one of the seven short names, anything
+else fails with `unknown service`), build each image from `services/<svc>/Dockerfile` with the repo root as
+context and push it to `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>:<build id>`, then
+`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances 2..3`,
+after refusing any image reference that is not `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>@sha256:...`.
+The upload is an allowlist (`.gcloudignore`): only `pyproject.toml`, `uv.lock`, `.dockerignore`, `evals/pyproject.toml`
+and the `packages`, `services`, `config`, `contracts`, `prompts` and `templates` trees leave your machine, and secret
+and state files (`.env*`, keys, `client_secret*.json`, `token*.json`, `*.tfplan`, `*.tfstate*`) are excluded inside them.
+The project id is Cloud Build's `$PROJECT_ID`, never written in the file. Nothing else is touched: no ingress, IAM,
+env vars or secrets. The build runs as the dedicated account `tilo-cloudbuild` (below). It times out at 2700 s (the 45 minute cap of the workflow), logs
+go to Cloud Logging only, and the builder images are pinned and listed in `docs/licences.md`.
+
+Rollback: send traffic to a previous revision in the Cloud Run console, or revert and run the recipe again.
+
+### IAM the Cloud Build service account needs (a separate Terraform PR, put in place by you)
+
+`cloudbuild.yaml` sets its top-level `serviceAccount` field to
+`projects/$PROJECT_ID/serviceAccounts/tilo-cloudbuild@$PROJECT_ID.iam.gserviceaccount.com`
+(`tilo-cloudbuild@<project id>.iam.gserviceaccount.com`), so every build runs as that dedicated account, which holds
+only the five roles below and has no key. Never grant them to the Compute Engine default service account or to the
+legacy Cloud Build account (`<project number>@cloudbuild.gserviceaccount.com`): those are shared identities that
+every other build, VM or function inherits, and on many projects the Compute Engine default account holds a broad
+editor role already (inferred from Google's defaults, not checked on this project). Pinning `tilo-cloudbuild` is what
+keeps the build to these five grants.
+
+`tilo-cloudbuild` does not exist yet. The build fails before any step runs until the separate Terraform PR creates
+the account and grants it the roles; the PR is written by Tilo's tooling and put in place by you
+(`infra/README.md`), and it needs its own security review. Nothing is built or deployed in the meantime.
+
+Roles for `tilo-cloudbuild`, scoped the way the deployer's access is:
+
+- `roles/artifactregistry.writer` on the Artifact Registry repository `tilo` (not project-wide).
+- `roles/run.developer` on each of the seven services `tilo-<svc>` (per service, never project-wide). It cannot set
+  IAM, so invoker bindings stay with Terraform.
+- `roles/iam.serviceAccountUser` on each of the seven runtime service accounts (the updated revision runs as them).
+- `roles/logging.logWriter` at project level (Google offers no narrower scope), so `CLOUD_LOGGING_ONLY` works.
+- `roles/storage.objectViewer` on the source staging bucket, so the build can read the upload.
+
+You, as the person running `gcloud builds submit`, need `roles/cloudbuild.builds.editor` and permission to act as
+`tilo-cloudbuild` (the project owner has both).
 
 ## Web app (Firebase Hosting, manual; P0-07c)
 
@@ -150,5 +209,7 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
 ## Never
 
 - Never put a service-account key file in the repository or in Actions secrets: WIF only.
-- Never deploy `tilo-demo` from this recipe or workflow.
-- The only dispatch input is a fixed `service` choice, passed through `env:`, never into a script.
+- Never deploy `tilo-demo` from this recipe, from `cloudbuild.yaml` or from the workflow.
+- The only dispatch input is a fixed `service` choice, passed through `env:`, never into a script. Cloud Build's
+  `_SERVICE` is passed the same way (a step environment variable, never spliced into the script, never `eval`ed).
+- Cloud Build deploys no web app, no infrastructure and no IAM.
