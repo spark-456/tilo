@@ -18,3 +18,11 @@ output "alert_policies" {
     }
   }
 }
+
+output "cost_alert_policy" {
+  description = "NFR-27 owner cost alert: policy display name and the log-based metric it reads (kept apart from alert_policies, which pins the three NFR-23 keys)."
+  value = {
+    display_name = google_monitoring_alert_policy.cost_alert.display_name
+    metric_name  = google_logging_metric.cost_alert.name
+  }
+}

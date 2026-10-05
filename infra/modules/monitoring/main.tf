@@ -128,3 +128,73 @@ resource "google_monitoring_alert_policy" "events_oldest_unacked" {
     }
   }
 }
+
+# Owner cost alerts (NFR-27): the metering code writes one redacted JSON line per alert
+# (`"event": "cost_alert"`, kind uid_cap_80 / uid_cap_100 / global_daily, packages/metering). The log-based
+# counter below turns each line into a data point and the policy emails the owner. Alert-only: nothing here
+# blocks or changes spend.
+resource "google_logging_metric" "cost_alert" {
+  project     = var.project_id
+  name        = "tilo_cost_alert"
+  description = "Count of NFR-27 owner cost alert log lines, by kind."
+  filter      = "jsonPayload.event=\"cost_alert\""
+
+  metric_descriptor {
+    metric_kind  = "DELTA"
+    value_type   = "INT64"
+    unit         = "1"
+    display_name = "Tilo cost alerts"
+
+    labels {
+      key         = "kind"
+      value_type  = "STRING"
+      description = "uid_cap_80, uid_cap_100 or global_daily."
+    }
+  }
+
+  label_extractors = {
+    kind = "EXTRACT(jsonPayload.kind)"
+  }
+}
+
+resource "google_monitoring_alert_policy" "cost_alert" {
+  project               = var.project_id
+  display_name          = "Tilo owner cost alert"
+  combiner              = "OR"
+  notification_channels = [google_monitoring_notification_channel.email.id]
+
+  documentation {
+    mime_type = "text/markdown"
+    content   = "A Tilo cost alert line was logged (NFR-27): a uid reached 80% or 100% of its lifetime spend cap, or the day's global spend passed its threshold. Open Logs Explorer and filter on jsonPayload.event=\"cost_alert\" for the kind, the uid_ref digest (never the raw uid) and the figures. Alert-only: spend is not blocked."
+  }
+
+  conditions {
+    display_name = "Cost alert logged"
+
+    condition_threshold {
+      filter          = "metric.type=\"logging.googleapis.com/user/tilo_cost_alert\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "0s"
+
+      aggregations {
+        alignment_period     = "300s"
+        per_series_aligner   = "ALIGN_SUM"
+        cross_series_reducer = "REDUCE_SUM"
+        group_by_fields      = ["metric.label.kind"]
+      }
+
+      trigger {
+        count = 1
+      }
+    }
+  }
+
+  alert_strategy {
+    notification_rate_limit {
+      period = "3600s"
+    }
+  }
+
+  depends_on = [google_logging_metric.cost_alert]
+}
