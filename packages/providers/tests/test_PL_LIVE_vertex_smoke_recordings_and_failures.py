@@ -303,7 +303,9 @@ def test_PL_LIVE_07_a_400_message_never_prints_a_token_or_an_authorization_heade
     result, _ = _rejected_run(tmp_path, REJECTED_THINKING[0], message)
     assert result.code == 1
     lines = result.err_lines()
-    assert len(lines) == 1 and FAIL_RE.match(lines[0]) and FAIL_RE.match(lines[0])["code"] == "rejected"
+    assert len(lines) == 1
+    match = FAIL_RE.match(lines[0])
+    assert match is not None and match["code"] == "rejected"
     for secret in (token, bearer, bearer.split(" ", 1)[1], key, "Authorization"):
         assert secret not in result.everything
 
@@ -321,7 +323,8 @@ def test_PL_LIVE_07_a_400_reason_is_one_line_and_capped_at_200_characters(tmp_pa
 
 def test_PL_LIVE_07_other_failure_codes_still_print_no_server_text(tmp_path: Path) -> None:
     result, _ = _rejected_run(tmp_path, 403, "Permission denied: SERVER-TEXT-MARKER [PERMISSION_DENIED]")
-    assert FAIL_RE.match(result.err_lines()[0])["code"] == "permission"
+    match = FAIL_RE.match(result.err_lines()[0])
+    assert match is not None and match["code"] == "permission"
     assert "SERVER-TEXT-MARKER" not in result.everything
 
 
@@ -346,7 +349,9 @@ LEAKY_SHAPES = [
 def test_PL_LIVE_07_a_400_reason_scrubs_labelled_values_in_every_common_shape(leak: str, tmp_path: Path) -> None:
     result, _ = _rejected_run(tmp_path, 400, f"Request rejected. {leak} End.")
     lines = result.err_lines()
-    assert len(lines) == 1 and FAIL_RE.match(lines[0])["code"] == "rejected"
+    assert len(lines) == 1
+    match = FAIL_RE.match(lines[0])
+    assert match is not None and match["code"] == "rejected"
     assert OPAQUE not in result.everything
 
 
@@ -368,4 +373,5 @@ def test_PL_LIVE_07_a_rejected_request_with_no_server_reason_still_prints_a_clea
 
 def test_PL_LIVE_07_a_400_whose_text_looks_like_another_failure_is_still_rejected(tmp_path: Path) -> None:
     result, _ = _rejected_run(tmp_path, 400, "The field is disabled. [NOT_FOUND] [PERMISSION_DENIED]")
-    assert FAIL_RE.match(result.err_lines()[0])["code"] == "rejected"
+    match = FAIL_RE.match(result.err_lines()[0])
+    assert match is not None and match["code"] == "rejected"
