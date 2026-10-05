@@ -16,7 +16,10 @@ from .schemas import conforms, event_ok
 P = ParamSpec("P")
 R = TypeVar("R")
 LEVELS = ("L0", "L1", "L2", "L3")
-INSTRUCTION_CHANNELS = {"world.requested": ("web", "mobile_web"), "channel.message_in": ("whatsapp",)}
+# ADR-0019 (SD-01): Tilo knows the person only in a signed-in web or mobile-web session. A gate
+# answer and an L2 instruction (a world.requested, never a channel.message_in) count only there;
+# `whatsapp` stays a valid enum value and opens nothing.
+SIGNED_IN = ("web", "mobile_web")
 # The policy fields open_gate reads when a Team Lead answers (PRD 10.1).
 LEAD_POLICY_KEYS = ("id", "owner", "action_type", "team_lead_domains", "created_by", "changed_by", "expiry", "history")
 # common.schema.json email_address, fully matched; a BOM / zero-width no-break space counts as space
@@ -169,29 +172,20 @@ def covering_level(policy: dict, target: Target, owner: str, at: str) -> str | N
     return level_at(policy, at) if covered else None
 
 
-def _typed_words(instruction: dict) -> bool:
-    """ADR-0007, BQ-56: a WhatsApp message counts only as the owner's typed words (no tapped
-    option) answering no card or a question card; a gate, consent or meeting answer never does."""
-    data = instruction["data"]
-    if instruction["type"] != "channel.message_in":
-        return True
-    return data["option"] is None and data["card_kind"] in (None, "needs_you")
-
-
 @fail_closed(False)
 def instruction_counts(
     instruction: dict | None, world_id: str, policy: dict, destination: str | None, before: str, applied: list[dict]
 ) -> bool:
-    """PI-08..PI-10: the policy owner's own instruction in this world about this destination,
-    signed in or from the bound WhatsApp number (never email), given while the L2 level in force
-    at `before` was (no earlier than the entry that set it) and not used by an earlier send."""
+    """PI-08..PI-10: the policy owner's own world.requested in this world about this destination,
+    from a signed-in session (never email, never a channel.message_in, ADR-0019), given while the
+    L2 level in force at `before` was (no earlier than the entry that set it) and not used by an
+    earlier send."""
     return (
         instruction is not None
-        and instruction["data"]["channel"] in INSTRUCTION_CHANNELS.get(instruction["type"], ())
+        and instruction["type"] == "world.requested"
+        and instruction["data"]["channel"] in SIGNED_IN
         and conforms("event.schema.json", instruction, "id", "type", "actor", "ts", "world_id")
-        # the whole data, so its if/then/else runs (a set card_id needs its card_kind, ADR-0007)
-        and conforms(f"events/data/{instruction['type']}.schema.json", instruction["data"])
-        and _typed_words(instruction)
+        and conforms("events/data/world.requested.schema.json", instruction["data"])  # the whole data
         and (instruction["world_id"], instruction["actor"]) == (world_id, policy["owner"])
         and level_since(policy, before) <= ts(instruction["ts"]) < ts(before)
         and destination is not None
@@ -224,8 +218,9 @@ def gate_tier(reserved: dict) -> str:
 @fail_closed(False)
 def opens_gate(reserved: dict, resolved: dict, owner: str, lead: dict | None, policy: dict | None) -> bool:
     """PI-02..PI-04, PRD 10.1, SEC-06: approve on the very gate, card and outbox entry, from the
-    owner, the named Approver or an allowed Team Lead; a T3 gate on WhatsApp needs its PIN.
-    Both events must be contract-valid (so never answered by email, never by a model)."""
+    owner, the named Approver or an allowed Team Lead, in a signed-in session (ADR-0019: never
+    WhatsApp, whatever the tier or `pin_verified`). Both events must be contract-valid (so never
+    answered by email, never by a model)."""
     valid = event_ok(reserved, ("approval.requested",)) and event_ok(resolved, ("approval.resolved",))
     if not valid or not conforms("common.schema.json#/$defs/user_id", owner):
         return False
@@ -233,7 +228,7 @@ def opens_gate(reserved: dict, resolved: dict, owner: str, lead: dict | None, po
     at, allowed = ts(authz["at"]), gate["team_lead"]
     if answer["option"] != "approve" or any(answer[k] != gate[k] for k in ("gate_id", "card_id", "outbox_id")):
         return False
-    if gate_tier(reserved) == "T3" and answer["channel"] == "whatsapp" and answer["pin_verified"] is not True:
+    if answer["channel"] not in SIGNED_IN:
         return False
     if authz["by"] == "person":
         approver = gate["approver"]  # the owner's assignment, made no later than the answer (ADR-0006)

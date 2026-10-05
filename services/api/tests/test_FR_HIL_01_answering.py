@@ -116,26 +116,26 @@ def test_FR_HIL_01_gate_answer_emits_approval_resolved_with_the_answering_person
     assert part in writer.parts
 
 
-def test_FR_HIL_01_SEC_06_t3_gate_on_whatsapp_needs_pin_verified():
-    """gate_send_reply is T3 and its answer_channels include whatsapp (SEC-06, API.md's
-    open_gate note: "when risk_tier == T3 and channel == whatsapp, pin_verified must be true,
-    whoever answered")."""
+def test_FR_HIL_01_SEC_06_t3_gate_answer_on_whatsapp_is_refused():
+    """SEC-06 as amended (SD-01, ADR-0019): gate_send_reply is T3 and its answer_channels no longer
+    list whatsapp, so an answer over it is refused, PIN or not, and writes nothing."""
     card = load_valid_card("gate_send_reply")
     assert card["gate"]["risk_tier"] == "T3"
-    assert "whatsapp" in card["answer_channels"]
-    store, _clock, _writer = _store(card["world_id"])
+    assert "whatsapp" not in card["answer_channels"]
+    store, _clock, writer = _store(card["world_id"])
     store.submit(card, outbox_id=new_ulid("outbox-3"))
 
-    missing_pin = store.answer(
-        card["world_id"], card["id"], option="approve", channel="whatsapp", principal=OWNER_P, pin_verified=False
-    )
-    assert missing_pin.outcome == "rejected"
-    assert missing_pin.reason == "pin_required"
-
-    with_pin = store.answer(
-        card["world_id"], card["id"], option="approve", channel="whatsapp", principal=OWNER_P, pin_verified=True
-    )
-    assert with_pin.outcome == "answered"
+    for pin_verified in (False, True):
+        result = store.answer(
+            card["world_id"],
+            card["id"],
+            option="approve",
+            channel="whatsapp",
+            principal=OWNER_P,
+            pin_verified=pin_verified,
+        )
+        assert (result.outcome, result.reason) == ("rejected", "invalid_channel")
+    assert writer.parts == []
 
 
 def test_FR_HIL_01_answering_an_unknown_card_is_rejected():

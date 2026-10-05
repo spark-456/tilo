@@ -75,8 +75,7 @@ def test_FR_MEM_12_artifact_schema_is_artifact_version_1_0_0(repo_root):
 
 def test_FR_MEM_12_media_type_is_a_closed_enum_of_nine(repo_root):
     common = load_schema(repo_root, "common")
-    major, minor, _patch = (int(p) for p in common["x-version"].split("."))
-    assert (major, minor) >= (1, 2), "an added $defs entry is a minor bump (ADR-0002); 1.2.0 merges both 1.1.0s"
+    assert common["x-version"] == "1.2.0", "an added $defs entry is a minor bump (ADR-0002); 1.2.0 merges both 1.1.0s"
     enum = common["$defs"]["media_type"]["enum"]
     assert set(enum) == MEDIA_TYPES and len(enum) == 9 and "media_type" in common["properties"]
 

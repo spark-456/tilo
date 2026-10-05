@@ -2,6 +2,8 @@
 
 - Status: Accepted (2026-09-25, architect; ticket P0-03, security review rounds 8 and 9).
   Freezes with the CP0 set on 29 Sep.
+- Superseded in part by ADR-0019 (SD-01): no PIN; a gate opens only in a signed-in web or
+  mobile-web session, never over WhatsApp.
 - Deciders: architect, orchestrator
 - Requirement: FR-WLD-03 (PRD 10.1, 10.3, 16.2, SEC-06, HR-7)
 

@@ -1,6 +1,6 @@
 {
   "rule": "OB-01",
-  "note": "The instruction is the owner tapping Hold on WhatsApp, on the gate card of an earlier draft for the same thread. A tapped option is an answer, recorded by its approval.resolved, and only approve opens a gate (CR-07), so it is never an instruction and the reply waits at a gate (BQ-56).",
+  "note": "The instruction is the owner's typed WhatsApp answer to Tilo's question card, a path ADR-0007 once allowed. WhatsApp is out of scope (SD-01) and a channel.message_in is never an L2 instruction on any channel (ADR-0019), so the reply waits at a gate.",
   "entry": {
     "id": "01JB5VQ0000000000000009006",
     "idempotency_key": "r_village_basic_1:U2:send_email:1",
@@ -76,7 +76,7 @@
     "level": "L2",
     "undo_window_s": 60,
     "expiry": "2026-12-31T23:59:59.000Z",
-    "notify_channel": "whatsapp",
+    "notify_channel": "email",
     "team_lead_domains": [],
     "created_by": {
       "by": "u_owner",
@@ -109,16 +109,16 @@
     "item": null,
     "severity": "info",
     "credits": 0,
-    "summary": "You tapped Hold on the reply's approval card on WhatsApp.",
+    "summary": "Your WhatsApp answer arrived: reply yes on the supplier thread.",
     "cause": null,
     "vis": "all",
     "authz": null,
     "data": {
       "channel": "whatsapp",
       "message_ref": "r_village_basic_1/118",
-      "card_id": "01JB5VQ0000000000000000127",
-      "card_kind": "gate",
-      "option": "hold",
+      "card_id": "01JB5VQ0000000000000000129",
+      "card_kind": "needs_you",
+      "option": null,
       "destination": "thread-supplier-1"
     },
     "trace": {
