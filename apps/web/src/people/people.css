@@ -1,0 +1,102 @@
+/* S-26 Meetings and S-27 My plate (PPL-40a): neutral role tokens, the type ramp steps only. */
+.people-preview {
+  margin: 0 0 var(--space-16);
+  color: var(--color-ink-2);
+  font-size: var(--text-14);
+}
+.people-h3 {
+  margin: var(--space-16) 0 var(--space-4);
+  font: 800 var(--text-16) / 1.4 var(--font-display);
+}
+.people-flag {
+  margin: 0 0 var(--space-12);
+  padding: var(--space-12);
+  border: 2px solid var(--color-signal-needs);
+  border-radius: var(--radius-controls);
+  font-size: var(--text-14);
+}
+.meeting-pick {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  box-sizing: border-box;
+  justify-content: center;
+  min-height: 44px;
+  gap: var(--space-4);
+}
+.screen-body a.meeting-pick {
+  padding-left: var(--space-12);
+  border-left: 4px solid transparent; /* the current meeting is marked by this bar */
+  color: var(--color-ink-1);
+  text-decoration: none;
+}
+.meeting-pick b {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.screen-body a.meeting-pick[aria-current="page"] {
+  border-left-color: var(--color-brand-primary);
+}
+.meeting-pick .bitem-sub {
+  color: var(--color-ink-2);
+}
+.minutes-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+  margin: 0 0 var(--space-16);
+}
+.minutes-bar p {
+  margin: 0;
+  font-size: var(--text-14);
+}
+.people-list .bitem,
+.plate-list .bitem {
+  flex-wrap: wrap;
+}
+.evidence {
+  flex-basis: 100%;
+  font-size: var(--text-14);
+}
+.evidence summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+.evidence ul {
+  margin: 0;
+  padding: 0 0 0 var(--space-16);
+}
+.evidence li {
+  margin: 0 0 var(--space-8);
+}
+.evidence q {
+  display: block;
+}
+.evidence-by,
+.evidence-none {
+  color: var(--color-ink-2);
+  font-size: var(--text-12);
+}
+.plate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+.plate-status {
+  display: block;
+  min-height: calc(1.5 * var(--text-14));
+  margin: 0 0 var(--space-12);
+  font-size: var(--text-14);
+}
+.plate-status:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+@media (max-width: 767px) {
+  .plate-actions {
+    flex-basis: 100%;
+  }
+}

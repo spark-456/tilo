@@ -24,6 +24,8 @@ import { S_21 } from "./S_21";
 import { S_22 } from "./S_22";
 import { S_23 } from "./S_23";
 import { S_24 } from "./S_24";
+import { S_26 } from "./S_26";
+import { S_27 } from "./S_27";
 import { More, ScreensIndex } from "./ScreensIndex";
 import { inARun } from "./inARun";
 import { SCREENS } from "./meta";
@@ -53,7 +55,7 @@ const COMPONENTS: Readonly<Record<string, ComponentType<ScreenProps>>> = {
   "S-05": S_05, "S-06": NeedsYou, "S-07": GateSheet, "S-08": Consent, "S-09": Meeting, "S-10": S_10,
   "S-11": S_11, "S-12": S_12, "S-13": Library, "S-14": S_14, "S-15": Autonomy, "S-16": Channels,
   "S-17": Mail, "S-18": Team, "S-19": Connections, "S-21": Artifacts, "S-22": S_22, "S-23": Estimate,
-  "S-24": S_24,
+  "S-24": S_24, "S-26": S_26, "S-27": S_27,
 };
 
 export interface ScreenMatch {

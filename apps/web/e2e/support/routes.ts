@@ -28,5 +28,7 @@ export const ALL_ROUTES: readonly string[] = [
   "/settings",
   "/estimate",
   "/pilot",
+  "/meetings",
+  "/plate",
   "/more",
 ];
