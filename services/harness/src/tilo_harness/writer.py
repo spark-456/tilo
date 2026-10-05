@@ -27,10 +27,12 @@ writer that simply runs longer than `lease_s` loses its world out from under it.
 from __future__ import annotations
 
 import copy
+import functools
 import secrets
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from tilo_harness.ids import ORG_ID, RUN_ID, WORLD_ID, check_id
 from tilo_harness.validator import EventRejected, EventValidator, WorldState
@@ -52,6 +54,17 @@ _NULL_TRACE: dict[str, Any] = {
     "latency_ms": None,
     "archive_ref": None,
 }
+
+
+def _locked[F: Callable[..., Any]](method: F) -> F:
+    """Runs the method under the writer's lock: the loop's thread and an API thread both write."""
+
+    @functools.wraps(method)
+    def run(self: WorldWriter, *args: Any, **kwargs: Any) -> Any:
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return cast(F, run)
 
 
 class WriterBusy(Exception):
@@ -119,6 +132,7 @@ class WorldWriter:
         self._state.world_id = world_id
         self._view_ids: dict[str, set[str]] = {}
         self._view_seq: dict[str, int] = {}
+        self._lock = threading.RLock()
 
     @property
     def world_id(self) -> str:
@@ -177,6 +191,7 @@ class WorldWriter:
 
         self._store.transact(self._org_id, self._world_id, _release)
 
+    @_locked
     def emit(
         self,
         *,
@@ -194,12 +209,15 @@ class WorldWriter:
         vis: str | list[str] = "all",
         authz: dict[str, Any] | None = None,
         trace: dict[str, Any] | None = None,
+        event_id: str | None = None,
     ) -> dict[str, Any]:
+        """With `event_id` the event is committed under that id (FR-HIL-07): the same id and content again is a
+        resend that returns the committed event and writes nothing; other content raises `EventRejected` (EV-10)."""
         now = self._clock()
         entry = self._validator.registry_types.get(type) if isinstance(type, str) else None
         event = {
             "v": "1.0",
-            "id": new_ulid(now),
+            "id": event_id or new_ulid(now),
             "seq": self._state.last_seq + 1,
             "ts": format_ts(now),
             "world_id": self._world_id,
@@ -219,8 +237,12 @@ class WorldWriter:
             "data": data,
             "trace": trace if trace is not None else dict(_NULL_TRACE),
         }
+        committed = self._state.seen.get(event_id) if event_id else None
+        if committed is not None and _identical(event | {"seq": committed["seq"], "ts": committed["ts"]}, committed):
+            return copy.deepcopy(committed)
         return self._write(event)
 
+    @_locked
     def append(self, event: dict[str, Any]) -> dict[str, Any]:
         """Writes a pre-built event unchanged (the replay path): `seq` must be exactly
         `last_seq + 1`, `id` must be unused, `cause` must be null or an earlier event of this

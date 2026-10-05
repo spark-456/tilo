@@ -108,3 +108,17 @@ skills-test:
 # too, so the older documented form keeps working).
 deploy env="dev":
     python -c "import sys; env='{{env}}'; env=env[4:] if env.startswith('env=') else env; sys.exit(sys.stderr.write(f'deploy: only env=dev is allowed here, got {env!r}\n') or 1) if env != 'dev' else sys.exit(sys.stderr.write('deploy: infra/ is not applied yet (ticket P0-07 defines the plan; the user runs terraform apply)\n') or 1)"
+
+# Dispatch the tilo-dev deploy workflow (P0-07a) on main: it builds the images, swaps them on Cloud Run and
+# smoke-tests. Refuses everything but dev; needs `gh` signed in. Steps and variables: docs/deploy-dev.md.
+deploy-dev env="dev":
+    python -c "import sys; env='{{env}}'; env=env[4:] if env.startswith('env=') else env; sys.exit(sys.stderr.write(f'deploy-dev: only env=dev is allowed, got {env!r}\n') or 1) if env != 'dev' else None"
+    gh workflow run deploy-dev.yml --ref main
+
+# Build the web app and deploy it to Firebase Hosting on the tilo-dev project (P0-07c). The build is given an empty
+# VITE_TILO_API_URL, so the deployed app runs the fixture / replay world with no backend. Pinned to the dev project:
+# no parameter, no other project, never tilo-demo. Needs your own `firebase login` first (the CI deployer has no
+# Firebase role). Steps and the resulting URL: docs/deploy-dev.md.
+deploy-web:
+    python -c "import os,subprocess,sys; sys.exit(subprocess.call('pnpm --filter @tilo/web run build', shell=True, env=dict(os.environ, VITE_TILO_API_URL='' )))"
+    pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0

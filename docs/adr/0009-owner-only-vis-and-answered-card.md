@@ -1,9 +1,11 @@
 # ADR-0009: Owner-only event visibility, and the card on `question.answered`
 
-- Status: Proposed — awaiting user approval (2026-10-02, architect; issue #125, BQ-73). It changes
+- Status: Accepted (2026-10-05, user decision: "yes to all as you think necessary", relayed by the supervisor;
+  proposed 2026-10-02 by the architect; issue #125, BQ-73). It changes
   frozen contracts (`event.schema.json`, `events/data/question.answered.schema.json`,
-  `events/registry.yaml`, `event.rules.md`), so nothing in `contracts/` changes until the user
-  approves (root `CLAUDE.md`, ADR-0002 decision 2).
+  `events/registry.yaml`, `event.rules.md`). The user's approval covers that change; this status
+  edit does not make it, so `contracts/` is changed by its own architect PR (root `CLAUDE.md`,
+  ADR-0002 decision 2).
 - Deciders: user (approval), architect (proposal)
 - Requirement: FR-HIL-01, FR-HIL-02, FR-HIL-09, FR-HIL-11, FR-CHN-05, SEC-07 (PRD 9.3, 9.5, 9.6,
   10.1, 10.3, 15.3)

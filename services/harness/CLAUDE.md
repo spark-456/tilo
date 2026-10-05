@@ -7,7 +7,7 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 ## Commands
 - `uv run pytest services/harness/tests -m "not emulator"` — fast suite
 - `uv run pytest services/harness/tests -m emulator` — Firestore-emulator suite (Java + firebase-tools)
-- `just harness-skeleton` — runs `python -m tilo_harness.skeleton` against the emulator; `just check` — full gate
+- `just harness-skeleton` — runs `python -m tilo_harness.skeleton` against the emulator; `just check` — full gate. Image: `services/harness/Dockerfile` runs `tilo_harness.app:app` (`/healthz` only, P0-07a).
 
 ## Contracts
 - Reads (read-only): `contracts/event*`, `common`, `events/{registry.yaml,data/*}`, `layout`, `plan`,
@@ -16,13 +16,13 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 - Writes: Firestore (worlds, events, views, checkpoints); Pub/Sub to BigQuery (later ticket). Own fixtures: `fixtures/three_agent/`, `tests/fixtures/skills*/`.
 
 ## Config
-- `config/agents.yaml` via `config.load_agents_config()` (invalid or missing: `AgentsConfigError`, start-up stops); skills via `skills.SkillRegistry`.
+- `config/agents.yaml` via `config.load_agents_config()` (invalid or missing: `AgentsConfigError`, start-up stops).
 
 ## Requirement IDs
 - P0-09 (D-11): skeleton, writer, store. FR-AGT-01/02/03: `executor.run_plan` (PG-02/03/11
   pre-flight writes nothing; `max_specialists` semaphore; deps before start), skill pins.
-- FR-AGT-05: `must_ask.MustAsk` (rules in code; a model reply can only add a question, an unreadable
-  one asks); `run_plan(must_ask=)` parks the asked unit and skips its dependents.
+- FR-AGT-05: `must_ask.MustAsk` (rules in code; a model reply can only add a question; card stored first);
+  `run_plan(must_ask=)` parks the asked unit. FR-HIL-10: `question_wait=` (`QuestionWait`) waits (no slot; a failed answer never strands the deadline, #338) and `Ask.runs` decides: Hold/default leave it held.
 - FR-AGT-12: `verifier.Verifier` (rules in code, then only the verifier-role model; `verified` recomputed); `run_plan(verifier=)` reviews every handed-over artifact.
 
 ## Local rules

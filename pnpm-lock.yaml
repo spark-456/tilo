@@ -63,6 +63,9 @@ importers:
       fast-check:
         specifier: ^4.10.2
         version: 4.10.2
+      firebase-tools:
+        specifier: 15.31.0
+        version: 15.31.0(@types/node@22.20.4)
       happy-dom:
         specifier: ^20.14.5
         version: 20.14.5

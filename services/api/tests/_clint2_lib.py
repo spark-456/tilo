@@ -30,6 +30,8 @@ from _cards_lib import build_registry as build_schema_registry
 from _clint1_lib import FLOW_USER, OTHER_USER, Flow, registered_event_types, seam
 from tilo_connectors.mock import MockConnector
 from tilo_connectors.registry import ConnectorRegistry
+from tilo_providers.fake import FakeModelProvider
+from tilo_providers.interfaces import GenerateRequest, GenerateResponse
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 SKILLS_ROOT = REPO_ROOT / "services" / "harness" / "tests" / "fixtures" / "skills"  # skills/ is empty until #70
@@ -211,6 +213,31 @@ class ScriptedRunner:
         return UnitOutcome(success=True, summary=f"Finished {unit['title']}.", artifact_refs=(ref,))
 
 
+class ClearModel(FakeModelProvider):
+    """The must-ask model of a flow that is not about questions (FR-AGT-05, BQ-236): every unit is judged clear."""
+
+    def __init__(self) -> None:
+        super().__init__(profile_id="scripted-clear")
+
+    def generate(self, request: GenerateRequest) -> GenerateResponse:
+        return GenerateResponse(text='{"ask": false}', profile_id=self._profile_id)
+
+
+def covering_policy(owner: str = FLOW_USER) -> dict[str, Any]:
+    """The owner's L1 ("ask me each time") autonomy policy for send_email on the mock connector. It covers the
+    action for FR-AGT-05's rule (PRD 8.3: no question for a send an autonomy policy covers) and changes nothing
+    else: at L1 the policy engine gates exactly as with no policy."""
+    stamp = {"by": owner, "at": "2026-09-29T09:30:00.000Z"}
+    return {
+        "id": "pol_send_ask", "owner": owner, "action_type": "send_email",
+        "scope": {"connectors": [MOCK_ID], "recipients": [], "domains": [], "districts": []},
+        "limits": {"per_day": None, "credits": None},
+        "conditions": {"no_attachments": True, "no_new_recipients": True, "no_safety_flags": True},
+        "level": "L1", "undo_window_s": 60, "expiry": None, "notify_channel": "email", "team_lead_domains": [],
+        "created_by": stamp, "changed_by": stamp, "history": [{**stamp, "change": "Created at L1", "level": "L1"}],
+    }  # fmt: skip
+
+
 class CrashAfterSendMock(MockConnector):
     """The provider accepted the send, then the connection reset before the outbox could record it: `send_reply`
     records the send and raises on its first call only (what FR-AGT-11's "retried send step" looks like)."""
@@ -316,6 +343,9 @@ class RunFlow:
         overrides[seam(deps, "get_connector_adapters")] = lambda: {MOCK_ID: self.adapter}
         overrides[seam(deps, "get_outbox_store")] = lambda: self.outbox_store
         overrides[deps.get_event_writer] = lambda: self.writer
+        roles = ("director", "lead", "specialist", "verifier", "writer", "narrator")
+        providers = {role: ClearModel() for role in roles}
+        overrides[seam(deps, "get_must_ask_providers")] = lambda: providers  # judges every unit clear
 
     # the seam callables (keyword-only, as API_CL_INT_2.md fixes them)
 
@@ -480,9 +510,15 @@ def index_of(events: list[dict[str, Any]], event: dict[str, Any]) -> int:
 
 
 def build_run_flow(
-    repo_root: pathlib.Path, *, ambiguous: list[str] | None = None, adapter_factory: Callable[[Any], Any] | None = None
+    repo_root: pathlib.Path,
+    *,
+    ambiguous: list[str] | None = None,
+    adapter_factory: Callable[[Any], Any] | None = None,
+    covered: bool = False,
 ) -> RunFlow:
-    """A fresh store, `Flow` (clear task: no questions) and `RunFlow`. Usable inside a Hypothesis example."""
+    """A fresh store, `Flow` (clear task: no questions) and `RunFlow`. Usable inside a Hypothesis example. The plan's
+    send is T2 and, with no autonomy policy covering it, asks a question before its gate card (PRD 8.3, BQ-236);
+    `covered` installs the owner's L1 policy for it, so a flow about the gate meets no question."""
     from _api_lib import make_store  # noqa: PLC0415
     from _clint1_lib import brief_reply, make_spy_safety  # noqa: PLC0415
     from tilo_connectors import InMemoryOutboxStore  # noqa: PLC0415
@@ -490,6 +526,8 @@ def build_run_flow(
     store = make_store()
     flow = Flow(repo_root, store, make_spy_safety(), brief_reply([] if ambiguous is None else ambiguous))
     adapter = adapter_factory(mock_declaration()) if adapter_factory else None
+    if covered:
+        store.policies["pol_send_ask"] = covering_policy()
     return RunFlow(flow, InMemoryOutboxStore(), adapter)
 
 
@@ -507,12 +545,14 @@ __all__ = [
     "UNIT_ARTIFACT",
     "WORK_PREFIXES",
     "BAD_PLANS",
+    "ClearModel",
     "CrashAfterSendMock",
     "RunFlow",
     "assert_stream_valid",
     "bad_plan",
     "base_plan",
     "build_run_flow",
+    "covering_policy",
     "index_of",
     "layout_for",
     "only",

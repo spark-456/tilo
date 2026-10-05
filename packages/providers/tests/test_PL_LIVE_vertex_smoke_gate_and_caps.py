@@ -158,7 +158,9 @@ def test_PL_LIVE_02_default_caps_are_small_and_hard_limits_bound_the_flags() -> 
     assert 0 < module.DEFAULT_MAX_TOTAL_CREDITS <= 2.0  # at most US$0.01: tiny by default
     assert module.DEFAULT_MAX_TOTAL_CREDITS <= module.HARD_MAX_TOTAL_CREDITS <= 100.0
     assert module.SMOKE_ROLES == ROLES
-    assert module.THINKING_MINIMUM == "minimal"
+    # Live evidence (5 Oct 2026): Vertex answers 400 to THINKING_LEVEL_MINIMAL for the director profile, and the same
+    # call with no thinking level succeeds. So the smoke sends none (a correction of the earlier "minimal" pin).
+    assert module.THINKING_MINIMUM is None
 
 
 def test_PL_LIVE_02_prompt_is_fixed_short_and_synthetic() -> None:

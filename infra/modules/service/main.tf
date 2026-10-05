@@ -80,6 +80,10 @@ resource "google_cloud_run_v2_service" "this" {
       template[0].containers[0].image,
       client,
       client_version,
+      # The API defaults this service-level block (min/manual instance count
+      # 0), which showed as a perpetual diff. template[0].scaling above is
+      # the real min/max and stays managed.
+      scaling,
     ]
   }
 }

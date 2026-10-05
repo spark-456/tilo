@@ -1,10 +1,11 @@
 # ADR-0013: An L2 instruction records the action it asks for
 
-- Status: Proposed — awaiting user approval (2026-10-02, architect; issue #28, BQ-57, PI-21). It
+- Status: Accepted (2026-10-05, user decision: "yes to all as you think necessary", relayed by the supervisor;
+  proposed 2026-10-02 by the architect; issue #28, BQ-57, PI-21). It
   adds fields to frozen contracts (`card.schema.json`, `events/data/channel.message_in`,
-  `events/data/world.requested`) and tightens outbox rule OB-01, so nothing in `contracts/`
-  changes until the user approves (root `CLAUDE.md`). The interim engine rule in BQ-57 is decided
-  and does not wait for this ADR.
+  `events/data/world.requested`) and tightens outbox rule OB-01. The user's approval covers that
+  change; this status edit does not make it, so `contracts/` is changed by its own architect PR
+  (root `CLAUDE.md`). The interim engine rule in BQ-57 is decided and did not wait for this ADR.
 - Deciders: user (approval), architect (proposal)
 - Requirement: FR-HIL-05, FR-CHN-11 (PRD 10.4, 11.2, 11.4); follows ADR-0007
 

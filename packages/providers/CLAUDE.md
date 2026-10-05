@@ -14,7 +14,7 @@ The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `Search
 ## Config
 - `config/models.yaml` + `config/prices.yaml` (PL-06); `TILO_MODELS_FILE` selects `models.nim.yaml` (ADR-0003) or `models.dev.yaml`.
 - `prompts/<role>/<template>.md` via `tilo_providers.prompts`; `LIVE=1` goes live; `+TILO_RECORD=1` records.
-  `just vertex-smoke` (PL-02, `vertex_smoke.py`): one capped call per role on user ADC (`GOOGLE_LOCATION`, default global; no API key), stops at the first failure; `--replay` serves recordings. Refused before any client: `GOOGLE_LOCATION` not global/us/eu/region, bad project id, `GOOGLE_VERTEX_BASE_URL` set, service-account key (the variable's file or gcloud's well-known ADC file). `thinking_level` goes only to profiles with `thinking`; google `output_tokens` include thought tokens, a None count is 0.
+  `just vertex-smoke` (PL-02, `vertex_smoke.py`): one capped call per role on user ADC (`GOOGLE_LOCATION`, default global; no API key), stops at the first failure; `--replay` serves recordings. Refused before any client: `GOOGLE_LOCATION` not global/us/eu/region, bad project id, `GOOGLE_VERTEX_BASE_URL` set, service-account key (the variable's file or gcloud's well-known ADC file). the smoke sends no `thinking_level` (Vertex 400s on `minimal`); a 400 prints its scrubbed reason (`rejected`, check it before pasting); `thinking_level` goes only to profiles with `thinking`; google `output_tokens` include thought tokens, a None count is 0.
 - `config/conformance/<profile>.json` (PL-05): `load_providers_config(..., conformance_dir=...)` refuses a role whose primary/
   fallback/cascade profile fails; a missing result warns unless `TILO_REQUIRE_CONFORMANCE=1`.
 

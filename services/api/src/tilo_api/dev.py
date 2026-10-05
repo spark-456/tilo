@@ -124,6 +124,7 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
     refuse_if_unsafe(env)
     origins = cors_origins(env)
     store = deps.Store()
+    store.policies["pol_dev_send"] = dev_run.dev_send_policy(DEV_OWNER)  # the dev run goes straight to its gate card
     writer = DevEventWriter(store)
 
     def principal(request: Request) -> deps.Principal:
