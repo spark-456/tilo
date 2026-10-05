@@ -1,0 +1,203 @@
+[
+  {
+    "id": "mt_q4_plan",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Q4 planning",
+    "series": "q4_planning_weekly",
+    "scheduled": null,
+    "agenda": [
+      {
+        "title": "Launch date",
+        "minutes": 15
+      },
+      {
+        "title": "Rate sheet",
+        "minutes": null
+      }
+    ],
+    "attendees": [
+      {
+        "name": "Asha Rao",
+        "user": "u_owner"
+      },
+      {
+        "name": "Priya",
+        "user": "u_priya"
+      },
+      {
+        "name": "Dev from Acme",
+        "user": null
+      }
+    ],
+    "attestation": {
+      "by": "u_owner",
+      "at": "2026-10-05T09:00:00.000Z",
+      "notice_version": "1.0.0"
+    },
+    "source": "upload",
+    "status": "minuted",
+    "ended_reason": "completed",
+    "transcript": {
+      "artifact_id": "art_transcript_q4_plan",
+      "version": 1
+    },
+    "minutes": {
+      "artifact_id": "art_minutes_q4_plan",
+      "version": 1
+    },
+    "minutes_confirmed_by": null,
+    "delete_transcript_after": "2026-11-05T10:00:00.000Z",
+    "delete_minutes_after": "2027-01-04T10:00:00.000Z",
+    "created_at": "2026-10-05T09:00:00.000Z"
+  },
+  {
+    "id": "mt_vendor_sync",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Vendor sync",
+    "series": null,
+    "scheduled": null,
+    "agenda": [
+      {
+        "title": "Rate sheet",
+        "minutes": null
+      }
+    ],
+    "attendees": [
+      {
+        "name": "Asha Rao",
+        "user": "u_owner"
+      },
+      {
+        "name": "Priya",
+        "user": "u_priya"
+      },
+      {
+        "name": "Dev from Acme",
+        "user": null
+      }
+    ],
+    "attestation": {
+      "by": "u_owner",
+      "at": "2026-10-06T09:00:00.000Z",
+      "notice_version": "1.0.0"
+    },
+    "source": "upload",
+    "status": "minuted",
+    "ended_reason": "completed",
+    "transcript": {
+      "artifact_id": "art_transcript_vendor_sync",
+      "version": 1
+    },
+    "minutes": {
+      "artifact_id": "art_minutes_vendor_sync",
+      "version": 1
+    },
+    "minutes_confirmed_by": {
+      "by": "u_owner",
+      "at": "2026-10-06T10:30:00.000Z"
+    },
+    "delete_transcript_after": "2026-11-06T10:00:00.000Z",
+    "delete_minutes_after": "2027-01-05T10:00:00.000Z",
+    "created_at": "2026-10-06T09:00:00.000Z"
+  },
+  {
+    "id": "mt_design_review",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Design review",
+    "series": null,
+    "scheduled": {
+      "start": "2026-10-07T03:30:00.000Z",
+      "end": "2026-10-07T04:30:00.000Z"
+    },
+    "agenda": [
+      {
+        "title": "Launch date",
+        "minutes": 15
+      },
+      {
+        "title": "Rate sheet",
+        "minutes": null
+      }
+    ],
+    "attendees": [
+      {
+        "name": "Asha Rao",
+        "user": "u_owner"
+      },
+      {
+        "name": "Priya",
+        "user": "u_priya"
+      },
+      {
+        "name": "Dev from Acme",
+        "user": null
+      }
+    ],
+    "attestation": {
+      "by": "u_owner",
+      "at": "2026-10-07T03:00:00.000Z",
+      "notice_version": "1.0.0"
+    },
+    "source": "bot",
+    "status": "live",
+    "ended_reason": null,
+    "transcript": null,
+    "minutes": null,
+    "minutes_confirmed_by": null,
+    "delete_transcript_after": null,
+    "delete_minutes_after": null,
+    "created_at": "2026-10-07T03:00:00.000Z"
+  },
+  {
+    "id": "mt_standup",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "title": "Team stand-up",
+    "series": null,
+    "scheduled": {
+      "start": "2026-10-06T04:00:00.000Z",
+      "end": "2026-10-06T04:15:00.000Z"
+    },
+    "agenda": [
+      {
+        "title": "Launch date",
+        "minutes": 15
+      },
+      {
+        "title": "Rate sheet",
+        "minutes": null
+      }
+    ],
+    "attendees": [
+      {
+        "name": "Asha Rao",
+        "user": "u_owner"
+      },
+      {
+        "name": "Priya",
+        "user": "u_priya"
+      },
+      {
+        "name": "Dev from Acme",
+        "user": null
+      }
+    ],
+    "attestation": {
+      "by": "u_owner",
+      "at": "2026-10-06T04:00:00.000Z",
+      "notice_version": "1.0.0"
+    },
+    "source": "bot",
+    "status": "discarded",
+    "ended_reason": "left_on_request",
+    "transcript": null,
+    "minutes": null,
+    "minutes_confirmed_by": null,
+    "delete_transcript_after": null,
+    "delete_minutes_after": null,
+    "created_at": "2026-10-06T04:00:00.000Z"
+  }
+]

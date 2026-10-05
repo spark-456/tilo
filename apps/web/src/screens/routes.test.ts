@@ -8,9 +8,9 @@ import { matchScreen } from "./routes";
 const FLOW_SCREENS = ["S-01", "S-02", "S-03", "S-04"];
 
 describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
-  it("S-01..S-24 are all listed, and only the Should screens have no address", () => {
+  it("S-01..S-27 are all listed (S-26 and S-27 are the people screens, PPL-40a), and only the Should screens have no address", () => {
     expect(SCREENS.map((s) => s.id)).toEqual(
-      Array.from({ length: 25 }, (_, i) => `S-${String(i + 1).padStart(2, "0")}`),
+      Array.from({ length: 27 }, (_, i) => `S-${String(i + 1).padStart(2, "0")}`),
     );
     for (const s of SCREENS) expect(s.path === null).toBe(s.priority === "Should");
   });
