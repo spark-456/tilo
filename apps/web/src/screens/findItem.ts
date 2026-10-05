@@ -3,7 +3,7 @@
 // or in the events that carry it (artifacts). State comes from the reducer, never a guess (HR-1).
 import type { Event, Layout } from "@tilo/contracts";
 import type { WorldState } from "../world/reducer";
-import { BUILDING_STATE, agentNames } from "../world/runSummary";
+import { BUILDING_STATE, ISLAND_STATE, agentNames } from "../world/runSummary";
 
 export interface Found {
   readonly kind: string;
@@ -19,12 +19,6 @@ const ARTIFACT_STATE: Readonly<Record<string, string>> = {
   "artifact.versioned": "New version saved",
   "artifact.rolled_back": "Restored to an earlier version",
 };
-const ISLAND_STATE = {
-  locked: "Locked",
-  requested: "Waiting for consent",
-  connected: "Connected",
-  failed: "Connection lost",
-} as const;
 
 /** The item with this id anywhere in the layout or the events (artifacts), with its place and its
  * state text. */

@@ -152,12 +152,15 @@ def budget_respected(obs: Observation) -> list[Finding]:
 
 
 def delivers_something(obs: Observation) -> list[Finding]:
-    """REPORTED, not gated: a run that completes should have delivered at least one artifact. Today
-    `artifact.delivered` is written only for a gated action, so a plan without one finishes with
-    "Done: 0 deliverables" (services/api runs.py); the bank counts it so the gap stays visible."""
+    """REPORTED, not gated: a run whose units really produced an item (an `artifact.created`) and that completes should
+    have delivered at least one (BQ-218: the plan's `deliver` unit delivers them in Tilo, ungated). A run whose units
+    produced nothing delivers nothing and is not counted here: nothing is made up to fill the count (HR-1)."""
     done = next((e for e in obs.events if e["type"] == "world.completed"), None)
-    if done and done["data"]["deliverable_count"] < 1:
-        return [Finding("delivers_something", "the run completed with 0 delivered artifacts", hard=False)]
+    made = any(e["type"] == "artifact.created" for e in obs.events)
+    if done and made and done["data"]["deliverable_count"] < 1:
+        return [
+            Finding("delivers_something", "the run made items but completed with 0 delivered artifacts", hard=False)
+        ]
     return []
 
 

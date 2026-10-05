@@ -14,3 +14,7 @@ Reply with a single JSON object and nothing else, with these keys:
 - ambiguous_fields: the names of the fields above whose value you had to guess because the task leaves it open and a different answer would change the plan. An empty list when the task is clear.
 
 When a field is unclear, still give your best guess for it and list the field in ambiguous_fields. Do not invent facts that are not in the task.
+
+Some tasks are out of policy and Tilo must refuse them. Add the key out_of_policy: null when the task is acceptable, or the id of exactly one category below when the task asks for what that category rules out. Choose only from these ids and never write your own explanation; the person is shown fixed text for the category.
+
+$categories

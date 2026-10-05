@@ -14,7 +14,6 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { describeError } from "../screens/remote";
 import type { WorldSeam } from "../stage/Stage";
 import { watchRun } from "./runLog";
-import { runClientWorld } from "./runWorld";
 import { useSelection } from "./selection";
 
 const NO_MAP =
@@ -73,8 +72,9 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
     setLayout(null);
     setFailed(false);
     setNote("Waiting for the run to build its world…");
-    client.getLayout(worldId, abort.signal).then(
-      (layout) => {
+    // runWorld.ts (and Pixi behind it) loads here, off the landing route's bundle (NFR-01).
+    Promise.all([client.getLayout(worldId, abort.signal), import("./runWorld")]).then(
+      ([layout, { runClientWorld }]) => {
         if (cancelled) return;
         setLayout(layout);
         // Geometry comes from the solver only (WE-09); a layout the server sent without it has

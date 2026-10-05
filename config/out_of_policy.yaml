@@ -1,0 +1,26 @@
+# Out-of-policy task categories (FR-INT-12, PRD 7.1, 10.4, 16.1, 16.3, BQ-203).
+# The Director only names a category id; code shows the person `reason` and `alternative` from here, so no
+# model-written or task-quoting text reaches a person. `alternative` is the nearest task Tilo can do.
+# Shape: categories: [{id (slug), reason, alternative}], ids unique, each text 1..400 characters, no other keys.
+categories:
+  - id: credential_handling
+    reason: Tilo never handles passwords, logins or saved credentials.
+    alternative: Connect the account through its own sign-in and consent screen, then ask Tilo for the work itself.
+  - id: unapproved_send
+    reason: Nothing leaves Tilo without your approval or a policy you set, and a person always approves the riskiest actions.
+    alternative: Ask Tilo to prepare the messages or payments as drafts that you approve one by one.
+  - id: bypass_safeguards
+    reason: Tilo does not skip its approval gates, safety screen or bot checks, and no one can switch them off for a task.
+    alternative: Ask Tilo to run the work normally, and approve each gate it shows you.
+  - id: deception
+    reason: Tilo does not impersonate people, fake reviews or documents, or mislead anyone.
+    alternative: Ask Tilo to write the same message or document in your own name, with accurate facts.
+  - id: bulk_or_unsolicited_sending
+    reason: Tilo does not send bulk or unsolicited messages to people who have not agreed to hear from you.
+    alternative: Ask Tilo to draft one message for contacts who have opted in, and approve it before it goes.
+  - id: covert_or_private_data
+    reason: Tilo does not collect private details, track people without their knowledge or reach areas you cannot sign in to.
+    alternative: Ask Tilo to work from public pages and the files and accounts you have connected yourself.
+  - id: destructive_without_confirmation
+    reason: Tilo does not delete, share or move data without asking you first.
+    alternative: Ask Tilo to list what it would change, then confirm each deletion or share yourself.

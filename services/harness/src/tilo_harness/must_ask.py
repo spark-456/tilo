@@ -26,9 +26,10 @@ from typing import Any, cast
 
 from tilo_policy.tiers import RiskTable, load_risk_table
 from tilo_providers.interfaces import GenerateRequest, ModelProvider
-from tilo_providers.prompts import load_prompt, neutralise_marker
+from tilo_providers.prompts import load_prompt
 
 from tilo_harness.config import AgentsConfig
+from tilo_harness.untrusted import neutralise
 from tilo_harness.writer import format_ts, new_ulid
 
 ROLE = "specialist"  # prompts/specialist/must_ask_*.md
@@ -154,7 +155,7 @@ class MustAsk:
             "title": unit["title"],
             "actions": ", ".join(unit["actions"]) or "none",
         }
-        prompt = load_prompt(ROLE, "must_ask_task.md", {k: neutralise_marker(v, "TASK") for k, v in fields.items()})
+        prompt = load_prompt(ROLE, "must_ask_task.md", {k: neutralise(v, limit=200) for k, v in fields.items()})
         return GenerateRequest(system=self._system, prompt=prompt, json_mode=True, max_output_tokens=400)
 
     def raise_question(

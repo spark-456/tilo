@@ -3,18 +3,27 @@
 // redraws the stage in place: characters get smaller and every tag carries its recorded state,
 // and nothing is emitted or replayed (HR-1..HR-3, FR-WLD-09: no event, no new animation).
 import type { Event, Layout } from "@tilo/contracts";
-import { Container } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { villageBasicEvents, villageBasicLayout } from "../../test-support/worldFixtures";
 import { setDensity } from "../display/density";
 import { AGENT_SCALE } from "./art/agent";
+import { BUILDING_STATE, ISLAND_STATE } from "./runSummary";
 import { runClientWorld } from "./runWorld";
+
+const invert = (m: Record<string, string>) =>
+  Object.fromEntries(Object.values(m).map((v) => [v, 1]));
 
 // Pixi's Text needs a canvas the test runtime does not have, so a tag is a bare container whose
 // label is its text: what matters here is which words the renderer asks for.
 vi.mock("./art/labels", async () => {
-  const { Container: C } = await import("pixi.js");
-  const pill = (text: string) => Object.assign(new C(), { label: text });
+  const { Container: C, Graphics: G } = await import("pixi.js");
+  // 130 px wide, about a name and its state word at 12 px: tag placement needs a width to work with.
+  const pill = (text: string) => {
+    const c = Object.assign(new C(), { label: text });
+    c.addChild(new G().rect(-65, -10, 130, 20).fill(0));
+    return c;
+  };
   return {
     makePill: (text: string) => pill(text),
     buildingTag: pill,
@@ -27,13 +36,13 @@ vi.mock("./art/labels", async () => {
 const layout = villageBasicLayout() as unknown as Layout;
 const events = villageBasicEvents() as unknown as Event[];
 
-function stage() {
+function stage(width = 900) {
   const world = new Container();
   const calls = { delivered: 0, seq: 0, render: 0 };
   const stop = runClientWorld({
     world,
     layout,
-    size: () => ({ width: 900, height: 600 }),
+    size: () => ({ width, height: 600 }),
     requestRender: () => {
       calls.render += 1;
     },
@@ -59,7 +68,11 @@ function stage() {
       .filter((c) => c.visible)
       .map((c) => c.label)
       .sort();
-  return { stop, calls, scales, tags };
+  const layers = () => {
+    const [, objects, , labels] = content.children as Container[];
+    return { objects, labels };
+  };
+  return { stop, calls, scales, tags, layers };
 }
 
 beforeEach(() => setDensity("friendly"));
@@ -85,6 +98,63 @@ describe("FR-WLD-14 the stage follows the density mode, read at draw time", () =
     setDensity("friendly");
     expect(s.scales()).toEqual([AGENT_SCALE]);
     expect(s.tags()).toEqual(friendlyTags);
+    s.stop();
+  });
+
+  it("a phone-sized stage keeps the names and drops the state words, which are unreadable there", () => {
+    setDensity("professional");
+    const phone = stage(390);
+    const tags = phone.tags();
+    expect(tags.length).toBeGreaterThan(0);
+    expect(
+      tags.some((t) =>
+        /^(Town Hall|[A-Z][\w ]+) · (At work|Finished|Planned|Being built)$/.test(t),
+      ),
+    ).toBe(false);
+    // Gate states and rank words are the same 6 px type: they go too, and the Policy tag keeps its word.
+    expect(tags.some((t) => t.startsWith("Gate · "))).toBe(false);
+    expect(tags.some((t) => /^(Director|Lead|Verifier|Specialist)$/.test(t))).toBe(false);
+    phone.stop();
+    const wide = stage();
+    expect(wide.tags().some((t) => t.startsWith("Gate · "))).toBe(true); // a full-size stage keeps them
+    wide.stop();
+  });
+
+  it("a building's tag keeps clear of the figures resting in front of any building (FR-WLD-14, 1920 stage)", () => {
+    setDensity("professional");
+    const s = stage(1400);
+    const { objects, labels } = s.layers();
+    const names = new Set(
+      layout.semantic.levels.flatMap((l) =>
+        l.districts.flatMap((d) => d.buildings.map((b) => b.name)),
+      ),
+    );
+    const figures = (objects?.children ?? []).filter((c) => c.scale.x !== 1);
+    const tags = (labels?.children ?? []).filter(
+      (c) => c.visible && names.has(c.label.split(" · ")[0] ?? ""),
+    );
+    expect(figures.length).toBeGreaterThan(0);
+    expect(tags.length).toBeGreaterThan(0);
+    for (const t of tags) {
+      for (const f of figures) {
+        const across = Math.abs(t.x - f.x) < 65 + 18;
+        const down = f.y - 30 * AGENT_SCALE < t.y + 10 && f.y + 6 > t.y - 10;
+        expect(across && down, `${t.label} touches a figure at ${f.x},${f.y}`).toBe(false);
+      }
+    }
+    s.stop();
+  });
+
+  it("a tag's state words are the Inspect panel's: one shared map", () => {
+    setDensity("professional");
+    const s = stage();
+    const words = new Set(Object.values(BUILDING_STATE));
+    const states = s
+      .tags()
+      .filter((t) => t.includes(" · ") && !t.startsWith("Gate · "))
+      .map((t) => t.split(" · ")[1] ?? "");
+    expect(states.length).toBeGreaterThan(0);
+    for (const w of states) expect(words.has(w as never) || w in invert(ISLAND_STATE)).toBe(true);
     s.stop();
   });
 
