@@ -14,7 +14,7 @@ import tomllib
 
 import pytest
 
-SERVICES = ["api", "harness", "channels", "connectors", "browser", "render"]
+SERVICES = ["api", "harness", "channels", "connectors", "browser", "render", "sandbox-web"]
 REQ_NAME = re.compile(r"^\s*([A-Za-z0-9_.-]+)")
 
 
