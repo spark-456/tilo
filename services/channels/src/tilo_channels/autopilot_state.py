@@ -31,12 +31,20 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from tilo_policy.schemas import conforms
+
 ACTION_TYPE = "send_email"
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+DECISION_MAX_AGE_S = 30  # a stored decision authorises an entry at most this long after its `authz.at` (BQ-245, BQ-249)
+SKEW_S = 5  # a decision stamped this far ahead of our clock is still read as now
 
 
 class CancelPending(RuntimeError):
     """The outbox did not confirm the cancel of an entry that may still be scheduled: retry."""
+
+
+class StaleDecision(RuntimeError):
+    """The L2 entry would be created outside its decision's freshness bound: nothing is enqueued, decide again."""
 
 
 class Outbox(Protocol):  # the names of tilo_connectors.outbox.Outbox, which tilo-channels never imports (BQ-158)
@@ -61,6 +69,22 @@ class CardStore(Protocol):  # JSON-able documents keyed (user_id, key): get, ato
 
 def timestamp(ms: int) -> str:
     return datetime.fromtimestamp(ms // 1000, UTC).strftime("%Y-%m-%dT%H:%M:%S") + f".{ms % 1000:03d}Z"
+
+
+def parse_ms(stamp: Any) -> int | None:
+    """Epoch milliseconds of a contract timestamp (RFC 3339 UTC, three fractional digits); None for anything else."""
+    if type(stamp) is not str or not conforms("common.schema.json#/$defs/timestamp", stamp):
+        return None
+    try:
+        return round(datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC).timestamp() * 1000)
+    except (ValueError, OverflowError, OSError):  # the pattern allows dates that do not exist
+        return None
+
+
+def fresh(authz_at: Any, now_ms: int) -> bool:
+    """`authz_at` is no more than the skew ahead of `now_ms` and no more than the bound behind it."""
+    at = parse_ms(authz_at)
+    return at is not None and -SKEW_S * 1000 <= now_ms - at <= DECISION_MAX_AGE_S * 1000
 
 
 def ulid(ms: int) -> str:
@@ -176,6 +200,8 @@ class Ledger:
         authority = {"by": "policy", "ref": doc["policy_id"]} if policy else {"by": "person", "ref": doc["user_id"]}
         if authz is None and policy and isinstance(doc.get("policy_applied"), dict):
             authz = doc["policy_applied"]["authz"]
+            if not fresh(authz.get("at"), ms):  # judged on the clock read that stamps created_at (BQ-245)
+                raise StaleDecision("the card's decision is outside its freshness bound")
         return {
             "id": doc["outbox_id"] or ulid(ms),
             "idempotency_key": f"autopilot:{doc['card_id']}",

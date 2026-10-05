@@ -31,6 +31,7 @@ from tilo_channels.autopilot_state import (
     CardStore,
     Ledger,
     Outbox,
+    StaleDecision,
     StopQueue,
     timestamp,
     ulid,
@@ -195,12 +196,13 @@ class Autopilot:
         index_artifact(self._cards, user_id, doc)  # a preview that died before indexing is completed here
         doc = self._port.resolve(user_id, doc)  # a stale L2 decision is made again; dropped, it is an L1 card below
         if doc["level"] == "L2":  # the entry's real state; a stopped card never enqueues again
-            entry = self._ledger.schedule(user_id, doc)
-            state = entry["state"] if entry else "cancelled"
-            status = (
-                "refused" if state in ("cancelled", "failed") else "scheduled" if state == "scheduled" else "queued"
-            )
-            return Outcome(status, doc["outbox_id"])
+            entry, doc = self._schedule(user_id, doc)
+            if doc["level"] == "L2":
+                state = entry["state"] if entry else "cancelled"
+                status = (
+                    "refused" if state in ("cancelled", "failed") else "scheduled" if state == "scheduled" else "queued"
+                )
+                return Outcome(status, doc["outbox_id"])
         built: dict[str, Any] = {}
         if not self._fake:  # the gate path: nothing is built from the model, the card or the caller beyond the approval
             evidence = evidence_for(doc, approval, self._world_owner())
@@ -222,7 +224,9 @@ class Autopilot:
         if doc is None or doc["state"] == "superseded":
             return Outcome("refused", None)
         if doc["state"] == "open":
-            if doc["level"] == "L2":  # cancels the entry whichever Cancel or Edit claimed the stop first
+            if doc["level"] == "L2" or doc.get(
+                "dropped"
+            ):  # cancels the entry (a dropped card too) whichever Cancel or Edit claimed the stop first
                 status = self._ledger.stop(user_id, doc, "cancel")  # raises CancelPending: retry
             else:  # an L1 card is closed unless its owner's Send came first (a crashed Edit's claim closes it too)
                 send_first = self._ledger.first(user_id, card_id, "decision", "close") == "send"
@@ -243,7 +247,7 @@ class Autopilot:
         if len(instruction) > MAX_INSTRUCTION or "#" in instruction_id or doc["mode"] not in REPLY_FORMATS:
             raise ValueError("edit too long, bad instruction id, or a format the drafter cannot redraft")
         mine = f"edit:{instruction_id}"
-        if doc["state"] == "open" and doc["level"] == "L2":
+        if doc["state"] == "open" and (doc["level"] == "L2" or doc.get("dropped")):
             closed = self._ledger.stop(user_id, doc, mine) == "cancelled"
             closed = closed and self._ledger.first(user_id, card_id, "stop", mine) == mine
         else:
@@ -313,10 +317,28 @@ class Autopilot:
         index_artifact(self._cards, user_id, doc)  # the text DraftArtifacts serves, before any enqueue (BQ-182)
         doc = self._port.resolve(user_id, doc)  # the stored decision, kept only while fresh and bound to this card
         if doc["level"] == "L2" and doc["state"] == "open":  # the recorded decision, never worked out again
-            entry = self._ledger.schedule(user_id, doc)  # the card's one entry, by its key; none once stopped
+            entry, doc = self._schedule(user_id, doc)  # the card's one entry, by its key; none once stopped
             doc = doc | {"scheduled_at": entry["scheduled_at"]} if entry else doc
         _LOG.info("autopilot card %s: %s %s %s", card_id, doc["status"], doc["tier"], doc["level"])
         return _preview(doc)
+
+    def _schedule(self, user_id: str, doc: dict[str, Any]) -> tuple[dict | None, dict[str, Any]]:
+        """`Ledger.schedule` for an L2 card, and the card as it then stands. An entry that would be created outside
+        its decision's bound is refused and the card decided again; an entry that landed while the decision was
+        dropped by another instance is stopped like a Cancel (CHN-WIRE-4: no entry the card's Cancel cannot stop)."""
+        for _ in range(3):
+            try:
+                entry = self._ledger.schedule(user_id, doc)
+            except StaleDecision:
+                doc = self._port.resolve(user_id, doc)
+                if doc["level"] != "L2":
+                    return None, doc
+                continue
+            if entry is not None and self._port.dropped(user_id, doc):
+                self._ledger.stop(user_id, doc, "dropped")  # raises CancelPending: retry
+                return None, self._port.resolve(user_id, doc)
+            return entry, doc
+        raise RuntimeError("the card's policy decision did not settle: retry")
 
     def _decision(
         self, user_id: str, card_id: str, context: DraftContext, result: DraftResult, instructed: bool

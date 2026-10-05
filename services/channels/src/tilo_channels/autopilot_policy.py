@@ -16,45 +16,58 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable
-from datetime import UTC, datetime
 from typing import Any
 
 import tilo_policy
 from tilo_policy.schemas import conforms, event_ok
 
 from tilo_channels.autopilot_gate import gate_id_for, requested_part
-from tilo_channels.autopilot_state import ACTION_TYPE, CardStore, Ledger
+from tilo_channels.autopilot_state import (
+    ACTION_TYPE,
+    DECISION_MAX_AGE_S,
+    SKEW_S,
+    CardStore,
+    Ledger,
+    fresh,
+    parse_ms,
+)
 
-DECISION_MAX_AGE_S = 30  # a stored decision authorises a first enqueue at most this long after its `authz.at`
-SKEW_S = 5  # a decision stamped this far ahead of our clock is still read as now
-MAX_WINDOW_S = 86400
-_ROUNDS = 3
-_TIMESTAMP, _POLICY_ID = "common.schema.json#/$defs/timestamp", "common.schema.json#/$defs/policy_id"
+__all__ = ["DECISION_MAX_AGE_S", "PolicyPort"]
+
+MAX_WINDOW_S = 3600  # policy.schema.json caps undo_window_s here
+MAX_REDECISIONS = 3  # replays after the bound that the outbox keeps refusing must not add decisions for ever
+_ROUNDS = 4
+_POLICY_ID = "common.schema.json#/$defs/policy_id"
 
 
-def _ms(stamp: Any) -> int | None:
-    if not isinstance(stamp, str) or not conforms(_TIMESTAMP, stamp):
+def _is(value: Any, expected: str) -> bool:
+    return type(value) is str and value == expected  # exact str: a subclass cannot vouch for itself
+
+
+def _usable(d: Any, now_ms: int) -> dict[str, str] | None:
+    """The authz of a clean decision for this card (BQ-248), built from validated fields: run_after_undo, T2, L2, no
+    modifier, a policy stamp naming a valid policy id, a readable `at` not ahead of us, and an int window of 1 s or
+    more; None otherwise."""
+    if type(d) is not tilo_policy.Decision:
         return None
-    return round(datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC).timestamp() * 1000)
-
-
-def _usable(d: Any, now_ms: int) -> bool:
-    """A clean decision for this card (BQ-248): run_after_undo, T2, L2, no modifier, a policy stamp naming a valid
-    policy id, a readable `at` not ahead of us, and an int window of at least 1 s."""
-    if not isinstance(d, tilo_policy.Decision):
-        return False
-    if (d.outcome, d.tier, d.level) != ("run_after_undo", "T2", "L2") or d.modifiers != ():
-        return False
-    stamp = d.authz.get("at") if isinstance(d.authz, dict) else None
-    at, window = _ms(stamp), d.undo_window_s
-    if at is None or at > now_ms + SKEW_S * 1000 or d.authz != {"by": "policy", "ref": d.policy_id, "at": stamp}:
-        return False
-    return conforms(_POLICY_ID, d.policy_id) and type(window) is int and 1 <= window <= MAX_WINDOW_S
-
-
-def _fresh(part: dict, now_ms: int) -> bool:
-    at = _ms(part["authz"].get("at"))
-    return at is not None and -SKEW_S * 1000 <= now_ms - at <= DECISION_MAX_AGE_S * 1000
+    if not (_is(d.outcome, "run_after_undo") and _is(d.tier, "T2") and _is(d.level, "L2")):
+        return None
+    authz, window = d.authz, d.undo_window_s
+    if type(d.modifiers) is not tuple or d.modifiers or type(authz) is not dict or len(authz) != 3:
+        return None
+    by, ref, stamp = authz.get("by"), authz.get("ref"), authz.get("at")
+    at = parse_ms(stamp)
+    if (
+        not _is(by, "policy")
+        or type(ref) is not str
+        or ref != d.policy_id
+        or at is None
+        or not conforms(_POLICY_ID, ref)
+    ):
+        return None
+    if at > now_ms + SKEW_S * 1000 or type(window) is not int or not 1 <= window <= MAX_WINDOW_S:
+        return None
+    return {"by": "policy", "ref": ref, "at": str(stamp)}
 
 
 def _proposal(stored: dict) -> tilo_policy.Proposal:
@@ -64,7 +77,7 @@ def _proposal(stored: dict) -> tilo_policy.Proposal:
     return tilo_policy.Proposal(**{k: copy.deepcopy(stored[k]) for k in keys}, facts=facts, instruction=None)
 
 
-def _bound(doc: dict, stored: dict) -> bool:
+def _bound(doc: dict, stored: dict, connector: str) -> bool:
     """BQ-247: the card still says what the decision was made for."""
     return (
         doc["tier"] == "T2"
@@ -73,6 +86,7 @@ def _bound(doc: dict, stored: dict) -> bool:
         and tuple(dict.fromkeys(doc["to"] + doc["cc"])) == tuple(stored["recipients"])
         and doc["thread_id"] == stored["destination"]
         and doc["item"] == stored["item"]
+        and stored["connector"] == connector
     )
 
 
@@ -109,32 +123,45 @@ class PolicyPort:
         """The card as it stands: its newest stored decision, or L1 (with its gate) when the last slot is a drop."""
         if doc is None or "policy_applied" not in doc:
             return doc
-        part = self._head(user_id, doc)[1]
-        if part is None:
+        return self._overlay(doc, self._head(user_id, doc)[1])
+
+    def dropped(self, user_id: str, doc: dict[str, Any]) -> bool:
+        return "policy_applied" in doc and self._head(user_id, doc)[1] is None
+
+    @staticmethod
+    def _overlay(doc: dict[str, Any], part: dict | None) -> dict[str, Any]:
+        if part is None:  # `dropped` marks a card that held an L2 decision: its Cancel and Edit stop its key
             kept = {k: v for k, v in doc.items() if k not in ("policy_applied", "proposal")}
             gate = requested_part(doc, doc["outbox_id"])
-            return kept | {"level": "L1", "undo_window_s": 0, "scheduled_at": None, "approval_requested": gate}
+            at_l1 = {"level": "L1", "undo_window_s": 0, "scheduled_at": None, "approval_requested": gate}
+            return kept | at_l1 | {"dropped": True}
         data = part["data"]
         return doc | {"policy_applied": part, "policy_id": data["policy_id"], "undo_window_s": data["undo_window_s"]}
 
     def resolve(self, user_id: str, doc: dict[str, Any]) -> dict[str, Any]:
-        """The card to enqueue from: before any entry exists, a stale or unbound decision is made again or dropped."""
+        """The card to enqueue from: before any entry exists, a stale or unbound decision is made again or dropped.
+        The new slot is created at the index of the head read that judged the old one; if another instance moved the
+        head, the create fails and the loop reads again. No decision is recorded once the card's key is stored."""
         for _ in range(_ROUNDS):
             now = round(self._clock() * 1000)
-            card = self.view(user_id, doc) or doc
-            if "policy_applied" not in card or card["level"] != "L2" or card["state"] != "open":
+            if "policy_applied" not in doc:
+                return doc
+            n, head = self._head(user_id, doc)
+            card = self._overlay(doc, head)
+            if head is None or card["level"] != "L2" or card["state"] != "open":
                 return card
             if not self._ledger.ours(card) or self._ledger.holds(user_id, card["card_id"], "stop"):
                 return card  # another world's, or stopped: `schedule` settles it
-            if self._ledger.stored(card) is not None:
+            bound = _bound(card, card["proposal"], self._ids["connector"])
+            if self._ledger.stored(card) is not None or (bound and fresh(head["authz"].get("at"), now)):
                 return card
-            bound = _bound(card, card["proposal"])
-            if bound and _fresh(card["policy_applied"], now):
+            part = self._answer(user_id, card, now) if bound and n < MAX_REDECISIONS else None
+            if self._ledger.stored(card) is not None:  # an enqueue landed while the engine was asked
                 return card
-            part = self._answer(user_id, card, now) if bound else None
-            slot = f"{card['card_id']}#pol{self._head(user_id, doc)[0] + 1}"
-            if self._cards.create(user_id, slot, {"part": part} if part else {"drop": True}):
+            if self._cards.create(user_id, f"{card['card_id']}#pol{n + 1}", {"part": part} if part else {"drop": True}):
                 self._emit(copy.deepcopy(part) if part else requested_part(card, card["outbox_id"]))
+                if part is None and self._ledger.stored(card) is not None:  # an enqueue raced the drop: stop it
+                    self._ledger.stop(user_id, card, "dropped")
         raise RuntimeError("the card's policy decision did not settle: retry")
 
     def _head(self, user_id: str, doc: dict[str, Any]) -> tuple[int, dict | None]:
@@ -151,11 +178,12 @@ class PolicyPort:
             d = self._policy.decide(user_id, _proposal(stored))
         except Exception:
             return None
-        if not _usable(d, now_ms):
+        authz = _usable(d, now_ms)
+        if authz is None:
             return None
         part = {
             "type": "policy.applied",
-            "authz": copy.deepcopy(d.authz),
+            "authz": authz,
             "data": {
                 "policy_id": d.policy_id,
                 "gate_id": gate_id_for(doc["card_id"]),
@@ -172,4 +200,4 @@ class PolicyPort:
                 "credits": stored["credits"],
             },
         }
-        return part if event_ok(part, ("policy.applied",)) and _fresh(part, now_ms) else None
+        return part if event_ok(part, ("policy.applied",)) and fresh(authz["at"], now_ms) else None
