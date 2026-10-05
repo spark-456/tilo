@@ -249,6 +249,13 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     `policy.applied`; its gate and outbox ids are sample values, not an emitted flow. No schema
     changes: `connector_id` already admits `internal`, and only its meaning gains a reserved value
     (BQ-75, overridable).
+15. **`common` 1.2.0 (additive, 2026-10-05, merge housekeeping).** Two parallel branches each bumped
+    `common.schema.json` to 1.1.0 with different content: ADR-0018 added `media_type` (artifact
+    media types) and ADR-0016 (CC-PEOPLE) added the people ids, `opaque_ref`, `maker` and
+    `record_ref`. After both merged, one version number named two contents. 1.2.0 is the merged
+    file: nothing is removed or changed, so it is additive. Two tests that pinned `== "1.1.0"` now
+    check "1.2.0 or later". **Rule for parallel contract branches:** before merging a branch that
+    bumps a schema, compare its `x-version` with the base's and take the next free minor.
 
 ## Consequences
 - Builders import `tilo_contracts` or `@tilo/contracts` and never hand-write these shapes.

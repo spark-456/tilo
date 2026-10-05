@@ -1,4 +1,4 @@
-"""CC-PEOPLE: the eight new contract files, common.schema.json 1.1.0 and the shared "line" rule.
+"""CC-PEOPLE: the eight new contract files, common.schema.json 1.2.0 and the shared "line" rule.
 
 Requirement trail: FR-WLD-02 and ADR-0002 (file conventions: 2020-12, `$id`, `x-version`, `title`,
 closed objects), people.rules.md PE-02/PE-06/PE-11 (the ids, `maker`, `record_ref`, `opaque_ref`),
@@ -62,9 +62,11 @@ def test_CC_PEOPLE_FR_WLD_02_schema_declares_its_named_defs(repo_root, name, def
             assert schema["$defs"][d].get("additionalProperties") is False, f"$defs/{d} must be closed"
 
 
-def test_CC_PEOPLE_FR_WLD_02_common_schema_is_1_1_0_and_keeps_its_old_defs(repo_root):
+def test_CC_PEOPLE_FR_WLD_02_common_schema_is_at_least_1_2_0_and_keeps_its_old_defs(repo_root):
     schema = pl.load_contract(repo_root, "common")
-    assert schema["x-version"] == "1.1.0"
+    # Two releases were both called 1.1.0 (artifact media types, people ids); 1.2.0 is the merge.
+    major, minor, _patch = (int(p) for p in schema["x-version"].split("."))
+    assert (major, minor) >= (1, 2), "common carries the people ids and media_type, so it is 1.2.0 or later"
     old = {"ulid", "timestamp", "calendar_date", "authz", "artifact_ref", "destination", "user_id", "org_id"}
     new = {
         "work_item_id",

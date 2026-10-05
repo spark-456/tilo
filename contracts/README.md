@@ -6,7 +6,7 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 
 | File | Describes | Version |
 | --- | --- | --- |
-| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier, artifact media types; 1.1.0 adds the people ids (`wi_`, `mt_`, `pb_`, `mn_`, `ce_`, `tm_`, utterance), `opaque_ref`, `maker`, `record_ref` | 1.1.0 |
+| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier, artifact media types, the people ids (`wi_`, `mt_`, `pb_`, `mn_`, `ce_`, `tm_`, utterance), `opaque_ref`, `maker`, `record_ref`; 1.2.0 merges the artifact media types (1.1.0, ADR-0018) and the people ids (1.1.0, ADR-0016); both 1.1.0 releases carried different content, so 1.2.0 is the first version that has both (additive, no breaking change) | 1.2.0 |
 | `brief.schema.json` | Structured brief from intake (FR-INT-03 to 05) | 1.0.0 |
 | `plan.schema.json` | `PlanGraph`: approaches, units, dependencies, gates, budget cap; rules in `plan.rules.md` | 1.0.0 |
 | `layout.schema.json` | `WorldLayout` v1: semantic part and solver geometry; rules in `layout.rules.md` | 1.0.0 |
