@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -28,7 +29,10 @@ from tilo_providers.router import BudgetExceededError, Router
 
 SMOKE_ROLES = ("director", "lead", "specialist", "verifier", "writer", "narrator", "autopilot")
 SMOKE_PROMPT = "Reply with one short sentence about a calm harbour town at sunrise, in plain words."  # fixed, synthetic
-THINKING_MINIMUM = "minimal"
+THINKING_MINIMUM = (
+    None  # no thinking level: Vertex answers 400 to "minimal" for the director profile (live, 5 Oct 2026)
+)
+MAX_REASON_CHARS = 200  # the longest server reason printed for a "rejected" request
 DEFAULT_MAX_OUTPUT_TOKENS = 64
 HARD_MAX_OUTPUT_TOKENS = 256
 DEFAULT_MAX_TOTAL_CREDITS = 2.0  # US$0.01 at 1 credit = US$0.005 (PRD 14.1)
@@ -68,8 +72,10 @@ class SmokeFailed(Exception):  # a role failed; the rows before it are in `repor
         self.role, self.code, self.fix, self.report = role, code, fix, report
 
 
-# code -> (one-line message, one-line fix). Server text is never printed: it can echo credentials (PRD 16.1 rule 4).
+# code -> (one-line message, one-line fix). Server text is never printed: it can echo credentials (PRD 16.1 rule 4),
+# except the adapter's already-redacted reason for "rejected", scrubbed again and capped (see `_reason`).
 _FAILURES = {
+    "rejected": ("Google rejected a request setting", "the reason is shown above; adjust the role or profile settings"),
     "quota": ("every candidate hit its quota", "request more Vertex AI quota in the Cloud console, or retry later"),
     "permission": ("the call was denied", "grant roles/aiplatform.user on the project to the account used for ADC"),
     "api_disabled": ("the Vertex AI API is not enabled", "enable aiplatform.googleapis.com on the project"),
@@ -108,7 +114,21 @@ def classify(error: BaseException) -> str:
         return "location"
     if 429 in statuses or "QuotaError" in names or "resource_exhausted" in text:
         return "quota"
+    if 400 in statuses or "RequestError" in names:
+        return "rejected"
     return "unknown"
+
+
+_SECRET_RE = re.compile(
+    r"(?i)(?:authorization|bearer)\b[:=\s]*(?:bearer\s+)?\S+|ya29\.[\w.\-]+|AIza[\w\-]{35,}"
+    r"|\b(?:token|key|secret|password|credential)s?\s*[:=]\s*\S+"
+)
+
+
+def _reason(error: BaseException) -> str:
+    """The adapter's redacted server text for a rejected request: one line, scrubbed once more, capped."""
+    text = next((str(link) for link in _chain(error) if type(link).__name__ == "_RedactedAPIError"), "")
+    return " ".join(_SECRET_RE.sub("[redacted]", text).split())[:MAX_REASON_CHARS]
 
 
 def _check_caps(max_output_tokens: int, max_total_credits: float) -> None:
@@ -184,8 +204,9 @@ def run_vertex_smoke(
     router = Router(config, fixtures_dir=Path(fixtures_dir) if fixtures_dir else _REPO_ROOT / "fixtures")
     for role in SMOKE_ROLES:
         primary = config.roles[role].primary
-        level = THINKING_MINIMUM if "thinking" in config.profiles[primary].caps else None
-        request = GenerateRequest(prompt=SMOKE_PROMPT, max_output_tokens=max_output_tokens, thinking_level=level)
+        request = GenerateRequest(
+            prompt=SMOKE_PROMPT, max_output_tokens=max_output_tokens, thinking_level=THINKING_MINIMUM
+        )
 
         def fail(code: str, role: str = role, message: str | None = None) -> SmokeFailed:
             text, fix = _FAILURES[code]
@@ -194,7 +215,10 @@ def run_vertex_smoke(
         try:
             result = router.generate(role, request, budget=max(report.ceiling_credits - report.total_credits, 0.0))
         except Exception as error:
-            raise fail(classify(error)) from None
+            code = classify(error)
+            raise fail(
+                code, message=f"{_FAILURES[code][0]}: {_reason(error)}" if code == "rejected" else None
+            ) from None
         served = next((a for a in reversed(result.attempts) if a.outcome == "ok"), None)
         usage = result.response.usage if result.response else None
         if served is None or not usage or "input_tokens" not in usage or "output_tokens" not in usage:

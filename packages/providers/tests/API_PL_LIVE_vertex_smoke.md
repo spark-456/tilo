@@ -18,7 +18,7 @@ adapter are code, not `contracts/`). Location uses the existing `GOOGLE_LOCATION
 ```python
 SMOKE_ROLES = ("director", "lead", "specialist", "verifier", "writer", "narrator", "autopilot")  # run in this order
 SMOKE_PROMPT: str  # fixed, synthetic, <= 40 words, one line, no environment text
-THINKING_MINIMUM = "minimal"
+THINKING_MINIMUM = None  # corrected 5 Oct 2026: Vertex answers 400 to "minimal"; no level is the verified setting
 DEFAULT_MAX_OUTPUT_TOKENS = 64
 HARD_MAX_OUTPUT_TOKENS: int  # 64 <= x <= 256; a flag above it (or below 1) is refused
 DEFAULT_MAX_TOTAL_CREDITS: float  # 0 < x <= 2.0 (<= US$0.01)
@@ -97,13 +97,13 @@ import and no network. Prices are still required (credits are printed). A missin
 
 ```python
 GenerateRequest(prompt=SMOKE_PROMPT, max_output_tokens=<cap, default 64>,
-                thinking_level=THINKING_MINIMUM if "thinking" in profile.caps else None)
+                thinking_level=THINKING_MINIMUM)  # None: no thinking config is sent
 ```
 
 Nothing else (no system text, tools, schema, json_mode). The smoke code names no model id and no profile id. The
 level is decided from the role's PRIMARY profile caps; the role's configured `thinking` (director: high) is NOT used.
 A fallback profile gets the same request, so the adapter ignores `thinking_level` for a profile without the `thinking`
-capability (see below): the SDK sees `minimal` only for profiles that think.
+capability (see below): the SDK sees no thinking config for any profile (a live run showed `minimal` is a 400 for the director profile).
 
 The Vertex client is whatever the router builds: `genai.Client(vertexai=True, project=$GOOGLE_CLOUD_PROJECT,
 location=$GOOGLE_LOCATION or "global")`. Exactly those three arguments: ADC, never `api_key`, never a credentials object.
@@ -139,7 +139,8 @@ Failed: `quota` (429 on every candidate, fix mentions quota), `permission` (403 
 `roles/aiplatform.user`), `api_disabled` (403 SERVICE_DISABLED / "has not been used", fix mentions
 `aiplatform.googleapis.com`), `location` (404 NOT_FOUND, fix mentions `GOOGLE_LOCATION`), `auth` (401 or missing ADC, fix
 mentions `gcloud auth application-default login`), `ceiling` (fix mentions `--max-credits`), `replay_miss` (fix mentions
-`TILO_RECORD`), `unknown` (anything else). Classify by walking the `__cause__` chain of the `RouterError`
+`TILO_RECORD`), `rejected` (HTTP 400 or a `RequestError`; the message adds the adapter's redacted reason, scrubbed again,
+one line, at most 200 characters; fix: adjust the role or profile settings), `unknown` (anything else). Classify by walking the `__cause__` chain of the `RouterError`
 (status/message text and exception class name), check `api_disabled` before `permission`. The run stops at the first failed
 role. No traceback, no header, no token, no `Authorization` text ever reaches stdout, stderr or logging (scrub the
 server's message with the same redaction as recordings, or do not print it).

@@ -121,7 +121,9 @@ def test_PL_LIVE_03_importing_the_smoke_imports_no_vertex_client() -> None:
 # ---------------------------------------------------------------------------------------------------------
 
 
-def test_PL_LIVE_04_thinking_is_minimal_for_every_profile_that_has_the_thinking_capability(tmp_path: Path) -> None:
+def test_PL_LIVE_04_no_thinking_level_is_sent_even_for_profiles_that_have_the_thinking_capability(
+    tmp_path: Path,
+) -> None:
     cfg = real_config()
     result, sdk, _ = live_run(tmp_path)
     assert result.code == 0, result.err
@@ -132,8 +134,8 @@ def test_PL_LIVE_04_thinking_is_minimal_for_every_profile_that_has_the_thinking_
         level = config_thinking_level(call["config"])
         if "thinking" in profile.caps:
             saw_thinking = True
-            # not the role's configured level (director is "high" in config/models.yaml): the minimum
-            assert level == "minimal", f"{role}: thinking level {level!r}"
+            # Vertex rejects "minimal" here (HTTP 400, live, 5 Oct 2026); none is the verified setting
+            assert level is None, f"{role}: thinking level {level!r}"
         else:
             saw_plain = True
             assert level is None, f"{role}: profile cannot think, so no thinking config may be sent"
