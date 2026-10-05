@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/artifact.schema.json",
+  "x-version": "1.0.0",
+  "title": "ArtifactVersion",
+  "description": "One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-08 in artifact.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "artifact",
+    "org_id",
+    "world_id",
+    "run_id",
+    "owner",
+    "media_type",
+    "size_bytes",
+    "content_sha256",
+    "parents",
+    "origin",
+    "sources",
+    "screening",
+    "redacted",
+    "idempotency_key",
+    "created_at"
+  ],
+  "properties": {
+    "v": { "const": "1.0" },
+    "artifact": { "$ref": "common.schema.json#/$defs/artifact_ref" },
+    "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+    "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+    "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+    "owner": { "$ref": "common.schema.json#/$defs/user_id" },
+    "media_type": { "$ref": "common.schema.json#/$defs/media_type" },
+    "size_bytes": {
+      "description": "Stored size: at least 1 byte, at most 50,000,000 for a file and 2,000,000 for text or JSON (BQ-257, AR-04).",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50000000
+    },
+    "content_sha256": {
+      "description": "SHA-256 of the stored bytes, lower-case hex; every read recomputes it (AR-01).",
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "parents": {
+      "description": "The earlier version of the same artifact this one continues, or the version a restore copies (AR-02); empty for version 1.",
+      "type": "array",
+      "maxItems": 1,
+      "items": { "$ref": "common.schema.json#/$defs/artifact_ref" }
+    },
+    "origin": { "$ref": "#/$defs/origin" },
+    "sources": {
+      "description": "Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12). Never exported.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "screening": {
+      "description": "Safety screen of the content (PRD 16.3 item 2). Only clean versions leave Tilo (AR-07).",
+      "type": "string",
+      "enum": ["clean", "flagged", "unscreened"]
+    },
+    "redacted": {
+      "description": "true when the secret redactor changed the content before it was stored (SEC-01, BQ-258, AR-07).",
+      "type": "boolean"
+    },
+    "idempotency_key": {
+      "description": "Set for unit and render outputs (AR-05); null for uploads and restores.",
+      "anyOf": [{ "$ref": "#/$defs/idempotency_key" }, { "type": "null" }]
+    },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+  },
+  "if": {
+    "properties": { "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] } },
+    "required": ["media_type"]
+  },
+  "then": {
+    "properties": { "size_bytes": { "maximum": 2000000 } },
+    "if": {
+      "properties": { "origin": { "properties": { "kind": { "enum": ["upload", "restore"] } } } }
+    },
+    "then": { "properties": { "idempotency_key": { "type": "null" } } },
+    "else": { "properties": { "idempotency_key": { "type": "string" } } }
+  },
+  "else": {
+    "if": {
+      "properties": { "origin": { "properties": { "kind": { "enum": ["upload", "restore"] } } } }
+    },
+    "then": { "properties": { "idempotency_key": { "type": "null" } } },
+    "else": { "properties": { "idempotency_key": { "type": "string" } } }
+  },
+  "$defs": {
+    "origin": {
+      "description": "What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither) or a restore (FR-MEM-06; no unit). Set by the store from the run, never by a runner.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "unit", "agent"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["unit", "render", "upload", "restore"] },
+        "unit": { "anyOf": [{ "$ref": "common.schema.json#/$defs/unit_id" }, { "type": "null" }] },
+        "agent": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/agent_id" }, { "type": "null" }]
+        }
+      },
+      "if": { "properties": { "kind": { "enum": ["unit", "render"] } }, "required": ["kind"] },
+      "then": {
+        "properties": { "unit": { "$ref": "common.schema.json#/$defs/unit_id" } },
+        "if": { "properties": { "kind": { "const": "unit" } }, "required": ["kind"] },
+        "then": { "properties": { "agent": { "$ref": "common.schema.json#/$defs/agent_id" } } }
+      },
+      "else": {
+        "properties": { "unit": { "type": "null" } },
+        "if": { "properties": { "kind": { "const": "upload" } }, "required": ["kind"] },
+        "then": { "properties": { "agent": { "type": "null" } } }
+      }
+    },
+    "source": {
+      "description": "Where one source's text is in the raw archive: id is the manifest source id, archive_ref the tool call record. A pointer, never content.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "archive_ref"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/slug" },
+        "archive_ref": { "$ref": "event.schema.json#/$defs/archive_ref" }
+      }
+    },
+    "idempotency_key": {
+      "description": "<run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257).",
+      "type": "string",
+      "pattern": "^r_[0-9A-Za-z_]{1,48}:U[0-9]{1,4}:(0|[1-9][0-9]{0,3}):[0-9]$",
+      "not": { "pattern": "\n" }
+    },
+    "manifest_revision": {
+      "description": "One append-only revision of a version's provenance manifest, at .../versions/{version:06d}/manifests/{n:04d} (AR-06): created at put, reviewed after the Verifier (cause its artifact.reviewed), sent or exported when the version leaves Tilo. Readers take the highest n.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n", "stage", "cause", "manifest"],
+      "properties": {
+        "n": { "type": "integer", "minimum": 1, "maximum": 9999 },
+        "stage": { "type": "string", "enum": ["created", "reviewed", "sent", "exported"] },
+        "cause": { "anyOf": [{ "$ref": "common.schema.json#/$defs/ulid" }, { "type": "null" }] },
+        "manifest": { "$ref": "manifest.schema.json" }
+      }
+    }
+  }
+}

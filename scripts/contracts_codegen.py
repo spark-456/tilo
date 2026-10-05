@@ -7,7 +7,7 @@ Both commands validate every schema under contracts/ (2020-12, $id, x-version, t
 fixture: contracts/fixtures/<name>/ against the schema root, contracts/fixtures/<name>.<def>/
 against $defs.<def>; valid fixtures must also round-trip through the generated pydantic models.
 The event registry, event fixtures and fixture streams are checked by scripts/contracts_events.py
-(rules EV-01 to EV-14, contracts/event.rules.md). The config/ files listed in CONFIG_SHAPES must
+(rules EV-01 to EV-15, contracts/event.rules.md). The config/ files listed in CONFIG_SHAPES must
 validate against the contract that owns their shape.
 Generation bundles contracts/**/*.schema.json into one schema whose $defs names cannot collide
 (common defs keep their name, e.g. RiskTier; other defs get their contract as prefix, e.g.
@@ -58,7 +58,7 @@ CONFIG_SHAPES = {
     "config/scenarios/*.yaml": "scenario",
 }
 # Contract roots whose generated name is not the PascalCase file name.
-ROOT_NAMES = {"events/registry": "EventRegistry", "agents": "AgentsConfig"}
+ROOT_NAMES = {"events/registry": "EventRegistry", "agents": "AgentsConfig", "artifact": "ArtifactVersion"}
 # Fixture folders with their own layout, checked by contracts_events.
 EVENT_FIXTURES = {"events", "streams"}
 SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")

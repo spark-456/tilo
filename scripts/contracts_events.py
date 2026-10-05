@@ -1,6 +1,6 @@
 """Event contract checks for `just contracts-check` (ticket P0-03, FR-WLD-03).
 
-Registry-driven rules EV-01 to EV-14 from contracts/event.rules.md, applied to the event fixtures,
+Registry-driven rules EV-01 to EV-15 from contracts/event.rules.md, applied to the event fixtures,
 the fixture streams and contracts/events/registry.yaml itself. The harness validator (P0-09) runs
 the same rules on every event before it is written. `validate(key, instance)` returns JSON Schema
 error messages for contracts/<key>.schema.json.
@@ -120,12 +120,31 @@ def _is_send_of(cause: dict[str, Any] | None, delivered: dict[str, Any]) -> bool
     )
 
 
+CONTINUES = {"artifact.versioned": "previous_version", "artifact.rolled_back": "restored_version"}
+
+
+def _version_problems(event: dict[str, Any], recorded: set[tuple[str, int]], where: str) -> list[str]:
+    """EV-15: artifact events name versions this world recorded; adds the version the event records."""
+    type_, data = event["type"], event["data"]
+    if not type_.startswith("artifact."):
+        return []
+    artifact_id, version = data["artifact"]["artifact_id"], data["artifact"]["version"]
+    named = data[CONTINUES[type_]] if type_ in CONTINUES else version
+    created = type_ == "artifact.created"
+    bad = version != 1 if created else (artifact_id, named) not in recorded
+    if created or type_ in CONTINUES:
+        recorded.add((artifact_id, version))
+    why = "not 1" if created else "which this world never recorded"
+    return [f"EV-15: {where} {type_} names {artifact_id} version {named}, {why}"] if bad else []
+
+
 def stream_problems(events: list[dict[str, Any]], known: set[str]) -> list[str]:
-    """EV-10 to EV-14 over one stream that already passed event_problems."""
+    """EV-10 to EV-15 over one stream that already passed event_problems."""
     problems = []
     if len({event["world_id"] for event in events}) != 1:
         problems.append("EV-10: a stream holds one world")
     seen: dict[str, dict[str, Any]] = {}
+    recorded: set[tuple[str, int]] = set()
     for previous, event in zip([None, *events], events, strict=False):
         where = f"seq {event['seq']}"
         if previous is not None and event["seq"] <= previous["seq"]:
@@ -147,6 +166,7 @@ def stream_problems(events: list[dict[str, Any]], known: set[str]) -> list[str]:
             and not _is_send_of(seen.get(event["cause"] or ""), event)
         ):
             problems.append(f"EV-14: {where} cause is not the data.transfer out of outbox {event['data']['outbox_id']}")
+        problems += _version_problems(event, recorded, where)
     return problems
 
 
@@ -165,7 +185,7 @@ def round_trip(event: dict[str, Any], module: Any, data_model: str) -> bool:
 def check_event_fixtures(
     contracts: Path, registry: dict[str, Any], validate: Validate, module: Any, data_model: Callable[[str], str]
 ) -> list[str]:
-    """fixtures/events/{valid,invalid,registry/invalid} and fixtures/streams/*.jsonl."""
+    """fixtures/events/{valid,invalid,registry/invalid} and fixtures/streams/{,invalid/}*.jsonl."""
     errors = []
     folder = contracts / "fixtures/events"
     for path in sorted((folder / "valid").glob("*.json")):
@@ -189,8 +209,9 @@ def check_event_fixtures(
     layouts = [
         json.loads(p.read_text(encoding="utf-8")) for p in sorted((contracts / "fixtures/layout/valid").glob("*.json"))
     ]
-    for path in sorted((contracts / "fixtures/streams").glob("*.jsonl")):
-        name = f"fixtures/streams/{path.name}"
+    streams = contracts / "fixtures/streams"
+    for path in sorted([*streams.glob("*.jsonl"), *streams.glob("invalid/*.jsonl")]):
+        name = f"fixtures/streams/{path.relative_to(streams).as_posix()}"
         events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
         bad = [(e.get("seq"), problems[:2]) for e in events if (problems := event_problems(e, registry, validate))]
         if bad or not events:
@@ -200,7 +221,14 @@ def check_event_fixtures(
         if len(matches) != 1:
             errors.append(f"{name}: needs exactly one fixtures/layout/valid/ layout for {events[0]['world_id']}")
             continue
-        errors += [f"{name}: {problem}" for problem in stream_problems(events, layout_ids(matches[0]))]
+        found = stream_problems(events, layout_ids(matches[0]))
+        if path.parent.name == "invalid":
+            match = RULE_FILE.match(path.name)
+            rule = f"EV-{match.group(1)}" if match else "EV-??"
+            if not found or any(not p.startswith(rule) for p in found):
+                errors.append(f"{name} must break {rule} only, found {found[:3]}")
+            continue
+        errors += [f"{name}: {problem}" for problem in found]
         errors += [
             f"{name}: seq {e['seq']} does not round-trip"
             for e in events

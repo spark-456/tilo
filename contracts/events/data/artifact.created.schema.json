@@ -1,11 +1,37 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/events/data/artifact.created.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "ArtifactCreatedData",
-  "description": "data of artifact.created (PRD 9.5).",
+  "description": "data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape).",
   "type": "object",
   "additionalProperties": false,
   "required": ["artifact"],
-  "properties": { "artifact": { "$ref": "../../common.schema.json#/$defs/artifact_ref" } }
+  "properties": {
+    "artifact": { "$ref": "../../common.schema.json#/$defs/artifact_ref" },
+    "content_sha256": {
+      "description": "SHA-256 of the stored bytes, lower-case hex, as the store recorded it (AR-01).",
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "media_type": { "$ref": "../../common.schema.json#/$defs/media_type" },
+    "size_bytes": {
+      "description": "Stored size: at least 1 byte, at most 50,000,000 for a file and 2,000,000 for text or JSON (BQ-257).",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50000000
+    }
+  },
+  "dependentRequired": {
+    "content_sha256": ["media_type", "size_bytes"],
+    "media_type": ["content_sha256", "size_bytes"],
+    "size_bytes": ["content_sha256", "media_type"]
+  },
+  "if": {
+    "properties": { "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] } },
+    "required": ["media_type"]
+  },
+  "then": { "properties": { "size_bytes": { "maximum": 2000000 } } }
 }
