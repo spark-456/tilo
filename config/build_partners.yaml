@@ -1,0 +1,32 @@
+# Build partners (PRD supplement 2026-10-05 s6, SD-03; FR-CON-16, FR-CON-17, FR-CON-20).
+# Read by tilo_connectors.handoff.load_build_partners; the shape is pinned in
+# services/connectors/tests/API_FR_CON_16_17_20.md and checked by the loader (like config/out_of_policy.yaml):
+# no other keys, every limit an integer in its range, every partner a connector of config/connectors.yaml whose
+# `action` is declared there as T3, gated and irreversible. The loader refuses the whole file otherwise.
+# A connector entry is a closed contracts/connector.schema.json document, so route limits live here (BQ-BUILD-3).
+#
+# Lovable "Build with URL" (docs.lovable.dev/integrations/build-with-url, checked 2026-10-05): the link is
+# https://lovable.dev/#prompt=<percent-encoded prompt>, the prompt is at most 50,000 characters, autosubmit is
+# ignored (the person presses send in Lovable), and "very long URLs can exceed browser length limits", so
+# max_url_length is Tilo's own cap. A brief over either limit is refused as too long, never cut.
+partners:
+  lovable:
+    action: build_handoff
+    route: link # the only route built; mcp is FR-CON-18
+    max_prompt_chars: 50000 # Lovable's documented limit: characters of the decoded prompt (1..50000)
+    max_url_length: 32000 # characters of the whole link (BQ-BUILD-3)
+    max_framing_chars: 400 # the writer's framing paragraph (BH-03)
+    max_excerpt_chars: 4000 # one excerpt of a granted item (DG-04)
+    max_items: 6 # items one grant may name, and distinct items one handoff may carry (1..6, BQ-BUILD-5)
+
+# Words a writer framing may use besides the words of the accepted requirements (BH-03): function words and
+# generic build words only, never a feature, style or product word. Lower-case, one word each.
+framing_words: [
+    a, an, the, and, or, of, for, to, in, on, at, by, with, from, as, that, this, these, those, it, its,
+    is, are, be, will, should, must, can, please, here, there, also, into, than, then, so, who, which,
+    what, where, when, how, they, them, their, we, our, you, your, client, build, create, make, develop,
+    website, web, site, app, application, page, pages, front, end, frontend, user, users, use, using,
+    below, above, described, following, listed, requirement, requirements, goal, audience, approach,
+    deliverable, each, every, all, only, exactly, follow, include, including, not, no, nothing, add,
+    else, other, more,
+  ]
