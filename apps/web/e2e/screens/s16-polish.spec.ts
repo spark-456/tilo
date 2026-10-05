@@ -22,6 +22,20 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await expect(page.getByRole("heading", { name: "Notification preferences" })).toBeVisible();
   });
 
+  test(`#345 S-16 at ${at}: the one-row Connected Google accounts box fits, so it is not a tab stop`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto("/channels");
+    const accounts = page.getByLabel("Connected Google accounts list");
+    await expect(accounts).toContainText("Gmail", { timeout: 15_000 });
+    const fit = await accounts.evaluate((el) => ({
+      scrolls: el.scrollHeight > el.clientHeight + 1,
+      tabindex: el.getAttribute("tabindex"),
+    }));
+    expect(fit).toEqual({ scrolls: false, tabindex: null });
+  });
+
   test(`#345 a reserved list box is a tab stop only while it scrolls, at ${at}`, async ({
     page,
   }) => {
