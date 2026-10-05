@@ -173,7 +173,7 @@ def default_recordings_dir(case_id: str) -> Path:
 # --- the gate (EFF-01) ---------------------------------------------------------------------------------------------
 
 
-def _gate(mode: str, env: Mapping[str, str], max_credits: float) -> None:
+def _gate(mode: str, env: Mapping[str, str], max_credits: float | None) -> None:
     """The refusals that need no file, in the order the interface pins; the live switch is looked at first of all."""
     live = mode == "live"
     if live and env.get("LIVE") != "1":
@@ -185,10 +185,12 @@ def _gate(mode: str, env: Mapping[str, str], max_credits: float) -> None:
         os.environ,
     )  # the live decision itself reads os.environ, so a caller's own environ never hides a marker
     if live and any(e.get("CI") or e.get("GITHUB_ACTIONS") for e in both):
-        raise LiveE2ERefused("ci_refused", "a live run is refused in CI")
+        raise LiveE2ERefused("ci_refused", "a live run is refused in CI (CI or GITHUB_ACTIONS is set)")
     if live and any("K_SERVICE" in e or "CLOUD_RUN_JOB" in e for e in both):
-        raise LiveE2ERefused("deployed_refused", "a live run is refused when deployed (Cloud Run)")
-    if not (math.isfinite(max_credits) and 0 < max_credits <= HARD_MAX_CREDITS):
+        raise LiveE2ERefused(
+            "deployed_refused", "a live run is refused when deployed (K_SERVICE or CLOUD_RUN_JOB is set)"
+        )
+    if max_credits is not None and not (math.isfinite(max_credits) and 0 < max_credits <= HARD_MAX_CREDITS):
         raise LiveE2ERefused("cap_out_of_range", f"--max-credits must be above 0 and at most {HARD_MAX_CREDITS:g}")
     if live:
         for name in ("GOOGLE_API_KEY", "GEMINI_API_KEY"):
@@ -198,7 +200,9 @@ def _gate(mode: str, env: Mapping[str, str], max_credits: float) -> None:
             raise LiveE2ERefused("missing_project", "GOOGLE_CLOUD_PROJECT is not set")
 
 
-def _load_config(models_path: Path | None, prices_path: Path | None, env: Mapping[str, str]) -> ProvidersConfig:
+def _load_config(
+    models_path: Path | None, prices_path: Path | None, env: Mapping[str, str], extra_roles: tuple[str, ...] = ()
+) -> ProvidersConfig:
     models = Path(models_path) if models_path else resolve_models_path(env=env)
     prices = Path(prices_path) if prices_path else _REPO / "config" / "prices.yaml"
     try:
@@ -207,7 +211,8 @@ def _load_config(models_path: Path | None, prices_path: Path | None, env: Mappin
         raise LiveE2ERefused("config_invalid", f"the models or prices file did not load: {error}") from None
     if config.prices.status != "set":
         raise LiveE2ERefused("prices_unset", "config/prices.yaml is unset: confirm the prices, then set status to set")
-    absent = [r for r in ("director", "lead", "specialist", "verifier", "writer", "narrator") if r not in config.roles]
+    needed = ("director", "lead", "specialist", "verifier", "writer", "narrator", *extra_roles)
+    absent = [r for r in needed if r not in config.roles]
     if absent:
         raise LiveE2ERefused("config_invalid", f"the models file has no role {absent[0]!r}")
     return config
@@ -238,7 +243,12 @@ def _output_cap(config: ProvidersConfig, role: str) -> int:
 
 
 def _estimate(config: ProvidersConfig, case: BankCase) -> Estimate:
-    base = _PROMPT_TOKENS + (len(case.brief) + sum(len(f["text"]) for f in case.files)) // 3
+    return _estimate_chars(config, len(case.brief) + sum(len(f["text"]) for f in case.files))
+
+
+def _estimate_chars(config: ProvidersConfig, chars: int) -> Estimate:
+    """One run of a brief with `chars` characters of input (the generator reuses it for each brief it will run)."""
+    base = _PROMPT_TOKENS + chars // 3
 
     def credits(role: str, calls: int, tokens_in: int, tokens_out: int) -> float:
         quote = config.price(config.roles[role].primary)
@@ -765,6 +775,28 @@ def _mark_recordings(recordings: Path, *, synthetic: bool) -> None:
         marker.unlink(missing_ok=True)
 
 
+def _execute(
+    case: BankCase, router: _MeteredRouter, meter: _Meter, screen: SafetyProvider, env: Mapping[str, str],
+    *, live: bool, cap: float, narrate: bool = True,
+) -> tuple[Observation, str, str | None, list[StoryLine], str | None]:  # fmt: skip
+    """One case through the real pipeline on `router`: (observation, outcome class, reason, Story, why no Story).
+    The generator calls it once per brief on its own router, so the whole run shares one meter and one cap."""
+    approve = {**(case.approve or {}), "cap": min(float((case.approve or {}).get("cap", cap)), cap)}
+    obs = Observation(case=dataclasses.replace(case, approve=approve))
+    story: list[StoryLine] = []
+    note: str | None = None
+    app = _app(router, screen, _UnitRunner(router, meter))
+    with _quiet():
+        try:
+            drive(obs.case, obs, _UNIT_TIMEOUT_S["live" if live else "replay"], app)
+        except Exception as error:  # noqa: BLE001 - a crash is an observation; the error's text is never kept
+            obs.crash = type(error).__name__
+        if narrate and obs.events and not meter.stop:
+            story, note = _story(router, obs.events, env)
+    outcome, reason = _classify(obs, meter, screen, env)
+    return obs, outcome, reason, story, note
+
+
 def run_live_e2e(
     case_id: str = "B-007",
     *,
@@ -799,17 +831,9 @@ def run_live_e2e(
         _mark_recordings(recordings, synthetic=live_provider_factory is not None)  # only a test injects a provider
     providers = _Providers(config, meter, recordings, factory)
     router = _MeteredRouter(config, meter, providers)
-    runner = _UnitRunner(router, meter)
-    approve = {**(case.approve or {}), "cap": min(float((case.approve or {}).get("cap", max_credits)), max_credits)}
-    obs = Observation(case=dataclasses.replace(case, approve=approve))
-    with _quiet():
-        try:
-            drive(obs.case, obs, _UNIT_TIMEOUT_S["live" if live else "replay"], _app(router, screen, runner))
-        except Exception as error:  # noqa: BLE001 - a crash is an observation; the error's text is never kept
-            obs.crash = type(error).__name__
-        if obs.events and not meter.stop:
-            report.story_lines, report.story_note = _story(router, obs.events, env)
-    report.outcome_class, report.reason = _classify(obs, meter, screen, env)
+    obs, report.outcome_class, report.reason, report.story_lines, report.story_note = _execute(
+        case, router, meter, screen, env, live=live, cap=max_credits
+    )
     if report.reason:  # a last line of defence: nothing printed names the project, an ADC path or a token
         report.reason = _scrub_known(" ".join(report.reason.split()), env)
     if not live:
