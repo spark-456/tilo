@@ -13,7 +13,10 @@ from tilo_api.intake import router as intake_router
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.tasks import router as _tasks_router
 
-app = FastAPI(title="tilo-api")
+# Generated docs only in local dev mode: deployed, the service is public and the route list is not for
+# strangers (issue #411). `app.openapi()` still works in-process for tests.
+_DOCS = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+app = FastAPI(title="tilo-api", **_DOCS)
 
 
 @app.exception_handler(_deps.ReplayOnly)

@@ -6,6 +6,8 @@ tilo-dev, documented in docs/system-test.md; this file is its local twin."""
 
 from __future__ import annotations
 
+import importlib
+
 import httpx
 import pytest
 from _sys_lib import Server, free_port
@@ -28,8 +30,10 @@ SERVICES = {
 PUBLIC_BY_DESIGN = {"sandbox-web": {"/manifest.json"}}
 
 
-def _operations(base: str) -> list[tuple[str, str]]:
-    spec = httpx.get(f"{base}/openapi.json", timeout=10).json()
+def _operations(app: str) -> list[tuple[str, str]]:
+    """The routes an app serves, read in-process: no service publishes /openapi.json any more (#411)."""
+    module, name = app.split(":")
+    spec = getattr(importlib.import_module(module), name).openapi()
     return [(m.upper(), p) for p, ops in spec["paths"].items() for m in ops if m.upper() != "HEAD"]
 
 
@@ -45,6 +49,8 @@ def test_SYS_P0_07a_each_service_starts_and_answers_both_health_paths(name):
             response = httpx.get(server.url + path)
             assert (response.status_code, response.json()) == (200, {"status": "ok"}), path
         assert httpx.get(server.url + "/no-such-route").status_code == 404
+        for path in ("/openapi.json", "/docs", "/redoc"):
+            assert httpx.get(server.url + path).status_code == 404, f"{name} publishes {path} (#411)"
     finally:
         server.stop()
 
@@ -56,7 +62,7 @@ def test_SYS_SEC_05_a_service_route_that_is_not_public_by_design_refuses_an_anon
         if name == "sandbox-web":
             ops = [("GET", "/manifest.json"), ("GET", "/s/x/x")]
         else:
-            ops = _operations(server.url)
+            ops = _operations(SERVICES[name])
         for method, path in ops:
             if path in OPEN or path in PUBLIC_BY_DESIGN.get(name, set()) or path.startswith("/s/"):
                 continue
@@ -67,7 +73,7 @@ def test_SYS_SEC_05_a_service_route_that_is_not_public_by_design_refuses_an_anon
 
 
 def test_SYS_SEC_05_tilo_api_without_dev_mode_serves_nothing_that_needs_a_person(prod_api):
-    ops = [(m, p) for m, p in _operations(prod_api.url) if p not in OPEN]
+    ops = [(m, p) for m, p in _operations("tilo_api:app") if p not in OPEN]
     assert ("POST", "/intake") in ops and ("GET", "/worlds/{world_id}/events") in ops, "the route list was read"
     for method, path in ops:
         response = httpx.request(method, prod_api.url + _fill(path), json={} if method == "POST" else None, timeout=15)
@@ -87,3 +93,8 @@ def test_SYS_SEC_05_an_anonymous_call_to_tilo_api_is_a_clean_401_or_503_not_a_50
     for method, path in [("POST", "/intake"), ("GET", "/worlds/w_x/events"), ("POST", "/worlds/w_x/pause")]:
         response = httpx.request(method, prod_api.url + path, json={} if method == "POST" else None, timeout=15)
         assert response.status_code in {401, 503}, f"{method} {path} answered {response.status_code}"
+
+
+def test_SYS_SEC_05_tilo_api_without_dev_mode_does_not_publish_its_route_list(prod_api):
+    for path in ("/openapi.json", "/docs", "/redoc"):
+        assert httpx.get(prod_api.url + path).status_code == 404, f"tilo-api publishes {path} (#411)"
