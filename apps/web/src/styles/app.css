@@ -1842,7 +1842,7 @@ button.row {
 }
 /* One world fills the row as the artboard's hero card (thumbnail left, the card's words right), so
    the page is not a lone card beside empty tracks. Several worlds go back to the grid of cards. */
-@media (min-width: 1100px) {
+@media (min-width: 1280px) {
   .world-grid:has(> .flow-slot:only-child > .world-card) {
     grid-template-columns: 1fr;
   }

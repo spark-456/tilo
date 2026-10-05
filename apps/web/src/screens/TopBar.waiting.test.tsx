@@ -19,6 +19,7 @@ describe("UX-227-C1 the Needs-you chip is a link, except on the queue's own page
   it("renders a link elsewhere and plain text with aria-current on the queue", async () => {
     const link = await html(<Waiting count={2} here={false} to="/needs-you" />);
     expect(link.querySelector("a")?.getAttribute("href")).toBe("/needs-you");
+    expect(link.querySelector("a")?.textContent).toMatch(/2.*decisions waiting/);
     const text = await html(<Waiting count={2} here to="/needs-you" />);
     expect(text.querySelector("a")).toBeNull();
     expect(text.querySelector('[aria-current="page"]')?.textContent).toContain("2");
