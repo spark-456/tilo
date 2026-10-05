@@ -16,7 +16,7 @@ Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP c
 
 ## Config
 - Env only, never logged: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_BASE_URL`.
-- `config/connectors.yaml` (gmail, google_drive: scopes, actions), `config/autonomy.yaml` (risk tiers per action).
+- `config/connectors.yaml` (gmail, google_drive, lovable: scopes, actions), `config/autonomy.yaml` (risk tiers), `config/build_partners.yaml` (link-route limits, framing words; `handoff.py`, `grants.py`, `adapters/lovable.py`: FR-CON-16/17/20, API in `tests/API_FR_CON_16_17_20.md`).
 
 ## Requirement IDs
 - Section 12 (connectors, hands and deliverables; FR-CON-04/05 Gmail, Drive; FR-CON-10 manifest, MF-01..06; FR-CHN-08 `watch`/`stop_watch`/`list_history`/`recent_inbox`: read scope, no outbox); SEC-02, SEC-03, SEC-09, SEC-11, SEC-14.
