@@ -9,8 +9,8 @@ import { waitingForYou } from "../world/runLog";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
-import { findItem } from "./S_05";
 import { StopAutopilot } from "./StopAutopilot";
+import { findItem } from "./findItem";
 import {
   Chip,
   Page,

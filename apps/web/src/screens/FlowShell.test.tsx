@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { type ReactElement, act } from "react";
 import { type Root, createRoot } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClientProvider } from "../api/ClientProvider";
 import type { ApproachesResult, TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
@@ -56,6 +56,11 @@ const tryAgain = () =>
     (b) => b.textContent === "Try again",
   );
 const button = (cls: string) => container.querySelector<HTMLButtonElement>(`button.${cls}`);
+
+// S-02 and S-03 are code-split chunks (NFR-01): load them first, so a render finds them ready.
+beforeAll(async () => {
+  await Promise.all([import("./s02/Understanding"), import("./s03/Approaches")]);
+});
 
 beforeEach(() => {
   container = document.createElement("div");

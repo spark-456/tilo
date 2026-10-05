@@ -2,15 +2,20 @@
 // the next step) that AGW-02 to AGW-05 fill in. S-12 (Delivery) is S_12.tsx, routed by routes.tsx.
 // Every client call has loading, empty and error states with a retry (PRD 18.4); one filled
 // primary button per screen (UX-1).
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, Suspense, lazy, useEffect, useRef } from "react";
 import { useFlowRoute } from "../router";
+import { ChunkBoundary } from "./ChunkBoundary";
 import { StartScreen } from "./flow/StartScreen";
 import "./flow/flow.css";
 import { type Action, type Remote, useAction } from "./remote";
-import { Understanding } from "./s02/Understanding";
-import { Approaches } from "./s03/Approaches";
 
 const enc = encodeURIComponent;
+
+// S-02 and S-03 load when a task reaches them (NFR-01): the Start screen does not carry their code.
+const Understanding = lazy(() =>
+  import("./s02/Understanding").then((m) => ({ default: m.Understanding })),
+);
+const Approaches = lazy(() => import("./s03/Approaches").then((m) => ({ default: m.Approaches })));
 
 /** What each flow screen calls itself. Start is the Home hero (artboard Tilo Home v2). */
 const HEADINGS: Readonly<Record<string, string>> = { Start: "What should Tilo do?" };
@@ -97,6 +102,23 @@ function World({ worldId }: { worldId: string }) {
   return <Primary label="View delivery" action={action} />;
 }
 
+/** A screen whose chunk loads on demand: the card is already drawn, so the words sit in its slot. */
+function Later({ children }: { children: ReactNode }) {
+  return (
+    <ChunkBoundary>
+      <Suspense
+        fallback={
+          <div className="flow-slot">
+            <output className="flow-loading">Loading…</output>
+          </div>
+        }
+      >
+        {children}
+      </Suspense>
+    </ChunkBoundary>
+  );
+}
+
 export function FlowShell() {
   const { route } = useFlowRoute();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -116,9 +138,17 @@ export function FlowShell() {
       case "Start":
         return <StartScreen />;
       case "Understanding":
-        return <Understanding taskId={route.taskId} />;
+        return (
+          <Later>
+            <Understanding taskId={route.taskId} />
+          </Later>
+        );
       case "Approaches":
-        return <Approaches taskId={route.taskId} />;
+        return (
+          <Later>
+            <Approaches taskId={route.taskId} />
+          </Later>
+        );
       case "World":
         return (
           <>

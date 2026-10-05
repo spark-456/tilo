@@ -3,7 +3,7 @@
 // started last. With a live API and neither, there is no run: the screen says "No run yet" instead
 // of asking the API about the fixture world (a 404 or 403 on every poll). A world the client does
 // not know is "Not found", in fixture mode (`?world=bogus`) and live alike.
-import type { ComponentType } from "react";
+import type { ComponentType, ElementType } from "react";
 import { useWorldKnown } from "../api/ClientProvider";
 import { useRunWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
@@ -12,7 +12,7 @@ import { Page } from "./kit";
 import type { ScreenProps } from "./routes";
 
 export function inARun(
-  Screen: ComponentType<ScreenProps>,
+  Screen: ElementType<ScreenProps>,
   page: { testid: string; title: string },
 ): ComponentType<ScreenProps> {
   return function InARun(props: ScreenProps) {
