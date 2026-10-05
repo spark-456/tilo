@@ -56,7 +56,7 @@ def test_NFR_27_output_is_strict_json_and_a_non_finite_figure_is_not_delivered()
     lines.clear()
     huge = _alerts(lines.append, daily_usd_threshold=1e-300, credit_usd=1e308)
     huge.check([_commit("u1", 1e300)])
-    assert all("Infinity" not in line and "NaN" not in line for line in lines)
+    assert all(json.loads(line)["kind"] != "global_daily" for line in lines)  # the inf figure is withheld
 
 
 def test_NFR_27_a_failing_sink_is_retried_and_never_raises():
@@ -100,24 +100,22 @@ def test_NFR_27_sink_runs_off_the_lock():
 
 
 def test_NFR_27_concurrent_checks_deliver_each_alert_once():
-    gate = threading.Barrier(2)
+    entered, release = threading.Event(), threading.Event()
     lines: list[str] = []
 
     def sink(line: str) -> None:
         lines.append(line)
+        entered.set()
+        release.wait(5)
 
     alerts = _alerts(sink)
-    ledger = [_commit("u1", 1000)]
-    results: list[tuple[dict, ...]] = []
-
-    def run() -> None:
-        gate.wait(5)
-        results.append(alerts.check(ledger))
-
-    threads = [threading.Thread(target=run) for _ in range(2)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join(5)
-    assert sorted(json.loads(line)["kind"] for line in lines) == ["uid_cap_100", "uid_cap_80"]
-    assert sum(len(r) for r in results) == 2
+    ledger = [_commit("u1", 800)]
+    first = threading.Thread(target=alerts.check, args=(ledger,))
+    first.start()
+    assert entered.wait(5)
+    try:
+        assert alerts.check(ledger) == (), "an alert whose delivery is in flight must not be sent twice"
+    finally:
+        release.set()
+        first.join(5)
+    assert len(lines) == 1

@@ -78,10 +78,11 @@ class CostAlerts:
                     delivered = True
                 except Exception:  # not marked as sent: the next check retries
                     pass
-                with self._lock:
-                    self._inflight.discard(key)
-                    if delivered:
-                        self._sent.add(key)
+                finally:
+                    with self._lock:
+                        self._inflight.discard(key)
+                        if delivered:
+                            self._sent.add(key)
                 if delivered:
                     raised.append(record)
             return tuple(raised)
