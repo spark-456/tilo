@@ -57,8 +57,8 @@ def _ts(value: str) -> dt.datetime:
 
 
 def _clean(text: str) -> str:
-    """PE-24: control and format characters (Unicode Cc and Cf) are removed for every viewer."""
-    return "".join(ch for ch in text if unicodedata.category(ch) not in ("Cc", "Cf"))
+    """PE-24: control, format and separator characters (Unicode Cc, Cf, Zl, Zp) are removed for every viewer."""
+    return "".join(ch for ch in text if unicodedata.category(ch) not in ("Cc", "Cf", "Zl", "Zp"))
 
 
 def _cut(text: str, owner: bool) -> tuple[str, bool]:
@@ -100,7 +100,7 @@ def _speaker(case: dict, label: str) -> str | None:
     user = next((a["user"] for a in case["meeting"]["attendees"] if a["name"] == label and a["user"]), None)
     if user not in persons or (user != actor and not pl.teammates(persons, actor, user, case["now"])):
         return None
-    return persons[user]["display_name"]
+    return _clean(persons[user]["display_name"]) or None
 
 
 def expected_quotes(case: dict) -> dict | None:
@@ -197,6 +197,8 @@ def _plate_problems(plate: dict) -> list[str]:
         found += [f"{r['ref']}: reason" for r in rows if r["reason"] not in KIND_REASONS[r["ref"]["kind"]]]
         found += [f"{r['ref']}: group" for r in rows if lane == "rows" and r["group"] != _group(r, plate["today"])]
         found += [] if [_order(r) for r in rows] == sorted(map(_order, rows)) else [f"{lane}: order"]
+    if plate["truncated"] and len(plate["rows"]) < 200 and len(plate["parked"]) < 100:  # PE-27: only a full lane
+        found.append("truncated below the cap")
     return found + ([] if plate["fingerprint"] == _fingerprint(plate["rows"]) else ["fingerprint"])
 
 
@@ -286,10 +288,13 @@ def test_CC_PEOPLE_3_PE_28_valid_plates_are_grouped_ordered_and_fingerprinted_by
         assert not _plate_problems(plate), _plate_problems(plate)
 
 
-def test_CC_PEOPLE_3_PE_28_the_plate_check_refuses_a_wrong_group_order_or_fingerprint(repo_root):
-    plate = max((load_json(p) for p in pl.fixture_files(repo_root, "plate/valid")), key=lambda p: len(p["rows"]))
+def test_CC_PEOPLE_3_PE_28_the_plate_check_refuses_a_wrong_group_order_fingerprint_or_truncation(repo_root):
+    plates = [load_json(p) for p in pl.fixture_files(repo_root, "plate/valid")]
+    plate = next(p for p in plates if p["parked"] and len({r["group"] for r in p["rows"]}) > 2)
     swapped = pl.put(plate, ("rows",), plate["rows"][::-1])
     moved = pl.put(plate, ("rows", 0, "group"), "rest")
     retitled = pl.put(plate, ("rows", 0, "title"), "Another title")
-    for doc in (swapped, moved, retitled):
+    truncated = pl.put(plate, ("truncated",), True)
+    for doc in (swapped, moved, retitled, truncated):
         assert _plate_problems(doc), "a plate the code would not build must be refused"
+    assert any(p["truncated"] and len(p["rows"]) == 200 for p in plates), "a valid plate truncated at the row cap"

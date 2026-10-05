@@ -133,4 +133,5 @@
 - The crossref cases are `fixtures/transcript/crossref/`, a format of their own that states the
   answer (`response`) and adds the transcript's `ArtifactVersion` (`version`, for `screening` and
   the scope check), instead of the `read_quote` view on the person crossref (BQ-CCP3-3).
-- A discarded or deleted meeting answers a 404, not `expired` (BQ-CCP3-2).
+- A discarded or deleted meeting answers a 404, not `expired`, until the user decides whether to
+  amend decision 2 (BQ-CCP3-2).

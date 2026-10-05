@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/plate.schema.json",
   "x-version": "1.0.0",
   "title": "Plate",
-  "description": "A person's plate (FR-PA-02, ADR-0021): a read model tilo-api builds per request for the signed-in person only, never stored and never an event (PE-26). S-27, the digest and the panel read the same `rows`; `parked` holds the person's own snoozed, reassign-asked and recently done work items for S-27 only (PE-27). Groups and order are code (PE-28): `today` is the date in the person's time zone at `as_of`. A row is a reference with at most a title (PE-29). `truncated` says rows beyond the caps exist; `fingerprint` is the SHA-256 of `rows` as JSON with sorted keys and no whitespace (PE-30).",
+  "description": "A person's plate (FR-PA-02, ADR-0021): a read model tilo-api builds per request for the signed-in person only, never stored and never an event (PE-26). S-27, the digest and the panel read the same `rows`; `parked` holds the person's own snoozed, reassign-asked and recently done work items for S-27 only (PE-27). Groups and order are code (PE-28): `today` is the date in the person's time zone at `as_of`. A row is a reference with at most a title (PE-29). `truncated` says more rows passing PE-26 and PE-27 exist than a full lane holds (200 rows or 100 parked), so it is true only with a full lane (PE-27); `fingerprint` is the SHA-256 of `rows` as JSON with sorted keys and no whitespace (PE-30).",
   "type": "object",
   "additionalProperties": false,
   "required": ["v", "user", "as_of", "today", "rows", "parked", "truncated", "fingerprint"],
@@ -37,6 +37,13 @@
     },
     "truncated": { "type": "boolean" },
     "fingerprint": { "type": "string", "maxLength": 64, "pattern": "^[0-9a-f]{64}$" }
+  },
+  "if": { "properties": { "truncated": { "const": true } }, "required": ["truncated"] },
+  "then": {
+    "anyOf": [
+      { "properties": { "rows": { "minItems": 200 } } },
+      { "properties": { "parked": { "minItems": 100 } } }
+    ]
   },
   "$defs": {
     "plate_row": {
@@ -91,6 +98,7 @@
             "group": { "const": "rest" },
             "title": { "type": "null" },
             "due": { "type": "null" },
+            "from": { "type": "null" },
             "actions": { "items": { "enum": ["open", "draft_reply"] } }
           }
         },
@@ -138,11 +146,11 @@
       "enum": ["attention", "overdue", "soon", "rest", "snoozed", "asked", "done"]
     },
     "title": {
-      "description": "The record's own title, cut to 140 characters: one line, untrusted, shown as plain text.",
+      "description": "The record's own title, cut to 140 characters and cleaned like a quote line (no Cc, no Zl or Zp, no Basic Multilingual Plane Cf; astral Cf removed by code, PE-29): one line, untrusted, shown as plain text.",
       "type": "string",
       "minLength": 1,
       "maxLength": 140,
-      "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF\\uFFF9-\\uFFFB]+$",
       "not": { "pattern": "[\\n\\r]" }
     },
     "action": {

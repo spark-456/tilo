@@ -110,13 +110,13 @@
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
  * pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
- * plate.schema.json 1.0.0 sha256:e673350831b2ede6
+ * plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
  * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
- * transcript.schema.json 1.0.0 sha256:b42dfd31a11ad2b5
+ * transcript.schema.json 1.0.0 sha256:56ff45f9814edc77
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
  * work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
  * events/registry.yaml 1.1.0 sha256:2db78f63298c923a
@@ -740,7 +740,7 @@ export type PlateReason =
  */
 export type PlateGroup = "attention" | "overdue" | "soon" | "rest" | "snoozed" | "asked" | "done";
 /**
- * The record's own title, cut to 140 characters: one line, untrusted, shown as plain text.
+ * The record's own title, cut to 140 characters and cleaned like a quote line (no Cc, no Zl or Zp, no Basic Multilingual Plane Cf; astral Cf removed by code, PE-29): one line, untrusted, shown as plain text.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PlateTitle".
@@ -781,7 +781,7 @@ export type ScenarioId = string;
  */
 export type ScenarioSeedPath = string;
 /**
- * Quote text or speaker: one line of at most 240 characters with no control or format characters (no bidi override, no zero-width character).
+ * Quote text or speaker: one line of at most 240 characters with no control character (Cc), no line or paragraph separator and no format character (Cf) of the Basic Multilingual Plane, so no bidi override or zero-width character. Astral format characters (tag characters U+E0000 to U+E007F and others) are removed by code (PE-24, validator only).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "TranscriptQuoteLine".
@@ -3805,7 +3805,7 @@ export interface PlanGate {
   policy_ref: PolicyId | null;
 }
 /**
- * A person's plate (FR-PA-02, ADR-0021): a read model tilo-api builds per request for the signed-in person only, never stored and never an event (PE-26). S-27, the digest and the panel read the same `rows`; `parked` holds the person's own snoozed, reassign-asked and recently done work items for S-27 only (PE-27). Groups and order are code (PE-28): `today` is the date in the person's time zone at `as_of`. A row is a reference with at most a title (PE-29). `truncated` says rows beyond the caps exist; `fingerprint` is the SHA-256 of `rows` as JSON with sorted keys and no whitespace (PE-30).
+ * A person's plate (FR-PA-02, ADR-0021): a read model tilo-api builds per request for the signed-in person only, never stored and never an event (PE-26). S-27, the digest and the panel read the same `rows`; `parked` holds the person's own snoozed, reassign-asked and recently done work items for S-27 only (PE-27). Groups and order are code (PE-28): `today` is the date in the person's time zone at `as_of`. A row is a reference with at most a title (PE-29). `truncated` says more rows passing PE-26 and PE-27 exist than a full lane holds (200 rows or 100 parked), so it is true only with a full lane (PE-27); `fingerprint` is the SHA-256 of `rows` as JSON with sorted keys and no whitespace (PE-30).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Plate".
