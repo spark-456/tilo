@@ -3,6 +3,7 @@
 Convention pinned here: `services/<svc>/Dockerfile`, built with the REPOSITORY ROOT as context (the uv
 workspace needs `pyproject.toml`, `uv.lock` and `packages/`), plus a root `.dockerignore`. The final stage runs
 `uvicorn <module>:<attr>` where `<module>` lives in `services/<svc>/src` and the service answers `GET /healthz`
+(plus `/health`, P0-07h)
 (api and sandbox-web already do; harness, channels, connectors, browser and render have no HTTP app yet, so the
 builder adds one: PRD 6.2 says all seven are Cloud Run services).
 
