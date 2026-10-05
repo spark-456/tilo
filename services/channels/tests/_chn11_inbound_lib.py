@@ -117,6 +117,45 @@ R3_BODY_FAILURES = [
 R3_SUBJECT_FAILURES = ["Re: _contract_ by Friday", "Re:con-tract", "Re:contract"]
 
 
+# Round 4 (security review of PR #389): a family word cut by line breaks (or a stop mark and a line break) with a
+# neighbouring word glued by a line break. Each is NOT clean (a signal OR not plain), as a body and as a Subject.
+R4_NEWLINE_GLUE = [
+    "Please confirm the\ntrans\nfer today.",
+    "Please confirm the.\ntrans.\nfer today.",
+    "Please\nsi\ngn\nit today.",
+    "Please confirm the\ncon\ntract today.",
+    "Please confirm the\nwi\nre today.",
+    "Please confirm the\nrefu\nnd today.",
+    "Please\nguaran\ntee it today.",
+    "Please confirm the?\ndepo\nsit today.",
+]
+R4_SUBJECT_NEWLINE_GLUE = ["Re:\ncon\ntract", *R4_NEWLINE_GLUE]
+# Ordinary multi-line plain scheduling talk stays clean and rides L2.
+R4_PLAIN_MULTILINE = [
+    "Hi Sarah,\nare you free on Friday\nafternoon or on\nSaturday morning?\nThanks,\nDavid",
+    "Hi Sarah,\n\nCan Marcus come by this Friday afternoon?\nLet us meet at 14:30 on Thursday.\n\nThanks,\nDavid",
+]
+# Raw non-ASCII text that NFKC would turn into plain ASCII: never plain ("reſund", "ſees", fullwidth letters, NBSP).
+R4_RAW_NON_ASCII_BODIES = [
+    "Please confirm the re" + chr(0x017F) + "und today.",
+    "Please confirm the " + chr(0x017F) + "ees today.",
+    "Hi Sarah, are you free on Friday" + chr(0x00AA) + " afternoon?",
+    "Hi Sarah, are you free on " + chr(0xFF26) + "riday?",
+    "Hi Sarah, are you free on Friday" + chr(0x00A0) + "afternoon?",
+]
+R4_RAW_NON_ASCII_SUBJECTS = [
+    "Re: re" + chr(0x017F) + "und",
+    chr(0x017F) + "ees",
+    "Friday" + chr(0x00A0) + "afternoon",
+    "Re: " + chr(0xFF26) + "riday afternoon",
+]
+# Single letters separated by times of day ("w 5pm i 5pm r 5pm e" is "wire"): not clean.
+R4_LETTERS_BETWEEN_TIMES = [
+    "w 5pm i 5pm r 5pm e it today",
+    "Please confirm the t 3pm r 3pm a 3pm n 3pm s 3pm fer today.",
+]
+
+
 def t3_module() -> Any:
     """Imported at call time so a missing function fails the test, not collection."""
     return importlib.import_module("tilo_channels.autopilot_t3")
