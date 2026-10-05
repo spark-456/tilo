@@ -45,7 +45,7 @@ def ids(rows) -> list[str]:
 def test_FR_MEM_03_fixture_ids_are_unique():
     """Guard for the tests below: the registered-type fixtures can be replayed as one stream."""
     events = all_fixture_events()
-    assert len(events) == 72
+    assert len(events) == 89
     assert len({e["id"] for e in events}) == len(events)
 
 
@@ -88,7 +88,7 @@ def test_FR_MEM_03_replay_of_a_whole_stream_adds_no_rows(ledger, table):
     stream = all_fixture_events()
     for i, event in enumerate(stream):
         assert ledger.ingest(message_for(event, f"first-{i}")).status == "inserted"
-    assert len(table.rows()) == 72
+    assert len(table.rows()) == len(stream)
     for i, event in enumerate(stream):
         assert ledger.ingest(message_for(event, f"replay-{i}")).status == "duplicate"
     assert sorted(ids(table.rows())) == sorted(e["id"] for e in stream)
