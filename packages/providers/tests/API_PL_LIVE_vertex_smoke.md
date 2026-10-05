@@ -143,7 +143,9 @@ mentions `gcloud auth application-default login`), `ceiling` (fix mentions `--ma
 one line, at most 200 characters; fix: adjust the role or profile settings), `unknown` (anything else). Classify by walking the `__cause__` chain of the `RouterError`
 (status/message text and exception class name), check `api_disabled` before `permission`. The run stops at the first failed
 role. No traceback, no header, no token, no `Authorization` text ever reaches stdout, stderr or logging (scrub the
-server's message with the same redaction as recordings, or do not print it).
+server's message with the same redaction as recordings, or do not print it). The one exception is `rejected`: its
+reason is printed on the same line after control and format characters are dropped and a labelled-value scrub (token, key,
+secret, signature, Authorization/Bearer in plain, quoted or escaped-JSON form), scrub before the 200 character cap.
 
 ### Recordings
 

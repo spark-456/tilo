@@ -12,6 +12,7 @@ import argparse
 import os
 import re
 import sys
+import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +26,7 @@ from tilo_providers.config import (
     resolve_models_path,
 )
 from tilo_providers.interfaces import GenerateRequest
+from tilo_providers.replay import _AUTHORIZATION_LIKE_RE  # the recordings' own Authorization/Bearer scrub
 from tilo_providers.router import BudgetExceededError, Router
 
 SMOKE_ROLES = ("director", "lead", "specialist", "verifier", "writer", "narrator", "autopilot")
@@ -104,6 +106,8 @@ def classify(error: BaseException) -> str:
     text = " ".join(str(link) for link in _chain(error)).lower()
     if "ReplayMissError" in names:
         return "replay_miss"
+    if 400 in statuses:  # before the text checks: a 400's own words ("is disabled", "not_found") never decide its code
+        return "rejected"
     if "DefaultCredentialsError" in names or "default credentials" in text or 401 in statuses:
         return "auth"
     if "service_disabled" in text or "has not been used" in text or "is disabled" in text:
@@ -114,21 +118,24 @@ def classify(error: BaseException) -> str:
         return "location"
     if 429 in statuses or "QuotaError" in names or "resource_exhausted" in text:
         return "quota"
-    if 400 in statuses or "RequestError" in names:
+    if "RequestError" in names:
         return "rejected"
     return "unknown"
 
 
+# A labelled value (a token, key, secret, signature ...) in any common shape: plain, quoted, or escaped JSON.
 _SECRET_RE = re.compile(
-    r"(?i)(?:authorization|bearer)\b[:=\s]*(?:bearer\s+)?\S+|ya29\.[\w.\-]+|AIza[\w\-]{35,}"
-    r"|\b(?:token|key|secret|password|credential)s?\s*[:=]\s*\S+"
+    r"(?i)ya29\.[\w.\-]+|AIza[\w\-]{35,}"
+    r"|[\w\-]*(?:token|key|secret|password|credential|signature|sig)s?\\*\"?(?:\s*[:=]\s*|\s+is\s+)\\*\"?[^\s\"\\,;&}]+"
 )
 
 
 def _reason(error: BaseException) -> str:
-    """The adapter's redacted server text for a rejected request: one line, scrubbed once more, capped."""
+    """The adapter's redacted server text for a rejected request, made safe to print: one line, no control or format
+    characters (so none can hide a label or drive the terminal), scrubbed again, then capped (scrub before cap)."""
     text = next((str(link) for link in _chain(error) if type(link).__name__ == "_RedactedAPIError"), "")
-    return " ".join(_SECRET_RE.sub("[redacted]", text).split())[:MAX_REASON_CHARS]
+    text = "".join(c for c in " ".join(text.split()) if unicodedata.category(c) not in ("Cc", "Cf", "Co", "Cs"))
+    return _SECRET_RE.sub("[redacted]", _AUTHORIZATION_LIKE_RE.sub("[redacted]", text))[:MAX_REASON_CHARS]
 
 
 def _check_caps(max_output_tokens: int, max_total_credits: float) -> None:
@@ -216,9 +223,8 @@ def run_vertex_smoke(
             result = router.generate(role, request, budget=max(report.ceiling_credits - report.total_credits, 0.0))
         except Exception as error:
             code = classify(error)
-            raise fail(
-                code, message=f"{_FAILURES[code][0]}: {_reason(error)}" if code == "rejected" else None
-            ) from None
+            reason = _reason(error) if code == "rejected" else ""
+            raise fail(code, message=f"{_FAILURES[code][0]}: {reason}" if reason else None) from None
         served = next((a for a in reversed(result.attempts) if a.outcome == "ok"), None)
         usage = result.response.usage if result.response else None
         if served is None or not usage or "input_tokens" not in usage or "output_tokens" not in usage:

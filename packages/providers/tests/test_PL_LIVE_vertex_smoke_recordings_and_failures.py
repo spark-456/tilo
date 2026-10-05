@@ -323,3 +323,49 @@ def test_PL_LIVE_07_other_failure_codes_still_print_no_server_text(tmp_path: Pat
     result, _ = _rejected_run(tmp_path, 403, "Permission denied: SERVER-TEXT-MARKER [PERMISSION_DENIED]")
     assert FAIL_RE.match(result.err_lines()[0])["code"] == "permission"
     assert "SERVER-TEXT-MARKER" not in result.everything
+
+
+OPAQUE = "OpaqueValue" + "0123456789abcdef"  # not credential-shaped on purpose: only the label around it gives it away
+LEAKY_SHAPES = [
+    pytest.param(f'Authorization: "Bearer {OPAQUE}"', id="quoted-authorization"),
+    pytest.param('{\\"Authorization\\":\\"Bearer ' + OPAQUE + '\\"}', id="escaped-json-authorization"),
+    pytest.param(f"access_token={OPAQUE}", id="access_token"),
+    pytest.param(f"refresh_token: {OPAQUE}", id="refresh_token"),
+    pytest.param(f"api_key={OPAQUE}", id="api_key"),
+    pytest.param(f"apiKey={OPAQUE}", id="apiKey"),
+    pytest.param(f"client_secret={OPAQUE}", id="client_secret"),
+    pytest.param(f'{{"token": "{OPAQUE}"}}', id="json-token"),
+    pytest.param(f'{{"key": "{OPAQUE}"}}', id="json-key"),
+    pytest.param(f"X-Goog-Signature={OPAQUE}", id="signed-url-signature"),
+    pytest.param(f"Author\u200bization: Bearer {OPAQUE}", id="zero-width-in-label"),
+    pytest.param("ya\u200b" + "29." + OPAQUE, id="zero-width-in-token"),
+]
+
+
+@pytest.mark.parametrize("leak", LEAKY_SHAPES)
+def test_PL_LIVE_07_a_400_reason_scrubs_labelled_values_in_every_common_shape(leak: str, tmp_path: Path) -> None:
+    result, _ = _rejected_run(tmp_path, 400, f"Request rejected. {leak} End.")
+    lines = result.err_lines()
+    assert len(lines) == 1 and FAIL_RE.match(lines[0])["code"] == "rejected"
+    assert OPAQUE not in result.everything
+
+
+def test_PL_LIVE_07_a_400_reason_drops_terminal_control_and_format_characters(tmp_path: Path) -> None:
+    message = "Bad setting \x1b]52;c;ZGF0YQ==\x07 \x1b[2K \x08 \u202e reversed \u200b zero."
+    result, _ = _rejected_run(tmp_path, 400, message)
+    line = result.err_lines()[0]
+    assert FAIL_RE.match(line) and "Bad setting" in line
+    assert not any(ord(c) < 32 or 127 <= ord(c) < 160 or c in "\u202e\u200b" for c in result.err.rstrip("\n"))
+
+
+def test_PL_LIVE_07_a_rejected_request_with_no_server_reason_still_prints_a_clean_line() -> None:
+    module = smoke()
+    from tilo_providers.errors import RequestError  # noqa: PLC0415
+
+    assert module.classify(RequestError("plain")) == "rejected"
+    assert module._reason(RequestError("plain")) == ""
+
+
+def test_PL_LIVE_07_a_400_whose_text_looks_like_another_failure_is_still_rejected(tmp_path: Path) -> None:
+    result, _ = _rejected_run(tmp_path, 400, "The field is disabled. [NOT_FOUND] [PERMISSION_DENIED]")
+    assert FAIL_RE.match(result.err_lines()[0])["code"] == "rejected"
