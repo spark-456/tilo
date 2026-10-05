@@ -68,8 +68,8 @@
       "card_id": "01JB5VQ0000000000000009021",
       "outbox_id": "01JB5VQ0000000000000009010",
       "option": "approve",
-      "channel": "whatsapp",
-      "pin_verified": true
+      "channel": "mobile_web",
+      "pin_verified": false
     }
   },
   "policy": null,

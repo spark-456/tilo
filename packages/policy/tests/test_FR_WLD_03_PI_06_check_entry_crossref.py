@@ -8,6 +8,8 @@ over every file so a new fixture is covered automatically.
 
 from __future__ import annotations
 
+import copy
+
 import pytest
 import tilo_policy
 
@@ -37,7 +39,7 @@ def test_FR_WLD_03_PI_06_check_entry_matches_every_fixtures_own_rule(crossref_va
     "name",
     [
         "gate_reply_sent_in_village_basic.json",
-        "gate_t3_reply_approved_by_assigned_approver_with_pin.json",
+        "gate_t3_reply_approved_by_assigned_approver_signed_in.json",
         "policy_l3_status_update_waiting.json",
         "policy_reply_instructed_on_the_web.json",
         "policy_reply_sent_after_undo_window.json",
@@ -52,3 +54,17 @@ def test_FR_WLD_03_PI_06_named_valid_case_passes(crossref_valid_cases, name):
     by_name = dict(crossref_valid_cases)
     assert name in by_name, f"{name} is missing from contracts/fixtures/outbox/crossref/valid/"
     assert tilo_policy.check_entry(by_name[name]) is None
+
+
+@pytest.mark.parametrize("name", ["ob01_gate_approved_on_whatsapp", "ob01_l2_instruction_is_a_whatsapp_message"])
+def test_FR_WLD_03_PI_04_PI_09_whatsapp_alone_breaks_each_case(crossref_invalid_cases, name):
+    """ADR-0019: the engine refuses WhatsApp itself; signed in on mobile web, the same case passes."""
+    case = copy.deepcopy(dict(crossref_invalid_cases)[f"{name}.json"])
+    assert tilo_policy.check_entry(case) == "OB-01"
+    if case["instruction"] is not None:
+        destination = case["instruction"]["data"]["destination"]
+        case["instruction"]["type"] = "world.requested"
+        case["instruction"]["data"] = {"title": "Reply yes", "channel": "mobile_web", "destination": destination}
+    else:
+        case["authorised_by"]["data"]["channel"] = "mobile_web"
+    assert tilo_policy.check_entry(case) is None

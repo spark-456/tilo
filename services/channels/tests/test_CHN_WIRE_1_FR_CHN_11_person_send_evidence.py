@@ -139,28 +139,6 @@ def test_CHN_WIRE_1_FR_CHN_11_evidence_handed_to_the_outbox_is_the_gate_path_the
     assert tilo_policy.check_entry(case) is None, "the real OB-01 / OB-05 check accepts the Autopilot's evidence"
 
 
-def test_CHN_WIRE_1_FR_CHN_11_t3_whatsapp_send_with_a_checked_pin_is_accepted() -> None:
-    """SEC-06: a T3 gate answered on WhatsApp opens only with `pin_verified` true, which tilo-channels sets only after
-    it checked the PIN; with it, the Send goes through."""
-    line = make_wire_line("L1")
-    _, _, card = card_for(line, "T3")
-    approval = resolved(requested_part(line, card), line, channel="whatsapp", pin_verified=True)
-
-    assert try_send(line.ap, card.card_id, approval).status == "queued"
-
-    entry = one_sent(line)
-    assert entry["risk_tier"] == "T3" and entry["authz"] == approval["authz"]
-
-
-def test_CHN_WIRE_1_FR_CHN_11_t2_whatsapp_tap_needs_no_pin() -> None:
-    line = make_wire_line("L1")
-    _, _, card = card_for(line, "T2")
-    approval = resolved(requested_part(line, card), line, channel="whatsapp", pin_verified=False)
-
-    assert try_send(line.ap, card.card_id, approval).status == "queued"
-    assert one_sent(line)["risk_tier"] == "T2"
-
-
 def test_CHN_WIRE_1_FR_CHN_11_t3_web_send_needs_no_pin() -> None:
     line = make_wire_line("L1")
     _, _, card = card_for(line, "T3")

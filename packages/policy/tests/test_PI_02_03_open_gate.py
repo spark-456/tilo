@@ -5,6 +5,7 @@ Director — open_gate only ever hands authority to a person or a Team Lead (PI-
 
 from __future__ import annotations
 
+import pytest
 import tilo_policy
 from _policy_lib import OWNER
 
@@ -81,16 +82,23 @@ def test_PI_02_answer_from_another_person_when_no_approver_is_named_opens_nothin
     assert decision.outcome == "gate"
 
 
-def test_PI_04_SEC_06_t3_gate_on_whatsapp_without_pin_opens_nothing():
-    reserved = _reserved(risk_tier="T3")
-    resolved = _resolved(channel="whatsapp", pin_verified=False)
+@pytest.mark.parametrize("risk_tier", ["T1", "T2", "T3"])
+@pytest.mark.parametrize("pin_verified", [True, False])
+@pytest.mark.parametrize("ref", [OWNER, "u_approver"])
+def test_PI_04_SEC_06_an_answer_over_whatsapp_opens_nothing(risk_tier, pin_verified, ref):
+    """ADR-0019 (SD-01, SEC-06 amended): a gate opens only in a signed-in web or mobile-web
+    session. `whatsapp` stays enum-valid, so a legacy or forged answer over it is refused, PIN or not."""
+    reserved = _reserved(risk_tier=risk_tier, approver=APPROVER)
+    resolved = _resolved(ref=ref, channel="whatsapp", pin_verified=pin_verified)
     decision = tilo_policy.open_gate(reserved, resolved, world_owner=OWNER)
-    assert decision.outcome == "gate"
+    assert (decision.outcome, decision.authz) == ("gate", None)
 
 
-def test_PI_04_SEC_06_t3_gate_on_whatsapp_with_pin_opens():
+@pytest.mark.parametrize("channel", ["web", "mobile_web"])
+def test_PI_04_SEC_06_t3_gate_in_a_signed_in_session_opens_without_a_pin(channel):
+    """SEC-06 as amended: no PIN; the signed-in session is the control."""
     reserved = _reserved(risk_tier="T3", approver=APPROVER)
-    resolved = _resolved(ref="u_approver", channel="whatsapp", pin_verified=True)
+    resolved = _resolved(ref="u_approver", channel=channel, pin_verified=False)
     decision = tilo_policy.open_gate(reserved, resolved, world_owner=OWNER)
     assert decision.outcome == "run"
 

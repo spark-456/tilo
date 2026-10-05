@@ -53,6 +53,6 @@
     }
   ],
   "actions": ["show_me", "snooze"],
-  "answer_channels": ["web", "mobile_web", "whatsapp"],
+  "answer_channels": ["web", "mobile_web"],
   "safe_default": "hold"
 }
