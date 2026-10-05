@@ -3,6 +3,7 @@
 Convention pinned here: `services/<svc>/Dockerfile`, built with the REPOSITORY ROOT as context (the uv
 workspace needs `pyproject.toml`, `uv.lock` and `packages/`), plus a root `.dockerignore`. The final stage runs
 `uvicorn <module>:<attr>` where `<module>` lives in `services/<svc>/src` and the service answers `GET /healthz`
+(plus `/health`, P0-07h)
 (api and sandbox-web already do; harness, channels, connectors, browser and render have no HTTP app yet, so the
 builder adds one: PRD 6.2 says all seven are Cloud Run services).
 
@@ -159,9 +160,13 @@ def test_P0_07a_dockerfile_runs_the_real_app_on_port_env(repo_root: pathlib.Path
 
 
 @pytest.mark.parametrize("svc", SERVICES)
-def test_P0_07a_service_exposes_healthz_and_declares_its_server_dependencies(repo_root: pathlib.Path, svc: str) -> None:
+def test_P0_07a_service_exposes_health_and_healthz_and_declares_its_server_dependencies(
+    repo_root: pathlib.Path, svc: str
+) -> None:
     src = repo_root / "services" / svc / "src"
     assert any('"/healthz"' in p.read_text(encoding="utf-8") for p in src.rglob("*.py")), "GET /healthz route"
+    # P0-07h (issue #397): Cloud Run reserves /healthz on run.app, so each service also answers /health.
+    assert any('"/health"' in p.read_text(encoding="utf-8") for p in src.rglob("*.py")), "GET /health route"
     data = tomllib.loads((repo_root / "services" / svc / "pyproject.toml").read_text(encoding="utf-8"))
     deps = [re.match(r"[A-Za-z0-9_.\-]+", d).group(0).lower() for d in data["project"]["dependencies"]]
     assert "uvicorn" in deps, "pyproject must depend on uvicorn (the image runs it)"
