@@ -12,3 +12,5 @@
 - [Brief Director gaps](brief-director-gaps.md): FR-INT-03/04/05 r1 PASS flagged: brief fields are model output; repair echo; memory seam unscoped; text unscreened
 - [Provider secret handling](provider-secret-handling.md): P0-05 r11 PASS (7a0d1be); residual for P0-06: malformed 200 body raises raw pydantic error (echoed key truncated)
 - [Harness writer gaps](harness-writer-gaps.md): P0-09 r6 PASS: head moved to _head/state (rules must deny it); open: ids `$` \n, emulator lock-timeout flake
+- [Artifact store FR-MEM-06](artifact-store-fr-mem-06.md): PR #382 r1 FAIL (64bd1c1) orphans/.tilo; r2 FAIL (6c59628) repair path; r3 PASS flagged (bc7ff3c): GRACE lease, T8 must fence
+- [Unit outputs T3](unit-outputs-t3-fr-agt-02.md): ADR-0018 T3 r1 PASS flagged (fec3947); open: store/EV-15 version desync, restart re-announce, scope not bound to writer
