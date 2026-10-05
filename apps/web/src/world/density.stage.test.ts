@@ -8,7 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { villageBasicEvents, villageBasicLayout } from "../../test-support/worldFixtures";
 import { setDensity } from "../display/density";
 import { AGENT_SCALE } from "./art/agent";
+import { BUILDING_STATE, ISLAND_STATE } from "./runSummary";
 import { runClientWorld } from "./runWorld";
+
+const invert = (m: Record<string, string>) =>
+  Object.fromEntries(Object.values(m).map((v) => [v, 1]));
 
 // Pixi's Text needs a canvas the test runtime does not have, so a tag is a bare container whose
 // label is its text: what matters here is which words the renderer asks for.
@@ -27,13 +31,13 @@ vi.mock("./art/labels", async () => {
 const layout = villageBasicLayout() as unknown as Layout;
 const events = villageBasicEvents() as unknown as Event[];
 
-function stage() {
+function stage(width = 900) {
   const world = new Container();
   const calls = { delivered: 0, seq: 0, render: 0 };
   const stop = runClientWorld({
     world,
     layout,
-    size: () => ({ width: 900, height: 600 }),
+    size: () => ({ width, height: 600 }),
     requestRender: () => {
       calls.render += 1;
     },
@@ -85,6 +89,33 @@ describe("FR-WLD-14 the stage follows the density mode, read at draw time", () =
     setDensity("friendly");
     expect(s.scales()).toEqual([AGENT_SCALE]);
     expect(s.tags()).toEqual(friendlyTags);
+    s.stop();
+  });
+
+  it("a phone-sized stage keeps the names and drops the state words, which are unreadable there", () => {
+    setDensity("professional");
+    const phone = stage(390);
+    const tags = phone.tags();
+    expect(tags.length).toBeGreaterThan(0);
+    expect(
+      tags.some((t) =>
+        /^(Town Hall|[A-Z][\w ]+) · (At work|Finished|Planned|Being built)$/.test(t),
+      ),
+    ).toBe(false);
+    expect(tags.some((t) => t.startsWith("Gate · "))).toBe(true); // gate and rank tags are unchanged
+    phone.stop();
+  });
+
+  it("a tag's state words are the Inspect panel's: one shared map", () => {
+    setDensity("professional");
+    const s = stage();
+    const words = new Set(Object.values(BUILDING_STATE));
+    const states = s
+      .tags()
+      .filter((t) => t.includes(" · ") && !t.startsWith("Gate · "))
+      .map((t) => t.split(" · ")[1] ?? "");
+    expect(states.length).toBeGreaterThan(0);
+    for (const w of states) expect(words.has(w as never) || w in invert(ISLAND_STATE)).toBe(true);
     s.stop();
   });
 

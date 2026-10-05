@@ -79,12 +79,15 @@ export function S_22() {
         note="Email bodies are never cached. The style profile keeps settings, not emails. Data stays in asia-southeast1."
       >
         <ul className="blist">
-          <Row name="Export my data" sub="Events, files and a provenance manifest.">
+          <Row
+            name="Export my data"
+            sub="Events, files and a provenance manifest. Not available in the app yet."
+          >
             <Placeholder label="Export" compact />
           </Row>
           <Row
             name="Delete my account and data"
-            sub="Removed from every store within 30 days. This cannot be undone."
+            sub="Not available in the app yet. When it is, your data is removed from every store within 30 days, and this cannot be undone."
           >
             <Placeholder label="Delete" compact />
           </Row>

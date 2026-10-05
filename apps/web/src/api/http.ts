@@ -12,6 +12,7 @@ import type {
   QuestionAnswer,
   TiloClient,
 } from "./client";
+import { type StopResult, isStopResult } from "./stop";
 
 /** What a person reads when a call fails (PRD 18.4). `retryable` is true for 5xx and for network
  * or unreadable-reply failures; a 4xx carries a reason and retrying the same call will not help. */
@@ -485,6 +486,18 @@ export class HttpClient implements TiloClient {
 
   getDelivery(worldId: string): Promise<DeliveryResult> {
     return this.request(`/worlds/${encodeURIComponent(worldId)}/delivery`);
+  }
+
+  /** `POST /worlds/{id}/autopilot/stop` (FR-HIL-07): every rule of the world's owner back to L1. The
+   * reply is the API's own count; a body that is not that shape is an unreadable reply, never a
+   * result. Not on the TiloClient interface (like `pauseWorld`). */
+  async stopAutopilot(worldId: string): Promise<StopResult> {
+    const result = await this.post<unknown>(
+      `/worlds/${encodeURIComponent(worldId)}/autopilot/stop`,
+      {},
+    );
+    if (!isStopResult(result)) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return result;
   }
 
   /** `POST /worlds/{id}/pause` (FR-WLD-07). Not on the TiloClient interface yet. */

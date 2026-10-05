@@ -10,6 +10,7 @@ import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
 import { findItem } from "./S_05";
+import { StopAutopilot } from "./StopAutopilot";
 import {
   Chip,
   Page,
@@ -69,9 +70,9 @@ export function S_15() {
       />
       <Section
         title="Stop all autopilot"
-        note="Sets every rule to level L1 at once, so everything waits for you. Pause all also stops the agents. Nothing runs on its own in this build, so there is nothing to stop yet."
+        note="Sets every rule to level L1 at once, so everything waits for you. Pause all also stops the agents."
       >
-        <Placeholder label="Stop all autopilot" compact danger />
+        <StopAutopilot worldId={worldId} />
       </Section>
       <Section
         title="Levels"

@@ -7,9 +7,7 @@ import { DESKTOP, MOBILE } from "../support/viewports";
 const tile = (page: Page, id: string, label: string) =>
   page.getByTestId(id).locator("li", { hasText: label }).first();
 
-test("UX-1 G2b S-15 Stop all autopilot is the one danger-styled control, and says why it is idle", async ({
-  page,
-}) => {
+test("UX-1 G2b S-15 Stop all autopilot is the one danger-styled control", async ({ page }) => {
   test.setTimeout(90_000);
   const problems = watchConsole(page);
   for (const viewport of [DESKTOP, MOBILE]) {
@@ -17,10 +15,8 @@ test("UX-1 G2b S-15 Stop all autopilot is the one danger-styled control, and say
     await page.goto("/autonomy?speed=100");
     const stop = page.getByRole("button", { name: /Stop all autopilot/ });
     await expect(stop).toBeVisible({ timeout: 20_000 });
-    await expect(stop).toHaveAttribute("aria-disabled", "true"); // not built: never a dead live control
     await expect(page.locator("main .danger")).toHaveCount(1);
     expect(await stop.evaluate((el) => getComputedStyle(el).borderTopStyle)).toBe("solid");
-    await expect(page.getByTestId("autonomy")).toContainText("nothing to stop yet");
     await expect(page.getByRole("button", { name: /New rule/ })).toHaveCount(0);
   }
   expect(problems).toEqual([]);

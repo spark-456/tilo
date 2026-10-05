@@ -139,6 +139,25 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
     expect(calls[3]?.init?.method).toBe("POST");
   });
 
+  it("FR-HIL-07 stopAutopilot posts to the world's stop route and returns the API's own count", async () => {
+    const body = { stopped: 2, already_l1: 1, confirmations: [{ channel: "web" }], pending: 0 };
+    const { calls, fetch } = script(json(body), json({ ...body, pending: 1 }, 202));
+    const c = client(fetch);
+    expect(await c.stopAutopilot("w 1")).toEqual(body);
+    expect(calls[0]?.url).toBe(`${BASE}/worlds/w%201/autopilot/stop`);
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect((await c.stopAutopilot("w 1")).pending).toBe(1); // 202: still being recorded
+  });
+
+  it("FR-HIL-07 stopAutopilot refuses a reply that is not the documented shape and keeps a 403's words", async () => {
+    const { fetch } = script(json({ stopped: "two" }), json({ detail: "not the owner" }, 403));
+    const c = client(fetch);
+    await expect(c.stopAutopilot("w1")).rejects.toMatchObject({
+      message: expect.stringMatching(/could not read/),
+    });
+    await expect(c.stopAutopilot("w1")).rejects.toMatchObject({ status: 403, retryable: false });
+  });
+
   it("answerCard for a card it never listed says so, without calling the server", async () => {
     const { calls, fetch } = script();
     await expect(

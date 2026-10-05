@@ -2,7 +2,8 @@
 Director's brief and its clarifying questions (services/api/tests/API_CL_INT_1.md).
 
 The signed-in principal comes first. A business-rule rejection (limits, file type, flagged task text) answers
-422 {"error": reason} and stores nothing. The safety screen is built from the `safety` role in the provider
+422 {"error": reason} and stores nothing; an out-of-policy task (FR-INT-12) adds `alternative` and `category`,
+both configured text. The safety screen is built from the `safety` role in the provider
 config on every request (PRD 16.3 item 2): no role, a provider the factory refuses, or a screen that cannot
 answer closes intake with 503 before anything is stored or sent to a model.
 """
@@ -27,6 +28,7 @@ from tilo_planning.intake import (
     screen_task_text,
     submit_intake,
 )
+from tilo_planning.refusal import RefusalConfigError, TaskRefused
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
@@ -73,6 +75,15 @@ async def intake(
         # artifacts without a task (BQ-99).
         try:
             extraction = await run_in_threadpool(extract_brief, text, router=model_router)
+        except TaskRefused as refused:
+            # FR-INT-12: configured text only (reason, nearest task, category); nothing stored, no further call.
+            return JSONResponse(
+                status_code=422,
+                content={"error": refused.reason, "alternative": refused.alternative, "category": refused.category},
+            )
+        except RefusalConfigError as exc:  # fail closed: no refusal list, no brief
+            logger.error("refusal config unusable: %s", exc)
+            raise HTTPException(status_code=503, detail="Task screening is unavailable; nothing was stored.") from exc
         except BriefExtractionError as exc:
             # A category only: the error text can quote the model's output.
             logger.warning("brief extraction failed: %s", type(exc.__cause__ or exc).__name__)
