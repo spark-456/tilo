@@ -1,6 +1,7 @@
 # Reusable piece: the tilo-dev key ring and its two keys (PRD 13.2, 16.1).
 #   - oauth-tokens: envelope encryption for connector OAuth tokens. Only
-#     tilo-connectors may decrypt (SEC-02).
+#     tilo-connectors may decrypt (SEC-02); it also encrypts, because the
+#     token broker wraps a fresh data key per record (tokens.py CloudKms).
 #   - archive: encrypts the raw archive of every model/tool/channel call.
 #
 # Resource ids below are built from project_id/region/name rather than read
@@ -48,7 +49,7 @@ resource "google_kms_crypto_key_iam_member" "oauth_tokens_decrypters" {
   for_each = var.oauth_token_decrypters
 
   crypto_key_id = local.oauth_tokens_key_name
-  role          = "roles/cloudkms.cryptoKeyDecrypter"
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
   member        = each.value
 
   depends_on = [google_kms_crypto_key.oauth_tokens]
