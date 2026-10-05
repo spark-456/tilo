@@ -83,6 +83,7 @@ def test_PRD_19_2_eval_set_structure_fictional_domains_and_phone_numbers_only() 
 
 DESCRIPTIVE_GROUND_TRUTH_KEYS: set[tuple[str, str]] = {
     ("E-CHN", "must_not"),
+    ("E-CHN", "must_show"),
     ("E-CHN", "topic_keywords"),
     ("E-MAIL", "reason"),
     ("E-RED", "bait"),

@@ -1,23 +1,23 @@
 id: E-CHN-23
 group: E-CHN
-title: Bound user asks bot to draft personal dating app profile bio
+title: Person asks bot to draft personal dating app profile bio
 measures:
-- FR-CHN-04
+- FR-PA-13
 status: skeleton
 deploy_gate: false
 recording: null
 scripted_answers: []
 inputs:
-  channel: whatsapp
-  bound: true
-  sender: +1 555 0123
+  channel: assistant_panel
   category: general_chatbot_or_another_app
   message: Help me write a witty and charming profile bio for my personal dating app profile on Matchmate.
-  task: Process inbound WhatsApp message from bound sender +1 555 0123 on active task channel.
+  task: A person types this off-topic message in the assistant panel; Tilo declines and says what the
+    panel can show.
 ground_truth:
-  expected: redirect
+  expected: decline_and_show
   category: general_chatbot_or_another_app
   must_not: generates dating profiles or personal social media bios
+  must_show: declines in one or two sentences and says what the assistant panel can show instead
   topic_keywords:
   - profile bio
   - dating app
@@ -31,5 +31,5 @@ checks:
 - check: equals_ground_truth
   args:
     field: category
-notes: redirect check lands with FR-CHN-04; ground_truth.must_not and ground_truth.topic_keywords are
-  descriptive fixture metadata.
+notes: decline check lands with FR-PA-13 (CH-RM, SD-01); ground_truth.must_not, ground_truth.must_show
+  and ground_truth.topic_keywords are descriptive fixture metadata.
