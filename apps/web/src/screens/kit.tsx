@@ -194,7 +194,7 @@ export const doneState = (n: number, word: string): StatState =>
 export type Lines = number | readonly [number, number];
 
 /** True while `ref`'s box has more content than fits, re-checked when it or its content changes. */
-function useScrolls(ref: RefObject<HTMLElement | null>): boolean {
+export function useScrolls(ref: RefObject<HTMLElement | null>): boolean {
   const [scrolls, setScrolls] = useState(false);
   useEffect(() => {
     const el = ref.current;
