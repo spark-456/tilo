@@ -1,0 +1,27 @@
+{
+  "v": "1.0",
+  "artifact": {
+    "artifact_id": "art_floor_plan",
+    "version": 1,
+    "label": "floor-plan.png"
+  },
+  "org_id": "org_example",
+  "world_id": "w_example",
+  "run_id": "r_example_1",
+  "owner": "u_owner",
+  "media_type": "image/png",
+  "size_bytes": 820000,
+  "content_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "parents": [],
+  "origin": {
+    "kind": "upload",
+    "unit": null,
+    "agent": null
+  },
+  "sources": [],
+  "screening": "unscreened",
+  "screened_at": null,
+  "redacted": false,
+  "idempotency_key": null,
+  "created_at": "2026-10-05T09:30:00.000Z"
+}

@@ -28,3 +28,8 @@ output "services" {
     }
   }
 }
+
+output "uris" {
+  description = "Map of service key => its run.app URL (known after apply)."
+  value       = { for k, svc in google_cloud_run_v2_service.this : k => svc.uri }
+}

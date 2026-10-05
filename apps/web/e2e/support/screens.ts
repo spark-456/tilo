@@ -15,10 +15,12 @@ export function watchConsole(page: Page): string[] {
  * The one filled primary button navigates, and each screen's own test clicks it. A lens control
  * (data-lens-control, FR-WLD-06) selects an object and is covered by lens-sync.spec.ts; Pause all
  * (data-pause-control, FR-WLD-07) sends a request and is covered by world-pause.spec.ts; Stop all
- * autopilot (data-stop-control, FR-HIL-07) asks first and is covered by autopilot-stop.spec.ts. */
+ * autopilot (data-stop-control, FR-HIL-07) asks first and is covered by autopilot-stop.spec.ts. The
+ * Ask Tilo launcher (data-assistant-control, FR-PA-12) opens the assistant panel and is covered by
+ * assistant-panel.spec.ts. */
 export async function expectNoDeadControls(page: Page, scope = "main") {
   const buttons = page.locator(
-    `${scope} button:not(.primary):not([data-lens-control]):not([data-pause-control]):not([data-stop-control])`,
+    `${scope} button:not(.primary):not([data-lens-control]):not([data-pause-control]):not([data-stop-control]):not([data-assistant-control])`,
   );
   for (let i = 0; i < (await buttons.count()); i++) {
     const b = buttons.nth(i);

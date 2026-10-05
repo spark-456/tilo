@@ -2,11 +2,12 @@
 # contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
+# artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.1.0 sha256:f1559856c133da51
+# common.schema.json 1.1.0 sha256:a843c4274305fd64
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -35,7 +36,7 @@
 # events/data/app.tested.schema.json 1.0.0 sha256:7cc150abdade1ee3
 # events/data/approval.requested.schema.json 1.0.0 sha256:fa01c18f73338a6d
 # events/data/approval.resolved.schema.json 1.0.0 sha256:3c56d4ad96d63941
-# events/data/artifact.created.schema.json 1.0.0 sha256:1e70d4b7f7bc11a7
+# events/data/artifact.created.schema.json 1.1.0 sha256:e796f958760d0464
 # events/data/artifact.delivered.schema.json 1.0.0 sha256:a0e7a46e56965c1d
 # events/data/artifact.reviewed.schema.json 1.0.0 sha256:fee51f5f590c73c4
 # events/data/artifact.rolled_back.schema.json 1.0.0 sha256:4c4dac77a4b5c873
@@ -104,12 +105,13 @@
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
 # minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
-# person.schema.json 1.0.0 sha256:1533492b42bcf31e
+# person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
 # pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
 # providers.schema.json 1.1.0 sha256:ece7537b584e69f8
+# scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
@@ -190,6 +192,14 @@ class AgentsConfigQuestions(BaseModel):
         extra="forbid",
     )
     hourly_cap_per_person: Annotated[int, Field(ge=1)]
+
+
+type ArtifactVersionIdempotencyKey = Annotated[
+    str, Field(pattern="^r_[0-9A-Za-z_]{1,48}:U[0-9]{1,4}:(0|[1-9][0-9]{0,3}):[0-9]$")
+]
+"""
+<run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257).
+"""
 
 
 type Constraint = Annotated[str, Field(max_length=300, min_length=1)]
@@ -466,6 +476,12 @@ Data class (PRD 12.1): personal, business or public.
 type DeliverableFormat = Literal["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app"]
 """
 Deliverable format (PRD 12.4), plus email for replies and in_app for answers shown in Tilo.
+"""
+
+
+type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg"]
+"""
+Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it from the role and the pinned skill, never a model, a file name or sniffing. Closed: no HTML or SVG.
 """
 
 
@@ -2283,6 +2299,48 @@ class ProvidersPrice(BaseModel):
     output: Annotated[float | None, Field(ge=0.0)]
 
 
+type ScenarioId = Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,31}$")]
+"""
+Scenario id: a letter, then up to 31 letters, digits, hyphens or underscores. Equals the file name without .yaml (SN-01). The not-pattern rejects a final line break, which a Python validator's $ lets through.
+"""
+
+
+type ScenarioSeedPath = Annotated[
+    str,
+    Field(
+        max_length=240,
+        pattern="^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$",
+    ),
+]
+"""
+A repo-relative file path with forward slashes. Each segment starts with a letter, digit or underscore, so there is no absolute path, drive letter, backslash, empty segment, . or .. segment, and no hidden file such as .env or .git. The not-pattern rejects a final line break, which a Python validator's $ lets through.
+"""
+
+
+class ScenarioAutonomyEntry(BaseModel):
+    """
+    One policy seed: the policy.schema.json fields a scenario may set. Everything else is fixed when the policy is created (SN-08): owner and stamps from the approving owner, scope recipients, domains and districts empty, limits.credits null, conditions all true, expiry null, notify_channel web, no Team Lead domains. A scenario never sets a tier: tiers come from config/autonomy.yaml and its modifiers.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    action_type: ActionType
+    level: AutonomyLevel
+    connectors: Annotated[list[ConnectorId], Field(min_length=1)]
+    """
+    The policy's scope.connectors: ids from the scenario's own connectors, or the reserved internal for an action that goes through no connector (SN-07).
+    """
+    per_day: Annotated[int | None, Field(ge=0)] = None
+    """
+    The policy's limits.per_day: most actions per UTC day. Required at L2 and L3 (policy.schema.json, BQ-30); left out at L0 and L1 means no daily cap (null in the policy).
+    """
+    undo_window_s: Annotated[int, Field(ge=0, le=3600)] = 60
+    """
+    The policy's undo_window_s: seconds an L2 action can still be undone; left out means the policy default, 60.
+    """
+
+
 class SkillEmbeddedSchema(BaseModel):
     """
     A JSON Schema (2020-12) for the skill's inputs or outputs. Deliberately open: the skill loader checks it against the 2020-12 meta-schema.
@@ -2439,6 +2497,31 @@ class AgentsConfig(BaseModel):
     liveness: AgentsConfigLiveness
     retries: AgentsConfigRetries
     questions: AgentsConfigQuestions
+
+
+class ArtifactVersionOrigin(BaseModel):
+    """
+    What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither) or a restore (FR-MEM-06; no unit). Set by the store from the run, never by a runner.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["unit", "render", "upload", "restore"]
+    unit: UnitId | None
+    agent: AgentId | None
+
+
+class ArtifactVersionSource(BaseModel):
+    """
+    Where one source's text is in the raw archive: id is the manifest source id, archive_ref the tool call record. A pointer, never content.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Slug
+    archive_ref: EventArchiveRef
 
 
 class Attention(BaseModel):
@@ -2825,13 +2908,24 @@ class ApprovalRequestedDataApproverAssignment(BaseModel):
 
 class ArtifactCreatedData(BaseModel):
     """
-    data of artifact.created (PRD 9.5).
+    data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape).
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
     artifact: ArtifactRef
+    content_sha256: Annotated[
+        str | None, Field(max_length=64, min_length=64, pattern="^[0-9a-f]{64}$")
+    ] = None
+    """
+    SHA-256 of the stored bytes, lower-case hex, as the store recorded it (AR-01).
+    """
+    media_type: MediaType | None = None
+    size_bytes: Annotated[int | None, Field(ge=1, le=50000000)] = None
+    """
+    Stored size: at least 1 byte, at most 50,000,000 for a file and 2,000,000 for text or JSON (BQ-257).
+    """
 
 
 class ArtifactDeliveredData(BaseModel):
@@ -3376,6 +3470,38 @@ class ProvidersPrices(BaseModel):
     profiles: Annotated[dict[ProvidersProfileId, ProvidersPrice], Field(min_length=1)]
 
 
+class Scenario(BaseModel):
+    """
+    A scenario config, config/scenarios/<id>.yaml (PRD 4.3, 7.1 FR-INT-11, ADR-0014): the skill set, connectors, seed data, autonomy policy and world theme a scenario preloads, and nothing else. Data only: no code, prompt, model id, brief text or plan, so a scenario that needs any of those becomes a pillar requirement first, and no platform source names a scenario id. The same shape serves any scenario, a demo, a held-out bank case or a generated brief. theme is the world theme, the same slug as layout.schema.json theme (config/themes/, FR-WLD-15; only its shape is checked until that folder exists, BQ-202). Rules that need other files (the id equals the file name, connectors in config/connectors.yaml, seed files exist inside the repo, each autonomy level within its risk tier's max_level, T3 at L1 only) are SN-01 to SN-09 in contracts/scenario.rules.md, checked by the loader.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: ScenarioId
+    title: Annotated[str, Field(max_length=120, min_length=1)]
+    """
+    Display name of the scenario, plain text.
+    """
+    skills: Annotated[list[SkillId], Field(min_length=1)]
+    """
+    Skill ids the scenario preloads (skills/<domain>/<skill-id>/skill.yaml, FR-AGT-04); at least one.
+    """
+    connectors: list[ConnectorId]
+    """
+    Connector ids the scenario uses, each declared in config/connectors.yaml (SN-03); may be empty. Preloading a connector never connects it: the person still grants it on a consent card (PRD 10.3, FR-HIL-08).
+    """
+    seed_data: list[ScenarioSeedPath]
+    """
+    Seed files the scenario loads, as repo-relative paths (SN-04); may be empty.
+    """
+    theme: Slug
+    autonomy: list[ScenarioAutonomyEntry] | None = None
+    """
+    Policy seeds (PRD 10.4). Each entry becomes one policy.schema.json record only when the owner approves the task, as the owner's own (SN-08); absent or empty preloads none. Each level is at most its action type's max_level in config/autonomy.yaml, so a T3 action never goes above L1 (SN-06).
+    """
+
+
 class Skill(BaseModel):
     """
     skill.yaml in skills/<domain>/<skill-id>/ (PRD 8.2). The planner sees only id and the one-line description; the executing agent loads the full skill.
@@ -3461,6 +3587,59 @@ class WorkItem(BaseModel):
     history: Annotated[list[WorkItemHistoryEntry], Field(min_length=1)]
     created_at: Timestamp
     updated_at: Timestamp
+
+
+class ArtifactVersion(BaseModel):
+    """
+    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-08 in artifact.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    artifact: ArtifactRef
+    org_id: OrgId
+    world_id: WorldId
+    run_id: RunId
+    owner: UserId
+    media_type: MediaType
+    size_bytes: Annotated[int, Field(ge=1, le=50000000)]
+    """
+    Stored size: at least 1 byte, at most 50,000,000 for a file and 2,000,000 for text or JSON (BQ-257, AR-04).
+    """
+    content_sha256: Annotated[
+        str, Field(max_length=64, min_length=64, pattern="^[0-9a-f]{64}$")
+    ]
+    """
+    SHA-256 of the stored bytes, lower-case hex; every read recomputes it (AR-01).
+    """
+    parents: Annotated[list[ArtifactRef], Field(max_length=1)]
+    """
+    The earlier version of the same artifact this one continues, or the version a restore copies (AR-02); empty for version 1.
+    """
+    origin: ArtifactVersionOrigin
+    sources: list[ArtifactVersionSource]
+    """
+    Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).
+    """
+    screening: Literal["clean", "flagged", "unscreened"]
+    """
+    The SafetyProvider verdict on the exact stored bytes (PRD 16.3 item 2), unscreened when there is none. A version that is not clean raises safety_flag in the policy engine (AR-07).
+    """
+    screened_at: Timestamp | None
+    """
+    When that verdict came back; null exactly when screening is unscreened (AR-07).
+    """
+    redacted: bool
+    """
+    true when the secret redactor changed text or JSON before it was stored (SEC-01, BQ-258). The redactor reads only text and JSON, so false on a file means it did not run (AR-07).
+    """
+    idempotency_key: ArtifactVersionIdempotencyKey | None
+    """
+    Set for unit and render outputs (AR-05); null for uploads and restores.
+    """
+    created_at: Timestamp
 
 
 class BriefAppliedPreference(BaseModel):
@@ -3570,6 +3749,7 @@ class Common(BaseModel):
     channel: Channel | None = None
     data_class: DataClass | None = None
     deliverable_format: DeliverableFormat | None = None
+    media_type: MediaType | None = None
     credit_range: CreditRange | None = None
     time_range: TimeRange | None = None
     work_item_id: WorkItemId | None = None
@@ -3833,7 +4013,7 @@ class Metering(BaseModel):
 
 class Person(BaseModel):
     """
-    A person of an org (PRD 15.1 User entity, ADR-0014): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).
+    A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).
     """
 
     model_config = ConfigDict(
@@ -3920,6 +4100,20 @@ type UiAction = Annotated[
 """
 The allow-list of what the assistant panel may do on the page (FR-PA-14, PE-10): a closed union on `kind`. The web app has one executor that maps each kind to a handler; a document that does not validate is dropped, so a model can never click, type, read the page or go anywhere outside these routes and targets. State-changing kinds act on the signed-in person's own records through the same API routes as the buttons; `draft_reply` makes a draft (T1) and sends nothing; no kind sends to another person.
 """
+
+
+class ArtifactVersionManifestRevision(BaseModel):
+    """
+    One append-only revision of a version's provenance manifest, at .../versions/{version:06d}/manifests/{n:04d} (AR-06): created at put, reviewed after the Verifier (cause its artifact.reviewed), sent (cause the data.transfer out) or exported when the version leaves Tilo. Readers take the highest n.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    n: Annotated[int, Field(ge=1, le=9999)]
+    stage: Literal["created", "reviewed", "sent", "exported"]
+    cause: Ulid | None
+    manifest: Manifest
 
 
 class Brief(BaseModel):

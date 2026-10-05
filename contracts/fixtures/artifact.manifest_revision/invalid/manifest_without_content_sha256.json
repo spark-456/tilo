@@ -1,0 +1,33 @@
+{
+  "n": 1,
+  "stage": "created",
+  "cause": "01JB5VQ0000000000000000201",
+  "manifest": {
+    "v": "1.0",
+    "artifact": {
+      "artifact_id": "art_market_brief",
+      "version": 1
+    },
+    "parents": [],
+    "produced_by": {
+      "agent_id": "A_s1",
+      "role": "specialist",
+      "skill": null,
+      "model_role": null,
+      "profile": null
+    },
+    "inputs": [],
+    "sources": [],
+    "claims": [
+      {
+        "id": "cl_backlog",
+        "location": "paragraph/2",
+        "text": "About forty messages are still waiting for a reply.",
+        "source_ids": [],
+        "verified": false
+      }
+    ],
+    "events": [],
+    "authz": null
+  }
+}

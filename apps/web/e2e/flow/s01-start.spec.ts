@@ -52,6 +52,27 @@ for (const viewport of [DESKTOP, MOBILE]) {
     expect(errors).toEqual([]);
   });
 
+  // #227 (Tilo Home v2): the one action sits inside the task box it acts on, above the chips.
+  test(`UX-1 S_01 #227: Start task sits inside the task box, above the chips, and the preview ends with the task column at ${size}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    const box = await page.locator(".task-box").boundingBox();
+    const start = await page.getByRole("button", { name: "Start task", exact: true }).boundingBox();
+    const chips = await page.getByRole("group", { name: "Suggested tasks" }).boundingBox();
+    if (!(box && start && chips)) throw new Error("S-01 parts are not on screen");
+    expect(start.y).toBeGreaterThanOrEqual(box.y);
+    expect(start.y + start.height).toBeLessThanOrEqual(box.y + box.height);
+    expect(chips.y).toBeGreaterThanOrEqual(box.y + box.height);
+    const preview = page.getByLabel("What Tilo would build");
+    if (viewport.width < 1280) return await expect(preview).toBeHidden(); // no room for both
+    const side = await preview.boundingBox();
+    const main = await page.locator(".home-main").boundingBox();
+    if (!(side && main)) throw new Error("S-01 columns are not on screen");
+    expect(Math.abs(side.y + side.height - (main.y + main.height))).toBeLessThanOrEqual(24);
+  });
+
   test(`FR-INT-01 S_01: text plus 3 files submits once and lands on Understanding at ${size}`, async ({
     page,
   }) => {

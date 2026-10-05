@@ -92,30 +92,55 @@
   min-height: 0;
 }
 .home-preview {
-  align-self: start;
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch; /* as tall as the task column, like the artboard's preview card */
+  padding: 12px 16px 16px;
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-cards);
-  background: var(--color-surface-0);
+  background: var(--color-surface-1);
+}
+.home-preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+}
+/* A label, not a control: dark pill, white text (about 16:1). */
+.home-tier {
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-1);
+  color: var(--color-surface-1);
+  font: 800 var(--text-12) / 1.4 var(--font-ui);
 }
 .home-preview-title {
-  margin: 0 0 8px;
-  font: 800 var(--text-14) / 1.3 var(--font-ui);
+  color: var(--color-ink-2);
+  font: 500 var(--text-12) / 1.4 var(--font-mono);
 }
 .home-glyph {
   display: block;
+  flex: 1 1 0; /* takes what the task column leaves, so the two columns end together */
   width: 100%;
-  height: auto;
+  min-height: 120px;
+}
+@media (min-width: 768px) {
+  .flow-wide .flow-summary {
+    font-size: var(--text-16); /* the hero's lead line, as the artboard sets it larger than body */
+  }
 }
 .home-tiles {
   display: grid;
+  flex: none;
   gap: 8px;
-  margin: 8px 0 0;
+  margin: 0;
 }
 .home-tiles > div {
   padding: 8px 12px;
   border-radius: var(--radius-controls);
-  background: var(--color-surface-1);
+  background: var(--color-surface-0);
 }
 .home-tiles dt {
   color: var(--color-ink-2);
@@ -173,10 +198,17 @@
 /* S-01 task box, chips, file drop. */
 .task-box {
   border: 2px solid var(--color-surface-2);
-  border-bottom-width: 4px;
+  border-bottom: 5px solid var(--color-fog); /* the artboard's card lip */
   border-radius: var(--radius-cards);
-  background: var(--color-surface-1);
-  padding: 8px 12px 4px;
+  background: var(--color-surface-0);
+  padding: 8px 12px;
+}
+/* The one action lives in the box (artboard Tilo Home v2): the hint on the left, Start task on the right. */
+.task-box .flow-actions {
+  padding-top: 4px;
+}
+.task-box .flow-actions .primary {
+  font-size: var(--text-16);
 }
 .task-box textarea {
   box-sizing: border-box;
@@ -213,7 +245,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 12px 0;
+  margin: 16px 0;
 }
 .task-chip {
   min-height: 40px;
@@ -221,10 +253,19 @@
   border: 2px solid var(--color-surface-2);
   border-radius: var(--radius-pill);
   background: var(--color-surface-1);
+  box-shadow: 0 3px 0 var(--color-fog); /* a lip that takes no layout */
   color: var(--color-ink-1);
   font: 700 var(--text-14) / 1.3 var(--font-ui);
   text-align: left;
   cursor: pointer;
+}
+.task-chip:hover {
+  border-color: var(--color-brand-primary);
+  color: var(--color-brand-primary);
+}
+.task-chip:active {
+  transform: translateY(3px);
+  box-shadow: none;
 }
 @media (max-width: 767px) {
   .task-chip {

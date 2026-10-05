@@ -3,7 +3,7 @@
   "$id": "https://contracts.tilo.example/person.schema.json",
   "x-version": "1.0.0",
   "title": "Person",
-  "description": "A person of an org (PRD 15.1 User entity, ADR-0014): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).",
+  "description": "A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).",
   "type": "object",
   "additionalProperties": false,
   "required": [

@@ -4,7 +4,7 @@ Cloud Run service (PRD 6.2): WhatsApp webhook and sender, email notifications, w
 channel identity binding, Email Autopilot triage. Public ingress for signature-verified webhooks only.
 
 ## Commands
-- `uv run --package tilo-channels pytest services/channels`; `just check` from the repo root.
+- `uv run --package tilo-channels pytest services/channels`; `just check` from the repo root. Image: `Dockerfile` runs `tilo_channels.app:app` (`/healthz` only, P0-07a).
 ## Contracts and config
 - `packages/contracts-py` event types; writes to `tilo-api` only, never Firestore business state. `config/connectors.yaml`, flags.
 

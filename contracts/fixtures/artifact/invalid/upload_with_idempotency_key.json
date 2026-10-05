@@ -1,0 +1,27 @@
+{
+  "v": "1.0",
+  "artifact": {
+    "artifact_id": "art_market_brief",
+    "version": 1,
+    "label": "Market brief"
+  },
+  "org_id": "org_example",
+  "world_id": "w_example",
+  "run_id": "r_example_1",
+  "owner": "u_owner",
+  "media_type": "text/markdown",
+  "size_bytes": 1840,
+  "content_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "parents": [],
+  "origin": {
+    "kind": "upload",
+    "unit": null,
+    "agent": null
+  },
+  "sources": [],
+  "screening": "clean",
+  "screened_at": "2026-10-05T09:29:59.500Z",
+  "redacted": false,
+  "idempotency_key": "r_example_1:U2:1:0",
+  "created_at": "2026-10-05T09:30:00.000Z"
+}

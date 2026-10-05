@@ -39,6 +39,7 @@ class Observation:
     cards: list[dict[str, Any]] = field(default_factory=list)
     http: list[tuple[str, str, int]] = field(default_factory=list)
     questions: int = 0
+    answered: dict[str, str | None] = field(default_factory=dict)  # question field -> the answer sent
     plan: dict[str, Any] | None = None
     delivery: dict[str, Any] | None = None
     cap: float = 0.0
@@ -108,12 +109,11 @@ def _detail(response: Any) -> str:
     return said if isinstance(said, str) and said else f"HTTP {response.status_code}"
 
 
-def _drive(case: BankCase, obs: Observation, timeout_s: float) -> None:
+def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any) -> None:
+    """Intake to a terminal state through `app`'s own routes (the live runner passes its own wiring)."""
     from fastapi.testclient import TestClient  # noqa: PLC0415
     from tilo_api import deps, dev  # noqa: PLC0415
 
-    director = ScriptedDirector(case.director)
-    app = _app(director)
     client = TestClient(app, base_url=f"http://localhost:{dev.PORT}", raise_server_exceptions=False)
     store = app.dependency_overrides[deps.get_store]()
     adapters = app.dependency_overrides[deps.get_connector_adapters]()
@@ -148,6 +148,7 @@ def _drive(case: BankCase, obs: Observation, timeout_s: float) -> None:
             return
         given = case.answers or {}
         answers = [{"field": q["field"], "answer": given.get(q["field"])} for q in task["questions"]]
+        obs.answered = {a["field"]: a["answer"] for a in answers}
         if fail(call("POST", f"/tasks/{task['task_id']}/answers", json={"answers": answers, "brief_edits": {}})):
             return
         approaches = call("GET", f"/tasks/{task['task_id']}/approaches")
@@ -200,7 +201,6 @@ def _drive(case: BankCase, obs: Observation, timeout_s: float) -> None:
             if obs.outcome in (None, "held_at_gate"):
                 client.post(f"/worlds/{obs.world_id}/pause")  # end the run's thread; a held gate never times out
         obs.sent_total = sent()
-        obs.director_calls = list(director.calls)
 
 
 def run_case(case: BankCase, *, timeout_s: float = DEFAULT_TIMEOUT_S) -> Observation:
@@ -208,11 +208,13 @@ def run_case(case: BankCase, *, timeout_s: float = DEFAULT_TIMEOUT_S) -> Observa
     obs = Observation(case=case)
     started = time.monotonic()
     with _dev_env():
+        director = ScriptedDirector(case.director)
         try:
-            _drive(case, obs, timeout_s)
+            drive(case, obs, timeout_s, _app(director))
         except BankRefused:
             raise
         except Exception as exc:  # noqa: BLE001 - a crash is an observation: the checks report it
             obs.crash = f"{type(exc).__name__}: {exc}"
+        obs.director_calls = list(director.calls)
     obs.seconds = round(time.monotonic() - started, 3)
     return obs

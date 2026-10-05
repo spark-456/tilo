@@ -18,6 +18,7 @@ from typing import Any
 
 from tilo_connectors.mock import MockConnector
 from tilo_metering.prices import PriceBook, Usage
+from tilo_providers.interfaces import GenerateResponse
 
 from tilo_api import deps
 from tilo_api.runs import MeteredOutcome
@@ -70,6 +71,29 @@ class DevUnitRunner:
         )
 
 
+class DevClearModel:
+    """No model call: every unit is judged clear (FR-AGT-05); only the deterministic rules may ask."""
+
+    def generate(self, request: Any) -> GenerateResponse:
+        _refuse()
+        return GenerateResponse(text='{"ask": false}', profile_id="dev-clear")
+
+
+def dev_send_policy(owner: str) -> dict[str, Any]:
+    """The dev owner's L1 ("ask me each time") policy for send_email. It covers the action for FR-AGT-05 (PRD 8.3),
+    so a dev run still goes straight to its gate card, and changes nothing else: at L1 the engine gates as with none."""
+    stamp = {"by": owner, "at": "2026-09-29T09:30:00.000Z"}
+    return {
+        "id": "pol_dev_send", "owner": owner, "action_type": "send_email",
+        "scope": {"connectors": sorted(deps.get_connector_registry().ids()), "recipients": [], "domains": [],
+                  "districts": []},
+        "limits": {"per_day": None, "credits": None},
+        "conditions": {"no_attachments": True, "no_new_recipients": True, "no_safety_flags": True},
+        "level": "L1", "undo_window_s": 60, "expiry": None, "notify_channel": "email", "team_lead_domains": [],
+        "created_by": stamp, "changed_by": stamp, "history": [{**stamp, "change": "Created at L1", "level": "L1"}],
+    }  # fmt: skip
+
+
 def resolve_action(*, unit: dict, action_type: str, item: dict, brief: dict) -> dict:
     _refuse()
     return {"destination": DEV_DESTINATION, "recipients": [DEV_RECIPIENT], "known_recipients": []}
@@ -93,6 +117,10 @@ def overrides() -> dict[Callable[..., Any], Callable[[], Any]]:
         _refuse()
         return resolve_action
 
+    def get_must_ask() -> dict[str, DevClearModel]:
+        _refuse()
+        return {role: DevClearModel() for role in ("specialist", "writer", "verifier")}
+
     def get_adapters() -> dict[str, Any]:
         _refuse()
         return adapters
@@ -101,4 +129,5 @@ def overrides() -> dict[Callable[..., Any], Callable[[], Any]]:
         deps.get_unit_runner: get_runner,
         deps.get_action_resolver: get_resolver,
         deps.get_connector_adapters: get_adapters,
+        deps.get_must_ask_providers: get_must_ask,
     }
