@@ -49,6 +49,9 @@ describe("FR-WLD-11 Story announces only what arrives live", () => {
   });
 
   async function open() {
+    // The fixture client imports its layout on first use; with it already loaded the call settles
+    // inside act(), which fake timers cannot wait on for a real module load.
+    await Promise.all([import("../api/fixtures/layout"), import("../api/fixtures/events")]);
     const { client, send } = liveClient();
     const container = document.createElement("div");
     document.body.append(container);

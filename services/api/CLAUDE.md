@@ -37,4 +37,4 @@ service the web client and channels write through; the client reads live state f
 - Run (CL-INT-2, `tilo_api.runs`): approve starts a run if the Director's plan (`deps.get_plan_compiler`, FR-INT-09)
   passes `validate_plan`; a unit may ask first (`MustAsk`, `deps.get_must_ask_providers`; `QuestionWait` holds it, no
   `world.completed` while one waits, BQ-235..237); a send waits at a gate card, then the outbox after the owner approves.
-  Events via `deps.get_event_writer`; paused gets none. A `deliver` unit delivers in_app, ungated. `GET .../delivery`: 409 until `world.completed`. `tests/API_CL_INT_2.md`.
+  Events via `deps.get_event_writer`; paused gets none. A `deliver` unit delivers in_app, ungated. `replay_only` (NFR-24, process-wide flag, BQ-238) closes intake, answers, approaches, approve: 503 `replay_only: true`. `GET .../delivery`: 409 until `world.completed`. `tests/API_CL_INT_2.md`.
