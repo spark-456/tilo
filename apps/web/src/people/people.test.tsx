@@ -76,6 +76,15 @@ describe("PPL-40a plate order (FR-PA-02)", () => {
       expect(back?.snoozed_until).toBeNull();
     }
   });
+
+  it("PPL_40a put-back on an item that is already open is a no-op: no redundant reopened entry", () => {
+    for (const id of ["wi_budget_review", "wi_venue_shortlist"]) {
+      expect(reducePlate(WORK_ITEMS, { kind: "put_back", id })).toEqual(WORK_ITEMS);
+      const once = reducePlate(WORK_ITEMS, { kind: "snooze", id });
+      const back = reducePlate(once, { kind: "put_back", id });
+      expect(reducePlate(back, { kind: "put_back", id })).toEqual(back);
+    }
+  });
 });
 
 describe("PPL-40a S-27 My plate", () => {
@@ -128,6 +137,17 @@ describe("PPL-40a S-27 My plate", () => {
     expect(box.textContent).toContain("Waiting for Priya Nair to reassign");
   });
 
+  it("PPL_40a every row's source line has a decorative icon: meeting, mail or you", async () => {
+    const box = await render(<S_27 />);
+    const rows = [...box.querySelectorAll('[data-testid="plate-item"] .bitem-sub')];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const sub of rows) {
+      const icon = sub.querySelector("svg.source-icon");
+      expect(icon?.getAttribute("aria-hidden")).toBe("true");
+    }
+    expect(rows.some((r) => r.textContent?.startsWith("Added by you."))).toBe(true);
+  });
+
   it("PPL_40a Not mine is offered only on an item someone else assigned", async () => {
     const box = await render(<S_27 />);
     expect(named(box, "Not mine: Share the venue shortlist")).toBeDefined();
@@ -160,6 +180,29 @@ describe("PPL-40a S-26 Meetings", () => {
     const radio = strip?.querySelectorAll("input")[1] as HTMLInputElement;
     await click(radio);
     expect(box.querySelectorAll('[data-testid="meeting-list"] li')).toHaveLength(1);
+  });
+
+  it("PPL_40a the filter pills are a named group of radios with one selected, like the S-14 tabs", async () => {
+    document.body.replaceChildren(); // radios of the same name in earlier renders share one group
+    const box = await render(<S_26 params={[""]} />);
+    const strip = box.querySelector('[data-testid="meeting-strip"]');
+    expect(strip?.tagName).toBe("FIELDSET");
+    expect(strip?.querySelector("legend")?.textContent).toBe("Filter meetings");
+    const radios = [...(strip?.querySelectorAll("input") ?? [])] as HTMLInputElement[];
+    expect(radios.every((r) => r.type === "radio" && r.name === radios[0]?.name)).toBe(true);
+    expect(radios.map((r) => r.checked)).toEqual([true, false, false, false]);
+    await click(radios[2]);
+    expect(radios.map((r) => r.checked)).toEqual([false, false, true, false]);
+  });
+
+  it("PPL_40a an attendee with no account gets a neutral glyph, not initials; the rest keep initials", async () => {
+    const box = await render(<S_26 params={["mt_vendor_sync"]} />);
+    const discs = [...box.querySelectorAll('ul[aria-label="Attendees"] .avatar')];
+    const guest = discs.find((d) => d.parentElement?.textContent === "Dev from Acme");
+    expect(guest?.querySelector("svg")).not.toBeNull();
+    expect(guest?.textContent).toBe("");
+    expect(discs.some((d) => d.textContent === "DA")).toBe(false);
+    expect(discs.some((d) => d.textContent === "AR")).toBe(true);
   });
 
   it("PPL_40a Confirm minutes swaps the button for the confirmed chip", async () => {

@@ -8,7 +8,7 @@
 import type { WorkItem } from "@tilo/contracts";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { QUOTES, WORK_ITEMS, displayName } from "../people/data";
-import { Evidence, PersonTag, PreviewNote, pillLabel } from "../people/parts";
+import { Evidence, PersonTag, PreviewNote, SourceIcon, pillLabel } from "../people/parts";
 import {
   type Bucket,
   type PlateAction,
@@ -52,10 +52,23 @@ function chipOf(i: WorkItem, key: Key): readonly [string, string] {
 function Source({ item: i }: { item: WorkItem }) {
   const by = i.assigned_by && i.assigned_by.by !== i.owner ? i.assigned_by.by : null;
   const said = i.due_text ? ` Said “${i.due_text}”.` : "";
-  if (i.source.kind === "mail") return <>From mail you marked to track.{said}</>;
-  if (i.source.kind !== "meeting") return <>Added by you.{said}</>;
+  if (i.source.kind === "mail")
+    return (
+      <>
+        <SourceIcon kind="mail" />
+        From mail you marked to track.{said}
+      </>
+    );
+  if (i.source.kind !== "meeting")
+    return (
+      <>
+        <SourceIcon kind="you" />
+        Added by you.{said}
+      </>
+    );
   return (
     <>
+      <SourceIcon kind="meeting" />
       From a meeting{by && ", assigned by "}
       {by && <PersonTag user={by} />}.{said}
     </>
@@ -175,6 +188,8 @@ export function S_27() {
           </div>
         ),
       )}
+      {/* In the page's flow after the last group, in a box always as tall as a toast: it never
+          covers a button, and appearing moves nothing. */}
       <output ref={box} tabIndex={-1} className="plate-toast-slot" data-testid="plate-toast">
         {toast && (
           <span className="plate-toast">

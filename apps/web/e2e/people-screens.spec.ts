@@ -83,6 +83,81 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       ).toEqual([]);
     });
 
+    test("PPL-40a S-27: the toast never covers a visible button, at the top, middle or end of the page", async ({
+      page,
+    }) => {
+      await watchShifts(page);
+      await page.goto("/plate");
+      await page.getByRole("button", { name: /^Snooze until tomorrow: Call Acme/ }).click();
+      await page.getByRole("button", { name: /^Done: Review the Q4/ }).click();
+      await expect(page.getByTestId("plate-status")).toBeVisible();
+      const slot = page.getByTestId("plate-toast");
+      const covered = () =>
+        slot.evaluate((el) => {
+          const toast = el.querySelector(".plate-toast")?.getBoundingClientRect();
+          if (!toast) return ["no toast"];
+          const vh = window.innerHeight;
+          return [...document.querySelectorAll("main button, main a, main summary")].flatMap(
+            (b) => {
+              if (el.contains(b)) return [];
+              const r = b.getBoundingClientRect();
+              const shown = r.bottom > 0 && r.top < vh && r.width > 0;
+              const hit =
+                r.left < toast.right &&
+                r.right > toast.left &&
+                r.top < toast.bottom &&
+                r.bottom > toast.top;
+              return shown && hit ? [`${b.textContent?.trim()}`] : [];
+            },
+          );
+        });
+      for (const to of [0, 0.5, 1]) {
+        await page.evaluate((f) => {
+          for (const el of document.querySelectorAll("*"))
+            if (
+              el.scrollHeight > el.clientHeight + 1 &&
+              getComputedStyle(el).overflowY !== "visible"
+            )
+              el.scrollTop = (el.scrollHeight - el.clientHeight) * f;
+          window.scrollTo(0, (document.documentElement.scrollHeight - innerHeight) * f);
+        }, to);
+        expect(await covered()).toEqual([]);
+      }
+      // The box is reserved at toast height before any toast shows, so nothing shifts.
+      const box = await slot.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(name === "mobile" ? 100 : 68);
+      expect(
+        await page.evaluate(() => (window as unknown as { __shifts: number[] }).__shifts),
+      ).toEqual([]);
+    });
+
+    test("PPL-40a S-26: the filter pills are a named radio group with one selected", async ({
+      page,
+    }) => {
+      await page.goto("/meetings");
+      const group = page.getByRole("group", { name: "Filter meetings" });
+      await expect(group.getByRole("radio")).toHaveCount(4);
+      await expect(group.getByRole("radio", { name: /^All/ })).toBeChecked();
+      await group.getByRole("radio", { name: /^Confirmed/ }).check();
+      await expect(group.getByRole("radio", { name: /^Confirmed/ })).toBeChecked();
+      await expect(group.getByRole("radio", { name: /^All/ })).not.toBeChecked();
+      await page.keyboard.press("ArrowRight");
+      await expect(group.getByRole("radio", { name: /^Other/ })).toBeChecked();
+    });
+
+    test("PPL-40a S-26: an attendee with no account has a neutral glyph, not initials", async ({
+      page,
+    }) => {
+      await page.goto("/meetings/mt_vendor_sync");
+      await expect(page.getByRole("heading", { level: 2, name: /^Minutes: / })).toBeVisible();
+      const guest = page
+        .getByRole("list", { name: "Attendees" })
+        .getByRole("listitem")
+        .filter({ hasText: "Dev from Acme" });
+      await expect(guest.locator(".avatar svg")).toHaveCount(1);
+      await expect(guest.locator(".avatar")).toHaveText("");
+    });
+
     test("PPL-40a S-27: the strip jumps to a group and the Evidence trigger shows quotes with line numbers", async ({
       page,
     }) => {

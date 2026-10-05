@@ -255,10 +255,15 @@
 }
 .plate-toast-slot {
   display: block;
-  position: sticky;
-  bottom: var(--space-16);
-  z-index: 5;
-  pointer-events: none;
+  box-sizing: border-box;
+  min-height: 68px; /* one line and Undo; the phone reserves more (below) */
+  margin-top: var(--space-16);
+}
+.source-icon {
+  display: inline-block;
+  flex: none;
+  margin: 0 var(--space-8) -3px 0;
+  color: var(--color-ink-2);
 }
 .plate-toast-slot:focus-visible {
   outline: 2px solid var(--color-brand-primary);
@@ -275,7 +280,6 @@
   background: var(--color-ink-1);
   color: var(--color-surface-1);
   font: 700 var(--text-14) / 1.4 var(--font-ui);
-  pointer-events: auto;
 }
 
 /* S-28 pinboards: the two boards side by side when the room is wide (the team board takes two
@@ -593,6 +597,9 @@
 }
 
 @media (max-width: 767px) {
+  .plate-toast-slot {
+    min-height: 100px;
+  }
   .people-strip {
     flex-wrap: nowrap;
     overflow-x: auto;
