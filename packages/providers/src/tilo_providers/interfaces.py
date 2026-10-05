@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import Any, TypedDict
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from tilo_providers.errors import RequestError
 
@@ -36,6 +36,8 @@ class GenerateRequest(BaseModel):  # one ModelProvider.generate() / .stream() ca
     tools: list[dict[str, Any]] | None = None
     json_mode: bool = False  # PL-02 structured output: force JSON-only output, no schema
     response_schema: dict[str, Any] | None = None  # PL-02 structured output: JSON output validated against this schema
+    # google only; None sends no thinking config. A pattern, not a Literal, so callers' type checkers stay quiet.
+    thinking_level: str | None = Field(default=None, pattern="^(minimal|low|medium|high)$")
 
 
 class GenerateResponse(BaseModel):  # one generate() result, or one stream() chunk
