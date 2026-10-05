@@ -31,6 +31,6 @@
     }
   ],
   "actions": ["show_me", "snooze", "delegate"],
-  "answer_channels": ["web", "mobile_web", "whatsapp", "email"],
+  "answer_channels": ["web", "mobile_web", "email"],
   "safe_default": "per_kwh"
 }

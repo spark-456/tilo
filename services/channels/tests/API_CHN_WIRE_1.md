@@ -2,7 +2,7 @@
 
 CHN-WIRE-1 (FR-CHN-11; issue #307 plan ticket 1, issue #256 gate 3, BQ-152, BQ-158, BQ-184). Scope: the person-approved
 L1 and T3 path only. Not here: the L2 / policy path (ADR-0013, tickets 4 and 5), the `tilo-api` route that records the tap
-(ticket 2), the WhatsApp PIN for autopilot previews (ticket 3). Sources: PRD 10.3, 10.4, 11.4, SEC-06;
+(ticket 2); the WhatsApp PIN for autopilot previews (ticket 3) is removed with WhatsApp (SD-01). Sources: PRD 10.3, 10.4, 11.4, SEC-06;
 `contracts/outbox.rules.md` OB-01, OB-04, OB-05; `contracts/events/data/approval.requested.schema.json`,
 `approval.resolved.schema.json`; `tilo_policy.check_entry` (crossref.py) and `opens_gate` (coverage.py).
 
@@ -90,7 +90,7 @@ its data schema, no mail text in it (no subject, body, address). A redraft after
 What the real `check_entry` refuses, and the Autopilot must therefore refuse or let the outbox refuse (the tests assert
 only "no entry"): another `gate_id`, `card_id` or `outbox_id`; `option` other than `approve`; `authz.ref` that is not the
 card's owner (no Approver or Team Lead is assigned on an autopilot gate); `authz.by` of `team_lead` or `policy`; a T3
-card answered on `whatsapp` without `pin_verified` true; an approval whose parts break their contracts (email channel,
+card answered on `whatsapp` (a gate opens only in a signed-in session, ADR-0019); an approval whose parts break their contracts (email channel,
 missing field, bad timestamp, extra field); and OB-05: an entry whose `action_type`, `risk_tier` or `item` differs from the
 stored `approval.requested` (the tests change the card doc after preview).
 

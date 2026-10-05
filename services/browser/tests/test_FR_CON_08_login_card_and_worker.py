@@ -92,6 +92,13 @@ def test_FR_CON_08_the_safe_default_is_skip():
     assert isinstance(card["timeout"], int) and card["timeout"] == 3600
 
 
+def test_CH_RM_FR_CON_08_the_login_card_is_answered_on_web_mobile_web_or_email_never_whatsapp():
+    from tilo_browser.login import build_login_card
+
+    card = build_login_card(_signal(), url=f"{PORTAL}/app", ctx=_ctx())
+    assert card["answer_channels"] == ["web", "mobile_web", "email"]
+
+
 def test_FR_CON_08_the_login_card_has_no_free_text_field_that_could_collect_a_password():
     from tilo_browser.login import build_login_card
 

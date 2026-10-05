@@ -1,4 +1,4 @@
-"""FR-HIL-07 (PRD 10.4, 10.6): "Kill switches from app and WhatsApp: STOP AUTOPILOT sets all
+"""FR-HIL-07 (PRD 10.4, 10.6; WhatsApp left by SD-01): "Kill switches from the app: STOP AUTOPILOT sets all
 policies to L1 in <= 5 s; confirmed on every channel." PI-13 and PI-18
 (docs/security/p4-policy-invariants.md): Stop all autopilot sets every policy to L1, one
 `policy.changed` per policy, only the owner may do it, and one writer per world stamps every
@@ -182,7 +182,7 @@ def test_FR_HIL_07_stop_all_never_raises_an_l0_policy(client, store):
 
 
 def test_FR_HIL_07_stop_all_confirms_on_every_enabled_channel(client, store):
-    store.worlds[WORLD] = make_world(owner=OWNER, owner_channels=("web", "whatsapp", "email"))
+    store.worlds[WORLD] = make_world(owner=OWNER, owner_channels=("web", "email"))
     as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
 
     resp = client.post(f"/worlds/{WORLD}/autopilot/stop")
@@ -190,7 +190,7 @@ def test_FR_HIL_07_stop_all_confirms_on_every_enabled_channel(client, store):
     assert resp.status_code == 200
     body = resp.json()
     channels = {c["channel"] for c in body["confirmations"]}
-    assert channels == {"web", "whatsapp", "email"}
+    assert channels == {"web", "email"}
 
 
 def test_FR_HIL_07_stop_all_completes_within_5s_for_200_policies(client, store):
@@ -304,9 +304,9 @@ def test_FR_HIL_07_PI_13_decide_gates_after_stop_all(client, store):
 def test_FR_HIL_07_pause_all_emits_world_paused_and_sets_l1(client, store):
     ids = _world_with_policies(store, 3, level="L3")
     # ST-3a-2: the channel comes from the principal's session, never the request body.
-    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD, channel="whatsapp"))
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD, channel="mobile_web"))
 
-    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "whatsapp"})
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "mobile_web"})
 
     assert resp.status_code == 200
     assert resp.json()["paused"] is True
@@ -316,21 +316,22 @@ def test_FR_HIL_07_pause_all_emits_world_paused_and_sets_l1(client, store):
     paused_events = [e for e in store.events[WORLD] if e["type"] == "world.paused"]
     assert len(paused_events) == 1
     event = paused_events[0]
-    assert event["data"] == {"reason": "pause_all", "channel": "whatsapp"}
+    assert event["data"] == {"reason": "pause_all", "channel": "mobile_web"}
     assert event["authz"] is None  # world.paused is side_effect: false (events/registry.yaml)
     assert event["vis"] == "all"
     validate_event(event)
     assert store.worlds[WORLD].paused is True, "round-4: the durable paused flag must be set too"
 
 
-def test_FR_HIL_07_pause_channel_outside_the_schema_enum_is_422(client, store, writer):
-    """Round-1 finding: PauseRequest.channel accepted any string. It is now typed to
-    common.schema.json#/$defs/channel's own enum, so an out-of-enum value never reaches the
-    handler: 422, nothing changes, nothing is emitted."""
+@pytest.mark.parametrize("channel", ["sms", "whatsapp"])
+def test_FR_HIL_07_pause_channel_outside_the_enum_is_422(client, store, writer, channel):
+    """Round-1 finding: PauseRequest.channel accepted any string. It is now typed to the channels a
+    signed-in or email session can have (whatsapp left with SD-01, CH-RM), so any other value never
+    reaches the handler: 422, nothing changes, nothing is emitted."""
     ids = _world_with_policies(store, 2, level="L2")
     as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))
 
-    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "sms"})
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": channel})
 
     assert resp.status_code == 422
     for pid in ids:
@@ -848,7 +849,7 @@ def test_FR_HIL_07_pause_all_still_pauses_and_lowers_when_the_writer_is_down(cli
 
 def test_FR_HIL_07_concurrent_stop_alls_produce_exactly_one_change_per_policy(client, store):
     """qa finding (biggest): two concurrent Stop-all requests (the owner double-tapping the
-    button, or app and WhatsApp racing) against a slow writer must not each independently see
+    button, or app and email racing) against a slow writer must not each independently see
     every policy at L2 and both lower + emit for it. Exactly one policy.changed and one stop_all
     history entry per policy survive the race."""
     ids = _world_with_policies(store, 6, level="L2")
@@ -1817,14 +1818,14 @@ def test_FR_HIL_07_bounded_threads_against_a_writer_that_never_returns(client, s
 
 def test_FR_HIL_07_pause_channel_is_derived_from_the_principals_session_not_the_body(client, store, writer):
     _world_with_policies(store, 2, level="L2")
-    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD, channel="whatsapp"))
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD, channel="mobile_web"))
 
     resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "email"})
 
     assert resp.status_code == 200, resp.text
     paused_events = [e for e in store.events[WORLD] if e["type"] == "world.paused"]
     assert len(paused_events) == 1
-    assert paused_events[0]["data"]["channel"] == "whatsapp", (
+    assert paused_events[0]["data"]["channel"] == "mobile_web", (
         "world.paused.data.channel must be the principal's own session channel, never the body's claim"
     )
 
@@ -1833,7 +1834,7 @@ def test_FR_HIL_07_pause_channel_defaults_to_web_when_the_principal_carries_none
     _world_with_policies(store, 2, level="L2")
     as_principal(make_principal(user_id=OWNER, role="owner", world_id=WORLD))  # channel defaults to "web"
 
-    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "whatsapp"})
+    resp = client.post(f"/worlds/{WORLD}/pause", json={"channel": "email"})
 
     assert resp.status_code == 200, resp.text
     paused_events = [e for e in store.events[WORLD] if e["type"] == "world.paused"]
@@ -1938,7 +1939,7 @@ def test_FR_HIL_07_revoke_of_an_unmapped_policy_is_locked_against_a_concurrent_r
 
 def test_FR_HIL_07_three_concurrent_stop_alls_plus_revokes_against_a_partially_slow_writer(client, store):
     """Three concurrent Stop-alls (the owner double- and triple-tapping the kill switch, or app +
-    WhatsApp + a retry racing) against ten owned policies, plus two concurrent revokes of two other
+    email + a retry racing) against ten owned policies, plus two concurrent revokes of two other
     policies in the same world (a different owner, so Stop-all's own owned-policy scan never also
     targets them -- keeping each policy's expected event count unambiguous), against a writer that
     is slow on roughly half its calls: every part is written exactly once, and the parts one call

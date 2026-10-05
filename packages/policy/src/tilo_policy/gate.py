@@ -16,7 +16,7 @@ def open_gate(
     team_lead: dict | None = None,
     policy: dict | None = None,
 ) -> Decision:
-    tier = gate_tier(reserved)  # the same validated tier opens_gate checks the PIN against
+    tier = gate_tier(reserved)  # the validated tier, T3 when the reservation is malformed
     if resolved is None or not opens_gate(reserved, resolved, world_owner, team_lead, policy):
         return gate(tier, (), "L1", None, "gate_not_opened")
     return Decision("run", tier, (), "L1", None, dict(resolved["authz"]), 0, None, "gate_approved")

@@ -4,7 +4,7 @@ that tilo-api and the run machinery own. Written from the PRD text before any bu
 - NFR-04 "Approval -> world visible: <= 6 s p95": from `POST /tasks/{id}/approve` until the world has started
   (`world.started` is on record) AND its layout is served (`GET /worlds/{id}/layout` is 200).
 - NFR-06 "Card answered (any channel) -> agent resumes: <= 2 s p95": from `POST .../cards/{id}/answer` (the web
-  channel; WhatsApp and email add their own hop) until the run records anything after `approval.resolved`.
+  channel; email adds its own hop) until the run records anything after `approval.resolved`.
 
 These are a lower bound: the live Director, real queues and the network add to them, so the target is also
 measured on tilo-dev after the deploy (docs/open-questions.md). A fake that is slow here is a bug in the path.
