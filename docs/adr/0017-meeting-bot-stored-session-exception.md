@@ -1,8 +1,8 @@
-# ADR-0016: Meeting bot session exception (only if guest join fails)
+# ADR-0017: Meeting bot session exception (only if guest join fails)
 
-- Status: Proposed, conditional. Do not act on it unless the guest-join experiment (FR-MTG-09)
-  fails; then it needs the user's approval before any such bot runs. (2026-10-05, architect; user
-  decision D-2 of the addendum.)
+- Status: Accepted as a fallback (2026-10-05, user, confirmed in chat). Do not
+  act on it unless the guest-join experiment (FR-MTG-09) fails. (Architect; user decision D-2 of the
+  addendum.) Renumbered from 0016.
 - Deciders: user (approval, only if the condition holds), architect (proposal)
 - Requirement: FR-MTG-09, FR-MTG-11; PRD 16.1 rule 3, 3.4, 16.2
 

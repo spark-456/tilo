@@ -1,8 +1,8 @@
-# ADR-0015: Contracts for people, pinboards, calendar and the assistant panel
+# ADR-0016: Contracts for people, pinboards, calendar and the assistant panel
 
-- Status: Proposed (2026-10-05, architect; ticket CC-PEOPLE). Everything in it is additive, so it
-  needs no major bump, but it rests on ADR-0014, which waits for the user.
-- Deciders: user (approval of ADR-0014), architect (proposal)
+- Status: Accepted (2026-10-05, user, confirmed in chat; ticket CC-PEOPLE).
+  Everything in it is additive, so it needs no major bump. It rests on ADR-0015. Renumbered from 0015.
+- Deciders: user (approval of ADR-0015), architect (proposal)
 - Requirement: FR-MTG-03 to -07, FR-PA-01, -11 to -19, FR-PB-01 to -08, FR-CAL-01 to -08
   (`docs/prd-addendum-people-agents.md`); PRD 9.5, 10.1, 10.4, 15.2, 16.5
 

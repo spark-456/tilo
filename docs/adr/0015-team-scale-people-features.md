@@ -1,8 +1,8 @@
-# ADR-0014: People features at personal and team scale
+# ADR-0015: People features at personal and team scale
 
-- Status: Proposed. The decision is the user's answer of 2026-10-05 as relayed by the orchestrator;
-  it amends the PRD's non-goals, so it waits for the user's confirmation of this text before the
-  contracts branch (`feat/CC-PEOPLE-contracts`) merges.
+- Status: Accepted (2026-10-05, user, confirmed in chat; recorded by the
+  supervisor). It amends the PRD's non-goals for these features only. Renumbered from 0014 because
+  the scenario config ADR keeps 0014.
 - Deciders: user (decision), architect (record)
 - Requirement: FR-MTG, FR-PA, FR-PB, FR-CAL in `docs/prd-addendum-people-agents.md` (PRD 3.4,
   23.3, 23.5, 10.1, 16.5)
