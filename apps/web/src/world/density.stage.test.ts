@@ -16,12 +16,13 @@ const invert = (m: Record<string, string>) =>
 
 // Pixi's Text needs a canvas the test runtime does not have, so a tag is a bare container whose
 // label is its text: what matters here is which words the renderer asks for.
+const pillWidth = vi.hoisted(() => ({ w: 130 }));
 vi.mock("./art/labels", async () => {
   const { Container: C, Graphics: G } = await import("pixi.js");
   // 130 px wide, about a name and its state word at 12 px: tag placement needs a width to work with.
   const pill = (text: string) => {
     const c = Object.assign(new C(), { label: text });
-    c.addChild(new G().rect(-65, -10, 130, 20).fill(0));
+    c.addChild(new G().rect(-pillWidth.w / 2, -10, pillWidth.w, 20).fill(0));
     return c;
   };
   return {
@@ -76,7 +77,10 @@ function stage(width = 900) {
 }
 
 beforeEach(() => setDensity("friendly"));
-afterEach(() => setDensity("friendly"));
+afterEach(() => {
+  setDensity("friendly");
+  pillWidth.w = 130;
+});
 
 describe("FR-WLD-14 the stage follows the density mode, read at draw time", () => {
   it("Professional draws smaller characters and puts the recorded state in every tag", () => {
@@ -143,6 +147,37 @@ describe("FR-WLD-14 the stage follows the density mode, read at draw time", () =
       }
     }
     s.stop();
+  });
+
+  it("on a phone the name tags are drawn at a readable size, and the ones that would overlap are left out", () => {
+    pillWidth.w = 400; // long names: enlarged, they cannot all fit
+    for (const mode of ["friendly", "professional"] as const) {
+      setDensity(mode);
+      const phone = stage(390);
+      const { labels } = phone.layers();
+      const shown = (labels?.children ?? []).filter((c) => c.visible && c.scale.x > 1);
+      expect(shown.length, `${mode}: some tags stay`).toBeGreaterThan(0);
+      // 12 px on screen: the fit scale times the enlargement times the 12 px tag.
+      const fit = (labels?.parent as Container).scale.x;
+      for (const t of shown) expect(fit * t.scale.x * 12).toBeCloseTo(12, 5);
+      for (const [i, a] of shown.entries()) {
+        for (const b of shown.slice(i + 1)) {
+          const apart =
+            Math.abs(a.x - b.x) >= 65 * a.scale.x + 65 * b.scale.x ||
+            Math.abs(a.y - b.y) >= 10 * a.scale.x + 10 * b.scale.x;
+          expect(apart, `${a.label} overlaps ${b.label}`).toBe(true);
+        }
+      }
+      const all = (labels?.children ?? []).filter((c) => c.scale.x > 1);
+      expect(all.length, `${mode}: a crowded phone stage leaves tags out`).toBeGreaterThan(
+        shown.length,
+      );
+      phone.stop();
+      const wide = stage(1400);
+      const sizes = new Set((wide.layers().labels?.children ?? []).map((c) => c.scale.x));
+      expect([...sizes]).toEqual([1]); // a full-size stage keeps the tags as drawn
+      wide.stop();
+    }
   });
 
   it("a tag's state words are the Inspect panel's: one shared map", () => {
