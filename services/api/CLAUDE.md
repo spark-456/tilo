@@ -32,7 +32,7 @@ service the web client and channels write through; the client reads live state f
   `safety` role, 503 without one) screens every typed string; models only via `deps.get_router`; one budget grant per
   owner at a time. `tests/API_CL_INT_1.md`, BQ-83.
 - Cards (FR-HIL-01/02, `tilo_api.cards`): `GET /worlds/{id}/cards`, `POST .../answer`. Identity is the verified
-  `deps.Principal` only; channel = the principal's; email only from tilo-channels, needs_you only; WhatsApp removed (SD-01), no PIN (CH-RM). Viewer 403; PRD 10.1 scope. First
+  `deps.Principal` only; channel class = the session's (web or mobile_web, either); email only from tilo-channels, needs_you only; WhatsApp removed (SD-01), no PIN (CH-RM). Viewer 403; PRD 10.1 scope. First
   answer wins (400 `already_resolved`, 409 `busy`); one derived `event_id` each. `tests/API_ST3b.md` (Round 2), BQ-69..73.
 - Run (CL-INT-2, `tilo_api.runs`): approve starts a run if the Director's plan (`deps.get_plan_compiler`, FR-INT-09)
   passes `validate_plan`; a unit may ask first (`MustAsk`, `deps.get_must_ask_providers`; `QuestionWait` holds it, no

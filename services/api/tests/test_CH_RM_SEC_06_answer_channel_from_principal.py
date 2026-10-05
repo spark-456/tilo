@@ -1,7 +1,8 @@
 """CH-RM follow-ups (issue #388 items 1 and 2), SEC-06 as amended (SD-01, ADR-0019): a user's answer takes its channel
-from the authenticated principal, never from the request body. A mismatch, or a principal channel that is not web or
-mobile web, is refused before anything is resolved, closed or written. A tilo-channels caller may claim only email, and
-only on a needs_you card; it never opens a gate. And `submit` never stores a card nobody can answer.
+class from the authenticated principal, never from the request body: a web or mobile web session records either (one
+signed-in session), and nothing else. A session of another class is refused before anything is resolved, closed or
+written. A tilo-channels caller may claim only email, and only on a needs_you card; it never opens a gate. And `submit`
+never stores a card nobody can answer.
 """
 
 from __future__ import annotations
@@ -33,17 +34,38 @@ def _refused(resp) -> bool:
     return (resp.status_code, resp.json()) == (400, {"outcome": "rejected", "reason": "invalid_channel"})
 
 
-@pytest.mark.parametrize(("session", "claimed"), [("web", "mobile_web"), ("mobile_web", "web")])
-def test_CH_RM_SEC_06_a_body_channel_that_differs_from_the_session_is_refused_before_any_write(session, claimed):
+@pytest.mark.parametrize(("session", "claimed"), [("web", "mobile_web"), ("mobile_web", "web"), ("web", "web")])
+def test_CH_RM_SEC_06_a_signed_in_session_records_either_web_channel(session, claimed):
+    """web and mobile_web are one signed-in session class (policy SIGNED_IN): a phone window on a dev-style principal
+    (no channel, so web) records mobile_web, and nothing else is accepted from it."""
     store, writer = _store()
     card = _card(store, "gate_send_reply")
+
+    assert _post(answer_client(store, principal(channel=session)), card, claimed).status_code == 200
+    assert [p["data"]["channel"] for p in writer.of_type("approval.resolved")] == [claimed]
+
+
+def test_CH_RM_SEC_06_the_dev_principal_with_no_channel_answers_on_mobile_web():
+    from tilo_api.deps import Principal
+
+    store, writer = _store()
+    card = _card(store, "gate_send_reply")
+    dev = Principal(user_id="u_owner", role="owner", world_id=W)  # as tilo_api.dev builds it
+
+    assert _post(answer_client(store, dev), card, "mobile_web").status_code == 200
+    assert [p["data"]["channel"] for p in writer.of_type("approval.resolved")] == ["mobile_web"]
+
+
+@pytest.mark.parametrize("claimed", ["email", "whatsapp", "sms", ""])
+@pytest.mark.parametrize("session", ["web", "mobile_web"])
+def test_CH_RM_SEC_06_a_signed_in_session_never_records_another_channel(session, claimed):
+    store, writer = _store()
+    card = _card(store, "needs_you_blocked")
     client = answer_client(store, principal(channel=session))
 
-    assert _refused(_post(client, card, claimed))
-
+    assert _post(client, card, claimed, card["options"][0]["id"]).status_code in (400, 403)
     assert writer.parts == []
-    assert _post(client, card, session).status_code == 200  # the card stayed open for the session's own answer
-    assert [p["data"]["channel"] for p in writer.of_type("approval.resolved")] == [session]
+    assert _post(client, card, session, card["options"][0]["id"]).status_code == 200  # the card stayed open
 
 
 @pytest.mark.parametrize("channel", ["web", "mobile_web"])
@@ -62,7 +84,7 @@ def test_CH_RM_SEC_06_a_session_whose_channel_is_not_web_never_answers_without_t
     client = answer_client(store, principal(channel="email"))  # not from tilo-channels
 
     assert _post(client, card, "email", option).status_code == 403  # channel_not_permitted, as before
-    assert _refused(_post(client, card, "web", option))  # the body names a channel the session does not have
+    assert _refused(_post(client, card, "web", option))  # an email session is not a signed-in web session
     assert writer.parts == []
 
 

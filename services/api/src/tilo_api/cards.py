@@ -7,9 +7,9 @@ no randomness. A card is validated against contracts/card.schema.json plus the v
 CR-01 and CR-02 before it is stored; an invalid card is never shown and never times out. Gate and
 consent cards are authorisations: never merged, never delegated to the Director, and never resolved
 by a timeout. Who answers comes only from the verified `deps.Principal` (PRD 10.1), never from the
-request body: the body's channel must equal the principal's. A user answers on web or mobile web; an authenticated
-tilo-channels caller claims only email, and only on a needs_you card, never a gate (CH-RM, SEC-06). WhatsApp was removed
-(SD-01, ADR-0019): no PIN path exists. Deciding whether an answer opens a gate stays with packages/policy.
+request body: a web or mobile web session (one signed-in class) records either; an authenticated tilo-channels
+caller claims only email, and only on a needs_you card, never a gate (CH-RM, SEC-06; `session_allows`). WhatsApp was
+removed (SD-01, ADR-0019): no PIN path exists. Deciding whether an answer opens a gate stays with packages/policy.
 """
 
 from __future__ import annotations
@@ -565,6 +565,16 @@ class _AnswerBody(BaseModel):
     pin_verified: bool = False
 
 
+def session_allows(principal: Principal, claimed: str, from_channels: bool) -> bool:
+    """The channel a request may record comes from its authenticated session, never the body (CH-RM, SEC-06). A user's
+    session is web or mobile web, one signed-in class (policy SIGNED_IN): it may record either, never email or
+    anything else. A tilo-channels caller acting for an email session may claim only email. Checked before the store
+    sees the answer, so a refusal resolves, closes and writes nothing."""
+    if from_channels:
+        return principal.channel == "email" and claimed == "email"
+    return principal.channel in _WEB_CHANNELS and claimed in _WEB_CHANNELS
+
+
 def get_channels_caller() -> bool:
     """True only when the request was authenticated as tilo-channels, acting for the principal
     (service-to-service auth lands with sign-in, PRD 15.3). Until then no caller is, so every
@@ -607,10 +617,7 @@ def build_router(
             raise HTTPException(status_code=404)
         if body.pin_verified or (not from_channels and body.channel not in _WEB_CHANNELS):
             return JSONResponse(status_code=403, content={"outcome": "rejected", "reason": "channel_not_permitted"})
-        # The channel is the session's, never the body's (CH-RM, SEC-06): a user answers on web or mobile web, and
-        # tilo-channels claims only email. Refused before the store sees it, so nothing is resolved or written.
-        allowed = ("email",) if from_channels else _WEB_CHANNELS
-        if body.channel != principal.channel or body.channel not in allowed:
+        if not session_allows(principal, body.channel, from_channels):
             return JSONResponse(status_code=400, content={"outcome": "rejected", "reason": "invalid_channel"})
         try:
             result = store.answer(
