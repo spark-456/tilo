@@ -21,7 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEV_API_PORT = 8080  # fixed by tilo_api.dev: its Host check only accepts the loopback address on this port
 DEV_API_URL = f"http://localhost:{DEV_API_PORT}"
 # Variables that would make a service refuse dev mode or go live: the system tests never inherit them.
-_STRIPPED = ("LIVE", "K_SERVICE", "CLOUD_RUN_JOB", "TILO_API_DEV", "TILO_MODELS_FILE")
+_STRIPPED = ("LIVE", "K_SERVICE", "CLOUD_RUN_JOB", "TILO_API_DEV", "TILO_API_DEV_ORIGINS", "TILO_MODELS_FILE")
 
 
 def free_port() -> int:
@@ -72,16 +72,24 @@ class Server:
     def stop(self) -> None:
         proc = self._proc
         if proc is not None and proc.poll() is None:
-            proc.terminate()
+            if sys.platform == "win32":  # the venv launcher can leave the real interpreter behind: take the tree
+                subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, check=False)
+            else:
+                proc.terminate()
             try:
                 proc.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 proc.kill()
         self._log.close()
-        try:
-            Path(self._log.name).unlink(missing_ok=True)
-        except OSError:  # Windows keeps the file locked a moment after the child exits; the temp dir is cleaned later
-            pass
+        deadline = time.monotonic() + 5  # the OS can hold the file a moment after the child exits
+        while True:
+            try:
+                Path(self._log.name).unlink(missing_ok=True)
+                return
+            except OSError:
+                if time.monotonic() > deadline:
+                    raise
+                time.sleep(0.2)
 
 
 def dev_api_env() -> dict[str, str]:
