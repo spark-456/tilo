@@ -326,7 +326,7 @@ class Rig:
         to: Sequence[str] = ("ops@harborview.example",),
         cc: Sequence[str] = ("sarah.chen@harborview.example",),
         subject: str = "Engine tune-up scheduling and estimate",
-        body: str = "Can Marcus come by this Friday afternoon, and what is your hourly rate?",
+        body: str = "Can Marcus come by this Friday afternoon to look at the engine?",
         headers: dict[str, str] | None = None,
         earlier: Sequence[Msg] = (),
         answers: Sequence[Scripted] = (),
