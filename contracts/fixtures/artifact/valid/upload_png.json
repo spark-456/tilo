@@ -20,6 +20,7 @@
   },
   "sources": [],
   "screening": "unscreened",
+  "screened_at": null,
   "redacted": false,
   "idempotency_key": null,
   "created_at": "2026-10-05T09:30:00.000Z"

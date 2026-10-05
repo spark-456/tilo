@@ -20,6 +20,7 @@
     "origin",
     "sources",
     "screening",
+    "screened_at",
     "redacted",
     "idempotency_key",
     "created_at"
@@ -53,17 +54,21 @@
     },
     "origin": { "$ref": "#/$defs/origin" },
     "sources": {
-      "description": "Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12). Never exported.",
+      "description": "Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).",
       "type": "array",
       "items": { "$ref": "#/$defs/source" }
     },
     "screening": {
-      "description": "Safety screen of the content (PRD 16.3 item 2). Only clean versions leave Tilo (AR-07).",
+      "description": "The SafetyProvider verdict on the exact stored bytes (PRD 16.3 item 2), unscreened when there is none. A version that is not clean raises safety_flag in the policy engine (AR-07).",
       "type": "string",
       "enum": ["clean", "flagged", "unscreened"]
     },
+    "screened_at": {
+      "description": "When that verdict came back; null exactly when screening is unscreened (AR-07).",
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+    },
     "redacted": {
-      "description": "true when the secret redactor changed the content before it was stored (SEC-01, BQ-258, AR-07).",
+      "description": "true when the secret redactor changed text or JSON before it was stored (SEC-01, BQ-258). The redactor reads only text and JSON, so false on a file means it did not run (AR-07).",
       "type": "boolean"
     },
     "idempotency_key": {
@@ -73,23 +78,66 @@
     "created_at": { "$ref": "common.schema.json#/$defs/timestamp" }
   },
   "if": {
-    "properties": { "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] } },
-    "required": ["media_type"]
+    "properties": {
+      "origin": { "properties": { "kind": { "enum": ["unit", "render"] } }, "required": ["kind"] }
+    },
+    "required": ["origin"]
   },
   "then": {
-    "properties": { "size_bytes": { "maximum": 2000000 } },
+    "properties": { "idempotency_key": { "type": "string" } },
     "if": {
-      "properties": { "origin": { "properties": { "kind": { "enum": ["upload", "restore"] } } } }
+      "properties": {
+        "origin": { "properties": { "kind": { "const": "unit" } }, "required": ["kind"] }
+      },
+      "required": ["origin"]
     },
-    "then": { "properties": { "idempotency_key": { "type": "null" } } },
-    "else": { "properties": { "idempotency_key": { "type": "string" } } }
+    "then": {
+      "description": "A model writes only text and JSON, never a file (ADR-0018 1).",
+      "properties": { "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] } }
+    },
+    "else": {
+      "description": "tilo-render makes only files.",
+      "properties": {
+        "media_type": {
+          "enum": [
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "image/png",
+            "image/jpeg"
+          ]
+        }
+      }
+    }
   },
   "else": {
+    "properties": { "idempotency_key": { "type": "null" } },
     "if": {
-      "properties": { "origin": { "properties": { "kind": { "enum": ["upload", "restore"] } } } }
+      "properties": {
+        "origin": { "properties": { "kind": { "const": "upload" } }, "required": ["kind"] }
+      },
+      "required": ["origin"]
     },
-    "then": { "properties": { "idempotency_key": { "type": "null" } } },
-    "else": { "properties": { "idempotency_key": { "type": "string" } } }
+    "then": { "properties": { "sources": { "maxItems": 0 } } }
+  },
+  "dependentSchemas": {
+    "media_type": {
+      "description": "Text and JSON are at most 2,000,000 bytes (BQ-257). Keyed by a required field, so it always applies; the root keeps one if/then/else.",
+      "if": {
+        "properties": {
+          "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] }
+        },
+        "required": ["media_type"]
+      },
+      "then": { "properties": { "size_bytes": { "maximum": 2000000 } } }
+    },
+    "screening": {
+      "description": "clean and flagged carry the verdict's time; unscreened has none (AR-07).",
+      "if": { "properties": { "screening": { "const": "unscreened" } }, "required": ["screening"] },
+      "then": { "properties": { "screened_at": { "type": "null" } } },
+      "else": { "properties": { "screened_at": { "$ref": "common.schema.json#/$defs/timestamp" } } }
+    }
   },
   "$defs": {
     "origin": {
@@ -133,7 +181,7 @@
       "not": { "pattern": "\n" }
     },
     "manifest_revision": {
-      "description": "One append-only revision of a version's provenance manifest, at .../versions/{version:06d}/manifests/{n:04d} (AR-06): created at put, reviewed after the Verifier (cause its artifact.reviewed), sent or exported when the version leaves Tilo. Readers take the highest n.",
+      "description": "One append-only revision of a version's provenance manifest, at .../versions/{version:06d}/manifests/{n:04d} (AR-06): created at put, reviewed after the Verifier (cause its artifact.reviewed), sent (cause the data.transfer out) or exported when the version leaves Tilo. Readers take the highest n.",
       "type": "object",
       "additionalProperties": false,
       "required": ["n", "stage", "cause", "manifest"],
@@ -142,7 +190,9 @@
         "stage": { "type": "string", "enum": ["created", "reviewed", "sent", "exported"] },
         "cause": { "anyOf": [{ "$ref": "common.schema.json#/$defs/ulid" }, { "type": "null" }] },
         "manifest": { "$ref": "manifest.schema.json" }
-      }
+      },
+      "if": { "properties": { "stage": { "enum": ["reviewed", "sent"] } }, "required": ["stage"] },
+      "then": { "properties": { "cause": { "$ref": "common.schema.json#/$defs/ulid" } } }
     }
   }
 }

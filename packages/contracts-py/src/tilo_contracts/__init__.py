@@ -2,7 +2,7 @@
 # contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
-# artifact.schema.json 1.0.0 sha256:4d3d78f773286f8b
+# artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
@@ -2865,15 +2865,19 @@ class ArtifactVersion(BaseModel):
     origin: ArtifactVersionOrigin
     sources: list[ArtifactVersionSource]
     """
-    Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12). Never exported.
+    Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).
     """
     screening: Literal["clean", "flagged", "unscreened"]
     """
-    Safety screen of the content (PRD 16.3 item 2). Only clean versions leave Tilo (AR-07).
+    The SafetyProvider verdict on the exact stored bytes (PRD 16.3 item 2), unscreened when there is none. A version that is not clean raises safety_flag in the policy engine (AR-07).
+    """
+    screened_at: Timestamp | None
+    """
+    When that verdict came back; null exactly when screening is unscreened (AR-07).
     """
     redacted: bool
     """
-    true when the secret redactor changed the content before it was stored (SEC-01, BQ-258, AR-07).
+    true when the secret redactor changed text or JSON before it was stored (SEC-01, BQ-258). The redactor reads only text and JSON, so false on a file means it did not run (AR-07).
     """
     idempotency_key: ArtifactVersionIdempotencyKey | None
     """
@@ -3232,7 +3236,7 @@ class Providers(BaseModel):
 
 class ArtifactVersionManifestRevision(BaseModel):
     """
-    One append-only revision of a version's provenance manifest, at .../versions/{version:06d}/manifests/{n:04d} (AR-06): created at put, reviewed after the Verifier (cause its artifact.reviewed), sent or exported when the version leaves Tilo. Readers take the highest n.
+    One append-only revision of a version's provenance manifest, at .../versions/{version:06d}/manifests/{n:04d} (AR-06): created at put, reviewed after the Verifier (cause its artifact.reviewed), sent (cause the data.transfer out) or exported when the version leaves Tilo. Readers take the highest n.
     """
 
     model_config = ConfigDict(

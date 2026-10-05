@@ -123,19 +123,25 @@ def _is_send_of(cause: dict[str, Any] | None, delivered: dict[str, Any]) -> bool
 CONTINUES = {"artifact.versioned": "previous_version", "artifact.rolled_back": "restored_version"}
 
 
-def _version_problems(event: dict[str, Any], recorded: set[tuple[str, int]], where: str) -> list[str]:
-    """EV-15: artifact events name versions this world recorded; adds the version the event records."""
+def _version_problems(event: dict[str, Any], latest: dict[str, int], where: str) -> list[str]:
+    """EV-15: artifact events name versions this world recorded, 1 to the latest with no gaps. artifact.created
+    starts a new id at 1; versioned and rolled_back continue a recorded version and record the next one."""
     type_, data = event["type"], event["data"]
     if not type_.startswith("artifact."):
         return []
     artifact_id, version = data["artifact"]["artifact_id"], data["artifact"]["version"]
-    named = data[CONTINUES[type_]] if type_ in CONTINUES else version
-    created = type_ == "artifact.created"
-    bad = version != 1 if created else (artifact_id, named) not in recorded
-    if created or type_ in CONTINUES:
-        recorded.add((artifact_id, version))
-    why = "not 1" if created else "which this world never recorded"
-    return [f"EV-15: {where} {type_} names {artifact_id} version {named}, {why}"] if bad else []
+    top = latest.get(artifact_id, 0)
+    if type_ == "artifact.created":
+        why = "" if (version, top) == (1, 0) else f"version {version}; created starts a new id at version 1"
+    elif type_ in CONTINUES:
+        earlier = data[CONTINUES[type_]]
+        ok = 1 <= earlier <= top and version == top + 1
+        why = "" if ok else f"{earlier} to {version}; it must continue a recorded version as version {top + 1}"
+    else:
+        why = "" if 1 <= version <= top else f"version {version}, which this world never recorded"
+    if type_ == "artifact.created" or type_ in CONTINUES:
+        latest[artifact_id] = max(top, version)
+    return [f"EV-15: {where} {type_} {artifact_id} {why}"] if why else []
 
 
 def stream_problems(events: list[dict[str, Any]], known: set[str]) -> list[str]:
@@ -144,7 +150,7 @@ def stream_problems(events: list[dict[str, Any]], known: set[str]) -> list[str]:
     if len({event["world_id"] for event in events}) != 1:
         problems.append("EV-10: a stream holds one world")
     seen: dict[str, dict[str, Any]] = {}
-    recorded: set[tuple[str, int]] = set()
+    latest: dict[str, int] = {}
     for previous, event in zip([None, *events], events, strict=False):
         where = f"seq {event['seq']}"
         if previous is not None and event["seq"] <= previous["seq"]:
@@ -166,7 +172,7 @@ def stream_problems(events: list[dict[str, Any]], known: set[str]) -> list[str]:
             and not _is_send_of(seen.get(event["cause"] or ""), event)
         ):
             problems.append(f"EV-14: {where} cause is not the data.transfer out of outbox {event['data']['outbox_id']}")
-        problems += _version_problems(event, recorded, where)
+        problems += _version_problems(event, latest, where)
     return problems
 
 

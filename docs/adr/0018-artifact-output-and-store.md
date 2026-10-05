@@ -243,3 +243,15 @@ Option A, chosen by the user on 2026-10-05. The tickets run in this order. Each 
   applied by the user, not by a builder or an agent; until then the retention adapter deletes at
   90 days in code.
 - BQ-262 requirement ID: FR-CON-15 (`docs/prd-supplement-2026-10-05.md`).
+
+## T1 notes (contract made 2026-10-05, PR #366; the contract wins where it is stricter)
+- `artifact.created` 1.1.0 carries all three new fields or none. `parents` has at most one item.
+- The record gains `screened_at` (the SafetyProvider verdict's time, null exactly when
+  `unscreened`). A `unit` output is text or JSON only, a `render` output is a file only, and an
+  upload has no `sources`. A `reviewed` or `sent` manifest revision names its cause.
+- AR-03: sources come from the record's own run (a restore copies them), and archive reads go
+  through the Scope. AR-05: the key lookup is inside the Scope. AR-06: record sources never
+  leave Tilo. AR-07: the policy engine raises `safety_flag` for any version not `clean`, read from
+  the record (BQ-264 asks for the matching outbox rule).
+- EV-15 also requires `versioned` and `rolled_back` to record the next version and rejects a
+  second `artifact.created` of a recorded id.

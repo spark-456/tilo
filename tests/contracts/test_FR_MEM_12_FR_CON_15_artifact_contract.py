@@ -19,7 +19,7 @@ OOXML = "application/vnd.openxmlformats-officedocument."
 MEDIA_TYPES = {"text/markdown", "text/csv", "application/json", "application/pdf", "image/png", "image/jpeg"}
 MEDIA_TYPES |= {OOXML + t for t in ("presentationml.presentation", "wordprocessingml.document", "spreadsheetml.sheet")}
 REQUIRED = {"v", "artifact", "org_id", "world_id", "run_id", "owner", "media_type", "size_bytes", "content_sha256"}
-REQUIRED |= {"parents", "origin", "sources", "screening", "redacted", "idempotency_key", "created_at"}
+REQUIRED |= {"parents", "origin", "sources", "screening", "screened_at", "redacted", "idempotency_key", "created_at"}
 SHA = "0123456789abcdef" * 4
 STORED = {"artifact": {"artifact_id": "art_report", "version": 1}, "content_sha256": SHA}
 STORED |= {"media_type": "text/markdown", "size_bytes": 1200}
@@ -31,14 +31,22 @@ INVALID = {
         *("org_id_with_slash", "unit_output_without_idempotency_key", "upload_with_idempotency_key"),
         *("restore_with_idempotency_key", "idempotency_key_eleventh_output", "unit_origin_without_unit"),
         *("upload_origin_with_agent", "two_parents", "screening_unknown", "redacted_missing", "source_with_text"),
+        # Security r1 on #366: a model never makes a file, render makes only files, an upload has no archive
+        # sources, and `clean` or `flagged` needs the SafetyProvider verdict's time (AR-07).
+        *("unit_origin_with_pdf", "unit_origin_with_pptx", "render_origin_with_markdown", "upload_with_sources"),
+        *("upload_clean_without_screen_record", "unscreened_with_a_verdict_time"),
     ),
-    "artifact.manifest_revision": ("stage_unknown", "n_zero", "manifest_without_content_sha256"),
+    "artifact.manifest_revision": (
+        *("stage_unknown", "n_zero", "manifest_without_content_sha256", "reviewed_without_cause"),
+        "sent_without_cause",
+    ),
     "common": ("media_type_text_html",),
 }
 INVALID_STREAMS = (
     *("ev15_created_names_version_2", "ev15_reviewed_version_never_recorded", "ev15_delivered_before_created"),
     *("ev15_delivered_other_artifact", "ev15_versioned_previous_never_recorded"),
-    "ev15_rolled_back_restored_never_recorded",
+    *("ev15_rolled_back_restored_never_recorded", "ev15_created_twice", "ev15_versioned_skips_a_version"),
+    "ev15_rolled_back_onto_a_recorded_version",
 )
 
 
@@ -86,6 +94,25 @@ def test_FR_MEM_12_each_rule_has_an_invalid_fixture_that_fails(repo_root, regist
     assert errors_for(_ref(folder), fixture, registry), f"{folder}/invalid/{name}.json must fail"
 
 
+def _foreign_sources(record):
+    """AR-03 reference check: a unit or render output's sources are records of its own run (the run in the
+    Scope). A restore copies the copied version's sources, and an upload has none (schema)."""
+    if record["origin"]["kind"] not in ("unit", "render"):
+        return []
+    return [s["archive_ref"] for s in record["sources"] if s["archive_ref"].split("/", 1)[0] != record["run_id"]]
+
+
+def test_FR_MEM_12_AR_03_sources_come_from_the_records_own_run(repo_root, registry):
+    fixtures = repo_root / "contracts/fixtures/artifact"
+    assert all(_foreign_sources(load_json(p)) == [] for p in (fixtures / "valid").glob("*.json"))
+    invalid = sorted((fixtures / "crossref/invalid").glob("ar03_*.json"))
+    assert invalid, "AR-03 needs an invalid cross-reference case"
+    for path in invalid:
+        record = load_json(path)
+        assert not errors_for(_ref("artifact"), record, registry), f"{path.name} passes the schema"
+        assert _foreign_sources(record), f"{path.name} must break AR-03"
+
+
 def test_FR_MEM_12_artifact_created_data_is_1_1_0_and_additive(repo_root, registry):
     schema = load_json(repo_root / "contracts/events/data/artifact.created.schema.json")
     assert (schema["x-version"], schema["required"]) == ("1.1.0", ["artifact"])
@@ -125,6 +152,8 @@ def test_FR_MEM_12_EV_15_and_AR_rules_are_written_down(repo_root):
     assert "| EV-15 |" in (repo_root / "contracts/event.rules.md").read_text(encoding="utf-8")
     rules = (repo_root / "contracts/artifact.rules.md").read_text(encoding="utf-8")
     assert all(f"| AR-0{n} |" in rules for n in range(1, 9))
+    ar07 = next(line for line in rules.splitlines() if line.startswith("| AR-07 |"))
+    assert all(w in ar07 for w in ("SafetyProvider", "unscreened", "safety_flag", "policy engine")), "security r1"
 
 
 def test_FR_MEM_12_generated_types(repo_root):
