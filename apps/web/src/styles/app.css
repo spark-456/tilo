@@ -435,6 +435,11 @@ a.secondary {
   /* One page-shell offset: every screen's first line sits --space-32 below the top edge. */
   padding: var(--space-32) var(--space-24) var(--space-24);
 }
+/* Inset, like the stage frame's: the viewport edges can never clip it. */
+.screen-page:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: -3px;
+}
 .screen-body {
   max-width: 720px;
 }
