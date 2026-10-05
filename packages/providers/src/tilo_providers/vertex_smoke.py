@@ -133,9 +133,9 @@ _SECRET_RE = re.compile(
 def _reason(error: BaseException) -> str:
     """The adapter's redacted server text for a rejected request, made safe to print: one line, no control or format
     characters (so none can hide a label or drive the terminal), scrubbed again, then capped (scrub before cap)."""
-    text = next((str(link) for link in _chain(error) if type(link).__name__ == "_RedactedAPIError"), "")
-    text = "".join(c for c in " ".join(text.split()) if unicodedata.category(c) not in ("Cc", "Cf", "Co", "Cs"))
-    return _SECRET_RE.sub("[redacted]", _AUTHORIZATION_LIKE_RE.sub("[redacted]", text))[:MAX_REASON_CHARS]
+    said = next((str(link) for link in _chain(error) if type(link).__name__ == "_RedactedAPIError"), "")
+    said = "".join(c for c in " ".join(said.split()) if unicodedata.category(c) not in ("Cc", "Cf", "Co", "Cs"))
+    return _SECRET_RE.sub("[redacted]", _AUTHORIZATION_LIKE_RE.sub("[redacted]", said))[:MAX_REASON_CHARS]
 
 
 def _check_caps(max_output_tokens: int, max_total_credits: float) -> None:
