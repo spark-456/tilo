@@ -81,5 +81,5 @@ export const KNOWN_EVENT_TYPES: readonly string[] = [
   "calendar.entry_proposed",
   "calendar.entry_changed",
   "assistant.asked",
-  "assistant.replied"
+  "assistant.replied",
 ];
