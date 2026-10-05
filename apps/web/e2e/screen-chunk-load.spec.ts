@@ -53,6 +53,23 @@ for (const viewport of [DESKTOP, MOBILE]) {
   });
 }
 
+test("NFR-01 a nav click to a code-split screen still moves focus to the new heading", async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await page.goto("/worlds");
+  await expect(page.getByRole("heading", { level: 1, name: "Worlds" })).toBeVisible({
+    timeout: 20_000,
+  });
+  const nav = page.getByRole("navigation", { name: /primary/i });
+  await nav.getByRole("link", { name: /^Library/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeFocused();
+  // Keyboard activation of the next link lands the same way.
+  await nav.getByRole("link", { name: /^More/ }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".screen-page h1").first()).toBeFocused();
+});
+
 /** Page errors and console errors other than the browser's and React's own lines for the aborted import. */
 function collect(page: Page): string[] {
   const problems: string[] = [];

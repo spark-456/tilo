@@ -70,21 +70,22 @@ export function App() {
     // The World lens is the stage with the flow shell's heading, so it takes focus the same way.
     const focusHeading = (): boolean => {
       const h1 = document.querySelector<HTMLElement>(".screen-page h1, .flow-heading");
-      if (!h1) return false;
+      if (!h1 || h1.getClientRects().length === 0) return false; // not there yet, or hidden
       h1.setAttribute("tabindex", "-1");
       h1.focus();
       return true;
     };
     if (focusHeading()) return;
     // A screen is a code-split chunk (NFR-01): its heading arrives with it. Focus it then, unless
-    // the person has moved on in the meantime (focus is on the page body only while nothing has it).
+    // the person has moved focus somewhere else in the meantime (it is still where the navigation
+    // left it: the link they used, or the page body).
+    const left = document.activeElement;
+    const root = document.getElementById("root") ?? document.body;
     const watch = new MutationObserver(() => {
-      if (document.activeElement !== document.body && document.activeElement !== null) {
-        return watch.disconnect();
-      }
+      if (document.activeElement !== left) return watch.disconnect();
       if (focusHeading()) watch.disconnect();
     });
-    watch.observe(document.body, { childList: true, subtree: true });
+    watch.observe(root, { childList: true, subtree: true });
     const giveUp = setTimeout(() => watch.disconnect(), 10_000);
     return () => {
       watch.disconnect();
