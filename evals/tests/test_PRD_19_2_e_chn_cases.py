@@ -45,48 +45,55 @@ def test_PRD_19_2_e_chn_thirty_cases_five_per_category() -> None:
         assert count == 5, f"expected 5 cases for {cat}, got {count}"
 
 
-def test_PRD_19_2_e_chn_FR_CHN_04_deploy_gate_ground_truth_and_checks() -> None:
+def test_PRD_19_2_e_chn_FR_PA_13_ground_truth_and_checks() -> None:
+    """CH-RM / SD-01: the 30 cases are off-topic messages to the assistant panel (FR-PA-13), no longer WhatsApp
+    (FR-CHN-04 is removed). The expected answer is a decline that says what the panel can show."""
     cases = _e_chn_cases()
     assert len(cases) == 30
     for case in cases:
         assert case.status == "skeleton"
         assert case.deploy_gate is False
         assert case.recording is None
-        assert "FR-CHN-04" in case.measures
-        assert case.notes and "FR-CHN-04" in case.notes and "descriptive" in case.notes
+        assert "FR-PA-13" in case.measures and "FR-CHN-04" not in case.measures
+        assert case.notes and "FR-PA-13" in case.notes and "descriptive" in case.notes
         assert case.checks == [
             {"check": "no_side_effects", "args": {}},
             {"check": "equals_ground_truth", "args": {"field": "expected"}},
             {"check": "equals_ground_truth", "args": {"field": "category"}},
         ]
         assert case.ground_truth is not None
-        assert case.ground_truth.get("expected") == "redirect"
+        assert case.ground_truth.get("expected") == "decline_and_show"
         assert case.ground_truth.get("category") == case.inputs.get("category")
         must_not = case.ground_truth.get("must_not")
         assert isinstance(must_not, str) and len(must_not) > 10
+        must_show = case.ground_truth.get("must_show")
+        assert isinstance(must_show, str) and "panel" in must_show.lower(), f"{case.id}: say what the decline shows"
 
 
-def test_PRD_19_2_e_chn_inputs_senders_and_tasks_valid() -> None:
+def test_PRD_19_2_e_chn_inputs_are_assistant_panel_messages_valid() -> None:
     cases = _e_chn_cases()
     assert len(cases) == 30
     for case in cases:
-        assert case.inputs.get("channel") == "whatsapp"
-        assert case.inputs.get("bound") is True
-        sender = case.inputs.get("sender")
-        assert isinstance(sender, str)
-        m = _PHONE_RE.fullmatch(sender)
-        assert m is not None, f"{case.id}: sender {sender!r} not matching +1 555 01xx"
-        num = int(m.group(1))
-        assert 100 <= num <= 199, f"{case.id}: sender number {num} not in 0100..0199"
-
+        assert case.inputs.get("channel") == "assistant_panel"
+        assert "sender" not in case.inputs and "bound" not in case.inputs, f"{case.id}: no phone sender or binding"
         msg = case.inputs.get("message")
         assert isinstance(msg, str) and len(msg.strip()) >= 20, f"{case.id}: hollow message"
         assert " ," not in msg and not re.search(r"(?<!\d),000\b", msg), (
             f"{case.id}: shell-expansion artifact in {msg!r}"
         )
-
         task = case.inputs.get("task")
         assert isinstance(task, str) and len(task.strip()) >= 20, f"{case.id}: missing/hollow task"
+        assert "assistant panel" in task.lower(), f"{case.id}: the task must say where the message arrives"
+
+
+def test_PRD_19_2_e_chn_nothing_whatsapp_is_left_in_the_cases() -> None:
+    """SD-01: WhatsApp is out of scope; no case names it or carries a phone number."""
+    cases = _e_chn_cases()
+    assert len(cases) == 30
+    for case in cases:
+        raw = case.path.read_text(encoding="utf-8")
+        assert "whatsapp" not in raw.lower(), f"{case.id}: still mentions WhatsApp"
+        assert not _extract_phones(raw), f"{case.id}: phone number left in an assistant-panel case"
 
 
 def test_PRD_19_2_e_chn_ground_truth_matches_planted_message() -> None:

@@ -17,3 +17,5 @@ branch | services/channels/src/tilo_channels/drafting_check.py | _read | reads c
 branch | services/channels/src/tilo_channels/links.py | _b64d | strict decoding of a signed link's parts
 branch | services/channels/src/tilo_channels/links.py | _verify | signed-link verification: signature before claims
 branch | services/connectors/src/tilo_connectors/adapters/gmail.py | _msg_ids | extracts Message-ID tokens from a mail header value
+branch | packages/providers/src/tilo_providers/google_adapter.py | redact | scrubs credentials (ya29./AIza) from provider and error text; never task text
+branch | packages/providers/src/tilo_providers/vertex_smoke.py | classify | maps provider error text to a fixed failure class; never task text

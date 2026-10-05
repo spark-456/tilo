@@ -10,7 +10,7 @@ Layout:
 - `infra/modules/<name>/` -- reusable pieces: `service` (Cloud Run + its
   service account), `iam` (project IAM bindings), `storage` (buckets),
   `events` (Pub/Sub topic + BigQuery ledger), `kms` (key ring and keys),
-  `wif` (GitHub OIDC + deployer service account), `budget` (billing budget).
+  `wif` (GitHub OIDC + deployer service account), `budget` (billing budget), `monitoring` (email channel and SLO alert policies).
 - `infra/envs/dev/` -- composes the modules into the `tilo-dev` environment.
 
 ## Commands (Windows PowerShell)
@@ -68,6 +68,7 @@ terraform -chdir=infra/envs/dev plan `
   -var="github_repository=owner/tilo" `
   -var="github_repository_id=REPO_ID" `
   -var="github_repository_owner_id=OWNER_ID" `
+  -var="alert_email=you@example.com" `
   -out=tfplan
 
 # 9. Apply -- YOU run this, never an agent.
@@ -79,6 +80,36 @@ client, WhatsApp API token, channels webhook signing key, email action-link
 signing key) through the Cloud Console or `gcloud secrets versions add` --
 Terraform declares the secrets but never writes a version (PRD 16.1 rule 4).
 
+`alert_email` has no default; it receives the Cloud Monitoring alerts.
+Optional thresholds live in `infra/modules/monitoring/variables.tf`
+(defaults: 5xx ratio 2% per NFR-23, request latency p95 25000 ms, events
+backlog 600 s, each held 300 s). Alerts are metric-based, so nothing keeps a
+scale-to-zero service warm.
+
+The access audit (`infra/ACCESS.md`) lists every API, IAM grant, secret slot,
+OAuth scope and console step; read its section 7 and 8 before applying.
+It adds the `gmail_push` module, a Model Armor template, bucket-scoped
+service grants and the optional `deployer_project_roles` (left empty for dev)
+and `model_armor_location` variables. The oauth-tokens key binding changes
+role (connectors may now encrypt too), which Terraform shows as one replace.
+Expect about 55 to add, 0 to change, 2 to destroy in total from the P0-07
+state (17 APIs, 4 monitoring, 9 secret slots and accessors, 7 storage
+grants, 5 project grants plus 1 custom Vertex role, 6 Gmail push, 2 service
+accounts, 1 Model Armor template, 2 invokers, 1 KMS replace). The 2 destroys
+are the old KMS decrypter binding and api's accessor on
+`email-action-link-signing-key` (moved to channels). Firebase deploys are manual: see
+`infra/ACCESS.md` section 7.
+
+### What apply will change (P0-07b, on top of an already-applied P0-07)
+
+Expect **14 to add, 0 to change, 0 to destroy**: ten `google_project_service`
+entries (modelarmor, cloudscheduler, identitytoolkit, firebaseappcheck,
+monitoring, cloudtrace, logging, plus gmail, calendar-json and drive, which
+you enabled by hand: enabling an enabled API is a no-op), one email
+notification channel and three alert policies. The Cloud Run services no
+longer show an in-place diff for the API-defaulted service-level `scaling`
+block, and the `secret_accessors` output is the same before and after a refresh.
+
 ## Destroy
 
 ```powershell
@@ -86,7 +117,8 @@ terraform -chdir=infra/envs/dev destroy `
   -var="billing_account_id=YOUR_BILLING_ACCOUNT_ID" `
   -var="github_repository=owner/tilo" `
   -var="github_repository_id=REPO_ID" `
-  -var="github_repository_owner_id=OWNER_ID"
+  -var="github_repository_owner_id=OWNER_ID" `
+  -var="alert_email=you@example.com"
 ```
 
 The `oauth-tokens` and `archive` KMS keys have `prevent_destroy`; remove that

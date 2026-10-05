@@ -5,7 +5,7 @@ Cloud Run service (PRD 6.2): sessions, tasks, cards, approvals, policies, downlo
 service the web client and channels write through; the client reads live state from Firestore under rules.
 
 ## Commands
-- `uv run --package tilo-api pytest` — tests; `just check` — gate; `just dev-api` — dev mode on 127.0.0.1:8080 (fake Director)
+- `uv run --package tilo-api pytest` — tests; `just check` — gate; `just dev-api` — dev mode on 127.0.0.1:8080 (fake Director); `Dockerfile` runs `tilo_api:app`, deploy `docs/deploy-dev.md`
 
 ## Requirement IDs
 - PRD 6.2 row; SEC-05..12; FR-INT-11/12, FR-HIL-10 (API half).

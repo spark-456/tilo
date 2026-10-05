@@ -4,7 +4,15 @@
 // knows (HR-4: the shell's replay banner says so on every screen). Look after the card, chip and
 // row language of design/source "Tilo Worlds.dc.html" and "Tilo Team.dc.html".
 import type { Authz, Event } from "@tilo/contracts";
-import type { CSSProperties, ReactNode, Ref } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useClient } from "../api/ClientProvider";
 import { elapsed, useRunLog } from "../world/runLog";
 import { useWorldContext } from "../world/worldContext";
@@ -29,11 +37,10 @@ export const words = (id: string): string =>
 export const plural = (n: number, one: string, many = `${one}s`): string =>
   `${n} ${n === 1 ? one : many}`;
 
-/** Brand and channel names as people write them ("WhatsApp", "Google Drive"). */
+/** Brand and channel names as people write them ("Google Drive", "Email"). */
 const NAMES: Readonly<Record<string, string>> = {
   gmail: "Gmail",
   google_drive: "Google Drive",
-  whatsapp: "WhatsApp",
   email: "Email",
 };
 export const nameOf = (id: string): string => NAMES[id] ?? words(id);
@@ -186,6 +193,26 @@ export const doneState = (n: number, word: string): StatState =>
 /** Lines of body height: one number, or [wide screens, narrow screens]. */
 export type Lines = number | readonly [number, number];
 
+/** True while `ref`'s box has more content than fits, re-checked when it or its content changes. */
+function useScrolls(ref: RefObject<HTMLElement | null>): boolean {
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setScrolls(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const resize = new ResizeObserver(check);
+    resize.observe(el);
+    const content = new MutationObserver(check);
+    content.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => {
+      resize.disconnect();
+      content.disconnect();
+    };
+  }, [ref]);
+  return scrolls;
+}
+
 /** A card with a title. With `reserve` (a height in lines) the body has that fixed height and
  * scrolls, so data arriving inside it, however long, moves nothing around it (CLS, UX-1). */
 export function Section({
@@ -202,9 +229,11 @@ export function Section({
   action?: ReactNode;
   /** Makes the heading focusable (tabindex -1) and hands it back, to move focus there. */
   headingRef?: Ref<HTMLHeadingElement>;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   const [wide, narrow] = typeof reserve === "number" ? [reserve, reserve] : (reserve ?? []);
+  const box = useRef<HTMLElement>(null);
+  const scrolls = useScrolls(box);
   return (
     <section className="screen-section card" aria-label={title}>
       <div className="card-head">
@@ -218,8 +247,10 @@ export function Section({
         <section
           className="section-box reserved"
           aria-label={`${title} list`}
-          // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be keyboard reachable (WCAG 2.1.1).
-          tabIndex={0}
+          ref={box}
+          // A box that scrolls must be keyboard reachable (WCAG 2.1.1); one that holds all of its
+          // rows is not a stop worth making.
+          tabIndex={scrolls ? 0 : undefined}
           style={
             {
               "--lines": wide,

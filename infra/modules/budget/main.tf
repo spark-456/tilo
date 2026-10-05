@@ -7,11 +7,14 @@ resource "google_billing_budget" "this" {
 
   budget_filter {
     projects = ["projects/${var.project_number}"]
+    # Track gross spend. With the default (INCLUDE_ALL_CREDITS) free-trial credits
+    # are subtracted first, so net spend stays 0 and no alert fires until they run out.
+    credit_types_treatment = "EXCLUDE_ALL_CREDITS"
   }
 
   amount {
     specified_amount {
-      currency_code = "USD"
+      currency_code = var.currency_code
       units         = tostring(var.amount_usd)
     }
   }
