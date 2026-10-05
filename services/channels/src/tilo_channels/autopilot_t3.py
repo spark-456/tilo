@@ -12,6 +12,9 @@ BQ-224 (issue #256): the families also run on a squeezed copy (separators `- . _
 digits dropped, 0 o, 1 i, 3 e, 4 a, 5 s, 7 t, @ a), and L2 is an allowlist: a body over SHORT_BODY_MAX, a link, a digit
 that is not a time of day, or a word off the scheduling list gives "unlisted". Names are allowed only as the greeting's
 and the signature's run (two words each) and as repeats of those words. Every step is linear, no model.
+
+BQ-223 (issue #298): `inbound_signal` is the same check for the message a draft answers, minus the allowlist. A
+risky inbound message ("please confirm the transfer of $5,000") keeps even a clean draft ("Yes, confirmed.") off L2.
 """
 
 from __future__ import annotations
@@ -186,3 +189,11 @@ def t3_content_signal(text: str) -> frozenset[str]:
     if _unlisted(cleaned):
         signal.add("unlisted")
     return frozenset(signal)
+
+
+def inbound_signal(text: str) -> frozenset[str]:
+    """The same signal for the message a draft answers (FR-CHN-11, ADR-0013, BQ-223): `t3_content_signal` without
+    "unlisted", because an inbound message is free text, not a draft held to the L2 allowlist. A subset of {"money",
+    "legal", "commitment", "obfuscated"}; empty means clean. A hidden character or a body over SIGNAL_CAP is
+    "obfuscated" (fail closed)."""
+    return t3_content_signal(text) - {"unlisted"}
