@@ -13,16 +13,16 @@
   "item": null,
   "severity": "info",
   "credits": 0,
-  "summary": "Your WhatsApp answer arrived.",
+  "summary": "Your email answer arrived.",
   "cause": "01JB5VQ0000000000000000035",
   "vis": "all",
   "authz": null,
   "data": {
-    "channel": "whatsapp",
+    "channel": "email",
     "message_ref": "r_village_basic_1/29",
     "card_id": "01JB5VQ0000000000000009001",
     "card_kind": null,
-    "option": "approve",
+    "option": null,
     "destination": null
   },
   "trace": {
