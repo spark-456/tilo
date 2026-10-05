@@ -385,13 +385,45 @@ class _Metered(_Redacting):
         return response
 
 
+class _FakeRecorder(RecordReplayProvider):
+    """Records every reply of an injected fake, whatever the environment says: it never reads the live switch or the
+    record flag, so the fake path (`record_with_fake`) cannot be turned into a paid call by the environment."""
+
+    def _is_live(self) -> bool:
+        return True
+
+    def _is_record(self) -> bool:
+        return True
+
+
+def _require_fake(provider: object) -> None:
+    """A provider handed to the fake path must call itself a fake and must not be a network adapter (EFF-01)."""
+    from tilo_providers.google_adapter import GoogleModelProvider  # noqa: PLC0415
+    from tilo_providers.openai_compat_adapter import OpenAICompatModelProvider  # noqa: PLC0415
+
+    network = isinstance(provider, GoogleModelProvider | OpenAICompatModelProvider)
+    if (
+        network
+        or not isinstance(provider, ModelProvider)
+        or getattr(type(provider), "SYNTHETIC_FAKE", False) is not True
+    ):
+        raise LiveE2ERefused("not_a_fake_provider", "the fake record path takes only an injected fake provider")
+
+
 class _Providers:
     """(role, profile) -> the provider the Router uses: `RecordReplayProvider` around the live one, built lazily."""
 
     def __init__(
-        self, config: ProvidersConfig, meter: _Meter, recordings: Path, live: Callable[[str, str], ModelProvider] | None
+        self,
+        config: ProvidersConfig,
+        meter: _Meter,
+        recordings: Path,
+        live: Callable[[str, str], ModelProvider] | None,
+        *,
+        fake_record: bool = False,
     ) -> None:
         self._config, self._meter, self._recordings, self._live = config, meter, recordings, live
+        self._wrap = _FakeRecorder if fake_record else RecordReplayProvider
         self._made: dict[tuple[str, str], ModelProvider] = {}
 
     def __call__(self, role: str, profile: str) -> ModelProvider:
@@ -403,7 +435,7 @@ class _Providers:
                 return _Redacting(self._live(role, profile))
 
             caps = {Capability(c) for c in self._config.profiles[profile].caps}
-            recorded = RecordReplayProvider(role, profile, live_factory, self._recordings, caps)
+            recorded = self._wrap(role, profile, live_factory, self._recordings, caps)
             self._made[(role, profile)] = _Metered(recorded, role, profile, self._meter)
         return self._made[(role, profile)]
 
@@ -778,13 +810,29 @@ def run_live_e2e(
     live_provider_factory: Callable[[str, str], ModelProvider] | None = None,
     safety: SafetyProvider | None = None,
     announce: Callable[[Estimate, float], None] | None = None,
+    fake_record: bool = False,  # only `record_with_fake` sets this; the command line has no way to
 ) -> LiveE2EReport:
-    env = os.environ if environ is None else environ
-    _gate(mode, env, max_credits)
+    env: Mapping[str, str] = {} if fake_record else os.environ if environ is None else environ
+    if fake_record and (live_provider_factory is None or mode != "live"):
+        raise LiveE2ERefused("not_a_fake_provider", "the fake record path takes only an injected fake provider")
+    _gate("dry-run" if fake_record else mode, env, max_credits)  # the fake path has no live decision to gate
     config = _load_config(models_path, prices_path, env)
     case = _load_case(case_id, bank_dir)
     live = mode == "live"
     factory = (live_provider_factory or _vertex(config)) if live else None
+    refused: list[LiveE2ERefused] = []
+    if fake_record and factory is not None:
+        built = factory
+
+        def factory(role: str, profile: str) -> ModelProvider:  # noqa: F811 - checked before its first call
+            provider = built(role, profile)
+            try:
+                _require_fake(provider)
+            except LiveE2ERefused as refusal:
+                refused.append(refusal)
+                raise
+            return provider
+
     estimate = _estimate(config, case)
     if announce is not None:
         announce(estimate, max_credits)  # before any model call
@@ -795,9 +843,9 @@ def run_live_e2e(
         return report
     meter = _Meter(config, max_credits)
     recordings = Path(recordings_dir) if recordings_dir else default_recordings_dir(case_id)
-    if live and os.environ.get("TILO_RECORD") == "1":
+    if live and not fake_record and os.environ.get("TILO_RECORD") == "1":
         _mark_recordings(recordings, synthetic=live_provider_factory is not None)  # only a test injects a provider
-    providers = _Providers(config, meter, recordings, factory)
+    providers = _Providers(config, meter, recordings, factory, fake_record=fake_record)
     router = _MeteredRouter(config, meter, providers)
     runner = _UnitRunner(router, meter)
     approve = {**(case.approve or {}), "cap": min(float((case.approve or {}).get("cap", max_credits)), max_credits)}
@@ -812,6 +860,10 @@ def run_live_e2e(
     report.outcome_class, report.reason = _classify(obs, meter, screen, env)
     if report.reason:  # a last line of defence: nothing printed names the project, an ADC path or a token
         report.reason = _scrub_known(" ".join(report.reason.split()), env)
+    if refused:
+        raise refused[0]
+    if fake_record:
+        _mark_recordings(recordings, synthetic=True)
     if not live:
         report.recordings = "synthetic" if (recordings / SYNTHETIC_MARKER).is_file() else "unmarked"
     stopped = report.outcome_class in ("stopped_at_cap", "replay_miss")
@@ -821,6 +873,28 @@ def run_live_e2e(
     report.rows, report.total_credits = list(meter.rows.values()), meter.total
     report.events, report.questions, report.answered = obs.events, obs.questions, obs.answered
     return report
+
+
+def record_with_fake(
+    case_id: str = "B-007",
+    *,
+    fake_factory: Callable[[str, str], ModelProvider] | None,
+    recordings_dir: Path,
+    prices_path: Path | None = None,
+    bank_dir: Path | None = None,
+    models_path: Path | None = None,
+    max_credits: float = DEFAULT_MAX_CREDITS,
+    safety: SafetyProvider | None = None,
+) -> LiveE2EReport:
+    """Re-record the synthetic fixture (issue #367) through an injected fake: the real Router, record-and-replay layer
+    and pipeline, with every reply from `fake_factory`. Programmatic only: no flag or environment variable reaches it,
+    it reads neither the live switch nor the record flag, and it refuses (`not_a_fake_provider`, before the provider's
+    first call) anything that is a network adapter or does not call itself a fake (`SYNTHETIC_FAKE = True`)."""
+    return run_live_e2e(
+        case_id, mode="live", max_credits=max_credits, bank_dir=bank_dir, models_path=models_path,
+        prices_path=prices_path, recordings_dir=recordings_dir, live_provider_factory=fake_factory, safety=safety,
+        fake_record=True,
+    )  # fmt: skip
 
 
 # --- the command ---------------------------------------------------------------------------------------------------
