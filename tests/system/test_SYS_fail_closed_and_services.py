@@ -80,7 +80,7 @@ def test_SYS_SEC_05_tilo_api_without_dev_mode_serves_nothing_that_needs_a_person
 @pytest.mark.xfail(
     strict=True,
     reason="tilo-api answers an anonymous call with a 500 and a traceback in its log (get_current_principal raises "
-    "NotImplementedError until sign-in lands): fail-closed, but a 5xx that the run_5xx_ratio alert counts. "
+    "NotImplementedError until sign-in lands; issue #410): fail-closed, but a 5xx that the run_5xx_ratio alert counts. "
     "Expected: 401 (or 503 not_configured).",
 )
 def test_SYS_SEC_05_an_anonymous_call_to_tilo_api_is_a_clean_401_or_503_not_a_500(prod_api):

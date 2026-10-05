@@ -31,4 +31,4 @@ Region `asia-southeast1`. Commands used, all reads: `gcloud run services list` a
 
 Web app: https://essential-wares-510320-f0.web.app answers 200.
 
-Findings are filed as issues; see the PR that added this file.
+Findings: #410 (anonymous calls to `tilo-api` answer 500, not 401/503) and #411 (`tilo-api` and `tilo-channels` publish `/openapi.json` and `/docs`).
