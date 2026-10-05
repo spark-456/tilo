@@ -78,3 +78,6 @@ desktop.ini
 .vscode/*
 !.vscode/extensions.json
 evals/bank-results.local.md
+
+# Local artifact store default (TILO_ARTIFACT_DIR, ADR-0018)
+.tilo/
