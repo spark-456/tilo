@@ -2,7 +2,7 @@
 // "Tilo 2 Balanced Refined.dc.html" 2-1: hero figures, a needs-you count chip, roster and outline
 // rows. Right rail on desktop, bottom sheet on mobile. Every figure is derived from the recorded
 // events (HR-1); before the first event nothing shows a figure (UX-3, HR-2).
-import type { Layout } from "@tilo/contracts";
+import type { Event, Layout } from "@tilo/contracts";
 import type { ReactNode } from "react";
 import { useClient } from "../api/ClientProvider";
 import { reduce } from "../world/reducer";
@@ -13,6 +13,8 @@ import {
   RUN_STATUS_LABEL,
   agentNames,
   budgetCap,
+  hudGlance,
+  memorySaved,
   rankName,
   worldStatus,
 } from "../world/runSummary";
@@ -44,11 +46,33 @@ function Pick({
   );
 }
 
+/** The phone's collapsed World status line: the HUD at a glance, from the same replayed events as
+ * the panels it opens (a fixed one-line box: new words never move the sheet, CLS). */
+export function HudGlance({
+  worldId,
+  replayed = null,
+}: { worldId: string; replayed?: readonly Event[] | null }) {
+  const log = useReplayedLog(useClient(), worldId);
+  const events = replayed ?? log.events;
+  return (
+    <span className="hud-glance" data-testid="hud-glance">
+      {hudGlance(worldStatus(events), events, creditsUsed(events), waitingForYou(events))}
+    </span>
+  );
+}
+
 /** `tabs`: show the lens tabs (S-04 has no page header of its own; the lens screens do). Without
- * them the same height stays reserved, so the rail does not jump between world screens. */
-export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: boolean }) {
+ * them the same height stays reserved, so the rail does not jump between world screens.
+ * `replayed`: the events of a ?fixture= replay up to the stage's seq; they replace the client's own
+ * log of the same world, which may not have started (HR-1: one run on screen, one story). */
+export function WorldPanels({
+  worldId,
+  tabs = true,
+  replayed = null,
+}: { worldId: string; tabs?: boolean; replayed?: readonly Event[] | null }) {
   const client = useClient();
-  const { events } = useReplayedLog(client, worldId);
+  const log = useReplayedLog(client, worldId);
+  const events = replayed ?? log.events;
   const [selected, , toggle] = useSelection(worldId);
   const [layoutRemote] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const status = worldStatus(events);
@@ -92,6 +116,10 @@ export function WorldPanels({ worldId, tabs = true }: { worldId: string; tabs?: 
                 <div>
                   <b>{saved ? `${saved.low_min} to ${saved.high_min} min` : "Not yet"}</b>
                   <span>saved · estimate</span>
+                </div>
+                <div data-testid="memory-saved">
+                  <b>{memorySaved(events)}</b>
+                  <span>credits saved by memory</span>
                 </div>
               </div>
             )}

@@ -241,6 +241,7 @@ export function Stage({
     };
     listen("pointerdown", (e) => {
       if (e.button !== 0 || pts.size >= 2) return; // right and middle buttons never pan
+      if ((e.target as Element).closest(".stage-controls")) return; // a button press is not a drag
       ease = null; // direct manipulation takes over from an eased keyboard move
       goal = cur;
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -351,6 +352,28 @@ export function Stage({
         <p className="stage-fallback" data-testid="stage-fallback">
           This browser can't render the isometric World. The Story lens will show the run instead.
         </p>
+      )}
+      {!bare && supported && !loadFailed && (
+        // The wheel and pinch have a pointer alternative (WCAG 2.5.7). A press sends the same "+"
+        // or "-" key the stage already handles, so the camera has one path (HR-3, PRD 9.7).
+        <div className="stage-controls">
+          {(["+", "-"] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              className="secondary"
+              data-lens-control
+              aria-label={key === "+" ? "Zoom in" : "Zoom out"}
+              onClick={() =>
+                frameRef.current?.dispatchEvent(
+                  new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+                )
+              }
+            >
+              <span aria-hidden="true">{key === "+" ? "+" : "−"}</span>
+            </button>
+          ))}
+        </div>
       )}
       {outlineItems.length > 0 && (
         <ul
