@@ -84,6 +84,9 @@ def make_card(card_id: str, *, created_at: float = float(T0), timeout: int = 360
     """A contract fixture card with its own id, world, run, creation time and timeout."""
     card = json.loads((CARD_FIXTURES / f"{_FIXTURE_FOR[card_id]}.json").read_text(encoding="utf-8"))
     card.update(id=card_id, world_id=WORLD, run_id=RUN, created_at=rfc3339(created_at), timeout=timeout)
+    if card["kind"] != "consent":  # CH-RM PR 1 took whatsapp out of the fixtures (SD-01); PR 2 deletes these tests
+        rest = [c for c in card["answer_channels"] if c != "email"]
+        card["answer_channels"] = [*rest, "whatsapp", *(["email"] if "email" in card["answer_channels"] else [])]
     return card
 
 

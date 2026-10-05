@@ -156,16 +156,16 @@ def test_FR_HIL_01_SEC_06_a_web_session_cannot_claim_whatsapp_or_a_verified_pin(
     assert writer.parts == []
 
 
-def test_FR_HIL_01_SEC_06_a_whatsapp_t3_approve_needs_the_pin_from_tilo_channels():
+def test_FR_HIL_01_SEC_06_a_whatsapp_answer_from_tilo_channels_is_refused():
+    """SEC-06 as amended (SD-01, ADR-0019): no contract gate card lists whatsapp, PIN or not."""
     store, _clock, writer = _store()
     card = _gate(store)
     client = answer_client(store, OWNER_P, from_channels=True)
 
-    no_pin = _answer(client, card, channel="whatsapp")
-    assert (no_pin.status_code, no_pin.json()["reason"]) == (400, "pin_required")
+    for pin_verified in (False, True):
+        refused = _answer(client, card, channel="whatsapp", pin_verified=pin_verified)
+        assert (refused.status_code, refused.json()["reason"]) == (400, "invalid_channel")
     assert writer.parts == []
-    assert _answer(client, card, channel="whatsapp", pin_verified=True).status_code == 200
-    assert writer.of_type("approval.resolved")[0]["data"]["pin_verified"] is True
 
 
 # -- gate answers follow CR-07 and CR-13 -----------------------------------------------------------

@@ -1,6 +1,6 @@
 """ST-3b / OB-01 (#204, #155): the cards API is first-answer-wins and idempotent per card. The web gate sheet lets a
 person answer again after 20 s with no closing event, so a second answer to a card (the same option or another, in
-sequence or at once, from web or WhatsApp) must write nothing and send nothing, and must get the stable
+sequence or at once, from web or mobile web) must write nothing and send nothing, and must get the stable
 `already_resolved` refusal, never a 500. A writer that commits an event and then raises gives a 503 and then a 200 on
 retry with one approval.resolved, because each card resolution has one stable event id (FR-HIL-07).
 """
@@ -23,9 +23,9 @@ BUSY = {"outcome": "rejected", "reason": "busy"}  # a write is in flight and may
 
 # fixture, first option, another option, the channels the two answers come from, the event the first one writes
 CASES = {
-    "gate": ("gate_send_reply", "approve", "hold", ("whatsapp", "web"), "approval.resolved"),
+    "gate": ("gate_send_reply", "approve", "hold", ("mobile_web", "web"), "approval.resolved"),
     "consent": ("consent_drive_folder", "connect", "hold", ("web", "mobile_web"), "connection.consented"),
-    "question": ("needs_you_blocked", "per_kwh", "per_pack", ("whatsapp", "web"), "question.answered"),
+    "question": ("needs_you_blocked", "per_kwh", "per_pack", ("mobile_web", "web"), "question.answered"),
 }
 
 

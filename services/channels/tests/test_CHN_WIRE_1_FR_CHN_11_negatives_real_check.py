@@ -196,17 +196,16 @@ def test_CHN_WIRE_1_FR_CHN_11_only_the_worlds_owner_opens_the_gate(tier: str, by
     then_a_valid_approval_still_works(line, card, requested)
 
 
-def test_CHN_WIRE_1_FR_CHN_11_t3_on_whatsapp_without_a_checked_pin_opens_nothing() -> None:
-    """SEC-06: the channels service rejects a wrong or missing PIN and emits no approval.resolved; if one arrives
-    without `pin_verified`, OB-01 (the real check_entry) refuses the T3 entry."""
+@pytest.mark.parametrize("tier", TIERS)
+@pytest.mark.parametrize("pin_verified", [False, True])
+def test_CHN_WIRE_1_FR_CHN_11_an_answer_on_whatsapp_opens_nothing_pin_or_not(tier: str, pin_verified: bool) -> None:
+    """ADR-0019 (SD-01, SEC-06 as amended): a gate opens only in a signed-in session, so OB-01 (the real check_entry)
+    refuses an approval.resolved over WhatsApp, PIN or not; the owner's signed-in approval still works."""
     line = make_wire_line("L1")
-    card = card_for(line, "T3")
+    card = card_for(line, tier)
     requested = requested_part(line, card)
-    refused_and_untouched(line, card, resolved(requested, line, channel="whatsapp", pin_verified=False))
-
-    pinned = resolved(requested, line, channel="whatsapp", pin_verified=True)
-    assert try_send(line.ap, card.card_id, pinned).status == "queued", "a refusal does not burn the card"
-    assert one_sent(line)["authz"] == pinned["authz"]
+    refused_and_untouched(line, card, resolved(requested, line, channel="whatsapp", pin_verified=pin_verified))
+    then_a_valid_approval_still_works(line, card, requested)
 
 
 # -- a policy is never a person (OB-04) ---------------------------------------------------------------------------

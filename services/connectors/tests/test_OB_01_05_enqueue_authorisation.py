@@ -72,7 +72,7 @@ def test_OB_01_enqueue_refuses_every_unauthorised_entry(crossref_invalid_cases):
     "name",
     [
         "gate_reply_sent_in_village_basic.json",
-        "gate_t3_reply_approved_by_assigned_approver_with_pin.json",
+        "gate_t3_reply_approved_by_assigned_approver_signed_in.json",
         "policy_l3_status_update_waiting.json",
         "policy_reply_instructed_on_the_web.json",
         "policy_reply_sent_after_undo_window.json",
