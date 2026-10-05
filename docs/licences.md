@@ -114,7 +114,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | @biomejs/biome | MIT | https://www.npmjs.com/package/@biomejs/biome |
-| firebase-tools (runs the Firestore emulator for `services/harness`, P0-09) | MIT | https://www.npmjs.com/package/firebase-tools |
+| firebase-tools (runs the Firestore emulator for `services/harness`, P0-09; also an `apps/web` devDependency at the same pinned 15.31.0 for `just deploy-web`, P0-07c) | MIT | https://www.npmjs.com/package/firebase-tools |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
 | react, react-dom, pixi.js, vite, @vitejs/plugin-react, vitest, @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/ |
 | vite 6.4.x (#69, replaces 5.4.x; pulls esbuild 0.25, rollup, fdir, tinyglobby, all MIT; no licence change) | MIT | https://www.npmjs.com/package/vite |

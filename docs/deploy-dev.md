@@ -63,16 +63,30 @@ in-VPC probe or a wider role: your decision (docs/p0-07a-notes.md, item 7).
 To roll back, revert on `main` and dispatch again (the workflow always runs `main`), or send traffic to a
 previous revision in the Cloud Run console.
 
-## Web app (Firebase Hosting, manual)
+## Web app (Firebase Hosting, manual; P0-07c)
 
 ```powershell
 pnpm install
-pnpm --filter @tilo/web run build     # writes apps/web/dist
-pnpm exec firebase deploy --only hosting --project <project id>
+pnpm exec firebase login      # once: you sign in with your own Google account (browser)
+just deploy-web
 ```
 
-`firebase.json` serves `apps/web/dist` with a single-page-app rewrite to `/index.html`. Sign in with
-your own account (`firebase login`); Tilo's tooling never handles passwords.
+`just deploy-web` builds `apps/web` with `VITE_TILO_API_URL` set to empty, then runs
+`pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0`. It takes no argument
+and refuses every other project by construction (the project id is fixed in the recipe). The
+`firebase-tools` CLI is an `apps/web` devDependency, so no global install is needed. The result is
+live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` alias).
+
+- Fixture / replay world: with `VITE_TILO_API_URL` unset the deployed web app uses the in-browser
+  `FixtureClient`; it replays the recorded world and makes no call to any backend. Pointing it at a
+  deployed `tilo-api` is a later step (set the variable at build time), not part of this deploy.
+- The CI deployer has no Firebase role, so Hosting is never deployed from Actions: this is a manual
+  step by you. Tilo's tooling never handles passwords or tokens; `firebase login` is yours.
+- `firebase.json` serves `apps/web/dist` with a single-page-app rewrite to `/index.html`, hashed files
+  under `/assets/**` as `public, max-age=31536000, immutable`, and `index.html` as `no-cache` so a new
+  deploy is picked up on the next load.
+- Check before you deploy: `pnpm --filter @tilo/web run build` then `pnpm --filter @tilo/web exec vite preview`
+  serves the same bundle locally.
 
 ## Never
 
