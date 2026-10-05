@@ -140,6 +140,109 @@ textarea {
   margin: var(--space-16) 0 var(--space-4);
   font-size: var(--text-14);
 }
+/* S-04 levels panel (artboard "Tilo World Player"): a fixed column left of the stage, from 1280 px.
+   Its width is reserved while the layout loads (CLS); below 1280 px and in stage mode the stage
+   keeps the room. Each card is one link to the level's Inspect page. */
+.levels-panel {
+  display: none;
+}
+@media (min-width: 1280px) {
+  .levels-panel {
+    display: block;
+    flex: 0 0 220px;
+    box-sizing: border-box;
+    padding: var(--space-16) var(--space-12);
+    overflow-y: auto;
+    background: var(--color-surface-1);
+    border-right: 2px solid var(--color-surface-2);
+    font-size: var(--text-14);
+  }
+  .app-shell[data-stage-mode="on"] .levels-panel {
+    display: none;
+  }
+}
+.levels-panel .levels-counts {
+  margin: var(--space-8) 0 var(--space-16);
+  color: var(--color-ink-2);
+}
+.levels-panel h2 {
+  margin: 0 0 var(--space-8);
+  font-size: var(--text-12);
+  color: var(--color-ink-2);
+}
+.levels-panel ul {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.level-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-4) var(--space-8);
+  padding: var(--space-8) var(--space-12);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-cards);
+  color: var(--color-ink-1);
+  text-decoration: none;
+}
+.level-card[data-active] {
+  border-color: var(--color-brand-primary);
+}
+.level-card:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.level-badge {
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-controls);
+  background: var(--color-brand-primary);
+  color: var(--color-surface-1);
+  font: 800 var(--text-12) / 1 var(--font-ui);
+}
+.level-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.level-pct {
+  min-width: 5ch; /* "100%" fits and the text starts at the same place, so a figure changing moves nothing (CLS) */
+  text-align: left;
+  font: 700 var(--text-12) / 1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+.level-card progress {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 6px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  appearance: none;
+  overflow: hidden;
+}
+.level-card progress::-webkit-progress-bar {
+  background: var(--color-surface-2);
+}
+.level-card progress::-webkit-progress-value {
+  background: var(--color-brand-primary);
+  border-radius: var(--radius-pill);
+}
+.level-card progress::-moz-progress-bar {
+  background: var(--color-brand-primary);
+}
+.level-line {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--color-ink-2);
+  font-size: var(--text-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Bundle C (#227): the shared top bar every artboard has (Tilo Home v2, Worlds, World Player): the
    logo, the current place, and the run's Needs-you count. Fixed under the status strip, so no
    layout moves it; the shell is padded by --chrome-h. No user, plan or avatar: the client has none.
@@ -354,7 +457,7 @@ textarea {
   list-style: none;
   margin: 0;
   padding: 0;
-  height: 240px; /* reserved: rows arriving never move the Trace heading (CLS) */
+  height: 126px; /* reserved: rows arriving never move the Trace heading (CLS); six whole 21 px rows leave the HUD above it room for its Pause all note and the Needs-you row */
   overflow-y: auto;
   font: 400 var(--text-12) var(--font-mono);
   color: var(--color-ink-2);
@@ -2428,6 +2531,37 @@ button.row {
   height: 44px;
   margin: 0;
   accent-color: var(--color-brand-primary);
+}
+.replay-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.replay-track input[type="range"] {
+  width: 100%;
+}
+/* The marks sit in the upper part of the 44 px track box, above the thumb's path: no height of
+   their own (CLS). 8 px is half the native thumb, so a mark lines up with its stop. */
+.replay-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.replay-marks i {
+  position: absolute;
+  top: 2px;
+  left: calc(8px + (100% - 16px) * var(--at));
+  width: 6px;
+  height: 9px;
+  margin-left: -3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-signal-needs);
+}
+.replay-marks i[data-kind="done"] {
+  background: var(--color-signal-done);
+}
+.replay-marks i[data-kind="problem"] {
+  background: var(--color-signal-blocked);
 }
 .replay-step {
   flex: none;

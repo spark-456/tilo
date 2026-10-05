@@ -5,7 +5,9 @@
 // it. A live run cannot be scrubbed, and the reason is on screen. The region is one reserved box
 // (CLS): the banner and the reason share a slot, so a run finishing moves nothing.
 import type { Event } from "@tilo/contracts";
+import { type CSSProperties, useMemo } from "react";
 import { useClient } from "../api/ClientProvider";
+import { scrubMarks } from "../world/levels";
 import {
   indexToPoint,
   pointToIndex,
@@ -34,6 +36,7 @@ export function ReplayScrubber({
   const index = pointToIndex(events, point);
   const go = (to: number) => setReplayPoint(worldId, indexToPoint(events, to));
   const text = scrubText(events, index);
+  const marks = useMemo(() => scrubMarks(events), [events]);
   const banner = finished ? replayBanner(events, fixture) : null;
   return (
     <section className="replay-dock" aria-label="Replay" data-testid="replay-scrubber">
@@ -60,17 +63,31 @@ export function ReplayScrubber({
         >
           ‹
         </button>
-        <input
-          type="range"
-          aria-label="Replay position"
-          aria-valuetext={finished ? text : "Not available while the run is going"}
-          min={0}
-          max={last}
-          step={1}
-          value={index}
-          disabled={!finished || last === 0}
-          onChange={(e) => go(Number(e.currentTarget.value))}
-        />
+        <div className="replay-track">
+          <input
+            type="range"
+            aria-label="Replay position"
+            aria-valuetext={finished ? text : "Not available while the run is going"}
+            min={0}
+            max={last}
+            step={1}
+            value={index}
+            disabled={!finished || last === 0}
+            onChange={(e) => go(Number(e.currentTarget.value))}
+          />
+          {/* Where the run asked for a decision, finished a level or hit a problem: the same
+              events the position text names, drawn on the track. Decoration, never a control. */}
+          <span className="replay-marks" aria-hidden="true" data-testid="scrub-marks">
+            {finished &&
+              marks.map((m) => (
+                <i
+                  key={m.index}
+                  data-kind={m.kind}
+                  style={{ "--at": m.index / last } as CSSProperties}
+                />
+              ))}
+          </span>
+        </div>
         <button
           type="button"
           className="replay-step"
