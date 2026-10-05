@@ -104,3 +104,9 @@ skills-test:
 # too, so the older documented form keeps working).
 deploy env="dev":
     python -c "import sys; env='{{env}}'; env=env[4:] if env.startswith('env=') else env; sys.exit(sys.stderr.write(f'deploy: only env=dev is allowed here, got {env!r}\n') or 1) if env != 'dev' else sys.exit(sys.stderr.write('deploy: infra/ is not applied yet (ticket P0-07 defines the plan; the user runs terraform apply)\n') or 1)"
+
+# Dispatch the tilo-dev deploy workflow (P0-07a) on main: it builds the images, swaps them on Cloud Run and
+# smoke-tests. Refuses everything but dev; needs `gh` signed in. Steps and variables: docs/deploy-dev.md.
+deploy-dev env="dev":
+    python -c "import sys; env='{{env}}'; env=env[4:] if env.startswith('env=') else env; sys.exit(sys.stderr.write(f'deploy-dev: only env=dev is allowed, got {env!r}\n') or 1) if env != 'dev' else None"
+    gh workflow run deploy-dev.yml --ref main
