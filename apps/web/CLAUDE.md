@@ -26,7 +26,7 @@ Trace lenses, cards and settings.
 - `meta.ts` is the PRD 18.3 table (S-01..S-25, status, route pattern); `routes.tsx` maps each
   routed screen to its `S_NN.tsx`. Build one: replace the stub, flip its status. `/more`, `/screens`. `ScreenPage` (the routed `<main>`) is tabbable and named only while it scrolls (#361).
 - A control that does nothing yet is `aria-disabled="true"` with a "Coming soon" title. Nothing to list yet is `EmptyState` (`kit.tsx`: glyph, title, line, one action), in the reserved box the loading state held.
-- `?speed=` is parsed in `world/speed.ts` (clamped 0.1..1000); the HR-6 badge says "Replay at N× speed"; it and the HR-4 pill sit in the fixed `.status-strip` (shell padded by `--strip-h`).
+- `?speed=` is parsed in `world/speed.ts` (clamped 0.1..1000); the HR-6 badge says "Replay at N× speed"; it and the HR-4 pill sit in the fixed `.status-strip`; under it the shared `TopBar` (logo, place, real Needs-you count; no user/plan data, none exists) — fixed layers start below `--chrome-h`; keep its text from moving (CLS).
 - An unknown world id or an unowned path under `/world/` or `/task/` shows `NotFound`, not Start.
 
 ## Needs you (`src/needs-you/`, AGW-05)

@@ -10,6 +10,7 @@ import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
 import { LoggedScrubber, ReplayScrubber } from "./screens/ReplayScrubber";
 import { ScreenPage } from "./screens/ScreenPage";
+import { TopBar } from "./screens/TopBar";
 import { HudGlance, WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
 import { Stage } from "./stage/Stage";
@@ -131,6 +132,7 @@ export function App() {
       data-replay-badge={speedBadge ? "on" : "off"}
       data-replay-dock={dock ? "on" : "off"}
     >
+      <TopBar fixture={world.active} />
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
         <ScreenPage key={screen.id} screenId={screen.id}>
