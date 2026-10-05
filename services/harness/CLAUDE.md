@@ -7,7 +7,7 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 ## Commands
 - `uv run pytest services/harness/tests -m "not emulator"` — fast suite
 - `uv run pytest services/harness/tests -m emulator` — Firestore-emulator suite (Java + firebase-tools)
-- `just harness-skeleton` (`tilo_harness.skeleton` vs the emulator); `just check` — full gate from the root
+- `just harness-skeleton` — runs `python -m tilo_harness.skeleton` against the emulator; `just check` — full gate
 
 ## Contracts
 - Reads (read-only): `contracts/event*`, `common`, `events/{registry.yaml,data/*}`, `layout`, `plan`,
@@ -21,9 +21,9 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 ## Requirement IDs
 - P0-09 (D-11): skeleton, writer, store. FR-AGT-01/02/03: `executor.run_plan` (PG-02/03/11
   pre-flight writes nothing; `max_specialists` semaphore; deps before start), skill pins.
-- FR-AGT-05: `must_ask.MustAsk` (rules in code; a model reply can only add a question, an unreadable
-  one asks; card first); `run_plan(must_ask=)` parks the asked unit, skips its dependents. FR-HIL-10:
-  with `question_wait=` (`QuestionWait`) it waits for the answer or the card's deadline, holding no slot.
+- FR-AGT-05: `must_ask.MustAsk` (rules in code; a model reply can only add a question; card stored first);
+  `run_plan(must_ask=)` parks the asked unit. FR-HIL-10: `question_wait=` (`QuestionWait`) waits for the answer or the deadline, no slot held.
+- FR-AGT-12: `verifier.Verifier` (rules in code, then only the verifier-role model; `verified` recomputed); `run_plan(verifier=)` reviews every handed-over artifact.
 
 ## Local rules
 - Never calls a model directly — always through `packages/providers`, by role (PL-01); the

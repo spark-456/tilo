@@ -24,7 +24,7 @@ from tilo_harness.executor import UnitOutcome, run_plan
 from tilo_harness.must_ask import MustAsk
 from tilo_harness.question_wait import AlreadyAnswered, QuestionWait
 from tilo_harness.validator import repo_validator
-from tilo_planning.compiler import PlanInputs
+from tilo_planning.compiler import DELIVER, PlanInputs
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps, events
@@ -121,6 +121,7 @@ class Run:
         self.sends: dict[str, dict[str, Any]] = {}  # outbox_id -> what its data.transfer needs
         self.titles: dict[str, str] = {}  # artifact_id -> the delivering unit's title
         self.delivered: list[str] = []  # artifact.delivered event ids
+        self.produced: dict[str, list[tuple[dict, dict, str]]] = {}  # unit id -> (unit, item, artifact.created id)
         self._built: dict[str, dict] = {}  # event id -> the event as first built, resent as is on an exact retry
         self.failure: str | None = None
         self._failed = False
@@ -419,6 +420,20 @@ class Run:
         self.titles[item["artifact_id"]] = unit["title"]
         self.delivered.append(delivered["id"])
 
+    def deliver_in_app(self, unit: dict, worker: str) -> None:
+        """BQ-218, FR-CON-10: the items a `deliver` unit (and the units it waits for) really produced are delivered in
+        Tilo: no outbound side effect, so no gate. Nothing is made up: a run whose units produced nothing delivers
+        nothing and says so (deliverable_count 0)."""
+        seen = {e["data"]["artifact"]["artifact_id"] for e in self.store.events.get(self.world_id, [])
+                if e["type"] == "artifact.delivered"}  # fmt: skip
+        for source in (unit["id"], *unit["depends_on"]):
+            for producer, item, made in self.produced.get(source, []):
+                if item["artifact_id"] in seen:
+                    continue
+                seen.add(item["artifact_id"])
+                data = {"artifact": item, "format": "in_app", "outbox_id": None}
+                self._deliver(producer, worker, item, data, made)
+
     async def _send(self, entry: dict, evidence: dict[str, Any]) -> dict:
         """Enqueue with the person's authz, then dispatch until the outbox records the entry sent."""
         outbox = self._outbox()
@@ -525,6 +540,9 @@ class _GatedRunner:
                 {"artifact": {"artifact_id": ref["artifact_id"], "version": ref["version"]}}, district=unit["district"],
                 credits=credits if ref is refs[0] else 0,
             )["id"]  # fmt: skip
+        self._run.produced[unit["id"]] = [
+            (unit, {"artifact_id": r["artifact_id"], "version": r["version"]}, made[r["artifact_id"]]) for r in refs
+        ]
         try:
             for action in unit["actions"]:  # the item to send is the unit's first artifact
                 if not refs:
@@ -533,6 +551,8 @@ class _GatedRunner:
         except _GateFailed as exc:
             self._run.failure = str(exc)
             return UnitOutcome(success=False, summary="The gated step could not finish.")
+        if unit["unit_type"] == DELIVER and not unit["actions"]:  # a deliver unit that sends delivers at its gate
+            self._run.deliver_in_app(unit, context.agent_id)
         return outcome
 
 
