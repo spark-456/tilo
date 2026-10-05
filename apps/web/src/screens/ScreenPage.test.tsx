@@ -26,7 +26,19 @@ function page(heights: { scroll: number; client: number }): HTMLElement {
   return host.querySelector("main") as HTMLElement;
 }
 
+const tick = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+
 describe("FR_WLD_11 #361 ScreenPage", () => {
+  it("follows a screen root swapped after mount", async () => {
+    const heights = { scroll: 800, client: 800 };
+    const main = page(heights);
+    expect(main.hasAttribute("tabindex")).toBe(false);
+    heights.scroll = 1200; // the new content is taller; only the swap tells the page
+    main.append(document.createElement("div"));
+    await tick();
+    expect(main.getAttribute("tabindex")).toBe("0");
+  });
+
   it("takes a tab stop and a name while its content overflows", () => {
     const main = page({ scroll: 1200, client: 800 });
     expect(main.getAttribute("tabindex")).toBe("0");

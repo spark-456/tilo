@@ -20,9 +20,22 @@ export function ScreenPage({ screenId, children }: { screenId: string; children:
     sync();
     if (typeof ResizeObserver === "undefined") return;
     const watch = new ResizeObserver(sync);
-    watch.observe(page);
-    for (const child of Array.from(page.children)) watch.observe(child);
-    return () => watch.disconnect();
+    const follow = () => {
+      watch.disconnect();
+      watch.observe(page);
+      for (const child of Array.from(page.children)) watch.observe(child);
+    };
+    follow();
+    // A screen that swaps its root (loading -> loaded, a changed param) is followed too.
+    const swaps = new MutationObserver(() => {
+      follow();
+      sync();
+    });
+    swaps.observe(page, { childList: true });
+    return () => {
+      watch.disconnect();
+      swaps.disconnect();
+    };
   }, []);
   return (
     <main ref={ref} className="screen-page" data-testid="screen-page" data-screen={screenId}>
