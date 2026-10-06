@@ -6,24 +6,20 @@
 // carries data-flash="true" while `params.focus === "share"` (the 1.8 s clearing needs a timer, deferred to
 // WEB-3b, so it is not asserted); the expanded details block shows fact pairs (key element, then its sibling).
 import fc from "fast-check";
-import { createElement } from "react";
 import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { press } from "../../../../test-support/park/componentsHarness";
+import { cleanup, makeApp, renderTeam } from "../../../../test-support/park/teamHarness";
 import * as fx from "../../api/fixtures";
-import { TeamPage } from "./TeamPage";
 import { COPY, COVERAGE, LIMIT_BY_ROLE, PEOPLE, ROLES } from "./teamExpect";
 import {
   buttonNamed,
   choose,
-  cleanup,
   clickAndSettle,
   inputNamed,
-  makeApp,
   optionNames,
   ownText,
   region,
-  renderTeam,
   rowsOf,
   selectNamed,
   selectOf,
@@ -381,8 +377,8 @@ describe("WEB_10_team_focus: arriving from the Ledger", () => {
   });
 
   it("WEB_10_team_focus_arriving_after_mount_also_flashes", async () => {
-    const { m, root } = await renderTeam(makeApp());
-    m.render(createElement(TeamPage, { app: makeApp({ params: { focus: "share" } }) }));
+    const { m, root, tree } = await renderTeam(makeApp());
+    m.render(tree(makeApp({ params: { focus: "share" } })));
     await settle();
     expect(region(root, "Approval coverage").getAttribute("data-flash")).toBe("true");
   });

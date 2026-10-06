@@ -1,116 +1,14 @@
-// WEB-10 test helper (not a test): a full AppCtx built from the handoff README contract, a spying Api, the
-// mount/settle/query helpers the Team tests share. AppCtx arrives in WEB-3a (park/app/AppCtx.ts), so every
-// test file that imports this one fails until that branch is merged, which is the intended order.
-// The repo has no @testing-library, so this mounts with react-dom in happy-dom. It lives in the page folder
-// and park.static.test.ts reads it as park code: it imports nothing from outside park, so the mount helper
-// is a local copy of test-support/park/componentsHarness. No timers: async work is flushed with microtasks.
-import { type ReactElement, act, createElement } from "react";
-import { type Root, createRoot } from "react-dom/client";
-import { type Mock, vi } from "vitest";
-import { API_METHODS, type Api, type ApiMethod } from "../../api";
-import { createFixtureApi } from "../../api/fixtureApi";
-import { makeWorld } from "../../api/fixtures";
-import type { AppCtx } from "../../app/AppCtx";
-import { TeamPage } from "./TeamPage";
-
-Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
-
-export interface Mounted {
-  readonly container: HTMLElement;
-  render(ui: ReactElement): void;
-  unmount(): void;
-}
-const live: Mounted[] = [];
-
-function mount(ui: ReactElement): Mounted {
-  const container = document.createElement("div");
-  document.body.appendChild(container);
-  const root: Root = createRoot(container);
-  let open = true;
-  const m: Mounted = {
-    container,
-    render(next) {
-      act(() => root.render(next));
-    },
-    unmount() {
-      if (!open) return;
-      open = false;
-      act(() => root.unmount());
-      container.remove();
-    },
-  };
-  m.render(ui);
-  live.push(m);
-  return m;
-}
-
-/** Call from afterEach in every test file that renders the page. */
-export function cleanup(): void {
-  for (const m of live.splice(0)) m.unmount();
-  document.body.replaceChildren();
-}
-
-export type TestApp = AppCtx & {
-  go: Mock<AppCtx["go"]>;
-  decide: Mock<AppCtx["decide"]>;
-  addWorld: Mock<AppCtx["addWorld"]>;
-  toast: Mock<AppCtx["toast"]>;
-  setPref: Mock<AppCtx["setPref"]>;
-};
-
-/** README AppCtx, page "team", day, nothing decided yet; go/decide/toast/addWorld/setPref are spies. */
-export function makeApp(over: Partial<AppCtx> = {}): TestApp {
-  const base: AppCtx = {
-    page: "team",
-    params: {},
-    go: vi.fn<AppCtx["go"]>(),
-    dec: { depot: false, mail: false },
-    decide: vi.fn<AppCtx["decide"]>(),
-    needsLeft: 2,
-    added: [],
-    addWorld: vi.fn<AppCtx["addWorld"]>(() => makeWorld("quick", "Test job", 1)),
-    toast: vi.fn<AppCtx["toast"]>(),
-    time: "day",
-    night: false,
-    motion: "lively",
-    setPref: vi.fn<AppCtx["setPref"]>(),
-    prefs: {},
-    vw: 1440,
-    vh: 900,
-    pins: [],
-    ready: true,
-  };
-  return { ...base, ...over } as TestApp;
-}
-
-export type SpyApi = Api & { [M in ApiMethod]: Mock };
-
-/** The fixture Api with every method wrapped in a spy (results unchanged: `source: "fixture"`). */
-export function spyApi(base: Api = createFixtureApi()): SpyApi {
-  const entries = API_METHODS.map((m) => [
-    m,
-    vi.fn((...a: never[]) => (base[m] as (...args: unknown[]) => unknown)(...a)),
-  ]);
-  return Object.fromEntries(entries) as unknown as SpyApi;
-}
+// WEB-10 test helper (not a test): settle, DOM queries and actions the Team tests share. No timers: async
+// work is flushed with microtasks. The repo has no @testing-library; roles and names are read from attributes.
+// The page folder is read as park code by park.static.test.ts, so this file imports nothing from outside park;
+// mounting, the AppCtx stub and the Api spies are in test-support/park/teamHarness.ts.
+import { act } from "react";
 
 /** Let promises, effects and the state updates they cause finish (microtasks only). */
 export async function settle(): Promise<void> {
   await act(async () => {
     for (let i = 0; i < 30; i++) await Promise.resolve();
   });
-}
-
-export interface Rendered {
-  readonly m: Mounted;
-  readonly root: HTMLElement;
-}
-
-/** Mount `<TeamPage app={app} />` (the fixture Api by default) and wait for its data. */
-export async function renderTeam(app: AppCtx, api?: Api): Promise<Rendered> {
-  const m = mount(createElement(TeamPage, { app, ...(api ? { api } : {}) }));
-  await settle();
-  return { m, root: m.container };
 }
 
 // ---- queries (no accessibility tree in happy-dom: roles and names are read from the attributes) ----

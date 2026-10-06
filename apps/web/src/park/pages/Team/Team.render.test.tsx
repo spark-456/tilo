@@ -2,8 +2,8 @@
 // WEB-10 render + copy (plan section 10; design "Tilo App Team.dc.html", inventory.md "Team"): every designed
 // element is on the page, every visible string is the design's, the data comes only through the park Api, and
 // the page never passes fixture numbers off as live. Interface pinned here, for the builder:
-// - `TeamPage({ app })` from ./TeamPage; an optional `api?: Api` prop overrides the default (fixture) Api, so a
-//   test can inject a spy or the live stub (the default comes from useParkApi() once WEB-3a lands it).
+// - `TeamPage({ app })` from ./TeamPage, props `{ app }` ONLY: data comes from useParkApi() (WEB-3a context.tsx);
+//   tests wrap it in <ParkProvider api={spy | live stub}> (test-support/park/teamHarness.ts), AppCtx is `stubApp`.
 // - members and matrix rows are <tr> or role="row" elements; a row's DIRECT children are its columns in the design's order;
 //   a matrix cell carries data-granted="true|false"; the coverage section (aria-label "Approval coverage")
 //   rows are role="row" too (4 children: what, who, wait, action).
@@ -11,21 +11,18 @@
 // Defaults taken where the design/PRD is silent (listed in the WEB-10 report): the page adds no copy of its
 // own (the shell shows "Sample data"), "1 people" is the design's own count formula, kept for parity.
 import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, makeApp, renderTeam, spyApi } from "../../../../test-support/park/teamHarness";
 import * as fx from "../../api/fixtures";
 import { createLiveApi } from "../../api/liveApi";
 import { COPY, COVERAGE, FIRST_PAINT_STRINGS, MATRIX, PEOPLE, ROLES, RULES } from "./teamExpect";
 import {
-  cleanup,
   inputNamed,
-  makeApp,
   maybeSelectOf,
   ownText,
   region,
-  renderTeam,
   rowsOf,
   selectNamed,
   selectOf,
-  spyApi,
   strings,
   switchNamed,
 } from "./testApp";

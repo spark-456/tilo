@@ -9,17 +9,9 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { dv, gaps, rulesOf } from "../../../../test-support/park/pageCss";
 import { PARK_DIR } from "../../../../test-support/park/prototype";
+import { cleanup, makeApp, renderTeam } from "../../../../test-support/park/teamHarness";
 import { COPY, COVERAGE, MATRIX, PEOPLE } from "./teamExpect";
-import {
-  cleanup,
-  inputNamed,
-  makeApp,
-  ownText,
-  region,
-  renderTeam,
-  rowsOf,
-  typeInto,
-} from "./testApp";
+import { inputNamed, ownText, region, rowsOf, typeInto } from "./testApp";
 
 afterEach(cleanup);
 
