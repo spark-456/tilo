@@ -11,6 +11,7 @@ import { type ReactElement, act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeScheduler } from "../../../test-support/park/appHarness";
 import { cleanup, mount } from "../../../test-support/park/componentsHarness";
+import { decisions } from "../api/fixtures/decisions";
 import { API_METHODS, type Api } from "../api/index";
 import { NotBuilt } from "../api/liveApi";
 import type { AppCtx } from "./AppCtx";
@@ -100,6 +101,7 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
 
   it("WEB_3a_context_decide_updates_dec_needsLeft_and_shows_the_toast", () => {
     const { api } = setup();
+    seen.store.setDecisions(decisions); // the shell does this once the Api has returned them (WEB-3b)
     act(() => seen.app.decide("depot"));
     expect(seen.app.dec.depot).toBe(true);
     expect(seen.app.needsLeft).toBe(1);
