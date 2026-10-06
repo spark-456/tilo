@@ -110,6 +110,21 @@ Running list; each designed element with no PRD requirement, so it can be wired 
 | --- | --- | --- | --- |
 | (none yet) | | | |
 
+## 8c. Parity exceptions and component backlog (from the WEB-2 design-critic pass)
+
+Design-owned exceptions (the design's own values win, listed in the PR that shows them): night white label on `--hero` (4.29:1, primary Button); day KPI label `--sch` on `--schSoft` (3.86:1, the "Saved by memory" tone); mobile touch targets under 44px (the design's control heights 32/34/36/38/42 win); font file (static fontsource Nunito Sans against the design's variable opsz Google font, about 0.015px per label).
+
+Component variants the reference pages use, to add in the page ticket that first needs them:
+
+- SegmentedControl: compact (Skills tool access: radiogroup r10, items h28 r7 12.5px `0 10px`); Worlds status tabs (h34, `0 12px`, 14px/700, count badge gap 7); Ledger "Group by" (grid of 3, no padding); Home "Size of job" (r16, p4, sliding, h36, 14px).
+- Button sizes: h40, h44, h46 r14 (22px), h54 r18 (24px), h36 secondary r10, h34 secondary r10 13.5px, h28/h30/h32 small; trailing icon (`0 12px 0 16px`); needs hover `brightness(1.05)` (Worlds "Approve").
+- SummaryPill solid amber ("Waiting for you": `#F0A500` / `#1F1D2B`, 13px, `0 12px`).
+- Switch 40x24, knob 18, travel 16 (Profile notification matrix, Skills "ask me first") besides the 44x26 one (WEB-11 and the Skills phase).
+- Card padding 18, 20/22/18, 22/24/24, 10 and PageSheet gap 20 (Ledger), 22 (Connectors, Profile, Team, World, Worlds), 30 (Agenda, Skills), padding `28px 32px 36px` (Skills 40 bottom, World 24 top): props before the screen tickets.
+- Menu: account header (44px avatar, name 15/800, email 13/600, org 12.5/700 `--ink3`, lh 1.3, padding `10px 10px 12px`), separator (`1px --line2`, margin `0 6px 4px`); the Notifications popover is 392 wide.
+
+Motion to restore in WEB-3 (reference values): primary hover `filter` (Home composer `.2s`, `transform .15s`, active `translateY(2px)`), needs hover `brightness(1.05)`; `background-color .2s` on ListRow, menu rows, nav rows and switch tracks (KPI `.3s`; Skills 40x24 switch `.25s`); switch knob `transform .25s cubic-bezier(.3,1.3,.5,1)`; sliding thumb `transform .4s cubic-bezier(.34,1.3,.5,1)` and item `color .25s`; Worlds tabs `background-color .2s, color .2s`; scrim `opacity .25s ease` and its modal panel `transform .4s cubic-bezier(.2,.8,.2,1)`; page transition `opacity .24s ease, transform .38s cubic-bezier(.2,.8,.2,1)`; Toast auto-hide 4.2 s; `@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`. Toast and popover have no animation in the reference.
+
 ## 9. Decisions (approved 6 Oct 2026; logged in `docs/open-questions.md` as BQ-WEB-n)
 
 - **A (BQ-WEB-2). World page**: the Park SVG overview, linking to the Pixi stage and to S-05, S-10, S-11, S-12. The stage is not replaced; no ADR.
