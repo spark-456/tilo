@@ -1496,7 +1496,10 @@ dependencies = [
     { name = "pyyaml" },
     { name = "referencing" },
     { name = "tilo-api" },
+    { name = "tilo-archive" },
     { name = "tilo-contracts" },
+    { name = "tilo-harness" },
+    { name = "tilo-memory" },
     { name = "tilo-planning" },
     { name = "tilo-providers" },
 ]
@@ -1508,7 +1511,10 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-api", editable = "services/api" },
+    { name = "tilo-archive", editable = "packages/archive" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-harness", editable = "services/harness" },
+    { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-providers", editable = "packages/providers" },
 ]
