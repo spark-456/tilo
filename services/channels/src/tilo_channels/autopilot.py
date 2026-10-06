@@ -69,7 +69,7 @@ _TUPLES = ("options", "to", "cc", "findings", "questions", "modifiers")
 @dataclass(frozen=True)
 class DraftContext:
     instruction_id: str
-    thread_id: str
+    thread_id: str | None  # None: a new, thread-less email (FR-MTG-08); nothing reads a thread for it
     instruction: str
     mailbox: str
     mode: str = "reply"
@@ -446,8 +446,9 @@ class Autopilot:
         mailbox = _address(context.mailbox)
         own = _base(mailbox) if mailbox else None  # a non-ASCII mailbox vouches for nothing
         try:
-            listed = self._reader.get_thread(user_id, context.thread_id).get("messages")
-        except Exception:  # any read failure only narrows what is known
+            thread_id = context.thread_id
+            listed = self._reader.get_thread(user_id, thread_id).get("messages") if thread_id else []
+        except Exception:  # any read failure, or no thread, only narrows what is known
             listed = []
         for message in [m for m in (listed if isinstance(listed, list) else []) if isinstance(m, dict)][-MAX_MESSAGES:]:
             sender = _addresses(message.get("from"))[:1]

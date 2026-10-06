@@ -85,7 +85,7 @@ def test_FR_MTG_08b_a_commitment_word_in_a_confirmed_entry_does_not_license_it_i
     card = world.minutes_email("u_priya", "u_sam")
 
     assert_not_sendable(world, card)
-    assert card is None or any(f.kind == "commitment" for f in card.findings)
+    assert card is None or any(f.startswith("commitment") for f in card.findings)
 
 
 @needs_followup
