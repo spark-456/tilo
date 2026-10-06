@@ -1,9 +1,9 @@
 """The people API (PPL-11a; docs/prd-addendum-people-agents.md, ADR-0020/0021, services/api/tests/API_PPL_11a.md).
-Slices A and B: the two evidence-quote routes and the plate. Every route sits behind the SEC-15 gate (none is
-public), takes the person from the verified `deps.Principal` (the session's world role neither grants nor takes
-away), and reads one org only
-(`deps.ORG_ID`, at call time). It makes no model call and builds no router. One 404 body for every refusal; 422 for a
-bad shape before any lookup; 503 `not_configured` for an unwired seam and 503 for a store that cannot be read.
+Slices A to C: the evidence-quote routes, the plate and the writes (`people_writes.py`). Every route sits behind the
+SEC-15 gate (none is public), takes the person from the verified `deps.Principal` (the session's world role neither
+grants nor takes away), and reads one org only (`deps.ORG_ID`, at call time). It makes no model call and builds no
+router. One 404 body for every refusal; 422 for a bad shape before any lookup; 503 `not_configured` for an unwired seam
+and 503 for a store that cannot be read.
 """
 
 from __future__ import annotations
@@ -21,6 +21,20 @@ from tilo_people.stores import PeopleStores
 from tilo_api import deps
 from tilo_api.people_plate import build_plate
 from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
+from tilo_api.people_writes import (
+    Empty,
+    ItemIn,
+    MeetingIn,
+    PersonIn,
+    Refusal,
+    Writer,
+    confirm_item,
+    confirm_minutes,
+    create_item,
+    create_meeting,
+    create_person,
+    json_body,
+)
 
 _MEETING_ID = re.compile(r"mt_[0-9A-Za-z_]{1,48}")
 _ITEM_ID = re.compile(r"wi_[0-9A-Za-z_]{1,48}")
@@ -41,8 +55,11 @@ class _PeopleRoute(APIRoute):
             except NotImplementedError:
                 response = JSONResponse(status_code=503, content={"detail": "not_configured"})
             except HTTPException as refusal:
+                extra = refusal.extra if isinstance(refusal, Refusal) else {}
                 response = JSONResponse(
-                    status_code=refusal.status_code, content={"detail": refusal.detail}, headers=refusal.headers
+                    status_code=refusal.status_code,
+                    content={"detail": refusal.detail, **extra},
+                    headers=refusal.headers,
                 )
             response.headers["Cache-Control"] = "no-store"
             return response
@@ -120,3 +137,81 @@ def plate_route(
     person with no record is a 404 (the sources are not asked); a source that fails is a 503, never a partial plate."""
     now = clock()
     return _answer(lambda: build_plate(stores, sources, owners, deps.ORG_ID, principal.user_id, now))
+
+
+def _writer(
+    principal: deps.Principal,
+    stores: PeopleStores,
+    clock: Callable[[], str],
+    redact: Callable[[str], str] | None = None,
+) -> Writer:
+    return Writer(stores, deps.ORG_ID, principal.user_id, clock(), *(() if redact is None else (redact,)))
+
+
+@router.post("/v1/meetings/{meeting_id}/confirm")
+def confirm_meeting_route(
+    meeting_id: str,
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The meeting owner confirms the minutes: the stamp is the owner and the server clock (PE-05, PE-07)."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    return _answer(lambda: confirm_minutes(_writer(principal, stores, clock), meeting_id))
+
+
+@router.post("/v1/work-items/{work_item_id}/confirm")
+def confirm_work_item_route(
+    work_item_id: str,
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The assigner confirms a proposed item; nobody else can see it exists (PE-03, PE-07)."""
+    if _ITEM_ID.fullmatch(work_item_id) is None:
+        raise _not_found()
+    return _answer(lambda: confirm_item(_writer(principal, stores, clock), work_item_id))
+
+
+@router.post("/v1/meetings", status_code=201)
+def create_meeting_route(
+    body: Annotated[MeetingIn, Depends(json_body(MeetingIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """A person of the org adds a meeting; the server mints the id and stamps the attestation (PE-18)."""
+    return _answer(lambda: create_meeting(_writer(principal, stores, clock, redact), body))
+
+
+@router.post("/v1/people", status_code=201)
+def create_person_route(
+    body: Annotated[PersonIn, Depends(json_body(PersonIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """An org owner adds a person; the server mints the id and the org is `deps.ORG_ID` (PE-17)."""
+    return _answer(lambda: create_person(_writer(principal, stores, clock, redact), body))
+
+
+@router.post("/v1/work-items", status_code=201)
+def create_work_item_route(
+    request: Request,
+    body: Annotated[ItemIn, Depends(json_body(ItemIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """A person adds their own item; a mail or request source is checked against its owner (PE-08)."""
+
+    def owners() -> deps.SourceOwners:  # resolved only when the source is mail or a request
+        return request.app.dependency_overrides.get(deps.get_source_owners, deps.get_source_owners)()  # type: ignore[no-any-return]
+
+    return _answer(lambda: create_item(_writer(principal, stores, clock, redact), body, owners))
