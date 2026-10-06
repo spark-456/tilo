@@ -38,7 +38,7 @@ from .errors import (
     RateLimited,
     SyncTokenExpired,
 )
-from .registry import ConnectorRegistry, _NoAliasLoader
+from .registry import ConnectorRegistry, load_strict_yaml
 from .tokens import ConnectionExpired, InsufficientScope, Kms, KmsError, NotConnected, TokenError
 
 DEFAULT_PERSONAL_CONFIG = Path(__file__).resolve().parents[4] / "config" / "personal.yaml"
@@ -88,8 +88,8 @@ class CalendarSyncConfig:
 
 
 def _read_yaml(text: str) -> Any:
-    """The one place this module parses YAML (no aliases). Swap for registry.load_strict_yaml once it exists here."""
-    return yaml.load(text, Loader=_NoAliasLoader)  # noqa: S506
+    """The one place this module parses YAML: the registry's strict loader (no aliases, merge keys or repeated keys)."""
+    return load_strict_yaml(text)
 
 
 def _int(value: Any, low: int, high: int, key: str) -> int:
