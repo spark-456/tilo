@@ -80,6 +80,7 @@ class WorldRecord:
     run_id: str = "r_village_basic_1"  # the world's current run; tilo-api reads this, never invents it
     paused: bool = False  # true once Pause all has actually paused this world (PRD 9.4 honesty:
     # only ever true together with a world.paused event queued or committed somewhere)
+    prior_world_id: str | None = None  # a scheduled run's previous world (FR-AGT-14b): offered, never silently reused
 
 
 @dataclass
