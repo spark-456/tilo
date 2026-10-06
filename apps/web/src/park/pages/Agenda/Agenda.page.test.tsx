@@ -92,11 +92,9 @@ describe("WEB_9_agenda_copy: the designed text, verbatim", () => {
       "15 minutes ahead, in your inbox",
     ])
       expect(d, s).toContain(s);
-    expect(qa(detail(container), '[role="switch"]').map((s) => s.getAttribute("aria-checked"))).toEqual([
-      "true",
-      "true",
-      "true",
-    ]);
+    expect(
+      qa(detail(container), '[role="switch"]').map((s) => s.getAttribute("aria-checked")),
+    ).toEqual(["true", "true", "true"]);
   });
 });
 
@@ -274,7 +272,9 @@ describe("WEB_9_agenda_decide: every approval goes through app.decide(key)", () 
     click(byText(first.container, "button", "Find a time"));
     click(qa(region(first.container, "This week"), "[data-slot]")[0] as HTMLElement);
     await settle();
-    expect(text(detail(first.container))).toContain("Laptop Depot budget is still waiting for sign-off.");
+    expect(text(detail(first.container))).toContain(
+      "Laptop Depot budget is still waiting for sign-off.",
+    );
     first.decideFromOutside("depot");
     expect(text(detail(first.container))).toContain("Laptop Depot budget was approved today.");
   });
