@@ -1,9 +1,4 @@
-"""tilo_channels.quiet_hours: per-user quiet hours notification filter (FR-HIL-13; PRD 10.2, 10.6, 13.1).
-
-During a user's quiet hours (`start` to `end` in the user's IANA `timezone` / `time_zone`, supporting windows
-that cross midnight), every outbound notification is suppressed except `gate` and `blocked`. Suppressed items
-still appear in the app.
-"""
+"""tilo_channels.quiet_hours: per-user quiet hours notification filter (FR-HIL-13; PRD 10.2, 10.6, 13.1)."""
 
 from __future__ import annotations
 
@@ -144,9 +139,7 @@ class NotificationGate:
         clock: Callable[[], float | int | str | dt.datetime] | None = None,
         sender: Callable[[dict], None] | None = None,
     ) -> None:
-        self._prefs = preferences
-        self._clock = clock or (lambda: dt.datetime.now(dt.UTC))
-        self._sender = sender
+        self._prefs, self._clock, self._sender = preferences, clock or (lambda: dt.datetime.now(dt.UTC)), sender
         self._in_app: dict[str, list[dict]] = {}
         self._lock = threading.Lock()
 
@@ -157,8 +150,7 @@ class NotificationGate:
         return should_notify(item, prefs=prefs, now=self._clock() if now is None else now)
 
     def deliver(self, user_id: str, item: dict) -> DeliveryDecision:
-        stored = copy.deepcopy(item)
-        notify = self.should_notify(user_id, stored)
+        stored, notify = copy.deepcopy(item), self.should_notify(user_id, item)
         with self._lock:
             self._in_app.setdefault(user_id, []).append(stored)
         if notify and self._sender is not None:

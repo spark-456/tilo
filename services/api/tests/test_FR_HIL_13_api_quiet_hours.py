@@ -1,35 +1,18 @@
-"""FR-HIL-13 (PRD 10.6): Quiet hours on tilo-api CardStore.
-
-During quiet hours only `gate` and `blocked` cards notify outbound channels; suppressed cards
-(`needs_you`, `meeting`, `consent`) still appear in the app (`list_for_world` / `GET /worlds/{id}/cards`).
-"""
+"""FR-HIL-13 (PRD 10.6): Quiet hours on tilo-api CardStore."""
 
 from __future__ import annotations
 
 from _cards_lib import OWNER_P, FakeClock, FakeEventWriter, answer_client, clone_card, load_valid_card, new_ulid
 from tilo_api.cards import CardStore
 
-OWNER = "u_owner"
-W = "w_01"
-
-
-class FakePreferenceStore:
-    def __init__(self) -> None:
-        self._data: dict[str, dict] = {}
-
-    def get(self, user_id: str) -> dict | None:
-        return self._data.get(user_id)
-
-    def put(self, user_id: str, value: dict) -> None:
-        self._data[user_id] = value
+OWNER, W = "u_owner", "w_01"
 
 
 def _setup(
     now: str = "2026-09-29T18:00:00.000Z", quiet_hours: dict | None = None
-) -> tuple[CardStore, FakeClock, list[dict], FakePreferenceStore]:
-    clock, writer, prefs = FakeClock(now), FakeEventWriter(), FakePreferenceStore()
-    if quiet_hours is not None:
-        prefs.put(OWNER, {"quiet_hours": quiet_hours})
+) -> tuple[CardStore, FakeClock, list[dict], dict[str, dict]]:
+    clock, writer = FakeClock(now), FakeEventWriter()
+    prefs: dict[str, dict] = {OWNER: {"quiet_hours": quiet_hours}} if quiet_hours is not None else {}
     notified: list[dict] = []
     store = CardStore(clock=clock, writer=writer, world_owners={W: OWNER}, preferences=prefs, notifier=notified.append)
     return store, clock, notified, prefs
@@ -68,7 +51,6 @@ def test_FR_HIL_13_outside_quiet_hours_needs_you_and_meeting_notify() -> None:
     needs_you_card = clone_card(load_valid_card("needs_you_compare_basis"), id_=new_ulid("ny2"), building="B2")
     meeting_card = clone_card(load_valid_card("meeting_budget_split"), id_=new_ulid("mtg2"), building="B3")
     gate_card = clone_card(load_valid_card("gate_send_reply"), id_=new_ulid("gate2"))
-
     store.submit(needs_you_card)
     store.submit(meeting_card)
     store.submit(gate_card, outbox_id=new_ulid("ob2"))
