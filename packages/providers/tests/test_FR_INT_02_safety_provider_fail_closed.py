@@ -1,6 +1,6 @@
 """FR-INT-02 / CC-SP-47 builder tests: the safety layer fails closed on
 config it cannot honour, on native files the replay layer cannot screen, and
-on the not-yet-built Model Armor adapter (ADR-0003: mocks and recordings only)."""
+on a live Model Armor adapter that has no project to talk to (ADR-0003: mocks and recordings only)."""
 
 from __future__ import annotations
 
@@ -40,10 +40,13 @@ def test_FR_INT_02_factory_refuses_an_unknown_safety_provider(tmp_path):
         build_safety_provider(_config(tmp_path, safety_models_config("mystery")), fixtures_dir=tmp_path)
 
 
-def test_FR_INT_02_model_armor_live_stub_refuses_instead_of_passing(tmp_path, monkeypatch):
+def test_FR_INT_02_model_armor_live_without_a_project_refuses_instead_of_passing(tmp_path, monkeypatch):
+    """The live adapter is built (test_FR_INT_02_model_armor_adapter.py); without GOOGLE_CLOUD_PROJECT
+    the live factory still refuses loudly rather than passing the content."""
     provider = build_safety_provider(_config(tmp_path, safety_models_config("model_armor")), fixtures_dir=tmp_path)
     monkeypatch.setenv("LIVE", "1")
-    with pytest.raises(ProviderConfigError, match="not built yet"):
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    with pytest.raises(ProviderConfigError, match="GOOGLE_CLOUD_PROJECT"):
         provider.check("hello")
 
 

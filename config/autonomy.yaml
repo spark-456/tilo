@@ -16,7 +16,10 @@
 # build_handoff (FR-CON-16, supplement 2026-10-05 s6) hands company data to an outside build partner, so it
 # is T3 and always needs a person. It is listed, not left to the unlisted-is-T3 default, so that removing the
 # line by mistake cannot pass unnoticed: the FR-CON-16 config test pins it at T3.
+# read_events (google_calendar, FR-CAL-08) reads the person's own calendar: no side effect, never
+# gated, never an outbox entry. Listed so the table and config/connectors.yaml agree on its tier.
 actions:
+  read_events: T1
   create_draft: T1
   save_file: T1
   save_as_google_file: T1

@@ -1,25 +1,30 @@
 """tilo_channels.meeting_followup: after the Owner confirmed a meeting's minutes, a drafted (never sent) minutes email
-to the attendees the Owner picks and a nudge per open item (FR-MTG-08; PRD 10.4, 11.4; PE-03, PE-05, PE-07, PE-09,
-PE-19 to PE-22; BQ-MTG08-1 to -8).
+to the attendees the Owner picks and a nudge per open item (FR-MTG-08, FR-MTG-08b; PRD 10.4, 11.4; PE-03, PE-05, PE-07,
+PE-09, PE-19 to PE-22; BQ-MTG08-1 to -8, BQ-MTG08B-1 to -6).
 
 Only the meeting's Owner drafts, and only for a `minuted` meeting whose minutes the Owner confirmed. Content is what
 the Owner confirmed: the summary, the `verified` decisions and the action items whose work item is `open`, confirmed
-by the Owner and of this meeting. Recipients come from the directory (tilo-api), never from a model, the minutes or
-the meeting text. The FR-CHN-10 `Checker` runs on every body with the confirmed text as its only source, and a body
-that repeats text the Owner did not confirm is refused (`needs_you`, never sendable). A draft is a new thread-less
-email: `Autopilot.preview` makes it T3 (new recipients), L1, and a card waits for the Owner's approval. This module
-imports no connector, outbox, policy engine or network client and never sends. Cards and prompts hold the meeting
-text; no log line or event does.
+by the Owner, of this meeting and assigned to the person the minutes name. Recipients come from the directory
+(tilo-api), never from a model, the minutes or the meeting text. The FR-CHN-10 `Checker` runs on every body with the
+confirmed text as its only source of facts and no instruction, so no commitment word is granted: one is allowed only
+inside a verbatim repeat of a confirmed entry. A body that repeats text the Owner did not confirm is refused
+(`needs_you`, never sendable). A draft is a new thread-less email: `Autopilot.preview` makes it T3 (new recipients),
+L1, and a card waits for the Owner's approval. This module imports no connector, outbox, policy engine or network
+client and never sends. Cards and prompts hold the meeting text; no log line or event does.
+
+Fail closed (FR-MTG-08b): a `flagged` that is not `False` reads as flagged (PE-21); more entries than minutes.schema
+allows draw nothing and read no work item; the idempotency key is a JSON array, so no part can forge another.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import re
 import secrets
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 from tilo_providers.interfaces import GenerateRequest, ModelProvider, SafetyProvider
 from tilo_providers.prompts import load_prompt
@@ -45,11 +50,16 @@ from tilo_channels.drafting_check import Checker, Finding, clean
 
 __all__ = ["MeetingFollowUp"]
 
-TEXT_CAP, SUMMARY_CAP, MAX_ENTRIES = 2_000, 8_000, 100  # raw characters per text; entries per list (more: no draft)
+# minutes.schema.json: 240 characters per text (a longer one is cut and its rest only screened); at most 8 summary
+# points, 30 decisions and 60 action items (more of any: no draft, before any work item is read).
+TEXT_CAP, MAX_SUMMARY, MAX_DECISIONS, MAX_ACTIONS = 240, 8, 30, 60
 SUBJECT_CAP = 120
+MINUTES_CAP = 40_000  # chars of a minutes body and its answer: a maximal minutes is ~23.5k (BQ-MTG08B-5)
 INSTRUCTION = "Follow up a confirmed meeting"  # the card's stored instruction: no meeting text
 
 _LOG = logging.getLogger(__name__)
+# Where a verbatim repeat of an entry may start: the line start, after a colon, a list marker or "1. ".
+_LEAD = r"(?:^|(?<=: )|(?<=- )|(?<=\* )|(?<=• )|(?<=\d\. )|(?<=\d\d\. ))"
 
 
 class MeetingReader(Protocol):
@@ -79,6 +89,39 @@ def _text(value: Any, cap: int, rests: list[str]) -> str:
 
 def _norm(text: str) -> str:
     return " ".join(clean(text).split())
+
+
+def _lists(minutes: Mapping[str, Any]) -> tuple[list[Mapping], list[Mapping], list[Mapping]] | None:
+    """(summary points, decisions, action items) as mappings, or None when one list has more entries than the schema
+    allows. Checked first: nothing is read or screened for minutes that are too large to write safely."""
+    out: list[list[Mapping]] = []
+    for key, cap in (("summary", MAX_SUMMARY), ("decisions", MAX_DECISIONS), ("action_items", MAX_ACTIONS)):
+        raw = minutes.get(key)
+        raw = raw if isinstance(raw, (list, tuple)) else []
+        if len(raw) > cap:
+            return None
+        out.append([e for e in raw if isinstance(e, Mapping)])
+    return out[0], out[1], out[2]
+
+
+def _unquoted(body: str, confirmed: Sequence[str]) -> str:
+    """The body, as the checker reads it, with every verbatim repeat of a confirmed entry cut out. A repeat is the whole
+    entry, at a line start or after a list marker or a colon, and it ends its line (a full stop may follow). Inside a
+    longer sentence an entry is no repeat: a commitment word the Owner confirmed is not one the body may use."""
+    lines = "\n".join(" ".join(line.split()) for line in clean(body).split("\n"))
+    entries = sorted({n for c in confirmed if (n := _norm(c))}, key=len, reverse=True)
+    if not entries:
+        return lines
+    pattern = re.compile(_LEAD + "(?:" + "|".join(map(re.escape, entries)) + r")(?=[.;!]?$)", re.MULTILINE)
+    return pattern.sub("", lines)
+
+
+def _audit(checker: Checker, body: str, confirmed: Sequence[str]) -> list[Finding]:
+    """The checker's findings for `body`. The checker holds no instruction, so it grants no commitment word; the
+    commitment words are read again on the body without its verbatim confirmed entries, and each one left is a
+    finding. Numbers, dates, contacts and obfuscations are read on the whole body."""
+    found = [f for f in checker.find(body) if f.kind != "commitment"]
+    return found + [f for f in checker.find(_unquoted(body, confirmed)) if f.kind == "commitment"]
 
 
 def _repeats(body: str, unconfirmed: Sequence[str], confirmed: Sequence[str]) -> list[Finding]:
@@ -122,6 +165,9 @@ class MeetingFollowUp:
         if found is None or not request_id or not isinstance(recipients, (list, tuple)):
             return None
         meeting, minutes, owner_mailbox = found
+        lists = _lists(minutes)
+        if lists is None:
+            return None  # too large to write safely: nothing read, screened or drafted
         attendees = {a.get("user") for a in meeting.get("attendees") or [] if isinstance(a, Mapping)}
         picks = list(dict.fromkeys(recipients))
         if not picks or not all(isinstance(p, str) and p in attendees for p in picks):
@@ -131,15 +177,12 @@ class MeetingFollowUp:
             return None
         to = tuple(dict.fromkeys(a for a in addresses if a))
         rests: list[str] = []
-        lines = [s for s in minutes.get("summary") or [] if isinstance(s, Mapping)]
-        summary = [t for s in lines if (t := _text(s.get("text"), SUMMARY_CAP, rests))]
+        summary = [t for s in lists[0] if (t := _text(s.get("text"), TEXT_CAP, rests))]
         decisions, unconfirmed = list[str](), list[str]()
-        for d in minutes.get("decisions") or []:
-            if isinstance(d, Mapping) and (t := _text(d.get("text"), TEXT_CAP, rests)):
+        for d in lists[1]:
+            if t := _text(d.get("text"), TEXT_CAP, rests):
                 (decisions if d.get("state") == "verified" else unconfirmed).append(t)
-        items, held, flagged = self._open_items(user_id, meeting_id, minutes, rests)
-        if max(len(summary), len(decisions), len(items), len(unconfirmed)) > MAX_ENTRIES:
-            return None  # too large to write safely
+        items, held = self._open_items(user_id, meeting_id, lists[2], rests)
         unconfirmed += held["unconfirmed"]
         confirmed = [*summary, *decisions, *[i["text"] for i in items]]
         fields = {
@@ -148,9 +191,10 @@ class MeetingFollowUp:
             "items": "\n".join(f"- {i['text']}" for i in items) or "(none)",
         }
         title = _header(meeting.get("title"), SUBJECT_CAP)
-        subject = f"Minutes: {title}" if title else "Meeting minutes"
+        clear = bool(title) and not Checker(instruction="", thread=[title]).find(title)  # the title is the Owner's own
+        subject = f"Minutes: {title}" if clear else "Meeting minutes"  # facts in it are known; a commitment is not
         key = self._key("minutes", meeting_id, request_id, *sorted(to))
-        flagged = flagged or bool(minutes.get("flagged"))
+        flagged = any(i["flagged"] for i in items) or minutes.get("flagged") is not False
         return self._run(
             user_id, key, "minutes_task.md", fields, confirmed, unconfirmed, rests, flagged, to, subject, owner_mailbox
         )
@@ -161,27 +205,26 @@ class MeetingFollowUp:
         if found is None or not request_id:
             return []
         meeting, minutes, owner_mailbox = found
-        everything = [
-            _text(s.get("text"), SUMMARY_CAP, []) for s in minutes.get("summary") or [] if isinstance(s, Mapping)
-        ]
-        everything += [
-            _text(d.get("text"), TEXT_CAP, []) for d in minutes.get("decisions") or [] if isinstance(d, Mapping)
-        ]
-        items, held, _ = self._open_items(user_id, meeting_id, minutes, [])
+        lists = _lists(minutes)
+        if lists is None:
+            return []  # at most MAX_ACTIONS items: no work item is read for more
+        everything = [_text(s.get("text"), TEXT_CAP, []) for s in [*lists[0], *lists[1]]]
+        items, held = self._open_items(user_id, meeting_id, lists[2], [])
         everything += held["all"]
         cards: list[Preview] = []
         for it in items:
             owner = it["owner"]
-            address = _address(self._directory.address(owner) or "") if isinstance(owner, str) else None
+            address = _address(self._directory.address(owner) or "")
             if address is None:
                 continue  # an assignee Tilo cannot address gets no nudge (the Owner's list is never guessed)
             rests: list[str] = []
             text = _text(it["raw"], TEXT_CAP, rests)
             key = self._key("nudge", meeting_id, request_id, it["work_item_id"])
             subject = f"Reminder: {_header(text, SUBJECT_CAP)}"
+            flagged = it["flagged"] or minutes.get("flagged") is not False
             card = self._run(
-                user_id, key, "nudge_task.md", {"item": text}, [text], everything, rests,
-                it["flagged"] or bool(minutes.get("flagged")), (address,), subject, owner_mailbox,
+                user_id, key, "nudge_task.md", {"item": text}, [text], everything, rests, flagged, (address,), subject,
+                owner_mailbox,
             )  # fmt: skip
             if card is not None:
                 cards.append(card)
@@ -210,12 +253,13 @@ class MeetingFollowUp:
         return (meeting, minutes, mailbox) if isinstance(mailbox, str) and mailbox else None
 
     def _open_items(
-        self, user_id: str, meeting_id: str, minutes: Mapping[str, Any], rests: list[str]
-    ) -> tuple[list[dict[str, Any]], dict[str, list[str]], bool]:
-        """The confirmed open items (verified, work item `open`, confirmed by the Owner, of this meeting), the texts of
-        every other item, and whether a confirmed item's work item is flagged (PE-21)."""
+        self, user_id: str, meeting_id: str, actions: Sequence[Mapping[str, Any]], rests: list[str]
+    ) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
+        """The confirmed open items (verified, work item `open`, confirmed by the Owner, of this meeting, assigned to
+        the person the minutes name), and the texts of every other item. `owner` is the work item's, `flagged` is True
+        unless the work item says `False` (PE-21)."""
         items, held = [], {"unconfirmed": list[str](), "all": list[str]()}
-        for ai in [a for a in minutes.get("action_items") or [] if isinstance(a, Mapping)]:
+        for ai in actions:
             text = _text(ai.get("text"), TEXT_CAP, rests)
             held["all"].append(text)
             work_id = ai.get("work_item_id")
@@ -228,17 +272,20 @@ class MeetingFollowUp:
                 {
                     "raw": ai.get("text"),
                     "text": text,
-                    "owner": ai.get("owner"),
+                    "owner": work["owner"],
                     "work_item_id": work_id,
-                    "flagged": work.get("flagged") is True,
+                    "flagged": work.get("flagged") is not False,
                 }
             )
-        return items, held, any(i["flagged"] for i in items)
+        return items, held
 
     @staticmethod
     def _is_open(user_id: str, meeting_id: str, action: Mapping[str, Any], work: Mapping[str, Any] | None) -> bool:
         if not isinstance(work, Mapping) or action.get("state") != "verified" or work.get("status") != "open":
             return False
+        owner = work.get("owner")
+        if not isinstance(owner, str) or owner != action.get("owner"):
+            return False  # the minutes and the work item name different people: no nudge, no line (fail closed)
         by, source = work.get("confirmed_by"), work.get("source")
         ours = isinstance(source, Mapping) and source.get("ref") == f"{meeting_id}#{action.get('id')}"
         return ours and isinstance(by, Mapping) and by.get("by") == user_id
@@ -247,7 +294,8 @@ class MeetingFollowUp:
 
     @staticmethod
     def _key(kind: str, *parts: str) -> str:
-        return f"mtg08-{kind}-" + hashlib.sha256("\n".join(parts).encode()).hexdigest()[:32]
+        """Injective in (kind, parts): a JSON array, so no text in a part can read as another part."""
+        return f"mtg08-{kind}-" + hashlib.sha256(json.dumps([kind, *parts]).encode()).hexdigest()[:32]
 
     def _run(
         self,
@@ -273,9 +321,7 @@ class MeetingFollowUp:
         if doc["status"] == "failed":
             return None
         result: DraftResult = _result(instruction_id, doc)
-        context = DraftContext(
-            instruction_id, cast(str, None), INSTRUCTION, mailbox, "new"
-        )  # thread-less: no thread id
+        context = DraftContext(instruction_id, None, INSTRUCTION, mailbox, "new")  # thread-less: no thread id
         return self._autopilot.preview(user_id, context, result)
 
     def _announce(self, user_id: str, instruction_id: str, doc: Mapping[str, Any]) -> None:
@@ -301,7 +347,7 @@ class MeetingFollowUp:
         subject: str,
     ) -> dict[str, Any]:
         """The model writes the body from the confirmed text only; the screen sees exactly the prompt plus the raw rest
-        of any cut text (up to SCREEN_CAP, more is flagged). Raises: nothing stored or emitted."""
+        of any cut text (up to SCREEN_CAP, more is flagged) and the subject. Raises: nothing stored or emitted."""
         prompt = load_prompt(ROLE, template, {**fields, "problems": "none"})
         screened, room = [prompt], SCREEN_CAP
         for rest in rests:
@@ -309,7 +355,8 @@ class MeetingFollowUp:
             room -= len(rest)
         flagged = self._safety.check("\n".join([*screened, subject]))["flagged"] or room < 0 or flagged
         doc: dict[str, Any] = {"drafted_at": self._clock(), "flagged": flagged, "draft": None, "findings": []}
-        checker = Checker(instruction="\n".join(confirmed), thread=[])  # the Owner's confirmed text is the only source
+        # The Owner's confirmed text is the only source of facts; no instruction, so no commitment word is granted.
+        checker = Checker(instruction="", thread=confirmed, cap=MINUTES_CAP)
         findings: list[Finding] = []
         for _ in range(MAX_ATTEMPTS):
             request = GenerateRequest(
@@ -318,7 +365,7 @@ class MeetingFollowUp:
             response = self._model.generate(request)
             if response is None:  # the Router's own screen blocked the call: fail closed
                 return {**doc, "status": "failed", "flagged": True, "questions": []}
-            parsed = None if response.tool_calls else _parse(response.text)
+            parsed = None if response.tool_calls else _parse(response.text, MINUTES_CAP)
             if parsed is None or self._safety.check(parsed[0] or "\n".join(parsed[1]))["flagged"]:
                 return {**doc, "status": "failed", "questions": []}
             body, questions = parsed
@@ -327,7 +374,7 @@ class MeetingFollowUp:
                 shown = [{"kind": f.kind, "text": f.text} for _, found in checked for f in found]
                 kept = [q for q, found in checked if not found and len(q) <= QUESTION_CAP][:MAX_QUESTIONS]
                 return {**doc, "status": "needs_you", "findings": shown, "questions": kept}
-            findings = [*checker.find(body), *_repeats(body, unconfirmed, confirmed)]
+            findings = [*_audit(checker, body, confirmed), *_repeats(body, unconfirmed, confirmed)]
             if not findings:
                 draft = {"artifact_id": "art_" + secrets.token_hex(12), "version": 1, "thread_id": None, "mode": "new"}
                 draft |= {"to": list(to), "cc": [], "bcc": [], "subject": subject, "in_reply_to": "", "references": ""}

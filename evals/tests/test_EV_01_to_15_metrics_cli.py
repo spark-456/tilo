@@ -124,6 +124,19 @@ def test_EV_07_cli_takes_credit_usd_from_tilo_metering_not_from_a_literal(repo, 
     assert "0.1" in note and "0.04" not in note, "8 credits * 0.0125 = 0.1; the default 0.005 would give 0.04"
 
 
+def test_EV_07_cli_takes_credit_usd_from_the_cost_report_loader_of_tilo_metering(repo, monkeypatch):
+    """The same `tilo_metering.costs` module that FR-MTR-10's cost report is built on supplies credit_usd (#434)."""
+    import tilo_metering.costs as costs
+
+    add_case(repo, "E-RES-01", [completed(8)], measures=["EV-01"])
+    monkeypatch.setattr(costs, "load_credit_usd", lambda path: 0.0125)
+
+    assert _run(repo) == 0
+
+    note = _row(_json_rows(repo), "EV-07", "recorded")["note"]
+    assert "0.1" in note and "0.04" not in note, "8 credits * 0.0125 = 0.1; the default 0.005 would give 0.04"
+
+
 def test_EV_01_cli_replay_is_a_full_pass_under_the_credit_cap(repo):
     write_evals_config(repo / "config", credit_cap={"full": 50, "smoke": 50, "gate": 50})
     for n in (1, 2, 3):
