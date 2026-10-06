@@ -142,10 +142,15 @@ class Writer:
         return Directory.of(s.record for s in self.stores.persons.list(self.org))
 
     def text(self, value: str) -> str:
-        """A person's text: format and separator characters out first (so a zero-width character cannot hide a link
-        from the schema), then the secret redactor, then the schema. ASCII controls are left for the schema to refuse
-        (a line break is a 422, not a quiet join)."""
-        return self.redact(value if _ASCII_CONTROL.search(value) else clean_line(value))
+        """A person's text: every non-ASCII control, format and separator character out first, always (so a zero-width
+        character cannot hide a link from the redactor or the schema), then the secret redactor, then the schema.
+        ASCII controls are never stripped or joined: the schema refuses them (a line break is a 422), and the
+        redactor's output is checked again, since one that removes a multi-line block could otherwise hide them."""
+        cleaned = "".join(c for c in value if c.isascii() or clean_line(c))
+        redacted = self.redact(cleaned)
+        if _ASCII_CONTROL.search(redacted):
+            raise Refusal(422, "invalid_record")
+        return redacted
 
     def stamp(self) -> dict[str, str]:
         return {"by": self.actor, "at": self.now}
