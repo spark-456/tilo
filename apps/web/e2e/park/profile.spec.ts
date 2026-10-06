@@ -83,6 +83,19 @@ for (const [vpName, viewport] of Object.entries(SIZES)) {
       });
     }
 
+    // The "Sample data" chip belongs to the shell header; the page itself holds none.
+    test(`WEB_12_e2e_the_shell_sample_data_chip_is_visible_on_the_profile_page_${vpName}`, async ({
+      page,
+    }) => {
+      await open(page, "day");
+      await expect(
+        page.locator("header").getByRole("button", { name: "Sample data" }),
+      ).toBeVisible();
+      await expect(
+        page.getByTestId("park-page-profile").getByRole("button", { name: "Sample data" }),
+      ).toHaveCount(0);
+    });
+
     test(`WEB_12_e2e_${vpName}_params_tab_opens_that_tab_first`, async ({ page }) => {
       await open(page, "day", "notifications");
       await expect(tab(page, "Notifications")).toHaveAttribute("aria-current", "page");

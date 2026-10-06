@@ -18,8 +18,15 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { dv, gaps, rulesOf } from "../../../../test-support/park/pageCss";
 import { makeApp } from "../../../../test-support/park/profileApp";
+import {
+  NOTIF,
+  NOTIF_COPY,
+  SECURITY_COPY,
+  SWATCHES,
+  USER,
+  switchLabel,
+} from "../../../../test-support/park/profileExpect";
 import { PARK_DIR } from "../../../../test-support/park/prototype";
-import { NOTIF, NOTIF_COPY, SECURITY_COPY, SWATCHES, USER, switchLabel } from "./profileExpect";
 import {
   buttonNamed,
   buttonWith,
