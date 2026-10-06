@@ -276,3 +276,9 @@ Option A, chosen by the user on 2026-10-05. The tickets run in this order. Each 
   only the store sees can still leave an unannounced version.
 - tilo-api's gate runs after the announce, in `run_plan(before_handoff=)`: `_GatedRunner` and `Run.foreign` are gone.
   Production artifact, redactor and archive seams refuse (no run starts) until T8 and FR-MEM-05; dev mode is in memory.
+
+## FR-MEM-10 notes (run bundle, 2026-10-06; clarifications, no new decision; defaults in BQ-MEM10-1 and -2)
+- `ArtifactStore.import_version(scope, record, content)` is the only way a version enters a store without `put`: it
+  keeps the bundle's id, version, bytes, hash and `created_at` (so EV-15 still holds for the replayed events), takes
+  the importer's org, world and owner, drops `sources` (AR-06) and screens a `clean` claim again (AR-07).
+- A bundle export is read-only and adds no `exported` manifest revision; that stage stays for a later export route.

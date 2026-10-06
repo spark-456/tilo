@@ -531,32 +531,126 @@ class ArtifactStore:
                 }
                 if record["screened_at"] is not None and record["screened_at"] > record["created_at"]:
                     raise _refuse("AR-07", "screened_at is after created_at")
-                try:
-                    self._validate_record(record)
-                except Exception:  # noqa: BLE001 - any validator failure refuses the call; its text may echo values
-                    raise _refuse("schema", "the record does not validate") from None
-                path, key = _record_path(scope, ref), _blob_key(scope, ref)
-                try:
-                    self._meta.create(path, record)
-                except FileExistsError:
-                    continue  # another writer took this version: plan again
-                try:
-                    self._blobs.create(key, data)
-                except FileExistsError:
-                    # A blob is already at a version whose record we hold: accept it only if it is these bytes
-                    # (create-only fill-in); otherwise it is corrupt. Never delete or rewrite it.
-                    self._verified(scope, record)
-                except BaseException:
-                    # The create may have written some or all of the bytes before it raised. Delete the blob, and the
-                    # record only if that worked; otherwise the record stays listed (reads as corrupt) and purgeable.
-                    try:
-                        self._blobs.delete(key)
-                        self._meta.delete(path)
-                    except Exception:  # noqa: BLE001
-                        pass
-                    raise
-                return StoredVersion(record)
+                self._check_record(record)
+                stored = self._write(scope, record, data)
+                if stored is not None:
+                    return stored
+                # another writer took this version: plan again
         raise ArtifactError("AR-02: could not take the next version")
+
+    def _check_record(self, record: dict[str, Any]) -> None:
+        try:
+            self._validate_record(record)
+        except Exception:  # noqa: BLE001 - any validator failure refuses the call; its text may echo values
+            raise _refuse("schema", "the record does not validate") from None
+
+    def _write(self, scope: Scope, record: dict[str, Any], data: bytes) -> StoredVersion | None:
+        """Record, then blob. None when the record path is already taken (nothing written)."""
+        ref = record["artifact"]
+        path, key = _record_path(scope, ref), _blob_key(scope, ref)
+        try:
+            self._meta.create(path, record)
+        except FileExistsError:
+            return None
+        try:
+            self._blobs.create(key, data)
+        except FileExistsError:
+            # A blob is already at a version whose record we hold: accept it only if it is these bytes
+            # (create-only fill-in); otherwise it is corrupt. Never delete or rewrite it.
+            self._verified(scope, record)
+        except BaseException:
+            # The create may have written some or all of the bytes before it raised. Delete the blob, and the
+            # record only if that worked; otherwise the record stays listed (reads as corrupt) and purgeable.
+            try:
+                self._blobs.delete(key)
+                self._meta.delete(path)
+            except Exception:  # noqa: BLE001
+                pass
+            raise
+        return StoredVersion(record)
+
+    def import_version(self, scope: Scope, record: dict[str, Any], content: bytes) -> StoredVersion:
+        """One version from an untrusted run bundle (FR-MEM-10) under the IMPORTER's `scope`, keeping the ids,
+        version, bytes, hash and times the run's events name. AR-03 identity and AR-06 `sources` are overwritten;
+        AR-04 kinds and caps come before any hash; AR-01 hash and size; AR-02 gapless with one earlier parent;
+        AR-05 key; AR-07 text must survive the redactor unchanged and a `clean` claim is judged again here."""
+        _check_scope(scope)
+        rec = self._check_import(scope, record, content)
+        path = _record_path(scope, rec["artifact"])
+        held = self._meta.get(path)
+        if held is None:
+            self._plan(scope, None, None, len(content))  # AR-04 world cap, before any hashing
+        if self._hash(content) != rec["content_sha256"]:
+            raise _refuse("AR-01", "the bytes do not match the record's hash")
+        if rec["media_type"] in TEXT_TYPES and self._clean(content)[1] is not None:
+            raise _refuse("AR-07", "the text holds what the secret redactor removes; nothing stored")
+        if held is None and rec["screening"] == "clean":  # a claim is never copied: this store's verdict only
+            rec["screening"], rec["screened_at"] = self._screen(content, rec["media_type"])
+        with self._lock:
+            held = held or self._meta.get(path)
+            if held is None:
+                self._check_lineage(scope, rec, len(content))
+                stored = self._write(scope, rec, content)
+                if stored is not None:
+                    return stored
+                held = self._meta.get(path)
+        if held is None or held["owner"] != scope.owner or held["content_sha256"] != rec["content_sha256"]:
+            raise _refuse("AR-02", "this version already exists with other bytes")
+        settled = self._settle(scope, held)  # the same version: returned, nothing written
+        return settled if settled is not None else self.import_version(scope, record, content)
+
+    def _check_import(self, scope: Scope, record: Any, content: bytes) -> dict[str, Any]:
+        """The record in the importer's scope, checked without hashing: schema, ids matched whole, kinds, caps."""
+        if not isinstance(record, dict):
+            raise _refuse("schema", "the record is not an object")
+        rec = copy.deepcopy(record) | {
+            "org_id": scope.org_id,
+            "world_id": scope.world_id,
+            "owner": scope.owner,
+            "sources": [],
+        }
+        self._check_record(rec)
+        try:
+            for ref in (rec["artifact"], *rec["parents"]):
+                _ref(ref)
+            for stamp in (rec["created_at"], rec["screened_at"]):
+                if stamp is not None:
+                    _when(stamp)  # whole-string parse: the schema's `$` lets a trailing newline through
+        except ValueError:
+            raise _refuse("AR-03", "an artifact ref or a time is malformed") from None
+        if (rec["screening"] == "unscreened") != (rec["screened_at"] is None):
+            raise _refuse("AR-07", "screened_at is null exactly when unscreened")
+        origin = rec["origin"]
+        if origin["kind"] == "restore" and not rec["parents"]:
+            raise _refuse("AR-02", "a restore copies an earlier version")
+        kind = "upload" if origin["kind"] == "restore" else origin["kind"]  # a restore has no unit, agent or key
+        self._check_new(
+            NewVersion(
+                media_type=rec["media_type"],
+                content=content,
+                run_id=rec["run_id"],
+                origin=Origin(kind=kind, unit=origin["unit"], agent=origin["agent"]),
+                idempotency_key=rec["idempotency_key"],
+            )
+        )
+        if rec["size_bytes"] != len(content):
+            raise _refuse("AR-01", "the size does not match the bytes")
+        return rec
+
+    def _check_lineage(self, scope: Scope, rec: dict[str, Any], size: int) -> None:
+        """AR-05 key, AR-04 world cap and AR-02 order for an imported version (under the lock)."""
+        world = self._docs(f"orgs/{scope.org_id}/worlds/{scope.world_id}/artifacts/")
+        if sum(d["size_bytes"] for d in world) + size > MAX_WORLD:
+            raise _refuse("AR-04", "the world would hold more than 200,000,000 bytes")
+        docs = [d for d in world if d["owner"] == scope.owner]
+        key, (art, version) = rec["idempotency_key"], (rec["artifact"]["artifact_id"], rec["artifact"]["version"])
+        if key is not None and any(d["idempotency_key"] == key for d in docs):
+            raise _refuse("AR-05", "another version holds this idempotency key")
+        have = {d["artifact"]["version"] for d in docs if d["artifact"]["artifact_id"] == art}
+        parents = [(p["artifact_id"], p["version"]) for p in rec["parents"]]
+        continues = parents == [] if version == 1 else len(parents) == 1 and parents[0][0] == art
+        if version != max(have, default=0) + 1 or not continues or any(v not in have for _, v in parents):
+            raise _refuse("AR-02", "the version does not continue an earlier version of this artifact")
 
     def put(self, scope: Scope, new: NewVersion) -> StoredVersion:
         _check_scope(scope)
@@ -640,8 +734,13 @@ class ArtifactStore:
         """The bytes to store and whether the redactor changed them (text and JSON only; files are not read)."""
         if new.media_type not in TEXT_TYPES:
             return new.content, False
+        _text, cleaned = self._clean(new.content)
+        return (new.content, False) if cleaned is None else (cleaned.encode("utf-8"), True)
+
+    def _clean(self, content: bytes) -> tuple[str, str | None]:
+        """Text or JSON bytes as text, and what the redactor made of it (None when it changed nothing)."""
         try:
-            text = new.content.decode("utf-8")
+            text = content.decode("utf-8")
         except UnicodeDecodeError:
             raise _refuse("AR-04", "text must be UTF-8") from None
         if not text.strip():
@@ -652,7 +751,7 @@ class ArtifactStore:
             raise _refuse("AR-07", "the secret redactor failed; nothing stored") from None
         if type(cleaned) is not str:
             raise _refuse("AR-07", "the secret redactor returned no text")
-        return (new.content, False) if cleaned == text else (cleaned.encode("utf-8"), True)
+        return text, None if cleaned == text else cleaned
 
     def _screen(self, data: bytes, media_type: str) -> tuple[str, str | None]:
         """`clean`/`flagged` only from a verdict on exactly these bytes; anything else is `unscreened` (AR-07)."""
