@@ -143,9 +143,11 @@ class DriveAdapter(GoogleAdapter):
         user, scopes = self._owner_of(str(entry["world_id"])), self._scopes("write")
         marker = side_effect_marker(entry)
         q = f"trashed = false and appProperties has {{ key='{_SAVE_KEY}' and value='{marker}' }}"  # in any folder
-        found = self._get(user, scopes, "/files", {"q": q, "fields": "files(id,parents)"}, patient=False)
+        found = self._get(user, scopes, "/files", {"q": q, "fields": "files(id,parents,shared)"}, patient=False)
         if earlier := found.get("files") or []:  # OB-03: a lost response or another instance already saved it
             file_id, parents = _final_id(earlier[0].get("id")), earlier[0].get("parents") or []
+            if earlier[0].get("shared") is not False:  # shared since the save (a lost answer hid it): fail closed
+                raise PossiblySent("the saved file is shared; a person checks who can see it")
             folder = _final_id(parents[0]) if parents else ""
         else:
             destination = entry.get("destination")
@@ -176,8 +178,9 @@ class DriveAdapter(GoogleAdapter):
                 user, scopes, "POST", DRIVE_UPLOAD_API, params=params, headers=headers, content=body, patient=False
             )
             file_id = _final_id(saved.get("id"))  # the file exists, so a bad id is final, never retried (alerts)
-            if saved.get("shared") is not False:  # it was shared between the check and the upload (or Drive said
-                raise PossiblySent("the saved file is shared; a person checks who can see it")  # nothing): fail closed
+            # shared between the check and the upload, or Drive did not say it is not: fail closed
+            if saved.get("shared") is not False:
+                raise PossiblySent("the saved file is shared; a person checks who can see it")
         self._remember(self._created, user, [i for i in (folder, file_id) if i])
         if native:  # the editor link is built from the checked id, never taken from an answer
             url = f"https://docs.google.com/{native[1]}/d/{checked_id(file_id)}/edit"
