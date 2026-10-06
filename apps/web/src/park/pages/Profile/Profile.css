@@ -1,0 +1,607 @@
+/* Profile page (WEB-12): design_handoff_tilo_web_app/design/Tilo App Profile.dc.html. Every selector sits
+   under [data-park] with a park-profile- class; colours are the tokens. No transition, animation or
+   keyframes: the design's .2s colour fades and the switch knob's .25s travel arrive with WEB-3b (BQ-WEB-3). */
+
+[data-park] .park-profile-head,
+[data-park] .park-profile-layout,
+[data-park] .park-profile-nav,
+[data-park] .park-profile-tab,
+[data-park] .park-profile-card,
+[data-park] .park-profile-input,
+[data-park] .park-profile-btn,
+[data-park] .park-profile-connect,
+[data-park] .park-profile-small,
+[data-park] .park-profile-signout,
+[data-park] .park-profile-link,
+[data-park] .park-profile-time,
+[data-park] .park-profile-motion,
+[data-park] .park-profile-switch,
+[data-park] .park-profile-plan,
+[data-park] .park-profile-spend,
+[data-park] .park-profile-pay,
+[data-park] .park-profile-invoices {
+  box-sizing: border-box;
+  font-family: "Nunito Sans", sans-serif;
+}
+
+/* ---- Header ---- */
+[data-park] .park-profile-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+[data-park] .park-profile-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  background: #e6e1f8;
+  color: #1f1d2b;
+  font-size: 24px;
+  font-weight: 800;
+  box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--hero);
+}
+[data-park] .park-profile-who {
+  flex: 1;
+  min-width: 0;
+}
+[data-park] .park-profile-name {
+  margin: 0;
+  font-family: "Nunito", sans-serif;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -0.8px;
+  line-height: 1.05;
+  color: var(--ink);
+}
+[data-park] .park-profile-name:focus {
+  outline: none;
+}
+[data-park] .park-profile-sub {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-profile-connect {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 42px;
+  padding: 0 16px 0 14px;
+  border-radius: 12px;
+  background: var(--btn2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* ---- Settings navigation and the two layouts (the design's wide = vw >= 980) ---- */
+[data-park] .park-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+[data-park] .park-profile-layout.park-profile-layout--wide {
+  grid-template-columns: 230px minmax(0, 1fr);
+}
+[data-park] .park-profile-nav {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  padding: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 20px;
+}
+[data-park] .park-profile-nav.park-profile-nav--wide {
+  flex-direction: column;
+}
+[data-park] .park-profile-tab {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  flex: none;
+  height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-park] .park-profile-tab.park-profile-tab--on {
+  background: var(--rowOn);
+  color: var(--heroInk);
+}
+
+/* ---- Cards ---- */
+[data-park] .park-profile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding: 22px 24px;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  color: var(--ink);
+}
+[data-park] .park-profile-card.park-profile-card--list {
+  gap: 6px;
+  padding: 22px 24px 12px;
+}
+[data-park] .park-profile-card.park-profile-card--appearance {
+  gap: 22px;
+}
+[data-park] .park-profile-card.park-profile-card--billing {
+  gap: 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+[data-park] .park-profile-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+[data-park] .park-profile-blurb {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-profile-group {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+/* ---- Profile form ---- */
+[data-park] .park-profile-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+[data-park] .park-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+[data-park] .park-profile-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink2);
+}
+[data-park] .park-profile-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+[data-park] .park-profile-help {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-profile-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line2);
+}
+
+/* ---- Buttons that are not the core Button's sizes (variant requests in the PR) ---- */
+[data-park] .park-profile-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-park] .park-profile-btn.park-profile-btn--quiet {
+  padding: 0 16px;
+  background: var(--btn2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+[data-park] .park-profile-btn.park-profile-btn--fit {
+  align-self: flex-start;
+}
+[data-park] .park-profile-small {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 36px;
+  padding: 0 14px;
+  background: var(--btn2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-profile-signout {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--btn2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-profile-link {
+  padding: 4px 6px;
+  background: transparent;
+  border: 0;
+  color: var(--redInk);
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* ---- Tiles ---- */
+[data-park] .park-profile-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+[data-park] .park-profile-tile.park-profile-tile--ok {
+  background: var(--okSoft);
+  color: var(--ok);
+}
+[data-park] .park-profile-tile.park-profile-tile--sunk {
+  background: var(--sunk);
+  color: var(--ink2);
+}
+[data-park] .park-profile-tile.park-profile-tile--hero {
+  width: 36px;
+  height: 36px;
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+
+/* ---- Notification matrix ---- */
+[data-park] .park-profile-scroll {
+  overflow-x: auto;
+}
+[data-park] .park-profile-matrix {
+  min-width: 520px;
+}
+[data-park] .park-profile-mhead,
+[data-park] .park-profile-mrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, 92px);
+  align-items: center;
+}
+[data-park] .park-profile-mhead {
+  height: 32px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+}
+[data-park] .park-profile-cell {
+  justify-self: center;
+}
+[data-park] .park-profile-mrow {
+  min-height: 58px;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-profile-mlabel {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+[data-park] .park-profile-msub {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-profile-switch {
+  display: flex;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  padding: 3px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--track);
+  cursor: pointer;
+}
+[data-park] .park-profile-switch.park-profile-switch--on {
+  background: var(--ok);
+}
+/* motion: restored in WEB-3b (BQ-WEB-3): the knob's .25s cubic-bezier(.3,1.3,.5,1) travel */
+[data-park] .park-profile-knob {
+  width: 18px;
+  height: 18px;
+  border-radius: 99px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(31, 29, 43, 0.3);
+}
+[data-park] .park-profile-knob.park-profile-knob--on {
+  transform: translateX(16px);
+}
+[data-park] .park-profile-quiet {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 6px;
+  padding: 14px 16px;
+  background: var(--sunk);
+  border-radius: 16px;
+}
+[data-park] .park-profile-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- Appearance ---- */
+[data-park] .park-profile-times {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+[data-park] .park-profile-time {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-profile-time.park-profile-time--on {
+  border: 2px solid var(--hero);
+}
+[data-park] .park-profile-swatch {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 84px;
+  padding: 10px;
+  border-radius: 12px;
+}
+[data-park] .park-profile-block {
+  border-radius: 7px;
+}
+[data-park] .park-profile-block.park-profile-block--a {
+  width: 44px;
+  height: 30px;
+}
+[data-park] .park-profile-block.park-profile-block--b {
+  width: 30px;
+  height: 46px;
+}
+[data-park] .park-profile-block.park-profile-block--c {
+  width: 38px;
+  height: 22px;
+}
+[data-park] .park-profile-tname {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+[data-park] .park-profile-tsub {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-profile-motion {
+  display: flex;
+  gap: 2px;
+  align-self: flex-start;
+  padding: 3px;
+  background: var(--seg);
+  border-radius: 12px;
+}
+[data-park] .park-profile-mopt {
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink2);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-profile-mopt.park-profile-mopt--on {
+  background: var(--tabOn);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(31, 29, 43, 0.16);
+}
+[data-park] .park-profile-motion-help {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+
+/* ---- Security ---- */
+[data-park] .park-profile-srow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-profile-stitle {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+[data-park] .park-profile-ssub {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-profile-signed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+[data-park] .park-profile-session {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line2);
+}
+
+/* ---- Plan and billing ---- */
+[data-park] .park-profile-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+[data-park] .park-profile-plan,
+[data-park] .park-profile-spend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 22px;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  color: var(--ink);
+}
+[data-park] .park-profile-spend {
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-profile-eyebrow {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--ink3);
+}
+[data-park] .park-profile-planname {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+[data-park] .park-profile-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+[data-park] .park-profile-big {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+[data-park] .park-profile-of {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-profile-bar {
+  display: block;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--track);
+}
+[data-park] .park-profile-fill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--hero);
+}
+[data-park] .park-profile-open {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--heroInk);
+}
+[data-park] .park-profile-pay {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 22px;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+}
+[data-park] .park-profile-invoices {
+  padding: 18px 22px 8px;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+}
+[data-park] .park-profile-invoices-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 800;
+}
+[data-park] .park-profile-invoice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 90px 40px;
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  border-top: 1px solid var(--line2);
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-profile-money {
+  text-align: right;
+  font-weight: 800;
+}
+[data-park] .park-profile-download {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  color: var(--ink2);
+  cursor: pointer;
+}
