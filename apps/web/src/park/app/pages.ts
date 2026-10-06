@@ -7,7 +7,7 @@ import type { AppCtx, PageId } from "./AppCtx";
 const Placeholder = lazy(() => import("./Placeholder"));
 
 export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppCtx }>>> = {
-  home: Placeholder,
+  home: lazy(() => import("../pages/Home/HomePage").then((m) => ({ default: m.HomePage }))),
   worlds: Placeholder,
   world: Placeholder,
   // biome-ignore format: the registry keeps one line per page

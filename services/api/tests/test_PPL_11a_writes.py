@@ -584,8 +584,9 @@ def test_PPL_11a_PE_17_an_org_owner_creates_a_person_with_a_minted_id_and_gets_t
         "memberships": [],
         "created_by": {"by": OWNER, "at": NOW},
     }
-    second = rig.post("/v1/people", PERSON).json()
-    assert second["id"] != view["id"], "the same input twice is two people with two ids"
+    # PPL-11c: an email belongs to one person of the org, so "the same input twice" differs in its address now
+    second = rig.post("/v1/people", {**PERSON, "email": "nina.patel.two@example.com"}).json()
+    assert second["id"] != view["id"], "the same name twice is two people with two ids"
     rig.as_user(view["id"])
     plate = rig.plate()
     assert plate.status_code == 200 and plate.json()["rows"] == [] and plate.json()["user"] == view["id"]
