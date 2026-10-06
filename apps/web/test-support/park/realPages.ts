@@ -11,6 +11,7 @@ export const REAL_PAGES: readonly PageId[] = [
   "agenda",
   "connectors",
   "team",
+  "profile",
 ];
 
 export const PLACEHOLDER_PAGES: readonly PageId[] = PAGE_IDS.filter(
