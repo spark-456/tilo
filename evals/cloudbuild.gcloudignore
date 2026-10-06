@@ -35,3 +35,4 @@ node_modules/
 .venv/
 __pycache__/
 *.pyc
+/evals/*.local.md

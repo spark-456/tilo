@@ -58,7 +58,7 @@ resource "google_cloud_run_v2_job" "eval_nightly" {
       containers {
         image   = local.eval_nightly_image
         command = ["python"]
-        args    = ["-m", "tilo_evals", "nightly"]
+        args    = ["-m", "tilo_evals", "nightly", "--results-md", "/tmp/nightly.md"]
 
         resources {
           limits = {
