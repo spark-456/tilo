@@ -124,6 +124,54 @@ def test_FR_MEM_10_a_huge_or_understated_entry_count_is_refused_before_the_direc
     assert_nothing_imported(dest)
 
 
+def _overlapping_zip(n: int, region: int) -> bytes:
+    """Fifield-style overlap (review round 2): each entry's deflate stream stores the next local header, then runs
+    into one shared region of empty stored blocks. Every declared size and CRC holds, but inflating every entry
+    would scan the shared region n times."""
+
+    def local(name: bytes) -> bytes:
+        return struct.pack("<IHHHHHIIIHH", 0x04034B50, 20, 0, 8, 0, 0x21, 0, 0, 0, len(name), 0) + name
+
+    names = [f"artifacts/art_{i:08d}/v000001/content".encode() for i in range(n)]
+    headers = [local(name) for name in names]
+    body, offsets, starts = bytearray(), [], []
+    for i, header in enumerate(headers):
+        offsets.append(len(body))
+        body += header
+        starts.append(len(body))
+        if i + 1 < n:  # a stored block quoting the next local header
+            body += b"\x00" + struct.pack("<HH", len(headers[i + 1]), len(headers[i + 1]) ^ 0xFFFF)
+    body += b"\x00\x00\x00\xff\xff" * (region // 5) + b"\x01\x00\x00\xff\xff"
+    central = bytearray()
+    for i, name in enumerate(names):
+        out = b"".join(headers[i + 1 :])
+        central += struct.pack(
+            "<IHHHHHHIIIHHHHHII", 0x02014B50, (3 << 8) | 20, 20, 0, 8, 0, 0x21, zlib.crc32(out),
+            len(body) - starts[i], len(out), len(name), 0, 0, 0, 0, 0o100644 << 16, offsets[i],
+        ) + name  # fmt: skip
+    end = struct.pack("<IHHHHIIH", 0x06054B50, 0, 0, n, n, len(central), len(body), 0)
+    return bytes(body + central + end)
+
+
+def test_FR_MEM_10_overlapping_entries_are_refused_before_anything_is_inflated(src, tmp_path) -> None:
+    bundle = _overlapping_zip(200, 8 * MiB)  # inflating each entry would scan about 1.6 GB in all
+    dest = make_dest(tmp_path, src.layout)
+    started = time.perf_counter()
+    error = refused_and_nothing_written(dest, bundle)
+    assert time.perf_counter() - started < 1, "refused before any entry was inflated"
+    assert "overlap" in str(error)
+
+
+def test_FR_MEM_10_the_import_locks_go_away_once_no_import_holds_them(src, tmp_path) -> None:
+    import gc
+
+    from tilo_harness import run_bundle
+
+    do_import(make_dest(tmp_path, src.layout), do_export(src))
+    gc.collect()
+    assert len(run_bundle._LOCKS) == 0, "one lock per world and per run is not kept forever"
+
+
 # --- secrets in the archive -----------------------------------------------------------------------------------------
 
 

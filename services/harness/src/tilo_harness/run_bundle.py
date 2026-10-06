@@ -21,6 +21,7 @@ import re
 import stat
 import struct
 import threading
+import weakref
 import zipfile
 import zlib
 from collections.abc import Callable, Iterator, Sequence
@@ -283,15 +284,32 @@ def _zip(entries: dict[str, bytes]) -> bytes:
 
 # --- import ---------------------------------------------------------------------------------------------------------
 
-_LOCKS: dict[tuple[str, ...], threading.Lock] = {}
+
+class _KeyLock:
+    """A lock that a weak registry can hold: it lives while an import holds or waits for it, then goes."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+
+    def __enter__(self) -> None:
+        self._lock.acquire()
+
+    def __exit__(self, *_exc: object) -> None:
+        self._lock.release()
+
+
+_LOCKS: weakref.WeakValueDictionary[tuple[str, ...], _KeyLock] = weakref.WeakValueDictionary()
 _LOCKS_GUARD = threading.Lock()
 
 
-def _lock(*key: str) -> threading.Lock:
+def _lock(*key: str) -> _KeyLock:
     """One in-process lock per key (a world, or an org's run archive). Across processes the writer's lease holds
     the world; two processes importing one run into two worlds of one org at once are not serialised (BQ-MEM10-2)."""
     with _LOCKS_GUARD:
-        return _LOCKS.setdefault(key, threading.Lock())
+        found = _LOCKS.get(key)
+        if found is None:
+            found = _LOCKS[key] = _KeyLock()
+        return found
 
 
 def import_run(
@@ -487,6 +505,16 @@ def _read_zip(bundle: bytes, limits: Limits) -> dict[str, bytes]:
             ):
                 raise _refuse("an entry is not a plain file of the bundle's closed set")
     _check_limits(limits, max_uncompressed_bytes=sum(info.file_size for info in infos))
+    # No overlap (the check ZipFile.open does, which _inflate bypasses): each entry's header, name, extra and
+    # compressed bytes end at or before the next entry's header, and the last before the central directory.
+    cd_start = len(bundle) - _EOCD.size - cd_size
+    if _offset != cd_start:
+        raise _refuse("the central directory is not where the end record says")
+    ordered = sorted(infos, key=lambda info: info.header_offset)
+    for info, limit in zip(ordered, [i.header_offset for i in ordered[1:]] + [cd_start], strict=True):
+        name_len, extra_len = struct.unpack_from("<2H", bundle, info.header_offset + _LOCAL.size - 4)
+        if info.header_offset + _LOCAL.size + name_len + extra_len + info.compress_size > limit:
+            raise _refuse("entries overlap")
     return {info.filename: _inflate(bundle, info) for info in infos}
 
 
