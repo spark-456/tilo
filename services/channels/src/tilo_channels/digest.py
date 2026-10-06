@@ -35,18 +35,13 @@ def _to_epoch_s(value: float | int | str | dt.datetime | None) -> float | None:
     if isinstance(value, int | float):
         return float(value)
     if isinstance(value, dt.datetime):
-        aware = value.astimezone(dt.UTC) if value.tzinfo is not None else value.replace(tzinfo=dt.UTC)
-        return aware.timestamp()
-    if isinstance(value, str):
-        raw = value.strip()
-        if not raw:
-            return None
+        return (value.astimezone(dt.UTC) if value.tzinfo is not None else value.replace(tzinfo=dt.UTC)).timestamp()
+    if isinstance(value, str) and (raw := value.strip()):
         try:
             parsed = dt.datetime.fromisoformat(raw[:-1] + "+00:00" if raw.endswith("Z") else raw)
         except ValueError:
             return None
-        aware = parsed.astimezone(dt.UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=dt.UTC)
-        return aware.timestamp()
+        return (parsed.astimezone(dt.UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=dt.UTC)).timestamp()
     return None
 
 
@@ -133,32 +128,36 @@ class DailyDigestBuilder:
             report_url = f"{self._base_url}/outbox/{outbox_id}/report"
             link_kind: Literal["undo", "report"] = "undo" if can_undo else "report"
             level_lit: Literal["L2", "L3"] = "L2" if lvl == "L2" else "L3"
+            act_type = str(data.get("action_type") or entry.get("action_type") or "send_email")
+            conn = str(data.get("connector") or entry.get("connector") or "gmail")
+            tier = str(data.get("risk_tier") or entry.get("risk_tier") or "T2")
             actions.append(
                 DigestAction(
-                    outbox_id=outbox_id,
-                    policy_id=str(data.get("policy_id") or ""),
-                    level=level_lit,
-                    action_type=str(data.get("action_type") or entry.get("action_type") or "send_email"),
-                    connector=str(data.get("connector") or entry.get("connector") or "gmail"),
-                    risk_tier=str(data.get("risk_tier") or entry.get("risk_tier") or "T2"),
-                    state=state,
-                    timestamp=ts_str,
-                    link_kind=link_kind,
-                    action_url=undo_url or report_url,
-                    undo_url=undo_url,
-                    report_url=report_url,
+                    outbox_id,
+                    str(data.get("policy_id") or ""),
+                    level_lit,
+                    act_type,
+                    conn,
+                    tier,
+                    state,
+                    ts_str,
+                    link_kind,
+                    undo_url or report_url,
+                    undo_url,
+                    report_url,
                 )
             )
             seen_outbox_ids.add(outbox_id)
 
-        fyi_items: list[DigestFyiItem] = []
-        for mail in fyi_mail:
-            if not isinstance(mail, Mapping) or mail.get("category") != "fyi":
-                continue
-            msg_id, triaged_s = str(mail.get("message_id") or ""), _to_epoch_s(mail.get("triaged_at"))
-            if msg_id and triaged_s is not None and (cutoff_s <= triaged_s <= now_s):
-                fyi_items.append(DigestFyiItem(msg_id, str(mail.get("priority") or "normal"), triaged_s))
-
+        fyi_items = [
+            DigestFyiItem(str(m["message_id"]), str(m.get("priority") or "normal"), ts)
+            for m in fyi_mail
+            if isinstance(m, Mapping)
+            and m.get("category") == "fyi"
+            and m.get("message_id")
+            and (ts := _to_epoch_s(m.get("triaged_at"))) is not None
+            and (cutoff_s <= ts <= now_s)
+        ]
         if not actions and not fyi_items:
             return None
 
@@ -169,12 +168,7 @@ class DailyDigestBuilder:
         )
         lines.extend(f"- [FYI] {item.message_id} priority={item.priority}" for item in fyi_items)
         return DailyDigest(
-            user_id=user_id,
-            window_start=_fmt_utc(cutoff_s),
-            window_end=_fmt_utc(now_s),
-            actions=tuple(actions),
-            fyi_mail=tuple(fyi_items),
-            rendered_text="\n".join(lines),
+            user_id, _fmt_utc(cutoff_s), _fmt_utc(now_s), tuple(actions), tuple(fyi_items), "\n".join(lines)
         )
 
 
