@@ -44,6 +44,7 @@ from __future__ import annotations
 import itertools
 import re
 import unicodedata
+from collections.abc import Iterable
 
 SIGNAL_CAP = 20_000  # the drafting checker's CHECK_CAP: a longer body is not read, it is T3
 
@@ -156,8 +157,25 @@ _NUMBER_WORDS = frozenset(
     "eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety dozen hundred hundreds thousand thousands "
     "million millions billion billions trillion lakh lakhs lac lacs crore crores mil mn bn cr".split()
 )
-# a name word, apostrophes dropped, made only of number words (+ "k", "grand", "s") is a number ("Fifty'Thousand")
-_NUMBERISH = re.compile("(?:" + "|".join(sorted(_NUMBER_WORDS, key=len, reverse=True)) + ")+(?:k|grand|s)?")
+
+
+def _alternation(words: Iterable[str]) -> str:
+    return "(?:" + "|".join(sorted(words, key=len, reverse=True)) + ")"
+
+
+# With apostrophes dropped a name word is never a name when (a) it is number words followed by at most one unit
+# (k, m, b, l, s, grand(s) or a currency word of `_MONEY`: "Fifty'Thousand", "Tenk", "Fiftybucks"); (b) it starts with
+# a number word of four or more letters ("Fiftyfoo"); or (c) it holds hundred, thousand, million, billion, trillion,
+# lakh or crore anywhere. Three-letter number words (one, two, six, ten) and the abbreviations (mil, lac, cr) count
+# only as the whole word (a), so Craig, Milan, Miles, Tenzin and Sixtine stay names. Accepted false positives:
+# Fournier, Lakhani, Ninette, Sevenoaks and any long name over `_NAME_WORD_MAX`. Bounded scans, no model.
+_UNITS = frozenset(
+    "k m b l s ks grand grands buck bucks quid dollar dollars euro euros pound pounds rupee rupees "
+    "usd eur gbp inr sgd aud cad jpy chf rs".split()
+)
+_NUMBER_ONLY = re.compile(_alternation(_NUMBER_WORDS) + "+" + _alternation(_UNITS) + "?")
+_NUMBER_START = re.compile(_alternation(w for w in _NUMBER_WORDS if len(w) >= 4))
+_MAGNITUDE_INSIDE = re.compile(_alternation("hundred thousand million billion trillion lakh crore".split()))
 _NAME_WORD_MAX = 24  # a longer word is no name: the check stays bounded (a 20k-character word is read no further)
 _WORDS = frozenset(
     (
@@ -207,9 +225,11 @@ def _sign_off(items: list[str]) -> bool:
 
 
 def _numberish(word: str) -> bool:
-    """CHN-GATE-D: `word` (lower case) is no name: too long, or number words only once its apostrophes are dropped."""
+    """CHN-GATE-D: `word` (lower case) is no name: too long, or a number by the rules above."""
     word = word.replace("'", "")
-    return len(word) > _NAME_WORD_MAX or bool(_NUMBERISH.fullmatch(word))
+    return len(word) > _NAME_WORD_MAX or bool(
+        _NUMBER_ONLY.fullmatch(word) or _NUMBER_START.match(word) or _MAGNITUDE_INSIDE.search(word)
+    )
 
 
 def _name_run(lines: list[list[str]], index: int, start: int, greeting: bool) -> list[str]:
