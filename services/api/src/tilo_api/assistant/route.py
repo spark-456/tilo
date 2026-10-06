@@ -371,7 +371,7 @@ async def ask_assistant(
     open_archive: Annotated[Callable[..., RunArchive], Depends(_archive_opener)],
     people: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     plates: Annotated[deps.PlateSource, Depends(deps.get_plate_source)],
-    owners: Annotated[SourceOwners, Depends(deps.get_source_owners)],
+    owners: Annotated[SourceOwners, Depends(deps.get_panel_source_owners)],
     decider: Annotated[Decider | None, Depends(deps.get_assistant_decider)],
     flags: Annotated[FlagStore, Depends(deps.get_flag_store)],
 ) -> Mapping[str, Any] | JSONResponse:

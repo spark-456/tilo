@@ -18,7 +18,7 @@ import logging
 import math
 import os
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, cast
@@ -30,6 +30,7 @@ from tilo_connectors.registry import ConnectorRegistry, load_registry
 from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
+from tilo_metering import LedgerEntry
 from tilo_metering.flags import FlagStore, process_flags
 from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import PlanInputs, compile_plan
@@ -40,9 +41,11 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router
 from tilo_providers.safety import build_safety_provider
 
+from tilo_api import events
 from tilo_api.access import AccessStore, Mode, provider_mode
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
-from tilo_api.people_access import NoSourceOwners, SourceOwners
+from tilo_api.people_access import NoSourceOwners
+from tilo_api.people_access import SourceOwners as PanelSourceOwners
 
 if TYPE_CHECKING:
     from tilo_api.assistant.core import Decider
@@ -171,6 +174,16 @@ def get_store() -> Store:
 
 def get_event_writer() -> EventWriter:
     raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_ledger() -> Sequence[LedgerEntry]:
+    """The Treasury's ledger (FR-MTR-10). No ledger store is wired in yet (BQ-MTR10-4): fail closed."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def prices_path() -> Path:
+    """config/prices.yaml, the price sheet (FR-MTR-01): the one public way for a route to find it."""
+    return _REPO_ROOT / "config" / "prices.yaml"
 
 
 def providers_config() -> ProvidersConfig:
@@ -340,6 +353,39 @@ def get_redactor() -> Callable[[str], str]:
     raise NotImplementedError("the shared secret redactor is not built, so no run starts")
 
 
+# --- the people API seams (PPL-11a, services/api/tests/API_PPL_11a.md section 4); production fails closed ---
+
+NOTICE_VERSION = "1.0.0"  # stamped as `attestation.notice_version` on a meeting a person adds; read at call time
+
+
+class PlateSources(Protocol):
+    """The cards, runs and mail a plate may draw on; each returns facts, possibly more than the person's own."""
+
+    def cards(self, user_id: str) -> Iterable[dict[str, Any]]: ...
+    def runs(self, user_id: str) -> Iterable[dict[str, Any]]: ...
+    def mail(self, user_id: str) -> Iterable[dict[str, Any]]: ...
+
+
+class SourceOwners(Protocol):
+    def owner_of(self, kind: str, ref: str) -> str | None: ...  # kind "mail" or "request"
+
+
+def get_people_stores() -> PeopleStores:
+    raise HTTPException(status_code=503, detail="not_configured")  # no Firestore adapter yet (ticket PPL-11c)
+
+
+def get_clock() -> Callable[[], str]:
+    return events.now  # a `common#timestamp`; a route reads it once per request
+
+
+def get_plate_sources() -> PlateSources:
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_source_owners() -> SourceOwners:
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
 def get_run_archive() -> Callable[..., RunArchive]:
     """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses."""
     raise NotImplementedError("no raw-archive store is configured, so no run starts")
@@ -406,15 +452,30 @@ class PlateSource(Protocol):
     def build(self, user: str, now: str) -> dict: ...
 
 
-def get_people_stores() -> PeopleStores:
-    raise HTTPException(status_code=503, detail="not_configured")  # the Firestore stores are a later ticket
+class _PlateBuilder:
+    """The panel's `PlateSource` over PPL-11a's one plate builder (ADR-0021, BQ-PPL11B-15)."""
+
+    def __init__(self, stores: PeopleStores, sources: PlateSources, owners: SourceOwners) -> None:
+        self._stores, self._sources, self._owners = stores, sources, owners
+
+    def build(self, user: str, now: str) -> dict:
+        from tilo_api.people_plate import build_plate  # noqa: PLC0415  (people_plate imports this module)
+
+        plate = build_plate(self._stores, self._sources, self._owners, ORG_ID, user, now)
+        if plate is None:
+            raise LookupError("no such person")
+        return plate
 
 
-def get_plate_source() -> PlateSource:
-    raise HTTPException(status_code=503, detail="not_configured")  # PPL-11a's `tilo_api.plate.build`, adapted here
+def get_plate_source(
+    stores: Annotated[PeopleStores, Depends(get_people_stores)],
+    sources: Annotated[PlateSources, Depends(get_plate_sources)],
+    owners: Annotated[SourceOwners, Depends(get_source_owners)],
+) -> PlateSource:
+    return _PlateBuilder(stores, sources, owners)  # each seam is 503 `not_configured` until wired
 
 
-def get_source_owners() -> SourceOwners:
+def get_panel_source_owners() -> PanelSourceOwners:
     return NoSourceOwners()  # fail closed until PPL-31 and PPL-11a read the owner from the source store (BQ-PPL11B-13)
 
 

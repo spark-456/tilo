@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
+from tilo_api import people as _people
 from tilo_api import runs as _runs
 from tilo_api import skill_proposals as _skill_proposals
 from tilo_api.access import AccessGate as _AccessGate
@@ -15,6 +16,7 @@ from tilo_api.access_routes import router as _access_router
 from tilo_api.assistant.route import router as _assistant_router
 from tilo_api.cards import build_router as _build_cards_router
 from tilo_api.console import build_router as _build_console_router
+from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.intake import router as intake_router
 from tilo_api.redaction import router as _redaction_router
@@ -50,12 +52,14 @@ app.include_router(_access_router)
 app.include_router(intake_router)
 app.include_router(_dispatch_router)
 app.include_router(_redaction_router)
+app.include_router(_costs_router)
 app.include_router(_tasks_router)
 app.include_router(_build_cards_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
 app.include_router(_build_console_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
 app.include_router(_build_sharing_router(_world_views))
 app.include_router(_runs.router)
 app.include_router(_assistant_router)
+app.include_router(_people.router)
 
 
 def _world_owner(world_id: str) -> str | None:

@@ -38,6 +38,8 @@ blob-report/
 
 # Local dev eval replay output (just eval); evals/results.md is the committed pass record (PRD 19.5)
 evals/results.local.md
+evals/nightly.local.md
+evals/metrics.local.md
 # Live generator output (issue #272 b): one folder per run; the user promotes a case into evals/bank/ by PR
 evals/generated/
 

@@ -29,3 +29,4 @@ both on `commit` and pre-emptively in `reserve` when a reservation alone would c
 - Both loaders turn any unreadable, malformed or invalid file into `MeteringConfigError` naming the path.
 - `Treasury` validates amounts (`errors.number`) and `at` (timezone-aware); thread-safe; the ledger is append-only.
 - FR-MTR-06: `savings.credits_saved` sums `origin_cost - lookup_cost` over `memory.hit` events (id once, never `data.saved`).
+- FR-MTR-10: `costs.cost_report` (pure): spend from ledger commits at their recorded credits, never re-priced; by tier (world tier), profile, task type; no model id.

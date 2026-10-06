@@ -23,7 +23,16 @@ from typing import Any
 from tilo_contracts import ProvidersProfile
 
 from tilo_providers.errors import ProviderError, SafetyError, map_http_status, map_transport_error
-from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
+from tilo_providers.interfaces import (
+    Capability,
+    GenerateRequest,
+    GenerateResponse,
+    ModelProvider,
+    PriceQuote,
+    cached_tokens_or_none,
+)
+
+_NO_FIELD = object()
 
 
 def _genai_module(name: str) -> Any:
@@ -67,6 +76,12 @@ def validate_google_settings(project: str, location: str, environ: Mapping[str, 
         )
     if not _PROJECT_RE.fullmatch(project):
         raise GoogleSettingsError("project_invalid", "GOOGLE_CLOUD_PROJECT is not a valid project id")
+    refuse_service_account_key(environ)
+
+
+def refuse_service_account_key(environ: Mapping[str, str] | None = None) -> None:
+    """Refuses a service-account key file as ADC (user ADC only); shared with the Model Armor adapter."""
+    environ = os.environ if environ is None else environ
     explicit = environ.get(_CREDENTIALS_VAR)
     path = explicit or _well_known_adc_path(environ)  # ADC reads the variable's file, else gcloud's well-known one
     try:
@@ -197,6 +212,12 @@ class GoogleModelProvider(ModelProvider):
                 "output_tokens": (usage_metadata.candidates_token_count or 0) + thoughts,
                 "total_tokens": usage_metadata.total_token_count or 0,
             }
+            # EFF-04: the API leaves a zero cached count out, so present usage with a None count is a reported 0.
+            # An object with no such field at all (not the SDK's model) reports nothing: unknown.
+            cached = getattr(usage_metadata, "cached_content_token_count", _NO_FIELD)
+            cached = cached_tokens_or_none(0 if cached is None else cached, usage["input_tokens"])
+            if cached is not None:
+                usage["cached_tokens"] = cached
 
         return GenerateResponse(text=response.text, profile_id=self._profile_id, tool_calls=tool_calls, usage=usage)
 
