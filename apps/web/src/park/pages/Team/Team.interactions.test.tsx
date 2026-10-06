@@ -9,9 +9,15 @@ import fc from "fast-check";
 import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { press } from "../../../../test-support/park/componentsHarness";
+import {
+  COPY,
+  COVERAGE,
+  LIMIT_BY_ROLE,
+  PEOPLE,
+  ROLES,
+} from "../../../../test-support/park/teamExpect";
 import { cleanup, makeApp, renderTeam } from "../../../../test-support/park/teamHarness";
 import * as fx from "../../api/fixtures";
-import { COPY, COVERAGE, LIMIT_BY_ROLE, PEOPLE, ROLES } from "./teamExpect";
 import {
   buttonNamed,
   choose,
