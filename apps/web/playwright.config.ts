@@ -28,6 +28,13 @@ const NFR01 = process.env.TILO_NFR01 === "1";
 const NFR01_PORT = Number(process.env.TILO_NFR01_PORT ?? 5393);
 const NFR01_ORIGIN = `http://127.0.0.1:${NFR01_PORT}`;
 const NFR01_SPECS = "**/nfr01/**";
+// WEB-PARITY (`TILO_PARITY=1`, `just parity`, local only): the Park pixel-parity harness. Its own Vite
+// app server (TILO_PARITY_PORT) is ours; the design reference is served by the spec itself on
+// TILO_PARITY_REF_PORT. Never the shared 5173. CI never sets TILO_PARITY.
+const PARITY = process.env.TILO_PARITY === "1";
+const PARITY_PORT = Number(process.env.TILO_PARITY_PORT ?? 5395);
+const PARITY_ORIGIN = `http://127.0.0.1:${PARITY_PORT}`;
+const PARITY_SPECS = "**/park/parity/**";
 const TIMING_SPECS = [
   "**/world-perf.spec.ts",
   "**/world-reduced-motion-toggle.spec.ts",
@@ -50,7 +57,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: [...TIMING_SPECS, CP2_SPECS, NFR01_SPECS],
+      testIgnore: [...TIMING_SPECS, CP2_SPECS, NFR01_SPECS, PARITY_SPECS],
       // Runs the timing project after this one finishes, pass or fail. A `dependencies` link would
       // skip the C8 freeze and perf specs whenever any chromium test failed.
       teardown: "timing",
@@ -71,6 +78,22 @@ export default defineConfig({
       : []),
     ...(NFR01
       ? [{ name: "nfr01", testMatch: NFR01_SPECS, use: { ...BROWSER, baseURL: NFR01_ORIGIN } }]
+      : []),
+    ...(PARITY
+      ? [
+          {
+            name: "parity",
+            testMatch: "**/park/parity/*.spec.ts",
+            workers: 1,
+            timeout: 180_000,
+            // Grayscale glyph anti-aliasing on both sides (LCD text and hinting are most of the AA noise).
+            use: {
+              ...BROWSER,
+              baseURL: PARITY_ORIGIN,
+              launchOptions: { args: ["--disable-lcd-text", "--font-render-hinting=none"] },
+            },
+          },
+        ]
       : []),
   ],
   webServer: [
@@ -95,6 +118,16 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },
+    ...(PARITY
+      ? [
+          {
+            command: `pnpm exec vite --host 127.0.0.1 --port ${PARITY_PORT} --strictPort`,
+            url: `${PARITY_ORIGIN}/@vite/client`,
+            reuseExistingServer: false,
+            timeout: 30_000,
+          },
+        ]
+      : []),
     ...(CP2
       ? [
           {

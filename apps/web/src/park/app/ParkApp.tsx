@@ -1,20 +1,14 @@
-// The Park app shell (README "Routes", "The `app` prop", "Focus"): the data-park root, one <main> with
-// the page for the route, the toast, the document title and the focus move after a route change.
-// Lazy-imported by src/Root.tsx, so a landing visit never loads it (NFR-01).
-import {
-  type MouseEvent,
-  type RefObject,
-  Suspense,
-  useEffect,
-  useRef,
-  useSyncExternalStore,
-} from "react";
-import { PageSheet, Toast } from "../components";
+// The Park app (README "Routes", "The `app` prop", "Focus"): the data-park root around the shell (shell/AppShell:
+// nav, backdrop, the one <main>, toast, world loader), the page for the route, the document title and the
+// focus move after a route change. Lazy-imported by src/Root.tsx, so a landing visit never loads it (NFR-01).
+import { type MouseEvent, Suspense, useEffect, useRef } from "react";
+import { PageSheet } from "../components";
+import { AppShell } from "../shell/AppShell";
 import "../tokens/fonts";
 import "../tokens/park.css";
 import { type AppCtx, PAGE_LABEL } from "./AppCtx";
 import "./park-app.css";
-import { ParkProvider, useApp, useParkStore } from "./context";
+import { ParkProvider, usePageApp } from "./context";
 import { PAGES } from "./pages";
 import { useParkRoute } from "./router";
 
@@ -45,18 +39,16 @@ function NotFound({ go }: { go: AppCtx["go"] }) {
 // Suspense hides the page it is replacing with an inline `display: none` until the new chunk arrives.
 const isHidden = (el: Element): boolean => el.closest('[style*="display: none"]') !== null;
 
-function FocusHeading({
-  main,
-  routeKey,
-}: { main: RefObject<HTMLElement | null>; routeKey: string }) {
+function FocusHeading({ routeKey }: { routeKey: string }) {
   const last = useRef<string | null>(null);
+  const mark = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (last.current === null || last.current === routeKey) {
       last.current = routeKey;
       return;
     }
     last.current = routeKey;
-    const root = main.current;
+    const root = mark.current?.closest("main");
     if (!root) return;
     const left = document.activeElement;
     // The new page's heading, never the hidden one of the page it replaces.
@@ -68,8 +60,8 @@ function FocusHeading({
       return true;
     };
     if (focusHeading()) return;
-    // A lazy page's heading arrives with its chunk. Focus it then, unless the person has moved focus
-    // somewhere else in the meantime.
+    // A lazy page's heading arrives with its chunk, or with its data. Focus it then, unless the person has
+    // moved focus somewhere else in the meantime.
     const watch = new MutationObserver(() => {
       if (document.activeElement !== left) return watch.disconnect();
       if (focusHeading()) watch.disconnect();
@@ -81,16 +73,14 @@ function FocusHeading({
       attributeFilter: ["style"],
     });
     return () => watch.disconnect();
-  }, [main, routeKey]);
-  return null;
+  }, [routeKey]);
+  // The shell owns the <main>; this marker (inside it) is how the heading is found.
+  return <span ref={mark} hidden />;
 }
 
 function Shell() {
-  const app = useApp();
-  const store = useParkStore();
+  const app = usePageApp();
   const route = useParkRoute();
-  const toast = useSyncExternalStore(store.subscribe, () => store.getState().toast);
-  const main = useRef<HTMLElement>(null);
   const title = route ? PAGE_LABEL[route.page] : NOT_FOUND_TITLE;
   // A world is a different page per id; the other pages keep focus where it is when only a query changes.
   const routeKey = route
@@ -108,20 +98,12 @@ function Shell() {
   const Page = route ? PAGES[route.page] : null;
   return (
     <div data-park data-time={app.time}>
-      <main ref={main} className="park-app__main">
+      <AppShell>
         <Suspense fallback={null}>
           {Page ? <Page app={app} /> : <NotFound go={app.go} />}
-          <FocusHeading main={main} routeKey={routeKey} />
+          <FocusHeading routeKey={routeKey} />
         </Suspense>
-      </main>
-      {toast ? (
-        <Toast
-          message={toast.message}
-          {...(toast.actionLabel !== undefined ? { actionLabel: toast.actionLabel } : {})}
-          {...(toast.action !== undefined ? { onAction: toast.action } : {})}
-          onDismiss={store.dismissToast}
-        />
-      ) : null}
+      </AppShell>
     </div>
   );
 }

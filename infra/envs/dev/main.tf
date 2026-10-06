@@ -274,6 +274,7 @@ module "service" {
       service = "harness"
       member  = "serviceAccount:${google_service_account.tasks_invoker.account_id}@${var.project_id}.iam.gserviceaccount.com"
     }
+    # No entry for the schedule tick (FR-AGT-14): it calls public tilo-api, whose route checks its own OIDC caller.
   }
 
   depends_on = [google_project_service.apis]
@@ -503,6 +504,30 @@ resource "google_artifact_registry_repository" "containers" {
   format        = "DOCKER"
   description   = "Tilo service container images (PRD 6.3 Cloud Build, Artifact Registry)."
 
+  # EFF-05c: every `just build-evals-image` pushes a new :<build id> version of the evals package (plus :latest).
+  # Keep the newest 5 and delete older ones after 7 days. Scoped to the evals package: the service images
+  # (api, harness, ...) have no policy here and are never touched (a repository with no DELETE policy deletes nothing).
+  cleanup_policies {
+    id     = "evals-keep-newest-5"
+    action = "KEEP"
+
+    most_recent_versions {
+      package_name_prefixes = ["evals"]
+      keep_count            = 5
+    }
+  }
+
+  cleanup_policies {
+    id     = "evals-delete-older-than-7d"
+    action = "DELETE"
+
+    condition {
+      tag_state             = "ANY"
+      package_name_prefixes = ["evals"]
+      older_than            = "604800s"
+    }
+  }
+
   depends_on = [google_project_service.apis]
 }
 
@@ -597,6 +622,7 @@ module "monitoring" {
   alert_email             = var.alert_email
   cloud_run_service_names = [for k in keys(local.cloud_run_services) : "tilo-${k}"]
   events_subscription_id  = module.events.subscription_name
+  eval_nightly_job_name   = google_cloud_run_v2_job.eval_nightly.name
 
   depends_on = [google_project_service.apis]
 }
@@ -743,4 +769,51 @@ module "gmail_push" {
   pubsub_service_agent_email      = module.events.pubsub_service_agent_email
 
   depends_on = [google_project_service.apis]
+}
+
+# ---------------------------------------------------------------------------
+# Scheduled runs (FR-AGT-14): one Scheduler job ticks every minute and POSTs
+# api /internal/schedules/tick (the run lives in tilo-api; ADR-0023); the tick
+# reads the due user schedules. api is public and the route verifies the OIDC
+# caller itself, so the service account holds no IAM binding. The tick answers
+# 503 until the user sets TILO_SCHEDULE_TICK_AUDIENCE, TILO_SCHEDULE_TICK_CALLER
+# and TILO_SCHEDULES_STORE=firestore with TILO_FIRESTORE_PROJECT on tilo-api.
+# ---------------------------------------------------------------------------
+
+resource "google_service_account" "schedule_scheduler" {
+  project      = var.project_id
+  account_id   = "tilo-schedule-scheduler"
+  display_name = "Tilo scheduled runs tick (Cloud Scheduler OIDC identity)"
+
+  depends_on = [google_project_service.apis]
+}
+
+module "schedule_tick" {
+  source = "../../modules/schedule_tick"
+
+  project_id            = var.project_id
+  region                = var.region
+  target_uri            = module.service.uris["api"]
+  service_account_email = google_service_account.schedule_scheduler.email
+
+  depends_on = [google_project_service.apis]
+}
+
+# The due query (`enabled == true ORDER BY next_due` on orgs/{org}/schedules, tilo_harness.schedule_store) needs this
+# composite index; without it the first live tick fails. The collection-scoped index covers every org's `schedules`.
+resource "google_firestore_index" "schedules_due" {
+  project     = var.project_id
+  database    = google_firestore_database.default.name
+  collection  = "schedules"
+  query_scope = "COLLECTION"
+
+  fields {
+    field_path = "enabled"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "next_due"
+    order      = "ASCENDING"
+  }
 }

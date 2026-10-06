@@ -200,3 +200,48 @@ resource "google_monitoring_alert_policy" "cost_alert" {
 
   depends_on = [google_logging_metric.cost_alert]
 }
+
+# Failed nightly eval executions (EFF-05c; the PR #465 cost review noted a failed night was silent). Reads the Cloud
+# Run job metric directly, so no log-based counter is needed and nothing runs while idle. Alert-only. It does not fire
+# if Cloud Scheduler never starts the job (no execution, no data point); a Scheduler-side alert is a later ticket.
+resource "google_monitoring_alert_policy" "eval_nightly_failed" {
+  project               = var.project_id
+  display_name          = "Tilo nightly eval job failed"
+  combiner              = "OR"
+  notification_channels = [google_monitoring_notification_channel.email.id]
+
+  documentation {
+    mime_type = "text/markdown"
+    content   = "An execution of the Cloud Run job ${var.eval_nightly_job_name} (the nightly eval replay, EFF-05) finished as failed. Open Cloud Run, Jobs, ${var.eval_nightly_job_name}, Executions, then the execution log in Cloud Logging. Alert-only: this policy retries and blocks nothing."
+  }
+
+  conditions {
+    display_name = "Failed execution of the nightly eval job"
+
+    condition_threshold {
+      filter          = "metric.type=\"run.googleapis.com/job/completed_execution_count\" AND resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"${var.eval_nightly_job_name}\" AND metric.labels.result=\"failed\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      # Same shape as the cost alert: a non-zero duration (the API rejects evaluation_missing_data with 0s), and one
+      # failed execution keeps the 300s sum above 0 for 300s, so 60s still fires on a single failure.
+      duration = "60s"
+
+      evaluation_missing_data = "EVALUATION_MISSING_DATA_INACTIVE"
+
+      aggregations {
+        alignment_period     = "300s"
+        per_series_aligner   = "ALIGN_SUM"
+        cross_series_reducer = "REDUCE_SUM"
+        group_by_fields      = ["resource.label.job_name"]
+      }
+
+      trigger {
+        count = 1
+      }
+    }
+  }
+
+  alert_strategy {
+    auto_close = "1800s"
+  }
+}
