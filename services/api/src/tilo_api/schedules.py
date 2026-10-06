@@ -132,25 +132,31 @@ def _unverified(token: str) -> tuple[dict[str, Any], dict[str, Any]]:
 CERT_URL = "https://www.googleapis.com/oauth2/v1/certs"  # Google's public signing certificates, `{kid: x509 PEM}`
 CERT_TTL_S = 900.0  # a fetched set is trusted this long, counted from the fetch (never from the last use)
 CERT_FETCH_TIMEOUT_S = 3.0  # google-auth's own default is 120 s, which would hold a request thread for two minutes
-_REFETCH_MIN_S = 30.0  # an unknown key id inside the TTL refetches at most this often (junk tokens cannot force more)
+CERT_RETRY_COOLDOWN_S = 10.0  # after ANY fetch attempt (cold, expired, unknown kid, failed) no other starts this soon
+_REFETCH_MIN_S = 30.0  # an unknown key id inside the TTL refetches at most this often, whatever the cooldown says
 
 
 class GoogleOidcVerifier:
     """google-auth's ID-token check behind the `OidcVerifier` Protocol, with a bounded and cached certificate fetch.
 
     A token that is not a JWT with a Google RS256 key id, issuer and our audience is refused from its own header and
-    claims BEFORE any certificate fetch. The certificates are fetched with a timeout of `CERT_FETCH_TIMEOUT_S` and
-    reused for `CERT_TTL_S` from the fetch. A failed fetch stores nothing and a failed refresh never serves older
-    certificates past the TTL. `transport` has google-auth's `Request` shape; `clock` (seconds) only ages the cache."""
+    claims BEFORE any certificate fetch. Those checks only use public values, so anyone can pass them: the fetch is
+    therefore single-flight and rate limited. The certificates live in one immutable snapshot, swapped whole after a
+    successful fetch and read without any lock, so a known key id on a fresh snapshot never waits for a refresh. A
+    refresh takes a lock with a NON-blocking acquire: a caller that finds a fetch in flight is refused at once, so at
+    most one thread is ever inside a fetch. Every attempt, failed ones too, starts a cooldown of
+    `CERT_RETRY_COOLDOWN_S`; an unknown key id inside the TTL also waits `_REFETCH_MIN_S` since the last fetch or
+    attempt. A failed fetch stores nothing, and a snapshot older than `CERT_TTL_S` (counted from the fetch) is never
+    served: a failed refresh past the TTL clears it. `transport` has google-auth's `Request` shape; `clock` (seconds)
+    only ages the cache."""
 
     def __init__(
         self, *, transport: Callable[..., Any] | None = None, clock: Callable[[], float] = time.monotonic
     ) -> None:
         self._transport, self._clock = transport, clock
-        self._lock = threading.Lock()  # one fetch at a time; a caller that waited re-reads the cache first
-        self._certs: dict[str, str] = {}
-        self._fetched_at: float | None = None
-        self._tried_at = float("-inf")  # the last refresh attempt for an unknown kid inside the TTL
+        self._lock = threading.Lock()  # held by the one thread inside a fetch; never waited for
+        self._snapshot: tuple[dict[str, str], float] | None = None  # (certificates, fetched_at); never mutated in place
+        self._tried_at = float("-inf")  # when the last fetch attempt started, whatever became of it
 
     def _fetch(self) -> dict[str, str]:
         if self._transport is None:
@@ -169,33 +175,54 @@ class GoogleOidcVerifier:
             raise ValueError("certificate fetch returned no certificates")
         return certs
 
+    def _usable(self, kid: str, now: float) -> dict[str, str] | None:
+        """The certificates to verify with, or None when a fetch is due. Raises when the set is stale and a fetch may
+        not start yet. Reads the snapshot and the attempt time once each, without the lock."""
+        snapshot, tried = self._snapshot, self._tried_at
+        if snapshot is not None and 0 <= now - snapshot[1] < CERT_TTL_S:
+            certs, fetched = snapshot
+            if kid in certs or now - max(fetched, tried) < _REFETCH_MIN_S:
+                return certs  # an unknown kid this soon after an attempt is refused (by the decode), not fetched for
+        if 0 <= now - tried < CERT_RETRY_COOLDOWN_S:
+            raise ValueError("certificates unavailable")  # stale, cold or an unknown kid: refused, no fetch
+        return None
+
     def _certificates(self, kid: str) -> dict[str, str]:
-        with self._lock:
-            now, fetched = self._clock(), self._fetched_at
-            fresh = fetched is not None and 0 <= now - fetched < CERT_TTL_S
-            if fresh and fetched is not None:
-                if kid in self._certs or now - max(fetched, self._tried_at) < _REFETCH_MIN_S:
-                    return self._certs  # an unknown kid this soon after an attempt is refused, not fetched for
-                self._tried_at = now
-            try:
-                certs = self._fetch()
-            except Exception:
-                if not fresh:  # past the TTL a failed refresh never serves the old set
-                    self._certs, self._fetched_at = {}, None
-                raise
-            self._certs, self._fetched_at = certs, now
+        now = self._clock()
+        certs = self._usable(kid, now)
+        if certs is not None:
             return certs
+        if not self._lock.acquire(blocking=False):
+            raise ValueError("certificate refresh in flight")  # fail fast: never queue behind a fetch
+        try:
+            now = self._clock()
+            certs = self._usable(kid, now)  # a fetch that finished since the first look may have settled it
+            if certs is not None:
+                return certs
+            self._tried_at = now
+            try:
+                fetched = self._fetch()
+            except Exception:
+                snapshot = self._snapshot
+                if snapshot is None or not 0 <= now - snapshot[1] < CERT_TTL_S:
+                    self._snapshot = None  # past the TTL a failed refresh never serves the old set
+                raise
+            self._snapshot = (fetched, now)
+            return fetched
+        finally:
+            self._lock.release()
 
     def verify(self, token: str, audience: str) -> Mapping[str, Any]:
         header, claims = _unverified(token)
-        if header.get("alg") != "RS256" or not isinstance(header.get("kid"), str):
+        kid = header.get("kid")
+        if header.get("alg") != "RS256" or not isinstance(kid, str) or not kid:
             raise ValueError("not a Google-signed token")
         if claims.get("iss") not in GOOGLE_ISSUERS or claims.get("aud") != audience:
             raise ValueError("not a token for this service")
         from google.auth import jwt
 
         verified = jwt.decode(
-            token, certs=self._certificates(header["kid"]), verify=True, audience=audience, clock_skew_in_seconds=10
+            token, certs=self._certificates(kid), verify=True, audience=audience, clock_skew_in_seconds=10
         )
         if verified.get("iss") not in GOOGLE_ISSUERS:
             raise ValueError("not a Google-signed token")
@@ -392,6 +419,8 @@ class ScheduleStarter:
             raise StartSkipped("owner_mismatch")
         if record.brief is None or record.approach is None:
             raise StartSkipped("snapshot_missing")
+        if not record.enabled:  # claimed just before `disable_for_owner` or a pause: read again here, after the claim
+            raise StartSkipped("schedule_disabled", count=False)
         if self._seams is None:
             raise StartSkipped("run_seams_unwired", count=False)  # the whole service, not this schedule: not counted
         digest = _digest(run.idempotency_key)

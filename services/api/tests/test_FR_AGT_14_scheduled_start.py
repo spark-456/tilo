@@ -401,6 +401,50 @@ def test_FR_AGT_14_a_disabled_schedule_never_fires_and_a_deleted_one_is_gone(rig
     assert rig.worlds_besides(source.world_id) == []
 
 
+def test_FR_AGT_14_a_start_of_a_schedule_disabled_after_the_claim_is_skipped_uncounted(rig: SchedApi) -> None:
+    """FR-AGT-14d (security review): `ScheduleStarter.start` re-reads `enabled` after the claim. A slot claimed just
+    before `disable_for_owner` or a pause must not start a run, and must not count as a failure."""
+    from tilo_api import schedules
+    from tilo_harness.schedule import StartSkipped
+
+    source = armed(rig)
+    sid = rig.created(source)["schedule_id"]
+    record = rig.schedules.get(sid)
+    starter = schedules.ScheduleStarter(
+        store=rig.store,
+        schedules=rig.schedules,
+        seams=object(),
+        clock=rig.clock,  # type: ignore[arg-type]
+    )
+    assert rig.schedules.disable_for_owner(record.owner_user_id) == 1
+    with pytest.raises(StartSkipped) as skipped:
+        starter.start(run_start(rig, sid))
+    assert (skipped.value.code, skipped.value.count) == ("schedule_disabled", False)
+    assert rig.worlds_besides(source.world_id) == []
+
+
+def test_FR_AGT_14_a_schedule_disabled_between_the_claim_and_the_start_fires_nothing_and_records_nothing(
+    rig: SchedApi, monkeypatch
+) -> None:
+    source = armed(rig)
+    sid = rig.created(source)["schedule_id"]
+    claim = rig.schedules.claim
+
+    def claim_then_disable(schedule_id: str, due: Any) -> bool:
+        won = claim(schedule_id, due)
+        if won:
+            rig.schedules.update(schedule_id, enabled=False)  # the owner pauses it right after the claim
+        return won
+
+    monkeypatch.setattr(rig.schedules, "claim", claim_then_disable)
+    assert fire(rig) == 0
+    record = rig.schedules.get(sid)
+    assert rig.worlds_besides(source.world_id) == []
+    assert (record.failures, record.last_error, record.enabled) == (0, None, False)
+    assert record.next_due == MON_0330Z
+    assert record.backoff_until is None
+
+
 def test_FR_AGT_14_replay_only_holds_the_slot_and_it_fires_once_when_the_flag_clears(rig: SchedApi) -> None:
     source = armed(rig)
     sid = rig.created(source)["schedule_id"]

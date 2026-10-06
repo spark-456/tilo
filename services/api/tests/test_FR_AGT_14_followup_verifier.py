@@ -22,7 +22,9 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import pytest
@@ -96,6 +98,22 @@ class CountingTransport:
         return Response(200, json.dumps(self.certs).encode())
 
 
+class BlockingTransport(CountingTransport):
+    """Holds every fetch until `release` is set while `block` is on; `entries` counts the callers that got inside."""
+
+    def __init__(self, certs: dict[str, str]) -> None:
+        super().__init__(certs)
+        self.block, self.entries = False, 0
+        self.entered, self.release = threading.Event(), threading.Event()
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Response:
+        if self.block:
+            self.entries += 1
+            self.entered.set()
+            self.release.wait(10)
+        return super().__call__(*args, **kwargs)
+
+
 class FakeClock:
     """Seconds, monotonic-like: `Callable[[], float]`. Moves only when the test moves it."""
 
@@ -107,13 +125,19 @@ class FakeClock:
 
 
 class Rig:
-    def __init__(self, keypair: tuple[bytes, str]) -> None:
+    def __init__(self, keypair: tuple[bytes, str], transport_cls: type[CountingTransport] = CountingTransport) -> None:
         from tilo_api import schedules
 
         self.private, cert = keypair
-        self.transport, self.clock = CountingTransport({KID: cert}), FakeClock()
+        self.transport, self.clock = transport_cls({KID: cert}), FakeClock()
         self.verifier = schedules.GoogleOidcVerifier(transport=self.transport, clock=self.clock)
         self.ttl = schedules.CERT_TTL_S
+
+    @property
+    def cooldown(self) -> float:
+        from tilo_api import schedules
+
+        return schedules.CERT_RETRY_COOLDOWN_S
 
     def token(self, **claims: Any) -> str:
         return make_token(self.private, **claims)
@@ -177,9 +201,12 @@ def test_FR_AGT_14_the_cache_is_timed_from_the_fetch_not_from_the_last_use(rig: 
 @pytest.mark.parametrize("mode", ["status500", "raise"])
 def test_FR_AGT_14_a_failed_fetch_is_not_cached_and_does_not_poison_the_next_call(rig: Rig, mode: str) -> None:
     rig.transport.mode = mode
-    for _ in range(2):  # a failure is a failure every time, and each retry may try the endpoint again
+    for _ in range(
+        2
+    ):  # a failure is a failure every time, and each retry (after the cooldown) tries the endpoint again
         with pytest.raises(Exception):  # noqa: B017, PT011 - any error type: the route turns all of them into 401
             rig.verifier.verify(rig.token(), AUDIENCE)
+        rig.clock.now += rig.cooldown + 1  # FR-AGT-14d: every attempt, failed ones too, starts a cooldown
     failed = len(rig.transport.calls)
     assert failed >= 1
     rig.transport.mode = "ok"
@@ -224,6 +251,169 @@ def test_FR_AGT_14_the_default_dependency_returns_one_shared_verifier_so_the_cac
 
     first, second = schedules.get_oidc_verifier(), schedules.get_oidc_verifier()
     assert first is second and isinstance(first, schedules.GoogleOidcVerifier)
+
+
+# --- 5b. a flood of junk tokens: one fetch in flight, a cooldown after every attempt (14d security review) -----------
+
+
+def _refused(rig: Rig, kid: str = KID) -> bool:
+    try:
+        rig.verifier.verify(rig.token(kid=kid), AUDIENCE)
+    except Exception:  # noqa: BLE001 - any error type: the route turns all of them into 401
+        return True
+    return False
+
+
+def test_FR_AGT_14_the_retry_cooldown_is_a_short_module_constant() -> None:
+    from tilo_api import schedules
+
+    assert 5 <= schedules.CERT_RETRY_COOLDOWN_S <= 30
+
+
+def test_FR_AGT_14_junk_tokens_fail_fast_while_one_fetch_is_in_flight_and_only_one_thread_fetches(
+    keypair: tuple[bytes, str],
+) -> None:
+    rig = Rig(keypair, BlockingTransport)
+    transport: BlockingTransport = rig.transport  # type: ignore[assignment]
+    transport.block = True
+    try:
+        with ThreadPoolExecutor(41) as pool:
+            first = pool.submit(rig.verifier.verify, rig.token(), AUDIENCE)
+            assert transport.entered.wait(5), "the first caller never reached the fetch"
+            tokens = [rig.token(kid=f"junk-{i}") for i in range(40)]  # signing is slow: outside the timed part
+            started = time.monotonic()
+            junk = [pool.submit(rig.verifier.verify, token, AUDIENCE) for token in tokens]
+            for future in junk:  # `exception(timeout)` raises TimeoutError (a failure here) for a caller that waits
+                assert future.exception(timeout=1) is not None
+            assert time.monotonic() - started < 1.0
+            assert transport.entries == 1  # at most one pool thread is ever inside a fetch
+            transport.release.set()
+            assert first.result(timeout=5)["email"] == SCHEDULE_SA  # the one fetch still succeeds for its own caller
+    finally:
+        transport.release.set()
+    assert transport.entries == 1
+    assert len(transport.calls) == 1
+
+
+def test_FR_AGT_14_a_known_kid_on_a_fresh_cache_never_waits_for_a_refresh_for_another_kid(
+    keypair: tuple[bytes, str],
+) -> None:
+    rig = Rig(keypair, BlockingTransport)
+    transport: BlockingTransport = rig.transport  # type: ignore[assignment]
+    assert not _refused(rig)  # the cache is warm
+    rig.clock.now += 31  # an unknown kid may refetch now (inside the TTL)
+    transport.block = True
+    try:
+        with ThreadPoolExecutor(4) as pool:
+            slow = pool.submit(rig.verifier.verify, rig.token(kid="other"), AUDIENCE)
+            assert transport.entered.wait(5)
+            known = pool.submit(rig.verifier.verify, rig.token(), AUDIENCE)
+            assert known.result(timeout=1)["email"] == SCHEDULE_SA  # returns while the refresh is still in flight
+            assert not slow.done()
+            transport.release.set()
+            assert slow.exception(timeout=5) is not None  # "other" is not in Google's set
+    finally:
+        transport.release.set()
+    assert transport.entries == 1
+
+
+@pytest.mark.parametrize("mode", ["raise", "status500"])
+def test_FR_AGT_14_a_dead_endpoint_costs_one_fetch_per_cooldown_with_a_cold_cache(rig: Rig, mode: str) -> None:
+    rig.transport.mode = mode
+    for _ in range(25):
+        assert _refused(rig)
+    assert len(rig.transport.calls) == 1  # the clock is frozen: the first attempt starts the cooldown
+    rig.clock.now += rig.cooldown - 0.1
+    assert _refused(rig)
+    assert len(rig.transport.calls) == 1
+    rig.clock.now += 0.2
+    for _ in range(25):
+        assert _refused(rig)
+    assert len(rig.transport.calls) == 2
+    rig.transport.mode = "ok"  # the endpoint is back: the next attempt after the cooldown works and is cached
+    assert _refused(rig)  # still inside the cooldown of the second attempt
+    assert len(rig.transport.calls) == 2
+    rig.clock.now += rig.cooldown + 1
+    assert not _refused(rig)
+    assert not _refused(rig)
+    assert len(rig.transport.calls) == 3
+
+
+@pytest.mark.parametrize("mode", ["raise", "status500"])
+def test_FR_AGT_14_a_dead_endpoint_costs_one_fetch_per_cooldown_with_an_expired_cache(rig: Rig, mode: str) -> None:
+    assert not _refused(rig)
+    rig.clock.now += rig.ttl + 1
+    rig.transport.mode = mode
+    for _ in range(25):
+        assert _refused(rig)
+    assert len(rig.transport.calls) == 2  # the warm-up and ONE refresh attempt
+    rig.transport.mode = "ok"
+    assert _refused(rig)  # inside the cooldown, and the expired set is never served
+    assert len(rig.transport.calls) == 2
+    rig.clock.now += rig.cooldown + 1
+    assert not _refused(rig)
+    assert len(rig.transport.calls) == 3
+
+
+def test_FR_AGT_14_a_good_endpoint_with_an_expired_cache_is_fetched_once_for_many_callers(rig: Rig) -> None:
+    assert not _refused(rig)
+    rig.clock.now += rig.ttl + 1
+    assert not _refused(rig)
+    for _ in range(10):
+        assert not _refused(rig)
+    assert len(rig.transport.calls) == 2
+
+
+@pytest.mark.parametrize("mode", ["ok", "raise"])
+def test_FR_AGT_14_an_unknown_kid_costs_at_most_one_fetch_per_thirty_seconds_and_the_cooldown(
+    rig: Rig, mode: str
+) -> None:
+    from tilo_api import schedules
+
+    assert not _refused(rig)
+    rig.transport.mode = mode
+    for _ in range(10):  # too soon after the fetch: refused with no fetch at all
+        assert _refused(rig, "junk")
+    assert len(rig.transport.calls) == 1
+    rig.clock.now += schedules._REFETCH_MIN_S + 1
+    for _ in range(25):
+        assert _refused(rig, "junk")
+    assert len(rig.transport.calls) == 2
+    rig.clock.now += rig.cooldown + 1  # the cooldown is over but the 30 s window of the last attempt is not
+    for _ in range(10):
+        assert _refused(rig, "junk")
+    assert len(rig.transport.calls) == 2
+    assert not _refused(rig)  # the warm set (inside its TTL) still serves the known kid, with no fetch
+    assert len(rig.transport.calls) == 2
+    rig.clock.now += schedules._REFETCH_MIN_S
+    assert _refused(rig, "junk")
+    assert len(rig.transport.calls) == 3
+
+
+def test_FR_AGT_14_a_failed_refresh_for_an_unknown_kid_inside_the_ttl_keeps_the_warm_set(rig: Rig) -> None:
+    from tilo_api import schedules
+
+    assert not _refused(rig)
+    rig.clock.now += schedules._REFETCH_MIN_S + 1
+    rig.transport.mode = "raise"
+    assert _refused(rig, "junk")
+    assert len(rig.transport.calls) == 2
+    assert not _refused(rig)  # not past the TTL: the set still verifies the known kid
+    assert len(rig.transport.calls) == 2
+
+
+def test_FR_AGT_14_an_empty_kid_is_refused_before_any_fetch(rig: Rig) -> None:
+    assert _refused(rig, "")
+    assert rig.transport.calls == []
+
+
+def test_FR_AGT_14_a_token_with_an_empty_kid_is_401_on_the_route_and_fetches_nothing(rig: Rig, sched: SchedApi) -> None:
+    from tilo_api import schedules
+
+    sched.app.dependency_overrides[schedules.get_oidc_verifier] = lambda: rig.verifier
+    response = sched.tick(headers=bearer(rig.token(kid="")))
+    assert response.status_code == 401
+    assert rig.transport.calls == []
 
 
 # --- 6. what the route logs when the verifier raises -----------------------------------------------------------------
