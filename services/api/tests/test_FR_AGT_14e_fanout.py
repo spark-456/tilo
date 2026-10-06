@@ -47,6 +47,9 @@ def sched(clear_flow, monkeypatch) -> SchedApi:
     return rig
 
 
+BODY_KEYS = {"schedule_id", "slot", "due", "skipped", "prior_world_id"}  # BQ-AGT14-5 R1 (was the first three only)
+
+
 def name_of(schedule_id: str, due: Any = MON_0330Z) -> str:
     return f"{QUEUE}/tasks/{task_name(slot_key(schedule_id, due))}"
 
@@ -95,7 +98,8 @@ def test_FR_AGT_14e_fan_out_creates_exactly_one_task_per_due_slot(sched: SchedAp
         headers = {k.lower(): v for k, v in request.get("headers", {}).items()}
         assert headers.get("content-type") == "application/json" and "authorization" not in headers
         body = task_payload(task)
-        assert set(body) == {"schedule_id", "slot", "due"}
+        assert set(body) == BODY_KEYS  # BQ-AGT14-5 R1: the slot, plus the two server-written facts of this firing
+        assert (body["skipped"], body["prior_world_id"]) == (0, None)  # an on-time first firing
         assert body["schedule_id"] == schedule_id and body["slot"] == slot_key(schedule_id, MON_0330Z)
         assert body["slot"] == f"{schedule_id}:{body['due']}"  # `due` is the instant inside the slot key
     for schedule_id in ("sched_a", "sched_b"):  # the slot is completed as before: it is not offered again
@@ -135,7 +139,7 @@ def test_FR_AGT_14e_the_task_carries_no_secret_and_none_of_the_owners_data(sched
         assert text_of_owner not in text, text_of_owner
     for secret in (sched.good_token, sched.tasks_token, "Bearer", "budget_cap", "owner_user_id", "brief", "approach"):
         assert secret not in text, secret
-    assert set(task_payload(enqueued)) == {"schedule_id", "slot", "due"}
+    assert set(task_payload(enqueued)) == BODY_KEYS
 
 
 def test_FR_AGT_14e_missed_slots_collapse_into_one_task_for_the_latest_slot(sched: SchedApi) -> None:
@@ -147,11 +151,34 @@ def test_FR_AGT_14e_missed_slots_collapse_into_one_task_for_the_latest_slot(sche
     (task,) = sched.tasks.calls
     assert task["name"] == name_of("sched_a", latest)
     assert task_payload(task) == {
-        "schedule_id": "sched_a", "slot": slot_key("sched_a", latest), "due": latest.isoformat(),
-    }  # fmt: skip
+        "schedule_id": "sched_a",
+        "slot": slot_key("sched_a", latest),
+        "due": latest.isoformat(),
+        "skipped": 3,
+        "prior_world_id": None,
+    }  # fmt: skip  (R1: the count of collapsed slots travels with the task, so the delivery can raise the alert)
     assert sched.schedules.get("sched_a").next_due == latest + WEEK
     after = snapshot(sched)  # the slot's world does not exist yet: nothing (not even an alert) was written to it
     assert (after["worlds"], after["events"]) == (before["worlds"], before["events"])
+
+
+def test_FR_AGT_14e_the_task_carries_the_prior_world_and_the_slots_world_is_recorded_for_the_next_firing(
+    sched: SchedApi,
+) -> None:
+    """BQ-AGT14-5 R1: the task names the schedule's `last_world_id` as it was BEFORE the slot completed, and `complete`
+    records THIS slot's world id (the enqueuer's return value, the one the starter will derive), so a chain of firings
+    offers each the world before it."""
+    sched.insert(sched.approved_task(), "sched_a", last_world_id="w_previous")  # the state before this firing
+    assert sched.tick().json() == {"fired": 1}
+    (first,) = sched.tasks.calls
+    assert task_payload(first)["prior_world_id"] == "w_previous"  # read before complete overwrote it
+    recorded = sched.schedules.get("sched_a").last_world_id
+    assert recorded and recorded != "w_previous" and re.fullmatch(r"w_[0-9A-Za-z_]{1,48}", recorded)
+
+    sched.clock.set(MON_0330Z + WEEK)
+    assert sched.tick().json() == {"fired": 1}
+    assert task_payload(sched.tasks.calls[1])["prior_world_id"] == recorded  # each firing is offered the one before
+    assert sched.schedules.get("sched_a").last_world_id not in ("w_previous", recorded)
 
 
 # --- the Scheduler path never runs anything --------------------------------------------------------
@@ -239,7 +266,7 @@ def test_FR_AGT_14e_already_exists_counts_as_success(sched: SchedApi) -> None:
         None,
         None,
     )
-    assert record.last_slot == slot_key("sched_a", MON_0330Z)
+    assert record.last_slot == slot_key("sched_a", MON_0330Z) and record.last_world_id  # the slot's world is recorded
     assert len(sched.tasks.calls) == 1 and len(sched.tasks.created) == 1  # still one task, not two
 
 
@@ -361,6 +388,26 @@ def test_FR_AGT_14e_the_enqueuer_is_a_run_starter_that_hands_over_one_task(sched
     assert isinstance(world, str) and world
     assert [t["name"] for t in sched.tasks.calls] == [name_of("sched_a")]
     assert world not in sched.store.worlds  # it makes no world: the task's own request does
+
+
+def test_FR_AGT_14e_the_enqueuer_returns_the_slots_deterministic_world_id_and_passes_the_two_facts_on(
+    sched: SchedApi,
+) -> None:
+    """BQ-AGT14-5 R1: the id it returns is a function of the slot alone (the starter's own derivation), so `complete`
+    can record it; `skipped` and `prior_world_id` of the RunStart go into the task's body, nothing else does."""
+    from _fr_agt_14e_lib import run_start
+
+    due_schedules(sched, "sched_a", "sched_b")
+    first = _enqueuer(sched).start(run_start(sched, "sched_a", skipped=2, prior_world_id="w_before"))
+    again = _enqueuer(sched).start(run_start(sched, "sched_a"))  # the same slot, a different count: same world
+    other_slot = _enqueuer(sched).start(run_start(sched, "sched_a", slot=MON_0330Z + WEEK))
+    other_schedule = _enqueuer(sched).start(run_start(sched, "sched_b"))
+    assert first == again and len({first, other_slot, other_schedule}) == 3
+    assert all(re.fullmatch(r"w_[0-9A-Za-z_]{1,48}", w) for w in (first, other_slot, other_schedule))
+    assert task_payload(sched.tasks.calls[0]) == {
+        "schedule_id": "sched_a", "slot": slot_key("sched_a", MON_0330Z), "due": MON_0330Z.isoformat(),
+        "skipped": 2, "prior_world_id": "w_before",
+    }  # fmt: skip
 
 
 def test_FR_AGT_14e_the_enqueuer_raises_when_the_client_fails_and_not_on_already_exists(sched: SchedApi) -> None:

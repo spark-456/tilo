@@ -126,6 +126,7 @@ def test_FR_AGT_14_a_due_schedule_creates_the_owners_world_and_starts_its_run(ri
 
     kinds = [e["type"] for e in stream]
     assert kinds.index("world.requested") < kinds.index("budget.granted") < kinds.index("world.started")
+    assert "alert.raised" not in kinds  # an on-time firing collapsed nothing: no alert
     (grant,) = [e for e in stream if e["type"] == "budget.granted"]
     assert grant["data"] == {"granted": CAP, "cap": CAP}
     assert grant["authz"]["by"] == "policy" and grant["authz"]["ref"] == POLICY_ID  # the owner's rule, not a person
@@ -284,6 +285,9 @@ def test_FR_AGT_14_without_a_covering_owner_policy_the_firing_is_skipped_and_ret
     record = rig.schedules.get(sid)
     assert rig.worlds_besides(source.world_id) == []  # no world, no events, no run
     assert len(rig.rf.compile_calls) == compiled
+    # (14e, BQ-AGT14-5 R3) the refusal is recorded as the fixed code. It is no longer a counted failure: the slot was
+    # completed at fan-out and the refused delivery is not retried, so there is no `failures` and no backoff to assert.
+    assert record.last_error == "budget_not_granted"
     assert record.next_due == MON_0330Z + WEEK  # the slot is spent: it is retried next week, not every minute
 
     for step in (timedelta(minutes=1), timedelta(hours=6), timedelta(days=3)):  # not every minute
@@ -299,6 +303,7 @@ def test_FR_AGT_14_without_a_covering_owner_policy_the_firing_is_skipped_and_ret
     wait_for(lambda: rig.events(world_id, "world.started"), what="the run")
     (grant,) = rig.events(world_id, "budget.granted")
     assert (grant["authz"]["by"], grant["authz"]["ref"]) == ("policy", POLICY_ID)
+    assert rig.schedules.get(sid).last_error is None  # the next slot's completion clears the recorded refusal
     settled(rig, world_id)
 
 
@@ -309,6 +314,8 @@ def test_FR_AGT_14_a_policy_with_one_grant_a_day_covers_one_schedule_per_day_acr
     assert fire(rig) == 1  # the second one meets the policy's daily allowance, counted over the owner's earlier grants
     assert len(rig.tasks.calls) == 2  # (14e) both slots were handed over; only one delivery found a budget
     assert rig.schedules.get("sched_a").last_world_id
+    skipped = rig.schedules.get("sched_b")  # (14e, R3) the refused one says why; failures no longer apply (see above)
+    assert skipped.last_error == "budget_not_granted" and skipped.next_due == MON_0330Z + WEEK
     assert len(rig.worlds_besides(source.world_id)) == 1
     settled(rig, world_of(rig, "sched_a"))
 
@@ -374,19 +381,18 @@ def test_FR_AGT_14_each_firing_is_offered_the_previous_world_and_never_reuses_it
     second = world_of(rig, sid)
     second_stream = settled(rig, second)
 
-    # (14e) a task's body names no prior world, so what the start is offered is open (BQ): the previous world or none,
-    # but never the world being started itself
-    assert seen[0].prior_world_id is None
-    assert seen[1].prior_world_id in (None, first) and seen[1].prior_world_id != world_of(rig, sid)
+    # (14e, BQ-AGT14-5 R1) the fan-out writes the schedule's last world into the task and the delivery offers it: the
+    # original strict assertion holds again
+    assert [r.prior_world_id for r in seen] == [None, first]
     assert [r.slot for r in seen] == [MON_0330Z, MON_0330Z + WEEK]
     assert second != first and WORLD_ID.match(second)
     assert not first_ids & {e["id"] for e in second_stream}  # offered, never silently reused
     assert rig.schedules.get(sid).last_slot == slot_key(sid, MON_0330Z + WEEK)
 
 
-def test_FR_AGT_14_missed_slots_collapse_into_one_run_and_the_world_starts_with_world_requested(rig: SchedApi) -> None:
-    """(14e) The info `alert.raised` this test used to pin in the new world is not part of the hand-off: a task's body
-    carries no count of skipped slots and the world does not exist yet at fan-out (BQ-AGT14-5)."""
+def test_FR_AGT_14_missed_slots_collapse_into_one_run_and_one_info_alert_in_its_world(rig: SchedApi, registry) -> None:
+    """(14e, BQ-AGT14-5 R2) The alert is raised by the task's delivery (the body carries the count), after
+    `world.requested`: the world does not exist yet at fan-out, so the tick writes nothing to any world."""
     source = armed(rig)
     sid = rig.created(source)["schedule_id"]
     assert fire(rig, MON_0330Z + 3 * WEEK + timedelta(days=2)) == 1
@@ -395,6 +401,14 @@ def test_FR_AGT_14_missed_slots_collapse_into_one_run_and_the_world_starts_with_
     assert rig.schedules.get(sid).next_due == MON_0330Z + 4 * WEEK
     assert rig.schedules.get(sid).last_slot.startswith(f"{sid}:")  # (complete() records the claimed slot's key)
     assert stream[0]["type"] == "world.requested" and stream[0]["seq"] == 1
+    (alert,) = [e for e in stream if e["type"] == "alert.raised"]
+    assert (
+        alert["seq"] > 1
+        and alert["severity"] == "info"
+        and alert["data"]["card_id"] is None
+        and "3" in alert["summary"]
+    )
+    assert_valid_event(REPO_ROOT, registry, alert)
     assert len(rig.worlds_besides(source.world_id)) == 1  # no backfill storm
 
 

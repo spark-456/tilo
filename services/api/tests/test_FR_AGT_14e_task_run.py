@@ -26,10 +26,12 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
-from _clint2_lib import settle, wait_for
+from _api_contracts_lib import assert_valid_event
+from _clint2_lib import REPO_ROOT, settle, wait_for
 from _fr_agt_14_lib import (
     API_SA,
     AUDIENCE,
+    ENV_QUEUE,
     ENV_TASKS_CALLER,
     FLOW_USER,
     GMAIL_SA,
@@ -337,8 +339,10 @@ def test_FR_AGT_14e_replay_only_blocks_the_tasks_mode_too(rig: SchedApi) -> None
     before = snapshot(rig)
     rig.flags.set("replay_only", True, reason="NFR-24 test")
     response = execute(rig)
-    assert refused(response) or response.status_code == 503, (response.status_code, response.text)
+    assert response.status_code == 503, (response.status_code, response.text)  # BQ-AGT14-5 R4: Cloud Tasks retries it
+    assert "Traceback" not in response.text
     assert_unchanged(rig, before)
+    assert_record_untouched(rig, "sched_a")
     assert rig.worlds_besides(source.world_id) == []
     rig.flags.set("replay_only", False, reason="cleared")
     assert execute(rig).json()["ran"] == 1  # the same task, delivered again once the flag is clear
@@ -348,10 +352,16 @@ def test_FR_AGT_14e_replay_only_blocks_the_tasks_mode_too(rig: SchedApi) -> None
 
 GOOD = task_body("sched_a", MON_0330Z)
 EXTRA = [
-    ("owner_user_id", "u_other"), ("brief", {"title": "x"}), ("approach", {"id": "quick"}), ("budget_cap", 9999),
-    ("cap", 9999), ("title", "Hijacked"), ("world_id", "w_x"), ("skipped", 3), ("prior_world_id", "w_y"),
-    ("idempotency_key", "k"), ("extra", 1),
-]  # fmt: skip
+    ("owner_user_id", "u_other"),
+    ("brief", {"title": "x"}),
+    ("approach", {"id": "quick"}),
+    ("budget_cap", 9999),
+    ("cap", 9999),
+    ("title", "Hijacked"),
+    ("world_id", "w_x"),
+    ("idempotency_key", "k"),
+    ("extra", 1),
+]  # fmt: skip  (BQ-AGT14-5 R1: `skipped` and `prior_world_id` left this list: they are the two server-written fields)
 
 
 @pytest.mark.parametrize(("key", "value"), EXTRA, ids=[k for k, _ in EXTRA])
@@ -639,6 +649,8 @@ def test_FR_AGT_14e_missed_slots_run_once_and_the_new_world_still_starts_with_wo
     stream = stream_of(rig, world_id)
     assert [e["seq"] for e in stream] == list(range(1, len(stream) + 1))
     assert stream[0]["type"] == "world.requested"  # nothing (not the missed-slots alert) came before it
+    (alert,) = [e for e in stream if e["type"] == "alert.raised"]  # BQ-AGT14-5 R2: the delivery raises it, once
+    assert alert["seq"] > 1 and alert["severity"] == "info" and "3" in alert["summary"]
     assert len(rig.worlds_besides(source.world_id)) == 1  # no backfill storm
 
 
@@ -656,3 +668,184 @@ def test_FR_AGT_14e_a_world_is_never_its_own_prior_world(rig: SchedApi) -> None:
     for world_id in worlds:
         assert rig.store.worlds[world_id].prior_world_id != world_id
     assert rig.schedules.get("sched_a").last_world_id == worlds[1]
+
+
+# --- BQ-AGT14-5 R1: the two server-written fields, `skipped` and `prior_world_id`, are untrusted data -------
+
+
+def test_FR_AGT_14e_skipped_and_the_prior_world_are_taken_as_data_within_their_bounds(rig: SchedApi) -> None:
+    source = scheduled(rig)
+    response = rig.task_call(task_body("sched_a", MON_0330Z, skipped=100_000, prior_world_id=source.world_id))
+    assert response.status_code == 200 and response.json() == {"ran": 1, "state": "parked"}, response.text
+    world_id = only_world(rig, source)
+    assert rig.store.worlds[world_id].prior_world_id == source.world_id  # offered to the new world, never reused
+    assert rig.store.worlds[world_id].owner == FLOW_USER  # and nothing in the body made it anyone else's
+
+
+def test_FR_AGT_14e_a_body_without_the_two_fields_means_none_skipped_and_no_prior_world(rig: SchedApi) -> None:
+    source = scheduled(rig)
+    assert rig.task_call(task_body("sched_a", MON_0330Z, skipped=0, prior_world_id=None)).json()["ran"] == 1
+    world_id = only_world(rig, source)
+    assert rig.store.worlds[world_id].prior_world_id is None
+    assert "alert.raised" not in types(rig, world_id)
+
+
+BAD_SKIPPED = [-1, 100_001, 10**12, True, 2.5, "3", None, [3], {"n": 3}]
+BAD_PRIOR = [
+    "", "w_", "x_abc", "sched_a", "w_" + "x" * 49, "w_a/b", "w_a b", "W_abc", "w_é", " w_abc", "w_abc\n",
+    5, True, ["w_a"], {"id": "w_a"},
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("skipped", BAD_SKIPPED, ids=[repr(v)[:20] for v in BAD_SKIPPED])
+def test_FR_AGT_14e_a_skipped_count_out_of_bounds_or_of_the_wrong_type_is_422(rig: SchedApi, skipped: Any) -> None:
+    scheduled(rig)
+    before = snapshot(rig)
+    response = rig.task_call(task_body("sched_a", MON_0330Z, skipped=skipped))
+    assert response.status_code == 422, (skipped, response.status_code, response.text)
+    assert_unchanged(rig, before)
+    assert_record_untouched(rig, "sched_a")
+
+
+@pytest.mark.parametrize("prior", BAD_PRIOR, ids=[repr(v)[:20] for v in BAD_PRIOR])
+def test_FR_AGT_14e_a_prior_world_that_is_not_a_world_id_is_422(rig: SchedApi, prior: Any) -> None:
+    scheduled(rig)
+    before = snapshot(rig)
+    response = rig.task_call(task_body("sched_a", MON_0330Z, prior_world_id=prior))
+    assert response.status_code == 422, (prior, response.status_code, response.text)
+    assert_unchanged(rig, before)
+    assert_record_untouched(rig, "sched_a")
+
+
+@pytest.mark.parametrize("prior", ["w_theirs", "w_nothing_like_it"], ids=["another owner's world", "no such world"])
+def test_FR_AGT_14e_a_prior_world_that_is_not_the_owners_own_is_never_recorded(rig: SchedApi, prior: str) -> None:
+    """The body can name any well-formed world id (only a forged Tasks token could). The new world still starts, but a
+    world the owner does not have is not offered to it: the field is data, never a way to point at someone else's."""
+    from tilo_api import deps
+
+    source = scheduled(rig)
+    rig.store.worlds["w_theirs"] = deps.WorldRecord(owner="u_other", districts={}, run_id="r_theirs")
+    response = rig.task_call(task_body("sched_a", MON_0330Z, prior_world_id=prior))
+    assert response.status_code == 200 and response.json()["ran"] == 1, response.text
+    assert rig.store.worlds[only_world(rig, source)].prior_world_id is None
+
+
+# --- BQ-AGT14-5 R2: the collapsed-missed-slots alert is raised by the delivery --------------------------
+
+
+def test_FR_AGT_14e_a_task_that_collapsed_missed_slots_raises_one_info_alert_after_world_requested(
+    rig: SchedApi, registry: Any
+) -> None:
+    source = scheduled(rig)
+    body = task_body("sched_a", MON_0330Z, skipped=3)
+    assert rig.task_call(body).json()["ran"] == 1
+    world_id = only_world(rig, source)
+    stream = stream_of(rig, world_id)
+    (alert,) = [e for e in stream if e["type"] == "alert.raised"]
+    assert stream[0]["type"] == "world.requested" and alert["seq"] > 1
+    assert (alert["actor"], alert["severity"], alert["target"], alert["vis"]) == ("system", "info", world_id, "all")
+    assert alert["data"]["card_id"] is None and "3" in alert["summary"]
+    assert_valid_event(REPO_ROOT, registry, alert)
+    assert [e["seq"] for e in stream] == list(range(1, len(stream) + 1))
+    assert rig.task_call(body).status_code == 200  # a duplicate delivery of the same task
+    assert [e["type"] for e in stream_of(rig, world_id)].count("alert.raised") == 1  # raises no second alert
+
+
+def test_FR_AGT_14e_an_on_time_task_raises_no_alert(rig: SchedApi) -> None:
+    source = scheduled(rig)
+    assert execute(rig).json()["ran"] == 1
+    assert "alert.raised" not in [e["type"] for e in stream_of(rig, only_world(rig, source))]
+
+
+def test_FR_AGT_14e_a_refused_task_that_names_skipped_slots_writes_no_alert_and_no_world(rig: SchedApi) -> None:
+    scheduled(rig)
+    _no_policy(rig)
+    before = snapshot(rig)
+    response = rig.task_call(task_body("sched_a", MON_0330Z, skipped=2))
+    assert response.json() == {"ran": 0, "skipped": "budget_not_granted"}
+    assert_unchanged(rig, before)
+
+
+# --- BQ-AGT14-5 R3: a permanent refusal is recorded on the schedule as `last_error`, and only that ----------
+
+
+def _swap_owner_of_the_slots_world(rig: SchedApi) -> None:
+    known = set(rig.store.worlds)
+    assert execute(rig).json()["ran"] == 1
+    (world_id,) = set(rig.store.worlds) - known
+    stream_of(rig, world_id)
+    rig.store.worlds[world_id] = dataclasses.replace(rig.store.worlds[world_id], owner="u_other")
+
+
+RECORDED = [
+    pytest.param(_no_policy, "budget_not_granted", id="no budget policy"),
+    pytest.param(_other_owners_policy, "budget_not_granted", id="only another owner's policy"),
+    pytest.param(_swap_owner_of_the_slots_world, "owner_mismatch", id="the slot's world is someone else's"),
+]
+
+
+@pytest.mark.parametrize(("break_it", "code"), RECORDED)
+def test_FR_AGT_14e_a_refusal_sets_last_error_and_nothing_else_on_the_schedule(
+    rig: SchedApi, break_it: Any, code: str
+) -> None:
+    """Not a failure (not retried, the slot is spent): no `failures`, no backoff, and `next_due` stays."""
+    scheduled(rig)
+    break_it(rig)
+    for _ in range(2):  # the same answer on a repeat; nothing counts up
+        assert execute(rig).json() == {"ran": 0, "skipped": code}
+        record = rig.schedules.get("sched_a")
+        assert (record.last_error, record.failures, record.backoff_until) == (code, 0, None)
+        assert (record.next_due, record.enabled, record.last_slot) == (MON_0330Z, True, None)
+
+
+def test_FR_AGT_14e_a_record_with_no_snapshot_records_snapshot_missing(rig: SchedApi) -> None:
+    source = armed(rig)
+    rig.insert(source, "sched_a", brief=None)
+    assert execute(rig).json() == {"ran": 0, "skipped": "snapshot_missing"}
+    record = rig.schedules.get("sched_a")
+    assert (record.last_error, record.failures, record.backoff_until, record.next_due) == (
+        "snapshot_missing",
+        0,
+        None,
+        MON_0330Z,
+    )
+
+
+def test_FR_AGT_14e_a_missing_or_disabled_schedule_records_nothing(rig: SchedApi) -> None:
+    scheduled(rig)
+    _disable(rig)
+    assert execute(rig).json() == {"ran": 0, "skipped": "schedule_disabled"}
+    assert rig.schedules.get("sched_a").last_error is None  # the schedule is off: the owner turned it off
+    _gone(rig)
+    assert execute(rig).json() == {"ran": 0, "skipped": "schedule_missing"}
+    assert rig.schedules.get("sched_a") is None  # and nothing was created to hold an error
+
+
+def test_FR_AGT_14e_the_next_slots_completion_clears_a_recorded_refusal(rig: SchedApi) -> None:
+    """The recorded code is for the slot the task was for; the next fan-out's `complete` clears it again."""
+    scheduled(rig)
+    _no_policy(rig)
+    assert rig.tick().json() == {"fired": 1}
+    assert rig.deliver_new_tasks() == 0
+    assert rig.schedules.get("sched_a").last_error == "budget_not_granted"
+    rig.store.policies[POLICY_ID] = l3_budget_policy()
+    rig.clock.set(MON_0330Z + WEEK)
+    assert rig.tick().json() == {"fired": 1} and rig.deliver_new_tasks() == 1
+    assert rig.schedules.get("sched_a").last_error is None
+
+
+# --- configuration: the Tasks mode is closed too -------------------------------------------------------
+
+
+def test_FR_AGT_14e_without_a_queue_the_tasks_mode_is_503_and_touches_nothing(
+    rig: SchedApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scheduled(rig)
+    before = snapshot(rig)
+    monkeypatch.delenv(ENV_QUEUE)
+    response = execute(rig)
+    assert response.status_code == 503 and "Traceback" not in response.text
+    assert_unchanged(rig, before)
+    assert_record_untouched(rig, "sched_a")
+    monkeypatch.setenv(ENV_QUEUE, "projects/demo-tilo/locations/asia-southeast1/queues/runs")
+    assert execute(rig).json()["ran"] == 1  # configured again: the same task runs

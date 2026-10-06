@@ -120,3 +120,28 @@ def test_FR_AGT_14e_a_run_waiting_on_a_question_is_parked_until_it_is_answered(a
     assert response.status_code == 200, response.text
     wait_for(lambda: rf.events("world.completed"), what="world.completed")
     assert run.wait_until_parked_or_done(30.0) == "done"
+
+
+def test_FR_AGT_14e_a_question_wait_is_not_parked_while_another_unit_still_computes(repo_root) -> None:
+    """BQ-AGT14-5 R6: "parked" means the whole run is quiet at a person. U1 waits for an answer, but the independent U2
+    is still working: the wait must say "timeout" (the request keeps its CPU for the work), and only once U2 and what
+    follows it are done does it say "parked"."""
+    rf = build_ask_flow(repo_root, tasks_provider(ASK, *CLEAR[1:]), independent=True)
+    try:
+        rf.runner.block_on = "U2"
+        start_and_approve(rf)
+        wait_for(lambda: rf.events("question.routed"), what="question.routed")
+        assert rf.runner.entered.wait(timeout=10), "U2 never started"
+        run = run_of(rf)
+        (card,) = needs_you_cards(rf)
+        assert run.wait_until_parked_or_done(0.3) == "timeout"  # a person is awaited, but a unit computes
+        clock = TickingClock(step=600.0)
+        assert run.wait_until_parked_or_done(25 * 60, clock=clock, poll_s=0.001) == "timeout"
+        rf.runner.release.set()  # U2 finishes and U3 runs; only U1's question is left
+        assert run.wait_until_parked_or_done(30.0) == "parked"
+        assert {"U2", "U3"} <= set(rf.runner.ran)  # it did not return before the other units were done
+        assert rf.answer(card["id"], card["options"][0]["id"]).status_code == 200
+        wait_for(lambda: rf.events("world.completed"), what="world.completed")
+        assert run.wait_until_parked_or_done(30.0) == "done"
+    finally:
+        rf.close()

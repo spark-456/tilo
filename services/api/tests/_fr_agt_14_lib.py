@@ -85,12 +85,14 @@ def task_payload(task: Mapping[str, Any]) -> dict[str, Any]:
     return json.loads(base64.b64decode(task["httpRequest"]["body"]))
 
 
-def task_body(schedule_id: str, due: datetime) -> dict[str, str]:
-    """The body Cloud Tasks delivers for one slot: exactly `schedule_id`, `slot` (the slot key) and `due` (ISO, UTC)."""
+def task_body(schedule_id: str, due: datetime, **extra: Any) -> dict[str, Any]:
+    """The body Cloud Tasks delivers for one slot: `schedule_id`, `slot` (the slot key) and `due` (ISO, UTC), plus what
+    the fan-out also writes (`skipped`, `prior_world_id`; BQ-AGT14-5 R1), which a test passes as `extra` (both are
+    optional: a body without them means 0 and None)."""
     from tilo_harness.schedule import slot_key  # noqa: PLC0415
 
     return {
-        "schedule_id": schedule_id, "slot": slot_key(schedule_id, due), "due": due.astimezone(UTC).isoformat(),
+        "schedule_id": schedule_id, "slot": slot_key(schedule_id, due), "due": due.astimezone(UTC).isoformat(), **extra,
     }  # fmt: skip
 
 
