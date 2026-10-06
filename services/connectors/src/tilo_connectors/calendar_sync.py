@@ -87,6 +87,11 @@ class CalendarSyncConfig:
     per_minute: int  # google_calendar limits.per_minute: requests per person in any 60 s
 
 
+def _read_yaml(text: str) -> Any:
+    """The one place this module parses YAML (no aliases). Swap for registry.load_strict_yaml once it exists here."""
+    return yaml.load(text, Loader=_NoAliasLoader)  # noqa: S506
+
+
 def _int(value: Any, low: int, high: int, key: str) -> int:
     if type(value) is not int or not low <= value <= high:
         raise CalendarConfigError(f"{key}: must be an integer from {low} to {high}")
@@ -106,7 +111,7 @@ def load_calendar_sync_config(
     """Refuses the whole file (and a google_calendar declaration that is not read-only) with a message that
     names a key, never a value. Other top-level keys belong to CC-PEOPLE-2 and are ignored."""
     try:
-        raw = yaml.load(Path(path).read_text(encoding="utf-8"), Loader=_NoAliasLoader)  # noqa: S506
+        raw = _read_yaml(Path(path).read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError, RecursionError, ValueError) as exc:
         raise CalendarConfigError(f"personal config: not a readable UTF-8 YAML file ({type(exc).__name__})") from None
     window, sync = _block(raw, "working_window", {"start", "end"}), _block(raw, "calendar_sync", set(_LIMITS))
