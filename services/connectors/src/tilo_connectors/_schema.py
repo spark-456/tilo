@@ -46,6 +46,18 @@ def connector_validator() -> jsonschema.protocols.Validator:
 
 
 @functools.lru_cache(maxsize=1)
+def brief_validator() -> jsonschema.protocols.Validator:
+    schema = _load_json(_CONTRACTS_DIR / "brief.schema.json")
+    return jsonschema.Draft202012Validator(schema, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
+def approach_validator() -> jsonschema.protocols.Validator:  # plan.schema.json#/$defs/approach
+    ref = {"$ref": "https://contracts.tilo.example/plan.schema.json#/$defs/approach"}
+    return jsonschema.Draft202012Validator(ref, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
 def manifest_validator() -> jsonschema.protocols.Validator:
     """Without uniqueItems on parents and inputs: jsonschema compares those pairwise (O(n^2)), so
     provenance.build_manifest refuses a repeated (artifact_id, version) first, in O(n) (#187)."""

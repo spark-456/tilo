@@ -86,22 +86,14 @@ def _text_only(message: dict[str, Any]) -> bool:
 
 
 def _clauses(value: str) -> list[str] | None:
-    """The header split as RFC 8601 does: comments (nested; a backslash quotes the next character) are dropped,
-    quoted strings are kept whole, and ";" splits only outside both. None when a comment or quote is unbalanced."""
+    """The header split as RFC 8601 does, for a value with no quote or backslash (`_dmarc_pass` refuses those):
+    nested comments are dropped and ";" splits only outside them. None when a comment is unbalanced."""
     clauses: list[str] = []
     current: list[str] = []
-    depth, quoted, i = 0, False, 0
-    while i < len(value):
-        c = value[i]
-        if c == "\\" and (depth or quoted) and i + 1 < len(value):
-            current += [] if depth else [value[i : i + 2]]
-            i += 2
-            continue
+    depth = 0
+    for c in value:
         if depth:
             depth += (c == "(") - (c == ")")
-        elif quoted:
-            current.append(c)
-            quoted = c != '"'
         elif c == "(":
             depth = 1
             current.append(" ")
@@ -112,23 +104,24 @@ def _clauses(value: str) -> list[str] | None:
             current = []
         else:
             current.append(c)
-            quoted = c == '"'
-        i += 1
-    if depth or quoted:
-        return None
-    return [*clauses, "".join(current)]
+    return None if depth else [*clauses, "".join(current)]
 
 
 def _dmarc_pass(message: dict[str, Any], trusted: str | None) -> bool:
     """True when the Authentication-Results header is text written by the trusted server (its authserv-id, the text
     before the first top-level ";", is `trusted`, compared as ASCII) and holds at least one top-level `dmarc` clause
-    (a clause whose method is exactly `dmarc`) and every such clause is "pass". Text inside a comment, a quoted
-    string or another method's clause (Gmail copies the envelope sender's local part into its spf clause, and an arc
-    comment) is never a verdict. No trusted id, another or no id, an unbalanced comment or quote, a `dmarc` clause
-    with no result, any other result, a pass beside a failure, no dmarc clause, a missing or non-text header (or two
-    keys that differ only by case): False."""
+    (a clause whose method is exactly `dmarc`) and every such clause is "pass". Text inside a comment or another
+    method's clause (Gmail copies the envelope sender's local part into its spf clause, and an arc comment) is never
+    a verdict. No trusted id, another or no id, a value with a quote or a backslash, an unbalanced comment, a `dmarc`
+    clause with no result, any other result, a pass beside a failure, no dmarc clause, a missing or non-text header
+    (or two keys that differ only by case): False."""
     value = headers_of(message).get(AUTH_HEADER)
     if not trusted or not isinstance(value, str) or len(value) > AUTH_CAP:
+        return False
+    # A quote opens a string at top level but is plain text inside a comment, and the sender's text is copied into both
+    # (the spf comment and smtp.mailfrom), so a parser can be desynchronised. Gmail's own syntax needs neither a quote
+    # nor a backslash: a value that holds one is not read.
+    if '"' in value or "\\" in value:
         return False
     clauses = _clauses(value)
     if clauses is None or len(clauses) < 2:

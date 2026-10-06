@@ -12,7 +12,7 @@ import math
 import threading
 import unicodedata
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
@@ -25,8 +25,8 @@ from tilo_harness.executor import UnitOutcome, run_plan
 from tilo_harness.must_ask import MustAsk
 from tilo_harness.question_wait import AlreadyAnswered, QuestionWait
 from tilo_harness.validator import repo_validator
+from tilo_memory.artifacts import Scope
 from tilo_planning.compiler import DELIVER, PlanInputs
-from tilo_policy.schemas import conforms
 
 from tilo_api import deps, events
 from tilo_api.cards import AlreadyCommitted, CardStore, _card_errors
@@ -40,6 +40,7 @@ _GATE_TIMEOUT_S = 86_400  # BQ-90: then the card holds; a gate never times out t
 _POLL_S = 0.25  # how often a waiting gate looks for an answer or a pause
 _EXACT_MAX = 500  # card.schema.json: gate.action.exact
 _SEND_RETRY_DELAYS_S = (0.0, 0.2, 0.5, 1.0, 2.0, 2.0)  # FR-AGT-11: the send step is retried, never resent
+_RECORDS = ("artifact.created", "artifact.versioned", "artifact.rolled_back")  # the events that record a version
 
 
 class _WallClock:
@@ -52,7 +53,7 @@ _CLOCK = _WallClock()
 
 @dataclass(frozen=True)
 class MeteredOutcome(UnitOutcome):
-    """A unit's outcome plus the credits its work metered (PRD 14.1); recorded on the unit's first artifact.created."""
+    """A unit's outcome plus the credits its work metered (PRD 14.1); recorded on the unit's first announced item."""
 
     credits: float = 0.0
 
@@ -77,13 +78,16 @@ class Seams:
     outbox_store: Any
     writer: deps.EventWriter
     must_ask_providers: Mapping[str, Any]
+    artifacts: Any  # tilo_memory.artifacts.ArtifactStore (ADR-0018 T4)
+    redactor: Callable[[str], str]  # the shared secret redactor the store was given
+    open_archive: Callable[..., Any]  # (*, org_id, run_id) -> the run's tilo_archive.RunArchive
 
 
 def run_seams(request: Request) -> Seams | None:
     """The seams as the app wires them, overrides included; if any cannot be built, no run starts."""
     overrides = request.app.dependency_overrides
     names = "plan_compiler layout_builder unit_runner action_resolver skill_registry connector_registry"
-    names += " connector_adapters outbox_store event_writer must_ask_providers"
+    names += " connector_adapters outbox_store event_writer must_ask_providers artifact_store redactor run_archive"
     try:
         return Seams(*(overrides.get(seam, seam)() for seam in (getattr(deps, f"get_{n}") for n in names.split())))
     except Exception as exc:
@@ -116,10 +120,13 @@ class _NoCards:
 
 
 class Run:
-    """Also the executor's writer (`emit`) and its CardStore's (`write`): both end at the single writer."""
+    """Also the executor's writer (`emit`, `org_id`, `world_id`, `recorded_version`) and its CardStore's (`write`):
+    both end at the single writer."""
 
     def __init__(self, store: deps.Store, task: deps.TaskRecord, approach: dict, cap: float, seams: Seams) -> None:
         self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)
+        self.org_id = deps.ORG_ID  # the run's artifact Scope is (org_id, world_id, owner); never a request's
+        self.scope: Scope | None = None  # set when the run starts
         self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
         self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
@@ -133,7 +140,7 @@ class Run:
         self.sends: dict[str, dict[str, Any]] = {}  # outbox_id -> what its data.transfer needs
         self.titles: dict[str, str] = {}  # artifact_id -> the delivering unit's title
         self.delivered: list[str] = []  # artifact.delivered event ids
-        self.produced: dict[str, list[tuple[dict, dict, str]]] = {}  # unit id -> (unit, item, artifact.created id)
+        self.produced: dict[str, list[tuple[dict, dict, str]]] = {}  # unit id -> (unit, item, its announcing event id)
         self._built: dict[str, dict] = {}  # event id -> the event as first built, resent as is on an exact retry
         self.failure: str | None = None
         self._failed = False
@@ -156,7 +163,7 @@ class Run:
             raise ValueError("an event's vis is never widened")
         event = {
             "id": kw.get("event_id") or events.new_part_id(), "type": type_, "actor": actor, "target": target,
-            "level": self.levels.get(district) if district else None, "district": district, "item": None,
+            "level": self.levels.get(district) if district else None, "district": district, "item": kw.get("item"),
             "severity": kw.get("severity") or repo_validator().registry_types[type_]["default_severity"],
             "credits": kw.get("credits", 0), "summary": summary[:140], "cause": kw.get("cause"), "vis": vis,
             "authz": kw.get("authz"), "data": data,
@@ -180,17 +187,26 @@ class Run:
                 raise
             raise AlreadyCommitted(committed) from None
 
-    def metered(self, outcome: Any) -> float:
-        """The credits a unit's outcome reports, finite and at least 0, and never more than the approved budget still
-        leaves (the sum of the run's event credits is the meter, HR-1)."""
-        credits = getattr(outcome, "credits", 0)
+    def metered(self, credits: Any) -> float:
+        """A unit's credits, finite and at least 0, and never more than the approved budget still leaves (the sum of
+        the run's event credits is the meter, HR-1)."""
         if isinstance(credits, bool) or not isinstance(credits, int | float) or not math.isfinite(credits):
             return 0
         spent = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))
         return max(0, min(credits, self.cap - spent))
 
+    def recorded_version(self, artifact_id: str) -> int:
+        """The highest version of `artifact_id` this world's stream recorded (EV-15), 0 if none."""
+        stream = list(self.store.events.get(self.world_id, []))
+        versions = (e["data"]["artifact"] for e in stream if e["type"] in _RECORDS)
+        return max((ref["version"] for ref in versions if ref["artifact_id"] == artifact_id), default=0)
+
     def emit(self, *, type: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
-        passed = {k: kw[k] for k in ("district", "cause", "vis", "severity", "event_id") if k in kw}
+        """The executor's events. A unit's credits ride on its first announced item, clamped by `metered`."""
+        keys = ("district", "cause", "vis", "severity", "event_id", "item")
+        passed: dict[str, Any] = {k: kw[k] for k in keys if k in kw}
+        if kw.get("credits"):
+            passed["credits"] = self.metered(kw["credits"])
         defaulted = type == "question.answered" and data.get("answered_by") == "default"
         try:
             event = self.put(type, actor, target, summary, data, **passed)
@@ -316,11 +332,17 @@ class Run:
         config = self._prepare()
         if config is None:
             return
+        try:  # the run's own Scope and raw archive (ADR-0018 T4); never named by a request
+            self.scope = scope = Scope(org_id=self.org_id, world_id=self.world_id, owner=self.owner)
+            archive = self.seams.open_archive(org_id=self.org_id, run_id=self.run_id)
+        except Exception as exc:
+            logger.warning("run %s: no artifact scope or archive (%s)", self.run_id, type(exc).__name__)
+            self._fail("the run's item store could not be opened", None)
+            return
         stream = self.store.events.get(self.world_id, [])
         granted = next((e["id"] for e in reversed(stream) if e["type"] == "budget.granted"), None)
         summary = f"Work started with a budget of {self.cap:g} credits."
         self.put("world.started", self.director, self.world_id, summary, {"budget_cap": self.cap}, cause=granted)
-        runner = _GatedRunner(self, self.seams.runner)
         must_ask = MustAsk(
             self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
             covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
@@ -332,9 +354,14 @@ class Run:
                 writer=self,
                 config=config,
                 skills=self.seams.skills,
-                runner=runner,
+                runner=self.seams.runner,
                 must_ask=must_ask,
                 question_wait=self.question_wait,
+                artifacts=self.seams.artifacts,
+                scope=scope,
+                archive=archive,
+                redact=self.seams.redactor,
+                before_handoff=self.before_handoff,
             )  # fmt: skip
         )
         while not planned.done():  # a unit waiting for a person must not outlive a pause
@@ -365,11 +392,25 @@ class Run:
         if district is None or self.cards.submit(card, district=district, merge=False).outcome == "rejected":
             raise RuntimeError("the question card was refused")
 
+    async def before_handoff(self, unit: dict, worker: str, announced: list[tuple[dict, str]]) -> bool:
+        """The executor stored and announced the unit's items (ADR-0018 T4). A unit with actions stops at its gate (the
+        item to send is its first announced version); a `deliver` unit with none delivers in Tilo. False fails it."""
+        self.produced[unit["id"]] = [(unit, dict(ref), made) for ref, made in announced]
+        try:
+            for action in unit["actions"]:
+                if not announced:
+                    raise _GateFailed("the step had nothing to send")
+                await self.gate(unit, worker, action, *announced[0])
+        except _GateFailed as exc:
+            self.failure = str(exc)
+            return False
+        if unit["unit_type"] == DELIVER and not unit["actions"]:  # a deliver unit that sends delivers at its gate
+            self.deliver_in_app(unit, worker)
+        return True
+
     async def gate(self, unit: dict, worker: str, action: str, ref: dict, made: str) -> None:
         """PRD 10.3/10.4: the policy engine assesses the send, a person approves it, the outbox sends it once."""
         item, district = {"artifact_id": ref["artifact_id"], "version": ref["version"]}, unit["district"]
-        if self.foreign([item]):  # fails closed before the policy engine or any card sees it
-            raise _GateFailed("the item to send belongs to another world")
         gate = next((g for g in self.plan["gates"] if unit["id"] in g["guards"] and g["action_type"] == action), None)
         connector = next((c for c in unit["connectors"] if self._action(c, action)), None)
         if gate is None or connector is None:
@@ -383,7 +424,13 @@ class Run:
         if not (isinstance(destination, str) and destination.strip() and isinstance(recipients, list) and recipients
                 and all(isinstance(r, str) and r.strip() for r in recipients)):  # fmt: skip
             raise _GateFailed("the send has no recipients or no destination")  # fails closed, before any gate
-        facts = tilo_policy.SideEffectFacts(recipients=tuple(recipients), known_recipients=tuple(known or ()))
+        try:  # AR-07, OB-05, BQ-264: from the stored record, never a default; only a `clean` verdict clears the flag
+            flagged = self.seams.artifacts.head(self.scope, item).record["screening"] != "clean"
+        except Exception as exc:
+            raise _GateFailed("the item to send is not in the run's store") from exc
+        facts = tilo_policy.SideEffectFacts(
+            recipients=tuple(recipients), known_recipients=tuple(known or ()), safety_flags=flagged
+        )
         proposal = tilo_policy.Proposal(self.world_id, action, connector, district, destination, facts, item, 0, None)
         decision = tilo_policy.decide(
             proposal, table=tilo_policy.load_risk_table(), policies=list(self.store.policies.values()),
@@ -520,15 +567,6 @@ class Run:
             "consent": None,
         }  # fmt: skip
 
-    def foreign(self, refs: list[dict]) -> list[str]:
-        """Artifact ids that another world already holds: a unit never makes or sends another world's item. A
-        runner names its own artifacts only; the streams are what say whose an item is."""
-        ids = {ref["artifact_id"] for ref in refs}
-        return sorted(
-            i for w, stream in self.store.events.items() if w != self.world_id for e in stream
-            if e.get("type") == "artifact.created" and (i := e["data"]["artifact"]["artifact_id"]) in ids
-        )  # fmt: skip
-
     def _exact(self, connector: str, action: str, destination: str, recipients: list[str]) -> str:
         """What the send does, from the action, connector, destination and recipients only; no model-written text
         (a unit's title is not trusted to describe what is sent)."""
@@ -543,50 +581,6 @@ class Run:
         """The owner's policy.applied events in every world, so a policy's daily caps never multiply (PI-11)."""
         worlds = [w for w, record in self.store.worlds.items() if record.owner == self.owner]
         return [e for w in worlds for e in self.store.events.get(w, []) if e.get("type") == "policy.applied"]
-
-
-class _GatedRunner:
-    """Each artifact a unit made is recorded before anything refers to it; a unit with actions then stops at its
-    gate before it hands off."""
-
-    def __init__(self, run: Run, inner: Any) -> None:
-        self._run, self._inner = run, inner
-
-    async def run(self, unit: Any, context: Any) -> UnitOutcome:
-        outcome = await self._inner.run(unit, context)
-        if not isinstance(outcome, UnitOutcome) or outcome.success is not True:
-            return outcome
-        if outcome.outputs:  # stopgap: api runs get the artifact store in ADR-0018 T4; until then, dropped as before T3
-            outcome = replace(outcome, outputs=())
-        refs = list(outcome.artifact_refs) if isinstance(outcome.artifact_refs, list | tuple) else None
-        if refs is None or not all(conforms("common.schema.json#/$defs/artifact_ref", ref) for ref in refs):
-            return UnitOutcome(success=False, summary="The unit named an artifact that does not exist.")
-        if foreign := self._run.foreign(refs):  # nothing of this unit is recorded
-            self._run.failure = "the unit named an item that belongs to another world"
-            logger.warning("run %s: a unit named items of another world: %s", self._run.run_id, foreign)
-            return UnitOutcome(success=False, summary="The unit named an artifact that does not belong to this world.")
-        credits = self._run.metered(outcome)  # the unit's cost rides on its first item
-        made = {}
-        for ref in refs:
-            made[ref["artifact_id"]] = self._run.put(
-                "artifact.created", context.agent_id, ref["artifact_id"], "The agent made an item.",
-                {"artifact": {"artifact_id": ref["artifact_id"], "version": ref["version"]}}, district=unit["district"],
-                credits=credits if ref is refs[0] else 0,
-            )["id"]  # fmt: skip
-        self._run.produced[unit["id"]] = [
-            (unit, {"artifact_id": r["artifact_id"], "version": r["version"]}, made[r["artifact_id"]]) for r in refs
-        ]
-        try:
-            for action in unit["actions"]:  # the item to send is the unit's first artifact
-                if not refs:
-                    raise _GateFailed("the step had nothing to send")
-                await self._run.gate(unit, context.agent_id, action, refs[0], made[refs[0]["artifact_id"]])
-        except _GateFailed as exc:
-            self._run.failure = str(exc)
-            return UnitOutcome(success=False, summary="The gated step could not finish.")
-        if unit["unit_type"] == DELIVER and not unit["actions"]:  # a deliver unit that sends delivers at its gate
-            self._run.deliver_in_app(unit, context.agent_id)
-        return outcome
 
 
 def get_card_store(world_id: str, store: Annotated[deps.Store, Depends(deps.get_store)]) -> CardStore:

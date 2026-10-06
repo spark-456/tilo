@@ -310,6 +310,8 @@ def _message(resource: Mapping[str, Any]) -> dict[str, Any]:
     headers = _headers(payload)
     parts = list(_parts(payload))
     text = next((p for p in parts if p.get("mimeType") == "text/plain" and not p.get("filename")), None)
+    if text is not None and ((text.get("body") or {}).get("attachmentId") or "data" not in (text.get("body") or {})):
+        text = None  # its content is served separately (or absent): not text this message carries; it counts as "other"
     # What the body is made of, so a reader can tell "no text part" (HTML-only) from "empty text": a leaf part that is
     # neither the text part nor a named file (text/html, a second text/plain, an inline image) is "other".
     leaves = [p for p in parts if not (str(p.get("mimeType", "")).startswith("multipart/") or p.get("parts"))]

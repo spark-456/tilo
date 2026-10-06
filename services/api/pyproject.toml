@@ -16,9 +16,13 @@ dependencies = [
     "tilo-connectors",
     "tilo-metering",
     "tilo-world",
+    "tilo-archive",
+    "tilo-memory",
 ]
 
 [tool.uv.sources]
+tilo-archive = { workspace = true }
+tilo-memory = { workspace = true }
 tilo-planning = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-harness = { workspace = true }

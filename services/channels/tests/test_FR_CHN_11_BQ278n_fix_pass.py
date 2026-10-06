@@ -49,6 +49,17 @@ def _card(kind: str, value: str, edit: Callable[[dict], None] | None = None):
 # ---------------------------------------------------------------------------
 # 1. Only a top-level dmarc clause is a verdict
 
+
+def _gmail_header(local: str, *, dmarc: str | None = None, spf: str = "pass") -> str:
+    """Gmail's header shape: the spf comment and smtp.mailfrom both echo the envelope sender (MAIL FROM)."""
+    verb = "designates" if spf == "pass" else "does not designate"
+    value = (
+        f"mx.google.com;\r\n       spf={spf} (google.com: domain of {local}@attacker.example {verb} 192.0.2.1 "
+        f"as permitted sender) smtp.mailfrom={local}@attacker.example"
+    )
+    return value + (f";\r\n       {dmarc}" if dmarc else "")
+
+
 NO_REAL_VERDICT = {
     "mailfrom_local_part": (
         "mx.google.com; spf=pass (google.com: domain of dmarc=pass@attacker.example designates 192.0.2.1 as "
@@ -89,6 +100,15 @@ NO_REAL_VERDICT = {
     "real_fail_plus_arc_comment_pass": "mx.google.com; arc=pass (dmarc=pass); dmarc=fail header.from=a.example",
     "unterminated_comment": "mx.google.com; dmarc=pass (p=none header.from=a.example",
     "unterminated_quote": 'mx.google.com; dmarc=pass header.from="a.example',
+    "desync_paren_close_open": _gmail_header('"); dmarc=pass; x=("'),
+    "desync_no_space": _gmail_header('");dmarc=pass;("'),
+    "desync_softfail": _gmail_header('"); dmarc=pass; x=("', spf="softfail"),
+    "desync_backslash": _gmail_header('"\\); dmarc=pass; x=(\\"'),
+    "desync_with_a_real_fail": _gmail_header(
+        '"); dmarc=pass; x=("', dmarc="dmarc=fail (p=NONE) header.from=harriercharters.example"
+    ),
+    "quoted_property": 'mx.google.com; dmarc=pass header.from="harriercharters.example"',
+    "backslash_anywhere": "mx.google.com; dmarc=pass header.from=a\\.example",
     "stray_close_parenthesis": "mx.google.com; dmarc=pass) header.from=a.example",
     "comment_hides_the_authserv_id_semicolon": "attacker.example (x; mx.google.com); dmarc=pass header.from=a.example",
 }
@@ -117,8 +137,10 @@ GENUINE = {
     "comment_before_the_method": "mx.google.com; (checked) dmarc=pass header.from=harriercharters.example",
     "nested_comment_after_pass": "mx.google.com; dmarc=pass (p=NONE (policy) sp=NONE) header.from=a.example",
     "upper_case": "MX.GOOGLE.COM; DMARC=PASS HEADER.FROM=HARRIERCHARTERS.EXAMPLE",
+    "gmail_pass_after_a_plain_spf_clause": _gmail_header(
+        "david", dmarc="dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=harriercharters.example"
+    ),
     "two_passes": "mx.google.com; dmarc=pass header.from=a.example; dmarc=pass header.from=b.example",
-    "quoted_property": 'mx.google.com; dmarc=pass header.from="harriercharters.example"',
 }
 
 
@@ -287,6 +309,15 @@ def test_FR_CHN_11_a_plain_text_part_inside_multipart_mixed_without_files_is_cle
 )
 def test_FR_CHN_11_a_message_that_is_not_a_lone_plain_text_body_is_never_clean(payload: dict[str, Any]) -> None:
     assert _clean(payload) is False
+
+
+def test_FR_CHN_11_a_text_part_whose_content_is_served_separately_is_never_clean() -> None:
+    """A text/plain part with an attachmentId and no inline data gives an empty body, which is not an empty text."""
+    served_apart = {"mimeType": "text/plain", "headers": [], "body": {"attachmentId": "a9", "size": 9000}}
+
+    assert _clean(_top("multipart/mixed", [served_apart])) is False
+    assert _clean(_top("text/plain", [served_apart])) is False
+    assert _clean(_top("multipart/mixed", [_leaf("text/plain", CLEAN)])) is True  # the control
 
 
 def test_FR_CHN_11_an_arc_comment_dmarc_pass_is_not_clean_over_the_real_reader() -> None:

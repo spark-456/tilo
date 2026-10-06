@@ -27,6 +27,11 @@ def _html(text: str = "<p>Hello</p>") -> dict[str, Any]:
     return {"mimeType": "text/html", "headers": [], "body": {"data": _b64(text)}}
 
 
+def _apart() -> dict[str, Any]:
+    """A text/plain part whose content Gmail serves separately: an attachmentId, no inline data."""
+    return {"mimeType": "text/plain", "headers": [], "body": {"attachmentId": "a9", "size": 9000}}
+
+
 def _pdf() -> dict[str, Any]:
     return {
         "mimeType": "application/pdf",
@@ -56,6 +61,8 @@ def _multi(kind: str, *parts: dict[str, Any]) -> dict[str, Any]:
         (_multi("multipart/mixed", _html(), _pdf()), False, True, 1),
         (_multi("multipart/related", _multi("multipart/alternative", _plain(), _html())), True, True, 0),
         (_multi("multipart/mixed"), False, False, 0),
+        (_multi("multipart/mixed", _apart()), False, True, 0),
+        (_multi("multipart/alternative", _apart(), _html()), False, True, 0),
         ({"mimeType": "application/pdf", "headers": [], "body": {"size": 3}}, False, True, 0),
     ],
     ids=[
@@ -68,6 +75,8 @@ def _multi(kind: str, *parts: dict[str, Any]) -> dict[str, Any]:
         "html_and_pdf",
         "nested_alternative",
         "no_leaf",
+        "text_served_apart",
+        "text_served_apart_and_html",
         "unnamed_binary",
     ],
 )

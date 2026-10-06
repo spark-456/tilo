@@ -135,8 +135,17 @@ class WorldWriter:
         self._lock = threading.RLock()
 
     @property
+    def org_id(self) -> str:
+        return self._org_id
+
+    @property
     def world_id(self) -> str:
         return self._world_id
+
+    @_locked
+    def recorded_version(self, artifact_id: str) -> int:
+        """The highest version of `artifact_id` this world recorded (EV-15), 0 if none: versions 1..n are announced."""
+        return self._state.versions.get(artifact_id, 0)
 
     @property
     def run_id(self) -> str:
