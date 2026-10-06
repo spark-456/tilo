@@ -67,6 +67,12 @@ def validate_google_settings(project: str, location: str, environ: Mapping[str, 
         )
     if not _PROJECT_RE.fullmatch(project):
         raise GoogleSettingsError("project_invalid", "GOOGLE_CLOUD_PROJECT is not a valid project id")
+    refuse_service_account_key(environ)
+
+
+def refuse_service_account_key(environ: Mapping[str, str] | None = None) -> None:
+    """Refuses a service-account key file as ADC (user ADC only); shared with the Model Armor adapter."""
+    environ = os.environ if environ is None else environ
     explicit = environ.get(_CREDENTIALS_VAR)
     path = explicit or _well_known_adc_path(environ)  # ADC reads the variable's file, else gcloud's well-known one
     try:

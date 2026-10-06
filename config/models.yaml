@@ -22,10 +22,17 @@ profiles:
     context: 1000000
     caps: [json, tools]
   # FR-INT-02 (issue #103): the dev safety screen. The provider layer refuses a fake safety profile in
-  # live mode or when deployed (K_SERVICE set), so intake fails closed there until Model Armor is wired.
+  # live mode or when deployed (K_SERVICE set); config/models.dev.yaml's safety role uses it, the production role uses armor-default.
   safety-fake:
     provider: fake
     model: fake-safety
+    context: 1000000
+    caps: []
+  # FR-INT-02: Model Armor. `model` is the Model Armor template id (not a model); the project is
+  # GOOGLE_CLOUD_PROJECT and the location TILO_MODEL_ARMOR_LOCATION (default asia-southeast1).
+  armor-default:
+    provider: model_armor
+    model: tilo-default
     context: 1000000
     caps: []
 
@@ -41,7 +48,7 @@ roles:
   # issue #272 (b): the live scenario generator (evals/generator.yaml caps its spend) and its autorater.
   generator: { primary: flash-38, fallback: flash-37, thinking: low }
   autorater: { primary: flash-37, fallback: lite-31 }
-  safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only; never a weaker fallback
+  safety: { primary: armor-default, fallback: armor-default } # screens use the primary only; never a weaker fallback
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]

@@ -6,8 +6,8 @@ screens a native PDF/PNG/JPEG, and any other media type raises `RequestError`
 and stateless; `SafetyRecordReplayProvider` mirrors `replay.RecordReplayProvider`
 (EFF-01: replay by default, `LIVE=1` live, `+TILO_RECORD=1` writes a redacted
 recording); `build_safety_provider` resolves the "safety" role in
-config/models.yaml. The Model Armor adapter is not built yet (ADR-0003): with
-`LIVE=1` its live factory refuses loudly."""
+config/models.yaml. With `LIVE=1` the `model_armor` profile builds
+`model_armor_adapter.ModelArmorSafetyProvider` (lazily; a missing project refuses loudly)."""
 
 from __future__ import annotations
 
@@ -210,7 +210,14 @@ def build_safety_provider(config: ProvidersConfig, *, fixtures_dir: Path | str) 
 
 
 def _build_live_safety_provider(profile: ProvidersProfile, profile_id: str) -> SafetyProvider:
-    raise ProviderConfigError(
-        f"FR-INT-02: the {profile.provider!r} safety adapter for {profile_id!r} is not built yet "
-        "(ADR-0003: Google adapters stay on mocks and recordings); refusing to screen live"
+    """The live Model Armor adapter: the profile's `model` is the template id, the project is
+    `GOOGLE_CLOUD_PROJECT` and the location `TILO_MODEL_ARMOR_LOCATION` (default asia-southeast1)."""
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+    if not project:
+        raise ProviderConfigError(f"FR-INT-02: GOOGLE_CLOUD_PROJECT is not set; cannot screen live for {profile_id!r}")
+    location = os.environ.get("TILO_MODEL_ARMOR_LOCATION", "asia-southeast1")
+    from tilo_providers import model_armor_adapter  # noqa: PLC0415  (lazy: replay never loads it)
+
+    return model_armor_adapter.ModelArmorSafetyProvider(
+        profile_id=profile_id, template_id=profile.model, project=project, location=location
     )

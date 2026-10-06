@@ -34,7 +34,7 @@ The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `Search
 - `safety` (CC-SP-47, FR-INT-02, BQ-68): `check()` returns `{flagged, reason}`; adapters implement `_check`, `check` gates the media
   type (`content=`/`mime_type=`: PDF/PNG/JPEG only, else `RequestError`, fail closed). `build_safety_provider` reads only the
   primary, never a fallback: `fake` -> `FakeSafetyProvider` (refused if `LIVE=1` or `K_SERVICE`/`CLOUD_RUN_JOB` is set at all),
-  `model_armor` -> `SafetyRecordReplayProvider` (live stub refuses); reasons are fixed categories, writes atomic, corrupt -> `ProviderError`.
+  `model_armor` -> `SafetyRecordReplayProvider`, live `model_armor_adapter` (REST `:sanitizeUserPrompt`, ADC bearer, `model`=template id, env `GOOGLE_CLOUD_PROJECT`/`TILO_MODEL_ARMOR_LOCATION`; clean only on NO_MATCH+SUCCESS+all filters ran, else raises); reasons are fixed categories, writes atomic, corrupt -> `ProviderError`.
 - `Router._candidate` is the one choke point for every candidate touch (build, count_tokens, calls, first chunk): `RequestError`/
   stream-embed `SafetyError` raise (generate: `safety_blocked`), mid-stream -> `StreamInterruptedError`, anything else falls back
   (over budget: never sent). Only `RouterError`s leave, with `.attempts` and `__cause__`.
