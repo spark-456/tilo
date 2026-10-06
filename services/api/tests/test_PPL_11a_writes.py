@@ -17,6 +17,7 @@ import time
 
 import pytest
 from _ppl11a_lib import (
+    ATTEST,
     DEV,
     EARLY,
     MEERA,
@@ -42,7 +43,7 @@ PERSON = {
     "time_zone": "Asia/Kolkata",
     "preferred_channel": "web",
 }
-MEETING = {"title": "Weekly sync", "source": "upload"}
+MEETING = {"title": "Weekly sync", "source": "upload", **ATTEST}
 
 
 def _proposed_item(rig):
@@ -320,6 +321,8 @@ def test_PPL_11a_PE_18_a_created_meeting_is_stamped_by_the_server_and_has_no_wor
     rig.as_user(PRIYA)
     rig.require_route(("POST", "/v1/meetings"))
     body = {
+        "attest": True,
+        "notice_version": "2.3.4",
         "title": "Q4 planning",
         "source": "upload",
         "series": "q4_planning_weekly",
@@ -338,6 +341,7 @@ def test_PPL_11a_PE_18_a_created_meeting_is_stamped_by_the_server_and_has_no_wor
     assert meeting["minutes_confirmed_by"] is None and meeting["transcript"] is None and meeting["minutes"] is None
     assert meeting["attendees"] == [{"name": "Asha Rao", "user": None}, {"name": "Dev from Acme", "user": None}]
     assert (meeting["title"], meeting["series"], meeting["agenda"]) == (body["title"], body["series"], body["agenda"])
+    assert "attest" not in meeting
     assert rig.stored("meetings", meeting["id"]) == meeting
     assert meeting["delete_transcript_after"] is None and meeting["delete_minutes_after"] is None
     again = rig.post("/v1/meetings", body).json()
@@ -351,7 +355,6 @@ def test_PPL_11a_PE_18_a_created_meeting_is_stamped_by_the_server_and_has_no_wor
         {"org_id": "org_elsewhere"},
         {"owner": "u_sam"},
         {"attestation": {"by": "u_sam", "at": "2020-01-01T00:00:00.000Z", "notice_version": "0.0.1"}},
-        {"notice_version": "0.0.1"},
         {"status": "minuted"},
         {"world_id": "w_someone_elses"},
         {"minutes_confirmed_by": {"by": "u_priya", "at": "2026-10-06T10:00:00.000Z"}},
@@ -416,6 +419,7 @@ def test_PPL_11a_SEC_01_a_secret_is_redacted_before_check_write_so_it_can_never_
     response = rig.post(
         "/v1/meetings",
         {
+            **ATTEST,
             "title": title,
             "source": "bot",
             "agenda": [{"title": f"agenda {secret}", "minutes": 5}],
@@ -439,6 +443,115 @@ def test_PPL_11a_PE_18_only_a_person_of_the_org_creates_a_meeting_and_a_refusal_
     rig.as_user("u_ghost")
     assert rig.post("/v1/meetings", MEETING).status_code == 403
     _unchanged(rig, before)
+
+
+# --- create a meeting: the attest step is explicit (PE-18, issue #464) ------------------------------------------------
+
+
+def _attest_refusal(rig, body, secret=None):
+    before = rig.snapshot()
+    response = rig.client.post("/v1/meetings", json=body)
+    assert response.status_code == 422, (body, response.status_code, response.text[:200])
+    assert response.json()["detail"] == "invalid_body"
+    assert rig.snapshot() == before, "a refused attest stores nothing and writes no attestation"
+    return response
+
+
+def _meeting_body(**over):
+    body = {"title": "Weekly sync", "source": "upload", **ATTEST}
+    body.update(over)
+    return {k: v for k, v in body.items() if v is not _MISSING}
+
+
+_MISSING = object()
+
+
+@pytest.mark.parametrize(
+    "over, field",
+    [
+        ({"attest": _MISSING}, "attest"),
+        ({"attest": False}, "attest"),
+        ({"attest": "true"}, "attest"),
+        ({"attest": 1}, "attest"),
+        ({"attest": None}, "attest"),
+        ({"notice_version": _MISSING}, "notice_version"),
+        ({"notice_version": "0.9.0"}, "notice_version"),
+        ({"notice_version": "1.0.1"}, "notice_version"),
+        ({"notice_version": ""}, "notice_version"),
+        ({"notice_version": 1}, "notice_version"),
+        ({"notice_version": 1.0}, "notice_version"),
+        ({"notice_version": ["1.0.0"]}, "notice_version"),
+        ({"notice_version": None}, "notice_version"),
+    ],
+)
+def test_PPL_11a_PE_18_a_meeting_needs_an_explicit_attest_and_the_current_notice_version(people_rig, over, field):
+    """`attest` must be exactly `true` and `notice_version` exactly the current one: anything else is 422 on that field
+    and nothing is stored."""
+    rig = people_rig()
+    rig.add_people()
+    rig.as_user(PRIYA)
+    rig.require_route(("POST", "/v1/meetings"))
+    response = _attest_refusal(rig, _meeting_body(**over))
+    assert response.json()["fields"] == [[field]]
+
+
+def test_PPL_11a_PE_18_both_attest_fields_missing_is_one_422_naming_both_locations(people_rig):
+    rig = people_rig()
+    rig.add_people()
+    rig.as_user(PRIYA)
+    rig.require_route(("POST", "/v1/meetings"))
+    response = _attest_refusal(rig, {"title": "Weekly sync", "source": "upload"})
+    assert sorted(response.json()["fields"]) == [["attest"], ["notice_version"]]
+
+
+def test_PPL_11a_PE_18_the_notice_version_is_checked_against_the_current_one_at_call_time(people_rig, monkeypatch):
+    """A client that showed 1.0.0 is refused once the notice moves on, and one that showed the new text is admitted."""
+    rig = people_rig()
+    rig.add_people()
+    rig.as_user(PRIYA)
+    rig.require_route(("POST", "/v1/meetings"))
+    monkeypatch.setattr(rig.deps, "NOTICE_VERSION", "2.0.0", raising=False)
+    _attest_refusal(rig, _meeting_body())
+    ok = rig.post("/v1/meetings", _meeting_body(notice_version="2.0.0"))
+    assert ok.status_code == 201 and ok.json()["attestation"]["notice_version"] == "2.0.0"
+
+
+def test_PPL_11a_PE_18_a_refused_attest_echoes_no_caller_value_and_comes_before_authorisation(people_rig):
+    """The 422 names field locations only (a secret in a wrong-typed or stale value is never echoed), and a person
+    outside the org gets the same 422 for a bad attest as anyone (the body check is first), 403 only for a good one."""
+    secret = fake_token()
+    rig = people_rig()
+    rig.add_people()
+    rig.require_route(("POST", "/v1/meetings"))
+    for who in (PRIYA, "u_ghost"):
+        rig.as_user(who)
+        for over in (
+            {"attest": secret},
+            {"notice_version": secret},
+            {"notice_version": [secret]},
+            {"attest": {"k": secret}},
+        ):
+            response = _attest_refusal(rig, _meeting_body(**over))
+            assert secret not in response.text and secret[:8] not in response.text, over
+    rig.as_user("u_ghost")
+    before = rig.snapshot()
+    assert rig.post("/v1/meetings", MEETING).status_code == 403
+    assert rig.snapshot() == before
+
+
+def test_PPL_11a_PE_18_a_valid_attest_stores_exactly_actor_now_and_the_current_notice_version(people_rig):
+    """The stamp is the verified principal, the server clock and the current notice version: never the request's."""
+    rig = people_rig()
+    rig.add_people()
+    rig.require_route(("POST", "/v1/meetings"))
+    for who in (PRIYA, OWNER):
+        rig.as_user(who)
+        response = rig.post("/v1/meetings", MEETING)
+        assert response.status_code == 201, response.text[:300]
+        stored = rig.stored("meetings", response.json()["id"])
+        assert stored["attestation"] == {"by": who, "at": NOW, "notice_version": rig.deps.NOTICE_VERSION}
+        assert set(stored["attestation"]) == {"by", "at", "notice_version"}
+        assert stored["owner"] == who and "attest" not in stored and "notice_version" not in stored
 
 
 # --- create a person: the id is minted by the server (PE-17, G1) ----------------------------------------------------

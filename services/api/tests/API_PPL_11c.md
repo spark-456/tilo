@@ -270,3 +270,11 @@ pinned four.
   is unchanged.
 * **User decisions:** (1) does deleting a meeting also delete the active personal pins and accepted calendar entries Tilo made
   from it (ambiguity 5)? (2) FR-MTG-01 attestation: still stamped automatically on create (#464, unchanged here).
+
+## 12. After PR #488 (explicit attest on `POST /v1/meetings`)
+
+Every meeting-creating call here sends `**ATTEST` from `_ppl11a_lib` (`attest: true` and the current notice version):
+`MEETING_BODY` in `_ppl11c_lib.py` carries it, and s2a (the unstarted-meeting delete), s4 (cap, idempotency, rate, listing
+tests) and s5, s6 use that constant. The s4 padded-body tests pad the whole JSON body (attest fields included) to exactly
+`MAX_BODY_BYTES` and `MAX_BODY_BYTES + 1`; the test asserts both lengths. A branch rebased onto this one (S1, S2a) must send
+`**ATTEST` in any meeting create of a test it adds itself.

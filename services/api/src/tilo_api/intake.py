@@ -20,6 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from tilo_metering.flags import FlagStore
 from tilo_planning.artifacts import InMemoryArtifactStore
 from tilo_planning.brief import BriefExtractionError, extract_brief
+from tilo_planning.gaps import NothingPossible
 from tilo_planning.intake import (
     MAX_FILES,
     MAX_TOTAL_BYTES,
@@ -92,7 +93,12 @@ async def intake(
                 status_code=422,
                 content={"error": refused.reason, "alternative": refused.alternative, "category": refused.category},
             )
-        except RefusalConfigError as exc:  # fail closed: no refusal list, no brief
+        except NothingPossible as nothing:
+            # FR-INT-15: acceptable but nothing Tilo can do; plain, with the alternatives, never a refusal.
+            return JSONResponse(
+                status_code=422, content={"error": nothing.message, "gaps": [g.as_dict() for g in nothing.gaps]}
+            )
+        except RefusalConfigError as exc:  # fail closed: no refusal list or gap list, no brief
             logger.error("refusal config unusable: %s", exc)
             raise HTTPException(status_code=503, detail="Task screening is unavailable; nothing was stored.") from exc
         except BriefExtractionError as exc:
@@ -111,7 +117,14 @@ async def intake(
     questions = [
         {"field": q.field, "text": q.text, "suggested_answers": list(q.suggested_answers)} for q in task.questions
     ]
-    return {**body, "task_id": task_id, "brief": task.brief, "questions": questions, "scenario": scenario}
+    return {
+        **body,
+        "task_id": task_id,
+        "brief": task.brief,
+        "questions": questions,
+        "scenario": scenario,
+        "gaps": [g.as_dict() for g in task.gaps],
+    }
 
 
 def _rejected(reason: str) -> JSONResponse:

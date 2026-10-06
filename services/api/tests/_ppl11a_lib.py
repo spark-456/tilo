@@ -35,6 +35,10 @@ CONTRACT_TESTS = REPO_ROOT / "tests" / "contracts"
 ORG = "org_example"
 OTHER_ORG = "org_elsewhere"
 NOW = "2026-10-06T10:00:00.000Z"  # the crossref cases' `now`
+ATTEST = {
+    "attest": True,
+    "notice_version": "1.0.0",
+}  # the explicit attest step of POST /v1/meetings: deps.NOTICE_VERSION
 EARLY = "2026-10-05T09:00:00.000Z"  # before every stamp a case makes
 OWNER, PRIYA, DEV, SAM, MEERA = "u_owner", "u_priya", "u_dev", "u_sam", "u_meera"
 

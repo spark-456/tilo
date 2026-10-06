@@ -10,9 +10,9 @@ import re
 import unicodedata
 
 import pytest
-from _ppl11a_lib import OWNER, PRIYA, u
+from _ppl11a_lib import ATTEST, OWNER, PRIYA, u
 
-MEETING = {"title": "Weekly sync", "source": "upload"}
+MEETING = {"title": "Weekly sync", "source": "upload", **ATTEST}
 ITEM = {"title": "Water the plants", "source": {"kind": "manual", "ref": None}}
 PERSON = {
     "display_name": "Nina Patel",
