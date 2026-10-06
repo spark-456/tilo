@@ -11,7 +11,7 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 
 ## Contracts
 - Reads (read-only): `contracts/event*`, `common`, `events/{registry.yaml,data/*}`, `layout`, `plan`,
-  `envelope`, `skill`, `agents`, `manifest` schemas. `EventValidator` is a fresh EV-01..EV-15 implementation
+  `envelope`, `skill`, `agents`, `manifest` schemas. `EventValidator` is a fresh EV-01..EV-16 implementation
   (never imports `scripts/`); `contract_problems(name, x)` checks any other contract.
 - Writes: Firestore (worlds, events, views, checkpoints); Pub/Sub to BigQuery (later ticket). Own fixtures: `fixtures/three_agent/`, `tests/fixtures/skills*/`.
 
