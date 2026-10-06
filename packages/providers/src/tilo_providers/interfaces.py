@@ -45,7 +45,9 @@ class GenerateResponse(BaseModel):  # one generate() result, or one stream() chu
     text: str | None = None  # None for a tool-call-only turn with no text content (PL-02, ticket P0-05)
     profile_id: str
     tool_calls: list[dict[str, Any]] | None = None  # PL-02 tool calling: [{"name": ..., "args": {...}}]
-    usage: dict[str, int] | None = None  # PL-02 usage tokens: {"input_tokens", "output_tokens", "total_tokens"}
+    # PL-02 usage tokens: {"input_tokens", "output_tokens", "total_tokens"}, plus "cached_tokens" (a part of
+    # input_tokens) only when the provider reported a cached count; left out means unknown (EFF-04, ADR-0022).
+    usage: dict[str, int] | None = None
 
 
 class PriceQuote(BaseModel):  # standard list price, US dollars per million tokens (PL-06)
