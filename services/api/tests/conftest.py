@@ -177,3 +177,14 @@ def people_rig(monkeypatch: pytest.MonkeyPatch):
     yield make
     for rig in made:
         rig.close()
+
+
+def pytest_collection_modifyitems(items):
+    """PPL-11a: tests that need a slice B or C route are strict xfails until that slice lands (`SLICE_BC_PENDING`)."""
+    if not any("test_PPL_11a_" in item.nodeid for item in items):
+        return
+    from _ppl11a_lib import SLICE_BC_PENDING
+
+    for item in items:
+        if "test_PPL_11a_" in item.nodeid and any(entry in item.nodeid for entry in SLICE_BC_PENDING):
+            item.add_marker(pytest.mark.xfail(strict=True, reason="PPL-11a slice B/C"))

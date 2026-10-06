@@ -1,5 +1,12 @@
 # PPL-11a: the people API on tilo-api (what the acceptance tests pin)
 
+> **Status of this branch (slice A only).** The tests that need a slice B or C route are `xfail(strict=True, reason="PPL-11a
+> slice B/C")`: the entries are `SLICE_BC_PENDING` in `_ppl11a_lib.py`, applied by `pytest_collection_modifyitems` in
+> `conftest.py`. They are 15 tests in `test_PPL_11a_gate_seams_and_dev.py` and the huge-history test in
+> `test_PPL_11a_quotes_text_and_leaks.py`. The files `test_PPL_11a_plate_crossref.py`, `_plate_sources.py` and `_writes.py` are not on
+> the slice A branch. Slice B and C each restore their files from `origin/tests/PPL-11a-people-api` and delete the
+> `SLICE_BC_PENDING` entries their routes turn green (strict: an unmarked pass fails the run).
+
 Source: `docs/prd-addendum-people-agents.md` (FR-MTG, FR-PA), `contracts/people.rules.md` PE-01 to PE-30, ADR-0020
 (evidence quotes) and ADR-0021 (the plate), ADR-0015/16/17, `docs/open-questions.md` BQ-265 to BQ-273, BQ-CCP3-1 to
 BQ-CCP3-3, BQ-PPL10-*, the PPL-10 follow-ups (PR #438), SEC-15 (`API_SEC_15.md`), SEC-16, EFF-01, PL-01, HR-1.
