@@ -17,6 +17,7 @@ import threading
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from ..errors import PossiblySent
 from ..outbox import Grant
 from ._google import GoogleAdapter, checked_id, side_effect_marker
 from ._transport import AdapterError, FileTooLarge, NotPicked, SideEffectRefused
@@ -142,9 +143,11 @@ class DriveAdapter(GoogleAdapter):
         user, scopes = self._owner_of(str(entry["world_id"])), self._scopes("write")
         marker = side_effect_marker(entry)
         q = f"trashed = false and appProperties has {{ key='{_SAVE_KEY}' and value='{marker}' }}"  # in any folder
-        found = self._get(user, scopes, "/files", {"q": q, "fields": "files(id,parents)"}, patient=False)
+        found = self._get(user, scopes, "/files", {"q": q, "fields": "files(id,parents,shared)"}, patient=False)
         if earlier := found.get("files") or []:  # OB-03: a lost response or another instance already saved it
             file_id, parents = _final_id(earlier[0].get("id")), earlier[0].get("parents") or []
+            if earlier[0].get("shared") is not False:  # shared since the save (a lost answer hid it): fail closed
+                raise PossiblySent("the saved file is shared; a person checks who can see it")
             folder = _final_id(parents[0]) if parents else ""
         else:
             destination = entry.get("destination")
@@ -169,12 +172,15 @@ class DriveAdapter(GoogleAdapter):
                     f"\r\n--{boundary}--\r\n".encode(),
                 ]
             )
-            params = {"uploadType": "multipart", "fields": "id"}
+            params = {"uploadType": "multipart", "fields": "id,shared"}
             headers = {"content-type": f"multipart/related; boundary={boundary}"}
             saved = self._json(
                 user, scopes, "POST", DRIVE_UPLOAD_API, params=params, headers=headers, content=body, patient=False
             )
-            file_id = _final_id(saved.get("id"))  # the file exists, so a bad id is final, never retried
+            file_id = _final_id(saved.get("id"))  # the file exists, so a bad id is final, never retried (alerts)
+            # shared between the check and the upload, or Drive did not say it is not: fail closed
+            if saved.get("shared") is not False:
+                raise PossiblySent("the saved file is shared; a person checks who can see it")
         self._remember(self._created, user, [i for i in (folder, file_id) if i])
         if native:  # the editor link is built from the checked id, never taken from an answer
             url = f"https://docs.google.com/{native[1]}/d/{checked_id(file_id)}/edit"
@@ -206,10 +212,12 @@ class DriveAdapter(GoogleAdapter):
 
 
 def _final_id(value: Any) -> str:
+    """The id of a file that exists (just uploaded, or found by an earlier attempt). A bad id cannot be used or
+    retried, but the file is there: PossiblySent, so the outbox alerts a person instead of failing quietly."""
     try:
         return checked_id(value)
     except AdapterError:
-        raise SideEffectRefused("Drive answered with an id that is not a valid id") from None
+        raise PossiblySent("Drive answered with an id that is not a valid id; the file may exist") from None
 
 
 def _meta(raw: Mapping[str, Any]) -> dict[str, Any]:

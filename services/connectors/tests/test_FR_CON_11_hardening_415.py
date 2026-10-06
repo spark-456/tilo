@@ -122,3 +122,163 @@ def test_FR_CON_11_an_unshared_tilo_folder_still_takes_the_save():
     enqueue(g.outbox, _deck(g, origin_kind="upload", action="save_file", artifact="art_415_f", name="b.pptx"))
 
     assert [e["state"] for e in g.outbox.dispatch_due()] == ["sent", "sent"]
+
+
+# -- #415 leftovers: PossiblySent on a bad id, `shared` asked on the upload, a non-boolean `shared` -----------
+
+
+def _with(resp, **fields):
+    return FakeApiResponse(resp.status_code, {**resp.json(), **fields})
+
+
+def _alerting_outbox(g):
+    from tilo_connectors.outbox import Outbox
+
+    alerts: list = []
+    clock = g.env.clock
+    return Outbox(
+        g.store, {"google_drive": g.drive}, emit=g.env.emitted.append, clock=clock, alert=alerts.append
+    ), alerts
+
+
+def _states(outbox):
+    return {e["id"]: e["state"] for e in outbox.dispatch_due()}
+
+
+def test_FR_CON_11_a_bad_id_after_the_upload_alerts_a_person():
+    g = make_gapi_env()
+    g.apis._drive_upload = lambda req: FakeApiResponse(200, {"id": "../files/x?y=1", "shared": False})
+    outbox, alerts = _alerting_outbox(g)
+    case = _deck(g, origin_kind="render")
+    enqueue(outbox, case)
+
+    assert _states(outbox) == {case["entry"]["id"]: "failed"}
+    assert [a["data"]["alert_id"] for a in alerts] == [case["entry"]["id"]]  # the file exists: not a quiet refusal
+    assert outbox.dispatch_due() == []
+
+
+def test_FR_CON_11_a_bad_id_on_an_earlier_attempts_file_alerts_a_person():
+    g = make_gapi_env()
+    real = g.apis._drive
+    found = FakeApiResponse(200, {"files": [{"id": "a/b", "parents": []}]})
+    g.apis._drive = lambda req, path: (
+        found
+        if req.method == "GET" and path == "/files" and "tilo_save" in str(req.params.get("q"))
+        else real(req, path)
+    )
+    outbox, alerts = _alerting_outbox(g)
+    case = _deck(g, origin_kind="render")
+    enqueue(outbox, case)
+
+    assert _states(outbox) == {case["entry"]["id"]: "failed"}
+    assert [a["data"]["alert_id"] for a in alerts] == [case["entry"]["id"]]
+    assert [r for r in g.apis.requests if r.url == DRIVE_UPLOAD_API] == []
+
+
+def test_FR_CON_11_the_upload_asks_for_the_shared_flag():
+    g = make_gapi_env()
+    enqueue(g.outbox, _deck(g, origin_kind="render"))
+    g.outbox.dispatch_due()
+
+    (upload,) = [r for r in g.apis.requests if r.url == DRIVE_UPLOAD_API]
+    assert upload.params["fields"] == "id,shared"
+
+
+@pytest.mark.parametrize("shared", [True, None, "false", "False", 0, "", "true"], ids=repr)
+def test_FR_CON_11_a_saved_file_not_provably_unshared_alerts_a_person(shared):
+    g = make_gapi_env()
+    real = g.apis._drive_upload
+    g.apis._drive_upload = lambda req: _with(real(req), shared=shared)  # shared after the check, or an odd answer
+    outbox, alerts = _alerting_outbox(g)
+    case = _deck(g, origin_kind="render")
+    enqueue(outbox, case)
+
+    assert _states(outbox) == {case["entry"]["id"]: "failed"}
+    assert [a["data"]["alert_id"] for a in alerts] == [case["entry"]["id"]]
+    assert outbox.dispatch_due() == []  # never retried
+
+
+@pytest.mark.parametrize("shared", [None, "false", 0, "", "true"], ids=repr)
+def test_FR_CON_11_a_folder_check_that_is_not_the_boolean_false_refuses_before_the_upload(shared):
+    g = make_gapi_env()
+    enqueue(g.outbox, _deck(g, origin_kind="upload", action="save_file", artifact="art_415_h"))
+    g.outbox.dispatch_due()  # the first save makes the Tilo folder
+    uploads = len([r for r in g.apis.writes() if r.url == DRIVE_UPLOAD_API])
+    real = g.apis._drive
+
+    def drive(req, path):
+        out = real(req, path)
+        if req.method == "GET" and path == f"/files/{_tilo(g).id}":
+            return _with(out, shared=shared)
+        return out
+
+    g.apis._drive = drive
+    second = _deck(g, origin_kind="upload", action="save_file", artifact="art_415_i")
+    enqueue(g.outbox, second)
+
+    assert _failed(g, second)
+    assert len([r for r in g.apis.writes() if r.url == DRIVE_UPLOAD_API]) == uploads
+
+
+# -- an earlier attempt's file (OB-03): shared and parent id are checked on the retry too ------------------------
+
+
+def _earlier_attempt(g, **file):
+    """Make the `tilo_save` lookup answer with an earlier attempt's file (a lost answer, then a retry)."""
+    real = g.apis._drive
+    found = FakeApiResponse(200, {"files": [file]})
+    g.apis._drive = lambda req, path: (
+        found
+        if req.method == "GET" and path == "/files" and "tilo_save" in str(req.params.get("q"))
+        else real(req, path)
+    )
+
+
+@pytest.mark.parametrize("shared", [True, None, "false", 0, "true", "<missing>"], ids=repr)
+def test_FR_CON_11_an_earlier_attempts_file_not_provably_unshared_alerts_a_person(shared):
+    g = make_gapi_env()
+    file = {"id": "f_old", "parents": ["p_old"]}
+    if shared != "<missing>":
+        file["shared"] = shared
+    _earlier_attempt(g, **file)
+    outbox, alerts = _alerting_outbox(g)
+    case = _deck(g, origin_kind="render")
+    enqueue(outbox, case)
+
+    assert _states(outbox) == {case["entry"]["id"]: "failed"}  # never `sent` with no alert
+    assert [a["data"]["alert_id"] for a in alerts] == [case["entry"]["id"]]
+    assert outbox.dispatch_due() == []
+
+
+def test_FR_CON_11_an_earlier_attempts_lookup_asks_for_the_shared_flag():
+    g = make_gapi_env()
+    _earlier_attempt(g, id="f_old", parents=["p_old"], shared=False)
+    enqueue(g.outbox, _deck(g, origin_kind="render"))
+    g.outbox.dispatch_due()
+
+    (lookup,) = [r for r in g.apis.requests if "tilo_save" in str(r.params.get("q"))]
+    assert lookup.params["fields"] == "files(id,parents,shared)"
+
+
+def test_FR_CON_11_an_earlier_attempts_unshared_file_is_found_and_the_entry_is_sent():
+    g = make_gapi_env()
+    _earlier_attempt(g, id="f_old", parents=["p_old"], shared=False)
+    outbox, alerts = _alerting_outbox(g)
+    case = _deck(g, origin_kind="render")
+    enqueue(outbox, case)
+
+    assert _states(outbox) == {case["entry"]["id"]: "sent"} and alerts == []
+    assert [r for r in g.apis.requests if r.url == DRIVE_UPLOAD_API] == []
+
+
+@pytest.mark.parametrize("parent", ["../x", "a/b", "", 7, None], ids=repr)
+def test_FR_CON_11_an_earlier_attempts_file_with_a_bad_parent_id_alerts_a_person(parent):
+    g = make_gapi_env()
+    _earlier_attempt(g, id="f_old", parents=[parent], shared=False)  # a good file id, a bad parent id
+    outbox, alerts = _alerting_outbox(g)
+    case = _deck(g, origin_kind="render")
+    enqueue(outbox, case)
+
+    assert _states(outbox) == {case["entry"]["id"]: "failed"}
+    assert [a["data"]["alert_id"] for a in alerts] == [case["entry"]["id"]]
+    assert [r for r in g.apis.requests if r.url == DRIVE_UPLOAD_API] == []
