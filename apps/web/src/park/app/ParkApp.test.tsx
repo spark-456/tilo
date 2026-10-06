@@ -9,6 +9,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PAGE_LABEL } from "../../../test-support/park/appHarness";
 import { cleanup, mount, q, qa } from "../../../test-support/park/componentsHarness";
+import { PLACEHOLDER_PAGES } from "../../../test-support/park/realPages";
 import { PAGE_IDS } from "./AppCtx";
 import DefaultParkApp, { ParkApp } from "./ParkApp";
 
@@ -59,9 +60,11 @@ describe("WEB_3a_parkapp: the shell around a page", () => {
   });
 
   it("WEB_3a_parkapp_the_placeholder_says_Not_built_yet_under_one_h1", async () => {
-    const m = await visit("/park/ledger"); // home has its page since WEB-4
+    const id = PLACEHOLDER_PAGES.find((p) => p !== "world");
+    if (!id) return; // every page has a real implementation: nothing is a placeholder any more
+    const m = await visit(`/park/${id}`);
     expect(qa(m.container, "h1")).toHaveLength(1);
-    expect(q(m.container, "h1").textContent).toBe("Ledger");
+    expect(q(m.container, "h1").textContent).toBe(PAGE_LABEL[id]);
     expect(m.container.textContent).toContain("Not built yet");
   });
 
@@ -92,10 +95,10 @@ describe("WEB_3a_parkapp: each route renders its page", () => {
       ["/park/home?x=1", "home"],
     ] as const;
     for (const [path, id] of table) {
+      if (!PLACEHOLDER_PAGES.includes(id)) continue; // a real page is covered by its own spec
       const m = await visit(path);
       expect(qa(m.container, `[data-testid="park-page-${id}"]`), path).toHaveLength(1);
-      // Home's h1 is the greeting (WEB-4); the others are still the Placeholder's page name.
-      if (id !== "home") expect(q(m.container, "h1").textContent, path).toBe(PAGE_LABEL[id]);
+      expect(q(m.container, "h1").textContent, path).toBe(PAGE_LABEL[id]);
       expect(qa(m.container, "main"), path).toHaveLength(1);
       expect(qa(m.container, '[data-testid^="park-page-"]'), path).toHaveLength(1);
       expect(document.title, path).toBe(`${PAGE_LABEL[id]} · Tilo`);
