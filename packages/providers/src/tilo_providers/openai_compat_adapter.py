@@ -34,6 +34,7 @@ class OpenAICompatModelProvider(ModelProvider):
         api_key_env: str,
         transport: httpx.BaseTransport | None = None,
         price: PriceQuote | None = None,
+        live_permitted: bool = False,
     ) -> None:
         self._profile = profile
         self._profile_id = profile_id
@@ -55,8 +56,9 @@ class OpenAICompatModelProvider(ModelProvider):
                 "(no whitespace or control characters)"
             )
 
-        # EFF-01: reachable directly (not only via RecordReplayProvider).
-        if transport is None and os.environ.get("LIVE") != "1":
+        # EFF-01: reachable directly (not only via RecordReplayProvider). `live_permitted` is the SEC-15 injected
+        # permission (the deployed-judge path); it is never read from the environment.
+        if transport is None and os.environ.get("LIVE") != "1" and not live_permitted:
             raise ProviderError(
                 "PL-02/EFF-01: refusing to build a real network client without LIVE=1 (inject transport= for tests)"
             )
