@@ -39,3 +39,15 @@ allocates ids):
 | BQ-TBD | How is "0 invented commitments" tested when a model writes the body? | The FR-CHN-10 checker runs on every body with the confirmed text as its only sources, and a body that repeats text the Owner did not confirm is refused; a refused body is `needs_you` (Edit and Cancel only) or no card, never sendable. A scripted faithful model gives a ready card. | FR-CHN-10, PRD 11.4 Content |
 | BQ-TBD | Flagged minutes or items? | T3 with `safety_flag` (already T3 here; the modifier is shown on the card). | PE-21, SEC-04 |
 | BQ-TBD | Edit on these cards? | Not pinned: `Autopilot.edit` redrafts reply formats only, so a changed draft is a new request id. | FR-CHN-11 |
+
+## FR-MTG-08b: wiring checklist for tilo-api (what the module does NOT do)
+
+`MeetingFollowUp` trusts its caller for these; tilo-api's meeting actions must do each before calling it:
+
+- [ ] `user_id` comes from the signed-in session (auth), never from the request body; the module also refuses anyone who is not the meeting's Owner and any `user_id` the Autopilot's world does not belong to.
+- [ ] `request_id` is minted by the server (or validated: a short opaque id the server issued for this tap). The idempotency key is a JSON array of (kind, meeting, request id, picked addresses / work item), so any text is safe, but a client that picks the id can only replay its own draft.
+- [ ] The `Autopilot` is built for the Owner's meeting / Desk world (PE-12): `world_id`, `world_owner`, the card store and the outbox are that world's; never a shared or another person's world.
+- [ ] A per-Owner rate limit on both methods (each call may make a model call per item, at most 60 items, and a screen of up to 100,000 characters).
+- [ ] Check `meeting.minutes_confirmed_by.at` against the time of the request (PE-07, PE-19): the confirmation is no later than now and the minutes artifact version the meeting names is the one confirmed. The module checks `by`, `status` and the artifact's `meeting_id`, not the timestamp.
+- [ ] The readers are scoped to the Owner (PE-05) and the directory resolves addresses server side (PE-09, PE-20); the `recipients` the Owner picks are person ids of attendees.
+- [ ] Sending is only `Autopilot.send` with the Owner's recorded `approval.resolved` (CHN-WIRE-1); there is no send path in this module.
