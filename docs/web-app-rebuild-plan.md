@@ -140,3 +140,23 @@ Still open, with the default shown:
 - **Labels**: in fixture mode "Live now" reads "Sample run"; "Needs you" keeps its wording.
 - **Mobile app link** in the account menu points at a placeholder ("Concept"), as in the README.
 - **Dates**: fixtures are fixed at September 2026; the "today" marker is data, not the clock.
+
+## 10. Helper contract (lanes building pages in parallel; set 6 Oct 2026)
+
+Owner of the shared layer: the AG-WEB lane (frontend owner). Page lanes: CL-REACH (Ledger WEB-7, Agenda WEB-9), EVALS (parity harness, then Team WEB-10, Connectors WEB-11, Profile WEB-12). AG-WEB keeps Home WEB-4, Worlds WEB-5, World WEB-6, Skills WEB-8.
+
+**Branches.** Stack on the newest of `feat/WEB-2-components` (components, `/dev/components`; pushed) and, once pushed, `feat/WEB-3a-appctx` (AppCtx types, store, router, page registry). Name yours `feat/WEB-<n>-<page>` (tests on `tests/WEB-<n>`); PR base is whatever you stacked on, marked "stacked on #nnn"; the supervisor retargets after merges. Merge `origin/phase0-stack` into your branch before opening the PR.
+
+**Folder per page.** `apps/web/src/park/pages/<Page>/`: `<Page>Page.tsx` (named export `<Page>Page`, props `{ app: AppCtx }`), page-local components and CSS (`<Page>.css`, every selector under `[data-park]`, class prefix `park-<page>-`), tests `<Page>.*.test.tsx` and e2e `apps/web/e2e/park/<page>.spec.ts`. Everything page-specific lives there. Page-local components are promoted to `components/` only by AG-WEB.
+
+**Shared files, AG-WEB only** (ask by PR comment or message, then continue with a local copy or the smallest page-local wrapper; never edit): `park/tokens/*`, `park/components/*` (a missing variant is a request: post the reference element, its exact computed values and the page; 2 hours is the target), `park/app/*` (AppCtx, store, router, `pages.ts`, AppShell), `park/shell/*`, `park/api/types.ts`, `park/api/index.ts`, `park/api/fixtures/*`, `park/engines/*`, `screens/*`, `test-support/honestyScan.ts`, root and `apps/web/CLAUDE.md`. The one exception: you add exactly one line for your page to `park/app/pages.ts`: `<pageId>: lazy(() => import("../pages/<Page>/<Page>Page"))`.
+
+**Plugging in.** The shell passes every page `app: AppCtx` (README contract: `page, params, go(page, params?), dec, decide(key), needsLeft, added, addWorld, toast(msg, label?, action?), time, night, motion, setPref, prefs, vw, vh, pins, ready`; types in `park/app/AppCtx.ts`). Navigate only with `app.go(...)`; approve only with `app.decide(key)`; never read `window.location`. Read data only through the `Api` (`park/api/index.ts`, every method a Promise with `source`) via `useParkApi()`; render an `EmptyState` "Not connected yet" on `NotBuilt`. Never import from `screens/`, `world/`, `stage/`.
+
+**Honesty.** No `transition`, `animation`, `@keyframes`, timers or rAF in page code until WEB-3b lands the reviewed allowlist; then only the shared motion classes from `park/components`. Fixture-backed numbers show the shell's "Sample data" chip automatically; do not hide it. Agents animate only from recorded events. Copy verbatim from `design_handoff_tilo_web_app/inventory.md`; never drop or simplify a designed element for lack of a PRD requirement: build it on the typed fixtures and list it (one file per page, `docs/park-designed-not-in-prd/<Page>.md`, rows: element, fixture source, status; AG-WEB folds them into section 8b).
+
+**Tests and names.** Tests first (a separate test-writer context), failing before the build. Names carry the ticket: `WEB_<n>_<page>_<what>`. Vitest for behaviour, a stylesheet/computed-style spec per page, Playwright on your own `TILO_WEB_PORT` (use `--workers=3`; a cold Vite start can time out the first test). Any console error fails. No `any`, no `@ts-ignore`, no `dangerouslySetInnerHTML`, no `window` globals, no model ids, no `support.js`.
+
+**Parity and review.** The bar is pixel parity with the served `.dc.html` at 1440 and 390, day and night (user's rule). The EVALS parity harness (`apps/web/e2e/park/parity/`) produces the diff report the design-critic uses. One Sonnet code-reviewer plus one design-critic parity pass per page; a failing page gets one fix pass for all blockers, then a re-check of the failed items only. A difference is a FAIL unless the PR lists it as a design-owned exception (see 8c).
+
+**Size and gates.** Hand-written logic and tests under 400 lines per PR; split a page (Skills, Agenda) into frame and sections. Gates before pushing: `pnpm --filter @tilo/web run test`, `typecheck`, `pnpm exec biome check .`, `uv run pytest tests/repo -q`, your Playwright spec. PR body: local evidence plus the reviewers' verdict blocks posted as a PR comment against the head SHA.
