@@ -1,8 +1,8 @@
 // WEB-7 test support: a fake `app` (the README AppCtx) around the Ledger page. `decide` changes the host's
 // own `dec`, like the shell's store does, so a test sees the page react. Nothing here is bundled.
 import { type ReactElement, act, useState } from "react";
+import { type Root, createRoot } from "react-dom/client";
 import { vi } from "vitest";
-import { mount } from "../../../../test-support/park/componentsHarness";
 import { createFixtureApi } from "../../api/fixtureApi";
 import type { Api } from "../../api/index";
 import type { DecisionKey } from "../../api/types";
@@ -56,6 +56,28 @@ function Host({ opts, calls }: { opts: HarnessOpts; calls: Calls }): ReactElemen
       <LedgerPage app={app} api={api} />
     </div>
   );
+}
+
+Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
+
+const roots: { root: Root; container: HTMLElement }[] = [];
+
+/** Unmount every page mounted by renderLedger. Call from afterEach and between renders in one test. */
+export function cleanup(): void {
+  for (const { root, container } of roots.splice(0)) {
+    act(() => root.unmount());
+    container.remove();
+  }
+  document.body.replaceChildren();
+}
+
+function mount(ui: ReactElement): { container: HTMLElement } {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  act(() => root.render(ui));
+  roots.push({ root, container });
+  return { container };
 }
 
 /** Mount the page, wait for the Api result, and return the container with the recorded calls. */

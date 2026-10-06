@@ -2,16 +2,10 @@
 // WEB-7 Ledger page: exact copy (inventory.md "Tilo App Ledger"), the interactions of the reference
 // (Tilo App Ledger.dc.html) and the decide() effects, rendered on the fixture Api in happy-dom.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  cleanup,
-  click,
-  countPrimary,
-  q,
-  qa,
-} from "../../../../test-support/park/componentsHarness";
+import { click, countPrimary, q, qa } from "../../../../test-support/park/componentsHarness";
 import { createFixtureApi } from "../../api/fixtureApi";
 import { NotBuilt } from "../../api/liveApi";
-import { renderLedger, settle } from "./ledgerHarness";
+import { cleanup, renderLedger, settle } from "./ledgerHarness";
 
 afterEach(() => {
   cleanup();
