@@ -44,5 +44,6 @@ def test_EFF_04_trace_never_writes_null_or_a_bad_count_and_never_exceeds_tokens_
     bad: list[Any] = [-1, True, 2.5, "7", None, 5000]  # 5000 > the call's input: EV-16 would refuse the event
     for value in bad:
         usage: dict[str, Any] = _usage(1000, None) | {"cached_tokens": value}
-        trace = _trace([_response(usage)])
+        # model_construct skips pydantic's coercion, which would turn True or "7" into a whole number
+        trace = _trace([GenerateResponse.model_construct(text="ok", profile_id="small", usage=usage)])
         assert "tokens_cached" not in trace, f"{value!r} must read as unknown"
