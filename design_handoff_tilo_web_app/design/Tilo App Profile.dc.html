@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div data-screen-label="Profile and settings" style="background:var(--sheet);border:1px solid var(--gBd);border-radius:28px;box-shadow:var(--sh);padding:28px 32px 36px;display:flex;flex-direction:column;gap:22px">
+  <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+    <div style="width:72px;height:72px;border-radius:999px;background:#E6E1F8;color:#1F1D2B;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex:none;box-shadow:0 0 0 3px var(--card),0 0 0 5px var(--hero)">AM</div>
+    <div style="display:flex;flex-direction:column;gap:4px;min-width:0;flex:1">
+      <h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:34px;letter-spacing:-.8px;line-height:1.05">{{ name }}</h1>
+      <p style="margin:0;font-size:15px;font-weight:600;color:var(--ink2)">{{ title }} · Northwind Ops · Owner on the Team plan</p>
+    </div>
+    <button onClick="{{ goConnectors }}" style="height:42px;padding:0 16px 0 14px;border-radius:12px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:14.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap">{{ icPlug }}Connectors</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:{{ cols }};gap:18px;align-items:start">
+    <nav aria-label="Settings" style="background:var(--card);border:1px solid var(--line2);border-radius:20px;padding:8px;display:flex;flex-direction:{{ navDir }};gap:2px;overflow-x:auto;overflow-y:hidden">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+        <button onClick="{{ t.pick }}" aria-current="{{ t.cur }}" style="height:42px;padding:0 12px;border:0;border-radius:12px;background:{{ t.bg }};color:{{ t.fg }};font-size:14.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left;white-space:nowrap;flex:none;transition:background-color .2s">{{ t.icon }}{{ t.label }}</button>
+      </sc-for>
+    </nav>
+
+    <div style="min-width:0;display:flex;flex-direction:column;gap:18px">
+      <sc-if value="{{ is.profile }}" hint-placeholder-val="{{ true }}">
+        <section aria-label="Profile" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:22px 24px;display:flex;flex-direction:column;gap:18px">
+          <div><h2 style="margin:0;font-size:18px;font-weight:800">Profile</h2><div style="font-size:13.5px;font-weight:600;color:var(--ink2);margin-top:3px">How you appear to your team and how Tilo addresses you.</div></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
+            <sc-for list="{{ fields }}" as="f" hint-placeholder-count="6">
+              <label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:800;color:var(--ink2)">{{ f.label }}</span><input value="{{ f.v }}" onChange="{{ f.set }}" style="height:44px;box-sizing:border-box;border-radius:12px;border:1px solid var(--line);background:var(--field);padding:0 14px;font-size:15px;font-weight:700;color:var(--ink);outline:none"></input><span style="font-size:12.5px;font-weight:600;color:var(--ink3)">{{ f.help }}</span></label>
+            </sc-for>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px;border-top:1px solid var(--line2)"><button onClick="{{ reset }}" style="height:40px;padding:0 16px;margin-top:14px;border-radius:12px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">Cancel</button><button onClick="{{ saveProfile }}" style="height:40px;padding:0 18px;margin-top:14px;border:0;border-radius:12px;background:var(--hero);color:#FFFFFF;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">Save changes</button></div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ is.notifications }}" hint-placeholder-val="{{ false }}">
+        <section aria-label="Notifications" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:22px 24px 12px;display:flex;flex-direction:column;gap:6px">
+          <div style="padding-bottom:10px"><h2 style="margin:0;font-size:18px;font-weight:800">Notifications</h2><div style="font-size:13.5px;font-weight:600;color:var(--ink2);margin-top:3px">Choose where Tilo reaches you. Decisions always reach you somewhere.</div></div>
+          <div style="overflow-x:auto;overflow-y:hidden"><div style="min-width:520px">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) repeat(3,92px);align-items:center;height:32px;font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--ink3)"><span>WHEN</span><span style="text-align:center">PHONE</span><span style="text-align:center">EMAIL</span><span style="text-align:center">SLACK</span></div>
+            <sc-for list="{{ notif }}" as="n" hint-placeholder-count="5">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) repeat(3,92px);align-items:center;min-height:58px;border-top:1px solid var(--line2)">
+                <div style="line-height:1.35;min-width:0"><div style="font-size:14.5px;font-weight:800">{{ n.label }}</div><div style="font-size:13px;font-weight:600;color:var(--ink2)">{{ n.sub }}</div></div>
+                <sc-for list="{{ n.cells }}" as="c" hint-placeholder-count="3"><span style="display:flex;justify-content:center"><button role="switch" aria-checked="{{ c.on }}" aria-label="{{ c.label }}" onClick="{{ c.toggle }}" style="width:40px;height:24px;border:0;border-radius:99px;background:{{ c.track }};padding:3px;cursor:pointer;display:flex;transition:background-color .2s"><span style="width:18px;height:18px;border-radius:99px;background:#FFFFFF;box-shadow:0 1px 3px rgba(31,29,43,.3);transform:{{ c.knob }};transition:transform .25s cubic-bezier(.3,1.3,.5,1)"></span></button></span></sc-for>
+              </div>
+            </sc-for>
+          </div></div>
+          <div style="display:flex;align-items:center;gap:14px;margin-top:6px;padding:14px 16px;border-radius:16px;background:var(--sunk)">
+            <span style="width:36px;height:36px;border-radius:11px;background:var(--heroSoft);color:var(--heroInk);display:flex;align-items:center;justify-content:center;flex:none">{{ icMoon }}</span>
+            <div style="flex:1;min-width:0;line-height:1.4"><div style="font-size:14.5px;font-weight:800">Quiet hours · 19:00 to 08:00</div><div style="font-size:13px;font-weight:600;color:var(--ink2)">Phone stays silent, except decisions over £1,000.</div></div>
+            <button role="switch" aria-checked="{{ quiet.on }}" aria-label="Quiet hours" onClick="{{ quiet.toggle }}" style="width:44px;height:26px;border:0;border-radius:99px;background:{{ quiet.track }};padding:3px;cursor:pointer;display:flex;flex:none;transition:background-color .2s"><span style="width:20px;height:20px;border-radius:99px;background:#FFFFFF;box-shadow:0 1px 3px rgba(31,29,43,.3);transform:{{ quiet.knob }};transition:transform .25s cubic-bezier(.3,1.3,.5,1)"></span></button>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ is.appearance }}" hint-placeholder-val="{{ false }}">
+        <section aria-label="Appearance" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:22px 24px;display:flex;flex-direction:column;gap:22px">
+          <div><h2 style="margin:0;font-size:18px;font-weight:800">Appearance</h2><div style="font-size:13.5px;font-weight:600;color:var(--ink2);margin-top:3px">Your city, your way. Changes apply straight away.</div></div>
+          <div style="display:flex;flex-direction:column;gap:10px"><span style="font-size:14px;font-weight:800">Time of day</span>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+              <sc-for list="{{ times }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" style="display:flex;flex-direction:column;gap:10px;padding:10px;border-radius:18px;border:2px solid {{ o.bd }};background:var(--card);color:var(--ink);cursor:pointer;text-align:left;transition:border-color .2s"><span style="height:84px;border-radius:12px;background:{{ o.sw }};display:flex;align-items:flex-end;padding:10px;box-sizing:border-box;gap:6px"><span style="width:44px;height:30px;border-radius:7px;background:{{ o.b1 }}"></span><span style="width:30px;height:46px;border-radius:7px;background:{{ o.b2 }}"></span><span style="width:38px;height:22px;border-radius:7px;background:{{ o.b3 }}"></span></span><span style="display:flex;align-items:center;justify-content:space-between;padding:0 4px"><span style="font-size:14.5px;font-weight:800">{{ o.label }}</span><span style="font-size:12.5px;font-weight:700;color:var(--ink3)">{{ o.sub }}</span></span></button></sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px"><span style="font-size:14px;font-weight:800">Motion in the city</span>
+            <div style="display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--seg);align-self:flex-start;flex-wrap:wrap"><sc-for list="{{ motions }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" style="height:36px;padding:0 16px;border:0;border-radius:9px;background:{{ o.bg }};box-shadow:{{ o.sh }};color:{{ o.fg }};font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">{{ o.label }}</button></sc-for></div>
+            <span style="font-size:13px;font-weight:600;color:var(--ink2)">{{ motionHelp }}</span>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ is.security }}" hint-placeholder-val="{{ false }}">
+        <section aria-label="Security" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:22px 24px 12px;display:flex;flex-direction:column;gap:6px">
+          <div style="padding-bottom:8px"><h2 style="margin:0;font-size:18px;font-weight:800">Security</h2><div style="font-size:13.5px;font-weight:600;color:var(--ink2);margin-top:3px">Sign-in, devices and how approvals are confirmed.</div></div>
+          <sc-for list="{{ secRows }}" as="r" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--line2);flex-wrap:wrap">
+              <span style="width:38px;height:38px;border-radius:11px;background:var(--okSoft);color:var(--ok);display:flex;align-items:center;justify-content:center;flex:none">{{ r.icon }}</span>
+              <div style="flex:1;min-width:200px;line-height:1.4"><div style="font-size:14.5px;font-weight:800">{{ r.t }}</div><div style="font-size:13px;font-weight:600;color:var(--ink2)">{{ r.s }}</div></div>
+              <button onClick="{{ r.act }}" style="height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">{{ r.a }}</button>
+            </div>
+          </sc-for>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 0 6px;border-top:1px solid var(--line2)"><span style="font-size:15px;font-weight:800">Signed in on</span><button onClick="{{ signOutAll }}" style="border:0;background:transparent;color:var(--redInk);font-size:13.5px;font-weight:800;cursor:pointer;padding:4px 6px">Sign out everywhere else</button></div>
+          <sc-for list="{{ sessions }}" as="d" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-top:1px solid var(--line2)">
+              <span style="width:38px;height:38px;border-radius:11px;background:var(--sunk);color:var(--ink2);display:flex;align-items:center;justify-content:center;flex:none">{{ d.icon }}</span>
+              <div style="flex:1;min-width:0;line-height:1.4"><div style="font-size:14.5px;font-weight:800">{{ d.t }}</div><div style="font-size:13px;font-weight:600;color:var(--ink2)">{{ d.s }}</div></div>
+              <sc-if value="{{ d.current }}" hint-placeholder-val="{{ false }}"><span style="height:24px;padding:0 9px;border-radius:7px;background:var(--okSoft);color:var(--okInk);font-size:12px;font-weight:800;display:flex;align-items:center">This device</span></sc-if>
+              <sc-if value="{{ d.other }}" hint-placeholder-val="{{ true }}"><button onClick="{{ d.out }}" style="height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap">Sign out</button></sc-if>
+            </div>
+          </sc-for>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ is.billing }}" hint-placeholder-val="{{ false }}">
+        <section aria-label="Plan and billing" style="display:flex;flex-direction:column;gap:18px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px">
+            <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:20px 22px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3)">PLAN</span>
+              <span style="font-size:24px;font-weight:800;letter-spacing:-.4px">Team</span>
+              <span style="font-size:13.5px;font-weight:600;color:var(--ink2);line-height:1.45">5 seats, shared boards, two-person approvals. Renews 1 October.</span>
+              <div style="display:flex;gap:8px;margin-top:4px"><button onClick="{{ changePlan }}" style="height:36px;padding:0 14px;border:0;border-radius:10px;background:var(--hero);color:#FFFFFF;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">Compare plans</button></div>
+            </div>
+            <button onClick="{{ goLedger }}" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:20px 22px;display:flex;flex-direction:column;gap:10px;text-align:left;cursor:pointer;color:var(--ink)">
+              <span style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3)">AGENT SPEND · SEPTEMBER</span>
+              <span style="display:flex;align-items:baseline;gap:8px"><span style="font-size:24px;font-weight:800;letter-spacing:-.4px">£2,412</span><span style="font-size:14px;font-weight:700;color:var(--ink2)">of £8,000</span></span>
+              <span style="width:100%;height:6px;border-radius:99px;background:var(--track);overflow:hidden;display:flex"><span style="width:30%;background:var(--hero)"></span></span>
+              <span style="font-size:13.5px;font-weight:800;color:var(--heroInk)">Open the Ledger</span>
+            </button>
+            <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:20px 22px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3)">PAYMENT</span>
+              <span style="display:flex;align-items:center;gap:10px"><span style="width:44px;height:30px;border-radius:7px;background:var(--sunk);color:var(--ink2);display:flex;align-items:center;justify-content:center">{{ icCard }}</span><span style="font-size:15px;font-weight:800">Visa ending 4242</span></span>
+              <span style="font-size:13.5px;font-weight:600;color:var(--ink2)">Invoices go to finance@northwind.co</span>
+              <div><button onClick="{{ updateCard }}" style="height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">Update</button></div>
+            </div>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px 22px 8px">
+            <h2 style="margin:0 0 8px;font-size:17px;font-weight:800">Invoices</h2>
+            <sc-for list="{{ invoices }}" as="i" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) 110px 90px 40px;gap:12px;align-items:center;min-height:50px;border-top:1px solid var(--line2);font-size:14px"><span style="font-weight:800">{{ i.t }}</span><span style="font-weight:800;text-align:right">{{ i.amt }}</span><span style="display:flex;justify-content:flex-end"><span style="height:24px;padding:0 9px;border-radius:7px;background:var(--okSoft);color:var(--okInk);font-size:12px;font-weight:800;display:flex;align-items:center">Paid</span></span><button onClick="{{ i.dl }}" aria-label="Download" style="width:34px;height:34px;border:0;border-radius:10px;background:transparent;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:var(--chip)">{{ icDown }}</button></div>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: null, form: null, notif: { decisions: [1, 1, 1], spend: [1, 1, 0], finished: [1, 0, 1], digest: [0, 1, 0], weekly: [0, 1, 1] }, quiet: true, signed: {} };
+  renderVals() {
+    const h = React.createElement, app = this.props.app || {}, TA = window.TiloApp, D = TA && TA.data;
+    if (!D) return {};
+    const K = TA.ready() ? TA.kit(h) : null, S = this.state, go = app.go || (() => {}), toast = app.toast || (() => {}), U = D.user;
+    const icon = (n, s) => K ? K.icon(n, s) : null, up = p => this.setState(p);
+    const tab = S.tab || (app.params && app.params.tab) || 'profile', wide = (app.vw || 1440) >= 980;
+    const form = S.form || { name: U.name, email: U.email, title: U.title, tz: U.tz, lang: U.lang, hours: U.hours };
+    const sw = on => ({ track: on ? 'var(--ok)' : 'var(--track)', knob: on ? 'translateX(16px)' : 'none' });
+    const sw2 = on => ({ track: on ? 'var(--ok)' : 'var(--track)', knob: on ? 'translateX(18px)' : 'none' });
+    const seg = on => ({ bg: on ? 'var(--tabOn)' : 'transparent', sh: on ? '0 1px 3px rgba(31,29,43,.16)' : 'none', fg: on ? 'var(--ink)' : 'var(--ink2)' });
+    const NOTIF = [['decisions', 'A decision needs you', 'Budget sign-offs, gates and anything outside the company'], ['spend', 'Spend goes over a limit', 'A world or district passes its budget'], ['finished', 'Work is ready', 'Quick tasks and routine runs finish'], ['digest', 'Morning digest at 08:00', 'What happened overnight and what’s next'], ['weekly', 'Weekly ledger summary', 'Every Monday, spend and hours saved']];
+    const CH = ['Phone', 'Email', 'Slack'], time = app.time || 'day', motion = app.motion || 'calm';
+    const sess = [{ k: 'mac', t: 'MacBook Pro · Chrome', s: 'London · active now', ic: 'laptop', current: true }, { k: 'ios', t: 'iPhone 15 · Tilo app', s: 'London · 2 hours ago · Face ID for approvals', ic: 'phone' }, { k: 'ipad', t: 'iPad · Safari', s: 'Manchester · yesterday', ic: 'screen' }].filter(d => !S.signed[d.k]);
+    return {
+      name: form.name, title: form.title, icPlug: icon('plug', 16), icMoon: icon('moon', 17), icCard: icon('card', 18), icDown: icon('download', 15),
+      goConnectors: () => go('connectors'), goLedger: () => go('ledger'),
+      cols: wide ? '230px minmax(0,1fr)' : 'minmax(0,1fr)', navDir: wide ? 'column' : 'row',
+      tabs: [['profile', 'Profile', 'person'], ['notifications', 'Notifications', 'bell'], ['appearance', 'Appearance', 'sun'], ['security', 'Security', 'shield'], ['billing', 'Plan and billing', 'card']].map(([k, label, ic]) => ({ label, icon: icon(ic, 17), cur: tab === k ? 'page' : undefined, bg: tab === k ? 'var(--rowOn)' : 'transparent', fg: tab === k ? 'var(--heroInk)' : 'var(--ink)', pick: () => up({ tab: k }) })),
+      is: { profile: tab === 'profile', notifications: tab === 'notifications', appearance: tab === 'appearance', security: tab === 'security', billing: tab === 'billing' },
+      fields: [['name', 'Full name', 'Shown to your team'], ['email', 'Work email', 'Verified · used for sign-in'], ['title', 'Job title', 'Helps Tilo route approvals'], ['tz', 'Time zone', 'Agenda and routines use this'], ['lang', 'Language', 'For drafts Tilo writes for you'], ['hours', 'Working hours', 'Tilo won’t book outside these']].map(([k, label, help]) => ({ label, help, v: form[k], set: e => up({ form: { ...form, [k]: e.target.value } }) })),
+      reset: () => up({ form: null }), saveProfile: () => toast('Profile saved'),
+      notif: NOTIF.map(([k, label, sub]) => ({ label, sub, cells: CH.map((c, i) => { const on = !!S.notif[k][i]; return { label: label + ' by ' + c, on, ...sw(on), toggle: () => { if (k === 'decisions' && on && S.notif[k].filter(Boolean).length === 1) { toast('Decisions need at least one channel'); return; } const v = S.notif[k].slice(); v[i] = on ? 0 : 1; up({ notif: { ...S.notif, [k]: v } }); } }; }) })),
+      quiet: { on: S.quiet, ...sw2(S.quiet), toggle: () => up({ quiet: !S.quiet }) },
+      times: [['day', 'Day', 'Bright lawns', '#B6DCA0', '#F4B23E', '#3E9BE6', '#EC6AA6'], ['night', 'Night', 'Lamps and glow', '#2C3556', '#FFD98A', '#5A6BD0', '#7A62F5']].map(([v, label, sub, s, b1, b2, b3]) => ({ label, sub, sw: s, b1, b2, b3, on: time === v, bd: time === v ? 'var(--hero)' : 'var(--line)', pick: () => app.setPref && app.setPref('time', v) })),
+      motions: [['lively', 'Lively'], ['calm', 'Calm'], ['still', 'Still']].map(([v, label]) => ({ label, on: motion === v, ...seg(motion === v), pick: () => app.setPref && app.setPref('motion', v) })),
+      motionHelp: motion === 'still' ? 'Nothing moves. Best for older laptops and long sessions.' : motion === 'calm' ? 'Agents and cars move slowly. The city pauses when you leave Home.' : 'Full speed on Home. The city pauses when you leave Home.',
+      secRows: [{ t: 'Two-step sign-in', s: 'On · authenticator app', a: 'Manage', icon: icon('shield', 18), act: () => toast('Two-step settings') }, { t: 'Confirm approvals with Face ID', s: 'On the Tilo phone app, for spend over £250', a: 'Change', icon: icon('phone', 18), act: () => toast('Approval confirmation settings') }].map(r => r),
+      sessions: sess.map(d => ({ t: d.t, s: d.s, icon: icon(d.ic, 18), current: !!d.current, other: !d.current, out: () => { up({ signed: { ...S.signed, [d.k]: true } }); toast('Signed out of ' + d.t); } })),
+      signOutAll: () => { up({ signed: { ios: true, ipad: true } }); toast('Signed out everywhere except this device'); },
+      changePlan: () => toast('Plan comparison opens here'), updateCard: () => toast('Card update is handled by our payment provider'),
+      invoices: [['September 2026 · 5 seats', '£245.00'], ['August 2026 · 5 seats', '£245.00'], ['July 2026 · 4 seats', '£196.00']].map(([t, amt]) => ({ t, amt, dl: () => toast('Downloaded ' + t.split(' ·')[0] + ' invoice') }))
+    };
+  }
+}
+</script>
+</body>
+</html>
