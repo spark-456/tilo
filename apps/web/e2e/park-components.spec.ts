@@ -302,7 +302,7 @@ for (const [vpName, viewport] of Object.entries(SIZES)) {
           const m = await measure(item);
           near(m.h, 32, "segmented item height");
           expect(m.radius).toBe("9px");
-          expect(m.fontSize, "reference: Ledger 'Entry type'").toBe("13px");
+          expect(m.fontSize, "reference: Ledger 'Entry type', README 13.5px").toBe("13.5px");
           expect(m.padding).toBe("0px 11px");
           expect(m.fontWeight).toBe("800");
           const on =

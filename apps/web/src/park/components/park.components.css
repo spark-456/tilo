@@ -172,7 +172,7 @@
   border-radius: 9px;
   background: transparent;
   color: var(--ink2);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 800;
   cursor: pointer;
   white-space: nowrap;
@@ -187,6 +187,7 @@
   position: relative;
   padding: 0;
   border-radius: 0;
+  font-size: 13px;
 }
 [data-park] .park-seg__item--ink {
   color: var(--ink);

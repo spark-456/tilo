@@ -226,12 +226,12 @@ describe("WEB_2_styles_segmented", () => {
     pin(["park-seg"], "gap", "2px");
   });
 
-  it("WEB_2_styles_segmented_plain_item_h32_r9_13px_800_padding_0_11px_ink2", () => {
-    // Reference (Ledger "Entry type"): padding 0 11px, 13px. The README's 13.5px is the type table's range.
+  it("WEB_2_styles_segmented_plain_item_h32_r9_13_5px_800_padding_0_11px_ink2", () => {
+    // Reference (Ledger "Entry type"): padding 0 11px, 13.5px (README: item 13.5px 800). Sliding items are 13px.
     const c = ["park-seg__item"];
     pin(c, "height", "32px");
     pin(c, "border-radius", "9px");
-    pin(c, "font-size", "13px");
+    pin(c, "font-size", "13.5px");
     pin(c, "font-weight", "800");
     pin(c, "padding", "0 11px");
     pin(c, "color", "var(--ink2)");
