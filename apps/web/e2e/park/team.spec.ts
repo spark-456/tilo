@@ -1,8 +1,8 @@
 // WEB-10 acceptance in a real browser: /park/team (the route lands with WEB-3a, so this fails until then) at
 // 1440x900 and 390x844, day and night. The page heading is visible, the five members are on screen, the key computed values match the design, nothing overflows the page
 // sideways (the 820px members table scrolls inside its card), and there are ZERO console errors or warnings.
-// The shell's "Sample data" chip is NOT asserted here: it arrives with the WEB-3b nav (the page itself renders
-// no chip, which Team.static.test.ts pins). Add the visibility check when WEB-3b lands.
+// The shell's "Sample data" chip (WEB-3b nav) is asserted by the last test per viewport; the page itself
+// renders no chip, which Team.static.test.ts pins.
 // Run on a private port, three workers (a cold Vite start can time out the first test):
 //   TILO_WEB_PORT=5411 pnpm --filter @tilo/web exec playwright test e2e/park/team.spec.ts --project=chromium --no-deps --workers=3
 //
@@ -98,6 +98,17 @@ for (const [vpName, viewport] of Object.entries(SIZES)) {
       });
       expect(scroller, "an overflow-x:auto wrapper holds the 820px table").not.toBeNull();
       expect(scroller?.scrolls).toBe(vpName === "mobile");
+    });
+
+    // The chip belongs to the shell nav (WEB-3b), not to the page: the page renders none of its own.
+    test(`WEB_10_e2e_${vpName}_shell_sample_data_chip_shows_on_the_team_page`, async ({ page }) => {
+      await open(page, "day");
+      await expect(
+        page.locator("header").getByRole("button", { name: "Sample data" }),
+      ).toBeVisible();
+      await expect(
+        page.getByTestId("park-page-team").getByRole("button", { name: "Sample data" }),
+      ).toHaveCount(0);
     });
   });
 }
