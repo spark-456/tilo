@@ -1,10 +1,11 @@
 // The Park "Profile" page (WEB-12; design "Tilo App Profile.dc.html"): the person, notifications,
-// appearance, security and plan on five tabs. The user comes through useParkApi(); everything else is the
-// design's literal data or page state (save, the notification matrix, quiet hours, sessions and billing
-// call nothing: docs/park-designed-not-in-prd/Profile.md). Time and motion are the shell's prefs, written
-// with app.setPref and read back from the AppCtx. Navigation is app.go only.
+// appearance, security and plan on five tabs. The user, the profile settings (sessions, invoices, payment,
+// plan, notification defaults, quiet hours) and the ledger (agent spend) all come through useParkApi();
+// the matrix, quiet hours, sessions and the form are page state and call nothing
+// (docs/park-designed-not-in-prd/Profile.md). Time and motion are the shell's prefs, written with
+// app.setPref and read back from the AppCtx. Navigation is app.go only.
 import { type ReactNode, useEffect, useState } from "react";
-import type { User } from "../../api/types";
+import type { ProfileSession, ProfileSettings, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { PageSheet, StatusChip, Switch } from "../../components";
@@ -40,18 +41,6 @@ const formOf = (u: User): Form => ({
 });
 
 const CHANNELS = ["Phone", "Email", "Slack"] as const;
-const NOTIFS: readonly (readonly [string, string, readonly boolean[]])[] = [
-  [
-    "A decision needs you",
-    "Budget sign-offs, gates and anything outside the company",
-    [true, true, true],
-  ],
-  ["Spend goes over a limit", "A world or district passes its budget", [true, true, false]],
-  ["Work is ready", "Quick tasks and routine runs finish", [true, false, true]],
-  ["Morning digest at 08:00", "What happened overnight and what’s next", [false, true, false]],
-  ["Weekly ledger summary", "Every Monday, spend and hours saved", [false, true, true]],
-];
-
 const SWATCH = {
   day: ["#B6DCA0", "#F4B23E", "#3E9BE6", "#EC6AA6"],
   night: ["#2C3556", "#FFD98A", "#5A6BD0", "#7A62F5"],
@@ -75,30 +64,16 @@ const SECURITY_ROWS = [
     "Approval confirmation settings",
   ],
 ] as const;
-interface Session {
-  title: string;
-  sub: string;
-  current: boolean;
-  icon: ReactNode;
-}
-const SESSIONS: readonly Session[] = [
-  { title: "MacBook Pro · Chrome", sub: "London · active now", current: true, icon: ICONS.laptop },
-  {
-    title: "iPhone 15 · Tilo app",
-    sub: "London · 2 hours ago · Face ID for approvals",
-    current: false,
-    icon: ICONS.phone,
-  },
-  { title: "iPad · Safari", sub: "Manchester · yesterday", current: false, icon: ICONS.tablet },
-];
+const SESSION_ICONS = { laptop: ICONS.laptop, phone: ICONS.phone, screen: ICONS.tablet } as const;
+const sessionSub = (s: ProfileSession): string =>
+  [s.place, s.lastActive, s.note].filter(Boolean).join(" · ");
+const money = (n: number): string => `£${n.toLocaleString("en-GB")}`;
 
-const INVOICES = [
-  ["September 2026 · 5 seats", "£245.00", "September 2026"],
-  ["August 2026 · 5 seats", "£245.00", "August 2026"],
-  ["July 2026 · 4 seats", "£196.00", "July 2026"],
-] as const;
-const SPENT = 2412;
-const LIMIT = 8000;
+interface Loaded {
+  user: User;
+  settings: ProfileSettings;
+  spend: { spent: number; budget: number };
+}
 
 const cls = (...names: (string | false)[]): string => names.filter(Boolean).join(" ");
 
@@ -132,21 +107,28 @@ function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange:
 
 export function ProfilePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
-  const [user, setUser] = useState<User | null>(null);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<"missing" | "failed" | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [tab, setTab] = useState<TabId>(() => tabFrom(app.params.tab));
-  const [notif, setNotif] = useState(() => NOTIFS.map((n) => [...n[2]]));
-  const [quiet, setQuiet] = useState(true);
-  const [sessions, setSessions] = useState(SESSIONS);
+  const [notif, setNotif] = useState<boolean[][]>([]);
+  const [quiet, setQuiet] = useState(false);
+  const [sessions, setSessions] = useState<ProfileSession[]>([]);
 
   useEffect(() => {
     let live = true;
-    api.getUser().then(
-      (r) => {
+    Promise.all([api.getUser(), api.getProfileSettings(), api.getLedger()]).then(
+      ([u, st, led]) => {
         if (!live) return;
-        setUser(r.data);
-        setForm(formOf(r.data));
+        setLoaded({
+          user: u.data,
+          settings: st.data,
+          spend: { spent: led.data.spent, budget: led.data.budget },
+        });
+        setForm(formOf(u.data));
+        setNotif(st.data.notifications.map((n) => [n.phone, n.email, n.slack]));
+        setQuiet(st.data.quiet.on);
+        setSessions(st.data.sessions);
       },
       (e: unknown) => {
         if (live) setProblem(e instanceof Error && e.name === "NotBuilt" ? "missing" : "failed");
@@ -158,17 +140,22 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   }, [api]);
 
   const wide = app.vw >= 980;
+  const user = loaded?.user;
   const flip = (r: number, c: number) => {
     const row = notif[r] ?? [];
-    if (r === 0 && row[c] && row.filter(Boolean).length === 1) {
+    if (
+      loaded?.settings.notifications[r]?.id === "decisions" &&
+      row[c] &&
+      row.filter(Boolean).length === 1
+    ) {
       app.toast("Decisions need at least one channel");
       return;
     }
     setNotif(notif.map((cells, i) => (i === r ? cells.map((v, j) => (j === c ? !v : v)) : cells)));
   };
-  const signOut = (s: Session) => {
+  const signOut = (s: ProfileSession) => {
     setSessions(sessions.filter((o) => o !== s));
-    app.toast(`Signed out of ${s.title}`);
+    app.toast(`Signed out of ${s.device}`);
   };
   // One head for every state, so the h1 is the same node while the data loads (focus stays on it).
   const subtitle =
@@ -201,7 +188,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
             Connectors
           </button>
         </div>
-        {user && form ? (
+        {loaded && user && form ? (
           <div className={cls("park-profile-layout", wide && "park-profile-layout--wide")}>
             <nav
               aria-label="Settings"
@@ -279,8 +266,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                         </span>
                       ))}
                     </div>
-                    {NOTIFS.map(([label, sub], r) => (
-                      <div key={label} className="park-profile-mrow">
+                    {loaded.settings.notifications.map(({ id, label, description: sub }, r) => (
+                      <div key={id} className="park-profile-mrow">
                         <div>
                           <div className="park-profile-mlabel">{label}</div>
                           <div className="park-profile-msub">{sub}</div>
@@ -301,9 +288,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 <div className="park-profile-quiet">
                   <Tile tone="hero">{ICONS.moon}</Tile>
                   <div className="park-profile-grow">
-                    <div className="park-profile-mlabel">Quiet hours · 19:00 to 08:00</div>
+                    <div className="park-profile-mlabel">{`Quiet hours · ${loaded.settings.quiet.start} to ${loaded.settings.quiet.end}`}</div>
                     <div className="park-profile-msub">
-                      Phone stays silent, except decisions over £1,000.
+                      {`Phone stays silent, except decisions over ${loaded.settings.quiet.threshold}.`}
                     </div>
                   </div>
                   <Switch label="Quiet hours" checked={quiet} onChange={setQuiet} />
@@ -408,11 +395,11 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   </button>
                 </div>
                 {sessions.map((s) => (
-                  <div key={s.title} className="park-profile-session">
-                    <Tile tone="sunk">{s.icon}</Tile>
+                  <div key={s.id} className="park-profile-session">
+                    <Tile tone="sunk">{SESSION_ICONS[s.icon]}</Tile>
                     <div className="park-profile-grow">
-                      <div className="park-profile-stitle">{s.title}</div>
-                      <div className="park-profile-ssub">{s.sub}</div>
+                      <div className="park-profile-stitle">{s.device}</div>
+                      <div className="park-profile-ssub">{sessionSub(s)}</div>
                     </div>
                     {s.current ? (
                       <StatusChip tone="ok">This device</StatusChip>
@@ -438,9 +425,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 <div className="park-profile-cards">
                   <div className="park-profile-plan">
                     <span className="park-profile-eyebrow">PLAN</span>
-                    <span className="park-profile-planname">Team</span>
+                    <span className="park-profile-planname">{loaded.settings.plan.name}</span>
                     <span className="park-profile-blurb">
-                      5 seats, shared boards, two-person approvals. Renews 1 October.
+                      {`${loaded.settings.plan.seats} seats, ${loaded.settings.plan.perks}. Renews ${loaded.settings.plan.renews}.`}
                     </span>
                     <button
                       type="button"
@@ -455,15 +442,17 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     className="park-profile-spend"
                     onClick={() => app.go("ledger")}
                   >
-                    <span className="park-profile-eyebrow">AGENT SPEND · SEPTEMBER</span>
+                    <span className="park-profile-eyebrow">{`AGENT SPEND · ${loaded.settings.plan.spendMonth.toUpperCase()}`}</span>
                     <span className="park-profile-amount">
-                      <span className="park-profile-big">£2,412</span>
-                      <span className="park-profile-of">of £8,000</span>
+                      <span className="park-profile-big">{money(loaded.spend.spent)}</span>
+                      <span className="park-profile-of">{`of ${money(loaded.spend.budget)}`}</span>
                     </span>
                     <span className="park-profile-bar">
                       <span
                         className="park-profile-fill"
-                        style={{ width: `${Math.round((SPENT / LIMIT) * 100)}%` }}
+                        style={{
+                          width: `${Math.round((loaded.spend.spent / loaded.spend.budget) * 100)}%`,
+                        }}
                       />
                     </span>
                     <span className="park-profile-open">Open the Ledger</span>
@@ -473,8 +462,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   <Tile tone="hero">{ICONS.billing}</Tile>
                   <div className="park-profile-grow">
                     <span className="park-profile-eyebrow">PAYMENT</span>
-                    <div className="park-profile-stitle">Visa ending 4242</div>
-                    <div className="park-profile-ssub">Invoices go to finance@northwind.co</div>
+                    <div className="park-profile-stitle">{`${loaded.settings.payment.brand} ending ${loaded.settings.payment.last4}`}</div>
+                    <div className="park-profile-ssub">{`Invoices go to ${loaded.settings.payment.billingEmail}`}</div>
                   </div>
                   <button
                     type="button"
@@ -486,16 +475,16 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 </div>
                 <div className="park-profile-invoices">
                   <h2 className="park-profile-invoices-title">Invoices</h2>
-                  {INVOICES.map(([title, amount, month]) => (
-                    <div key={title} className="park-profile-invoice">
-                      <span>{title}</span>
-                      <span className="park-profile-money">{amount}</span>
-                      <StatusChip tone="ok">Paid</StatusChip>
+                  {loaded.settings.invoices.map((inv) => (
+                    <div key={inv.id} className="park-profile-invoice">
+                      <span>{`${inv.period} · ${inv.seats} seats`}</span>
+                      <span className="park-profile-money">{inv.amount}</span>
+                      <StatusChip tone="ok">{inv.status}</StatusChip>
                       <button
                         type="button"
                         aria-label="Download"
                         className="park-profile-download"
-                        onClick={() => app.toast(`Downloaded ${month} invoice`)}
+                        onClick={() => app.toast(`Downloaded ${inv.period} invoice`)}
                       >
                         {ICONS.download}
                       </button>
