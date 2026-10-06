@@ -1,6 +1,6 @@
 // The page registry (plan section 10). Each page is one line: a lane replaces its line with
-//   home: lazy(() => import("../pages/Home")),
-// (a default export taking `{ app: AppCtx }`) and touches nothing else in this file.
+//   home: lazy(() => import("../pages/Home/HomePage").then((m) => ({ default: m.HomePage }))),
+// (a NAMED export `HomePage` taking `{ app: AppCtx }`, no default export) and touches nothing else in this file.
 import { type ComponentType, type LazyExoticComponent, lazy } from "react";
 import type { AppCtx, PageId } from "./AppCtx";
 
