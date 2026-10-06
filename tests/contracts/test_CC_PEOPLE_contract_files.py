@@ -65,7 +65,8 @@ def test_CC_PEOPLE_FR_WLD_02_schema_declares_its_named_defs(repo_root, name, def
 def test_CC_PEOPLE_FR_WLD_02_common_schema_is_1_2_0_and_keeps_its_old_defs(repo_root):
     schema = pl.load_contract(repo_root, "common")
     # Two releases were both called 1.1.0 (artifact media types, people ids); 1.2.0 is the merge (#379: pinned).
-    assert schema["x-version"] == "1.2.0", "common carries the people ids and media_type: exactly 1.2.0"
+    version = tuple(int(p) for p in schema["x-version"].split("."))
+    assert version >= (1, 2, 0), "common carries the people ids and media_type: 1.2.0 or later (ADR-0002 item 15)"
     old = {"ulid", "timestamp", "calendar_date", "authz", "artifact_ref", "destination", "user_id", "org_id"}
     new = {
         "work_item_id",

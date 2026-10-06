@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/common.schema.json",
-  "x-version": "1.2.0",
+  "x-version": "1.4.0",
   "title": "Common",
   "description": "Definitions shared by every Tilo contract. The root is a sampler with one optional property per definition so that fixtures and generated types cover each one; no service sends a Common document.",
   "type": "object",
@@ -204,9 +204,9 @@
       "enum": ["director", "lead", "specialist", "verifier", "writer", "narrator"]
     },
     "channel": {
-      "description": "Where a person sees and answers Tilo (PRD 10.3, 11.1).",
+      "description": "Where a person sees and answers Tilo (PRD 10.3, 11.1), plus `schedule`, how a run that a recurring schedule started came to be (1.4.0, FR-AGT-14). `schedule` is not a place anyone answers: only world.requested uses it, and it is never an owner instruction or a person's approval (OB-01).",
       "type": "string",
-      "enum": ["web", "mobile_web", "whatsapp", "email"]
+      "enum": ["web", "mobile_web", "whatsapp", "email", "schedule"]
     },
     "data_class": {
       "description": "Data class (PRD 12.1): personal, business or public.",
