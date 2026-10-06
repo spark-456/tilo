@@ -10,11 +10,6 @@
 [data-park] .park-ledger-root button {
   font-family: inherit;
 }
-[data-park] .park-ledger-root h1,
-[data-park] .park-ledger-root h2,
-[data-park] .park-ledger-root p {
-  margin: 0;
-}
 
 /* header */
 [data-park] .park-ledger-head {
@@ -31,6 +26,7 @@
   min-width: 0;
 }
 [data-park] .park-ledger-title {
+  margin: 0;
   font-family: "Nunito", sans-serif;
   font-weight: 900;
   font-size: 36px;
@@ -38,6 +34,7 @@
   line-height: 1.05;
 }
 [data-park] .park-ledger-lede {
+  margin: 0;
   font-size: 15.5px;
   font-weight: 600;
   color: var(--ink2);
@@ -88,7 +85,7 @@
   color: var(--ink3);
 }
 [data-park] .park-ledger-h2 {
-  margin-top: 4px;
+  margin: 4px 0 0;
   font-size: 18px;
   font-weight: 800;
 }
@@ -535,7 +532,6 @@
   width: 100%;
   max-width: 60px;
   border-radius: 10px 10px 3px 3px;
-  transform-origin: bottom;
 }
 [data-park] .park-ledger-weeks {
   display: grid;
