@@ -116,6 +116,11 @@ def test_FR_AGT_14_the_job_authenticates_as_the_schedule_scheduler_and_for_the_h
         "FR-AGT-14: the job must not borrow the Gmail scheduler or the Cloud Tasks identity"
     )
     assert re.search(r"audience\s*=", oidc.group(1)), "FR-AGT-14: set the OIDC audience to the harness URL"
+    audience = re.search(r"audience\s*=\s*(\S+)", oidc.group(1)).group(1)
+    uri = re.search(r"\buri\s*=\s*\"(.+)\"", body)
+    assert uri and uri.group(1).startswith(f"${{{audience}}}"), (
+        "FR-AGT-14: the OIDC audience is the base URL the job calls (the uri is that plus the tick path)"
+    )
 
 
 def test_FR_AGT_14_the_schedule_scheduler_holds_no_project_level_role(repo_root):
