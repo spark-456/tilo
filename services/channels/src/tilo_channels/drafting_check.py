@@ -4,7 +4,10 @@ Content; BQ-140). A heuristic gate: every rule fails toward a finding (needs_you
 The draft and every source are read the same way: NFKD (compatibility and canonical decomposition), then controls,
 format characters, combining marks and fillers dropped (so "refụnd" reads "refund"), single-script Cyrillic and
 Greek look-alikes mapped to Latin, lower case, stroke letters read as their base ("refunđ" reads "refund");
-hyphen-split words are also read joined. In the draft (and a model question) a text-direction control is an
+hyphen-split words are also read joined. The NFKD work is bounded (FR-MTG-08c, `_bound`): a run of more than
+MAX_MARK_RUN non-starters is cut and the text is cut where its decomposed length passes the cap, so no input makes it
+quadratic or longer than the cap; either, an overlay or enclosing mark (strike-through), or a text that is nothing but
+dropped characters is an "obfuscation" finding. In the draft (and a model question) a text-direction control is an
 "obfuscation" finding, and so is a word holding a letter of any script but Latin, Cyrillic and Greek, mixing those
 scripts, or holding a non-ASCII Latin letter other than the stroke letters (small capitals, IPA). A commitment word
 is allowed only when the instruction mentions it and holds no negator anywhere; a draft sentence with exactly one
@@ -14,12 +17,15 @@ the instruction mentions the word.
 
 from __future__ import annotations
 
+import functools
+import itertools
 import re
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 CHECK_CAP, SOURCES_CAP = 20_000, 100_000  # per text, and across all sources (a cut fact is reported, never assumed)
+MAX_MARK_RUN = 30  # non-starters in a row that NFKD may reorder (UAX #15 stream-safe: more is cut)
 
 _DROP = ("Cc", "Cf", "Mn", "Me")  # controls, format characters (zero-width, soft hyphen, tags), joiners, marks
 _CONTROLS = dict.fromkeys(c for c in [*range(32), 127] if chr(c) not in "\n\r\t")
@@ -27,6 +33,8 @@ _FILLERS = "".join(map(chr, (0x115F, 0x1160, 0x3164, 0xFFA0)))  # Hangul fillers
 _BIDI = "".join(map(chr, (*range(0x202A, 0x202F), *range(0x2066, 0x206A), 0x200E, 0x200F, 0x061C)))
 _BIDI_GAP = dict.fromkeys(map(ord, _BIDI), " ")
 _BIDI_SPAN = re.compile(f"\\S{{0,40}}[{_BIDI}]\\S{{0,40}}")
+# Overlay and enclosing marks (strike-through, slash, box) are dropped by `clean`; in model text each is a finding.
+_OVERLAY = re.compile("\\S{0,20}[\u0334-\u0338\u0488\u0489\u20d2-\u20f0\ua670-\ua672]\\S{0,20}")
 # Latin letters with no ASCII decomposition that are ordinary spelling, read as their base letters
 _FOLD = str.maketrans({"ß": "ss", "ø": "o", "æ": "ae", "œ": "oe", "đ": "d", "ł": "l", "þ": "th", "ð": "d", "ħ": "h"})
 _FOLD |= str.maketrans({"ŧ": "t", "ı": "i", "ƀ": "b", "ƶ": "z", "ǥ": "g", "ɍ": "r", "ɇ": "e"})
@@ -91,17 +99,53 @@ class Finding:
     text: str  # the draft span no source supports; shown to the user, never logged or emitted
 
 
-def _strip(text: str) -> str:
-    """NFKD, with controls, format characters, marks and fillers dropped; a direction control becomes a space."""
+@functools.lru_cache(maxsize=4096)
+def _profile(char: str) -> tuple[int, int, int]:
+    """(leading non-starters, trailing non-starters, length) of the character's NFKD; all non-starters iff the first
+    equals the length. Cached, so a scan is linear."""
+    marks = [unicodedata.combining(c) != 0 for c in unicodedata.normalize("NFKD", char)]
+    lead = next((i for i, mark in enumerate(marks) if not mark), len(marks))
+    return lead, next((i for i, mark in enumerate(reversed(marks)) if not mark), len(marks)), len(marks)
+
+
+def _bound(text: str, limit: int) -> tuple[str, bool]:
+    """(text, whether anything was cut): a character that would make a run of more than MAX_MARK_RUN non-starters in
+    its NFKD is dropped, and the text ends before the character that takes the NFKD length past `limit`. Reordering
+    is quadratic in such a run (U+0F73 is two non-starters, U+FDFA expands 18 times), so NFKD of the result is
+    linear."""
+    out: list[str] = []
+    run, size, cut = 0, 0, False
+    for char in text:
+        lead, trail, grows = _profile(char) if char >= "\x80" else (0, 0, 1)
+        after = run + grows if lead == grows else trail
+        if run + lead > MAX_MARK_RUN:
+            cut = True
+        elif size + grows > limit:
+            return "".join(out), True
+        else:
+            out.append(char)
+            run, size = after, size + grows
+    return "".join(out), cut
+
+
+def _read_text(text: str, limit: int) -> tuple[str, bool]:
+    """(NFKD of `text` bounded by `_bound`, with controls, format characters, marks and fillers dropped and a
+    direction control read as a space; whether `_bound` cut anything)."""
     if text.isascii():
-        return text.translate(_CONTROLS)
-    text = unicodedata.normalize("NFKD", text.translate(_BIDI_GAP))
-    return "".join(c for c in text if c in "\n\r\t" or (c not in _FILLERS and unicodedata.category(c) not in _DROP))
+        return text.translate(_CONTROLS), False
+    text, cut = _bound(text.translate(_BIDI_GAP), limit)
+    text = unicodedata.normalize("NFKD", text)
+    keep = "".join(c for c in text if c in "\n\r\t" or (c not in _FILLERS and unicodedata.category(c) not in _DROP))
+    return keep, cut
 
 
-def clean(text: str) -> str:
-    """`text` as every check reads it (see the module docstring)."""
-    text = _strip(text)
+def _strip(text: str, limit: int = SOURCES_CAP) -> str:
+    return _read_text(text, limit)[0]
+
+
+def clean(text: str, limit: int = SOURCES_CAP) -> str:
+    """`text` as every check reads it (see the module docstring); at most `limit` characters are normalised."""
+    text = _strip(text, limit)
     if text.isascii():
         return text.lower()
     return text.translate(_LOOKALIKES).lower().translate(_LOOKALIKES).translate(_FOLD)
@@ -119,10 +163,15 @@ def _suspect(word: str) -> bool:
     return len(scripts) > 1
 
 
-def _obfuscations(text: str) -> list[Finding]:
-    """Direction controls and mixed-script words in model text: what a person sees is not what is checked."""
+def _obfuscations(text: str, cap: int) -> list[Finding]:
+    """Direction controls, overlay marks, mixed-script words, text that is cut to read it (a long run of marks, more
+    than `cap` once decomposed) and text with nothing readable in it: what a person sees is not what is checked."""
     found = [Finding("obfuscation", m.group(0).translate(_BIDI_GAP).strip() or "?") for m in _BIDI_SPAN.finditer(text)]
-    words = re.finditer(r"[^\W\d_]+", _strip(text)) if not text.isascii() else ()
+    found += [Finding("obfuscation", m.group(0)) for m in itertools.islice(_OVERLAY.finditer(text), 5)]
+    stripped, cut = _read_text(text, cap)
+    if cut or (text.strip() and not stripped.strip()):
+        found.append(Finding("obfuscation", "unreadable text"))
+    words = re.finditer(r"[^\W\d_]+", stripped) if not text.isascii() else ()
     return found + [
         Finding("obfuscation", m.group(0)) for m in words if not m.group(0).isascii() and _suspect(m.group(0))
     ]
@@ -194,7 +243,7 @@ class Checker:
             budget -= len(pieces[-1])
         self._known = {(kind, value) for kind, value, _ in _read(clean("\n".join(pieces)), commitments=False)[0]}
         self._granted, self._mentioned, self._denied = set[int](), set[int](), set[tuple[int, str]]()
-        text = clean(instruction[:cap])
+        text = clean(instruction[:cap], cap)
         negated = _negators(text) > 0  # a negator anywhere in the instruction: no commitment word is granted
         for family, _, phrase, _count in _read(text)[1]:
             self._mentioned.add(family)
@@ -207,8 +256,8 @@ class Checker:
         """Every unsupported fact, unallowed commitment and obfuscation in `body`. Over the cap: ValueError."""
         if len(body) > self._cap:
             raise ValueError("draft too long to check")
-        found = {(f.kind, f.text): f for f in _obfuscations(body)}
-        facts, words = _read(clean(body))
+        found = {(f.kind, f.text): f for f in _obfuscations(body, self._cap)}
+        facts, words = _read(clean(body, self._cap))
         for kind, value, span in facts:
             if (kind, value) not in self._known:
                 found.setdefault((kind, value), Finding(kind, span))
