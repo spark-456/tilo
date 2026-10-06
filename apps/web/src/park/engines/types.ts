@@ -213,3 +213,25 @@ export interface Spot {
   area: number;
   st: string;
 }
+
+// ---- the render kit (kit.ts, WEB-1c; ported from tilo-app.js `kit(h)`) ----
+/** The decisions taken so far (structurally the same as `Dec` of ../api/types, which engines may not import). */
+export type Dec = Partial<Record<"depot" | "mail", boolean>>;
+/** The plan source: the prototype's `D.plans(dec)`, every plan by id. */
+export type PlanSource = (dec?: Dec) => Record<string, Plan>;
+/** What `createKit(h, deps)` needs: the plan source and the optional browser calls of the park engine. */
+export interface KitDeps {
+  plans: PlanSource;
+  env?: ParkEnv | undefined;
+}
+/** A building in a world's art: a kit name, or an inline generated building (no name of its own). */
+export type ArtKit =
+  | string
+  | { fp: [number, number]; fl: number; roof: string; fa: string; i: string };
+/** An art slot is `[building, state, district]`. */
+export type ArtSlot = [ArtKit, string, string];
+/** The part of a world that `art()` and `strip()` read: `single` or `row`, both null or missing when absent. */
+export interface ArtWorld {
+  single?: ArtSlot | null | undefined;
+  row?: ArtSlot[] | null | undefined;
+}
