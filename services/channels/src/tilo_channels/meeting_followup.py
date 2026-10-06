@@ -14,6 +14,10 @@ client and never sends. Cards and prompts hold the meeting text; no log line or 
 
 Fail closed (FR-MTG-08b): a `flagged` that is not `False` reads as flagged (PE-21); more entries than minutes.schema
 allows draw nothing and read no work item; the idempotency key is a JSON array, so no part can forge another.
+
+Residuals (FR-MTG-08c, BQ-MTG08C-1 to -7): a body too long to read once cleaned is a finding, not an exception, and one
+failed nudge never aborts the others; an entry that holds a commitment word is a verbatim repeat only after a label
+lead-in ("Action items:", not "Approved:"); the title is checked against the confirmed text.
 """
 
 from __future__ import annotations
@@ -55,6 +59,12 @@ __all__ = ["MeetingFollowUp"]
 TEXT_CAP, MAX_SUMMARY, MAX_DECISIONS, MAX_ACTIONS = 240, 8, 30, 60
 SUBJECT_CAP = 120
 MINUTES_CAP = 40_000  # chars of a minutes body and its answer: a maximal minutes is ~23.5k (BQ-MTG08B-5)
+MAX_LABEL_WORDS = 6  # a lead-in that is only a label: this many words, all of LABEL_WORDS (BQ-MTG08C-2)
+LABEL_WORDS = frozenset(
+    "a an the this that item items reminder reminders about for on of from action actions decision decisions summary "
+    "note notes follow following up here is are your our meeting minutes task tasks open next step steps point points "
+    "re regarding".split()
+)
 INSTRUCTION = "Follow up a confirmed meeting"  # the card's stored instruction: no meeting text
 
 _LOG = logging.getLogger(__name__)
@@ -104,24 +114,53 @@ def _lists(minutes: Mapping[str, Any]) -> tuple[list[Mapping], list[Mapping], li
     return out[0], out[1], out[2]
 
 
-def _unquoted(body: str, confirmed: Sequence[str]) -> str:
+def _neutral(label: str) -> bool:
+    """True when the words of a lead-in are only a label ("Action items", "A reminder about this item"): no word that
+    could say what the entry after it means (approved, agreed, grant, yes, please)."""
+    words = re.findall(r"[^\W\d_]+", label)
+    return len(words) <= MAX_LABEL_WORDS and set(words) <= LABEL_WORDS
+
+
+def _lead_in(lines: str, start: int) -> str:
+    """The words in front of the entry at `start` on its line; with none, the heading line above it (the nearest line
+    with text) when that ends in a colon."""
+    begin = lines.rfind("\n", 0, start) + 1
+    before = lines[begin:start]
+    if re.search(r"[^\W\d_]", before) or begin == 0:
+        return before
+    above = lines[:begin].rstrip("\n").rsplit("\n", 1)[-1]
+    return above if above.rstrip().endswith(":") else ""
+
+
+def _unquoted(body: str, confirmed: Sequence[str], checker: Checker) -> str:
     """The body, as the checker reads it, with every verbatim repeat of a confirmed entry cut out. A repeat is the whole
     entry, at a line start or after a list marker or a colon, and it ends its line (a full stop may follow). Inside a
-    longer sentence an entry is no repeat: a commitment word the Owner confirmed is not one the body may use."""
-    lines = "\n".join(" ".join(line.split()) for line in clean(body).split("\n"))
+    longer sentence an entry is no repeat: a commitment word the Owner confirmed is not one the body may use. Nor is it
+    when the entry holds a commitment word and a lead-in says more than a label ("Approved: <entry>")."""
+    lines = "\n".join(" ".join(line.split()) for line in clean(body, MINUTES_CAP).split("\n"))
     entries = sorted({n for c in confirmed if (n := _norm(c))}, key=len, reverse=True)
     if not entries:
         return lines
+    risky = {e for e in entries if any(f.kind == "commitment" for f in checker.find(e))}
     pattern = re.compile(_LEAD + "(?:" + "|".join(map(re.escape, entries)) + r")(?=[.;!]?$)", re.MULTILINE)
-    return pattern.sub("", lines)
+
+    def cut(match: re.Match[str]) -> str:
+        keep = match.group(0) in risky and not _neutral(_lead_in(lines, match.start()))
+        return match.group(0) if keep else ""
+
+    return pattern.sub(cut, lines)
 
 
 def _audit(checker: Checker, body: str, confirmed: Sequence[str]) -> list[Finding]:
     """The checker's findings for `body`. The checker holds no instruction, so it grants no commitment word; the
     commitment words are read again on the body without its verbatim confirmed entries, and each one left is a
-    finding. Numbers, dates, contacts and obfuscations are read on the whole body."""
-    found = [f for f in checker.find(body) if f.kind != "commitment"]
-    return found + [f for f in checker.find(_unquoted(body, confirmed)) if f.kind == "commitment"]
+    finding. Numbers, dates, contacts and obfuscations are read on the whole body. A body too long to read once it is
+    cleaned is a finding too, never an exception (one bad item must not abort the others)."""
+    try:
+        found = [f for f in checker.find(body) if f.kind != "commitment"]
+        return found + [f for f in checker.find(_unquoted(body, confirmed, checker)) if f.kind == "commitment"]
+    except ValueError:
+        return [Finding("obfuscation", "text too long to check")]
 
 
 def _repeats(body: str, unconfirmed: Sequence[str], confirmed: Sequence[str]) -> list[Finding]:
@@ -191,13 +230,20 @@ class MeetingFollowUp:
             "items": "\n".join(f"- {i['text']}" for i in items) or "(none)",
         }
         title = _header(meeting.get("title"), SUBJECT_CAP)
-        clear = bool(title) and not Checker(instruction="", thread=[title]).find(title)  # the title is the Owner's own
-        subject = f"Minutes: {title}" if clear else "Meeting minutes"  # facts in it are known; a commitment is not
+        subject = f"Minutes: {title}" if self._title_is_clear(title, confirmed) else "Meeting minutes"
         key = self._key("minutes", meeting_id, request_id, *sorted(to))
         flagged = any(i["flagged"] for i in items) or minutes.get("flagged") is not False
         return self._run(
             user_id, key, "minutes_task.md", fields, confirmed, unconfirmed, rests, flagged, to, subject, owner_mailbox
         )
+
+    @staticmethod
+    def _title_is_clear(title: str, confirmed: Sequence[str]) -> bool:
+        """The title is its own source of nothing: a link, address, number, commitment word or obfuscation in it that
+        the confirmed text does not hold gives the generic subject (BQ-MTG08C-6). "Q3" or "v2" is a label."""
+        checked = re.sub(r"\b[A-Za-z]{1,2}\d{1,2}\b", " ", title)
+        found = Checker(instruction="", thread=confirmed, cap=MINUTES_CAP).find(checked)
+        return bool(title) and not [f for f in found if f.kind != "date"]
 
     def draft_nudges(self, user_id: str, meeting_id: str, *, request_id: str) -> list[Preview]:
         """One T3 card per confirmed open item: a new email to its assignee about that item alone."""
@@ -222,10 +268,14 @@ class MeetingFollowUp:
             key = self._key("nudge", meeting_id, request_id, it["work_item_id"])
             subject = f"Reminder: {_header(text, SUBJECT_CAP)}"
             flagged = it["flagged"] or minutes.get("flagged") is not False
-            card = self._run(
-                user_id, key, "nudge_task.md", {"item": text}, [text], everything, rests, flagged, (address,), subject,
-                owner_mailbox,
-            )  # fmt: skip
+            try:
+                card = self._run(
+                    user_id, key, "nudge_task.md", {"item": text}, [text], everything, rests, flagged, (address,),
+                    subject, owner_mailbox,
+                )  # fmt: skip
+            except Exception as error:  # one bad item never aborts the other nudges; the type only, never the message
+                _LOG.warning("meeting follow-up %s: failed (%s)", key, type(error).__name__)
+                continue
             if card is not None:
                 cards.append(card)
         return cards

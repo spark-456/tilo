@@ -63,9 +63,10 @@ output "secret_accessors" {
 output "monitoring" {
   description = "Alert email and alert policies (config values)."
   value = {
-    notification_email = module.monitoring.notification_channel_email
-    alert_policies     = module.monitoring.alert_policies
-    cost_alert_policy  = module.monitoring.cost_alert_policy
+    notification_email        = module.monitoring.notification_channel_email
+    alert_policies            = module.monitoring.alert_policies
+    cost_alert_policy         = module.monitoring.cost_alert_policy
+    eval_nightly_alert_policy = module.monitoring.eval_nightly_alert_policy
   }
 }
 
@@ -143,6 +144,13 @@ output "gmail_push" {
     push_path         = module.gmail_push.push_path
     scheduler_jobs    = module.gmail_push.scheduler_jobs
   }
+}
+
+output "schedule_tick" {
+  description = "The scheduled-runs tick: one Scheduler job to harness (FR-AGT-14)."
+  value = merge(module.schedule_tick.tick, {
+    service_account = "${google_service_account.schedule_scheduler.account_id}@${var.project_id}.iam.gserviceaccount.com"
+  })
 }
 
 output "service_storage_grants" {
