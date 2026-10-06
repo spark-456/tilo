@@ -1498,6 +1498,7 @@ dependencies = [
     { name = "referencing" },
     { name = "tilo-api" },
     { name = "tilo-contracts" },
+    { name = "tilo-metering" },
     { name = "tilo-planning" },
     { name = "tilo-providers" },
 ]
@@ -1510,6 +1511,7 @@ requires-dist = [
     { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-api", editable = "services/api" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-metering", editable = "packages/metering" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-providers", editable = "packages/providers" },
 ]
