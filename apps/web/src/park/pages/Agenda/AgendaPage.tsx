@@ -6,25 +6,28 @@
 import type { ReactNode } from "react";
 import type { Api } from "../../api/index";
 import type { Agenda } from "../../api/types";
+import { useParkApi } from "../../app/context";
 import { Button, PageSheet } from "../../components";
 import "../../components/park.components.css";
+import type { AppCtx } from "../../app/AppCtx";
 import { Boards } from "./Boards";
 import { Week } from "./Week";
-import type { AppCtx } from "./appCtx";
 import { icon } from "./icons";
 import { useAgenda, useAgendaUi } from "./useAgenda";
-import { useParkApi } from "./useParkApi";
 import "./Agenda.css";
 
 export interface AgendaPageProps {
   app: AppCtx;
-  /** Tests inject an Api; the page otherwise reads the shared Park Api. */
-  api?: Api;
 }
 
 function Frame({ source, children }: { source?: string; children?: ReactNode }) {
   return (
-    <div className="park-agenda-root" data-park-agenda="" data-source={source}>
+    <div
+      className="park-agenda-root"
+      data-testid="park-page-agenda"
+      data-park-agenda=""
+      data-source={source}
+    >
       <PageSheet gap={30}>{children}</PageSheet>
     </div>
   );
@@ -57,10 +60,9 @@ function Ready({ A, app, api }: { A: Agenda; app: AppCtx; api: Api }) {
   );
 }
 
-export function AgendaPage({ app, api }: AgendaPageProps) {
-  const shared = useParkApi();
-  const use = api ?? shared;
-  const state = useAgenda(use);
+export function AgendaPage({ app }: AgendaPageProps) {
+  const api = useParkApi();
+  const state = useAgenda(api);
 
   if (state.status === "not-built" || state.status === "error") {
     return (
@@ -82,7 +84,7 @@ export function AgendaPage({ app, api }: AgendaPageProps) {
   if (state.status === "loading") return <Frame />;
   return (
     <Frame source={state.source}>
-      <Ready A={state.data} app={app} api={use} />
+      <Ready A={state.data} app={app} api={api} />
     </Frame>
   );
 }

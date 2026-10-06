@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Api } from "../../api/index";
 import { NotBuilt } from "../../api/liveApi";
 import type { Agenda, AgendaPin, AgendaSlot, Source } from "../../api/types";
-import type { AppCtx } from "./appCtx";
+import type { AppCtx } from "../../app/AppCtx";
 import { type BoardKey, type Flags, addPin, blockFocus, bookedPins } from "./model";
 
 export type AgendaState =

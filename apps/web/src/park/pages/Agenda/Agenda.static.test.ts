@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 const DIR = __dirname;
 const src = readdirSync(DIR)
-  .filter((f) => /\.(tsx?|css)$/.test(f) && !/\.test\.tsx?$/.test(f) && f !== "agendaHarness.tsx")
+  .filter((f) => /\.(tsx?|css)$/.test(f) && !/\.test\.tsx?$/.test(f))
   .map((f) => ({ f, t: readFileSync(join(DIR, f), "utf8") }));
 const strip = (t: string) =>
   t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
@@ -14,7 +14,7 @@ const strip = (t: string) =>
 describe("WEB_9_agenda_static", () => {
   it("WEB_9_agenda_files_exist", () => {
     const names = src.map((s) => s.f);
-    for (const f of ["AgendaPage.tsx", "Agenda.css", "index.ts", "model.ts", "appCtx.ts"])
+    for (const f of ["AgendaPage.tsx", "Agenda.css", "index.ts", "model.ts"])
       expect(names, f).toContain(f);
   });
 

@@ -3,8 +3,8 @@
 // opening a world goes through `app.go`.
 import type { CSSProperties } from "react";
 import type { AgendaPin } from "../../api/types";
+import type { AppCtx } from "../../app/AppCtx";
 import { SegmentedControl } from "../../components";
-import type { AppCtx } from "./appCtx";
 import { face, icon } from "./icons";
 import { BOARDS, type BoardKey, GROUPS, PERSON, type PinVm, pinVm } from "./model";
 import type { AgendaUi } from "./useAgenda";

@@ -101,8 +101,9 @@
   font-weight: 600;
   color: var(--ink2);
 }
+/* The reference track is 220 wide inside its own 3px padding (content-box): 226 in all. */
 [data-park] .park-agenda-styleseg {
-  width: 220px;
+  width: 226px;
 }
 [data-park] .park-agenda-boards {
   display: grid;
@@ -759,7 +760,7 @@
   align-items: center;
 }
 [data-park] .park-agenda-person {
-  box-sizing: border-box;
+  box-sizing: content-box;
   display: flex;
   align-items: center;
   justify-content: center;

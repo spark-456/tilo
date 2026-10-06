@@ -12,7 +12,7 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   world: Placeholder,
   skills: Placeholder,
   ledger: Placeholder,
-  agenda: Placeholder,
+  agenda: lazy(() => import("../pages/Agenda/AgendaPage").then((m) => ({ default: m.AgendaPage }))),
   team: Placeholder,
   profile: Placeholder,
   connectors: Placeholder,

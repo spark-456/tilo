@@ -2,8 +2,8 @@
 // calendar filters, the find-a-time banner, the week grid with its dashed slots, and the detail aside.
 import type { CSSProperties } from "react";
 import type { Agenda } from "../../api/types";
+import type { AppCtx } from "../../app/AppCtx";
 import { Detail } from "./Detail";
-import type { AppCtx } from "./appCtx";
 import { face, icon } from "./icons";
 import {
   CAL,

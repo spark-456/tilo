@@ -3,10 +3,10 @@
 // (Tilo App Agenda.dc.html) and the decide() effects, rendered on the fixture Api in happy-dom.
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, renderAgenda, settle } from "../../../../test-support/park/agendaHarness";
 import { click, countPrimary, q, qa } from "../../../../test-support/park/componentsHarness";
 import { createFixtureApi } from "../../api/fixtureApi";
 import { NotBuilt } from "../../api/liveApi";
-import { cleanup, renderAgenda, settle } from "./agendaHarness";
 
 afterEach(() => {
   cleanup();
@@ -29,8 +29,8 @@ const type = (input: HTMLInputElement, value: string) =>
     set?.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-const toasted = (calls: { toast: ReturnType<typeof vi.fn> }, msg: string) =>
-  expect(calls.toast).toHaveBeenCalledWith(msg, undefined, undefined);
+const toasted = (h: { toast: () => string | undefined }, msg: string) =>
+  expect(h.toast()).toBe(msg);
 
 describe("WEB_9_agenda_copy: the designed text, verbatim", () => {
   it("WEB_9_agenda_header_boards_and_week_copy", async () => {
@@ -145,11 +145,11 @@ describe("WEB_9_agenda_boards: pins", () => {
   });
 
   it("WEB_9_agenda_tilo_suggestions_block_it_dismiss_and_find", async () => {
-    const { container, calls } = await renderAgenda();
+    const { container, ...h } = await renderAgenda();
     const m0 = pin(container, "m0");
     expect(text(m0)).toContain("Block it");
     click(byText(m0, "button", "Block it"));
-    toasted(calls, "Blocked 09:30–11:30 on Monday in Google Calendar");
+    toasted(h, "Blocked 09:30–11:30 on Monday in Google Calendar");
     expect(text(pin(container, "m0"))).toContain("Focus time · Mon 28 Sep");
     expect(text(pin(container, "m0"))).toContain("09:30–11:30, added to your Google Calendar");
     expect(text(pin(container, "m0"))).toContain("Blocked by Tilo");
@@ -158,14 +158,14 @@ describe("WEB_9_agenda_boards: pins", () => {
   });
 
   it("WEB_9_agenda_open_and_review_go_to_the_world", async () => {
-    const { container, calls } = await renderAgenda();
+    const { container, ...h } = await renderAgenda();
     click(byText(pin(container, "m2"), "button", "Open"));
-    expect(calls.go).toHaveBeenCalledWith("world", { id: "invoice" });
+    expect(h.navigate).toHaveBeenLastCalledWith("/park/world/invoice");
     click(byText(pin(container, "t1"), "button", "Review and approve"));
-    expect(calls.go).toHaveBeenCalledWith("world", { id: "k1" });
+    expect(h.navigate).toHaveBeenLastCalledWith("/park/world/k1");
     click(q(pin(container, "t1"), 'button[aria-label="Mark as done"]'));
-    expect(calls.go).toHaveBeenCalledTimes(3);
-    expect(calls.decide).not.toHaveBeenCalled();
+    expect(h.navigate).toHaveBeenCalledTimes(3);
+    expect(h.spy.decide).not.toHaveBeenCalled();
   });
 });
 
@@ -203,21 +203,21 @@ describe("WEB_9_agenda_week: the calendar", () => {
   });
 
   it("WEB_9_agenda_ask_tilo_for_a_brief_and_the_switches", async () => {
-    const { container, calls } = await renderAgenda();
+    const { container, ...h } = await renderAgenda();
     click(event(container, "read"));
     click(byText(detail(container), "button", "Ask Tilo for a brief"));
-    toasted(calls, "Tilo will brief you 15 minutes before Read Tilo’s brief");
+    toasted(h, "Tilo will brief you 15 minutes before Read Tilo’s brief");
     expect(text(detail(container))).toContain("Queued · arrives 15 min before");
     click(event(container, "sync"));
     click(q(detail(container), '[role="switch"]'));
-    toasted(calls, "Tilo won’t join this one");
+    toasted(h, "Tilo won’t join this one");
     expect(text(region(container, "This week"))).toContain("Tilo joins 3 still to come");
     click(q(detail(container), '[role="switch"]'));
-    toasted(calls, "Tilo will join Supplier sync · Northline");
+    toasted(h, "Tilo will join Supplier sync · Northline");
   });
 
   it("WEB_9_agenda_find_a_time_books_a_slot_and_pins_it", async () => {
-    const { container, calls } = await renderAgenda();
+    const { container, ...h } = await renderAgenda();
     const week = region(container, "This week");
     click(byText(container, "button", "Find a time"));
     expect(text(week)).toContain("K1 Level 3 gate review · 30 min · Alex, Jin, Priya, Tom");
@@ -232,7 +232,7 @@ describe("WEB_9_agenda_week: the calendar", () => {
     click(byText(container, "button", "Find a time"));
     click(qa(week, "[data-slot]")[0] as HTMLElement);
     await settle();
-    toasted(calls, "Booked Thu 16:00. Invites sent from Google Calendar");
+    toasted(h, "Booked Thu 16:00. Invites sent from Google Calendar");
     expect(qa(week, "[data-slot]")).toHaveLength(0);
     expect(container.querySelector('[data-pin="t0"]')).toBeNull();
     expect(text(pin(container, "tg"))).toContain("K1 gate review booked");
@@ -241,7 +241,7 @@ describe("WEB_9_agenda_week: the calendar", () => {
     expect(text(detail(container))).toContain("Thu 24 Sep · 16:00–16:30 · booked by Tilo");
     expect(text(detail(container))).toContain("Booked by Tilo");
     click(byText(container, "button", "Find a time"));
-    toasted(calls, "Already booked for Thu 16:00");
+    toasted(h, "Already booked for Thu 16:00");
   });
 
   it("WEB_9_agenda_narrow_width_stacks_the_detail_under_the_calendar", async () => {
@@ -256,15 +256,16 @@ describe("WEB_9_agenda_week: the calendar", () => {
 
 describe("WEB_9_agenda_decide: every approval goes through app.decide(key)", () => {
   it("WEB_9_agenda_the_depot_pin_follows_dec", async () => {
-    const { container, decideFromOutside, calls } = await renderAgenda();
+    const { container, decideFromOutside, spy } = await renderAgenda();
     expect(text(pin(container, "t1"))).toContain("£3,420 for 6 test laptops · K1 electric scooter");
     decideFromOutside("depot");
     const t1 = text(pin(container, "t1"));
     expect(t1).toContain("Approved · £3,420 · K1 electric scooter");
     expect(t1).toContain("Done");
     expect(t1).not.toContain("Review and approve");
+    expect(spy.decide).toHaveBeenCalledTimes(1);
+    expect(spy.decide).toHaveBeenCalledWith("depot");
     expect(text(q(container, '[data-board="team"]'))).toContain("5 open");
-    expect(calls.decide).not.toHaveBeenCalled();
   });
 
   it("WEB_9_agenda_the_gate_brief_reads_the_depot_decision", async () => {

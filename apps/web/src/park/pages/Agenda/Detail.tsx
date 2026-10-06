@@ -1,6 +1,6 @@
 // The event detail aside (reference: the `Event detail` region of Tilo App Agenda.dc.html): who is
 // there, Tilo's brief, notes and follow-ups of a past meeting, and the three switches of an upcoming one.
-import type { AppCtx } from "./appCtx";
+import type { AppCtx } from "../../app/AppCtx";
 import { face } from "./icons";
 import { CAL, type DetailVm, PERSON } from "./model";
 import type { AgendaUi } from "./useAgenda";
