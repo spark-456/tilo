@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
-// WEB-3b: the static city backdrop (README "City backdrop"; reference `Tilo App.dc.html`: the scene is drawn
-// once per `time|motion` and cached, its free `spots` become `app.pins`). The city is STATIC in this ticket
-// (no cars or walkers; the motion restore is BQ-WEB-3). Mounted through <AppShell/> with the scene engine
+// WEB-3b: the city backdrop (README "City backdrop"; reference `Tilo App.dc.html`: the scene is drawn
+// once per `time|motion` and cached, its free `spots` become `app.pins`). It was static in WEB-3b; WEB-MOTION-1
+// made it live (Backdrop.motion.test.tsx pins the motion choices; here only the draw count and pins). Mounted through <AppShell/> with the scene engine
 // replaced by a fast stand-in (test-support/park/shellEngine.ts); the real scene is exercised in the browser spec.
 // Pins, from the reference: three targets [1000,420] (min area 4), [820,640] (4), [900,250] (2); each takes
 // the nearest unused free spot with at least that area, else stays at the target; then x = (px - 800) * scale
@@ -82,12 +82,14 @@ describe("WEB_3b_backdrop: the city behind the page", () => {
     expect(scene().getAttribute("data-build")).toBe(build);
   });
 
-  it("WEB_3b_backdrop_every_scene_asked_for_is_the_1600_by_1000_still_one", async () => {
+  it("WEB_3b_backdrop_every_scene_asked_for_is_the_1600_by_1000_one_and_the_default_is_live", async () => {
+    // WEB-MOTION-1: the city is live (still false) unless the person, the OS or the device says otherwise.
     await mountApp();
     expect(sceneSpy.mock.calls.length).toBeGreaterThan(0);
     for (const c of sceneSpy.mock.calls) {
-      expect(opts(c)).toMatchObject({ w: 1600, h: 1000, still: true });
+      expect(opts(c)).toMatchObject({ w: 1600, h: 1000 });
     }
+    expect(opts(sceneSpy.mock.calls[0])?.still).toBe(false);
   });
 });
 

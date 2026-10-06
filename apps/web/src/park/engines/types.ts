@@ -140,7 +140,7 @@ export type PinOpts = Opt<{
   tint: string;
   icon: string;
   count: string;
-  /** Accepted and ignored: motion is restored in WEB-3 (BQ-WEB-3). */
+  /** Slow-down for the live movers (the prototype's calm is 1.9); no effect when `still`. */
   anim: string | null;
 }>;
 export type TagOpts = Opt<{ fs: number; left: boolean; ink: string }>;
@@ -150,7 +150,7 @@ export type WorldOpts = Opt<{
   seed: number;
   labels: boolean;
   stage: number;
-  /** Accepted and ignored: motion is restored in WEB-3 (BQ-WEB-3). */
+  /** Slow-down for the live movers (the prototype's calm is 1.9); no effect when `still`. */
   anim: boolean;
   tags: boolean;
   ls: number;
@@ -187,7 +187,7 @@ export type Level = { name: string; code: string; plan: Plan } & Opt<{
 export type MetroOpts = Opt<{
   seed: number;
   labels: boolean;
-  /** Accepted and ignored: motion is restored in WEB-3 (BQ-WEB-3). */
+  /** Slow-down for the live movers (the prototype's calm is 1.9); no effect when `still`. */
   anim: boolean;
   gapZ: number;
   zig: number;
@@ -200,9 +200,9 @@ export type SceneOpts = Opt<{
   vw: number;
   seed: number;
   night: boolean;
-  /** Accepted and ignored: motion is restored in WEB-3 (BQ-WEB-3). */
+  /** Slow-down for the live movers (the prototype's calm is 1.9); no effect when `still`. */
   k: number;
-  /** Accepted and ignored: the scene is always drawn frozen until WEB-3 (BQ-WEB-3). */
+  /** True draws cars and walkers frozen at their seeded phase; false (the default) runs them. */
   still: boolean;
   mute: number;
 }>;
