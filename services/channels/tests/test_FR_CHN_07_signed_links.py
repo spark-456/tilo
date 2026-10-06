@@ -473,7 +473,7 @@ def test_FR_CHN_07_link_for_a_card_already_answered_on_another_channel_is_refuse
     L = links()
     rig = make_rig()
     link = rig.issue(Q1, ALICE, "answer", "per_kwh")
-    rig.book.answered.add(Q1)  # answered on WhatsApp or the web in the meantime
+    rig.book.answered.add(Q1)  # answered on the web in the meantime
     assert _refusal(L, rig.redeem, link) == "card_answered"
     assert rig.store.consumed == {}
 
@@ -505,7 +505,7 @@ def test_FR_CHN_07_answer_redeem_is_refused_when_the_card_is_not_answerable_by_e
     a = rig.issue(Q1, ALICE, "answer", "per_kwh")
     b = rig.issue(Q2, ALICE, "answer", "per_kwh")
     rig.book.cards[Q1] = {**copy.deepcopy(rig.book.cards[GATE]), "id": Q1}
-    rig.book.cards[Q2]["answer_channels"] = ["web", "mobile_web", "whatsapp"]
+    rig.book.cards[Q2]["answer_channels"] = ["web", "mobile_web"]
     assert _refusal(L, rig.redeem, a) == "not_allowed"
     assert _refusal(L, rig.redeem, b) == "not_allowed"
     assert rig.store.consumed == {}

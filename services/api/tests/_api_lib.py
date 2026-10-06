@@ -139,7 +139,7 @@ def base_policy(
         "level": level,
         "undo_window_s": undo_window_s,
         "expiry": expiry,
-        "notify_channel": "whatsapp",
+        "notify_channel": "email",
         "team_lead_domains": list(team_lead_domains),
         "created_by": stamp(created_at, owner),
         "changed_by": None,
@@ -206,7 +206,7 @@ RUN_ID = "r_village_basic_1"  # matches base_event's own default run_id, so a fi
 def make_world(
     *,
     owner: str = OWNER,
-    owner_channels: tuple[str, ...] = ("web", "whatsapp", "email"),
+    owner_channels: tuple[str, ...] = ("web", "email"),
     districts: dict[str, deps.DistrictRecord | None] | None = None,
     run_id: str = RUN_ID,
     paused: bool = False,

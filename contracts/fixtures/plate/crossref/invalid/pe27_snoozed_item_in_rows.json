@@ -1,0 +1,163 @@
+{
+  "rule": "PE-27",
+  "note": "A snoozed item is parked, never in rows.",
+  "now": "2026-10-06T10:00:00.000Z",
+  "persons": {
+    "u_owner": {
+      "id": "u_owner",
+      "org_id": "org_example",
+      "display_name": "Asha Rao",
+      "aliases": ["Asha"],
+      "email": "asha@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_priya": {
+      "id": "u_priya",
+      "org_id": "org_example",
+      "display_name": "Priya Nair",
+      "aliases": ["Priya"],
+      "email": "priya@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_dev": {
+      "id": "u_dev",
+      "org_id": "org_example",
+      "display_name": "Dev Menon",
+      "aliases": ["Dev"],
+      "email": "dev@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam": {
+      "id": "u_sam",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam"],
+      "email": "sam@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_meera": {
+      "id": "u_meera",
+      "org_id": "org_example",
+      "display_name": "Meera Shah",
+      "aliases": ["Meera"],
+      "email": "meera@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    }
+  },
+  "request": {
+    "actor": "u_priya",
+    "user": "u_priya"
+  },
+  "source": {
+    "kind": "work_item",
+    "data": {
+      "id": "wi_slides",
+      "org_id": "org_example",
+      "owner": "u_priya",
+      "title": "Draft the launch slides",
+      "due": null,
+      "due_text": null,
+      "status": "open",
+      "source": {
+        "kind": "manual",
+        "ref": null,
+        "evidence": []
+      },
+      "created_by": {
+        "by": "person",
+        "ref": "u_priya",
+        "at": "2026-10-04T09:00:00.000Z"
+      },
+      "assigned_by": null,
+      "confirmed_by": null,
+      "snoozed_until": "2026-10-07T03:30:00.000Z",
+      "flagged": false,
+      "history": [
+        {
+          "at": "2026-10-04T09:00:00.000Z",
+          "by": "u_priya",
+          "change": "created",
+          "status": "open"
+        }
+      ],
+      "created_at": "2026-10-04T09:00:00.000Z",
+      "updated_at": "2026-10-04T09:00:00.000Z"
+    }
+  },
+  "join": "rows"
+}

@@ -19,6 +19,7 @@
 actions:
   create_draft: T1
   save_file: T1
+  save_as_google_file: T1
   grant_budget: T1
   send_email: T2
   post_status_update: T2

@@ -31,6 +31,6 @@
     }
   ],
   "actions": ["show_me", "snooze", "delegate"],
-  "answer_channels": ["web", "whatsapp"],
+  "answer_channels": ["web"],
   "safe_default": "even"
 }

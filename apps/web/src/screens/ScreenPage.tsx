@@ -1,7 +1,8 @@
 // The page shell every plain screen renders into. It scrolls, so a keyboard user must be able to reach it
 // (axe scrollable-region-focusable): it takes a tab stop and a name only while its content overflows, set
 // on the element itself so a resize never re-renders the screen and nothing shifts (CLS).
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, Suspense, useEffect, useRef } from "react";
+import { ChunkBoundary } from "./ChunkBoundary";
 
 export function ScreenPage({ screenId, children }: { screenId: string; children: ReactNode }) {
   const ref = useRef<HTMLElement>(null);
@@ -39,7 +40,18 @@ export function ScreenPage({ screenId, children }: { screenId: string; children:
   }, []);
   return (
     <main ref={ref} className="screen-page" data-testid="screen-page" data-screen={screenId}>
-      {children}
+      {/* The frame is already on screen; the fallback fills the same box, so nothing shifts. */}
+      <ChunkBoundary>
+        <Suspense
+          fallback={
+            <output className="screen-loading" data-testid="screen-loading">
+              Loading…
+            </output>
+          }
+        >
+          {children}
+        </Suspense>
+      </ChunkBoundary>
     </main>
   );
 }

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClientProvider } from "../../api/ClientProvider";
 import type { ApproachesResult, TiloClient } from "../../api/client";
 import { FixtureClient } from "../../api/fixtureClient";
@@ -38,6 +38,11 @@ async function openApproaches(overrides: Partial<ApproachesResult> = {}, getAppr
   await settle(0);
   return { approve, load };
 }
+
+// S-03 is a code-split chunk (NFR-01): load it first, so a render finds it ready.
+beforeAll(async () => {
+  await import("./Approaches");
+});
 
 beforeEach(() => {
   container = document.createElement("div");

@@ -76,7 +76,7 @@
     "level": "L1",
     "undo_window_s": 60,
     "expiry": "2026-12-31T23:59:59.000Z",
-    "notify_channel": "whatsapp",
+    "notify_channel": "email",
     "team_lead_domains": [],
     "created_by": {
       "by": "u_owner",
@@ -110,7 +110,7 @@
     "ts": "2026-09-29T09:41:50.000Z",
     "world_id": "w_village_basic",
     "run_id": "r_village_basic_1",
-    "type": "channel.message_in",
+    "type": "world.requested",
     "actor": "u_owner",
     "target": "w_village_basic",
     "level": null,
@@ -118,16 +118,13 @@
     "item": null,
     "severity": "info",
     "credits": 0,
-    "summary": "Your WhatsApp answer arrived: reply yes on the supplier thread.",
+    "summary": "You asked Tilo on your phone to reply yes on the supplier thread.",
     "cause": null,
     "vis": "all",
     "authz": null,
     "data": {
-      "channel": "whatsapp",
-      "message_ref": "r_village_basic_1/118",
-      "card_id": "01JB5VQ0000000000000000129",
-      "card_kind": "needs_you",
-      "option": null,
+      "title": "Reply yes on the supplier thread",
+      "channel": "mobile_web",
       "destination": "thread-supplier-1"
     },
     "trace": {

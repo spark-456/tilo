@@ -1,33 +1,10 @@
 // The route table for every screen outside the flow shell. One row per screen: its S_NN.tsx
 // component. The address pattern and the built/placeholder status live in meta.ts, so adding or
 // replacing a screen is a one-line change here plus its own file.
-import type { ComponentType } from "react";
+import { type ComponentType, type ElementType, lazy } from "react";
 import { CardsGallery } from "../needs-you/CardsGallery";
 import { matchFlowRoute } from "../router";
 import { NotFound } from "./NotFound";
-import { S_05 } from "./S_05";
-import { S_06 } from "./S_06";
-import { S_07 } from "./S_07";
-import { S_08 } from "./S_08";
-import { S_09 } from "./S_09";
-import { S_10 } from "./S_10";
-import { S_11 } from "./S_11";
-import { S_12 } from "./S_12";
-import { S_13 } from "./S_13";
-import { S_14 } from "./S_14";
-import { S_15 } from "./S_15";
-import { S_16 } from "./S_16";
-import { S_17 } from "./S_17";
-import { S_18 } from "./S_18";
-import { S_19 } from "./S_19";
-import { S_21 } from "./S_21";
-import { S_22 } from "./S_22";
-import { S_23 } from "./S_23";
-import { S_24 } from "./S_24";
-import { S_26 } from "./S_26";
-import { S_27 } from "./S_27";
-import { S_28 } from "./S_28";
-import { S_29 } from "./S_29";
 import { More, ScreensIndex } from "./ScreensIndex";
 import { inARun } from "./inARun";
 import { SCREENS } from "./meta";
@@ -36,6 +13,34 @@ export interface ScreenProps {
   /** The pattern's capture groups, URL-decoded (world id, item id). */
   readonly params: readonly string[];
 }
+
+// Every screen is its own chunk (NFR-01): a route loads only its own code. ScreenPage holds the
+// Suspense boundary, so the frame stays put while a chunk arrives.
+const screen = (load: () => Promise<Record<string, unknown>>, name: string) =>
+  lazy(() => load().then((m) => ({ default: m[name] as ComponentType<ScreenProps> })));
+const S_05 = screen(() => import("./S_05"), "S_05");
+const S_06 = screen(() => import("./S_06"), "S_06");
+const S_07 = screen(() => import("./S_07"), "S_07");
+const S_08 = screen(() => import("./S_08"), "S_08");
+const S_09 = screen(() => import("./S_09"), "S_09");
+const S_10 = screen(() => import("./S_10"), "S_10");
+const S_11 = screen(() => import("./S_11"), "S_11");
+const S_12 = screen(() => import("./S_12"), "S_12");
+const S_13 = screen(() => import("./S_13"), "S_13");
+const S_14 = screen(() => import("./S_14"), "S_14");
+const S_15 = screen(() => import("./S_15"), "S_15");
+const S_16 = screen(() => import("./S_16"), "S_16");
+const S_17 = screen(() => import("./S_17"), "S_17");
+const S_18 = screen(() => import("./S_18"), "S_18");
+const S_19 = screen(() => import("./S_19"), "S_19");
+const S_21 = screen(() => import("./S_21"), "S_21");
+const S_22 = screen(() => import("./S_22"), "S_22");
+const S_23 = screen(() => import("./S_23"), "S_23");
+const S_24 = screen(() => import("./S_24"), "S_24");
+const S_26 = screen(() => import("./S_26"), "S_26");
+const S_27 = screen(() => import("./S_27"), "S_27");
+const S_28 = screen(() => import("./S_28"), "S_28");
+const S_29 = screen(() => import("./S_29"), "S_29");
 
 // Screens that read one run from a bare address: no run yet, or an unknown world, is said, not fetched
 // (a live API is never asked about the fixture world).
@@ -53,7 +58,7 @@ const Artifacts = inARun(S_21, { testid: "artifacts", title: "Artifact history" 
 const Estimate = inARun(S_23, { testid: "estimate", title: "How we estimate" });
 
 // biome-ignore format: one line per screen keeps group edits to a single line.
-const COMPONENTS: Readonly<Record<string, ComponentType<ScreenProps>>> = {
+const COMPONENTS: Readonly<Record<string, ElementType<ScreenProps>>> = {
   "S-05": S_05, "S-06": NeedsYou, "S-07": GateSheet, "S-08": Consent, "S-09": Meeting, "S-10": S_10,
   "S-11": S_11, "S-12": S_12, "S-13": Library, "S-14": S_14, "S-15": Autonomy, "S-16": Channels,
   "S-17": Mail, "S-18": Team, "S-19": Connections, "S-21": Artifacts, "S-22": S_22, "S-23": Estimate,
@@ -63,7 +68,7 @@ const COMPONENTS: Readonly<Record<string, ComponentType<ScreenProps>>> = {
 export interface ScreenMatch {
   readonly id: string;
   readonly params: readonly string[];
-  readonly Component: ComponentType<ScreenProps>;
+  readonly Component: ElementType<ScreenProps>;
 }
 
 const decode = (s: string | undefined): string => {
@@ -75,7 +80,7 @@ const decode = (s: string | undefined): string => {
 };
 
 /** /more is the production menu; /screens is the dev-only index (PRD 18.3, AGW-08). */
-const EXTRA: ReadonlyArray<{ id: string; re: RegExp; Component: ComponentType<ScreenProps> }> = [
+const EXTRA: ReadonlyArray<{ id: string; re: RegExp; Component: ElementType<ScreenProps> }> = [
   { id: "more", re: /^\/more\/?$/, Component: More },
   ...(import.meta.env.DEV
     ? [

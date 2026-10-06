@@ -1,6 +1,8 @@
 # ADR-0005: Event contract, registry and per-type payloads
 
 - Status: Accepted (2026-09-25, architect; ticket P0-03). Freezes with the CP0 set on 29 Sep.
+- Superseded in part by ADR-0019 (SD-01): an L2 instruction is a signed-in `world.requested`
+  only; a `channel.message_in` is never one.
 - Deciders: architect, orchestrator
 - Requirement: FR-WLD-03 (PRD 9.3 to 9.5, 9.8, 15.2)
 - Numbering: ADR-0004 is left to ticket P0-04 (provider layer), in flight at the same time.

@@ -10,8 +10,12 @@ import argparse
 import json
 import os
 import sys
-from datetime import UTC, datetime
+from collections.abc import Callable, Mapping
+from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
+
+from tilo_providers.interfaces import ModelProvider, SafetyProvider
 
 from .cases import CaseError
 from .config import EvalsConfig, EvalsConfigError
@@ -29,6 +33,15 @@ def _parser() -> argparse.ArgumentParser:
     bank.add_argument("--repeat", type=int, default=1)
     bank.add_argument("--bank", dest="bank_dir", default="evals/bank")
     bank.add_argument("--results-md", dest="results_md", default="evals/bank-results.local.md")
+    gen = commands.add_parser("generate", help="the live scenario generator; the user's live switch only (issue #272)")
+    gen.add_argument("--n", type=int, required=True, help="how many briefs to ask for (at least 1)")
+    gen.add_argument("--dry-run", dest="dry_run", action="store_true", help="print the estimate and stop; no call")
+    gen.add_argument("--max-inr", dest="max_inr", type=float, default=None, help="cap in rupees (the file's default)")
+    gen.add_argument(
+        "--date", type=date.fromisoformat, default=None, help="folder name, YYYY-MM-DD (default today UTC)"
+    )
+    for name in ("settings", "bank-dir", "out-dir", "models-file", "prices-file", "report-md"):
+        gen.add_argument(f"--{name}", type=Path, default=None)
     run = commands.add_parser("run", help="run an eval pass")
     run.add_argument("--pass", dest="pass_kind", choices=PASS_KINDS, required=True)
     run.add_argument("--group", default=None)
@@ -95,8 +108,55 @@ def _bank(args: argparse.Namespace) -> int:
     return EXIT_OK if passed == len(results) else EXIT_FAILED
 
 
-def main(argv: list[str] | None = None) -> int:
+def _generate(
+    args: argparse.Namespace,
+    environ: Mapping[str, str] | None,
+    live_provider_factory: Callable[[str, str], ModelProvider] | None,
+    safety: SafetyProvider | None,
+) -> int:
+    from .generator import GenerateRefused, exit_code, render_report, run_generate  # noqa: PLC0415
+
+    def announce(estimate: Any, cap: float) -> None:
+        low, high = estimate.credits_low, estimate.credits_high
+        print(f"estimate credits_low={low:.4f} credits_high={high:.4f} cap={cap:.4f}", flush=True)
+
+    out = args.out_dir
+    try:
+        report = run_generate(
+            args.n, mode="dry-run" if args.dry_run else "live", max_inr=args.max_inr, environ=environ,
+            bank_dir=args.bank_dir, out_dir=out, settings_path=args.settings, models_path=args.models_file,
+            prices_path=args.prices_file, live_provider_factory=live_provider_factory, safety=safety,
+            today=args.date, announce=announce,
+        )  # fmt: skip
+    except GenerateRefused as refusal:
+        print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)
+        return EXIT_ERROR
+    if args.dry_run:
+        return EXIT_OK
+    root = out or Path(__file__).resolve().parents[3] / "evals" / "generated"
+    path = args.report_md or root / report.date / "report.md"
+    _write(path, render_report(report))
+    print(f"generated: {len(report.cases)} of {report.requested} kept and written; report: {path.as_posix()}")
+    print(f"total credits={report.total_credits:.4f} cap={report.cap_credits:.4f}")
+    code = exit_code(report)
+    if code == EXIT_PARTIAL:
+        print("STOP stopped at the credit cap: nothing over the cap was sent; see the report", file=sys.stderr)
+    elif code:
+        print("STOP no case was written, or a generated case failed a hard check; see the report", file=sys.stderr)
+    return code
+
+
+def main(
+    argv: list[str] | None = None,
+    *,
+    environ: Mapping[str, str] | None = None,
+    live_provider_factory: Callable[[str, str], ModelProvider] | None = None,
+    safety: SafetyProvider | None = None,
+) -> int:
+    """`environ`, `live_provider_factory` and `safety` are test seams used by `generate` only."""
     args = _parser().parse_args(argv)
+    if args.command == "generate":
+        return _generate(args, environ, live_provider_factory, safety)
     return _bank(args) if args.command == "bank" else _run(args)
 
 

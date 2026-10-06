@@ -2,8 +2,8 @@
 redaction, FR-HIL-07 kill switches, services/api/tests/API_ST3a.md). Real sign-in, Firestore and
 the harness are later tickets (PRD 15.3); every route takes a `Principal`, a `Store` and, for the
 three that emit events, an `EventWriter` via FastAPI dependency overrides. Production code raises
-NotImplementedError until those land, so a route can never run unauthenticated or against no
-store or writer.
+a refusal until those land (401 without a principal, 503 `not_configured` without a store or writer, issue
+#410), so a route can never run unauthenticated or against no store or writer.
 
 `Store.dispatch_state` is FR-HIL-07's own per-world lock and per-policy lock bookkeeping
 (services/api/src/tilo_api/dispatch.py): it lives on the Store instance itself, never a
@@ -37,7 +37,7 @@ from tilo_providers.router import Router
 from tilo_providers.safety import build_safety_provider
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
-Channel = Literal["web", "mobile_web", "whatsapp", "email"]
+Channel = Literal["web", "mobile_web", "email"]  # WhatsApp removed: SD-01, ADR-0019
 
 logger = logging.getLogger("tilo_api.deps")
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -71,7 +71,7 @@ class WorldRecord:
     owner: str  # common.schema.json#/$defs/user_id
     districts: dict[str, DistrictRecord | None]  # district_id -> record; a malformed/None value
     # is a test proving the read routes fail closed (hidden) rather than raising
-    owner_channels: tuple[str, ...] = ("web", "whatsapp", "email")  # kill-switch confirmations
+    owner_channels: tuple[str, ...] = ("web", "email")  # kill-switch confirmations
     run_id: str = "r_village_basic_1"  # the world's current run; tilo-api reads this, never invents it
     paused: bool = False  # true once Pause all has actually paused this world (PRD 9.4 honesty:
     # only ever true together with a world.paused event queued or committed somewhere)
@@ -151,15 +151,15 @@ class EventWriter(Protocol):
 
 
 def get_current_principal() -> Principal:
-    raise NotImplementedError
+    raise HTTPException(status_code=401, detail="Sign in to use this.")  # no sign-in is wired: fail closed, cleanly
 
 
 def get_store() -> Store:
-    raise NotImplementedError
+    raise HTTPException(status_code=503, detail="not_configured")
 
 
 def get_event_writer() -> EventWriter:
-    raise NotImplementedError
+    raise HTTPException(status_code=503, detail="not_configured")
 
 
 def providers_config() -> ProvidersConfig:

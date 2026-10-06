@@ -47,7 +47,7 @@
       },
       {
         "id": "I2",
-        "name": "WhatsApp",
+        "name": "Email",
         "conn": "channel",
         "bridge": "road",
         "state": "connected"

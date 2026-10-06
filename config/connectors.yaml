@@ -33,6 +33,7 @@
     - {id: read_file, capability: read, description: "Read the files you pick in Drive.", risk_tier: T1, gate_type: none, irreversible: false}
     - {id: list_files, capability: list, description: "See the files in the folder you pick.", risk_tier: T1, gate_type: none, irreversible: false}
     - {id: save_file, capability: write, description: "Save finished work in a Tilo folder in your Drive.", risk_tier: T1, gate_type: approval, irreversible: false}
+    - {id: save_as_google_file, capability: write, description: "Save a deck, doc or sheet as a Slides, Docs or Sheets file in a Tilo folder in your Drive.", risk_tier: T1, gate_type: approval, irreversible: false}
   limits: {per_minute: 60, batch_size: 50}
   data_class: {returns: [personal, business], redact: []}
 

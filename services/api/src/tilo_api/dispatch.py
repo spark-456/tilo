@@ -46,6 +46,7 @@ logger = logging.getLogger("tilo_api.dispatch")
 
 _CALL_BUDGET_S = 4.5  # a whole request's own write-attempt budget, under FR-HIL-07's 5s
 _SOLE_RETRY_LIMIT = 2  # total attempts for a fast-failing part with nothing else left to try
+_CONFIRM_CHANNELS = ("web", "email")  # FR-HIL-07 as amended (SD-01): confirm on the web and by email only
 _MAX_ABANDONED = 2  # presumed-lost threads tolerated per world before no new thread starts
 
 
@@ -279,7 +280,7 @@ def _confirmations(world: WorldRecord) -> list[dict[str, str]]:
     channels = world.owner_channels
     if not isinstance(channels, (tuple, list)):
         return []
-    return [{"channel": c} for c in channels if isinstance(c, str)]
+    return [{"channel": c} for c in channels if c in _CONFIRM_CHANNELS]  # web and email only (FR-HIL-07, SD-01)
 
 
 def _revoke_fallback_world(store: Store, principal: Principal) -> str | None:
@@ -361,7 +362,7 @@ def stop_autopilot(
 
 
 class PauseRequest(BaseModel):
-    channel: Literal["web", "mobile_web", "whatsapp", "email"] | None = None
+    channel: Literal["web", "mobile_web", "email"] | None = None
 
 
 @router.post("/worlds/{world_id}/pause")

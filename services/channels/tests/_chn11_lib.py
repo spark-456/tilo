@@ -22,8 +22,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from _channels_lib import FakeClock
-from _chn10_lib import USER, MemoryDraftStore, Rig, Thread, answer, drafting_module, make_rig
-from _chn_0305_lib import CONTRACTS, _registry
+from _chn10_lib import USER, MemoryDraftStore, Rig, Thread, answer, drafting_module, make_rig, message_id_header
+from _chn_contracts_lib import CONTRACTS, _registry
 from jsonschema import Draft202012Validator
 
 MAILBOX = "ops@harborview.example"
@@ -262,6 +262,16 @@ def context(
     )
 
 
+def reply_target(thread: Thread) -> str:
+    """The Message-ID header a real Drafter puts in `in_reply_to` / `references`: that of the thread's last inbound
+    message (the inbound-aware L2 check, FR-CHN-11, looks that message up). A thread with no inbound message keeps a
+    placeholder."""
+    try:
+        return message_id_header(thread.last_inbound(MAILBOX).message_id)
+    except IndexError:
+        return "<m@mail.example>"
+
+
 def ready(
     thread: Thread,
     body: str,
@@ -276,6 +286,7 @@ def ready(
     """A FR-CHN-10 `ready` DraftResult built directly: what the checker passed, with no findings."""
     mod = drafting_module()
     iid = instruction_id or "ins-" + secrets.token_hex(6)
+    target = reply_target(thread)
     draft = mod.Draft(
         artifact_id="art_" + secrets.token_hex(6),
         version=1,
@@ -284,9 +295,9 @@ def ready(
         to=to,
         cc=cc,
         bcc=(),
-        subject="Re: Engine tune-up scheduling and estimate",
-        in_reply_to="<m@mail.example>",
-        references="<m@mail.example>",
+        subject="Re: Engine tuneup scheduling",
+        in_reply_to=target,
+        references=target,
         body=body,
         attachments=(),
         safety_flag=safety_flag,

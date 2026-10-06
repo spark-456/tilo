@@ -1,0 +1,136 @@
+{
+  "rule": "OB-01",
+  "note": "The instruction is the owner's typed WhatsApp answer to Tilo's question card, a path ADR-0007 once allowed. WhatsApp is out of scope (SD-01) and a channel.message_in is never an L2 instruction on any channel (ADR-0019), so the reply waits at a gate.",
+  "entry": {
+    "id": "01JB5VQ0000000000000009006",
+    "idempotency_key": "r_village_basic_1:U2:send_email:1",
+    "world_id": "w_village_basic",
+    "run_id": "r_village_basic_1",
+    "action_type": "send_email",
+    "connector": "gmail",
+    "recipients": ["riya@example.com"],
+    "attachments": [],
+    "item": {
+      "artifact_id": "art_followup_reply",
+      "version": 1
+    },
+    "destination": "thread-supplier-1",
+    "modifiers": [],
+    "risk_tier": "T2",
+    "authz": {
+      "by": "policy",
+      "ref": "pol_autopilot_l2",
+      "at": "2026-09-29T09:42:16.000Z"
+    },
+    "undo_window_s": 60,
+    "scheduled_at": "2026-09-29T09:43:16.000Z",
+    "state": "scheduled",
+    "created_at": "2026-09-29T09:42:16.000Z"
+  },
+  "reserved_by": null,
+  "authorised_by": {
+    "type": "policy.applied",
+    "authz": {
+      "by": "policy",
+      "ref": "pol_autopilot_l2",
+      "at": "2026-09-29T09:42:16.000Z"
+    },
+    "data": {
+      "policy_id": "pol_autopilot_l2",
+      "gate_id": "G1",
+      "outbox_id": "01JB5VQ0000000000000009006",
+      "action_type": "send_email",
+      "connector": "gmail",
+      "destination": "thread-supplier-1",
+      "district": "D1",
+      "risk_tier": "T2",
+      "level": "L2",
+      "instruction_id": "01JB5VQ0000000000000000131",
+      "undo_window_s": 60,
+      "item": {
+        "artifact_id": "art_followup_reply",
+        "version": 1
+      },
+      "credits": 2
+    }
+  },
+  "policy": {
+    "id": "pol_autopilot_l2",
+    "owner": "u_owner",
+    "action_type": "send_email",
+    "scope": {
+      "connectors": ["gmail"],
+      "recipients": [],
+      "domains": ["example.com"],
+      "districts": ["D1"]
+    },
+    "limits": {
+      "per_day": 20,
+      "credits": 50
+    },
+    "conditions": {
+      "no_attachments": true,
+      "no_new_recipients": true,
+      "no_safety_flags": true
+    },
+    "level": "L2",
+    "undo_window_s": 60,
+    "expiry": "2026-12-31T23:59:59.000Z",
+    "notify_channel": "email",
+    "team_lead_domains": [],
+    "created_by": {
+      "by": "u_owner",
+      "at": "2026-09-29T09:30:00.000Z"
+    },
+    "changed_by": null,
+    "history": [
+      {
+        "by": "u_owner",
+        "at": "2026-09-29T09:30:00.000Z",
+        "change": "Created at L2 for replies to example.com",
+        "level": "L2"
+      }
+    ]
+  },
+  "team_lead": null,
+  "world_owner": "u_owner",
+  "instruction": {
+    "v": "1.0",
+    "id": "01JB5VQ0000000000000000131",
+    "seq": 131,
+    "ts": "2026-09-29T09:41:50.000Z",
+    "world_id": "w_village_basic",
+    "run_id": "r_village_basic_1",
+    "type": "channel.message_in",
+    "actor": "u_owner",
+    "target": "w_village_basic",
+    "level": null,
+    "district": null,
+    "item": null,
+    "severity": "info",
+    "credits": 0,
+    "summary": "Your WhatsApp answer arrived: reply yes on the supplier thread.",
+    "cause": null,
+    "vis": "all",
+    "authz": null,
+    "data": {
+      "channel": "whatsapp",
+      "message_ref": "r_village_basic_1/118",
+      "card_id": "01JB5VQ0000000000000000129",
+      "card_kind": "needs_you",
+      "option": null,
+      "destination": "thread-supplier-1"
+    },
+    "trace": {
+      "model_role": null,
+      "profile": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "tool": null,
+      "latency_ms": null,
+      "archive_ref": null
+    }
+  },
+  "earlier_applied": [],
+  "transfer": null
+}

@@ -255,27 +255,48 @@
 }
 .plate-toast-slot {
   display: block;
+  box-sizing: border-box;
   position: sticky;
   bottom: var(--space-16);
   z-index: 5;
-  pointer-events: none;
 }
-.plate-toast-slot:focus-visible {
-  outline: 2px solid var(--color-brand-primary);
-  outline-offset: 2px;
+.plate-toast-slot[data-on="true"] {
+  margin-top: var(--space-16); /* its own height is the room kept at the end of the page */
+}
+.source-icon {
+  display: inline-block;
+  flex: none;
+  margin: 0 var(--space-8) -3px 0;
+  color: var(--color-ink-2);
 }
 .plate-toast {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-12);
+}
+.plate-toast output {
+  flex: 1 1 0;
+  min-width: 0; /* the words wrap beside Undo, so the bar stays low over the rows under it */
+}
+.plate-toast button {
+  flex: none;
+}
+.plate-toast .plate-dismiss {
+  min-width: 44px;
+  padding: 0 var(--space-8);
+}
+/* The page scrolls clear of the toast (--toast-h: bottom of the view to the toast's top, measured
+   in S_27), so a tabbed-to control is never under it (WCAG 2.4.11). */
+.screen-page:has(.plate-toast[data-on="true"]) {
+  scroll-padding-bottom: calc(var(--toast-h, 100px) + var(--space-16));
+}
+.plate-toast[data-on="true"] {
   padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-controls);
   background: var(--color-ink-1);
   color: var(--color-surface-1);
   font: 700 var(--text-14) / 1.4 var(--font-ui);
-  pointer-events: auto;
 }
 
 /* S-28 pinboards: the two boards side by side when the room is wide (the team board takes two

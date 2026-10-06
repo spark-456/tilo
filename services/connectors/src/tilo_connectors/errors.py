@@ -24,6 +24,11 @@ class SideEffectRefused(AdapterError):
     """Final: the side effect can never succeed as written. The outbox marks the entry failed."""
 
 
+class PossiblySent(SideEffectRefused):
+    """Final, but an earlier attempt may have acted and the provider cannot be asked: the outbox marks the entry
+    failed and alerts a person, who checks by hand. It is never retried."""
+
+
 class RateLimited(AdapterError):
     """429 still answered after the attempts, or a Retry-After over 60 s. The outbox waits it out across ticks."""
 

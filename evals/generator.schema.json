@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evals.tilo.example/generator.schema.json",
+  "title": "GeneratorSettings",
+  "description": "Settings of the live scenario generator (issue #272 (b)): evals/generator.yaml. Evals-local, like bank.schema.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["max_inr", "inr_per_usd"],
+  "properties": {
+    "max_inr": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Per-run spend cap in Indian rupees."
+    },
+    "inr_per_usd": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Rupees per US dollar, to turn the cap into credits."
+    }
+  }
+}

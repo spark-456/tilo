@@ -24,7 +24,7 @@ from _chn10_lib import (
     drafting_module,
     make_rig,
 )
-from _chn_0305_lib import CONTRACTS, data_errors, registered_types
+from _chn_contracts_lib import CONTRACTS, data_errors, registered_types
 from tilo_providers.errors import ProviderError
 
 CLEAN = "Hi David,\n\nFriday at 2pm works for us.\n\nBest regards,\nSarah"
@@ -45,12 +45,7 @@ FORBIDDEN_IMPORTS = (
     "tilo_connectors",
     "tilo_api",
     "tilo_policy",
-    "tilo_channels.cards",
-    "tilo_channels.keywords",
     "tilo_channels.links",
-    "tilo_channels.binding",
-    "tilo_channels.inbound",
-    "tilo_channels.whatsapp",
     "httpx",
     "requests",
     "socket",
@@ -152,7 +147,7 @@ def _exercise(rig) -> list[str]:
     fragments: list[str] = []
     style = {"signature": "Sarah Chen, Harborview Ops desk"}
     paths = [
-        ("Engine tune-up scheduling", "Can Marcus come by this Friday afternoon?", answer(CLEAN)),
+        ("Engine tuneup scheduling", "Can Marcus come by this Friday afternoon?", answer(CLEAN)),
         ("Haul-out for Northern Star", "Can we book the haul-out on Tuesday?", answer(f"{CLEAN} It is free.")),
         ("Parcel delivered to the office", "Your parcel was left at the marina office.", "not json at all"),
         ("Updated remittance details", f"Our bank changed. {INJECTION_MARKER}.", answer(CLEAN)),

@@ -2,7 +2,7 @@
 // CP2 #258: a bare /needs-you, /needs-you/gate or /library with a live API shows the run this
 // session started last, or "No run yet"; an unknown world is "Not found" in fixture and live mode.
 // Nothing is asked of the API about a world the page cannot name (no 404 or 403 on every poll).
-import { act } from "react";
+import { Suspense, act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClientProvider } from "../api/ClientProvider";
@@ -42,13 +42,21 @@ async function visit(address: string, client: TiloClient) {
   await act(async () => {
     root.render(
       <ClientProvider client={client}>
-        <match.Component params={match.params} />
+        <Suspense fallback={null}>
+          <match.Component params={match.params} />
+        </Suspense>
       </ClientProvider>,
     );
   });
   await act(async () => {
     await new Promise((r) => setTimeout(r, 30)); // a few polls
   });
+  // Screens are code-split chunks (NFR-01): wait, bounded, until the screen's own chunk has rendered.
+  for (let i = 0; i < 100 && !container.textContent; i++) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+  }
   return {
     text: () => container.textContent ?? "",
     container,

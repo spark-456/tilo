@@ -483,7 +483,7 @@ def base_budget_policy(
         "level": "L3",
         "undo_window_s": 60,
         "expiry": None,
-        "notify_channel": "whatsapp",
+        "notify_channel": "email",
         "team_lead_domains": [],
         "created_by": {"by": owner, "at": created_at},
         "changed_by": None,

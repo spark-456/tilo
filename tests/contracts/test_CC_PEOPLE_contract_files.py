@@ -40,7 +40,7 @@ def test_CC_PEOPLE_FR_WLD_02_schema_file_follows_the_contract_conventions(repo_r
     jsonschema.Draft202012Validator.check_schema(schema)
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert schema["$id"] == f"https://contracts.tilo.example/{name}.schema.json"
-    assert schema["x-version"] == "1.0.0"
+    assert schema["x-version"] == ("1.1.0" if name == "meeting" else "1.0.0"), "meeting 1.1.0 adds world_id (ADR-0020)"
     assert schema["title"] == title
     assert "allOf" not in schema, "contracts/CLAUDE.md: avoid a root-level allOf (open intersection types)"
     if name != "ui_action":
@@ -62,11 +62,10 @@ def test_CC_PEOPLE_FR_WLD_02_schema_declares_its_named_defs(repo_root, name, def
             assert schema["$defs"][d].get("additionalProperties") is False, f"$defs/{d} must be closed"
 
 
-def test_CC_PEOPLE_FR_WLD_02_common_schema_is_at_least_1_2_0_and_keeps_its_old_defs(repo_root):
+def test_CC_PEOPLE_FR_WLD_02_common_schema_is_1_3_0_and_keeps_its_old_defs(repo_root):
     schema = pl.load_contract(repo_root, "common")
-    # Two releases were both called 1.1.0 (artifact media types, people ids); 1.2.0 is the merge.
-    major, minor, _patch = (int(p) for p in schema["x-version"].split("."))
-    assert (major, minor) >= (1, 2), "common carries the people ids and media_type, so it is 1.2.0 or later"
+    # 1.2.0 merged two 1.1.0 releases (#379: pinned); 1.3.0 adds `mail` to record_ref.kind (ADR-0021).
+    assert schema["x-version"] == "1.3.0", "common carries the people ids, media_type and mail: exactly 1.3.0"
     old = {"ulid", "timestamp", "calendar_date", "authz", "artifact_ref", "destination", "user_id", "org_id"}
     new = {
         "work_item_id",
@@ -178,7 +177,7 @@ def test_CC_PEOPLE_PE_08_maker_is_a_person_or_tilo_with_the_matching_ref(repo_ro
 
 
 def test_CC_PEOPLE_PE_11_record_ref_names_a_kind_and_a_plain_id(repo_root, registry):
-    kinds = ("work_item", "calendar_entry", "meeting", "pinboard_item", "mention", "card", "world", "event")
+    kinds = ("work_item", "calendar_entry", "meeting", "pinboard_item", "mention", "card", "world", "event", "mail")
     for kind in kinds:
         pl.assert_valid(repo_root, registry, "common", {"kind": kind, "id": "wi_1"}, "record_ref", kind)
     pl.assert_valid(repo_root, registry, "common", {"kind": "event", "id": "A" * 64}, "record_ref")

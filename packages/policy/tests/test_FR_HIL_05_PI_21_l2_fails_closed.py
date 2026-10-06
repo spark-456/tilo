@@ -17,7 +17,7 @@ L0_HISTORY = [{"by": OWNER, "at": "2026-09-29T09:30:00.000Z", "change": "Observe
 # Every shape of instruction the interim rule could once have accepted, and the ways it fails.
 SHAPES = {
     "none": None,
-    "whatsapp_typed": base_instruction(channel="whatsapp", type_="channel.message_in"),
+    "whatsapp_typed": base_instruction(channel="whatsapp", type_="channel.message_in"),  # ADR-0019: never
     "web_signed_in": base_instruction(channel="web", type_="world.requested"),
     "mobile_web": base_instruction(channel="mobile_web", type_="world.requested"),
     "email": base_instruction(channel="email", type_="channel.message_in"),
@@ -64,7 +64,7 @@ def test_FR_HIL_05_PI_21_l2_send_waits_at_a_gate_under_every_instruction_shape(s
 
 
 def test_FR_HIL_05_PI_21_an_unused_valid_instruction_still_gates_and_a_used_one_too():
-    instruction = SHAPES["whatsapp_typed"]
+    instruction = SHAPES["web_signed_in"]
     policy = base_policy(level="L2")
     earlier = [applied_entry(policy_id=policy["id"], at="2026-09-29T09:35:00.000Z", instruction_id=instruction["id"])]
     assert _decide(instruction, policy).outcome == "gate"
@@ -74,8 +74,8 @@ def test_FR_HIL_05_PI_21_an_unused_valid_instruction_still_gates_and_a_used_one_
 def test_FR_HIL_05_PI_21_the_interim_rule_stays_as_an_extra_check_once_an_action_is_recorded(monkeypatch):
     policy = base_policy(level="L2")
     monkeypatch.setattr(coverage, "L2_ACTION_RECORDED", True)
-    assert _decide(SHAPES["whatsapp_typed"], policy).outcome == "run_after_undo"
-    for shape in ("none", "email", "someone_else", "other_thread", "after_the_send"):
+    assert _decide(SHAPES["web_signed_in"], policy).outcome == "run_after_undo"
+    for shape in ("none", "whatsapp_typed", "email", "someone_else", "other_thread", "after_the_send"):
         assert _decide(SHAPES[shape], policy).outcome == "gate", shape
 
 

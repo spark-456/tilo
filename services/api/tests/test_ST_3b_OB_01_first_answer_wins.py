@@ -1,6 +1,6 @@
 """ST-3b / OB-01 (#204, #155): the cards API is first-answer-wins and idempotent per card. The web gate sheet lets a
 person answer again after 20 s with no closing event, so a second answer to a card (the same option or another, in
-sequence or at once, from web or WhatsApp) must write nothing and send nothing, and must get the stable
+sequence or at once, from web or mobile web) must write nothing and send nothing, and must get the stable
 `already_resolved` refusal, never a 500. A writer that commits an event and then raises gives a 503 and then a 200 on
 retry with one approval.resolved, because each card resolution has one stable event id (FR-HIL-07).
 """
@@ -13,7 +13,6 @@ import time
 import pytest
 from _cards_lib import OWNER_P, FakeClock, FakeEventWriter, answer_client, load_valid_card, new_ulid
 from _clint2_lib import wait_for
-from tilo_api import cards
 from tilo_api.cards import CardStore
 
 W = "w_01"
@@ -23,9 +22,9 @@ BUSY = {"outcome": "rejected", "reason": "busy"}  # a write is in flight and may
 
 # fixture, first option, another option, the channels the two answers come from, the event the first one writes
 CASES = {
-    "gate": ("gate_send_reply", "approve", "hold", ("whatsapp", "web"), "approval.resolved"),
+    "gate": ("gate_send_reply", "approve", "hold", ("mobile_web", "web"), "approval.resolved"),
     "consent": ("consent_drive_folder", "connect", "hold", ("web", "mobile_web"), "connection.consented"),
-    "question": ("needs_you_blocked", "per_kwh", "per_pack", ("whatsapp", "web"), "question.answered"),
+    "question": ("needs_you_blocked", "per_kwh", "per_pack", ("mobile_web", "web"), "question.answered"),
 }
 
 
@@ -46,7 +45,7 @@ def _store(kind: str, writer: FakeEventWriter | None = None) -> tuple[CardStore,
 
 
 def _answer(store: CardStore, card: dict, option: str, channel: str = "web"):
-    return store.answer(W, card["id"], option=option, channel=channel, principal=OWNER_P, pin_verified=True)
+    return store.answer(W, card["id"], option=option, channel=channel, principal=OWNER_P)
 
 
 @pytest.mark.parametrize("kind", CASES)
@@ -116,35 +115,33 @@ def _count_sends(run_flow) -> tuple[int, int, int]:
     )
 
 
-def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_in_sequence_by_web_then_whatsapp(run_flow):
-    run_flow.flow.app.dependency_overrides[cards.get_channels_caller] = lambda: True  # tilo-channels is the caller
+def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_in_sequence_by_web_then_mobile_web(run_flow):
     _, card = run_flow.run_to_gate()
-    url = f"/worlds/{run_flow.world_id}/cards/{card['id']}/answer"
     assert run_flow.answer(card["id"], "approve").status_code == 200
     wait_for(lambda: run_flow.events("world.completed"), what="world.completed")
+    run_flow.sessions_by_channel()
 
     later = [
-        run_flow.flow.client.post(url, json={"option": "approve", "channel": "web"}),
-        run_flow.flow.client.post(url, json={"option": "approve", "channel": "whatsapp", "pin_verified": True}),
-        run_flow.flow.client.post(url, json={"option": "hold", "channel": "whatsapp"}),
+        run_flow.answer_on(card["id"], {"option": "approve", "channel": "web"}),
+        run_flow.answer_on(card["id"], {"option": "approve", "channel": "mobile_web"}),
+        run_flow.answer_on(card["id"], {"option": "hold", "channel": "mobile_web"}),
     ]
 
     assert [(r.status_code, r.json()) for r in later] == [(400, REFUSED)] * 3
     assert _count_sends(run_flow) == (1, 1, 1)
 
 
-def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_at_once_from_web_and_whatsapp(run_flow):
-    run_flow.flow.app.dependency_overrides[cards.get_channels_caller] = lambda: True
+def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_at_once_from_web_and_mobile_web(run_flow):
     _, card = run_flow.run_to_gate()
-    url = f"/worlds/{run_flow.world_id}/cards/{card['id']}/answer"
+    run_flow.sessions_by_channel()
     bodies = [
         {"option": "approve", "channel": "web"},
-        {"option": "approve", "channel": "whatsapp", "pin_verified": True},
+        {"option": "approve", "channel": "mobile_web"},
     ]
     replies: list = []
 
     def post(body: dict) -> None:
-        replies.append(run_flow.flow.client.post(url, json=body))
+        replies.append(run_flow.answer_on(card["id"], body))
 
     threads = [threading.Thread(target=post, args=(bodies[i % 2],)) for i in range(8)]
     for t in threads:

@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
-Channel = Literal["web", "mobile_web", "whatsapp", "email"]
+Channel = Literal["web", "mobile_web", "email"]  # whatsapp removed by CH-RM (SD-01)
 
 
 @dataclass(frozen=True)
@@ -64,7 +64,7 @@ class WorldRecord:
     districts: dict[str, "DistrictRecord | None"]  # district_id -> DistrictRecord, this world's
     # full layout. A test may store None or another malformed value under a key to prove the read
     # routes (and the kill-switch vis computation) fail closed rather than raising.
-    owner_channels: tuple[str, ...] = ("web", "whatsapp", "email")  # the owner's enabled channels
+    owner_channels: tuple[str, ...] = ("web", "email")  # the owner's enabled channels
     # for kill-switch confirmations (PRD 10.2's "all enabled channels"; mobile_web treated as the
     # same surface as web for this purpose).
     run_id: str = "r_village_basic_1"  # the world's current run, the harness's own record; the
@@ -135,21 +135,21 @@ class EventWriter(Protocol):
 
 
 def get_current_principal() -> Principal:
-    """Raises NotImplementedError in production until real sign-in lands; every test overrides
+    """Answers 401 in production until real sign-in lands (#410); every test overrides
     this via app.dependency_overrides[get_current_principal]."""
-    raise NotImplementedError
+    raise HTTPException(...)  # 401 / 503, see deps.py
 
 
 def get_store() -> Store:
-    """Raises NotImplementedError in production until Firestore wiring lands; every test
+    """Answers 503 not_configured in production until Firestore wiring lands (#410); every test
     overrides this via app.dependency_overrides[get_store]."""
-    raise NotImplementedError
+    raise HTTPException(...)  # 401 / 503, see deps.py
 
 
 def get_event_writer() -> EventWriter:
-    """Raises NotImplementedError in production until the harness wiring lands; every test
+    """Answers 503 not_configured in production until the harness wiring lands (#410); every test
     overrides this via app.dependency_overrides[get_event_writer]."""
-    raise NotImplementedError
+    raise HTTPException(...)  # 401 / 503, see deps.py
 
 
 def get_part_write_deadline_s() -> float:

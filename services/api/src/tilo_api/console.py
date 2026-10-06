@@ -23,7 +23,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from tilo_policy.schemas import conforms
 
-from tilo_api.cards import _STATUS, CardStore, _parse_ts
+from tilo_api.cards import _STATUS, CardStore, _parse_ts, get_channels_caller, session_allows
 from tilo_api.deps import Principal, get_current_principal
 
 logger = logging.getLogger("tilo_api.console")
@@ -102,18 +102,21 @@ def build_router(
         card_id: str,
         body: _ConsoleAnswer,
         principal: Principal = Depends(get_current_principal),
+        from_channels: bool = Depends(get_channels_caller),
         team_leads: list[dict] = Depends(get_team_leads),
         store: CardStore = Depends(get_cards),
     ) -> JSONResponse:
         if principal.world_id != world_id:
             raise HTTPException(status_code=404)
         lead = _lead_record(principal, team_leads, store, world_id)
+        if from_channels or not session_allows(principal, principal.channel, False):  # the lead's own signed-in session
+            return JSONResponse(status_code=400, content={"outcome": "rejected", "reason": "invalid_channel"})
         try:
             result = store.answer(
                 world_id,
                 card_id,
                 option=body.option,
-                channel="web",
+                channel=principal.channel,
                 principal=principal,
                 console_domain=lead["domain"],
             )

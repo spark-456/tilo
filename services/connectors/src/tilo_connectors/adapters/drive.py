@@ -3,6 +3,8 @@
 Every call uses drive.file. A file is readable only when the user picked it, `list_folder` listed it from
 a picked folder, or this adapter created it; anything else is `NotPicked` before any request names it.
 Saving is the one side effect (SEC-03), into the folder named `Tilo` this adapter created, exactly once.
+`save_as_google_file` (FR-CON-11) is the same save with Drive's upload-with-conversion: a PPTX, DOCX or XLSX
+artifact becomes a native Slides, Docs or Sheets file, still on drive.file, with no new method or scope.
 File names are data: returned verbatim, never logged, never a path.
 """
 
@@ -28,6 +30,13 @@ _FIELDS = "id,name,mimeType,size,parents"
 _FOLDER_MARK = ("tilo_role", "folder")  # appProperties of the folder this adapter created
 _SAVE_KEY = "tilo_save"  # appProperties key of a saved file: side_effect_marker(entry)
 _MIME = re.compile(r"[A-Za-z0-9][\w.+-]*/[\w.+-]+")
+_OOXML = "application/vnd.openxmlformats-officedocument."
+_NATIVE = {  # tilo-render's OOXML type -> (the native Google type Drive converts it to, its editor URL segment)
+    _OOXML + "presentationml.presentation": ("application/vnd.google-apps.presentation", "presentation"),
+    _OOXML + "wordprocessingml.document": ("application/vnd.google-apps.document", "document"),
+    _OOXML + "spreadsheetml.sheet": ("application/vnd.google-apps.spreadsheet", "spreadsheets"),
+}
+_OOXML_EXTENSION = re.compile(r"\.(pptx|docx|xlsx)\Z", re.IGNORECASE | re.ASCII)
 
 
 class InMemoryPicks:
@@ -114,27 +123,40 @@ class DriveAdapter(GoogleAdapter):
         return self._final_on_rejection(lambda: self._save(entry))
 
     def _save(self, entry: Mapping[str, Any]) -> dict[str, Any]:
-        if entry.get("action_type") != "save_file":
+        action = entry.get("action_type")
+        if action not in ("save_file", "save_as_google_file"):
             raise SideEffectRefused("google_drive has no side effect for this action")
         item = self._artifact(entry.get("item"), "file")
         name, content, mime = item.get("name"), item.get("content"), str(item.get("mime_type", ""))
         if not isinstance(name, str) or not name or not isinstance(content, bytes | bytearray):
             raise SideEffectRefused("the file cannot be saved as written")
         mime = mime if _MIME.fullmatch(mime) else "application/octet-stream"
+        native = None
+        if action == "save_as_google_file":  # FR-CON-11: only a deck, doc or sheet from tilo-render converts
+            origin = item.get("origin")  # a converted Sheet runs formulas (IMPORTXML): never an upload or a third party
+            if not isinstance(origin, Mapping) or origin.get("kind") != "render":
+                raise SideEffectRefused("only a file tilo-render made becomes a Slides, Docs or Sheets file")
+            if mime not in _NATIVE:
+                raise SideEffectRefused("only a PPTX, DOCX or XLSX file becomes a Slides, Docs or Sheets file")
+            native, name = _NATIVE[mime], _OOXML_EXTENSION.sub("", name) or name
         user, scopes = self._owner_of(str(entry["world_id"])), self._scopes("write")
         marker = side_effect_marker(entry)
         q = f"trashed = false and appProperties has {{ key='{_SAVE_KEY}' and value='{marker}' }}"  # in any folder
         found = self._get(user, scopes, "/files", {"q": q, "fields": "files(id,parents)"}, patient=False)
         if earlier := found.get("files") or []:  # OB-03: a lost response or another instance already saved it
-            file_id, parents = checked_id(earlier[0].get("id")), earlier[0].get("parents") or []
-            folder = checked_id(parents[0]) if parents else ""
+            file_id, parents = _final_id(earlier[0].get("id")), earlier[0].get("parents") or []
+            folder = _final_id(parents[0]) if parents else ""
         else:
             destination = entry.get("destination")
             folders = self._tilo_folders(user, scopes, create=destination is None)
             if not folders or (destination is not None and destination not in folders):
                 raise SideEffectRefused("files are saved only in the Tilo folder")
             folder = destination if destination is not None else folders[0]
-            meta = {"name": name, "mimeType": mime, "parents": [folder], "appProperties": {_SAVE_KEY: marker}}
+            shared = self._get(user, scopes, f"/files/{checked_id(folder)}", {"fields": "id,shared"}, patient=False)
+            if shared.get("shared") is not False:  # a save there reaches other people: external sharing, a T3 act
+                raise SideEffectRefused("the Tilo folder is shared; a save there is external sharing")
+            stored = native[0] if native else mime  # the type Drive stores; the media part keeps the source type
+            meta = {"name": name, "mimeType": stored, "parents": [folder], "appProperties": {_SAVE_KEY: marker}}
             boundary = "tilo-" + secrets.token_hex(16)
             while boundary.encode() in content:
                 boundary = "tilo-" + secrets.token_hex(16)
@@ -152,8 +174,11 @@ class DriveAdapter(GoogleAdapter):
             saved = self._json(
                 user, scopes, "POST", DRIVE_UPLOAD_API, params=params, headers=headers, content=body, patient=False
             )
-            file_id = str(saved.get("id", ""))
+            file_id = _final_id(saved.get("id"))  # the file exists, so a bad id is final, never retried
         self._remember(self._created, user, [i for i in (folder, file_id) if i])
+        if native:  # the editor link is built from the checked id, never taken from an answer
+            url = f"https://docs.google.com/{native[1]}/d/{checked_id(file_id)}/edit"
+            return {"id": file_id, "folder_id": folder, "mime_type": native[0], "open_url": url}
         return {"id": file_id, "folder_id": folder}
 
     def _tilo_folders(self, user: str, scopes: list[str], *, create: bool) -> list[str]:
@@ -178,6 +203,13 @@ class DriveAdapter(GoogleAdapter):
             folders = listed() or [checked_id(made.get("id"))]
         self._remember(self._created, user, folders)
         return folders
+
+
+def _final_id(value: Any) -> str:
+    try:
+        return checked_id(value)
+    except AdapterError:
+        raise SideEffectRefused("Drive answered with an id that is not a valid id") from None
 
 
 def _meta(raw: Mapping[str, Any]) -> dict[str, Any]:

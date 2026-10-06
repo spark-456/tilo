@@ -157,7 +157,7 @@ def t3_money_body() -> str:
 def load_policy_applied_part() -> dict:
     """A contract-valid `policy.applied` part (the OB-01 crossref fixture of an L2 web instruction), for the tests that
     hand the Autopilot a policy part where an approval belongs."""
-    from _chn_0305_lib import CONTRACTS
+    from _chn_contracts_lib import CONTRACTS
 
     path = CONTRACTS / "fixtures" / "outbox" / "crossref" / "valid" / "policy_reply_instructed_on_the_web.json"
     return json.loads(path.read_text(encoding="utf-8"))["authorised_by"]

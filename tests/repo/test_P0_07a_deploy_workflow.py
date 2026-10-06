@@ -155,14 +155,15 @@ def test_P0_07a_workflow_deploys_the_seven_services_within_cost_caps(repo_root: 
         assert "tilo-" in sa, "per-service runtime SA (tilo-<svc>@...)"
 
 
-def test_P0_07a_workflow_smoke_tests_healthz_after_deploy_using_deploy_outputs(repo_root: pathlib.Path) -> None:
+def test_P0_07a_workflow_smoke_tests_health_after_deploy_using_deploy_outputs(repo_root: pathlib.Path) -> None:
     wf = _wf(repo_root)
     runs = _runs(wf)
     auth = _first(wf, lambda s: s.get("uses", "").startswith("google-github-actions/auth@"))
     push = _first(wf, lambda s: "docker push" in s.get("run", ""))
     deploy = _first(wf, lambda s: re.search(r"gcloud run (deploy|services update)", s.get("run", "")) is not None)
-    smoke = _first(wf, lambda s: "/healthz" in s.get("run", ""))
+    # P0-07h (issue #397): Cloud Run reserves /healthz on run.app URLs, so the smoke step probes /health.
+    smoke = _first(wf, lambda s: re.search(r"/health(?!z)", s.get("run", "")) is not None)
     assert auth < push < deploy < smoke, "order: auth, push, deploy, smoke"
     smoke_run = _steps(wf)[smoke]["run"]
-    assert re.search(r"curl[^\n]*(--fail|-f\b|-sf|-fs)", smoke_run), "curl --fail on /healthz"
+    assert re.search(r"curl[^\n]*(--fail|-f\b|-sf|-fs)", smoke_run), "curl --fail on /health"
     assert re.search(r"status\.url|--format|\.url\b", runs), "URLs come from gcloud output, never typed in"

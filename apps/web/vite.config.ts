@@ -34,4 +34,10 @@ function preloadFonts(): Plugin {
 
 export default defineConfig({
   plugins: [react(), preloadFonts()],
+  build: {
+    // Pixi (about 0.9 MB in two lazy chunks) is fetched after the landing page is interactive
+    // (NFR-01), never with it, so the size warning is lifted just above it. No manualChunks: it
+    // hoisted shared modules into one Pixi chunk the entry then preloaded in index.html.
+    chunkSizeWarningLimit: 1000,
+  },
 });
