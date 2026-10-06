@@ -196,24 +196,46 @@ export interface PinDef {
   readonly sub: string;
 }
 
-/** The three pins of the reference, by index of `app.pins`. */
-export function pinDefs(needs: number, night: boolean): PinDef[] {
+/** The world a decision waits in: the first world (not one just started) whose state is "needs". */
+export function needsWorld(worlds: readonly World[]): World | undefined {
+  return worlds.find((w) => w.st === "needs" && !w.isNew);
+}
+
+/**
+ * The three pins of the reference, by index of `app.pins`, chosen from the worlds the Api returned (not
+ * ones just started): pin 0 is the first world that needs you or runs, pin 1 the next running one, pin 2
+ * the first scheduled one. A slot with no such world has no pin.
+ */
+export function pinDefs(
+  worlds: readonly World[],
+  needs: number,
+  night: boolean,
+): readonly (PinDef | undefined)[] {
+  const old = worlds.filter((w) => !w.isNew);
+  const [first, second] = old.filter((w) => w.st === "needs" || w.st === "running");
+  const sched = old.find((w) => w.st === "scheduled");
+  const nd = first?.st === "needs";
   return [
-    {
-      worldId: "k1",
-      icon: needs ? "flag" : "bolt",
-      tone: needs ? "needs" : "run",
-      sub: needs
+    first && {
+      worldId: first.id,
+      icon: nd ? "flag" : "bolt",
+      tone: nd ? "needs" : "run",
+      sub: nd
         ? `${needs} ${plural(needs, "decision needs you", "decisions need you")}`
-        : "Running · 46%",
+        : `Running · ${first.prog ?? 0}%`,
     },
-    {
-      worldId: "hires",
+    second && {
+      worldId: second.id,
       icon: "people",
       tone: "run",
-      sub: night ? "Running overnight · 58%" : "Running · 58%",
+      sub: `${night ? "Running overnight" : "Running"} · ${second.prog ?? 0}%`,
     },
-    { worldId: "invoice", icon: "clock", tone: "sch", sub: "Next run Mon 09:00" },
+    sched && {
+      worldId: sched.id,
+      icon: "clock",
+      tone: "sch",
+      sub: `${sched.nextL} ${sched.nextV}`,
+    },
   ];
 }
 
@@ -241,7 +263,7 @@ export function placedPins(
   ];
   const clear = (p: { x: number; y: number }): boolean =>
     !blocks.some((b) => p.x + 140 > b[0] && p.x - 140 < b[2] && p.y > b[1] && p.y - 84 < b[3]);
-  const defs = pinDefs(needs, night);
+  const defs = pinDefs(worlds, needs, night);
   const out: PlacedPin[] = [];
   pins.forEach((p, i) => {
     const def = defs[i];

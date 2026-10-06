@@ -648,6 +648,7 @@
   bottom: 4px;
   left: 4px;
   border-radius: 12px;
+  /* !important: SegmentedControl sets its own width inline ((100% - 6px) / N); this track has 4px padding */
   width: calc((100% - 8px) / 3) !important;
 }
 [data-park] .park-home-hint {

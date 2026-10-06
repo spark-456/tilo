@@ -46,10 +46,20 @@ export interface HeroProps {
   readonly summary: string;
   readonly needs: number;
   readonly night: boolean;
+  /** The world the waiting decisions are in, from the Api's worlds; null names none. */
+  readonly worldName: string | null;
   readonly onReview: () => void;
 }
 
-export function Hero({ dateLine, greeting, summary, needs, night, onReview }: HeroProps) {
+export function Hero({
+  dateLine,
+  greeting,
+  summary,
+  needs,
+  night,
+  worldName,
+  onReview,
+}: HeroProps) {
   return (
     <div className="park-home-hero park-home-glass">
       <div className="park-home-date">{dateLine}</div>
@@ -59,8 +69,8 @@ export function Hero({ dateLine, greeting, summary, needs, night, onReview }: He
         <button type="button" className="park-home-needs" onClick={onReview}>
           <span className="park-home-needs__tile">{needsAgent(30, night)}</span>
           <span>
-            <span className="park-home-needs__bold">{decisionsWaiting(needs)}</span> in K1 electric
-            scooter
+            <span className="park-home-needs__bold">{decisionsWaiting(needs)}</span>
+            {worldName ? ` in ${worldName}` : ""}
           </span>
           <span className="park-home-needs__review">Review</span>
         </button>
@@ -77,6 +87,8 @@ export function Hero({ dateLine, greeting, summary, needs, night, onReview }: He
 /** A link of the reference: a real address (so it can be read and copied), but a click goes through app.go. */
 function GoLink({ href, onGo, children }: { href: string; onGo: () => void; children: ReactNode }) {
   const click = (e: MouseEvent<HTMLAnchorElement>) => {
+    // Only a plain left click is ours; a modified or non-primary click is the browser's (new tab, window).
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     onGo();
   };

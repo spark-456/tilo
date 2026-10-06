@@ -14,6 +14,7 @@ import {
   DRAFT_MS,
   MODES,
   liveRows,
+  needsWorld,
   nextEvents,
   placedPins,
   spendOf,
@@ -120,6 +121,7 @@ export function HomePage({ app }: { app: AppCtx }) {
   const open = (id: string) => go("world", { id });
   const failed = base === "failed" || worlds === "failed";
   const ready = base !== null && base !== "failed" && worlds !== null && worlds !== "failed";
+  const waitingIn = ready ? needsWorld(worlds) : undefined;
 
   return (
     <div className="park-home-root" data-testid="park-page-home">
@@ -135,7 +137,8 @@ export function HomePage({ app }: { app: AppCtx }) {
             summary={summaryLine(needs, night)}
             needs={needs}
             night={night}
-            onReview={() => open("k1")}
+            worldName={waitingIn?.name ?? null}
+            onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
           />
           {(vw || 1440) >= 1180 ? (
             <TodayPanel
