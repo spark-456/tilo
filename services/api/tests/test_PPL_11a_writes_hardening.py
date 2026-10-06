@@ -4,9 +4,9 @@ instead of dropping it. Code points are built with `u()` (no escape sequences in
 
 from __future__ import annotations
 
-from _ppl11a_lib import OWNER, PRIYA, fake_token, u
+from _ppl11a_lib import ATTEST, OWNER, PRIYA, fake_token, u
 
-MEETING = {"title": "Weekly sync", "source": "upload"}
+MEETING = {"title": "Weekly sync", "source": "upload", **ATTEST}
 ITEM = {"title": "Water the plants", "source": {"kind": "manual", "ref": None}}
 PERSON = {
     "display_name": "Nina Patel",
@@ -27,6 +27,7 @@ def test_PPL_11a_PE_24_hidden_format_and_separator_characters_are_cleaned_from_e
     meeting = rig.post(
         "/v1/meetings",
         {
+            **ATTEST,
             "title": f"Pl{HIDDEN}an Q4",
             "source": "bot",
             "series": f"q4{HIDDEN}-plan",
