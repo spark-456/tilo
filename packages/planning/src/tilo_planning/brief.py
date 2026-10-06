@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import functools
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,7 +20,6 @@ from tilo_providers.router import Router, RouterError, RouterResult
 
 from tilo_planning.gaps import (
     MAX_GAPS,
-    MAX_PART,
     Gap,
     GapConfigError,
     GapPolicy,
@@ -86,21 +86,12 @@ def output_schema() -> dict[str, Any]:
     schema["required"].append("ambiguous_fields")
     # Optional (FR-INT-12): absent or null means in policy; a category id means refuse. Code checks the id.
     schema["properties"]["out_of_policy"] = {"type": ["string", "null"]}
-    # Optional (FR-INT-15): the parts Tilo cannot do. No enum, maxItems or uniqueItems: a schema repair could trade
-    # a gap or a refusal id away, so code checks ids and count and fails closed. The empty-deliverables minimum is
-    # relaxed here only (brief.schema.json is unchanged): code turns "no deliverable" into NothingPossible or an error.
-    schema["properties"]["out_of_scope"] = {
-        "type": "array",
-        "items": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["category", "part"],
-            "properties": {
-                "category": {"type": "string"},
-                "part": {"type": "string", "minLength": 1, "maxLength": MAX_PART},
-            },
-        },
-    }
+    # Optional (FR-INT-15): the parts Tilo cannot do. Listed but unconstrained: the router checks the schema before
+    # code sees the reply, repairs it (a fresh generation that can drop a refusal id) and escalates, so every shape,
+    # length, count and duplicate check is code (`_gaps`, `clean_part`), on the one call. The empty-deliverables
+    # minimum is relaxed here only (brief.schema.json is unchanged): code turns "no deliverable" into NothingPossible
+    # or an error.
+    schema["properties"]["out_of_scope"] = {}
     del schema["properties"]["deliverables"]["minItems"]
     return schema
 
@@ -109,14 +100,29 @@ def _refusal_menu(policy: RefusalPolicy) -> str:
     return "\n".join(f"- {c.id}: {c.reason}" for c in policy.categories)
 
 
+def _strings(value: Any) -> Iterator[str]:
+    """What the refusal scan reads of `out_of_scope`, in order: the value if a string; each string element of a list;
+    for a mapping (or a mapping element) its `category` if a string, then its other string values. Nothing else."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        category = value.get("category")
+        yield from [category] if isinstance(category, str) else []
+        yield from (v for k, v in value.items() if k != "category" and isinstance(v, str))
+    elif isinstance(value, list):
+        for element in value:
+            yield from _strings(element) if isinstance(element, str | dict) else ()
+
+
 def _gaps(value: Any, refusal: RefusalPolicy, policy: GapPolicy) -> tuple[Gap, ...]:
-    """The Director's `out_of_scope` as gaps (FR-INT-15). A refusal id anywhere refuses first (FR-INT-12 wins, the
-    cap included); then any unknown id, malformed item or unusable label, or more than MAX_GAPS gaps, fails closed."""
+    """The Director's `out_of_scope` as gaps (FR-INT-15). A refusal id anywhere in it refuses first, whatever else is
+    wrong (FR-INT-12 wins; no shape or cap check runs before). Then an unknown id, a malformed item, an unusable label
+    or more than MAX_GAPS gaps fails closed. The messages name the rule, never the value."""
+    for text in _strings(value):
+        if (c := refusal.get(text)) is not None:
+            raise TaskRefused(c.id, c.reason, c.alternative)
     if not isinstance(value, list):
         raise BriefExtractionError("FR-INT-15: out_of_scope must be a list")
-    for item in value:
-        if isinstance(item, dict) and isinstance(item.get("category"), str) and (c := refusal.get(item["category"])):
-            raise TaskRefused(c.id, c.reason, c.alternative)
     found: dict[tuple[str, str], Gap] = {}
     for item in value:
         category = item.get("category") if isinstance(item, dict) else None

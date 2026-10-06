@@ -22,6 +22,7 @@ DEFAULT_GAP_CONFIG = _ROOT / "capability_gaps.yaml"
 DEFAULT_CONNECTORS = _ROOT / "connectors.yaml"
 MAX_GAPS = 3  # gaps per task, after de-duplication
 MAX_PART = 60  # characters of a part label, raw and cleaned
+INVISIBLE = frozenset("ᅟᅠㅤﾠ⠀")  # blank-looking letters (Lo) and Braille blank: shown as nothing
 MAX_REASON, MAX_ALTERNATIVE, MAX_LEAD = 120, 200, 200  # config text limits
 GAP_LINE = "Not done: {part}. {reason}"  # one skips line: at most 10 + 60 + 2 + 120 = 192 <= 200 (plan.schema.json)
 _SLUG = re.compile(r"[a-z][a-z0-9_]{0,63}")  # common.schema.json slug
@@ -127,9 +128,11 @@ def load_gap_policy(path: Path | None = None, *, connectors_path: Path | None = 
 
 def clean_part(value: Any) -> str | None:
     """The label as shown, or None when unusable: a `str` of at most MAX_PART characters, with every C-category
-    character (controls, bidi and zero-width marks, surrogates, private use, unassigned) removed, whitespace runs
-    collapsed, a trailing period dropped. No NFKC (it can grow a string): cleaning only shrinks."""
+    character (controls, bidi and zero-width marks, surrogates, private use, unassigned) and every INVISIBLE one
+    removed, whitespace runs collapsed, a trailing period dropped, and at least one letter or digit left (a label
+    of marks, symbols or blanks is never a gap). No NFKC (it can grow a string): cleaning only shrinks."""
     if not isinstance(value, str) or len(value) > MAX_PART:
         return None
-    kept = "".join(ch for ch in value if not unicodedata.category(ch).startswith("C"))
-    return " ".join(kept.split()).rstrip(".").strip() or None
+    kept = "".join(ch for ch in value if ch not in INVISIBLE and not unicodedata.category(ch).startswith("C"))
+    label = " ".join(kept.split()).rstrip(".").strip()
+    return label if any(unicodedata.category(ch)[0] in "LN" for ch in label) else None

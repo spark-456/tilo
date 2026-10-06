@@ -127,7 +127,7 @@ def propose_approaches(
     """`base` holds the event's v/ts/world_id/run_id/actor; the event gets `seq`. The brief goes in as data. FR-INT-15:
     the model is told its skips room (5 minus the gaps); on a usable set code puts the gap lines first in every
     approach's `skips`, so the plan names what was not done. The model never sees or writes those lines."""
-    room = max(MAX_SKIPS - len(gaps), 0)
+    room = MAX_SKIPS - len(gaps)  # at least 2: extract_brief keeps at most MAX_GAPS (3)
     brief_text = _data(json.dumps(brief, ensure_ascii=False, indent=2), "BRIEF")
     prompt = load_prompt(DIRECTOR_ROLE, "approaches_task.md", {"brief": brief_text, "skip_room": room})
     run, approaches = _ask(router, prompt, budget)
