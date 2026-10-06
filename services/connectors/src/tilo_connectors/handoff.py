@@ -26,7 +26,7 @@ from ._schema import approach_validator, brief_validator
 from ._text import collapse, flagged, has_hidden, redacted_unchanged, safe_id
 from .adapters.lovable import link_length
 from .errors import BriefTooLong, BuildPartnerConfigError, HandoffRefused
-from .registry import ConnectorRegistry, _NoAliasLoader
+from .registry import ConnectorRegistry, load_strict_yaml
 
 if TYPE_CHECKING:
     from .grants import Excerpt, GrantStore
@@ -105,9 +105,9 @@ def load_build_partners(
 ) -> dict[str, BuildPartnerConfig]:
     """Every partner of the file, or BuildPartnerConfigError for the whole file (it names a key, never a value)."""
     try:
-        raw = yaml.load(Path(path).read_text(encoding="utf-8"), Loader=_NoAliasLoader)  # noqa: S506
+        raw = load_strict_yaml(Path(path).read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError, RecursionError, ValueError):
-        raise BuildPartnerConfigError("build partners: not a readable YAML file without aliases") from None
+        raise BuildPartnerConfigError("build partners: not a readable strict YAML file") from None
     if not isinstance(raw, dict) or set(raw) != {"partners", "framing_words"} or not isinstance(raw["partners"], dict):
         raise BuildPartnerConfigError("build partners: needs exactly the keys partners (a mapping) and framing_words")
     words = _framing_words(raw["framing_words"])
