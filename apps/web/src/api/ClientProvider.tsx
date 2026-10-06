@@ -4,10 +4,13 @@ import { chooseClient } from "./config";
 import { FixtureClient } from "./fixtureClient";
 import { HttpClient } from "./http";
 
+/** The one reader of `VITE_TILO_API_URL` (repo test P0-07c); the Park app takes it from here. */
+export const API_URL: string | undefined = import.meta.env.VITE_TILO_API_URL;
+
 // `VITE_TILO_API_URL` selects the HTTP client (config.ts); the fixture client is the default.
 function createDefaultClient(): TiloClient {
   const search = typeof window === "undefined" ? "" : window.location.search;
-  return chooseClient({ apiUrl: import.meta.env.VITE_TILO_API_URL, search });
+  return chooseClient({ apiUrl: API_URL, search });
 }
 
 const ClientContext = createContext<TiloClient>(createDefaultClient());

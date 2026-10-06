@@ -5,7 +5,7 @@ import "@fontsource/jetbrains-mono/500.css";
 import "./styles/app.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { App } from "./App";
+import { Root } from "./Root";
 import { initDensity } from "./display/density";
 
 initDensity(); // the saved display mode is on <html> before the first paint
@@ -23,7 +23,7 @@ Promise.all(fonts)
   .then(() =>
     root.render(
       <StrictMode>
-        <App />
+        <Root />
       </StrictMode>,
     ),
   );
