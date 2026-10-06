@@ -273,9 +273,25 @@ def _trace(responses: list[GenerateResponse]) -> dict[str, Any]:
         return {}
     usage = [r.usage for r in responses if r.usage]
     profile = responses[-1].profile_id
-    return {
+    tokens_in = sum(u.get("input_tokens", 0) for u in usage) if usage else None
+    trace: dict[str, Any] = {
         "model_role": ROLE,
         "profile": profile if _PROFILE.fullmatch(profile) else None,
-        "tokens_in": sum(u.get("input_tokens", 0) for u in usage) if usage else None,
+        "tokens_in": tokens_in,
         "tokens_out": sum(u.get("output_tokens", 0) for u in usage) if usage else None,
     }
+    if (cached := _cached_tokens(usage)) is not None and cached <= (tokens_in or 0):
+        trace["tokens_cached"] = cached  # never above tokens_in: EV-16 would refuse the event
+    return trace
+
+
+def _cached_tokens(usage: list[dict[str, int]]) -> int | None:
+    """EFF-04 (ADR-0022 decision 7): the sum of the calls' cache reads, only when every call counted in
+    `tokens_in` reported a whole number >= 0. One missing or bad count makes it unknown (None), never 0."""
+    total = 0
+    for u in usage:
+        count = u.get("cached_tokens")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            return None
+        total += count
+    return total if usage else None
