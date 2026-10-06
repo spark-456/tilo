@@ -19,8 +19,8 @@ words:
   nav_skip: [me, to, the, a, an, page, screen, tab, up, over, please, now] # dropped after a navigation verb
   context: [this, it, that, here, there, selected] # "open this": the selected record (the context chip)
   context_nouns: [one, item, task, meeting, world, entry, card, pin, record]
-  title_skip: [the, a, an, my, task, item, pin, entry, card, meeting, world, run, on]
-  question_stop: [what, which, how, is, are, am, was, were, i, me, my, the, a, an, of, on, in, for, to, do, does, did, has, have, any, anything, there, today, now, please, can, could, you, tell, show, it, its, be, been, with, at, about, still, so, far, going, status, progress]
+  title_skip: [the, a, an, my, task, item, pin, entry, card, meeting, world, run, "on"]
+  question_stop: [what, which, how, is, are, am, was, were, i, me, my, the, a, an, of, "on", in, for, to, do, does, did, has, have, any, anything, there, today, now, please, can, could, you, tell, show, it, its, be, been, with, at, about, still, so, far, going, status, progress]
   # A possessive ("<word>'s") is about someone else unless the word is one of these.
   self_possessives: [what, it, that, there, where, who, how, let, here, today, tomorrow, yesterday, team, week, month, day, year, one]
   third_person: [he, she, him, her, his, hers, someone, somebody, colleague, colleagues, teammate, teammates, manager, boss, everyone, everybody, others]
