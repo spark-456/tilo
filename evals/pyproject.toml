@@ -12,6 +12,7 @@ dependencies = [
     "tilo-api",
     "tilo-planning",
     "tilo-providers",
+    "tilo-metering",
 ]
 
 [tool.uv.sources]
@@ -19,6 +20,7 @@ tilo-contracts = { workspace = true }
 tilo-api = { workspace = true }
 tilo-planning = { workspace = true }
 tilo-providers = { workspace = true }
+tilo-metering = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

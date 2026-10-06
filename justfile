@@ -90,6 +90,10 @@ harness-skeleton:
 eval:
     uv run python -m tilo_evals run --pass full --results-md evals/results.local.md
 
+# EV-01..EV-15 metrics report from the replay set and the bank on fakes into the git-ignored evals/metrics.local.md; no paid calls; exit 2 if LIVE, K_SERVICE or CLOUD_RUN_JOB is set.
+eval-metrics:
+    uv run python -m tilo_evals metrics
+
 # PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
 conformance:
     uv run python -m tilo_providers.conformance
