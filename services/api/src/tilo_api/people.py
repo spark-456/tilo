@@ -34,6 +34,7 @@ from tilo_api.people_writes import (
     create_meeting,
     create_person,
     json_body,
+    remove_meeting,
 )
 
 _MEETING_ID = re.compile(r"mt_[0-9A-Za-z_]{1,48}")
@@ -160,6 +161,21 @@ def confirm_meeting_route(
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
     return _answer(lambda: confirm_minutes(_writer(principal, stores, clock), meeting_id))
+
+
+@router.post("/v1/meetings/{meeting_id}/delete")
+def delete_meeting_route(
+    meeting_id: str,
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The meeting owner deletes it and everything made from it (FR-MTG-10); needs the artifact store (503 without)."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    return _answer(lambda: remove_meeting(_writer(principal, stores, clock), artifacts, meeting_id))
 
 
 @router.post("/v1/work-items/{work_item_id}/confirm")

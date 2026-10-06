@@ -41,7 +41,7 @@ async function show(path: string, client: TiloClient): Promise<void> {
   });
 }
 const settle = (ms = PRESS_MS + 20) =>
-  act(async () => void (await new Promise((r) => setTimeout(r, ms))));
+  act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 /** S-01 starts only with text in the box. */
 async function fillTask(text = "Triage my inbox") {
   const box = container.querySelector("textarea");
@@ -63,6 +63,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+  vi.useFakeTimers();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -74,6 +75,7 @@ afterEach(async () => {
   process.off("unhandledRejection", onUnhandled);
   unhandled.length = 0;
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("PRD-18.3 flow: a rejecting client shows the error and a retry, never a console error", () => {
