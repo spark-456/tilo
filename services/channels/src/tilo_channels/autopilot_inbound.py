@@ -52,10 +52,10 @@ def _configured_id(path: Path) -> str | None:
     return value if _AUTHSERV.fullmatch(value) else None
 
 
-def inbound_is_clean(reader: ThreadReader, user_id: str, thread_id: str, in_reply_to: str) -> bool:
+def inbound_is_clean(reader: ThreadReader, user_id: str, thread_id: str | None, in_reply_to: str) -> bool:
     """True only when the thread was read, exactly one message carries the draft's `in_reply_to` as its Message-ID,
     and that message has a body and a Subject that are plain with no inbound signal, and a DMARC pass. Never raises."""
-    if not in_reply_to:
+    if not in_reply_to or not isinstance(thread_id, str) or not thread_id:  # no thread: nothing to be clean
         return False
     try:
         listed = reader.get_thread(user_id, thread_id).get("messages")
