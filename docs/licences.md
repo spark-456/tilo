@@ -145,6 +145,9 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | fast-check (property tests, ticket P0-08b-player, FR-WLD-04) | MIT | https://www.npmjs.com/package/fast-check |
 | happy-dom (DOM for React component unit tests, AGW-01; dev only) | MIT | https://www.npmjs.com/package/happy-dom |
 | ajv (JSON Schema validator for the PPL-40a plate reducer test; dev only) | MIT | https://www.npmjs.com/package/ajv |
+| pixelmatch (WEB-PARITY pixel diff of design vs ours; dev/test only) | ISC | https://www.npmjs.com/package/pixelmatch |
+| pngjs (WEB-PARITY PNG decode/encode; dev/test only) | MIT | https://www.npmjs.com/package/pngjs |
+| @types/pngjs (types for pngjs; dev only) | MIT | https://www.npmjs.com/package/@types/pngjs |
 | @tilo/contracts (`packages/contracts-ts`, internal workspace package, not third-party) | n/a | `packages/contracts-ts` |
 
 ## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)

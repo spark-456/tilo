@@ -24,6 +24,12 @@ dev-api:
 e2e-cp2:
     node apps/web/scripts/e2e-cp2.mjs
 
+# Park pixel-parity harness (WEB-PARITY, dev/test only, local): design reference vs our /park pages, report in
+# apps/web/parity-report/. `just parity team` or `just parity team,profile` (default: all pages). Own ports
+# TILO_PARITY_PORT (5395) and TILO_PARITY_REF_PORT (5396). Reports diffs; never fails on one.
+parity pages="":
+    node apps/web/scripts/parity.mjs {{pages}}
+
 # Whole-stack system test (tests/system): starts the real tilo-api (dev mode, fake providers) and the other
 # services as processes and drives them over HTTP; about 3 minutes, port 8080. Docs: docs/system-test.md.
 system-test:
