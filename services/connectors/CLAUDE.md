@@ -1,6 +1,6 @@
 # services/connectors — `tilo-connectors`
 ## Purpose
-Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP client, outbox. Only it decrypts tokens.
+Cloud Run service (PRD 6.2): OAuth token broker, Gmail, Drive and Calendar adapters (calendar read and sync: `calendar_sync.py`, `calendar_cache.py`), MCP client, outbox. Only it decrypts tokens.
 
 ## Commands
 - `uv run pytest services/connectors/tests -q` — API pinned in `tests/API*.md`; `just check` is the full gate. Image: `Dockerfile` runs `tilo_connectors.app:app` (`/health` for Cloud Run smoke checks, `/healthz` for in-container probes; P0-07a, P0-07h).
@@ -15,10 +15,10 @@ Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP c
   The broker holds no lock while a hook, `emit` or `alert` runs: collect under the lock, call out after (#149).
 ## Config
 - Env only, never logged: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_BASE_URL`.
-- `config/connectors.yaml` (gmail, google_drive, lovable: scopes, actions), `config/autonomy.yaml` (risk tiers), `config/mcp.yaml` (FR-CON-12 MCP allowlist, T3 only, at most once; empty = none), `config/build_partners.yaml` (link-route limits; `handoff.py`, `grants.py`, `adapters/lovable.py`: FR-CON-16/17/20, API `tests/API_FR_CON_16_17_20.md`).
+- `config/connectors.yaml` (gmail, google_drive, google_calendar, lovable: scopes, actions), `config/personal.yaml` (`working_window`, `calendar_sync`: API `tests/API_FR_CAL_08.md`; syncs inside the window, no model call), `config/autonomy.yaml` (risk tiers), `config/mcp.yaml` (FR-CON-12 MCP allowlist, T3 only, at most once), `config/build_partners.yaml` (link-route limits; `handoff.py`, `grants.py`, `adapters/lovable.py`: FR-CON-16/17/20, API `tests/API_FR_CON_16_17_20.md`).
 
 ## Requirement IDs
-- Section 12 (connectors, hands and deliverables; FR-CON-04/05 Gmail, Drive; FR-CON-11 `save_as_google_file` (`tests/API_FR_CON_11.md`); FR-CON-10 manifest, MF-01..06; FR-CHN-08 `watch`/`stop_watch`/`list_history`/`recent_inbox`: read scope, no outbox); FR-CON-12 `mcp.py`; SEC-02, SEC-03, SEC-09, SEC-11, SEC-14.
+- Section 12 (connectors, hands and deliverables; FR-CON-04/05 Gmail, Drive; FR-CAL-08 and the FR-CAL-02 read path, Calendar; FR-CON-11 `save_as_google_file` (`tests/API_FR_CON_11.md`); FR-CON-10 manifest, MF-01..06; FR-CHN-08 `watch`/`stop_watch`/`list_history`/`recent_inbox`: read scope, no outbox); FR-CON-12 `mcp.py`; SEC-02, SEC-03, SEC-09, SEC-11, SEC-14.
 
 ## Local rules
 - Side-effect methods are callable only from the outbox (SEC-03); every side-effect event carries

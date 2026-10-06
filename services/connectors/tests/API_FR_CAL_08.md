@@ -117,7 +117,7 @@ def clean_title(value: Any) -> str: ...  # pure; always a valid calendar_entry t
    `broker.access_token_for_adapter(user_id, "google_calendar", required_scopes=[CALENDAR_READONLY])` through
    `GoogleAdapter._call` (SEC-02).
 3. One attempt per request (`max_attempts=1`), so the adapter never waits or sleeps: 429 emits the base class's
-   `connection.rate_limited` part and raises `RateLimited`; 5xx or `TransportError` raises
+   `connection.rate_limited` part and raises `RateLimited`; 500, 502, 503, 504 or `TransportError` raises
    `ProviderUnavailable`; 401 gets the base class's one forced refresh and one retry; 410 raises
    `SyncTokenExpired` when the request carried `syncToken` (otherwise `AdapterError`, `.status == 410`); any
    other non-2xx raises `AdapterError` with `.status`. The body of a non-2xx answer is never read.
@@ -269,9 +269,9 @@ def load_calendar_sync_config(
 The loader refuses the whole file (`CalendarConfigError`) on: unreadable or non-UTF-8 YAML or aliases (as
 `registry._read_entries`); a top level that is not a mapping; `working_window` or `calendar_sync` missing, not a
 mapping, or holding a key other than its own (`start`, `end`; the six above); a time that is not a string
-fullmatching `([01][0-9]|2[0-3]):[0-5][0-9]` (YAML 1.1 reads an unquoted `09:00` as the integer 540: refused), or
-`start >= end`; a bool, a non-int or an out-of-range number; a
-registry without `google_calendar`, whose `scopes.read` is not exactly `[CALENDAR_READONLY]`, whose `read_events`
+fullmatching `([01][0-9]|2[0-3]):[0-5][0-9]` (PyYAML loads an unquoted `09:00` as the string `'09:00'`, but an
+unquoted `9:00` or `18:00` is a base-60 integer: an int is refused, so quote times), or `start >= end`; a bool, a non-int or an out-of-range number; a
+registry without `google_calendar`, whose `scopes` is not exactly `{read: [CALENDAR_READONLY]}`, whose `read_events`
 action is not `capability: read`, `gate_type: none`, `risk_tier: T1`, `irreversible: false`, or whose
 `per_minute` or `batch_size` is null or out of range; and `2 * max_pages >= per_minute`. Other top-level keys
 are ignored.
