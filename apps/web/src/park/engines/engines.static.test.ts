@@ -233,7 +233,7 @@ describe("WEB_1b_static: no animation in the engines but the city's movers (BQ-W
     // Belt and braces for the scan's blind spots (quoted keys, computed names, timers): the prototype's
     // keyframe names, a timer or a Web Animations call may not appear anywhere in code.
     const re =
-      /animation|keyframes|\bmvXY\b|\bwaddle\b|\bsprite2\b|\btiloDash\b|\btiloBob\b|\btiloGhost\b|\bsetTimeout\b|\bsetInterval\b|requestAnimationFrame|requestIdleCallback|\.animate\b|<animate|\btransition\b/i;
+      /animation|keyframes|\bmvXY\b|\bwaddle\b|\bwalkFrame\b|\bsprite2\b|tilo(?:Dash|Bob|Ghost|Pulse)|\bsetTimeout\b|\bsetInterval\b|requestAnimationFrame|requestIdleCallback|\.animate\b|<animate|transition/i;
     const hits = codeFiles
       .filter((p) => rel(p) !== MOVER_FILE)
       .flatMap((p) =>
@@ -250,8 +250,13 @@ describe("WEB_1b_static: no animation in the engines but the city's movers (BQ-W
     // WEB-MOTION-1: the city's motion is declared (keyframe names in the animation shorthand), never driven.
     const src = code(join(ENGINES_DIR, MOVER_FILE));
     expect(src).not.toMatch(
-      /\bsetTimeout\b|\bsetInterval\b|requestAnimationFrame|requestIdleCallback|\.animate\b|<animate|\btransition\b|keyframes|\bsprite2\b/i,
+      /\bsetTimeout\b|\bsetInterval\b|requestAnimationFrame|requestIdleCallback|\.animate\b|<animate|transition|keyframes|\bsprite2\b|tilo(?:Dash|Bob|Ghost|Pulse)/i,
     );
-    expect(src).toMatch(/\bmvXY\b/);
+    // The animation names are exactly the three keyframes of park.shell.css, written only as the shorthand.
+    const names = [...src.matchAll(/animation:\s*`(\w+)\s/g)].map((m) => m[1]);
+    expect([...new Set(names)].sort()).toEqual(["mvXY", "waddle", "walkFrame"]);
+    expect(src).not.toMatch(
+      /animation(?:Name|Duration|Delay|Direction|Iteration|Timing|Fill|PlayState)|animation-/,
+    );
   });
 });

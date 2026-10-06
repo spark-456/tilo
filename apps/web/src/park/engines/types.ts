@@ -140,7 +140,7 @@ export type PinOpts = Opt<{
   tint: string;
   icon: string;
   count: string;
-  /** Slow-down for the live movers (the prototype's calm is 1.9); no effect when `still`. */
+  /** Accepted and ignored: only SceneOpts.k slows the live movers (the prototype's calm is 1.9). */
   anim: string | null;
 }>;
 export type TagOpts = Opt<{ fs: number; left: boolean; ink: string }>;
@@ -150,7 +150,7 @@ export type WorldOpts = Opt<{
   seed: number;
   labels: boolean;
   stage: number;
-  /** Slow-down for the live movers (the prototype's calm is 1.9); no effect when `still`. */
+  /** Accepted and ignored: only SceneOpts.k slows the live movers (the prototype's calm is 1.9). */
   anim: boolean;
   tags: boolean;
   ls: number;
@@ -187,7 +187,7 @@ export type Level = { name: string; code: string; plan: Plan } & Opt<{
 export type MetroOpts = Opt<{
   seed: number;
   labels: boolean;
-  /** Slow-down for the live movers (the prototype's calm is 1.9); no effect when `still`. */
+  /** Accepted and ignored: only SceneOpts.k slows the live movers (the prototype's calm is 1.9). */
   anim: boolean;
   gapZ: number;
   zig: number;

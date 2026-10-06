@@ -85,8 +85,9 @@
 [data-park] .park-shell__backdrop[data-paused] .park-shell__scene * {
   animation-play-state: paused !important;
 }
-/* Sprite cap (narrow window or weak device): every second mover layer is not drawn. The scene's root div
-   holds the static pictures (img) and one div per car or walker. */
+/* Sprite cap (narrow window or weak device): every second mover layer is not drawn. This relies on the
+   scene's root div holding the static pictures as <img> and ONLY movers as div children, one per car or
+   walker (nth-of-type counts divs only); engines/park.sprite-cap.test.ts pins that structure. */
 [data-park] .park-shell__backdrop[data-lite] .park-shell__scene > div > div:nth-of-type(even) {
   display: none;
 }
