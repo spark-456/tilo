@@ -8,44 +8,41 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
+import tilo_policy
+from tilo_policy.schemas import conforms
+
+from tilo_channels.autopilot_gate import gate_id_for
+from tilo_channels.autopilot_state import ACTION_TYPE, parse_ms, timestamp, ulid
+
 __all__ = [
-    "AUTOMATED_LEVELS",
-    "DailyDigest",
-    "DailyDigestBuilder",
-    "DigestAction",
-    "DigestFyiItem",
-    "DigestOutboxPort",
-    "DigestService",
-    "FakeDigestChannel",
-    "WINDOW_S",
-    "build_daily_digest",
-]
+    "AUTOMATED_LEVELS", "DailyDigest", "DailyDigestBuilder", "DigestAction", "DigestFyiItem",
+    "DigestOutboxPort", "DigestPolicyPort", "DigestService", "FakeDigestChannel", "WINDOW_S", "build_daily_digest",
+]  # fmt: skip
 
 WINDOW_S = 86_400
 AUTOMATED_LEVELS: frozenset[str] = frozenset({"L2", "L3"})
+_POLICY_ID_REF = "common.schema.json#/$defs/policy_id"
 
 
 class DigestOutboxPort(Protocol):
     def enqueue(self, entry: dict, evidence: dict) -> dict: ...
 
 
+class DigestPolicyPort(Protocol):
+    def decide(self, user_id: str, proposal: tilo_policy.Proposal) -> tilo_policy.Decision: ...
+
+
 def _to_epoch_s(value: float | int | str | dt.datetime | None) -> float | None:
     if isinstance(value, int | float):
         return float(value)
-    if isinstance(value, dt.datetime):
-        return (value.astimezone(dt.UTC) if value.tzinfo is not None else value.replace(tzinfo=dt.UTC)).timestamp()
     if isinstance(value, str) and (raw := value.strip()):
         try:
-            parsed = dt.datetime.fromisoformat(raw[:-1] + "+00:00" if raw.endswith("Z") else raw)
+            value = dt.datetime.fromisoformat(raw[:-1] + "+00:00" if raw.endswith("Z") else raw)
         except ValueError:
             return None
-        return (parsed.astimezone(dt.UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=dt.UTC)).timestamp()
+    if isinstance(value, dt.datetime):
+        return (value.astimezone(dt.UTC) if value.tzinfo is not None else value.replace(tzinfo=dt.UTC)).timestamp()
     return None
-
-
-def _fmt_utc(epoch_s: float) -> str:
-    ms = round(epoch_s * 1000)
-    return dt.datetime.fromtimestamp(ms // 1000, dt.UTC).strftime("%Y-%m-%dT%H:%M:%S") + f".{ms % 1000:03d}Z"
 
 
 @dataclass(frozen=True)
@@ -79,6 +76,7 @@ class DailyDigest:
     actions: tuple[DigestAction, ...]
     fyi_mail: tuple[DigestFyiItem, ...]
     rendered_text: str
+    skipped_outbox_ids: tuple[str, ...] = ()
 
 
 class DailyDigestBuilder:
@@ -86,14 +84,9 @@ class DailyDigestBuilder:
         self._base_url, self._window_s = base_url.rstrip("/"), window_s
 
     def build(
-        self,
-        *,
-        user_id: str,
-        events: Iterable[Mapping[str, Any]],
-        outbox_entries: Iterable[Mapping[str, Any]] = (),
-        fyi_mail: Iterable[Mapping[str, Any]] = (),
-        now: float | int | str | dt.datetime | None = None,
-    ) -> DailyDigest | None:
+        self, *, user_id: str, events: Iterable[Mapping[str, Any]], outbox_entries: Iterable[Mapping[str, Any]] = (),
+        fyi_mail: Iterable[Mapping[str, Any]] = (), now: float | int | str | dt.datetime | None = None,
+    ) -> DailyDigest | None:  # fmt: skip
         now_s = _to_epoch_s(now) if now is not None else dt.datetime.now(dt.UTC).timestamp()
         if now_s is None:
             raise ValueError(f"invalid digest timestamp: {now!r}")
@@ -101,48 +94,49 @@ class DailyDigestBuilder:
         entries_by_id = {
             str(e["id"]): e for e in outbox_entries if isinstance(e, Mapping) and isinstance(e.get("id"), str)
         }
-        actions: list[DigestAction] = []
-        seen_outbox_ids: set[str] = set()
+        actions, seen_ids, skipped_ids = [], set(), []
 
         for ev in events:
             if not isinstance(ev, Mapping) or ev.get("type") != "policy.applied":
                 continue
-            data = ev.get("data")
-            if not isinstance(data, Mapping):
+            data, ts_str = ev.get("data"), ev.get("ts")
+            if not isinstance(data, Mapping) or not isinstance(ts_str, str):
                 continue
-            lvl, outbox_id = str(data.get("level") or ev.get("level") or ""), str(data.get("outbox_id") or "")
-            if lvl not in AUTOMATED_LEVELS or not outbox_id or outbox_id in seen_outbox_ids:
+            lvl, outbox_id = data.get("level"), data.get("outbox_id")
+            if lvl not in AUTOMATED_LEVELS or not isinstance(outbox_id, str) or not outbox_id or outbox_id in seen_ids:
                 continue
-            ts_str = str(ev.get("ts") or (ev.get("authz") or {}).get("at") or "")
             ev_s = _to_epoch_s(ts_str)
             if ev_s is None or not (cutoff_s <= ev_s <= now_s):
                 continue
-            entry = entries_by_id.get(outbox_id, {})
-            state = str(entry.get("state") or ("scheduled" if lvl == "L2" else "sent"))
+            seen_ids.add(outbox_id)
+            entry = entries_by_id.get(outbox_id)
+            fields = ("action_type", "connector", "risk_tier", "policy_id")
+            req = (*(data.get(k) for k in fields), entry.get("state")) if entry is not None else ()
+            if not req or not all(isinstance(v, str) and v for v in req):
+                skipped_ids.append(outbox_id)
+                continue
+            action_type, connector, risk_tier, policy_id, state = (str(v) for v in req)
+            assert entry is not None
             sched_s = _to_epoch_s(entry.get("scheduled_at"))
-            undo_window = int(data.get("undo_window_s") or entry.get("undo_window_s") or 0)
-            can_undo = state == "scheduled" and undo_window > 0 and (sched_s is None or sched_s > now_s)
+            can_undo = state == "scheduled" and int(data.get("undo_window_s") or 0) > 0 and (sched_s or now_s) > now_s
             undo_url = f"{self._base_url}/outbox/{outbox_id}/undo" if can_undo else None
             report_url = f"{self._base_url}/outbox/{outbox_id}/report"
-            link_kind: Literal["undo", "report"] = "undo" if can_undo else "report"
-            level_lit: Literal["L2", "L3"] = "L2" if lvl == "L2" else "L3"
             actions.append(
                 DigestAction(
-                    outbox_id=outbox_id,
-                    policy_id=str(data.get("policy_id") or ""),
-                    level=level_lit,
-                    action_type=str(data.get("action_type") or entry.get("action_type") or "send_email"),
-                    connector=str(data.get("connector") or entry.get("connector") or "gmail"),
-                    risk_tier=str(data.get("risk_tier") or entry.get("risk_tier") or "T2"),
-                    state=state,
-                    timestamp=ts_str,
-                    link_kind=link_kind,
-                    action_url=undo_url or report_url,
-                    undo_url=undo_url,
-                    report_url=report_url,
-                )
+                    outbox_id,
+                    policy_id,
+                    "L2" if lvl == "L2" else "L3",
+                    action_type,
+                    connector,
+                    risk_tier,
+                    state,
+                    ts_str,
+                    "undo" if can_undo else "report",
+                    undo_url or report_url,
+                    undo_url,
+                    report_url,
+                )  # fmt: skip
             )
-            seen_outbox_ids.add(outbox_id)
 
         fyi_items = [
             DigestFyiItem(str(m["message_id"]), str(m.get("priority") or "normal"), ts)
@@ -156,20 +150,20 @@ class DailyDigestBuilder:
         if not actions and not fyi_items:
             return None
 
-        lines = [f"Daily Digest ({_fmt_utc(cutoff_s)} to {_fmt_utc(now_s)})"]
+        start_iso, end_iso = timestamp(round(cutoff_s * 1000)), timestamp(round(now_s * 1000))
+        lines = [f"Daily Digest ({start_iso} to {end_iso})"]
         lines.extend(
             f"- [{a.level}] {a.action_type} ({a.outbox_id}) state={a.state} {a.link_kind}={a.action_url}"
             for a in actions
         )
         lines.extend(f"- [FYI] {item.message_id} priority={item.priority}" for item in fyi_items)
         return DailyDigest(
-            user_id, _fmt_utc(cutoff_s), _fmt_utc(now_s), tuple(actions), tuple(fyi_items), "\n".join(lines)
+            user_id, start_iso, end_iso, tuple(actions), tuple(fyi_items), "\n".join(lines), tuple(skipped_ids)
         )
 
 
 def build_daily_digest(**kwargs: Any) -> DailyDigest | None:
-    base_url = str(kwargs.pop("base_url", "https://app.tilo.example"))
-    return DailyDigestBuilder(base_url=base_url).build(**kwargs)
+    return DailyDigestBuilder(base_url=str(kwargs.pop("base_url", "https://app.tilo.example"))).build(**kwargs)
 
 
 class FakeDigestChannel:
@@ -182,60 +176,78 @@ class FakeDigestChannel:
         return record
 
 
+def _allowed_decision(d: Any) -> tuple[dict[str, str], int] | None:
+    if type(d) is not tilo_policy.Decision or d.outcome not in ("run_after_undo", "run"):
+        return None
+    if d.level not in AUTOMATED_LEVELS or d.tier not in ("T1", "T2") or d.modifiers:
+        return None
+    authz = d.authz
+    if not isinstance(authz, dict) or authz.get("by") != "policy" or not isinstance(d.policy_id, str):
+        return None
+    ref, stamp = authz.get("ref"), authz.get("at")
+    if ref != d.policy_id or not isinstance(ref, str) or not conforms(_POLICY_ID_REF, ref) or parse_ms(stamp) is None:
+        return None
+    undo = 0 if d.outcome == "run" else d.undo_window_s
+    return ({"by": "policy", "ref": ref, "at": str(stamp)}, undo) if isinstance(undo, int) and undo >= 0 else None
+
+
 class DigestService:
     def __init__(
-        self,
-        *,
-        builder: DailyDigestBuilder,
-        outbox: DigestOutboxPort,
-        dev_channel: FakeDigestChannel | None = None,
-        world_id: str,
-        run_id: str,
-        connector: str = "gmail",
-        dev_mode: bool = False,
-    ) -> None:
-        self._builder, self._outbox, self._dev_channel = builder, outbox, dev_channel
-        self._world_id, self._run_id, self._connector, self._dev_mode = world_id, run_id, connector, dev_mode
+        self, *, builder: DailyDigestBuilder, outbox: DigestOutboxPort, policy: DigestPolicyPort | None = None,
+        dev_channel: FakeDigestChannel | None = None, world_id: str, run_id: str, connector: str = "gmail",
+        district: str = "D1", dev_mode: bool = False,
+    ) -> None:  # fmt: skip
+        if dev_mode and dev_channel is None:
+            raise ValueError("dev_mode=True requires a dev_channel")
+        self._builder, self._outbox, self._policy, self._dev_channel = builder, outbox, policy, dev_channel
+        self._world_id, self._run_id, self._connector, self._district = world_id, run_id, connector, district
+        self._dev_mode = dev_mode
 
     def deliver_if_non_empty(
-        self,
-        *,
-        user_id: str,
-        recipient: str,
-        events: Iterable[Mapping[str, Any]],
-        outbox_entries: Iterable[Mapping[str, Any]] = (),
-        fyi_mail: Iterable[Mapping[str, Any]] = (),
+        self, *, user_id: str, recipient: str, events: Iterable[Mapping[str, Any]],
+        outbox_entries: Iterable[Mapping[str, Any]] = (), fyi_mail: Iterable[Mapping[str, Any]] = (),
         now: float | int | str | dt.datetime | None = None,
-        policy_applied: Mapping[str, Any] | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any] | None:  # fmt: skip
         digest = self._builder.build(
             user_id=user_id, events=events, outbox_entries=outbox_entries, fyi_mail=fyi_mail, now=now
         )
         if digest is None:
             return None
-        if self._dev_mode and self._dev_channel is not None:
+        if self._dev_mode:
+            assert self._dev_channel is not None
             return self._dev_channel.send(user_id, recipient, digest)
-        if policy_applied is None or policy_applied.get("type") != "policy.applied":
-            raise ValueError("production digest send requires a policy.applied authorisation record")
-        data, authz = policy_applied["data"], copy.deepcopy(policy_applied["authz"])
-        created, undo = str(authz.get("at") or digest.window_end), int(data.get("undo_window_s") or 0)
+        if self._policy is None:
+            return None
+        now_ms = parse_ms(digest.window_end) or round(dt.datetime.now(dt.UTC).timestamp() * 1000)
+        outbox_id = ulid(now_ms)
+        item = {"artifact_id": f"art_digest_{outbox_id[:16].lower()}", "version": 1}
+        facts = tilo_policy.SideEffectFacts(recipients=(recipient,), known_recipients=(recipient,))
+        proposal = tilo_policy.Proposal(
+            world_id=self._world_id, action_type=ACTION_TYPE, connector=self._connector, district=self._district,
+            destination=None, item=copy.deepcopy(item), credits=0, facts=facts, instruction=None,
+        )  # fmt: skip
+        try:
+            decision = self._policy.decide(user_id, proposal)
+        except Exception:
+            return None
+        if (checked := _allowed_decision(decision)) is None:
+            return None
+        authz, undo = checked
+        policy_applied = {
+            "type": "policy.applied", "authz": copy.deepcopy(authz),
+            "data": {
+                "policy_id": decision.policy_id, "gate_id": gate_id_for(f"digest_{outbox_id}"), "outbox_id": outbox_id,
+                "action_type": ACTION_TYPE, "connector": self._connector, "destination": None,
+                "district": self._district, "risk_tier": decision.tier, "level": decision.level,
+                "instruction_id": None, "undo_window_s": undo, "item": copy.deepcopy(item), "credits": 0,
+            },
+        }  # fmt: skip
         entry = {
-            "id": str(data["outbox_id"]),
-            "idempotency_key": f"digest:{user_id}:{digest.window_end}",
-            "world_id": self._world_id,
-            "run_id": self._run_id,
-            "action_type": str(data.get("action_type") or "send_email"),
-            "connector": str(data.get("connector") or self._connector),
-            "recipients": [recipient],
-            "attachments": [],
-            "item": copy.deepcopy(data.get("item")),
-            "destination": data.get("destination"),
-            "modifiers": [],
-            "risk_tier": str(data.get("risk_tier") or "T2"),
-            "authz": authz,
-            "undo_window_s": undo,
-            "scheduled_at": created,
-            "state": "scheduled" if undo > 0 else "queued",
-            "created_at": created,
-        }
-        return self._outbox.enqueue(entry, {"authorised_by": dict(policy_applied)})
+            "id": outbox_id, "idempotency_key": f"digest:{user_id}:{digest.window_end}",
+            "world_id": self._world_id, "run_id": self._run_id, "action_type": ACTION_TYPE,
+            "connector": self._connector, "recipients": [recipient], "attachments": [], "item": item,
+            "destination": None, "modifiers": [], "risk_tier": decision.tier, "authz": authz,
+            "undo_window_s": undo, "scheduled_at": timestamp(now_ms + undo * 1000),
+            "state": "scheduled" if undo > 0 else "queued", "created_at": authz["at"],
+        }  # fmt: skip
+        return self._outbox.enqueue(entry, {"authorised_by": policy_applied})
