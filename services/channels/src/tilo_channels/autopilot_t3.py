@@ -27,11 +27,17 @@ of day are plain. Punctuation, underscore, glue and digit-suffix classes are clo
 character waits for a person.
 
 BQ-274 round 4: `inbound_plain` reads the raw text (no NFKC), `inbound_signal` also checks every join of pieces cut by
-line breaks or marks as a whole word (`_joins`), and a time of day between single letters keeps their run going.
+line breaks or marks as a whole word, and a time of day between single letters keeps their run going.
+
+BQ-278 (i)-(m): the piece-join check is `_join_hits`. A space next to a line break and a time of day are piece cuts
+too ("the \\ntrans \\nfer", "trans 5pm fer"); a phrase family cut inside a word ("account\\nnum\\nber") is matched
+piece by piece (`_PHRASES`); the joined length is capped at 2,000 characters (over it fails closed as "obfuscated")
+and the scan stops at the first hit. Plain-ASCII text skips the per-character Unicode checks.
 """
 
 from __future__ import annotations
 
+import itertools
 import re
 import unicodedata
 
@@ -70,10 +76,50 @@ _LEET = str.maketrans("013457@", "oieasta")
 # letters and digits it sits between, so both patterns are linear.
 _DROP = re.compile(r"(?<=[a-z0-9])[^a-z0-9 ]+(?=[a-z0-9])")
 _SPREAD = re.compile(r"(?<![a-z0-9])[a-z0-9](?:[^a-z0-9]+[a-z0-9](?![a-z0-9]))+(?![a-z0-9])")
-# Round 4: a chain is pieces cut by non-space runs (a line break, stop marks); each join of pieces is a word.
-_CHAIN = re.compile(r"(?<![a-z0-9])[a-z0-9]+(?:[^a-z0-9 ]+[a-z0-9]+)+")
-_PIECE = re.compile(r"[a-z0-9]+")
+# Round 4: pieces are cut by non-space runs (a line break, stop marks); each join of pieces is a word. BQ-278: a space
+# next to a line break and a time of day are cuts too (`_prepare_cuts`).
+_ANY_CUT = re.compile(r"[a-z0-9][^a-z0-9 ]+(?=[a-z0-9])")
+_PIECE_GAP = re.compile(r"([a-z0-9]+)([^a-z0-9]*)")
+_SPACE_AT_BREAK = re.compile(r"(?<! ) +(?=\n)|(?<=\n) +")  # linear: a match starts only at the start of a space run
+_DIGIT_OR_PERCENT = re.compile(r"[\d%]")
 _STEM_MAX = 10  # as long as the longest family stem ("settlement", "solicitors"): a join past it needs no more pieces
+JOIN_CAP = 2_000  # BQ-278 (l): joined characters read; over it the text is not read in full and fails closed
+_CHECK_EVERY = 256  # joined characters between two family checks (stop at the first hit)
+# BQ-278 (k): the phrase families (those with `\s+` inside) as words, each word a set of spellings. A word may be cut
+# into pieces by line breaks or marks; a word break is any whitespace-only gap or cut.
+_Phrase = tuple[tuple[str, ...], ...]
+_PHRASES: tuple[tuple[str, _Phrase], ...] = (
+    ("money", (("account",), ("number", "numbers"))),
+    ("money", (("sort",), ("code", "codes"))),
+    ("commitment", (("we", "i"), ("will", "shall"))),
+    ("commitment", (("we", "i"), ("ll",))),
+    ("commitment", (("will",), ("do",))),
+    ("commitment", (("for",), ("free",))),
+    ("commitment", (("on",), ("us", "me", "it"))),
+    ("commitment", (("consider",), ("it",), ("done", "settled", "sorted"))),
+    ("commitment", (("my",), ("word",))),
+    ("commitment", (("count",), ("on",), ("me", "us"))),
+    ("commitment", (("rest",), ("assured",))),
+    ("commitment", (("leave",), ("it",), ("with", "to"), ("me", "us"))),
+    ("commitment", (("you",), ("can",), ("rely",))),
+    ("commitment", (("we", "i"), ("am", "are", "m", "re"), ("going",), ("to",))),
+)
+
+
+def _phrase_index() -> tuple[dict[str, list[tuple[str, _Phrase]]], re.Pattern[str]]:
+    """The phrases by every prefix of their first word's spellings (a start piece must be one), and one pattern for
+    every spelling of every phrase with no gaps ("accountnumber"): no match in the pieces joined as one string, no
+    phrase."""
+    starts: dict[str, list[tuple[str, _Phrase]]] = {}
+    for family, words in _PHRASES:
+        for spelling in words[0]:
+            for n in range(1, len(spelling) + 1):
+                starts.setdefault(spelling[:n], []).append((family, words))
+    flat = {"".join(spellings) for _, words in _PHRASES for spellings in itertools.product(*words)}
+    return starts, re.compile("|".join(sorted(flat)))
+
+
+_PHRASE_STARTS, _PHRASE_FLAT = _phrase_index()
 # BQ-274: an amount with no money word. A decimal part or a thousands separator, a run of 3+ digits that is not a
 # 2020-2039 year, a percent sign, a number word, or a number with a magnitude suffix ("5m", "50 K", "10L"). Times of
 # day and small counts ("2 tarps", "dock 14", "2 kayaks") stay clean.
@@ -122,7 +168,13 @@ def clean_text(text: str) -> str:
     `str.splitlines` breaks on) as "\\n", then without Unicode format (Cf) characters and control (Cc) characters other
     than newline and tab. A break between two words never joins them."""
     text = _BREAKS.sub("\n", text)
+    if text.isascii():  # BQ-278: ASCII has no Cf; its Cc other than newline and tab are these
+        return _ASCII_CONTROL.sub("", text)
     return "".join(c for c in text if c in "\n\t" or unicodedata.category(c) not in ("Cc", "Cf"))
+
+
+_ASCII_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+_ASCII_HIDDEN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")  # `_hidden` for ASCII: Cc but not newline, tab, CR
 
 
 def _hidden(c: str) -> bool:
@@ -215,23 +267,86 @@ def _join(match: re.Match[str]) -> str:
     return "".join(c for c in match.group() if c.isalnum())
 
 
-def _joins(folded: str) -> str:
-    """Round 4, inbound only: pieces of a word cut by marks or line breaks ("the\\ntrans\\nfer") with a neighbour glued
-    the same way lose their word edges once the cuts are dropped ("thetransfer"). So every join of 2 or more
-    consecutive pieces of a chain is emitted as a word of its own, and the families see it with edges. A join stops
-    growing once it holds a stem's worth of characters (_STEM_MAX), which keeps the work linear."""
-    out = []
-    for chain in _CHAIN.findall(folded):
-        pieces = _PIECE.findall(chain)
-        for i in range(len(pieces) - 1):
-            word = pieces[i]
-            for count, piece in enumerate(pieces[i + 1 : i + 1 + _STEM_MAX], 2):
-                if len(word) >= _STEM_MAX:
-                    break
-                word += piece
-                if len(word) > count:  # single letters only: `_SPREAD` already joins and searches them
-                    out.append(word)
-    return "\x01".join(out)  # not whitespace: a family phrase ("we will") cannot match across two joins
+def _prepare_cuts(folded: str) -> str:
+    """BQ-278 (i), (j): a time of day becomes a line break (a cut between two pieces), and a space next to a line break
+    is dropped ("the \\ntrans \\nfer" gives "the\\ntrans\\nfer")."""
+    text = _TIME.sub("\n", folded) if _DIGIT_OR_PERCENT.search(folded) else folded
+    return _SPACE_AT_BREAK.sub("", text) if "\n" in text else text
+
+
+def _match_phrase(
+    pieces: list[str], joinable: list[bool], breakable: list[bool], start: int, words: _Phrase, k: int = 0
+) -> bool:
+    """The phrase `words` from piece `start`: each word is one piece or several pieces joined across cuts, and the next
+    word starts after any whitespace-only gap or cut. A spelling that is a prefix of another ("number", "numbers")
+    branches; a word grows only while it is a prefix of a spelling, so the work per start is bounded by the phrase."""
+    word = ""
+    for j in range(start, len(pieces)):
+        if j > start and not joinable[j - 1]:
+            break
+        word += pieces[j]
+        if word in words[k] and (
+            k + 1 == len(words)
+            or (
+                j + 1 < len(pieces) and breakable[j] and _match_phrase(pieces, joinable, breakable, j + 1, words, k + 1)
+            )
+        ):
+            return True
+        if not any(w.startswith(word) for w in words[k]):
+            break
+    return False
+
+
+def _word_hits(words: list[str]) -> frozenset[str]:
+    text = "\x01".join(words)  # not whitespace: a family phrase ("we will") cannot match across two joins
+    hits = {name for name, pattern in _FAMILIES if pattern.search(text)}
+    return frozenset(hits | {"money"} if _NUMBER_WORD.search(text) else hits)
+
+
+def _join_hits(prepared: str) -> frozenset[str]:
+    """Round 4, inbound only (BQ-278 (i)-(m)): pieces of a word cut by marks or line breaks ("the\\ntrans\\nfer") with a
+    neighbour glued the same way lose their word edges once the cuts are dropped ("thetransfer"). So every join of 2 or
+    more consecutive pieces cut that way is a word of its own, and the families see it with edges; a join stops growing
+    at a stem's worth of characters (_STEM_MAX). A phrase family cut inside a word is matched piece by piece
+    (`_PHRASES`). The scan stops at the first hit; over JOIN_CAP joined characters the rest is not read, so the text is
+    "obfuscated" (fail closed). Linear."""
+    if not _ANY_CUT.search(prepared):
+        return frozenset()
+    pairs = _PIECE_GAP.findall(prepared)
+    pieces = [piece for piece, _ in pairs]
+    joinable = [" " not in gap for _, gap in pairs]  # the gap after the piece holds no space: a cut
+    breakable = [cut or gap.isspace() for cut, (_, gap) in zip(joinable, pairs, strict=True)]
+    reach, next_long = [0] * len(pieces), len(pieces)  # the next piece of 2 or more characters, from each piece on
+    for i in range(len(pieces) - 1, -1, -1):
+        next_long = i if len(pieces[i]) > 1 else next_long
+        reach[i] = next_long
+    words: list[str] = []
+    size = checked = 0
+    for i in range(len(pieces) - 1):
+        if reach[i] - i >= _STEM_MAX:  # a run of single letters: no join from here is a word of its own
+            continue
+        word = pieces[i]
+        j = i
+        while joinable[j] and j + 1 < len(pieces) and len(word) < _STEM_MAX:
+            j += 1
+            word += pieces[j]
+            if len(word) > j - i + 1:  # single letters only: `_SPREAD` already joins and searches them
+                words.append(word)
+                size += len(word)
+        if size - checked >= _CHECK_EVERY or size > JOIN_CAP:
+            if hits := _word_hits(words):
+                return hits | {"obfuscated"} if size > JOIN_CAP else hits
+            if size > JOIN_CAP:
+                return frozenset({"obfuscated"})
+            words, checked = [], size
+    if hits := _word_hits(words):
+        return hits
+    if _PHRASE_FLAT.search("".join(pieces)):
+        for i, piece in enumerate(pieces):
+            for family, phrase in _PHRASE_STARTS.get(piece, ()):
+                if _match_phrase(pieces, joinable, breakable, i, phrase):
+                    return frozenset({family})
+    return frozenset()
 
 
 def _forms(folded: str) -> list[str]:
@@ -242,33 +357,54 @@ def _forms(folded: str) -> list[str]:
 def _amount(folded: str) -> bool:
     """BQ-274: a decimal part or thousands separator, 3+ digits in a row (a recent 4-digit year aside), "%" or a number
     word."""
+    if not _DIGIT_OR_PERCENT.search(folded):  # every other shape needs a digit or "%"
+        return bool(_NUMBER_WORD.search(folded))
     return bool(_AMOUNT.search(folded) or _NUMBER_WORD.search(folded) or _DIGITS.search(_YEAR.sub(" ", folded)))
 
 
 def _signal(text: str, *, inbound: bool) -> frozenset[str]:
     if len(text) > SIGNAL_CAP:
         return frozenset({"obfuscated"})
-    signal = {"obfuscated"} if any(_hidden(c) for c in text) else set()
-    parts, size, raw = [], 0, clean_text(text)
-    for i in range(0, len(raw), 512):  # NFKC can expand a character 18-fold (U+FDFA): stop when the output is too big
-        parts.append(unicodedata.normalize("NFKC", raw[i : i + 512]))
-        size += len(parts[-1])
-        if size > SIGNAL_CAP:
-            return frozenset(signal | {"obfuscated"})
-    cleaned = "".join(parts)
+    ascii_only = text.isascii()  # BQ-278: no per-character Unicode checks on plain ASCII
+    hidden = _ASCII_HIDDEN.search(text) if ascii_only else any(_hidden(c) for c in text)
+    signal = {"obfuscated"} if hidden else set()
+    raw = clean_text(text)
+    if raw.isascii():  # NFKC leaves ASCII as it is
+        cleaned = raw
+    else:
+        parts, size = [], 0
+        for i in range(0, len(raw), 512):  # NFKC can expand a character 18-fold: stop when the output is too big
+            parts.append(unicodedata.normalize("NFKC", raw[i : i + 512]))
+            size += len(parts[-1])
+            if size > SIGNAL_CAP:
+                return frozenset(signal | {"obfuscated"})
+        cleaned = "".join(parts)
     folded = cleaned.lower()
-    if any(_suspicious(c) for c in folded):
-        signal.add("obfuscated")
-    if any(unicodedata.category(c) == "Sc" for c in folded):
-        signal.add("money")
+    if cleaned.isascii():
+        if "$" in folded:  # the only ASCII currency sign
+            signal.add("money")
+    else:
+        if any(_suspicious(c) for c in folded):
+            signal.add("obfuscated")
+        if any(unicodedata.category(c) == "Sc" for c in folded):
+            signal.add("money")
     if inbound:  # BQ-274: punctuation as a class, both split orders, spread-out letters, amounts with no money word
+        prepared = _prepare_cuts(folded)
+        prepared_leet = prepared.translate(_LEET)
+        joined = _join_hits(prepared) or (_join_hits(prepared_leet) if prepared_leet != prepared else frozenset())
+        if joined:  # the first hit stops the scan (or more joined text than JOIN_CAP: not read in full, fail closed)
+            return frozenset(signal | joined)
         spread = _SPREAD.sub(_join, folded)
-        forms = _forms(folded) + _forms(folded.translate(_LEET))  # translated: "@" is an "a" before it can be dropped
-        joins = [_joins(folded), _joins(folded.translate(_LEET))]
-        if _amount(folded) or _amount(spread) or any(_NUMBER_WORD.search(f) for f in [*forms[:3], *joins]):
+        leet = folded.translate(_LEET)  # translated: "@" is an "a" before it can be dropped
+        forms = _forms(folded) + (_forms(leet) if leet != folded else [])
+        if (
+            _amount(folded)
+            or (spread != folded and _amount(spread))
+            or any(_NUMBER_WORD.search(f) for f in {*forms[1:3]})
+        ):
             signal.add("money")
         runs = " ".join(_join(m) for t in forms[::3] for m in _SPREAD.finditer(t))
-        texts = list(dict.fromkeys([*forms, *(f.translate(_LEET) for f in forms[:3]), *joins]))
+        texts = list(dict.fromkeys([*forms, *(f.translate(_LEET) for f in forms[:3])]))
         signal |= {n for n, p in _INSIDE if p.search(runs)}
     else:
         texts = [folded, _SPLIT.sub("", folded).translate(_LEET)]
