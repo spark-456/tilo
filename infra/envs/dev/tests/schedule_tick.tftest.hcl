@@ -62,10 +62,10 @@ run "FR_AGT_14_one_every_minute_job_posts_the_tick_route_as_the_schedule_schedul
     error_message = "The tick authenticates as tilo-schedule-scheduler, not the Gmail scheduler or the Cloud Tasks identity."
   }
 
-  assert {
-    condition     = output.schedule_tick.audience != "" && startswith(output.schedule_tick.uri, output.schedule_tick.audience) && endswith(output.schedule_tick.uri, "/internal/schedules/tick")
-    error_message = "The OIDC audience is the harness base URL the job calls, and the URI is that plus the tick path (no query)."
-  }
+  # audience and uri come from the Cloud Run service URI, which is unknown at plan time under mock_provider (a
+  # condition on it is skipped as "Unknown condition value", skipping the invoker runs below). Their equality (the
+  # audience is the harness base URL, the uri is that plus the tick path) is pinned statically in
+  # tests/repo/test_FR_AGT_14_schedule_tick_terraform.py.
 }
 
 run "FR_AGT_14_the_schedule_scheduler_may_invoke_harness_only" {

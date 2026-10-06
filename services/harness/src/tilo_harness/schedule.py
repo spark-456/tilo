@@ -140,6 +140,12 @@ class Schedule:
 
     def __post_init__(self) -> None:
         _aware(self.next_due, "next_due")
+        if (
+            isinstance(self.budget_cap, bool)
+            or not isinstance(self.budget_cap, int | float)
+            or not 0 < self.budget_cap < float("inf")
+        ):
+            raise ValueError("budget_cap must be a finite number above 0")  # NaN fails the comparison too
 
 
 def slot_key(schedule_id: str, due: datetime) -> str:
