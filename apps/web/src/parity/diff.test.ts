@@ -2,8 +2,8 @@
 import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
 import { crop, decode, diffImages, encode, gridRects } from "../../e2e/park/parity/diff";
+import { type CaptureResult, renderMarkdown } from "../../e2e/park/parity/report";
 import { compareStyles } from "../../e2e/park/parity/styles";
-import { renderMarkdown, type CaptureResult } from "../../e2e/park/parity/report";
 
 function solid(w: number, h: number, rgba: [number, number, number, number]): PNG {
   const png = new PNG({ width: w, height: h });

@@ -1,7 +1,7 @@
 // WEB-PARITY: a tiny static server for the read-only design reference (no dependency). Serves
 // `design_handoff_tilo_web_app/design/`; support.js only ever runs in the browser to show the reference.
 import { readFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
+import { type Server, createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";

@@ -5,12 +5,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "@playwright/test";
 import { type Shot, openDesign, openOurs, setTheme, shoot } from "./capture";
-import { crop, decode, diffImages, encode, gridRects, type Rect } from "./diff";
-import { compareStyles } from "./styles";
-import { PAGES, THEMES, VIEWPORTS, type PageSpec, type Theme } from "./pages";
-import { type CaptureResult, type RegionResult, writeReport } from "./report";
-import { DEFAULT_STYLE_ROOT, REGIONS } from "./regions";
+import { type Rect, crop, decode, diffImages, encode, gridRects } from "./diff";
+import { PAGES, type PageSpec, THEMES, type Theme, VIEWPORTS } from "./pages";
 import { startRefServer } from "./refServer";
+import { DEFAULT_STYLE_ROOT, REGIONS } from "./regions";
+import { type CaptureResult, type RegionResult, writeReport } from "./report";
+import { compareStyles } from "./styles";
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "../../../parity-report");
 const REF_PORT = Number(process.env.TILO_PARITY_REF_PORT ?? 5396);

@@ -2,9 +2,9 @@
 // theme the same way, and take full-page screenshots. Dev/test tool only.
 import type { Page } from "@playwright/test";
 import type { Rect } from "./diff";
-import { STYLE_PROPS, type StyleNode } from "./styles";
 import type { PageSpec, Theme } from "./pages";
 import type { RegionSpec } from "./regions";
+import { STYLE_PROPS, type StyleNode } from "./styles";
 
 /** The identical freeze for both sides (the browsers also run with prefers-reduced-motion: reduce). */
 const FREEZE_CSS =
