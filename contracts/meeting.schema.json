@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/meeting.schema.json",
-  "x-version": "1.1.0",
+  "x-version": "1.2.0",
   "title": "Meeting",
-  "description": "A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273).",
+  "description": "A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273). The free text (`title`, agenda `title`, attendee `name`) holds no link (PE-13; 1.2.0, ADR-0016 decision 14): no `://` or its backslash forms; no meeting host meet.google.com, teams.microsoft.com, teams.live.com, zoom.us, webex.com or whereby.com, alone or as a suffix (acme.zoom.us); no bare `host.tld/segment` (a last label of 2 to 63 letters other than `js`, an optional port, a slash and a path character), which also catches g.co/meet and teams.live.com/meet; no Cc, Zl, Zp, Basic Multilingual Plane Cf, Hangul filler (U+115F, U+1160, U+3164, U+FFA0), braille blank (U+2800) or unassigned default-ignorable code point anywhere; an invisible combining mark (U+034F, U+17B4, U+17B5, U+180B to U+180D, U+180F, variation selectors U+FE00 to U+FE0F) only after a non-ASCII character, or U+FE0E and U+FE0F after a keycap base (# or * or a digit), so emoji keep their variation selector. Astral format and default-ignorable characters (U+E0000 to U+E0FFF, which include the tag characters and variation selectors 17 to 256, and others) cannot be written portably in a pattern: tilo-api removes or refuses them before the schema check (validator, PE-13).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -41,17 +41,17 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 120,
-      "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
       "not": {
         "anyOf": [
+          { "pattern": "[\\n\\r]" },
+          { "pattern": ":[/\\\\]{2}" },
           {
-            "pattern": "[\\n\\r]"
+            "pattern": "(?:^|[^A-Za-z0-9-])(?:[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]|[tT][eE][aA][mM][sS]\\.[lL][iI][vV][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[wW][eE][bB][eE][xX]\\.[cC][oO][mM]|[wW][hH][eE][rR][eE][bB][yY]\\.[cC][oO][mM])(?:[^A-Za-z0-9-]|$)"
           },
+          { "pattern": "[A-Za-z0-9-]+\\.(?![jJ][sS][/:])[A-Za-z]{2,63}(?::[0-9]{1,5})?/[^\\s/]" },
           {
-            "pattern": "://"
-          },
-          {
-            "pattern": "[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]"
+            "pattern": "(?:^|[\\u0000-\\u0022\\u0024-\\u0029\\u002B-\\u002F\\u003A-\\u007F])[\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0F]|[#*0-9][\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0D]"
           }
         ]
       }
@@ -248,17 +248,19 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 120,
-          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
           "not": {
             "anyOf": [
+              { "pattern": "[\\n\\r]" },
+              { "pattern": ":[/\\\\]{2}" },
               {
-                "pattern": "[\\n\\r]"
+                "pattern": "(?:^|[^A-Za-z0-9-])(?:[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]|[tT][eE][aA][mM][sS]\\.[lL][iI][vV][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[wW][eE][bB][eE][xX]\\.[cC][oO][mM]|[wW][hH][eE][rR][eE][bB][yY]\\.[cC][oO][mM])(?:[^A-Za-z0-9-]|$)"
               },
               {
-                "pattern": "://"
+                "pattern": "[A-Za-z0-9-]+\\.(?![jJ][sS][/:])[A-Za-z]{2,63}(?::[0-9]{1,5})?/[^\\s/]"
               },
               {
-                "pattern": "[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]"
+                "pattern": "(?:^|[\\u0000-\\u0022\\u0024-\\u0029\\u002B-\\u002F\\u003A-\\u007F])[\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0F]|[#*0-9][\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0D]"
               }
             ]
           }
@@ -291,17 +293,19 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 80,
-          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
           "not": {
             "anyOf": [
+              { "pattern": "[\\n\\r]" },
+              { "pattern": ":[/\\\\]{2}" },
               {
-                "pattern": "[\\n\\r]"
+                "pattern": "(?:^|[^A-Za-z0-9-])(?:[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]|[tT][eE][aA][mM][sS]\\.[lL][iI][vV][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[wW][eE][bB][eE][xX]\\.[cC][oO][mM]|[wW][hH][eE][rR][eE][bB][yY]\\.[cC][oO][mM])(?:[^A-Za-z0-9-]|$)"
               },
               {
-                "pattern": "://"
+                "pattern": "[A-Za-z0-9-]+\\.(?![jJ][sS][/:])[A-Za-z]{2,63}(?::[0-9]{1,5})?/[^\\s/]"
               },
               {
-                "pattern": "[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]"
+                "pattern": "(?:^|[\\u0000-\\u0022\\u0024-\\u0029\\u002B-\\u002F\\u003A-\\u007F])[\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0F]|[#*0-9][\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0D]"
               }
             ]
           }
