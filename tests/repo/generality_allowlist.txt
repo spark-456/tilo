@@ -12,9 +12,12 @@ branch | services/browser/src/tilo_browser/login.py | _asks_in_text | detects a 
 branch | services/browser/src/tilo_browser/masking.py | _mask | masks secrets in page text before it is stored or shown
 branch | services/browser/src/tilo_browser/masking.py | _mask_cards | masks Luhn-valid card numbers in page text
 branch | services/channels/src/tilo_channels/autopilot_t3.py | clean_text | strips control and format characters from message text
-branch | services/channels/src/tilo_channels/autopilot_t3.py | _prepare_cuts | marks line-break, space and time-of-day cuts in message text; safety screen of an inbound message for the inbound-aware L2 gate (FR-CHN-11, ADR-0013): matches fixed money, legal and commitment word families in untrusted mail text to decide whether a person must approve; it never chooses what a run does from the subject of a task, and a hit only makes the card wait for a person
-branch | services/channels/src/tilo_channels/autopilot_t3.py | _signal | runs the word families over the prepared message text; safety screen of an inbound message for the inbound-aware L2 gate (FR-CHN-11, ADR-0013): matches fixed money, legal and commitment word families in untrusted mail text to decide whether a person must approve; it never chooses what a run does from the subject of a task, and a hit only makes the card wait for a person
-branch | services/channels/src/tilo_channels/autopilot_t3.py | _word_hits | finds family words in the pieces of the message text; safety screen of an inbound message for the inbound-aware L2 gate (FR-CHN-11, ADR-0013): matches fixed money, legal and commitment word families in untrusted mail text to decide whether a person must approve; it never chooses what a run does from the subject of a task, and a hit only makes the card wait for a person
+# autopilot_t3 (FR-CHN-11, ADR-0013): the next three are one safety screen of message or draft text for the L2 gate. They match
+# fixed money, legal and commitment word families in untrusted text to decide whether a person must approve; none chooses what a run
+# does from the subject of a task, and a hit only makes the card wait for a person.
+branch | services/channels/src/tilo_channels/autopilot_t3.py | _prepare_cuts | marks line-break, space and time-of-day cuts in message or draft text; part of the safety screen above
+branch | services/channels/src/tilo_channels/autopilot_t3.py | _signal | runs the word families over the prepared message or draft text; part of the safety screen above
+branch | services/channels/src/tilo_channels/autopilot_t3.py | _word_hits | finds family words in the pieces of the message or draft text; part of the safety screen above
 branch | services/channels/src/tilo_channels/drafting_check.py | _obfuscations | finds direction controls and mixed-script words in model text (PRD 11.4 checks)
 branch | services/channels/src/tilo_channels/drafting_check.py | _read | reads contacts, numbers, dates and commitment words from a draft, to compare with its sources
 branch | services/channels/src/tilo_channels/links.py | _b64d | strict decoding of a signed link's parts
