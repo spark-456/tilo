@@ -125,11 +125,16 @@ def test_FR_AGT_14_an_adr_names_the_explicit_switch_that_opens_the_live_store(re
 
 
 def test_FR_AGT_14_one_bq_row_logs_the_decisions_and_it_is_the_last_row(repo_root: pathlib.Path) -> None:
+    """14b logged ONE row, BQ-AGT14-3; 14d appends ONE more, BQ-AGT14-4, which is now the last row (deliberately
+    changed from "BQ-AGT14-3 is last"): each is present exactly once and the newest ends the file."""
     rows = [
         line
         for line in (repo_root / "docs" / "open-questions.md").read_text(encoding="utf-8").splitlines()
         if line.startswith("|")
     ]
-    mine = [line for line in rows if line.startswith("| BQ-AGT14-3 |")]
-    assert len(mine) == 1, "log the 14b decisions as ONE row, BQ-AGT14-3"
-    assert rows[-1] == mine[0], "append it at the end of docs/open-questions.md"
+    third = [line for line in rows if line.startswith("| BQ-AGT14-3 |")]
+    assert len(third) == 1, "the 14b decisions stay ONE row, BQ-AGT14-3"
+    fourth = [line for line in rows if line.startswith("| BQ-AGT14-4 |")]
+    assert len(fourth) == 1, "log the 14d decisions as ONE row, BQ-AGT14-4"
+    assert rows[-1] == fourth[0], "append it at the end of docs/open-questions.md"
+    assert rows.index(third[0]) < rows.index(fourth[0])

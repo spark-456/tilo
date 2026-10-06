@@ -23,7 +23,8 @@ import random
 import re
 import threading
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol, TypeGuard
 
@@ -34,6 +35,8 @@ SCHEDULE_ID = re.compile(r"^sched_[0-9A-Za-z_]{1,64}$")  # an id can never reach
 MAX_FAILURES = 8  # after this many failed or skipped starts in a row the schedule is disabled
 MAX_BACKOFF = timedelta(hours=24)
 INVALID_RECORD = "invalid_record"
+OWNER_DISABLED = "owner_disabled"
+_OWNER_ID = re.compile(r"u_[0-9A-Za-z_]{1,48}")  # contracts/common.schema.json user_id; use with fullmatch
 _PROJECT = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")  # a GCP project id
 _ERROR_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _ATTEMPTS = 8  # whole-transaction retries on contention, with jitter
@@ -65,6 +68,9 @@ class ScheduleRepository(ScheduleStore, Protocol):
     def record_failure(
         self, schedule_id: str, due: datetime, *, error: str, next_due: datetime | None = None
     ) -> None: ...
+    def disable_for_owner(self, owner_user_id: str) -> int: ...
+    def documents(self) -> list[tuple[str, dict[str, Any]]]: ...
+    def now(self) -> datetime: ...
 
 
 def backoff_for(failures: int) -> timedelta:
@@ -231,14 +237,33 @@ def _failure(
     return changes
 
 
+def _stale_cadence(doc: Mapping[str, Any]) -> Cadence | None:
+    try:
+        raw = doc["cadence"]
+        return Cadence(weekday=raw["weekday"], hour=raw["hour"], minute=raw["minute"], tz=raw["tz"])
+    except Exception:  # a record that cannot be built is left as it is (quarantine handles it)
+        return None
+
+
 def _update(
-    enabled: bool | None, title: str | None, cadence: Cadence | None, next_due: datetime | None
+    doc: Mapping[str, Any],
+    now: datetime,
+    enabled: bool | None,
+    title: str | None,
+    cadence: Cadence | None,
+    next_due: datetime | None,
 ) -> dict[str, Any]:
     changes: dict[str, Any] = {}
     if enabled is not None:
         changes["enabled"] = enabled
         if enabled:  # switching a schedule on again is a fresh start
             changes.update({"failures": 0, "backoff_until": None, "last_error": None})
+            stale = doc.get("next_due")
+            if next_due is None and doc.get("enabled") is not True and _is_dt(stale) and stale <= now:
+                # off since its slot passed: no catch-up run, the first slot strictly after now (store's clock)
+                current = cadence if cadence is not None else _stale_cadence(doc)
+                if current is not None:
+                    changes["next_due"] = next_slot(current, now)
     if title is not None:
         changes["title"] = title
     if cadence is not None:
@@ -285,8 +310,30 @@ class _Store:
         cadence: Cadence | None = None,
         next_due: datetime | None = None,
     ) -> Schedule | None:
-        changes = _update(enabled, title, cadence, next_due)
-        return _decode(self._apply(schedule_id, lambda doc, now: changes))
+        return _decode(self._apply(schedule_id, lambda doc, now: _update(doc, now, enabled, title, cadence, next_due)))
+
+    def owner_ids(self, owner_user_id: str) -> list[str]:
+        raise NotImplementedError
+
+    def disable_for_owner(self, owner_user_id: str) -> int:
+        """Stops every enabled schedule of one owner (`enabled=False`, `last_error="owner_disabled"`) and returns how
+        many changed. Another owner's records are never read as a match; an invalid owner id raises ValueError."""
+        if not isinstance(owner_user_id, str) or not _OWNER_ID.fullmatch(owner_user_id):
+            raise ValueError("owner_user_id is not a user id")
+
+        def change(doc: dict[str, Any], now: datetime) -> dict[str, Any] | None:
+            if doc.get("owner_user_id") != owner_user_id or doc.get("enabled") is not True:
+                return None  # re-checked inside the transaction; a held claim does not stop the disable
+            return {"enabled": False, "last_error": OWNER_DISABLED}
+
+        return sum(1 for sid in self.owner_ids(owner_user_id) if self._apply(sid, change) is not None)
+
+    def documents(self) -> list[tuple[str, dict[str, Any]]]:
+        """A fresh read of every raw document of the store (id, fields), decodable or not."""
+        raise NotImplementedError
+
+    def now(self) -> datetime:
+        raise NotImplementedError
 
     def claim(self, schedule_id: str, due: datetime) -> bool:
         try:
@@ -339,6 +386,17 @@ class InMemoryScheduleStore(_Store):
     def delete(self, schedule_id: str) -> bool:
         with self._lock:
             return _valid_id(schedule_id) and self._rows.pop(schedule_id, None) is not None
+
+    def owner_ids(self, owner_user_id: str) -> list[str]:
+        with self._lock:
+            return [sid for sid, row in self._rows.items() if row.get("owner_user_id") == owner_user_id]
+
+    def documents(self) -> list[tuple[str, dict[str, Any]]]:
+        with self._lock:
+            return [(sid, copy.deepcopy(row)) for sid, row in self._rows.items()]
+
+    def now(self) -> datetime:
+        return self._clock()
 
     def due(self, now: datetime, limit: int) -> list[Schedule]:
         healthy: list[Schedule] = []
@@ -446,6 +504,15 @@ class FirestoreScheduleStore(_Store):
 
         return bool(self._txn(work))
 
+    def owner_ids(self, owner_user_id: str) -> list[str]:
+        return [snap.id for snap in self._by_owner(owner_user_id).stream()]
+
+    def documents(self) -> list[tuple[str, dict[str, Any]]]:
+        return [(snap.id, snap.to_dict() or {}) for snap in self._col.stream()]
+
+    def now(self) -> datetime:
+        return datetime.now(UTC)
+
     def due(self, now: datetime, limit: int) -> list[Schedule]:
         """Ascending by next_due over the enabled records; stops at the first healthy one in the future. Bad records
         met on the way are quarantined. Reads at most `_MAX_SCAN` documents per call."""
@@ -500,6 +567,45 @@ class FirestoreScheduleStore(_Store):
 
         result: dict[str, Any] | None = self._txn(work)
         return result
+
+
+@dataclass(frozen=True)
+class ScheduleRecord:
+    """The `tilo_memory.retention.Record` of one schedule document. Never carries its content."""
+
+    record_id: str
+    user_id: str | None
+    created_at: datetime
+    entity: str = "schedule"
+
+
+class ScheduleRetention:
+    """A `tilo_memory.retention.RetentionStore` over a schedule store, so a registry's `firestore` entry can hold
+    `orgs/*/schedules` (erasure, FR-MEM-09). `records()` is a fresh read of EVERY document, enabled or not, and also
+    of those that cannot be decoded (quarantined, malformed), by their raw owner; a document with no owner is yielded
+    with `user_id=None` and an erasure never deletes it. `entity` is "schedule": it has no window in
+    `tilo_memory.retention.RETENTION_DAYS`, so `purge_expired` over a registry holding this adapter needs a decision
+    first (BQ-AGT14-4)."""
+
+    def __init__(self, store: ScheduleRepository) -> None:
+        self._store = store
+
+    def records(self) -> Iterable[ScheduleRecord]:
+        now = self._store.now()
+        out: list[ScheduleRecord] = []
+        for schedule_id, doc in self._store.documents():
+            owner, made = doc.get("owner_user_id"), doc.get("created_at")
+            out.append(
+                ScheduleRecord(
+                    record_id=schedule_id,
+                    user_id=owner if isinstance(owner, str) else None,
+                    created_at=made if _is_dt(made) else now,
+                )
+            )
+        return out
+
+    def delete(self, record_id: str) -> None:
+        self._store.delete(record_id)  # idempotent; an id that is no schedule id is simply not there
 
 
 def open_schedule_store(
