@@ -417,9 +417,12 @@ def test_FR_AGT_14_replay_only_holds_the_slot_and_it_fires_once_when_the_flag_cl
 # --- failures: unwired seams, a start that raises, a failing schedule that must not starve another --------------------
 
 
-def test_FR_AGT_14_with_the_run_seams_unwired_the_firing_is_skipped_backed_off_and_retried_for_the_same_slot(
+def test_FR_AGT_14_with_the_run_seams_unwired_the_firing_is_skipped_without_a_failure_and_retried_next_tick(
     rig: SchedApi,
 ) -> None:
+    """FR-AGT-14d item 3 (changed deliberately from FR-AGT-14b, which pinned `failures == 1` and a backoff here):
+    unwired seams are a GLOBAL condition, not this schedule's fault, so nothing is counted against it. The claim is
+    released, `failures` stays 0, there is no backoff and the same slot is claimable on the very next tick."""
     from tilo_api import deps
 
     source = armed(rig)
@@ -432,13 +435,14 @@ def test_FR_AGT_14_with_the_run_seams_unwired_the_firing_is_skipped_backed_off_a
     assert fire(rig) == 0
     record = rig.schedules.get(sid)
     assert rig.worlds_besides(source.world_id) == []
-    assert (record.failures, record.last_error, record.next_due) == (1, "run_seams_unwired", MON_0330Z)
-    assert record.backoff_until > MON_0330Z
-    assert fire(rig, MON_0330Z + timedelta(seconds=30)) == 0  # backed off: not retried every minute
-    assert rig.schedules.get(sid).failures == 1
+    assert (record.failures, record.last_error, record.next_due) == (0, None, MON_0330Z)
+    assert record.backoff_until is None  # no backoff
+    assert record.enabled is True
+    assert fire(rig, MON_0330Z + timedelta(seconds=30)) == 0  # still unwired: tried again, nothing counted
+    assert (rig.schedules.get(sid).failures, rig.schedules.get(sid).backoff_until) == (0, None)
 
     rig.app.dependency_overrides[deps.get_artifact_store] = lambda: rig.rf.rig.store  # wired again
-    assert fire(rig, record.backoff_until) == 1
+    assert fire(rig, MON_0330Z + timedelta(seconds=60)) == 1  # the slot was claimable at once: no backoff to wait out
     assert rig.schedules.get(sid).last_slot == slot_key(sid, MON_0330Z)  # the same slot, not a later one
     settled(rig, world_of(rig, sid))
 
