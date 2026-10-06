@@ -30,3 +30,4 @@ branch | services/connectors/src/tilo_connectors/handoff.py | _fence | picks a M
 branch | services/connectors/src/tilo_connectors/handoff.py | record | compares the stored prompt's hash and ids with the prepared ones (BH-07); the prompt text is never read
 branch | services/connectors/src/tilo_connectors/grants.py | _excerpt | cuts a granted text to the requested part and checks its hash and size (DG-04); compares task text with the owner's own request and the file, never with a literal
 branch | services/connectors/src/tilo_connectors/calendar_sync.py | _diff | PE-13/PE-21: compares a synced title with the stored copy of the same event so an unchanged title keeps its verdict and is not screened again; no word of the title is read
+branch | packages/providers/src/tilo_providers/model_armor_adapter.py | redact | scrubs the bearer token and credentials (ya29./AIza) from provider and error text; never task text
