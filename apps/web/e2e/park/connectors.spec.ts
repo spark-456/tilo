@@ -41,6 +41,26 @@ for (const [size, viewport] of Object.entries(SIZES)) {
   }
 }
 
+for (const [size, viewport] of Object.entries(SIZES)) {
+  test.describe(`WEB_11_connectors_e2e sample chip ${size}`, () => {
+    test.use({ viewport });
+
+    // The "Sample data" chip belongs to the shell header; the page itself holds none.
+    test(`WEB_11_connectors_e2e_the_shell_sample_data_chip_is_visible_on_the_connectors_page_${size}`, async ({
+      page,
+    }) => {
+      await openConnectors(page, "day");
+      await expect(page.getByRole("heading", { level: 1, name: "Connectors" })).toBeVisible();
+      await expect(
+        page.locator("header").getByRole("button", { name: "Sample data" }),
+      ).toBeVisible();
+      await expect(
+        page.getByTestId("park-page-connectors").getByRole("button", { name: "Sample data" }),
+      ).toHaveCount(0);
+    });
+  });
+}
+
 test.describe("WEB_11_connectors_e2e drawer", () => {
   test.use({ viewport: DESKTOP });
 
