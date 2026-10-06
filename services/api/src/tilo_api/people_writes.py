@@ -49,7 +49,8 @@ _UNASSIGNED_IGNORABLE = frozenset({0x2065, 0x2800})  # unassigned default-ignora
 
 
 def _plane14_hidden(o: int) -> bool:
-    """Plane 14 is variation selectors and unassigned points; only the tag characters (flag emoji) may stay."""
+    """Plane 14 is variation selectors and unassigned points. Tag characters already go in `clean_line` (Cf), on
+    purpose: they are the ASCII-smuggling channel, so subdivision flags are stored as a bare black flag."""
     return 0xE0000 <= o <= 0xE0FFF and not 0xE0020 <= o <= 0xE007F
 
 
