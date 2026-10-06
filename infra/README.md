@@ -145,7 +145,7 @@ No Terraform change: the tick no longer starts the run on the Scheduler's reques
 bills request-based CPU, so a run thread there is throttled and lost on scale-to-zero). It
 hands each due slot to the existing Cloud Tasks queue `runs`, and Cloud Tasks delivers it to
 the same tick route as `tilo-tasks-invoker`, where the run executes inside that request.
-`tilo-api` already holds `roles/cloudtasks.enqueuer` and `serviceAccountUser` on
+`tilo-api` (and `tilo-harness`) already hold `roles/cloudtasks.enqueuer` and `serviceAccountUser` on
 `tilo-tasks-invoker`, and api is public, so a task reaches it without any `run.invoker`.
 Two more variables on tilo-api are yours to set (the tick answers 503 until both are set):
 

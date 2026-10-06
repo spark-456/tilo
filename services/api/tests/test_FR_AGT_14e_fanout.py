@@ -429,14 +429,19 @@ def test_FR_AGT_14e_the_enqueuer_raises_when_the_client_fails_and_not_on_already
 class FakeSession:
     """The `requests.Session` shape `CloudTasksRestClient` takes; records each POST and answers `status`."""
 
-    def __init__(self, status: int) -> None:
-        self.status, self.posts = status, []
+    def __init__(self, status: int, error_status: str | None = None) -> None:
+        self.status, self.error_status, self.posts = status, error_status, []
 
     def post(self, url: str, *, json: Any = None, timeout: Any = None) -> Any:
         from types import SimpleNamespace
 
+        def body() -> Any:
+            if self.error_status is None:
+                raise ValueError("no json body")
+            return {"error": {"code": self.status, "status": self.error_status, "message": "token s3cret-value"}}
+
         self.posts.append((url, json, timeout))
-        return SimpleNamespace(status_code=self.status, text="provider says: token s3cret-value is bad")
+        return SimpleNamespace(status_code=self.status, text="provider says: token s3cret-value is bad", json=body)
 
 
 def _rest_task(sched: SchedApi) -> dict[str, Any]:
@@ -457,16 +462,21 @@ def test_FR_AGT_14e_the_rest_client_posts_the_task_to_its_queue_with_a_short_tim
     assert timeout == schedules.TASKS_TIMEOUT_S == 10.0
 
 
-def test_FR_AGT_14e_the_rest_client_maps_409_to_already_exists_and_raises_on_anything_else(
+def test_FR_AGT_14e_the_rest_client_maps_only_already_exists_to_already_exists_and_raises_on_anything_else(
     sched: SchedApi, caplog: pytest.LogCaptureFixture
 ) -> None:
     from tilo_api import schedules
 
     task = _rest_task(sched)
-    assert isinstance(schedules.CloudTasksRestClient(session=FakeSession(409)).enqueue(task), schedules.AlreadyExists)
-    for status in (400, 403, 404, 429, 500, 503):
+    exists = FakeSession(409, "ALREADY_EXISTS")
+    assert isinstance(schedules.CloudTasksRestClient(session=exists).enqueue(task), schedules.AlreadyExists)
+    # a 409 that is ABORTED (contention) or says nothing readable created no task: the slot must not complete
+    failures = [FakeSession(400), FakeSession(403), FakeSession(404), FakeSession(429), FakeSession(500)]
+    failures += [FakeSession(503), FakeSession(409, "ABORTED"), FakeSession(409), FakeSession(409, "")]
+    for session in failures:
+        status = session.status
         with pytest.raises(Exception) as raised:  # noqa: PT011 - the type is the client's own
-            schedules.CloudTasksRestClient(session=FakeSession(status)).enqueue(task)
+            schedules.CloudTasksRestClient(session=session).enqueue(task)
         assert str(status) in str(raised.value)
         for leaked in ("s3cret", "provider says", task["httpRequest"]["body"]):
             assert leaked not in str(raised.value) and leaked not in caplog.text

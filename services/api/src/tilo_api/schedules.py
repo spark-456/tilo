@@ -513,6 +513,15 @@ class TasksError(RuntimeError):
     """Cloud Tasks refused an enqueue. Carries the status only: never the request, the response or a credential."""
 
 
+def _error_status(response: Any) -> str | None:
+    """The google.rpc status name of an error answer ("ALREADY_EXISTS"), or None; never raises, never the text."""
+    try:
+        status = response.json()["error"]["status"]
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None
+    return status if isinstance(status, str) else None
+
+
 class CloudTasksRestClient:
     """The Cloud Tasks REST API (`POST /v2/{queue}/tasks`) through google-auth's `AuthorizedSession`: no extra client
     library. Built only after a caller's token passed (credentials are looked up here, once per request). The body of
@@ -531,7 +540,7 @@ class CloudTasksRestClient:
         queue = str(task["name"]).rpartition("/tasks/")[0]
         response = self._session.post(f"{TASKS_API}/{queue}/tasks", json={"task": dict(task)}, timeout=self._timeout_s)
         status = response.status_code
-        if status == 409:  # ALREADY_EXISTS
+        if status == 409 and _error_status(response) == "ALREADY_EXISTS":  # ABORTED is a 409 too: that one is a failure
             return AlreadyExists()
         if not 200 <= status < 300:
             raise TasksError(f"cloud tasks answered {status}")
@@ -608,11 +617,11 @@ class TaskRunIn(BaseModel):
         """`due` is one UTC-aware instant spelled as `slot_key` spells it, and `slot` is exactly that schedule's key."""
         try:
             due = datetime.fromisoformat(self.due)
-        except ValueError as exc:
+            if due.tzinfo is None or due.utcoffset() is None:
+                raise ValueError("due is not timezone-aware")
+            spelled = due.astimezone(UTC).isoformat()
+        except (ValueError, OverflowError) as exc:  # OverflowError: an offset pushes the instant out of range
             raise ValueError("due is not an instant") from exc
-        if due.tzinfo is None or due.utcoffset() is None:
-            raise ValueError("due is not timezone-aware")
-        spelled = due.astimezone(UTC).isoformat()
         if self.due != spelled or self.slot != f"{self.schedule_id}:{spelled}":
             raise ValueError("the slot is not this schedule's slot key")
         return self
@@ -796,7 +805,11 @@ def _run_task(
         return refused("schedule_missing")
     if due > clock() + _CLOCK_SLACK:
         return refused("slot_not_due")
-    if next_slot(record.cadence, due - timedelta(microseconds=1)) != due:
+    try:
+        on_cadence = next_slot(record.cadence, due - timedelta(microseconds=1)) == due
+    except OverflowError:  # an instant at the edge of the calendar is no slot of any cadence
+        on_cadence = False
+    if not on_cadence:
         return refused("slot_off_cadence")
     world_id, _run_id = slot_ids(body.slot)
     prior = store.worlds.get(body.prior_world_id) if body.prior_world_id else None

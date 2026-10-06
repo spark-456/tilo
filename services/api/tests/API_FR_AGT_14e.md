@@ -78,7 +78,11 @@ class TaskEnqueuer:                                             # the tick's Run
         "httpMethod": "POST",
         "url": TILO_SCHEDULE_TICK_AUDIENCE + "/internal/schedules/tick",
         "headers": {"Content-Type": "application/json"},  # never an Authorization header
-        "body": base64(json.dumps({"schedule_id": ..., "slot": slot_key, "due": due_iso})),  # ONLY these three keys
+        "body": base64(
+            json.dumps(
+                {"schedule_id": ..., "slot": slot_key, "due": due_iso, "skipped": n, "prior_world_id": id_or_null}
+            )
+        ),  # ONLY these five keys (BQ-AGT14-5 d)
         "oidcToken": {"serviceAccountEmail": TILO_TASKS_CALLER, "audience": TILO_SCHEDULE_TICK_AUDIENCE},
     },
 }  # no retry config (the queue owns it), no brief, owner, approach, cap, title, token or secret anywhere
@@ -98,15 +102,17 @@ class TaskEnqueuer:                                             # the tick's Run
 Body model (JSON only: another content type is 415 or 422; closed, so an unknown key is 422; no input is echoed):
 
 ```python
-class TaskRunIn(BaseModel):  # extra="forbid", all strict str
+class TaskRunIn(BaseModel):  # extra="forbid"
     schedule_id: str  # ^sched_[0-9A-Za-z_]{1,64}$ fullmatch, else 422
     slot: str  # the slot key
     due: str  # ISO-8601, UTC-aware
+    skipped: int  # 0..100000, default 0 (R1, untrusted, only drives the collapsed-slots alert)
+    prior_world_id: str | None  # null or a world id (R1, untrusted, offered only if it is the owner's world)
 ```
 
 - Wrong shape, wrong types, missing or unknown keys (`owner_user_id`, `brief`, `approach`, `budget_cap`, `cap`, `title`,
-  `world_id`, `skipped`, `prior_world_id`, ...), a malformed schedule id, a non-object body, invalid JSON: **422**.
-  The owner, brief, approach, cap and prior world are NEVER read from the body.
+  `world_id`, ...), a malformed schedule id, a non-object body, invalid JSON: **422**.
+  The owner, brief, approach and cap are NEVER read from the body; `skipped` and `prior_world_id` are data, never authority.
 - A forged slot is refused without a run, by 422 or a 2xx `{"ran": 0, "skipped": "<fixed code>"}`: `slot` not exactly
   `slot_key(schedule_id, due)` (another schedule's slot, another instant, another spelling of the same instant, a naive
   instant), a `due` ahead of `get_clock()`, a `due` that is not an instant of the schedule's cadence.

@@ -420,6 +420,25 @@ def test_FR_AGT_14e_a_schedule_id_that_is_not_an_id_is_422(rig: SchedApi, schedu
     assert_unchanged(rig, before)
 
 
+@pytest.mark.parametrize("due", ["0001-01-01T00:00:00+05:00", "9999-12-31T23:59:59-05:00"])
+def test_FR_AGT_14e_a_due_that_overflows_the_calendar_is_422_not_a_500(rig: SchedApi, due: str) -> None:
+    scheduled(rig)
+    before = snapshot(rig)
+    response = rig.task_call({"schedule_id": "sched_a", "slot": f"sched_a:{due}", "due": due})
+    assert response.status_code == 422, (due, response.status_code, response.text)
+    assert "Traceback" not in response.text and due not in response.text
+    assert_unchanged(rig, before)
+
+
+def test_FR_AGT_14e_the_first_instant_of_the_calendar_is_no_slot_and_runs_nothing(rig: SchedApi) -> None:
+    scheduled(rig)
+    before = snapshot(rig)
+    due = "0001-01-01T00:00:00+00:00"  # a well-formed UTC instant whose predecessor does not exist
+    response = rig.task_call({"schedule_id": "sched_a", "slot": f"sched_a:{due}", "due": due})
+    assert (response.status_code, response.json()) == (200, {"ran": 0, "skipped": "slot_off_cadence"})
+    assert_unchanged(rig, before)
+
+
 def test_FR_AGT_14e_only_a_json_body_is_read(rig: SchedApi) -> None:
     scheduled(rig)
     before = snapshot(rig)

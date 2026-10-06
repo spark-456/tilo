@@ -253,8 +253,9 @@ Hard requirements from the security review for the routes the infra points at:
   strict; the owner, brief and cap come from the stored schedule only). Why only these two:
   any Google service account can mint a token with the api audience, so only the two named
   accounts pass. A run it starts still goes through the outbox and the policy engine; every
-  T3 step waits for a person. No Terraform change: `tilo-api` already holds
-  `cloudtasks.enqueuer` and `serviceAccountUser` on `tilo-tasks-invoker`, and api needs no
+  T3 step waits for a person. No Terraform change: `tilo-api` (like `tilo-harness`) already holds
+  `cloudtasks.enqueuer` and `serviceAccountUser` on `tilo-tasks-invoker`, so either can mint a
+  task token for this route (an accepted trust set, BQ-AGT14-5 h), and api needs no
   `run.invoker` for a task to reach it. The api service's request timeout must cover the
   in-request wait (1500 s): see `infra/README.md`.
 - `tilo-channels` is `allUsers`, so the `tilo-gmail-push` `run.invoker` binding
