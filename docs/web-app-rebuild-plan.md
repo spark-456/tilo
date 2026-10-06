@@ -1,6 +1,6 @@
 # Web app rebuild plan: Park City handoff (phase 0 proposal)
 
-Status: PROPOSAL, awaiting approval (supervisor, on the user's behalf). No code is written until it is approved.
+Status: APPROVED by the supervisor on 6 Oct 2026 with the decisions recorded in section 9 (BQ-WEB-1 to BQ-WEB-6).
 Sources read: `design_handoff_tilo_web_app/` (README, PROMPTS, inventory, tokens.css, `design/tilo-app.js`, `tilo-park.js`, `tilo-world.js`; PR #442), `apps/web/CLAUDE.md`, `src/router.ts`, `src/screens/{meta,routes}.ts(x)`, `src/App.tsx`, the honesty scan (`src/honesty/`, `test-support/honestyScan.ts`). The `.dc.html` pages are read page by page in their own phase, not here.
 
 ## 1. What changes and what stays
@@ -98,13 +98,18 @@ Line cap: CLAUDE.md caps a diff at 400 hand-written lines. A mechanical port of 
 
 Nothing is deleted before the cutover PR, and the cutover PR lists each file here for approval. Replaced (route handed to Park): S-01 Start, S-14 Worlds list, S-18 route `/team` (its console moves to `/team/console`), S-19 Connections list, S-22 Settings, S-28 Pinboards and S-29 Calendar (visual). Replaced screens' tests are ported to the Park page or removed in the same PR with the list. Kept as they are: everything in the "Not covered" list in section 3. Files that become dead after cutover (candidates, to be confirmed with a reference check): `screens/S_14.tsx`, `S_22.tsx`, `S_28.tsx`, `S_29.tsx`, the S-01 body in `FlowShell.tsx`, and their tests and e2e specs. The `people/` data layer stays.
 
-## 9. Open questions (also logged in `docs/open-questions.md`)
+## 9. Decisions (approved 6 Oct 2026; logged in `docs/open-questions.md` as BQ-WEB-n)
 
-- **A. World page**: Park SVG overview with links to the honest stage (proposed), or replace the stage? Replacing it would drop S-04..S-12's event-driven view and needs an ADR.
-- **B. Labels**: "Live now" and "Needs you" wording in fixture mode (proposed: "Sample run", the chip from section 6).
-- **C. Currency**: the fixtures use £ and Northwind Ops, the platform meters credits and INR/USD. Proposed: fixtures keep £ as sample data; the live API shows credits with the configured currency; the Ledger gets a unit prop.
-- **D. Connector logos**: CLAUDE.md and UX-8 forbid copying third-party assets, so the monograms stay; the README's "replace with official logos" is declined; open question logged. The monogram tile takes the connector's brand-neutral tint from role tokens.
-- **E. Type tokens**: PRD 18.2 pins `var(--text-N)` sizes (12/14/16/20/24/32/40) and `e2e/type-ramp.spec.ts` checks them, while the design uses 14.5, 15.5, 17, 22, 27, 36 px. Proposal: Park pages are scoped under `[data-park]` and exempt from the type-ramp spec by selector, with a Park ramp test of their own. Needs approval because it relaxes an existing test's scope.
-- **F. Prototype approval**: root CLAUDE.md names `tilo-kit.js`, `tilo-world.js`, `tilo-player.js` and `k1-generator.js` as portable (ADR-0003). `tilo-park.js`, `tilo-app.js` and the new `tilo-world.js` are not named. The supervisor's message says to treat them the same; an ADR-0003 addendum from the user should record it.
-- **G. Mobile app link** in the account menu points at a placeholder ("Concept"), as in the README.
-- **H. Currency of the dates**: fixtures are fixed at September 2026; the "today" marker is data, not the clock.
+- **A (BQ-WEB-2). World page**: the Park SVG overview, linking to the Pixi stage and to S-05, S-10, S-11, S-12. The stage is not replaced; no ADR.
+- **B (BQ-WEB-3). Ambient motion**: NOT approved for now; the user decides. `honestyScan.ts` and FR-WLD-09 stay untouched. Until then the backdrop ships static: cars and walkers off, which equals motion `still` as the default. Only agents animate, and only from events. All ambient motion (cars, walkers, boot slide) sits behind one flag, `PARK_AMBIENT_MOTION` (default off), so it can be switched on if the user says yes. UI feedback keyframes (spinner, toast, page transition, `tiloGhost`, `tiloPulse`) are not agent motion, but they also trip the scan, so each page that needs one lists it in its ticket, and none is added before the user decides; until then they are static or instant.
+- **C (BQ-WEB-4). Type tokens**: Park pages are scoped under `[data-park]` with their own ramp test pinning the design's sizes. The existing `type-ramp.spec.ts` stays unchanged for the old screens. The user's final design differs from PRD 18.2; this is recorded here as the reason.
+- **D (BQ-WEB-5). Line cap**: engine ports and fixture transcriptions count as generated only when the PR body shows the diff against the prototype file, or a script that checks the port is faithful (each port ticket ships a parity test that runs the prototype in Node and the TS port with the same inputs and compares). Hand-written page code, logic and tests stay under 400 lines per PR. Pages are split as needed (Skills in two or more PRs).
+- **E (BQ-WEB-6). Prototype approval**: `docs/adr/0003a-park-prototype-porting.md` cites the user's 6 Oct 2026 handoff. Root CLAUDE.md is not edited by this lane; the supervisor asks the user to add the file names there. `support.js` is never ported.
+- **F (BQ-WEB-1). Connector logos**: monograms stay.
+
+Still open, with the default shown:
+
+- **Currency**: fixtures keep £ as sample data; the live API shows credits in the configured currency; the Ledger gets a unit prop.
+- **Labels**: in fixture mode "Live now" reads "Sample run"; "Needs you" keeps its wording.
+- **Mobile app link** in the account menu points at a placeholder ("Concept"), as in the README.
+- **Dates**: fixtures are fixed at September 2026; the "today" marker is data, not the clock.
