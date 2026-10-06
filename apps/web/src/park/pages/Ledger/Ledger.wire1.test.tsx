@@ -149,3 +149,18 @@ describe("WIRE_1_ledger_page: a live Ledger with zero budget and empty arrays", 
     expect(container.innerHTML).not.toMatch(BAD);
   });
 });
+
+describe("WIRE_1_ledger_page: live amounts in the currency served", () => {
+  it("WIRE_1_ledger_live_usd_amounts_show_dollars_and_never_pounds", async () => {
+    const { container } = await renderLive(live({ currency: "USD" }));
+    const text = container.textContent ?? "";
+    expect(text, "spent so far").toContain("$1.21");
+    expect(text, "a where-it-goes row").toContain("$0.71");
+    expect(text).not.toContain("£");
+  });
+
+  it("WIRE_1_ledger_without_a_currency_keeps_pounds_as_the_fixture_does", async () => {
+    const { container } = await renderLive(live());
+    expect(container.textContent ?? "").toContain("£1.21");
+  });
+});

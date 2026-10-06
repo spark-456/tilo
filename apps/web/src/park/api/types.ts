@@ -247,6 +247,8 @@ export interface Ledger {
   memory: number[];
   hours: [string, number, string, string][];
   activity: LedgerEntry[];
+  /** The currency the amounts are in, as served; absent means pounds (the fixture). */
+  currency?: "GBP" | "USD";
 }
 
 // Agenda

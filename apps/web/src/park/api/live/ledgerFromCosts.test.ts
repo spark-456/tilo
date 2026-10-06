@@ -226,3 +226,10 @@ describe("WIRE_1_ledgerFromCosts: property", () => {
     );
   });
 });
+
+describe("WIRE_1_ledgerFromCosts: currency", () => {
+  it("WIRE_1_ledgerFromCosts_amounts_are_marked_usd_as_the_report_serves_them", () => {
+    expect(ledgerFromCosts(REPORT).currency).toBe("USD");
+    expect(ledgerFromCosts(EMPTY_REPORT).currency).toBe("USD");
+  });
+});

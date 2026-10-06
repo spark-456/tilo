@@ -11,8 +11,12 @@ import type {
 // of the Ledger fixture and `dec`, so a test can pin every number. No clock, no random, no network.
 import type { KpiTone } from "../../components";
 
-export const gbp = (v: number): string =>
-  `£${v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB")}`;
+const amount = (v: number): string =>
+  v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB");
+export const gbp = (v: number): string => `£${amount(v)}`;
+/** An amount in the Ledger's own currency: a live Ledger served in dollars is never shown as pounds. */
+export const money = (L: Ledger, v: number): string =>
+  L.currency === "USD" ? `$${amount(v)}` : gbp(v);
 
 /** The decision the ledger is waiting on: the one its pending transaction is tied to. */
 const waitingKey = (L: Ledger): DecisionKey | undefined => L.tx.find((t) => t.dec)?.dec;
@@ -70,7 +74,7 @@ export function kpis(L: Ledger, dec: Dec, decisions: readonly Decision[] = []): 
   const rows: (KpiRow | null)[] = [
     {
       label: "Spent so far",
-      value: gbp(spent),
+      value: money(L, spent),
       sub: L.budget > 0 ? `${Math.round((spent / L.budget) * 100)}% of ${gbp(L.budget)}` : "",
     },
     L.forecast > 0 && L.budget > 0
@@ -219,7 +223,7 @@ export function donut(L: Ledger, by: By) {
       tot > 0 ? `conic-gradient(${stops.join(", ")})` : "conic-gradient(transparent, transparent)",
     rows: B.rows.map((r, i) => ({
       name: r[0],
-      amt: gbp(r[1]),
+      amt: money(L, r[1]),
       pct: `${Math.round(share(r[1]))}%`,
       c: PALETTE[i] ?? "#8C8899",
     })),

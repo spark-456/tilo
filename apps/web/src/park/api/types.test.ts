@@ -71,6 +71,7 @@ describe("WEB_1a_types: entity shapes follow the README data model", () => {
       | "memory"
       | "hours"
       | "activity"
+      | "currency"
     >();
     expectTypeOf<keyof Agenda>().toEqualTypeOf<
       | "days"

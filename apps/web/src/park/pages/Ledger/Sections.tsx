@@ -7,6 +7,7 @@ import {
   type By,
   donut,
   gbp,
+  money,
   groupsWithRows,
   hourBars,
   memoryBars,
@@ -63,7 +64,7 @@ export function WhereItGoes({ L }: { L: Ledger }) {
           <div className="park-ledger-ring" data-donut="" style={{ background: d.conic }} />
           <div className="park-ledger-hole">
             <span className="park-ledger-hole-label">Total</span>
-            <span className="park-ledger-hole-value">{gbp(L.spent)}</span>
+            <span className="park-ledger-hole-value">{money(L, L.spent)}</span>
           </div>
         </div>
         <div className="park-ledger-legendlist">
