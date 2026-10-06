@@ -23,10 +23,11 @@ import logging
 import re
 import secrets
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import jsonschema
 from fastapi import APIRouter, Depends, HTTPException
@@ -43,6 +44,7 @@ logger = logging.getLogger("tilo_api.cards")
 CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
+_HHMM_RE = re.compile(r"^([01][0-9]|2[0-3]):([0-5][0-9])$")
 _ULID_RE = re.compile(r"^[0-7][0-9A-HJKMNP-TV-Z]{25}$")
 _USER_RE = re.compile(r"^u_[0-9A-Za-z_]{1,48}$")
 _DOMAIN_RE = re.compile(r"[a-z][a-z0-9_]{0,63}")  # common.schema.json slug
@@ -52,6 +54,38 @@ _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _WEB_CHANNELS = ("web", "mobile_web")
 _ANSWER_CHANNELS = (*_WEB_CHANNELS, "email")  # the only channels that answer, whatever a card lists (CH-RM)
 _STATUS = {"card_not_found": 404, "forbidden": 403, "busy": 409}  # AnswerResult.reason -> HTTP; others are 400
+_ALWAYS_NOTIFY = frozenset({"gate", "blocked"})
+
+
+def _parse_hhmm(value: object) -> int | None:
+    if not isinstance(value, str) or (m := _HHMM_RE.match(value.strip())) is None:
+        return None
+    return int(m.group(1)) * 60 + int(m.group(2))
+
+
+def _quiet_hours_active(prefs: Mapping[str, Any] | None, now: datetime.datetime) -> bool:
+    """FR-HIL-13: whether `now` falls in the user's `[start, end)` quiet-hours window in their IANA timezone."""
+    if not isinstance(prefs, Mapping):
+        return False
+    raw = prefs.get("quiet_hours")
+    block = raw if isinstance(raw, Mapping) else (prefs if "start" in prefs and "end" in prefs else None)
+    if not isinstance(block, Mapping) or block.get("enabled") is False:
+        return False
+    start_min, end_min = _parse_hhmm(block.get("start")), _parse_hhmm(block.get("end"))
+    if start_min is None or end_min is None or start_min == end_min:
+        return False
+    tz_name = (
+        block.get("timezone") or block.get("time_zone") or prefs.get("timezone") or prefs.get("time_zone") or "UTC"
+    )
+    if not isinstance(tz_name, str) or not tz_name.strip():
+        return False
+    try:
+        tz = ZoneInfo(tz_name.strip())
+    except (ZoneInfoNotFoundError, KeyError, ValueError):
+        return False
+    local_dt = now.astimezone(tz)
+    cur_min = local_dt.hour * 60 + local_dt.minute
+    return (start_min <= cur_min < end_min) if start_min < end_min else (cur_min >= start_min or cur_min < end_min)
 
 
 def _derived_id(seed: str) -> str:
@@ -225,17 +259,39 @@ class CardStore:
         writer: EventWriter,
         world_owners: dict[str, str] | None = None,
         merge_window_s: int = 60,
+        preferences: Any | None = None,
+        notifier: Callable[[dict], None] | None = None,
     ) -> None:
         self._clock = clock
         self._writer = writer
         self._world_owners = dict(world_owners or {})
         self._merge_window_s = merge_window_s
+        self._preferences = preferences
+        self._notifier = notifier
         self._records: dict[str, dict[str, _Record]] = {}
         self._seen: dict[tuple[str, str], tuple[str, SubmitResult]] = {}
         self._groups: dict[tuple, _Group] = {}
         self._pending: dict[tuple[str, str], _Record] = {}  # open and not yet nudged: tick's work set
         self._answers_by_lead: list[dict[str, Any]] = []  # a Team Lead's own answers, in order (FR-HIL-10)
         self._lock = threading.RLock()  # guards every state change; a write happens outside it
+
+    def _user_prefs(self, user_id: str | None) -> Mapping[str, Any] | None:
+        if not user_id or self._preferences is None:
+            return None
+        if isinstance(self._preferences, Mapping):
+            return self._preferences.get(user_id)
+        if callable(getattr(self._preferences, "get", None)):
+            return self._preferences.get(user_id)
+        return None
+
+    def should_notify(self, card: dict, *, user_id: str | None = None, now: str | None = None) -> bool:
+        """FR-HIL-13: during quiet hours only `gate` and `blocked` cards notify."""
+        target = user_id or self._world_owners.get(card.get("world_id", ""))
+        instant = _parse_ts(now or self._clock.now())
+        rung = str(card.get("rung") or card.get("kind") or "").lower()
+        if _quiet_hours_active(self._user_prefs(target), instant):
+            return rung in _ALWAYS_NOTIFY or card.get("kind") == "gate"
+        return True
 
     # -- submit ---------------------------------------------------------
 
@@ -302,6 +358,10 @@ class CardStore:
         self._pending[(world_id, card_id)] = record
         result = SubmitResult("merged" if merged else "accepted", group.primary_id, ())
         self._seen[(world_id, card_id)] = (digest, result)
+        if not merged and self._notifier is not None:
+            recipient = assignee or self._world_owners.get(world_id)
+            if self.should_notify(record.card, user_id=recipient):
+                self._notifier(copy.deepcopy(record.card))
         return result
 
     def _submit_errors(
