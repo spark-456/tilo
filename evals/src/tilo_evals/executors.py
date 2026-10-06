@@ -40,6 +40,19 @@ def _credits(case: Any, raw: Any) -> float:
     return value
 
 
+def _check_tokens_cached(case: Any, trace: dict[str, Any]) -> None:
+    """EFF-04 (ADR-0022): `tokens_cached`, when the key is present, is a whole number >= 0 and at most `tokens_in`
+    (EV-16). A null, a bool, a fraction or a string is refused; an absent key is unknown and is fine."""
+    if "tokens_cached" not in trace:
+        return
+    cached, tokens_in = trace["tokens_cached"], trace.get("tokens_in")
+    whole = isinstance(cached, int) and not isinstance(cached, bool) and cached >= 0
+    if not whole:
+        raise ExecutorError(f"case {case.id}: event trace.tokens_cached must be a whole number >= 0")
+    if isinstance(tokens_in, bool) or not isinstance(tokens_in, int) or cached > tokens_in:
+        raise ExecutorError(f"case {case.id}: event trace.tokens_cached must be at most trace.tokens_in (EV-16)")
+
+
 def _event(case: Any, event: dict[str, Any]) -> dict[str, Any]:
     """Validates every event field the runner reads (trace, model_role, profile, credits)."""
     trace = event.get("trace")
@@ -49,6 +62,7 @@ def _event(case: Any, event: dict[str, Any]) -> dict[str, Any]:
         value = (trace or {}).get(key)
         if value is not None and not isinstance(value, str):
             raise ExecutorError(f"case {case.id}: event trace.{key} must be a string")
+    _check_tokens_cached(case, trace or {})
     return {**event, "credits": _credits(case, event.get("credits"))}
 
 
