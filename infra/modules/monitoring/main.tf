@@ -175,7 +175,8 @@ resource "google_monitoring_alert_policy" "cost_alert" {
       filter          = "metric.type=\"logging.googleapis.com/user/tilo_cost_alert\""
       comparison      = "COMPARISON_GT"
       threshold_value = 0
-      duration        = "0s"
+      # Non-zero: the API rejects evaluation_missing_data with a 0s duration. One alert line keeps the 300s sum above 0 for 300s, so 60s still fires on a single event.
+      duration = "60s"
 
       evaluation_missing_data = "EVALUATION_MISSING_DATA_INACTIVE"
 

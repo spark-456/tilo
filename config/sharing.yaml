@@ -1,0 +1,6 @@
+# tilo-api's Approver share links (FR-HIL-12, BQ-HIL12-2). A link opens one gate for one named Approver after
+# sign-in and stops working this many hours after it is made, or when the owner revokes it, whichever is first.
+# Read on every request by tilo_api.sharing; 24 h matches PRD 10.3's email links. Anything outside (0, 168] is
+# ignored and the default is used.
+sharing:
+  link_ttl_hours: 24

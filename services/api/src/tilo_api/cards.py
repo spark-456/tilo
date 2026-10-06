@@ -21,6 +21,7 @@ import hashlib
 import json
 import logging
 import re
+import secrets
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -146,6 +147,10 @@ class AnswerResult:
     emitted: tuple[dict, ...]
 
 
+class ShareRefused(Exception):
+    """`share_gate` refused; `args[0]` is a stable reason (card_not_found, not_an_open_gate, card_invalid)."""
+
+
 @dataclass(frozen=True)
 class TimeoutResult:
     card_id: str
@@ -178,15 +183,17 @@ class _Record:
     status: str = "open"  # "open" | "resolved" -- a held gate/consent stays "open"
     attempt: tuple[tuple, dict] | None = None  # (who and what, part) of a write that raised: a retry resends it
     domain: str | None = None  # the Team Lead domain the question was routed to; None is the owner fallback
+    assignee_until: datetime.datetime | None = None  # a share link's expiry: the assignee sees nothing at or after it
+    reraised_from: str | None = None  # a share's new card names the gate card it re-raised (FR-HIL-12)
 
     @property
     def kind(self) -> str:
         return self.card["kind"]
 
 
-def _can_see(p: Principal, world_id: str, owner: str | None, r: _Record) -> bool:
+def _can_see(p: Principal, world_id: str, owner: str | None, r: _Record, now: datetime.datetime) -> bool:
     """PRD 10.1 scope: the owner sees every card, a Team Lead their districts' cards, an Approver
-    only the cards assigned to them; a Viewer none."""
+    only the cards assigned to them (and, for a share link's card, only before it expires); a Viewer none."""
     if p.world_id != world_id or owner is None or _USER_RE.match(p.user_id) is None:
         return False
     if p.role == "owner":
@@ -194,7 +201,7 @@ def _can_see(p: Principal, world_id: str, owner: str | None, r: _Record) -> bool
     if p.role == "team_lead":
         # a question routed to a domain is the console's: only that domain's lead sees it (FR-HIL-10)
         return r.domain is None and r.district is not None and r.district in _safe_districts(p.districts)
-    return p.role == "approver" and r.assignee == p.user_id
+    return p.role == "approver" and r.assignee == p.user_id and (r.assignee_until is None or now < r.assignee_until)
 
 
 def _routed_to(r: _Record, world_id: str, domain: str) -> bool:
@@ -261,13 +268,7 @@ class CardStore:
         domain: str | None,
         merge: bool,
     ) -> SubmitResult:
-        errors = _card_errors(card)
-        if not errors:
-            errors = self._companion_errors(card["kind"], outbox_id, district, assignee, domain)
-        if not errors:
-            usable = _WEB_CHANNELS if card["kind"] in ("gate", "consent") else _ANSWER_CHANNELS
-            if not set(card["answer_channels"]) & set(usable):  # a card nobody can answer is never stored (CH-RM)
-                errors = ["answer_channels: no listed channel can answer this card"]
+        errors = self._submit_errors(card, outbox_id, district, assignee, domain)
         if errors:
             return SubmitResult("rejected", None, tuple(errors))
 
@@ -302,6 +303,19 @@ class CardStore:
         result = SubmitResult("merged" if merged else "accepted", group.primary_id, ())
         self._seen[(world_id, card_id)] = (digest, result)
         return result
+
+    def _submit_errors(
+        self, card: dict, outbox_id: str | None, district: str | None, assignee: str | None, domain: str | None
+    ) -> list[str]:
+        """Every reason `_submit` would refuse this card on its own content (empty: it would store it)."""
+        errors = _card_errors(card)
+        if not errors:
+            errors = self._companion_errors(card["kind"], outbox_id, district, assignee, domain)
+        if not errors:
+            usable = _WEB_CHANNELS if card["kind"] in ("gate", "consent") else _ANSWER_CHANNELS
+            if not set(card["answer_channels"]) & set(usable):  # a card nobody can answer is never stored (CH-RM)
+                errors = ["answer_channels: no listed channel can answer this card"]
+        return errors
 
     @staticmethod
     def _companion_errors(
@@ -354,6 +368,11 @@ class CardStore:
 
     # -- reads ------------------------------------------------------------
 
+    def is_open(self, world_id: str, card_id: str) -> bool:
+        """Whether the card still waits for an answer (a gate's answer closes every card of it)."""
+        with self._lock:
+            return (r := self._records.get(world_id, {}).get(card_id)) is not None and r.status == "open"
+
     def get(self, world_id: str, card_id: str) -> dict | None:
         """A card by its own submitted id, merged or not."""
         record = self._records.get(world_id, {}).get(card_id)
@@ -373,12 +392,13 @@ class CardStore:
         ):
             raise PermissionError(f"{principal.user_id} may not list cards of world {world_id}")
         shown: dict[int, _Record] = {}
+        now = _parse_ts(self._clock.now())
         with self._lock:
             for record in self._records.get(world_id, {}).values():
                 if (
                     record.status == "open"
                     and id(record.group) not in shown
-                    and _can_see(principal, world_id, owner, record)
+                    and _can_see(principal, world_id, owner, record, now)
                 ):
                     shown[id(record.group)] = record
             return sorted((copy.deepcopy(r.card) for r in shown.values()), key=lambda c: c["created_at"])
@@ -402,6 +422,67 @@ class CardStore:
                 for h in self._answers_by_lead
                 if h["world_id"] == world_id and h["user_id"] == user_id
             ]
+
+    # -- share a gate with an Approver (FR-HIL-12) --------------------------------
+
+    def share_gate(self, world_id: str, card_id: str, *, approver: str, until: str) -> tuple[str, str, list[str]]:
+        """BQ-32, ADR-0006: re-raise an open gate as a NEW proposal for the owner's chosen Approver: a new card (new
+        id, a fresh outbox id, the same gate, tier and pinned item) seen by that Approver until `until`, after one
+        `approval.requested` naming `approver {user, assigned_by: {by: owner, at: now}}` (authz null: a proposal never
+        authorises). The new card joins the original's group, so the gate is ONE wait: the first answer on any of its
+        cards closes them all, in the one step that writes it. A gate has at most one live share: sharing again ends the
+        earlier one's assignment. Returns (new card id, the assignment's time, the cards whose assignment it ended). The
+        caller has already checked that the signed-in person is the world's owner; the original card is untouched. Held
+        under the lock throughout, so no answer lands between the proposal and the card. Raises ShareRefused."""
+        with self._lock:
+            record = self._records.get(world_id, {}).get(card_id)
+            owner = self._world_owners.get(world_id)
+            if record is None or owner is None:
+                raise ShareRefused("card_not_found")
+            group = record.group
+            if record.kind != "gate" or record.status != "open" or group.closed or group.resolving:
+                raise ShareRefused("not_an_open_gate")
+            if record.reraised_from is not None:
+                raise ShareRefused("not_an_original_gate")  # a shared card is never shared again
+            now = self._clock.now()
+            new_id, outbox_id = _derived_id(secrets.token_hex(16)), _derived_id(secrets.token_hex(16))
+            card = copy.deepcopy(record.card) | {"id": new_id, "created_at": now}
+            if self._submit_errors(card, outbox_id, record.district, approver, None):  # before anything is written
+                raise ShareRefused("card_invalid")
+            gate = card["gate"]
+            data = {
+                "gate_id": gate["id"],
+                "card_id": new_id,
+                "outbox_id": outbox_id,
+                "action_type": gate["action"]["type"],
+            }
+            data |= {
+                "risk_tier": gate["risk_tier"],
+                "irreversible": gate["irreversible"],
+                "item": gate["action"].get("item"),
+            }
+            data |= {"approver": {"user": approver, "assigned_by": {"by": owner, "at": now}}, "team_lead": None}
+            draft = _Record(world_id, card, outbox_id, record.district, approver, _deadline(card), group)
+            part = self._part(draft, "approval.requested", data, authz=None) | {"reraised_from": card_id}
+            self._writer.write(part)  # the proposal is on record before the card can be seen; a failure stores nothing
+            ended = [m.card["id"] for m in group.members if m.assignee is not None and m.reraised_from is not None]
+            for earlier in ended:
+                self.unassign(world_id, earlier)
+            if self._submit(card, outbox_id, record.district, approver, None, False).outcome != "accepted":
+                raise ShareRefused("card_invalid")
+            shared = self._records[world_id][new_id]
+            self._pending.pop((world_id, new_id), None)  # the original's nudge speaks for the gate
+            shared.group.members.remove(shared)
+            shared.group = group
+            group.members.append(shared)
+            shared.reraised_from, shared.assignee_until = card_id, _parse_ts(until)
+        return new_id, now, ended
+
+    def unassign(self, world_id: str, card_id: str) -> None:
+        """Ends an Approver's assignment (a revoked or replaced share link): the card stays open for the owner."""
+        with self._lock:
+            if (record := self._records.get(world_id, {}).get(card_id)) is not None:
+                record.assignee = record.assignee_until = None
 
     # -- answer -------------------------------------------------------------
 
@@ -428,7 +509,8 @@ class CardStore:
             elif console_domain is not None:
                 seen = principal.world_id == world_id and _routed_to(record, world_id, console_domain)
             else:
-                seen = _can_see(principal, world_id, self._world_owners.get(world_id), record)
+                now = _parse_ts(self._clock.now())
+                seen = _can_see(principal, world_id, self._world_owners.get(world_id), record, now)
             if record is None or not seen:
                 return AnswerResult("rejected", "card_not_found", ())
             if not _can_answer(principal, record):

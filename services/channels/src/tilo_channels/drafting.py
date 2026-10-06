@@ -14,6 +14,7 @@ import json
 import logging
 import secrets
 import unicodedata
+from collections import Counter
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from email.utils import getaddresses
@@ -53,6 +54,10 @@ class ThreadReader(Protocol):  # the quarantined reader (PRD 16.3 item 3): read-
 class DraftStore(Protocol):  # JSON-able results keyed (user_id, instruction_id)
     def get(self, user_id: str, instruction_id: str) -> dict | None: ...
     def create(self, user_id: str, instruction_id: str, value: dict) -> bool: ...  # atomic set-if-absent
+
+
+class ReplyTargetMoved(Exception):
+    """The message a reply would answer is not the one the caller named (`Drafter.draft(answers=...)`)."""
 
 
 @dataclass(frozen=True)
@@ -139,11 +144,27 @@ def _reply_header(value: Any) -> str:
     return _header(value, HEADER_CAP) if isinstance(value, str) and len(value) <= HEADER_CAP else ""
 
 
+def headers_of(message: Mapping[str, Any]) -> dict[str, Any]:
+    """The message's headers by lower-cased name (the Gmail adapter lower-cases them; a fake may not). A name that
+    occurs twice differing only by case is ambiguous: neither is kept, so it reads as absent and fails closed."""
+    raw = message.get("headers") if isinstance(message, Mapping) else None
+    if not isinstance(raw, dict):
+        return {}
+    names = [str(k).lower() for k in raw]
+    seen = Counter(names)
+    return {name: v for name, v in zip(names, raw.values(), strict=True) if seen[name] == 1}
+
+
 def message_id_of(message: Mapping[str, Any]) -> str:
     """The Message-ID header of a message as the draft's `in_reply_to` carries it ("" when it has none)."""
-    raw = message.get("headers")
-    headers = {str(k).lower(): v for k, v in raw.items()} if isinstance(raw, dict) else {}
-    return _reply_header(headers.get("message-id"))
+    return _reply_header(headers_of(message).get("message-id"))
+
+
+def gmail_id_of(message: Mapping[str, Any]) -> str | None:
+    """The reader's id of a message (`message_id`: the Gmail message id, which no sender writes), None when it is
+    not a non-empty text. Never the Message-ID header, which a later message can copy."""
+    value = message.get("message_id")
+    return value if isinstance(value, str) and value else None
 
 
 def _replied(messages: list[dict[str, Any]], own: str) -> dict[str, Any] | None:
@@ -159,8 +180,7 @@ def _envelope(message: Mapping[str, Any], own: str, mode: str) -> dict[str, Any]
         for field, out in (("to", to), ("cc", cc)):
             out += [a for a in dict.fromkeys(_addresses(message.get(field))) if _base(a) != own and a not in to + cc]
     to, cc = to[:MAX_RECIPIENTS], cc[: max(0, MAX_RECIPIENTS - len(to))]
-    raw = message.get("headers")
-    headers = {str(k).lower(): v for k, v in raw.items()} if isinstance(raw, dict) else {}
+    headers = headers_of(message)
     message_id = message_id_of(message)
     references = _reply_header(headers.get("references")).split()
     references += [message_id] if message_id and message_id not in references else []
@@ -232,7 +252,11 @@ class Drafter:
         mode: str = "reply",
         preset: str | None = None,
         style: Mapping[str, Any] | None = None,
+        answers: str | None = None,
     ) -> DraftResult:
+        """`answers` (optional) is the reader id of the message the draft must answer (FR-PA-07). If the thread no
+        longer gives a reply to that message, `ReplyTargetMoved` is raised before anything is stored or emitted and
+        before the model is called; a draft already stored for `instruction_id` is returned as it is."""
         if mode not in MODES or (preset is not None and preset not in PRESETS) or "#" in instruction_id:
             raise ValueError("unknown drafting mode, preset or instruction id")
         if len(instruction) > MAX_INSTRUCTION:
@@ -240,7 +264,7 @@ class Drafter:
         doc = self._drafts.get(user_id, instruction_id)
         if doc is None:
             request = {"thread_id": thread_id, "instruction": instruction, "mode": mode, "preset": preset or "none"}
-            doc = self._make(user_id, mailbox, style or {}, request)
+            doc = self._make(user_id, mailbox, style or {}, request, answers)
             if self._drafts.create(user_id, instruction_id, doc):  # BQ-150: keyed by the instruction
                 _LOG.info("drafting %s: %s", instruction_id, doc["status"])
             else:  # another call or instance stored it first: theirs is the result
@@ -249,12 +273,18 @@ class Drafter:
         return _result(instruction_id, doc)
 
     def reply_target(self, user_id: str, thread_id: str, mailbox: str) -> str | None:
-        """The Message-ID of the message a reply in this thread would answer (what `Draft.in_reply_to` will hold),
-        read only: nothing is screened, drafted, stored or emitted. None when there is no one to reply to."""
-        listed = self._reader.get_thread(user_id, thread_id).get("messages")
+        """The reader's id (the Gmail message id) of the message a reply in this thread would answer, read only:
+        nothing is screened, drafted, stored or emitted. Never the Message-ID header, which a later message can copy.
+        None when there is no one to reply to or the message has no id."""
+        replied = self._target(self._reader.get_thread(user_id, thread_id), mailbox)
+        return gmail_id_of(replied) if replied is not None else None
+
+    @staticmethod
+    def _target(thread: Mapping[str, Any], mailbox: str) -> dict[str, Any] | None:
+        listed = thread.get("messages")
         messages = [m for m in (listed if isinstance(listed, list) else [])[-MAX_MESSAGES:] if isinstance(m, dict)]
         replied = _replied(messages, _base(_address(mailbox) or mailbox.lower()))
-        return message_id_of(replied) if replied is not None and _addresses(replied.get("from")) else None
+        return replied if replied is not None and _addresses(replied.get("from")) else None
 
     def stored(self, user_id: str, instruction_id: str) -> DraftResult | None:
         """The result stored for the instruction, read only (BQ-183); None when nothing is stored."""
@@ -272,7 +302,9 @@ class Drafter:
             self._emit({"type": "artifact.created", "data": {"artifact": artifact}})
             self._drafts.create(user_id, f"{instruction_id}#emitted", {})
 
-    def _make(self, user_id: str, mailbox: str, style: Mapping[str, Any], ask: dict[str, str]) -> dict[str, Any]:
+    def _make(
+        self, user_id: str, mailbox: str, style: Mapping[str, Any], ask: dict[str, str], answers: str | None = None
+    ) -> dict[str, Any]:
         listed = self._reader.get_thread(user_id, ask["thread_id"]).get("messages")
         messages = [m for m in (listed if isinstance(listed, list) else [])[-MAX_MESSAGES:] if isinstance(m, dict)]
         fields, rests = _thread([{k: _raw(m.get(k)) for k in FIELD_CAPS} for m in messages])
@@ -296,6 +328,10 @@ class Drafter:
         doc: dict[str, Any] = {"drafted_at": self._clock(), "flagged": flagged, "draft": None, "findings": []}
         own = _base(_address(mailbox) or mailbox.lower())
         replied = _replied(messages, own)
+        if answers is not None and (
+            replied is None or not _addresses(replied.get("from")) or gmail_id_of(replied) != answers
+        ):
+            raise ReplyTargetMoved  # the thread changed since the caller looked: nothing stored, emitted or called
         if replied is None or not _addresses(replied.get("from")):  # no one to reply to: fail closed
             return {**doc, "status": "failed", "questions": []}
         envelope = _envelope(replied, own, ask["mode"])
