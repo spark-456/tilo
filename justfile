@@ -82,6 +82,12 @@ typecheck:
     uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src packages/memory/src services/render/src services/channels/src services/browser/src packages/people/src
     pnpm -r exec tsc --noEmit
 
+# Validate the dev Terraform without a backend or credentials (EFF-05c). Downloads providers, changes nothing in the cloud.
+# Run it before the apply (docs/deploy-dev.md); needs the terraform binary on PATH.
+tf-validate:
+    terraform -chdir=infra/envs/dev init -backend=false -input=false
+    terraform -chdir=infra/envs/dev validate
+
 # Start the Firestore emulator and run the harness skeleton against it (P0-09).
 harness-skeleton:
     uv run --package tilo-harness python -m tilo_harness.skeleton --world w_harness_skeleton --run r_harness_skeleton
@@ -134,6 +140,11 @@ deploy-dev env="dev":
 deploy-dev-cloudbuild service="all" env="dev":
     python -c "print('deploy-dev-cloudbuild: env and service accepted')" {{ if env != 'dev' { error('deploy-dev-cloudbuild: only env=dev is allowed, got ' + env) } else { '' } }} {{ if service =~ '^(all|api|harness|channels|connectors|browser|render|sandbox-web)$' { '' } else { error('deploy-dev-cloudbuild: service must be all or one of api, harness, channels, connectors, browser, render, sandbox-web, got ' + service) } }}
     gcloud builds submit --config cloudbuild.yaml --project essential-wares-510320-f0 --substitutions "_SERVICE={{service}}" --region asia-southeast1 --gcs-source-staging-dir gs://essential-wares-510320-f0-cloudbuild-staging/source .
+
+# Build and push the nightly eval job image on Cloud Build (EFF-05b, evals/cloudbuild.yaml): run it before the apply
+# that creates the Cloud Run job tilo-eval-nightly. Pinned to the dev project; takes no parameter. Needs `gcloud auth login`.
+build-evals-image:
+    gcloud builds submit --config evals/cloudbuild.yaml --ignore-file evals/cloudbuild.gcloudignore --project essential-wares-510320-f0 --region asia-southeast1 --gcs-source-staging-dir gs://essential-wares-510320-f0-cloudbuild-staging/source .
 
 # Build the web app and deploy it to Firebase Hosting on the tilo-dev project (P0-07c). The build is given an empty
 # VITE_TILO_API_URL, so the deployed app runs the fixture / replay world with no backend. Pinned to the dev project:

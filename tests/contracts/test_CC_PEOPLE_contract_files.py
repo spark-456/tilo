@@ -67,8 +67,10 @@ def test_CC_PEOPLE_FR_WLD_02_schema_declares_its_named_defs(repo_root, name, def
 
 def test_CC_PEOPLE_FR_WLD_02_common_schema_is_1_3_0_and_keeps_its_old_defs(repo_root):
     schema = pl.load_contract(repo_root, "common")
-    # 1.2.0 merged two 1.1.0 releases (#379: pinned); 1.3.0 adds `mail` to record_ref.kind (ADR-0021).
-    assert schema["x-version"] == "1.3.0", "common carries the people ids, media_type and mail: exactly 1.3.0"
+    # 1.2.0 merged two 1.1.0 releases (#379: pinned); 1.3.0 adds `mail` to record_ref.kind (ADR-0021);
+    # later minors are additive (ADR-0002 item 15).
+    version = tuple(int(p) for p in schema["x-version"].split("."))
+    assert version >= (1, 3, 0), "common carries the people ids, media_type and mail: 1.3.0 or later"
     old = {"ulid", "timestamp", "calendar_date", "authz", "artifact_ref", "destination", "user_id", "org_id"}
     new = {
         "work_item_id",

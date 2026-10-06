@@ -1,0 +1,44 @@
+# Build-context filter for evals/Dockerfile (BuildKit uses <Dockerfile>.dockerignore instead of the root .dockerignore,
+# which keeps evals/ out of the service images). Same exclusions as the root file, except that evals/ is kept in
+# (the replay reads its cases, fixtures and schemas) minus its tests, scripts, bank and generated output.
+.git
+.gitattributes
+.github
+.claude
+.venv
+**/.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+node_modules
+**/node_modules
+.env*
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+# Credential files at any depth (OAuth client secrets, saved tokens); a bare pattern only matches the context root.
+**/*.pem
+**/client_secret*.json
+**/token*.json
+**/credentials.json
+service-account*.json
+*-credentials.json
+application_default_credentials.json
+design
+docs
+infra
+apps
+meet-bot
+scratch*
+*.log
+**/tests
+packages/contracts-ts
+evals/scripts
+evals/bank
+evals/generated
+evals/*.local.md
