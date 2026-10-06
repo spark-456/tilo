@@ -9,6 +9,7 @@
       "**/node_modules/**",
       "**/*.md",
       "design/**",
+      "design_handoff_tilo_web_app/**",
       "packages/contracts-ts/src/**"
     ]
   },

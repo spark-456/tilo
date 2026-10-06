@@ -57,7 +57,10 @@ def test_PL_LIVE_E2E_28_a_live_run_with_no_injected_screen_uses_it_and_says_so(t
     with env(LIVE="1", GOOGLE_CLOUD_PROJECT=PROJECT):
         result = invoke_main(cli_args(tmp_path, prices=prices), world=world, safety=False)
     assert result.code == 0, result.err
-    assert "safety: trusted_bank_input (Model Armor not wired)" in result.out
+    assert (
+        "safety: trusted_bank_input (by design; Model Armor is the safety role's live adapter, FR-INT-02, #450)"
+        in result.out
+    )
     assert world.calls
 
 

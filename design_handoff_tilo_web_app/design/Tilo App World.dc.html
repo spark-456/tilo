@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div data-screen-label="World detail" style="background:var(--sheet);border:1px solid var(--gBd);border-radius:28px;box-shadow:var(--sh);padding:24px 32px 36px;display:flex;flex-direction:column;gap:22px">
+  <nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--ink3)">
+    <a href="#worlds" onClick="{{ back }}" style="display:flex;align-items:center;gap:6px;height:32px;padding:0 10px 0 6px;border-radius:10px;color:var(--ink2)" style-hover="background:var(--chip);color:var(--ink)">{{ icBack }}Worlds</a>
+    <span>/</span><span style="color:var(--ink)">{{ name }}</span>
+  </nav>
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:800;letter-spacing:.7px;color:var(--ink3)">{{ eyebrow }}</span>
+        <span style="height:26px;padding:0 10px;border-radius:8px;background:{{ chipBg }};color:{{ chipFg }};font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:7px;white-space:nowrap"><span style="width:7px;height:7px;border-radius:99px;background:{{ dot }}"></span>{{ stl }}</span>
+      </div>
+      <h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:36px;letter-spacing:-.8px;line-height:1.05;text-wrap:balance">{{ name }}</h1>
+      <p style="margin:0;font-size:15.5px;font-weight:600;color:var(--ink2)">{{ meta }}</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onClick="{{ togglePause }}" style="height:42px;padding:0 16px 0 14px;border-radius:12px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:14.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap">{{ pauseIc }}{{ pauseL }}</button>
+      <button onClick="{{ share }}" style="height:42px;padding:0 16px 0 14px;border-radius:12px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:14.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap">{{ icShare }}Share</button>
+      <sc-if value="{{ isCity }}" hint-placeholder-val="{{ true }}"><a href="Tilo World Player.dc.html" style="height:42px;padding:0 18px;box-sizing:border-box;border-radius:12px;background:var(--hero);color:#FFFFFF;font-size:14.5px;font-weight:800;display:flex;align-items:center;gap:8px;white-space:nowrap" style-hover="color:#FFFFFF;filter:brightness(1.08)">{{ icPlay }}Open live view</a></sc-if>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:{{ topCols }};gap:18px;align-items:start">
+    <div style="min-width:0;background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:12px;display:flex;flex-direction:column;gap:12px">
+      <div style="position:relative;height:440px;border-radius:16px;background:var(--sunk);overflow:hidden;display:flex;align-items:center;justify-content:center">
+        <sc-if value="{{ isCity }}" hint-placeholder-val="{{ true }}">{{ worldArt }}</sc-if>
+        <sc-if value="{{ notCity }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:flex-end;justify-content:center;gap:4px">{{ bigArt }}</div></sc-if>
+        <div style="position:absolute;left:14px;top:14px;height:32px;padding:0 12px;border-radius:10px;background:var(--pop);box-shadow:var(--sh);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800">{{ heroTag }}</div>
+        <sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center"><div style="height:40px;padding:0 16px;border-radius:12px;background:var(--pop);box-shadow:var(--sh);display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800">{{ icPause }}Paused · agents are waiting</div></div></sc-if>
+      </div>
+      <div style="display:flex;align-items:center;gap:18px;padding:2px 6px 4px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px;display:flex;align-items:center;gap:10px"><div style="flex:1;height:6px;border-radius:99px;background:var(--track);overflow:hidden"><div style="height:100%;width:{{ progW }};background:{{ bar }};border-radius:99px;transition:width .5s"></div></div><span style="font-size:13.5px;font-weight:800;min-width:40px;text-align:right">{{ progL }}</span></div>
+        <div style="display:flex;gap:14px;font-size:12.5px;font-weight:700;color:var(--ink2);flex-wrap:wrap">
+          <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4"><span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:{{ l.c }}"></span>{{ l.t }}</span></sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+      <sc-if value="{{ hasNeeds }}" hint-placeholder-val="{{ false }}">
+        <div style="background:var(--amberSoft);border:1px solid var(--amberLine);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:11px;background:var(--amberTile);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ needsAgent }}</div><div style="line-height:1.3"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--amberInk)">WAITING FOR YOU</div><div style="font-size:15px;font-weight:800">{{ needsT }}</div></div></div>
+          <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="2">
+            <div style="background:var(--card);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+              <div style="line-height:1.4"><div style="font-size:14px;font-weight:800">{{ d.title }}</div><div style="font-size:13px;font-weight:600;color:var(--ink2);text-wrap:pretty">{{ d.body }}</div></div>
+              <sc-if value="{{ d.open }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px;flex-wrap:wrap"><button onClick="{{ d.approve }}" style="height:34px;padding:0 14px;border:0;border-radius:10px;background:#F0A500;color:#1F1D2B;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">{{ d.yes }}</button><button onClick="{{ d.later }}" style="height:34px;padding:0 12px;border-radius:10px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">Ask me later</button></div></sc-if>
+              <sc-if value="{{ d.done }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;font-weight:800;color:var(--okInk);display:flex;align-items:center;gap:6px">{{ d.doneIcon }}{{ d.doneText }}</div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:15px;font-weight:800">Spend</span><a href="#ledger" onClick="{{ goLedger }}" style="font-size:13.5px">Ledger</a></div>
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:28px;font-weight:800;letter-spacing:-.5px">{{ spend }}</span><span style="font-size:14px;font-weight:700;color:var(--ink2)">{{ of }}</span></div>
+        <sc-if value="{{ hasBudget }}" hint-placeholder-val="{{ true }}"><div style="height:8px;border-radius:99px;background:var(--track);overflow:hidden"><div style="height:100%;width:{{ spendW }};background:var(--hero);border-radius:99px"></div></div></sc-if>
+        <div style="font-size:13px;font-weight:700;color:var(--ink2);line-height:1.4">{{ spendNote }}</div>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:8px 18px;display:flex;flex-direction:column">
+        <sc-for list="{{ facts }}" as="f" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:center;min-height:44px;padding:6px 0;border-bottom:1px solid var(--line2)"><span style="font-size:13px;font-weight:700;color:var(--ink3)">{{ f.k }}</span><span style="font-size:14px;font-weight:800;min-width:0">{{ f.v }}</span></div>
+        </sc-for>
+        <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:start;padding:12px 0 8px"><span style="font-size:13px;font-weight:700;color:var(--ink3);padding-top:5px">Skills</span><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ skills }}" as="s" hint-placeholder-count="1"><button onClick="{{ s.open }}" style="height:28px;padding:0 10px;border:0;border-radius:8px;background:var(--heroSoft);color:var(--heroInk);font-size:12.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap">{{ s.icon }}{{ s.name }}</button></sc-for><sc-if value="{{ noSkills }}" hint-placeholder-val="{{ false }}"><span style="font-size:13.5px;font-weight:700;color:var(--ink3);padding-top:5px">Uses Tilo’s general skills</span></sc-if></div></div>
+        <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:start;padding:4px 0 14px"><span style="font-size:13px;font-weight:700;color:var(--ink3);padding-top:5px">Tools</span><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ tools }}" as="t" hint-placeholder-count="2"><button onClick="{{ goConnectors }}" style="height:28px;padding:0 10px 0 4px;border:1px solid var(--line);border-radius:8px;background:var(--btn2);color:var(--ink);font-size:12.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:20px;height:20px;border-radius:6px;background:var(--sunk);color:{{ t.c }};font-size:10.5px;font-weight:900;display:flex;align-items:center;justify-content:center">{{ t.mono }}</span>{{ t.name }}</button></sc-for></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px;align-items:start">
+    <section aria-label="{{ mainT }}" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px 18px 10px;display:flex;flex-direction:column;gap:4px;min-width:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px 8px"><h2 style="margin:0;font-size:17px;font-weight:800">{{ mainT }}</h2><span style="font-size:13px;font-weight:700;color:var(--ink3)">{{ mainSub }}</span></div>
+      <sc-if value="{{ isCity }}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{ districts }}" as="d" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:40px minmax(0,1fr) 110px auto;gap:14px;align-items:center;padding:10px 4px;border-top:1px solid var(--line2)">
+            <span style="width:40px;height:40px;border-radius:12px;background:{{ d.tile }};color:{{ d.ic }};display:flex;align-items:center;justify-content:center">{{ d.icon }}</span>
+            <span style="min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14.5px;font-weight:800">{{ d.name }}</span><span style="font-size:13px;font-weight:600;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.note }}</span></span>
+            <span style="display:flex;flex-direction:column;gap:5px"><span style="font-size:12.5px;font-weight:700;color:var(--ink2)">{{ d.count }}</span><span style="height:5px;border-radius:99px;background:var(--track);overflow:hidden"><span style="display:block;height:100%;width:{{ d.w }};background:{{ d.bar }}"></span></span></span>
+            <span style="height:24px;padding:0 9px;border-radius:7px;background:{{ d.chipBg }};color:{{ d.chipFg }};font-size:12px;font-weight:800;display:flex;align-items:center;white-space:nowrap">{{ d.stl }}</span>
+          </div>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{ isTown }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ runs }}" as="r" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 4px;border-top:1px solid var(--line2)">
+            <span style="width:32px;height:32px;border-radius:10px;background:{{ r.tile }};color:{{ r.ic }};display:flex;align-items:center;justify-content:center">{{ r.icon }}</span>
+            <span style="min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14.5px;font-weight:800">{{ r.what }}</span><span style="font-size:13px;font-weight:600;color:var(--ink2)">{{ r.when }}</span></span>
+            <span style="font-size:14px;font-weight:800">{{ r.cost }}</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noRuns }}" hint-placeholder-val="{{ false }}"><div style="padding:18px 4px;border-top:1px solid var(--line2);font-size:14px;font-weight:600;color:var(--ink2)">No runs yet. The first run waits for your approval.</div></sc-if>
+        <div style="display:flex;gap:8px;padding:12px 4px 8px;border-top:1px solid var(--line2)"><button onClick="{{ runNow }}" style="height:38px;padding:0 14px 0 12px;border:0;border-radius:11px;background:var(--hero);color:#FFFFFF;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap">{{ icPlay }}Run now</button><button onClick="{{ goAgenda }}" style="height:38px;padding:0 14px;border-radius:11px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">See in Agenda</button></div>
+      </sc-if>
+      <sc-if value="{{ isVillage }}" hint-placeholder-val="{{ false }}">
+        <div style="border-top:1px solid var(--line2);padding:14px 4px 12px;display:flex;flex-direction:column;gap:14px">
+          <div style="border-radius:14px;background:var(--sunk);padding:16px 18px;font-size:15px;font-weight:700;line-height:1.5;text-wrap:pretty">{{ out }}</div>
+          <sc-if value="{{ outReady }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px;flex-wrap:wrap"><button onClick="{{ openOut }}" style="height:38px;padding:0 16px;border:0;border-radius:11px;background:var(--hero);color:#FFFFFF;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">Open result</button><button onClick="{{ sendSlack }}" style="height:38px;padding:0 14px;border-radius:11px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">Share to Slack</button></div></sc-if>
+          <sc-if value="{{ outRunning }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:700;color:var(--ink2)">{{ spin }}{{ when }}</div></sc-if>
+        </div>
+      </sc-if>
+    </section>
+
+    <section aria-label="Activity" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px 18px 10px;display:flex;flex-direction:column;gap:4px;min-width:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px 8px"><h2 style="margin:0;font-size:17px;font-weight:800">Activity</h2><span style="font-size:13px;font-weight:700;color:var(--ink3)">Today</span></div>
+      <sc-for list="{{ activity }}" as="a" hint-placeholder-count="4">
+        <div style="display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:start;padding:10px 4px;border-top:1px solid var(--line2)">
+          <span style="width:36px;height:36px;border-radius:11px;background:var(--sunk);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;font-size:12px;font-weight:800">{{ a.av }}</span>
+          <span style="min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.4"><span style="font-size:13px;font-weight:800;color:var(--ink2);display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:99px;background:{{ a.dot }}"></span>{{ a.who }}</span><span style="font-size:14px;font-weight:600;text-wrap:pretty">{{ a.text }}</span></span>
+          <span style="font-size:12.5px;font-weight:700;color:var(--ink3);white-space:nowrap">{{ a.t }}</span>
+        </div>
+      </sc-for>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { paused: {}, ready: !!(window.TiloApp && window.TiloApp.ready()) };
+  componentDidMount() { if (!this.state.ready) this.t = setInterval(() => { if (window.TiloApp && window.TiloApp.ready()) { clearInterval(this.t); this.setState({ ready: true }); } }, 50); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const h = React.createElement, app = this.props.app || {}, TA = window.TiloApp, D = TA && TA.data;
+    if (!D) return {};
+    const K = this.state.ready ? TA.kit(h) : null, night = !!app.night, dec = app.dec || {}, go = app.go || (() => {}), toast = app.toast || (() => {});
+    const icon = (n, s) => K ? K.icon(n, s) : null;
+    const all = D.worlds(dec, app.added), id = (app.params && app.params.id) || 'k1', w = all.find(x => x.id === id) || all.find(x => x.id === 'k1');
+    const needsLeft = D.needsLeft(dec), paused = !!this.state.paused[w.id];
+    const SM = { needs: ['Needs you', '#F0A500', '#1F1D2B', '#1F1D2B', 'var(--amber)'], running: ['Running', 'var(--chip)', 'var(--ink)', 'var(--run)', 'var(--run)'], scheduled: ['Scheduled', 'var(--chip)', 'var(--ink)', 'var(--sch)', 'var(--sch)'], finished: ['Ready', 'var(--okSoft)', 'var(--okInk)', 'var(--ok)', 'var(--ok)'] };
+    const st = paused ? ['Paused', 'var(--chip)', 'var(--ink)', 'var(--ink3)', 'var(--ink3)'] : w.isNew ? ['Starting', 'var(--heroSoft)', 'var(--heroInk)', 'var(--hero)', 'var(--hero)'] : SM[w.st];
+    const isCity = w.tier === 'City', isTown = w.tier === 'Town', isVillage = w.tier === 'Village', isK1 = w.id === 'k1';
+    const DS = { needs: ['Needs you', '#F0A500', '#1F1D2B', 'var(--amberTile)', 'var(--amberInk)', 'var(--amber)'], running: ['Building', 'var(--heroSoft)', 'var(--heroInk)', 'var(--heroSoft)', 'var(--heroInk)', 'var(--run)'], finished: ['Done', 'var(--okSoft)', 'var(--okInk)', 'var(--okSoft)', 'var(--ok)', 'var(--ok)'], scheduled: ['Planned', 'var(--chip)', 'var(--ink2)', 'var(--sunk)', 'var(--ink2)', 'var(--sch)'] };
+    const districts = (w.districts || []).map(d => { const s = DS[d.st]; return { name: d.name, note: d.note, icon: icon(d.icon, 18), count: d.done + ' of ' + d.total + ' buildings · ' + d.agents + ' agents', w: (d.total ? d.done / d.total * 100 : 0) + '%', stl: s[0], chipBg: s[1], chipFg: s[2], tile: s[3], ic: s[4], bar: s[5] }; });
+    const skillsUsed = D.skills.filter(s => s.used.includes(w.id));
+    const toolNames = []; skillsUsed.forEach(s => s.tools.forEach(t => { if (!toolNames.includes(t[0])) toolNames.push(t[0]); }));
+    if (!toolNames.length) toolNames.push('Gmail', 'Google Drive');
+    const MAP = { 'Google Sheets': 'gdrive', 'Google Workspace': 'gmail', Web: null, BambooHR: 'bamboo' };
+    const tools = toolNames.map(n => { const c = D.connectors.find(x => x.name === n) || D.connectors.find(x => x.id === MAP[n]); return { name: n, mono: n === 'Web' ? 'W' : c ? c.mono : n[0], c: c ? c.col : 'var(--ink2)' }; });
+    const ROLEC = { needs: 'var(--amber)', done: 'var(--ok)', info: 'var(--run)' };
+    const activity = (w.activity || [{ t: w.started, rank: 'director', who: 'Director', text: 'Started ' + w.name.toLowerCase() + '.', kind: 'info' }]).map(a => ({ t: a.t, who: a.who, text: a.text, dot: ROLEC[a.kind] || 'var(--run)', av: a.you ? 'AM' : K ? K.agent(a.rank ? { rank: a.rank, expr: 'neutral' } : { role: a.role, expr: a.kind === 'needs' ? 'needs' : 'focused' }, 32, night) : null }));
+    const runs = (w.runs || []).map(r => ({ what: r.what, when: r.when, cost: r.cost, icon: icon(r.ok ? 'check' : 'flag', 15), tile: r.ok ? 'var(--okSoft)' : 'var(--amberTile)', ic: r.ok ? 'var(--ok)' : 'var(--amberInk)' }));
+    const decisions = isK1 ? D.decisions.map(d => ({ title: d.title, body: d.body, yes: d.yes, open: !dec[d.k], done: !!dec[d.k], doneText: d.done, doneIcon: icon('check', 14), approve: () => app.decide && app.decide(d.k), later: () => toast('Tilo will remind you at 16:00') })) : [];
+    const sp = w.budget ? Math.min(100, w.spendV / w.budget * 100) : 0;
+    const spendNote = isK1 ? (dec.depot ? 'Laptop Depot approved today for £3,420. It’s billed on delivery.' : '£3,420 is waiting for your sign-off at Laptop Depot.') : w.tier === 'Town' ? 'Each run costs about ' + w.spend + '. Billed monthly.' : w.budget ? Math.round(sp) + '% of budget used. Forecast within budget.' : 'Quick tasks are billed when they finish.';
+    const heroTag = isK1 ? 'Level 3 of 6 · Prototypes and suppliers' : isCity ? w.districts.length + ' districts · ' + w.agents + ' agents' : isTown ? (w.tool === 'Routine' ? 'Runs on a schedule · ' + w.nextL + ' ' + w.nextV : 'Small project · ' + w.agents + ' agents') : 'Quick task · ' + w.agents + (w.agents === 1 ? ' agent' : ' agents');
+    const big = K ? (isTown && w.row ? w.row.map((b, i) => h('div', { key: i, style: { marginLeft: i ? -40 : 0 } }, K.building(b[0], b[1], b[2], 200, night))) : K.art(w, 220, night)) : null;
+    return {
+      name: w.name, eyebrow: (w.tier + ' · ' + w.tool).toUpperCase(), stl: w.st === 'needs' && !paused ? needsLeft + (needsLeft === 1 ? ' decision' : ' decisions') : st[0], chipBg: st[1], chipFg: st[2], dot: st[3],
+      meta: 'Owned by ' + w.owner + ' · started ' + w.started + ' · ' + w.agents + (w.agents === 1 ? ' agent' : ' agents'),
+      back: e => { e.preventDefault(); go('worlds'); }, icBack: icon('arrowL', 15), icShare: icon('share', 16), icPlay: icon('play', 14), icPause: icon('pause', 15),
+      paused, pauseIc: icon(paused ? 'play' : 'pause', 14), pauseL: paused ? 'Resume' : 'Pause',
+      togglePause: () => { this.setState(s => ({ paused: { ...s.paused, [w.id]: !paused } })); toast(paused ? 'Resumed. Agents are back at work' : 'Paused. No spend while paused'); },
+      share: () => { try { navigator.clipboard.writeText(location.href); } catch (e) {} toast('Link copied. Only your team can open it'); },
+      isCity, notCity: !isCity, isTown, isVillage, topCols: (app.vw || 1440) >= 1060 ? 'minmax(0,1.7fr) minmax(300px,1fr)' : 'minmax(0,1fr)',
+      worldArt: K && isCity && w.plan ? K.world(w.plan, dec, night) : null, bigArt: big, heroTag,
+      progW: (w.prog || 0) + '%', progL: w.prog != null ? w.prog + '%' : w.nextV, bar: st[4],
+      legend: isCity ? [{ c: 'var(--run)', t: 'Building' }, { c: 'var(--amber)', t: 'Needs you' }, { c: 'var(--ok)', t: 'Done' }, { c: 'var(--track)', t: 'Planned' }] : [],
+      hasNeeds: isK1 && needsLeft > 0, needsT: needsLeft + (needsLeft === 1 ? ' decision' : ' decisions') + ' before agents continue', decisions, needsAgent: K ? K.agent({ role: 'builder', expr: 'needs' }, 32, night) : null,
+      spend: w.spend, of: w.of || '', hasBudget: !!w.budget, spendW: sp.toFixed(1) + '%', spendNote, goLedger: e => { e.preventDefault(); go('ledger'); },
+      facts: [{ k: 'Owner', v: w.owner }, { k: 'Started', v: w.started }, { k: w.nextL, v: w.nextV }, { k: 'Agents', v: String(w.agents) }],
+      skills: skillsUsed.map(s => ({ name: s.name, icon: icon('bolt', 12), open: () => go('skills', { id: s.id }) })), noSkills: skillsUsed.length === 0,
+      tools, goConnectors: () => go('connectors'),
+      mainT: isCity ? 'Districts' : isTown ? 'Run history' : 'Result', mainSub: isCity ? districts.length + ' districts' : isTown ? (w.runs || []).length + ' recent runs' : w.when,
+      districts, runs, noRuns: isTown && !runs.length,
+      runNow: () => toast('Run started. You’ll get a notification when it finishes'), goAgenda: () => go('agenda'),
+      out: w.out || '', outReady: w.st === 'finished', outRunning: w.st !== 'finished', when: w.when,
+      openOut: () => toast('Opening the result in Google Drive'), sendSlack: () => toast('Shared to #ops in Slack'),
+      spin: h('span', { style: { width: 16, height: 16, boxSizing: 'border-box', borderRadius: 99, border: '2.5px solid var(--track)', borderTopColor: 'var(--hero)', animation: 'tiloSpin .7s linear infinite', display: 'block', flex: 'none' } }),
+      activity
+    };
+  }
+}
+</script>
+</body>
+</html>

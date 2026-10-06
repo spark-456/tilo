@@ -11,14 +11,16 @@ from __future__ import annotations
 import os
 import re
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 from tilo_harness.validator import repo_validator
+from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, dev_run, events
 
@@ -119,6 +121,42 @@ class DevEventWriter:
             return stamped
 
 
+class _NoSources:
+    """Dev plate sources and source owners: nothing to join and no owner to name (a stand-in, never a second store)."""
+
+    def cards(self, user_id: str) -> tuple[()]:
+        refuse_if_unsafe()
+        return ()
+
+    runs = mail = cards
+
+    def owner_of(self, kind: str, ref: str) -> None:
+        refuse_if_unsafe()
+
+
+def _dev_people() -> dict[Callable[..., Any], Callable[[], Any]]:
+    """One in-memory `PeopleStores` per install, holding the dev owner as an org owner of `deps.ORG_ID` (PPL-11a)."""
+    stores, none = PeopleStores.in_memory(), _NoSources()
+    stamp = {"by": DEV_OWNER, "at": "2026-09-29T09:30:00.000Z"}
+    stores.persons.create(
+        {
+            "id": DEV_OWNER, "org_id": deps.ORG_ID, "display_name": "Dev Owner", "aliases": [],
+            "email": "dev-owner@example.com", "time_zone": "Asia/Kolkata", "preferred_channel": "web",
+            "org_role": "owner", "memberships": [], "created_by": stamp,
+        }
+    )  # fmt: skip
+
+    def get_stores() -> PeopleStores:
+        refuse_if_unsafe()
+        return stores
+
+    def get_none() -> _NoSources:
+        refuse_if_unsafe()
+        return none
+
+    return {deps.get_people_stores: get_stores, deps.get_plate_sources: get_none, deps.get_source_owners: get_none}
+
+
 def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
     """Wires `app` for local dev; raises DevModeRefused before changing anything if that is unsafe."""
     refuse_if_unsafe(env)
@@ -146,6 +184,7 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
 
     app.dependency_overrides[deps.get_event_writer] = get_writer
     app.dependency_overrides.update(dev_run.overrides())  # fake unit runner, recipient and send (CL-INT-5c)
+    app.dependency_overrides.update(_dev_people())  # in-memory people stores, the dev owner an org owner
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

@@ -12,7 +12,8 @@
 # is none); {data.<field>} is a required field of the type's data schema (contracts-check fails
 # otherwise). trace_row is the type-specific Detail column; the other Trace columns (seq, ts,
 # type, actor, target, severity, credits, authz, model profile, tokens, latency, archive link,
-# cause) are the same for every type. hud_effect "none" means the HUD does not change.
+# cause) are the same for every type; tokens include trace.tokens_cached when the provider
+# reported it (event.schema.json 1.1.0, ADR-0022). hud_effect "none" means the HUD does not change.
 #
 # side_effect: true marks a type that records a side effect or the decision that authorises one
 # (PRD 10.4 Audit, HR-7). Such an event carries authz (EV-03) from one of authz_by (EV-04), and

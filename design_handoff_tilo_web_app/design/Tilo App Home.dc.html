@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div data-screen-label="Home" style="position:relative;height:100vh;min-height:720px;overflow:hidden">
+
+  <sc-for list="{{ pins }}" as="p" hint-placeholder-count="0">
+    <div style="position:absolute;left:{{ p.x }};top:{{ p.y }};transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;z-index:2">
+      <button onClick="{{ p.open }}" style="display:flex;align-items:center;gap:10px;padding:5px 16px 5px 5px;border-radius:999px;border:1px solid var(--line2);background:var(--pop);box-shadow:var(--sh);white-space:nowrap;cursor:pointer;color:var(--ink);text-align:left;transition:transform .3s cubic-bezier(.2,.8,.2,1)" style-hover="transform:translateY(-3px)">
+        <span style="width:34px;height:34px;border-radius:999px;background:{{ p.c }};color:{{ p.fc }};display:flex;align-items:center;justify-content:center;flex:none">{{ p.ic }}</span>
+        <span style="display:flex;flex-direction:column;line-height:1.15"><span style="font-weight:800;font-size:14.5px">{{ p.t }}</span><span style="font-size:12.5px;font-weight:700;color:var(--ink2)">{{ p.s }}</span></span>
+      </button>
+      <div style="width:2px;height:26px;background:var(--stem)"></div>
+      <div style="width:10px;height:10px;border-radius:99px;background:var(--pin);box-shadow:0 0 0 5px var(--halo)"></div>
+    </div>
+  </sc-for>
+
+  <div style="position:absolute;left:24px;top:96px;width:500px;max-width:calc(100% - 48px);box-sizing:border-box;padding:24px 26px 22px;border-radius:28px;background:var(--gBg);backdrop-filter:var(--gFx);-webkit-backdrop-filter:var(--gFx);border:1px solid var(--gBd);box-shadow:var(--sh);display:flex;flex-direction:column;gap:12px;z-index:3">
+    <div style="font-size:13px;font-weight:800;letter-spacing:.7px;color:var(--ink2)">{{ dateLine }}</div>
+    <h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:50px;line-height:1;letter-spacing:-1.4px">{{ hello }}</h1>
+    <p style="margin:0;font-size:17px;line-height:1.45;color:var(--ink2);font-weight:600;text-wrap:pretty">{{ summary }}</p>
+    <sc-if value="{{ hasNeeds }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ review }}" style="align-self:flex-start;display:flex;align-items:center;gap:10px;background:var(--amberSoft);border:1px solid var(--amberLine);border-radius:999px;padding:4px 5px 4px 4px;color:var(--ink);font-weight:600;font-size:14.5px;cursor:pointer;text-align:left">
+        <span style="width:32px;height:32px;border-radius:999px;background:var(--amberTile);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ needsAgent }}</span>
+        <span><span style="font-weight:800">{{ needsT }}</span> in K1 electric scooter</span>
+        <span style="height:30px;padding:0 14px;border-radius:999px;background:#F0A500;color:#1F1D2B;font-weight:800;font-size:13.5px;display:flex;align-items:center;flex:none">Review</span>
+      </button>
+    </sc-if>
+    <sc-if value="{{ allClear }}" hint-placeholder-val="{{ false }}">
+      <div style="align-self:flex-start;display:flex;align-items:center;gap:10px;background:var(--okSoft);border-radius:999px;padding:6px 16px 6px 6px;font-size:14.5px;font-weight:700">
+        <span style="width:28px;height:28px;border-radius:99px;background:var(--ok);color:#FFFFFF;display:flex;align-items:center;justify-content:center">{{ icCheck }}</span>You’re all caught up
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ showSide }}" hint-placeholder-val="{{ true }}">
+    <aside aria-label="Today" style="position:absolute;right:24px;top:96px;width:352px;max-height:calc(100% - 330px);overflow-y:auto;box-sizing:border-box;padding:8px;border-radius:26px;background:var(--gBg);backdrop-filter:var(--gFx);-webkit-backdrop-filter:var(--gFx);border:1px solid var(--gBd);box-shadow:var(--sh);display:flex;flex-direction:column;gap:6px;z-index:3">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 10px 4px">
+        <span style="font-size:15px;font-weight:800">Live now</span>
+        <a href="#worlds" onClick="{{ goWorlds }}" style="font-size:13.5px">All worlds</a>
+      </div>
+      <sc-for list="{{ live }}" as="w" hint-placeholder-count="4">
+        <button onClick="{{ w.open }}" style="display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:center;padding:7px 10px 7px 7px;border:0;border-radius:16px;background:transparent;color:var(--ink);text-align:left;cursor:pointer;transition:background-color .2s" style-hover="background:var(--rowHover)">
+          <span style="width:40px;height:40px;border-radius:12px;background:{{ w.tile }};display:flex;align-items:flex-end;justify-content:center;overflow:hidden">{{ w.art }}</span>
+          <span style="min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.name }}</span><span style="font-size:12.5px;font-weight:700;color:{{ w.subC }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.sub }}</span></span>
+          <span style="width:44px;height:5px;border-radius:99px;background:var(--track);overflow:hidden"><span style="display:block;height:100%;width:{{ w.progW }};background:{{ w.bar }};border-radius:99px"></span></span>
+        </button>
+      </sc-for>
+      <div style="height:1px;background:var(--line2);margin:4px 10px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px 2px">
+        <span style="font-size:15px;font-weight:800">Up next today</span>
+        <a href="#agenda" onClick="{{ goAgenda }}" style="font-size:13.5px">Agenda</a>
+      </div>
+      <sc-for list="{{ next }}" as="e" hint-placeholder-count="2">
+        <button onClick="{{ goAgenda }}" style="display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;align-items:center;padding:8px 10px;border:0;border-radius:14px;background:transparent;color:var(--ink);text-align:left;cursor:pointer;transition:background-color .2s" style-hover="background:var(--rowHover)">
+          <span style="font-size:14px;font-weight:800;color:var(--ink2)">{{ e.time }}</span>
+          <span style="min-width:0;display:flex;flex-direction:column;gap:2px;padding-left:10px;border-left:3px solid {{ e.c }}"><span style="font-size:14px;font-weight:800;line-height:1.3">{{ e.title }}</span><span style="font-size:12.5px;font-weight:700;color:var(--ink2)">{{ e.sub }}</span></span>
+        </button>
+      </sc-for>
+      <div style="height:1px;background:var(--line2);margin:4px 10px"></div>
+      <button onClick="{{ goLedger }}" style="display:flex;flex-direction:column;gap:8px;padding:10px 10px 12px;border:0;border-radius:16px;background:transparent;color:var(--ink);text-align:left;cursor:pointer;transition:background-color .2s" style-hover="background:var(--rowHover)">
+        <span style="display:flex;align-items:center;justify-content:space-between;width:100%"><span style="font-size:15px;font-weight:800">September spend</span><span style="font-size:13.5px;font-weight:800;color:var(--heroInk)">Ledger</span></span>
+        <span style="display:flex;align-items:baseline;gap:8px"><span style="font-size:24px;font-weight:800;letter-spacing:-.4px">£2,412</span><span style="font-size:13.5px;font-weight:700;color:var(--ink2)">of £8,000</span></span>
+        <span style="width:100%;height:6px;border-radius:99px;background:var(--track);overflow:hidden;display:flex"><span style="width:30%;background:var(--hero)"></span><span style="width:43%;background:var(--amber);opacity:.85"></span></span>
+        <span style="font-size:12.5px;font-weight:700;color:var(--ink2)">Forecast £6,300 · £3,420 waiting on you</span>
+      </button>
+    </aside>
+  </sc-if>
+
+  <div style="position:absolute;left:50%;bottom:24px;transform:translateX(-50%);width:1040px;max-width:calc(100% - 48px);display:flex;flex-direction:column;gap:12px;align-items:center;z-index:4">
+    <sc-if value="{{ idle }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+        <sc-for list="{{ chips }}" as="c" hint-placeholder-count="3">
+          <button onClick="{{ c.pick }}" style="height:38px;padding:0 16px;border-radius:999px;background:var(--gBg);backdrop-filter:var(--gFx);-webkit-backdrop-filter:var(--gFx);border:1px solid var(--gBd);font-weight:800;font-size:14px;color:var(--ink);cursor:pointer;white-space:nowrap;transition:transform .3s cubic-bezier(.2,.8,.2,1)" style-hover="transform:translateY(-2px)">{{ c.label }}</button>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ drafting }}" hint-placeholder-val="{{ false }}">
+      <div role="status" style="display:flex;align-items:center;gap:12px;height:44px;padding:0 18px 0 14px;border-radius:999px;background:var(--pop);border:1px solid var(--line2);box-shadow:var(--sh);font-size:14.5px;font-weight:700">{{ spin }}Tilo is drafting a {{ word }} for “{{ qShow }}”</div>
+    </sc-if>
+    <sc-if value="{{ planned }}" hint-placeholder-val="{{ false }}">
+      <div style="width:100%;box-sizing:border-box;background:var(--pop);border:1px solid var(--line2);border-radius:24px;box-shadow:var(--sh);padding:18px 18px 18px 22px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center">
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="height:24px;padding:0 9px;border-radius:7px;background:var(--heroSoft);color:var(--heroInk);font-size:12px;font-weight:800;letter-spacing:.5px;display:flex;align-items:center">{{ tierUp }}</span><span style="font-size:17px;font-weight:800;min-width:0">{{ qShow }}</span></div>
+          <div style="display:flex;gap:22px;flex-wrap:wrap;font-size:13.5px;font-weight:700;color:var(--ink2)">
+            <sc-for list="{{ planMeta }}" as="m" hint-placeholder-count="3"><span><span style="color:var(--ink3)">{{ m.k }}</span> <span style="color:var(--ink);font-weight:800">{{ m.v }}</span></span></sc-for>
+          </div>
+          <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px">
+            <sc-for list="{{ planSteps }}" as="s" hint-placeholder-count="3"><li style="display:flex;gap:10px;font-size:14px;font-weight:600;color:var(--ink2)"><span style="width:20px;height:20px;border-radius:99px;background:var(--chip);color:var(--ink);font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">{{ s.n }}</span>{{ s.t }}</li></sc-for>
+          </ol>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button onClick="{{ confirm }}" style="height:46px;padding:0 22px;border:0;border-radius:14px;background:var(--hero);color:#FFFFFF;font-size:15px;font-weight:800;cursor:pointer;white-space:nowrap" style-hover="filter:brightness(1.08)">{{ confirmL }}</button>
+          <button onClick="{{ cancel }}" style="height:40px;padding:0 18px;border:1px solid var(--line);border-radius:12px;background:var(--btn2);color:var(--ink);font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">Change brief</button>
+        </div>
+      </div>
+    </sc-if>
+    <div style="width:100%;box-sizing:border-box;background:var(--gBg);backdrop-filter:var(--gFx);-webkit-backdrop-filter:var(--gFx);border:1px solid var(--gBd);border-radius:28px;padding:10px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:14px;padding-left:12px">
+        <div style="width:36px;height:36px;border-radius:12px;background:var(--hero);display:flex;align-items:center;justify-content:center;flex:none"><div style="width:22px;height:12px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><div style="width:3px;height:3px;border-radius:9px;background:#1F1D2B"></div><div style="width:3px;height:3px;border-radius:9px;background:#1F1D2B"></div></div></div>
+        <input aria-label="Describe your task" value="{{ q }}" onChange="{{ onQ }}" onKeyDown="{{ onKey }}" placeholder="{{ ph }}" style="flex:1;min-width:0;height:58px;border:0;outline:none;background:transparent;font-size:20px;font-weight:700;color:var(--ink)"></input>
+        <button onClick="{{ draft }}" style="height:54px;padding:0 24px;border:0;border-radius:18px;background:var(--hero);color:#FFFFFF;font-size:16px;font-weight:800;cursor:pointer;flex:none;transition:filter .2s,transform .15s;white-space:nowrap" style-hover="filter:brightness(1.08)" style-active="transform:translateY(2px)">{{ startL }}</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;padding:0 4px 2px;flex-wrap:wrap">
+        <div role="tablist" aria-label="Size of job" style="position:relative;width:390px;max-width:100%;flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--seg);border-radius:16px;padding:4px;box-sizing:border-box">
+          <div style="position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px) / 3);border-radius:12px;background:var(--tabOn);box-shadow:0 1px 3px rgba(31,29,43,.16);transform:translateX({{ segX }});transition:transform .45s cubic-bezier(.34,1.3,.5,1)"></div>
+          <sc-for list="{{ modes }}" as="t" hint-placeholder-count="3">
+            <button role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="position:relative;height:36px;border:0;background:transparent;color:{{ t.fg }};font-weight:800;font-size:14px;cursor:pointer;transition:color .3s">{{ t.label }}</button>
+          </sc-for>
+        </div>
+        <div style="flex:1;min-width:200px;font-size:14px;font-weight:700;color:var(--ink2);line-height:1.35">{{ hint }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { m: 'quick', q: '', ph: 'idle', ready: !!(window.TiloApp && window.TiloApp.ready()) };
+  componentDidMount() { if (!this.state.ready) this.t = setInterval(() => { if (window.TiloApp && window.TiloApp.ready()) { clearInterval(this.t); this.setState({ ready: true }); } }, 50); }
+  componentWillUnmount() { clearInterval(this.t); clearTimeout(this.dt); }
+  renderVals() {
+    const h = React.createElement, app = this.props.app || {}, TA = window.TiloApp, D = TA && TA.data;
+    if (!D) return {};
+    const K = this.state.ready ? TA.kit(h) : null, S = this.state, night = !!app.night, dec = app.dec || {}, go = app.go || (() => {});
+    const icon = (n, s) => K ? K.icon(n, s) : null, up = p => this.setState(p);
+    const needs = D.needsLeft(dec), worlds = D.worlds(dec, app.added);
+    const open = id => () => go('world', { id });
+    const T = D.TIERS[S.m], qShow = S.q.trim() || T.ph;
+    const W = id => worlds.find(w => w.id === id);
+    const pinDefs = [
+      { w: W('k1'), s: needs ? needs + (needs === 1 ? ' decision needs you' : ' decisions need you') : 'Running · 46%', c: needs ? '#F0A500' : 'var(--hero)', fc: needs ? '#1F1D2B' : '#FFFFFF', ic: needs ? 'flag' : 'bolt' },
+      { w: W('hires'), s: night ? 'Running overnight · 58%' : 'Running · 58%', c: 'var(--hero)', fc: '#FFFFFF', ic: 'people' },
+      { w: W('invoice'), s: 'Next run Mon 09:00', c: 'var(--sch)', fc: '#FFFFFF', ic: 'clock' }
+    ];
+    const vw = app.vw || 1440, vh = app.vh || 900, side = vw >= 1180;
+    const blocks = [[0, 0, vw, 96], [0, 80, 548, 430], side ? [vw - 400, 80, vw, vh - 300] : [0, 0, 0, 0], [0, vh - 250, vw, vh]];
+    const clear = p => !blocks.some(b => p.x + 140 > b[0] && p.x - 140 < b[2] && p.y > b[1] && p.y - 84 < b[3]);
+    const pins = (app.pins || []).map((p, i) => ({ p, i })).filter(o => clear(o.p)).map(({ p, i }) => { const d = pinDefs[i]; return { x: p.x.toFixed(0) + 'px', y: p.y.toFixed(0) + 'px', t: d.w.short, s: d.s, c: d.c, fc: d.fc, ic: icon(d.ic, 16), open: open(d.w.id) }; });
+    const live = worlds.filter(w => w.st === 'needs' || w.st === 'running').slice(0, 5).map(w => {
+      const nd = w.st === 'needs';
+      return { name: w.short, open: open(w.id), sub: nd ? needs + (needs === 1 ? ' decision waiting' : ' decisions waiting') : w.isNew ? 'Starting now' : w.tier === 'Village' ? w.when : 'Running · ' + w.prog + '%', subC: nd ? 'var(--amberInk)' : 'var(--ink2)',
+        tile: nd ? 'var(--amberTile)' : 'var(--sunk)', progW: (w.prog || 0) + '%', bar: nd ? 'var(--amber)' : 'var(--run)',
+        art: K ? (w.tier === 'City' ? K.building('townhall', 'active', 'hall', 34, night) : K.art(w, 30, night)) : null };
+    });
+    const fmt = t => { const hh = Math.floor(t), mm = Math.round((t - hh) * 60); return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); };
+    const CAL = { work: 'var(--hero)', personal: 'var(--ok)', tilo: 'var(--sch)' };
+    const next = D.agenda.events.filter(e => e.d === D.agenda.today && e.s > 9.3).slice(0, 2).map(e => ({ time: fmt(e.s), title: e.t, c: CAL[e.cal], sub: e.brief ? 'Tilo’s brief is ready' : e.cal === 'tilo' ? 'Tilo routine' : 'Google Calendar · ' + Math.round((e.e - e.s) * 60) + ' min' }));
+    const draft = () => { if (S.ph !== 'idle') return; clearTimeout(this.dt); up({ ph: 'drafting' }); this.dt = setTimeout(() => this.setState({ ph: 'plan' }), 900); };
+    const STEPS = { quick: ['Gather what it needs from your connected tools', 'Do the work with 2 agents', 'Hand you the result to review'], routine: ['Run once tomorrow at 08:00 for your approval', 'Then repeat on the schedule you set', 'Ask you if anything looks unusual'], workspace: ['Draft districts, teams and gates', 'Estimate budget and timeline', 'Wait for your sign-off before any spend'] };
+    const idx = { quick: 0, routine: 1, workspace: 2 }[S.m];
+    return {
+      pins,
+      dateLine: (D.today.long + (night ? ' · 21:10' : '')).toUpperCase(),
+      hello: (night ? 'Good evening, ' : 'Good morning, ') + D.user.first + '.',
+      summary: night ? 'Your city keeps working overnight. ' + (needs ? (needs === 1 ? 'One thing needs' : 'Two things need') + ' you before morning.' : 'Nothing needs you.') : '38 agents are at work across 4 worlds. ' + (needs ? (needs === 1 ? 'One thing needs you.' : 'Two things need you.') : 'Nothing needs you right now.'),
+      hasNeeds: needs > 0, allClear: needs === 0, needsT: needs + (needs === 1 ? ' decision waiting' : ' decisions waiting'), review: open('k1'), icCheck: icon('check', 14),
+      needsAgent: K ? K.agent({ role: 'builder', expr: 'needs' }, 30, night) : null,
+      showSide: (app.vw || 1440) >= 1180, live, next,
+      goWorlds: e => { e.preventDefault(); go('worlds'); }, goAgenda: e => { if (e) e.preventDefault(); go('agenda'); }, goLedger: () => go('ledger'),
+      idle: S.ph === 'idle', drafting: S.ph === 'drafting', planned: S.ph === 'plan', spin: h('span', { style: { width: 18, height: 18, boxSizing: 'border-box', borderRadius: 99, border: '2.5px solid var(--track)', borderTopColor: 'var(--hero)', animation: 'tiloSpin .7s linear infinite', display: 'block', flex: 'none' } }),
+      word: T.word, qShow, tierUp: T.tier.toUpperCase(),
+      planMeta: [{ k: 'Agents', v: String(T.agents) }, { k: 'Cost', v: T.cost }, { k: 'Time', v: T.eta }],
+      planSteps: STEPS[S.m].map((t, i) => ({ n: String(i + 1), t })),
+      confirmL: S.m === 'workspace' ? 'Draft the city' : S.m === 'routine' ? 'Schedule it' : 'Start now',
+      confirm: () => { if (app.addWorld) app.addWorld(S.m, S.q.trim()); up({ ph: 'idle', q: '' }); },
+      cancel: () => up({ ph: 'idle' }),
+      chips: T.chips.map(label => ({ label, pick: () => up({ q: label, ph: 'idle' }) })),
+      q: S.q, onQ: e => up({ q: e.target.value, ph: 'idle' }), onKey: e => { if (e.key === 'Enter') draft(); }, draft,
+      ph: 'e.g. ' + T.ph, startL: T.start, hint: T.hint, segX: (idx * 100) + '%',
+      modes: [['quick', 'Quick task'], ['routine', 'Routine'], ['workspace', 'Workspace']].map(([m, label]) => ({ label, on: S.m === m, fg: S.m === m ? 'var(--heroInk)' : 'var(--ink2)', pick: () => up({ m, ph: 'idle' }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>
