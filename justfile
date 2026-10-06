@@ -82,6 +82,12 @@ typecheck:
     uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src packages/memory/src services/render/src services/channels/src services/browser/src packages/people/src
     pnpm -r exec tsc --noEmit
 
+# Validate the dev Terraform without a backend or credentials (EFF-05c). Downloads providers, changes nothing in the cloud.
+# Run it before the apply (docs/deploy-dev.md); needs the terraform binary on PATH.
+tf-validate:
+    terraform -chdir=infra/envs/dev init -backend=false -input=false
+    terraform -chdir=infra/envs/dev validate
+
 # Start the Firestore emulator and run the harness skeleton against it (P0-09).
 harness-skeleton:
     uv run --package tilo-harness python -m tilo_harness.skeleton --world w_harness_skeleton --run r_harness_skeleton
