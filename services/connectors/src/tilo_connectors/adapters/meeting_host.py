@@ -139,7 +139,9 @@ class MeetingHostAdapter(GoogleAdapter):
             well_formed = all(isinstance(draft.get(key), str) for key in _DRAFT_TEXT_KEYS)
         except SideEffectRefused:
             raise
-        except Exception:  # noqa: BLE001 - a store error text must not travel
+        except Exception as error:  # noqa: BLE001 - a store error text must not travel
+            if "Corrupt" not in type(error).__name__:  # only the hash mismatch (AR-01) is final; the rest is retried
+                raise
             raise SideEffectRefused("MH-11: the draft cannot be read") from None
         if not well_formed:
             raise SideEffectRefused("MH-11: the draft is malformed")
