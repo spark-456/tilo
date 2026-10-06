@@ -23,8 +23,15 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 - `dev/Components.tsx`: `/dev/components` (dev build, lazy route in `screens/routes.tsx`), a day and a
   night `data-park` panel with every component; one filled primary button per panel (UX-1).
 
+## App (WEB-3a, `app/`)
+- `src/Root.tsx` shows the old app, or the lazy `app/ParkApp.tsx` under `/park` (`isParkPath`).
+- `AppCtx.ts` is the `app` prop. `store.ts` (framework-free, injected `schedule`) holds decisions, started
+  worlds, prefs and the toast. `context.tsx`: `ParkProvider`, `useApp`, `useParkApi` (notes each result's
+  `source`). `router.ts` is the only file that reads the address bar.
+- `pages.ts`: one line per page, `home: lazy(() => import("../pages/Home")),`; nothing else changes.
+
 ## Local rules
-- Import nothing from `screens/`, `world/`, `stage/`; only the shared `src/api` seam may be reused.
+- Import nothing from `screens/`, `world/`, `stage/`; only the shared `src/api` and `src/router` seams may be reused.
 - No `window` globals, no clock or random or network in `api/`, no model ids, no design runtime port.
 - Ambient motion arrives in WEB-3 with its own honesty-scan entry (BQ-WEB-3); none here.
 - `engines/kit.ts`: `createKit` builds a fresh cache per call; hold one kit per document (a provider), or world and building memoisation is lost.
