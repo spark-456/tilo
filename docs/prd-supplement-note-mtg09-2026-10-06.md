@@ -14,7 +14,7 @@ ADR-0024 (Accepted, 6 Oct 2026), `services/connectors/tests/API_FR_MTG_09.md`,
 
 | ID | Requirement | Acceptance test | Pri |
 | --- | --- | --- | --- |
-| FR-MTG-09 | **Bot-hosted meeting.** For a scheduled bot meeting, the Owner asks Tilo to host it. The meeting bot's own Google account (connector `meeting_host`, scope `calendar.events.owned` on that account only) creates a Google Calendar event with a Google Meet link and Google invites the Owner and the attendees who are Tilo persons of the org. It is T3: the Owner approves a gate card showing the title, time, Meet link behaviour, sender and exact recipients, and the outbox sends exactly that. The Meet link is stored nowhere in Tilo. At meeting time the bot, signed in as that account through its one persistent dedicated profile (ADR-0024 amendment 3), enters as host, posts the disclosure first and admits only invited addresses | Fake Calendar transport: one `events.insert` with `conferenceData.createRequest` (`hangoutsMeet`), `conferenceDataVersion=1`, `sendUpdates=all`, attendees equal to the card's recipients; none before an approving `approval.resolved`; a retry makes no second event; a log, event and artifact scan finds no link. Report of the user's live run with test accounts in `docs/`: invitation from the host account, bot entered as host without admission, disclosure first; the persistent profile sits only on the demo machine's named volume, no cookie file or profile in the image, repo, backup, Secret Manager or any Cloud Run service | Must (fake flow and report); Should (Tilo launches the bot with the link, PPL-60c) |
+| FR-MTG-09 | **Bot-hosted meeting.** For a scheduled bot meeting, the Owner asks Tilo to host it. The meeting bot's own Google account (connector `meeting_host`, scope `calendar.events.owned` on that account only) creates a Google Calendar event with a Google Meet link and Google invites the Owner and the attendees who are Tilo persons of the org. It is T3: the Owner approves a gate card showing the title, time, Meet link behaviour, sender and exact recipients, and the outbox sends exactly that. The Meet link is stored nowhere in Tilo. At meeting time the bot, signed in as that account through its one persistent dedicated profile (ADR-0024 amendment 3, pending the user's yes), enters as host, posts the disclosure first and never clicks Admit | Fake Calendar transport: one `events.insert` with `conferenceData.createRequest` (`hangoutsMeet`), `conferenceDataVersion=1`, `sendUpdates=all`, attendees equal to the card's recipients; none before an approving `approval.resolved`; a retry makes no second event; a log, event and artifact scan finds no link. Report of the user's live run with test accounts in `docs/`: invitation from the host account, bot entered as host without admission, disclosure first; the persistent profile sits only on the demo machine's named volume, no cookie file or profile in the image, repo, backup, Secret Manager or any Cloud Run service | Must (fake flow and report); Should (Tilo launches the bot with the link, PPL-60c) |
 
 ## Knock-on changes
 
@@ -26,8 +26,8 @@ ADR-0024 (Accepted, 6 Oct 2026), `services/connectors/tests/API_FR_MTG_09.md`,
   test user; no person re-consents (people's Calendar stays `calendar.readonly`).
 - **Plan rows (addendum 8):** PPL-60b (guest-join experiment) is replaced by MTG09-a (CL-REACH: connector,
   adapter, token grant groups, config, fake, live smoke script; security review), MTG09-b (CL-PEOPLE, CL-INT:
-  `POST /v1/meetings/{id}/host`, fixed one-gate plan, S-26 button), MTG09-c (MEET: host join, admit only
-  invited addresses, one persistent dedicated profile) and the user's live run with the report. PPL-60c (later) hands the link to the bot in memory.
+  `POST /v1/meetings/{id}/host`, fixed one-gate plan, S-26 button), MTG09-c (MEET: host join, never click
+  Admit, persistent profile only on the user's yes) and the user's live run with the report. PPL-60c (later) hands the link to the bot in memory.
 - **CC-PEOPLE-2** config list: `meeting_host` in `config/connectors.yaml`, `create_meeting_event: T3` in
   `config/autonomy.yaml`, `meeting_host.max_duration_min: 60` in `config/personal.yaml` (MTG09-a adds them;
   B-007 regen by the orchestrator or the user).
@@ -35,6 +35,6 @@ ADR-0024 (Accepted, 6 Oct 2026), `services/connectors/tests/API_FR_MTG_09.md`,
 ## Still needs the user
 
 1. Confirm ADR-0024 (it widens ADR-0017), or choose the Owner's own calendar as organizer (BQ-MTG09-2).
-2. A bot Google account used by nothing else (tiloagent@gmail.com); 2-step verification was declined by the user; never a password to Tilo or an agent.
+2. The bot Google account: preferably a new one with no project role (tiloagent@gmail.com is today the project Owner login, ADR-0024 amendment 3(a)); 2-step verification was declined by the user; never a password to Tilo or an agent. The persistent browser profile (amendment 3) needs the user's explicit yes.
 3. Consent screen: the scope above and the bot account as a test user.
 4. The first live run (`LIVE=1` is the user's): the smoke script, then a test meeting with test accounts only.

@@ -25,7 +25,7 @@ makes a network call, calls a model or reads `LIVE`.
 ## The decision in short
 
 - **Organizer: the meeting bot's own Google account** (the account ADR-0017 already defines: created by the
-  user, used by nothing else), connected to Tilo as the connector `meeting_host`. Only the organizer is the Meet
+  user; today tiloagent@gmail.com, which is also the project Owner login, see ADR-0024 amendment 3(a)), connected to Tilo as the connector `meeting_host`. Only the organizer is the Meet
   host, so this is the one choice where "the bot starts the meeting" holds; on the Owner's calendar the Owner is
   host and the bot is still a guest who must be admitted. It is also least privilege for people: every
   person's own Calendar grant stays `calendar.readonly` (FR-CAL-08 unchanged, no re-consent); the only write
@@ -412,8 +412,9 @@ from dev or CI; the Calendar API is free, but the rule is no live call without `
 ## First live step (the user only)
 
 1. Confirm ADR-0024 (or choose the Owner's own calendar instead, BQ-MTG09-2).
-2. Use a bot Google account that nothing else uses (tiloagent@gmail.com; 2-step verification was declined by
-   the user, 7 Oct 2026, BQ-MTG09-19). Tilo and its agents never ask for its password.
+2. Decide the bot account: preferably a new Google account with no project role and no alerts (ADR-0024
+   amendment 3(a)); tiloagent@gmail.com is today the project Owner login. 2-step verification was declined by
+   the user, 7 Oct 2026, BQ-MTG09-19. Tilo and its agents never ask for its password.
 3. Google Cloud console, OAuth consent screen (Testing): on Data Access add
    `https://www.googleapis.com/auth/calendar.events.owned`; on Audience add the bot account as a test user;
    enable the Google Calendar API if it is not enabled yet.
@@ -439,8 +440,9 @@ from dev or CI; the Calendar API is free, but the rule is no live call without `
   seams (resolver as step 5; `exact` from `draft.exact` for this action instead of `_exact`, whose
   address list would hit the 500 limit), abandon on `meeting_host` disconnect, the `needs_you` card on
   `conference: failure`.
-- MTG09-c (MEET lane, `meet-bot/` on its own branch): ADR-0024 bot rules (host join, admit only invited
-  addresses, one persistent dedicated profile on a named volume, link never written to `out/`, logs or the package).
+- MTG09-c (MEET lane, `meet-bot/` on its own branch): ADR-0024 bot rules (host join, never click Admit (refuse
+  `--auto-admit`), one persistent dedicated profile on a named volume only if the user says yes (amendment 3,
+  with its preconditions: VNC only for `login` with a password, no `--no-sandbox`, guard deny), link never written to `out/`, logs or the package).
 - PPL-60c (later): `MeetingHostAdapter.join_link(owner: str, receipt: HostReceipt) -> str` (a read with
   `fields: "status,hangoutLink"`; MH-20 a cancelled event, MH-21 a link that does not fullmatch
   `https://meet\.google\.com/[a-z]{3}-[a-z]{4}-[a-z]{3}`); the string lives in memory for the bot's start
