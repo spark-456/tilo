@@ -44,6 +44,34 @@ def test_FR_MTR_10_a_memory_hit_that_disagrees_with_its_costs_is_422_inconsisten
     assert response.json() == {"detail": "inconsistent_ledger"}
 
 
+def _no_id(hit):
+    del hit["id"]
+
+
+def _text_cost(hit):
+    hit["data"]["origin_cost"] = "six"
+
+
+def _negative_cost(hit):
+    hit["data"]["lookup_cost"] = -1
+
+
+def _data_not_an_object(hit):
+    hit["data"] = "nope"
+
+
+@pytest.mark.parametrize("break_it", [_no_id, _text_cost, _negative_cost, _data_not_an_object])
+@pytest.mark.parametrize("path", PATHS)
+def test_FR_MTR_10_a_malformed_memory_hit_is_422_inconsistent_ledger_never_a_500(client, seeded, path, break_it):
+    bad = copy.deepcopy(next(e for e in seeded.events[A1] if e["type"] == "memory.hit"))
+    bad["id"] = f"01JB5VQ{998:019d}"
+    break_it(bad)
+    seeded.events[A1].append(bad)
+    response = client.get(path)
+    assert response.status_code == 422
+    assert response.json() == {"detail": "inconsistent_ledger"}
+
+
 @pytest.mark.parametrize("path", PATHS)
 def test_FR_MTR_10_any_other_value_error_is_not_turned_into_a_422(client, seeded, monkeypatch, path):
     def boom(*_args, **_kwargs):
