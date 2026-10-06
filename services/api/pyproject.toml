@@ -10,6 +10,8 @@ dependencies = [
     "jsonschema>=4.18",
     "referencing>=0.30",
     "python-multipart>=0.0.18",
+    "google-auth>=2.30",
+    "requests>=2.31",
     "tilo-planning",
     "tilo-policy",
     "tilo-harness",
@@ -18,11 +20,13 @@ dependencies = [
     "tilo-world",
     "tilo-archive",
     "tilo-memory",
+    "tilo-people",
 ]
 
 [tool.uv.sources]
 tilo-archive = { workspace = true }
 tilo-memory = { workspace = true }
+tilo-people = { workspace = true }
 tilo-planning = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-harness = { workspace = true }

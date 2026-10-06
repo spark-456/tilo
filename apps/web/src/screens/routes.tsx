@@ -41,6 +41,8 @@ const S_26 = screen(() => import("./S_26"), "S_26");
 const S_27 = screen(() => import("./S_27"), "S_27");
 const S_28 = screen(() => import("./S_28"), "S_28");
 const S_29 = screen(() => import("./S_29"), "S_29");
+// The dev build's component gallery (WEB-2): its chunk is never reached from the landing bundle.
+const DevComponents = screen(() => import("../park/dev/Components"), "Components");
 
 // Screens that read one run from a bare address: no run yet, or an unknown world, is said, not fetched
 // (a live API is never asked about the fixture world).
@@ -86,6 +88,7 @@ const EXTRA: ReadonlyArray<{ id: string; re: RegExp; Component: ElementType<Scre
     ? [
         { id: "screens", re: /^\/screens\/?$/, Component: ScreensIndex },
         { id: "screens-cards", re: /^\/screens\/cards\/?$/, Component: CardsGallery },
+        { id: "dev-components", re: /^\/dev\/components\/?$/, Component: DevComponents },
       ]
     : []),
 ];

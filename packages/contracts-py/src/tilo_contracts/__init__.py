@@ -7,12 +7,12 @@
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.3.0 sha256:f819a7e2e62bf60b
+# common.schema.json 1.4.0 sha256:09b36846ed11add2
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
 # evals.schema.json 1.0.0 sha256:ac8bab7830371705
-# event.schema.json 1.0.0 sha256:06d09566f16c4dfc
+# event.schema.json 1.1.0 sha256:623dffe796a61450
 # events/data/agent.assigned.schema.json 1.0.0 sha256:f7672c62780b8b4b
 # events/data/agent.blocked.schema.json 1.0.0 sha256:a4b1f97998b1d554
 # events/data/agent.cloned.schema.json 1.0.0 sha256:99567a48c7c65f6f
@@ -92,14 +92,14 @@
 # events/data/world.failed.schema.json 1.0.0 sha256:17a50a9c70ba8ae1
 # events/data/world.paused.schema.json 1.0.0 sha256:1b190f91f08a918c
 # events/data/world.planned.schema.json 1.0.0 sha256:eb423b257e5fc838
-# events/data/world.requested.schema.json 1.0.0 sha256:d59a584d7d9b0cf8
+# events/data/world.requested.schema.json 1.1.0 sha256:7f1370b796c05ea1
 # events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
 # events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
 # events/registry.schema.json 1.1.0 sha256:22ae30d4e99499c8
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
-# meeting.schema.json 1.1.0 sha256:10547b42a2268966
+# meeting.schema.json 1.2.0 sha256:034e93898bb28957
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -464,9 +464,9 @@ Agent rank and model role (PRD 8.1).
 """
 
 
-type Channel = Literal["web", "mobile_web", "whatsapp", "email"]
+type Channel = Literal["web", "mobile_web", "whatsapp", "email", "schedule"]
 """
-Where a person sees and answers Tilo (PRD 10.3, 11.1).
+Where a person sees and answers Tilo (PRD 10.3, 11.1), plus `schedule`, how a run that a recurring schedule started came to be (1.4.0, FR-AGT-14). `schedule` is not a place anyone answers: only world.requested uses it, and it is never an owner instruction or a person's approval (OB-01).
 """
 
 
@@ -730,6 +730,9 @@ type EventDistrictList = Annotated[list[DistrictId], Field(min_length=1)]
 
 
 type TokensIn = Annotated[int, Field(ge=0)]
+"""
+Every input token the model calls behind this event processed, cached tokens included (ADR-0022).
+"""
 
 
 type TokensOut = Annotated[int, Field(ge=0)]
@@ -1485,7 +1488,7 @@ class WorldPlannedData(BaseModel):
 
 class WorldRequestedData(BaseModel):
     """
-    data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world. destination is the thread or folder the request was made from (an email thread forwarded to Tilo, or one the request was started from), as an opaque id set from where it was sent, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is web or mobile_web, where the owner is signed in; a request by email has an unauthenticated sender and is never an instruction.
+    data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world. destination is the thread or folder the request was made from (an email thread forwarded to Tilo, or one the request was started from), as an opaque id set from where it was sent, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is web or mobile_web, where the owner is signed in; a request by email has an unauthenticated sender and is never an instruction. A scheduled run (FR-AGT-14, a recurring schedule the owner approved) starts with a world.requested of channel `schedule` (1.1.0): actor is the schedule's owner, the person who approved the brief when they set the schedule up (never `system`, because the owner of a world is the actor of its first world.requested and only a person can be one, OB-01), destination is null and title is the schedule's title. `schedule` is never an owner instruction (OB-01 counts only web and mobile_web) and never a person's approval: a scheduled run still goes through the outbox and the policy engine, and every T3 step waits for a person.
     """
 
     model_config = ConfigDict(
@@ -1770,7 +1773,12 @@ class MeetingAttendee(BaseModel):
         extra="forbid",
     )
     name: Annotated[
-        str, Field(max_length=80, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+        str,
+        Field(
+            max_length=80,
+            min_length=1,
+            pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+        ),
     ]
     user: UserId | None
 
@@ -2895,7 +2903,7 @@ Server-side redaction scope (PRD 10.1): all, or the districts whose viewers may 
 
 class EventTrace(BaseModel):
     """
-    Trace lens columns (PRD 9.6). Each field is null when the event made no model or tool call.
+    Trace lens columns (PRD 9.6). Each required field is null when the event made no model or tool call. tokens_cached (1.1.0, EFF-04, ADR-0022) is optional: left out means unknown, never zero; when present, tokens_in is a number and tokens_cached is at most tokens_in (EV-16).
     """
 
     model_config = ConfigDict(
@@ -2910,6 +2918,9 @@ class EventTrace(BaseModel):
     Profile name from config/models.yaml, never a model id.
     """
     tokens_in: TokensIn | None
+    """
+    Every input token the model calls behind this event processed, cached tokens included (ADR-0022).
+    """
     tokens_out: TokensOut | None
     tool: Slug | None
     """
@@ -2917,6 +2928,10 @@ class EventTrace(BaseModel):
     """
     latency_ms: LatencyMs | None
     archive_ref: EventArchiveRef | None
+    tokens_cached: Annotated[int | None, Field(ge=0)] = None
+    """
+    Input tokens the provider served from its prompt cache, a part of tokens_in (EFF-04, ADR-0022). Set only when the provider reported a cached count for every model call behind this event; 0 is a reported miss. Left out means unknown, never zero; never null.
+    """
 
 
 class AgentContextHandoffCompletedData(BaseModel):
@@ -3295,7 +3310,12 @@ class MeetingAgendaItem(BaseModel):
         extra="forbid",
     )
     title: Annotated[
-        str, Field(max_length=120, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+        str,
+        Field(
+            max_length=120,
+            min_length=1,
+            pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+        ),
     ]
     minutes: MeetingAgendaMinutes | None
 
@@ -3974,7 +3994,7 @@ class Decision(BaseModel):
 
 class Event(BaseModel):
     """
-    TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-14 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.
+    TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-16 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.
     """
 
     model_config = ConfigDict(
@@ -4128,7 +4148,7 @@ class Manifest(BaseModel):
 
 class Meeting(BaseModel):
     """
-    A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273).
+    A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273). The free text (`title`, agenda `title`, attendee `name`) holds no link (PE-13; 1.2.0, ADR-0016 decision 14): no `://` or its backslash forms; no meeting host meet.google.com, teams.microsoft.com, teams.live.com, zoom.us, webex.com or whereby.com, alone or as a suffix (acme.zoom.us); no bare `host.tld/segment` (a last label of 2 to 63 letters other than `js`, an optional port, a slash and a path character), which also catches g.co/meet and teams.live.com/meet; no Cc, Zl, Zp, Basic Multilingual Plane Cf, Hangul filler (U+115F, U+1160, U+3164, U+FFA0), braille blank (U+2800) or unassigned default-ignorable code point anywhere; an invisible combining mark (U+034F, U+17B4, U+17B5, U+180B to U+180D, U+180F, variation selectors U+FE00 to U+FE0F) only after a non-ASCII character, or U+FE0E and U+FE0F after a keycap base (# or * or a digit), so emoji keep their variation selector. Astral format and default-ignorable characters (U+E0000 to U+E0FFF, which include the tag characters and variation selectors 17 to 256, and others) cannot be written portably in a pattern: tilo-api removes or refuses them before the schema check (validator, PE-13).
     """
 
     model_config = ConfigDict(
@@ -4139,7 +4159,12 @@ class Meeting(BaseModel):
     owner: UserId
     world_id: WorldId | None = None
     title: Annotated[
-        str, Field(max_length=120, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+        str,
+        Field(
+            max_length=120,
+            min_length=1,
+            pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+        ),
     ]
     series: Series | None
     scheduled: MeetingScheduledWindow | None

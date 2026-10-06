@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&display=swap" rel="stylesheet">
+<script src="./tilo-world.js"></script>
+<script src="./tilo-park.js"></script>
+<script src="./tilo-app.js"></script>
+<style>
+html,body{margin:0}
+body{background:#A6D78C;-webkit-font-smoothing:antialiased}
+a{color:var(--heroInk);font-weight:800;text-decoration:none}a:hover{color:var(--hero)}
+button,input,select,textarea{font-family:inherit}
+input::placeholder,textarea::placeholder{color:var(--ink3)}
+*:focus-visible{outline:3px solid #5A3FE0;outline-offset:2px}
+:root{--ground:#A6D78C;--paper:#F1EFE9;--gBg:rgba(255,255,255,.72);--gBd:rgba(255,255,255,.85);--gFx:blur(20px) saturate(1.5);--sh:0 1px 2px rgba(31,29,43,.06),0 18px 40px -24px rgba(31,29,43,.45);--shPop:0 2px 6px rgba(31,29,43,.08),0 28px 60px -20px rgba(31,29,43,.42);--veil:rgba(241,239,233,.42);--scrim:rgba(241,239,233,.55);--sheet:rgba(250,249,246,.95);--pop:#FFFFFF;--ink:#1F1D2B;--ink2:#4A4655;--ink3:#6B6779;--inv:#FFFFFF;--line:rgba(31,29,43,.12);--line2:rgba(31,29,43,.07);--card:#FFFFFF;--sunk:rgba(31,29,43,.045);--field:#FFFFFF;--seg:rgba(31,29,43,.06);--tabOn:#FFFFFF;--chip:rgba(31,29,43,.06);--track:rgba(31,29,43,.1);--rowHover:rgba(31,29,43,.04);--rowOn:rgba(90,63,224,.08);--hero:#5A3FE0;--heroInk:#4A31CC;--heroSoft:rgba(90,63,224,.1);--logo:#5A3FE0;--run:#5A3FE0;--sch:#0E7C79;--schSoft:rgba(14,124,121,.1);--ok:#1E8A4C;--okInk:#155E32;--okSoft:rgba(31,127,68,.12);--amber:#F0A500;--amberSoft:#FFF4DA;--amberLine:#F1D48C;--amberInk:#7A5000;--amberTile:#FFE7B0;--red:#C8372D;--redInk:#A52A21;--redSoft:rgba(200,55,45,.1);--btn2:#FFFFFF;--toast:#1F1D2B;--toastInk:#FFFFFF;--pin:#FFFFFF;--stem:rgba(255,255,255,.95);--halo:rgba(255,255,255,.4);--blueSoft:rgba(63,127,224,.12);--blueInk:#1F5FBF;--pinkSoft:#FBE4EE;--orangeSoft:#FDEBDD;--greenSoft:#E8F1DC;--cork:#E6DAC2;--corkDot:rgba(120,88,40,.16);--corkFrame:#CBAA7A}
+[data-time="night"]{--ground:#465A56;--paper:#14163A;--gBg:rgba(20,22,52,.66);--gBd:rgba(255,255,255,.14);--gFx:blur(20px) saturate(1.4);--sh:0 1px 2px rgba(0,0,0,.3),0 18px 40px -24px rgba(0,0,0,.75);--shPop:0 2px 6px rgba(0,0,0,.3),0 28px 60px -20px rgba(0,0,0,.8);--veil:rgba(10,12,34,.42);--scrim:rgba(10,12,34,.55);--sheet:rgba(22,24,54,.95);--pop:#23264F;--ink:#F4F2FA;--ink2:#D2CEE3;--ink3:#A9A5BE;--inv:#1F1D2B;--line:rgba(255,255,255,.13);--line2:rgba(255,255,255,.07);--card:rgba(255,255,255,.055);--sunk:rgba(255,255,255,.05);--field:rgba(255,255,255,.07);--seg:rgba(255,255,255,.08);--tabOn:rgba(255,255,255,.16);--chip:rgba(255,255,255,.1);--track:rgba(255,255,255,.14);--rowHover:rgba(255,255,255,.05);--rowOn:rgba(122,98,245,.2);--hero:#7A62F5;--heroInk:#BCAFFF;--heroSoft:rgba(122,98,245,.22);--logo:#BCAFFF;--run:#A493FF;--sch:#5FD0CB;--schSoft:rgba(95,208,203,.14);--ok:#5CCB86;--okInk:#86D9A2;--okSoft:rgba(92,203,134,.16);--amberSoft:rgba(58,42,16,.85);--amberLine:rgba(247,200,92,.45);--amberInk:#F7C85C;--amberTile:#4A3810;--red:#FF7A6E;--redInk:#FF9C92;--redSoft:rgba(255,122,110,.16);--btn2:rgba(255,255,255,.1);--toast:#F4F2FA;--toastInk:#1F1D2B;--pin:#FFE296;--stem:rgba(255,226,150,.85);--halo:rgba(255,226,150,.3);--blueSoft:rgba(141,184,255,.16);--blueInk:#8DB8FF;--pinkSoft:rgba(217,88,140,.2);--orangeSoft:rgba(217,98,43,.2);--greenSoft:rgba(118,160,53,.2);--cork:#3A3126;--corkDot:rgba(255,220,170,.08);--corkFrame:#5A4832}
+[data-paused="1"] *{animation-play-state:paused!important}
+@keyframes mvXY{from{transform:translate(0,0)}to{transform:translate(var(--dx),var(--dy))}}
+@keyframes sprite2{from{background-position:0% 0}to{background-position:200% 0}}
+@keyframes waddle{0%,100%{transform:rotate(-6deg) translateY(0)}25%{transform:rotate(0deg) translateY(-2.5px)}50%{transform:rotate(6deg) translateY(0)}75%{transform:rotate(0deg) translateY(-2.5px)}}
+@keyframes tiloSpin{to{transform:rotate(360deg)}}
+@keyframes tiloSlide{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
+@keyframes tiloPulse{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes tiloFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes tiloGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes tiloGhost{0%,100%{opacity:1}50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div data-time="{{ time }}" style="position:relative;min-height:100vh;font-family:'Nunito Sans',sans-serif;color:var(--ink);font-variant-numeric:tabular-nums">
+
+  <div aria-hidden="true" data-paused="{{ paused }}" style="position:fixed;inset:0;overflow:hidden;background:var(--ground);z-index:0">
+    <div style="position:absolute;left:50%;top:50%;width:1600px;height:1000px;margin:-500px 0 0 -800px;transform:scale({{ bgScale }});transform-origin:50% 50%">{{ scene }}</div>
+    <div style="position:absolute;inset:0;background:var(--veil);opacity:{{ veilOp }};transition:opacity .6s ease"></div>
+  </div>
+
+  <header style="position:fixed;left:16px;right:16px;top:14px;height:62px;z-index:30;box-sizing:border-box;padding:0 10px 0 12px;border-radius:22px;background:var(--gBg);backdrop-filter:var(--gFx);-webkit-backdrop-filter:var(--gFx);border:1px solid var(--gBd);box-shadow:var(--sh);display:flex;align-items:center;gap:16px">
+    <a href="#home" onClick="{{ goHome }}" aria-label="Tilo home" style="display:flex;align-items:center;gap:10px;flex:none;color:var(--logo)">
+      <div style="width:34px;height:34px;border-radius:12px;background:var(--hero);display:flex;align-items:center;justify-content:center"><div style="width:22px;height:12px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><div style="width:3px;height:3px;border-radius:9px;background:#1F1D2B"></div><div style="width:3px;height:3px;border-radius:9px;background:#1F1D2B"></div></div></div>
+      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:27px;color:var(--logo);letter-spacing:-.5px">tilo</div>
+    </a>
+    <nav aria-label="Main" style="display:flex;gap:2px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none">
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="6">
+        <a href="{{ n.href }}" onClick="{{ n.click }}" aria-current="{{ n.cur }}" style="height:40px;padding:0 14px;border-radius:14px;background:{{ n.bg }};color:{{ n.fg }};font-size:15px;font-weight:800;display:flex;align-items:center;gap:7px;flex:none;transition:background-color .2s,color .2s" style-hover="background:var(--chip)">{{ n.label }}<sc-if value="{{ n.badge }}" hint-placeholder-val="{{ false }}"><span style="min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:99px;background:#F0A500;color:#1F1D2B;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center">{{ n.badgeN }}</span></sc-if></a>
+      </sc-for>
+    </nav>
+    <div style="display:flex;align-items:center;gap:4px;flex:none">
+      <button onClick="{{ toggleTime }}" aria-label="{{ timeLabel }}" title="{{ timeLabel }}" style="width:40px;height:40px;border-radius:13px;border:0;background:transparent;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background-color .2s" style-hover="background:var(--chip)">{{ icTime }}</button>
+      <button onClick="{{ toggleNotif }}" aria-label="Notifications" aria-expanded="{{ notifOpen }}" style="position:relative;width:40px;height:40px;border-radius:13px;border:0;background:{{ notifBg }};color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background-color .2s" style-hover="background:var(--chip)">{{ icBell }}<sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:99px;background:#F0A500;box-shadow:0 0 0 2px var(--pop)"></span></sc-if></button>
+      <button onClick="{{ toggleAcct }}" aria-label="Account menu" aria-expanded="{{ acctOpen }}" style="width:38px;height:38px;margin-left:6px;border-radius:999px;border:0;background:var(--card);color:var(--ink);box-shadow:{{ avRing }};font-weight:800;font-size:13px;cursor:pointer;flex:none;transition:box-shadow .2s">AM</button>
+    </div>
+    <div aria-hidden="true" style="position:absolute;left:22px;right:22px;bottom:-1px;height:3px;border-radius:99px;overflow:hidden;opacity:{{ barOp }};transition:opacity .3s ease"><div style="height:100%;width:{{ barW }};background:var(--hero);border-radius:99px;transition:width .45s cubic-bezier(.2,.8,.2,1)"></div></div>
+  </header>
+
+  <sc-if value="{{ anyMenu }}" hint-placeholder-val="{{ false }}"><div onClick="{{ closeMenus }}" style="position:fixed;inset:0;z-index:28"></div></sc-if>
+
+  <sc-if value="{{ notifOpen }}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" aria-label="Notifications" style="position:fixed;top:86px;right:60px;width:392px;max-width:calc(100vw - 32px);z-index:31;box-sizing:border-box;background:var(--pop);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shPop);padding:8px;display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px 6px">
+        <span style="font-size:16px;font-weight:800">Notifications</span>
+        <button onClick="{{ openPrefs }}" style="border:0;background:transparent;color:var(--heroInk);font-size:13.5px;font-weight:800;cursor:pointer;padding:4px 6px;border-radius:8px">Settings</button>
+      </div>
+      <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="4">
+        <button onClick="{{ n.open }}" style="display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px;border:0;border-radius:14px;background:transparent;text-align:left;cursor:pointer;color:var(--ink);transition:background-color .2s" style-hover="background:var(--rowHover)">
+          <span style="width:36px;height:36px;border-radius:11px;background:{{ n.tile }};color:{{ n.ic }};display:flex;align-items:center;justify-content:center">{{ n.icon }}</span>
+          <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:14px;font-weight:800;line-height:1.3">{{ n.title }}</span><span style="font-size:13px;font-weight:600;color:var(--ink2)">{{ n.sub }}</span></span>
+          <span style="font-size:12.5px;font-weight:700;color:var(--ink3);align-self:flex-start;padding-top:2px">{{ n.t }}</span>
+        </button>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ acctOpen }}" hint-placeholder-val="{{ false }}">
+    <div role="menu" aria-label="Account" style="position:fixed;top:86px;right:16px;width:300px;z-index:31;box-sizing:border-box;background:var(--pop);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shPop);padding:8px;display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 10px 12px">
+        <div style="width:44px;height:44px;border-radius:999px;background:#E6E1F8;color:#1F1D2B;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none">AM</div>
+        <div style="min-width:0;line-height:1.3"><div style="font-size:15px;font-weight:800">Alex Morgan</div><div style="font-size:13px;font-weight:600;color:var(--ink2)">alex@northwind.co</div><div style="font-size:12.5px;font-weight:700;color:var(--ink3)">Northwind Ops · Team plan</div></div>
+      </div>
+      <div style="height:1px;background:var(--line2);margin:0 6px 4px"></div>
+      <sc-for list="{{ acctItems }}" as="m" hint-placeholder-count="4">
+        <a href="{{ m.href }}" onClick="{{ m.click }}" role="menuitem" style="height:42px;padding:0 10px;border-radius:12px;display:flex;align-items:center;gap:12px;color:var(--ink);font-size:14.5px;font-weight:700;transition:background-color .2s" style-hover="background:var(--rowHover);color:var(--ink)"><span style="color:var(--ink2);display:flex">{{ m.icon }}</span><span style="flex:1">{{ m.label }}</span><span style="font-size:12.5px;font-weight:700;color:var(--ink3)">{{ m.hint }}</span></a>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <main style="position:relative;z-index:1;opacity:{{ pageOp }};transform:{{ pageTf }};transition:opacity .24s ease,transform .38s cubic-bezier(.2,.8,.2,1)">
+    <sc-if value="{{ is.home }}" hint-placeholder-val="{{ true }}">
+      <dc-import name="Tilo App Home" app="{{ app }}" hint-size="100%,100vh"></dc-import>
+    </sc-if>
+    <sc-if value="{{ inner }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:100px 24px 56px;box-sizing:border-box;min-height:100vh">
+        <div style="max-width:1320px;margin:0 auto">
+          <sc-if value="{{ is.worlds }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo App Worlds" app="{{ app }}" hint-size="100%,1200px"></dc-import></sc-if>
+          <sc-if value="{{ is.world }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo App World" app="{{ app }}" hint-size="100%,1200px"></dc-import></sc-if>
+          <sc-if value="{{ is.skills }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo App Skills" app="{{ app }}" hint-size="100%,1200px"></dc-import></sc-if>
+          <sc-if value="{{ is.ledger }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo App Ledger" app="{{ app }}" hint-size="100%,1200px"></dc-import></sc-if>
+          <sc-if value="{{ is.agenda }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo App Agenda" app="{{ app }}" hint-size="100%,1200px"></dc-import></sc-if>
+          <sc-if value="{{ is.team }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo App Team" app="{{ app }}" hint-size="100%,1200px"></dc-import></sc-if>
+          <sc-if value="{{ is.profile }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo App Profile" app="{{ app }}" hint-size="100%,1200px"></dc-import></sc-if>
+          <sc-if value="{{ is.connectors }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo App Connectors" app="{{ app }}" hint-size="100%,1200px"></dc-import></sc-if>
+        </div>
+      </div>
+    </sc-if>
+  </main>
+
+  <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+    <div role="status" aria-live="polite" style="position:fixed;left:50%;top:92px;transform:translateX(-50%);z-index:45;max-width:calc(100vw - 32px);box-sizing:border-box;background:var(--toast);color:var(--toastInk);border-radius:16px;padding:8px 8px 8px 14px;display:flex;align-items:center;gap:12px;box-shadow:var(--shPop);font-size:14.5px;font-weight:700">
+      <span style="width:24px;height:24px;border-radius:99px;background:#1E8A4C;color:#FFFFFF;display:flex;align-items:center;justify-content:center;flex:none">{{ icCheck }}</span>
+      <span style="min-width:0">{{ toastMsg }}</span>
+      <sc-if value="{{ toastHasAct }}" hint-placeholder-val="{{ false }}"><button onClick="{{ toastAct }}" style="height:32px;padding:0 12px;border:0;border-radius:10px;background:rgba(127,127,140,.22);color:var(--toastInk);font-size:13.5px;font-weight:800;cursor:pointer;flex:none">{{ toastActL }}</button></sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ wlOn }}" hint-placeholder-val="{{ false }}">
+    <div role="status" aria-live="polite" style="position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:var(--scrim);opacity:{{ wl.op }};transition:opacity .25s ease">
+      <div style="width:400px;max-width:calc(100vw - 48px);box-sizing:border-box;background:var(--pop);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shPop);padding:22px 24px 24px;display:flex;flex-direction:column;gap:18px;transform:{{ wl.tf }};transition:transform .4s cubic-bezier(.2,.8,.2,1)">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="width:58px;height:58px;border-radius:16px;background:var(--sunk);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ wl.art }}</div>
+          <div style="min-width:0;line-height:1.3"><div style="font-size:12px;font-weight:800;letter-spacing:.7px;color:var(--ink3)">{{ wl.eyebrow }}</div><div style="font-size:19px;font-weight:800;letter-spacing:-.2px">{{ wl.name }}</div><div style="font-size:13.5px;font-weight:600;color:var(--ink2)">{{ wl.meta }}</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ wl.steps }}" as="s" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;color:{{ s.fg }};transition:color .2s">
+              <span style="width:20px;height:20px;border-radius:99px;background:{{ s.bg }};color:#FFFFFF;display:flex;align-items:center;justify-content:center;flex:none;transition:background-color .2s">{{ s.mark }}</span>{{ s.label }}
+            </div>
+          </sc-for>
+        </div>
+        <div style="height:4px;border-radius:99px;background:var(--track);overflow:hidden"><div style="height:100%;width:{{ wl.w }};background:var(--hero);border-radius:99px;transition:width .35s cubic-bezier(.2,.8,.2,1)"></div></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ bootOn }}" hint-placeholder-val="{{ true }}">
+    <div role="status" aria-label="Loading Tilo" style="position:fixed;inset:0;z-index:60;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;opacity:{{ bootOp }};transition:opacity .45s ease">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:56px;height:56px;border-radius:18px;background:var(--hero);display:flex;align-items:center;justify-content:center"><div style="width:36px;height:20px;border-radius:8px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:8px"><div style="width:5px;height:5px;border-radius:9px;background:#1F1D2B"></div><div style="width:5px;height:5px;border-radius:9px;background:#1F1D2B"></div></div></div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:48px;color:var(--logo);letter-spacing:-1.2px">tilo</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+        <div style="width:200px;height:4px;border-radius:99px;background:var(--track);overflow:hidden">{{ bootBar }}</div>
+        <div style="font-size:14.5px;font-weight:700;color:var(--ink2)">Loading your city</div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;time&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;day&quot;,&quot;night&quot;],&quot;default&quot;:&quot;day&quot;,&quot;tsType&quot;:&quot;'day'|'night'&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;motion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;lively&quot;,&quot;calm&quot;,&quot;still&quot;],&quot;default&quot;:&quot;calm&quot;,&quot;tsType&quot;:&quot;'lively'|'calm'|'still'&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;startPage&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;worlds&quot;,&quot;world&quot;,&quot;skills&quot;,&quot;ledger&quot;,&quot;agenda&quot;,&quot;team&quot;,&quot;profile&quot;,&quot;connectors&quot;],&quot;default&quot;:&quot;home&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Preview&quot;}}">
+class Component extends DCLogic {
+  state = { ready: false, boot: 'on', page: 'home', params: {}, phase: 'in', bar: 0, barOn: false, wl: null, dec: {}, added: [], menu: null, toast: null, read: false, prefs: {}, vw: 1440, vh: 900 };
+  cache = {};
+  PAGES = ['home', 'worlds', 'world', 'skills', 'ledger', 'agenda', 'team', 'profile', 'connectors'];
+  componentDidMount() {
+    this.onResize = () => {
+      const de = document.documentElement, w = de.clientWidth || window.innerWidth, hh = de.clientHeight || window.innerHeight;
+      if (!w || !hh) { this.rz = setTimeout(this.onResize, 60); return; }
+      if (w !== this.state.vw || hh !== this.state.vh) this.setState({ vw: w, vh: hh });
+    };
+    this.onKey = e => { if (e.key === 'Escape' && this.state.menu) this.setState({ menu: null }); };
+    window.addEventListener('resize', this.onResize); window.addEventListener('keydown', this.onKey);
+    try { this.ro = new ResizeObserver(() => this.onResize()); this.ro.observe(document.documentElement); } catch (e) {}
+    this.onResize(); requestAnimationFrame(this.onResize);
+    window.tiloNavigate = (p, params) => this.go(p, params);
+    const hs = (location.hash || '').replace('#', '').split('/'), start = this.PAGES.includes(hs[0]) ? hs[0] : (this.props.startPage ?? 'home');
+    this.setState({ page: start, params: start === 'world' ? { id: hs[1] || 'k1' } : {} });
+    const boot = () => {
+      if (!(window.TiloApp && window.TiloApp.ready())) { this.bt = setTimeout(boot, 40); return; }
+      this.bt = setTimeout(() => { this.setState({ ready: true }); this.bt2 = setTimeout(() => this.setState({ boot: 'fade' }), 200); this.bt3 = setTimeout(() => { this.setState({ boot: 'off' }); ['Worlds', 'World', 'Skills', 'Ledger', 'Agenda', 'Team', 'Profile', 'Connectors'].forEach(n => { try { fetch('./Tilo App ' + n + '.dc.html'); } catch (e) {} }); }, 700); }, 60);
+    };
+    boot();
+  }
+  componentDidUpdate(p) { if (p.startPage !== this.props.startPage && this.props.startPage) this.go(this.props.startPage, this.props.startPage === 'world' ? { id: 'k1' } : {}); }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); clearTimeout(this.rz); if (this.ro) this.ro.disconnect();
+    [this.bt, this.bt2, this.bt3, this.tA, this.tB, this.tC, this.tD, this.toastT].forEach(clearTimeout); clearInterval(this.wlT);
+  }
+  hash(page, params) { try { history.replaceState(null, '', '#' + page + (params && params.id ? '/' + params.id : '')); } catch (e) {} }
+  go = (page, params) => {
+    params = params || {};
+    if (page === 'world') { this.openWorld(params.id || 'k1'); return; }
+    if (page === this.state.page && JSON.stringify(params) === JSON.stringify(this.state.params)) { this.setState({ menu: null }); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    [this.tA, this.tB, this.tC, this.tD].forEach(clearTimeout);
+    this.setState({ phase: 'out', barOn: true, bar: 35, menu: null });
+    this.tA = setTimeout(() => {
+      this.setState({ page, params, phase: 'pre', bar: 78 }); this.hash(page, params); window.scrollTo(0, 0);
+      this.tB = setTimeout(() => this.setState({ phase: 'in', bar: 100 }), 40);
+      this.tC = setTimeout(() => this.setState({ barOn: false }), 460);
+      this.tD = setTimeout(() => this.setState({ bar: 0 }), 820);
+    }, 200);
+  };
+  openWorld(id) {
+    const D = window.TiloApp && window.TiloApp.data; if (!D) return;
+    const w = D.worlds(this.state.dec, this.state.added).find(x => x.id === id); if (!w) return;
+    clearInterval(this.wlT); [this.tC, this.tD].forEach(clearTimeout);
+    this.setState({ wl: { id, step: 0, op: 0 }, menu: null, barOn: true, bar: 18 });
+    this.tB = setTimeout(() => this.setState(s => ({ wl: s.wl && { ...s.wl, op: 1 } })), 20);
+    let step = 0;
+    this.wlT = setInterval(() => {
+      step++;
+      if (step < 3) this.setState(s => ({ wl: s.wl && { ...s.wl, step }, bar: 18 + step * 26 }));
+      else if (step === 3) { this.setState(s => ({ wl: s.wl && { ...s.wl, step: 3 }, page: 'world', params: { id }, phase: 'in', bar: 100 })); this.hash('world', { id }); window.scrollTo(0, 0); }
+      else { clearInterval(this.wlT); this.setState(s => ({ wl: s.wl && { ...s.wl, op: 0 }, barOn: false })); this.tC = setTimeout(() => this.setState({ wl: null, bar: 0 }), 280); }
+    }, w.tier === 'City' ? 340 : 250);
+  }
+  toast = (msg, actL, act) => { clearTimeout(this.toastT); this.setState({ toast: { msg, actL, act } }); this.toastT = setTimeout(() => this.setState({ toast: null }), 4200); };
+  decide = k => {
+    const D = window.TiloApp.data, d = D.decisions.find(x => x.k === k);
+    this.setState(s => ({ dec: { ...s.dec, [k]: true } }));
+    this.toast(k === 'depot' ? 'Approved £3,420 for Laptop Depot' : 'Supplier brief sent to 3 suppliers', 'Undo', () => { this.setState(s => ({ dec: { ...s.dec, [k]: false }, toast: null })); });
+  };
+  addWorld = (mode, q) => {
+    const D = window.TiloApp.data, w = D.makeWorld(mode, q, this.state.added.length + 1);
+    this.setState(s => ({ added: [w, ...s.added] }));
+    this.toast('Started “' + w.short + '”', 'Open', () => { this.setState({ toast: null }); this.openWorld(w.id); });
+    return w;
+  };
+  setPref = (k, v) => this.setState(s => ({ prefs: { ...s.prefs, [k]: v } }));
+  renderVals() {
+    const h = React.createElement, S = this.state, TA = window.TiloApp, ok = S.ready && TA && TA.ready();
+    const K = ok ? TA.kit(h) : null, D = TA ? TA.data : null;
+    const time = S.prefs.time ?? this.props.time ?? 'day', night = time === 'night', motion = S.prefs.motion ?? this.props.motion ?? 'calm';
+    const still = motion === 'still', k = motion === 'calm' ? 1.9 : 1;
+    const ck = (key, f) => (key in this.cache) ? this.cache[key] : (this.cache[key] = f());
+    const key = time + '|' + motion;
+    const sc = K ? ck('scene|' + key, () => K.TP.scene({ w: 1600, h: 1000, vw: 1240, night, k, still })) : null;
+    const VW = S.vw || 1440, VH = S.vh || 900, scale = Math.max(VW / 1600, VH / 1000);
+    const raw = sc ? ck('pins|' + key, () => {
+      const used = new Set();
+      const near = (t, min) => { let b = -1, bd = 1e9; sc.spots.forEach((p, i) => { if (used.has(i) || p.area < min) return; const d = Math.hypot(p.x - t[0], p.y - t[1]); if (d < bd) { bd = d; b = i; } }); if (b < 0) return { x: t[0], y: t[1] }; used.add(b); return sc.spots[b]; };
+      return [near([1000, 420], 4), near([820, 640], 4), near([900, 250], 2)];
+    }) : [];
+    const pins = raw.map(p => ({ x: (p.x - 800) * scale + VW / 2, y: (p.y - 500) * scale + VH / 2 }));
+    const icon = (n, s) => K ? K.icon(n, s) : null;
+    const page = S.page, needsLeft = D ? D.needsLeft(S.dec) : 2;
+    const menu = S.menu, link = (p, params) => e => { if (e) e.preventDefault(); this.go(p, params); };
+    const NAV = [['home', 'Home'], ['worlds', 'Worlds'], ['skills', 'Skills'], ['ledger', 'Ledger'], ['agenda', 'Agenda'], ['team', 'Team']];
+    const nav = NAV.map(([p, label]) => {
+      const on = page === p || (p === 'worlds' && page === 'world');
+      return { label, href: '#' + p, click: link(p), cur: on ? 'page' : undefined, bg: on ? 'var(--heroSoft)' : 'transparent', fg: on ? 'var(--heroInk)' : 'var(--ink)', hov: on ? 'var(--heroSoft)' : 'var(--chip)', badge: p === 'worlds' && needsLeft > 0, badgeN: String(needsLeft) };
+    });
+    const KIND = { needs: ['var(--amberTile)', 'var(--amberInk)', 'flag'], done: ['var(--okSoft)', 'var(--ok)', 'check'], warn: ['var(--redSoft)', 'var(--red)', 'plug'], info: ['var(--heroSoft)', 'var(--heroInk)', 'dot'] };
+    const notifs = D ? D.notifications.map(n => {
+      const doneDec = n.dec && S.dec[n.dec], kd = KIND[doneDec ? 'done' : n.kind];
+      return { t: n.t, title: doneDec ? (n.dec === 'depot' ? 'You approved Laptop Depot' : 'You sent the supplier brief') : n.title, sub: n.sub, tile: kd[0], ic: kd[1], icon: icon(kd[2], 16), open: () => { this.setState({ menu: null }); this.go(n.go[0], n.go[1] ? { id: n.go[1] } : {}); } };
+    }) : [];
+    const acctItems = [['person', 'Profile and settings', 'profile', ''], ['plug', 'Connectors', 'connectors', '6 on'], ['people', 'Team and roles', 'team', ''], ['phone', 'Mobile app', 'mobile', 'Concept'], ['logout', 'Sign out', 'signout', '']].map(([ic, label, p, hint]) => ({
+      icon: icon(ic, 17), label, hint,
+      href: p === 'mobile' ? 'Tilo iOS Native.dc.html' : '#' + p,
+      click: p === 'mobile' ? undefined : e => { e.preventDefault(); if (p === 'signout') { this.setState({ menu: null }); this.toast('This is a prototype, so you stay signed in'); return; } this.go(p); }
+    }));
+    const wl = S.wl, wlW = wl && D ? D.worlds(S.dec, S.added).find(x => x.id === wl.id) : null;
+    const STEPS = { City: ['Loading districts and buildings', 'Waking ' + (wlW ? wlW.agents : '') + ' agents', 'Syncing spend and decisions'], Town: ['Loading the routine', 'Reading run history', 'Checking the next run'], Village: ['Loading the task', 'Checking progress', 'Fetching results'] };
+    const spin = h('span', { style: { width: 16, height: 16, boxSizing: 'border-box', borderRadius: 99, border: '2.5px solid var(--track)', borderTopColor: 'var(--hero)', animation: 'tiloSpin .7s linear infinite', display: 'block' } });
+    const wlV = wl && wlW ? {
+      op: String(wl.op), tf: wl.op ? 'translateY(0) scale(1)' : 'translateY(8px) scale(.98)', name: wlW.name,
+      eyebrow: ('Opening ' + wlW.tier).toUpperCase(), meta: wlW.tool + ' · ' + wlW.agents + (wlW.agents === 1 ? ' agent' : ' agents'),
+      art: K ? (wlW.tier === 'City' ? K.agent({ rank: 'director', expr: 'focused' }, 50, night) : K.art(wlW, 50, night)) : null,
+      w: Math.min(100, (wl.step + 1) * 30) + '%',
+      steps: STEPS[wlW.tier].map((label, i) => ({ label, bg: i < wl.step ? 'var(--ok)' : i === wl.step ? 'transparent' : 'var(--track)', fg: i <= wl.step ? 'var(--ink)' : 'var(--ink3)', mark: i < wl.step ? icon('check', 12) : i === wl.step ? spin : null }))
+    } : { op: '0', tf: 'none', steps: [] };
+    const phase = S.phase;
+    const app = {
+      page, params: S.params, go: this.go, dec: S.dec, decide: this.decide, needsLeft, added: S.added, addWorld: this.addWorld, toast: this.toast,
+      time, night, motion, setPref: this.setPref, prefs: S.prefs, vw: VW, vh: VH, pins, ready: ok
+    };
+    const toastV = S.toast;
+    return {
+      time, scene: sc ? sc.el : null, bgScale: scale.toFixed(4), paused: page === 'home' && !S.wl ? '0' : '1', veilOp: page === 'home' ? '0' : '1',
+      nav, goHome: link('home'),
+      icTime: icon(night ? 'sun' : 'moon', 18), timeLabel: night ? 'Switch to day' : 'Switch to night', toggleTime: () => this.setPref('time', night ? 'day' : 'night'),
+      icBell: icon('bell', 19), hasUnread: !S.read && needsLeft > 0, notifOpen: menu === 'notif', acctOpen: menu === 'acct', anyMenu: !!menu, notifBg: menu === 'notif' ? 'var(--chip)' : 'transparent',
+      toggleNotif: () => this.setState(s => ({ menu: s.menu === 'notif' ? null : 'notif', read: true })),
+      toggleAcct: () => this.setState(s => ({ menu: s.menu === 'acct' ? null : 'acct' })),
+      closeMenus: () => this.setState({ menu: null }),
+      openPrefs: () => { this.setState({ menu: null }); this.go('profile', { tab: 'notifications' }); },
+      avRing: menu === 'acct' || page === 'profile' || page === 'connectors' ? '0 0 0 2px var(--pop),0 0 0 4px var(--hero)' : '0 0 0 2px var(--pop),0 0 0 3.5px var(--line)',
+      notifs, acctItems,
+      barW: S.bar + '%', barOp: S.barOn ? '1' : '0',
+      pageOp: phase === 'in' ? '1' : '0', pageTf: phase === 'in' ? 'none' : phase === 'out' ? 'translateY(-4px)' : 'translateY(10px)',
+      is: { home: page === 'home', worlds: page === 'worlds', world: page === 'world', skills: page === 'skills', ledger: page === 'ledger', agenda: page === 'agenda', team: page === 'team', profile: page === 'profile', connectors: page === 'connectors' },
+      inner: page !== 'home', app,
+      toastOn: !!toastV, toastMsg: toastV ? toastV.msg : '', toastHasAct: !!(toastV && toastV.actL), toastActL: toastV ? toastV.actL : '', toastAct: toastV && toastV.act ? toastV.act : undefined, icCheck: icon('check', 13),
+      wlOn: !!(wl && wlW), wl: wlV,
+      bootOn: S.boot !== 'off', bootOp: S.boot === 'fade' ? '0' : '1',
+      bootBar: h('div', { style: { width: '42%', height: '100%', borderRadius: 99, background: 'var(--hero)', animation: 'tiloSlide 1.1s cubic-bezier(.4,0,.2,1) infinite' } })
+    };
+  }
+}
+</script>
+</body>
+</html>
