@@ -19,7 +19,7 @@ Cloud Run service (PRD 6.2): OAuth token broker, Gmail and Drive adapters, MCP c
   `config/mcp.yaml` (FR-CON-12 MCP allowlist, code-validated; side effects T3 only, at most once; empty = none).
 
 ## Requirement IDs
-- Section 12 (connectors, hands and deliverables; FR-CON-04/05 Gmail, Drive; FR-CON-11 `save_as_google_file` (`tests/API_FR_CON_11.md`); FR-CON-10 manifest, MF-01..06; FR-CHN-08 `watch`/`stop_watch`/`list_history`/`recent_inbox`: read scope, no outbox); FR-CON-12 `mcp.py`; SEC-02, SEC-03, SEC-09, SEC-11, SEC-14.
+- Section 12 (connectors, hands and deliverables; FR-CON-04/05 Gmail, Drive; FR-CON-11 `save_as_google_file` (`tests/API_FR_CON_11.md`); FR-CON-10 manifest, MF-01..06; FR-CHN-08 `watch`/`stop_watch`/`list_history`/`recent_inbox`: read scope, no outbox); FR-CON-12 `mcp.py`; SEC-02, SEC-03, SEC-09, SEC-11, SEC-14. Gmail messages carry a `headers` map: 4 names, lower-case, first of a repeat wins (BQ-278 n).
 
 ## Local rules
 - Side-effect methods are callable only from the outbox (SEC-03); every side-effect event carries

@@ -30,6 +30,7 @@ _ADDRESS = re.compile(r"[^@\s,;:<>()\[\]\"\\]+@[^@\s,;:<>()\[\]\"\\]+")
 _MSG_ID = re.compile(r"<[^<>\s]+>")
 _MIME = re.compile(r"[A-Za-z0-9][\w.+-]*/[\w.+-]+")
 _RE_PREFIX = re.compile(r"^(\s*re\s*:\s*)+", re.I)
+_KEPT_HEADERS = ("message-id", "in-reply-to", "references", "authentication-results")  # what channels reads
 _CHARSET = re.compile(r"charset=\"?([\w.:-]+)", re.I)
 _TOPIC = re.compile(r"projects/[a-z][a-z0-9.:-]{4,62}/topics/[A-Za-z][\w.~+%-]{2,254}")  # Pub/Sub resource names
 
@@ -318,6 +319,9 @@ def _message(resource: Mapping[str, Any]) -> dict[str, Any]:
         "cc": _addresses(headers.get("cc", "")),
         "subject": headers.get("subject", ""),
         "message_id": headers.get("message-id", "").strip(),
+        # lower-case names, only those four, the first of a repeated name (Gmail writes its own Authentication-Results
+        # above any the sender wrote); the rest of the header block never leaves the adapter
+        "headers": {name: headers[name] for name in _KEPT_HEADERS if name in headers},
         "label_ids": [str(x) for x in resource.get("labelIds") or []],
         "body_text": _decoded(text) if text is not None else "",
         "attachments": [_attachment(p) for p in parts if p.get("filename")],
