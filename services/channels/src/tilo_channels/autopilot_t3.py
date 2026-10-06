@@ -13,6 +13,10 @@ digits dropped, 0 o, 1 i, 3 e, 4 a, 5 s, 7 t, @ a), and L2 is an allowlist: a bo
 that is not a time of day, or a word off the scheduling list gives "unlisted". Names are allowed only as the greeting's
 and the signature's run (two words each) and as repeats of those words. Every step is linear, no model.
 
+CHN-GATE-D (issue #298): a name run counts only when it ends properly (`_name_run`: "," "!" or a blank line for the
+greeting, its line for the signature), a number word is never a name, and a repeat of a name starts only after greeting
+words that open a line or clause (`_opens_clause`). Body only: no participants, no contract change.
+
 BQ-274 (issue #298): `inbound_signal` is the same check for the message a draft answers, minus the allowlist, plus
 what an inbound message may hide: an amount, a magnitude suffix ("5m", "50 K") or a number word is "money" with no
 money word around it, and punctuation inside a word (any run of non-letter, non-digit characters, a tab or line break
@@ -145,6 +149,13 @@ _TOKEN = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)*|\0")
 # sign-off line ("Best,", "Kind regards,", "Many thanks!") may hold.
 _GREETING = frozenset("hi hello hey dear good morning afternoon evening thanks thank you".split())
 _SIGN_OFF = frozenset("best regards kind warm wishes cheers thanks thank you many sincerely all the".split())
+_CLAUSE_MARKS = frozenset(".,!?;:")
+# CHN-GATE-D: a number word is never a name ("Hi Fifty Thousand, works for us."); `_NUMBER_WORD` covers the magnitudes.
+_NUMBER_WORDS = frozenset(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen "
+    "eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety dozen hundred hundreds thousand thousands "
+    "million millions billion billions trillion lakh lakhs lac lacs crore crores mil mn bn cr".split()
+)
 _WORDS = frozenset(
     (
         "hi hello hey dear good morning afternoon evening night thanks thank you your very much so again for "
@@ -192,11 +203,42 @@ def _sign_off(items: list[str]) -> bool:
     return bool(words) and all(w in _SIGN_OFF for w in words) and all(i[0].isalpha() or i in ",.!" for i in items)
 
 
+def _name_run(lines: list[list[str]], index: int, start: int, greeting: bool) -> list[str]:
+    """CHN-GATE-D: the name run of `lines[index]` from item `start`: at most two Title-case words of two letters or more
+    that are neither listed words nor number words. It counts only when it ends properly: a greeting run with "," or
+    "!", or with its line when a blank line (or the end) follows; a signature run with its line. "-" and "_" are items
+    of their own, so "Fifty Thousand-ok" ends in "-", not in a name. Anything else gives no name at all."""
+    items = lines[index]
+    run: list[str] = []
+    for item in items[start : start + 2]:
+        word = item.lower()
+        if not (len(item) > 1 and item.istitle() and word not in _WORDS and word not in _NUMBER_WORDS):
+            break
+        run.append(word)
+    after = items[start + len(run)] if start + len(run) < len(items) else None
+    if greeting:
+        blank_after = index + 1 == len(lines) or not lines[index + 1]
+        ended = after in (",", "!") or (after is None and blank_after)
+    else:
+        ended = after is None
+    return run if ended else []
+
+
+def _opens_clause(items: list[str], i: int) -> bool:
+    """CHN-GATE-D: `items[i]` follows greeting words only, and the first of them opens the line or a clause (after
+    "," "." "!" "?" ";" or ":"): "Thanks David" and "Sounds good, thanks David" yes, "Sounds good David" and "See you
+    David" no."""
+    k = i
+    while k > 0 and items[k - 1].lower() in _GREETING:
+        k -= 1
+    return k < i and (k == 0 or items[k - 1] in _CLAUSE_MARKS)
+
+
 def _names(lines: list[list[str]]) -> set[str]:
     """The words of the body's two name runs: the greeting's, right after the greeting words that open the first line
     ("Hi David,"), and the signature's, opening the last line when the non-empty line before it is the last sign-off
-    line ("Best," then "Sarah"). A run is at most two Title-case words of two letters or more; anything else ends it, a
-    time of day included."""
+    line ("Best," then "Sarah"). A run is at most two Title-case words of two letters or more and must end as
+    `_name_run` says; anything else ends it, a time of day included."""
     filled = [i for i, items in enumerate(lines) if items]
     starts: dict[int, int] = {}
     if filled:
@@ -209,10 +251,7 @@ def _names(lines: list[list[str]]) -> set[str]:
             starts[filled[-1]] = 0
     names: set[str] = set()
     for index, start in starts.items():
-        for item in lines[index][start : start + 2]:
-            if not (len(item) > 1 and item.istitle() and item.lower() not in _WORDS):
-                break
-            names.add(item.lower())
+        names.update(_name_run(lines, index, start, greeting=start > 0))
     return names
 
 
@@ -235,12 +274,11 @@ def _unlisted(cleaned: str) -> bool:
     sig = filled[-1] if signs and filled[-2:-1] == signs[-1:] else None  # the signature line
     for li, items in enumerate(lines):
         run: list[str] = []  # a name run: at most two words, every join of them is checked
-        prev: str | None = None
-        for item in items:
+        for idx, item in enumerate(items):
             word = item.lower()
             if word in names:
-                # a run starts right after a greeting word, or opens the signature line
-                if not run and not ((prev is not None and prev.lower() in _GREETING) or (prev is None and li == sig)):
+                # a run starts right after greeting words that open a line or clause, or opens the signature line
+                if not run and not (_opens_clause(items, idx) or (idx == 0 and li == sig)):
                     return True
                 run = [*run, word]
                 if len(run) > 2:
@@ -254,7 +292,6 @@ def _unlisted(cleaned: str) -> bool:
                 if item[0].isalpha() and word not in _WORDS:
                     return True
                 run = []
-            prev = item
     return False
 
 
