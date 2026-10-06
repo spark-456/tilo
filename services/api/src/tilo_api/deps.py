@@ -18,7 +18,7 @@ import logging
 import math
 import os
 import threading
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol, cast
@@ -30,6 +30,7 @@ from tilo_connectors.registry import ConnectorRegistry, load_registry
 from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
+from tilo_metering import LedgerEntry
 from tilo_metering.flags import FlagStore, process_flags
 from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import PlanInputs, compile_plan
@@ -166,6 +167,11 @@ def get_store() -> Store:
 
 
 def get_event_writer() -> EventWriter:
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_ledger() -> Sequence[LedgerEntry]:
+    """The Treasury's ledger (FR-MTR-10). No ledger store is wired in yet (BQ-MTR10-4): fail closed."""
     raise HTTPException(status_code=503, detail="not_configured")
 
 

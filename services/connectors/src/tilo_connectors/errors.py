@@ -41,6 +41,23 @@ class ProviderUnavailable(AdapterError):
     """5xx or a TransportError, still after the attempts: ambiguous, the provider may have acted."""
 
 
+class SyncTokenExpired(AdapterError):
+    """Google answered 410 to a request that carried a sync token (FR-CAL-08): the next sync lists in full."""
+
+    status = 410
+
+
+class CalendarConfigError(ValueError):
+    """config/personal.yaml or the google_calendar entry is refused whole (FR-CAL-08). Names a key, never a value."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message[:500])
+
+
+class CalendarSyncRefused(ValueError):
+    """register(): a bad id, or the person is registered already under another org or world."""
+
+
 class BuildPartnerConfigError(ValueError):
     """config/build_partners.yaml is refused whole (FR-CON-16, API_FR_CON_16_17_20.md). Names a key, never a value."""
 

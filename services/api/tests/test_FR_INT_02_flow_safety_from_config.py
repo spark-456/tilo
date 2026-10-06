@@ -112,11 +112,12 @@ def test_FR_INT_02_flow_unrecorded_live_safety_profile_fails_closed(flow_factory
 
 
 def test_FR_INT_02_flow_shipped_config_has_a_fake_safety_role_for_dev(repo_root, tmp_path):
-    """Issue #103: config/models.yaml gets a `safety` role on a fake profile for dev."""
+    """Issue #103: config/models.dev.yaml has a `safety` role on a fake profile for dev (config/models.yaml
+    now points it at Model Armor, FR-INT-02)."""
     from tilo_providers.config import load_providers_config
     from tilo_providers.safety import build_safety_provider
 
-    config = load_providers_config(repo_root / "config" / "models.yaml", repo_root / "config" / "prices.yaml")
+    config = load_providers_config(repo_root / "config" / "models.dev.yaml", repo_root / "config" / "prices.yaml")
 
     assert "safety" in config.roles
     assert config.profiles[config.roles["safety"].primary].provider == "fake"
