@@ -1121,6 +1121,8 @@ def test_PPL_10b_FR_MTG_05_property_a_month_and_day_is_this_years_date_or_next_y
     got = res(phrase, at=_stamp(dt), tz=zone)
     if expected is None:
         assert (got.due, got.reason) == (None, "not_understood"), phrase
+    elif (expected - d0).days > 366:  # API.md: a result over 366 days after D0 is out_of_range (Feb 29)
+        assert (got.due, got.reason) == (None, "out_of_range"), phrase
     else:
         assert (got.due, got.reason) == (expected.isoformat(), "resolved"), phrase
 
