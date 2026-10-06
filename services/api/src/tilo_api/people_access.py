@@ -12,7 +12,7 @@ import json
 from collections.abc import Mapping
 from typing import Any, Protocol
 
-from tilo_people import access
+import tilo_people.access as access
 from tilo_people.stores import PeopleStores
 from tilo_policy.schemas import conforms
 
