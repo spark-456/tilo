@@ -1,0 +1,196 @@
+# Assistant panel (S-30): word rules, answer templates and caps (FR-PA-13, FR-PA-14, FR-PA-17, FR-PA-19).
+# API and semantics: services/api/tests/API_PPL_11b.md. Loader: tilo_api.assistant.config (strict: an unknown
+# key, a missing key or a broken rule refuses the whole file and the panel answers 503 not_configured).
+# Rules first (PR-9): these words answer and navigate with no model call. The `assistant` model role
+# (config/models*.yaml, which also holds the per-call token caps 8000 in / 1000 out) is asked only when no
+# rule matches, and may only pick a fact intent below or a navigate action; code checks what it picks.
+# Rules read only the signed-in person's own question. No rule names a person, a record or a scenario.
+# Words are compared after normalisation (NFKC, control and format characters removed, casefold), and a
+# word with an apostrophe counts as the part before it ("what's" is "what").
+
+version: 1
+
+question:
+  max_chars: 500 # FR-PA-19: bounds the model input; longer questions get 422 before anything is stored
+
+words:
+  fillers: [please, can, could, would, will, you, kindly, tilo, hey, hi, ok, okay, now, just] # dropped from the start
+  nav_verbs: [open, show, go, take, navigate, bring, jump, switch, view, display, see]
+  nav_skip: [me, to, the, a, an, page, screen, tab, up, over, please, now] # dropped after a navigation verb
+  context: [this, it, that, here, there, selected] # "open this": the selected record (the context chip)
+  context_nouns: [one, item, task, meeting, world, entry, card, pin, record]
+  title_skip: [the, a, an, my, task, item, pin, entry, card, meeting, world, run, on]
+  question_stop: [what, which, how, is, are, am, was, were, i, me, my, the, a, an, of, on, in, for, to, do, does, did, has, have, any, anything, there, today, now, please, can, could, you, tell, show, it, its, be, been, with, at, about, still, so, far, going, status, progress]
+  # A possessive ("<word>'s") is about someone else unless the word is one of these.
+  self_possessives: [what, it, that, there, where, who, how, let, here, today, tomorrow, yesterday, team, week, month, day, year, one]
+  third_person: [he, she, him, her, his, hers, someone, somebody, colleague, colleagues, teammate, teammates, manager, boss, everyone, everybody, others]
+
+# FR-PA-13: each fact intent is a filter over the signed-in person's own plate rows (ADR-0021, PE-26 to
+# PE-29) and a template. `when`: every inner list must share a word with the question (AND of ORs). The
+# first intent in this order that matches wins. `rows`: a row is kept when it passes every key given.
+facts:
+  - id: mail
+    describe: "mail that needs your reply"
+    when: [[mail, mails, email, emails, inbox, reply, replies]]
+    rows: { reasons: [mail_reply] }
+    header: "Mail that needs your reply:"
+    empty: "No mail needs your reply."
+  - id: waiting
+    describe: "cards and blocked work waiting for your answer or approval"
+    when: [[waiting, wait, waits, needs, need, approve, approval, approvals, pending, answer, decide]]
+    rows: { reasons: [gate, consent, blocked, question, meeting_card] }
+    header: "Waiting for you:"
+    empty: "Nothing is waiting for you."
+  - id: overdue
+    describe: "work items and pins past their due date"
+    when: [[overdue, late, behind, missed]]
+    rows: { groups: [overdue] }
+    header: "Overdue:"
+    empty: "Nothing is overdue."
+  - id: due_soon
+    describe: "things due today or in the next two days"
+    when: [[due, deadline, deadlines], [soon, today, tomorrow, next, week, days, upcoming, coming]]
+    rows: { groups: [soon], has_due: true }
+    header: "Due in the next two days:"
+    empty: "Nothing is due in the next two days."
+  - id: calendar_today
+    describe: "your own calendar entries today"
+    when: [[calendar, schedule, agenda, meetings]]
+    rows: { reasons: [calendar] }
+    header: "On your calendar today:"
+    empty: "Nothing is on your calendar today."
+  - id: changed
+    describe: "what is new on your plate in the last 24 hours"
+    when: [[changed, change, changes, new, updated, update, updates, happened, since]]
+    rows:
+      within_hours: 24
+      reasons: [gate, consent, blocked, question, meeting_card, run, work_item, mail_reply, pin_owner, pin_tagged]
+    header: "New on your plate since yesterday:"
+    empty: "Nothing new since yesterday."
+  - id: pins
+    describe: "pins you are responsible for or tagged on"
+    when: [[pin, pins, pinned, pinboard, tagged, mentioned, mention, mentions]]
+    rows: { reasons: [pin_owner, pin_tagged] }
+    header: "Your pins:"
+    empty: "No pins need you."
+  - id: tasks
+    describe: "how your running and blocked tasks are going"
+    when: [[task, tasks, run, runs, going, progress, status, world, worlds]]
+    rows: { reasons: [run, blocked], kinds: [world] }
+    header: "Your tasks:"
+    empty: "None of your tasks is running."
+    narrow: true # the selected world, or the one row whose title holds the question's other words
+  - id: plate
+    describe: "everything on your plate, most urgent first"
+    when: [[plate, plates, todo, todos]]
+    rows: { groups: [attention, overdue, soon, rest] }
+    header: null # the plate answer puts answer.group_headers before each group instead
+    empty: "Your plate is empty."
+
+# FR-PA-14: a verb from words.nav_verbs, then (after words.nav_skip) exactly one of these phrases; a
+# leading "my" is tried with and then without it. `with_context`: when the selected record is of that
+# kind and the person may read it, open it on its own route instead. A phrase belongs to one route.
+navigate:
+  - route: plate
+    describe: "My plate"
+    phrases: [plate, my plate, todo list, to do list, work items, my work]
+  - route: calendar
+    describe: "the calendar"
+    phrases: [calendar, agenda, schedule, team calendar]
+  - route: meetings
+    describe: "meetings and minutes"
+    phrases: [meetings, meeting minutes, minutes]
+    with_context: meeting
+  - route: pinboard_team
+    describe: "the team pinboard"
+    phrases: [pinboard, pinboards, team pinboard, team board, board, team pins]
+  - route: pinboard_personal
+    describe: "your personal pinboard"
+    phrases: [personal pinboard, personal board, private pinboard, private board, my pinboard, my board, my pins]
+  - route: worlds
+    describe: "worlds and replays"
+    phrases: [worlds, all worlds, world list, replays, my tasks, tasks]
+  - route: cards
+    describe: "the needs-you queue"
+    phrases: [needs you, needs you queue, queue, cards, approvals]
+  - route: connections
+    describe: "connections"
+    phrases: [connections, connected accounts, integrations, accounts]
+  - route: channels
+    describe: "channels and notifications"
+    phrases: [channels, notifications, notification settings, email settings]
+  - route: autonomy
+    describe: "autonomy and autopilot"
+    phrases: [autonomy, autopilot, autonomy settings, policies]
+  - route: settings
+    describe: "settings"
+    phrases: [settings, preferences, account settings]
+
+# assistant.asked `screen`: the first segment of the web path sent as context.route; `/meetings/<id>` is
+# `meeting`. Any other path gives null.
+screens:
+  plate: plate
+  calendar: calendar
+  meetings: meetings
+  pinboards: pinboard_team
+  worlds: worlds
+  world: world
+  needs-you: cards
+  connections: connections
+  channels: channels
+  autonomy: autonomy
+  settings: settings
+
+answer:
+  max_lines: 10 # claim lines per answer (assistant.replied `sources` holds at most 20)
+  more: "More on My plate." # claims nothing; offered with a navigate to `plate` when rows were left out
+  due_suffix: " (due $due)" # added to a claim line whose row has a due date, except calendar rows
+  flagged_suffix: " (flagged)" # added when the row's record is flagged (PE-21)
+  kind_labels: # $label for a row with no title; never another person's text
+    mail: "Mail that needs your reply"
+  untitled: "Untitled item" # $label for any other row with no title
+  opening: "Opening $screen." # the one line of a navigated answer; $screen: the route's describe
+  target_screens: # $screen for the two routes that always open a record
+    world: "the world"
+    meeting: "the meeting"
+  group_headers: # the plate intent only; claims nothing
+    attention: "Needs you:"
+    overdue: "Overdue:"
+    soon: "Soon:"
+    rest: "Later:"
+  lines: # one claim per row, by plate reason. $label: the row title; $time: HH:MM in your time zone
+    gate: "$label: waiting for your approval"
+    consent: "$label: waiting for your consent"
+    blocked: "$label: blocked"
+    question: "$label: waiting for your answer"
+    meeting_card: "$label: minutes to confirm"
+    run: "$label: running"
+    work_item: "$label"
+    mail_reply: "$label"
+    pin_owner: "$label (you are responsible)"
+    pin_tagged: "$label (you are tagged)"
+    calendar: "$time $label"
+
+# Fixed texts. Which one is used depends only on the question, this file, the person's own records and
+# spend, and the model's reply; never on whether someone else or someone else's record exists (FR-PA-17).
+declines:
+  unknown: "I can answer about your plate: what is waiting for you, what is overdue or due soon, today's calendar, your pins, mail that needs a reply, how your tasks are going and what is new. I can also open a screen, like My plate, Calendar or Pinboards."
+  other_person: "I can only answer about your own plate and calendar, and open the team boards you can see."
+  no_selection: "Nothing is selected that I can open. Tell me which screen you want, like My plate or Calendar."
+  dropped: "I could not work that out safely, so I did nothing. Try asking about your plate, or name a screen to open."
+  rules_only: "I can only answer common questions right now. Try asking what is on your plate."
+  budget: "Today's assistant allowance is used up, so I can only answer common questions until tomorrow (UTC)."
+  flagged: "I can't help with that question."
+  failed: "I can't read your plate right now. Please try again in a moment."
+
+model: # the fallback (FR-PA-14, FR-PA-19); never asked when a rule matched
+  role: assistant
+  menu_rows: 40 # at most this many of the person's own plate rows are offered to the model
+  max_output_chars: 2000 # a longer reply is dropped unread
+
+cost:
+  user_day_credits: 50 # FR-PA-19: per person per UTC day (BQ-44), US$0.25; after it, rules only
+
+cache: # FR-PA-19: model decisions only, per person, keyed on the person and every input the model saw
+  per_user_entries: 64
+  ttl_hours: 24

@@ -41,6 +41,9 @@ roles:
   # issue #272 (b): the live scenario generator (evals/generator.yaml caps its spend) and its autorater.
   generator: { primary: flash-38, fallback: flash-37, thinking: low }
   autorater: { primary: flash-37, fallback: lite-31 }
+  # FR-PA-19: the assistant panel's fallback (config/assistant.yaml) on the cheapest profile; the
+  # fallback (NFR-25) is used only on a provider error. Per-call caps: 8000 tokens in, 1000 out (EFF-03).
+  assistant: { primary: lite-31, fallback: flash-37, max_input_tokens: 8000, max_output_tokens: 1000 }
   safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only; never a weaker fallback
 
 rules:
