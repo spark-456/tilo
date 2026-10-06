@@ -3,7 +3,14 @@
 // starts work. Plan 8b (designed, no Api yet): invite, role change, remove, resend and cancel, the five rule
 // switches and the backup picker are page state; the "Now / 2h ago" activity strings and the wait times are
 // the fixture's own text. Motion (the details fade, the 1.8 s flash timer, hover fades) arrives with WEB-3b.
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { Button, PageSheet } from "../../components";
@@ -23,7 +30,7 @@ import {
 
 const EMAIL = /.+@.+\..+/;
 
-function Top({ count, children }: { count?: string; children?: ReactNode }) {
+function Top({ count, children }: { count?: string | undefined; children?: ReactNode }) {
   return (
     <div className="park-team-top">
       <div className="park-team-titles">
@@ -53,14 +60,18 @@ function Frame({ children }: { children: ReactNode }) {
 
 export function TeamPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
-  const { dec, added } = app;
+  const { dec, added, toast } = app;
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
+  const [people, setPeople] = useState<Member[] | null>(null);
+  const [email, setEmail] = useState("");
+  const sent = useRef(0);
   useEffect(() => {
     let live = true;
     Promise.all([api.getTeam(), api.getLearn(), api.getSkills(), api.getWorlds(dec, added)])
       .then(([t, l, s, w]) => {
-        if (live)
-          setLoaded({ team: t.data, helpers: l.data.helpers, skills: s.data, worlds: w.data });
+        if (!live) return;
+        setPeople((ps) => ps ?? t.data.people);
+        setLoaded({ team: t.data, helpers: l.data.helpers, skills: s.data, worlds: w.data });
       })
       .catch(() => live && setLoaded("failed"));
     return () => {
@@ -68,11 +79,48 @@ export function TeamPage({ app }: { app: AppCtx }) {
     };
   }, [api, dec, added]);
 
-  if (loaded && loaded !== "failed") return <TeamBody app={app} data={loaded} />;
+  const valid = EMAIL.test(email.trim());
+  const invite = () => {
+    const to = email.trim();
+    if (!valid) return toast("Enter a work email to invite");
+    sent.current += 1;
+    const pending = { id: `i${sent.current}`, name: to, email: to, dept: "", role: "Member" };
+    setPeople((ps) => [
+      ...(ps ?? []),
+      { ...pending, active: "Pending", c: "transparent", pending: true },
+    ]);
+    setEmail("");
+    toast(`Invite sent to ${to}`);
+  };
+
+  // One stable root: the frame and the heading are the same elements while loading, loaded or failed, so
+  // the h1 the shell focuses on arrival is not remounted when the data lands.
+  const ready = loaded && loaded !== "failed" && people ? { data: loaded, people } : null;
   return (
     <Frame>
-      <Top />
-      {loaded === "failed" ? (
+      <Top count={ready ? `${ready.people.length} people` : undefined}>
+        {ready ? (
+          <div className="park-team-invite">
+            <div className="park-team-field">
+              {icon("mail", 16)}
+              <input
+                className="park-team-input"
+                aria-label="Invite by email"
+                placeholder="name@northwind.co"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && invite()}
+              />
+            </div>
+            <Button variant="primary" style={{ opacity: valid ? 1 : 0.6 }} onClick={invite}>
+              Invite
+            </Button>
+          </div>
+        ) : null}
+      </Top>
+      {ready ? (
+        <TeamBody app={app} data={ready.data} people={ready.people} setPeople={setPeople} />
+      ) : loaded === "failed" ? (
         <section className="park-team-card park-team-empty">
           <h2 className="park-team-h2">Not connected yet</h2>
         </section>
@@ -81,37 +129,33 @@ export function TeamPage({ app }: { app: AppCtx }) {
   );
 }
 
-function TeamBody({ app, data }: { app: AppCtx; data: Loaded }) {
+interface BodyProps {
+  app: AppCtx;
+  data: Loaded;
+  people: Member[];
+  setPeople: Dispatch<SetStateAction<Member[] | null>>;
+}
+
+function TeamBody({ app, data, people, setPeople }: BodyProps) {
   const { team } = data;
   const { toast } = app;
-  const [email, setEmail] = useState("");
-  const [people, setPeople] = useState<Member[]>(team.people);
   const [open, setOpen] = useState<string | null>(null);
   const [backups, setBackups] = useState<Backups>({});
   const [flags, setFlags] = useState<Record<string, boolean>>({});
-  const sent = useRef(0);
 
   const pref = app.prefs.backup;
   const lent = typeof pref === "string" && !backups.share ? { ...backups, share: pref } : backups;
   const rows = coverRows(team, people, lent);
   const views = memberViews(people, rows, lent, data);
-  const valid = EMAIL.test(email.trim());
 
-  const invite = () => {
-    const to = email.trim();
-    if (!valid) return toast("Enter a work email to invite");
-    sent.current += 1;
-    const pending = { id: `i${sent.current}`, name: to, email: to, dept: "", role: "Member" };
-    setPeople((ps) => [...ps, { ...pending, active: "Pending", c: "transparent", pending: true }]);
-    setEmail("");
-    toast(`Invite sent to ${to}`);
-  };
   const setRole = (p: Member, role: string) => {
-    setPeople((ps) => ps.map((q) => (q.id === p.id ? { ...q, role, limit: undefined } : q)));
+    setPeople((ps) =>
+      (ps ?? []).map((q) => (q.id === p.id ? { ...q, role, limit: undefined } : q)),
+    );
     toast(`${p.name} is now ${role === "Approver" || role === "Owner" ? "an" : "a"} ${role}`);
   };
   const remove = (p: Member) => {
-    setPeople((ps) => ps.filter((q) => q.id !== p.id));
+    setPeople((ps) => (ps ?? []).filter((q) => q.id !== p.id));
     setOpen(null);
     toast(
       p.pending
@@ -128,25 +172,7 @@ function TeamBody({ app, data }: { app: AppCtx; data: Loaded }) {
   };
 
   return (
-    <Frame>
-      <Top count={`${people.length} people`}>
-        <div className="park-team-invite">
-          <div className="park-team-field">
-            {icon("mail", 16)}
-            <input
-              className="park-team-input"
-              aria-label="Invite by email"
-              placeholder="name@northwind.co"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && invite()}
-            />
-          </div>
-          <Button variant="primary" style={{ opacity: valid ? 1 : 0.6 }} onClick={invite}>
-            Invite
-          </Button>
-        </div>
-      </Top>
+    <>
       <Members
         views={views}
         roles={team.roles}
@@ -171,6 +197,6 @@ function TeamBody({ app, data }: { app: AppCtx; data: Loaded }) {
         />
         <MatrixCard team={team} />
       </div>
-    </Frame>
+    </>
   );
 }
