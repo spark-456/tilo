@@ -11,7 +11,7 @@ import { type Mock, vi } from "vitest";
 import { API_METHODS, type Api, type ApiMethod } from "../../api";
 import { createFixtureApi } from "../../api/fixtureApi";
 import type { AppCtx } from "../../app/AppCtx";
-import { ParkProvider } from "../../app/context";
+import { ParkProvider, type ParkProviderProps } from "../../app/context";
 import { ProfilePage } from "./ProfilePage";
 
 Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
@@ -76,11 +76,9 @@ export interface Rendered {
 
 /** `<ParkProvider api viewport><ProfilePage app/></ParkProvider>`, the fixture-backed spy Api by default. */
 export function profileTree(app: AppCtx, api: Api = spyApi()): ReactElement {
-  return createElement(ParkProvider, {
-    api,
-    viewport: { vw: app.vw, vh: app.vh },
-    children: createElement(ProfilePage, { app }),
-  });
+  // children arrive as the third argument, as createElement documents; the props type lists them as required
+  const props = { api, viewport: { vw: app.vw, vh: app.vh } } as ParkProviderProps;
+  return createElement(ParkProvider, props, createElement(ProfilePage, { app }));
 }
 
 /** Mount the page and wait for its data. */
