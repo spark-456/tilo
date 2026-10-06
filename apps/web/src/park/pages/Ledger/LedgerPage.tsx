@@ -21,7 +21,12 @@ export interface LedgerPageProps {
 
 function Frame({ source, children }: { source?: string; children?: ReactNode }) {
   return (
-    <div className="park-ledger-root" data-park-ledger="" data-source={source}>
+    <div
+      className="park-ledger-root"
+      data-testid="park-page-ledger"
+      data-park-ledger=""
+      data-source={source}
+    >
       <PageSheet gap={20}>{children}</PageSheet>
     </div>
   );
