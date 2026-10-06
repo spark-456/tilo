@@ -1272,7 +1272,12 @@ test.describe("park skills: keyboard", () => {
     page,
   }) => {
     const problems = await open(page, "day");
-    // the first control is "Teach a skill"; focus shows the design's ring
+    // the first control of the PAGE is "Teach a skill" (the shell's nav comes first in the document, so start from
+    // the page heading, where the shell puts focus after a navigation); focus shows the design's ring
+    await page.getByRole("heading", { level: 1 }).evaluate((h) => {
+      h.setAttribute("tabindex", "-1");
+      (h as HTMLElement).focus();
+    });
     await page.keyboard.press("Tab");
     const teach = page.getByRole("button", { name: "Teach a skill", exact: true });
     await expect(teach).toBeFocused();
