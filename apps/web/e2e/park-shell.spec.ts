@@ -7,22 +7,25 @@
 // e2e/park-shell.spec.ts --project=chromium --no-deps --workers=3
 import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
+import { PLACEHOLDER_PAGES } from "../test-support/park/realPages";
 import { collectConsoleProblems } from "./support/console";
 import { DESKTOP, MOBILE } from "./support/viewports";
 
 const SIZES = { desktop: DESKTOP, mobile: MOBILE } as const;
 
-const ROUTES = [
-  ["/park/home", "home", "Home"],
-  ["/park/worlds", "worlds", "Worlds"],
-  ["/park/world/k1", "world", "World"],
-  ["/park/skills", "skills", "Skills"],
-  ["/park/ledger", "ledger", "Ledger"],
-  ["/park/agenda", "agenda", "Agenda"],
-  ["/park/team", "team", "Team"],
-  ["/park/profile", "profile", "Profile"],
-  ["/park/connectors", "connectors", "Connectors"],
-] as const;
+const ROUTES = (
+  [
+    ["/park/home", "home", "Home"],
+    ["/park/worlds", "worlds", "Worlds"],
+    ["/park/world/k1", "world", "World"],
+    ["/park/skills", "skills", "Skills"],
+    ["/park/ledger", "ledger", "Ledger"],
+    ["/park/agenda", "agenda", "Agenda"],
+    ["/park/team", "team", "Team"],
+    ["/park/profile", "profile", "Profile"],
+    ["/park/connectors", "connectors", "Connectors"],
+  ] as const
+).filter(([, id]) => PLACEHOLDER_PAGES.includes(id)); // a real page has its own spec
 
 const RING = {
   outlineStyle: "solid",
@@ -62,7 +65,9 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       await expect(page.locator("[data-park]")).toHaveCount(1);
       await expect(page.locator("[data-park]")).toHaveAttribute("data-time", "day");
       await expect(page.getByTestId("park-page-home")).toBeVisible();
-      await expect(page.getByTestId("park-page-home")).toContainText("Not built yet");
+      if (PLACEHOLDER_PAGES.includes("home")) {
+        await expect(page.getByTestId("park-page-home")).toContainText("Not built yet");
+      }
       await expect(page.getByRole("main")).toHaveCount(1);
       expect(problems).toEqual([]);
     });
@@ -79,6 +84,24 @@ for (const [name, viewport] of Object.entries(SIZES)) {
         expect(problems).toEqual([]);
       });
     }
+
+    test(`WEB_3a_e2e_${name}_the_design_fonts_are_declared_on_park_pages`, async ({ page }) => {
+      await page.goto("/park/home");
+      const faces = await page.evaluate(() =>
+        [...document.fonts].map((f) => `${f.family.replace(/"/g, "")} ${f.weight}`),
+      );
+      // The design: Nunito 800 and 900 (display, logo) and Nunito Sans 400, 600, 700 and 800 (all UI text).
+      for (const face of [
+        "Nunito 800",
+        "Nunito 900",
+        "Nunito Sans 400",
+        "Nunito Sans 600",
+        "Nunito Sans 700",
+        "Nunito Sans 800",
+      ]) {
+        expect(faces, face).toContain(face);
+      }
+    });
 
     test(`WEB_3a_e2e_${name}_a_world_route_shows_its_id`, async ({ page }) => {
       await page.goto("/park/world/k1");
