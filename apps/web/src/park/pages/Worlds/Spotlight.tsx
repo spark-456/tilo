@@ -7,6 +7,8 @@ import { plural } from "./model";
 interface SpotlightProps {
   art: Art;
   decisions: readonly Decision[];
+  /** The name of the world the decisions wait on (data, not a literal). */
+  worldName: string;
   dec: Dec;
   needsLeft: number;
   onDecide: (key: DecisionKey) => void;
@@ -50,7 +52,15 @@ function DecisionCard({
   );
 }
 
-export function Spotlight({ art, decisions, dec, needsLeft, onDecide, onOpen }: SpotlightProps) {
+export function Spotlight({
+  art,
+  decisions,
+  worldName,
+  dec,
+  needsLeft,
+  onDecide,
+  onOpen,
+}: SpotlightProps) {
   if (needsLeft === 0)
     return (
       <div className="park-worlds-clear">
@@ -58,7 +68,7 @@ export function Spotlight({ art, decisions, dec, needsLeft, onDecide, onOpen }: 
         <div className="park-worlds-clear__text">
           <div className="park-worlds-clear__title">You’re all caught up</div>
           <div className="park-worlds-clear__body">
-            K1 electric scooter is moving again. Tilo will ask if anything else needs you.
+            {worldName} is moving again. Tilo will ask if anything else needs you.
           </div>
         </div>
       </div>
@@ -69,7 +79,7 @@ export function Spotlight({ art, decisions, dec, needsLeft, onDecide, onOpen }: 
         <div className="park-worlds-spot__agent">{art.agent()}</div>
         <div className="park-worlds-spot__text">
           <div className="park-worlds-spot__label">WAITING FOR YOU</div>
-          <div className="park-worlds-spot__world">K1 electric scooter</div>
+          <div className="park-worlds-spot__world">{worldName}</div>
           <div className="park-worlds-spot__paused">
             {plural(needsLeft, "building paused", "buildings paused")}
           </div>

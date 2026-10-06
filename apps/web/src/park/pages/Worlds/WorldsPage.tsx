@@ -82,6 +82,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
             <Spotlight
               art={art}
               decisions={data.decisions}
+              worldName={all.find((w) => w.id === data.decisions[0]?.world)?.name ?? ""}
               dec={dec}
               needsLeft={needsLeft}
               onDecide={(key) => app.decide(key)}
