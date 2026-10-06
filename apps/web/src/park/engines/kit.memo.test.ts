@@ -1,6 +1,6 @@
 // WEB-1c (docs/web-app-rebuild-plan.md sections 2, 5, 9): the kit memoises exactly as the prototype's does
 // (tilo-app.js: `ck(k, f) = (k in C) ? C[k] : (C[k] = f())`; keys 'a|'+JSON.stringify(a)+'|'+s+'|'+!!night,
-// 'b|'+JSON.stringify(spec)+st+dist+ht+!!night, 'w|'+key+'|'+!!night with the k1 depot/mail key rule).
+// 'b|'+JSON.stringify(spec)+st+dist+ht+!!night, 'w|'+key+'|'+!!night, WEB-3b: key = plan + the decision flags that are on, no plan is special-cased).
 // The prototype keeps one module-level cache; the port keeps one cache per kit instance.
 //
 // Engine calls are counted without touching the engines: the kit's `h` and the park's injected
@@ -160,7 +160,7 @@ describe("WEB_1c_memo_building: building(spec, state, dist, ht, night) is cached
   });
 });
 
-describe("WEB_1c_memo_world: world(planId, dec, night) is cached by 'w|' + key + night, key = k1 + depot + mail for k1", () => {
+describe("WEB_1c_memo_world: world(planId, dec, night) is cached by plan, the decision flags that are on, and night", () => {
   it("WEB_1c_memo_world_equal_arguments_return_the_identical_object_and_build_the_plan_and_picture_once", () => {
     const c = counted();
     expect(c.plans, "createKit does not read the plans").not.toHaveBeenCalled();
@@ -176,11 +176,13 @@ describe("WEB_1c_memo_world: world(planId, dec, night) is cached by 'w|' + key +
     expect(c.plans, "a hit does not ask for the plans again").toHaveBeenCalledTimes(1);
   });
 
-  it("WEB_1c_memo_world_k1_decisions_make_the_key_only_the_two_flags_are_read", () => {
+  it("WEB_1c_memo_world_the_decision_flags_that_are_on_make_the_key_and_off_ones_do_not", () => {
     const c = counted();
     const dep = c.kit.world("k1", { depot: true }, false);
     expect(c.kit.world("k1", { depot: true, mail: false }, false)).toBe(dep);
-    expect(c.kit.world("k1", { depot: true, mail: false, other: true } as never, false)).toBe(dep);
+    expect(c.kit.world("k1", { depot: true, mail: false, other: true } as never, false)).not.toBe(
+      dep,
+    );
     const none = c.kit.world("k1", undefined, false);
     expect(none).not.toBe(dep);
     expect(c.kit.world("k1", {}, false)).toBe(none);
@@ -194,13 +196,14 @@ describe("WEB_1c_memo_world: world(planId, dec, night) is cached by 'w|' + key +
     expect(new Set(all).size, "four decision combinations, four entries").toBe(4);
   });
 
-  it("WEB_1c_memo_world_other_plans_ignore_the_decisions_in_the_key", () => {
+  it("WEB_1c_memo_world_every_plan_is_keyed_by_its_decision_flags_the_same_way", () => {
     const c = counted();
     const hires = c.kit.world("hires", { depot: true }, false);
-    const again = work(c, () => c.kit.world("hires", { mail: true }, false));
+    const again = work(c, () => c.kit.world("hires", { depot: true, mail: false }, false));
     expect(again.out).toBe(hires);
     expect(again.h).toBe(0);
-    expect(c.kit.world("hires", undefined, false)).toBe(hires);
+    expect(c.kit.world("hires", { mail: true }, false)).not.toBe(hires);
+    expect(c.kit.world("hires", undefined, false)).not.toBe(hires);
     expect(c.kit.world("audit", { depot: true }, false)).not.toBe(hires);
     expect(c.kit.world("fresh", {}, false)).not.toBe(c.kit.world("audit", {}, false));
   });
@@ -217,7 +220,7 @@ describe("WEB_1c_memo_world: world(planId, dec, night) is cached by 'w|' + key +
   });
 });
 
-describe("WEB_1c_memo_keys: the cache keys are the prototype's exact strings (seeded through ck)", () => {
+describe("WEB_1c_memo_keys: the cache keys are the prototype's strings, the world key in the generic form (seeded through ck)", () => {
   const SENT = { sentinel: true };
 
   it.each([
@@ -242,13 +245,13 @@ describe("WEB_1c_memo_keys: the cache keys are the prototype's exact strings (se
       'b|{"fp":[2,1],"i":"mail"}idlemail120true',
       (k: Kit) => k.building({ fp: [2, 1], i: "mail" }, "idle", "mail", 120, true),
     ],
-    ["w|k100|false", (k: Kit) => k.world("k1")],
-    ["w|k100|false", (k: Kit) => k.world("k1", {}, false)],
-    ["w|k110|false", (k: Kit) => k.world("k1", { depot: true }, false)],
-    ["w|k101|false", (k: Kit) => k.world("k1", { mail: true }, false)],
-    ["w|k111|true", (k: Kit) => k.world("k1", { depot: true, mail: true }, true)],
-    ["w|hires|false", (k: Kit) => k.world("hires", { depot: true }, false)],
-    ["w|fresh|true", (k: Kit) => k.world("fresh", undefined, true)],
+    ["w|k1||false", (k: Kit) => k.world("k1")],
+    ["w|k1||false", (k: Kit) => k.world("k1", {}, false)],
+    ["w|k1|depot|false", (k: Kit) => k.world("k1", { depot: true }, false)],
+    ["w|k1|mail|false", (k: Kit) => k.world("k1", { mail: true }, false)],
+    ["w|k1|depot+mail|true", (k: Kit) => k.world("k1", { depot: true, mail: true }, true)],
+    ["w|hires|depot|false", (k: Kit) => k.world("hires", { depot: true }, false)],
+    ["w|fresh||true", (k: Kit) => k.world("fresh", undefined, true)],
   ] as const)("WEB_1c_memo_keys_case_%# %s", (key, ask) => {
     const c = counted();
     expect(c.kit.ck(key, () => SENT)).toBe(SENT);
