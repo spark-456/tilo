@@ -34,6 +34,7 @@ from tilo_metering import LedgerEntry
 from tilo_metering.flags import FlagStore, process_flags
 from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import PlanInputs, compile_plan
+from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
@@ -83,6 +84,7 @@ class WorldRecord:
     run_id: str = "r_village_basic_1"  # the world's current run; tilo-api reads this, never invents it
     paused: bool = False  # true once Pause all has actually paused this world (PRD 9.4 honesty:
     # only ever true together with a world.paused event queued or committed somewhere)
+    prior_world_id: str | None = None  # a scheduled run's previous world (FR-AGT-14b): offered, never silently reused
 
 
 @dataclass
@@ -102,6 +104,7 @@ class TaskRecord:
     approaches: list[dict] | None = None  # proposed for the current brief
     granted: bool = False
     scenario: str | None = None  # FR-INT-11: the scenario id named at intake; its policies are created at approve
+    gaps: tuple[Gap, ...] = ()  # FR-INT-15: the parts Tilo cannot do, set once at intake; answers and edits keep them
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
 
