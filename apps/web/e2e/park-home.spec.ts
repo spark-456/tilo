@@ -505,7 +505,7 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
               trackBg: cs(track, "background-color"),
               trackW: track?.getBoundingClientRect().width,
               trackH: track?.getBoundingClientRect().height,
-              barBg: cs(bar, "background-color"),
+              barBg: cs(bar ?? undefined, "background-color"),
               barW: bar?.getBoundingClientRect().width,
             };
           });

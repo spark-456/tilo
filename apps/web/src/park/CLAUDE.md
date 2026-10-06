@@ -27,8 +27,10 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 - `src/Root.tsx` shows the old app, or the lazy `app/ParkApp.tsx` under `/park` (`isParkPath`).
 - `AppCtx.ts` is the `app` prop. `store.ts` (framework-free, injected `schedule`) holds decisions, started
   worlds, prefs and the toast. `context.tsx`: `ParkProvider`, `useApp`, `useParkApi` (notes each result's
-  `source`). `router.ts` is the only file that reads the address bar.
-- `pages.ts`: one line per page, `home: lazy(() => import("../pages/Home")),`; nothing else changes.
+  `source`), `useSchedule` (the injected timer: pages never call setTimeout). `router.ts` alone reads the address bar.
+- `pages.ts`: one line per page, `home: lazy(() => import("../pages/Home/HomePage").then(...)),`; nothing else changes.
+- `pages/Home/` (WEB-4): panels float over the shell's city (no `<main>`, no h1 but the greeting); a failed or
+  unbuilt read shows "Not connected yet"; composer copy is page-local (`homeData.ts`); `Home.css` overrides the sliding SegmentedControl.
 
 ## Local rules
 - Import nothing from `screens/`, `world/`, `stage/`; only the shared `src/api` and `src/router` seams may be reused.

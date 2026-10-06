@@ -29,6 +29,7 @@ export interface ParkProviderProps {
 interface Held {
   store: ParkStore;
   api: Api;
+  schedule: Schedule;
 }
 
 interface Viewport {
@@ -65,12 +66,13 @@ export function ParkProvider({ api, navigate, schedule, viewport, children }: Pa
     const raw = api ?? parkApi({ VITE_TILO_API_URL: API_URL });
     let store: ParkStore | null = null;
     const wrapped = noting(raw, (source) => store?.noteSource(source));
+    const timer = schedule ?? realSchedule;
     store = createParkStore({
       api: wrapped,
       navigate: navigate ?? navigatePark,
-      schedule: schedule ?? realSchedule,
+      schedule: timer,
     });
-    return { store, api: wrapped };
+    return { store, api: wrapped, schedule: timer };
   });
   const [win, setWin] = useState(windowSize);
   useEffect(() => {
@@ -102,6 +104,8 @@ function useHeld(): Held {
 
 export const useParkStore = (): ParkStore => useHeld().store;
 export const useParkApi = (): Api => useHeld().api;
+/** The provider's timer: a page that waits (the Home composer's 900 ms) goes through it, never setTimeout. */
+export const useSchedule = (): Schedule => useHeld().schedule;
 
 export function useApp(): AppCtx {
   const { store } = useHeld();

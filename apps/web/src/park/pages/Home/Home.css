@@ -1,0 +1,750 @@
+/* The Home page (WEB-4), transcribed from the inline styles of design_handoff_tilo_web_app/design/
+   Tilo App Home.dc.html. Every selector sits under [data-park] and a park-home- class; colours are tokens
+   except the README's hard-coded #F0A500 / #1F1D2B (needs), #FFFFFF (on the hero fill) and the #5A3FE0 focus
+   ring. No motion here (BQ-WEB-3): where the design moves, a marker says what returns in WEB-3. Night comes
+   from the tokens. */
+
+/* ---- the page: a positioned box the three panels and the pins are placed in ---- */
+[data-park] .park-home-root {
+  position: relative;
+  height: 100vh;
+  min-height: 720px;
+  overflow: hidden;
+}
+[data-park] .park-home-root button,
+[data-park] .park-home-root input {
+  font-family: inherit;
+}
+
+/* ---- glass (README "Glass (nav and Home only)") ---- */
+[data-park] .park-home-glass {
+  background: var(--gBg);
+  backdrop-filter: var(--gFx);
+  -webkit-backdrop-filter: var(--gFx);
+  border: 1px solid var(--gBd);
+  box-shadow: var(--sh);
+}
+
+/* ---- greeting panel (top left) ---- */
+[data-park] .park-home-hero {
+  position: absolute;
+  left: 24px;
+  top: 96px;
+  width: 500px;
+  max-width: calc(100% - 48px);
+  box-sizing: border-box;
+  padding: 24px 26px 22px;
+  border-radius: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 3;
+}
+[data-park] .park-home-date {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  color: var(--ink2);
+}
+[data-park] .park-home-h1 {
+  margin: 0;
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 50px;
+  line-height: 1;
+  letter-spacing: -1.4px;
+}
+[data-park] .park-home-summary {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--ink2);
+  font-weight: 600;
+  text-wrap: pretty;
+}
+
+/* the one amber "Needs you" pill, and the state that replaces it */
+[data-park] .park-home-needs {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--amberSoft);
+  border: 1px solid var(--amberLine);
+  border-radius: 999px;
+  padding: 4px 5px 4px 4px;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14.5px;
+  cursor: pointer;
+  text-align: left;
+}
+[data-park] .park-home-needs__tile {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--amberTile);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  flex: none;
+}
+[data-park] .park-home-needs__bold {
+  font-weight: 800;
+}
+[data-park] .park-home-needs__review {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #f0a500;
+  color: #1f1d2b;
+  font-weight: 800;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+[data-park] .park-home-caught {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--okSoft);
+  border-radius: 999px;
+  padding: 6px 16px 6px 6px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+[data-park] .park-home-caught__disc {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  background: var(--ok);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- Today panel (top right, from 1180 px) ---- */
+[data-park] .park-home-today {
+  position: absolute;
+  right: 24px;
+  top: 96px;
+  width: 352px;
+  max-height: calc(100% - 330px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 8px;
+  border-radius: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 3;
+}
+[data-park] .park-home-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 4px;
+}
+[data-park] .park-home-head--next {
+  padding: 6px 10px 2px;
+}
+[data-park] .park-home-title {
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-home-link {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--heroInk);
+  text-decoration: none;
+}
+[data-park] .park-home-link:hover {
+  color: var(--hero);
+}
+[data-park] .park-home-rule {
+  height: 1px;
+  background: var(--line2);
+  margin: 4px 10px;
+}
+
+/* Live now */
+[data-park] .park-home-live {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 10px 7px 7px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-tile {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+[data-park] .park-home-tile--needs {
+  background: var(--amberTile);
+}
+[data-park] .park-home-tile--run {
+  background: var(--sunk);
+}
+[data-park] .park-home-live__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+[data-park] .park-home-live__name {
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-park] .park-home-live__sub {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-park] .park-home-live__sub--needs {
+  color: var(--amberInk);
+}
+[data-park] .park-home-track {
+  width: 44px;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-home-bar {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+}
+[data-park] .park-home-bar--needs {
+  background: var(--amber);
+}
+[data-park] .park-home-bar--run {
+  background: var(--run);
+}
+
+/* Up next today */
+[data-park] .park-home-event {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-event__time {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink2);
+}
+[data-park] .park-home-event__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+}
+[data-park] .park-home-event__body--work {
+  border-left: 3px solid var(--hero);
+}
+[data-park] .park-home-event__body--personal {
+  border-left: 3px solid var(--ok);
+}
+[data-park] .park-home-event__body--tilo {
+  border-left: 3px solid var(--sch);
+}
+[data-park] .park-home-event__title {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+[data-park] .park-home-event__sub {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+
+/* September spend */
+[data-park] .park-home-spend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 12px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-spend__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+[data-park] .park-home-spend__link {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--heroInk);
+}
+[data-park] .park-home-spend__figures {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+[data-park] .park-home-spend__amount {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+[data-park] .park-home-spend__of {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-home-spend__bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+  display: flex;
+}
+[data-park] .park-home-spend__spent {
+  background: var(--hero);
+}
+[data-park] .park-home-spend__waiting {
+  background: var(--amber);
+  opacity: 0.85;
+}
+[data-park] .park-home-spend__note {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+
+/* row hover (the .2s fade returns in WEB-3) */
+[data-park] .park-home-live:hover,
+[data-park] .park-home-event:hover,
+[data-park] .park-home-spend:hover {
+  background: var(--rowHover);
+}
+
+/* ---- composer column (bottom centre) ---- */
+[data-park] .park-home-composer {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: 1040px;
+  max-width: calc(100% - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  z-index: 4;
+}
+[data-park] .park-home-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+/* motion: restored in WEB-3 (BQ-WEB-3): the chip lifts 2px on hover over .3s */
+[data-park] .park-home-chip {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--gBg);
+  backdrop-filter: var(--gFx);
+  -webkit-backdrop-filter: var(--gFx);
+  border: 1px solid var(--gBd);
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+[data-park] .park-home-chip:hover {
+  transform: translateY(-2px);
+}
+
+/* the drafting line: the ring turns in WEB-3 (BQ-WEB-3) */
+[data-park] .park-home-drafting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 18px 0 14px;
+  border-radius: 999px;
+  background: var(--pop);
+  border: 1px solid var(--line2);
+  box-shadow: var(--sh);
+  font-size: 14.5px;
+  font-weight: 700;
+}
+[data-park] .park-home-spin {
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border-radius: 99px;
+  border: 2.5px solid var(--track);
+  border-top-color: var(--hero);
+  display: block;
+  flex: none;
+}
+
+/* the plan card */
+[data-park] .park-home-plan {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--pop);
+  border: 1px solid var(--line2);
+  border-radius: 24px;
+  box-shadow: var(--sh);
+  padding: 18px 18px 18px 22px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+}
+[data-park] .park-home-plan__main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+[data-park] .park-home-plan__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+[data-park] .park-home-tier {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 7px;
+  background: var(--heroSoft);
+  color: var(--heroInk);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+}
+[data-park] .park-home-plan__query {
+  font-size: 17px;
+  font-weight: 800;
+  min-width: 0;
+}
+[data-park] .park-home-meta {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-home-meta__k {
+  color: var(--ink3);
+}
+[data-park] .park-home-meta__v {
+  color: var(--ink);
+  font-weight: 800;
+}
+[data-park] .park-home-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+[data-park] .park-home-step {
+  display: flex;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-home-step__n {
+  width: 20px;
+  height: 20px;
+  border-radius: 99px;
+  background: var(--chip);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+[data-park] .park-home-plan__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+[data-park] .park-home-confirm {
+  height: 46px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--hero);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+[data-park] .park-home-change {
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--btn2);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* the glass panel with the task input and the size of job */
+[data-park] .park-home-panel {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 28px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+[data-park] .park-home-input-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-left: 12px;
+}
+[data-park] .park-home-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--hero);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+[data-park] .park-home-logo__face {
+  width: 22px;
+  height: 12px;
+  border-radius: 5px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+[data-park] .park-home-logo__dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 9px;
+  background: #1f1d2b;
+}
+[data-park] .park-home-input {
+  flex: 1;
+  min-width: 0;
+  height: 58px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+[data-park] .park-home-input::placeholder {
+  color: var(--ink3);
+}
+/* the design draws no ring on the input; a keyboard user still needs to see where they are */
+[data-park] .park-home-input:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+/* motion: restored in WEB-3 (BQ-WEB-3): filter .2s and transform .15s */
+[data-park] .park-home-start {
+  height: 54px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--hero);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  flex: none;
+  white-space: nowrap;
+}
+[data-park] .park-home-start:hover,
+[data-park] .park-home-confirm:hover {
+  filter: brightness(1.08);
+}
+[data-park] .park-home-start:active {
+  transform: translateY(2px);
+}
+[data-park] .park-home-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 4px 2px;
+  flex-wrap: wrap;
+}
+/* "Size of job": the sliding SegmentedControl at the design's size (track 390 r16 p4, items h36 14px,
+   thumb r12 and a third of the inside) */
+[data-park] .park-home-size {
+  position: relative;
+  width: 390px;
+  max-width: 100%;
+  flex: none;
+}
+[data-park] .park-home-size .park-seg {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 16px;
+}
+[data-park] .park-home-size .park-seg__item {
+  height: 36px;
+  font-size: 14px;
+}
+[data-park] .park-home-size .park-seg__thumb {
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  border-radius: 12px;
+  width: calc((100% - 8px) / 3) !important;
+}
+[data-park] .park-home-hint {
+  flex: 1;
+  min-width: 200px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink2);
+  line-height: 1.35;
+}
+
+/* ---- map pins (positions come from app.pins) ---- */
+[data-park] .park-home-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+}
+/* motion: restored in WEB-3 (BQ-WEB-3): the card lifts 3px on hover over .3s */
+[data-park] .park-home-pin__card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 16px 5px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: var(--pop);
+  box-shadow: var(--sh);
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--ink);
+  text-align: left;
+}
+[data-park] .park-home-pin__card:hover {
+  transform: translateY(-3px);
+}
+[data-park] .park-home-pin__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+[data-park] .park-home-pin__icon--needs {
+  background: #f0a500;
+  color: #1f1d2b;
+}
+[data-park] .park-home-pin__icon--run {
+  background: var(--hero);
+  color: #ffffff;
+}
+[data-park] .park-home-pin__icon--sch {
+  background: var(--sch);
+  color: #ffffff;
+}
+[data-park] .park-home-pin__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+[data-park] .park-home-pin__name {
+  font-weight: 800;
+  font-size: 14.5px;
+}
+[data-park] .park-home-pin__sub {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-home-pin__stem {
+  width: 2px;
+  height: 26px;
+  background: var(--stem);
+}
+[data-park] .park-home-pin__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 99px;
+  background: var(--pin);
+  box-shadow: 0 0 0 5px var(--halo);
+}
+
+/* ---- focus: the README ring on every control of the page ---- */
+[data-park] .park-home-needs:focus-visible,
+[data-park] .park-home-link:focus-visible,
+[data-park] .park-home-live:focus-visible,
+[data-park] .park-home-event:focus-visible,
+[data-park] .park-home-spend:focus-visible,
+[data-park] .park-home-chip:focus-visible,
+[data-park] .park-home-start:focus-visible,
+[data-park] .park-home-confirm:focus-visible,
+[data-park] .park-home-change:focus-visible,
+[data-park] .park-home-pin__card:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}

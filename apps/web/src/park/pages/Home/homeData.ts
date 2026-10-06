@@ -1,0 +1,253 @@
+// Home page data rules, written out from the reference (design_handoff_tilo_web_app/design/
+// Tilo App Home.dc.html, its renderVals, and tilo-app.js). Pure functions over what the Api returned:
+// nothing here reads a fixture, the clock or the address bar.
+import type { Agenda, AgendaEvent, Ledger, TierKey, World } from "../../api/types";
+
+/** The composer's copy per size of job (the reference reads it from `D.TIERS`; the Api has no tier call). */
+export interface Mode {
+  readonly key: TierKey;
+  readonly label: string;
+  readonly tier: string;
+  readonly word: string;
+  readonly example: string;
+  readonly start: string;
+  readonly hint: string;
+  readonly chips: readonly string[];
+  readonly agents: string;
+  readonly cost: string;
+  readonly eta: string;
+  readonly confirm: string;
+  readonly steps: readonly string[];
+}
+
+export const MODES: readonly [Mode, Mode, Mode] = [
+  {
+    key: "quick",
+    label: "Quick task",
+    tier: "Village",
+    word: "village",
+    example: "Summarise this week’s customer feedback",
+    start: "Start task",
+    hint: "You see the plan and the cost before any agent starts.",
+    chips: ["Compare three suppliers", "Draft a reply to Northline", "Summarise yesterday’s calls"],
+    agents: "2",
+    cost: "about £0.60",
+    eta: "about 6 min",
+    confirm: "Start now",
+    steps: [
+      "Gather what it needs from your connected tools",
+      "Do the work with 2 agents",
+      "Hand you the result to review",
+    ],
+  },
+  {
+    key: "routine",
+    label: "Routine",
+    tier: "Town",
+    word: "town",
+    example: "Every Monday, match invoices to purchase orders",
+    start: "Set up routine",
+    hint: "You approve the first run. After that it runs on its own.",
+    chips: ["Weekly invoice match", "Monday pricing check", "Daily inbox triage"],
+    agents: "4",
+    cost: "about £0.40 a run",
+    eta: "first run tomorrow 08:00",
+    confirm: "Schedule it",
+    steps: [
+      "Run once tomorrow at 08:00 for your approval",
+      "Then repeat on the schedule you set",
+      "Ask you if anything looks unusual",
+    ],
+  },
+  {
+    key: "workspace",
+    label: "Workspace",
+    tier: "City",
+    word: "city",
+    example: "Onboard 12 new hires across email, HR and laptops",
+    start: "Plan project",
+    hint: "Tilo drafts districts, teams and gates for your sign-off.",
+    chips: ["Product launch", "Supplier onboarding", "Quarterly audit prep"],
+    agents: "18",
+    cost: "£400 budget to start",
+    eta: "plan in about 2 min",
+    confirm: "Draft the city",
+    steps: [
+      "Draft districts, teams and gates",
+      "Estimate budget and timeline",
+      "Wait for your sign-off before any spend",
+    ],
+  },
+];
+
+export const DRAFT_MS = 900;
+
+const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
+
+/** The greeting panel's summary line (the "38 agents" count is the reference's own text). */
+export function summaryLine(needs: number, night: boolean): string {
+  if (night) {
+    const tail = needs
+      ? `${plural(needs, "One thing needs", "Two things need")} you before morning.`
+      : "Nothing needs you.";
+    return `Your city keeps working overnight. ${tail}`;
+  }
+  const tail = needs
+    ? plural(needs, "One thing needs you.", "Two things need you.")
+    : "Nothing needs you right now.";
+  return `38 agents are at work across 4 worlds. ${tail}`;
+}
+
+export const decisionsWaiting = (needs: number): string =>
+  `${needs} ${plural(needs, "decision waiting", "decisions waiting")}`;
+
+export interface LiveRow {
+  readonly world: World;
+  readonly needs: boolean;
+  readonly sub: string;
+  readonly prog: number;
+}
+
+/** "Live now": the worlds that need you or run, five at most, in the Api's order. */
+export function liveRows(worlds: readonly World[], needs: number): LiveRow[] {
+  return worlds
+    .filter((w) => w.st === "needs" || w.st === "running")
+    .slice(0, 5)
+    .map((w) => {
+      const nd = w.st === "needs";
+      const sub = nd
+        ? decisionsWaiting(needs)
+        : w.isNew
+          ? "Starting now"
+          : w.tier === "Village"
+            ? (w.when ?? "")
+            : `Running · ${w.prog ?? 0}%`;
+      return { world: w, needs: nd, sub, prog: w.prog ?? 0 };
+    });
+}
+
+export type CalTone = AgendaEvent["cal"];
+
+export interface NextEvent {
+  readonly id: string;
+  readonly time: string;
+  readonly title: string;
+  readonly tone: CalTone;
+  readonly sub: string;
+}
+
+const clock = (t: number): string => {
+  const hh = Math.floor(t);
+  const mm = Math.round((t - hh) * 60);
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+};
+
+/** "Up next today": the first two of today's events after 09:18, in the Api's own order. */
+export function nextEvents(agenda: Agenda): NextEvent[] {
+  return agenda.events
+    .filter((e) => e.d === agenda.today && e.s > 9.3)
+    .slice(0, 2)
+    .map((e) => ({
+      id: e.id,
+      time: clock(e.s),
+      title: e.t,
+      tone: e.cal,
+      sub: e.brief
+        ? "Tilo’s brief is ready"
+        : e.cal === "tilo"
+          ? "Tilo routine"
+          : `Google Calendar · ${Math.round((e.e - e.s) * 60)} min`,
+    }));
+}
+
+/** 2412 -> "£2,412". */
+export const money = (n: number): string =>
+  `£${Math.round(n)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+
+export interface Spend {
+  readonly spent: string;
+  readonly of: string;
+  readonly forecast: string;
+  readonly spentPct: number;
+  readonly waitingPct: number;
+}
+
+/** September spend: the ledger's numbers; "waiting on you" is what its transactions still wait for. */
+export function spendOf(ledger: Ledger): Spend {
+  const waiting = ledger.tx.filter((t) => t.st === "waiting").reduce((sum, t) => sum + t.amt, 0);
+  const pct = (n: number): number =>
+    ledger.budget > 0 ? Math.round((n / ledger.budget) * 100) : 0;
+  return {
+    spent: money(ledger.spent),
+    of: `of ${money(ledger.budget)}`,
+    forecast: `Forecast ${money(ledger.forecast)} · ${money(waiting)} waiting on you`,
+    spentPct: Math.min(pct(ledger.spent), 100),
+    waitingPct: Math.min(pct(waiting), 100 - Math.min(pct(ledger.spent), 100)),
+  };
+}
+
+export type PinTone = "needs" | "run" | "sch";
+export interface PinDef {
+  readonly worldId: string;
+  readonly icon: string;
+  readonly tone: PinTone;
+  readonly sub: string;
+}
+
+/** The three pins of the reference, by index of `app.pins`. */
+export function pinDefs(needs: number, night: boolean): PinDef[] {
+  return [
+    {
+      worldId: "k1",
+      icon: needs ? "flag" : "bolt",
+      tone: needs ? "needs" : "run",
+      sub: needs
+        ? `${needs} ${plural(needs, "decision needs you", "decisions need you")}`
+        : "Running · 46%",
+    },
+    {
+      worldId: "hires",
+      icon: "people",
+      tone: "run",
+      sub: night ? "Running overnight · 58%" : "Running · 58%",
+    },
+    { worldId: "invoice", icon: "clock", tone: "sch", sub: "Next run Mon 09:00" },
+  ];
+}
+
+export interface PlacedPin extends PinDef {
+  readonly x: number;
+  readonly y: number;
+  readonly world: World;
+}
+
+/** A pin is dropped where it would sit under one of the page's own panels (the reference's `blocks`). */
+export function placedPins(
+  pins: readonly { x: number; y: number }[],
+  worlds: readonly World[],
+  needs: number,
+  night: boolean,
+  vw: number,
+  vh: number,
+): PlacedPin[] {
+  const side = vw >= 1180;
+  const blocks: readonly [number, number, number, number][] = [
+    [0, 0, vw, 96],
+    [0, 80, 548, 430],
+    side ? [vw - 400, 80, vw, vh - 300] : [0, 0, 0, 0],
+    [0, vh - 250, vw, vh],
+  ];
+  const clear = (p: { x: number; y: number }): boolean =>
+    !blocks.some((b) => p.x + 140 > b[0] && p.x - 140 < b[2] && p.y > b[1] && p.y - 84 < b[3]);
+  const defs = pinDefs(needs, night);
+  const out: PlacedPin[] = [];
+  pins.forEach((p, i) => {
+    const def = defs[i];
+    const world = def ? worlds.find((w) => w.id === def.worldId) : undefined;
+    if (def && world && clear(p))
+      out.push({ ...def, x: Math.round(p.x), y: Math.round(p.y), world });
+  });
+  return out;
+}
