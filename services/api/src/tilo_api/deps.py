@@ -34,6 +34,7 @@ from tilo_metering import LedgerEntry
 from tilo_metering.flags import FlagStore, process_flags
 from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import PlanInputs, compile_plan
+from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
@@ -103,6 +104,7 @@ class TaskRecord:
     approaches: list[dict] | None = None  # proposed for the current brief
     granted: bool = False
     scenario: str | None = None  # FR-INT-11: the scenario id named at intake; its policies are created at approve
+    gaps: tuple[Gap, ...] = ()  # FR-INT-15: the parts Tilo cannot do, set once at intake; answers and edits keep them
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
 
