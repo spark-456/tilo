@@ -1,0 +1,4 @@
+# Test fixture: the authserv-id the older FR-CHN-11 test headers are written with ("mx.example; dmarc=pass ...").
+# The conftest points `tilo_channels.autopilot_inbound.CONFIG_PATH` here for every test except the ones that
+# exercise the real `config/mail_trust.yaml` (test_FR_CHN_11_BQ278n_authserv_pin.py).
+gmail_authserv_id: mx.example

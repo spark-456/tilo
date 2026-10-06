@@ -66,10 +66,10 @@ class Plate:
     mailbox: str | None = MAILBOX
     reply: Any = None
 
-    def build(self, *, autopilot: Any = None, drafter: Any = None) -> Any:
+    def build(self, *, autopilot: Any = None, drafter: Any = None, mail: Any = None) -> Any:
         return plate_module().PlateReply(
             triage=self.tr.results,
-            mail=self.tr.reader,
+            mail=mail or self.tr.reader,
             drafter=drafter or self.line.bench.rig.svc,
             autopilot=autopilot or self.line.ap,
             mailbox=lambda user_id: self.mailbox,
