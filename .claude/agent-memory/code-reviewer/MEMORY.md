@@ -25,3 +25,4 @@
 - [Executor runner-output probe](executor-runner-output-probe.md) — schema-valid but writer-invalid outcome aborts run; current_task().cancel() hangs dependents
 - [Split PR leftovers](split-pr-leftovers.md) — split branches keep sibling scaffolding justified by same-diff code; repo-wide config excludes
 - [Eval check vacuous pass](eval-check-vacuous-pass.md) — args looked up by name (dup entries), missing field None==None passes; probe these
+- [Import keeps old created_at](import-keeps-old-created-at.md) — imported records defeat GRACE/_settle freshness; probe caller-supplied times
