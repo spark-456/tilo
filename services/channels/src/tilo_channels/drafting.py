@@ -139,6 +139,18 @@ def _reply_header(value: Any) -> str:
     return _header(value, HEADER_CAP) if isinstance(value, str) and len(value) <= HEADER_CAP else ""
 
 
+def message_id_of(message: Mapping[str, Any]) -> str:
+    """The Message-ID header of a message as the draft's `in_reply_to` carries it ("" when it has none)."""
+    raw = message.get("headers")
+    headers = {str(k).lower(): v for k, v in raw.items()} if isinstance(raw, dict) else {}
+    return _reply_header(headers.get("message-id"))
+
+
+def _replied(messages: list[dict[str, Any]], own: str) -> dict[str, Any] | None:
+    """The message a reply answers: the newest one not from the person's own mailbox."""
+    return next((m for m in reversed(messages) if [_base(a) for a in _addresses(m.get("from"))[:1]] != [own]), None)
+
+
 def _envelope(message: Mapping[str, Any], own: str, mode: str) -> dict[str, Any]:
     """Recipients (at most MAX_RECIPIENTS) and reply headers, from the message replied to only (BQ-144, BQ-146)."""
     to = _addresses(message.get("from"))[:1]
@@ -149,7 +161,7 @@ def _envelope(message: Mapping[str, Any], own: str, mode: str) -> dict[str, Any]
     to, cc = to[:MAX_RECIPIENTS], cc[: max(0, MAX_RECIPIENTS - len(to))]
     raw = message.get("headers")
     headers = {str(k).lower(): v for k, v in raw.items()} if isinstance(raw, dict) else {}
-    message_id = _reply_header(headers.get("message-id"))
+    message_id = message_id_of(message)
     references = _reply_header(headers.get("references")).split()
     references += [message_id] if message_id and message_id not in references else []
     subject = _header(message.get("subject"), FIELD_CAPS["subject"])
@@ -236,6 +248,14 @@ class Drafter:
         self._announce(user_id, instruction_id, doc)
         return _result(instruction_id, doc)
 
+    def reply_target(self, user_id: str, thread_id: str, mailbox: str) -> str | None:
+        """The Message-ID of the message a reply in this thread would answer (what `Draft.in_reply_to` will hold),
+        read only: nothing is screened, drafted, stored or emitted. None when there is no one to reply to."""
+        listed = self._reader.get_thread(user_id, thread_id).get("messages")
+        messages = [m for m in (listed if isinstance(listed, list) else [])[-MAX_MESSAGES:] if isinstance(m, dict)]
+        replied = _replied(messages, _base(_address(mailbox) or mailbox.lower()))
+        return message_id_of(replied) if replied is not None and _addresses(replied.get("from")) else None
+
     def stored(self, user_id: str, instruction_id: str) -> DraftResult | None:
         """The result stored for the instruction, read only (BQ-183); None when nothing is stored."""
         doc = None if "#" in instruction_id else self._drafts.get(user_id, instruction_id)
@@ -275,9 +295,7 @@ class Drafter:
         flagged = self._safety.check("\n".join(screened))["flagged"] or room < 0
         doc: dict[str, Any] = {"drafted_at": self._clock(), "flagged": flagged, "draft": None, "findings": []}
         own = _base(_address(mailbox) or mailbox.lower())
-        replied = next(
-            (m for m in reversed(messages) if [_base(a) for a in _addresses(m.get("from"))[:1]] != [own]), None
-        )
+        replied = _replied(messages, own)
         if replied is None or not _addresses(replied.get("from")):  # no one to reply to: fail closed
             return {**doc, "status": "failed", "questions": []}
         envelope = _envelope(replied, own, ask["mode"])
