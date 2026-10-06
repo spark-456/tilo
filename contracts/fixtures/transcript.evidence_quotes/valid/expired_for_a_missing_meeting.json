@@ -1,0 +1,13 @@
+{
+  "quotes": [
+    {
+      "meeting_id": "mt_never_held",
+      "transcript": null,
+      "utterance_id": "u0001",
+      "state": "expired",
+      "speaker": null,
+      "text": null,
+      "truncated": false
+    }
+  ]
+}

@@ -7,7 +7,7 @@
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.2.0 sha256:f81fb58a52038818
+# common.schema.json 1.3.0 sha256:f819a7e2e62bf60b
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -99,7 +99,7 @@
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
-# meeting.schema.json 1.0.0 sha256:da49e396159870f5
+# meeting.schema.json 1.1.0 sha256:10547b42a2268966
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -109,11 +109,13 @@
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
 # pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
+# plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
 # providers.schema.json 1.1.0 sha256:ece7537b584e69f8
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
+# transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
 # work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
 # events/registry.yaml 1.1.0 sha256:2db78f63298c923a
@@ -551,13 +553,13 @@ class Maker(BaseModel):
 
 class RecordRef(BaseModel):
     """
-    A pointer to a record a claim rests on (assistant answers cite these, HR-1): its kind and id, never its content.
+    A pointer to a record a claim rests on (assistant answers cite these, HR-1): its kind and id, never its content. For mail the id is the triage message id (1.3.0, ADR-0021); no kind names a transcript (ADR-0020).
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    kind: Literal["work_item", "calendar_entry", "meeting", "pinboard_item", "mention", "card", "world", "event"]
+    kind: Literal["work_item", "calendar_entry", "meeting", "pinboard_item", "mention", "card", "world", "event", "mail"]
     id: Annotated[str, Field(pattern="^[A-Za-z0-9_]{1,64}$")]
 
 
@@ -2130,6 +2132,46 @@ class PlanGate(BaseModel):
     """
 
 
+class PlateRowRef(BaseModel):
+    """
+    A common `record_ref` narrowed to the six plate sources (PE-27): a run row points at its world, a mail row at the triage message id.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["work_item", "card", "world", "mail", "pinboard_item", "calendar_entry"]
+    id: Annotated[str, Field(pattern="^[A-Za-z0-9_]{1,64}$")]
+
+
+type PlateReason = Literal["gate", "consent", "blocked", "question", "meeting_card", "run", "work_item", "mail_reply", "pin_owner", "pin_tagged", "calendar"]
+"""
+Why the row is here (PE-27): a gate, consent, blocked, question or meeting card; a blocked or running run (`blocked`, `run`); the person's work item; mail that needs a reply; a pin they own or are tagged on; today's calendar entry.
+"""
+
+
+type PlateGroup = Literal["attention", "overdue", "soon", "rest", "snoozed", "asked", "done"]
+"""
+`attention`, `overdue`, `soon` and `rest` order `rows` (PE-28); `snoozed`, `asked` and `done` are the `parked` lanes, work items only.
+"""
+
+
+type PlateTitle = Annotated[
+    str,
+    Field(
+        max_length=140,
+        min_length=1,
+        pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF\\uFFF9-\\uFFFB]+$",
+    ),
+]
+"""
+The record's own title, cut to 140 characters and cleaned like a quote line (no Cc, no Zl or Zp, no Basic Multilingual Plane Cf; astral Cf removed by code, PE-29): one line, untrusted, shown as plain text.
+"""
+
+
+type PlateAction = Literal["open", "done", "snooze", "not_mine", "put_back", "draft_reply"]
+
+
 type Domain = Annotated[
     str, Field(max_length=253, pattern="^([a-z0-9-]+\\.)+[a-z]{2,}$")
 ]
@@ -2362,6 +2404,38 @@ class TeamLeadAssignment(BaseModel):
     )
     by: UserId
     at: Timestamp
+
+
+class TranscriptUtterance(BaseModel):
+    """
+    One utterance: the speaker label as captioned or uploaded (untrusted, not a person id) and the offset from the start of the meeting.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: UtteranceId
+    speaker: Annotated[
+        str, Field(max_length=80, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    t_ms: Annotated[int, Field(ge=0)]
+    text: Annotated[
+        str,
+        Field(max_length=4000, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$"),
+    ]
+
+
+type TranscriptQuoteLine = Annotated[
+    str,
+    Field(
+        max_length=240,
+        min_length=1,
+        pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF\\uFFF9-\\uFFFB]+$",
+    ),
+]
+"""
+Quote text or speaker: one line of at most 240 characters with no control character (Cc), no line or paragraph separator and no format character (Cf) of the Basic Multilingual Plane, so no bidi override or zero-width character. Astral format characters (tag characters U+E0000 to U+E007F and others) are removed by code (PE-24, validator only).
+"""
 
 
 type UiActionRoute = Literal["plate", "calendar", "meetings", "meeting", "pinboard_team", "pinboard_personal", "worlds", "world", "cards", "connections", "channels", "autonomy", "settings"]
@@ -3391,6 +3465,26 @@ class PlanApproach(BaseModel):
     """
 
 
+class PlatePlateRow(BaseModel):
+    """
+    One row: what it points at, why it is here, its group, and a title, due date, time and assigner at most; never a body, quote, address, link or transcript line (PE-29). `title` is null for mail (BQ-269). `evidence` is true for a work item from a meeting that cites an utterance, whose quote the person may ask for (PE-23). `actions` is a hint; tilo-api checks every action again at the write (PE-10).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ref: PlateRowRef
+    reason: PlateReason
+    group: PlateGroup
+    title: PlateTitle | None
+    due: CalendarDate | None
+    at: Timestamp | None
+    from_: Annotated[UserId | None, Field(alias="from")]
+    flagged: bool
+    evidence: bool
+    actions: Annotated[list[PlateAction], Field(max_length=6)]
+
+
 class Policy(BaseModel):
     """
     Autonomy policy (PRD 10.4): a user's pre-authorisation of one action type within a scope and limits. Data only: the deterministic policy engine decides, a model never does, and a T3 action never runs above L1. $defs.risk_tier_table is the shape of the risk tiers in config/autonomy.yaml.
@@ -3541,6 +3635,47 @@ class TeamLead(BaseModel):
     user: UserId
     domain: Slug
     assigned_by: TeamLeadAssignment
+
+
+class Transcript(BaseModel):
+    """
+    The content of a transcript artifact version (FR-MTG-02; ADR-0018 store, application/json, inside the 2,000,000-byte text cap; ADR-0020). Ingest writes it; utterance ids strictly increase (PE-22, validator). Owner-only (PE-05): another person gets at most one `evidence_quote`, cut per request by tilo-api (PE-23). Speaker labels and text are untrusted.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    meeting_id: MeetingId
+    utterances: Annotated[list[TranscriptUtterance], Field(max_length=10000)]
+
+
+class TranscriptEvidenceQuote(BaseModel):
+    """
+    One evidence quote as tilo-api serves it (ADR-0020): a read-model row computed per request from the pinned transcript version, never stored, logged, archived, sent or put in an event or a prompt (PE-22). Code removes control and format characters and cuts the text at 240 characters on a word boundary (`truncated`); for a viewer other than the meeting owner it masks addresses, phone numbers and links, and the speaker is a teammate's display name or null (PE-24). Only `shown` carries text (PE-25). An `expired` quote has `transcript` null: the answer for a swept transcript or a missing, discarded or deleted meeting, given only to a reader PE-23 admits (PE-22).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    meeting_id: MeetingId
+    transcript: ArtifactRef | None
+    utterance_id: UtteranceId
+    state: Literal["shown", "missing", "expired", "withheld"]
+    speaker: TranscriptQuoteLine | None
+    text: TranscriptQuoteLine | None
+    truncated: bool
+
+
+class TranscriptEvidenceQuotes(BaseModel):
+    """
+    The answer of a quote request: one quote per requested utterance for the meeting owner, at most one for a work item's owner, none when the item cites nothing (PE-23).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    quotes: Annotated[list[TranscriptEvidenceQuote], Field(max_length=20)]
 
 
 type UiActionTarget = UiActionTargetWorld | UiActionTargetMeeting | UiActionTargetCard | UiActionTargetPin | UiActionTargetWorkItem | UiActionTargetCalendarEntry
@@ -3950,7 +4085,7 @@ class Manifest(BaseModel):
 
 class Meeting(BaseModel):
     """
-    A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days).
+    A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273).
     """
 
     model_config = ConfigDict(
@@ -3959,6 +4094,7 @@ class Meeting(BaseModel):
     id: MeetingId
     org_id: OrgId
     owner: UserId
+    world_id: WorldId | None = None
     title: Annotated[
         str, Field(max_length=120, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
     ]
@@ -4063,6 +4199,24 @@ class Plan(BaseModel):
     """
     Budget cap in credits the user confirmed (FR-INT-08).
     """
+
+
+class Plate(BaseModel):
+    """
+    A person's plate (FR-PA-02, ADR-0021): a read model tilo-api builds per request for the signed-in person only, never stored and never an event (PE-26). S-27, the digest and the panel read the same `rows`; `parked` holds the person's own snoozed, reassign-asked and recently done work items for S-27 only (PE-27). Groups and order are code (PE-28): `today` is the date in the person's time zone at `as_of`. A row is a reference with at most a title (PE-29). `truncated` says more rows passing PE-26 and PE-27 exist than a full lane holds (200 rows or 100 parked), so it is true only with a full lane (PE-27); `fingerprint` is the SHA-256 of `rows` as JSON with sorted keys and no whitespace (PE-30).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    user: UserId
+    as_of: Timestamp
+    today: CalendarDate
+    rows: Annotated[list[PlatePlateRow], Field(max_length=200)]
+    parked: Annotated[list[PlatePlateRow], Field(max_length=100)]
+    truncated: bool
+    fingerprint: Annotated[str, Field(max_length=64, pattern="^[0-9a-f]{64}$")]
 
 
 class PolicyRiskTierTable(BaseModel):
