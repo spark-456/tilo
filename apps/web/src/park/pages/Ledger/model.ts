@@ -64,40 +64,64 @@ export function kpis(L: Ledger, dec: Dec, decisions: readonly Decision[] = []): 
   const taken = waitingTaken(L, dec);
   const pending = decisionOf(decisions, waitingKey(L));
   const spent = taken ? L.spent + waiting : L.spent;
-  return [
+  const hours = sum(L.hours.map((h) => h[1]));
+  // A tile the Ledger holds no data for is left out, not shown as zero (HR-1..HR-7): no budget gives no
+  // share of it, no forecast no month-end tile, no waiting transaction no "Waiting on you", and so on.
+  const rows: (KpiRow | null)[] = [
     {
       label: "Spent so far",
       value: gbp(spent),
-      sub: `${Math.round((spent / L.budget) * 100)}% of ${gbp(L.budget)}`,
+      sub: L.budget > 0 ? `${Math.round((spent / L.budget) * 100)}% of ${gbp(L.budget)}` : "",
     },
-    {
-      label: "Month-end forecast",
-      value: gbp(L.forecast),
-      sub: `${gbp(L.budget - L.forecast)} under budget`,
-    },
-    taken
+    L.forecast > 0 && L.budget > 0
       ? {
-          label: "Waiting on you",
-          value: "£0",
-          sub: pending?.facts?.decided ?? "Approved today",
-          tone: "ok",
+          label: "Month-end forecast",
+          value: gbp(L.forecast),
+          sub: `${gbp(L.budget - L.forecast)} under budget`,
         }
-      : {
-          label: "Waiting on you",
-          value: gbp(waiting),
-          sub: pending?.facts?.waiting ?? "Needs your sign-off",
-          tone: "amber",
-          ...(pending ? { opensWorld: pending.world } : {}),
-        },
-    { label: "Saved by memory", value: gbp(sum(L.memory)), sub: "Up £120 on August", tone: "sch" },
-    {
-      label: "Hours handed back",
-      value: `${sum(L.hours.map((h) => h[1]))} h`,
-      sub: "About 6 working days",
-      tone: "hero",
-    },
+      : null,
+    waitingKey(L) === undefined
+      ? null
+      : taken
+        ? {
+            label: "Waiting on you",
+            value: "£0",
+            sub: pending?.facts?.decided ?? "Approved today",
+            tone: "ok",
+          }
+        : {
+            label: "Waiting on you",
+            value: gbp(waiting),
+            sub: pending?.facts?.waiting ?? "Needs your sign-off",
+            tone: "amber",
+            ...(pending ? { opensWorld: pending.world } : {}),
+          },
+    L.memory.length
+      ? {
+          label: "Saved by memory",
+          value: gbp(sum(L.memory)),
+          sub: "Up £120 on August",
+          tone: "sch",
+        }
+      : null,
+    L.hours.length
+      ? {
+          label: "Hours handed back",
+          value: `${hours} h`,
+          sub: `About ${Math.round(hours / 8)} working days`,
+          tone: "hero",
+        }
+      : null,
   ];
+  return rows.filter((r): r is KpiRow => r !== null);
 }
+
+/** The lede's "<month> · <n> days left": only when the Ledger holds daily spend for the month so far. */
+export const monthLeft = (L: Ledger): string | null =>
+  L.daily.length > 0 ? `September 2026 · ${30 - L.daily.length} days left` : null;
+
+/** The spend-over-time chart is drawn only when there is a budget to scale it by and a day to plot. */
+export const hasChart = (L: Ledger): boolean => L.budget > 0 && L.daily.length > 0;
 
 // ---- Spend over time (SVG 720x270) ----
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -180,33 +204,40 @@ export type By = keyof Ledger["by"];
 export function donut(L: Ledger, by: By) {
   const B = L.by[by];
   const tot = sum(B.rows.map((r) => r[1]));
+  const share = (v: number): number => (tot > 0 ? (v / tot) * 100 : 0);
   let acc = 0;
   const stops = B.rows.map((r, i) => {
-    const a = (acc / tot) * 100;
+    const a = share(acc);
     acc += r[1];
-    const b = (acc / tot) * 100;
+    const b = share(acc);
     return `${PALETTE[i]} ${a.toFixed(2)}% ${(b - 0.5).toFixed(2)}%, transparent ${(b - 0.5).toFixed(2)}% ${b.toFixed(2)}%`;
   });
   return {
     head: B.head,
-    conic: `conic-gradient(${stops.join(", ")})`,
+    // No spend to divide is an empty ring, not a gradient with NaN stops.
+    conic:
+      tot > 0 ? `conic-gradient(${stops.join(", ")})` : "conic-gradient(transparent, transparent)",
     rows: B.rows.map((r, i) => ({
       name: r[0],
       amt: gbp(r[1]),
-      pct: `${Math.round((r[1] / tot) * 100)}%`,
+      pct: `${Math.round(share(r[1]))}%`,
       c: PALETTE[i] ?? "#8C8899",
     })),
   };
 }
 
+/** The groupings that have rows; the Where-it-goes card shows only these. */
+export const groupsWithRows = (L: Ledger): By[] =>
+  (["world", "tool", "role"] as const).filter((k) => L.by[k].rows.length > 0);
+
 // ---- Cost per run, approval waits, what Tilo gave back ----
 export function runCards(L: Ledger) {
   return L.runs.map(([name, v, n, skill]) => {
-    const mx = v[0] ?? 1;
+    const mx = v[0] || 1;
     const line = v
       .map(
         (c, i) =>
-          `${i ? "L" : "M"}${((i / (v.length - 1)) * 200).toFixed(1)} ${(6 + (1 - c / mx) * 50).toFixed(1)}`,
+          `${i ? "L" : "M"}${((i / Math.max(1, v.length - 1)) * 200).toFixed(1)} ${(6 + (1 - c / mx) * 50).toFixed(1)}`,
       )
       .join(" ");
     const first = v[0] ?? 0;
@@ -219,13 +250,17 @@ export function runCards(L: Ledger) {
       area: `${line} L200 60 L0 60 Z`,
       first: `£${first.toFixed(2)}`,
       now: `£${last.toFixed(2)}`,
-      drop: `−${Math.round((1 - last / first) * 100)}%`,
+      drop: `−${first > 0 ? Math.round((1 - last / first) * 100) : 0}%`,
     };
   });
 }
 
+/** The approval-waits card is shown only when the Ledger holds waits to show. */
+export const hasWaits = (L: Ledger): boolean =>
+  L.waits.buckets.length > 0 || L.waits.types.length > 0;
+
 export function waitBuckets(L: Ledger) {
-  const bmax = Math.max(...L.waits.buckets.map((b) => b[1]));
+  const bmax = Math.max(1, ...L.waits.buckets.map((b) => b[1]));
   return L.waits.buckets.map(([label, n], i) => ({
     label,
     n: String(n),

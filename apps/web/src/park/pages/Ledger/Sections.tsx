@@ -7,6 +7,7 @@ import {
   type By,
   donut,
   gbp,
+  groupsWithRows,
   hourBars,
   memoryBars,
   runCards,
@@ -22,9 +23,11 @@ export function Head({
   return (
     <div>
       <div className="park-ledger-eyebrow">{eyebrow}</div>
-      <h2 className={balance ? "park-ledger-h2 park-ledger-h2--balance" : "park-ledger-h2"}>
-        {title}
-      </h2>
+      {title ? (
+        <h2 className={balance ? "park-ledger-h2 park-ledger-h2--balance" : "park-ledger-h2"}>
+          {title}
+        </h2>
+      ) : null}
     </div>
   );
 }
@@ -36,19 +39,25 @@ const BY_TABS = [
 ] as const;
 
 export function WhereItGoes({ L }: { L: Ledger }) {
-  const [by, setBy] = useState<By>("world");
+  const groups = groupsWithRows(L);
+  const [picked, setBy] = useState<By>("world");
+  // Only the groupings the Ledger has rows for are offered; the first of them opens.
+  const by = groups.includes(picked) ? picked : (groups[0] ?? picked);
+  const tabs = BY_TABS.filter((t) => groups.includes(t.value));
   const d = donut(L, by);
   return (
     <section aria-label="Where it goes" className="park-ledger-card">
       <Head eyebrow="WHERE IT GOES" title={d.head} balance />
-      <div className="park-ledger-group">
-        <SegmentedControl
-          label="Group by"
-          options={BY_TABS}
-          value={by}
-          onChange={(v) => setBy(v as By)}
-        />
-      </div>
+      {tabs.length > 1 ? (
+        <div className="park-ledger-group">
+          <SegmentedControl
+            label="Group by"
+            options={tabs}
+            value={by}
+            onChange={(v) => setBy(v as By)}
+          />
+        </div>
+      ) : null}
       <div className="park-ledger-donutrow">
         <div className="park-ledger-donut">
           <div className="park-ledger-ring" data-donut="" style={{ background: d.conic }} />
@@ -170,53 +179,62 @@ export function GaveBack({ L }: { L: Ledger }): ReactNode {
     <section aria-label="What Tilo gave back" className="park-ledger-card">
       <Head
         eyebrow="WHAT TILO GAVE BACK"
-        title={`${saved} saved by memory and ${total} hours handed back to people`}
+        title={[
+          L.memory.length ? `${saved} saved by memory` : null,
+          L.hours.length ? `${total} hours handed back to people` : null,
+        ]
+          .filter(Boolean)
+          .join(" and ")}
       />
       <div className="park-ledger-back">
-        <div className="park-ledger-col">
-          <div className="park-ledger-colhead">
-            <span>Saved by memory, per week</span>
-            <span style={{ color: "var(--sch)" }}>{saved}</span>
+        {L.memory.length > 0 ? (
+          <div className="park-ledger-col">
+            <div className="park-ledger-colhead">
+              <span>Saved by memory, per week</span>
+              <span style={{ color: "var(--sch)" }}>{saved}</span>
+            </div>
+            <div className="park-ledger-bars">
+              {memory.map((b, i) => (
+                <div key={`${b.v}-${i}`} className="park-ledger-bar">
+                  <span className="park-ledger-bar-value">{b.v}</span>
+                  <span className="park-ledger-bar-col" style={{ height: b.h, background: b.c }} />
+                </div>
+              ))}
+            </div>
+            <div className="park-ledger-weeks">
+              <span>1–7 Sep</span>
+              <span>8–14</span>
+              <span>15–21</span>
+              <span>22–24</span>
+            </div>
           </div>
-          <div className="park-ledger-bars">
-            {memory.map((b, i) => (
-              <div key={`${b.v}-${i}`} className="park-ledger-bar">
-                <span className="park-ledger-bar-value">{b.v}</span>
-                <span className="park-ledger-bar-col" style={{ height: b.h, background: b.c }} />
-              </div>
-            ))}
-          </div>
-          <div className="park-ledger-weeks">
-            <span>1–7 Sep</span>
-            <span>8–14</span>
-            <span>15–21</span>
-            <span>22–24</span>
-          </div>
-        </div>
-        <div className="park-ledger-col park-ledger-col--hours">
-          <div className="park-ledger-colhead">
-            <span>Hours handed back, by team</span>
-            <span style={{ color: "var(--heroInk)" }}>{total} h</span>
-          </div>
-          <div className="park-ledger-stacked">
-            {hours.map((t) => (
-              <span key={t.name} style={{ width: t.w, background: t.c }} />
-            ))}
-          </div>
-          <div className="park-ledger-tiles">
-            {hours.map((t) => (
-              <div key={t.name} className="park-ledger-tile">
-                <span className="park-ledger-tilebar" style={{ background: t.c }} />
-                <span className="park-ledger-tiletext">
-                  <span className="park-ledger-tilename">
-                    {t.name} · {t.h}
+        ) : null}
+        {L.hours.length > 0 ? (
+          <div className="park-ledger-col park-ledger-col--hours">
+            <div className="park-ledger-colhead">
+              <span>Hours handed back, by team</span>
+              <span style={{ color: "var(--heroInk)" }}>{total} h</span>
+            </div>
+            <div className="park-ledger-stacked">
+              {hours.map((t) => (
+                <span key={t.name} style={{ width: t.w, background: t.c }} />
+              ))}
+            </div>
+            <div className="park-ledger-tiles">
+              {hours.map((t) => (
+                <div key={t.name} className="park-ledger-tile">
+                  <span className="park-ledger-tilebar" style={{ background: t.c }} />
+                  <span className="park-ledger-tiletext">
+                    <span className="park-ledger-tilename">
+                      {t.name} · {t.h}
+                    </span>
+                    <span className="park-ledger-tilewhat">{t.what}</span>
                   </span>
-                  <span className="park-ledger-tilewhat">{t.what}</span>
-                </span>
-              </div>
-            ))}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </section>
   );
