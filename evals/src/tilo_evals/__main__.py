@@ -2,6 +2,8 @@
 PRD 3.5; exit 0, or 2 when refused in a live or deployed environment or a case file is bad).
 `python -m tilo_evals run --pass smoke|full|gate [--group G] [--case ID]... [--results-md PATH]
 [--results-json PATH] [--live]` (EFF-07; PRD 19.5, 6.6). `just eval` runs the replay set.
+`python -m tilo_evals nightly [--idempotency-key K] [--results-md P] [--results-json P] [--poll-interval-s S]
+[--max-wait-s S] [--live]`: the smoke pass through the batch path (EFF-05; see `nightly.py`).
 
 Exit codes: 0 every case that ran passed; 1 at least one case failed; 2 the pass could not run (bad config or
 case file, an unknown --case or --group, `--live` refused); 3 the pass stopped at its credit cap with no failure
@@ -17,10 +19,13 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+from tilo_providers.batch import BatchProvider
 from tilo_providers.interfaces import ModelProvider, SafetyProvider
 
 from .cases import CaseError
 from .config import EvalsConfig, EvalsConfigError
+from .nightly import add_arguments as nightly_arguments
+from .nightly import run_nightly
 from .results import build_hash, merge_results_md, render_json, render_section, summary_text
 from .runner import PASS_KINDS, SelectionError, run_pass
 
@@ -64,6 +69,8 @@ def _parser() -> argparse.ArgumentParser:
     lat = commands.add_parser("latency", help="NFR-02/03/05: Tilo's own latency overhead on fakes (PRD 17.1)")
     lat.add_argument("--n", type=_positive, required=True, help="samples per measure (at least 1)")
     lat.add_argument("--json", action="store_true", help="print the report as one JSON document")
+    nightly = commands.add_parser("nightly", help="the nightly smoke through the batch path (EFF-05)")
+    nightly_arguments(nightly)
     run = commands.add_parser("run", help="run an eval pass")
     run.add_argument("--pass", dest="pass_kind", choices=PASS_KINDS, required=True)
     run.add_argument("--group", default=None)
@@ -253,9 +260,12 @@ def main(
     environ: Mapping[str, str] | None = None,
     live_provider_factory: Callable[[str, str], ModelProvider] | None = None,
     safety: SafetyProvider | None = None,
+    batch_provider: BatchProvider | None = None,
 ) -> int:
-    """`environ`, `live_provider_factory` and `safety` are test seams used by `generate` only."""
+    """Test seams: `environ`, `live_provider_factory`, `safety` (`generate` only), `batch_provider` (`nightly` only)."""
     args = _parser().parse_args(argv)
+    if args.command == "nightly":
+        return run_nightly(args, batch_provider)
     if args.command == "generate":
         return _generate(args, environ, live_provider_factory, safety)
     if args.command == "metrics":
