@@ -390,7 +390,7 @@ def _signal(text: str, *, inbound: bool) -> frozenset[str]:
             signal.add("money")
     if inbound:  # BQ-274: punctuation as a class, both split orders, spread-out letters, amounts with no money word
         prepared = _prepare_cuts(folded)
-        prepared_leet = prepared.translate(_LEET)
+        prepared_leet = _prepare_cuts(folded.translate(_LEET))  # look-alikes first: "3:35" is letters, not a time
         joined = _join_hits(prepared) or (_join_hits(prepared_leet) if prepared_leet != prepared else frozenset())
         if joined:  # the first hit stops the scan (or more joined text than JOIN_CAP: not read in full, fail closed)
             return frozenset(signal | joined)

@@ -117,14 +117,14 @@ def _count_sends(run_flow) -> tuple[int, int, int]:
 
 def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_in_sequence_by_web_then_mobile_web(run_flow):
     _, card = run_flow.run_to_gate()
-    url = f"/worlds/{run_flow.world_id}/cards/{card['id']}/answer"
     assert run_flow.answer(card["id"], "approve").status_code == 200
     wait_for(lambda: run_flow.events("world.completed"), what="world.completed")
+    run_flow.sessions_by_channel()
 
     later = [
-        run_flow.flow.client.post(url, json={"option": "approve", "channel": "web"}),
-        run_flow.flow.client.post(url, json={"option": "approve", "channel": "mobile_web"}),
-        run_flow.flow.client.post(url, json={"option": "hold", "channel": "mobile_web"}),
+        run_flow.answer_on(card["id"], {"option": "approve", "channel": "web"}),
+        run_flow.answer_on(card["id"], {"option": "approve", "channel": "mobile_web"}),
+        run_flow.answer_on(card["id"], {"option": "hold", "channel": "mobile_web"}),
     ]
 
     assert [(r.status_code, r.json()) for r in later] == [(400, REFUSED)] * 3
@@ -133,7 +133,7 @@ def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_in_sequence_by
 
 def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_at_once_from_web_and_mobile_web(run_flow):
     _, card = run_flow.run_to_gate()
-    url = f"/worlds/{run_flow.world_id}/cards/{card['id']}/answer"
+    run_flow.sessions_by_channel()
     bodies = [
         {"option": "approve", "channel": "web"},
         {"option": "approve", "channel": "mobile_web"},
@@ -141,7 +141,7 @@ def test_ST_3b_OB_01_the_run_sends_once_when_the_gate_is_answered_at_once_from_w
     replies: list = []
 
     def post(body: dict) -> None:
-        replies.append(run_flow.flow.client.post(url, json=body))
+        replies.append(run_flow.answer_on(card["id"], body))
 
     threads = [threading.Thread(target=post, args=(bodies[i % 2],)) for i in range(8)]
     for t in threads:

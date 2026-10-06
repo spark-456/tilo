@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/meeting.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "Meeting",
-  "description": "A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days).",
+  "description": "A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -36,6 +36,7 @@
     "owner": {
       "$ref": "common.schema.json#/$defs/user_id"
     },
+    "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
     "title": {
       "type": "string",
       "minLength": 1,

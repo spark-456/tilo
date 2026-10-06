@@ -286,6 +286,16 @@ class InMemoryMcpCallLedger:
             self._state[marker] = "done"
 
 
+_LEDGERS: dict[str, InMemoryMcpCallLedger] = {}  # server id -> the ledger every default adapter of it shares
+_LEDGERS_LOCK = threading.Lock()
+
+
+def _shared_ledger(server_id: str) -> InMemoryMcpCallLedger:
+    """Two outboxes over one store each build an adapter; their ledger must be the same one (probe P1c)."""
+    with _LEDGERS_LOCK:
+        return _LEDGERS.setdefault(server_id, InMemoryMcpCallLedger())
+
+
 class McpAdapter:
     """Outbox connector for one allowlisted server: its side-effect tools, only with the outbox's grant."""
 
@@ -294,7 +304,7 @@ class McpAdapter:
     ) -> None:
         client.allowlist.server(server_id)
         self._client, self._server_id, self._artifacts = client, server_id, artifacts
-        self._ledger = ledger if ledger is not None else InMemoryMcpCallLedger()
+        self._ledger = ledger if ledger is not None else _shared_ledger(server_id)
 
     def _tool_for(self, entry: Mapping[str, Any]) -> McpTool:
         if entry.get("connector") != self._server_id:
