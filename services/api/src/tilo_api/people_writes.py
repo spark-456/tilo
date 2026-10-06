@@ -9,6 +9,7 @@ no clock read (`now` is handed in).
 
 from __future__ import annotations
 
+import re
 import secrets
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ from tilo_people.dates import resolve_due
 from tilo_people.directory import Directory
 from tilo_people.errors import NotFound, VersionConflict
 from tilo_people.stores import PeopleStores, RecordStore
+from tilo_people.text import clean_line
 from tilo_people.writes import check_write
 from tilo_policy.schemas import conforms
 
@@ -38,6 +40,10 @@ class Refusal(HTTPException):
 
 def _identity(text: str) -> str:
     return text
+
+
+_ASCII_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+DUE_TEXT_MAX = 60  # work_item.due_text maxLength
 
 
 # --- closed request bodies: a field the server owns is a 422 ------------------------------------------------------
@@ -112,7 +118,9 @@ def json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitab
         try:
             return model.model_validate_json(await request.body())
         except ValidationError as exc:
-            raise Refusal(422, "invalid_body", fields=[list(e["loc"]) for e in exc.errors()]) from exc
+            # A key the caller sent that the model does not know is never echoed (it could be a secret): `?`.
+            fields = [[*e["loc"][:-1], "?"] if e["type"] == "extra_forbidden" else list(e["loc"]) for e in exc.errors()]
+            raise Refusal(422, "invalid_body", fields=fields) from exc
 
     return parse
 
@@ -132,6 +140,12 @@ class Writer:
 
     def directory(self) -> Directory:
         return Directory.of(s.record for s in self.stores.persons.list(self.org))
+
+    def text(self, value: str) -> str:
+        """A person's text: format and separator characters out first (so a zero-width character cannot hide a link
+        from the schema), then the secret redactor, then the schema. ASCII controls are left for the schema to refuse
+        (a line break is a 422, not a quiet join)."""
+        return self.redact(value if _ASCII_CONTROL.search(value) else clean_line(value))
 
     def stamp(self) -> dict[str, str]:
         return {"by": self.actor, "at": self.now}
@@ -225,13 +239,13 @@ def confirm_minutes(w: Writer, meeting_id: str) -> dict[str, Any]:
 
 def create_meeting(w: Writer, body: MeetingIn) -> dict[str, Any]:
     """A person of the org adds a meeting they own and attest; the server stamps the attestation (PE-18, G2)."""
-    r = w.redact
+    r = w.text
     record: dict[str, Any] = {
         "id": _mint("mt"),
         "org_id": w.org,
         "owner": w.actor,
         "title": r(body.title),
-        "series": body.series,
+        "series": None if body.series is None else r(body.series),
         "scheduled": body.scheduled and body.scheduled.model_dump(),
         "agenda": [{"title": r(a.title), "minutes": a.minutes} for a in body.agenda],
         "attendees": [{"name": r(a.name), "user": None} for a in body.attendees],
@@ -251,7 +265,7 @@ def create_meeting(w: Writer, body: MeetingIn) -> dict[str, Any]:
 
 def create_person(w: Writer, body: PersonIn) -> dict[str, Any]:
     """An org owner adds a member; the id and the org are the server's (PE-17, G1). Answers the membership view."""
-    r = w.redact
+    r = w.text
     record: dict[str, Any] = {
         "id": _mint("u"),
         "org_id": w.org,
@@ -272,8 +286,11 @@ def create_item(w: Writer, body: ItemIn, owners: Callable[[], deps.SourceOwners]
     must be the caller's (someone else's ref and a missing ref are one 422)."""
     d = w.directory()
     me = d.record(w.actor)
+    due_text = None if body.due_text is None else w.text(body.due_text)
+    if due_text is not None and len(due_text) > DUE_TEXT_MAX:
+        raise Refusal(422, "invalid_record")  # never a silent null: the person is told the phrase is too long
     due = resolve_due(
-        w.redact(body.due_text) if body.due_text is not None else None,
+        due_text,
         meeting_at=w.now,
         time_zone=me["time_zone"] if me else "UTC",
     )
@@ -281,7 +298,7 @@ def create_item(w: Writer, body: ItemIn, owners: Callable[[], deps.SourceOwners]
         "id": _mint("wi"),
         "org_id": w.org,
         "owner": w.actor,
-        "title": w.redact(body.title),
+        "title": w.text(body.title),
         "due": due.due,
         "due_text": due.due_text,
         "status": "open",
