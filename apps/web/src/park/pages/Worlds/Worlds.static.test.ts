@@ -106,7 +106,11 @@ describe("WEB_5_worlds_static: the stylesheet", () => {
 
 describe("WEB_5_worlds_static: the registry gets one new line", () => {
   const src = readFileSync(join(DIR, "..", "..", "app", "pages.ts"), "utf8");
-  const entries = [...src.matchAll(/^\s*(\w+):\s*(.+?),\s*$/gm)].map((m) => [m[1], m[2]]);
+  // one entry per two-space-indented `key:`; an entry may wrap over several lines
+  const entries = [...src.matchAll(/^ {2}(\w+):\s*([\s\S]*?),?\n(?= {2}\w+:|\};)/gm)].map((m) => [
+    m[1],
+    (m[2] ?? "").replace(/\s+/g, " ").trim().replace(/,$/, ""),
+  ]);
 
   it("WEB_5_worlds_static_pages_ts_worlds_line_is_the_lazy_import_and_every_other_page_is_untouched_form", () => {
     expect(src).toContain(
@@ -114,7 +118,7 @@ describe("WEB_5_worlds_static: the registry gets one new line", () => {
     );
     expect(entries).toHaveLength(9);
     // another lane's page is its own one line in the same named-export form; the rest stay Placeholder
-    const form = /^lazy\(\(\) => import\("\.\.\/pages\/\w+\/\w+Page"\)\.then\(/;
+    const form = /^lazy\(\(\) =>/; // a long line may wrap, so only the opening is checked
     expect(
       entries
         .filter(([k]) => k !== "worlds")

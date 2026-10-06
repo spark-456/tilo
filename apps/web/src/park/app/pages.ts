@@ -15,5 +15,7 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   agenda: Placeholder,
   team: Placeholder,
   profile: Placeholder,
-  connectors: Placeholder,
+  connectors: lazy(() =>
+    import("../pages/Connectors/ConnectorsPage").then((m) => ({ default: m.ConnectorsPage })),
+  ),
 };
