@@ -164,16 +164,20 @@ def _alternation(words: Iterable[str]) -> str:
 
 
 # With apostrophes dropped a name word is never a name when (a) it is number words followed by at most one unit
-# (k, m, b, l, s, grand(s) or a currency word of `_MONEY`: "Fifty'Thousand", "Tenk", "Fiftybucks"); (b) it starts with
-# a number word of four or more letters ("Fiftyfoo"); or (c) it holds hundred, thousand, million, billion, trillion,
-# lakh or crore anywhere. Three-letter number words (one, two, six, ten) and the abbreviations (mil, lac, cr) count
-# only as the whole word (a), so Craig, Milan, Miles, Tenzin and Sixtine stay names. Accepted false positives:
-# Fournier, Lakhani, Ninette, Sevenoaks and any long name over `_NAME_WORD_MAX`. Bounded scans, no model.
-_UNITS = frozenset(
-    "k m b l s ks grand grands buck bucks quid dollar dollars euro euros pound pounds rupee rupees "
-    "usd eur gbp inr sgd aud cad jpy chf rs".split()
+# (k, m, b, l, s, ks, grand(s) or any word `_MONEY` matches, taken from `_MONEY` itself: "Fifty'Thousand", "Tenk",
+# "Tenrm", "Tenfee"); (b) it starts with a number word of four or more letters ("Fiftyfoo"); or (c) it holds hundred,
+# thousand, million, billion, trillion, lakh or crore anywhere. Three-letter number words (one, two, six, ten) and the
+# abbreviations (mil, lac, cr) are caught only by (a), so Craig, Milan, Miles, Tenzin and Sixtine stay names. Accepted
+# false positives: Fournier, Lakhani, Ninette, Sevenoaks, Crowe, Milbank and any long name over `_NAME_WORD_MAX`.
+# Bounded scans, no model.
+_NUMBER_ONLY = re.compile(
+    _alternation(_NUMBER_WORDS)
+    + "+(?:"
+    + _alternation("k m b l s ks grand grands".split())
+    + "|"
+    + _MONEY.pattern.replace(r"\b", "")
+    + ")?"
 )
-_NUMBER_ONLY = re.compile(_alternation(_NUMBER_WORDS) + "+" + _alternation(_UNITS) + "?")
 _NUMBER_START = re.compile(_alternation(w for w in _NUMBER_WORDS if len(w) >= 4))
 _MAGNITUDE_INSIDE = re.compile(_alternation("hundred thousand million billion trillion lakh crore".split()))
 _NAME_WORD_MAX = 24  # a longer word is no name: the check stays bounded (a 20k-character word is read no further)
