@@ -9,6 +9,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PAGE_LABEL } from "../../../test-support/park/appHarness";
 import { cleanup, mount, q, qa } from "../../../test-support/park/componentsHarness";
+import { PLACEHOLDER_PAGES } from "../../../test-support/park/realPages";
 import { PAGE_IDS } from "./AppCtx";
 import DefaultParkApp, { ParkApp } from "./ParkApp";
 
@@ -59,9 +60,11 @@ describe("WEB_3a_parkapp: the shell around a page", () => {
   });
 
   it("WEB_3a_parkapp_the_placeholder_says_Not_built_yet_under_one_h1", async () => {
-    const m = await visit("/park/home");
+    const id = PLACEHOLDER_PAGES.find((p) => p !== "world");
+    if (!id) return; // every page has a real implementation: nothing is a placeholder any more
+    const m = await visit(`/park/${id}`);
     expect(qa(m.container, "h1")).toHaveLength(1);
-    expect(q(m.container, "h1").textContent).toBe("Home");
+    expect(q(m.container, "h1").textContent).toBe(PAGE_LABEL[id]);
     expect(m.container.textContent).toContain("Not built yet");
   });
 
@@ -82,6 +85,7 @@ describe("WEB_3a_parkapp: each route renders its page", () => {
       ["/park/world/k1", "world"],
       ["/park/skills", "skills"],
       ["/park/skills?id=sk2", "skills"],
+      ["/park/ledger", "ledger"],
       ["/park/agenda", "agenda"],
       ["/park/team", "team"],
       ["/park/team?focus=share", "team"],
@@ -91,6 +95,7 @@ describe("WEB_3a_parkapp: each route renders its page", () => {
       ["/park/home?x=1", "home"],
     ] as const;
     for (const [path, id] of table) {
+      if (!PLACEHOLDER_PAGES.includes(id)) continue; // a real page is covered by its own spec
       const m = await visit(path);
       expect(qa(m.container, `[data-testid="park-page-${id}"]`), path).toHaveLength(1);
       expect(q(m.container, "h1").textContent, path).toBe(PAGE_LABEL[id]);
@@ -103,13 +108,12 @@ describe("WEB_3a_parkapp: each route renders its page", () => {
 
   it("WEB_3a_parkapp_all_nine_pages_are_reachable", async () => {
     const reached: string[] = [];
-    const placeholders = PAGE_IDS.filter((id) => id !== "ledger"); // ledger is a real page since WEB-7
-    for (const id of placeholders) {
+    for (const id of PAGE_IDS) {
       const m = await visit(id === "world" ? "/park/world/k1" : `/park/${id}`);
       if (m.container.querySelector(`[data-testid="park-page-${id}"]`)) reached.push(id);
       cleanup();
     }
-    expect(reached).toEqual(placeholders);
+    expect(reached).toEqual([...PAGE_IDS]);
   });
 });
 
@@ -156,10 +160,10 @@ describe("WEB_3a_parkapp: a path that is not a page", () => {
 describe("WEB_3a_parkapp: the browser's history drives the page", () => {
   it("WEB_3a_parkapp_popstate_switches_page_title_and_back_again", async () => {
     const m = await visit("/park/home");
-    await navigateTo("/park/agenda");
-    expect(m.container.querySelector('[data-testid="park-page-agenda"]')).not.toBeNull();
+    await navigateTo("/park/ledger");
+    expect(m.container.querySelector('[data-testid="park-page-ledger"]')).not.toBeNull();
     expect(m.container.querySelector('[data-testid="park-page-home"]')).toBeNull();
-    expect(document.title).toBe("Agenda · Tilo");
+    expect(document.title).toBe("Ledger · Tilo");
     await navigateTo("/park/home");
     expect(m.container.querySelector('[data-testid="park-page-home"]')).not.toBeNull();
     expect(document.title).toBe("Home · Tilo");

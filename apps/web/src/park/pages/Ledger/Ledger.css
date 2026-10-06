@@ -749,12 +749,37 @@
   color: var(--ink2);
 }
 
-/* A phone (the handoff has no Ledger layout below 1100): the Activity row gives its time column and the
-   detail its 130px indent back so nothing scrolls sideways; titles wrap instead of cutting off. */
+/* A phone (the handoff has no Ledger layout below 1100, and its own mobile row overflows the page, so this
+   is deliberately not a parity target): the time sits above the title and the amount under it, so the
+   title column keeps the row's full width beside the icon and reads; titles wrap instead of cutting off,
+   and nothing scrolls sideways. The detail gives its 130px indent back. */
 @media (max-width: 640px) {
   [data-park] .park-ledger-arow-btn {
-    grid-template-columns: 44px 36px minmax(0, 1fr) auto;
-    gap: 8px;
+    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-areas:
+      "icon time"
+      "icon what"
+      "icon amt";
+    gap: 0 10px;
+    align-items: start;
+  }
+  [data-park] .park-ledger-time {
+    grid-area: time;
+  }
+  [data-park] .park-ledger-icontile {
+    grid-area: icon;
+    width: 36px;
+    height: 36px;
+  }
+  [data-park] .park-ledger-what {
+    grid-area: what;
+  }
+  [data-park] .park-ledger-amt {
+    grid-area: amt;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 8px;
   }
   [data-park] .park-ledger-what-title,
   [data-park] .park-ledger-what-sub {

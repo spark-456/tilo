@@ -62,6 +62,20 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       expect(problems).toEqual([]);
     });
 
+    test(`WEB_7_e2e_${name}_activity_titles_have_room_to_read`, async ({ page }) => {
+      await page.goto("/park/ledger");
+      const title = page.locator(".park-ledger-what-title").first();
+      await expect(title).toBeVisible();
+      const box = await title.boundingBox();
+      expect(box?.width ?? 0, "an Activity title is at least 120px wide").toBeGreaterThanOrEqual(
+        120,
+      );
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth,
+      );
+      expect(overflow, "the page does not scroll sideways").toBeLessThanOrEqual(0);
+    });
+
     test(`WEB_7_e2e_${name}_one_approval_goes_through_decide_and_undo_restores_it`, async ({
       page,
     }) => {
@@ -96,9 +110,11 @@ for (const [name, viewport] of Object.entries(SIZES)) {
           await page.evaluate(() => {
             document.querySelector("[data-park]")?.setAttribute("data-time", "night");
           });
-        // Known, owned by the shared tokens and KpiTile (not this page): the "sch" tone colours the label of
-        // the "Saved by memory" tile teal #0e7c79 on #e2ede9, 4.19:1 against the 4.5:1 minimum, in the
-        // design handoff itself. Everything else on the page is still scanned.
+        // Design-owned exception (the reference's own teal on its own soft tint; plan 8c), narrow on purpose:
+        // the "sch" tone colours the label of the "Saved by memory" tile teal #0e7c79 on #e2ede9. Measured
+        // 4.19:1 at 13px bold against the 4.5:1 minimum (WEB-7 builder, this tile state); the WEB-2 critic
+        // measured 3.86:1 on a different tile state. It lives in the shared tokens and KpiTile, not this
+        // page. Everything else on the page is still scanned.
         const results = await new AxeBuilder({ page })
           .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
           .exclude(".park-kpi--sch .park-kpi__label")

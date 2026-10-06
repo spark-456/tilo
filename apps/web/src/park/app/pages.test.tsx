@@ -10,6 +10,7 @@ import type { ComponentType, LazyExoticComponent } from "react";
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { PAGE_LABEL, stubApp } from "../../../test-support/park/appHarness";
 import { cleanup, mount, q, qa } from "../../../test-support/park/componentsHarness";
+import { PLACEHOLDER_PAGES } from "../../../test-support/park/realPages";
 import { type AppCtx, PAGE_IDS, type PageId } from "./AppCtx";
 import { PAGES } from "./pages";
 
@@ -63,9 +64,8 @@ describe("WEB_3a_pages: a page with no real page yet renders the Placeholder", (
     expect(q(m.container, '[data-testid="park-page-world"]').textContent).toContain("k1");
   });
 
-  it("WEB_3a_pages_placeholder_for_every_page", async () => {
-    for (const id of PAGE_IDS.filter((p) => p !== "ledger")) {
-      // ledger is a real page since WEB-7
+  it("WEB_3a_pages_placeholder_for_every_page_that_has_no_real_page_yet", async () => {
+    for (const id of PLACEHOLDER_PAGES) {
       const Page = PAGES[id];
       const m = mount(
         <Suspense fallback={null}>
