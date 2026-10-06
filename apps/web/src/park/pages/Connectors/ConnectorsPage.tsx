@@ -189,6 +189,3 @@ export function ConnectorsPage({ app }: { app: AppCtx }) {
     </Frame>
   );
 }
-
-// The page registry (`app/pages.ts`) lazy-loads a default export.
-export default ConnectorsPage;
