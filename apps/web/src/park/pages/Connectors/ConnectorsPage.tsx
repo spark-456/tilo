@@ -7,7 +7,7 @@
 // label shows at once and the result lands on the promise continuation. The S-08 consent hand-off belongs to
 // live mode, when the Api has a connect endpoint. The "Sample data" chip belongs to the shell.
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import type { Connector, Skill } from "../../api/types";
+import type { Connector, ConnectorTerms, Skill } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { PageSheet } from "../../components";
@@ -19,7 +19,7 @@ import { type Overrides, isOn, matches, merge } from "./view";
 
 type Load =
   | { kind: "loading" }
-  | { kind: "ready"; connectors: Connector[]; skills: Skill[] }
+  | { kind: "ready"; connectors: Connector[]; skills: Skill[]; terms: ConnectorTerms }
   | { kind: "unavailable" };
 
 /** The shell's page contract: one `park-page-<id>` root holding the sheet (as the Placeholder does). */
@@ -59,8 +59,9 @@ export function ConnectorsPage({ app }: { app: AppCtx }) {
 
   useEffect(() => {
     let live = true;
-    Promise.all([api.getConnectors(), api.getSkills()]).then(
-      ([c, s]) => live && setLoad({ kind: "ready", connectors: c.data, skills: s.data }),
+    Promise.all([api.getConnectors(), api.getSkills(), api.getConnectorTerms()]).then(
+      ([c, s, t]) =>
+        live && setLoad({ kind: "ready", connectors: c.data, skills: s.data, terms: t.data }),
       () => live && setLoad({ kind: "unavailable" }),
     );
     return () => {
@@ -116,7 +117,7 @@ export function ConnectorsPage({ app }: { app: AppCtx }) {
     void Promise.resolve().then(() => {
       setReconnecting(false);
       setOver((o) => ({ ...o, st: { ...o.st, [c.id]: "connected" } }));
-      app.toast(`${c.name} reconnected for 90 days`);
+      app.toast(`${c.name} reconnected for ${load.terms.reconnectDays} days`);
     });
   };
 
