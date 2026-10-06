@@ -1,0 +1,37 @@
+# Source upload filter for evals/cloudbuild.yaml (`just build-evals-image`, passed as --ignore-file). Same allowlist as
+# the root .gcloudignore except that evals/ is uploaded (minus tests, scripts, bank, generated output) because the
+# nightly replay reads evals/cases, evals/fixtures and the schemas. The root file is untouched: its tests pin that
+# the service builds never upload evals/cases. Last matching pattern wins, so the denies come last.
+/*
+!/pyproject.toml
+!/uv.lock
+!/.dockerignore
+!/packages/
+!/services/
+!/config/
+!/contracts/
+!/prompts/
+!/templates/
+!/evals/
+/evals/tests/
+/evals/scripts/
+/evals/bank/
+/evals/generated/
+
+.env
+.env.*
+*.pem
+*.key
+*.p12
+service-account*.json
+*-credentials.json
+application_default_credentials.json
+client_secret*.json
+token*.json
+*.tfplan
+tfplan
+*.tfstate*
+node_modules/
+.venv/
+__pycache__/
+*.pyc
