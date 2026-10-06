@@ -24,10 +24,12 @@ from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol, cast
 
 from fastapi import Depends, HTTPException, Request
+from tilo_archive import RunArchive
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
 from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
+from tilo_memory.artifacts import ArtifactStore
 from tilo_metering.flags import FlagStore, process_flags
 from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
@@ -314,6 +316,27 @@ def get_connector_adapters() -> dict[str, Any]:
 @functools.cache
 def get_outbox_store() -> InMemoryOutboxStore:
     return InMemoryOutboxStore()  # the process's own until the Firestore store lands
+
+
+# ADR-0018 T4: tilo-api has no org until sign-in, so every run's artifact Scope is in this org (PRD 15.1), never a
+# request's.
+ORG_ID = "org_tilo"
+
+
+def get_artifact_store() -> ArtifactStore:
+    """Where a run's outputs go. No production backend exists until ADR-0018 T8 (Firestore, GCS), so this refuses and
+    no run starts (fail closed, BQ-AGT02-T4-1); dev mode wires one in-memory store."""
+    raise NotImplementedError("no artifact store is configured, so no run starts")
+
+
+def get_redactor() -> Callable[[str], str]:
+    """The shared secret redactor the store was given (MF-06). Not built until FR-MEM-05 (BQ-109): refuses."""
+    raise NotImplementedError("the shared secret redactor is not built, so no run starts")
+
+
+def get_run_archive() -> Callable[..., RunArchive]:
+    """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses."""
+    raise NotImplementedError("no raw-archive store is configured, so no run starts")
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."
