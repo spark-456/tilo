@@ -140,3 +140,19 @@ def crashing_run_flow(repo_root: pathlib.Path):
     yield rf
     rf.close()
     app.dependency_overrides.clear()
+
+
+# --- SEC-15 (deployed access: visitor or judge): see API_SEC_15.md and _sec15_lib.py ---------------
+
+
+@pytest.fixture()
+def sec15_factory(monkeypatch: pytest.MonkeyPatch):
+    """`make(declarations=..., deployed=True)` -> a `Sec15` over the real app, deployed-style (K_SERVICE set, the
+    live switches cleared), with a fake access store and a scripted router behind a spy on `deps.router_for_mode`."""
+    import _sec15_lib
+
+    def make(**kwargs):
+        return _sec15_lib.build(monkeypatch, **kwargs)
+
+    yield make
+    _sec15_lib.close()
