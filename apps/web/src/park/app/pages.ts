@@ -14,6 +14,7 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   ledger: Placeholder,
   agenda: Placeholder,
   team: Placeholder,
-  profile: Placeholder,
+  // biome-ignore format: the helper contract (plan section 10) fixes this one-line form
+  profile: lazy(() => import("../pages/Profile/ProfilePage").then((m) => ({ default: m.ProfilePage }))),
   connectors: Placeholder,
 };

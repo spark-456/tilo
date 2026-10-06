@@ -76,11 +76,11 @@ export interface Rendered {
 
 /** `<ParkProvider api viewport><ProfilePage app/></ParkProvider>`, the fixture-backed spy Api by default. */
 export function profileTree(app: AppCtx, api: Api = spyApi()): ReactElement {
-  return createElement(
-    ParkProvider,
-    { api, viewport: { vw: app.vw, vh: app.vh } },
-    createElement(ProfilePage, { app }),
-  );
+  return createElement(ParkProvider, {
+    api,
+    viewport: { vw: app.vw, vh: app.vh },
+    children: createElement(ProfilePage, { app }),
+  });
 }
 
 /** Mount the page and wait for its data. */
