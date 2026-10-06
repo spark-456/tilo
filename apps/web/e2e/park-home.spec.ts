@@ -1066,7 +1066,8 @@ test.describe("park home at 1440x900: the links of the Today panel", () => {
     await expect(input(page)).toBeVisible();
     await expect(page.getByRole("main")).toHaveCount(1);
     await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
-    await expect(page.getByText(/sample data/i)).toHaveCount(0); // the shell owns that chip
+    // the shell owns that chip (nav); the page itself renders none
+    await expect(page.getByTestId("park-page-home").getByText(/sample data/i)).toHaveCount(0);
   });
 });
 
