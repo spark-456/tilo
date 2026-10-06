@@ -30,6 +30,7 @@ export interface ParkProviderProps {
 interface Held {
   store: ParkStore;
   api: Api;
+  schedule: Schedule;
   /** The default Api is the fixture one, so every page will read sample data (no injected Api, no url). */
   expectsSample: boolean;
 }
@@ -76,12 +77,13 @@ export function ParkProvider({ api, navigate, schedule, viewport, children }: Pa
     const raw = api ?? parkApi({ VITE_TILO_API_URL: API_URL });
     let store: ParkStore | null = null;
     const wrapped = noting(raw, (source) => store?.noteSource(source));
+    const timer = schedule ?? realSchedule;
     store = createParkStore({
       api: wrapped,
       navigate: navigate ?? navigatePark,
-      schedule: schedule ?? realSchedule,
+      schedule: timer,
     });
-    return { store, api: wrapped, expectsSample: api === undefined && !API_URL };
+    return { store, api: wrapped, schedule: timer, expectsSample: api === undefined && !API_URL };
   });
   const [win, setWin] = useState(windowSize);
   useEffect(() => {
@@ -117,6 +119,8 @@ function useHeld(): Held {
 
 export const useParkStore = (): ParkStore => useHeld().store;
 export const useParkApi = (): Api => useHeld().api;
+/** The provider's timer: a page that waits (the Home composer's 900 ms) goes through it, never setTimeout. */
+export const useSchedule = (): Schedule => useHeld().schedule;
 
 /** True when the Sample data chip is going to show (the fixture Api is the default), so its place can be kept. */
 export const useExpectsSample = (): boolean => useHeld().expectsSample;

@@ -108,16 +108,18 @@ describe("WEB_5_worlds_static: the registry gets one new line", () => {
   const src = readFileSync(join(DIR, "..", "..", "app", "pages.ts"), "utf8");
   const entries = [...src.matchAll(/^\s*(\w+):\s*(.+?),\s*$/gm)].map((m) => [m[1], m[2]]);
 
-  it("WEB_5_worlds_static_pages_ts_worlds_line_is_the_lazy_import_and_the_other_eight_stay_Placeholder", () => {
+  it("WEB_5_worlds_static_pages_ts_worlds_line_is_the_lazy_import_and_every_other_page_is_untouched_form", () => {
     expect(src).toContain(
       '  worlds: lazy(() => import("../pages/Worlds/WorldsPage").then((m) => ({ default: m.WorldsPage }))),\n',
     );
     expect(entries).toHaveLength(9);
-    expect(entries.filter(([k]) => k !== "worlds").every(([, v]) => v === "Placeholder")).toBe(
-      true,
-    );
+    // another lane's page is its own one line in the same named-export form; the rest stay Placeholder
+    const form = /^lazy\(\(\) => import\("\.\.\/pages\/\w+\/\w+Page"\)\.then\(/;
+    expect(
+      entries
+        .filter(([k]) => k !== "worlds")
+        .every(([, v]) => v === "Placeholder" || form.test(v ?? "")),
+    ).toBe(true);
     expect(src).toContain('const Placeholder = lazy(() => import("./Placeholder"));');
-    const lines = src.replace(/^\s*\/\/.*$/gm, ""); // comments name the pattern on purpose
-    expect(lines.match(/import\(/g)).toHaveLength(2); // the Placeholder and Worlds, nothing else
   });
 });
