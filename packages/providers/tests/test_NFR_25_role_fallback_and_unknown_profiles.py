@@ -89,6 +89,7 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
         "safety",  # CL-INT-1 / issue #103: the dev safety screen
         "generator",  # issue #272 (b), GEN-07: the live scenario generator
         "autorater",  # issue #272 (b), GEN-10: scores the generator's plans
+        "assistant",  # PPL-11b, FR-PA-19: the assistant panel's fallback (services/api/tests/API_PPL_11b.md)
     }
     assert config.roles["director"].primary == "flash-38"
     assert config.roles["director"].fallback == "flash-37"

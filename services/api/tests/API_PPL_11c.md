@@ -8,7 +8,8 @@
 Source: `docs/prd-addendum-people-agents.md` (FR-MTG-10, FR-PA-01, FR-PA-03, FR-PB-01), `contracts/people.rules.md` PE-02,
 PE-03, PE-05, PE-07, PE-08, PE-12, PE-13, PE-16, PE-17, PE-19, PE-22, PE-23, PE-24, PE-29, PE-30, ADR-0015/16/17/20/21,
 `docs/open-questions.md` BQ-265..273, BQ-CCP3-*, BQ-PPL10-*, `API_PPL_11a.md`, `API_SEC_15.md`, and the follow-ups of
-issues #456, #462 and #464 (and the #470 review comment on `email`). Built on `packages/people` (`decide`, `check_write`,
+issues #456, #462 and #464 (and the #470 review comment on `email`), SEC-10 (rate limits), and the defaults logged as
+BQ-PPL11C-1 to -12 in `docs/open-questions.md`. Built on `packages/people` (`decide`, `check_write`,
 `Directory`, the stores, `delete_meeting`/`meeting_tombstone`, `resolve_due`) and PPL-11a's `Writer`, `json_body`,
 `Refusal`, `_PeopleRoute`. Fakes only: in-memory people stores, an in-memory `ArtifactStore`, a stamping fake event writer,
 fake Desk worlds and a fake meeting-world maker (`_ppl11a_lib.Rig`, extended here with those three seams). No network, no
@@ -196,7 +197,7 @@ The id never comes from the request. **Needs a change in `packages/people` (not 
 that adds `world_id` (create refuses it; the meeting edit row does not list it). The builder adds one row (absent to a
 world id, owner only) with its own tests there; these tests pin only the HTTP behaviour.
 
-## 7. Limits on the writes (SEC-09, #462, #464)
+## 7. Limits on the writes (SEC-10, #462, #464; BQ-PPL11C-1 to -4, -12)
 
 * **Body cap:** every people POST route refuses a body over `MAX_BODY_BYTES = 32768` with 413 `{"detail":
   "body_too_large"}` before reading the rest (a declared `Content-Length` over the cap is refused with no body read; a
@@ -234,7 +235,10 @@ The two event types are registered and fixtured; emails the contract already ref
 owner still gets `expired` from a discarded or deleted meeting (and from a missing one); the public route list is still the
 pinned four.
 
-## 10. Ambiguities resolved by default (also in the report)
+## 10. Ambiguities resolved by default (each is logged in `docs/open-questions.md` as BQ-PPL11C-1 to -12)
+
+Map: 1 -> BQ-PPL11C-8; 2, 3, 4 -> -10; 5 -> -9; 6, 7, 8 -> -11; 9 -> -3 (the key: -4); 10 -> -5; 11 -> -1 and -2;
+12, 13 -> -7; 14 -> -6; the per-write listing is -12.
 
 1. POST for every change (no PATCH, no DELETE): dev CORS allows GET, POST, OPTIONS only.
 2. A work-item action returns the full stored record (the owner reads it in full); the assigner's `confirm` keeps the status view.
@@ -249,8 +253,9 @@ pinned four.
 9. Email: ASCII dot-atom subset above, stored as typed, compared case-insensitively; the uniqueness answer (409 `email_taken`)
    is a small oracle to an org owner about their own org, accepted (the alternative is a silent success).
 10. First person: allowed iff the org has no person and the principal has no record; the record id is the principal's id.
-11. Rate cap 60 a minute per principal and body cap 32 KiB are defaults (no PRD number); both are constants the tests import
-    nothing from, so a builder changes the number in `_ppl11c_lib.py` and the doc together.
+11. Rate cap 60 a minute per principal and body cap 32 KiB are defaults (SEC-10 and the PRD give no number).
+    `_ppl11c_lib.py` defines `WRITES_PER_MINUTE` and `MAX_BODY_BYTES` and the s4 tests import them (the tests import nothing
+    from production code); a builder who changes a number changes it in `_ppl11c_lib.py`, this doc and BQ-PPL11C-1 or -2 together.
 12. A confirm's event goes to the assignee's Desk world (PE-12 reads "confirmed for P"); the other reading (the confirmer's
     world) is one line in `test_PPL_11c_s5_PE_12_a_confirm_is_written_in_the_assignees_desk_world_not_the_assigners`.
 13. The Desk world id is `w_desk_<suffix of the user id>`; a user id whose suffix exceeds 43 characters has no Desk world
@@ -274,3 +279,22 @@ pinned four.
   is unchanged.
 * **User decisions:** (1) does deleting a meeting also delete the active personal pins and accepted calendar entries Tilo made
   from it (ambiguity 5)? (2) FR-MTG-01 attestation: still stamped automatically on create (#464, unchanged here).
+
+## 12. After PR #488 (explicit attest on `POST /v1/meetings`)
+
+Every meeting-creating call here sends `**ATTEST` from `_ppl11a_lib` (`attest: true` and the current notice version):
+`MEETING_BODY` in `_ppl11c_lib.py` carries it, and s2a (the unstarted-meeting delete), s4 (cap, idempotency, rate, listing
+tests) and s5, s6 use that constant. The s4 padded-body tests pad the whole JSON body (attest fields included) to exactly
+`MAX_BODY_BYTES` and `MAX_BODY_BYTES + 1`; the test asserts both lengths. A branch rebased onto this one (S1, S2a) must send
+`**ATTEST` in any meeting create of a test it adds itself.
+
+## 13. Why some assertions accept two answers, and a note on exemptions
+
+* A second `done` on a done item is `in (404, 409)` (`test_PPL_11c_s1_PE_30_a_second_done_changes_nothing`), and the
+  per-action write in `test_PPL_11c_s1_BQ_PPL11C_12_a_write_reads_no_whole_org_directory...` is `in (200, 409)`: the spec is
+  loose there (PPL-11a's own repeated confirm is `in (404, 409)` for the same reason: `decide` refuses an action that needs an
+  `open` item, which is the one 404, while a MAY-row refusal is a 409). What is pinned is the part that matters: nothing
+  changes, and no second history entry or version appears. BQ-PPL11C-10 records it. The assertions are not changed.
+* `PENDING_EXEMPT` (a per-test exemption from `SLICE_PENDING`) is not part of this branch; the S1 branch introduces it later.
+  Here a slice is exempt only by deleting its entry in `SLICE_PENDING`, and an entry matches by file prefix
+  (`test_PPL_11c_s4_`), so renaming a test inside a file changes nothing about its gating or about `-k` selection by file.

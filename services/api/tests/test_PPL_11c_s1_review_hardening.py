@@ -81,7 +81,23 @@ def _split(secret: str, mark: str) -> str:
 
 @pytest.mark.parametrize(
     "mark",
-    [u(0x034F), u(0xFE0F), u(0x180B), u(0x115F), u(0x1160), u(0x3164), u(0xFFA0), u(0xE0100), u(0xE01EF)],
+    [
+        u(0x034F),
+        u(0xFE0F),
+        u(0x180B),
+        u(0x115F),
+        u(0x1160),
+        u(0x3164),
+        u(0xFFA0),
+        u(0xE0100),
+        u(0xE01EF),
+        u(0x2065),
+        u(0xFFF0),
+        u(0xFFF8),
+        u(0xE0000),
+        u(0xE0FFF),
+        u(0x2800),
+    ],
     ids=lambda m: f"U+{ord(m):04X}",
 )
 def test_PPL_11c_s1_SEC_01_an_invisible_mark_cannot_split_a_secret_past_the_redactor(people_rig, mark):

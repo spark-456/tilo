@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
 from fastapi import HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, field_validator, model_validator
 from tilo_memory.artifacts import ArtifactNotFound, ArtifactStore, Scope
 from tilo_people.access import AccessRequest, decide, project
 from tilo_people.dates import resolve_due
@@ -45,6 +45,12 @@ def _identity(text: str) -> str:
 
 _ASCII_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _FILLERS = frozenset({0x115F, 0x1160, 0x3164, 0xFFA0})  # default-ignorable letters: invisible, never meaningful
+_UNASSIGNED_IGNORABLE = frozenset({0x2065, 0x2800})  # unassigned default-ignorable, and the blank braille cell
+
+
+def _plane14_hidden(o: int) -> bool:
+    """Plane 14 is variation selectors and unassigned points; only the tag characters (flag emoji) may stay."""
+    return 0xE0000 <= o <= 0xE0FFF and not 0xE0020 <= o <= 0xE007F
 
 
 def _unhide(text: str) -> str:
@@ -54,7 +60,7 @@ def _unhide(text: str) -> str:
     out: list[str] = []
     for i, c in enumerate(text):
         o = ord(c)
-        if o in _FILLERS or 0xE0100 <= o <= 0xE01EF:
+        if o in _FILLERS or o in _UNASSIGNED_IGNORABLE or 0xFFF0 <= o <= 0xFFF8 or _plane14_hidden(o):
             continue
         if o in (0x34F, 0x17B4, 0x17B5) or 0x180B <= o <= 0x180F or 0xFE00 <= o <= 0xFE0F:
             before = out[-1] if out else ""
@@ -98,12 +104,31 @@ class WindowIn(_Closed):
 
 
 class MeetingIn(_Closed):
+    """`attest` and `notice_version` are the explicit attest step (PE-18, issue #464): the person says `true` and the
+    notice version they were shown. Neither is stored from the request; the actor and clock are the server's."""
+
+    attest: StrictBool  # JSON `true` only (`Literal[True]` would admit `1`); anything else is 422, see below
+    notice_version: Text
     title: Text
     source: Text
     series: Text | None = None
     scheduled: WindowIn | None = None
     agenda: Annotated[list[AgendaIn], Field(max_length=20)] = []
     attendees: Annotated[list[AttendeeIn], Field(max_length=50)] = []
+
+    @field_validator("attest")
+    @classmethod
+    def _attested(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("attest")
+        return value
+
+    @field_validator("notice_version")
+    @classmethod
+    def _current_notice(cls, value: str) -> str:
+        if value != deps.NOTICE_VERSION:  # read at call time: a stale or future notice was not the one in force
+            raise ValueError("notice_version")
+        return value
 
 
 class PersonIn(_Closed):

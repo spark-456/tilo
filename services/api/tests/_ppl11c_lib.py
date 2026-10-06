@@ -18,6 +18,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from _ppl11a_lib import (
+    ATTEST,
     EARLY,
     NOW,
     ORG,
@@ -85,7 +86,7 @@ WRITES_PER_MINUTE = 60  # API_PPL_11c.md section 7
 
 UNIQUE_ID = "wi_never_made"
 WORK_ITEM_BODY = {"title": "Water the plants", "source": {"kind": "manual", "ref": None}}
-MEETING_BODY = {"title": "Weekly sync", "source": "upload"}
+MEETING_BODY = {"title": "Weekly sync", "source": "upload", **ATTEST}
 PERSON_BODY = {
     "display_name": "Nina Patel",
     "aliases": ["Nina"],

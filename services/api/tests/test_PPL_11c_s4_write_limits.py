@@ -1,4 +1,5 @@
-"""PPL-11c slice 4: limits on the people writes (PPL-11a follow-ups #464, #462; SEC-09; API_PPL_11c.md section 7).
+"""PPL-11c slice 4: limits on the people writes (PPL-11a follow-ups #462, #464; SEC-10; BQ-PPL11C-1 to -4, -8, -12;
+API_PPL_11c.md section 7).
 
 * A body over 32,768 bytes is a 413 `body_too_large`, decided before the whole body is read (by `Content-Length` when
   it is declared, by counting while streaming when it is not), on every people POST route.
@@ -63,7 +64,7 @@ BODY_ROUTES = {
 
 
 @pytest.mark.parametrize("path", list(BODY_ROUTES.values()), ids=list(BODY_ROUTES))
-def test_PPL_11c_s4_SEC_09_an_oversize_body_is_a_413_and_the_rest_of_it_is_never_read(people_rig, path):
+def test_PPL_11c_s4_BQ_PPL11C_1_an_oversize_body_is_a_413_and_the_rest_of_it_is_never_read(people_rig, path):
     """A client that keeps sending is stopped after the cap: the app asked for at most the cap plus one read-ahead
     chunk of a 5 MB stream, and a declared `Content-Length` over the cap is refused before any body is read."""
     rig = meeting_rig(people_rig)
@@ -76,8 +77,10 @@ def test_PPL_11c_s4_SEC_09_an_oversize_body_is_a_413_and_the_rest_of_it_is_never
     assert rig.snapshot() == before
 
 
-def test_PPL_11c_s4_SEC_09_a_body_of_exactly_the_cap_is_read_and_one_byte_more_is_not(people_rig):
+def test_PPL_11c_s4_BQ_PPL11C_1_a_body_of_exactly_the_cap_is_read_and_one_byte_more_is_not(people_rig):
     rig = work_rig(people_rig)
+    assert len(padded(MEETING_BODY, MAX_BODY_BYTES)) == MAX_BODY_BYTES  # the attest fields are inside the count
+    assert len(padded(MEETING_BODY, MAX_BODY_BYTES + 1)) == MAX_BODY_BYTES + 1
     at_cap = rig.client.post(
         "/v1/meetings", content=padded(MEETING_BODY, MAX_BODY_BYTES), headers={"content-type": "application/json"}
     )
@@ -176,7 +179,7 @@ def test_PPL_11c_s4_PE_17_a_retry_of_the_first_person_claim_is_the_first_answer(
 # --- the rate cap ---------------------------------------------------------------------------------------------------
 
 
-def test_PPL_11c_s4_SEC_09_the_sixty_first_write_in_a_minute_is_a_429_and_reads_still_work(people_rig):
+def test_PPL_11c_s4_SEC_10_the_sixty_first_write_in_a_minute_is_a_429_and_reads_still_work(people_rig):
     rig = work_rig(people_rig)
     for n in range(WRITES_PER_MINUTE):
         assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 201, n
@@ -195,7 +198,7 @@ def test_PPL_11c_s4_SEC_09_the_sixty_first_write_in_a_minute_is_a_429_and_reads_
     assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 201, "a minute later she may write again"
 
 
-def test_PPL_11c_s4_SEC_09_a_refused_write_counts_too(people_rig):
+def test_PPL_11c_s4_SEC_10_a_refused_write_counts_too(people_rig):
     rig = work_rig(people_rig)
     for _ in range(WRITES_PER_MINUTE):
         assert rig.post("/v1/people", PERSON_BODY).status_code == 403  # a member may not create people
@@ -204,7 +207,7 @@ def test_PPL_11c_s4_SEC_09_a_refused_write_counts_too(people_rig):
 
 @settings(max_examples=6, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(count=st.integers(WRITES_PER_MINUTE - 3, WRITES_PER_MINUTE + 4))
-def test_PPL_11c_s4_SEC_09_a_principal_never_gets_more_than_the_cap_accepted_in_a_minute(people_rig, count):
+def test_PPL_11c_s4_SEC_10_a_principal_never_gets_more_than_the_cap_accepted_in_a_minute(people_rig, count):
     rig = work_rig(people_rig)
     accepted = sum(rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 201 for _ in range(count))
     assert accepted == min(count, WRITES_PER_MINUTE)
@@ -217,7 +220,7 @@ def _listed(rig) -> bool:
     return ("person", "list", rig.org) in rig.store_calls
 
 
-def test_PPL_11c_s4_SEC_09_the_existing_writes_read_the_actor_by_id_and_list_no_directory(people_rig):
+def test_PPL_11c_s4_BQ_PPL11C_12_the_existing_writes_read_the_actor_by_id_and_list_no_directory(people_rig):
     """Create meeting, create work item and both confirms (PPL-11a) read the actor's record, never every person of the
     org (#464: 'every write lists the whole org directory'); no more than two person records are read."""
     rig = meeting_rig(people_rig)
@@ -294,7 +297,7 @@ def _dev_client(monkeypatch):
     return TestClient(app, base_url=f"http://localhost:{dev.PORT}", raise_server_exceptions=False)
 
 
-def test_PPL_11c_s4_SEC_09_the_dev_browser_may_send_an_idempotency_key_and_read_retry_after(monkeypatch):
+def test_PPL_11c_s4_BQ_PPL11C_4_the_dev_browser_may_send_an_idempotency_key_and_read_retry_after(monkeypatch):
     """The web app on the Vite origin sends `Idempotency-Key` on a create: its preflight must be allowed, and a 429's
     `Retry-After` must be readable by the page. Without that, dev mode answers the preflight 400."""
     from tilo_api import dev  # noqa: PLC0415

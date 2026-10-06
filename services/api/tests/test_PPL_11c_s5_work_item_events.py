@@ -20,6 +20,7 @@ from _api_lib import FlakyEventWriter
 from _ppl11a_lib import MEERA, OWNER, PRIYA, SAM
 from _ppl11c_lib import (
     ALL_WI_ACTIONS,
+    MEETING_BODY,
     R_TEAM_ADD,
     WORK_ITEM_BODY,
     act,
@@ -146,7 +147,7 @@ def test_PPL_11c_s5_PE_12_writes_that_have_no_registry_event_write_none_and_need
     rig = work_rig(people_rig)
     rig.unwire("event_writer", "desk_worlds")
     rig.as_user(PRIYA)
-    assert rig.post("/v1/meetings", {"title": "Weekly sync", "source": "upload"}).status_code == 201
+    assert rig.post("/v1/meetings", MEETING_BODY).status_code == 201
     rig.as_user(OWNER)
     person = rig.post(
         "/v1/people",

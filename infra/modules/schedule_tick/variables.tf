@@ -9,17 +9,17 @@ variable "region" {
 }
 
 variable "target_uri" {
-  description = "run.app URL of tilo-harness: the service the tick calls and the OIDC audience."
+  description = "run.app URL of tilo-api: the service the tick calls and the OIDC audience."
   type        = string
 }
 
 variable "service_account_email" {
-  description = "Email of tilo-schedule-scheduler, the identity the job runs as. It needs run.invoker on the target only."
+  description = "Email of tilo-schedule-scheduler, the identity the job runs as. It holds no IAM: the target is public and checks the token itself."
   type        = string
 }
 
 variable "path" {
-  description = "Path on the target (harness) that fires the due schedules."
+  description = "Path on the target (api) that fires the due schedules."
   type        = string
   default     = "/internal/schedules/tick"
 }

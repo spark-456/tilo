@@ -114,10 +114,12 @@ def _latest_slot(cadence: Cadence, next_due: datetime, now: datetime) -> tuple[d
     """(latest slot <= now, slots skipped before it) for `next_due <= now`, by arithmetic over whole weeks and then a
     few next_slot steps, so a year-old due time costs the same as a minute-old one."""
     cur, skipped = next_due, 0
-    weeks = (now - next_due) // WEEK - 2
-    day = next_due.astimezone(_zone(cadence.tz)).date()
-    if weeks > 0 and day.weekday() == cadence.weekday:  # an aligned `next_due`; otherwise just step
-        cur, skipped = _slot_on(cadence, day + timedelta(weeks=weeks)), weeks
+    zone = _zone(cadence.tz)
+    if (now - cur) // WEEK > 2 and cur.astimezone(zone).weekday() != cadence.weekday:
+        cur, skipped = next_slot(cadence, cur), 1  # a misaligned `next_due`: land on a slot first, then jump
+    weeks = (now - cur) // WEEK - 2
+    if weeks > 0:
+        cur, skipped = _slot_on(cadence, cur.astimezone(zone).date() + timedelta(weeks=weeks)), skipped + weeks
     while (following := next_slot(cadence, cur)) <= now:
         cur, skipped = following, skipped + 1
     return cur, skipped
@@ -137,9 +139,19 @@ class Schedule:
     next_due: datetime
     last_slot: str | None = None
     last_world_id: str | None = None
+    # FR-AGT-14b: the owner's approved brief and approach are SNAPSHOTTED here (a task may not survive a redeploy)
+    brief: dict[str, Any] | None = None
+    approach: dict[str, Any] | None = None
+    failures: int = 0
+    backoff_until: datetime | None = None
+    last_error: str | None = None  # a short fixed code (^[a-z][a-z0-9_]{0,63}$), never exception text
+    created_at: datetime | None = None
 
     def __post_init__(self) -> None:
         _aware(self.next_due, "next_due")
+        for label, value in (("backoff_until", self.backoff_until), ("created_at", self.created_at)):
+            if value is not None:
+                _aware(value, label)
         if (
             isinstance(self.budget_cap, bool)
             or not isinstance(self.budget_cap, int | float)
@@ -171,6 +183,32 @@ class RunStart:
     slot: datetime  # the slot being fired (UTC): the LATEST missed one when several were missed
     skipped: int  # missed slots collapsed into this firing
     cache_namespace: str  # == schedule_id: the result cache namespace (web results go stale after 7 days)
+
+
+class StartSkipped(Exception):
+    """A start that deliberately did nothing. `advance`: next_due moves to the first slot after the one skipped (retry
+    next week); otherwise the slot stays and is retried after the backoff. `code` is a short fixed code, never text.
+    `count=False` is for a condition of the whole service, not of one schedule: the claim is released and NOTHING is
+    recorded (no failure, no backoff, no move), whatever `advance` says."""
+
+    def __init__(self, code: str, *, advance: bool = False, count: bool = True) -> None:
+        super().__init__(code)
+        self.code, self.advance, self.count = code, advance, count
+
+
+GOOGLE_ISSUERS = frozenset({"https://accounts.google.com", "accounts.google.com"})  # exact, case-sensitive
+START_FAILED = "start_failed"  # the fixed code a raising start is recorded under
+
+
+def tick_caller_ok(claims: Mapping[str, Any], *, audience: str, caller: str) -> bool:
+    """The verified token claims of a tick call: Google issuer, our audience, the one allowed verified account."""
+    return (
+        isinstance(claims.get("iss"), str)
+        and claims["iss"] in GOOGLE_ISSUERS
+        and claims.get("aud") == audience
+        and claims.get("email") == caller
+        and claims.get("email_verified") is True
+    )
 
 
 class ScheduleStore(Protocol):
@@ -260,39 +298,68 @@ class Ticker:
         ):  # NFR-24: a replay-only link starts nothing; the slot fires once when cleared
             return TickResult(0)
         fired = 0
+        uncounted: set[str] = set()  # fixed codes of uncounted skips, each logged once per tick
         for schedule in self._store.due(now, MAX_FIRES_PER_TICK)[:MAX_FIRES_PER_TICK]:
             if not schedule.enabled or schedule.next_due > now:  # never trust the store with either rule
                 continue
             due = schedule.next_due
             if not self._store.claim(schedule.schedule_id, due):
                 continue
-            slot, skipped = _latest_slot(schedule.cadence, due, now)
-            run = RunStart(
-                idempotency_key=slot_key(schedule.schedule_id, slot),
-                schedule_id=schedule.schedule_id,
-                owner_user_id=schedule.owner_user_id,
-                title=schedule.title,
-                approved_brief_ref=schedule.approved_brief_ref,
-                prior_world_id=schedule.last_world_id,
-                budget_cap=schedule.budget_cap,
-                slot=slot,
-                skipped=skipped,
-                cache_namespace=schedule.schedule_id,
-            )
+            # Everything after the claim is inside the try: any exception records a failure and frees the claim.
+            slot: datetime | None = None
             try:
+                slot, skipped = _latest_slot(schedule.cadence, due, now)
+                run = RunStart(
+                    idempotency_key=slot_key(schedule.schedule_id, slot),
+                    schedule_id=schedule.schedule_id,
+                    owner_user_id=schedule.owner_user_id,
+                    title=schedule.title,
+                    approved_brief_ref=schedule.approved_brief_ref,
+                    prior_world_id=schedule.last_world_id,
+                    budget_cap=schedule.budget_cap,
+                    slot=slot,
+                    skipped=skipped,
+                    cache_namespace=schedule.schedule_id,
+                )
                 world_id = self._starter.start(run)
-            except Exception as exc:  # any failure: slot claimable again, next_due unmoved, retried next tick
-                log.warning("schedule start failed (%s); retrying next tick", type(exc).__name__)
-                self._release(schedule.schedule_id, due)
+            except StartSkipped as skip:  # a deliberate no-op: recorded, and may give the slot up until next week
+                if not skip.count:  # a global condition: nothing is recorded, the slot is claimable on the next tick
+                    if skip.code not in uncounted:
+                        uncounted.add(skip.code)
+                        log.warning("schedule starts skipped, not counted (%s)", skip.code)
+                    self._release(schedule.schedule_id, due)
+                    continue
+                log.info("schedule start skipped (%s)", skip.code)
+                after = next_slot(schedule.cadence, slot) if skip.advance and slot is not None else None
+                self._fail(schedule.schedule_id, due, skip.code, after)
                 continue
-            # The run started. `complete` failing leaves the claim held (it expires; the same key dedupes a restart).
-            self._store.complete(
-                schedule.schedule_id, due, next_due=next_slot(schedule.cadence, slot), last_world_id=world_id
-            )
+            except Exception as exc:  # any failure: slot claimable again, next_due unmoved, retried after the backoff
+                log.warning("schedule start failed (%s); retrying after the backoff", type(exc).__name__)
+                self._fail(schedule.schedule_id, due, START_FAILED, None)
+                continue
+            # The run started. `complete` failing leaves the claim held (it expires; the same key dedupes a restart);
+            # it never aborts the tick for the other schedules.
+            assert slot is not None  # the try only reaches here after the slot arithmetic
             fired += 1
+            try:
+                self._store.complete(
+                    schedule.schedule_id, due, next_due=next_slot(schedule.cadence, slot), last_world_id=world_id
+                )
+            except Exception as exc:
+                log.error("schedule complete failed (%s); the claim will lapse", type(exc).__name__)
             if skipped:
                 self._alert(world_id, skipped, now)
         return TickResult(fired)
+
+    def _fail(self, schedule_id: str, due: datetime, error: str, next_due: datetime | None) -> None:
+        """Records the failure (a store without `record_failure` retries every tick) and frees the claim."""
+        record = getattr(self._store, "record_failure", None)
+        if record is not None:
+            try:
+                record(schedule_id, due, error=error, next_due=next_due)
+            except Exception as exc:  # the lease expires on its own; the tick goes on
+                log.error("schedule failure not recorded (%s)", type(exc).__name__)
+        self._release(schedule_id, due)
 
     def _release(self, schedule_id: str, due: datetime) -> None:
         try:

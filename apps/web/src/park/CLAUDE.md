@@ -5,7 +5,7 @@ The Park City web app (design handoff of 6 Oct 2026, `docs/web-app-rebuild-plan.
 old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures and the `api/` layer.
 
 ## Contracts
-- `api/index.ts`: `Api` (20 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`.
+- `api/index.ts`: `Api` (23 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`.
   `parkApi(env)` (`api/select.ts`): no `VITE_TILO_API_URL` = fixture Api (`source: "fixture"`), a url =
   live Api, whose methods reject with `NotBuilt` until each endpoint exists. Never sample data as live.
 - `api/fixtures/`: the prototype's data, typed (`api/types.ts`). `worlds.ts` and `index.ts` are
@@ -14,9 +14,29 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
   `design_handoff_tilo_web_app/design/tilo-app.js` in a vm and compares.
 - `tokens/park.css`: handoff `tokens.css` scoped to `[data-park]`, night on `[data-time="night"]`,
   values verbatim (`biome-ignore format`), no motion. `tokens/ramp.ts` is the README type ramp.
+- `components/` (WEB-2): the README "Core components", named exports from `index.ts`, all styled by
+  `park.components.css` (BEM `park-btn park-btn--primary park-btn--md`). CSS rules: every selector
+  `[data-park] .class...`, literal values, `var(--token)` colours, no `transition`/`animation`; the
+  marker `motion: restored in WEB-3 (BQ-WEB-3)` sits where the design moves (thumb, knob). A control
+  that is a button is a real `<button type="button">`; `Toast` has no timer (`TOAST_MS` only);
+  `Popover`/`Menu` share `Panel.tsx` (Escape on the document, backdrop, focus back to the opener).
+- `dev/Components.tsx`: `/dev/components` (dev build, lazy route in `screens/routes.tsx`), a day and a
+  night `data-park` panel with every component; one filled primary button per panel (UX-1).
+
+## App (WEB-3a, `app/`)
+- `src/Root.tsx` shows the old app, or the lazy `app/ParkApp.tsx` under `/park` (`isParkPath`).
+- `AppCtx.ts` is the `app` prop. `store.ts` (framework-free, injected `schedule`) holds decisions, started
+  worlds, prefs and the toast. `context.tsx`: `ParkProvider`, `useApp`, `useParkApi` (notes each result's
+  `source`), `useSchedule` (the injected timer: pages never call setTimeout). `router.ts` alone reads the address bar.
+- `pages.ts`: one line per page, `home: lazy(() => import("../pages/Home/HomePage").then(...)),`; nothing else changes.
+- `pages/Home/` (WEB-4): panels float over the shell's city (no `<main>`, no h1 but the greeting); a failed or
+  unbuilt read shows "Not connected yet"; composer copy is page-local (`homeData.ts`); `Home.css` overrides the sliding SegmentedControl.
+
+## Shell (WEB-3b, `shell/`)
+- `AppShell` (named export, `children` only) holds the nav, popovers, one `<main>`, toast, loader, boot (`park.shell.css`: no motion, blur on the nav only); ParkApp owns `[data-park]`.
+- The city is STATIC (motion and its honesty-scan entry: BQ-WEB-3): `scene.ts` caches a scene per `time|motion` at module level, with the 3 pin points for `app.pins`.
+- `usePageApp()` is what pages get: `go('world')` runs the loader first (`store.openWorld`); `useApp().go` stays immediate.
 
 ## Local rules
-- Import nothing from `screens/`, `world/`, `stage/`; only the shared `src/api` seam may be reused.
-- No `window` globals, no clock or random or network in `api/`, no model ids, no design runtime port.
-- Ambient motion arrives in WEB-3 with its own honesty-scan entry (BQ-WEB-3); none here.
+- Import nothing from `screens/`, `world/`, `stage/` (only the shared `src/api`, `src/router` seams). No `window` globals, no model ids, no design runtime port.
 - `engines/kit.ts`: `createKit` builds a fresh cache per call; hold one kit per document (a provider), or world and building memoisation is lost.

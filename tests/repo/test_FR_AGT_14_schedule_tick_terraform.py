@@ -2,23 +2,24 @@
 
 Design (docs/open-questions.md will carry the BQ): ONE Cloud Scheduler job, not one per user schedule.
 `tilo-schedule-tick`
-runs every minute (the Scheduler floor) and POSTs `/internal/schedules/tick` on tilo-harness with an OIDC token for a
+runs every minute (the Scheduler floor) and POSTs `/internal/schedules/tick` on tilo-api (retargeted from harness in
+FR-AGT-14c: the run lives in tilo-api) with an OIDC token for a
 new
-service account `tilo-schedule-scheduler`, which holds `run.invoker` on harness only and no other IAM. The tick reads
+service account `tilo-schedule-scheduler`, which holds no IAM at all (api is public and checks the token itself).
+The tick reads
 due
 schedules from the store.
 
 Static checks (no terraform binary, no network, no credentials, nothing is planned or applied), in the style of
 test_NFR_27_cost_alert_terraform.py. The planned IAM is pinned by `infra/envs/dev/tests/schedule_tick.tftest.hcl` and by
-the deliberate change to the harness invoker list in `cloud_run.tftest.hcl`.
+the harness invoker list in `cloud_run.tftest.hcl`, back to three accounts.
 
   * exactly one `google_service_account` with account_id `tilo-schedule-scheduler`;
   * exactly one `google_cloud_scheduler_job` named `tilo-schedule-tick`: no for_each or count (one job, not one per
     user),
     `* * * * *`, POST, OIDC (not OAuth), path `/internal/schedules/tick` with no query and no body, `retry_count = 1`;
-  * that service account appears in no project-level IAM resource, and in the Cloud Run `extra_invokers` map exactly
-    once,
-    for the harness service;
+  * that service account appears in no project-level IAM resource and in no Cloud Run `extra_invokers` entry (the
+    target, tilo-api, is public and checks the token itself);
   * infra/ACCESS.md names the account, the job and the route.
 
 Ambiguity resolved (the brief fixes `UTC`; the gmail jobs write `Etc/UTC`): either spelling of UTC is accepted.
@@ -26,6 +27,7 @@ Ambiguity resolved (the brief fixes `UTC`; the gmail jobs write `Etc/UTC`): eith
 
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 
@@ -115,7 +117,7 @@ def test_FR_AGT_14_the_job_authenticates_as_the_schedule_scheduler_and_for_the_h
     assert sa and not re.search(r"gmail|tasks_invoker|tasks-invoker", sa.group(1)), (
         "FR-AGT-14: the job must not borrow the Gmail scheduler or the Cloud Tasks identity"
     )
-    assert re.search(r"audience\s*=", oidc.group(1)), "FR-AGT-14: set the OIDC audience to the harness URL"
+    assert re.search(r"audience\s*=", oidc.group(1)), "FR-AGT-14: set the OIDC audience to the target URL"
     audience = re.search(r"audience\s*=\s*(\S+)", oidc.group(1)).group(1)
     uri = re.search(r"\buri\s*=\s*\"(.+)\"", body)
     assert uri and uri.group(1).startswith(f"${{{audience}}}"), (
@@ -136,17 +138,26 @@ def test_FR_AGT_14_the_schedule_scheduler_holds_no_project_level_role(repo_root)
             )
 
 
-def test_FR_AGT_14_the_only_invoker_binding_for_the_schedule_scheduler_is_harness(repo_root):
+def test_FR_AGT_14_the_schedule_scheduler_holds_no_run_invoker_binding(repo_root):
+    """FR-AGT-14c retarget: the tick is on public tilo-api and checks its own OIDC caller (ADR-0023), so the account
+    needs no run.invoker anywhere (it used to hold one on harness, #446)."""
     entries: list[tuple[str, str, pathlib.Path]] = []
     for path in _tf_files(repo_root):
         text = path.read_text(encoding="utf-8")
         for m in re.finditer(r'\{\s*service\s*=\s*"([\w-]+)"\s*member\s*=\s*"([^"]*)"\s*\}', text):
             if SA_REF.search(m.group(2)):
                 entries.append((m.group(1), m.group(2), path))
-    assert len(entries) == 1, (
-        f"FR-AGT-14: expected one run.invoker entry for the schedule scheduler, found {len(entries)}"
-    )
-    assert entries[0][0] == "harness", "FR-AGT-14: run.invoker on harness only (never api, channels, connectors, ...)"
+    assert not entries, f"FR-AGT-14c: the schedule scheduler must hold no run.invoker entry, found {entries}"
+
+
+def test_FR_AGT_14c_the_tick_job_targets_api_not_harness(repo_root):
+    text = (repo_root / "infra" / "envs" / "dev" / "main.tf").read_text(encoding="utf-8")
+    call = re.search(r'^module\s+"schedule_tick"\s*\{', text, re.M)
+    assert call, "FR-AGT-14c: the schedule_tick module call exists"
+    body = _braced(text, call)
+    target = re.search(r"target_uri\s*=\s*(.+)", body)
+    assert target and 'uris["api"]' in target.group(1), "FR-AGT-14c: the tick job calls the api URL"
+    assert "harness" not in target.group(1)
 
 
 def test_FR_AGT_14_access_doc_names_the_account_the_job_and_the_route(repo_root):
@@ -154,9 +165,31 @@ def test_FR_AGT_14_access_doc_names_the_account_the_job_and_the_route(repo_root)
     for needle in (SA_ACCOUNT_ID, JOB_NAME, ROUTE):
         assert needle in access, f"FR-AGT-14: infra/ACCESS.md must mention {needle}"
     rows = [line for line in access.splitlines() if SA_ACCOUNT_ID in line and line.lstrip().startswith("|")]
-    assert any("run.invoker" in r and "harness" in r for r in rows), (
-        "FR-AGT-14: an ACCESS.md row says tilo-schedule-scheduler holds run.invoker on harness"
+    assert any("api" in r and ROUTE in r for r in rows), (
+        "FR-AGT-14c: an ACCESS.md row says tilo-schedule-scheduler calls the tick route on tilo-api"
     )
+    assert not any("run.invoker on **harness**" in r and SA_ACCOUNT_ID in r for r in rows), (
+        "FR-AGT-14c: ACCESS.md no longer says the schedule scheduler is a harness invoker"
+    )
+
+
+def test_FR_AGT_14c_the_due_query_has_its_composite_index_in_terraform(repo_root):
+    found = [i for i in _resources(repo_root, "google_firestore_index") if '"schedules"' in i[2]]
+    assert len(found) == 1, "FR-AGT-14c: one google_firestore_index on the `schedules` collection"
+    body = found[0][2]
+    assert re.search(r'query_scope\s*=\s*"COLLECTION"', body)
+    fields = re.findall(r'field_path\s*=\s*"(\w+)"\s*\n\s*order\s*=\s*"(\w+)"', body)
+    assert fields == [("enabled", "ASCENDING"), ("next_due", "ASCENDING")], fields
+
+
+def test_FR_AGT_14c_firestore_rules_deny_every_client_the_schedules_collection(repo_root):
+    """The brief snapshot is unredacted user text: only the server (IAM) may read or write `orgs/*/schedules`."""
+    rules = (repo_root / "firestore.rules").read_text(encoding="utf-8")
+    assert re.search(r"match\s+/orgs/\{\w+\}/schedules/\{\w+\}", rules), "FR-AGT-14c: a rule names the schedules path"
+    assert not re.search(r"allow[^;]*:\s*if\s+true", rules), "FR-AGT-14c: no allow-all in firestore.rules"
+    assert re.search(r"allow\s+read\s*,\s*write\s*:\s*if\s+false\s*;", rules)
+    firebase = json.loads((repo_root / "firebase.json").read_text(encoding="utf-8"))
+    assert firebase["firestore"]["rules"] == "firestore.rules"
 
 
 def test_FR_AGT_14_nothing_applies_itself(repo_root):
