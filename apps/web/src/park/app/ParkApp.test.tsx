@@ -59,9 +59,9 @@ describe("WEB_3a_parkapp: the shell around a page", () => {
   });
 
   it("WEB_3a_parkapp_the_placeholder_says_Not_built_yet_under_one_h1", async () => {
-    const m = await visit("/park/home");
+    const m = await visit("/park/ledger"); // home has its page since WEB-4
     expect(qa(m.container, "h1")).toHaveLength(1);
-    expect(q(m.container, "h1").textContent).toBe("Home");
+    expect(q(m.container, "h1").textContent).toBe("Ledger");
     expect(m.container.textContent).toContain("Not built yet");
   });
 
@@ -94,7 +94,8 @@ describe("WEB_3a_parkapp: each route renders its page", () => {
     for (const [path, id] of table) {
       const m = await visit(path);
       expect(qa(m.container, `[data-testid="park-page-${id}"]`), path).toHaveLength(1);
-      expect(q(m.container, "h1").textContent, path).toBe(PAGE_LABEL[id]);
+      // Home's h1 is the greeting (WEB-4); the others are still the Placeholder's page name.
+      if (id !== "home") expect(q(m.container, "h1").textContent, path).toBe(PAGE_LABEL[id]);
       expect(qa(m.container, "main"), path).toHaveLength(1);
       expect(qa(m.container, '[data-testid^="park-page-"]'), path).toHaveLength(1);
       expect(document.title, path).toBe(`${PAGE_LABEL[id]} · Tilo`);

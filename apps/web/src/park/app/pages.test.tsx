@@ -64,7 +64,8 @@ describe("WEB_3a_pages: a page with no real page yet renders the Placeholder", (
   });
 
   it("WEB_3a_pages_placeholder_for_every_page", async () => {
-    for (const id of PAGE_IDS) {
+    // A page lane takes its page out of this list in its own ticket (WEB-4: home; its page tests live in pages/Home/).
+    for (const id of PAGE_IDS.filter((p) => p !== "home")) {
       const Page = PAGES[id];
       const m = mount(
         <Suspense fallback={null}>

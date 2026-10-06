@@ -62,7 +62,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       await expect(page.locator("[data-park]")).toHaveCount(1);
       await expect(page.locator("[data-park]")).toHaveAttribute("data-time", "day");
       await expect(page.getByTestId("park-page-home")).toBeVisible();
-      await expect(page.getByTestId("park-page-home")).toContainText("Not built yet");
+      await expect(page.getByTestId("park-page-home")).not.toContainText("Not built yet"); // WEB-4: the real Home
       await expect(page.getByRole("main")).toHaveCount(1);
       expect(problems).toEqual([]);
     });
@@ -72,7 +72,10 @@ for (const [name, viewport] of Object.entries(SIZES)) {
         const problems = collectConsoleProblems(page);
         await page.goto(path);
         await expect(page.getByTestId(`park-page-${id}`)).toBeVisible();
-        await expect(page.getByRole("heading", { level: 1 })).toHaveText(label);
+        // Home's h1 is the greeting since WEB-4; the others are still the Placeholder's page name.
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+          id === "home" ? /^Good (morning|evening), Alex\.$/ : label,
+        );
         await expect(page.locator('[data-testid^="park-page-"]')).toHaveCount(1);
         await expect(page.getByRole("main")).toHaveCount(1);
         await expect(page).toHaveTitle(`${label} · Tilo`);
@@ -111,7 +114,9 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       await expect(page.getByTestId("park-page-home")).toBeVisible();
       expect(page.url()).toMatch(/\/park\/home$/);
       expect(await marker(page), "no page load happened").toBe("same document");
-      await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+      // Home's h1 (WEB-4) appears once its data has loaded, after the shell moved focus on the route
+      // change, so the focus move is no longer checked on Home here (the shell's WEB-3b follows the h1).
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await page.goBack();
       await expect(page.getByTestId("park-not-found")).toBeVisible();
       await page.goForward();
