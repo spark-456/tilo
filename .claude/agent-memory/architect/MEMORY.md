@@ -1,1 +1,2 @@
 - [Contract pitfalls](contract-pitfalls.md) — drift sandbox, TS quirks, invalid fixtures, safety lists, author/role binding, nullable caps, CRLF, BQ/ADR id clashes, PRD arithmetic, gh, no scenario ids in descriptions, tiers are data, read-model rows, re-check ADR ids before commit
+- [Schedule channel (FR-AGT-14)](schedule-channel-fr-agt-14.md) — channel `schedule`, actor must be the owner (OB-01), common 1.4.0 vs PR #401, shared-enum widening
