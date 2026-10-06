@@ -368,6 +368,11 @@ class CardStore:
 
     # -- reads ------------------------------------------------------------
 
+    def is_open(self, world_id: str, card_id: str) -> bool:
+        """Whether the card still waits for an answer (a gate's answer closes every card of it)."""
+        with self._lock:
+            return (r := self._records.get(world_id, {}).get(card_id)) is not None and r.status == "open"
+
     def get(self, world_id: str, card_id: str) -> dict | None:
         """A card by its own submitted id, merged or not."""
         record = self._records.get(world_id, {}).get(card_id)

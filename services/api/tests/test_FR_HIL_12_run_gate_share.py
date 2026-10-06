@@ -119,9 +119,20 @@ def test_FR_HIL_12_a_resolved_gate_cannot_be_shared_after_the_run_completed(run_
 def test_FR_HIL_12_an_email_session_cannot_read_a_shared_gate(run_flow):
     _, original = run_flow.run_to_gate()
     share = _share(run_flow, original["id"])
+    run_flow.as_member(user_id=APPROVER, role="approver")  # the Approver, in an email session
     run_flow.sessions_by_channel()
-    run_flow.as_member(user_id=APPROVER, role="approver")
 
     response = run_flow.flow.client.get(f"/share/{share['token']}", headers={"x-session-channel": "email"})
 
     assert response.status_code == 400 and "what_happened" not in response.text
+
+
+def test_FR_HIL_12_a_link_whose_gate_was_answered_elsewhere_is_gone(run_flow):
+    _, original = run_flow.run_to_gate()
+    share = _share(run_flow, original["id"])
+    assert run_flow.answer(original["id"], "approve").status_code == 200
+
+    run_flow.as_member(user_id=APPROVER, role="approver")
+    response = run_flow.flow.client.get(f"/share/{share['token']}")
+
+    assert response.status_code == 410 and "what_happened" not in response.text

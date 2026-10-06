@@ -1,7 +1,7 @@
 """tilo-api: sessions, tasks, cards, approvals, policies, downloads, sharing, RBAC (PRD 6.2)."""
 
 from collections.abc import Callable
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import runs as _runs
+from tilo_api import skill_proposals as _skill_proposals
 from tilo_api.cards import build_router as _build_cards_router
 from tilo_api.console import build_router as _build_console_router
 from tilo_api.dispatch import router as _dispatch_router
@@ -20,7 +21,7 @@ from tilo_api.tasks import router as _tasks_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
 # strangers (issue #411). `app.openapi()` still works in-process for tests.
-_DOCS = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+_DOCS: dict[str, Any] = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_url": None, "openapi_url": None}
 app = FastAPI(title="tilo-api", **_DOCS)
 
 
@@ -49,6 +50,15 @@ app.include_router(_build_cards_router(_runs.get_card_store, answer_guard=_runs.
 app.include_router(_build_console_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
 app.include_router(_build_sharing_router(_world_views))
 app.include_router(_runs.router)
+
+
+def _world_owner(world_id: str) -> str | None:
+    """The world's owner from the store the app is wired with (503 `not_configured` when none is)."""
+    world = app.dependency_overrides.get(_deps.get_store, _deps.get_store)().worlds.get(world_id)
+    return world.owner if world else None
+
+
+app.include_router(_skill_proposals.build_router(_skill_proposals.get_skill_proposals, owner_of=_world_owner))
 _dev.install_if_enabled(app)  # only with TILO_API_DEV=1; refuses when deployed or live (CL-INT-4)
 
 

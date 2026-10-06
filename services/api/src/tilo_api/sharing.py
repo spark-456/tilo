@@ -207,8 +207,8 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
         if link is None:
             return JSONResponse(status_code=404, content=_NOT_FOUND)
         view = resolve(link.world_id)
-        if not usable(link, view):
-            return JSONResponse(status_code=410, content=_GONE)
+        if not usable(link, view) or not view.cards.is_open(link.world_id, link.card_id):
+            return JSONResponse(status_code=410, content=_GONE)  # expired, revoked, or answered elsewhere
         card = view.cards.get(link.world_id, link.card_id)
         return (
             JSONResponse(status_code=200, content={"card": card})

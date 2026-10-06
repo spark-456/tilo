@@ -244,6 +244,7 @@ class FakeGoogleApis:
         references: str | None = None,
         labels: Iterable[str] = ("INBOX",),
         attachment: tuple[str, str, bytes] | None = None,
+        extra_headers: Iterable[tuple[str, str]] = (),
     ) -> dict:
         msg = EmailMessage()
         message_id = f"<{secrets.token_hex(8)}@mail.example.com>"
@@ -257,6 +258,8 @@ class FakeGoogleApis:
         if references:
             msg["References"] = references
             msg["In-Reply-To"] = references.split()[-1]
+        for name, value in extra_headers:  # in the order given; a name may repeat
+            msg.add_header(name, value)
         msg.set_content(body)
         if attachment is not None:
             name, mime, data = attachment
