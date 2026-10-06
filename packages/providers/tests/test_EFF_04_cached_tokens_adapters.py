@@ -45,8 +45,9 @@ def _google(client: Any = None):
     profile = ProvidersProfile.model_validate(
         {"provider": "google", "model": "adapter-test-model", "context": 1000, "caps": ["json", "tools"]}
     )
+    client = client or pytypes.SimpleNamespace(models=None)  # `_map_response` never touches the client
     return GoogleModelProvider(
-        profile=profile, profile_id="g", project="demo-project", location="global", client=client or FakeClient(None)
+        profile=profile, profile_id="g", project="demo-project", location="global", client=client
     )
 
 

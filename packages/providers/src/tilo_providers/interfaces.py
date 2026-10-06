@@ -50,6 +50,14 @@ class GenerateResponse(BaseModel):  # one generate() result, or one stream() chu
     usage: dict[str, int] | None = None
 
 
+def cached_tokens_or_none(value: Any, input_tokens: Any) -> int | None:
+    """EFF-04 (ADR-0022): a provider's cached-token count if it is a whole number from 0 to `input_tokens`, else None
+    (the caller leaves `usage["cached_tokens"]` out, so EV-16 can never refuse an event over a misreport)."""
+    if isinstance(value, bool) or not isinstance(value, int) or isinstance(input_tokens, bool):
+        return None
+    return value if isinstance(input_tokens, int) and 0 <= value <= input_tokens else None
+
+
 class PriceQuote(BaseModel):  # standard list price, US dollars per million tokens (PL-06)
     model_config = ConfigDict(extra="forbid")
     input: float

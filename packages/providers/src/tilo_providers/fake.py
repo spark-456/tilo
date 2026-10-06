@@ -29,13 +29,16 @@ class FakeModelProvider(ModelProvider):
         profile_id: str = "fake",
         caps: set[Capability] | None = None,
         price: PriceQuote | None = None,
+        usage: dict[str, int] | None = None,
     ) -> None:
         self._profile_id = profile_id
         self._caps = set(caps) if caps is not None else set(_DEFAULT_CAPS)
         self._price = price if price is not None else _DEFAULT_PRICE
+        self._usage = usage  # None: no usage, so token counts and cached tokens read as unknown (EFF-04)
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
-        return GenerateResponse(text=_canned_text(request.prompt), profile_id=self._profile_id)
+        usage = dict(self._usage) if self._usage is not None else None
+        return GenerateResponse(text=_canned_text(request.prompt), profile_id=self._profile_id, usage=usage)
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
         yield self.generate(request)
