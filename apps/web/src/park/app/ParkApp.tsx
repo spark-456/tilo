@@ -10,6 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { PageSheet, Toast } from "../components";
+import "../tokens/fonts";
 import "../tokens/park.css";
 import { type AppCtx, PAGE_LABEL } from "./AppCtx";
 import "./park-app.css";
@@ -41,6 +42,9 @@ function NotFound({ go }: { go: AppCtx["go"] }) {
 }
 
 /** Moves focus to the page heading when the route changes, never on the first load. */
+// Suspense hides the page it is replacing with an inline `display: none` until the new chunk arrives.
+const isHidden = (el: Element): boolean => el.closest('[style*="display: none"]') !== null;
+
 function FocusHeading({
   main,
   routeKey,
@@ -52,10 +56,31 @@ function FocusHeading({
       return;
     }
     last.current = routeKey;
-    const heading = main.current?.querySelector("h1");
-    if (!heading) return;
-    if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
-    heading.focus();
+    const root = main.current;
+    if (!root) return;
+    const left = document.activeElement;
+    // The new page's heading, never the hidden one of the page it replaces.
+    const focusHeading = (): boolean => {
+      const heading = [...root.querySelectorAll("h1")].find((h) => !isHidden(h));
+      if (!heading) return false;
+      if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+      heading.focus();
+      return true;
+    };
+    if (focusHeading()) return;
+    // A lazy page's heading arrives with its chunk. Focus it then, unless the person has moved focus
+    // somewhere else in the meantime.
+    const watch = new MutationObserver(() => {
+      if (document.activeElement !== left) return watch.disconnect();
+      if (focusHeading()) watch.disconnect();
+    });
+    watch.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+    return () => watch.disconnect();
   }, [main, routeKey]);
   return null;
 }
