@@ -38,6 +38,10 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       await expect(page.getByTestId("park-page-worlds")).toBeVisible();
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Worlds");
       await expect(page).toHaveTitle("Worlds · Tilo");
+      // The page reads the fixture Api; the shell, not the page, says so (plan section 6.1).
+      await expect(
+        page.locator("header").getByRole("button", { name: "Sample data" }),
+      ).toBeVisible();
       for (const [region, height] of Object.entries(HEIGHTS)) {
         const first = links(page, region).first();
         await expect(first).toBeVisible();
