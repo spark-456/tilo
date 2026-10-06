@@ -1372,6 +1372,7 @@ class Rig:
         self.flags = InMemoryFlagStore()
         self.now = now
         self.now_calls = 0
+        self.unwired: set[str] = set()
         self.client = TestClient(app, raise_server_exceptions=False)
         caplog.set_level(logging.DEBUG)
         self.activate()
@@ -1394,6 +1395,8 @@ class Rig:
         o[deps.get_current_principal] = lambda: self.principal
         if self.principal is None:
             o.pop(deps.get_current_principal, None)
+        for name in self.unwired:  # a seam the test took back to its production default stays that way
+            o.pop(seam(name), None)
 
     def set_principal(self, who: Any) -> None:
         self.principal = who
@@ -1401,6 +1404,7 @@ class Rig:
 
     def unwire(self, name: str) -> None:
         """Back to the production default of a seam (which refuses with 503 `not_configured`)."""
+        self.unwired.add(name)
         app.dependency_overrides.pop(seam(name), None)
 
     def post(self, body: Any, **kw: Any) -> Any:

@@ -761,15 +761,33 @@ def test_FR_PA_14_the_menu_a_model_is_shown_carries_the_plate_rows_and_the_selec
 
 # ------------------------------------------------------------------------- A14-3 (actions), A14-4/5/6
 def _fuzzed_actions():
+    """The actions of the fuzzed replies that carry one. A reply with DUPLICATE keys is left out here: read as plain
+    JSON (last key wins) its action is a valid navigate, and only `parse_decision` (slice 3) can drop such a reply.
+    The 200 fuzzed REPLIES, duplicate keys included, run through the real Router in test_PPL_11b_3 (A14-3)."""
     out = []
     for category, text in fuzz_replies():
         try:
+            pairs = json.loads(text, object_pairs_hook=lambda p: p)
             value = json.loads(text)
         except (ValueError, RecursionError):
+            continue
+        try:
+            if _has_duplicate_keys(pairs):
+                continue
+        except RecursionError:
             continue
         if isinstance(value, dict) and value.get("choice") == "navigate" and "action" in value and len(value) == 2:
             out.append((category, value["action"]))
     return out
+
+
+def _has_duplicate_keys(node):
+    if isinstance(node, list) and node and all(isinstance(p, tuple) and len(p) == 2 for p in node):
+        keys = [k for k, _ in node]
+        return len(set(keys)) != len(keys) or any(_has_duplicate_keys(v) for _, v in node)
+    if isinstance(node, list):
+        return any(_has_duplicate_keys(v) for v in node)
+    return False
 
 
 def test_FR_PA_14_A14_3_every_fuzzed_action_a_model_could_return_is_dropped_with_nothing_executed(rig_factory):
@@ -1315,7 +1333,7 @@ def test_FR_PA_17_one_org_is_loaded_per_request_and_the_directory_is_built_once(
         rig.world.reset_log()
         _ok(rig.ask(q))
         assert directory_spy.calls == n, "Directory.of once per request, never per row (about 6 ms per person)"
-        lists = [c for c in rig.world.log if c[:2] == ("persons", "list")]
+        lists = [c for c in rig.world.log if c[:2] == ("person", "list")]
         assert len(lists) == 1, "the persons of the org are listed once per request"
         assert {c[2] for c in rig.world.log} == {ORG}, "no lookup names another org"
 

@@ -530,7 +530,7 @@ def test_FR_PA_17_read_as_loads_the_source_meeting_of_a_tilo_made_record_from_th
     )
     world.stores.calendar.create(entry)
     assert _read(world, "calendar_entry", "ce_tilo1") == entry
-    assert ("meetings", "get", ORG, "mt_samsync1") in world.log
+    assert ("meeting", "get", ORG, "mt_samsync1") in world.log
     world.stores.meetings.delete(ORG, "mt_samsync1", expected_version=1)
     assert _read(world, "calendar_entry", "ce_tilo1") is None, "no source meeting: fail closed"
     other = calendar_entry(
@@ -588,7 +588,7 @@ def test_FR_PA_17_read_as_loads_the_released_work_item_of_a_calendar_proposal(wo
     assert access.read(context, directory_of(world)) is not None, "fixture check: the oracle allows with this context"
     world.reset_log()
     assert _read(world, "calendar_entry", "ce_rel1") == entry
-    assert ("work_items", "list", ORG, None) in world.log
+    assert ("work_item", "list", ORG, None) in world.log
     world.stores.work_items.delete(ORG, "wi_released", expected_version=1)
     assert _read(world, "calendar_entry", "ce_rel1") is None
 

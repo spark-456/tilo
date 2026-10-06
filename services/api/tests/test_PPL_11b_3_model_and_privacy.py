@@ -654,7 +654,7 @@ def test_FR_PA_17_a_model_request_loads_one_org_and_builds_the_directory_once(ri
     rig.world.reset_log()
     _ok(rig.ask(UNMATCHED))
     assert directory_spy.calls == 1 and len(mr.main.calls) == 1
-    assert len([c for c in rig.world.log if c[:2] == ("persons", "list")]) == 1 and {c[2] for c in rig.world.log} == {
+    assert len([c for c in rig.world.log if c[:2] == ("person", "list")]) == 1 and {c[2] for c in rig.world.log} == {
         ORG
     }
 
