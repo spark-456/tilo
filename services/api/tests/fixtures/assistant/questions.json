@@ -10,14 +10,34 @@
     { "n": 7, "text": "What is overdue?", "intent": "overdue", "narrow_title": null },
     { "n": 8, "text": "Am I late on anything?", "intent": "overdue", "narrow_title": null },
     { "n": 9, "text": "What is due soon?", "intent": "due_soon", "narrow_title": null },
-    { "n": 10, "text": "What's due in the next two days?", "intent": "due_soon", "narrow_title": null },
-    { "n": 11, "text": "What is on my calendar today?", "intent": "calendar_today", "narrow_title": null },
-    { "n": 12, "text": "What's my schedule for today?", "intent": "calendar_today", "narrow_title": null },
+    {
+      "n": 10,
+      "text": "What's due in the next two days?",
+      "intent": "due_soon",
+      "narrow_title": null
+    },
+    {
+      "n": 11,
+      "text": "What is on my calendar today?",
+      "intent": "calendar_today",
+      "narrow_title": null
+    },
+    {
+      "n": 12,
+      "text": "What's my schedule for today?",
+      "intent": "calendar_today",
+      "narrow_title": null
+    },
     { "n": 13, "text": "Which pins am I tagged on?", "intent": "pins", "narrow_title": null },
     { "n": 14, "text": "What is pinned for me?", "intent": "pins", "narrow_title": null },
     { "n": 15, "text": "Which emails need a reply?", "intent": "mail", "narrow_title": null },
     { "n": 16, "text": "How are my tasks going?", "intent": "tasks", "narrow_title": null },
-    { "n": 17, "text": "How is the launch site refresh going?", "intent": "tasks", "narrow_title": "Launch site refresh" },
+    {
+      "n": 17,
+      "text": "How is the launch site refresh going?",
+      "intent": "tasks",
+      "narrow_title": "Launch site refresh"
+    },
     { "n": 18, "text": "What is the status of my tasks?", "intent": "tasks", "narrow_title": null },
     { "n": 19, "text": "What changed since yesterday?", "intent": "changed", "narrow_title": null },
     { "n": 20, "text": "What's new?", "intent": "changed", "narrow_title": null }

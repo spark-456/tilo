@@ -1,35 +1,218 @@
 {
   "_note": "FR-PA-14 acceptance set (services/api/tests/API_PPL_11b.md section 11): 30 navigation intents. `context` names the selected record by alias (the test lib maps an alias to an id); `expect` is the exact navigate ui_action with the target by alias. `by` is who resolves it: rules, or model (intents 27 and 28 match no rule).",
   "intents": [
-    { "n": 1, "text": "Take me to my plate", "context": null, "by": "rules", "expect": { "route": "plate", "target": null } },
-    { "n": 2, "text": "Open my plate", "context": null, "by": "rules", "expect": { "route": "plate", "target": null } },
-    { "n": 3, "text": "Go to the calendar", "context": null, "by": "rules", "expect": { "route": "calendar", "target": null } },
-    { "n": 4, "text": "Open the calendar", "context": null, "by": "rules", "expect": { "route": "calendar", "target": null } },
-    { "n": 5, "text": "Show the meetings", "context": null, "by": "rules", "expect": { "route": "meetings", "target": null } },
-    { "n": 6, "text": "Show the meeting minutes", "context": "sam_meeting", "by": "rules", "expect": { "route": "meeting", "target": { "kind": "meeting", "alias": "sam_meeting" } } },
-    { "n": 7, "text": "Show the meeting minutes", "context": null, "by": "rules", "expect": { "route": "meetings", "target": null } },
-    { "n": 8, "text": "Open the pinboard", "context": null, "by": "rules", "expect": { "route": "pinboard_team", "target": null } },
-    { "n": 9, "text": "Open the team pinboard", "context": null, "by": "rules", "expect": { "route": "pinboard_team", "target": null } },
-    { "n": 10, "text": "Open my personal pinboard", "context": null, "by": "rules", "expect": { "route": "pinboard_personal", "target": null } },
-    { "n": 11, "text": "Show my board", "context": null, "by": "rules", "expect": { "route": "pinboard_personal", "target": null } },
-    { "n": 12, "text": "Go to my worlds", "context": null, "by": "rules", "expect": { "route": "worlds", "target": null } },
-    { "n": 13, "text": "Show all worlds", "context": null, "by": "rules", "expect": { "route": "worlds", "target": null } },
-    { "n": 14, "text": "Open this world", "context": "sam_world", "by": "rules", "expect": { "route": "world", "target": { "kind": "world", "alias": "sam_world" } } },
-    { "n": 15, "text": "Take me there", "context": "sam_work_item", "by": "rules", "expect": { "route": "plate", "target": { "kind": "work_item", "alias": "sam_work_item" } } },
-    { "n": 16, "text": "Open this", "context": "s1_card", "by": "rules", "expect": { "route": "cards", "target": { "kind": "card", "alias": "s1_card" } } },
-    { "n": 17, "text": "Open the needs-you queue", "context": null, "by": "rules", "expect": { "route": "cards", "target": null } },
-    { "n": 18, "text": "Show my approvals", "context": null, "by": "rules", "expect": { "route": "cards", "target": null } },
-    { "n": 19, "text": "Go to connections", "context": null, "by": "rules", "expect": { "route": "connections", "target": null } },
-    { "n": 20, "text": "Open settings", "context": null, "by": "rules", "expect": { "route": "settings", "target": null } },
-    { "n": 21, "text": "Open autonomy", "context": null, "by": "rules", "expect": { "route": "autonomy", "target": null } },
-    { "n": 22, "text": "Show my channels", "context": null, "by": "rules", "expect": { "route": "channels", "target": null } },
-    { "n": 23, "text": "Navigate to notification settings", "context": null, "by": "rules", "expect": { "route": "channels", "target": null } },
-    { "n": 24, "text": "Open the rate sheet task", "context": null, "by": "rules", "expect": { "route": "plate", "target": { "kind": "work_item", "alias": "rate_sheet_item" } } },
-    { "n": 25, "text": "Open the budget notes", "context": null, "by": "rules", "expect": { "route": "plate", "target": { "kind": "work_item", "alias": "sam_work_item" } } },
-    { "n": 26, "text": "Show the launch site refresh", "context": null, "by": "rules", "expect": { "route": "world", "target": { "kind": "world", "alias": "sam_world" } } },
-    { "n": 27, "text": "Open the 3pm one", "context": null, "by": "model", "expect": { "route": "calendar", "target": { "kind": "calendar_entry", "alias": "sam_calendar" } } },
-    { "n": 28, "text": "I want to see the team board", "context": null, "by": "model", "expect": { "route": "pinboard_team", "target": null } },
-    { "n": 29, "text": "Switch to autonomy", "context": null, "by": "rules", "expect": { "route": "autonomy", "target": null } },
-    { "n": 30, "text": "Open the needs you page", "context": null, "by": "rules", "expect": { "route": "cards", "target": null } }
+    {
+      "n": 1,
+      "text": "Take me to my plate",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "plate", "target": null }
+    },
+    {
+      "n": 2,
+      "text": "Open my plate",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "plate", "target": null }
+    },
+    {
+      "n": 3,
+      "text": "Go to the calendar",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "calendar", "target": null }
+    },
+    {
+      "n": 4,
+      "text": "Open the calendar",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "calendar", "target": null }
+    },
+    {
+      "n": 5,
+      "text": "Show the meetings",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "meetings", "target": null }
+    },
+    {
+      "n": 6,
+      "text": "Show the meeting minutes",
+      "context": "sam_meeting",
+      "by": "rules",
+      "expect": { "route": "meeting", "target": { "kind": "meeting", "alias": "sam_meeting" } }
+    },
+    {
+      "n": 7,
+      "text": "Show the meeting minutes",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "meetings", "target": null }
+    },
+    {
+      "n": 8,
+      "text": "Open the pinboard",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "pinboard_team", "target": null }
+    },
+    {
+      "n": 9,
+      "text": "Open the team pinboard",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "pinboard_team", "target": null }
+    },
+    {
+      "n": 10,
+      "text": "Open my personal pinboard",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "pinboard_personal", "target": null }
+    },
+    {
+      "n": 11,
+      "text": "Show my board",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "pinboard_personal", "target": null }
+    },
+    {
+      "n": 12,
+      "text": "Go to my worlds",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "worlds", "target": null }
+    },
+    {
+      "n": 13,
+      "text": "Show all worlds",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "worlds", "target": null }
+    },
+    {
+      "n": 14,
+      "text": "Open this world",
+      "context": "sam_world",
+      "by": "rules",
+      "expect": { "route": "world", "target": { "kind": "world", "alias": "sam_world" } }
+    },
+    {
+      "n": 15,
+      "text": "Take me there",
+      "context": "sam_work_item",
+      "by": "rules",
+      "expect": { "route": "plate", "target": { "kind": "work_item", "alias": "sam_work_item" } }
+    },
+    {
+      "n": 16,
+      "text": "Open this",
+      "context": "s1_card",
+      "by": "rules",
+      "expect": { "route": "cards", "target": { "kind": "card", "alias": "s1_card" } }
+    },
+    {
+      "n": 17,
+      "text": "Open the needs-you queue",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "cards", "target": null }
+    },
+    {
+      "n": 18,
+      "text": "Show my approvals",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "cards", "target": null }
+    },
+    {
+      "n": 19,
+      "text": "Go to connections",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "connections", "target": null }
+    },
+    {
+      "n": 20,
+      "text": "Open settings",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "settings", "target": null }
+    },
+    {
+      "n": 21,
+      "text": "Open autonomy",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "autonomy", "target": null }
+    },
+    {
+      "n": 22,
+      "text": "Show my channels",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "channels", "target": null }
+    },
+    {
+      "n": 23,
+      "text": "Navigate to notification settings",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "channels", "target": null }
+    },
+    {
+      "n": 24,
+      "text": "Open the rate sheet task",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "plate", "target": { "kind": "work_item", "alias": "rate_sheet_item" } }
+    },
+    {
+      "n": 25,
+      "text": "Open the budget notes",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "plate", "target": { "kind": "work_item", "alias": "sam_work_item" } }
+    },
+    {
+      "n": 26,
+      "text": "Show the launch site refresh",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "world", "target": { "kind": "world", "alias": "sam_world" } }
+    },
+    {
+      "n": 27,
+      "text": "Open the 3pm one",
+      "context": null,
+      "by": "model",
+      "expect": {
+        "route": "calendar",
+        "target": { "kind": "calendar_entry", "alias": "sam_calendar" }
+      }
+    },
+    {
+      "n": 28,
+      "text": "I want to see the team board",
+      "context": null,
+      "by": "model",
+      "expect": { "route": "pinboard_team", "target": null }
+    },
+    {
+      "n": 29,
+      "text": "Switch to autonomy",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "autonomy", "target": null }
+    },
+    {
+      "n": 30,
+      "text": "Open the needs you page",
+      "context": null,
+      "by": "rules",
+      "expect": { "route": "cards", "target": null }
+    }
   ]
 }
