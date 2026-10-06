@@ -8,7 +8,7 @@ date), PL-01 (no model id outside config/ and providers), `contracts/metering.ru
 
 Pinned interface (the builder may override it; update the tests with it):
 
-    cost_report(ledger, events, *, unit_types, credit_usd=0.005) -> dict
+    cost_report(ledger, events, *, unit_types, credit_usd) -> dict
         ledger      iterable of tilo_metering.LedgerEntry (Treasury.ledger); only `commit` entries are spend
         events      iterable of event.schema.json records (any worlds): world.planned (tier), world.completed,
                     memory.hit (saved credits); everything else is ignored
@@ -57,7 +57,7 @@ settings.load_profile("costs")
 
 def report(tmp_path, *, noise: bool = False, hits: bool = True) -> dict:
     ledger = build_ledger(tmp_path, noise=noise).ledger
-    return cost_report(ledger, scenario_events(hits=hits), unit_types=UNIT_TYPES)
+    return cost_report(ledger, scenario_events(hits=hits), unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
 
 
 def near(a: float, b: float) -> bool:
@@ -70,7 +70,7 @@ def near(a: float, b: float) -> bool:
 def test_FR_MTR_10_FR_MTR_01_totals_equal_the_ledger_exactly(tmp_path):
     t = build_ledger(tmp_path)
     ledger = t.ledger
-    out = cost_report(ledger, scenario_events(), unit_types=UNIT_TYPES)
+    out = cost_report(ledger, scenario_events(), unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     assert out["totals"]["credits"] == math.fsum(e.credits for e in commits(ledger))  # exact, not approximate
     assert near(out["totals"]["credits"], 322)
     assert out["credit_usd"] == CREDIT_USD
@@ -86,7 +86,7 @@ def test_FR_MTR_10_FR_MTR_01_each_entry_keeps_the_price_in_effect_on_its_date(tm
     assert [round(e.credits) for e in flash] == [40, 40, 120]
     today = price_book(tmp_path).credits(Usage(FLASH, 100_000, 50_000), at("2026-10-06"))
     assert round(today) == 120  # re-pricing every flash call at today's sheet would give 360, not 200
-    out = cost_report(t.ledger, scenario_events(), unit_types=UNIT_TYPES)
+    out = cost_report(t.ledger, scenario_events(), unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     flash_row = row(out["by_profile"], profile=FLASH)
     assert near(flash_row["credits"], 200)
     assert flash_row["credits"] == math.fsum(e.credits for e in flash)
@@ -99,7 +99,7 @@ def test_FR_MTR_10_only_commits_are_spend(tmp_path):
     quiet = report(tmp_path)
     noisy_ledger = build_ledger(tmp_path, noise=True).ledger
     assert {e.kind for e in noisy_ledger} >= {"commit", "release", "grant", "usage"}  # the noise is really there
-    noisy = cost_report(noisy_ledger, scenario_events(), unit_types=UNIT_TYPES)
+    noisy = cost_report(noisy_ledger, scenario_events(), unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     assert noisy == quiet
     assert near(noisy["totals"]["credits"], 322)
 
@@ -203,7 +203,7 @@ def test_FR_MTR_10_every_grouping_adds_up_to_the_ledger(tmp_path):
 
 
 def test_FR_MTR_10_nothing_recorded_is_zeros_not_an_error():
-    out = cost_report([], [], unit_types={})
+    out = cost_report([], [], unit_types={}, credit_usd=CREDIT_USD)
     assert out["credit_usd"] == CREDIT_USD
     assert out["totals"] == {
         "tasks": 0,
@@ -215,11 +215,11 @@ def test_FR_MTR_10_nothing_recorded_is_zeros_not_an_error():
     }
     for key in ("tasks", "by_tier", "by_profile", "by_task_type", "by_tier_profile"):
         assert out[key] == [], key
-    cost_report(iter([]), iter([]), unit_types={})  # plain iterators are fine too
+    cost_report(iter([]), iter([]), unit_types={}, credit_usd=CREDIT_USD)  # plain iterators are fine too
 
 
 def test_FR_MTR_10_a_run_with_events_but_no_spend_costs_zero_and_never_divides_by_zero():
-    out = cost_report([], [planned("r_a1", "village", 1), completed("r_a1", 2)], unit_types={})
+    out = cost_report([], [planned("r_a1", "village", 1), completed("r_a1", 2)], unit_types={}, credit_usd=CREDIT_USD)
     assert [(t["run_id"], t["tier"], t["completed"], t["credits"]) for t in out["tasks"]] == [
         ("r_a1", "village", True, 0)
     ]
@@ -230,7 +230,7 @@ def test_FR_MTR_10_a_run_with_events_but_no_spend_costs_zero_and_never_divides_b
 
 def test_FR_MTR_10_a_run_with_spend_but_no_events_is_reported_untiered(tmp_path):
     ledger = build_ledger(tmp_path).ledger
-    out = cost_report(ledger, [], unit_types=UNIT_TYPES)
+    out = cost_report(ledger, [], unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     assert [t["tier"] for t in out["tasks"]] == [None] * 4
     assert (out["totals"]["completed_tasks"], near(out["totals"]["credits"], 322)) == (0, True)
     assert near(row(out["by_tier"], tier=None)["credits"], 322)
@@ -242,7 +242,7 @@ def test_FR_MTR_10_an_unpriced_usage_record_counts_zero_credits_and_does_not_rai
     ledger.append(
         LedgerEntry("usage", "r_a1", "u_owner", "org_test", at("2026-06-06"), usage=Usage(FLASH, 10**6, 10**6))
     )
-    out = cost_report(ledger, scenario_events(), unit_types=UNIT_TYPES)
+    out = cost_report(ledger, scenario_events(), unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     assert near(out["totals"]["credits"], 322)
 
 
@@ -264,9 +264,9 @@ def test_FR_MTR_10_FR_MTR_06_saved_credits_are_origin_minus_lookup_per_hit_and_p
 def test_FR_MTR_10_FR_MTR_06_a_redelivered_hit_is_counted_once(tmp_path):
     events = scenario_events()
     assert sum(1 for e in events if e["id"] == H1["id"]) == 2  # the scenario delivers H1 twice
-    out = cost_report(build_ledger(tmp_path).ledger, events, unit_types=UNIT_TYPES)
+    out = cost_report(build_ledger(tmp_path).ledger, events, unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     assert near(out["totals"]["credits_saved"], 14.5)  # not 20
-    doubled = cost_report(build_ledger(tmp_path).ledger, events * 2, unit_types=UNIT_TYPES)
+    doubled = cost_report(build_ledger(tmp_path).ledger, events * 2, unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     assert near(doubled["totals"]["credits_saved"], 14.5)
 
 
@@ -278,7 +278,7 @@ def test_FR_MTR_10_FR_MTR_06_savings_are_not_netted_off_spend_and_not_counted_as
     for e in events:
         if e["type"] == "memory.hit":
             e["credits"] = e["data"]["lookup_cost"]  # the event carries its lookup cost, as a metering event may
-    with_hits = cost_report(build_ledger(tmp_path).ledger, events, unit_types=UNIT_TYPES)
+    with_hits = cost_report(build_ledger(tmp_path).ledger, events, unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     assert without["totals"]["credits_saved"] == 0
     for key in ("tasks", "by_tier", "by_profile", "by_task_type", "by_tier_profile"):
         spend_without = [{k: v for k, v in r.items() if k != "credits_saved"} for r in without[key]]
@@ -289,7 +289,9 @@ def test_FR_MTR_10_FR_MTR_06_savings_are_not_netted_off_spend_and_not_counted_as
 
 def test_FR_MTR_10_FR_MTR_06_only_memory_hit_events_count_as_saved(tmp_path):
     impostor = event("memory.saved", run="r_a1", seq=60, data={"layer": "result_cache", "item_count": 3, "saved": 99})
-    out = cost_report(build_ledger(tmp_path).ledger, scenario_events() + [impostor], unit_types=UNIT_TYPES)
+    out = cost_report(
+        build_ledger(tmp_path).ledger, scenario_events() + [impostor], unit_types=UNIT_TYPES, credit_usd=CREDIT_USD
+    )
     assert near(out["totals"]["credits_saved"], 14.5)
 
 
@@ -297,7 +299,9 @@ def test_FR_MTR_10_FR_MTR_06_a_hit_that_disagrees_with_its_own_costs_is_refused_
     bad = hit("r_a1", 61, 6, 0.5)
     bad["data"]["saved"] = 6  # EV-09: saved must be origin_cost - lookup_cost
     with pytest.raises(InconsistentMemoryHit):
-        cost_report(build_ledger(tmp_path).ledger, scenario_events() + [bad], unit_types=UNIT_TYPES)
+        cost_report(
+            build_ledger(tmp_path).ledger, scenario_events() + [bad], unit_types=UNIT_TYPES, credit_usd=CREDIT_USD
+        )
 
 
 # --- deterministic ordering -------------------------------------------------------------------------------------
@@ -320,7 +324,7 @@ def test_FR_MTR_10_rows_come_in_a_fixed_order(tmp_path):
 
 def test_FR_MTR_10_tier_order_follows_world_size_even_with_all_four_tiers():
     events = [planned(f"r_{tier}", tier, i) for i, tier in enumerate(["city", "outpost", "town", "village"], 1)]
-    assert [r["tier"] for r in cost_report([], events, unit_types={})["by_tier"]] == [
+    assert [r["tier"] for r in cost_report([], events, unit_types={}, credit_usd=CREDIT_USD)["by_tier"]] == [
         "outpost",
         "village",
         "town",
@@ -331,23 +335,27 @@ def test_FR_MTR_10_tier_order_follows_world_size_even_with_all_four_tiers():
 def test_FR_MTR_10_the_same_inputs_in_any_order_give_the_same_report(tmp_path):
     ledger = list(build_ledger(tmp_path).ledger)
     events = scenario_events()
-    expected = cost_report(ledger, events, unit_types=UNIT_TYPES)
+    expected = cost_report(ledger, events, unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     for seed in range(5):
         rng = random.Random(seed)
         rng.shuffle(ledger)
         rng.shuffle(events)
-        assert cost_report(ledger, events, unit_types=UNIT_TYPES) == expected
-        assert json.dumps(cost_report(ledger, events, unit_types=UNIT_TYPES)) == json.dumps(expected)
+        assert cost_report(ledger, events, unit_types=UNIT_TYPES, credit_usd=CREDIT_USD) == expected
+        assert json.dumps(cost_report(ledger, events, unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)) == json.dumps(
+            expected
+        )
 
 
 def test_FR_MTR_10_the_report_is_json_with_no_nan_and_leaves_its_inputs_alone(tmp_path):
     ledger = tuple(build_ledger(tmp_path).ledger)
     events = scenario_events()
     before = copy.deepcopy(events)
-    out = cost_report(ledger, events, unit_types=UNIT_TYPES)
+    out = cost_report(ledger, events, unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     json.dumps(out, allow_nan=False)
     assert events == before
-    assert cost_report(ledger, events, unit_types=UNIT_TYPES) == out  # a second call changes nothing
+    assert (
+        cost_report(ledger, events, unit_types=UNIT_TYPES, credit_usd=CREDIT_USD) == out
+    )  # a second call changes nothing
 
 
 # --- PL-01: profiles only, never a model id ---------------------------------------------------------------------
@@ -366,7 +374,7 @@ def test_FR_MTR_10_PL_01_the_report_names_profiles_and_never_a_model_id(tmp_path
     for e in events:
         e["summary"] = f"{hostile} said hello"
         e["trace"]["model_role"] = "specialist"
-    text = json.dumps(cost_report(ledger, events, unit_types=UNIT_TYPES))
+    text = json.dumps(cost_report(ledger, events, unit_types=UNIT_TYPES, credit_usd=CREDIT_USD))
     for model in ids:
         assert model not in text, f"model id {model!r} leaked into the cost report"
     assert f'"{FLASH}"' in text and f'"{LITE}"' in text
@@ -382,7 +390,7 @@ def test_FR_MTR_10_PL_01_a_model_id_recorded_as_a_profile_is_hidden_and_still_co
         "commit", "r_a1", "u_owner", "org_test", at("2026-06-07"), "U1", 8.0,
         usage=Usage(ids[0], 1, 1), price_effective_date="2026-06-01", price_source="Fake price sheet v2 for tests.",
     )  # fmt: skip
-    out = cost_report([*t.ledger, bad], scenario_events(), unit_types=UNIT_TYPES)
+    out = cost_report([*t.ledger, bad], scenario_events(), unit_types=UNIT_TYPES, credit_usd=CREDIT_USD)
     assert ids[0] not in json.dumps(out)
     assert near(out["totals"]["credits"], 330)
     assert near(row(out["by_profile"], profile=None)["credits"], 10)  # the plain commit's 2 plus this 8
@@ -429,7 +437,7 @@ UNITS = {run: {"U1": "research", "U2": "draft"} for run in RUNS}
 @given(worlds())
 def test_FR_MTR_10_property_every_grouping_partitions_the_ledgers_spend(world):
     entries, events = world
-    out = cost_report(entries, events, unit_types=UNITS)
+    out = cost_report(entries, events, unit_types=UNITS, credit_usd=CREDIT_USD)
     total = math.fsum(e.credits for e in entries)
     assert out["totals"]["credits"] == total
     for key in ("tasks", "by_tier", "by_profile", "by_task_type", "by_tier_profile"):
@@ -444,6 +452,26 @@ def test_FR_MTR_10_property_input_order_never_changes_the_report(world, rng):
     shuffled_entries, shuffled_events = list(entries), list(events)
     rng.shuffle(shuffled_entries)
     rng.shuffle(shuffled_events)
-    assert cost_report(shuffled_entries, shuffled_events, unit_types=UNITS) == cost_report(
-        entries, events, unit_types=UNITS
+    assert cost_report(shuffled_entries, shuffled_events, unit_types=UNITS, credit_usd=CREDIT_USD) == cost_report(
+        entries, events, unit_types=UNITS, credit_usd=CREDIT_USD
     )
+
+
+# --- credit_usd is required, and has one loader (follow-up of PR #434) -------------------------------------------
+
+
+def test_FR_MTR_10_credit_usd_is_a_required_keyword_with_no_default():
+    with pytest.raises(TypeError, match="credit_usd"):
+        cost_report([], [], unit_types={})  # type: ignore[call-arg]
+
+
+def test_FR_MTR_10_load_credit_usd_reads_the_prices_file_and_refuses_an_unreadable_one(tmp_path):
+    from pathlib import Path
+
+    from tilo_metering import MeteringConfigError
+    from tilo_metering.costs import load_credit_usd
+
+    prices = Path(__file__).resolve().parents[3] / "config" / "prices.yaml"
+    assert load_credit_usd(prices) == CREDIT_USD
+    with pytest.raises(MeteringConfigError):
+        load_credit_usd(tmp_path / "missing.yaml")

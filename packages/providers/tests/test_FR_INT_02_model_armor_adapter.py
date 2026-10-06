@@ -1030,7 +1030,7 @@ def test_FR_INT_02_model_armor_input_at_the_cap_is_screened():
 
 
 def _armor_config_with_cap(tmp_path, cap: int | None):
-    models = {
+    models: dict[str, Any] = {  # Any: mypy would infer `object` values and refuse the nested index below
         "example": True,
         "profiles": {
             "armor-default": {"provider": "model_armor", "model": TEMPLATE, "context": 1_000_000, "caps": []},

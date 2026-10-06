@@ -55,10 +55,13 @@ STAGES = ("intake", "approaches", "plan", "run", "narrate")
 OUTCOME_CLASSES = frozenset(
     {"completed", "held_at_gate", "needs_answers", "refused", "failed", "stopped_at_cap", "replay_miss", "rejected"}
 )
-SAFETY_NOTE = "trusted_bank_input (Model Armor not wired)"  # BQ-LE2E-5
+SAFETY_NOTE = (
+    "trusted_bank_input (by design; Model Armor is the safety role's live adapter, FR-INT-02, #450)"  # BQ-LE2E-5
+)
 SYNTHETIC_MARKER = "SYNTHETIC"  # a file beside `model-recordings/`: a fake provider wrote them (BQ-LE2E-9)
 FAKED = (  # what a run never does for real, printed with every report (HR-1: say what is not real)
-    "safety screen: trusted bank input only (Model Armor not wired)",
+    "safety screen: trusted bank input only, by design (Model Armor is the safety role's live adapter, "
+    "FR-INT-02, #450)",
     "connectors and recipient: recording mocks; no real mailbox, chat or Drive write",
     "Verifier verdict: recorded in the unit's summary, not acted on",
     "must-ask judgement: a fixed 'nothing to ask' stand-in, no model call; the deterministic rules still ask",
@@ -490,8 +493,9 @@ class TrustedBankInputScreen(SafetyProvider):
     """TRUSTED-BANK-INPUT: allows a text only if it is byte-identical (after CRLF to LF, as the bank digest does) to the
     brief, an attached file, the file names or the scripted answers of the committed bank case being run, whose own file
     hash it re-checks on every call; refuses everything else with a clear error. Nothing untrusted can reach a live
-    model through it. It is NOT a general safety provider (Model Armor is not wired), is never registered in the
-    factory and is used only by `just live-e2e`. A trusted text still gets the fake screen's injection-marker scan."""
+    model through it. It is NOT a general safety provider (Model Armor is the safety role's live adapter, FR-INT-02,
+    #450), is never registered in the factory and is used only by `just live-e2e`. A trusted text still gets the fake
+    screen's injection-marker scan."""
 
     def __init__(self, case: BankCase) -> None:
         self._path, self._file = case.path, _sha(case.path.read_text(encoding="utf-8"))
