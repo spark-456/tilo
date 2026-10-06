@@ -6,8 +6,9 @@
 // Defaults taken where the sources are silent (listed in the WEB-11 report):
 // - The Api has no connector write (README lists "connector reconnect/sync" as a server call to add), so
 //   connect, reconnect, level and disconnect are page-local state, as in the design (`st`, `lvl`).
-// - Fixture mode keeps the "Sample data" chip next to the title and the line "Sample data recorded for the
-//   demo, not your workspace" (plan 6.1); the shell's own chip is not under test here.
+// - The "Sample data" chip belongs to the shell (one chip in the WEB-3b top nav, AG-WEB ruling): the page
+//   renders no chip and no "Sample data recorded for the demo..." line, and that absence is pinned.
+// - The page takes only `{ app }` and reads through useParkApi() inside <ParkProvider> (WEB-3a).
 // - The design has no empty state for an empty search, so none is pinned: the counts say "0 connected".
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup } from "../../../../test-support/park/componentsHarness";
@@ -18,14 +19,15 @@ import {
   flush,
   hasExactText,
   labelled,
+  makeApp,
   renderPage,
+  spyApi,
   textOf,
   tileFor,
   typeInto,
   waitFor,
 } from "../../../../test-support/park/connectorsDom";
 import { connectors } from "../../api/fixtures";
-import { testApp } from "./testApp";
 
 afterEach(cleanup);
 
@@ -34,10 +36,11 @@ const on = connectors.filter((c) => c.st === "connected" || c.st === "attention"
 const avail = connectors.filter((c) => c.st === "available");
 
 async function open() {
-  const app = testApp();
-  const m = await renderPage(app);
+  const app = makeApp();
+  const api = spyApi();
+  const m = await renderPage(app, api);
   await waitFor(() => connectedTiles(m.container).length > 0, "the Connected tiles");
-  return { app, m, root: m.container };
+  return { app, api, m, root: m.container };
 }
 
 describe("WEB_11_connectors_render: every designed element", () => {
@@ -199,20 +202,16 @@ describe("WEB_11_connectors_search: filters both sections by name and category",
 });
 
 describe("WEB_11_connectors_honesty: fixture data is labelled, statuses come from data", () => {
-  it("WEB_11_connectors_honesty_sample_data_chip_and_line_are_shown_in_fixture_mode", async () => {
+  it("WEB_11_connectors_honesty_the_page_renders_no_sample_data_chip_or_line_the_shell_owns_it", async () => {
     const { root } = await open();
-    expect(countExactText(root, "Sample data")).toBeGreaterThanOrEqual(1);
-    expect(hasExactText(root, "Sample data recorded for the demo, not your workspace")).toBe(true);
-    const h1 = root.querySelector("h1") as HTMLElement;
-    const chip = [...root.querySelectorAll("*")].find((el) => textOf(el) === "Sample data");
-    expect(chip, "the chip is on the page, not hidden by display:none").toBeDefined();
-    expect((chip as HTMLElement).hidden).toBe(false);
-    // Next to the title: the closest element holding both is in the header, not the whole sheet.
-    let common: Element | null = h1;
-    while (common && !common.contains(chip as Element)) common = common.parentElement;
-    expect(common?.classList.contains("park-sheet"), "the chip sits in the title header").toBe(
-      false,
-    );
+    expect(countExactText(root, "Sample data")).toBe(0);
+    expect(textOf(root)).not.toContain("Sample data");
+    expect(hasExactText(root, "Sample data recorded for the demo, not your workspace")).toBe(false);
+  });
+
+  it("WEB_11_connectors_honesty_data_is_read_through_the_provided_api", async () => {
+    const { api } = await open();
+    expect(api.getConnectors).toHaveBeenCalled();
   });
 
   it("WEB_11_connectors_honesty_connected_status_appears_only_for_fixture_connected_tools", async () => {

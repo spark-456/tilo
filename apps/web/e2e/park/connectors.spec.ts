@@ -34,7 +34,6 @@ for (const [size, viewport] of Object.entries(SIZES)) {
         await expect(page.locator("[data-park]").first()).toBeAttached();
         await expect(page.locator('[aria-label="Connected"] button')).toHaveCount(6);
         await expect(page.getByLabel("Search connectors")).toBeVisible();
-        await expect(page.getByText("Sample data", { exact: true }).first()).toBeVisible();
         await page.waitForTimeout(500);
         expect(problems, problems.join("\n")).toEqual([]);
       });

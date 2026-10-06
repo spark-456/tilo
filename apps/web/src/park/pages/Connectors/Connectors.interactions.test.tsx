@@ -10,12 +10,15 @@
 //   "Connect" and "Reconnect"; the design has no such call, so app.go is NOT called here and the S-08
 //   consent hand-off is a live-mode follow-up (the shell's job once the Api has a connect endpoint).
 // - The design waits with setTimeout (1.4 s, 1.5 s). Page code may hold no timer until WEB-3b, so the wait
-//   is an awaited step: the completion must not depend on any timer (checked with fake timers).
+//   is an awaited step: the completion must not depend on any timer (checked with fake timers). ParkProvider's
+//   `schedule` is the store's seam (toast, page transition); WEB-3a exposes it to pages through no hook
+//   (useApp, useParkApi, useParkStore only), so the tests pin the awaited step, not a scheduled one.
 // - The design sends every "Used by" name that is not a skill to the Agenda (go("agenda"), no params).
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click } from "../../../../test-support/park/componentsHarness";
 import {
+  type TestApp,
   buttonText,
   connectButtons,
   connectedTiles,
@@ -23,13 +26,13 @@ import {
   flush,
   hasExactText,
   labelled,
+  makeApp,
   renderPage,
   textOf,
   tileFor,
   waitFor,
 } from "../../../../test-support/park/connectorsDom";
 import { connectors, skills } from "../../api/fixtures";
-import { testApp } from "./testApp";
 
 afterEach(() => {
   cleanup();
@@ -38,7 +41,7 @@ afterEach(() => {
 });
 
 async function open() {
-  const app = testApp();
+  const app = makeApp();
   const m = await renderPage(app);
   await waitFor(() => connectedTiles(m.container).length > 0, "the Connected tiles");
   return { app, m, root: m.container };
@@ -51,8 +54,8 @@ function openTile(root: HTMLElement, name: string): HTMLElement {
   return d as HTMLElement;
 }
 const radios = (d: HTMLElement) => [...d.querySelectorAll<HTMLElement>('[role="radio"]')];
-const lastToast = (app: ReturnType<typeof testApp>) => app.toast.mock.calls.at(-1);
-const toastCopy = (app: ReturnType<typeof testApp>, msg: string) => {
+const lastToast = (app: TestApp) => app.toast.mock.calls.at(-1);
+const toastCopy = (app: TestApp, msg: string) => {
   const call = lastToast(app);
   expect(call?.[0]).toBe(msg);
   expect(call?.[1], "the design's toast has no action").toBeUndefined();
@@ -153,7 +156,7 @@ describe("WEB_11_connectors_drawer: a tile opens the detail panel", () => {
 });
 
 describe("WEB_11_connectors_go: Used by sends people to skills or the Agenda", () => {
-  const goArgs = (app: ReturnType<typeof testApp>) => app.go.mock.calls.at(-1);
+  const goArgs = (app: TestApp) => app.go.mock.calls.at(-1);
 
   it("WEB_11_connectors_go_a_skill_name_opens_skills_with_its_id_and_closes_the_drawer", async () => {
     const { app, root } = await open();

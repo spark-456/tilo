@@ -1,21 +1,66 @@
-// WEB-11 test support: mounting and querying helpers for the Connectors page tests (happy-dom; the repo
-// has no @testing-library, see componentsHarness.tsx). The page is imported when a test asks for it, so a
-// test file can set its environment (the live Api) before the page module loads. Nothing here is bundled.
-import { act } from "react";
+// WEB-11 test support: mounts `<ConnectorsPage app>` inside the WEB-3a `<ParkProvider api schedule viewport>`
+// (the page takes only `{ app }` and reads data with useParkApi()), with the README AppCtx from appHarness
+// `stubApp`, an Api spy wrapper and DOM queries (happy-dom; the repo has no @testing-library). Same pattern as
+// teamHarness.ts. Lives here, not in the page folder, because park.static.test.ts reads page folder files as
+// park code (which may import nothing from outside park). No timers: the scheduler is the injected fake.
+import { type ReactElement, act, createElement } from "react";
+import { type Mock, vi } from "vitest";
+import { createFixtureApi } from "../../src/park/api/fixtureApi";
+import { API_METHODS, type Api, type ApiMethod } from "../../src/park/api/index";
 import type { AppCtx } from "../../src/park/app/AppCtx";
+import { ParkProvider } from "../../src/park/app/context";
+import { ConnectorsPage } from "../../src/park/pages/Connectors/ConnectorsPage";
+import { fakeScheduler, stubApp } from "./appHarness";
 import { type Mounted, mount } from "./componentsHarness";
 
-/** The page inside the same `data-park` root the shell gives it (day or night). */
-export async function renderPage(app: AppCtx, time: "day" | "night" = "day"): Promise<Mounted> {
-  const { ConnectorsPage } = await import("../../src/park/pages/Connectors/ConnectorsPage");
-  const m = mount(
-    <div data-park="" data-time={time}>
-      <ConnectorsPage app={app} />
-    </div>,
+export type TestApp = AppCtx & {
+  go: Mock<AppCtx["go"]>;
+  decide: Mock<AppCtx["decide"]>;
+  addWorld: Mock<AppCtx["addWorld"]>;
+  toast: Mock<AppCtx["toast"]>;
+  setPref: Mock<AppCtx["setPref"]>;
+};
+
+/** `stubApp("connectors", over)`: the README AppCtx on the connectors page, with spies on every action. */
+export function makeApp(over: Partial<AppCtx> = {}): TestApp {
+  return stubApp("connectors", over) as TestApp;
+}
+
+export type SpyApi = Api & { [M in ApiMethod]: Mock };
+
+/** The fixture Api with every method wrapped in a spy (results unchanged: `source: "fixture"`). */
+export function spyApi(base: Api = createFixtureApi()): SpyApi {
+  const entries = API_METHODS.map((m) => [
+    m,
+    vi.fn((...a: never[]) => (base[m] as (...args: unknown[]) => unknown)(...a)),
+  ]);
+  return Object.fromEntries(entries) as unknown as SpyApi;
+}
+
+export interface Rendered extends Mounted {
+  readonly api: Api;
+}
+
+/** The page inside `<ParkProvider api schedule viewport>` and the `data-park` root the shell gives it. */
+export async function renderPage(
+  app: AppCtx,
+  api: Api = createFixtureApi(),
+  time: "day" | "night" = "day",
+): Promise<Rendered> {
+  const sch = fakeScheduler();
+  const tree: ReactElement = createElement(
+    ParkProvider,
+    { api, schedule: sch.schedule, viewport: { vw: app.vw, vh: app.vh } },
+    createElement(
+      "div",
+      { "data-park": "", "data-time": time },
+      createElement(ConnectorsPage, { app }),
+    ),
   );
+  const m = mount(tree);
   // The page loads its data on mount; let that settle inside act so no update lands outside it.
   await flush();
-  return m;
+  return Object.assign(m, { api });
 }
 
 /** Polls (real timers, inside act) until `cond` holds; throws with `what` after about 2 s. */

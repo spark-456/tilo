@@ -374,9 +374,7 @@ describe("WEB_11_connectors_css: values match the reference", () => {
 describe("WEB_11_connectors_source: honesty and seams", () => {
   const files = (): string[] =>
     fs.existsSync(DIR)
-      ? fs
-          .readdirSync(DIR)
-          .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f) && f !== "testApp.ts")
+      ? fs.readdirSync(DIR).filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
       : [];
   const code = (f: string): string =>
     fs
@@ -389,6 +387,15 @@ describe("WEB_11_connectors_source: honesty and seams", () => {
     const page = code("ConnectorsPage.tsx");
     expect(page).toMatch(/export\s+(function|const)\s+ConnectorsPage\b/);
     expect(page).toMatch(/import\s+["']\.\/Connectors\.css["']/);
+  });
+
+  it("WEB_11_connectors_source_the_page_takes_only_app_and_reads_data_with_useParkApi", () => {
+    const page = code("ConnectorsPage.tsx");
+    expect(page).toMatch(/\buseParkApi\s*\(/);
+    expect(page).toMatch(/from\s+["']\.\.\/\.\.\/app\/context["']/);
+    expect(page, "the provider owns the Api, the page never builds one").not.toMatch(
+      /\bparkApi\s*\(|import\.meta\.env|createFixtureApi|createLiveApi/,
+    );
   });
 
   it("WEB_11_connectors_source_no_timer_no_raf_no_animation_api", () => {
