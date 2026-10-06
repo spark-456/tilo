@@ -152,7 +152,7 @@ def _screen(safety: SafetyProvider, strings: list[str]) -> None:
         return
     try:
         flagged = safety.check("\n".join(strings))["flagged"]
-    except (ProviderError, ReplayMissError) as exc:
+    except (ProviderError, ProviderConfigError, ReplayMissError) as exc:
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing changed.") from exc
     if flagged:
         raise HTTPException(status_code=422, detail="The safety screen flagged this change; rephrase it.")

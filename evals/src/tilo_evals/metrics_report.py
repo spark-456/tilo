@@ -6,9 +6,10 @@ Pure: the caller passes the build hash and the clock, so the same rows always gi
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
+from .latency import markdown_lines
 from .metrics import MetricRow
 
 CLAIM = (
@@ -36,12 +37,16 @@ def _cell(text: str) -> str:
     return text.replace("|", "\\|")
 
 
-def render_markdown(rows: Sequence[MetricRow], *, build_hash: str, now_utc: str) -> str:
+def render_markdown(
+    rows: Sequence[MetricRow], *, build_hash: str, now_utc: str, latency: Mapping[str, Any] | None = None
+) -> str:
     lines = ["# Metrics report (EV-01 to EV-15)", "", CLAIM, "", f"Build `{build_hash}`, generated {now_utc}.", ""]
     lines += [f"| {' | '.join(_HEADER)} |", f"| {' | '.join('---' for _ in _HEADER)} |"]
     for row in rows:
         cells = (row.id, row.name, row.basis or "-", _STATUS[row.status], _value(row), str(row.n), row.target)
         lines.append("| " + " | ".join(_cell(c) for c in cells) + " |")
+    if latency:
+        lines += ["", "## Latency (NFR-02, NFR-03, NFR-05)", "", *markdown_lines(dict(latency))]
     lines += ["", "## Method and gaps", ""]
     lines += [f"- **{row.id} {row.name}.** {row.method} {row.note}" for row in rows]
     return "\n".join(lines) + "\n"

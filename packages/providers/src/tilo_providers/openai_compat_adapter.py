@@ -18,7 +18,14 @@ import httpx
 from tilo_contracts import ProvidersProfile
 
 from tilo_providers.errors import ProviderError, SafetyError, map_http_status, map_transport_error
-from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
+from tilo_providers.interfaces import (
+    Capability,
+    GenerateRequest,
+    GenerateResponse,
+    ModelProvider,
+    PriceQuote,
+    cached_tokens_or_none,
+)
 
 _CLEAN_TOKEN_RE = re.compile(r"^[\x21-\x7e]+$")  # printable ASCII, no whitespace or control characters
 _MAX_ERROR_MESSAGE_LEN = 500
@@ -166,6 +173,13 @@ class OpenAICompatModelProvider(ModelProvider):
                 "output_tokens": usage_raw.get("completion_tokens", 0),
                 "total_tokens": usage_raw.get("total_tokens", 0),
             }
+            # EFF-04: NIM and others often leave prompt_tokens_details out; that is unknown, not 0.
+            details = usage_raw.get("prompt_tokens_details")
+            cached = cached_tokens_or_none(
+                details.get("cached_tokens") if isinstance(details, dict) else None, usage["input_tokens"]
+            )
+            if cached is not None:
+                usage["cached_tokens"] = cached
         return GenerateResponse(
             text=message.get("content"), profile_id=self._profile_id, tool_calls=tool_calls, usage=usage
         )
@@ -181,15 +195,24 @@ class OpenAICompatModelProvider(ModelProvider):
             return {"type": "json_object"}
         return None
 
-    def generate(self, request: GenerateRequest) -> GenerateResponse:
-        body: dict[str, Any] = {"model": self._profile.model, "messages": self._messages(request)}
+    def _body(self, request: GenerateRequest, *, stream: bool = False) -> dict[str, Any]:
+        # EFF-04 stable prefix: the static parts (tool definitions, response schema) come before `messages`, which
+        # holds the system prompt and then the per-call text; the per-call limits go last.
+        body: dict[str, Any] = {"model": self._profile.model}
         if request.tools is not None:
             body["tools"] = request.tools
-        if request.max_output_tokens is not None:
-            body["max_tokens"] = request.max_output_tokens
         response_format = self._response_format(request)
         if response_format is not None:
             body["response_format"] = response_format
+        body["messages"] = self._messages(request)
+        if request.max_output_tokens is not None:
+            body["max_tokens"] = request.max_output_tokens
+        if stream:
+            body["stream"] = True
+        return body
+
+    def generate(self, request: GenerateRequest) -> GenerateResponse:
+        body = self._body(request)
 
         response = self._post("/chat/completions", body)
         self._raise_for_status(response)
@@ -201,14 +224,7 @@ class OpenAICompatModelProvider(ModelProvider):
             raise ProviderError(self._scrub(f"PL-02: provider response missing {error}")) from None
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
-        body: dict[str, Any] = {"model": self._profile.model, "messages": self._messages(request), "stream": True}
-        if request.tools is not None:
-            body["tools"] = request.tools
-        if request.max_output_tokens is not None:
-            body["max_tokens"] = request.max_output_tokens
-        response_format = self._response_format(request)
-        if response_format is not None:
-            body["response_format"] = response_format
+        body = self._body(request, stream=True)
 
         # `client.stream()` keeps the connection open so each SSE line is
         # yielded as it arrives, instead of only after the body completes.

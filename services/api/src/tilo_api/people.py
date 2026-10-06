@@ -1,0 +1,217 @@
+"""The people API (PPL-11a; docs/prd-addendum-people-agents.md, ADR-0020/0021, services/api/tests/API_PPL_11a.md).
+Slices A to C: the evidence-quote routes, the plate and the writes (`people_writes.py`). Every route sits behind the
+SEC-15 gate (none is public), takes the person from the verified `deps.Principal` (the session's world role neither
+grants nor takes away), and reads one org only (`deps.ORG_ID`, at call time). It makes no model call and builds no
+router. One 404 body for every refusal; 422 for a bad shape before any lookup; 503 `not_configured` for an unwired seam
+and 503 for a store that cannot be read.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Callable
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
+from tilo_memory.artifacts import ArtifactStore
+from tilo_people.stores import PeopleStores
+
+from tilo_api import deps
+from tilo_api.people_plate import build_plate
+from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
+from tilo_api.people_writes import (
+    Empty,
+    ItemIn,
+    MeetingIn,
+    PersonIn,
+    Refusal,
+    Writer,
+    confirm_item,
+    confirm_minutes,
+    create_item,
+    create_meeting,
+    create_person,
+    json_body,
+)
+
+_MEETING_ID = re.compile(r"mt_[0-9A-Za-z_]{1,48}")
+_ITEM_ID = re.compile(r"wi_[0-9A-Za-z_]{1,48}")
+_IDS = r"^u[0-9]{4,6}(,u[0-9]{4,6}){0,19}$"  # 1 to 20 utterance ids, comma separated
+
+
+class _PeopleRoute(APIRoute):
+    """A seam with no production wiring raises `NotImplementedError` (T4's artifact store and redactor): 503
+    `not_configured`, like the seams that raise it as an HTTP error."""
+
+    def get_route_handler(self) -> Callable[[Request], Any]:
+        handler = super().get_route_handler()
+
+        async def guarded(request: Request) -> Response:
+            """Every answer, refusals included, is `Cache-Control: no-store` (PE-22: no copy outlives the request)."""
+            try:
+                response = await handler(request)
+            except NotImplementedError:
+                response = JSONResponse(status_code=503, content={"detail": "not_configured"})
+            except HTTPException as refusal:
+                extra = refusal.extra if isinstance(refusal, Refusal) else {}
+                response = JSONResponse(
+                    status_code=refusal.status_code,
+                    content={"detail": refusal.detail, **extra},
+                    headers=refusal.headers,
+                )
+            response.headers["Cache-Control"] = "no-store"
+            return response
+
+        return guarded
+
+
+router = APIRouter(route_class=_PeopleRoute)
+
+
+def _not_found() -> HTTPException:
+    return HTTPException(status_code=404, detail="not_found")  # one body whatever the cause: no oracle
+
+
+def _unreadable() -> HTTPException:
+    return HTTPException(status_code=503, detail="unavailable")
+
+
+def _answer(found: Callable[[], dict[str, Any] | None]) -> dict[str, Any]:
+    """404 for a refusal, 503 for anything the stores or the artifact store cannot give (never a 500, never a
+    partial answer; no record text in either body)."""
+    try:
+        answer = found()
+    except HTTPException:
+        raise
+    except Exception:
+        raise _unreadable() from None
+    if answer is None:
+        raise _not_found()
+    return answer
+
+
+@router.get("/v1/meetings/{meeting_id}/quotes")
+def meeting_quotes_route(
+    meeting_id: str,
+    ids: Annotated[str, Query(pattern=_IDS)],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The meeting owner's quotes, one per id in the order asked (PE-23)."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    reader = Reader(stores, artifacts, redact, deps.ORG_ID, principal.user_id, clock())
+    return _answer(lambda: meeting_quotes(reader, meeting_id, ids.split(",")))
+
+
+@router.get("/v1/work-items/{work_item_id}/quote")
+def work_item_quote_route(
+    work_item_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The one quote a work item's owner gets (PE-23). It takes no argument: nothing can ask for a second quote."""
+    if _ITEM_ID.fullmatch(work_item_id) is None:
+        raise _not_found()
+    reader = Reader(stores, artifacts, redact, deps.ORG_ID, principal.user_id, clock())
+    return _answer(lambda: item_quote(reader, work_item_id))
+
+
+@router.get("/v1/plate")
+def plate_route(
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    sources: Annotated[deps.PlateSources, Depends(deps.get_plate_sources)],
+    owners: Annotated[deps.SourceOwners, Depends(deps.get_source_owners)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The signed-in person's own plate (PE-26): nothing in the request names a person, so none can be asked for. A
+    person with no record is a 404 (the sources are not asked); a source that fails is a 503, never a partial plate."""
+    now = clock()
+    return _answer(lambda: build_plate(stores, sources, owners, deps.ORG_ID, principal.user_id, now))
+
+
+def _writer(
+    principal: deps.Principal,
+    stores: PeopleStores,
+    clock: Callable[[], str],
+    redact: Callable[[str], str] | None = None,
+) -> Writer:
+    return Writer(stores, deps.ORG_ID, principal.user_id, clock(), *(() if redact is None else (redact,)))
+
+
+@router.post("/v1/meetings/{meeting_id}/confirm")
+def confirm_meeting_route(
+    meeting_id: str,
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The meeting owner confirms the minutes: the stamp is the owner and the server clock (PE-05, PE-07)."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    return _answer(lambda: confirm_minutes(_writer(principal, stores, clock), meeting_id))
+
+
+@router.post("/v1/work-items/{work_item_id}/confirm")
+def confirm_work_item_route(
+    work_item_id: str,
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The assigner confirms a proposed item; nobody else can see it exists (PE-03, PE-07)."""
+    if _ITEM_ID.fullmatch(work_item_id) is None:
+        raise _not_found()
+    return _answer(lambda: confirm_item(_writer(principal, stores, clock), work_item_id))
+
+
+@router.post("/v1/meetings", status_code=201)
+def create_meeting_route(
+    body: Annotated[MeetingIn, Depends(json_body(MeetingIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """A person of the org adds a meeting; the server mints the id and stamps the attestation (PE-18)."""
+    return _answer(lambda: create_meeting(_writer(principal, stores, clock, redact), body))
+
+
+@router.post("/v1/people", status_code=201)
+def create_person_route(
+    body: Annotated[PersonIn, Depends(json_body(PersonIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """An org owner adds a person; the server mints the id and the org is `deps.ORG_ID` (PE-17)."""
+    return _answer(lambda: create_person(_writer(principal, stores, clock, redact), body))
+
+
+@router.post("/v1/work-items", status_code=201)
+def create_work_item_route(
+    request: Request,
+    body: Annotated[ItemIn, Depends(json_body(ItemIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """A person adds their own item; a mail or request source is checked against its owner (PE-08)."""
+
+    def owners() -> deps.SourceOwners:  # resolved only when the source is mail or a request
+        return request.app.dependency_overrides.get(deps.get_source_owners, deps.get_source_owners)()  # type: ignore[no-any-return]
+
+    return _answer(lambda: create_item(_writer(principal, stores, clock, redact), body, owners))
