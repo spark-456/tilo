@@ -168,7 +168,7 @@ export function useApp(): AppCtx {
 
 /**
  * The `app` a page receives: `useApp()` with `go` sending a world through the loader first (README: opening
- * a world always runs the WorldLoader), everything else straight to its page. `useApp().go` itself stays
+ * a world always runs the WorldLoader), everything else (a world without an id too: the worlds list) straight to its page. `useApp().go` itself stays
  * immediate, so the shell has one way to jump without the loader.
  */
 export function usePageApp(): AppCtx {
@@ -178,7 +178,7 @@ export function usePageApp(): AppCtx {
     () => ({
       ...app,
       go: (page, params) =>
-        page === "world" ? store.openWorld(params?.id ?? "k1") : store.go(page, params),
+        page === "world" && params?.id ? store.openWorld(params.id) : store.go(page, params),
     }),
     [app, store],
   );

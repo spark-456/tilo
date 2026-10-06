@@ -4,7 +4,7 @@ import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/
 // context.tsx. State is replaced on every change, never mutated. The one timer is the toast's, and it
 // is injected as `schedule` so a test never waits.
 import type { Api } from "../api/index";
-import type { Dec, DecisionKey, Source, TierKey, World } from "../api/types";
+import type { Dec, Decision, DecisionKey, Source, TierKey, World } from "../api/types";
 import { TOAST_MS } from "../components/Toast";
 import type { Motion, PageId, Params } from "./AppCtx";
 import { parkPath } from "./router";
@@ -60,6 +60,8 @@ export interface ParkStore {
   closeMenu(): void;
   markRead(): void;
   noteSource(source: Source): void;
+  /** The decisions the Api returned (their toast copy). Until they arrive, a toast says a plain line. */
+  setDecisions(list: readonly Decision[]): void;
   /** Cancels every timer the store holds (the toast's and the loader's). */
   dispose(): void;
 }
@@ -81,10 +83,12 @@ const derive = (prefs: Record<string, unknown>, dec: Dec) => ({
   needsLeft: countNeedsLeft(dec),
 });
 
-const DECIDED: Record<DecisionKey, string> = {
-  depot: "Approved £3,420 for Laptop Depot",
-  mail: "Supplier brief sent to 3 suppliers",
-};
+/** What the toast says when an item is decided: the designed copy of the Api's decision, else a plain line
+ * built from the item's own fields (the Api may not have it: live mode before the endpoint exists). */
+function decidedText(decision: Decision | undefined): string {
+  if (!decision) return "Decision recorded";
+  return decision.toast || `${decision.title}: ${decision.done}`;
+}
 
 export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): ParkStore {
   let state: ParkState = {
@@ -99,6 +103,8 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
     ...derive({}, {}),
   };
   const listeners = new Set<() => void>();
+  // The decisions with their designed copy, handed over by the shell once the Api has returned them.
+  let decisions: readonly Decision[] = [];
   let cancelToast: (() => void) | null = null;
   let cancelLoader: (() => void) | null = null;
 
@@ -158,7 +164,7 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
       quiet(api.decide(key));
       update({
         dec: { ...state.dec, [key]: true },
-        toast: arm(DECIDED[key], "Undo", () => undo(key)),
+        toast: arm(decidedText(decisions.find((d) => d.k === key)), "Undo", () => undo(key)),
       });
     },
     undo,
@@ -228,6 +234,9 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
     noteSource(source) {
       if (state.sources[source]) return;
       set({ ...state, sources: { ...state.sources, [source]: true } });
+    },
+    setDecisions(list) {
+      decisions = list;
     },
     dispose() {
       stopLoader();

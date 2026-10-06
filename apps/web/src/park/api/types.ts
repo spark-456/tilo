@@ -36,6 +36,10 @@ export interface Decision {
   yes: string;
   icon: string;
   done: string;
+  /** Additive designed copy (the reference shell's toast when this is approved). */
+  toast: string;
+  /** Additive designed copy (the notification title once this is approved). */
+  approvedTitle: string;
 }
 
 export type TierName = "Village" | "Town" | "City";

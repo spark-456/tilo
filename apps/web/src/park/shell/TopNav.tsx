@@ -30,6 +30,8 @@ export interface TopNavProps {
   unread: boolean;
   initials: string;
   sample: boolean;
+  /** The team's name, for the sample chip's explanation. */
+  org: string | null;
   /** The Api is the fixture one, so the chip is coming: keep its place so it moves nothing when it shows. */
   reserveSample: boolean;
   /** The boot splash is up: the nav is laid out but not shown. */
@@ -86,7 +88,7 @@ export function TopNav(p: TopNavProps) {
         })}
       </nav>
       <div className="park-shell__tools">
-        {p.sample ? <SampleChip /> : p.reserveSample ? <SampleChip ghost /> : null}
+        {p.sample ? <SampleChip org={p.org} /> : p.reserveSample ? <SampleChip ghost /> : null}
         <button
           type="button"
           aria-label={timeLabel}

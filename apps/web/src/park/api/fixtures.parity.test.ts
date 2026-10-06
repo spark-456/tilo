@@ -2,11 +2,48 @@
 // design prototype's data transcribed verbatim. The prototype (design_handoff_tilo_web_app/design/
 // tilo-app.js) runs in a Node vm; every data member and every function result must match the TS
 // fixtures (JSON-normalised: same strings, numbers and order).
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadPrototypeData, norm } from "../../../test-support/park/prototype";
+import { HANDOFF_DIR, loadPrototypeData, norm } from "../../../test-support/park/prototype";
 import * as fx from "./fixtures";
 
 const proto = loadPrototypeData();
+
+// ADDITIVE members (WEB-3b): designed copy the reference shell hard-codes (`design/Tilo App.dc.html`) that the
+// prototype's data does not carry. Superset check: every prototype property still deep-equals; only the paths
+// listed here may be extra (`[]` = each array item), and each is pinned to the string the reference shell
+// contains. A lane that needs another additive member adds one entry here and one in
+// scripts/park-fixtures.mjs; drift in any other property of the prototype's data still fails.
+const ADDITIVE_PATHS: Record<string, readonly string[]> = {
+  decisions: ["[].toast", "[].approvedTitle"],
+};
+const ADDITIVE_VALUES: readonly (readonly [
+  member: string,
+  find: string,
+  path: string,
+  value: string,
+])[] = [
+  ["decisions", "depot", "toast", "Approved £3,420 for Laptop Depot"],
+  ["decisions", "mail", "toast", "Supplier brief sent to 3 suppliers"],
+  ["decisions", "depot", "approvedTitle", "You approved Laptop Depot"],
+  ["decisions", "mail", "approvedTitle", "You sent the supplier brief"],
+];
+
+/** `value` without the additive paths of `member` (arrays are walked at `[]`). */
+function withoutAdditive(member: string, value: unknown): unknown {
+  const drop = (v: unknown, segs: readonly string[]): unknown => {
+    const [head, ...rest] = segs;
+    if (head === undefined) return v;
+    if (head === "[]") return Array.isArray(v) ? v.map((x) => drop(x, rest)) : v;
+    if (typeof v !== "object" || v === null) return v;
+    const o = { ...(v as Record<string, unknown>) };
+    if (rest.length === 0) delete o[head];
+    else if (head in o) o[head] = drop(o[head], rest);
+    return o;
+  };
+  return (ADDITIVE_PATHS[member] ?? []).reduce((v, p) => drop(v, p.split(".")), value);
+}
 
 const DEC_COMBOS = [
   { depot: false, mail: false },
@@ -40,7 +77,6 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
   it.each([
     "user",
     "today",
-    "decisions",
     "skills",
     "learn",
     "ledger",
@@ -52,6 +88,23 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
     "LEVELS",
   ] as const)("WEB_1a_fixtures_match_prototype %s is identical to the prototype", (name) => {
     expect(norm(fx[name]), `fixtures.${name} differs from tilo-app.js`).toEqual(norm(proto[name]));
+  });
+
+  it("WEB_1a_fixtures_match_prototype decisions: the prototype's own data is identical, only the listed paths are extra", () => {
+    expect(norm(withoutAdditive("decisions", fx.decisions))).toEqual(norm(proto.decisions));
+  });
+
+  it("WEB_1a_fixtures_match_prototype additive members: every listed path exists and holds the reference shell's string", () => {
+    const reference = fs.readFileSync(path.join(HANDOFF_DIR, "design", "Tilo App.dc.html"), "utf8");
+    for (const [member, k, key, want] of ADDITIVE_VALUES) {
+      const item = (fx[member as "decisions"] as unknown as Record<string, string>[]).find(
+        (d) => d.k === k,
+      );
+      expect(item?.[key], `${member}.${k}.${key}`).toBe(want);
+      expect(reference, `the reference shell has "${want}"`).toContain(want);
+    }
+    // no extra key outside the listed ones: stripping them leaves exactly the prototype's keys (the test above)
+    expect(Object.keys(ADDITIVE_PATHS)).toEqual(["decisions"]);
   });
 
   it("WEB_1a_fixtures_match_prototype the merged final state is what is transcribed (skills, ledger, team)", () => {
