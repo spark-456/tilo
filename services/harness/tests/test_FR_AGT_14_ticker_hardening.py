@@ -122,13 +122,28 @@ def test_FR_AGT_14_a_skipped_start_that_advances_moves_to_the_next_slot_and_back
 
 def test_FR_AGT_14_a_skipped_start_that_does_not_advance_keeps_the_slot_for_a_retry() -> None:
     rig = make_tick_rig()
-    rig.starter.fail_next(1, exc=StartSkipped("run_seams_unwired", advance=False))
+    rig.starter.fail_next(1, exc=StartSkipped("snapshot_missing", advance=False))
     assert rig.ticker.tick().fired == 0
     got = rig.store.get("sched_a")
-    assert (got.next_due, got.failures, got.last_error) == (MON_0330Z, 1, "run_seams_unwired")
+    assert (got.next_due, got.failures, got.last_error) == (MON_0330Z, 1, "snapshot_missing")
     assert rig.ticker.tick().fired == 0  # backed off
     rig.clock.set(got.backoff_until)
     assert rig.ticker.tick().fired == 1
+    assert rig.starter.attempts[0].idempotency_key == rig.starter.attempts[1].idempotency_key
+
+
+def test_FR_AGT_14_a_skipped_start_that_does_not_count_keeps_the_slot_with_no_failure_and_no_backoff() -> None:
+    """FR-AGT-14d item 3 (this pinned `failures == 1` and a backoff for `run_seams_unwired` in FR-AGT-14b; changed
+    deliberately): with `count=False` the claim is released and nothing is recorded; the slot is claimable at once."""
+    rig = make_tick_rig()
+    rig.starter.fail_next(1, exc=StartSkipped("run_seams_unwired", count=False))
+    assert rig.ticker.tick().fired == 0
+    got = rig.store.get("sched_a")
+    assert (got.next_due, got.failures, got.last_error, got.backoff_until) == (MON_0330Z, 0, None, None)
+    assert got.enabled is True
+    assert rig.store.claim("sched_a", MON_0330Z) is True  # the claim was released (and then this test takes it)
+    rig.store.release("sched_a", MON_0330Z)
+    assert rig.ticker.tick().fired == 1  # no backoff to wait out: the very next tick fires the same slot
     assert rig.starter.attempts[0].idempotency_key == rig.starter.attempts[1].idempotency_key
 
 

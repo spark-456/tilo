@@ -27,6 +27,8 @@ import json
 import logging
 import os
 import secrets
+import threading
+import time
 import unicodedata
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
@@ -54,6 +56,7 @@ from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
 from tilo_api import deps, dev, events, runs
+from tilo_api.access import Mode
 from tilo_api.tasks import _json_body
 
 logger = logging.getLogger("tilo_api.schedules")
@@ -99,6 +102,19 @@ def get_clock() -> Callable[[], datetime]:
     return lambda: datetime.now(UTC)
 
 
+def get_schedule_store_factory(request: Request) -> Callable[[], ScheduleRepository]:
+    """Builds nothing: the tick calls the factory only after its token passed. Honours an override of
+    `get_schedule_store` the way FastAPI would (the rigs install one)."""
+    return lambda: request.app.dependency_overrides.get(get_schedule_store, get_schedule_store)()
+
+
+def get_seams_factory(
+    request: Request, mode: Annotated[Mode, Depends(deps.get_mode)]
+) -> Callable[[], runs.Seams | None]:
+    """Builds nothing (about 80 ms when called): `runs.run_seams`, overrides included, for the tick to call after it."""
+    return lambda: runs.run_seams(request, mode)
+
+
 def _unverified(token: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """The header and claims of a JWT, NOT verified: only to refuse what is plainly not a Google token."""
     parts = token.split(".")
@@ -113,24 +129,117 @@ def _unverified(token: str) -> tuple[dict[str, Any], dict[str, Any]]:
     return header, claims
 
 
+CERT_URL = "https://www.googleapis.com/oauth2/v1/certs"  # Google's public signing certificates, `{kid: x509 PEM}`
+CERT_TTL_S = 900.0  # a fetched set is trusted this long, counted from the fetch (never from the last use)
+CERT_FETCH_TIMEOUT_S = 3.0  # google-auth's own default is 120 s, which would hold a request thread for two minutes
+CERT_RETRY_COOLDOWN_S = 10.0  # after ANY fetch attempt (cold, expired, unknown kid, failed) no other starts this soon
+_REFETCH_MIN_S = 30.0  # an unknown key id inside the TTL refetches at most this often, whatever the cooldown says
+
+
 class GoogleOidcVerifier:
-    """google-auth's ID-token check behind the `OidcVerifier` Protocol. A token that is not a JWT with a Google
-    RS256 key id, issuer and our audience is refused from its own header and claims BEFORE any certificate fetch."""
+    """google-auth's ID-token check behind the `OidcVerifier` Protocol, with a bounded and cached certificate fetch.
+
+    A token that is not a JWT with a Google RS256 key id, issuer and our audience is refused from its own header and
+    claims BEFORE any certificate fetch. Those checks only use public values, so anyone can pass them: the fetch is
+    therefore single-flight and rate limited. The certificates live in one immutable snapshot, swapped whole after a
+    successful fetch and read without any lock, so a known key id on a fresh snapshot never waits for a refresh. A
+    refresh takes a lock with a NON-blocking acquire: a caller that finds a fetch in flight is refused at once, so at
+    most one thread is ever inside a fetch. Every attempt, failed ones too, starts a cooldown of
+    `CERT_RETRY_COOLDOWN_S`; an unknown key id inside the TTL also waits `_REFETCH_MIN_S` since the last fetch or
+    attempt. A failed fetch stores nothing, and a snapshot older than `CERT_TTL_S` (counted from the fetch) is never
+    served: a failed refresh past the TTL clears it. `transport` has google-auth's `Request` shape; `clock` (seconds)
+    only ages the cache."""
+
+    def __init__(
+        self, *, transport: Callable[..., Any] | None = None, clock: Callable[[], float] = time.monotonic
+    ) -> None:
+        self._transport, self._clock = transport, clock
+        self._lock = threading.Lock()  # held by the one thread inside a fetch; never waited for
+        self._snapshot: tuple[dict[str, str], float] | None = None  # (certificates, fetched_at); never mutated in place
+        self._tried_at = float("-inf")  # when the last fetch attempt started, whatever became of it
+
+    def _fetch(self) -> dict[str, str]:
+        if self._transport is None:
+            from google.auth.transport import requests as grequests
+
+            self._transport = grequests.Request()
+        response = self._transport(CERT_URL, method="GET", timeout=CERT_FETCH_TIMEOUT_S)
+        if response.status != 200:
+            raise ValueError("certificate fetch failed")
+        certs = json.loads(response.data)
+        if (
+            not isinstance(certs, dict)
+            or not certs
+            or not all(isinstance(k, str) and isinstance(v, str) for k, v in certs.items())
+        ):
+            raise ValueError("certificate fetch returned no certificates")
+        return certs
+
+    def _usable(self, kid: str, now: float) -> dict[str, str] | None:
+        """The certificates to verify with, or None when a fetch is due. Raises when the set is stale and a fetch may
+        not start yet. Reads the snapshot and the attempt time once each, without the lock."""
+        snapshot, tried = self._snapshot, self._tried_at
+        if snapshot is not None and 0 <= now - snapshot[1] < CERT_TTL_S:
+            certs, fetched = snapshot
+            if kid in certs or now - max(fetched, tried) < _REFETCH_MIN_S:
+                return certs  # an unknown kid this soon after an attempt is refused (by the decode), not fetched for
+        if 0 <= now - tried < CERT_RETRY_COOLDOWN_S:
+            raise ValueError("certificates unavailable")  # stale, cold or an unknown kid: refused, no fetch
+        return None
+
+    def _certificates(self, kid: str) -> dict[str, str]:
+        now = self._clock()
+        certs = self._usable(kid, now)
+        if certs is not None:
+            return certs
+        if not self._lock.acquire(blocking=False):
+            raise ValueError("certificate refresh in flight")  # fail fast: never queue behind a fetch
+        try:
+            now = self._clock()
+            certs = self._usable(kid, now)  # a fetch that finished since the first look may have settled it
+            if certs is not None:
+                return certs
+            self._tried_at = now
+            try:
+                fetched = self._fetch()
+            except Exception:
+                snapshot = self._snapshot
+                if snapshot is None or not 0 <= now - snapshot[1] < CERT_TTL_S:
+                    self._snapshot = None  # past the TTL a failed refresh never serves the old set
+                raise
+            self._snapshot = (fetched, now)
+            return fetched
+        finally:
+            self._lock.release()
 
     def verify(self, token: str, audience: str) -> Mapping[str, Any]:
         header, claims = _unverified(token)
-        if header.get("alg") != "RS256" or not isinstance(header.get("kid"), str):
+        kid = header.get("kid")
+        if header.get("alg") != "RS256" or not isinstance(kid, str) or not kid:
             raise ValueError("not a Google-signed token")
         if claims.get("iss") not in GOOGLE_ISSUERS or claims.get("aud") != audience:
             raise ValueError("not a token for this service")
-        from google.auth.transport import requests as grequests
-        from google.oauth2 import id_token
+        from google.auth import jwt
 
-        return id_token.verify_oauth2_token(token, grequests.Request(), audience, clock_skew_in_seconds=10)
+        verified = jwt.decode(
+            token, certs=self._certificates(kid), verify=True, audience=audience, clock_skew_in_seconds=10
+        )
+        if verified.get("iss") not in GOOGLE_ISSUERS:
+            raise ValueError("not a Google-signed token")
+        return verified
+
+
+_verifier: GoogleOidcVerifier | None = None
+_verifier_lock = threading.Lock()
 
 
 def get_oidc_verifier() -> OidcVerifier:
-    return GoogleOidcVerifier()
+    """ONE shared verifier, so its certificate cache lives across requests."""
+    global _verifier
+    with _verifier_lock:
+        if _verifier is None:
+            _verifier = GoogleOidcVerifier()
+        return _verifier
 
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
@@ -310,8 +419,10 @@ class ScheduleStarter:
             raise StartSkipped("owner_mismatch")
         if record.brief is None or record.approach is None:
             raise StartSkipped("snapshot_missing")
+        if not record.enabled:  # claimed just before `disable_for_owner` or a pause: read again here, after the claim
+            raise StartSkipped("schedule_disabled", count=False)
         if self._seams is None:
-            raise StartSkipped("run_seams_unwired")
+            raise StartSkipped("run_seams_unwired", count=False)  # the whole service, not this schedule: not counted
         digest = _digest(run.idempotency_key)
         world_id, run_id, owner, store = f"w_s{digest}", f"r_s{digest}", record.owner_user_id, self._store
         with store.grant_lock(owner):  # one owner's grants at a time: daily limits count every earlier grant
@@ -375,14 +486,15 @@ def _bearer(request: Request) -> str | None:
 def tick(
     request: Request,
     config: Annotated[tuple[str, str], Depends(_tick_config)],
-    schedules: Schedules,
+    schedule_store: Annotated[Callable[[], ScheduleRepository], Depends(get_schedule_store_factory)],
+    seams_factory: Annotated[Callable[[], runs.Seams | None], Depends(get_seams_factory)],
     verifier: Annotated[OidcVerifier, Depends(get_oidc_verifier)],
     clock: Clock,
     flags: Flags,
     store: StoreDep,
-    seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
 ) -> Any:
-    """No body and no query are read: nothing a caller sends selects a schedule or sets the time."""
+    """No body and no query are read: nothing a caller sends selects a schedule or sets the time. The schedule store and
+    the run seams are built only after the token passed (an anonymous call costs neither), once per request."""
     audience, caller = config
     token = _bearer(request)
     if token is None:
@@ -390,10 +502,19 @@ def tick(
     try:
         claims = verifier.verify(token, audience)
         allowed = isinstance(claims, Mapping) and tick_caller_ok(claims, audience=audience, caller=caller)
-    except Exception:  # bad signature, expiry, audience or a verifier outage: not an accepted caller
+    except Exception as exc:  # bad signature, expiry, audience or a verifier outage: not an accepted caller
+        logger.warning("schedule tick token refused (%s)", type(exc).__name__)  # the type only: no text, no traceback
         return JSONResponse({"detail": "Unauthorized"}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
     if not allowed:
         return JSONResponse({"detail": "Forbidden"}, status_code=403)
+    try:
+        schedules = schedule_store()
+        seams = seams_factory()
+    except HTTPException as exc:  # no store configured: closed, with the fixed code the routes use
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+    except Exception as exc:
+        logger.error("schedule tick could not be set up (%s)", type(exc).__name__)
+        return JSONResponse({"detail": "tick failed"}, status_code=500)
 
     def alert(world_id: str, fields: dict[str, Any]) -> None:
         assert seams is not None  # an alert follows a fired run, which needs the seams
