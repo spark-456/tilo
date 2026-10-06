@@ -288,6 +288,29 @@
     white-space: nowrap;
   }
 }
+/* Narrow phones: in the reference nav (wordmark + three buttons) the Home tab gets ~78px at 390 and needs 68. Here the
+   chip is only its dot and gives back the pill chrome and the tools gap, so it takes ~4px of the strip (dot 8px, tools gap -4px) and Home stays whole at 390
+   (the reference itself scrolls the strip below ~380). The click area stays large. */
+@media (max-width: 430px) {
+  [data-park] .park-shell__sample {
+    position: relative;
+    margin: 0 -4px 0 0;
+  }
+  [data-park] .park-shell__sample::before {
+    content: "";
+    position: absolute;
+    inset: -8px -2px;
+  }
+  /* The invisible boot ghost must never take a tap meant for the next button. */
+  [data-park] .park-shell__sample.park-shell__booting::before {
+    pointer-events: none;
+  }
+  [data-park] .park-shell__sample .park-chip {
+    height: auto;
+    padding: 0;
+    background: transparent;
+  }
+}
 
 /* ---- Notifications popover (392 wide, right 60 as measured) ---- */
 [data-park] .park-popover.park-shell__notif {
