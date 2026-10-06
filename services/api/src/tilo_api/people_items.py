@@ -14,7 +14,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Annotated, Any
 
-from pydantic import StringConstraints, model_validator
+from pydantic import StringConstraints, field_validator, model_validator
 from tilo_people.access import AccessRequest, decide, read
 from tilo_people.dates import resolve_due
 from tilo_people.directory import Directory
@@ -48,6 +48,12 @@ class EditIn(_Closed):
 
 class SnoozeIn(_Closed):
     until: Timestamp
+
+    @field_validator("until")
+    @classmethod
+    def _a_real_date(cls, until: str) -> str:
+        datetime.strptime(until, _TS)  # a date that does not exist (2026-02-30) is a malformed timestamp: 422
+        return until
 
 
 def _nf() -> Refusal:
@@ -121,6 +127,8 @@ def change_item(w: Writer, item_id: str, access: str, build: Build) -> dict[str,
     request = AccessRequest(w.actor, access, "work_item", item, w.now, meeting=_meeting(w, item))
     if not decide(request, d).allowed:
         raise _nf()
+    if len(item["history"]) >= MAX_HISTORY:  # one more entry and the item would be unreadable to everyone
+        raise _refused("history")
     changes, change = build(item, d)
     status = changes.get("status", item["status"])
     entry = {"at": w.now, "by": w.actor, "change": change, "status": status}

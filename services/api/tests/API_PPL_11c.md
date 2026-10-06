@@ -44,6 +44,10 @@ routes of other slices, so S4 and S5 go last (or their route lists shrink in the
 S2a alone (security), (2) S1+S1b, (3) S2b+S6, (4) S3, (5) S4, (6) S5. S5 adds `deps.get_desk_worlds` and the dev wiring;
 S6 adds `deps.get_meeting_worlds`. Both seams default to 503 `not_configured`.
 
+`PENDING_EXEMPT` (same module, applied by `conftest.py`) lists tests inside a pending file that already pass once an earlier
+slice lands (today `test_PPL_11c_s5_HR_1_a_refused_...`, a negative test that S1's routes satisfy): they run, they are not
+xfail. The S5 builder deletes that entry in the PR that removes `test_PPL_11c_s5_` from `SLICE_PENDING`.
+
 `services/api/CLAUDE.md` has a 40-line cap that builders keep breaking: run `tests/repo` before pushing.
 
 ## 1. Routes (all behind the SEC-15 gate, all `Cache-Control: no-store`, all JSON only)
