@@ -125,6 +125,23 @@ Component variants the reference pages use, to add in the page ticket that first
 
 Motion to restore in WEB-3 (reference values): primary hover `filter` (Home composer `.2s`, `transform .15s`, active `translateY(2px)`), needs hover `brightness(1.05)`; `background-color .2s` on ListRow, menu rows, nav rows and switch tracks (KPI `.3s`; Skills 40x24 switch `.25s`); switch knob `transform .25s cubic-bezier(.3,1.3,.5,1)`; sliding thumb `transform .4s cubic-bezier(.34,1.3,.5,1)` and item `color .25s`; Worlds tabs `background-color .2s, color .2s`; scrim `opacity .25s ease` and its modal panel `transform .4s cubic-bezier(.2,.8,.2,1)`; page transition `opacity .24s ease, transform .38s cubic-bezier(.2,.8,.2,1)`; Toast auto-hide 4.2 s; `@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`. Toast and popover have no animation in the reference.
 
+## 8d. Fast track and parity backlog (supervisor, 6 Oct ~15:00; the user wants the frontend deployed today and refined with them)
+
+Per-PR gate from now on. Blocking: tests green (lean tests-first: render, exact copy from `inventory.md`, key interactions, `decide()` effects), no console errors, honesty rules, one Sonnet code-reviewer pass. Not blocking: the design-critic's parity pass. It runs once per page; its difference list goes into the PR body and into the backlog below, and refinement passes fix the list later with the user. No second parity loops. The shell ships as one PR with a static city; the motion restore and the honesty allowlist come in a follow-up PR (BQ-WEB-3).
+
+Parity backlog (differences known against the reference, to refine later):
+
+| Where | Difference | Reference value | Found in |
+| --- | --- | --- | --- |
+| Font delivery | static Nunito Sans (opsz 12) against the variable opsz 6..12 axis: text under 12px is about 0.5px narrower (chip sm 11.5px: 41.41 against 41.97) | self-host the variable font with its licence entry | WEB-2 |
+| Dev demo | the selected ListRow demo has no cost line (`--ink3` on `--rowOn` 4.23:1 by day); the component renders it identically | add the line with a documented axe exclusion | WEB-2 |
+| ListRow, KPI buttons | still set `font-variant-numeric: tabular-nums`; the reference computes `normal` (no visible difference found) | drop it | WEB-2 |
+| Sliding and lg SegmentedControl items | the reference carries the UA button padding `1px 6px`; the build has 0 (no visible effect at tested widths) | match if narrow tracks overflow | WEB-2 |
+| Buttons | the reference computes `display:block` with the same centring; the build uses `display:flex` | none visible | WEB-2 |
+| Disabled Button and Switch | opacity .6 chosen; the reference has no single disabled style | decide with the user | WEB-2 |
+| Popover and Menu | fixed at top 86, right 16, no placement prop yet | the shell places them (WEB-3) | WEB-2 |
+| Variants | listed in 8c | page tickets | WEB-2 |
+
 ## 9. Decisions (approved 6 Oct 2026; logged in `docs/open-questions.md` as BQ-WEB-n)
 
 - **A (BQ-WEB-2). World page**: the Park SVG overview, linking to the Pixi stage and to S-05, S-10, S-11, S-12. The stage is not replaced; no ADR.
