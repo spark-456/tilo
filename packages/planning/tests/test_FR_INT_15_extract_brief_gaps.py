@@ -75,6 +75,19 @@ def fails(reply, exc_type, *, task=TASK, **kwargs):
     return raised.value, director
 
 
+def max_schema_calls() -> int:
+    """The most Director calls a schema-rejected reply may cost: PL-03 gives each candidate of the `director` role in
+    config/models.yaml one call and one repair, then moves to the next (call, repair, escalate, repair), so the bound
+    is two per configured candidate, read from the same config `make_router` uses. A third repair or a retry loop
+    would exceed it."""
+    from tilo_providers.config import load_providers_config  # noqa: PLC0415
+
+    config = load_providers_config(REPO_ROOT / "config" / "models.yaml", REPO_ROOT / "config" / "prices.yaml")
+    role = config.roles["director"]
+    candidates = list(role.cascade or dict.fromkeys(p for p in (role.primary, role.fallback) if p))
+    return 2 * len(candidates)
+
+
 def texts():
     return {c.id: c for c in gaps().load_gap_policy().categories}
 
@@ -347,7 +360,7 @@ def test_FR_INT_15_H6_the_cap_counts_gaps_after_de_duplication():
 def test_FR_INT_15_H7_out_of_scope_that_is_not_a_list_never_yields_a_brief(value):
     exc, director = fails(gap_reply(value), brief().BriefExtractionError)
 
-    assert not isinstance(exc, refusal().TaskRefused) and len(director.calls) <= 2  # at most the router's one repair
+    assert not isinstance(exc, refusal().TaskRefused) and len(director.calls) <= max_schema_calls()
 
 
 @pytest.mark.parametrize(
@@ -372,7 +385,20 @@ def test_FR_INT_15_H7_out_of_scope_that_is_not_a_list_never_yields_a_brief(value
 def test_FR_INT_15_H7_a_malformed_item_never_yields_a_brief_or_a_gap(item):
     exc, director = fails(gap_reply([item]), brief().BriefExtractionError)
 
-    assert not isinstance(exc, (refusal().TaskRefused, gaps().NothingPossible)) and len(director.calls) <= 2
+    assert not isinstance(exc, (refusal().TaskRefused, gaps().NothingPossible))
+    assert 1 <= len(director.calls) <= max_schema_calls()
+
+
+def test_FR_INT_15_H7_a_schema_rejected_reply_costs_at_most_one_repair_per_candidate_and_never_a_loop():
+    """The shape of the guarantee: whatever the router does on a schema failure, it is one call and one repair per
+    configured candidate of the director role. More calls than that would be a retry loop or an extra repair."""
+    bound = max_schema_calls()
+    assert bound >= 2
+
+    for reply in (gap_reply({"category": "money_movement", "part": "x"}), gap_reply([{"category": "money_movement"}])):
+        _, director = fails(reply, brief().BriefExtractionError)
+
+        assert 1 <= len(director.calls) <= bound
 
 
 def test_FR_INT_15_H7_a_good_gap_beside_a_malformed_one_is_still_an_error_not_a_partial_list():
