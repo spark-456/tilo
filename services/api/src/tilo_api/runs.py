@@ -228,11 +228,16 @@ class Run:
             if shared
             else f"The gate card was answered: {data.get('option', 'default')}."
         )
+        origin = self.requested.get(
+            part.get("reraised_from", "")
+        )  # a re-raise is the original proposal's again (Trace)
+        who = origin["actor"] if origin else authz["ref"] if authz else "system"
         try:
             committed = self.put(
-                part["type"], authz["ref"] if authz else "system", data.get("gate_id", self.world_id),
+                part["type"], who, data.get("gate_id", self.world_id),
                 summary, data, district=part["district"],
-                cause=requested and requested["id"], authz=authz, vis=part["vis"], severity=part.get("severity"),
+                cause=(origin or requested or {}).get("id"), authz=authz, vis=part["vis"],
+                severity=part.get("severity"),
                 check_pause=shared, event_id=part["event_id"],  # one id per resolution: a retry is an identical resend
             )  # fmt: skip
             if shared:
@@ -420,11 +425,12 @@ class Run:
         self.requested[card_id] = requested
         if self.cards.submit(card, outbox_id=outbox_id, district=district).outcome != "accepted":
             raise _GateFailed("the gate card was refused")
-        while card_id not in self.resolved:  # only a person's approve on the cards API opens it
+        while (card_id := self._answered_card(gate["id"])) is None:  # a person's approve on any card of this gate
             if self.paused():
                 raise RunStopped
             await asyncio.sleep(_POLL_S)
-        resolved = self.resolved[card_id]
+        resolved, requested = self.resolved[card_id], self.requested[card_id]  # the answered card's own proposal
+        outbox_id = requested["data"]["outbox_id"]  # a share re-raised the gate under a fresh reservation (FR-HIL-12)
         if self.paused():
             raise RunStopped
         if tilo_policy.open_gate(requested, resolved, world_owner=self.owner).outcome != "run":
@@ -450,6 +456,13 @@ class Run:
         format_ = _FORMATS.get(action, "in_app")  # artifact.delivered: a format kept in Tilo has outbox_id null
         data = {"artifact": item, "format": format_, "outbox_id": outbox_id if format_ == "email" else None}
         self._deliver(unit, worker, item, data, transfer["id"])
+
+    def _answered_card(self, gate_id: str) -> str | None:
+        """The card of this gate (the original or a re-raise) with a committed answer: a gate is one wait."""
+        return next(
+            (c for c in list(self.resolved) if self.requested.get(c, {}).get("data", {}).get("gate_id") == gate_id),
+            None,
+        )
 
     def _deliver(self, unit: dict, worker: str, item: dict, data: dict, cause: str) -> None:
         delivered = self.put(

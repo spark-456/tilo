@@ -34,7 +34,9 @@ def _world_views(store: Annotated[_deps.Store, Depends(_deps.get_store)]) -> Cal
 
     def view(world_id: str) -> WorldView:
         world = store.worlds.get(world_id)
-        return WorldView(_runs.get_card_store(world_id, store), paused=bool(world and world.paused))
+        return WorldView(
+            _runs.get_card_store(world_id, store), paused=world is None or world.paused
+        )  # no record: closed, like Run.paused
 
     return view
 

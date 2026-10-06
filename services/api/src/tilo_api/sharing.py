@@ -151,7 +151,7 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
         expires = _parse_ts(view.cards.now()) + link_ttl()
         stamp = expires.isoformat(timespec="milliseconds").replace("+00:00", "Z")
         try:
-            new_id, assigned_at = view.cards.share_gate(world_id, card_id, approver=body.approver, until=stamp)
+            new_id, assigned_at, ended = view.cards.share_gate(world_id, card_id, approver=body.approver, until=stamp)
         except ShareRefused as exc:
             reason = str(exc)
             return JSONResponse(
@@ -173,6 +173,8 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
         )
         with lock:
             by_hash[link.token_hash], by_id[link.share_id] = link, link
+            for earlier in by_id.values():  # one live share per gate: the store ended the earlier ones' assignment
+                earlier.revoked |= earlier.card_id in ended
         return JSONResponse(
             status_code=201, content={"share_id": link.share_id, "token": token, "card_id": new_id, "expires_at": stamp}
         )
@@ -199,6 +201,8 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
         principal: Principal = Depends(get_current_principal),  # sign-in first: no token lookup before it
         resolve: Callable[[str], WorldView] = Depends(get_worlds),
     ) -> JSONResponse:
+        if not session_allows(principal, principal.channel, False):  # a gate opens only in a signed-in web session
+            return JSONResponse(status_code=400, content={"outcome": "rejected", "reason": "invalid_channel"})
         link = named_link(token, principal)
         if link is None:
             return JSONResponse(status_code=404, content=_NOT_FOUND)
@@ -219,6 +223,8 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
         principal: Principal = Depends(get_current_principal),
         resolve: Callable[[str], WorldView] = Depends(get_worlds),
     ) -> JSONResponse:
+        if not session_allows(principal, principal.channel, False):  # a gate opens only in a signed-in web session
+            return JSONResponse(status_code=400, content={"outcome": "rejected", "reason": "invalid_channel"})
         link = named_link(token, principal)
         if link is None:
             return JSONResponse(status_code=404, content=_NOT_FOUND)
@@ -229,8 +235,6 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
             return JSONResponse(status_code=409, content={"outcome": "rejected", "reason": "world_paused"})
         if _parse_ts(view.cards.now()) < link.assigned_at:  # BQ-32: the assignment must be no later than the answer
             return JSONResponse(status_code=403, content={"outcome": "rejected", "reason": "assignment_not_in_force"})
-        if not session_allows(principal, principal.channel, False):  # a gate opens only in a signed-in web session
-            return JSONResponse(status_code=400, content={"outcome": "rejected", "reason": "invalid_channel"})
         try:
             result = view.cards.answer(
                 link.world_id, link.card_id, option=body.option, channel=principal.channel, principal=principal
