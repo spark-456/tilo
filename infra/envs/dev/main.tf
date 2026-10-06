@@ -274,6 +274,12 @@ module "service" {
       service = "harness"
       member  = "serviceAccount:${google_service_account.tasks_invoker.account_id}@${var.project_id}.iam.gserviceaccount.com"
     }
+    # The one Scheduler job that fires user schedules calls harness only
+    # (FR-AGT-14); the route checks this caller itself.
+    "harness::schedule-scheduler" = {
+      service = "harness"
+      member  = "serviceAccount:${google_service_account.schedule_scheduler.account_id}@${var.project_id}.iam.gserviceaccount.com"
+    }
   }
 
   depends_on = [google_project_service.apis]
@@ -503,6 +509,30 @@ resource "google_artifact_registry_repository" "containers" {
   format        = "DOCKER"
   description   = "Tilo service container images (PRD 6.3 Cloud Build, Artifact Registry)."
 
+  # EFF-05c: every `just build-evals-image` pushes a new :<build id> version of the evals package (plus :latest).
+  # Keep the newest 5 and delete older ones after 7 days. Scoped to the evals package: the service images
+  # (api, harness, ...) have no policy here and are never touched (a repository with no DELETE policy deletes nothing).
+  cleanup_policies {
+    id     = "evals-keep-newest-5"
+    action = "KEEP"
+
+    most_recent_versions {
+      package_name_prefixes = ["evals"]
+      keep_count            = 5
+    }
+  }
+
+  cleanup_policies {
+    id     = "evals-delete-older-than-7d"
+    action = "DELETE"
+
+    condition {
+      tag_state             = "ANY"
+      package_name_prefixes = ["evals"]
+      older_than            = "604800s"
+    }
+  }
+
   depends_on = [google_project_service.apis]
 }
 
@@ -597,6 +627,7 @@ module "monitoring" {
   alert_email             = var.alert_email
   cloud_run_service_names = [for k in keys(local.cloud_run_services) : "tilo-${k}"]
   events_subscription_id  = module.events.subscription_name
+  eval_nightly_job_name   = google_cloud_run_v2_job.eval_nightly.name
 
   depends_on = [google_project_service.apis]
 }
@@ -741,6 +772,31 @@ module "gmail_push" {
   push_service_account_email      = google_service_account.gmail_push.email
   scheduler_service_account_email = google_service_account.gmail_scheduler.email
   pubsub_service_agent_email      = module.events.pubsub_service_agent_email
+
+  depends_on = [google_project_service.apis]
+}
+
+# ---------------------------------------------------------------------------
+# Scheduled runs (FR-AGT-14): one Scheduler job ticks every minute and POSTs
+# harness /internal/schedules/tick; the tick reads the due user schedules.
+# The service account holds run.invoker on harness only (extra_invokers).
+# ---------------------------------------------------------------------------
+
+resource "google_service_account" "schedule_scheduler" {
+  project      = var.project_id
+  account_id   = "tilo-schedule-scheduler"
+  display_name = "Tilo scheduled runs tick (Cloud Scheduler OIDC identity)"
+
+  depends_on = [google_project_service.apis]
+}
+
+module "schedule_tick" {
+  source = "../../modules/schedule_tick"
+
+  project_id            = var.project_id
+  region                = var.region
+  target_uri            = module.service.uris["harness"]
+  service_account_email = google_service_account.schedule_scheduler.email
 
   depends_on = [google_project_service.apis]
 }

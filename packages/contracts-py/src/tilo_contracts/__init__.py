@@ -7,7 +7,7 @@
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.3.0 sha256:f819a7e2e62bf60b
+# common.schema.json 1.4.0 sha256:09b36846ed11add2
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -92,7 +92,7 @@
 # events/data/world.failed.schema.json 1.0.0 sha256:17a50a9c70ba8ae1
 # events/data/world.paused.schema.json 1.0.0 sha256:1b190f91f08a918c
 # events/data/world.planned.schema.json 1.0.0 sha256:eb423b257e5fc838
-# events/data/world.requested.schema.json 1.0.0 sha256:d59a584d7d9b0cf8
+# events/data/world.requested.schema.json 1.1.0 sha256:7f1370b796c05ea1
 # events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
 # events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
 # events/registry.schema.json 1.1.0 sha256:22ae30d4e99499c8
@@ -463,9 +463,9 @@ Agent rank and model role (PRD 8.1).
 """
 
 
-type Channel = Literal["web", "mobile_web", "whatsapp", "email"]
+type Channel = Literal["web", "mobile_web", "whatsapp", "email", "schedule"]
 """
-Where a person sees and answers Tilo (PRD 10.3, 11.1).
+Where a person sees and answers Tilo (PRD 10.3, 11.1), plus `schedule`, how a run that a recurring schedule started came to be (1.4.0, FR-AGT-14). `schedule` is not a place anyone answers: only world.requested uses it, and it is never an owner instruction or a person's approval (OB-01).
 """
 
 
@@ -1487,7 +1487,7 @@ class WorldPlannedData(BaseModel):
 
 class WorldRequestedData(BaseModel):
     """
-    data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world. destination is the thread or folder the request was made from (an email thread forwarded to Tilo, or one the request was started from), as an opaque id set from where it was sent, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is web or mobile_web, where the owner is signed in; a request by email has an unauthenticated sender and is never an instruction.
+    data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world. destination is the thread or folder the request was made from (an email thread forwarded to Tilo, or one the request was started from), as an opaque id set from where it was sent, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is web or mobile_web, where the owner is signed in; a request by email has an unauthenticated sender and is never an instruction. A scheduled run (FR-AGT-14, a recurring schedule the owner approved) starts with a world.requested of channel `schedule` (1.1.0): actor is the schedule's owner, the person who approved the brief when they set the schedule up (never `system`, because the owner of a world is the actor of its first world.requested and only a person can be one, OB-01), destination is null and title is the schedule's title. `schedule` is never an owner instruction (OB-01 counts only web and mobile_web) and never a person's approval: a scheduled run still goes through the outbox and the policy engine, and every T3 step waits for a person.
     """
 
     model_config = ConfigDict(
