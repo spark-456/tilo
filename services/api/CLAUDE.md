@@ -6,21 +6,21 @@ Cloud Run service (PRD 6.2): sessions, tasks, cards, approvals, policies, downlo
 ## Commands
 - `uv run --package tilo-api pytest` — tests; `just check` — gate; `just dev-api` — dev mode on 127.0.0.1:8080 (fake Director); `Dockerfile` runs `tilo_api:app`, deploy `docs/deploy-dev.md`
 ## Requirement IDs
-- PRD 6.2 row; SEC-05..12, SEC-15; FR-INT-11/12, FR-HIL-10/12 (API half); FR-MTR-10 (`tilo_api.costs`: owner-only `GET /worlds/{id}/costs`, `GET /costs`; `deps.get_ledger` 503 until the Treasury is wired, BQ-MTR10-4); PPL-11a. Assistant panel (FR-PA-13/14/17/19, PPL-11b): `POST /v1/assistant/ask`, `tilo_api.assistant`, `desk`, `people_access`, `assistant.yaml`; every named record passes the `tilo_people` oracle as the principal; `tests/API_PPL_11b.md`.
+- PRD 6.2 row; SEC-05..12, SEC-15; FR-INT-11/12, FR-HIL-10/12 (API half); FR-MTR-10 (`tilo_api.costs`: owner-only `GET /worlds/{id}/costs`, `GET /costs`; `deps.get_ledger` 503 until the Treasury is wired, BQ-MTR10-4); PPL-11a. Assistant panel (FR-PA-13/14/17/19, PPL-11b): `POST /v1/assistant/ask`, `tilo_api.assistant`, `desk`, `people_access`, `assistant.yaml`; every named record passes the `tilo_people` oracle as the principal; `tests/API_PPL_11b.md`. FR-AGT-14b (`tilo_api.schedules`, `tests/API_FR_AGT_14b.md`, ADR-0023): `/schedules` routes snapshot a task the owner approved (404 for others); `POST /internal/schedules/tick` (own OIDC check: `TILO_SCHEDULE_TICK_AUDIENCE`, `TILO_SCHEDULE_TICK_CALLER`, 503 unset) starts runs only on the owner's L3 `grant_budget` policy; store `TILO_SCHEDULES_STORE`=memory (dev default) or firestore + `TILO_FIRESTORE_PROJECT`.
 
 ## Contracts and config
 - Reads/writes `packages/contracts-py` types; Firestore (worlds, events, cards, policies, grants); Cloud Tasks. Config:
-  `autonomy.yaml`, `flags/`, `connectors.yaml` (RBAC and routing only), `teams.yaml`, `scenarios/`, `out_of_policy.yaml`.
+  `autonomy.yaml`, `flags/`, `connectors.yaml` (RBAC and routing only), `teams.yaml`, `scenarios/`, `out_of_policy.yaml`, `capability_gaps.yaml`.
 - Env: `TILO_API_DEV=1`; `TILO_API_DEV_ORIGINS` (default `http://localhost:5173`); `TILO_DEV_UNIT_DELAY_S` (1.5, 0..10); `TILO_JUDGE_LIVE=1`.
 ## Local rules
 - Side effects go through the outbox and the deterministic policy engine, T3 only with a person. `/health` (Cloud Run smoke check, #397) and `/healthz` (in-container): ok. Task routes read only `application/json` (415).
-  SEC-15 (`tilo_api.access`, `tests/API_SEC_15.md`): deployed (`K_SERVICE`/`CLOUD_RUN_JOB`) the `AccessGate` middleware refuses every route not in `PUBLIC_ROUTES` (`/health`, `/healthz`, `GET /access`, `POST /access/declaration`) from the stored visitor/judge declaration (403 `under_construction`/`declaration_required`; 503 with no `deps.get_access_store`; set once, 409 `declaration_locked`). Live models only via `provider_mode` -> `deps.router_for_mode` (replay_only wins; `TILO_JUDGE_LIVE=1` is the user's, never set in code).
+  SEC-15 (`tilo_api.access`, `tests/API_SEC_15.md`): deployed (`K_SERVICE`/`CLOUD_RUN_JOB`) the `AccessGate` middleware refuses every route not in `PUBLIC_ROUTES` (`/health`, `/healthz`, `GET /access`, `POST /access/declaration`, `POST /internal/schedules/tick`) from the stored visitor/judge declaration (403 `under_construction`/`declaration_required`; 503 with no `deps.get_access_store`; set once, 409 `declaration_locked`). Live models only via `provider_mode` -> `deps.router_for_mode` (replay_only wins; `TILO_JUDGE_LIVE=1` is the user's, never set in code).
 - Dev mode (CL-INT-4, `tilo_api.dev`): fixed owner `u_dev_owner`, in-memory `Store`, a writer that refuses an event with no
   `vis`, CORS for `TILO_API_DEV_ORIGINS` only, Host loopback:8080; no cloud, no paid call; refuses when `K_SERVICE`,
   `CLOUD_RUN_JOB` or live is set. `dev_run` (CL-INT-5c/5d): a paced unit runner (`config/prices.dev.yaml`), a fake recipient.
 - `GET /worlds/{id}/layout` (FR-WLD-05): the run's layout, 404 until built; owner gets `tilo_world` geometry (CL-INT-6); others an allowlisted view.
 - `POST /intake` (FR-INT-01/02/11/12): multipart `text`, `files`, optional `scenario` -> 201 task, per-file status; or 422
-  `{"error": reason}`, nothing stored (a refusal adds `alternative`, `category`; a bad scenario id is 422).
+  `{"error": reason}`, nothing stored (a refusal adds `alternative`, `category`; nothing possible, FR-INT-15, adds `gaps`; a bad scenario id is 422); 201 has `gaps`.
   Approve builds the scenario's policies and events first, then stores: the owner's own, one `policy.changed` each.
 - Team Lead console (FR-HIL-10, `tilo_api.console`): `GET /worlds/{id}/console`, `POST .../console/cards/{id}/answer`;
   role `team_lead` + an owner-assigned, schema-valid `config/teams.yaml` record; only its domain's questions (never on the

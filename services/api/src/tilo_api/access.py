@@ -30,7 +30,16 @@ Mode = Literal["live", "replay"]
 
 # The only routes a person without access may call. A new public route is an owner decision (the test pins this).
 PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset(
-    {("GET", "/health"), ("GET", "/healthz"), ("GET", "/access"), ("POST", "/access/declaration")}
+    {
+        ("GET", "/health"),
+        ("GET", "/healthz"),
+        ("GET", "/access"),
+        ("POST", "/access/declaration"),
+        (
+            "POST",
+            "/internal/schedules/tick",
+        ),  # FR-AGT-14b: Cloud Scheduler has no session; the route checks its OIDC caller
+    }
 )
 
 UNDER_CONSTRUCTION = "Tilo is still under construction and not open to the public."
