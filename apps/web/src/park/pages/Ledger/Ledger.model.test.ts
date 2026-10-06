@@ -108,6 +108,42 @@ describe("WEB_7_ledger_model", () => {
     ]);
   });
 
+  it("WEB_7_ledger_taken_rows_buttons_and_details_follow_the_facts", () => {
+    // The decisions with some facts set and others removed.
+    const vary = (set: Partial<DecisionFacts>, drop: (keyof DecisionFacts)[] = []) =>
+      decisions.map((d) => {
+        const facts: DecisionFacts = { ...(d.facts as DecisionFacts), ...set };
+        for (const k of drop) delete facts[k];
+        return { ...d, facts };
+      });
+    // Details come from the facts as given (rows, order, words), for both taken rows.
+    const details: [string, string][] = [["Row A", "Value A"]];
+    const taken = activityGroups(ledger, { depot: true, mail: true }, "all", vary({ details }));
+    expect(taken.entries[0]?.detail).toEqual(details);
+    expect(taken.entries[1]?.detail).toEqual(details);
+    // No details given: an empty panel, never a made-up row.
+    const bare = activityGroups(ledger, { depot: true, mail: true }, "all", vary({}, ["details"]));
+    expect(bare.entries[0]?.detail).toEqual([]);
+    // The amount of a taken row is the facts' own, a dash when they name none.
+    expect(
+      activityGroups(ledger, { depot: true }, "all", vary({ amount: 7 })).entries[0]?.amt,
+    ).toBe("£7");
+    expect(
+      activityGroups(ledger, { depot: true }, "all", vary({}, ["amount"])).entries[0]?.amt,
+    ).toBe("—");
+    // The waiting rows' button: the facts' label, else "Approve" with an amount.
+    const labels = (decs: ReturnType<typeof vary>) =>
+      activityGroups(ledger, {}, "all", decs)
+        .groups.flatMap((g) => g.rows)
+        .filter((r) => r.waiting)
+        .map((r) => r.approveLabel);
+    expect(labels(vary({ approveLabel: "Do it" }))).toEqual(["Do it", "Do it"]);
+    expect(labels(vary({ amount: 12 }, ["approveLabel"]))).toEqual(["Approve £12", "Approve £12"]);
+    // Without decisions the amount the ledger's own transaction waits on is used.
+    const alone = activityGroups(ledger, {}, "all").groups.flatMap((g) => g.rows);
+    expect(alone.find((r) => r.decKey === "depot")?.approveLabel).toBe("Approve £3,420");
+  });
+
   it("WEB_7_ledger_without_decisions_the_tile_has_no_world_link_and_no_scenario_words", () => {
     const tile = kpis(ledger, {})[2];
     expect(tile?.opensWorld).toBeUndefined();

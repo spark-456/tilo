@@ -17,6 +17,10 @@ const FORBIDDEN: [string, RegExp][] = [
   ["company name", /Meridian|Northwind/i],
   ["person", /Alex Morgan|alex@northwind/i],
   ["amount", /3,?420/],
+  ["goods", /battery|suppliers?\b/i],
+  ["agent role", /Builder agent/i],
+  ["button label", /Send brief/i],
+  ["wait time", /\d+ h \d+ min/],
 ];
 
 describe("WEB_7_ledger_generic", () => {
