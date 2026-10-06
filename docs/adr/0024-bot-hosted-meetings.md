@@ -1,0 +1,78 @@
+# ADR-0024: Bot-hosted meetings and the meeting host account
+
+- Status: Proposed (2026-10-06). The decision that the bot hosts and invites is the user's ("Have the bot
+  start the meeting instead and then send invites to scheduled people", 6 Oct 2026, relayed by the
+  supervisor); it needs the user's own confirmation in chat, because it widens ADR-0017. Everything else here
+  is the architect's default, logged in `docs/open-questions.md` BQ-MTG09-1 to BQ-MTG09-12. Amends ADR-0017.
+  (Next free number on every remote branch at 2026-10-06; the merger may renumber.)
+- Deciders: user (the scope change; approval of the ADR-0017 change), architect (design)
+- Requirement: FR-MTG-09 (amended), FR-MTG-01, FR-MTG-10, FR-CAL-02, FR-CAL-04; PE-13, PE-14, PE-18, PE-20;
+  PRD 3.4, 10.4, 16.1, 16.2; ADR-0016 decision 7, ADR-0017
+
+## Context
+FR-MTG-09 was a guest-join experiment: the bot joins an ordinary Meet with no account and the host admits it;
+ADR-0017 allowed a signed-in bot account only if that failed. The user now wants the bot to start the meeting
+itself and send the invitations. Only a meeting's organizer is its Meet host, so the bot must own the event.
+Every person's Google Calendar grant is `calendar.readonly` (FR-CAL-08), and the token broker treats all of a
+person's connectors as one Google grant (CON-D10).
+
+## Decision
+1. **The organizer is the meeting bot's own Google account**, the one ADR-0017 defines (created by the user,
+   used by nothing else, holds no user data). Tilo connects it as a separate connector, `meeting_host`, with
+   one action, `create_meeting_event` (`send`, T3, `approval`, irreversible). The person's own `google_calendar`
+   connector stays read-only. Contract check: every record involved validates unchanged; no contract change.
+2. **One scope on the bot account only:** `https://www.googleapis.com/auth/calendar.events.owned`, asked
+   through the normal incremental consent (capability `send`) when the Owner first hosts a meeting. A person
+   signs in to Google as the bot, in their own browser; Tilo never sees or types a password. The Meet link
+   comes from `events.insert` with `conferenceData.createRequest` (`hangoutsMeet`) and
+   `conferenceDataVersion=1`; no Meet API scope.
+3. **Always a person.** The event invites at least the Owner, so `attendee_count > 0` and `new_recipients`
+   apply (PE-14); the action is listed T3 as well. A gate card shows the title, the time in the Owner's zone,
+   that a Meet link is made, that the host account sends the invitations and the exact recipients; the outbox
+   entry equals it (CR-12, OB-05). Only the meeting owner approves, in a signed-in session; no policy, Team
+   Lead or Approver opens it. Invitees are the Owner plus the meeting's attendees who resolved to Tilo persons
+   of the same org, by addresses from their person records; nobody a model, a transcript or an email names.
+   Guests cannot invite others, edit the event or see each other's addresses.
+4. **The Meet link is never stored** (FR-MTG-01, `meeting.schema.json`). The insert asks Google for no link;
+   Tilo keeps only Google's event id, in a receipt artifact. The bot gets the link in its start request: from
+   the Owner's own invitation now, from an in-memory hand-over later (PPL-60c).
+5. **Grant groups.** The token broker keeps the bot account's grant in its own group, so revoking it never
+   touches a person's Google grant and the reverse. A consent answer for `meeting_host` that carries any other
+   scope is refused as "not the bot account".
+6. **ADR-0017 changes as follows.** (a) Its condition ("only if guest join fails") is lifted for bot-hosted
+   meetings: the user's 6 Oct decision replaces the guest-first experiment (D-2), which is no longer required.
+   (b) Its decision 2 said Tilo gets no Gmail, Drive or Calendar access to the bot account; Tilo now holds one
+   OAuth grant on it with the single scope above, sealed by the token broker like every grant, and nothing
+   else. (c) Unchanged: the bot's browser session is signed in by a human through noVNC inside the demo
+   container, per meeting, on tmpfs; it is never in the image, the repository, a backup, Secret Manager or a
+   Cloud Run service; the container is started by hand and removed after; the deployed services never hold
+   or see that session; the exception ends at the hackathon freeze unless the user renews it.
+7. **What the bot does at meeting time.** Signed in as the organizer, it opens the link and enters as host
+   without admission, posts the versioned disclosure first (FR-MTG-01), leaves on `Tilo leave` (FR-MTG-10) and
+   never ends the call for everyone. It admits nobody by itself: invited attendees join under Meet's own rule
+   for calendar-invited accounts; a display-name allowlist is spoofable and the meet-bot's current
+   admit-everyone default is off for hosted meetings. The link is never written to the bot's `out/` files,
+   logs, events or the package it hands to Tilo. Its persistent named Docker volume goes (ADR-0017 terms).
+
+## Alternatives considered
+- *The Owner's own calendar as organizer* (FR-CAL-04's `create_event` with `calendar.events` on the person's
+  grant): invitations come from the Owner, but the Owner is host and the bot is still a guest who must be
+  admitted, which is what the user asked to remove; it also gives Tilo write access to a person's whole
+  calendar and needs every test user to re-consent.
+- *A Google service account*: a consumer account cannot delegate, and a service account cannot create Meet
+  conferences without Workspace domain-wide delegation.
+- *`meet.google.com/new` from the bot's browser* (the meet-bot's `start` today): no calendar invitation, and the
+  link would have to travel by email or chat, so Tilo would store it.
+- *`calendar.events`*: wider than needed (every calendar the account can edit). Kept as the fallback if Google
+  refuses conference creation under `calendar.events.owned`.
+
+## Consequences
+- FR-MTG-09's acceptance moves to the bot-hosted flow (`services/connectors/tests/API_FR_MTG_09.md`); the
+  supplement note `docs/prd-supplement-note-mtg09-2026-10-06.md` records it for the supervisor.
+- The user adds `calendar.events.owned` on the OAuth consent screen and the bot account as a test user; no
+  person re-consents.
+- A free consumer bot account ends group calls at 60 minutes; `meeting_host.max_duration_min` (60) refuses a
+  longer meeting until the user raises it.
+- Only the person who connected the host account hosts with it, for their own meetings; sharing it across a
+  team is a later decision.
+- Cancelling or moving a hosted meeting (delete or patch with invitations) is a later T3 ticket.

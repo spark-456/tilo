@@ -2,7 +2,9 @@
 
 - Status: Accepted as a fallback (2026-10-05, user, confirmed in chat). Do not
   act on it unless the guest-join experiment (FR-MTG-09) fails. (Architect; user decision D-2 of the
-  addendum.) Renumbered from 0016.
+  addendum.) Renumbered from 0016. **Amended by ADR-0024 (Proposed, 2026-10-06):** for bot-hosted
+  meetings the condition is lifted and Tilo holds one Calendar scope on the bot account; the session
+  terms of decision 2 stay.
 - Deciders: user (approval, only if the condition holds), architect (proposal)
 - Requirement: FR-MTG-09, FR-MTG-11; PRD 16.1 rule 3, 3.4, 16.2
 
