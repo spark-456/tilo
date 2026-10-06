@@ -7,7 +7,7 @@ Cloud Run service (PRD 6.2): sessions, tasks, cards, approvals, policies, downlo
 - `uv run --package tilo-api pytest` — tests; `just check` — gate; `just dev-api` — dev mode on 127.0.0.1:8080 (fake Director); `Dockerfile` runs `tilo_api:app`, deploy `docs/deploy-dev.md`
 
 ## Requirement IDs
-- PRD 6.2 row; SEC-05..12, SEC-15; FR-INT-11/12, FR-HIL-10/12 (API half).
+- PRD 6.2 row; SEC-05..12, SEC-15; FR-INT-11/12, FR-HIL-10/12 (API half). Assistant panel (FR-PA-13/14/17, PPL-11b): `POST /v1/assistant/ask`, `tilo_api.assistant`, `desk`, `people_access`, config `assistant.yaml`; rules answer, every named record passes the `tilo_people` oracle as the principal; `tests/API_PPL_11b.md`.
 
 ## Contracts and config
 - Reads/writes `packages/contracts-py` types; Firestore (worlds, events, cards, policies, grants); Cloud Tasks. Config:

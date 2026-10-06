@@ -21,7 +21,7 @@ import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Any, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, cast
 
 from fastapi import Depends, HTTPException, Request
 from tilo_archive import RunArchive
@@ -31,6 +31,7 @@ from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
 from tilo_metering.flags import FlagStore, process_flags
+from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
@@ -40,6 +41,11 @@ from tilo_providers.router import Router
 from tilo_providers.safety import build_safety_provider
 
 from tilo_api.access import AccessStore, Mode, provider_mode
+from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
+from tilo_api.people_access import NoSourceOwners, SourceOwners
+
+if TYPE_CHECKING:
+    from tilo_api.assistant.core import Decider
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
 Channel = Literal["web", "mobile_web", "email"]  # WhatsApp removed: SD-01, ADR-0019
@@ -389,3 +395,38 @@ def get_attempt_abandon_after_s() -> float:
     """How long an append may stay in flight before dispatch presumes it lost and resends the same
     event id (idempotent, EV-10)."""
     return _dispatch_config("attempt_abandon_after_s", _DEFAULT_ABANDON_AFTER_S)
+
+
+# --- the assistant panel seams (PPL-11b, services/api/tests/API_PPL_11b.md): each default refuses until wired ---
+
+
+class PlateSource(Protocol):
+    """ADR-0021: the one plate builder, for the signed-in person only (PE-26). PPL-11a supplies it (BQ-PPL11B-15)."""
+
+    def build(self, user: str, now: str) -> dict: ...
+
+
+def get_people_stores() -> PeopleStores:
+    raise HTTPException(status_code=503, detail="not_configured")  # the Firestore stores are a later ticket
+
+
+def get_plate_source() -> PlateSource:
+    raise HTTPException(status_code=503, detail="not_configured")  # PPL-11a's `tilo_api.plate.build`, adapted here
+
+
+def get_source_owners() -> SourceOwners:
+    return NoSourceOwners()  # fail closed until PPL-31 and PPL-11a read the owner from the source store (BQ-PPL11B-13)
+
+
+def get_assistant_config() -> AssistantConfig:
+    """Read on every call; an unusable file closes the panel (503) and the log names the key path only."""
+    try:
+        return load_assistant_config()
+    except AssistantConfigError as exc:
+        logger.warning("assistant config unusable: %s", exc)
+        raise HTTPException(status_code=503, detail="not_configured") from exc
+
+
+def get_assistant_decider() -> Decider | None:
+    """The model fallback (FR-PA-14). None until the cost wiring lands (slice 11b-4): the panel answers by rules."""
+    return None
