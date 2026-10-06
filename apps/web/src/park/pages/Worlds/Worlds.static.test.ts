@@ -19,14 +19,11 @@ const cssFiles = files.filter((f) => f.endsWith(".css"));
 const built = () => expect(tsFiles, "WorldsPage.tsx must exist").toContain("WorldsPage.tsx");
 
 describe("WEB_5_worlds_static: the page folder", () => {
-  it("WEB_5_worlds_static_has_the_page_the_index_and_a_stylesheet", () => {
+  it("WEB_5_worlds_static_has_the_named_page_and_a_stylesheet_and_no_default_export", () => {
     expect(files).toContain("WorldsPage.tsx");
-    expect(files).toContain("index.ts");
     expect(cssFiles.length).toBeGreaterThan(0);
     expect(code("WorldsPage.tsx")).toMatch(/export\s+(?:function|const)\s+WorldsPage\b/);
-    expect(code("index.ts")).toMatch(
-      /export\s+default\s+WorldsPage\b|export\s*\{\s*WorldsPage\s+as\s+default\s*\}/,
-    );
+    expect(code("WorldsPage.tsx")).not.toMatch(/export\s+default\b/);
   });
 
   it("WEB_5_worlds_static_imports_nothing_from_screens_world_or_stage", () => {
@@ -112,7 +109,9 @@ describe("WEB_5_worlds_static: the registry gets one new line", () => {
   const entries = [...src.matchAll(/^\s*(\w+):\s*(.+?),\s*$/gm)].map((m) => [m[1], m[2]]);
 
   it("WEB_5_worlds_static_pages_ts_worlds_line_is_the_lazy_import_and_the_other_eight_stay_Placeholder", () => {
-    expect(src).toContain('  worlds: lazy(() => import("../pages/Worlds")),\n');
+    expect(src).toContain(
+      '  worlds: lazy(() => import("../pages/Worlds/WorldsPage").then((m) => ({ default: m.WorldsPage }))),\n',
+    );
     expect(entries).toHaveLength(9);
     expect(entries.filter(([k]) => k !== "worlds").every(([, v]) => v === "Placeholder")).toBe(
       true,
