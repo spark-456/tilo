@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from tilo_harness.schedule import TickWiring
+from tilo_harness.schedule import TickWiring, tick_caller_ok
 
 log = logging.getLogger(__name__)
 
@@ -50,11 +50,14 @@ def create_app(*, schedule_tick: TickWiring | None = None) -> FastAPI:
         if token is None:
             return _refuse(401, "unauthorized")
         try:
-            claims = wiring.verifier.verify(token, wiring.audience)
-            audience, email, verified = claims.get("aud"), claims.get("email"), claims.get("email_verified")
+            allowed = tick_caller_ok(
+                wiring.verifier.verify(token, wiring.audience),
+                audience=wiring.audience,
+                caller=wiring.service_account,
+            )
         except Exception:  # bad signature, expiry, audience or a verifier outage: not an accepted caller
             return _refuse(401, "unauthorized")
-        if audience != wiring.audience or email != wiring.service_account or verified is not True:
+        if not allowed:  # issuer, audience, verified e-mail and the one allowed account, from the verified token only
             return _refuse(403, "forbidden")
         try:
             fired = wiring.ticker.tick().fired

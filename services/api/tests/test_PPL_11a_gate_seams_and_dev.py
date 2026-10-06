@@ -92,7 +92,16 @@ def test_PPL_11a_SEC_15_the_people_routes_exist_and_none_of_them_is_public(peopl
     assert (
         access.PUBLIC_ROUTES
         == PINNED_PUBLIC_ROUTES
-        == frozenset({("GET", "/health"), ("GET", "/healthz"), ("GET", "/access"), ("POST", "/access/declaration")})
+        == frozenset(
+            {
+                ("GET", "/health"),
+                ("GET", "/healthz"),
+                ("GET", "/access"),
+                ("POST", "/access/declaration"),
+                # FR-AGT-14b: the Scheduler tick checks its own OIDC caller; the owner approved this one route (6 Oct).
+                ("POST", "/internal/schedules/tick"),
+            }
+        )
     ), "a people route is never public (a new public route is the owner's decision)"
 
 
