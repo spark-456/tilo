@@ -37,7 +37,13 @@ CODE_DECLARATION_LOCKED = "declaration_locked"
 # The routes a refused or undeclared person may still call (API_SEC_15.md "Public routes"). Pinned here as
 # literals so that adding a public route needs a change to this test.
 PINNED_PUBLIC_ROUTES = frozenset(
-    {("GET", "/health"), ("GET", "/healthz"), ("GET", "/access"), ("POST", "/access/declaration")}
+    {
+        ("GET", "/health"),
+        ("GET", "/healthz"),
+        ("GET", "/access"),
+        ("POST", "/access/declaration"),
+        ("POST", "/internal/schedules/tick"),  # owner decision (FR-AGT-14b): the Scheduler's own OIDC-checked route
+    }
 )
 
 PROBE_PARAMS = {"world_id": "w_probe", "task_id": "t_probe", "policy_id": "pol_probe", "card_id": "c_probe"}
