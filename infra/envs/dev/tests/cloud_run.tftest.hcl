@@ -127,8 +127,10 @@ run "PRD_6_1_internal_services_invokable_only_by_their_callers" {
       # Added by P0-07b: Cloud Scheduler renews and polls Gmail watches through harness,
       # the only service that reaches connectors (PRD 6.1). Only this entry was added.
       "serviceAccount:tilo-gmail-scheduler@${var.project_id}.iam.gserviceaccount.com",
+      # Added by FR-AGT-14: the one Cloud Scheduler tick job that fires user schedules.
+      "serviceAccount:tilo-schedule-scheduler@${var.project_id}.iam.gserviceaccount.com",
     ])
-    error_message = "harness must be invokable by exactly tilo-api, the Cloud Tasks OIDC service account and the Gmail Scheduler service account (PRD 6.1)."
+    error_message = "harness must be invokable by exactly tilo-api, the Cloud Tasks OIDC service account, the Gmail Scheduler service account and the schedule tick service account (PRD 6.1)."
   }
 
   assert {
