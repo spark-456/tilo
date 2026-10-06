@@ -372,7 +372,9 @@ def test_EFF_04_the_router_passes_each_roles_static_parts_through_byte_for_byte(
 
 # Placeholders a `*_system.md` template may take: values that are the same on every call (a fixed list). A
 # per-call value belongs in the task template, after the static prefix.
-_STATIC_PLACEHOLDERS = {"categories"}
+# `intents` and `routes` (assistant/route_system.md, PPL-11b) are the closed menus read once from config/assistant.yaml:
+# the same on every call of a process, so the prefix stays byte-stable and cacheable.
+_STATIC_PLACEHOLDERS = {"categories", "intents", "routes"}
 
 
 def _system_templates() -> list[Path]:
