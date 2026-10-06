@@ -22,3 +22,6 @@ delimited thread data). `specialist/must_ask_*.md` is the must-ask check before 
 `must_ask_system.md` instructions, `must_ask_task.md` the delimited unit data). `verifier/claim_*.md` judges
 one claim against its cited sources (FR-AGT-12: `claim_system.md` instructions, `claim_task.md` the delimited,
 untrusted claim and source text).
+`writer/build_handoff.md` is the framing paragraph of a build handoff (FR-CON-16): `$requirements` is
+`tilo_connectors.handoff.writer_brief(...)` run through `neutralise_marker(..., "REQUIREMENTS")`, the only data the writer
+sees, and `$max_framing_chars` comes from `config/build_partners.yaml`. Code checks the reply before it is used (BH-03).
