@@ -17,7 +17,6 @@
 //   its group), nothing else beyond the design's set.
 import { afterEach, describe, expect, it } from "vitest";
 import { makeApp } from "../../../../test-support/park/profileApp";
-import { createLiveApi } from "../../api/liveApi";
 import {
   APPEARANCE_COPY,
   ARIA_LABELS,
@@ -35,7 +34,8 @@ import {
   type TabId,
   USER,
   switchLabel,
-} from "./profileExpect";
+} from "../../../../test-support/park/profileExpect";
+import { createLiveApi } from "../../api/liveApi";
 import {
   buttonNamed,
   buttonWith,

@@ -23,7 +23,7 @@ import {
   TABS,
   USER,
   switchLabel,
-} from "./profileExpect";
+} from "../../../../test-support/park/profileExpect";
 import {
   buttonNamed,
   buttonWith,
