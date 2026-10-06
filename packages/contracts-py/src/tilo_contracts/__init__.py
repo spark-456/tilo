@@ -12,7 +12,7 @@
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
 # evals.schema.json 1.0.0 sha256:ac8bab7830371705
-# event.schema.json 1.0.0 sha256:06d09566f16c4dfc
+# event.schema.json 1.1.0 sha256:623dffe796a61450
 # events/data/agent.assigned.schema.json 1.0.0 sha256:f7672c62780b8b4b
 # events/data/agent.blocked.schema.json 1.0.0 sha256:a4b1f97998b1d554
 # events/data/agent.cloned.schema.json 1.0.0 sha256:99567a48c7c65f6f
@@ -729,6 +729,9 @@ type EventDistrictList = Annotated[list[DistrictId], Field(min_length=1)]
 
 
 type TokensIn = Annotated[int, Field(ge=0)]
+"""
+Every input token the model calls behind this event processed, cached tokens included (ADR-0022).
+"""
 
 
 type TokensOut = Annotated[int, Field(ge=0)]
@@ -2852,7 +2855,7 @@ Server-side redaction scope (PRD 10.1): all, or the districts whose viewers may 
 
 class EventTrace(BaseModel):
     """
-    Trace lens columns (PRD 9.6). Each field is null when the event made no model or tool call.
+    Trace lens columns (PRD 9.6). Each required field is null when the event made no model or tool call. tokens_cached (1.1.0, EFF-04, ADR-0022) is optional: left out means unknown, never zero; when present, tokens_in is a number and tokens_cached is at most tokens_in (EV-16).
     """
 
     model_config = ConfigDict(
@@ -2867,6 +2870,9 @@ class EventTrace(BaseModel):
     Profile name from config/models.yaml, never a model id.
     """
     tokens_in: TokensIn | None
+    """
+    Every input token the model calls behind this event processed, cached tokens included (ADR-0022).
+    """
     tokens_out: TokensOut | None
     tool: Slug | None
     """
@@ -2874,6 +2880,10 @@ class EventTrace(BaseModel):
     """
     latency_ms: LatencyMs | None
     archive_ref: EventArchiveRef | None
+    tokens_cached: Annotated[int | None, Field(ge=0)] = None
+    """
+    Input tokens the provider served from its prompt cache, a part of tokens_in (EFF-04, ADR-0022). Set only when the provider reported a cached count for every model call behind this event; 0 is a reported miss. Left out means unknown, never zero; never null.
+    """
 
 
 class AgentContextHandoffCompletedData(BaseModel):
@@ -3931,7 +3941,7 @@ class Decision(BaseModel):
 
 class Event(BaseModel):
     """
-    TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-14 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.
+    TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-16 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.
     """
 
     model_config = ConfigDict(

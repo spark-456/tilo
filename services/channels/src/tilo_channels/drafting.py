@@ -190,8 +190,8 @@ def _envelope(message: Mapping[str, Any], own: str, mode: str) -> dict[str, Any]
     return envelope | {"references": " ".join(references)}
 
 
-def _parse(text: str | None) -> tuple[str, list[str]] | None:
-    if text is not None and len(text) > CHECK_CAP:  # also bounds the body and questions find_invented reads
+def _parse(text: str | None, cap: int = CHECK_CAP) -> tuple[str, list[str]] | None:
+    if text is not None and len(text) > cap:  # also bounds the body and questions find_invented reads
         return None
     try:
         answer = json.loads(text or "")
@@ -246,7 +246,7 @@ class Drafter:
         user_id: str,
         *,
         instruction_id: str,
-        thread_id: str,
+        thread_id: str | None,
         instruction: str,
         mailbox: str,
         mode: str = "reply",
@@ -257,6 +257,8 @@ class Drafter:
         """`answers` (optional) is the reader id of the message the draft must answer (FR-PA-07). If the thread no
         longer gives a reply to that message, `ReplyTargetMoved` is raised before anything is stored or emitted and
         before the model is called; a draft already stored for `instruction_id` is returned as it is."""
+        if not isinstance(thread_id, str) or not thread_id:  # a thread-less (new email) context has nothing to reply to
+            raise ValueError("a reply is drafted from a thread")
         if mode not in MODES or (preset is not None and preset not in PRESETS) or "#" in instruction_id:
             raise ValueError("unknown drafting mode, preset or instruction id")
         if len(instruction) > MAX_INSTRUCTION:

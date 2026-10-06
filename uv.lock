@@ -1380,6 +1380,7 @@ dependencies = [
     { name = "tilo-harness" },
     { name = "tilo-memory" },
     { name = "tilo-metering" },
+    { name = "tilo-people" },
     { name = "tilo-planning" },
     { name = "tilo-policy" },
     { name = "tilo-world" },
@@ -1400,6 +1401,7 @@ requires-dist = [
     { name = "tilo-harness", editable = "services/harness" },
     { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-metering", editable = "packages/metering" },
+    { name = "tilo-people", editable = "packages/people" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-world", editable = "packages/world" },
@@ -1464,6 +1466,7 @@ dependencies = [
     { name = "tilo-archive" },
     { name = "tilo-contracts" },
     { name = "tilo-policy" },
+    { name = "tzdata" },
     { name = "uvicorn" },
 ]
 
@@ -1477,6 +1480,7 @@ requires-dist = [
     { name = "tilo-archive", editable = "packages/archive" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tzdata", specifier = ">=2024.1" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 
@@ -1501,7 +1505,10 @@ dependencies = [
     { name = "pyyaml" },
     { name = "referencing" },
     { name = "tilo-api" },
+    { name = "tilo-archive" },
     { name = "tilo-contracts" },
+    { name = "tilo-harness" },
+    { name = "tilo-memory" },
     { name = "tilo-metering" },
     { name = "tilo-planning" },
     { name = "tilo-providers" },
@@ -1514,7 +1521,10 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-api", editable = "services/api" },
+    { name = "tilo-archive", editable = "packages/archive" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-harness", editable = "services/harness" },
+    { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-metering", editable = "packages/metering" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-providers", editable = "packages/providers" },
@@ -1651,6 +1661,7 @@ name = "tilo-providers"
 version = "0.1.0"
 source = { editable = "packages/providers" }
 dependencies = [
+    { name = "google-auth", extra = ["requests"] },
     { name = "google-genai" },
     { name = "httpx" },
     { name = "jsonschema" },
@@ -1659,6 +1670,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "google-auth", extras = ["requests"], specifier = ">=2.0" },
     { name = "google-genai", specifier = ">=1.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.18" },

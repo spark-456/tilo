@@ -27,6 +27,11 @@ profiles:
   flash-37: { input: 0.75, output: 3.75 } # promotional through 2026-12-31; 1.50 / 7.50 from 2027-01-01
   lite-31: { input: 0.25, output: 1.50 }
   # The profiles below make no paid call, so their price is 0 by decision (PL-06, 2026-10-04):
+  # Model Armor bills per token screened, so it is an input price and output is 0. US$0.10 per 1M tokens
+  # (standalone; the first 2M tokens a month are free, not modelled here), from
+  # https://cloud.google.com/security/products/model-armor and
+  # https://cloud.google.com/security-command-center/pricing, read 2026-10-06.
+  armor-default: { input: 0.10, output: 0 }
   safety-fake: { input: 0, output: 0 } # the dev fake safety screen; makes no paid call
   director-dev: { input: 0, output: 0 } # config/models.dev.yaml's fake Director; makes no paid call
   # PL-02/ADR-0003: config/models.nim.yaml's profiles need a price entry too --

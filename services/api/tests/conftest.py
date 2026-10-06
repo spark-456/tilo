@@ -156,3 +156,35 @@ def sec15_factory(monkeypatch: pytest.MonkeyPatch):
 
     yield make
     _sec15_lib.close()
+
+
+# --- PPL-11a (people API: quotes, plate, confirm, writes): see API_PPL_11a.md and _ppl11a_lib.py ----------------------
+
+
+@pytest.fixture()
+def people_rig(monkeypatch: pytest.MonkeyPatch):
+    """`make(org=..., now=..., deployed=False, access=None)` -> a `Rig` over the real app with every people seam
+    faked (stores, artifact store, redactor, clock, plate sources, source owners)."""
+    import _ppl11a_lib
+
+    made: list[_ppl11a_lib.Rig] = []
+
+    def make(**kwargs):
+        rig = _ppl11a_lib.Rig(monkeypatch, **kwargs)
+        made.append(rig)
+        return rig
+
+    yield make
+    for rig in made:
+        rig.close()
+
+
+def pytest_collection_modifyitems(items):
+    """PPL-11a: tests that need a slice B or C route are strict xfails until that slice lands (`SLICE_BC_PENDING`)."""
+    if not any("test_PPL_11a_" in item.nodeid for item in items):
+        return
+    from _ppl11a_lib import SLICE_BC_PENDING
+
+    for item in items:
+        if "test_PPL_11a_" in item.nodeid and any(entry in item.nodeid for entry in SLICE_BC_PENDING):
+            item.add_marker(pytest.mark.xfail(strict=True, reason="PPL-11a slice B/C"))
