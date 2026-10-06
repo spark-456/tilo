@@ -98,9 +98,12 @@ def build_router(
         owner, now = owner_of(world_id), _now()
         return {r["user"] for r in records if r.get("domain") == domain and _assigned(r, owner, now)}
 
-    def visible(proposal: dict | None, principal: deps.Principal, domains: set[str]) -> dict | None:
-        mine = proposal is not None and proposal["provenance"]["proposed_by"] == principal.user_id
-        return proposal if proposal is not None and (proposal["domain"] in domains or mine) else None
+    def visible(proposal: dict | None, principal: deps.Principal, domains: set[str], world_id: str) -> dict | None:
+        """The proposal if it belongs to this world and the caller holds its domain or proposed it; else None."""
+        if proposal is None or proposal["provenance"]["world_id"] != world_id:
+            return None  # another world's proposal is never listed, shown or decided, whatever the domain slug
+        mine = proposal["provenance"]["proposed_by"] == principal.user_id
+        return proposal if proposal["domain"] in domains or mine else None
 
     @router.post("/worlds/{world_id}/skill-proposals")
     def promote(
@@ -133,7 +136,7 @@ def build_router(
         store: SkillProposals = Depends(get_proposals),  # a closure name: not resolvable inside Annotated
     ) -> dict[str, Any]:
         domains = {r["domain"] for r in leads(principal, world_id, records)}
-        return {"proposals": [p for p in store.list() if visible(p, principal, domains)]}
+        return {"proposals": [p for p in store.list() if visible(p, principal, domains, world_id)]}
 
     @router.get("/worlds/{world_id}/skill-proposals/{proposal_id}")
     def one(
@@ -144,7 +147,7 @@ def build_router(
         store: SkillProposals = Depends(get_proposals),  # a closure name: not resolvable inside Annotated
     ) -> dict[str, Any]:
         domains = {r["domain"] for r in leads(principal, world_id, records)}
-        if (found := visible(store.get(proposal_id), principal, domains)) is None:
+        if (found := visible(store.get(proposal_id), principal, domains, world_id)) is None:
             raise HTTPException(status_code=404)
         return {"proposal": found}
 
@@ -158,7 +161,7 @@ def build_router(
         **kw: Any,
     ) -> JSONResponse:
         domains = {r["domain"] for r in leads(principal, world_id, records)}
-        found = visible(store.get(proposal_id), principal, domains)
+        found = visible(store.get(proposal_id), principal, domains, world_id)
         if found is None:
             raise HTTPException(status_code=404)
         try:

@@ -37,6 +37,7 @@ _SKILL_ID = re.compile(r"[a-z][a-z0-9]*([_-][a-z0-9]+)*")
 _SEMVER = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)")
 _REVIEWER = re.compile(r"[A-Za-z0-9_.@-]{1,80}")
 _HEADING = "## Team Lead guidance"
+_REVIEWER_STANDIN = "<the approving expert, filled in by code>"
 # a fresh copy of the patterns of scripts/secret_scan.py (that script is never imported)
 _SECRETS = [
     re.compile(p)
@@ -56,7 +57,20 @@ _SECRETS = [
         r"\"type\"\s*:\s*\"service_account\"",
     )
 ]
-_ALLOWED_FORMAT = {"‌", "‍"}  # joiners, for emoji and some scripts; every other format character is refused
+# Unicode Default_Ignorable_Code_Point (DerivedCoreProperties.txt; `unicodedata` has no such property): invisible in a
+# diff, so they can hide a key's halves or a payload. All refused, but one VS15/VS16 then one joiner after a visible
+# base character.
+_IGNORABLE = (
+    (0xAD, 0xAD), (0x34F, 0x34F), (0x61C, 0x61C), (0x115F, 0x1160), (0x17B4, 0x17B5), (0x180B, 0x180F),
+    (0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x206F), (0x3164, 0x3164), (0xFE00, 0xFE0F), (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0), (0xFFF0, 0xFFF8), (0x1BCA0, 0x1BCA3), (0x1D173, 0x1D17A), (0xE0000, 0xE0FFF),
+)  # fmt: skip
+_JOINERS = {"\u200c", "\u200d"}
+_VARIATION = {"\ufe0e", "\ufe0f"}
+
+
+def _ignorable(char: str) -> bool:
+    return any(lo <= ord(char) <= hi for lo, hi in _IGNORABLE)
 
 
 class SkillProposalError(Exception):
@@ -73,29 +87,44 @@ def _now() -> str:
 
 
 def _scan_secrets(sample: str) -> None:
-    """Refuses secret-looking text, judged on the NFKC form with format and control characters dropped, so a
-    full-width or zero-width-split token is still the token."""
-    flat = "".join(
-        c for c in unicodedata.normalize("NFKC", sample) if unicodedata.category(c) not in {"Cf", "Cc", "Cs"}
-    )
+    """Refuses secret-looking text, judged on the NFKC form with every invisible character dropped (format, control,
+    default-ignorable), so a full-width, zero-width or variation-selector-split token is still the token."""
+
+    def visible(value: str) -> str:
+        return "".join(
+            c
+            for c in unicodedata.normalize("NFKC", value)
+            if unicodedata.category(c) not in {"Cf", "Cc", "Cs"} and not _ignorable(c)
+        )
+
+    flat = visible(visible(sample))  # a second pass: dropping can leave a pair that normalises into something new
     if any(p.search(flat) or p.search(sample) for p in _SECRETS):
         raise SkillProposalError("secret_in_content")
 
 
 def _clean(text: Any, *, limit: int) -> str:
     """The text as stored: LF line ends, trimmed; refused if too long, blank, secret-looking, or holding anything but
-    plain printable text (surrogates, control, bidi and other format characters, line separators)."""
+    plain printable text: no surrogate, control, line separator or invisible default-ignorable character, except one
+    VS15/VS16 and one joiner right after a visible character (emoji sequences). Runs of them are refused."""
     if not isinstance(text, str):
         raise SkillProposalError("invalid_text")
     if len(text) > limit:
         raise SkillProposalError("too_large")
     text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    base, varied, joined = False, False, False  # the last visible char; a VS / joiner has followed it
     for char in text:
         category = unicodedata.category(char)
-        if category in {"Cs", "Zl", "Zp", "Co", "Cn"} or (
-            (category == "Cc" and char not in "\n\t") or (category == "Cf" and char not in _ALLOWED_FORMAT)
-        ):
+        if category in {"Cs", "Zl", "Zp", "Co", "Cn"} or (category == "Cc" and char not in "\n\t"):
             raise SkillProposalError("invalid_text")
+        if char in _VARIATION or char in _JOINERS:
+            is_vs = char in _VARIATION
+            if not base or joined or (is_vs and varied):
+                raise SkillProposalError("invalid_text")
+            varied, joined = varied or is_vs, joined or not is_vs
+        elif category == "Cf" or _ignorable(char):
+            raise SkillProposalError("invalid_text")
+        else:
+            base, varied, joined = not char.isspace(), False, False
     if not text:
         raise SkillProposalError("empty")
     _scan_secrets(text)
@@ -211,8 +240,8 @@ class SkillProposals:
             raise SkillProposalError("too_large")
         to_version = _bump(loaded.version)
         data = yaml.safe_load(raw_yaml)
-        new_yaml = _render_yaml(raw_yaml.decode("utf-8"), data, version=to_version, reviewer=None)
-        _render_yaml(raw_yaml.decode("utf-8"), data, version=to_version, reviewer="u_probe")  # approval must be able to
+        # the shown skill.yaml carries a stand-in reviewer: code fills in the approving expert's user id on approval
+        new_yaml = _render_yaml(raw_yaml.decode("utf-8"), data, version=to_version, reviewer=_REVIEWER_STANDIN)
         where = f"skills/{folder.parent.name}/{skill_id}"
         diff = (
             _udiff(f"{where}/SKILL.md", old_body, body)

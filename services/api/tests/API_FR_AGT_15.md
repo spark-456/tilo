@@ -41,6 +41,7 @@ class SkillProposals:
 | `diff` | one unified diff of the skill before and after: a section for `SKILL.md` and one for `skill.yaml` (the version bump), each `--- a/...` / `+++ b/...`, hunks `@@`; applying the SKILL.md section to the old file gives `proposed_body` exactly |
 | `provenance` | `decision_id` (which answer), `card_id`, `team_lead` (Team Lead id), `team_lead_user`, `world_id`, `run_id` (which run), `proposed_by`, `proposed_at` |
 | `reviewed_by`, `reviewed_at` | null until approved or rejected |
+| `review_note` | null, or the expert's `reject(reason=)` text (at most 500 characters, same text and secret checks as guidance), stored as data |
 
 ### Rules
 
@@ -59,6 +60,9 @@ class SkillProposals:
 | `not_expert` | `reviewer` is empty or not in `experts` |
 | `already_decided` | the proposal is not `proposed` any more |
 | `stale` | the skill's files changed since `base_sha256`; nothing is written |
+| `too_many_open` | the proposer already has 20 open (`proposed`) proposals; 409 at the API |
+| `invalid_text` | surrogate, control or line-separator character, or an invisible Default_Ignorable character (CGJ, variation selectors, Hangul fillers, tag characters, ...) other than one VS15/VS16 and one joiner right after a visible character; also checked on `reason` |
+| `unsupported_skill` | skill.yaml has no single top-level `version:`/`reviewer:` line or a non-plain-semver version, so code cannot edit it safely |
 | `unknown_proposal` | no such id |
 
 Approve writes `skills/<domain>/<id>/SKILL.md` (= `proposed_body`, UTF-8, LF) and `skill.yaml` (`version` = `to_version`,
@@ -85,6 +89,10 @@ via `owner_of`, `assigned_by.at` not in the future). A principal whose `world_id
 | `GET /worlds/{w}/skill-proposals/{id}` | same scope | 200 `{"proposal": {...}}`; outside it 404 (no existence oracle) |
 | `POST .../{id}/approve` body `{}` (`extra=forbid`) | role `team_lead`, a current record of the skill's domain, not the proposer | 200 `{"proposal": {...}}`; 403 (404 for a domain they cannot see) anyone else, including the owner as such, a Viewer, an Approver, the proposer, a removed or not-owner-assigned Team Lead; 4xx `{"error": reason}` for `already_decided`/`stale` |
 | `POST .../{id}/reject` body `{reason?}` | same as approve | 200; skill unchanged |
+
+A proposal belongs to the world of its Decision (`provenance.world_id`): list, get, approve and reject treat another world's proposal as absent (404 / omitted), whatever the domain slug.
+
+The `skill.yaml` section of the diff shows `reviewer` as `<the approving expert, filled in by code>`; approval writes the approver's user id.
 
 Identity is the verified principal only: no body field names a proposer, reviewer, status or role.
 
