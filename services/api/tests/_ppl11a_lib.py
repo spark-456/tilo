@@ -59,6 +59,30 @@ PEOPLE_ROUTES = (
 )
 
 
+# Tests that only slice B (plate) or slice C (writes) turn green: they call a route that slice A does not have. They are
+# marked `xfail(strict=True)` by `pytest_collection_modifyitems` in `conftest.py`. Slice B and C each delete the entries
+# their routes make green (strict: a test that passes unmarked fails the run) and restore their own test files from
+# `origin/tests/PPL-11a-people-api`. Entries are substrings of the pytest node id.
+SLICE_BC_PENDING = (
+    "test_PPL_11a_SEC_15_the_people_routes_exist_and_none_of_them_is_public",
+    "refused_before_anything_is_touched[GET /v1/plate]",
+    "refused_before_anything_is_touched[POST /v1/meetings/{meeting_id}/confirm]",
+    "refused_before_anything_is_touched[POST /v1/work-items/{work_item_id}/confirm]",
+    "refused_before_anything_is_touched[POST /v1/meetings]",
+    "refused_before_anything_is_touched[POST /v1/people]",
+    "refused_before_anything_is_touched[POST /v1/work-items]",
+    "lets_nobody_in[GET /v1/plate]",
+    "lets_nobody_in[POST /v1/meetings]",
+    "test_PPL_11a_SEC_15_a_judge_reaches_the_routes_own_rules_unchanged",
+    "test_PPL_11a_PE_19_every_people_route_is_503_not_configured_until_its_seams_are_wired",
+    "test_PPL_11a_PE_19_each_route_needs_exactly_the_seams_it_uses",
+    "test_PPL_11a_PE_17_dev_mode_serves_its_one_owner_an_empty_plate",
+    "test_PPL_11a_EFF_01_the_dev_people_stores_are_one_in_memory_set",
+    "test_PPL_11a_SEC_16_serving_people_requests_builds_no_router_and_reads_no_flag",
+    "test_PPL_11a_PE_19_an_item_with_a_huge_history_is_unreadable",
+)
+
+
 # --- the reference oracle (tests/contracts/test_CC_PEOPLE_3_quotes_and_plate.py) -----------------------------------
 
 
