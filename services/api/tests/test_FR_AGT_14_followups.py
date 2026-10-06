@@ -201,32 +201,8 @@ def test_FR_AGT_14_the_starter_with_no_seams_raises_the_uncounted_skip_and_creat
     assert set(sched.store.worlds) == worlds
 
 
-def test_FR_AGT_14_through_the_tick_unwired_seams_never_count_against_a_schedule(sched: SchedApi) -> None:
-    """The seams factory answers None (unwired). 25 schedules, 20 ticks a minute apart: none is disabled, backed off or
-    given a failure, and the slot stays the same."""
-    from tilo_api import schedules
-
-    sched.app.dependency_overrides[schedules.get_seams_factory] = lambda: lambda: None
-    task = sched.approved_task()
-    ids = [f"sched_u{n:02d}" for n in range(25)]
-    for schedule_id in ids:
-        sched.insert(task, schedule_id)
-    worlds = set(sched.store.worlds)
-    assert 20 > MAX_FAILURES
-    for minute in range(20):
-        sched.clock.set(MON_0330Z + timedelta(minutes=minute))
-        response = sched.tick()
-        assert (response.status_code, response.json()) == (200, {"fired": 0})
-    for schedule_id in ids:
-        got = sched.schedules.get(schedule_id)
-        assert (got.enabled, got.failures, got.last_error, got.backoff_until, got.next_due) == (
-            True,
-            0,
-            None,
-            None,
-            MON_0330Z,
-        ), schedule_id
-    assert set(sched.store.worlds) == worlds
+# (FR-AGT-14e retired `..._through_the_tick_unwired_seams_never_count_against_a_schedule`: the tick no longer runs
+# anything, so unwired seams are met by the task's delivery; `test_FR_AGT_14e_unwired_run_seams_are_retryable_...`.)
 
 
 # --- 4. PATCH enabled:true moves a stale next_due -------------------------------------------------------------------

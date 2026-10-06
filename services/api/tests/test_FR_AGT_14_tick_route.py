@@ -276,7 +276,8 @@ def test_FR_AGT_14_a_due_schedule_fires_once_and_a_scheduler_retry_fires_nothing
     run_sched.insert(source, "sched_a")
     run_sched.store.policies["pol_auto_budget"] = l3_budget_policy()
     first = run_sched.tick()
-    assert (first.status_code, first.json()) == (200, {"fired": 1})
+    assert (first.status_code, first.json()) == (200, {"fired": 1})  # FR-AGT-14e: handed to Cloud Tasks, not run here
+    assert run_sched.deliver_new_tasks() == 1  # the task's own delivery runs it
     assert run_sched.tick().json() == {"fired": 0}
     world_id = run_sched.schedules.get("sched_a").last_world_id
     assert world_id and world_id != source.world_id

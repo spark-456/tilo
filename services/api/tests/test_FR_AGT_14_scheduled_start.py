@@ -14,6 +14,12 @@ in-memory schedule store on a fake clock, and the CL-INT-2 run seams (scripted u
   not starve a healthy 21st.
 
 API_FR_AGT_14b.md pins every name used here. No model call, no network, no sleep beyond the scripted runner's polling.
+
+FR-AGT-14e (API_FR_AGT_14e.md) changed WHERE the start happens: the tick only hands each due slot to Cloud
+Tasks, and the task's own delivery (the same route, the Tasks identity) executes the run. `fire()` below therefore
+ticks AND delivers what the tick enqueued, and returns the number of runs that executed; a start that fails, unwired
+seams and the tick's rate limit are now pinned in `test_FR_AGT_14e_*.py` (the inline versions of those tests were
+retired there).
 """
 
 from __future__ import annotations
@@ -35,6 +41,7 @@ from _fr_agt_14_lib import (
     WEEK,
     SchedApi,
     l3_budget_policy,
+    task_payload,
 )
 from tilo_harness.schedule import RunStart, slot_key, world_requested_kwargs
 
@@ -58,10 +65,12 @@ def armed(rig: SchedApi, **policy: Any) -> Any:
 
 
 def fire(rig: SchedApi, at: Any = MON_0330Z) -> int:
+    """One minute of the Clock Tower (FR-AGT-14e): the Scheduler's tick, then Cloud Tasks delivering what it enqueued.
+    Returns how many runs executed."""
     rig.clock.set(at)
     response = rig.tick()
     assert response.status_code == 200, response.text
-    return response.json()["fired"]
+    return rig.deliver_new_tasks()
 
 
 def world_of(rig: SchedApi, schedule_id: str) -> str:
@@ -270,18 +279,16 @@ def test_FR_AGT_14_without_a_covering_owner_policy_the_firing_is_skipped_and_ret
     sid = rig.created(source)["schedule_id"]
     compiled = len(rig.rf.compile_calls)
 
-    assert fire(rig) == 0
+    assert fire(rig) == 0  # (14e) the slot went to Cloud Tasks; its delivery was refused with a 2xx, never retried
 
     record = rig.schedules.get(sid)
     assert rig.worlds_besides(source.world_id) == []  # no world, no events, no run
     assert len(rig.rf.compile_calls) == compiled
-    assert (record.failures, record.last_error) == (1, "budget_not_granted")
-    assert record.next_due == MON_0330Z + WEEK and record.last_world_id is None and record.last_slot is None
-    assert record.backoff_until is not None and record.backoff_until > MON_0330Z
+    assert record.next_due == MON_0330Z + WEEK  # the slot is spent: it is retried next week, not every minute
 
     for step in (timedelta(minutes=1), timedelta(hours=6), timedelta(days=3)):  # not every minute
         assert fire(rig, MON_0330Z + step) == 0
-    assert rig.schedules.get(sid).failures == 1
+    assert len(rig.tasks.calls) == 1  # one task for the slot, none for the minutes after it
     assert rig.worlds_besides(source.world_id) == []
 
     if NOT_COVERED[label] is not None:
@@ -300,9 +307,8 @@ def test_FR_AGT_14_a_policy_with_one_grant_a_day_covers_one_schedule_per_day_acr
     rig.insert(source, "sched_a")
     rig.insert(source, "sched_b")
     assert fire(rig) == 1  # the second one meets the policy's daily allowance, counted over the owner's earlier grants
+    assert len(rig.tasks.calls) == 2  # (14e) both slots were handed over; only one delivery found a budget
     assert rig.schedules.get("sched_a").last_world_id
-    skipped = rig.schedules.get("sched_b")
-    assert (skipped.last_world_id, skipped.failures, skipped.last_error) == (None, 1, "budget_not_granted")
     assert len(rig.worlds_besides(source.world_id)) == 1
     settled(rig, world_of(rig, "sched_a"))
 
@@ -368,14 +374,19 @@ def test_FR_AGT_14_each_firing_is_offered_the_previous_world_and_never_reuses_it
     second = world_of(rig, sid)
     second_stream = settled(rig, second)
 
-    assert [r.prior_world_id for r in seen] == [None, first]
+    # (14e) a task's body names no prior world, so what the start is offered is open (BQ): the previous world or none,
+    # but never the world being started itself
+    assert seen[0].prior_world_id is None
+    assert seen[1].prior_world_id in (None, first) and seen[1].prior_world_id != world_of(rig, sid)
     assert [r.slot for r in seen] == [MON_0330Z, MON_0330Z + WEEK]
     assert second != first and WORLD_ID.match(second)
     assert not first_ids & {e["id"] for e in second_stream}  # offered, never silently reused
     assert rig.schedules.get(sid).last_slot == slot_key(sid, MON_0330Z + WEEK)
 
 
-def test_FR_AGT_14_missed_slots_collapse_into_one_run_and_one_info_alert_in_its_world(rig: SchedApi, registry) -> None:
+def test_FR_AGT_14_missed_slots_collapse_into_one_run_and_the_world_starts_with_world_requested(rig: SchedApi) -> None:
+    """(14e) The info `alert.raised` this test used to pin in the new world is not part of the hand-off: a task's body
+    carries no count of skipped slots and the world does not exist yet at fan-out (BQ-AGT14-5)."""
     source = armed(rig)
     sid = rig.created(source)["schedule_id"]
     assert fire(rig, MON_0330Z + 3 * WEEK + timedelta(days=2)) == 1
@@ -383,9 +394,7 @@ def test_FR_AGT_14_missed_slots_collapse_into_one_run_and_one_info_alert_in_its_
     stream = settled(rig, world_id)
     assert rig.schedules.get(sid).next_due == MON_0330Z + 4 * WEEK
     assert rig.schedules.get(sid).last_slot.startswith(f"{sid}:")  # (complete() records the claimed slot's key)
-    (alert,) = [e for e in stream if e["type"] == "alert.raised"]
-    assert alert["severity"] == "info" and alert["data"]["card_id"] is None and "3" in alert["summary"]
-    assert_valid_event(REPO_ROOT, registry, alert)
+    assert stream[0]["type"] == "world.requested" and stream[0]["seq"] == 1
     assert len(rig.worlds_besides(source.world_id)) == 1  # no backfill storm
 
 
@@ -437,11 +446,10 @@ def test_FR_AGT_14_a_schedule_disabled_between_the_claim_and_the_start_fires_not
         return won
 
     monkeypatch.setattr(rig.schedules, "claim", claim_then_disable)
-    assert fire(rig) == 0
+    assert fire(rig) == 0  # (14e) at most a task that the delivery refuses (the record is read again there)
     record = rig.schedules.get(sid)
     assert rig.worlds_besides(source.world_id) == []
     assert (record.failures, record.last_error, record.enabled) == (0, None, False)
-    assert record.next_due == MON_0330Z
     assert record.backoff_until is None
 
 
@@ -461,12 +469,10 @@ def test_FR_AGT_14_replay_only_holds_the_slot_and_it_fires_once_when_the_flag_cl
 # --- failures: unwired seams, a start that raises, a failing schedule that must not starve another --------------------
 
 
-def test_FR_AGT_14_with_the_run_seams_unwired_the_firing_is_skipped_without_a_failure_and_retried_next_tick(
-    rig: SchedApi,
-) -> None:
-    """FR-AGT-14d item 3 (changed deliberately from FR-AGT-14b, which pinned `failures == 1` and a backoff here):
-    unwired seams are a GLOBAL condition, not this schedule's fault, so nothing is counted against it. The claim is
-    released, `failures` stays 0, there is no backoff and the same slot is claimable on the very next tick."""
+def test_FR_AGT_14_with_the_run_seams_unwired_the_delivery_is_retried_and_nothing_is_counted(rig: SchedApi) -> None:
+    """FR-AGT-14d item 3, in the 14e shape: unwired seams are a GLOBAL condition, not this schedule's fault. The tick
+    still hands the slot over (it runs nothing); the task's delivery answers a retryable 5xx, creates nothing and counts
+    nothing against the schedule, and the very same task runs once the seams are wired."""
     from tilo_api import deps
 
     source = armed(rig)
@@ -476,81 +482,17 @@ def test_FR_AGT_14_with_the_run_seams_unwired_the_firing_is_skipped_without_a_fa
         raise NotImplementedError("no artifact store is configured, so no run starts")
 
     rig.app.dependency_overrides[deps.get_artifact_store] = unwired
-    assert fire(rig) == 0
+    rig.clock.set(MON_0330Z)
+    assert rig.tick().json() == {"fired": 1}
+    (task,) = rig.tasks.calls
+    for _ in range(2):
+        response = rig.task_call(task_payload(task))
+        assert 500 <= response.status_code < 600
     record = rig.schedules.get(sid)
     assert rig.worlds_besides(source.world_id) == []
-    assert (record.failures, record.last_error, record.next_due) == (0, None, MON_0330Z)
-    assert record.backoff_until is None  # no backoff
-    assert record.enabled is True
-    assert fire(rig, MON_0330Z + timedelta(seconds=30)) == 0  # still unwired: tried again, nothing counted
-    assert (rig.schedules.get(sid).failures, rig.schedules.get(sid).backoff_until) == (0, None)
+    assert (record.failures, record.last_error, record.backoff_until, record.enabled) == (0, None, None, True)
 
     rig.app.dependency_overrides[deps.get_artifact_store] = lambda: rig.rf.rig.store  # wired again
-    assert fire(rig, MON_0330Z + timedelta(seconds=60)) == 1  # the slot was claimable at once: no backoff to wait out
+    assert rig.task_call(task_payload(task)).json()["ran"] == 1  # Cloud Tasks' retry of the same task
     assert rig.schedules.get(sid).last_slot == slot_key(sid, MON_0330Z)  # the same slot, not a later one
     settled(rig, world_of(rig, sid))
-
-
-def test_FR_AGT_14_a_run_that_cannot_start_releases_the_claim_backs_off_and_leaves_one_world_on_retry(
-    rig: SchedApi, monkeypatch
-) -> None:
-    from tilo_api import runs
-
-    source = armed(rig)
-    sid = rig.created(source)["schedule_id"]
-    original, calls = runs.start_run, []
-
-    def flaky(*args: Any, **kwargs: Any) -> Any:
-        calls.append(1)
-        if len(calls) == 1:
-            raise RuntimeError("scheduler says: api key s3cret-value for alice@example.com is invalid")
-        return original(*args, **kwargs)
-
-    monkeypatch.setattr(runs, "start_run", flaky)
-    rig.clock.set(MON_0330Z)
-    response = rig.tick()
-    assert response.status_code == 200 and response.json() == {"fired": 0}
-    for leaked in ("s3cret", "alice", "scheduler says"):
-        assert leaked not in response.text
-    record = rig.schedules.get(sid)
-    assert (record.failures, record.next_due, record.last_slot) == (1, MON_0330Z, None)
-    assert CODE.match(record.last_error) and "s3cret" not in record.last_error  # a fixed code, never the text
-    assert record.backoff_until > MON_0330Z
-    assert fire(rig, MON_0330Z + timedelta(seconds=10)) == 0  # backed off
-    assert len(calls) == 1
-
-    assert fire(rig, record.backoff_until) == 1  # the claim was released: the same slot starts
-    world_id = world_of(rig, sid)
-    wait_for(lambda: rig.events(world_id, "world.started"), what="the retried run")
-    settled(rig, world_id)
-    assert rig.worlds_besides(source.world_id) == [world_id]  # whatever the failed attempt made is this very world
-    for once in ("world.requested", "budget.granted", "world.started"):
-        assert types(rig, world_id).count(once) == 1, once
-    assert rig.schedules.get(sid).last_slot == slot_key(sid, MON_0330Z)
-
-
-def test_FR_AGT_14_twenty_failing_schedules_do_not_starve_a_healthy_twenty_first(rig: SchedApi, monkeypatch) -> None:
-    from tilo_api import runs
-
-    source = armed(rig)
-    rig.store.policies["pol_bad"] = l3_budget_policy("u_bad", id_="pol_bad", per_day=500)
-    rig.store.policies[POLICY_ID] = l3_budget_policy(per_day=500)
-    original = runs.start_run
-
-    def selective(store: Any, task: Any, **kwargs: Any) -> Any:
-        if task.owner == "u_bad":
-            raise RuntimeError("this owner's runs cannot start")
-        return original(store, task, **kwargs)
-
-    monkeypatch.setattr(runs, "start_run", selective)
-    for n in range(20):  # older than the healthy one, so they sort first
-        rig.insert(source, f"sched_bad{n:02d}", owner_user_id="u_bad", next_due=MON_0330Z - WEEK)
-    rig.insert(source, "sched_good")
-
-    assert fire(rig) == 0  # the rate limit: 20 attempts, all failing
-    assert rig.schedules.get("sched_good").last_world_id is None
-    assert fire(rig, MON_0330Z + timedelta(seconds=30)) == 1  # the 20 are backed off: the healthy one runs now
-    world_id = world_of(rig, "sched_good")
-    wait_for(lambda: rig.events(world_id, "world.started"), what="the healthy run")
-    settled(rig, world_id)
-    assert all(rig.schedules.get(f"sched_bad{n:02d}").failures == 1 for n in range(20))  # none was retried meanwhile
