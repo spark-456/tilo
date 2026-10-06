@@ -134,8 +134,8 @@ def _created(request: AccessRequest, after: Mapping[str, Any], directory: Direct
                 wrong = wrong or assigner is None or assigner["at"] != now
             else:
                 wrong = wrong or (assigner is not None and assigner != stamp)
-        if after["created_by"]["by"] == "person" and not _manual_source(after.get("source")):
-            wrong = True  # a person-made record cannot claim a Google, Tilo or meeting origin (PE-08)
+        if after["created_by"]["by"] == "person" and _claims_tilos_origin(kind, after.get("source")):
+            wrong = True  # a person-made record cannot claim an origin that is Tilo's (PE-08)
         if kind == "work_item" and after["snoozed_until"] is not None and not _snooze_ok(now, after["snoozed_until"]):
             found.add("snooze_range")
         if kind == "pinboard_item" and not _owner_ok(after, directory, now):
@@ -270,8 +270,11 @@ def _owner_ok(pin: Mapping[str, Any], directory: Directory, now: str) -> bool:
     return person is not None and person["org_id"] == pin["org_id"] and directory.is_member(owner, scope["team"], now)
 
 
-def _manual_source(source: Mapping[str, Any] | None) -> bool:
-    return source is None or source.get("kind") == "manual"
+def _claims_tilos_origin(kind: str, source: Mapping[str, Any] | None) -> bool:
+    """Only Tilo's own origins: a Google or Tilo calendar source, a meeting source on a work item or pin. A
+    person makes work items from mail, pinboard items and requests too (FR-PA-01, PE-08)."""
+    source_kind = None if source is None else source.get("kind")
+    return source_kind in (("google", "tilo") if kind == "calendar_entry" else ("meeting",))
 
 
 def _share_ok(entry: Mapping[str, Any], directory: Directory, now: str) -> bool:
