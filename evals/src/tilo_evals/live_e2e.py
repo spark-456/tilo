@@ -27,7 +27,6 @@ import re
 import sys
 import threading
 import time
-import uuid
 from collections.abc import Callable, Iterator, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -35,6 +34,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, Request
+from tilo_harness.outputs import UnitOutput
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.errors import ProviderError, QuotaError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
@@ -44,6 +44,7 @@ from tilo_providers.router import BudgetExceededError, Router
 from tilo_providers.safety import FakeSafetyProvider
 from tilo_providers.vertex_smoke import MAX_REASON_CHARS, classify, scrubbed_server_text
 
+from . import e2e_stand_ins
 from .bank import BankCase, BankError, load_bank
 from .bank_checks import CHECKS, Finding, check_case, terminal_honest
 from .bank_run import Observation, drive
@@ -613,11 +614,8 @@ class _UnitRunner:
             prompt = load_prompt("lead", "review.md", {"district": district, "work": _safe(work), **self._request()})
             review, spent = await asyncio.to_thread(self._ask, "lead", prompt)
             summary, credits = f"{summary} Lead review: {review[:200]}", credits + spent
-        ref = {
-            "artifact_id": f"art_live_{uuid.uuid4().hex[:20]}",
-            "version": 1,
-        }  # no artifact store yet: the item is a stand-in
-        return MeteredOutcome(success=True, summary=summary, artifact_refs=(ref,), credits=credits)
+        item = UnitOutput(media_type="text/markdown", content=text.encode("utf-8"))  # the executor stores it (ADR-0018)
+        return MeteredOutcome(success=True, summary=summary, outputs=(item,), credits=credits)
 
 
 def _safe(text: str) -> str:
@@ -676,6 +674,7 @@ def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) ->
             deps.get_router: lambda: router, deps.get_safety: lambda: safety, deps.get_plan_compiler: compiler,
             deps.get_unit_runner: lambda: runner, deps.get_action_resolver: lambda: resolve,
             deps.get_connector_adapters: lambda: adapters, deps.get_must_ask_providers: must_ask_providers,
+            **e2e_stand_ins.overrides(),  # the artifact store, redactor and raw archive the run needs (ADR-0018 T4)
         }
     )  # fmt: skip
     return app
