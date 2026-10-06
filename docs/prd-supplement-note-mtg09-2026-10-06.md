@@ -1,7 +1,7 @@
 # Supplement note: FR-MTG-09 becomes a bot-hosted meeting (6 Oct 2026)
 
 For the supervisor to fold into `docs/prd-supplement-2026-10-05.md` (this file does not edit it). Design:
-ADR-0024 (Proposed until the user confirms it in chat), `services/connectors/tests/API_FR_MTG_09.md`,
+ADR-0024 (Accepted, 6 Oct 2026), `services/connectors/tests/API_FR_MTG_09.md`,
 `docs/open-questions.md` BQ-MTG09-1 to BQ-MTG09-12. No contract change.
 
 ## Decision (user, 6 Oct 2026, relayed by the supervisor)

@@ -53,8 +53,9 @@ person's connectors as one Google grant (CON-D10).
    of ADR-0017 no longer applies.)
 7. **What the bot does at meeting time.** Signed in as the organizer, it opens the link and enters as host
    without admission, posts the versioned disclosure first (FR-MTG-01), leaves on `Tilo leave` (FR-MTG-10) and
-   never ends the call for everyone. It admits nobody by itself: invited attendees join under Meet's own rule
-   for calendar-invited accounts; a display-name allowlist is spoofable and the meet-bot's current
+   never ends the call for everyone. It admits only invited addresses (amendment 3, BQ-MTG09-15): invited
+   attendees join under Meet's own rule for calendar-invited accounts, a knock from any other account is not
+   admitted, and a display-name allowlist is never used because it is spoofable; the meet-bot's current
    admit-everyone default is off for hosted meetings. The link is never written to the bot's `out/` files,
    logs, events or the package it hands to Tilo. Its persistent profile stays on its named volume between
    meetings (amendment 3).
