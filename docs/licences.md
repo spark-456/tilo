@@ -79,6 +79,7 @@ loader. No new licence. FR-CON-02 adds `cryptography` for AES-GCM envelope encry
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | cryptography (`tilo_connectors.tokens`, FR-CON-02) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
+| tzdata (`tilo_connectors.calendar_sync`, FR-CAL-08: the IANA zone database `zoneinfo` needs on Windows) | Apache-2.0 | https://pypi.org/project/tzdata/ |
 
 FR-CON-10 (`tilo_connectors.provenance`) adds the in-workspace `tilo-archive` and `tilo-contracts`
 (not external). No new licence.
