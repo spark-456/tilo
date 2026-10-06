@@ -6,7 +6,7 @@ API_CL_INT_2.md.
 
 from __future__ import annotations
 
-from _clint2_lib import CAP, DRAFT_REF, OTHER_USER, wait_for
+from _clint2_lib import CAP, OTHER_USER, wait_for
 
 DELIVERY_KEYS = {"world_id", "artifacts", "credits_used", "time_saved"}
 ARTIFACT_KEYS = {"id", "title", "kind", "version"}
@@ -27,7 +27,8 @@ def test_CP2_delivery_returns_the_tilo_client_delivery_result(run_flow):
     assert [(a["id"], a["version"], a["kind"]) for a in body["artifacts"]] == [
         (e["data"]["artifact"]["artifact_id"], e["data"]["artifact"]["version"], e["data"]["format"]) for e in delivered
     ]
-    assert body["artifacts"][0]["id"] == DRAFT_REF["artifact_id"] and body["artifacts"][0]["kind"] == "email"
+    draft = run_flow.artifact_of("U4")  # the id the store minted for the draft that was sent
+    assert body["artifacts"][0]["id"] == draft["artifact_id"] and body["artifacts"][0]["kind"] == "email"
     assert all(isinstance(a["title"], str) and a["title"] for a in body["artifacts"])
     assert len(body["artifacts"]) == completed["deliverable_count"]
     assert body["credits_used"] == completed["credits_used"] and 0 <= body["credits_used"] <= CAP

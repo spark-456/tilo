@@ -3,10 +3,15 @@
 `keep` puts each output under the run's Scope with the idempotency key `<run_id>:<unit_id>:<attempt>:<index>` (AR-05)
 and stores a `created` manifest revision from `build_manifest` (FR-CON-10) for each version, before any event is
 written: the executor announces a version only once its bytes, record and manifest are all committed (HR-1). The store
-gets exactly `bytes(content)`, so a caller's `len()` is never trusted (AR-04). A corrupt blob under a key never clears
-(AR-01), so it starts a new attempt, at most `retries.max_attempts` in all. Every other failure raises `OutputRefused`
-and the unit fails with nothing announced; what a failed attempt stored stays unannounced, so invisible (s6).
-`existing` accepts refs of versions the store holds in the run's Scope only (AR-03).
+gets exactly the buffer's bytes (`bytes(memoryview(content))`), so a caller's `len()` or `__bytes__` is never trusted
+(AR-04). A corrupt blob under a key never clears (AR-01), so that output (only) takes the next attempt number, at most
+`retries.max_attempts` in all; the others keep their keys. Every other failure raises `OutputRefused` and the unit
+fails with nothing announced. What a refused unit stored stays unannounced, so invisible (s6), and would put the
+store's next version ahead of EV-15's (#393), so every refusal known before a put is checked first for every output:
+kind, size and text (UTF-8, not blank), a parent the world recorded (then put as that checked ref), and a dry run of
+the manifest (claims MF-01, MF-06, sources). Only refusals the store alone sees can still leave such a version (the
+store has no purge API).
+`existing` accepts refs of versions the store holds in the run's Scope (AR-03) and the world recorded (`recorded`).
 """
 
 from __future__ import annotations
@@ -16,10 +21,19 @@ from dataclasses import dataclass
 from typing import Any
 
 from tilo_connectors.provenance import build_manifest
-from tilo_memory.artifacts import ArtifactCorrupt, ArtifactNotFound, NewVersion, Origin, StoredVersion
+from tilo_memory.artifacts import (
+    MAX_TEXT,
+    TEXT_TYPES,
+    ArtifactCorrupt,
+    ArtifactNotFound,
+    NewVersion,
+    Origin,
+    StoredVersion,
+)
 
 MAX_OUTPUTS = 10  # a unit's cap (BQ-257)
 _LABEL_MAX = 80  # event.schema.json item.label
+_DRY_REF = {"artifact_id": "art_preflight", "version": 1}  # the manifest dry run's stand-in for a new artifact
 
 
 class OutputRefused(Exception):
@@ -45,8 +59,9 @@ class Kept:
     label: str | None
 
 
-def existing(artifacts: Any, scope: Any, refs: Any) -> list[dict[str, Any]]:
-    """Each ref as the store's own {artifact_id, version}; OutputRefused unless the store holds it in `scope`."""
+def existing(artifacts: Any, scope: Any, refs: Any, recorded: Callable[[str], int]) -> list[dict[str, Any]]:
+    """Each ref as the store's own {artifact_id, version}; OutputRefused unless the store holds it in `scope` and the
+    world announced it (`recorded(artifact_id)` is the highest version the world's stream recorded, EV-15)."""
     if not isinstance(refs, list | tuple):
         raise OutputRefused("artifact_refs is not a list")
     found = []
@@ -55,8 +70,8 @@ def existing(artifacts: Any, scope: Any, refs: Any) -> list[dict[str, Any]]:
             version = artifacts.head(scope, ref)
         except ValueError:
             version = None
-        if version is None:
-            raise OutputRefused("a ref names no version of this run's scope")
+        if version is None or not 1 <= version.version <= recorded(version.artifact_id):
+            raise OutputRefused("a ref names no version this world recorded in this run's scope")
         found.append(version.ref)
     return found
 
@@ -73,6 +88,7 @@ def keep(
     worker: str,
     events: list[dict[str, Any]],
     max_attempts: int,
+    recorded: Callable[[str], int],
 ) -> list[Kept]:
     """Stores every output and its manifest, or raises OutputRefused (see the module docstring)."""
     if not isinstance(outputs, list | tuple) or len(outputs) > MAX_OUTPUTS:
@@ -84,48 +100,82 @@ def keep(
         plain = type(label) is str and 0 < len(label) <= _LABEL_MAX and label.isprintable()
         if label is not None and not (plain and redact(label) == label):
             raise OutputRefused("an output label is not 1 to 80 characters free of secrets")
-    for attempt in range(max_attempts):
-        try:
-            kept = [
-                _put(artifacts, scope, out, run_id, unit, worker, f"{attempt}:{i}") for i, out in enumerate(outputs)
-            ]
-            for item, out in zip(kept, outputs, strict=True):
-                _manifest(artifacts, scope, archive, redact, run_id, unit, worker, events, item.version, out)
-        except ArtifactCorrupt:  # never clears under that key (AR-01): the next attempt uses new keys
-            continue
-        except Exception as error:  # a refused put or manifest, a backend error: the unit fails, nothing announced
-            raise OutputRefused(type(error).__name__) from None
-        return kept
-    raise OutputRefused("every attempt found a corrupt version")
+
+    def manifest_of(out: UnitOutput, ref: Any, content: bytes, parents: Any, sources: Any) -> dict[str, Any]:
+        return build_manifest(
+            run_id=run_id,
+            artifact=ref,
+            content=content,
+            parents=parents,
+            agent={"agent_id": worker, "role": unit["role"], "model_role": None, "profile": None},
+            inputs=[],
+            sources=sources,
+            claims=[dict(claim) for claim in out.claims],
+            events=events,
+            archive=archive.records() if archive is not None else [],
+            redact=redact,
+            archive_head=archive.head() if archive is not None else None,
+        )
+
+    kept: list[Kept] = []
+    try:
+        # every output's known refusals before the first put (#393); each parent as the store's own ref, used as is
+        parents = [_preflight(artifacts, scope, out, recorded, manifest_of) for out in outputs]
+        for i, (out, parent) in enumerate(zip(outputs, parents, strict=True)):
+            for attempt in range(max_attempts):
+                try:
+                    kept.append(_put(artifacts, scope, out, parent, run_id, unit, worker, f"{attempt}:{i}"))
+                    break
+                except ArtifactCorrupt:  # never clears under that key (AR-01): only this output takes a new key
+                    continue
+            else:
+                raise OutputRefused("every attempt found a corrupt version")
+        for item, out in zip(kept, outputs, strict=True):
+            _manifest(artifacts, scope, item.version, out, manifest_of)
+    except Exception as error:  # a refused put or manifest, a backend error: the unit fails, nothing announced
+        raise OutputRefused(type(error).__name__) from None
+    return kept
+
+
+def _preflight(
+    artifacts: Any, scope: Any, out: UnitOutput, recorded: Callable[[str], int], manifest_of: Any
+) -> dict[str, Any] | None:
+    """Raises for what the store or the manifest would refuse that is known before a put: a unit's kind, size and
+    text (UTF-8, not blank; AR-04), a parent the world never recorded, and a dry run of the manifest (claims, sources;
+    MF-01, MF-06). Returns the parent as the store's own ref, or None."""
+    if out.media_type not in TEXT_TYPES or not 0 < memoryview(out.content).nbytes <= MAX_TEXT:
+        raise OutputRefused("an output is not 1 byte to 2 MB of text or JSON")
+    if not bytes(memoryview(out.content)).decode("utf-8").strip():  # UnicodeDecodeError on bad UTF-8
+        raise OutputRefused("an output's text is blank")
+    parents = existing(artifacts, scope, [out.parent], recorded) if out.parent is not None else []
+    ref = {"artifact_id": parents[0]["artifact_id"], "version": parents[0]["version"] + 1} if parents else _DRY_REF
+    manifest_of(out, ref, b"", parents, [{"id": s["id"], "archive_ref": s["archive_ref"]} for s in out.sources])
+    return parents[0] if parents else None
 
 
 def _put(
-    artifacts: Any, scope: Any, out: UnitOutput, run_id: str, unit: Mapping[str, Any], worker: str, at: str
+    artifacts: Any,
+    scope: Any,
+    out: UnitOutput,
+    parent: dict[str, Any] | None,
+    run_id: str,
+    unit: Mapping[str, Any],
+    worker: str,
+    at: str,
 ) -> Kept:
     new = NewVersion(
         media_type=out.media_type,
-        content=bytes(out.content),  # exact bytes: a bytes subclass's own len() is never what the caps see
+        content=bytes(memoryview(out.content)),  # the buffer's bytes: never a subclass's len() or __bytes__
         run_id=run_id,
         origin=Origin(kind="unit", unit=unit["id"], agent=worker),
         sources=tuple(dict(source) for source in out.sources),
         idempotency_key=f"{run_id}:{unit['id']}:{at}",
-        parent=out.parent,
+        parent=parent,  # the ref the preflight checked, never the runner's object again
     )
     return Kept(artifacts.put(scope, new), out.label)
 
 
-def _manifest(
-    artifacts: Any,
-    scope: Any,
-    archive: Any,
-    redact: Callable[[str], str],
-    run_id: str,
-    unit: Mapping[str, Any],
-    worker: str,
-    events: list[dict[str, Any]],
-    version: StoredVersion,
-    out: UnitOutput,
-) -> None:
+def _manifest(artifacts: Any, scope: Any, version: StoredVersion, out: UnitOutput, manifest_of: Any) -> None:
     """The version's `created` revision; a restarted unit that gets its version back keeps the one it has."""
     try:
         if artifacts.manifest_revisions(scope, version.ref):
@@ -133,18 +183,6 @@ def _manifest(
     except ArtifactNotFound:
         pass
     record = version.record
-    manifest = build_manifest(
-        run_id=run_id,
-        artifact=version.ref,
-        content=artifacts.read(scope, version.ref),  # the stored bytes, re-hashed (AR-01)
-        parents=record["parents"],
-        agent={"agent_id": worker, "role": unit["role"], "model_role": None, "profile": None},
-        inputs=[],
-        sources=record["sources"],
-        claims=[dict(claim) for claim in out.claims],
-        events=events,
-        archive=archive.records() if archive is not None else [],
-        redact=redact,
-        archive_head=archive.head() if archive is not None else None,
-    )
+    content = artifacts.read(scope, version.ref)  # the stored bytes, re-hashed (AR-01)
+    manifest = manifest_of(out, version.ref, content, record["parents"], record["sources"])
     artifacts.add_manifest(scope, version.ref, manifest, stage="created", cause=None)

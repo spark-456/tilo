@@ -69,6 +69,15 @@ Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject
 (`tilo_providers.factory`); dev/CI tests fake the `google.genai` import path at the
 `sys.modules` boundary and never install real credentials (EFF-01).
 
+## Python (`packages/people`)
+
+`tilo-people` (PPL-10) depends on the in-workspace `tilo-policy` (schema checks; not external) and adds
+one runtime dependency, the IANA zone database for `zoneinfo` (Windows and slim images ship none):
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| tzdata | Apache-2.0 | https://pypi.org/project/tzdata/ |
+
 ## Python (`services/connectors`)
 
 `tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
@@ -97,7 +106,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 
 `tilo-planning` (FR-INT-01/02) depends only on the in-workspace `tilo-contracts` and
 `tilo-providers` (not external); `tilo-api` now depends on the in-workspace `tilo-planning`, and
-(CL-INT-2) on the in-workspace `tilo-policy`, `tilo-harness` and `tilo-connectors`, and (CL-INT-5d) on the in-workspace `tilo-metering`, and (CL-INT-6) on the in-workspace `tilo-world` (the layout solver; standard library only, no external dependency). No new licence.
+(CL-INT-2) on the in-workspace `tilo-policy`, `tilo-harness` and `tilo-connectors`, and (CL-INT-5d) on the in-workspace `tilo-metering`, and (CL-INT-6) on the in-workspace `tilo-world` (the layout solver; standard library only, no external dependency), and (ADR-0018 T4, FR-AGT-02) on the in-workspace `tilo-archive` and `tilo-memory` (not external). No new licence.
 
 ## Python (`services/render`)
 

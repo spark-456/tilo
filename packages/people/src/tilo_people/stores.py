@@ -1,0 +1,290 @@
+"""Record stores, the meeting tombstone, calendar disconnect and person erasure (PPL-10d; API.md section 5).
+
+The stores authorise nothing (callers run `decide` and `check_write` first). They key records by
+`(org_id, id)`, validate each record against its kind's schema through `tilo_people._schema`, and update
+only by compare-and-set. Errors and reprs name kinds, ids and versions, never record text.
+
+`delete_meeting`, `disconnect_calendar` and `erase_person` are written against the `RecordStore` protocol
+only, so a Firestore store gets them unchanged. No clock, logging or I/O happens here.
+"""
+
+from __future__ import annotations
+
+import copy
+import re
+import threading
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from typing import Any, Protocol
+
+from tilo_people._schema import valid
+from tilo_people.errors import AlreadyExists, NotFound, PeopleInputError, VersionConflict
+
+INDEXES: Mapping[str, tuple[str, ...]] = {
+    "person": (),
+    "meeting": ("owner",),
+    "work_item": ("owner",),
+    "pinboard_item": ("scope.user", "scope.team", "set_up_by"),
+    "mention": ("pin_id", "user"),
+    "calendar_entry": ("owner",),
+}
+
+_MISSING = object()
+_SAFE_ID = re.compile(r"[A-Za-z0-9_.-]{1,128}")
+_ATTEMPTS = 3
+
+
+@dataclass(frozen=True)
+class Stored:
+    kind: str
+    record: Mapping[str, Any] = field(repr=False)  # a deep copy
+    version: int  # 1 on create, +1 per replace
+
+
+class RecordStore(Protocol):
+    """What PPL-11a/b implement on Firestore later."""
+
+    kind: str
+
+    def get(self, org_id: str, record_id: str) -> Stored | None: ...
+    def create(self, record: Mapping[str, Any]) -> Stored: ...
+    def replace(self, record: Mapping[str, Any], *, expected_version: int) -> Stored: ...
+    def delete(self, org_id: str, record_id: str, *, expected_version: int) -> None: ...
+    def list(self, org_id: str, field: str | None = None, value: str | None = None) -> tuple[Stored, ...]: ...
+
+
+def _safe(value: Any) -> str:
+    """An id for a message; anything that is not plainly an id is not echoed."""
+    return value if isinstance(value, str) and _SAFE_ID.fullmatch(value) else "<malformed>"
+
+
+def _at(record: Mapping[str, Any], path: str) -> Any:
+    current: Any = record
+    for part in path.split("."):
+        if isinstance(current, Mapping) and part in current:
+            current = current[part]
+        else:
+            return _MISSING
+    return current
+
+
+class MemoryStore:
+    """A `RecordStore` for one kind of `INDEXES`, atomic per call under one lock."""
+
+    def __init__(self, kind: str) -> None:
+        if not isinstance(kind, str) or kind not in INDEXES:
+            raise PeopleInputError("unknown record kind")
+        self.kind = kind
+        self._schema = f"{kind}.schema.json"
+        self._lock = threading.Lock()
+        self._rows: dict[tuple[str, str], tuple[int, dict[str, Any]]] = {}
+
+    def __repr__(self) -> str:
+        return f"MemoryStore(kind={self.kind!r})"
+
+    def _checked(self, record: Any) -> tuple[str, str]:
+        if not isinstance(record, Mapping) or not valid(self._schema, record):
+            raise PeopleInputError(f"malformed {self.kind} record")
+        return record["org_id"], record["id"]
+
+    @staticmethod
+    def _version(expected_version: Any) -> int:
+        if type(expected_version) is not int:
+            raise PeopleInputError("expected_version must be an int")
+        return expected_version
+
+    def get(self, org_id: str, record_id: str) -> Stored | None:
+        if not isinstance(org_id, str) or not isinstance(record_id, str):
+            return None
+        with self._lock:
+            row = self._rows.get((org_id, record_id))
+            if row is None:
+                return None
+            return Stored(self.kind, copy.deepcopy(row[1]), row[0])
+
+    def create(self, record: Mapping[str, Any]) -> Stored:
+        key = self._checked(record)
+        copied = copy.deepcopy(dict(record))
+        with self._lock:
+            if key in self._rows:
+                raise AlreadyExists(f"AlreadyExists: {self.kind} {key[1]}")
+            self._rows[key] = (1, copied)
+        return Stored(self.kind, copy.deepcopy(copied), 1)
+
+    def replace(self, record: Mapping[str, Any], *, expected_version: int) -> Stored:
+        key = self._checked(record)
+        expected = self._version(expected_version)
+        copied = copy.deepcopy(dict(record))
+        with self._lock:
+            row = self._rows.get(key)
+            if row is None:
+                raise NotFound(f"NotFound: {self.kind} {key[1]}")
+            if row[0] != expected:
+                raise VersionConflict(f"VersionConflict: {self.kind} {key[1]} expected {expected} current {row[0]}")
+            self._rows[key] = (row[0] + 1, copied)
+            version = row[0] + 1
+        return Stored(self.kind, copy.deepcopy(copied), version)
+
+    def delete(self, org_id: str, record_id: str, *, expected_version: int) -> None:
+        expected = self._version(expected_version)
+        key = (org_id, record_id)
+        with self._lock:
+            row = self._rows.get(key) if isinstance(org_id, str) and isinstance(record_id, str) else None
+            if row is None:
+                raise NotFound(f"NotFound: {self.kind} {_safe(record_id)}")
+            if row[0] != expected:
+                raise VersionConflict(
+                    f"VersionConflict: {self.kind} {_safe(record_id)} expected {expected} current {row[0]}"
+                )
+            del self._rows[key]
+
+    def list(self, org_id: str, field: str | None = None, value: str | None = None) -> tuple[Stored, ...]:
+        if field is not None and (not isinstance(field, str) or field not in INDEXES[self.kind]):
+            raise PeopleInputError(f"{self.kind} has no such index")
+        if field is not None and not isinstance(value, str):
+            raise PeopleInputError("index value must be a string")
+        if not isinstance(org_id, str):
+            return ()
+        with self._lock:
+            rows = [(k[1], v) for k, v in self._rows.items() if k[0] == org_id]
+            rows.sort(key=lambda item: item[0])
+            return tuple(
+                Stored(self.kind, copy.deepcopy(rec), version)
+                for _, (version, rec) in rows
+                if field is None or _at(rec, field) == value
+            )
+
+
+@dataclass(frozen=True)
+class PeopleStores:
+    persons: RecordStore
+    meetings: RecordStore
+    work_items: RecordStore
+    pins: RecordStore
+    mentions: RecordStore
+    calendar: RecordStore
+
+    @classmethod
+    def in_memory(cls) -> PeopleStores:
+        return cls(
+            persons=MemoryStore("person"),
+            meetings=MemoryStore("meeting"),
+            work_items=MemoryStore("work_item"),
+            pins=MemoryStore("pinboard_item"),
+            mentions=MemoryStore("mention"),
+            calendar=MemoryStore("calendar_entry"),
+        )
+
+
+def meeting_tombstone(meeting: Mapping[str, Any]) -> dict[str, Any]:
+    """PE-19 tombstone, a schema-valid meeting (BQ-PPL10-2): identity kept, every bit of content dropped."""
+    if not isinstance(meeting, Mapping) or not valid("meeting.schema.json", meeting):
+        raise PeopleInputError("malformed meeting record")
+    tomb: dict[str, Any] = {
+        key: copy.deepcopy(meeting[key])
+        for key in ("id", "org_id", "owner", "world_id", "attestation", "source", "ended_reason", "created_at")
+        if key in meeting
+    }
+    tomb.update(
+        status="deleted",
+        title="Deleted meeting",
+        series=None,
+        scheduled=None,
+        agenda=[],
+        attendees=[],
+        transcript=None,
+        minutes=None,
+        minutes_confirmed_by=None,
+        delete_transcript_after=None,
+        delete_minutes_after=None,
+    )
+    return tomb
+
+
+def delete_meeting(stores: PeopleStores, org_id: str, meeting_id: str, *, expected_version: int) -> Stored:
+    """Replaces the meeting with its tombstone (compare-and-set). What was made from it is not touched."""
+    current = stores.meetings.get(org_id, meeting_id)
+    if current is None:
+        raise NotFound(f"NotFound: meeting {_safe(meeting_id)}")
+    return stores.meetings.replace(meeting_tombstone(current.record), expected_version=expected_version)
+
+
+def _delete_matching(
+    store: RecordStore, org_id: str, record_id: str, wanted: Callable[[Mapping[str, Any]], bool]
+) -> bool:
+    """Deletes the record when it still exists and `wanted`; a racing writer is retried, then reported."""
+    for attempt in range(_ATTEMPTS):
+        current = store.get(org_id, record_id)
+        if current is None or not wanted(current.record):
+            return False
+        try:
+            store.delete(org_id, record_id, expected_version=current.version)
+        except NotFound:
+            return False
+        except VersionConflict:
+            if attempt == _ATTEMPTS - 1:
+                raise
+            continue
+        return True
+    return False
+
+
+def _tombstone(store: RecordStore, org_id: str, meeting_id: str) -> bool:
+    for attempt in range(_ATTEMPTS):
+        current = store.get(org_id, meeting_id)
+        if current is None or current.record.get("status") == "deleted":
+            return False
+        try:
+            store.replace(meeting_tombstone(current.record), expected_version=current.version)
+        except NotFound:
+            return False
+        except VersionConflict:
+            if attempt == _ATTEMPTS - 1:
+                raise
+            continue
+        return True
+    return False
+
+
+def _is_google(entry: Mapping[str, Any]) -> bool:
+    source = entry.get("source")
+    return isinstance(source, Mapping) and source.get("kind") == "google"
+
+
+def disconnect_calendar(stores: PeopleStores, org_id: str, owner: str) -> int:
+    """PE-13: deletes the owner's entries whose source.kind is "google"; returns the count."""
+    count = 0
+    for stored in stores.calendar.list(org_id, "owner", owner):
+        if _is_google(stored.record):
+            count += _delete_matching(stores.calendar, org_id, stored.record["id"], _is_google)
+    return count
+
+
+def _holds(index: str, value: str) -> Callable[[Mapping[str, Any]], bool]:
+    def holds(record: Mapping[str, Any]) -> bool:
+        return bool(_at(record, index) == value)
+
+    return holds
+
+
+def _always(record: Mapping[str, Any]) -> bool:
+    return True
+
+
+def erase_person(stores: PeopleStores, org_id: str, user: str) -> dict[str, int]:
+    """PE-16 (BQ-PPL10-8): tombstones their meetings, then deletes their work items, personal pins,
+    mentions naming them, calendar entries and finally their person record. Idempotent."""
+    counts = dict.fromkeys(("meeting", "work_item", "pinboard_item", "mention", "calendar_entry", "person"), 0)
+    for stored in stores.meetings.list(org_id, "owner", user):
+        counts["meeting"] += _tombstone(stores.meetings, org_id, stored.record["id"])
+    plan = (
+        ("work_item", stores.work_items, "owner"),
+        ("pinboard_item", stores.pins, "scope.user"),
+        ("mention", stores.mentions, "user"),
+        ("calendar_entry", stores.calendar, "owner"),
+    )
+    for name, store, index in plan:
+        for stored in store.list(org_id, index, user):
+            counts[name] += _delete_matching(store, org_id, stored.record["id"], _holds(index, user))
+    counts["person"] += _delete_matching(stores.persons, org_id, user, _always)
+    return counts
