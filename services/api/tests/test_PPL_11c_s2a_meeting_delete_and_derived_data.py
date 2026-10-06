@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 from _ppl11a_lib import DEV, MEERA, OTHER_ORG, OWNER, PRIYA, SAM, own_item
 from _ppl11c_lib import (
+    MEETING_BODY,
     R_MT_DELETE,
     UNIQUE_ID,
     as_proposed,
@@ -149,7 +150,7 @@ def test_PPL_11c_s2a_FR_MTG_10_a_discarded_meeting_and_an_unstarted_one_can_be_d
     assert rig.stored("meetings", "mt_q4_plan")["status"] == "deleted"
     assert rig.stored("work_items", "wi_launch_note") is None
     rig.as_user(PRIYA)  # a meeting that never started: created over the API, then deleted by its owner
-    made = rig.post("/v1/meetings", {"title": "Weekly sync", "source": "upload"}).json()["id"]
+    made = rig.post("/v1/meetings", MEETING_BODY).json()["id"]
     assert _delete(rig, made).status_code == 200 and rig.stored("meetings", made)["status"] == "deleted"
 
 

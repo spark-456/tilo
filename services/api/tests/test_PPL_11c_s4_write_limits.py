@@ -78,6 +78,8 @@ def test_PPL_11c_s4_SEC_09_an_oversize_body_is_a_413_and_the_rest_of_it_is_never
 
 def test_PPL_11c_s4_SEC_09_a_body_of_exactly_the_cap_is_read_and_one_byte_more_is_not(people_rig):
     rig = work_rig(people_rig)
+    assert len(padded(MEETING_BODY, MAX_BODY_BYTES)) == MAX_BODY_BYTES  # the attest fields are inside the count
+    assert len(padded(MEETING_BODY, MAX_BODY_BYTES + 1)) == MAX_BODY_BYTES + 1
     at_cap = rig.client.post(
         "/v1/meetings", content=padded(MEETING_BODY, MAX_BODY_BYTES), headers={"content-type": "application/json"}
     )
