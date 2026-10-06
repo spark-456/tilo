@@ -129,7 +129,9 @@ def test_FR_MEM_10_an_archive_outage_rolls_the_artifacts_back_writes_no_event_an
         do_import(dest, bundle)
     assert dest.stream() == [] and all(dest.view(s) == [] for s in dest.view_scopes()), "no event was written"
     assert dest.meta.inner.paths() == [] and dest.blobs.inner.keys() == [], "every artifact was rolled back"
-    do_import(dest, bundle)  # a prefix of the same chain is completed, never rewritten or duplicated
+    if fail_on > 1:  # a partial chain may be another world's live chain: only an authenticated bundle completes it
+        refused_and_nothing_written(dest, bundle)
+    do_import(dest, bundle, expected_sha256=sha(bundle))  # the prefix is completed, never rewritten or duplicated
     assert_replayed_identically(src, dest)
     assert len(dest.archive_lines()) == 3
 

@@ -129,6 +129,7 @@ class NewVersion:
 @dataclass(frozen=True)
 class StoredVersion:
     doc: dict[str, Any] = field(repr=False)
+    written: bool = field(default=False, compare=False)  # this call stored it (FR-MEM-10 rolls back only its own)
 
     @property
     def record(self) -> dict[str, Any]:
@@ -567,13 +568,14 @@ class ArtifactStore:
             except Exception:  # noqa: BLE001
                 pass
             raise
-        return StoredVersion(record)
+        return StoredVersion(record, written=True)
 
     def import_version(self, scope: Scope, record: dict[str, Any], content: bytes) -> StoredVersion:
         """One version from an untrusted run bundle (FR-MEM-10) under the IMPORTER's `scope`, keeping the ids,
         version, bytes, hash and times the run's events name. AR-03 identity and AR-06 `sources` are overwritten;
         AR-04 kinds and caps come before any hash; AR-01 hash and size; AR-02 gapless with one earlier parent;
-        AR-05 key; AR-07 text must survive the redactor unchanged and a `clean` claim is judged again here."""
+        AR-05 key; AR-07 text must survive the redactor unchanged and a `clean` claim is judged again here (a restore
+        takes its parent's verdict: it is an exact copy). `written` on the result says whether this call stored it."""
         _check_scope(scope)
         rec = self._check_import(scope, record, content)
         path = _record_path(scope, rec["artifact"])
@@ -582,10 +584,10 @@ class ArtifactStore:
             self._plan(scope, None, None, len(content))  # AR-04 world cap, before any hashing
         if self._hash(content) != rec["content_sha256"]:
             raise _refuse("AR-01", "the bytes do not match the record's hash")
-        if rec["media_type"] in TEXT_TYPES and self._clean(content)[1] is not None:
+        if rec["media_type"] in TEXT_TYPES and self._clean(content) is not None:
             raise _refuse("AR-07", "the text holds what the secret redactor removes; nothing stored")
-        if held is None and rec["screening"] == "clean":  # a claim is never copied: this store's verdict only
-            rec["screening"], rec["screened_at"] = self._screen(content, rec["media_type"])
+        if held is None and rec["screening"] == "clean" and rec["origin"]["kind"] != "restore":
+            rec["screening"], rec["screened_at"] = self._screen(content, rec["media_type"])  # never the claim
         with self._lock:
             held = held or self._meta.get(path)
             if held is None:
@@ -595,9 +597,11 @@ class ArtifactStore:
                     return stored
                 held = self._meta.get(path)
         if held is None or held["owner"] != scope.owner or held["content_sha256"] != rec["content_sha256"]:
-            raise _refuse("AR-02", "this version already exists with other bytes")
-        settled = self._settle(scope, held)  # the same version: returned, nothing written
-        return settled if settled is not None else self.import_version(scope, record, content)
+            raise _refuse("AR-02", "the version cannot be placed in this scope")  # same answer for another owner's
+        if self._blob_state(scope, held) == "missing":  # never purged here: its writer may still be finishing
+            raise ArtifactBusy(f"artifact {rec['artifact']['artifact_id']} is not completely stored yet")
+        self._verified(scope, held)  # AR-01: a corrupt blob raises ArtifactCorrupt
+        return StoredVersion(held)
 
     def _check_import(self, scope: Scope, record: Any, content: bytes) -> dict[str, Any]:
         """The record in the importer's scope, checked without hashing: schema, ids matched whole, kinds, caps."""
@@ -613,11 +617,12 @@ class ArtifactStore:
         try:
             for ref in (rec["artifact"], *rec["parents"]):
                 _ref(ref)
-            for stamp in (rec["created_at"], rec["screened_at"]):
-                if stamp is not None:
-                    _when(stamp)  # whole-string parse: the schema's `$` lets a trailing newline through
+            # whole-string parse: the schema's `$` lets a trailing newline through
+            stamps = [_when(s) for s in (rec["created_at"], rec["screened_at"]) if s is not None]
         except ValueError:
             raise _refuse("AR-03", "an artifact ref or a time is malformed") from None
+        if any(stamp > self._clock() for stamp in stamps):  # a future record would never be purged (AR-08)
+            raise _refuse("AR-08", "a record time is after the store's clock")
         if (rec["screening"] == "unscreened") != (rec["screened_at"] is None):
             raise _refuse("AR-07", "screened_at is null exactly when unscreened")
         origin = rec["origin"]
@@ -651,6 +656,11 @@ class ArtifactStore:
         continues = parents == [] if version == 1 else len(parents) == 1 and parents[0][0] == art
         if version != max(have, default=0) + 1 or not continues or any(v not in have for _, v in parents):
             raise _refuse("AR-02", "the version does not continue an earlier version of this artifact")
+        if rec["origin"]["kind"] == "restore":  # an exact copy of the parent this scope holds (FR-MEM-06)
+            parent = next(d for d in docs if d["artifact"] == {"artifact_id": art, "version": parents[0][1]})
+            if any(parent[k] != rec[k] for k in ("content_sha256", "media_type", "size_bytes")):
+                raise _refuse("AR-02", "a restore is not an exact copy of its parent")
+            rec.update({k: parent[k] for k in ("screening", "screened_at", "redacted")})
 
     def put(self, scope: Scope, new: NewVersion) -> StoredVersion:
         _check_scope(scope)
@@ -734,11 +744,11 @@ class ArtifactStore:
         """The bytes to store and whether the redactor changed them (text and JSON only; files are not read)."""
         if new.media_type not in TEXT_TYPES:
             return new.content, False
-        _text, cleaned = self._clean(new.content)
+        cleaned = self._clean(new.content)
         return (new.content, False) if cleaned is None else (cleaned.encode("utf-8"), True)
 
-    def _clean(self, content: bytes) -> tuple[str, str | None]:
-        """Text or JSON bytes as text, and what the redactor made of it (None when it changed nothing)."""
+    def _clean(self, content: bytes) -> str | None:
+        """What the redactor makes of text or JSON bytes, or None when it changes nothing."""
         try:
             text = content.decode("utf-8")
         except UnicodeDecodeError:
@@ -751,7 +761,7 @@ class ArtifactStore:
             raise _refuse("AR-07", "the secret redactor failed; nothing stored") from None
         if type(cleaned) is not str:
             raise _refuse("AR-07", "the secret redactor returned no text")
-        return text, None if cleaned == text else cleaned
+        return None if cleaned == text else cleaned
 
     def _screen(self, data: bytes, media_type: str) -> tuple[str, str | None]:
         """`clean`/`flagged` only from a verdict on exactly these bytes; anything else is `unscreened` (AR-07)."""

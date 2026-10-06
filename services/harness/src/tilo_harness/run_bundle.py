@@ -4,27 +4,33 @@ A bundle is a deterministic ZIP with a closed set of entries (layout pinned in s
 `bundle.json` (format, version, run id, export time, counts, archive head, a SHA-256 per entry), `events.jsonl`,
 `archive.jsonl` and `artifacts/<id>/v<NNNNNN>/{record.json,content,manifests.json}`. Export is read-only and refuses
 what it cannot vouch for. Import treats every byte as untrusted: everything is validated first (a dry run of every
-version, manifest and event through scratch stores), then artifacts, archive lines and events are written, in that
-order. The importer's scope, world and screener decide. Messages hold rule names and counts, never content.
+version, manifest and event through scratch stores), then, under one lock per world and per (org, run), artifacts,
+archive lines and events are written, in that order. The importer's scope, world and screener decide. Only
+`expected_sha256` authenticates a bundle: its index and archive chain can be recomputed by whoever edits it.
+Messages hold rule names and counts, never content.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import io
 import json
 import math
 import re
 import stat
+import struct
+import threading
 import zipfile
+import zlib
 from collections.abc import Callable, Iterator, Sequence
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 from tilo_archive import RunArchive
 from tilo_archive.archive import Store, verify_chain
-from tilo_archive.record import ZERO_HASH, canonical_json
+from tilo_archive.record import VALID_KINDS, ZERO_HASH, canonical_json
 from tilo_memory.artifacts import (
     TEXT_TYPES,
     ArtifactError,
@@ -48,10 +54,13 @@ _HEX = re.compile(r"[0-9a-f]{64}")
 _STAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z")
 _CODE = re.compile(r"EV-[0-9]{2}|schema")
 _RECORDING = ("artifact.created", "artifact.versioned", "artifact.rolled_back")
-_DIGESTS = frozenset({"content_sha256", "fingerprint"})  # hex digests are not shown to the redactor (MF-06)
+_DIGESTS = frozenset({"content_sha256", "fingerprint", "hash", "prev_hash"})  # skipped only when they hold a digest
+_DIGEST = re.compile(r"(sha256:)?[0-9a-f]{64}")
 _COUNTS = ("events", "archive_records", "versions", "manifest_revisions")
 _META_KEYS = frozenset({"format", "version", "run_id", "exported_at", "counts", "archive_head", "entries"})
-_EPOCH = datetime(2000, 1, 1, tzinfo=UTC)
+_RECORD_KEYS = frozenset({"v", "run_id", "seq", "kind", "ts", "payload", "prev_hash", "hash"})  # RunArchive's
+_EOCD, _LOCAL = struct.Struct("<4s4H2LH"), struct.Struct("<4s5H3L2H")
+_CD_ENTRY_MAX = 256  # bytes a bundle's central-directory entry can need (fixed part, closed-set name, small extra)
 
 Ref = tuple[str, int]
 
@@ -89,6 +98,7 @@ class ImportResult:
     manifest_revisions: int
     archive_records: int
     already_imported: bool
+    verified: bool = False  # true only when `expected_sha256` was given and matched (BQ-MEM10-3)
 
 
 @dataclass
@@ -101,8 +111,10 @@ class _Version:
 @dataclass
 class _Bundle:
     run_id: str
+    exported_at: datetime
     events: list[dict[str, Any]]
     archive: list[str]
+    records: list[dict[str, Any]]
     versions: dict[Ref, _Version]
 
 
@@ -127,7 +139,7 @@ def _strings(value: Any) -> Iterator[str]:
         elif isinstance(item, dict):
             for key, child in item.items():
                 yield str(key)
-                if key not in _DIGESTS:
+                if not (key in _DIGESTS and isinstance(child, str) and _DIGEST.fullmatch(child)):
                     stack.append(child)
         elif isinstance(item, list):
             stack.extend(item)
@@ -174,6 +186,12 @@ def _check_limits(limits: Limits, **sizes: int) -> None:
             raise _refuse(f"over the {name} cap")
 
 
+def _stamp(text: Any) -> datetime:
+    if type(text) is not str or _STAMP.fullmatch(text) is None:
+        raise _refuse("a time is not a timestamp")
+    return datetime.strptime(text, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC)
+
+
 # --- export ---------------------------------------------------------------------------------------------------------
 
 
@@ -200,7 +218,7 @@ def export_run(
         texts = [v.content.decode("utf-8") for v in versions.values() if v.record["media_type"] in TEXT_TYPES]
     except UnicodeDecodeError:
         raise _refuse("a text version is not UTF-8") from None
-    _scan(redact, events, [r["payload"] for r in records], [v.revisions for v in versions.values()], texts)
+    _scan(redact, events, records, [v.revisions for v in versions.values()], texts)
     entries = {
         EVENTS: b"".join(_dumps(e) + b"\n" for e in events),
         ARCHIVE: b"".join(_dumps(r) + b"\n" for r in records),
@@ -223,8 +241,15 @@ def export_run(
         }
     )
     bundle = _zip(entries)
-    sizes = (len(bundle), sum(len(data) for data in entries.values()), len(entries), *counts[:3])
-    _check_limits(limits, **{f.name: size for f, size in zip(fields(Limits), sizes, strict=True)})
+    _check_limits(
+        limits,
+        max_bundle_bytes=len(bundle),
+        max_uncompressed_bytes=sum(len(data) for data in entries.values()),
+        max_entries=len(entries),
+        max_events=counts[0],
+        max_archive_records=counts[1],
+        max_versions=counts[2],
+    )
     return bundle
 
 
@@ -258,6 +283,16 @@ def _zip(entries: dict[str, bytes]) -> bytes:
 
 # --- import ---------------------------------------------------------------------------------------------------------
 
+_LOCKS: dict[tuple[str, ...], threading.Lock] = {}
+_LOCKS_GUARD = threading.Lock()
+
+
+def _lock(*key: str) -> threading.Lock:
+    """One in-process lock per key (a world, or an org's run archive). Across processes the writer's lease holds
+    the world; two processes importing one run into two worlds of one org at once are not serialised (BQ-MEM10-2)."""
+    with _LOCKS_GUARD:
+        return _LOCKS.setdefault(key, threading.Lock())
+
 
 def import_run(
     bundle: bytes,
@@ -287,9 +322,22 @@ def import_run(
         raise _refuse(f"a version is refused ({error})") from None
     except Exception:  # noqa: BLE001 - any other failure on untrusted bytes is a refusal, never a crash
         raise _refuse("the bundle is malformed") from None
-    run_id, events, lines, versions = parsed.run_id, parsed.events, parsed.archive, parsed.versions
+    with _lock("world", writer.org_id, writer.world_id), _lock("archive", scope.org_id, parsed.run_id):
+        return _commit(parsed, writer, artifacts, scope, archive_store, authenticated=expected_sha256 is not None)
 
-    # Checks against the importer's own stores (reads only; an outage here propagates as it is).
+
+def _commit(
+    parsed: _Bundle,
+    writer: WorldWriter,
+    artifacts: ArtifactStore,
+    scope: Scope,
+    archive_store: Store,
+    *,
+    authenticated: bool,
+) -> ImportResult:
+    """Checks against the importer's own stores, then the writes; the caller holds the world and archive locks."""
+    run_id, events, lines, versions = parsed.run_id, parsed.events, parsed.archive, parsed.versions
+    revisions = sum(len(v.revisions) for v in versions.values())
     held = writer.held_prefix(events)
     if held is None:
         raise _refuse("the world holds events that are not this run's")
@@ -310,30 +358,42 @@ def import_run(
     stored_lines = archive_store.read_lines(scope.org_id, run_id)
     if stored_lines != lines[: len(stored_lines)]:
         raise _refuse("another raw-archive chain is stored for this org and run")
+    result = ImportResult(
+        run_id, scope.org_id, scope.world_id, len(events), len(versions), revisions, len(lines), False, authenticated
+    )
+    if held == len(events):  # the world holds the whole run: nothing is written, and nothing may be missing
+        if stored_lines != lines or done != {ref: len(v.revisions) for ref, v in versions.items()}:
+            raise _refuse("the world holds this run but its artifact store or raw archive lacks part of it")
+        return dataclasses.replace(result, already_imported=True)
+    if stored_lines and len(stored_lines) < len(lines) and not authenticated:
+        # It may be another world's live chain of this org and run: appending after it would poison it for good.
+        raise _refuse("a partial raw-archive chain is stored for this run; only an import with expected_sha256 may")
 
     new: list[Ref] = []
     try:
         for ref in sorted(versions):
             version = versions[ref]
-            if ref not in done:
+            if artifacts.import_version(scope, version.record, version.content).written:
                 new.append(ref)
-            artifacts.import_version(scope, version.record, version.content)
             for revision in version.revisions[done.get(ref, 0) :]:
                 artifacts.add_manifest(
                     scope, _ref(ref), revision["manifest"], stage=revision["stage"], cause=revision["cause"]
                 )
         for line in lines[len(stored_lines) :]:
             archive_store.append_line(scope.org_id, run_id, line)
+        if writer.held_prefix(events) != held:
+            raise _refuse("the world changed during the import")
     except BaseException as error:
         _roll_back(artifacts, scope, new)
         if isinstance(error, ArtifactError):
             raise _refuse(f"a version is refused ({error})") from None
         raise
-    for event in events[held:]:  # last: an artifact event is never written for a version that is not stored
-        writer.append(event)
-    revisions = sum(len(v.revisions) for v in versions.values())
-    counts = (len(events), len(versions), revisions, len(lines), held == len(events))
-    return ImportResult(run_id, scope.org_id, scope.world_id, *counts)
+    try:
+        for event in events[held:]:  # last: an artifact event is never written for a version that is not stored
+            writer.append(event)
+    except EventRejected:
+        raise BundleError("FR-MEM-10: the world changed while the events were written; a prefix is in place") from None
+    return result
 
 
 def _roll_back(artifacts: ArtifactStore, scope: Scope, refs: list[Ref]) -> None:
@@ -352,7 +412,7 @@ def _validate(
     """Everything that needs no read of the importer's stores, in full, before any write."""
     parsed = _parse(_read_zip(bundle, limits), limits)
     parsed.events = [dict(e, world_id=writer.world_id) for e in parsed.events]
-    _scan(redact, parsed.events, [json.loads(line)["payload"] for line in parsed.archive])
+    _scan(redact, parsed.events, parsed.records)
     dry = WorldWriter(
         MemoryStore(),
         org_id=writer.org_id,
@@ -380,12 +440,12 @@ def _validate(
     scratch = ArtifactStore(
         MemoryMetaBackend(),
         MemoryBlobBackend(),
-        clock=lambda: _EPOCH,
+        clock=lambda: parsed.exported_at,  # so a record from after the export is refused
         redactor=redact,
         archive_lookup=lambda _scope, _ref: None,
         alert_sink=lambda _alert: None,
     )
-    for ref in sorted(parsed.versions):  # AR-01 to AR-07 and MF-06, as the real import will apply them
+    for ref in sorted(parsed.versions):  # AR-01 to AR-08 and MF-06, as the real import will apply them
         version = parsed.versions[ref]
         scratch.import_version(scope, version.record, version.content)
         for revision in version.revisions:
@@ -398,14 +458,23 @@ def _validate(
 
 
 def _read_zip(bundle: bytes, limits: Limits) -> dict[str, bytes]:
-    """The entries, after every name, type and declared size is checked; nothing is inflated before that."""
+    """The entries, after the end record, every name, type and declared size are checked. The end record is read
+    before zipfile builds its entry list (no comment, no ZIP64, a bounded central directory), and every entry is
+    inflated by `_inflate`, never past its declared size."""
     _check_limits(limits, max_bundle_bytes=len(bundle))
+    if len(bundle) < _EOCD.size:
+        raise _refuse("not a ZIP")
+    sig, disk, cd_disk, here, total, cd_size, _offset, comment = _EOCD.unpack_from(bundle, len(bundle) - _EOCD.size)
+    if sig != b"PK\x05\x06" or comment or disk or cd_disk or here != total or bundle[-42:-38] == b"PK\x06\x07":
+        raise _refuse("not a plain bundle ZIP (a comment, several disks or ZIP64)")
+    _check_limits(limits, max_entries=total)
+    if cd_size > total * _CD_ENTRY_MAX:
+        raise _refuse("the central directory is larger than its entries need")
     with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
         infos = archive.infolist()
-        _check_limits(limits, max_entries=len(infos))
         names = [info.orig_filename for info in infos]
-        if len(set(names)) != len(names):
-            raise _refuse("an entry name repeats")
+        if len(infos) != total or len(set(names)) != len(names):
+            raise _refuse("the entry count is wrong or an entry name repeats")
         for info in infos:
             match = _ENTRY.fullmatch(info.filename)
             if (
@@ -417,8 +486,31 @@ def _read_zip(bundle: bytes, limits: Limits) -> dict[str, bytes]:
                 or info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
             ):
                 raise _refuse("an entry is not a plain file of the bundle's closed set")
-        _check_limits(limits, max_uncompressed_bytes=sum(info.file_size for info in infos))
-        return {info.filename: archive.read(info) for info in infos}
+    _check_limits(limits, max_uncompressed_bytes=sum(info.file_size for info in infos))
+    return {info.filename: _inflate(bundle, info) for info in infos}
+
+
+def _inflate(bundle: bytes, info: zipfile.ZipInfo) -> bytes:
+    """One entry's bytes, inflated to at most its declared size + 1: more, less or another CRC refuses."""
+    start = info.header_offset
+    sig, _ver, flags, method, _t, _d, _crc, _csize, _size, name_len, extra_len = _LOCAL.unpack_from(bundle, start)
+    body = start + _LOCAL.size + name_len + extra_len
+    raw = memoryview(bundle)[body : body + info.compress_size]
+    name = bundle[start + _LOCAL.size : start + _LOCAL.size + name_len]
+    if sig != b"PK\x03\x04" or flags & 1 or method != info.compress_type or len(raw) != info.compress_size:
+        raise _refuse("an entry's local header does not match the central directory")
+    if name != info.orig_filename.encode("ascii"):
+        raise _refuse("an entry's local header does not match the central directory")
+    if method == zipfile.ZIP_STORED:
+        data = bytes(raw)
+    else:
+        inflater = zlib.decompressobj(-15)
+        data = inflater.decompress(raw, info.file_size + 1)  # never more than declared + 1 in memory
+        if not inflater.eof or inflater.unconsumed_tail or inflater.unused_data:
+            raise _refuse("an entry inflates to another size than it declares")
+    if len(data) != info.file_size or zlib.crc32(data) != info.CRC:
+        raise _refuse("an entry inflates to another size or CRC than it declares")
+    return data
 
 
 def _json(data: bytes | str) -> Any:
@@ -455,12 +547,9 @@ def _parse(entries: dict[str, bytes], limits: Limits) -> _Bundle:
         raise _refuse("bundle.json does not have exactly the bundle's keys")
     if meta["format"] != BUNDLE_FORMAT or meta["version"] != BUNDLE_VERSION:
         raise _refuse("another bundle format or version")
-    run_id, stamp, index = meta["run_id"], meta["exported_at"], meta["entries"]
+    run_id, exported_at, index = meta["run_id"], _stamp(meta["exported_at"]), meta["entries"]
     if type(run_id) is not str or _RUN.fullmatch(run_id) is None:
         raise _refuse("the run id is malformed")
-    if type(stamp) is not str or _STAMP.fullmatch(stamp) is None:
-        raise _refuse("exported_at is not a timestamp")
-    datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S.%fZ")
     if not isinstance(index, dict) or set(index) != set(entries) - {META}:
         raise _refuse("the index does not list exactly the entries")
     if any(index[name] != hashlib.sha256(data).hexdigest() for name, data in entries.items() if name != META):
@@ -471,12 +560,16 @@ def _parse(entries: dict[str, bytes], limits: Limits) -> _Bundle:
     records = [_json(line) for line in archive]
     if not all(isinstance(r, dict) and canonical_json(r) == line for r, line in zip(records, archive, strict=True)):
         raise _refuse("an archive line is not a canonical record")
+    for record in records:  # RunArchive's exact shape: no extra key can carry anything past the scan's reach
+        if set(record) != _RECORD_KEYS or record["v"] != "1.0" or record["kind"] not in VALID_KINDS:
+            raise _refuse("an archive record does not have the raw archive's shape")
+        _stamp(record["ts"])
     parts: dict[Ref, dict[str, bytes]] = {}
     for name, data in entries.items():
         if (match := _ENTRY.fullmatch(name)) is not None:
             parts.setdefault((match[1], int(match[2])), {})[match[3]] = data
     _check_limits(limits, max_versions=len(parts))
-    versions = {ref: _version(ref, found) for ref, found in parts.items()}
+    versions = {ref: _version(ref, found, run_id) for ref, found in parts.items()}
 
     counts, head = meta["counts"], meta["archive_head"]
     real = [len(events), len(records), len(versions), sum(len(v.revisions) for v in versions.values())]
@@ -488,18 +581,18 @@ def _parse(entries: dict[str, bytes], limits: Limits) -> _Bundle:
         raise _refuse("archive_head is malformed")
     if type(head["hash"]) is not str or _HEX.fullmatch(head["hash"]) is None:
         raise _refuse("archive_head is malformed")
-    if any(r.get("run_id") != run_id for r in records) or verify_chain(records, (head["seq"], head["hash"])):
+    if any(r["run_id"] != run_id for r in records) or verify_chain(records, (head["seq"], head["hash"])):
         raise _refuse("the raw-archive chain does not verify against archive_head")
     _check_stream(events, run_id)
-    return _Bundle(run_id, events, archive, versions)
+    return _Bundle(run_id, exported_at, events, archive, records, versions)
 
 
-def _version(ref: Ref, found: dict[str, bytes]) -> _Version:
+def _version(ref: Ref, found: dict[str, bytes], run_id: str) -> _Version:
     if set(found) != _PARTS:
         raise _refuse("a version directory lacks an entry")
     record, revisions = _json(found["record.json"]), _json(found["manifests.json"])
-    if not isinstance(record, dict) or record.get("artifact") != _ref(ref):
-        raise _refuse("a record does not name the version its path names")
+    if not isinstance(record, dict) or record.get("artifact") != _ref(ref) or record.get("run_id") != run_id:
+        raise _refuse("a record does not name the version its path names, or another run")
     if not isinstance(revisions, list) or not all(
         isinstance(r, dict) and r.get("n") == n and type(r.get("n")) is int for n, r in enumerate(revisions, start=1)
     ):

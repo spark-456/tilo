@@ -149,8 +149,10 @@ source `org_id`, `world_id` and `owner` as stored; the importer rewrites them.
    `add_manifest(stage, cause)` (so revisions get `n` 1..k). A failure rolls back what this call stored (via
    `store.retention().delete`) and raises (a `BundleRefused` for a refusal, the backend's error or a `BundleError` for an outage).
 2. The archive lines, verbatim (`archive_store.append_line(scope.org_id, run_id, line)`, so they land under the importer's
-   org). Lines already stored must be an identical prefix of the bundle's chain (then the rest is appended); another chain
-   already stored for that org and run refuses the import and is left untouched. A failure rolls the artifacts back.
+   org). An identical whole chain already stored is shared without writing; a stored strict prefix of the bundle's chain
+   (it may be another world's live chain of that org and run) is completed only when `expected_sha256` authenticated the
+   bundle, else refused; another chain already stored for that org and run refuses the import and is left untouched. A
+   failure rolls back the versions this call stored (`StoredVersion.written`). (Security review round 1.)
 3. The events, last, `writer.append(dict(event, world_id=writer.world_id))` one by one (an identical resend is a no-op,
    FR-HIL-07). The writer's own redaction builds the per-district views; nothing about views is in the bundle.
 

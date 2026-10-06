@@ -280,5 +280,7 @@ Option A, chosen by the user on 2026-10-05. The tickets run in this order. Each 
 ## FR-MEM-10 notes (run bundle, 2026-10-06; clarifications, no new decision; defaults in BQ-MEM10-1 and -2)
 - `ArtifactStore.import_version(scope, record, content)` is the only way a version enters a store without `put`: it
   keeps the bundle's id, version, bytes, hash and `created_at` (so EV-15 still holds for the replayed events), takes
-  the importer's org, world and owner, drops `sources` (AR-06) and screens a `clean` claim again (AR-07).
+  the importer's org, world and owner, drops `sources` (AR-06) and screens a `clean` claim again (AR-07). A restore
+  must be an exact copy of its parent and takes the parent's verdict; a record from after the store's clock is
+  refused (AR-08); a record without its blob is never purged by an import (`ArtifactBusy`).
 - A bundle export is read-only and adds no `exported` manifest revision; that stage stays for a later export route.
