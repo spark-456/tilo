@@ -1,6 +1,6 @@
 {
-  "rule": "PE-23",
-  "note": "A meeting that never existed answers expired like a deleted one.",
+  "rule": null,
+  "note": "Dev asks about Asha's deleted meeting: a 404, the same as for a live one.",
   "now": "2026-10-06T10:00:00.000Z",
   "persons": {
     "u_owner": {
@@ -119,16 +119,62 @@
       }
     }
   },
-  "meeting": null,
+  "meeting": {
+    "id": "mt_q4_plan",
+    "org_id": "org_example",
+    "owner": "u_owner",
+    "world_id": "w_meeting_q4_plan",
+    "title": "Q4 planning",
+    "series": "q4_planning_weekly",
+    "scheduled": null,
+    "agenda": [
+      {
+        "title": "Rate sheet",
+        "minutes": 15
+      }
+    ],
+    "attendees": [
+      {
+        "name": "Asha Rao",
+        "user": "u_owner"
+      },
+      {
+        "name": "Priya",
+        "user": "u_priya"
+      },
+      {
+        "name": "Sam",
+        "user": "u_sam"
+      },
+      {
+        "name": "Dev from Acme",
+        "user": null
+      }
+    ],
+    "attestation": {
+      "by": "u_owner",
+      "at": "2026-10-05T09:00:00.000Z",
+      "notice_version": "1.0.0"
+    },
+    "source": "upload",
+    "status": "deleted",
+    "ended_reason": "completed",
+    "minutes_confirmed_by": null,
+    "transcript": null,
+    "minutes": null,
+    "delete_transcript_after": "2026-11-04T10:00:00.000Z",
+    "delete_minutes_after": "2027-01-03T10:00:00.000Z",
+    "created_at": "2026-10-05T09:00:00.000Z"
+  },
   "minutes": null,
   "transcript": null,
   "version": null,
   "work_item": null,
   "request": {
     "actor": "u_dev",
-    "meeting": "mt_never_held",
+    "meeting": "mt_q4_plan",
     "work_item": null,
-    "ids": ["u0001"]
+    "ids": ["u0021", "u0023"]
   },
   "response": null
 }

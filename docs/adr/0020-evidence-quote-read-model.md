@@ -133,8 +133,9 @@
 - The crossref cases are `fixtures/transcript/crossref/`, a format of their own that states the
   answer (`response`) and adds the transcript's `ArtifactVersion` (`version`, for `screening` and
   the scope check), instead of the `read_quote` view on the person crossref (BQ-CCP3-3).
-- Decision 2 stands with no tombstone change (BQ-CCP3-2, decided by default, the user may
-  override): a missing, discarded or deleted meeting answers `expired` for every viewer, and an
+- Decisions 2 and 3 stand as accepted (BQ-CCP3-2). `expired` goes only to a reader decision 3
+  admits: on the owner route the meeting owner, known from the record or the PE-19 tombstone
+  (which keeps `owner`), for a discarded, deleted or swept meeting; on the item route the item's
+  owner, for the lowest id the item cites on every path. Everyone else gets a 404 whatever the
+  meeting's state, and a meeting with no record and no tombstone answers a 404 to everyone. An
   `expired` quote carries `transcript` null (`transcript` became nullable, still 1.0.0, unreleased).
-  The owner route gives the same answer to anyone but the owner of a live meeting, so it is no
-  existence oracle; the item route keeps the work item's own 404 for anyone who may not read it.

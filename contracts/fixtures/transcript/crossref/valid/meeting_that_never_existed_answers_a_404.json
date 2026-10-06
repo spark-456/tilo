@@ -1,6 +1,6 @@
 {
   "rule": null,
-  "note": "No such meeting: the same expired answer a deleted one gives, so nothing shows it never existed.",
+  "note": "No record and no tombstone: nobody can own it, so the owner route answers a 404 to everyone.",
   "now": "2026-10-06T10:00:00.000Z",
   "persons": {
     "u_owner": {
@@ -130,17 +130,5 @@
     "work_item": null,
     "ids": ["u0001"]
   },
-  "response": {
-    "quotes": [
-      {
-        "meeting_id": "mt_never_held",
-        "transcript": null,
-        "utterance_id": "u0001",
-        "state": "expired",
-        "speaker": null,
-        "text": null,
-        "truncated": false
-      }
-    ]
-  }
+  "response": null
 }

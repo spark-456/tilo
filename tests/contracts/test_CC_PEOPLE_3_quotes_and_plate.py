@@ -44,9 +44,12 @@ REQUIRED = {  # ADR-0020 and ADR-0021, "Crossref cases"
         "assignee_expired_after_the_sweep pe23_assignee_gets_a_second_quote pe23_proposed_work_item "
         "pe23_unconfirmed_minutes pe23_utterance_the_minutes_item_does_not_cite pe23_assigner_on_the_work_item_route "
         "pe23_attendee pe23_teammate pe23_org_owner pe23_another_orgs_meeting owner_reads_quotes_of_a_deleted_meeting "
-        "someone_asks_about_a_meeting_that_never_existed attendee_gets_the_answer_a_missing_meeting_gets "
-        "assignee_item_from_a_deleted_meeting assignee_item_from_a_discarded_meeting "
-        "assignee_item_whose_meeting_is_missing pe22_deleted_meeting_answered_with_a_404".split()
+        "meeting_that_never_existed_answers_a_404 attendee_gets_a_404_on_the_owner_route "
+        "non_owner_gets_a_404_for_a_deleted_meeting assignee_item_from_a_deleted_meeting "
+        "assignee_item_from_a_discarded_meeting assignee_item_whose_meeting_is_missing "
+        "assignee_swept_and_deleted_name_the_same_id assignee_deleted_and_swept_name_the_same_id "
+        "pe22_deleted_meeting_answered_with_a_404 pe23_non_owner_gets_expired_for_a_deleted_meeting "
+        "pe23_expired_for_a_meeting_that_never_existed pe22_swept_quote_names_another_id".split()
     ),
     "plate": set(
         "own_open_work_item_joins_rows pe27_proposed_work_item pe27_teammates_personal_pin "
@@ -83,9 +86,14 @@ def _num(utterance_id: str) -> int:
     return int(utterance_id[1:])
 
 
+def _lowest_cited(wi: dict) -> list[str]:
+    """PE-22: an expired quote on the item route names the lowest utterance the item itself cites, on every path."""
+    return sorted(wi["source"]["evidence"], key=_num)[:1]
+
+
 def _expired(meeting_id: str, ids: list[str]) -> dict:
-    """PE-22, PE-23: one answer for a swept transcript, a missing, discarded or deleted meeting and a refused
-    owner-route request: every id `expired`, no transcript ref, so it never shows whether or whose a meeting is."""
+    """PE-22: a swept transcript or a missing, discarded or deleted meeting, for a reader PE-23 admits: every id
+    `expired`, with no transcript ref."""
     quote = {**QUOTE, "meeting_id": meeting_id, "transcript": None, "state": "expired"}
     return {"quotes": [{**quote, "utterance_id": u} for u in ids]}
 
@@ -134,20 +142,20 @@ def expected_quotes(case: dict) -> dict | None:
     me, wi = case["persons"].get(req["actor"]), case["work_item"]
     if me is None or (req["meeting"] is None) == (req["work_item"] is None):
         return None
-    if req["meeting"] is not None:  # owner route: anyone but the owner of a live meeting gets the gone answer
-        if not 1 <= len(req["ids"]) <= 20:
-            return None
-        if m is None or m["status"] in ("discarded", "deleted") or m["id"] != req["meeting"]:
-            return _expired(req["meeting"], req["ids"])
+    if req["meeting"] is not None:  # owner route: the owner of the record or its PE-19 tombstone, else a 404
+        if not 1 <= len(req["ids"]) <= 20 or m is None or m["id"] != req["meeting"]:
+            return None  # a meeting with no record and no tombstone has no owner: a 404 for everyone
         if (req["actor"], me["org_id"]) != (m["owner"], m["org_id"]):
-            return _expired(req["meeting"], req["ids"])
+            return None
+        if m["status"] in ("discarded", "deleted"):
+            return _expired(m["id"], req["ids"])
         owner = True
     else:  # item route: the item's own owner only (PE-03); a gone meeting gives the item's lowest cited id
         if not _own_item(case, wi):
             return None
         meeting_id = wi["source"]["ref"].partition("#")[0]
         if m is None or m["status"] in ("discarded", "deleted") or m["id"] != meeting_id:
-            return _expired(meeting_id, sorted(wi["source"]["evidence"], key=_num)[:1])
+            return _expired(meeting_id, _lowest_cited(wi))
         owner = False
     if mins is None or "world_id" not in m or m["status"] != "minuted" or mins["meeting_id"] != m["id"]:
         return None
@@ -161,8 +169,8 @@ def expected_quotes(case: dict) -> dict | None:
             return None
     utterances = {} if swept else {u["id"]: u for u in tr["utterances"]}
     ids = req["ids"] if owner else _assignee_ids(case, set(utterances))
-    if ids is None or swept:
-        return None if ids is None else _expired(m["id"], ids)
+    if ids is None or swept:  # the item route names the same id on the swept and the deleted path
+        return None if ids is None else _expired(m["id"], ids if owner else _lowest_cited(wi))
     quotes = []
     for uid in ids:
         q = {"meeting_id": m["id"], "transcript": ref, "utterance_id": uid, **QUOTE}

@@ -38,7 +38,7 @@
       }
     },
     "evidence_quote": {
-      "description": "One evidence quote as tilo-api serves it (ADR-0020): a read-model row computed per request from the pinned transcript version, never stored, logged, archived, sent or put in an event or a prompt (PE-22). Code removes control and format characters and cuts the text at 240 characters on a word boundary (`truncated`); for a viewer other than the meeting owner it masks addresses, phone numbers and links, and the speaker is a teammate's display name or null (PE-24). Only `shown` carries text (PE-25). An `expired` quote has `transcript` null: it is the one answer for a swept transcript, a missing, discarded or deleted meeting and a refused owner-route request, so it never shows whether a meeting exists (PE-22, PE-23).",
+      "description": "One evidence quote as tilo-api serves it (ADR-0020): a read-model row computed per request from the pinned transcript version, never stored, logged, archived, sent or put in an event or a prompt (PE-22). Code removes control and format characters and cuts the text at 240 characters on a word boundary (`truncated`); for a viewer other than the meeting owner it masks addresses, phone numbers and links, and the speaker is a teammate's display name or null (PE-24). Only `shown` carries text (PE-25). An `expired` quote has `transcript` null: the answer for a swept transcript or a missing, discarded or deleted meeting, given only to a reader PE-23 admits (PE-22).",
       "type": "object",
       "additionalProperties": false,
       "required": [
