@@ -29,6 +29,9 @@ export function createFixtureApi(): Api {
     getTeam: () => ok(fx.team),
     getConnectors: () => ok(fx.connectors),
     getNotifications: () => ok(fx.notifications),
+    getTeamPolicy: () => ok(fx.teamPolicy),
+    getConnectorTerms: () => ok(fx.connectorTerms),
+    getProfileSettings: () => ok(fx.profileSettings),
     decide: (key) => set(key, true),
     undo: (key) => set(key, false),
     startWorld: (mode, query) => {

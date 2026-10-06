@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// Tilo's servers (tilo-api, tilo-harness) reach Firestore through IAM and bypass these rules. A browser or phone client
+// reads nothing here until the per-path client rules of PRD 15.3 land with their own ticket; until then everything is denied.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // FR-AGT-14: a schedule holds the owner's approved brief as unredacted user text. Server only.
+    match /orgs/{org}/schedules/{schedule} {
+      allow read, write: if false;
+    }
+
+    // Everything else: deny by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

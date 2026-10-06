@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
 from fastapi import HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, field_validator, model_validator
 from tilo_people.access import AccessRequest, project
 from tilo_people.dates import resolve_due
 from tilo_people.directory import Directory
@@ -75,12 +75,31 @@ class WindowIn(_Closed):
 
 
 class MeetingIn(_Closed):
+    """`attest` and `notice_version` are the explicit attest step (PE-18, issue #464): the person says `true` and the
+    notice version they were shown. Neither is stored from the request; the actor and clock are the server's."""
+
+    attest: StrictBool  # JSON `true` only (`Literal[True]` would admit `1`); anything else is 422, see below
+    notice_version: Text
     title: Text
     source: Text
     series: Text | None = None
     scheduled: WindowIn | None = None
     agenda: Annotated[list[AgendaIn], Field(max_length=20)] = []
     attendees: Annotated[list[AttendeeIn], Field(max_length=50)] = []
+
+    @field_validator("attest")
+    @classmethod
+    def _attested(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("attest")
+        return value
+
+    @field_validator("notice_version")
+    @classmethod
+    def _current_notice(cls, value: str) -> str:
+        if value != deps.NOTICE_VERSION:  # read at call time: a stale or future notice was not the one in force
+            raise ValueError("notice_version")
+        return value
 
 
 class PersonIn(_Closed):
