@@ -40,7 +40,10 @@ def test_CC_PEOPLE_FR_WLD_02_schema_file_follows_the_contract_conventions(repo_r
     jsonschema.Draft202012Validator.check_schema(schema)
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert schema["$id"] == f"https://contracts.tilo.example/{name}.schema.json"
-    assert schema["x-version"] == ("1.1.0" if name == "meeting" else "1.0.0"), "meeting 1.1.0 adds world_id (ADR-0020)"
+    if name == "meeting":  # 1.1.0 adds world_id (ADR-0020); 1.2.0 tightens the link check (ADR-0016 decision 14)
+        assert tuple(map(int, schema["x-version"].split("."))) >= (1, 2, 0), "meeting is 1.2.0 or later"
+    else:
+        assert schema["x-version"] == "1.0.0"
     assert schema["title"] == title
     assert "allOf" not in schema, "contracts/CLAUDE.md: avoid a root-level allOf (open intersection types)"
     if name != "ui_action":
@@ -64,8 +67,10 @@ def test_CC_PEOPLE_FR_WLD_02_schema_declares_its_named_defs(repo_root, name, def
 
 def test_CC_PEOPLE_FR_WLD_02_common_schema_is_1_3_0_and_keeps_its_old_defs(repo_root):
     schema = pl.load_contract(repo_root, "common")
-    # 1.2.0 merged two 1.1.0 releases (#379: pinned); 1.3.0 adds `mail` to record_ref.kind (ADR-0021).
-    assert schema["x-version"] == "1.3.0", "common carries the people ids, media_type and mail: exactly 1.3.0"
+    # 1.2.0 merged two 1.1.0 releases (#379: pinned); 1.3.0 adds `mail` to record_ref.kind (ADR-0021);
+    # later minors are additive (ADR-0002 item 15).
+    version = tuple(int(p) for p in schema["x-version"].split("."))
+    assert version >= (1, 3, 0), "common carries the people ids, media_type and mail: 1.3.0 or later"
     old = {"ulid", "timestamp", "calendar_date", "authz", "artifact_ref", "destination", "user_id", "org_id"}
     new = {
         "work_item_id",

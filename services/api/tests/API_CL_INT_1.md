@@ -7,7 +7,7 @@ Every route needs the signed-in `deps.Principal` (`deps.get_current_principal`).
 
 | Call | Route | Success | Errors |
 | --- | --- | --- | --- |
-| submitIntake | `POST /intake` (multipart `text`, `files`) | 201 `{task_id, world_id, run_id, event, brief, questions, files}`; the existing FR-INT-01/02 keys stay | 422 `{"error"}` limits (as today); 503 no or refused safety provider |
+| submitIntake | `POST /intake` (multipart `text`, `files`) | 201 `{task_id, world_id, run_id, event, brief, questions, files, gaps}` (`gaps`: FR-INT-15, `[]` when none); the existing FR-INT-01/02 keys stay | 422 `{"error"}` limits (as today); 422 `{"error", "gaps"}` when no part is possible (FR-INT-15); 503 no or refused safety provider |
 | answerQuestions | `POST /tasks/{task_id}/answers` JSON `{answers: [{field, answer\|null}], brief_edits: {}}` | 200 `{brief}` | 404 unknown task; 403/404 not the owner; 422 unknown field, invalid edit |
 | getApproaches | `GET /tasks/{task_id}/approaches` | 200 `{task_id, approaches, recommended, credit_usd}` | 404; 403/404 owner; 409 questions not yet answered |
 | approve | `POST /tasks/{task_id}/approve` JSON `{approach_id, budget_cap}` | 200 `{world_id}` | 404; 403/404 owner; 409 no approaches yet; 422 bad cap or approach |

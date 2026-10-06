@@ -1,0 +1,38 @@
+# Capability gaps (FR-INT-15, supplement 2026-10-05; BQ-INT15-1). A safe task may have parts Tilo cannot do.
+# The Director names each such part as {category, part}: `category` is an id below, `part` a label of at most
+# 60 characters. Code shows the person `reason` and `alternative` from here, beside the label, so the model
+# never writes what Tilo can or cannot do. Loader: tilo_planning.gaps.load_gap_policy (API_FR_INT_15.md).
+#
+# Shape: nothing_possible (text), categories: [{id (slug), reason, alternative}]. At least one category, ids
+# unique, no other keys; reason 1..120 characters, alternative 1..200 and different from reason,
+# nothing_possible 1..200. The ids must differ from every id in out_of_policy.yaml: a policy refusal is never
+# a gap, and a policy id anywhere in the Director's reply refuses the whole task (FR-INT-12 wins).
+#
+# Each category is a limit of this release that the PRD states (basis in the comment). Connected services
+# come from config/connectors.yaml, so a new connector shrinks `unconnected_service` with no change here;
+# a connector that fills a whole category removes or rewords that category in the same change.
+
+nothing_possible: Tilo cannot do any part of this task yet. Here is what it cannot do and what you could ask for instead.
+
+categories:
+  - id: money_movement # PRD 3.4 and 23.5: no movement of money; the Treasury governs compute budget only
+    reason: "Tilo does not move money: it cannot pay, buy, transfer or trade."
+    alternative: Ask Tilo to prepare the comparison, order details or payment list, so you can pay or buy it yourself.
+  - id: calls_and_chat # PRD 12.2: no telephony, text or chat-app connector (supplement SD-01)
+    reason: Tilo cannot make phone calls or send text or chat-app messages.
+    alternative: Ask Tilo to draft the message or a call script for you to use, or an email you approve before it is sent.
+  - id: physical_world # PRD 12: agents reach the world only through connected services, cloud browsers and files
+    reason: Tilo works with software, files and the web only; it cannot act in the physical world.
+    alternative: Ask Tilo for a plan, checklist or schedule you can follow, or the messages you need to arrange it.
+  - id: desktop_apps # PRD 3.4 and 12.5: desktop control and the browser extension are roadmap
+    reason: Tilo cannot control your computer, the apps installed on it or your own browser.
+    alternative: Upload the file or an export, and Tilo works on that copy and gives you the result.
+  - id: unconnected_service # PRD 12.2 and 3.4: only the connectors in config/connectors.yaml
+    reason: Tilo has no connection to that service yet.
+    alternative: Ask Tilo to prepare the content or file for you to add there yourself, or upload an export for Tilo to work from.
+  - id: unsupported_output # PRD 12.4 and common.schema.json deliverable_format
+    reason: Tilo delivers documents, decks, sheets, emails and in-app pages, not video, audio or image files.
+    alternative: Ask Tilo for the script, storyboard or brief as a document you can take to a production tool.
+  - id: non_english # PRD 7 (multilingual plans out of scope) and 23.1 (roadmap)
+    reason: Tilo writes plans and deliverables in English only for now.
+    alternative: Ask Tilo for the English version, which you can then have translated.

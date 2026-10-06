@@ -8,7 +8,7 @@
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
  * calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
- * common.schema.json 1.3.0 sha256:f819a7e2e62bf60b
+ * common.schema.json 1.4.0 sha256:09b36846ed11add2
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
  * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -93,14 +93,14 @@
  * events/data/world.failed.schema.json 1.0.0 sha256:17a50a9c70ba8ae1
  * events/data/world.paused.schema.json 1.0.0 sha256:1b190f91f08a918c
  * events/data/world.planned.schema.json 1.0.0 sha256:eb423b257e5fc838
- * events/data/world.requested.schema.json 1.0.0 sha256:d59a584d7d9b0cf8
+ * events/data/world.requested.schema.json 1.1.0 sha256:7f1370b796c05ea1
  * events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
  * events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
  * events/registry.schema.json 1.1.0 sha256:22ae30d4e99499c8
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
- * meeting.schema.json 1.1.0 sha256:10547b42a2268966
+ * meeting.schema.json 1.2.0 sha256:034e93898bb28957
  * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -300,12 +300,12 @@ export type CardOptions = [CardOption, CardOption, ...CardOption[]];
  */
 export type CardOptionId = string;
 /**
- * Where a person sees and answers Tilo (PRD 10.3, 11.1).
+ * Where a person sees and answers Tilo (PRD 10.3, 11.1), plus `schedule`, how a run that a recurring schedule started came to be (1.4.0, FR-AGT-14). `schedule` is not a place anyone answers: only world.requested uses it, and it is never an owner instruction or a person's approval (OB-01).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Channel".
  */
-export type Channel = "web" | "mobile_web" | "whatsapp" | "email";
+export type Channel = "web" | "mobile_web" | "whatsapp" | "email" | "schedule";
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "GateId".
@@ -2796,7 +2796,7 @@ export interface WorldPlannedData {
   credits: CreditRange;
 }
 /**
- * data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world. destination is the thread or folder the request was made from (an email thread forwarded to Tilo, or one the request was started from), as an opaque id set from where it was sent, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is web or mobile_web, where the owner is signed in; a request by email has an unauthenticated sender and is never an instruction.
+ * data of world.requested (PRD 9.5). A person asked for work, on the web or from a channel message (FR-INT-01, FR-INT-13). actor is that person, target the world. destination is the thread or folder the request was made from (an email thread forwarded to Tilo, or one the request was started from), as an opaque id set from where it was sent, never read out of the text by a model; null otherwise (BQ-29). An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is web or mobile_web, where the owner is signed in; a request by email has an unauthenticated sender and is never an instruction. A scheduled run (FR-AGT-14, a recurring schedule the owner approved) starts with a world.requested of channel `schedule` (1.1.0): actor is the schedule's owner, the person who approved the brief when they set the schedule up (never `system`, because the owner of a world is the actor of its first world.requested and only a person can be one, OB-01), destination is null and title is the schedule's title. `schedule` is never an owner instruction (OB-01 counts only web and mobile_web) and never a person's approval: a scheduled run still goes through the outbox and the policy engine, and every T3 step waits for a person.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "WorldRequestedData".
@@ -3178,7 +3178,7 @@ export interface LayoutGateGeometry {
   cell: LayoutPoint;
 }
 /**
- * A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273).
+ * A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273). The free text (`title`, agenda `title`, attendee `name`) holds no link (PE-13; 1.2.0, ADR-0016 decision 14): no `://` or its backslash forms; no meeting host meet.google.com, teams.microsoft.com, teams.live.com, zoom.us, webex.com or whereby.com, alone or as a suffix (acme.zoom.us); no bare `host.tld/segment` (a last label of 2 to 63 letters other than `js`, an optional port, a slash and a path character), which also catches g.co/meet and teams.live.com/meet; no Cc, Zl, Zp, Basic Multilingual Plane Cf, Hangul filler (U+115F, U+1160, U+3164, U+FFA0), braille blank (U+2800) or unassigned default-ignorable code point anywhere; an invisible combining mark (U+034F, U+17B4, U+17B5, U+180B to U+180D, U+180F, variation selectors U+FE00 to U+FE0F) only after a non-ASCII character, or U+FE0E and U+FE0F after a keycap base (# or * or a digit), so emoji keep their variation selector. Astral format and default-ignorable characters (U+E0000 to U+E0FFF, which include the tag characters and variation selectors 17 to 256, and others) cannot be written portably in a pattern: tilo-api removes or refuses them before the schema check (validator, PE-13).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Meeting".
