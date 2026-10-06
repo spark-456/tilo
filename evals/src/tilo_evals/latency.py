@@ -29,7 +29,10 @@ BUDGETS: dict[str, dict[str, int]] = {  # PRD 17.1, milliseconds
     "NFR-03": {"p50_ms": 12000, "p95_ms": 25000},
     "NFR-05": {"p95_ms": 1000},
 }
-NFR05_NOTE = "Stops at client receipt: the server half of emitted to rendered; the render half is not measured."
+NFR05_NOTE = (
+    "Stops at client receipt: the server half of emitted to rendered; the render half is not measured. "
+    "As built, the web client polls events every 1000 ms, so the 1 s p95 render budget cannot be met (BQ-NFR05-1)."
+)
 _FILES = [(f"suppliers{i}.csv", b"supplier,late_days\r\nAcme,2\r\nBeta,0\r\n") for i in range(3)]
 
 

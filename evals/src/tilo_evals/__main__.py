@@ -151,7 +151,7 @@ def _metrics(args: argparse.Namespace) -> int:
     from .bank_report import run_bank  # noqa: PLC0415
     from .bank_run import BankRefused  # noqa: PLC0415
     from .cases import load_cases  # noqa: PLC0415
-    from .latency import LatencyError, measure  # noqa: PLC0415
+    from .latency import LatencyError, LatencyRefused, measure  # noqa: PLC0415
     from .metrics import (  # noqa: PLC0415
         bank_measures,
         compute_metrics,
@@ -190,6 +190,7 @@ def _metrics(args: argparse.Namespace) -> int:
         BankRefused,
         MeteringConfigError,
         LatencyError,
+        LatencyRefused,
     ) as exc:
         print(f"tilo_evals: {exc}", file=sys.stderr)
         return EXIT_ERROR
