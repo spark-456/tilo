@@ -1546,6 +1546,11 @@ dependencies = [
     { name = "uvicorn" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "tilo-metering" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
@@ -1562,6 +1567,9 @@ requires-dist = [
     { name = "tilo-providers", editable = "packages/providers" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "tilo-metering", editable = "packages/metering" }]
 
 [[package]]
 name = "tilo-memory"

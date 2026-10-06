@@ -611,7 +611,14 @@ def test_FR_MEM_11_without_reuse_run_plan_is_unchanged(tmp_path: Path) -> None:
 def test_FR_MEM_11_event_order_is_deterministic(tmp_path: Path) -> None:
     def shape(scenario: Scenario) -> list[tuple[Any, ...]]:
         return [
-            (e["type"], e["actor"], e["target"], e["summary"], e["data"] if e["type"] == "memory.hit" else None)
+            # An artifact event names the store's random id (target, a review's summary): not part of the shape.
+            (
+                e["type"],
+                e["actor"],
+                None if e["type"].startswith("artifact.") else e["target"],
+                None if e["type"].startswith("artifact.") else e["summary"],  # the review's summary names the id
+                e["data"] if e["type"] == "memory.hit" else None,
+            )
             for e in scenario.env.events(BRANCH)
         ]
 

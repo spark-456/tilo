@@ -19,7 +19,13 @@ dependencies = [
     "tilo-providers",
 ]
 
+[dependency-groups]
+dev = [
+    "tilo-metering",  # tests only: FR-MEM-11 checks the credits chain (savings, cost_report)
+]
+
 [tool.uv.sources]
+tilo-metering = { workspace = true }
 tilo-archive = { workspace = true }
 tilo-connectors = { workspace = true }
 tilo-contracts = { workspace = true }
