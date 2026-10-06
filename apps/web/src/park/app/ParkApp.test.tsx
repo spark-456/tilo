@@ -12,6 +12,12 @@ import { cleanup, mount, q, qa } from "../../../test-support/park/componentsHarn
 import { PAGE_IDS } from "./AppCtx";
 import DefaultParkApp, { ParkApp } from "./ParkApp";
 
+// WEB-3b: ParkApp now draws the city backdrop. The real scene takes about 300 ms to build in happy-dom, so
+// these WEB-3a tests use the same fast stand-in as the shell tests (test-support/park/shellEngine.ts).
+vi.mock("../engines/park", async () =>
+  (await import("../../../test-support/park/shellEngine")).parkMock(),
+);
+
 const visit = async (path: string) => {
   window.history.pushState({}, "", path);
   const m = mount(<ParkApp />);

@@ -1,0 +1,513 @@
+/* THROWAWAY (WEB-3b validation only). */
+[data-park] .park-backdrop {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--ground);
+  z-index: 0;
+  pointer-events: none;
+}
+[data-park] .park-backdrop__scene {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1600px;
+  height: 1000px;
+  margin: -500px 0 0 -800px;
+  transform-origin: 50% 50%;
+}
+[data-park] .park-backdrop__veil {
+  position: absolute;
+  inset: 0;
+  background: var(--veil);
+}
+[data-park] .park-shell__main {
+  position: relative;
+  z-index: 1;
+}
+[data-park] .park-shell__column {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 100px 24px 56px;
+  box-sizing: border-box;
+}
+
+[data-park] .park-nav {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  top: 14px;
+  height: 62px;
+  z-index: 30;
+  box-sizing: border-box;
+  padding: 0 10px 0 12px;
+  border-radius: 22px;
+  background: var(--gBg);
+  backdrop-filter: var(--gFx);
+  border: 1px solid var(--gBd);
+  box-shadow: var(--sh);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: "Nunito Sans", sans-serif;
+  color: var(--ink);
+}
+[data-park] .park-nav__logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  color: var(--logo);
+}
+[data-park] .park-nav__tile {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: var(--hero);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-park] .park-nav__visor {
+  width: 22px;
+  height: 12px;
+  border-radius: 5px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+[data-park] .park-nav__eye {
+  width: 3px;
+  height: 3px;
+  border-radius: 9px;
+  background: #1f1d2b;
+}
+[data-park] .park-nav__word {
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 27px;
+  color: var(--logo);
+  letter-spacing: -0.5px;
+}
+[data-park] .park-nav__tabs {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+[data-park] .park-nav__tab {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  text-decoration: none;
+}
+[data-park] .park-nav__tab:hover {
+  background: var(--chip);
+}
+[data-park] .park-nav__tab--on {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+[data-park] .park-nav__badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 99px;
+  background: #f0a500;
+  color: #1f1d2b;
+  font-size: 12px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-park] .park-nav__right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+[data-park] .park-nav__chip {
+  border: 0;
+  background: transparent;
+  padding: 0 6px;
+  cursor: pointer;
+}
+[data-park] .park-nav__chip-text {
+  margin: 0;
+  padding: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-nav__icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-park] .park-nav__unread {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: #f0a500;
+  box-shadow: 0 0 0 2px var(--pop);
+}
+[data-park] .park-nav__avatar {
+  width: 38px;
+  height: 38px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px var(--pop), 0 0 0 3.5px var(--line);
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  flex: none;
+}
+[data-park] .park-nav__avatar--ring {
+  box-shadow: 0 0 0 2px var(--pop), 0 0 0 4px var(--hero);
+}
+[data-park] .park-nav__bar {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 99px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+[data-park] .park-notif__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 6px;
+}
+[data-park] .park-notif__head-title {
+  font-size: 16px;
+  font-weight: 800;
+}
+[data-park] .park-notif__settings {
+  border: 0;
+  background: transparent;
+  color: var(--heroInk);
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+[data-park] .park-notif__row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+}
+[data-park] .park-notif__row:hover {
+  background: var(--rowHover);
+}
+[data-park] .park-notif__tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-park] .park-notif__tile--needs {
+  background: var(--amberTile);
+  color: var(--amberInk);
+}
+[data-park] .park-notif__tile--done {
+  background: var(--okSoft);
+  color: var(--ok);
+}
+[data-park] .park-notif__tile--warn {
+  background: var(--redSoft);
+  color: var(--red);
+}
+[data-park] .park-notif__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+[data-park] .park-notif__title {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+[data-park] .park-notif__sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-notif__time {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink3);
+  align-self: flex-start;
+  padding-top: 2px;
+}
+
+[data-park] .park-acct__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 12px;
+}
+[data-park] .park-acct__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #e6e1f8;
+  color: #1f1d2b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  flex: none;
+}
+[data-park] .park-acct__name {
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-acct__email {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-acct__org {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-acct__sep {
+  height: 1px;
+  background: var(--line2);
+  margin: 0 6px 4px;
+}
+
+[data-park] .park-wl {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+}
+[data-park] .park-wl__card {
+  width: 400px;
+  max-width: calc(100vw - 48px);
+  box-sizing: border-box;
+  background: var(--pop);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--shPop);
+  padding: 22px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-family: "Nunito Sans", sans-serif;
+  color: var(--ink);
+}
+[data-park] .park-wl__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+[data-park] .park-wl__art {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  background: var(--sunk);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  flex: none;
+}
+[data-park] .park-wl__text {
+  min-width: 0;
+  line-height: 1.3;
+}
+[data-park] .park-wl__eyebrow {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  color: var(--ink3);
+}
+[data-park] .park-wl__name {
+  font-size: 19px;
+  font-weight: 800;
+}
+[data-park] .park-wl__meta {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-wl__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-wl__step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+[data-park] .park-wl__step--pending {
+  color: var(--ink3);
+}
+[data-park] .park-wl__tick {
+  width: 20px;
+  height: 20px;
+  border-radius: 99px;
+  background: var(--track);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+[data-park] .park-wl__tick--done {
+  background: var(--ok);
+}
+[data-park] .park-wl__tick--active {
+  background: transparent;
+}
+[data-park] .park-wl__tick--pending {
+  background: var(--track);
+}
+[data-park] .park-wl__spin {
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border-radius: 99px;
+  border: 2.5px solid var(--track);
+  border-top-color: var(--hero);
+  display: block;
+}
+[data-park] .park-wl__track {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-wl__fill {
+  height: 100%;
+  background: var(--hero);
+  border-radius: 99px;
+}
+
+[data-park] .park-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+[data-park] .park-boot__logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+[data-park] .park-boot__tile {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: var(--hero);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-park] .park-boot__visor {
+  width: 36px;
+  height: 20px;
+  border-radius: 8px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+[data-park] .park-boot__eye {
+  width: 5px;
+  height: 5px;
+  border-radius: 9px;
+  background: #1f1d2b;
+}
+[data-park] .park-boot__word {
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 48px;
+  color: var(--logo);
+  letter-spacing: -1.2px;
+}
+[data-park] .park-boot__bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+[data-park] .park-boot__track {
+  width: 200px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-boot__fill {
+  width: 42%;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--hero);
+}
+[data-park] .park-boot__label {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}

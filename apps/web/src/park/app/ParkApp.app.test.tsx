@@ -7,6 +7,12 @@ import { cleanup, click, mount, q, qa } from "../../../test-support/park/compone
 import type { AppCtx } from "./AppCtx";
 import { ParkApp } from "./ParkApp";
 
+// WEB-3b: ParkApp now draws the city backdrop. The real scene takes about 300 ms to build in happy-dom, so
+// these WEB-3a tests use the same fast stand-in as the shell tests (test-support/park/shellEngine.ts).
+vi.mock("../engines/park", async () =>
+  (await import("../../../test-support/park/shellEngine")).parkMock(),
+);
+
 const held = vi.hoisted(() => ({
   app: undefined as AppCtx | undefined,
   pagesSeen: [] as string[],
@@ -86,7 +92,7 @@ describe("WEB_3a_shell: the page gets the app prop", () => {
       time: "day",
       night: false,
       motion: "lively",
-      pins: [],
+      pins: expect.any(Array), // WEB-3b: the backdrop feeds the pins (was [] in WEB-3a)
       ready: true,
     });
     expect(app().vw).toBeGreaterThan(0);
