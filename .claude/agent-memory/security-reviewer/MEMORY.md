@@ -14,4 +14,4 @@
 - [Harness writer gaps](harness-writer-gaps.md): P0-09 r6 PASS: head moved to _head/state (rules must deny it); open: ids `$` \n, emulator lock-timeout flake
 - [Artifact store FR-MEM-06](artifact-store-fr-mem-06.md): PR #382 r1 FAIL (64bd1c1) orphans/.tilo; r2 FAIL (6c59628) repair path; r3 PASS flagged (bc7ff3c): GRACE lease, T8 must fence
 - [Unit outputs T3](unit-outputs-t3-fr-agt-02.md): ADR-0018 T3 r1 PASS flagged (fec3947); open: store/EV-15 version desync, restart re-announce, scope not bound to writer
-- [Schedule tick FR-AGT-14](schedule-tick-fr-agt-14.md): r1 FAIL (6c49214) tftest unknown at plan; r2 PASS flagged (a7ba44d); open: no iss check, head-of-line, store skips bad records
+- [Schedule tick FR-AGT-14](schedule-tick-fr-agt-14.md): r2 PASS flagged (a7ba44d); 14b r1 FAIL (27dd27e) licence/dep rule only; open: pre-auth seams, erasure, PR 2 infra

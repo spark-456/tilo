@@ -494,7 +494,8 @@ class FirestoreScheduleStore(_Store):
             changes = change(doc, snap.read_time) if doc is not None else None
             if doc is None or changes is None:
                 return None
-            tx.update(ref, changes)
+            if changes:  # Firestore refuses an empty update ("Cannot update with an empty document")
+                tx.update(ref, changes)
             return {**doc, **changes}
 
         result: dict[str, Any] | None = self._txn(work)

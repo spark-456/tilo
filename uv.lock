@@ -1369,10 +1369,12 @@ version = "0.1.0"
 source = { editable = "services/api" }
 dependencies = [
     { name = "fastapi" },
+    { name = "google-auth" },
     { name = "jsonschema" },
     { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "referencing" },
+    { name = "requests" },
     { name = "tilo-archive" },
     { name = "tilo-connectors" },
     { name = "tilo-harness" },
@@ -1387,10 +1389,12 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "google-auth", specifier = ">=2.30" },
     { name = "jsonschema", specifier = ">=4.18" },
     { name = "python-multipart", specifier = ">=0.0.18" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "requests", specifier = ">=2.31" },
     { name = "tilo-archive", editable = "packages/archive" },
     { name = "tilo-connectors", editable = "services/connectors" },
     { name = "tilo-harness", editable = "services/harness" },

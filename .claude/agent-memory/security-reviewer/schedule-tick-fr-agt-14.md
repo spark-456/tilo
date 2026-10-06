@@ -1,37 +1,42 @@
 ---
 name: schedule-tick-fr-agt-14
-description: FR-AGT-14 scheduled runs (tick route, tilo-schedule-scheduler SA, `schedule` channel) r1 FAIL (6c49214), r2 PASS flagged (a7ba44d); open list for the store/starter/wiring tickets
+description: FR-AGT-14 scheduled runs: r1 FAIL (6c49214), r2 PASS flagged (a7ba44d); 14b store/routes/starter/tilo-api tick r1 FAIL on licence rule only (27dd27e); open list for PR 2 (infra) and erasure
 metadata:
   type: project
 ---
 
-r2 (a7ba44d) PASS flagged: unknown-at-plan assertion removed (terraform test 54 pass, all three FR_AGT_14 runs execute), Schedule refuses non-finite/<=0/bool
-budget_cap (harness FR_AGT_14 101 passed). Residual: static repo test only checks an `audience =` line exists, not audience == target_uri (module HCL is
-correct: audience = var.target_uri, uri = target + path); Schedule now raises in the store's due() construction, so the store must skip a bad record, not abort.
+**14b r1 (2026-10-06, 27dd27e, branch feat/FR-AGT-14b-schedule-store-routes) FAIL, one blocker, security-flagged** (new public route
+`POST /internal/schedules/tick` on tilo-api in PUBLIC_ROUTES + SEC-15 pin; ADR-0023 live Firestore door amends ADR-0003).
+Blocker: `tilo_api/schedules.py:126-127` is the first production import of `google.auth` / `requests` in the repo; neither is declared in
+services/api/pyproject.toml nor in docs/licences.md (both Apache-2.0, already in uv.lock transitively). Fix = declare + two rows.
+Tests: api FR_AGT_14|SEC_15 359 pass, harness FR_AGT_14 210 pass, tests/repo 283 pass; emulator suite could NOT start here (TimeoutError in
+running_emulator, env), so FirestoreScheduleStore verified by reading only.
 
-r1 (2026-10-06, 6c49214, base phase0-stack) FAIL on one item, security-flagged (new IAM identity + OIDC route + frozen-contract widening).
-Blocking: `terraform test` fails in infra/envs/dev/tests/schedule_tick.tftest.hcl:66 ("Unknown condition value": audience/uri come from the
-Cloud Run service uri, unknown at plan under mock_provider), and terraform skips runs 2 and 3, the only ones asserting "run.invoker on harness
-only". Infra itself is right: in a scratch copy with that assert made plan-known, all three runs and the other 51 pass. CI does not run
-`terraform test` (only static tests/repo), so builders miss it: always run `terraform -chdir=infra/envs/dev test` on infra tickets.
+Closed from r1/r2: iss (tick_caller_ok on both routes, exact set, verified claims only); budget_cap (Schedule + schedule_from_doc); head-of-line
+(record_failure + backoff + MAX_FAILURES 8 + due() skips backoff); misaligned next_due (schedule_from_doc quarantines; _latest_slot 0.2 ms from year 1);
+owner from principal, extra=forbid, 404 same for unknown/other on every verb and create; per-owner cap 10 (atomic, counts disabled); world/run id
+sha256 of slot key; lease on store clock (Firestore snap.read_time); cache_namespace = server-random sched_<24 hex>; grant only
+budget.request_budget_grant (no person fallback, nothing created without a grant, owner filter in decide); Stop all / Pause all drop L3 -> skip.
+Prefilter probed: 14 malformed forms, zero network; a forged token that passes the prefilter (aud is public) still costs one cert fetch.
 
-What holds: route order 503 (nothing wired) / 401 / 403 / 500 with fixed bodies, types-only logs, no body or query read, claims from the verifier
-only, audience from wiring; `schedule` opens nothing (coverage SIGNED_IN allowlist, tests/contracts `broken()` returns OB-01 for schedule on
-both instruction and approval paths, probed); cards.py, deps.Channel, links use positive lists; new SA has only run.invoker on harness; replay_only
-read before any store read; exceptions propagate (500). Production `app = create_app()` is wired to nothing.
+Still open after 14b (non-blocking now, close before PR 2 sets TILO_SCHEDULE_TICK_* or TILO_SCHEDULES_STORE=firestore):
+- Pre-auth cost: tick resolves `runs.run_seams` (and store) as dependencies BEFORE the token check: 5 anonymous 401s built the seams 5 times (probe).
+  Today production 503s first (no store/seams wired). Resolve seams lazily after auth.
+- Erasure (FR-MEM-09) and consent revoke: nothing disables/deletes a user's schedules; brief snapshot in Firestore is unredacted user text
+  (intake has no secret screen). Register `orgs/*/schedules` in the erasure `firestore` store; firestore.rules (none exist) must deny clients.
+- Infra PR 2: composite index (enabled, next_due); egress to googleapis.com for the cert fetch (default requests timeout 120 s, no cert cache);
+  tilo-api SA Firestore role least privilege; ACCESS.md still says harness for the tick.
+- PATCH no-op on the Firestore store: `_update` returns {} and `tx.update(ref, {})` raises ValueError "Cannot update with an empty document" -> 500 (probe).
+- run_seams_unwired is a global condition but consumes per-schedule MAX_FAILURES: every schedule disabled after ~8.5 h of unwired seams.
+- Policy daily limits count in-memory history only (restart resets); ceiling (deps.budget_cap_ceiling) not re-applied at fire; schedule may pick any
+  offered approach, not the one approved; re-enabling an old schedule fires the latest missed slot at once; FirestoreScheduleStore(client=None)
+  can build a live client when constructed directly (door is only open_schedule_store); prior_world_id has no consumer yet (check owner when one lands).
+- Parked threads: each scheduled run waits at its gate on a daemon thread; no per-owner live-run bound.
+- `schedule` still valid in card.answer_channels / world.paused.channel / policy.notify_channel (BQ-AGT14-1 e).
 
-Open (check on the store / starter / wiring tickets, not failed here):
-- Route does not check `iss` (gmail_watch.py does, ACCESS.md push bullet requires it); wiring must use google-auth verify_oauth2_token or add the check.
-- Schedule.budget_cap unvalidated: NaN, inf, negative, 0 reach RunStart (probe). Validate finite > 0 in Schedule or Ticker, and the starter must bind it to the plan cap.
-- Head-of-line: due(now,20) is oldest-first and a failing start releases the claim, so 20 permanently failing schedules (dangling brief after erasure,
-  revoked consent) starve all others (probe: 21st never fires in 5 ticks). Needs failure counter/backoff and a per-owner schedule cap.
-- _latest_slot: arithmetic jump only when next_due weekday == cadence weekday; a misaligned stale next_due (0001-01-02) costs 5.5 s per schedule
-  (x20 = ~110 s vs 180 s attempt deadline). Store must validate next_due; computations after claim are outside the try (claim held until lease, tick aborts).
-- Store/starter must: take owner from the signed-in session never a body, verify approved_brief_ref and prior_world_id belong to that owner and org,
-  re-derive plan and gates (no carried approvals), start deterministic world id from the key, use server time for the lease, disable schedules on
-  user erasure and consent revoke. cache_namespace = schedule_id only (must be server-assigned and unique, or include org/owner).
-- `schedule` also valid in card.answer_channels (needs_you/blocked), world.paused.channel, policy.notify_channel (BQ-AGT14-1 e): narrow before any notify consumer exists.
-- ACCESS.md first Route-requirements bullet does not name tilo-schedule-scheduler; add a 403 test for it when the Gmail renew/poll and Tasks run routes land.
+r2 (a7ba44d) PASS flagged: unknown-at-plan assertion removed (terraform test 54 pass), Schedule refuses non-finite/<=0/bool budget_cap.
+r1 (6c49214) FAIL: `terraform test` failed at infra/envs/dev/tests/schedule_tick.tftest.hcl:66 (audience/uri unknown at plan under mock_provider).
+CI does not run `terraform test`: always run `terraform -chdir=infra/envs/dev test` on infra tickets.
 
-**Why:** the tick is the first route reachable by four run.invoker identities and the first unattended starter of runs.
-**How to apply:** on the wiring/store/starter tickets re-probe the list above first. Probe scripts: scratchpad probe_sched.py (rig from services/harness/tests/schedule_support.py), probe_ob01.py. Related: [[t3-invariant-gaps]], [[harness-writer-gaps]].
+**Why:** the tick is the first unattended starter of runs and now a public route with its own OIDC check.
+**How to apply:** on PR 2 (infra retarget) and the erasure/consent ticket re-probe the open list first. Probes in scratchpad: probe_oidc.py (real GoogleOidcVerifier with a counting transport), probe_e2e.py (rig from services/api/tests/_fr_agt_14_lib.py, run with PYTHONPATH=services/api/tests and `-p conftest`). Related: [[t3-invariant-gaps]], [[harness-writer-gaps]].
