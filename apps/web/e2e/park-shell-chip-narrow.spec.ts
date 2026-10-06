@@ -3,7 +3,7 @@
 // never intersects the tabs container's box, the container is wide enough to show the first tab (Home) fully, and the
 // chip keeps its accessible name "Sample data".
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
-// e2e/park-shell-chip-narrow.spec.ts --project=chromium --no-deps --workers=3
+// e2e/park-shell-chip-narrow.spec.ts --project=chromium --no-deps --workers=1
 import { expect, test } from "@playwright/test";
 
 const WIDTHS = [360, 375, 390, 414, 560] as const;
