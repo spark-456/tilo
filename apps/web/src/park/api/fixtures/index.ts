@@ -5,12 +5,15 @@ export const gbp = (v: number): string =>
 
 export { agenda } from "./agenda";
 export { connectors } from "./connectors";
+export { connectorTerms } from "./connectorTerms";
 export { decisions } from "./decisions";
 export { learn } from "./learn";
 export { ledger } from "./ledger";
 export { notifications } from "./notifications";
+export { profileSettings } from "./profileSettings";
 export { skills } from "./skills";
 export { team } from "./team";
+export { teamPolicy } from "./teamPolicy";
 export { LEVELS, TIERS } from "./tiers";
 export { today, user } from "./user";
 export { makeWorld, needsLeft, plans, worlds } from "./worlds";
