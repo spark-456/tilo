@@ -95,7 +95,17 @@ export function TeamPage({ app }: { app: AppCtx }) {
 
   // One stable root: the frame and the heading are the same elements while loading, loaded or failed, so
   // the h1 the shell focuses on arrival is not remounted when the data lands.
-  const ready = loaded && loaded !== "failed" && people ? { data: loaded, people } : null;
+  const ready =
+    loaded && loaded !== "failed" && people
+      ? {
+          data: loaded,
+          people,
+          // The invite placeholder takes the owner's mail domain from the team data.
+          domain:
+            loaded.team.people.find((p) => p.role === "Owner")?.email.split("@")[1] ??
+            "company.com",
+        }
+      : null;
   return (
     <Frame>
       <Top count={ready ? `${ready.people.length} people` : undefined}>
@@ -106,7 +116,7 @@ export function TeamPage({ app }: { app: AppCtx }) {
               <input
                 className="park-team-input"
                 aria-label="Invite by email"
-                placeholder="name@northwind.co"
+                placeholder={`name@${ready.domain}`}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && invite()}
@@ -189,6 +199,7 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
       />
       <Coverage
         rows={rows}
+        owner={team.people.find((p) => p.role === "Owner")?.name.split(" ")[0]}
         flash={Boolean(app.params.focus)}
         onBackup={addBackup}
         onLedger={() => app.go("ledger")}

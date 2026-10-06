@@ -6,12 +6,14 @@ import { type CoverRow, initialsOf } from "./teamModel";
 
 interface CoverageProps {
   rows: readonly CoverRow[];
+  /** First name of the team's owner, from the Team data; the owner sentence is left out without one. */
+  owner?: string | undefined;
   flash: boolean;
   onBackup: (row: CoverRow, personId: string) => void;
   onLedger: () => void;
 }
 
-export function Coverage({ rows, flash, onBackup, onLedger }: CoverageProps) {
+export function Coverage({ rows, owner, flash, onBackup, onLedger }: CoverageProps) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     if (flash) ref.current?.scrollIntoView?.({ block: "start" });
@@ -27,7 +29,7 @@ export function Coverage({ rows, flash, onBackup, onLedger }: CoverageProps) {
         <div className="park-team-heading">
           <h2 className="park-team-h2">Who signs off, and how fast</h2>
           <div className="park-team-hint">
-            Average wait this month, from the Ledger. Alex can approve anything as owner.
+            {`Average wait this month, from the Ledger.${owner ? ` ${owner} can approve anything as owner.` : ""}`}
           </div>
         </div>
         <a
