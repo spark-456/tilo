@@ -10,10 +10,12 @@ the same report.
 from __future__ import annotations
 
 import math
+import os
 import re
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any, NamedTuple
 
+from .prices import PriceBook
 from .savings import hit_saving
 from .treasury import LedgerEntry
 
@@ -100,12 +102,18 @@ def _row(runs: set[str], amounts: list[float], credit_usd: float) -> dict[str, A
     }
 
 
+def load_credit_usd(path: str | os.PathLike[str]) -> float:
+    """US$ per credit from a prices file (FR-MTR-01): the one place callers of `cost_report` get it from.
+    Raises `MeteringConfigError` when the file is unreadable or invalid."""
+    return PriceBook.load(path).credit_usd
+
+
 def cost_report(
     ledger: Iterable[LedgerEntry],
     events: Iterable[Mapping[str, Any]],
     *,
     unit_types: Mapping[str, Mapping[str, str]],
-    credit_usd: float = 0.005,
+    credit_usd: float,
 ) -> dict[str, Any]:
     """The report of PRD 14.5 ("cost per task by tier and profile"); shape in services/api/tests/API_FR_MTR_10.md."""
     tier_of, completed, saved = _read_events(events)

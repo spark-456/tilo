@@ -173,6 +173,11 @@ def get_ledger() -> Sequence[LedgerEntry]:
     raise HTTPException(status_code=503, detail="not_configured")
 
 
+def prices_path() -> Path:
+    """config/prices.yaml, the price sheet (FR-MTR-01): the one public way for a route to find it."""
+    return _REPO_ROOT / "config" / "prices.yaml"
+
+
 def providers_config() -> ProvidersConfig:
     """Read on every call, not at import: `TILO_MODELS_FILE` picks the models file (PL-02)."""
     return load_providers_config(resolve_models_path(_REPO_ROOT), _REPO_ROOT / "config" / "prices.yaml")
