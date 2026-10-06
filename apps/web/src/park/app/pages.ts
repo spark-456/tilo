@@ -9,7 +9,8 @@ const Placeholder = lazy(() => import("./Placeholder"));
 export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppCtx }>>> = {
   home: lazy(() => import("../pages/Home/HomePage").then((m) => ({ default: m.HomePage }))),
   worlds: Placeholder,
-  world: Placeholder,
+  // biome-ignore format: the registry keeps one line per page
+  world: lazy(() => import("../pages/World/WorldPage").then((m) => ({ default: m.WorldPage }))),
   // biome-ignore format: the registry keeps one line per page
   skills: lazy(() => import("../pages/Skills/SkillsPage").then((m) => ({ default: m.SkillsPage }))),
   ledger: lazy(() => import("../pages/Ledger/LedgerPage").then((m) => ({ default: m.LedgerPage }))),
