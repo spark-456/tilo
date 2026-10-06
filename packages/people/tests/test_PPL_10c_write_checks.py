@@ -1410,3 +1410,114 @@ def test_PPL_10c_PE_19_check_write_leaks_no_record_text_in_its_answer():
     request = dataclasses.replace(request, record={**request.record, "title": t.SENTINEL})
     got = check(request, {**after, "title": t.SENTINEL + "-new", "x": t.SENTINEL})
     assert got == ("schema",) and t.SENTINEL not in repr(got)
+
+
+# ---------------------------------------------------------------------------------------------
+# 5. Fix pass (security review): a new meeting holds its initial state, PE-02 owners on every pin
+#    write, and the rules edits already enforce also hold on create
+# ---------------------------------------------------------------------------------------------
+def _create_check(name, mutate):
+    request, after = CREATES[name]()
+    mutated = mutate(copy.deepcopy(after))
+    return check(dataclasses.replace(request, record=copy.deepcopy(mutated)), mutated)
+
+
+MEETING_FORGERIES = [
+    ("status minuted", _set(status="minuted"), "transition"),
+    ("status live", _set(status="live"), "transition"),
+    ("status ended", _set(status="ended"), "transition"),
+    ("foreign world_id", _set(world_id="w_01J8Z3K4M5N6P7Q8R9S0T1V2W3"), "stamp"),
+    ("transcript ref", _set(transcript=copy.deepcopy(pl.ART)), "stamp"),
+    ("ended_reason", _set(ended_reason="completed"), "stamp"),
+    ("delete_transcript_after", _set(delete_transcript_after="9999-12-31T23:59:59.999Z"), "stamp"),
+    ("delete_minutes_after", _set(delete_minutes_after="9999-12-31T23:59:59.999Z"), "stamp"),
+]
+
+
+@pytest.mark.parametrize("row", MEETING_FORGERIES, ids=[r[0] for r in MEETING_FORGERIES])
+def test_PPL_10c_PE_19_a_new_meeting_holds_only_its_initial_state(row):
+    _, mutate, code = row
+    got = _create_check("c_meeting", mutate)
+    assert got == ("not_allowed",) or (code in got and set(got) <= {code, "schema"}), got  # decide may refuse first
+
+
+def test_PPL_10c_PE_19_a_new_meeting_cannot_carry_forged_minutes_for_a_later_confirmation():
+    forged = _set(
+        status="minuted",
+        world_id="w_01J8Z3K4M5N6P7Q8R9S0T1V2W3",
+        transcript=copy.deepcopy(pl.ART),
+        minutes=copy.deepcopy(pl.ART_MINUTES),
+        ended_reason="completed",
+    )
+    assert {"stamp", "transition"} <= set(_create_check("c_meeting", forged))
+
+
+@pytest.mark.parametrize("owner", ["u_sam", "u_ext", "u_ghost"])
+@pytest.mark.parametrize("name", ["c_pin_team", "c_pin_tilo"])
+def test_PPL_10c_PE_02_a_team_pin_is_not_created_with_a_non_member_or_cross_org_owner(name, owner):
+    got = _create_check(name, _set(owner=owner))
+    assert got != () and set(got) <= {"owner_not_member", "not_allowed"}, got
+
+
+def test_PPL_10c_PE_02_a_person_made_team_pin_create_names_a_cross_org_owner_not_member():
+    assert _create_check("c_pin_team", _set(owner="u_ext")) == ("owner_not_member",)
+
+
+def test_PPL_10c_PE_02_a_team_pin_is_created_with_a_member_owner():
+    assert _create_check("c_pin_team", _set(owner="u_riya")) == ()
+
+
+@pytest.mark.parametrize("owner", ["u_sam", "u_ext", "u_ghost"])
+def test_PPL_10c_PE_02_a_pin_is_not_confirmed_with_a_non_member_or_cross_org_owner(owner):
+    request, after = pin_confirm()
+    before = {**copy.deepcopy(request.record), "owner": owner}
+    request = dataclasses.replace(request, record=before)
+    assert check(request, {**after, "owner": owner}) == ("owner_not_member",)
+
+
+def test_PPL_10c_PE_02_a_pin_is_confirmed_with_a_member_owner():
+    request, after = pin_confirm()
+    request = dataclasses.replace(request, record={**copy.deepcopy(request.record), "owner": "u_riya"})
+    assert check(request, {**after, "owner": "u_riya"}) == ()
+
+
+@pytest.mark.parametrize("owner", ["u_sam", "u_ext", "u_ghost"])
+def test_PPL_10c_PE_02_a_pin_edit_still_refuses_a_non_member_or_cross_org_owner(owner):
+    request, after = pin_edit()
+    assert check(request, {**_last(change="owner_changed")(after), "owner": owner}) == ("owner_not_member",)
+
+
+@pytest.mark.parametrize("team", ["tm_ops", "tm_other"])
+def test_PPL_10c_PE_04_an_accepted_entry_is_not_created_shared_with_a_team_the_owner_is_not_in(team):
+    assert _create_check("c_cal_person", _set(share={"team": team})) == ("owner_not_member",)
+
+
+def test_PPL_10c_PE_04_an_accepted_entry_is_created_shared_with_the_owners_team():
+    assert _create_check("c_cal_person", _set(share={"team": "tm_sales"})) == ()
+
+
+@pytest.mark.parametrize("until", [NOW, t.T0, stamp_after(days=30, millis=1), "2027-10-03T09:00:00.000Z"])
+def test_PPL_10c_PE_19_a_work_item_is_not_created_with_a_snooze_outside_30_days(until):
+    assert _create_check("c_wi_person", _set(snoozed_until=until)) == ("snooze_range",)
+
+
+def test_PPL_10c_PE_19_a_work_item_is_created_with_a_snooze_inside_the_window():
+    assert _create_check("c_wi_person", _set(snoozed_until=stamp_after(days=30))) == ()
+
+
+@pytest.mark.parametrize(
+    "name,source",
+    [
+        ("c_wi_person", {"kind": "meeting", "ref": "mt_weekly1", "evidence": []}),
+        ("c_pin_team", {"kind": "meeting", "ref": "mt_weekly1", "evidence": []}),
+        ("c_pin_personal", {"kind": "meeting", "ref": "mt_weekly1", "evidence": []}),
+        ("c_cal_person", copy.deepcopy(pl.GOOGLE_SOURCE)),
+        ("c_cal_person", {"kind": "tilo", "from": "meeting", "ref": "mt_weekly1"}),
+    ],
+)
+def test_PPL_10c_PE_08_a_person_made_record_cannot_claim_a_machine_origin(name, source):
+    request, after = CREATES[name]()
+    mutated = {**after, "source": source}
+    request = dataclasses.replace(request, record=copy.deepcopy(mutated), meeting=t.meeting(), source_owner="u_owner")
+    got = check(request, mutated)
+    assert "stamp" in got or got == ("not_allowed",), got

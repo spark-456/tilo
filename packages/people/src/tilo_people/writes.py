@@ -35,6 +35,15 @@ WRITE_PROBLEMS = (
 _WRITES = ("create", "mention", "edit", "confirm", "untag", "mark_done", "assign_membership", "set_org_role")
 _MISSING = object()
 _SNOOZE_MAX = timedelta(days=30)
+# Written by the harness as a meeting runs, never by its creator: a new meeting holds none of them.
+_MEETING_SERVER_FIELDS = (
+    "transcript",
+    "minutes",
+    "minutes_confirmed_by",
+    "ended_reason",
+    "delete_transcript_after",
+    "delete_minutes_after",
+)
 
 # What each (kind, action) may change; everything else on the record must stay as stored (`immutable`).
 _MAY: dict[tuple[str, str], frozenset[str]] = {
@@ -73,7 +82,7 @@ def _check(request: AccessRequest, after: Mapping[str, Any], directory: Director
     if not valid(f"{kind}.schema.json", after):
         return ("schema",)
     if action in ("create", "mention"):
-        found = _created(request, after)
+        found = _created(request, after, directory)
     elif (kind, action) in _MAY:
         found = _changed(request, after, directory)
     else:
@@ -92,7 +101,7 @@ def _maker(actor: str, now: str) -> dict[str, str]:
 # ---------------------------------------------------------------------------------------------
 # Creates: every stamp is the actor's at now, nothing comes from the body (PE-19)
 # ---------------------------------------------------------------------------------------------
-def _created(request: AccessRequest, after: Mapping[str, Any]) -> set[str]:
+def _created(request: AccessRequest, after: Mapping[str, Any], directory: Directory) -> set[str]:
     if _j(after) != _j(request.record):
         return {"identity"}
     kind, actor, now = request.record_kind, request.actor, request.now
@@ -105,11 +114,14 @@ def _created(request: AccessRequest, after: Mapping[str, Any]) -> set[str]:
         attestation = after["attestation"]
         if (
             after["created_at"] != now
-            or after["minutes_confirmed_by"] is not None
             or attestation["by"] != actor
             or attestation["at"] > now
+            or "world_id" in after
+            or any(after[key] is not None for key in _MEETING_SERVER_FIELDS)
         ):
             found.add("stamp")
+        if after["status"] != "scheduled":  # the initial state; the harness moves it on (BQ-PPL10-23)
+            found.add("transition")
     elif kind == "mention":
         if after["added_by"] != _maker(actor, now) or after["removed"] is not None:
             found.add("stamp")
@@ -122,6 +134,14 @@ def _created(request: AccessRequest, after: Mapping[str, Any]) -> set[str]:
                 wrong = wrong or assigner is None or assigner["at"] != now
             else:
                 wrong = wrong or (assigner is not None and assigner != stamp)
+        if after["created_by"]["by"] == "person" and not _manual_source(after.get("source")):
+            wrong = True  # a person-made record cannot claim a Google, Tilo or meeting origin (PE-08)
+        if kind == "work_item" and after["snoozed_until"] is not None and not _snooze_ok(now, after["snoozed_until"]):
+            found.add("snooze_range")
+        if kind == "pinboard_item" and not _owner_ok(after, directory, now):
+            found.add("owner_not_member")
+        if kind == "calendar_entry" and not _share_ok(after, directory, now):
+            found.add("owner_not_member")
         if wrong:
             found.add("stamp")
         if kind != "calendar_entry":
@@ -180,6 +200,8 @@ def _changed(request: AccessRequest, after: Mapping[str, Any], directory: Direct
             changes = ("accepted",) if (old, new) == ("proposed", "active") else None
             if after["confirmed_by"] != stamp:
                 found.add("stamp")
+            if not _owner_ok(after, directory, now):
+                found.add("owner_not_member")
         elif old == new:
             changes = ("owner_changed",) if _j(before["owner"]) != _j(after["owner"]) else ("edited", "owner_changed")
         elif new == "removed" and old in ("active", "proposed"):
@@ -246,6 +268,23 @@ def _owner_ok(pin: Mapping[str, Any], directory: Directory, now: str) -> bool:
         return True
     person = directory.record(owner)
     return person is not None and person["org_id"] == pin["org_id"] and directory.is_member(owner, scope["team"], now)
+
+
+def _manual_source(source: Mapping[str, Any] | None) -> bool:
+    return source is None or source.get("kind") == "manual"
+
+
+def _share_ok(entry: Mapping[str, Any], directory: Directory, now: str) -> bool:
+    """A shared entry's owner is a member of that team, of the entry's org (PE-04)."""
+    share = entry["share"]
+    if share is None:
+        return True
+    person = directory.record(entry["owner"])
+    return (
+        person is not None
+        and person["org_id"] == entry["org_id"]
+        and directory.is_member(entry["owner"], share["team"], now)
+    )
 
 
 def _snooze_ok(now: str, until: str) -> bool:
