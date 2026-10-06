@@ -9,12 +9,28 @@ export interface PopoverProps {
   onClose: () => void;
   /** In the flow, with no backdrop: for a gallery. */
   inline?: boolean;
+  /** An extra class for the shell to place it. */
+  className?: string;
   children: ReactNode;
 }
 
-export function Popover({ label, width, onClose, inline = false, children }: PopoverProps) {
+export function Popover({
+  label,
+  width,
+  onClose,
+  inline = false,
+  className,
+  children,
+}: PopoverProps) {
   return (
-    <Panel kind="popover" label={label} width={width} inline={inline} onClose={onClose}>
+    <Panel
+      kind="popover"
+      label={label}
+      width={width}
+      inline={inline}
+      className={className}
+      onClose={onClose}
+    >
       {children}
     </Panel>
   );

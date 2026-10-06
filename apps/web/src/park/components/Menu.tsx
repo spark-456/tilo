@@ -19,9 +19,11 @@ export interface MenuProps {
   onClose: () => void;
   width?: number;
   inline?: boolean;
+  /** Above the rows, inside the panel (the account menu's name, email and plan, then its rule). */
+  header?: ReactNode;
 }
 
-export function Menu({ label, items, onClose, width, inline = false }: MenuProps) {
+export function Menu({ label, items, onClose, width, inline = false, header }: MenuProps) {
   const [current, setCurrent] = useState(0);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -48,6 +50,7 @@ export function Menu({ label, items, onClose, width, inline = false }: MenuProps
       onClose={onClose}
       onKeyDown={onKeyDown}
     >
+      {header}
       {items.map((item, i) => (
         <button
           key={item.id}
