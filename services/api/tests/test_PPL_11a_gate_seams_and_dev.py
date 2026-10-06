@@ -16,6 +16,7 @@ import re
 import pytest
 from _clint1_lib import seam
 from _ppl11a_lib import (
+    ATTEST,
     DEV,
     OWNER,
     PEOPLE_ROUTES,
@@ -62,7 +63,7 @@ def _valid_request(route) -> dict:
     if route in (R_CONFIRM_ITEM, R_CONFIRM_MEETING):
         return {"json": {}}
     if route == R_CREATE_MEETING:
-        return {"json": {"title": "Weekly sync", "source": "upload"}}
+        return {"json": {"title": "Weekly sync", "source": "upload", **ATTEST}}
     if route == R_CREATE_PERSON:
         return {"json": _NEW_PERSON}
     if route == R_CREATE_ITEM:
