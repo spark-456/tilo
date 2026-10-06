@@ -137,6 +137,10 @@ def _metrics(args: argparse.Namespace) -> int:
     from .runner import PassResult  # noqa: PLC0415
 
     try:
+        if any(name in os.environ for name in ("LIVE", "K_SERVICE", "CLOUD_RUN_JOB")):  # refuse before anything runs
+            raise BankRefused(
+                "the metrics report runs on recordings and fakes only: LIVE, K_SERVICE and CLOUD_RUN_JOB must be unset"
+            )
         config = EvalsConfig.load("config/evals.yaml")
         credit_usd = PriceBook.load("config/prices.yaml").credit_usd
         replay, bank = load_cases(root=args.cases_root), load_bank(args.bank_dir)

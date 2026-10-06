@@ -8,8 +8,10 @@ import copy
 import dataclasses
 import json
 import re
+from pathlib import Path
 
 import pytest
+import yaml
 from _metrics_lib import (
     CLAIM_SENTENCE,
     COMPUTABLE,
@@ -201,12 +203,31 @@ def test_EV_01_to_15_a_metric_missing_from_coverage_reads_as_no_cases_and_none_r
     assert all("0 cases measure this, 0 recorded" in r.note for r in rows)
 
 
+def _configured_model_ids() -> list[str]:
+    """The real model ids from config/models.yaml (PL-01: a literal id never sits in a test)."""
+    found: list[str] = []
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            found.extend(v for k, v in node.items() if k == "model" and isinstance(v, str) and MODEL_ID.search(v))
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(yaml.safe_load((Path(__file__).resolve().parents[2] / "config" / "models.yaml").read_text("utf-8")))
+    return sorted(set(found))
+
+
 def test_EV_01_to_15_no_model_id_appears_in_any_row_or_rendering():
+    ids = _configured_model_ids()
+    assert ids, "config/models.yaml names at least one model id the detector knows"
     leaky = [
         dataclasses.replace(
             r,
-            outputs={"note": "answered by gemini-3.8-flash"},
-            events=tuple({**e, "summary": "gpt-5 and claude-opus said so"} for e in r.events),
+            outputs={"note": f"answered by {ids[0]}"},
+            events=tuple({**e, "summary": f"{' and '.join(ids)} said so"} for e in r.events),
         )
         for r in _every_computed_on_fakes()
     ]
