@@ -329,7 +329,7 @@ def refusal_rule(call: Callable[[], Any]) -> str:
     raise AssertionError("expected MeetingHostRefused, nothing was raised")
 
 
-def mh_refused() -> type:
+def mh_refused() -> type[BaseException]:
     return errs().MeetingHostRefused
 
 
