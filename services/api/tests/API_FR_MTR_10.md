@@ -45,10 +45,11 @@ releases, grants and `usage` records are not spend. From events it reads `world.
   not a `providers.schema.json` `profile_id` (`^[a-z][a-z0-9-]{0,31}$`), so a model id written there by mistake never
   reaches the output (PL-01). Its credits stay in every sum.
 - **task_type** is `unit_types[run_id][entry.step]`; `null` when the step is not a unit of that run's plan.
-- `tasks` in a group counts the distinct runs with spend in it; `credits_per_task = credits / tasks`, `0` when a
-  run has no spend. `credits_saved` is FR-MTR-06: the sum over `memory.hit` events of `origin_cost - lookup_cost`,
+- `tasks` in a group counts the distinct runs in it: runs with spend in it, and in `by_tier` also planned runs with no
+  spend (so a tier can show `credits_per_task` 0); `credits_per_task = credits / tasks`. `credits_saved` is FR-MTR-06: the sum over `memory.hit` events of `origin_cost - lookup_cost`,
   each event id once (a redelivery counts once), per run, never netted off spend and never added to it. A hit whose
-  `saved` disagrees raises `tilo_metering.savings.InconsistentMemoryHit`, as the meter does.
+  `saved` disagrees raises `tilo_metering.savings.InconsistentMemoryHit`, as the meter does (the routes answer 422
+  `inconsistent_ledger`, BQ-MTR10-5).
 - **Order**: `tasks` by `run_id`; `by_tier` and the tier of `by_tier_profile` by world size (outpost, village, town,
   city), then `null`; profiles and task types alphabetically, then `null`. The same inputs in any order give the same
   report, byte for byte once serialised.

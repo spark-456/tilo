@@ -10,9 +10,10 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
-from tilo_metering import LedgerEntry
+from tilo_metering import LedgerEntry, MeteringConfigError, PriceBook
 from tilo_metering.costs import cost_report
 
+from tilo_api import deps
 from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_ledger, get_store
 
 router = APIRouter()
@@ -26,6 +27,14 @@ def _unit_types(store: Store, world_id: str) -> dict[str, str]:
     return {unit_id: kind for unit_id, kind in pairs if isinstance(unit_id, str) and isinstance(kind, str)}
 
 
+def _credit_usd() -> float:
+    """US$ per credit from config/prices.yaml (FR-MTR-01); an unreadable file closes the routes (503)."""
+    try:
+        return PriceBook.load(deps._REPO_ROOT / "config" / "prices.yaml").credit_usd
+    except MeteringConfigError as exc:
+        raise HTTPException(status_code=503, detail="not_configured") from exc
+
+
 def _report(store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[str, WorldRecord]]) -> dict[str, Any]:
     """The report for these worlds: their runs (the world's own run id plus any on its events) and no others."""
     events: list[dict] = []
@@ -36,7 +45,12 @@ def _report(store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[
         events += world_events
         runs |= {world.run_id} | {e["run_id"] for e in world_events if isinstance(e.get("run_id"), str)}
         unit_types[world.run_id] = _unit_types(store, world_id)
-    return cost_report([e for e in ledger if e.run in runs], events, unit_types=unit_types)
+    try:
+        return cost_report(
+            [e for e in ledger if e.run in runs], events, unit_types=unit_types, credit_usd=_credit_usd()
+        )
+    except ValueError as exc:  # a memory.hit that disagrees with its own costs (BQ-MTR10-5): refuse, never a 500
+        raise HTTPException(status_code=422, detail="inconsistent_ledger") from exc
 
 
 @router.get("/worlds/{world_id}/costs")

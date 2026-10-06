@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any, NamedTuple
 
 from .savings import hit_saving
@@ -19,7 +19,7 @@ from .treasury import LedgerEntry
 
 TIER_ORDER = ("outpost", "village", "town", "city")  # PRD 9.1: world size
 _PROFILE_ID = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
-_GROUPS = ("tasks", "by_tier", "by_profile", "by_task_type", "by_tier_profile")
+_UNIT_TYPE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")  # common.schema.json slug, as plan.schema.json unit_type
 
 
 class _Spend(NamedTuple):
@@ -37,6 +37,11 @@ def _text(value: object) -> str | None:
 def _profile(entry: LedgerEntry) -> str | None:
     name = entry.usage.profile if entry.usage else None
     return name if isinstance(name, str) and _PROFILE_ID.match(name) else None
+
+
+def _task_type(unit_types: Mapping[str, Mapping[str, str]], entry: LedgerEntry) -> str | None:
+    kind = (unit_types.get(entry.run) or {}).get(entry.step or "")
+    return kind if isinstance(kind, str) and _UNIT_TYPE.match(kind) else None
 
 
 def _order(value: str | None, ranking: tuple[str, ...] = ()) -> tuple[bool, int, str]:
@@ -59,7 +64,7 @@ def _read_events(events: Iterable[Mapping[str, Any]]) -> tuple[dict, set, dict]:
             if event_id in seen:
                 continue
             saving = hit_saving(event)  # raises on a hit that disagrees with its own costs
-            seen.add(event_id or "")
+            seen.add(str(event_id))
             if run:
                 saved.setdefault(run, []).append(saving)
         elif run and kind == "world.completed":
@@ -91,7 +96,7 @@ def _row(runs: set[str], amounts: list[float], credit_usd: float) -> dict[str, A
         "tasks": len(runs),
         "credits": credits,
         "usd": credits * credit_usd,
-        "credits_per_task": credits / len(runs) if runs else 0,
+        "credits_per_task": credits / len(runs),  # a group exists only with a run in it
     }
 
 
@@ -105,9 +110,7 @@ def cost_report(
     """The report of PRD 14.5 ("cost per task by tier and profile"); shape in services/api/tests/API_FR_MTR_10.md."""
     tier_of, completed, saved = _read_events(events)
     spend = [
-        _Spend(
-            e.run, tier_of.get(e.run), _profile(e), (unit_types.get(e.run) or {}).get(e.step or ""), e.credits or 0.0
-        )
+        _Spend(e.run, tier_of.get(e.run), _profile(e), _task_type(unit_types, e), e.credits or 0.0)
         for e in ledger
         if e.kind == "commit"
     ]
@@ -126,17 +129,20 @@ def cost_report(
         for run in runs
     ]
 
-    def grouped(name: str, key_of, ranking: tuple[str, ...] = (), *, idle: bool = False) -> list[dict[str, Any]]:
-        items = [(s.run, key_of(s), s.credits) for s in spend]
+    def grouped(name: str, key_of: Callable[[_Spend], Any], *, idle: bool = False) -> list[dict[str, Any]]:
+        """Rows for the group `name` ("tier", "profile", "tier+profile"); a tier is ranked by world size."""
+        items: list[tuple[str, Any, float | None]] = [(s.run, key_of(s), s.credits) for s in spend]
         if idle:  # a planned run with no spend still counts as a task in its tier
             items += [(run, tier_of.get(run), None) for run in runs]
+        names = name.split("+")
+        ranks = [TIER_ORDER if n == "tier" else () for n in names]
         rows = []
         for key, (members, amounts) in _groups(items).items():
             parts = key if isinstance(key, tuple) else (key,)
-            row = {n: v for n, v in zip(name.split("+"), parts, strict=True)} | _row(members, amounts, credit_usd)
+            row = dict(zip(names, parts, strict=True)) | _row(members, amounts, credit_usd)
             if idle:
                 row["credits_saved"] = math.fsum(saved.get(run, 0) for run in members)
-            rows.append((tuple(_order(p, ranking) for p in parts), row))
+            rows.append((tuple(_order(p, rank) for p, rank in zip(parts, ranks, strict=True)), row))
         return [row for _, row in sorted(rows, key=lambda pair: pair[0])]
 
     total = math.fsum(s.credits for s in spend)
@@ -152,8 +158,8 @@ def cost_report(
             "usd_saved": total_saved * credit_usd,
         },
         "tasks": tasks,
-        "by_tier": grouped("tier", lambda s: s.tier, TIER_ORDER, idle=True),
+        "by_tier": grouped("tier", lambda s: s.tier, idle=True),
         "by_profile": grouped("profile", lambda s: s.profile),
         "by_task_type": grouped("task_type", lambda s: s.task_type),
-        "by_tier_profile": grouped("tier+profile", lambda s: (s.tier, s.profile), TIER_ORDER),
+        "by_tier_profile": grouped("tier+profile", lambda s: (s.tier, s.profile)),
     }
