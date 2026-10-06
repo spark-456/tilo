@@ -1,6 +1,7 @@
 """The people API (PPL-11a; docs/prd-addendum-people-agents.md, ADR-0020/0021, services/api/tests/API_PPL_11a.md).
-Slice A: the two evidence-quote routes. Every route sits behind the SEC-15 gate (none is public), takes the person from
-the verified `deps.Principal` (the session's world role neither grants nor takes away), and reads one org only
+Slices A and B: the two evidence-quote routes and the plate. Every route sits behind the SEC-15 gate (none is
+public), takes the person from the verified `deps.Principal` (the session's world role neither grants nor takes
+away), and reads one org only
 (`deps.ORG_ID`, at call time). It makes no model call and builds no router. One 404 body for every refusal; 422 for a
 bad shape before any lookup; 503 `not_configured` for an unwired seam and 503 for a store that cannot be read.
 """
@@ -18,6 +19,7 @@ from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps
+from tilo_api.people_plate import build_plate
 from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
 
 _MEETING_ID = re.compile(r"mt_[0-9A-Za-z_]{1,48}")
@@ -33,10 +35,17 @@ class _PeopleRoute(APIRoute):
         handler = super().get_route_handler()
 
         async def guarded(request: Request) -> Response:
+            """Every answer, refusals included, is `Cache-Control: no-store` (PE-22: no copy outlives the request)."""
             try:
-                return await handler(request)
+                response = await handler(request)
             except NotImplementedError:
-                return JSONResponse(status_code=503, content={"detail": "not_configured"})
+                response = JSONResponse(status_code=503, content={"detail": "not_configured"})
+            except HTTPException as refusal:
+                response = JSONResponse(
+                    status_code=refusal.status_code, content={"detail": refusal.detail}, headers=refusal.headers
+                )
+            response.headers["Cache-Control"] = "no-store"
+            return response
 
         return guarded
 
@@ -97,3 +106,17 @@ def work_item_quote_route(
         raise _not_found()
     reader = Reader(stores, artifacts, redact, deps.ORG_ID, principal.user_id, clock())
     return _answer(lambda: item_quote(reader, work_item_id))
+
+
+@router.get("/v1/plate")
+def plate_route(
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    sources: Annotated[deps.PlateSources, Depends(deps.get_plate_sources)],
+    owners: Annotated[deps.SourceOwners, Depends(deps.get_source_owners)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The signed-in person's own plate (PE-26): nothing in the request names a person, so none can be asked for. A
+    person with no record is a 404 (the sources are not asked); a source that fails is a 503, never a partial plate."""
+    now = clock()
+    return _answer(lambda: build_plate(stores, sources, owners, deps.ORG_ID, principal.user_id, now))
