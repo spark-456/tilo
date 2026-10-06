@@ -12,14 +12,20 @@
 # `request_budget_grant` without a person's own approval, for example a harness auto-start or
 # FR-MTR-03 top-ups (ADR-0002 decision 14).
 # A grant goes through no connector, so its connector id is the reserved `internal`.
+#
+# build_handoff (FR-CON-16, supplement 2026-10-05 s6) hands company data to an outside build partner, so it
+# is T3 and always needs a person. It is listed, not left to the unlisted-is-T3 default, so that removing the
+# line by mistake cannot pass unnoticed: the FR-CON-16 config test pins it at T3.
 actions:
   create_draft: T1
   save_file: T1
+  save_as_google_file: T1
   grant_budget: T1
   send_email: T2
   post_status_update: T2
   share_file: T3
   delete_file: T3
+  build_handoff: T3
 modifiers:
   - {condition: new_recipients, raises_to: T3}
   - {condition: attachments, raises_to: T3}

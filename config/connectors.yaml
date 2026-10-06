@@ -33,5 +33,24 @@
     - {id: read_file, capability: read, description: "Read the files you pick in Drive.", risk_tier: T1, gate_type: none, irreversible: false}
     - {id: list_files, capability: list, description: "See the files in the folder you pick.", risk_tier: T1, gate_type: none, irreversible: false}
     - {id: save_file, capability: write, description: "Save finished work in a Tilo folder in your Drive.", risk_tier: T1, gate_type: approval, irreversible: false}
+    - {id: save_as_google_file, capability: write, description: "Save a deck, doc or sheet as a Slides, Docs or Sheets file in a Tilo folder in your Drive.", risk_tier: T1, gate_type: approval, irreversible: false}
   limits: {per_minute: 60, batch_size: 50}
   data_class: {returns: [personal, business], redact: []}
+
+# Build partner (PRD supplement 2026-10-05 s6, SD-03; FR-CON-16, FR-CON-17). Link route only: Tilo makes a
+# Lovable "Build with URL" link from the person-accepted requirements and the person presses send in Lovable,
+# so there is no key, no token and no scope (auth none), and Tilo makes no call to Lovable. build_handoff is
+# `send`: it delivers a composed prompt to an outside party (`share` grants access to a stored file). It is T3
+# (also listed in config/autonomy.yaml) and irreversible: once the person opens the link the prompt and the
+# granted data it carries are with Lovable. Route limits are in config/build_partners.yaml. Listed after gmail
+# and google_drive: the dev Director takes the first gated action in catalogue order.
+- id: lovable
+  name: Lovable
+  icon: build
+  auth: none
+  scopes: {}
+  capabilities: [send]
+  actions:
+    - {id: build_handoff, capability: send, description: "Hand the accepted requirements to Lovable as a build prompt you send yourself.", risk_tier: T3, gate_type: approval, irreversible: true}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}

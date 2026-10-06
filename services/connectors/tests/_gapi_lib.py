@@ -50,6 +50,14 @@ GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 DRIVE_API = "https://www.googleapis.com/drive/v3"
 DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3/files"
 FOLDER_MIME = "application/vnd.google-apps.folder"
+OOXML = "application/vnd.openxmlformats-officedocument."
+GAPPS = "application/vnd.google-apps."
+# native Google type -> the one OOXML media type Drive converts it from on upload
+_NATIVE_SOURCE = {
+    GAPPS + "presentation": OOXML + "presentationml.presentation",
+    GAPPS + "document": OOXML + "wordprocessingml.document",
+    GAPPS + "spreadsheet": OOXML + "spreadsheetml.sheet",
+}
 
 GMAIL_ALL = [GMAIL_READONLY, GMAIL_COMPOSE, GMAIL_SEND]
 DRIVE_ALL = [DRIVE_FILE]
@@ -186,6 +194,7 @@ class _File:
     content: bytes | None
     app_properties: dict[str, str] = field(default_factory=dict)
     trashed: bool = False
+    shared: bool = False
 
     def meta(self) -> dict:
         out: dict[str, Any] = {
@@ -193,6 +202,7 @@ class _File:
             "name": self.name,
             "mimeType": self.mime_type,
             "parents": list(self.parents),
+            "shared": self.shared,
         }
         if self.content is not None:
             out["size"] = str(len(self.content))
@@ -542,6 +552,9 @@ class FakeGoogleApis:
             return _error(400, "INVALID_ARGUMENT")
         meta = jsonlib.loads(parts[0].get_payload(decode=True).decode("utf-8"))
         data = parts[1].get_payload(decode=True) or b""
+        native = _NATIVE_SOURCE.get(str(meta.get("mimeType", "")))
+        if native is not None and parts[1].get_content_type() != native:  # Drive converts only the matching OOXML
+            return _error(400, "INVALID_ARGUMENT")
         with self._lock:
             fid = self._next_id("f")
             props = {str(k): str(v) for k, v in (meta.get("appProperties") or {}).items()}
@@ -664,8 +677,12 @@ class FakeArtifacts:
         name: str = "report.pdf",
         mime_type: str = "application/pdf",
         content: bytes = b"%PDF-1.7 fake report",
+        origin_kind: str | None = None,
     ) -> dict:
-        self._items[(artifact_id, version)] = {"kind": "file", "name": name, "mime_type": mime_type, "content": content}
+        item = {"kind": "file", "name": name, "mime_type": mime_type, "content": content}
+        if origin_kind is not None:  # artifact.schema.json origin.kind: unit | render | upload | restore
+            item["origin"] = {"kind": origin_kind, "unit": None, "agent": None}
+        self._items[(artifact_id, version)] = item
         return {"artifact_id": artifact_id, "version": version}
 
     def get(self, artifact_id: str, version: int) -> dict:
@@ -813,13 +830,19 @@ def gmail_case(
     return case
 
 
-def drive_case(*, item: dict, destination: str | None = None, idempotency_key: str | None = None) -> dict:
+def drive_case(
+    *,
+    item: dict,
+    destination: str | None = None,
+    idempotency_key: str | None = None,
+    action_type: str = "save_file",
+) -> dict:
     outbox_id = next_outbox_id()
     case = gate_case(
         outbox_id=outbox_id,
-        idempotency_key=idempotency_key or f"r_village_basic_1:U3:save_file:{outbox_id[-4:]}",
+        idempotency_key=idempotency_key or f"r_village_basic_1:U3:{action_type}:{outbox_id[-4:]}",
         connector="google_drive",
-        action_type="save_file",
+        action_type=action_type,
         recipients=(),
         destination=destination or "placeholder",
         item=item,

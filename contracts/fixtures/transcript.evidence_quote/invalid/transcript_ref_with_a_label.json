@@ -1,0 +1,13 @@
+{
+  "meeting_id": "mt_q4_plan",
+  "transcript": {
+    "artifact_id": "art_transcript_q4_plan",
+    "version": 1,
+    "label": "q4.json"
+  },
+  "utterance_id": "u0021",
+  "state": "missing",
+  "speaker": null,
+  "text": null,
+  "truncated": false
+}

@@ -6,7 +6,7 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 
 | File | Describes | Version |
 | --- | --- | --- |
-| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier, artifact media types, the people ids (`wi_`, `mt_`, `pb_`, `mn_`, `ce_`, `tm_`, utterance), `opaque_ref`, `maker`, `record_ref`; 1.2.0 merges the artifact media types (1.1.0, ADR-0018) and the people ids (1.1.0, ADR-0016); both 1.1.0 releases carried different content, so 1.2.0 is the first version that has both (additive, no breaking change) | 1.2.0 |
+| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier, artifact media types, the people ids (`wi_`, `mt_`, `pb_`, `mn_`, `ce_`, `tm_`, utterance), `opaque_ref`, `maker`, `record_ref`; 1.2.0 merges the artifact media types (1.1.0, ADR-0018) and the people ids (1.1.0, ADR-0016); both 1.1.0 releases carried different content, so 1.2.0 is the first version that has both (additive, no breaking change); 1.3.0 adds `mail` to `record_ref.kind` (ADR-0021) | 1.3.0 |
 | `brief.schema.json` | Structured brief from intake (FR-INT-03 to 05) | 1.0.0 |
 | `plan.schema.json` | `PlanGraph`: approaches, units, dependencies, gates, budget cap; rules in `plan.rules.md` | 1.0.0 |
 | `layout.schema.json` | `WorldLayout` v1: semantic part and solver geometry; rules in `layout.rules.md` | 1.0.0 |
@@ -31,21 +31,24 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `attention.schema.json` | One measured span of a person's steering or review time, subtracted from time saved | 1.0.0 |
 | `evals.schema.json` | `config/evals.yaml`: eval pass credit caps, deploy-gate repeats, cost-regression threshold, case counts per group | 1.0.0 |
 | `pilot.schema.json` | EV-G3 pilot records by pseudonymous tester id: consent, run and card tags, diary entries, survey responses | 1.0.0 |
-| `person.schema.json` | A person of an org: aliases, time zone, preferred channel, team memberships assigned by an org owner (ADR-0015); rules PE-01 to PE-21 in `people.rules.md` | 1.0.0 |
-| `meeting.schema.json` | A meeting Tilo attended or took a transcript of: owner, agenda, attendees as said, attestation, retention; no field for a join link | 1.0.0 |
+| `person.schema.json` | A person of an org: aliases, time zone, preferred channel, team memberships assigned by an org owner (ADR-0015); rules PE-01 to PE-30 in `people.rules.md` | 1.0.0 |
+| `meeting.schema.json` | A meeting Tilo attended or took a transcript of: owner, agenda, attendees as said, attestation, retention; no field for a join link; 1.1.0 adds an optional `world_id` (ADR-0020) | 1.1.0 |
 | `minutes.schema.json` | The structured minutes of one meeting: summary, decisions, action items, agenda coverage, every item citing utterance ids | 1.0.0 |
 | `work_item.schema.json` | One thing a person has to do; proposed until the meeting Owner confirms an item Tilo made | 1.0.0 |
 | `pinboard_item.schema.json` | An entry on a personal or team pinboard; Tilo's entries carry a source and, on the team board, a confirmation | 1.0.0 |
 | `mention.schema.json` | An @mention of a team member on a team entry | 1.0.0 |
 | `calendar_entry.schema.json` | A stored calendar entry (cached Google event, own or proposed), plus the `agenda_item` read-model row and `free_busy` | 1.0.0 |
 | `ui_action.schema.json` | The assistant panel's closed allow-list of UI actions (FR-PA-14) | 1.0.0 |
+| `transcript.schema.json` | The content of a transcript artifact version (utterances), plus the `evidence_quote` read-model row tilo-api cuts per request (ADR-0020, PE-22 to PE-25) | 1.0.0 |
+| `plate.schema.json` | A person's plate (FR-PA-02): the read model S-27, the digest and the panel share; rows and parked lanes, groups and order by code (ADR-0021, PE-26 to PE-30) | 1.0.0 |
 | `scenario.schema.json` | `config/scenarios/<id>.yaml` (FR-INT-11, ADR-0014): skills, connectors, seed data, theme and autonomy policy seeds, and nothing else; rules SN-01 to SN-09 in `scenario.rules.md` | 1.0.0 |
 
 Still to come: `appspec` (Could).
 
 - `fixtures/<name>/valid|invalid/*.json` exercise each schema root; `fixtures/<name>.<def>/`
   exercise one `$defs` entry. Invalid file names say which rule they break.
-  `fixtures/card/crossref/` holds cross-reference cases for the card validator (CR-09 to CR-12).
+  `fixtures/card/crossref/` holds cross-reference cases for the card validator (CR-09 to CR-12);
+  `fixtures/transcript/crossref/` and `fixtures/plate/crossref/` hold the quote and plate cases (PE-19, PE-22 to PE-27).
 - `fixtures/events/` holds one valid event per registered type, invalid events, and
   `registry/invalid/` cases that only the registry rules catch; `fixtures/streams/*.jsonl` are
   ordered event streams that match a layout fixture (see `event.rules.md`).

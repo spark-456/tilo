@@ -13,7 +13,10 @@ from tilo_api.intake import router as intake_router
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.tasks import router as _tasks_router
 
-app = FastAPI(title="tilo-api")
+# Generated docs only in local dev mode: deployed, the service is public and the route list is not for
+# strangers (issue #411). `app.openapi()` still works in-process for tests.
+_DOCS = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+app = FastAPI(title="tilo-api", **_DOCS)
 
 
 @app.exception_handler(_deps.ReplayOnly)
@@ -31,6 +34,7 @@ app.include_router(_runs.router)
 _dev.install_if_enabled(app)  # only with TILO_API_DEV=1; refuses when deployed or live (CL-INT-4)
 
 
+@app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}

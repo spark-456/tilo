@@ -30,6 +30,7 @@ from _api_contracts_lib import assert_valid_event
 from _api_lib import FakeEventWriter
 from _cards_lib import build_registry as build_schema_registry
 from _clint1_lib import FLOW_USER, OTHER_USER, Flow, registered_event_types, seam
+from fastapi import Request
 from tilo_connectors.mock import MockConnector
 from tilo_connectors.registry import ConnectorRegistry
 from tilo_providers.fake import FakeModelProvider
@@ -549,6 +550,27 @@ class RunFlow:
     def answer(self, card_id: str, option: str, client: Any = None):
         return (client or self.flow.client).post(
             f"/worlds/{self.world_id}/cards/{card_id}/answer", json={"option": option}
+        )
+
+    def sessions_by_channel(self) -> None:
+        """Each request's principal takes its channel from an `x-session-channel` header (default web), so one run can
+        be answered from a web and a mobile-web session at once; the body's channel must match it (CH-RM, SEC-06)."""
+        import dataclasses  # noqa: PLC0415
+
+        from tilo_api import deps  # noqa: PLC0415
+
+        base = self.flow.principal
+
+        def current(request: Request) -> Any:
+            return dataclasses.replace(base, channel=request.headers.get("x-session-channel", "web"))
+
+        self.flow.app.dependency_overrides[deps.get_current_principal] = current
+
+    def answer_on(self, card_id: str, body: dict[str, Any]):
+        return self.flow.client.post(
+            f"/worlds/{self.world_id}/cards/{card_id}/answer",
+            json=body,
+            headers={"x-session-channel": body.get("channel", "web")},
         )
 
     def pause(self, client: Any = None):

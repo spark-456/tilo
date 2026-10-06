@@ -11,14 +11,15 @@ from typing import Any
 
 import pytest
 from _chn10_lib import drafting_module
-from _chn11_lib import BENIGN, DAVID, USER, context, make_bench, scripted_thread
+from _chn11_lib import BENIGN, DAVID, USER, context, make_bench, reply_target, scripted_thread
 
 KELVIN = "K"
 KATE = "kate@kayak.example"
 
 
 def card_for(bench: Any, *, mode: str = "reply", to=(DAVID,), cc=()) -> Any:
-    ctx = context(scripted_thread(bench), mode=mode)
+    thread = scripted_thread(bench)
+    ctx = context(thread, mode=mode)
     mod = drafting_module()
     draft = mod.Draft(
         artifact_id="art_" + secrets.token_hex(6),
@@ -29,8 +30,8 @@ def card_for(bench: Any, *, mode: str = "reply", to=(DAVID,), cc=()) -> Any:
         cc=tuple(cc),
         bcc=(),
         subject="Re: Engine tune-up scheduling and estimate",
-        in_reply_to="<m@mail.example>",
-        references="<m@mail.example>",
+        in_reply_to=reply_target(thread),
+        references=reply_target(thread),
         body=BENIGN,
         attachments=(),
         safety_flag=False,
