@@ -4,18 +4,21 @@
 // folder files as park code (which may import nothing from outside park). Query/action helpers are in
 // src/park/pages/Team/testApp.ts. No timers: the scheduler is the injected fake; async work is flushed with
 // microtasks.
-import { type ReactElement, createElement } from "react";
+import { type FunctionComponent, type ReactElement, createElement } from "react";
 import { type Mock, vi } from "vitest";
 import { createFixtureApi } from "../../src/park/api/fixtureApi";
 import { API_METHODS, type Api, type ApiMethod } from "../../src/park/api/index";
 import type { AppCtx } from "../../src/park/app/AppCtx";
-import { ParkProvider } from "../../src/park/app/context";
+import { ParkProvider, type ParkProviderProps } from "../../src/park/app/context";
 import { TeamPage } from "../../src/park/pages/Team/TeamPage";
 import { settle } from "../../src/park/pages/Team/testApp";
 import { fakeScheduler, stubApp } from "./appHarness";
 import { type Mounted, cleanup, mount } from "./componentsHarness";
 
 export { cleanup };
+
+/** ParkProvider typed so children go in as createElement's third argument (its props type requires them inline). */
+const Provider = ParkProvider as FunctionComponent<Omit<ParkProviderProps, "children">>;
 
 export type TestApp = AppCtx & {
   go: Mock<AppCtx["go"]>;
@@ -53,7 +56,7 @@ export async function renderTeam(app: AppCtx, api: Api = createFixtureApi()): Pr
   const sch = fakeScheduler();
   const tree = (a: AppCtx): ReactElement =>
     createElement(
-      ParkProvider,
+      Provider,
       { api, schedule: sch.schedule, viewport: { vw: a.vw, vh: a.vh } },
       createElement(TeamPage, { app: a }),
     );
