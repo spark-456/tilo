@@ -8,7 +8,7 @@ service the web client and channels write through; the client reads live state f
 - `uv run --package tilo-api pytest` — tests; `just check` — gate; `just dev-api` — dev mode on 127.0.0.1:8080 (fake Director); `Dockerfile` runs `tilo_api:app`, deploy `docs/deploy-dev.md`
 
 ## Requirement IDs
-- PRD 6.2 row; SEC-05..12; FR-INT-11/12, FR-HIL-10 (API half).
+- PRD 6.2 row; SEC-05..12; FR-INT-11/12, FR-HIL-10 (API half); FR-MTR-10 (`tilo_api.costs`: owner-only `GET /worlds/{id}/costs`, `GET /costs`; `deps.get_ledger` 503 until the Treasury is wired, BQ-MTR10-4).
 
 ## Contracts and config
 - Reads/writes `packages/contracts-py` types; Firestore (worlds, events, cards, policies, grants); Cloud Tasks. Config:
