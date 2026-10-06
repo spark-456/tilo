@@ -25,6 +25,7 @@ function setup() {
   const navigate = vi.fn();
   const sch = fakeScheduler();
   const store = createParkStore({ api, navigate, schedule: sch.schedule, now: () => 0 });
+  store.setDecisions(decisions); // what the shell hands over once the Api has returned them (WEB-3b)
   return { api, navigate, sch, store };
 }
 

@@ -5,11 +5,15 @@
 import { useState } from "react";
 import { Popover, StatusChip } from "../components";
 
-export const SAMPLE_NOTE =
-  "Northwind Ops is a fictional team. Amounts are examples (£), dates are September 2026.";
+/** What the sample is, in the team's own name (from the user the Api returned). */
+export const sampleNote = (org: string | null): string =>
+  `${org ?? "This team"} is a fictional team. Amounts are examples (£), dates are September 2026.`;
 
 /** `ghost`: the same box, invisible and out of the accessibility tree, held where the chip will appear. */
-export function SampleChip({ ghost = false }: { ghost?: boolean }) {
+export function SampleChip({
+  ghost = false,
+  org = null,
+}: { ghost?: boolean; org?: string | null }) {
   const [open, setOpen] = useState(false);
   if (ghost) {
     return (
@@ -39,7 +43,7 @@ export function SampleChip({ ghost = false }: { ghost?: boolean }) {
         <Popover label="Sample data" width={320} onClose={() => setOpen(false)}>
           <div className="park-shell__samplebox">
             <span className="park-shell__poptitle">Sample data</span>
-            <p className="park-shell__samplenote">{SAMPLE_NOTE}</p>
+            <p className="park-shell__samplenote">{sampleNote(org)}</p>
           </div>
         </Popover>
       ) : null}

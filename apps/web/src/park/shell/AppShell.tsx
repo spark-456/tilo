@@ -4,7 +4,7 @@
 // the store and the Api. The notifications and the user come through the Api on mount, so a fixture Api
 // raises the "Sample data" chip without any page asking for data. The city is STATIC (BQ-WEB-3).
 import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import type { Notification, User } from "../api/types";
+import type { Decision, Notification, User } from "../api/types";
 import { useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
 import { useParkRoute } from "../app/router";
 import { Toast } from "../components";
@@ -31,6 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const route = useParkRoute();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [decisions, setDecisions] = useState<Decision[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
@@ -44,6 +45,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       .then((r) => live && setNotifications(r.data))
       .catch(quiet);
     api
+      .getDecisions()
+      .then((r) => {
+        if (!live) return;
+        setDecisions(r.data);
+        store.setDecisions(r.data);
+      })
+      .catch(quiet);
+    api
       .getUser()
       .then((r) => live && setUser(r.data))
       .catch(quiet);
@@ -54,7 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => {
       live = false;
     };
-  }, [api]);
+  }, [api, store]);
 
   // The first city is drawn after the boot splash has been committed and the design fonts have loaded
   // (the shell stays hidden under the splash until then, so no text swaps face and moves the nav).
@@ -90,8 +99,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         night={app.night}
         menu={state.menu}
         unread={!state.read && app.needsLeft > 0}
-        initials={user?.initials ?? "AM"}
+        initials={user?.initials ?? ""}
         sample={state.sources.fixture}
+        org={user?.org ?? null}
         reserveSample={expectsSample}
         booting={!ready}
         progress={state.wl ? loaderBar(state.wl.step) : null}
@@ -103,6 +113,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {state.menu === "notif" ? (
         <NotificationsPopover
           notifications={notifications}
+          decisions={decisions}
           dec={state.dec}
           onOpen={open}
           onSettings={() => store.go("profile", { tab: "notifications" })}
