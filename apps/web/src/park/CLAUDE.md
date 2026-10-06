@@ -19,3 +19,4 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 - Import nothing from `screens/`, `world/`, `stage/`; only the shared `src/api` seam may be reused.
 - No `window` globals, no clock or random or network in `api/`, no model ids, no design runtime port.
 - Ambient motion arrives in WEB-3 with its own honesty-scan entry (BQ-WEB-3); none here.
+- `engines/kit.ts`: `createKit` builds a fresh cache per call; hold one kit per document (a provider), or world and building memoisation is lost.
