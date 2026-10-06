@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Ledger } from "../../api/types";
+import type { AppCtx } from "../../app/AppCtx";
 import { Button, SegmentedControl } from "../../components";
-import type { AppCtx } from "./appCtx";
 import { icon } from "./icons";
 import { KINDS, type Kind, activityGroups } from "./model";
 

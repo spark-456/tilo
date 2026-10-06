@@ -17,7 +17,6 @@ const ROUTES = [
   ["/park/worlds", "worlds", "Worlds"],
   ["/park/world/k1", "world", "World"],
   ["/park/skills", "skills", "Skills"],
-  ["/park/ledger", "ledger", "Ledger"],
   ["/park/agenda", "agenda", "Agenda"],
   ["/park/team", "team", "Team"],
   ["/park/profile", "profile", "Profile"],
@@ -123,22 +122,22 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       await page.goto("/park/home");
       await markDocument(page);
       await page.evaluate(() => {
-        window.history.pushState({}, "", "/park/ledger");
+        window.history.pushState({}, "", "/park/agenda");
         window.dispatchEvent(new PopStateEvent("popstate"));
       });
-      await expect(page.getByTestId("park-page-ledger")).toBeVisible();
-      await expect(page).toHaveTitle("Ledger · Tilo");
+      await expect(page.getByTestId("park-page-agenda")).toBeVisible();
+      await expect(page).toHaveTitle("Agenda · Tilo");
       await page.evaluate(() => {
         window.history.pushState({}, "", "/park/team?focus=share");
         window.dispatchEvent(new PopStateEvent("popstate"));
       });
       await expect(page.getByTestId("park-page-team")).toBeVisible();
       await page.goBack();
-      await expect(page.getByTestId("park-page-ledger")).toBeVisible();
+      await expect(page.getByTestId("park-page-agenda")).toBeVisible();
       await page.goBack();
       await expect(page.getByTestId("park-page-home")).toBeVisible();
       await page.goForward();
-      await expect(page.getByTestId("park-page-ledger")).toBeVisible();
+      await expect(page.getByTestId("park-page-agenda")).toBeVisible();
       expect(await marker(page), "back and forward stayed in one document").toBe("same document");
     });
 

@@ -3,23 +3,20 @@
 // Data comes only from the Park Api (fixture or live, with its `source`); every approval goes through
 // `app.decide(key)`; navigation only through `app.go`. No motion until WEB-3 (BQ-WEB-3).
 import type { ReactNode } from "react";
-import type { Api } from "../../api/index";
+import type { AppCtx } from "../../app/AppCtx";
+import { useParkApi } from "../../app/context";
 import { Button, KpiTile, PageSheet } from "../../components";
 import "../../components/park.components.css";
 import { Activity } from "./Activity";
 import { ApprovalWaits, CostPerRun, GaveBack, WhereItGoes } from "./Sections";
 import { SpendChart } from "./SpendChart";
-import type { AppCtx } from "./appCtx";
 import { icon } from "./icons";
 import { gbp, kpis } from "./model";
 import { useLedger } from "./useLedger";
-import { useParkApi } from "./useParkApi";
 import "./Ledger.css";
 
 export interface LedgerPageProps {
   app: AppCtx;
-  /** Tests inject an Api; the page otherwise reads the shared Park Api. */
-  api?: Api;
 }
 
 function Frame({ source, children }: { source?: string; children?: ReactNode }) {
@@ -30,9 +27,8 @@ function Frame({ source, children }: { source?: string; children?: ReactNode }) 
   );
 }
 
-export function LedgerPage({ app, api }: LedgerPageProps) {
-  const shared = useParkApi();
-  const state = useLedger(api ?? shared);
+export function LedgerPage({ app }: LedgerPageProps) {
+  const state = useLedger(useParkApi());
 
   if (state.status === "not-built" || state.status === "error") {
     return (

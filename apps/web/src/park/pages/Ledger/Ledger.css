@@ -748,3 +748,23 @@
   font-weight: 600;
   color: var(--ink2);
 }
+
+/* A phone (the handoff has no Ledger layout below 1100): the Activity row gives its time column and the
+   detail its 130px indent back so nothing scrolls sideways; titles wrap instead of cutting off. */
+@media (max-width: 640px) {
+  [data-park] .park-ledger-arow-btn {
+    grid-template-columns: 44px 36px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+  [data-park] .park-ledger-what-title,
+  [data-park] .park-ledger-what-sub {
+    white-space: normal;
+  }
+  [data-park] .park-ledger-detail {
+    padding-left: 16px;
+  }
+  [data-park] .park-ledger-detail-actions {
+    flex-wrap: wrap;
+    margin-left: 0;
+  }
+}

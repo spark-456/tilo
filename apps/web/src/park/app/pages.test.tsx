@@ -64,7 +64,8 @@ describe("WEB_3a_pages: a page with no real page yet renders the Placeholder", (
   });
 
   it("WEB_3a_pages_placeholder_for_every_page", async () => {
-    for (const id of PAGE_IDS) {
+    for (const id of PAGE_IDS.filter((p) => p !== "ledger")) {
+      // ledger is a real page since WEB-7
       const Page = PAGES[id];
       const m = mount(
         <Suspense fallback={null}>

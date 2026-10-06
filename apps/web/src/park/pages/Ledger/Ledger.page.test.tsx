@@ -1,16 +1,83 @@
 // @vitest-environment happy-dom
 // WEB-7 Ledger page: exact copy (inventory.md "Tilo App Ledger"), the interactions of the reference
-// (Tilo App Ledger.dc.html) and the decide() effects, rendered on the fixture Api in happy-dom.
+// (Tilo App Ledger.dc.html) and the decide() effects, rendered on the shared Park shell state (the real
+// ParkProvider and store) over the fixture Api in happy-dom. `go` is observed as the path the shell
+// navigates to, `toast` as the store's toast, `decide` as the call the store makes on the Api.
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { click, countPrimary, q, qa } from "../../../../test-support/park/componentsHarness";
-import { createFixtureApi } from "../../api/fixtureApi";
+import { fakeApi, fakeScheduler } from "../../../../test-support/park/appHarness";
+import {
+  cleanup,
+  click,
+  countPrimary,
+  mount,
+  q,
+  qa,
+} from "../../../../test-support/park/componentsHarness";
 import { NotBuilt } from "../../api/liveApi";
-import { cleanup, renderLedger, settle } from "./ledgerHarness";
+import { ParkProvider, useApp, useParkStore } from "../../app/context";
+import type { ParkStore } from "../../app/store";
+import { LedgerPage } from "./LedgerPage";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.history.pushState({}, "", "/");
 });
+
+interface RenderOpts {
+  getLedger?: () => Promise<never>;
+  vw?: number;
+  time?: "day" | "night";
+  prefs?: Record<string, unknown>;
+}
+
+const settle = () =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+/** The page the way the shell mounts it: the real AppCtx from the store, under the data-park root. */
+function Shell({ onStore }: { onStore: (s: ParkStore) => void }) {
+  const app = useApp();
+  onStore(useParkStore());
+  return (
+    <div data-park="" data-time={app.time}>
+      <LedgerPage app={app} />
+    </div>
+  );
+}
+
+/** Mount the Ledger route, apply the prefs, wait for the Api result; hand back what a test observes. */
+async function renderLedger(opts: RenderOpts = {}) {
+  window.history.pushState({}, "", "/park/ledger");
+  const api = fakeApi();
+  if (opts.getLedger) api.getLedger = opts.getLedger;
+  const navigate = vi.fn();
+  let held: ParkStore | undefined;
+  const m = mount(
+    <ParkProvider
+      api={api}
+      navigate={navigate}
+      schedule={fakeScheduler().schedule}
+      viewport={{ vw: opts.vw ?? 1440, vh: 900 }}
+    >
+      <Shell
+        onStore={(s) => {
+          held = s;
+        }}
+      />
+    </ParkProvider>,
+  );
+  const store = held;
+  if (!store) throw new Error("the shell did not mount");
+  act(() => {
+    for (const [key, value] of Object.entries({ time: opts.time, ...opts.prefs }))
+      if (value !== undefined) store.setPref(key, value);
+  });
+  await settle();
+  return { ...m, api, navigate, store };
+}
 
 const text = (root: ParentNode) => (root as HTMLElement).textContent ?? "";
 const byText = <T extends Element>(root: ParentNode, sel: string, t: string): T => {
@@ -108,21 +175,19 @@ describe("WEB_7_ledger_copy: the designed text, verbatim", () => {
 
 describe("WEB_7_ledger_interactions", () => {
   it("WEB_7_ledger_waiting_kpi_opens_k1_and_header_buttons_toast", async () => {
-    const { container, calls } = await renderLedger();
+    const { container, navigate, store } = await renderLedger();
     click(byText(container, "button", "Waiting on you£3,420Laptop Depot sign-off"));
-    expect(calls.go).toHaveBeenCalledWith("world", { id: "k1" });
+    expect(navigate).toHaveBeenCalledWith("/park/world/k1");
     click(byText(container, "button", "September 2026"));
-    expect(calls.toast).toHaveBeenCalledWith(
-      "August and earlier months live here",
-      undefined,
-      undefined,
-    );
+    expect(store.getState().toast).toMatchObject({
+      message: "August and earlier months live here",
+      actionLabel: undefined,
+    });
     click(byText(container, "button", "Export CSV"));
-    expect(calls.toast).toHaveBeenCalledWith(
-      "Exported september-2026.csv · also synced to Xero",
-      undefined,
-      undefined,
-    );
+    expect(store.getState().toast).toMatchObject({
+      message: "Exported september-2026.csv · also synced to Xero",
+      actionLabel: undefined,
+    });
   });
 
   it("WEB_7_ledger_chart_hover_shows_the_day_and_leaves", async () => {
@@ -141,7 +206,6 @@ describe("WEB_7_ledger_interactions", () => {
     });
     const tip = q(box, "[data-tip]");
     expect(tip.style.opacity).toBe("0");
-    const { act } = await import("react");
     act(() => {
       box.dispatchEvent(
         new MouseEvent("mousemove", { bubbles: true, clientX: 48 + 23 * (652 / 29) }),
@@ -172,18 +236,18 @@ describe("WEB_7_ledger_interactions", () => {
   });
 
   it("WEB_7_ledger_cost_cards_open_the_skill", async () => {
-    const { container, calls } = await renderLedger();
+    const { container, navigate } = await renderLedger();
     const cards = qa(region(container, "Cost per run"), "button");
     expect(cards).toHaveLength(4);
     expect(text(cards[0] as HTMLElement)).toBe("Match invoices to POs−79%£2.80 run 1£0.60 run 142");
     click(cards[0] as HTMLElement);
-    expect(calls.go).toHaveBeenCalledWith("skills", { id: "invoice" });
+    expect(navigate).toHaveBeenCalledWith("/park/skills?id=invoice");
   });
 
   it("WEB_7_ledger_add_a_backup_goes_to_team_and_prefs_backup_changes_the_wait", async () => {
     const first = await renderLedger();
     click(byText(first.container, "button", "Add a backup"));
-    expect(first.calls.go).toHaveBeenCalledWith("team", { focus: "share" });
+    expect(first.navigate).toHaveBeenCalledWith("/park/team?focus=share");
     expect(text(first.container)).toContain("2 h 10 min");
     cleanup();
     const { container } = await renderLedger({ prefs: { backup: "priya" } });
@@ -230,11 +294,12 @@ describe("WEB_7_ledger_interactions", () => {
 
 describe("WEB_7_ledger_decide: every approval goes through app.decide(key)", () => {
   it("WEB_7_ledger_the_first_waiting_row_is_open_and_approves_the_depot", async () => {
-    const { container, calls } = await renderLedger();
-    const act = region(container, "Activity");
-    expect(text(act)).toContain("Above the £2,500 district limit");
-    click(byText(act, "button", "Approve £3,420"));
-    expect(calls.decide).toHaveBeenCalledWith("depot");
+    const { container, api, store } = await renderLedger();
+    const activity = region(container, "Activity");
+    expect(text(activity)).toContain("Above the £2,500 district limit");
+    click(byText(activity, "button", "Approve £3,420"));
+    expect(api.decide).toHaveBeenCalledWith("depot");
+    expect(store.getState().toast?.message).toBe("Approved £3,420 for Laptop Depot");
     // Everything bound to dec updates at once.
     const t = text(container);
     expect(t).toContain("£5,832");
@@ -252,35 +317,35 @@ describe("WEB_7_ledger_decide: every approval goes through app.decide(key)", () 
   });
 
   it("WEB_7_ledger_waiting_filter_lists_the_two_asks_and_the_mail_row_sends_the_brief", async () => {
-    const { container, calls } = await renderLedger();
-    const act = region(container, "Activity");
-    click(byText(act, '[role="radio"]', "Waiting · 2"));
-    expect(text(act)).toContain("Laptop Depot asked for sign-off");
-    expect(text(act)).toContain("Supplier brief waiting at the Mail Room gate");
-    expect(text(act)).not.toContain("Battery cell samples");
-    expect(qa(act, "button").some((b) => b.textContent === "Send brief")).toBe(false);
-    click(rowWith(act, "Supplier brief waiting"));
-    click(byText(act, "button", "Send brief"));
-    expect(calls.decide).toHaveBeenCalledWith("mail");
+    const { container, api } = await renderLedger();
+    const activity = region(container, "Activity");
+    click(byText(activity, '[role="radio"]', "Waiting · 2"));
+    expect(text(activity)).toContain("Laptop Depot asked for sign-off");
+    expect(text(activity)).toContain("Supplier brief waiting at the Mail Room gate");
+    expect(text(activity)).not.toContain("Battery cell samples");
+    expect(qa(activity, "button").some((b) => b.textContent === "Send brief")).toBe(false);
+    click(rowWith(activity, "Supplier brief waiting"));
+    click(byText(activity, "button", "Send brief"));
+    expect(api.decide).toHaveBeenCalledWith("mail");
   });
 
   it("WEB_7_ledger_after_both_decisions_waiting_is_empty", async () => {
-    const { container, calls } = await renderLedger();
-    const act = region(container, "Activity");
-    click(byText(act, "button", "Approve £3,420"));
-    click(rowWith(act, "Supplier brief waiting"));
-    click(byText(act, "button", "Send brief"));
-    expect(calls.decide.mock.calls.map((c) => c[0])).toEqual(["depot", "mail"]);
-    click(byText(act, '[role="radio"]', "Waiting"));
-    expect(text(act)).toContain("Nothing here this month.");
-    click(byText(act, '[role="radio"]', "All"));
-    expect(text(act)).toContain("Sent the supplier brief to 3 battery suppliers");
+    const { container, api } = await renderLedger();
+    const activity = region(container, "Activity");
+    click(byText(activity, "button", "Approve £3,420"));
+    click(rowWith(activity, "Supplier brief waiting"));
+    click(byText(activity, "button", "Send brief"));
+    expect(api.decide.mock.calls.map((c) => c[0])).toEqual(["depot", "mail"]);
+    click(byText(activity, '[role="radio"]', "Waiting"));
+    expect(text(activity)).toContain("Nothing here this month.");
+    click(byText(activity, '[role="radio"]', "All"));
+    expect(text(activity)).toContain("Sent the supplier brief to 3 battery suppliers");
   });
 
   it("WEB_7_ledger_open_in_world_goes_to_the_row_world", async () => {
-    const { container, calls } = await renderLedger();
+    const { container, navigate } = await renderLedger();
     click(byText(region(container, "Activity"), "button", "Open in world"));
-    expect(calls.go).toHaveBeenCalledWith("world", { id: "k1" });
+    expect(navigate).toHaveBeenCalledWith("/park/world/k1");
   });
 });
 
@@ -291,11 +356,9 @@ describe("WEB_7_ledger_honesty_and_states", () => {
   });
 
   it("WEB_7_ledger_not_built_shows_not_connected_yet_and_no_numbers", async () => {
-    const api = {
-      ...createFixtureApi(),
+    const { container } = await renderLedger({
       getLedger: () => Promise.reject(new NotBuilt("getLedger")),
-    };
-    const { container } = await renderLedger({ api });
+    });
     expect(text(container)).toContain("Not connected yet");
     expect(text(container)).not.toContain("£2,412");
     expect(container.querySelector("svg")).toBeNull();
