@@ -11,7 +11,7 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   worlds: Placeholder,
   world: Placeholder,
   skills: Placeholder,
-  ledger: Placeholder,
+  ledger: lazy(() => import("../pages/Ledger/LedgerPage").then((m) => ({ default: m.LedgerPage }))),
   agenda: Placeholder,
   team: Placeholder,
   profile: Placeholder,
