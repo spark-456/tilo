@@ -91,9 +91,43 @@ class ReplayExecutor:
                 if not isinstance(outputs, dict):
                     raise ExecutorError(f"case {case.id}: recording outputs must be an object")
                 summary_credits = _credits(case, record.get("credits"))
-        events_total = sum(e["credits"] for e in events)
-        # The cap charges the larger of the summary and the event sum, so a recording cannot under-charge it.
-        credits = max(events_total, summary_credits or 0.0)
-        if not math.isfinite(credits):
-            raise ExecutorError(f"case {case.id}: recording credits are too large")
-        return Outcome(events=tuple(events), outputs=outputs, credits=credits)
+        return outcome_of(case, events, outputs, summary_credits)
+
+
+def outcome_of(
+    case: Any, events: list[dict[str, Any]], outputs: dict[str, Any], summary_credits: float | None
+) -> Outcome:
+    events_total = sum(e["credits"] for e in events)
+    # The cap charges the larger of the summary and the event sum, so a recording cannot under-charge it.
+    credits = max(events_total, summary_credits or 0.0)
+    if not math.isfinite(credits):
+        raise ExecutorError(f"case {case.id}: recording credits are too large")
+    return Outcome(events=tuple(events), outputs=outputs, credits=credits)
+
+
+def parse_batch_answer(case: Any, text: str | None) -> Outcome:
+    """EFF-05: a batch answer is `{"events": [...], "outputs": {...}, "credits": n}`, validated like a recording."""
+    try:
+        answer = json.loads(text or "")
+    except (ValueError, RecursionError) as exc:
+        raise ExecutorError(f"case {case.id}: batch answer is not valid JSON: {exc}") from exc
+    events = answer.get("events", []) if isinstance(answer, dict) else None
+    outputs = answer.get("outputs", {}) if isinstance(answer, dict) else None
+    if not isinstance(events, list) or not all(isinstance(e, dict) for e in events) or not isinstance(outputs, dict):
+        raise ExecutorError(f"case {case.id}: batch answer needs an events list and an outputs object")
+    return outcome_of(case, [_event(case, e) for e in events], outputs, _credits(case, answer.get("credits")))
+
+
+class BatchExecutor:
+    """EFF-05: serves each case's outcome from the results of one batch job (`BatchResult`s by case id). A failed
+    item or a bad answer makes that case not runnable, never the pass crash."""
+
+    def __init__(self, results: Any) -> None:
+        self._results = {r.custom_id: r for r in results}
+
+    def run(self, case: Any) -> Outcome:
+        result = self._results.get(case.id)
+        if result is None or result.status != "ok" or result.response is None:
+            reason = result.error if result is not None else "no result returned"
+            raise ExecutorError(f"case {case.id}: batch item failed: {reason}")
+        return parse_batch_answer(case, result.response.text)
