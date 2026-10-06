@@ -129,8 +129,11 @@ plus a 54-character fake token passes as 110 characters; a link in a meeting tit
   `open`, one `confirmed` history entry, `updated_at` = now; response is the `status` view. A second confirm changes nothing.
 * Meeting confirm: only the owner, on a `minuted` meeting with no confirmation; `minutes_confirmed_by` = {actor, now}; a confirmed
   meeting is 409 `problems` containing `transition`. Confirming opens the assignee's quote (PE-23).
-* Create meeting: body `{title, source: bot|upload, series?, scheduled?, agenda?, attendees?: [{name}]}`; the server mints `mt_...`,
-  sets owner, `org_id`, `attestation` {actor, now, `NOTICE_VERSION`}, status `scheduled`, no `world_id`, `transcript`, `minutes` or
+* Create meeting: body `{attest: true, notice_version, title, source: bot|upload, series?, scheduled?, agenda?, attendees?: [{name}]}`.
+  The attest step is explicit (issue #464): `attest` must be JSON `true` and `notice_version` the current `deps.NOTICE_VERSION`
+  (read at call time; stale, future, empty or wrong-typed is refused), else 422 `invalid_body` naming only field locations, before
+  authorisation, nothing stored. The server mints `mt_...`,
+  sets owner, `org_id`, `attestation` {actor, now, `NOTICE_VERSION`} (the actor is the principal, never the request), status `scheduled`, no `world_id`, `transcript`, `minutes` or
   confirmation; attendees are stored with `user: null` (`attendees[].user` is never identity and never taken from a request).
 * Create person: org owner only; body `{display_name, aliases, email, time_zone, preferred_channel}`; the server mints `u_...`
   (never from input, distinct per call), `org_id` = `deps.ORG_ID`, `org_role: member`, no memberships, `created_by` {actor, now}.
