@@ -4,5 +4,6 @@
   "run_minor": 12000,
   "org_day_minor": null,
   "global_day_hard_minor": 200000,
+  "unit_reserve_minor": 1000,
   "rate_limit_window_s": 60
 }

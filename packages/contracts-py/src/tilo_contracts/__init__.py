@@ -114,7 +114,7 @@
 # providers.schema.json 1.1.0 sha256:ece7537b584e69f8
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
-# spend_caps.schema.json 1.0.0 sha256:b062c55a144c3719
+# spend_caps.schema.json 1.1.0 sha256:d337adf13a5337f9
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
@@ -2397,7 +2397,7 @@ class SkillEmbeddedSchema(BaseModel):
 
 class SpendCapsConfig(BaseModel):
     """
-    config/spend_caps.yaml: the live-model spend caps and the per-uid rate limit (SEC-16, PRD supplement 4; FR-MTR-04, PRD 14.1, 17.3), read by tilo-api's spend loader. Money is an integer in INR minor units (paise, 1 INR = 100): never a float, a bool or a string. Every key is required and no other key is allowed; only org_day_minor may be null (ADR-0002 decision 13). The schema checks each value alone. Two rules it cannot express: a whole float such as 1000.0 is the same JSON number as 1000, so the loader also requires a YAML integer; and the shipped file keeps run_minor <= uid_lifetime_minor <= global_day_hard_minor. These caps sit beside config/metering.yaml (credits and US dollars) and replace none of it (ADR-0002 decision 16).
+    config/spend_caps.yaml: the live-model spend caps, the flat reservation per live unit and the per-uid rate limit (SEC-16, PRD supplement 4; FR-MTR-04, PRD 14.1, 17.3), read by tilo-api's spend loader. Money is an integer in INR minor units (paise, 1 INR = 100): never a float, a bool or a string. Every key is required and no other key is allowed; only org_day_minor may be null (ADR-0002 decision 13). The schema checks each value alone. Two rules it cannot express: a whole float such as 1000.0 is the same JSON number as 1000, so the loader also requires a YAML integer; and the shipped file keeps unit_reserve_minor <= run_minor <= uid_lifetime_minor <= global_day_hard_minor. These caps sit beside config/metering.yaml (credits and US dollars) and replace none of it (ADR-0002 decision 16). 1.1.0 adds unit_reserve_minor (BQ-SEC16-1).
     """
 
     model_config = ConfigDict(
@@ -2422,6 +2422,10 @@ class SpendCapsConfig(BaseModel):
     global_day_hard_minor: Annotated[int, Field(ge=1)]
     """
     The whole deployment's live-model spend per UTC day, in paise, above zero and never null; reaching it switches the link to replay-only (NFR-24, PRD 17.3).
+    """
+    unit_reserve_minor: Annotated[int, Field(ge=1)]
+    """
+    The flat amount, in paise, that each live unit and each Director call (intake, approaches, MustAsk) reserves against these caps and settles at, until a price table (PL-06) and a US$ to INR rate exist (BQ-SEC16-1). Above zero, never null.
     """
     rate_limit_requests: Annotated[int, Field(ge=1)]
     """

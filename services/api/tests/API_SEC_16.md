@@ -36,9 +36,10 @@ Keys, exactly these (an unknown key is refused), read through a YAML safe loader
 | `run_minor` | per-run cap, positive int |
 | `org_day_minor` | per-org per-UTC-day cap, positive int or null for none |
 | `global_day_hard_minor` | the whole deployment's per-UTC-day hard cap (NFR-24's trigger), positive int |
+| `unit_reserve_minor` | the flat amount each live unit and each Director call reserves and settles at until PL-06 prices exist (BQ-SEC16-1), positive int, never null (shipped: 1000) |
 | `rate_limit_requests`, `rate_limit_window_s` | the per-uid rate limit: positive ints |
 
-`SpendCaps` is a frozen dataclass with those six fields as keyword-only arguments (no `currency` field).
+`SpendCaps` is a frozen dataclass with those seven fields as keyword-only arguments (no `currency` field).
 `deps.get_spend_caps() -> SpendCaps` returns `load_spend_caps(None)`; tests override it.
 
 ## The ledger: `SpendLedger` protocol, `tilo_api.spend.InMemorySpendLedger(caps, *, shared=None)`
@@ -117,11 +118,10 @@ Never raises; every failure means live denied, not an error.
 - **Per-unit wiring and pricing.** The guard is the seam; the tests do not run a unit through it because cost cannot be
   computed yet: `config/prices.yaml` is unset (PL-06), the price book is USD credits, and the cap is INR. Converting a
   model call's cost to INR minor units needs a rate in config that the PRD does not give. Decision needed: the USD to INR
-  rate (a config key) or a direct INR price table. Until then the builder wires `begin_unit` and `settle_unit` around
-  each unit through whatever estimate the executor has, behind a reviewer check.
-- **The Director's own call at intake, approaches and MustAsk** are model spend too. Whether they reserve against the
-  uid's cap (and through which estimate) is the builder's decision; the tests pin only that a capped uid's new live
-  work is refused first.
+  rate (a config key) or a direct INR price table. Until then (BQ-SEC16-1, a default the user may change) the builder
+  wires `begin_unit` and `settle_unit` around each unit with `caps.unit_reserve_minor` as the estimate and the actual.
+- **The Director's own call at intake, approaches and MustAsk** are model spend too. By the same default they reserve
+  `caps.unit_reserve_minor` against the uid; the tests pin only that a capped uid's new live work is refused first.
 - **Production backing.** Firestore ledger and switch store (and a shared rate limiter) are later tickets; BQ-238 stays open
   until one exists. `TILO_JUDGE_LIVE=1` stays the user's to set (BQ-SEC15-6), and now has its precondition: this ticket.
 

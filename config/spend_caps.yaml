@@ -9,5 +9,6 @@ uid_lifetime_minor: 100000 # SEC-16: 1,000 INR per uid over its lifetime (the us
 run_minor: 12000 # 120 INR per run: PRD 17.3's 300 credits per public run is US$1.50
 org_day_minor: null # no separate per-org daily cap (as BQ-42 for credits); the deployment cap below applies
 global_day_hard_minor: 200000 # 2,000 INR per UTC day: PRD 17.3's US$25 hard cap; reaching it turns replay-only (NFR-24)
+unit_reserve_minor: 1000 # 10 INR reserved and settled per live unit or Director call until PL-06 prices exist (BQ-SEC16-1)
 rate_limit_requests: 240 # per uid per window; the web polls a run's events every second (BQ-SEC16-1)
 rate_limit_window_s: 60 # sliding window, seconds

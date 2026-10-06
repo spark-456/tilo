@@ -34,6 +34,7 @@ DEFAULT_CAPS: dict[str, Any] = {
     "run_minor": 400,
     "org_day_minor": 5_000,
     "global_day_hard_minor": 20_000,
+    "unit_reserve_minor": 100,
     "rate_limit_requests": 3,
     "rate_limit_window_s": 60,
 }

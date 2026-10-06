@@ -26,6 +26,7 @@ GOOD = {
     "run_minor": 20_000,
     "org_day_minor": None,
     "global_day_hard_minor": 2_000_000,
+    "unit_reserve_minor": 1_000,  # BQ-SEC16-1: the flat reservation per live unit
     "rate_limit_requests": 30,
     "rate_limit_window_s": 60,
 }
@@ -49,10 +50,17 @@ def test_SEC_16_the_shipped_config_gives_each_uid_a_lifetime_cap_of_1000_inr_in_
     assert CONFIG.is_file(), "config/spend_caps.yaml is missing: the caps must come from config"
     caps = load(None)  # the default path is the shipped file
     assert caps.uid_lifetime_minor == 100_000, "1,000 INR is 100,000 paise (PRD supplement SEC-16)"
-    for name in ("run_minor", "global_day_hard_minor", "rate_limit_requests", "rate_limit_window_s"):
+    for name in (
+        "run_minor",
+        "global_day_hard_minor",
+        "unit_reserve_minor",
+        "rate_limit_requests",
+        "rate_limit_window_s",
+    ):
         value = getattr(caps, name)
         assert type(value) is int and value > 0, f"{name} must be a positive integer, got {value!r}"
     assert caps.org_day_minor is None or (type(caps.org_day_minor) is int and caps.org_day_minor > 0)
+    assert caps.unit_reserve_minor <= caps.run_minor, "one unit's reservation must fit in a run, or no unit runs live"
     assert caps.run_minor <= caps.uid_lifetime_minor, "one run may not cost more than a person's whole lifetime"
     assert caps.uid_lifetime_minor <= caps.global_day_hard_minor
 
@@ -68,6 +76,7 @@ def test_SEC_16_a_good_file_loads_exactly_what_it_says(tmp_path):
     assert (caps.uid_lifetime_minor, caps.org_day_minor) == (777, 9_999)
     assert (caps.rate_limit_requests, caps.rate_limit_window_s) == (30, 60)
     assert load(write(tmp_path)).org_day_minor is None, "only the per-org daily cap may be null (ADR-0002 decision 13)"
+    assert load(write(tmp_path, unit_reserve_minor=55)).unit_reserve_minor == 55
 
 
 @pytest.mark.parametrize(
@@ -96,6 +105,14 @@ def test_SEC_16_a_good_file_loads_exactly_what_it_says(tmp_path):
         {"uid_lifetime_minor": ...},
         {"rate_limit_requests": ...},
         {"unknown_key": 1},  # same strictness as the other config files: no unknown keys
+        {"unit_reserve_minor": None},  # BQ-SEC16-1: the per-unit reservation, refused like the caps
+        {"unit_reserve_minor": 0},
+        {"unit_reserve_minor": -1},
+        {"unit_reserve_minor": 1000.0},
+        {"unit_reserve_minor": 2.5},
+        {"unit_reserve_minor": True},
+        {"unit_reserve_minor": "1000"},
+        {"unit_reserve_minor": ...},
     ],
 )
 def test_SEC_16_an_unusable_config_is_refused_not_defaulted(tmp_path, bad):
