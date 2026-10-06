@@ -11,12 +11,23 @@ export interface PanelProps {
   label: string;
   width?: number | undefined;
   inline: boolean;
+  /** An extra class, so the shell can place this panel (the notifications sit at right 60). */
+  className?: string | undefined;
   onClose: () => void;
   onKeyDown?: KeyboardEventHandler<HTMLDivElement> | undefined;
   children: ReactNode;
 }
 
-export function Panel({ kind, label, width, inline, onClose, onKeyDown, children }: PanelProps) {
+export function Panel({
+  kind,
+  label,
+  width,
+  inline,
+  className,
+  onClose,
+  onKeyDown,
+  children,
+}: PanelProps) {
   const ref = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -47,7 +58,7 @@ export function Panel({ kind, label, width, inline, onClose, onKeyDown, children
         role={kind === "menu" ? "menu" : "dialog"}
         aria-label={label}
         tabIndex={kind === "menu" ? undefined : -1}
-        className={cx("park-popover", inline && "park-popover--inline")}
+        className={cx("park-popover", inline && "park-popover--inline", className)}
         style={width !== undefined ? { width } : undefined}
         onKeyDown={onKeyDown}
       >

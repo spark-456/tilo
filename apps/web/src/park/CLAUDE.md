@@ -5,7 +5,7 @@ The Park City web app (design handoff of 6 Oct 2026, `docs/web-app-rebuild-plan.
 old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures and the `api/` layer.
 
 ## Contracts
-- `api/index.ts`: `Api` (20 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`.
+- `api/index.ts`: `Api` (23 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`.
   `parkApi(env)` (`api/select.ts`): no `VITE_TILO_API_URL` = fixture Api (`source: "fixture"`), a url =
   live Api, whose methods reject with `NotBuilt` until each endpoint exists. Never sample data as live.
 - `api/fixtures/`: the prototype's data, typed (`api/types.ts`). `worlds.ts` and `index.ts` are
@@ -31,8 +31,11 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
   `source`). `router.ts` is the only file that reads the address bar.
 - `pages.ts`: one line per page, `home: lazy(() => import("../pages/Home")),`; nothing else changes.
 
+## Shell (WEB-3b, `shell/`)
+- `AppShell` (named export, `children` only) holds the nav, popovers, one `<main>`, toast, loader, boot (`park.shell.css`: no motion, blur on the nav only); ParkApp owns `[data-park]`.
+- The city is STATIC (motion and its honesty-scan entry: BQ-WEB-3): `scene.ts` caches a scene per `time|motion` at module level, with the 3 pin points for `app.pins`.
+- `usePageApp()` is what pages get: `go('world')` runs the loader first (`store.openWorld`); `useApp().go` stays immediate.
+
 ## Local rules
-- Import nothing from `screens/`, `world/`, `stage/`; only the shared `src/api` and `src/router` seams may be reused.
-- No `window` globals, no clock or random or network in `api/`, no model ids, no design runtime port.
-- Ambient motion arrives in WEB-3 with its own honesty-scan entry (BQ-WEB-3); none here.
+- Import nothing from `screens/`, `world/`, `stage/` (only the shared `src/api`, `src/router` seams). No `window` globals, no model ids, no design runtime port.
 - `engines/kit.ts`: `createKit` builds a fresh cache per call; hold one kit per document (a provider), or world and building memoisation is lost.
