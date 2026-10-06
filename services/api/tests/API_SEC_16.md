@@ -106,7 +106,7 @@ Never raises; every failure means live denied, not an error.
 5. **The switch.** Either store set: new work is refused 503 `{"detail": <says replay>, "replay_only": true}` (NFR-24's
    existing refusal, now also from the ledger's record), nothing live is built, and after a restart (new ledger over the
    same backing, fresh flag store) it is still on.
-6. **Fail closed.** `deps.get_spend_ledger()` raises 503 `not_configured` until wired (like `get_access_store`); with the
+6. **Fail closed.** `deps.get_spend_cap_ledger()` raises 503 `not_configured` until wired (like `get_access_store`); with the
    ledger or the flag store unreachable, or the seam unwired, a judge's work runs as replay (201, router mode `replay`),
    never live and never a 5xx.
 7. **No client control.** A header, query or body field cannot raise, reset or move a cap or the switch (every gated

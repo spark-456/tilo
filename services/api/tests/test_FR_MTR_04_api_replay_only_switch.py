@@ -3,7 +3,7 @@ the demo hard cap switches the link to replay-only" (PRD 14.5), and "one flag sw
 (PRD 17.2), the US$25/day hard cap "triggers NFR-24" (PRD 17.3).
 
 The kill switch now has two stores that the API reads together (API_SEC_16.md): the NFR-24 flag store
-(`deps.get_flag_store`, unchanged) and the ledger's own durable `replay_only` record (`deps.get_spend_ledger`).
+(`deps.get_flag_store`, unchanged) and the ledger's own durable `replay_only` record (`deps.get_spend_cap_ledger`).
 Either one set means: no new work (503 `replay_only: true`, the existing NFR-24 refusal), `GET /access` says `models:
 "replay"`, and no router is built for live. The ledger's record outlives a process: a restart (a new ledger over the
 same backing) is still replay-only; only a named human reset clears it. The switch never makes anything more live.

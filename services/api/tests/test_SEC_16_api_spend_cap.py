@@ -9,7 +9,7 @@ What is pinned (API_SEC_16.md):
   "spend_cap_reached"`, a sentence naming the cap. A refusal changes nothing and builds no router. Replay-mode work is
   never refused for a cap (it costs nothing), and a cap never refuses a read.
 * `GET /access` says `models: "replay"` for a capped judge, and whenever live is denied: the durable switch is set, the
-  ledger or the switch store is unreachable, or no ledger is wired (the production seam `deps.get_spend_ledger`
+  ledger or the switch store is unreachable, or no ledger is wired (the production seam `deps.get_spend_cap_ledger`
   refuses until it is).
 * Nothing a request carries (a header, query, body field or path) can raise, reset or move a cap.
 
@@ -170,7 +170,7 @@ def test_SEC_16_the_production_ledger_seam_refuses_until_it_is_wired():
     from tilo_api import deps
 
     with pytest.raises(HTTPException) as caught:
-        deps.get_spend_ledger()
+        deps.get_spend_cap_ledger()
     assert caught.value.status_code == 503
 
 

@@ -31,7 +31,7 @@ OTHER_ORG = "org_other"
 # Small caps so a test reaches a boundary in a few calls. Every number here is a test number, not a product default.
 DEFAULT_CAPS: dict[str, Any] = {
     "uid_lifetime_minor": 1_000,
-    "run_minor": 400,
+    "run_minor": 1_000,  # the API tests put a uid's whole lifetime cap on one prefill run (`spend`)
     "org_day_minor": 5_000,
     "global_day_hard_minor": 20_000,
     "unit_reserve_minor": 100,
@@ -233,7 +233,9 @@ def build(
     app.dependency_overrides[seam(deps, "get_spend_caps")] = lambda: caps
     app.dependency_overrides[seam(deps, "get_rate_limiter")] = lambda: limiter
     if ledger is not None:
-        app.dependency_overrides[seam(deps, "get_spend_ledger")] = lambda: ledger
+        app.dependency_overrides[seam(deps, "get_spend_cap_ledger")] = lambda: ledger
+    else:  # the production seam, unwired (the SEC-15 harness wires a fresh ledger)
+        app.dependency_overrides.pop(seam(deps, "get_spend_cap_ledger"), None)
     sec.as_user(JUDGE_A)
     return Sec16(sec=sec, ledger=ledger, limiter=limiter, caps=caps, clock=clock)
 
