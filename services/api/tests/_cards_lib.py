@@ -155,11 +155,13 @@ def new_ulid(seed: str) -> str:
 # are structural, so these satisfy them without importing tilo_api.cards.
 
 
-def principal(role: str = "owner", user_id: str = "u_owner", world_id: str | None = "w_01", districts=()):
-    """A verified-principal test double (deps.Principal), the only source of who answers."""
+def principal(
+    role: str = "owner", user_id: str = "u_owner", world_id: str | None = "w_01", districts=(), channel: str = "web"
+):
+    """A verified-principal test double (deps.Principal), the only source of who answers and on which channel."""
     from tilo_api.deps import Principal
 
-    return Principal(user_id=user_id, role=role, world_id=world_id, districts=tuple(districts))
+    return Principal(user_id=user_id, role=role, world_id=world_id, districts=tuple(districts), channel=channel)
 
 
 OWNER_P = principal()

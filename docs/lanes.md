@@ -41,7 +41,7 @@ Never given to Antigravity: the Meet bot (user, 2026-10-01), and security, concu
    - CL-PLAN: FR-INT-11, FR-INT-12, FR-WLD-01 (layout: model semantics, deterministic solver, WE rules).
    - CL-HARNESS: FR-AGT-04 (skills redo, #70), -05, -08, -09, -10, -12, -13; FR-MEM-01, -02, -03, -05, -06, -09.
    - CL-TRUST: FR-HIL-10 (Team Lead console API), FR-HIL-11 (card sync across channels), P0-03b (#28).
-   - CL-REACH: FR-CHN-01 to -12 and -14 (web and WhatsApp channels, webhooks, email links, Gmail watch, triage, drafting, undo window); FR-CON-01 to -05, -07, -08, -10 (connector registry, token broker, consent, Gmail, Drive, browser workers, provenance manifest).
+   - CL-REACH: FR-CHN-01 to -12 and -14 (web channel, WhatsApp removed (SD-01), webhooks, email links, Gmail watch, triage, drafting, undo window); FR-CON-01 to -05, -07, -08, -10 (connector registry, token broker, consent, Gmail, Drive, browser workers, provenance manifest).
    - CL-EVID: P8-06c runner and credit cap, P8-06d results and CLI, the E-ROUTE checks (`routed_domain`, `answered_from_decision`), FR-MTR-06, EFF-06 nightly (P8-09).
 
 ## Antigravity queue

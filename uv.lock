@@ -1645,6 +1645,7 @@ dependencies = [
     { name = "python-pptx" },
     { name = "pyyaml" },
     { name = "reportlab" },
+    { name = "tilo-contracts" },
     { name = "uvicorn" },
 ]
 
@@ -1661,6 +1662,7 @@ requires-dist = [
     { name = "python-pptx", specifier = ">=1.0.2" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "reportlab", specifier = ">=4.2.5" },
+    { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 

@@ -121,9 +121,10 @@ export function WorldPanels({
                   <b>{memorySaved(events)}</b>
                   <span>credits saved by memory</span>
                 </div>
+                {/* The fourth cell of the grid, beside the memory figure: no line of its own. */}
+                {saved && <AppLink to="/estimate">How we estimate</AppLink>}
               </div>
             )}
-            {saved && <AppLink to="/estimate">How we estimate</AppLink>}
           </>
         )}
       </section>

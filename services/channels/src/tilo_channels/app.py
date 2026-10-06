@@ -7,9 +7,11 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-app = FastAPI(title="tilo-channels")
+# No generated docs: the service may be public, and the route list is not for strangers (issue #411).
+app = FastAPI(title="tilo-channels", docs_url=None, redoc_url=None, openapi_url=None)
 
 
+@app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
