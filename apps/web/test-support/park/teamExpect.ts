@@ -1,10 +1,7 @@
-// WEB-10 test data: the Team page exactly as the design renders it on first paint, typed out
+// WEB-10 test data (not a test): the Team page exactly as the design renders it on first paint, typed out
 // by hand from design_handoff_tilo_web_app/design/Tilo App Team.dc.html, inventory.md and the Team fixture
 // (tilo-app.js team, learn.helpers). Literals on purpose: a fixture that drifts from the design fails here.
-// It is a .test.ts file so the park scenario-literals guard treats it as test code; teamExpect.ts re-exports it.
-import { describe, expect, it } from "vitest";
 
-// biome-ignore lint/suspicious/noExportsInTest: shared test data, re-exported by teamExpect.ts
 export const PEOPLE = [
   {
     id: "am",
@@ -63,10 +60,8 @@ export const PEOPLE = [
   },
 ] as const;
 
-// biome-ignore lint/suspicious/noExportsInTest: shared test data, re-exported by teamExpect.ts
 export const ROLES = ["Owner", "Approver", "Member", "Viewer"] as const;
 /** Spend limit column by role after a role change (the design's LIM table; a changed role drops its own limit). */
-// biome-ignore lint/suspicious/noExportsInTest: shared test data, re-exported by teamExpect.ts
 export const LIMIT_BY_ROLE: Record<string, string> = {
   Owner: "No limit",
   Approver: "£1,000",
@@ -74,7 +69,6 @@ export const LIMIT_BY_ROLE: Record<string, string> = {
   Viewer: "—",
 };
 
-// biome-ignore lint/suspicious/noExportsInTest: shared test data, re-exported by teamExpect.ts
 export const COVERAGE = [
   {
     id: "small",
@@ -118,7 +112,6 @@ export const COVERAGE = [
   },
 ] as const;
 
-// biome-ignore lint/suspicious/noExportsInTest: shared test data, re-exported by teamExpect.ts
 export const RULES = [
   ["Spending over £250", "An approver signs off, within their limit", true],
   ["Sharing anything outside the company", "The owner or an approver signs off", true],
@@ -128,7 +121,6 @@ export const RULES = [
 ] as const;
 
 /** `[label, [owner, approver, member, viewer]]`: the fixture's bit masks 7, 7, 3, 3, 3, 1, 1, 15 spelled out. */
-// biome-ignore lint/suspicious/noExportsInTest: shared test data, re-exported by teamExpect.ts
 export const MATRIX: readonly (readonly [string, readonly boolean[]])[] = [
   ["Start quick tasks", [true, true, true, false]],
   ["Build routines", [true, true, true, false]],
@@ -140,7 +132,6 @@ export const MATRIX: readonly (readonly [string, readonly boolean[]])[] = [
   ["See the ledger", [true, true, true, true]],
 ];
 
-// biome-ignore lint/suspicious/noExportsInTest: shared test data, re-exported by teamExpect.ts
 export const COPY = {
   title: "Team",
   count: "5 people",
@@ -160,7 +151,6 @@ export const COPY = {
 } as const;
 
 /** Every visible string of the first paint, once each (the page's own text, options included). */
-// biome-ignore lint/suspicious/noExportsInTest: shared test data, re-exported by teamExpect.ts
 export const FIRST_PAINT_STRINGS: readonly string[] = [
   COPY.title,
   COPY.count,
@@ -183,10 +173,3 @@ export const FIRST_PAINT_STRINGS: readonly string[] = [
   COPY.matrixTitle,
   ...MATRIX.map((m) => m[0]),
 ];
-
-describe("WEB_10_team_expected_data: the hand-typed expectations are complete", () => {
-  it("WEB_10_team_expected_data_has_five_people_and_the_four_roles", () => {
-    expect(PEOPLE).toHaveLength(5);
-    expect(ROLES).toHaveLength(4);
-  });
-});

@@ -11,10 +11,18 @@
 // Defaults taken where the design/PRD is silent (listed in the WEB-10 report): the page adds no copy of its
 // own (the shell shows "Sample data"), "1 people" is the design's own count formula, kept for parity.
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  COPY,
+  COVERAGE,
+  FIRST_PAINT_STRINGS,
+  MATRIX,
+  PEOPLE,
+  ROLES,
+  RULES,
+} from "../../../../test-support/park/teamExpect";
 import { cleanup, makeApp, renderTeam, spyApi } from "../../../../test-support/park/teamHarness";
 import * as fx from "../../api/fixtures";
 import { createLiveApi } from "../../api/liveApi";
-import { COPY, COVERAGE, FIRST_PAINT_STRINGS, MATRIX, PEOPLE, ROLES, RULES } from "./teamExpect";
 import {
   inputNamed,
   maybeSelectOf,

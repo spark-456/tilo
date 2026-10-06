@@ -9,8 +9,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { dv, gaps, rulesOf } from "../../../../test-support/park/pageCss";
 import { PARK_DIR } from "../../../../test-support/park/prototype";
+import { COPY, COVERAGE, MATRIX, PEOPLE } from "../../../../test-support/park/teamExpect";
 import { cleanup, makeApp, renderTeam } from "../../../../test-support/park/teamHarness";
-import { COPY, COVERAGE, MATRIX, PEOPLE } from "./teamExpect";
 import { inputNamed, ownText, region, rowsOf, typeInto } from "./testApp";
 
 afterEach(cleanup);
