@@ -180,6 +180,38 @@ class FakeSources:
         return copy.deepcopy(self.mail_facts)
 
 
+class FakeDesks:
+    """`deps.get_desk_worlds()` (PPL-11c, API_PPL_11c.md section 5): the one lazily created Desk world of a person.
+    `desk_world(org_id, user_id)` is idempotent and answers the world id; `fail` makes it raise (the store is down)."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+        self.fail = False
+
+    def desk_world(self, org_id: str, user_id: str) -> str:
+        self.calls.append((org_id, user_id))
+        if self.fail:
+            raise RuntimeError("the desk world store is down")
+        return "w_desk_" + user_id[2:]
+
+
+class FakeWorldMaker:
+    """`deps.get_meeting_worlds()` (PPL-11c, API_PPL_11c.md section 6): creates the Outpost world of a meeting.
+    `make_meeting_world(org_id=, owner=, meeting_id=)` is idempotent per meeting and answers a world id; `answer`
+    overrides the id it returns (a hostile or broken maker), `fail` makes it raise."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, str]] = []
+        self.answer: Any = None
+        self.fail = False
+
+    def make_meeting_world(self, *, org_id: str, owner: str, meeting_id: str) -> Any:
+        self.calls.append((org_id, owner, meeting_id))
+        if self.fail:
+            raise RuntimeError("the world store is down")
+        return self.answer if self.answer is not None else "w_meeting_" + meeting_id[3:]
+
+
 class FakeOwners:
     """`deps.get_source_owners()`: who owns a mail message or a request (API_PPL_11a.md section 5)."""
 
@@ -279,6 +311,12 @@ class Rig:
         self.real = PeopleStores.in_memory()
         self.stores = self._wrap(self.real)
         self.redactor, self.sources, self.owners = SpyRedactor(), FakeSources(), FakeOwners()
+        # PPL-11c wiring: the single event writer (a stamping fake over its own `Store`), Desk worlds, meeting worlds.
+        from _api_lib import FakeEventWriter  # noqa: PLC0415
+
+        self.event_store = deps.Store()
+        self.events = FakeEventWriter(self.event_store)
+        self.desks, self.world_maker = FakeDesks(), FakeWorldMaker()
         self.screener, self._ids, self._store_now = _Screener(), [], datetime(2026, 10, 5, 10, 5, tzinfo=UTC)
         self.blobs, self.meta = MemoryBlobBackend(), MemoryMetaBackend()
         self.artifacts = ArtifactStore(
@@ -337,6 +375,9 @@ class Rig:
         ov[seam(deps, "get_clock")] = self._res("clock", lambda: lambda: self.clock)
         ov[seam(deps, "get_plate_sources")] = self._res("plate_sources", lambda: self.sources)
         ov[seam(deps, "get_source_owners")] = self._res("source_owners", lambda: self.owners)
+        ov[deps.get_event_writer] = lambda: self.events
+        ov[seam(deps, "get_desk_worlds")] = lambda: self.desks
+        ov[seam(deps, "get_meeting_worlds")] = lambda: self.world_maker
         if self.access is not None:
             ov[seam(deps, "get_access_store")] = lambda: self.access
 
