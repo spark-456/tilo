@@ -106,11 +106,11 @@ describe("WEB_5_worlds_static: the stylesheet", () => {
 
 describe("WEB_5_worlds_static: the registry gets one new line", () => {
   const src = readFileSync(join(DIR, "..", "..", "app", "pages.ts"), "utf8");
-  // one entry per two-space-indented `key:`; an entry may wrap over several lines
-  const entries = [...src.matchAll(/^ {2}(\w+):\s*([\s\S]*?),?\n(?= {2}\w+:|\};)/gm)].map((m) => [
-    m[1],
-    (m[2] ?? "").replace(/\s+/g, " ").trim().replace(/,$/, ""),
-  ]);
+  // one entry per two-space-indented `key:`; an entry may wrap over several lines, and a lane may leave
+  // a whole-line comment (such as a biome-ignore) above its entry
+  const entries = [
+    ...src.replace(/^ *\/\/.*\n/gm, "").matchAll(/^ {2}(\w+):\s*([\s\S]*?),?\n(?= {2}\w+:|\};)/gm),
+  ].map((m) => [m[1], (m[2] ?? "").replace(/\s+/g, " ").trim().replace(/,$/, "")]);
 
   it("WEB_5_worlds_static_pages_ts_worlds_line_is_the_lazy_import_and_every_other_page_is_untouched_form", () => {
     expect(src).toContain(

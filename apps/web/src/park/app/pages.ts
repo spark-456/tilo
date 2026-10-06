@@ -10,10 +10,11 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   home: lazy(() => import("../pages/Home/HomePage").then((m) => ({ default: m.HomePage }))),
   worlds: lazy(() => import("../pages/Worlds/WorldsPage").then((m) => ({ default: m.WorldsPage }))),
   world: Placeholder,
-  skills: Placeholder,
-  ledger: Placeholder,
-  agenda: Placeholder,
-  team: Placeholder,
+  // biome-ignore format: the registry keeps one line per page
+  skills: lazy(() => import("../pages/Skills/SkillsPage").then((m) => ({ default: m.SkillsPage }))),
+  ledger: lazy(() => import("../pages/Ledger/LedgerPage").then((m) => ({ default: m.LedgerPage }))),
+  agenda: lazy(() => import("../pages/Agenda/AgendaPage").then((m) => ({ default: m.AgendaPage }))),
+  team: lazy(() => import("../pages/Team/TeamPage").then((m) => ({ default: m.TeamPage }))),
   profile: Placeholder,
   connectors: lazy(() =>
     import("../pages/Connectors/ConnectorsPage").then((m) => ({ default: m.ConnectorsPage })),
