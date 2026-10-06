@@ -20,6 +20,7 @@ from tilo_api.console import build_router as _build_console_router
 from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.intake import router as intake_router
+from tilo_api.rate_limit import RateLimitGate as _RateLimitGate
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
@@ -30,6 +31,7 @@ from tilo_api.tasks import router as _tasks_router
 _DOCS: dict[str, Any] = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_url": None, "openapi_url": None}
 app = FastAPI(title="tilo-api", **_DOCS)
 app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration
+app.add_middleware(_RateLimitGate, fastapi_app=app)  # SEC-10: per-user and per-IP token-bucket rate limits
 
 
 @app.exception_handler(_deps.ReplayOnly)
