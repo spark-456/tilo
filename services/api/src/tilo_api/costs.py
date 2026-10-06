@@ -10,8 +10,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
-from tilo_metering import LedgerEntry, MeteringConfigError, PriceBook
-from tilo_metering.costs import cost_report
+from tilo_metering import LedgerEntry, MeteringConfigError
+from tilo_metering.costs import cost_report, load_credit_usd
+from tilo_metering.savings import InconsistentMemoryHit
 
 from tilo_api import deps
 from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_ledger, get_store
@@ -27,12 +28,25 @@ def _unit_types(store: Store, world_id: str) -> dict[str, str]:
     return {unit_id: kind for unit_id, kind in pairs if isinstance(unit_id, str) and isinstance(kind, str)}
 
 
+_credit_usd_cache: float | None = None
+
+
+def reset_credit_usd_cache() -> None:
+    """Forget the price sheet read so far (tests; a changed prices.yaml needs a restart otherwise)."""
+    global _credit_usd_cache
+    _credit_usd_cache = None
+
+
 def _credit_usd() -> float:
-    """US$ per credit from config/prices.yaml (FR-MTR-01); an unreadable file closes the routes (503)."""
-    try:
-        return PriceBook.load(deps._REPO_ROOT / "config" / "prices.yaml").credit_usd
-    except MeteringConfigError as exc:
-        raise HTTPException(status_code=503, detail="not_configured") from exc
+    """US$ per credit from config/prices.yaml (FR-MTR-01), read once; an unreadable file closes the routes (503).
+    Only a good read is kept, so an unreadable file is tried again on the next request."""
+    global _credit_usd_cache
+    if _credit_usd_cache is None:
+        try:
+            _credit_usd_cache = load_credit_usd(deps.prices_path())
+        except MeteringConfigError as exc:
+            raise HTTPException(status_code=503, detail="not_configured") from exc
+    return _credit_usd_cache
 
 
 def _report(store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[str, WorldRecord]]) -> dict[str, Any]:
@@ -45,11 +59,10 @@ def _report(store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[
         events += world_events
         runs |= {world.run_id} | {e["run_id"] for e in world_events if isinstance(e.get("run_id"), str)}
         unit_types[world.run_id] = _unit_types(store, world_id)
+    credit_usd = _credit_usd()
     try:
-        return cost_report(
-            [e for e in ledger if e.run in runs], events, unit_types=unit_types, credit_usd=_credit_usd()
-        )
-    except ValueError as exc:  # a memory.hit that disagrees with its own costs (BQ-MTR10-5): refuse, never a 500
+        return cost_report([e for e in ledger if e.run in runs], events, unit_types=unit_types, credit_usd=credit_usd)
+    except InconsistentMemoryHit as exc:  # a hit that disagrees with its own costs (BQ-MTR10-5): refuse, never a 500
         raise HTTPException(status_code=422, detail="inconsistent_ledger") from exc
 
 

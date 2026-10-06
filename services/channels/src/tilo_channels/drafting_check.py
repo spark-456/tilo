@@ -183,14 +183,18 @@ def _read(text: str, commitments: bool = True) -> tuple[list[tuple[str, str, str
 class Checker:
     """`find_invented` with its sources read once, for every body and question of one draft."""
 
-    def __init__(self, *, instruction: str, thread: Sequence[str], trusted: Sequence[str] = ()) -> None:
+    def __init__(
+        self, *, instruction: str, thread: Sequence[str], trusted: Sequence[str] = (), cap: int = CHECK_CAP
+    ) -> None:
+        """`cap`: characters read per source and of a body checked (FR-MTG-08b: a minutes email is longer)."""
+        self._cap = cap
         pieces, budget = [], SOURCES_CAP
         for text in (instruction, *trusted, *thread):
-            pieces.append(text[: max(0, min(CHECK_CAP, budget))])
+            pieces.append(text[: max(0, min(cap, budget))])
             budget -= len(pieces[-1])
         self._known = {(kind, value) for kind, value, _ in _read(clean("\n".join(pieces)), commitments=False)[0]}
         self._granted, self._mentioned, self._denied = set[int](), set[int](), set[tuple[int, str]]()
-        text = clean(instruction[:CHECK_CAP])
+        text = clean(instruction[:cap])
         negated = _negators(text) > 0  # a negator anywhere in the instruction: no commitment word is granted
         for family, _, phrase, _count in _read(text)[1]:
             self._mentioned.add(family)
@@ -200,8 +204,8 @@ class Checker:
                 self._denied.add((family, phrase))
 
     def find(self, body: str) -> list[Finding]:
-        """Every unsupported fact, unallowed commitment and obfuscation in `body`. Over CHECK_CAP: ValueError."""
-        if len(body) > CHECK_CAP:
+        """Every unsupported fact, unallowed commitment and obfuscation in `body`. Over the cap: ValueError."""
+        if len(body) > self._cap:
             raise ValueError("draft too long to check")
         found = {(f.kind, f.text): f for f in _obfuscations(body)}
         facts, words = _read(clean(body))

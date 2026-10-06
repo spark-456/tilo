@@ -19,7 +19,7 @@ The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `Search
   fallback/cascade profile fails; a missing result warns unless `TILO_REQUIRE_CONFORMANCE=1`.
 
 ## Requirement IDs
-- PL-01–PL-07 (6.4), NFR-25 (17.2), EFF-01–03 (6.6), FR-CON-13 (12.5): P0-04 config, P0-05 adapters, P0-06 router; FR-INT-02: CC-SP-47 safety.
+- PL-01–PL-07 (6.4), NFR-25 (17.2), EFF-01–05 (6.6), FR-CON-13 (12.5): P0-04 config, P0-05 adapters, P0-06 router; FR-INT-02: CC-SP-47 safety.
 
 ## Local rules
 - Denylisted ids fail start-up loudly (PL-07); every role needs a fallback (NFR-25); `price()` never invents one (PL-06).
@@ -28,9 +28,9 @@ The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `Search
   `CLOUD_RUN_JOB` is set; `dev_only`, so `run_conformance_suite` refuses it and no result file ever makes it conform (PL-05).
 - Adapters map SDK/HTTP errors onto `tilo_providers.errors`; `json_mode`/`.response_schema` map to `response_mime_type`/
   `response_schema` (google) or `response_format` (openai_compat). `openai_compat_adapter` rejects a dirty API key (names the
-  env var, never the value); `base_url` must be `https://` (loopback `http://` ok).
-- The `LIVE=1` gate lives in every adapter and `RecordReplayProvider`; only an injected `client=`/`transport=` or `live_permitted=True` (SEC-15, `Router`/`build_provider`, default False, never from env, never records) is exempt.
-- `redact(text)` (default no-op) scrubs a provider's own secret before a recording is written (`replay.redact_strings`).
+  env var, never the value); `base_url` must be `https://` (loopback `http://` ok). EFF-04: `usage["cached_tokens"]` only when a provider reported a whole number 0..input_tokens (google: present usage + None count = 0); else the key is absent = unknown, never 0/None. Static parts (system, tools, schema) precede per-call text.
+- The `LIVE=1` gate lives in every adapter and `RecordReplayProvider`; only an injected `client=`/`transport=` or `live_permitted=True` (SEC-15, `Router`/`build_provider`, default False, never from env, never records) is exempt. `redact(text)` (default no-op) scrubs a provider's own secret before a recording is written (`replay.redact_strings`).
+- `batch` (EFF-05): `BatchProvider` submit/poll/results (item failure is data, same idempotency key = same job, no item runs twice); `FakeBatchProvider` (refused if `LIVE=1` or `K_SERVICE`/`CLOUD_RUN_JOB` is set); `build_batch_provider`: fake -> fake, else `RecordReplayBatchProvider` (same recordings as `RecordReplayProvider`, a miss is an item error, never records); the live switch or `live_permitted` builds `google_batch_adapter` (mocks only, refuses without `LIVE=1`).
 - `safety` (CC-SP-47, FR-INT-02, BQ-68): `check()` returns `{flagged, reason}`; adapters implement `_check`, `check` gates the media
   type (`content=`/`mime_type=`: PDF/PNG/JPEG only, else `RequestError`, fail closed). `build_safety_provider` reads only the
   primary, never a fallback: `fake` -> `FakeSafetyProvider` (refused if `LIVE=1` or `K_SERVICE`/`CLOUD_RUN_JOB` is set at all),

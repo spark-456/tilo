@@ -18,7 +18,7 @@ import logging
 import math
 import os
 import threading
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol, cast
@@ -32,6 +32,7 @@ from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
 from tilo_metering import LedgerEntry
 from tilo_metering.flags import FlagStore, process_flags
+from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
@@ -41,6 +42,7 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router
 from tilo_providers.safety import build_safety_provider
 
+from tilo_api import events
 from tilo_api.access import AccessStore, Mode, provider_mode
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
@@ -173,6 +175,11 @@ def get_event_writer() -> EventWriter:
 def get_ledger() -> Sequence[LedgerEntry]:
     """The Treasury's ledger (FR-MTR-10). No ledger store is wired in yet (BQ-MTR10-4): fail closed."""
     raise HTTPException(status_code=503, detail="not_configured")
+
+
+def prices_path() -> Path:
+    """config/prices.yaml, the price sheet (FR-MTR-01): the one public way for a route to find it."""
+    return _REPO_ROOT / "config" / "prices.yaml"
 
 
 def providers_config() -> ProvidersConfig:
@@ -340,6 +347,39 @@ def get_artifact_store() -> ArtifactStore:
 def get_redactor() -> Callable[[str], str]:
     """The shared secret redactor the store was given (MF-06). Not built until FR-MEM-05 (BQ-109): refuses."""
     raise NotImplementedError("the shared secret redactor is not built, so no run starts")
+
+
+# --- the people API seams (PPL-11a, services/api/tests/API_PPL_11a.md section 4); production fails closed ---
+
+NOTICE_VERSION = "1.0.0"  # stamped as `attestation.notice_version` on a meeting a person adds; read at call time
+
+
+class PlateSources(Protocol):
+    """The cards, runs and mail a plate may draw on; each returns facts, possibly more than the person's own."""
+
+    def cards(self, user_id: str) -> Iterable[dict[str, Any]]: ...
+    def runs(self, user_id: str) -> Iterable[dict[str, Any]]: ...
+    def mail(self, user_id: str) -> Iterable[dict[str, Any]]: ...
+
+
+class SourceOwners(Protocol):
+    def owner_of(self, kind: str, ref: str) -> str | None: ...  # kind "mail" or "request"
+
+
+def get_people_stores() -> PeopleStores:
+    raise HTTPException(status_code=503, detail="not_configured")  # no Firestore adapter yet (ticket PPL-11c)
+
+
+def get_clock() -> Callable[[], str]:
+    return events.now  # a `common#timestamp`; a route reads it once per request
+
+
+def get_plate_sources() -> PlateSources:
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_source_owners() -> SourceOwners:
+    raise HTTPException(status_code=503, detail="not_configured")
 
 
 def get_run_archive() -> Callable[..., RunArchive]:

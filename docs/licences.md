@@ -96,6 +96,7 @@ loader. No new licence. FR-CON-02 adds `cryptography` for AES-GCM envelope encry
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | cryptography (`tilo_connectors.tokens`, FR-CON-02) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
+| tzdata (`tilo_connectors.calendar_sync`, FR-CAL-08: the IANA zone database `zoneinfo` needs on Windows) | Apache-2.0 | https://pypi.org/project/tzdata/ |
 
 FR-CON-10 (`tilo_connectors.provenance`) adds the in-workspace `tilo-archive` and `tilo-contracts`
 (not external). No new licence.
@@ -114,7 +115,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 
 `tilo-planning` (FR-INT-01/02) depends only on the in-workspace `tilo-contracts` and
 `tilo-providers` (not external); `tilo-api` now depends on the in-workspace `tilo-planning`, and
-(CL-INT-2) on the in-workspace `tilo-policy`, `tilo-harness` and `tilo-connectors`, and (CL-INT-5d) on the in-workspace `tilo-metering`, and (CL-INT-6) on the in-workspace `tilo-world` (the layout solver; standard library only, no external dependency), and (ADR-0018 T4, FR-AGT-02) on the in-workspace `tilo-archive` and `tilo-memory` (not external). No new licence.
+(CL-INT-2) on the in-workspace `tilo-policy`, `tilo-harness` and `tilo-connectors`, and (CL-INT-5d) on the in-workspace `tilo-metering`, and (CL-INT-6) on the in-workspace `tilo-world` (the layout solver; standard library only, no external dependency), and (ADR-0018 T4, FR-AGT-02) on the in-workspace `tilo-archive` and `tilo-memory` (not external), and (PPL-11a) on the in-workspace `tilo-people` (not external). No new licence.
 
 ## Python (`services/render`)
 

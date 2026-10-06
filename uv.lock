@@ -1378,6 +1378,7 @@ dependencies = [
     { name = "tilo-harness" },
     { name = "tilo-memory" },
     { name = "tilo-metering" },
+    { name = "tilo-people" },
     { name = "tilo-planning" },
     { name = "tilo-policy" },
     { name = "tilo-world" },
@@ -1396,6 +1397,7 @@ requires-dist = [
     { name = "tilo-harness", editable = "services/harness" },
     { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-metering", editable = "packages/metering" },
+    { name = "tilo-people", editable = "packages/people" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-world", editable = "packages/world" },
@@ -1460,6 +1462,7 @@ dependencies = [
     { name = "tilo-archive" },
     { name = "tilo-contracts" },
     { name = "tilo-policy" },
+    { name = "tzdata" },
     { name = "uvicorn" },
 ]
 
@@ -1473,6 +1476,7 @@ requires-dist = [
     { name = "tilo-archive", editable = "packages/archive" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tzdata", specifier = ">=2024.1" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 
