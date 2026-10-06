@@ -1,8 +1,7 @@
 # services/api — `tilo-api`
 
 ## Purpose
-Cloud Run service (PRD 6.2): sessions, tasks, cards, approvals, policies, downloads, sharing, RBAC. The only
-service the web client and channels write through; the client reads live state from Firestore under rules.
+Cloud Run service (PRD 6.2): sessions, tasks, cards, approvals, policies, downloads, sharing, RBAC. The only service the web client and channels write through; the client reads live state from Firestore under rules.
 
 ## Commands
 - `uv run --package tilo-api pytest` — tests; `just check` — gate; `just dev-api` — dev mode on 127.0.0.1:8080 (fake Director); `Dockerfile` runs `tilo_api:app`, deploy `docs/deploy-dev.md`
@@ -38,3 +37,4 @@ service the web client and channels write through; the client reads live state f
   passes `validate_plan`; a unit may ask first (`MustAsk`, `deps.get_must_ask_providers`; `QuestionWait` holds it, no
   `world.completed` while one waits, BQ-235..237; its card is never merged, #338); a send waits at a gate card, then the outbox after the owner approves.
   Events via `deps.get_event_writer`; paused gets none. A `deliver` unit delivers in_app, ungated. `replay_only` (NFR-24, process-wide flag, BQ-238) closes intake, answers, approaches, approve: 503 `replay_only: true`. `GET .../delivery`: 409 until `world.completed`. `tests/API_CL_INT_2.md`.
+  Outputs (ADR-0018 T4): `run_plan` puts them on `deps.get_artifact_store` in Scope (`deps.ORG_ID`, world, owner) and announces them; the gate runs in `Run.before_handoff` on the first announced item. The store, redactor and archive seams refuse in production (no run starts) until T8 and FR-MEM-05; dev mode wires an in-memory store. `tests/API_FR_AGT_02_T4.md`.
