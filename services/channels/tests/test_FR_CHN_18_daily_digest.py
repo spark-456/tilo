@@ -66,22 +66,24 @@ def _outbox_entry(outbox_id: str, created_at: str, state: str = "sent", schedule
 
 
 def test_FR_CHN_18_lists_every_l2_and_l3_action_in_last_24h_and_misses_none() -> None:
-    ob_l2_recent = "01J8Z3K4M5N6P7Q8R9S0T1V2A1"
-    ob_l3_recent = "01J8Z3K4M5N6P7Q8R9S0T1V2A2"
-    ob_l2_sched = "01J8Z3K4M5N6P7Q8R9S0T1V2A3"
-    ob_old = "01J8Z3K4M5N6P7Q8R9S0T1V2A0"
+    ob_l2, ob_l3, ob_sched, ob_old = (
+        "01J8Z3K4M5N6P7Q8R9S0T1V2A1",
+        "01J8Z3K4M5N6P7Q8R9S0T1V2A2",
+        "01J8Z3K4M5N6P7Q8R9S0T1V2A3",
+        "01J8Z3K4M5N6P7Q8R9S0T1V2A0",
+    )
     events = [
         _policy_ev(1, "2026-10-05T17:59:59.000Z", ob_old, "L2"),
-        _policy_ev(2, "2026-10-05T18:00:01.000Z", ob_l2_recent, "L2"),
-        _policy_ev(3, "2026-10-06T09:15:00.000Z", ob_l3_recent, "L3", "create_draft"),
-        _policy_ev(4, "2026-10-06T17:59:30.000Z", ob_l2_sched, "L2"),
+        _policy_ev(2, "2026-10-05T18:00:01.000Z", ob_l2, "L2"),
+        _policy_ev(3, "2026-10-06T09:15:00.000Z", ob_l3, "L3", "create_draft"),
+        _policy_ev(4, "2026-10-06T17:59:30.000Z", ob_sched, "L2"),
         {"type": "approval.resolved", "level": "L1", "ts": "2026-10-06T12:00:00.000Z", "data": {"outbox_id": "ob_l1"}},
     ]
     outbox_entries = [
         _outbox_entry(ob_old, "2026-10-05T17:59:59.000Z", "sent"),
-        _outbox_entry(ob_l2_recent, "2026-10-05T18:00:01.000Z", "sent"),
-        _outbox_entry(ob_l3_recent, "2026-10-06T09:15:00.000Z", "sent"),
-        _outbox_entry(ob_l2_sched, "2026-10-06T17:59:30.000Z", "scheduled", "2026-10-06T18:00:30.000Z"),
+        _outbox_entry(ob_l2, "2026-10-05T18:00:01.000Z", "sent"),
+        _outbox_entry(ob_l3, "2026-10-06T09:15:00.000Z", "sent"),
+        _outbox_entry(ob_sched, "2026-10-06T17:59:30.000Z", "scheduled", "2026-10-06T18:00:30.000Z"),
     ]
     fyi_mail = [
         {"message_id": "msg_fyi_1", "category": "fyi", "priority": "normal", "triaged_at": NOW_EPOCH - 3600},
@@ -93,23 +95,18 @@ def test_FR_CHN_18_lists_every_l2_and_l3_action_in_last_24h_and_misses_none() ->
         user_id=USER, events=events, outbox_entries=outbox_entries, fyi_mail=fyi_mail, now=NOW_TS, base_url=BASE_URL
     )
     assert digest is not None
-    assert [a.outbox_id for a in digest.actions] == [ob_l2_recent, ob_l3_recent, ob_l2_sched]
+    assert [a.outbox_id for a in digest.actions] == [ob_l2, ob_l3, ob_sched]
     assert [a.level for a in digest.actions] == ["L2", "L3", "L2"]
 
     by_id = {a.outbox_id: a for a in digest.actions}
-    assert by_id[ob_l2_recent].link_kind == "report"
-    assert by_id[ob_l2_recent].action_url == f"{BASE_URL}/outbox/{ob_l2_recent}/report"
-    assert by_id[ob_l3_recent].link_kind == "report"
-    assert by_id[ob_l3_recent].action_url == f"{BASE_URL}/outbox/{ob_l3_recent}/report"
-    assert by_id[ob_l2_sched].link_kind == "undo"
-    assert by_id[ob_l2_sched].action_url == f"{BASE_URL}/outbox/{ob_l2_sched}/undo"
+    assert by_id[ob_l2].link_kind == "report" and by_id[ob_l2].action_url == f"{BASE_URL}/outbox/{ob_l2}/report"
+    assert by_id[ob_l3].link_kind == "report" and by_id[ob_l3].action_url == f"{BASE_URL}/outbox/{ob_l3}/report"
+    assert by_id[ob_sched].link_kind == "undo" and by_id[ob_sched].action_url == f"{BASE_URL}/outbox/{ob_sched}/undo"
     assert [m.message_id for m in digest.fyi_mail] == ["msg_fyi_1"]
-    assert all(
-        x in digest.rendered_text for x in (ob_l2_recent, ob_l3_recent, ob_l2_sched, by_id[ob_l2_sched].action_url)
-    )
+    assert all(x in digest.rendered_text for x in (ob_l2, ob_l3, ob_sched, by_id[ob_sched].action_url))
 
 
-def test_FR_CHN_18_empty_day_produces_no_digest_and_sends_nothing() -> None:
+def test_FR_CHN_18_empty_day_and_send_paths() -> None:
     fake_channel, enqueued = FakeDigestChannel(), []
 
     class FakeOutbox:
@@ -123,19 +120,10 @@ def test_FR_CHN_18_empty_day_produces_no_digest_and_sends_nothing() -> None:
     assert svc.deliver_if_non_empty(user_id=USER, recipient="owner@example.com", events=[], now=NOW_TS) is None
     assert enqueued == [] and fake_channel.sent == []
 
-
-def test_FR_CHN_18_sending_uses_existing_outbox_or_dev_fake_channel_and_has_no_direct_send_path() -> None:
     ob_l2 = "01J8Z3K4M5N6P7Q8R9S0T1V2B1"
     events = [_policy_ev(1, "2026-10-06T15:00:00.000Z", ob_l2, "L2")]
     outbox_entries = [_outbox_entry(ob_l2, "2026-10-06T15:00:00.000Z", "sent")]
-    fake_channel, enqueued = FakeDigestChannel(), []
 
-    class FakeOutbox:
-        def enqueue(self, entry: dict, evidence: dict) -> dict:
-            enqueued.append((entry, evidence))
-            return entry
-
-    builder = DailyDigestBuilder(base_url=BASE_URL)
     dev_svc = DigestService(
         builder=builder, outbox=FakeOutbox(), dev_channel=fake_channel, world_id=WORLD, run_id=RUN, dev_mode=True
     )

@@ -30,8 +30,6 @@ class DigestOutboxPort(Protocol):
 
 
 def _to_epoch_s(value: float | int | str | dt.datetime | None) -> float | None:
-    if value is None:
-        return None
     if isinstance(value, int | float):
         return float(value)
     if isinstance(value, dt.datetime):
@@ -128,23 +126,20 @@ class DailyDigestBuilder:
             report_url = f"{self._base_url}/outbox/{outbox_id}/report"
             link_kind: Literal["undo", "report"] = "undo" if can_undo else "report"
             level_lit: Literal["L2", "L3"] = "L2" if lvl == "L2" else "L3"
-            act_type = str(data.get("action_type") or entry.get("action_type") or "send_email")
-            conn = str(data.get("connector") or entry.get("connector") or "gmail")
-            tier = str(data.get("risk_tier") or entry.get("risk_tier") or "T2")
             actions.append(
                 DigestAction(
-                    outbox_id,
-                    str(data.get("policy_id") or ""),
-                    level_lit,
-                    act_type,
-                    conn,
-                    tier,
-                    state,
-                    ts_str,
-                    link_kind,
-                    undo_url or report_url,
-                    undo_url,
-                    report_url,
+                    outbox_id=outbox_id,
+                    policy_id=str(data.get("policy_id") or ""),
+                    level=level_lit,
+                    action_type=str(data.get("action_type") or entry.get("action_type") or "send_email"),
+                    connector=str(data.get("connector") or entry.get("connector") or "gmail"),
+                    risk_tier=str(data.get("risk_tier") or entry.get("risk_tier") or "T2"),
+                    state=state,
+                    timestamp=ts_str,
+                    link_kind=link_kind,
+                    action_url=undo_url or report_url,
+                    undo_url=undo_url,
+                    report_url=report_url,
                 )
             )
             seen_outbox_ids.add(outbox_id)
@@ -172,18 +167,9 @@ class DailyDigestBuilder:
         )
 
 
-def build_daily_digest(
-    *,
-    user_id: str,
-    events: Iterable[Mapping[str, Any]],
-    outbox_entries: Iterable[Mapping[str, Any]] = (),
-    fyi_mail: Iterable[Mapping[str, Any]] = (),
-    now: float | int | str | dt.datetime | None = None,
-    base_url: str = "https://app.tilo.example",
-) -> DailyDigest | None:
-    return DailyDigestBuilder(base_url=base_url).build(
-        user_id=user_id, events=events, outbox_entries=outbox_entries, fyi_mail=fyi_mail, now=now
-    )
+def build_daily_digest(**kwargs: Any) -> DailyDigest | None:
+    base_url = str(kwargs.pop("base_url", "https://app.tilo.example"))
+    return DailyDigestBuilder(base_url=base_url).build(**kwargs)
 
 
 class FakeDigestChannel:
