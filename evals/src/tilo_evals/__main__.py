@@ -118,8 +118,8 @@ def _bank(args: argparse.Namespace) -> int:
 
 def _metrics(args: argparse.Namespace) -> int:
     """Replays the case set (a full pass under the credit cap), runs the bank on fakes, writes the EV rows."""
+    from tilo_metering.costs import load_credit_usd  # noqa: PLC0415 (the loader behind FR-MTR-10's cost_report)
     from tilo_metering.errors import MeteringConfigError  # noqa: PLC0415
-    from tilo_metering.prices import PriceBook  # noqa: PLC0415
 
     from .bank import BankError, load_bank  # noqa: PLC0415 (loads the services; `run` does not)
     from .bank_report import run_bank  # noqa: PLC0415
@@ -142,7 +142,7 @@ def _metrics(args: argparse.Namespace) -> int:
                 "the metrics report runs on recordings and fakes only: LIVE, K_SERVICE and CLOUD_RUN_JOB must be unset"
             )
         config = EvalsConfig.load("config/evals.yaml")
-        credit_usd = PriceBook.load("config/prices.yaml").credit_usd
+        credit_usd = load_credit_usd("config/prices.yaml")
         replay, bank = load_cases(root=args.cases_root), load_bank(args.bank_dir)
         replay_ids, bank_ids = {c.id for c in replay}, {c.id for c in bank}
         if unknown := sorted(set(args.case_ids) - replay_ids - bank_ids):
