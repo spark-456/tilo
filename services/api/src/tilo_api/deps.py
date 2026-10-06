@@ -49,6 +49,7 @@ from tilo_api.people_access import SourceOwners as PanelSourceOwners
 
 if TYPE_CHECKING:
     from tilo_api.assistant.core import Decider
+    from tilo_api.assistant.metering import DecisionCache, SpendLedger
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
 Channel = Literal["web", "mobile_web", "email"]  # WhatsApp removed: SD-01, ADR-0019
@@ -488,6 +489,37 @@ def get_assistant_config() -> AssistantConfig:
         raise HTTPException(status_code=503, detail="not_configured") from exc
 
 
-def get_assistant_decider() -> Decider | None:
-    """The model fallback (FR-PA-14). None until the cost wiring lands (slice 11b-4): the panel answers by rules."""
-    return None
+@functools.cache
+def get_spend_ledger() -> SpendLedger:
+    """The panel's daily allowance per person (FR-PA-19): in memory and process-wide until a shared store exists
+    (BQ-PPL11B-6), like `get_outbox_store`."""
+    from tilo_api.assistant.metering import InMemorySpendLedger  # noqa: PLC0415  (metering imports the model modules)
+
+    return InMemorySpendLedger()
+
+
+@functools.cache
+def get_decision_cache() -> DecisionCache:
+    from tilo_api.assistant.metering import InMemoryDecisionCache  # noqa: PLC0415
+
+    config = get_assistant_config()
+    return InMemoryDecisionCache(per_user_entries=config.cache_per_user_entries, ttl_hours=config.cache_ttl_hours)
+
+
+def get_assistant_decider(mode: Annotated[Mode, Depends(get_mode)] = "replay") -> Decider | None:
+    """The model fallback (FR-PA-14, FR-PA-19): the metered decider over the Router, or None, and the panel answers
+    by rules only. None when the `assistant` role is not configured (dev mode), has no caps or no price, or the
+    router or the safety provider is unavailable."""
+    from tilo_api.assistant.metering import MeteredDecider  # noqa: PLC0415
+    from tilo_api.assistant.model import AssistantModelUnavailable, ModelDecider  # noqa: PLC0415
+
+    try:
+        config = get_assistant_config()
+        providers = providers_config()
+        if config.model["role"] not in providers.roles:
+            return None
+        router = _seam_router(mode)
+        inner = ModelDecider(router=router, providers=providers, safety=get_safety(), config=config)
+        return MeteredDecider(inner, ledger=get_spend_ledger(), cache=get_decision_cache(), config=config)
+    except (HTTPException, ProviderConfigError, AssistantModelUnavailable):
+        return None
