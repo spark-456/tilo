@@ -1521,3 +1521,21 @@ def test_PPL_10c_PE_08_a_person_made_record_cannot_claim_a_machine_origin(name, 
     request = dataclasses.replace(request, record=copy.deepcopy(mutated), meeting=t.meeting(), source_owner="u_owner")
     got = check(request, mutated)
     assert "stamp" in got or got == ("not_allowed",), got
+
+
+@pytest.mark.parametrize("kind", ["mail", "pinboard", "request", "manual"])
+def test_PPL_10c_FR_PA_01_a_person_made_work_item_may_come_from_mail_a_pin_a_request_or_nothing(kind):
+    """A tracked-mail item can only be person-made (PE-08), so these sources must store."""
+    assert _create_check("c_wi_person", _set(source={"kind": kind, "ref": "src_abc123", "evidence": []})) == ()
+
+
+@pytest.mark.parametrize("kind", ["mail", "request", "manual"])  # a pin's source kinds exclude "pinboard"
+def test_PPL_10c_FR_PA_01_a_person_made_pin_may_come_from_mail_a_request_or_nothing(kind):
+    got = _create_check("c_pin_team", _set(source={"kind": kind, "ref": "src_abc123", "evidence": []}))
+    assert got == ()
+
+
+def test_PPL_10c_PE_08_a_person_made_pin_and_calendar_entry_may_have_no_source_or_a_manual_one():
+    assert _create_check("c_pin_team", _set(source=None)) == ()
+    assert _create_check("c_pin_personal", _set(source=None)) == ()
+    assert _create_check("c_cal_person", _set(source={"kind": "manual"})) == ()
