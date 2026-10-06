@@ -348,3 +348,7 @@ Questions found while building. Each has the default we build on until the user 
 | BQ-PPL10-16 | PPL-10c: when `identity` fails, should other problems be listed too? | No: `create`/`mention` with a different `after`, or an `edit` changing `id`/`org_id`, return only `("identity",)`. | API.md check_write | 2026-10-06 |
 | BQ-PPL10-17 | PPL-10c: an `edit` moving a status its MAY row does not cover (e.g. a Google-synced entry's `state`) | Reports `immutable` only, not `transition` (pinned by test rows). | API.md check_write | 2026-10-06 |
 | BQ-PPL10-18 | PPL-10c: `confirm` on a meeting | Requires stored `minutes_confirmed_by` None and new status `minuted`, else `transition` (API.md row). | FR-MTG, API.md | 2026-10-06 |
+| BQ-PPL10-19 | PPL-10d: a non-int `expected_version` (incl. bool) | `PeopleInputError`; an int that is not current is `VersionConflict` (test ambiguity A). | API.md stores | 2026-10-06 |
+| BQ-PPL10-20 | PPL-10d: what does `erase_person` count for meetings? | Only meetings it tombstones; already-deleted ones are not counted, so a second run returns all zeros (test ambiguity B). | API.md stores | 2026-10-06 |
+| BQ-PPL10-21 | PPL-10d: `MemoryStore.list(org, field, value)` with a non-string value | Refused with `PeopleInputError` whenever `field` is given (fail closed). | API.md stores | 2026-10-06 |
+| BQ-PPL10-22 | PPL-10d: `meeting_tombstone` on a record that is not a valid meeting | Refused with `PeopleInputError`. | API.md stores | 2026-10-06 |
