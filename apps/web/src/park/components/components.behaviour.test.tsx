@@ -271,12 +271,10 @@ describe("WEB_2_segmented: plain and sliding", () => {
   function Seg({
     start = "a",
     sliding = false,
-    itemWidth = 96,
     onChange,
   }: {
     start?: string;
     sliding?: boolean;
-    itemWidth?: number;
     onChange?: (v: string) => void;
   }) {
     const [v, set] = useState<string>(start);
@@ -285,14 +283,7 @@ describe("WEB_2_segmented: plain and sliding", () => {
       onChange?.(n);
     };
     return sliding ? (
-      <SegmentedControl
-        label="View"
-        options={OPTS}
-        value={v}
-        onChange={change}
-        sliding
-        itemWidth={itemWidth}
-      />
+      <SegmentedControl label="View" options={OPTS} value={v} onChange={change} sliding />
     ) : (
       <SegmentedControl label="View" options={OPTS} value={v} onChange={change} />
     );
@@ -302,10 +293,15 @@ describe("WEB_2_segmented: plain and sliding", () => {
   const GROUP = '[role="radiogroup"], [role="tablist"]';
   const selected = (el: Element) =>
     el.getAttribute("aria-checked") === "true" || el.getAttribute("aria-selected") === "true";
-  const translateX = (el: HTMLElement): number | null => {
-    const m = /translateX\(\s*(-?[\d.]+)(?:px)?\s*\)/.exec(el.style.transform);
-    return m ? Number.parseFloat(m[1] ?? "") : null;
+  const strip = (v: string): string => v.replace(/\s+/g, "");
+  /** The thumb's inline transform, whitespace removed: the number and its unit (reference: "%"). */
+  const slide = (el: Element): { n: number; unit: string } | null => {
+    const m = /transform:translateX\((-?[\d.]+)(%|px)?\)/.exec(
+      strip(el.getAttribute("style") ?? ""),
+    );
+    return m ? { n: Number.parseFloat(m[1] ?? ""), unit: m[2] ?? "" } : null;
   };
+  const inline = (el: Element): string => strip(el.getAttribute("style") ?? "");
 
   it("WEB_2_segmented_is_a_named_group_of_items_with_exactly_one_selected", () => {
     const { container } = mount(<Seg start="b" />);
@@ -374,60 +370,150 @@ describe("WEB_2_segmented: plain and sliding", () => {
     expect(classesOf(q(container, GROUP))).not.toContain("park-seg--sliding");
   });
 
-  it("WEB_2_segmented_sliding_thumb_sits_at_index_times_item_width_plus_the_2px_gap", () => {
-    const { container } = mount(<Seg sliding itemWidth={96} start="a" />);
+  it("WEB_2_segmented_sliding_thumb_translates_by_index_times_100_percent_with_no_gap", () => {
+    const { container } = mount(<Seg sliding start="a" />);
     const track = q(container, GROUP);
     expect(classesOf(track)).toContain("park-seg--sliding");
     const thumb = q(container, ".park-seg__thumb");
     expect(thumb.getAttribute("aria-hidden")).toBe("true");
-    expect(thumb.style.width).toBe("96px");
-    for (const it of qa(container, ITEM)) expect(it.style.width).toBe("96px");
-    expect(translateX(thumb)).toBe(0);
+    // Reference: width calc((100% - 6px)/N), transform translateX(i*100%); N = 4 here.
+    expect(inline(thumb)).toContain("width:calc((100%-6px)/4)");
+    expect(slide(thumb)?.n).toBe(0);
     click(qa(container, ITEM)[1] as HTMLElement);
-    expect(translateX(thumb)).toBe(98); // 1 * (96 + 2)
+    expect(slide(thumb)).toEqual({ n: 100, unit: "%" });
     click(qa(container, ITEM)[3] as HTMLElement);
-    expect(translateX(thumb)).toBe(294); // 3 * (96 + 2)
-    expect(thumb.style.transition, "motion arrives in WEB-3 (BQ-WEB-3)").toBe("");
+    expect(slide(thumb)).toEqual({ n: 300, unit: "%" });
+    expect(inline(thumb), "motion arrives in WEB-3 (BQ-WEB-3)").not.toMatch(/transition|animation/);
+  });
+
+  it("WEB_2_segmented_sliding_track_is_an_N_column_grid_through_an_inline_style", () => {
+    const { container } = mount(<Seg sliding />);
+    expect(inline(q(container, GROUP))).toContain("grid-template-columns:repeat(4,minmax(0,1fr))");
+  });
+
+  it("WEB_2_segmented_sliding_items_have_no_inline_width_and_carry_the_slide_class", () => {
+    const { container } = mount(<Seg sliding start="b" />);
+    for (const it of qa(container, ITEM)) {
+      expect(it.getAttribute("style") ?? "").not.toMatch(/width/);
+      expect(classesOf(it)).toContain("park-seg__item--slide");
+    }
+    // the thumb is the selected surface, so no item is the plain "on" item
+    expect(qa(container, ITEM).some((i) => classesOf(i).includes("park-seg__item--on"))).toBe(
+      false,
+    );
+  });
+
+  it("WEB_2_segmented_plain_items_are_not_slide_items_and_the_track_has_no_inline_grid", () => {
+    const { container } = mount(<Seg />);
+    for (const it of qa(container, ITEM))
+      expect(classesOf(it)).not.toContain("park-seg__item--slide");
+    expect(inline(q(container, GROUP))).not.toContain("grid-template-columns");
   });
 
   it("WEB_2_segmented_sliding_keeps_the_same_roles_and_keyboard", () => {
-    const { container } = mount(<Seg sliding itemWidth={80} />);
+    const { container } = mount(<Seg sliding />);
     focus(qa(container, ITEM)[0] as HTMLElement);
     press(active() as Element, "ArrowRight");
-    expect(translateX(q(container, ".park-seg__thumb"))).toBe(82);
+    expect(slide(q(container, ".park-seg__thumb"))).toEqual({ n: 100, unit: "%" });
     expect(qa(container, ITEM).filter(selected).map(nameOf)).toEqual(["Beta"]);
   });
 
-  it("WEB_2_segmented_property_thumb_offset_is_index_times_width_plus_2_for_any_size", () => {
+  it("WEB_2_segmented_property_thumb_is_index_times_100_percent_and_width_over_N_for_any_N", () => {
     fc.assert(
-      fc.property(
-        fc.integer({ min: 2, max: 6 }),
-        fc.integer({ min: 40, max: 200 }),
-        fc.nat(),
-        (count, width, pick) => {
-          const options = Array.from({ length: count }, (_, i) => ({
-            value: `v${i}`,
-            label: `Item ${i}`,
-          }));
-          const index = pick % count;
-          const m = mount(
-            <SegmentedControl
-              label="Any"
-              options={options}
-              value={`v${index}`}
-              onChange={() => undefined}
-              sliding
-              itemWidth={width}
-            />,
-          );
-          const thumb = q(m.container, ".park-seg__thumb");
-          const ok = translateX(thumb) === index * (width + 2);
-          m.unmount();
-          return ok;
-        },
-      ),
+      fc.property(fc.integer({ min: 2, max: 6 }), fc.nat(), (count, pick) => {
+        const options = Array.from({ length: count }, (_, i) => ({
+          value: `v${i}`,
+          label: `Item ${i}`,
+        }));
+        const index = pick % count;
+        const m = mount(
+          <SegmentedControl
+            label="Any"
+            options={options}
+            value={`v${index}`}
+            onChange={() => undefined}
+            sliding
+          />,
+        );
+        const thumb = q(m.container, ".park-seg__thumb");
+        const t = slide(thumb);
+        const ok =
+          t?.n === index * 100 &&
+          (index === 0 || t.unit === "%") &&
+          inline(thumb).includes(`width:calc((100%-6px)/${count})`) &&
+          inline(q(m.container, GROUP)).includes(`repeat(${count},minmax(0,1fr))`);
+        m.unmount();
+        return ok;
+      }),
       { numRuns: 20 },
     );
+  });
+
+  it("WEB_2_segmented_sliding_no_longer_takes_an_itemWidth_prop", () => {
+    // Type-level: the typecheck test (WEB_2_typecheck) fails if the marked line stops being an error.
+    const el = (
+      <SegmentedControl
+        label="x"
+        options={OPTS}
+        value="a"
+        onChange={() => undefined}
+        sliding
+        // @ts-expect-error itemWidth was removed: the sliding track fills its container
+        itemWidth={96}
+      />
+    );
+    expect(el).toBeTruthy();
+  });
+
+  it("WEB_2_segmented_option_tone_colours_the_selected_label_and_defaults_to_ink", () => {
+    const options = [
+      { value: "off", label: "Off", tone: "ink2" },
+      { value: "read", label: "Read", tone: "sch" },
+      { value: "draft", label: "Draft", tone: "heroInk" },
+      { value: "act", label: "Act", tone: "amberInk" },
+      { value: "plain", label: "Plain" },
+    ] as const;
+    function Tones() {
+      const [v, set] = useState<string>("off");
+      return <SegmentedControl label="Tool" options={options} value={v} onChange={set} sliding />;
+    }
+    const { container } = mount(<Tones />);
+    const TONE_CLASSES = ["ink", "ink2", "sch", "heroInk", "amberInk"].map(
+      (t) => `park-seg__item--${t}`,
+    );
+    const toneOf = (el: Element) => classesOf(el).filter((c) => TONE_CLASSES.includes(c));
+    const want = ["ink2", "sch", "heroInk", "amberInk", "ink"];
+    for (let i = 0; i < options.length; i++) {
+      click(qa(container, ITEM)[i] as HTMLElement);
+      const items = qa(container, ITEM);
+      expect(toneOf(items[i] as Element), `selected item ${i}`).toEqual([
+        `park-seg__item--${want[i]}`,
+      ]);
+      for (let j = 0; j < items.length; j++)
+        if (j !== i) expect(toneOf(items[j] as Element), `unselected item ${j}`).toEqual([]);
+    }
+  });
+
+  it("WEB_2_segmented_size_lg_marks_the_track_and_every_item_and_md_is_the_default", () => {
+    const lg = mount(
+      <SegmentedControl
+        label="Board style"
+        options={[
+          { value: "pin", label: "Pinboard" },
+          { value: "grp", label: "Grouped" },
+        ]}
+        value="pin"
+        onChange={() => undefined}
+        sliding
+        size="lg"
+      />,
+    );
+    expect(classesOf(q(lg.container, GROUP))).toContain("park-seg--lg");
+    for (const it of qa(lg.container, ITEM)) expect(classesOf(it)).toContain("park-seg__item--lg");
+    const md = mount(<Seg sliding />);
+    expect(classesOf(q(md.container, GROUP))).not.toContain("park-seg--lg");
+    for (const it of qa(md.container, ITEM))
+      expect(classesOf(it)).not.toContain("park-seg__item--lg");
   });
 
   it("WEB_2_segmented_property_n_right_arrows_come_back_to_the_start", () => {
@@ -471,6 +557,24 @@ describe("WEB_2_chip_and_pill: status chip and summary pill", () => {
     expect(pill.textContent).toBe("3 trusted");
   });
 
+  it("WEB_2_chip_size_sm_adds_park_chip_sm_and_md_is_the_default", () => {
+    const sm = mount(
+      <StatusChip tone="ok" size="sm">
+        Trusted
+      </StatusChip>,
+    );
+    expect(classesOf(q(sm.container, ".park-chip"))).toContain("park-chip--sm");
+    expect(classesOf(q(sm.container, ".park-chip"))).toContain("park-chip--ok");
+    const md = mount(<StatusChip tone="ok">Trusted</StatusChip>);
+    expect(classesOf(q(md.container, ".park-chip"))).not.toContain("park-chip--sm");
+    const md2 = mount(
+      <StatusChip tone="ok" size="md">
+        Trusted
+      </StatusChip>,
+    );
+    expect(classesOf(q(md2.container, ".park-chip"))).not.toContain("park-chip--sm");
+  });
+
   it("WEB_2_pill_defaults_to_the_neutral_tone", () => {
     const { container } = mount(<SummaryPill>2 learning</SummaryPill>);
     expect(classesOf(q(container, ".park-pill"))).toContain("park-pill--neutral");
@@ -505,7 +609,7 @@ describe("WEB_2_kpi: KPI tile", () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["amber", "ok"] as const)("WEB_2_kpi_tone_%s_adds_its_class", (tone) => {
+  it.each(["amber", "ok", "sch"] as const)("WEB_2_kpi_tone_%s_adds_its_class", (tone) => {
     const { container } = mount(<KpiTile label="L" value="1" tone={tone} />);
     expect(classesOf(q(container, ".park-kpi"))).toContain(`park-kpi--${tone}`);
   });

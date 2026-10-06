@@ -27,6 +27,8 @@ const DEMOS = [
   "button-needs",
   "seg-plain",
   "seg-sliding",
+  "seg-sliding-lg",
+  "seg-sliding-3",
   "switch",
   "chip",
   "pill",
@@ -145,6 +147,50 @@ describe("WEB_2_dev_page: every variant is on show", () => {
     expect(sel()[0]).toBe(other);
   });
 
+  it("WEB_2_dev_page_sliding_demos_are_N4_N2_lg_and_N3", () => {
+    const p = panel();
+    const items = (id: string) => qa(demo(p, id), '[role="radio"], [role="tab"]');
+    expect(items("seg-sliding")).toHaveLength(4);
+    expect(items("seg-sliding-lg")).toHaveLength(2);
+    expect(items("seg-sliding-3")).toHaveLength(3);
+    for (const id of ["seg-sliding", "seg-sliding-lg", "seg-sliding-3"])
+      expect(demo(p, id).querySelector(".park-seg__thumb"), id).not.toBeNull();
+    for (const it of items("seg-sliding-lg")) expect(classes(it)).toContain("park-seg__item--lg");
+    for (const it of items("seg-sliding")) expect(classes(it)).not.toContain("park-seg__item--lg");
+  });
+
+  it("WEB_2_dev_page_the_tools_demo_labels_and_tones_are_Off_ink2_Read_sch_Draft_heroInk_Act_amberInk", () => {
+    const p = panel();
+    const items = () => qa(demo(p, "seg-sliding"), '[role="radio"], [role="tab"]');
+    expect(items().map((i) => i.textContent)).toEqual(["Off", "Read", "Draft", "Act"]);
+    const want = ["ink2", "sch", "heroInk", "amberInk"];
+    for (let i = 0; i < 4; i++) {
+      click(items()[i] as HTMLElement);
+      expect(classes(items()[i] as Element), `selected ${i}`).toContain(
+        `park-seg__item--${want[i]}`,
+      );
+    }
+  });
+
+  it("WEB_2_dev_page_the_board_style_demo_is_a_two_option_lg_toggle", () => {
+    const items = qa(demo(panel(), "seg-sliding-lg"), '[role="radio"], [role="tab"]');
+    expect(items.map((i) => i.textContent)).toEqual(["Pinboard", "Grouped"]);
+  });
+
+  it("WEB_2_dev_page_a_list_row_trail_is_a_small_chip_over_a_cost_line", () => {
+    const trails = qa(demo(panel(), "list-row"), ".park-row__trail").filter((t) =>
+      t.querySelector(".park-chip--sm"),
+    );
+    expect(trails.length).toBeGreaterThanOrEqual(1);
+    for (const t of trails) {
+      const kids = [...t.children];
+      expect(kids).toHaveLength(2);
+      expect(classes(kids[0] as Element)).toContain("park-chip--sm");
+      expect(classes(kids[1] as Element)).toContain("park-row__cost");
+      expect(kids[1]?.textContent?.length).toBeGreaterThan(0);
+    }
+  });
+
   it("WEB_2_dev_page_switches_show_both_states_and_toggle", () => {
     const p = panel();
     const sws = qa(demo(p, "switch"), '[role="switch"]');
@@ -163,7 +209,7 @@ describe("WEB_2_dev_page: every variant is on show", () => {
       ["pill", "park-pill"],
     ] as const) {
       const tones = qa(demo(p, id), `.${base}`).flatMap((c) =>
-        classes(c).filter((k) => k.startsWith(`${base}--`)),
+        classes(c).filter((k) => k.startsWith(`${base}--`) && k !== `${base}--sm`),
       );
       expect([...new Set(tones)].sort()).toEqual(
         ["ok", "hero", "amber", "neutral"].map((t) => `${base}--${t}`).sort(),
@@ -171,12 +217,13 @@ describe("WEB_2_dev_page: every variant is on show", () => {
     }
   });
 
-  it("WEB_2_dev_page_kpi_tiles_show_default_amber_and_ok", () => {
+  it("WEB_2_dev_page_kpi_tiles_show_default_amber_ok_and_sch", () => {
     const tiles = qa(demo(panel(), "kpi"), ".park-kpi");
-    expect(tiles.length).toBeGreaterThanOrEqual(3);
+    expect(tiles.length).toBeGreaterThanOrEqual(4);
     const all = tiles.flatMap(classes);
     expect(all).toContain("park-kpi--amber");
     expect(all).toContain("park-kpi--ok");
+    expect(all, "the Ledger's 'Saved by memory' tint").toContain("park-kpi--sch");
     expect(tiles.some((t) => !classes(t).some((k) => k.startsWith("park-kpi--")))).toBe(true);
   });
 

@@ -124,21 +124,48 @@ export function compoundOf(selector: string): Compound | null {
   return { classes, rest: m[2] ?? "" };
 }
 
+/** `[data-park] .a .b:hover` -> { ancestor: {classes: [a]}, target: {classes: [b], rest: ":hover"} }: exactly one
+ * descendant combinator between two class compounds, nothing else. Null for any other shape. */
+export function descendantOf(selector: string): { ancestor: Compound; target: Compound } | null {
+  if (!selector.startsWith("[data-park]")) return null;
+  const tail = selector.slice("[data-park]".length).trim();
+  if (/[>+~]/.test(tail)) return null;
+  const parts = tail.split(/\s+/);
+  if (parts.length !== 2) return null;
+  const parse = (t: string): Compound | null => {
+    const m = /^\*?((?:\.[\w-]+)*)(.*)$/.exec(t);
+    return m ? { classes: (m[1] ?? "").split(".").filter(Boolean), rest: m[2] ?? "" } : null;
+  };
+  const ancestor = parse(parts[0] ?? "");
+  const target = parse(parts[1] ?? "");
+  return ancestor && target ? { ancestor, target } : null;
+}
+
 /** Declarations that apply to an element carrying exactly `classes`, merged in file order (later wins; no
  * specificity). `state` "" is the resting state (rules with no pseudo suffix); ":hover" or ":focus-visible"
- * selects the rules whose suffix contains it (those declarations only, not merged over the base). */
+ * selects the rules whose suffix contains it (those declarations only, not merged over the base).
+ * `ancestors` are the classes of an ancestor element (a tone modifier on a tile, say): rules of the form
+ * `.ancestor .target` then apply too. With no ancestors, descendant rules never match. */
 export function declsFor(
   rules: readonly CssRule[],
   classes: readonly string[],
   state = "",
+  ancestors: readonly string[] = [],
 ): Map<string, string> {
   const have = new Set(classes);
+  const above = new Set(ancestors);
   const merged = new Map<string, string>();
+  const fits = (c: Compound): boolean =>
+    c.classes.every((k) => have.has(k)) && (state === "" ? c.rest === "" : c.rest.includes(state));
   for (const r of rules) {
     const c = compoundOf(r.selector);
-    if (!c) continue;
-    if (!c.classes.every((k) => have.has(k))) continue;
-    if (state === "" ? c.rest !== "" : !c.rest.includes(state)) continue;
+    if (c) {
+      if (!fits(c)) continue;
+    } else if (ancestors.length > 0) {
+      const d = descendantOf(r.selector);
+      if (!d || d.ancestor.rest !== "" || !d.ancestor.classes.every((k) => above.has(k))) continue;
+      if (!fits(d.target)) continue;
+    } else continue;
     for (const [k, v] of r.decls) merged.set(k, v);
   }
   return merged;

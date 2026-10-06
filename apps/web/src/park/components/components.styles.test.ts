@@ -36,12 +36,24 @@ type Alias = "background" | "border-radius" | "box-shadow" | string;
 const PROP: Record<string, string[]> = {
   background: ["background", "background-color"],
 };
-const val = (classes: string[], prop: Alias, state = ""): string =>
-  pick(declsFor(rules(), classes, state), ...(PROP[prop] ?? [prop]));
+const val = (classes: string[], prop: Alias, state = "", ancestors: string[] = []): string =>
+  pick(declsFor(rules(), classes, state, ancestors), ...(PROP[prop] ?? [prop]));
 
 /** Pins `prop` of an element with `classes` to exactly `expected` (compared after normalisation). */
-function pin(classes: string[], prop: Alias, expected: string, state = ""): void {
-  expect(val(classes, prop, state), `${classes.join(".")} ${state} ${prop}`).toBe(norm(expected));
+function pin(
+  classes: string[],
+  prop: Alias,
+  expected: string,
+  state = "",
+  ancestors: string[] = [],
+): void {
+  const where = `${ancestors.map((a) => `.${a} `).join("")}${classes.join(".")} ${state} ${prop}`;
+  expect(val(classes, prop, state, ancestors), where).toBe(norm(expected));
+}
+
+/** Pins `prop` to one of several accepted spellings ("" means not declared). */
+function pinOneOf(classes: string[], prop: Alias, accepted: string[]): void {
+  expect(accepted.map(norm), `${classes.join(".")} ${prop}`).toContain(val(classes, prop));
 }
 
 /** Pins the first number of `prop` to lie in [lo, hi]. */
@@ -204,6 +216,9 @@ describe("WEB_2_styles_button", () => {
 });
 
 describe("WEB_2_styles_segmented", () => {
+  const SLIDE_TRACK = ["park-seg", "park-seg--sliding"];
+  const SLIDE_ITEM = ["park-seg__item", "park-seg__item--slide"];
+
   it("WEB_2_styles_segmented_track_seg_r12_p3_gap2", () => {
     pin(["park-seg"], "background", "var(--seg)");
     pin(["park-seg"], "border-radius", "12px");
@@ -211,12 +226,14 @@ describe("WEB_2_styles_segmented", () => {
     pin(["park-seg"], "gap", "2px");
   });
 
-  it("WEB_2_styles_segmented_item_h32_r9_13_5px_800_ink2", () => {
+  it("WEB_2_styles_segmented_plain_item_h32_r9_13px_800_padding_0_11px_ink2", () => {
+    // Reference (Ledger "Entry type"): padding 0 11px, 13px. The README's 13.5px is the type table's range.
     const c = ["park-seg__item"];
     pin(c, "height", "32px");
     pin(c, "border-radius", "9px");
-    pin(c, "font-size", "13.5px");
+    pin(c, "font-size", "13px");
     pin(c, "font-weight", "800");
+    pin(c, "padding", "0 11px");
     pin(c, "color", "var(--ink2)");
   });
 
@@ -227,14 +244,60 @@ describe("WEB_2_styles_segmented", () => {
     pin(c, "color", "var(--ink)");
   });
 
-  it("WEB_2_styles_segmented_sliding_thumb_is_the_selected_surface_without_a_transition", () => {
-    pin(["park-seg", "park-seg--sliding"], "position", "relative");
+  it("WEB_2_styles_segmented_sliding_track_is_a_relative_grid_with_no_gap", () => {
+    pin(SLIDE_TRACK, "position", "relative");
+    pin(SLIDE_TRACK, "display", "grid");
+    pin(SLIDE_TRACK, "background", "var(--seg)");
+    pin(SLIDE_TRACK, "border-radius", "12px");
+    pin(SLIDE_TRACK, "padding", "3px");
+    pinOneOf(SLIDE_TRACK, "gap", ["", "0", "normal"]);
+    pinOneOf(SLIDE_TRACK, "column-gap", ["", "0", "normal"]);
+  });
+
+  it("WEB_2_styles_segmented_sliding_thumb_is_inset_3px_all_round_and_carries_the_white", () => {
     const t = ["park-seg__thumb"];
     pin(t, "position", "absolute");
+    pin(t, "top", "3px");
+    pin(t, "bottom", "3px");
+    pin(t, "left", "3px");
     pin(t, "background", "var(--tabOn)");
     pin(t, "box-shadow", SHADOW_SEG);
     pin(t, "border-radius", "9px");
-    pin(t, "height", "32px");
+  });
+
+  it("WEB_2_styles_segmented_sliding_item_is_flat_h32_13px_800_no_radius_no_background", () => {
+    pin(SLIDE_ITEM, "position", "relative");
+    pin(SLIDE_ITEM, "height", "32px");
+    pin(SLIDE_ITEM, "border", "0");
+    pin(SLIDE_ITEM, "background", "transparent");
+    pin(SLIDE_ITEM, "font-weight", "800");
+    pin(SLIDE_ITEM, "font-size", "13px");
+    pinOneOf(SLIDE_ITEM, "border-radius", ["", "0", "none"]);
+    pinOneOf(SLIDE_ITEM, "box-shadow", ["", "none"]);
+    pin(SLIDE_ITEM, "color", "var(--ink2)");
+  });
+
+  it.each([
+    ["ink", "var(--ink)"],
+    ["ink2", "var(--ink2)"],
+    ["sch", "var(--sch)"],
+    ["heroInk", "var(--heroInk)"],
+    ["amberInk", "var(--amberInk)"],
+  ])("WEB_2_styles_segmented_selected_sliding_label_tone_%s", (tone, colour) => {
+    const c = [...SLIDE_ITEM, `park-seg__item--${tone}`];
+    pin(c, "color", colour);
+    pin(c, "background", "transparent");
+    pinOneOf(c, "box-shadow", ["", "none"]);
+  });
+
+  it("WEB_2_styles_segmented_size_lg_is_h34_14px_for_plain_and_sliding_items", () => {
+    for (const c of [
+      ["park-seg__item", "park-seg__item--lg"],
+      [...SLIDE_ITEM, "park-seg__item--lg"],
+    ]) {
+      pin(c, "height", "34px");
+      pin(c, "font-size", "14px");
+    }
   });
 });
 
@@ -277,6 +340,38 @@ describe("WEB_2_styles_chip_and_pill", () => {
     range(c, "font-size", 11.5, 12);
     pin(c, "font-weight", "800");
   });
+
+  it("WEB_2_styles_chip_md_is_24px_padding_0_9px_12px_r7_800", () => {
+    const c = ["park-chip", "park-chip--ok"];
+    pin(c, "height", "24px");
+    pin(c, "padding", "0 9px");
+    pin(c, "font-size", "12px");
+    pin(c, "border-radius", "7px");
+    pin(c, "font-weight", "800");
+  });
+
+  it("WEB_2_styles_chip_sm_is_22px_padding_0_8px_11_5px_r7_800_flex_nowrap", () => {
+    // Reference: Skills list rows.
+    const c = ["park-chip", "park-chip--ok", "park-chip--sm"];
+    pin(c, "height", "22px");
+    pin(c, "padding", "0 8px");
+    pin(c, "font-size", "11.5px");
+    pin(c, "border-radius", "7px");
+    pin(c, "font-weight", "800");
+    pin(c, "display", "flex");
+    pin(c, "align-items", "center");
+    pin(c, "white-space", "nowrap");
+  });
+
+  it.each(["ok", "hero", "amber", "neutral"])(
+    "WEB_2_styles_chip_sm_keeps_the_%s_tone_colours",
+    (tone) => {
+      const sm = ["park-chip", `park-chip--${tone}`, "park-chip--sm"];
+      const md = ["park-chip", `park-chip--${tone}`];
+      expect(val(sm, "background")).toBe(val(md, "background"));
+      expect(val(sm, "color")).toBe(val(md, "color"));
+    },
+  );
 
   it.each([
     ["ok", "var(--okSoft)", "var(--okInk)"],
@@ -326,6 +421,45 @@ describe("WEB_2_styles_kpi", () => {
   it.each(["amber", "ok"])("WEB_2_styles_kpi_tone_%s_sets_a_token_background", (tone) => {
     expect(val(["park-kpi", `park-kpi--${tone}`], "background")).toMatch(/var\(--/);
   });
+
+  describe("tone sch (Ledger 'Saved by memory')", () => {
+    const TILE = ["park-kpi", "park-kpi--sch"];
+    const IN = ["park-kpi--sch"];
+
+    it("WEB_2_styles_kpi_sch_tile_is_schSoft_with_a_transparent_1px_border_and_the_usual_box", () => {
+      pin(TILE, "background", "var(--schSoft)");
+      const d = declsFor(rules(), TILE);
+      const border = pick(d, "border");
+      const colour = pick(d, "border-color");
+      expect(
+        border === "1px solid transparent" ||
+          (/^1px solid /.test(border) && colour === "transparent"),
+        `border: ${border} / border-color: ${colour}`,
+      ).toBe(true);
+      pin(TILE, "border-radius", "18px");
+      pin(TILE, "padding", "16px 18px");
+      pin(TILE, "gap", "4px");
+    });
+
+    it("WEB_2_styles_kpi_sch_label_is_sch_13px_800", () => {
+      pin(["park-kpi__label"], "color", "var(--sch)", "", IN);
+      pin(["park-kpi__label"], "font-size", "13px", "", IN);
+      pin(["park-kpi__label"], "font-weight", "800", "", IN);
+    });
+
+    it("WEB_2_styles_kpi_sch_value_is_ink_28px_800_minus_0_6px", () => {
+      pin(["park-kpi__value"], "color", "var(--ink)", "", IN);
+      pin(["park-kpi__value"], "font-size", "28px", "", IN);
+      pin(["park-kpi__value"], "font-weight", "800", "", IN);
+      pin(["park-kpi__value"], "letter-spacing", "-0.6px", "", IN);
+    });
+
+    it("WEB_2_styles_kpi_sch_sub_is_ink2_13px_700", () => {
+      pin(["park-kpi__sub"], "color", "var(--ink2)", "", IN);
+      pin(["park-kpi__sub"], "font-size", "13px", "", IN);
+      pin(["park-kpi__sub"], "font-weight", "700", "", IN);
+    });
+  });
 });
 
 describe("WEB_2_styles_list_row", () => {
@@ -336,6 +470,17 @@ describe("WEB_2_styles_list_row", () => {
     pin(c, "gap", "12px");
     rangeAll(c, "padding", 8, 10);
     pin(c, "border-radius", "16px");
+  });
+
+  it("WEB_2_styles_list_row_trail_is_a_column_with_gap_3_and_the_cost_line_is_12px_700_ink3", () => {
+    // Reference (Skills list rows): a small chip over the cost, 22 + 3 + the 12px line = 41px.
+    pin(["park-row__trail"], "display", "flex");
+    pin(["park-row__trail"], "flex-direction", "column");
+    pin(["park-row__trail"], "gap", "3px");
+    pin(["park-row__cost"], "font-size", "12px");
+    pin(["park-row__cost"], "font-weight", "700");
+    pin(["park-row__cost"], "color", "var(--ink3)");
+    pin(["park-row__cost"], "white-space", "nowrap");
   });
 
   it("WEB_2_styles_list_row_hover_is_rowHover_and_selected_is_rowOn", () => {

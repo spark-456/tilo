@@ -29,6 +29,8 @@ const DEMOS = [
   "button-needs",
   "seg-plain",
   "seg-sliding",
+  "seg-sliding-lg",
+  "seg-sliding-3",
   "switch",
   "chip",
   "pill",
@@ -102,6 +104,10 @@ interface Measured {
   borderW: string;
   borderC: string;
   columns: string;
+  display: string;
+  flexDirection: string;
+  whiteSpace: string;
+  transitionDuration: string;
 }
 
 const measure = (loc: Locator): Promise<Measured> =>
@@ -130,6 +136,10 @@ const measure = (loc: Locator): Promise<Measured> =>
       borderW: s.borderTopWidth,
       borderC: s.borderTopColor,
       columns: s.gridTemplateColumns,
+      display: s.display,
+      flexDirection: s.flexDirection,
+      whiteSpace: s.whiteSpace,
+      transitionDuration: s.transitionDuration,
     };
   });
 
@@ -292,7 +302,8 @@ for (const [vpName, viewport] of Object.entries(SIZES)) {
           const m = await measure(item);
           near(m.h, 32, "segmented item height");
           expect(m.radius).toBe("9px");
-          expect(m.fontSize).toBe("13.5px");
+          expect(m.fontSize, "reference: Ledger 'Entry type'").toBe("13px");
+          expect(m.padding).toBe("0px 11px");
           expect(m.fontWeight).toBe("800");
           const on =
             (await item.getAttribute("aria-checked")) === "true" ||
@@ -309,35 +320,118 @@ for (const [vpName, viewport] of Object.entries(SIZES)) {
         expect(selected).toBe(1);
       });
 
-      test(`WEB_2_e2e_${vpName}_${theme}_sliding_thumb_sits_under_the_selected_item_at_index_times_width_plus_2`, async ({
+      test(`WEB_2_e2e_${vpName}_${theme}_sliding_N4_in_268px_has_items_at_3_68_5_134_199_5_and_no_gaps`, async ({
+        page,
+      }) => {
+        await open(page);
+        const panel = panelOf(page, theme);
+        const demo = demoOf(panel, "seg-sliding");
+        const track = demo.locator(".park-seg");
+        const t = await measure(track);
+        near(t.w, 268, "the demo container is 268px wide and the track fills it", 0.5);
+        expect(t.display).toBe("grid");
+        expect(t.radius).toBe("12px");
+        expect(t.padding).toBe("3px");
+        expect(["normal", "0px"], "no gap").toContain(t.gap);
+        expect(t.bg).toBe(await resolved(panel, "var(--seg)"));
+        const items = track.locator(".park-seg__item");
+        expect(await items.count()).toBe(4);
+        const X = [3, 68.5, 134, 199.5];
+        for (let i = 0; i < 4; i++) {
+          const m = await measure(items.nth(i));
+          near(m.left - t.left, X[i] as number, `item ${i} x`, 0.3);
+          near(m.w, 65.5, `item ${i} width`, 0.3);
+          near(m.h, 32, `item ${i} height`);
+          expect(m.fontSize).toBe("13px");
+          expect(m.fontWeight).toBe("800");
+          expect(m.radius, "no radius: the thumb is the surface").toBe("0px");
+          expect(m.bg, `item ${i} has no background`).toBe("rgba(0, 0, 0, 0)");
+          if (i > 0) {
+            const prev = await measure(items.nth(i - 1));
+            near(m.left - prev.right, 0, `no gap before item ${i}`, 0.3);
+          }
+        }
+      });
+
+      test(`WEB_2_e2e_${vpName}_${theme}_sliding_thumb_and_label_tone_follow_the_selection_Off_ink2_Read_sch_Draft_heroInk_Act_amberInk`, async ({
         page,
       }) => {
         await open(page);
         const panel = panelOf(page, theme);
         const demo = demoOf(panel, "seg-sliding");
         const items = demo.locator(".park-seg__item");
-        const n = await items.count();
-        expect(n).toBeGreaterThanOrEqual(3);
-        for (const i of [0, 1, n - 1]) {
+        const tones = ["var(--ink2)", "var(--sch)", "var(--heroInk)", "var(--amberInk)"];
+        for (let i = 0; i < 4; i++) {
           await items.nth(i).click();
           const thumb = await measure(demo.locator(".park-seg__thumb"));
           const item = await measure(items.nth(i));
-          near(thumb.left, item.left, `thumb left at index ${i}`);
-          near(thumb.w, item.w, `thumb width at index ${i}`);
-          near(thumb.h, 32, "thumb height");
+          near(thumb.left, item.left, `thumb x at index ${i}`, 0.3);
+          near(thumb.w, item.w, `thumb width at index ${i}`, 0.3);
+          near(thumb.h, item.h, `thumb height at index ${i}`, 0.5);
           expect(thumb.bg).toBe(await resolved(panel, "var(--tabOn)"));
           expect(thumb.radius).toBe("9px");
-          expect(item.bg, "the selected item adds no second surface over the thumb").toBe(
-            "rgba(0, 0, 0, 0)",
+          expect(thumb.shadow).toContain("rgba(31, 29, 43, 0.16)");
+          expect(thumb.transitionDuration, "no motion until WEB-3").toBe("0s");
+          expect(item.bg, "the selected item adds no second surface").toBe("rgba(0, 0, 0, 0)");
+          expect(item.color, `selected label ${i}`).toBe(
+            await resolved(panel, tones[i] as string, "color"),
           );
-          expect(item.color).toBe(await resolved(panel, "var(--ink)", "color"));
-          if (i > 0) {
-            const first = await measure(items.nth(0));
-            near(
-              thumb.left - first.left,
-              i * (item.w + 2),
-              `offset at index ${i} is index * (itemWidth + gap)`,
-            );
+          const other = await measure(items.nth((i + 1) % 4));
+          expect(other.color, "an unselected label").toBe(
+            await resolved(panel, "var(--ink2)", "color"),
+          );
+        }
+      });
+
+      test(`WEB_2_e2e_${vpName}_${theme}_sliding_lg_N2_in_220px_is_h34_14px_with_thumb_on_the_item`, async ({
+        page,
+      }) => {
+        await open(page);
+        const panel = panelOf(page, theme);
+        const demo = demoOf(panel, "seg-sliding-lg");
+        const track = demo.locator(".park-seg");
+        const t = await measure(track);
+        near(t.w, 220, "the demo container is 220px wide and the track fills it", 0.5);
+        const items = track.locator(".park-seg__item");
+        expect(await items.count()).toBe(2);
+        for (const [i, x] of [
+          [0, 3],
+          [1, 110],
+        ] as const) {
+          await items.nth(i).click();
+          const m = await measure(items.nth(i));
+          near(m.left - t.left, x, `item ${i} x`, 0.3);
+          near(m.w, 107, `item ${i} width`, 0.3);
+          near(m.h, 34, `item ${i} height`);
+          expect(m.fontSize).toBe("14px");
+          expect(m.fontWeight).toBe("800");
+          const thumb = await measure(demo.locator(".park-seg__thumb"));
+          near(thumb.left, m.left, `thumb x at index ${i}`, 0.3);
+          near(thumb.w, m.w, `thumb width at index ${i}`, 0.3);
+          near(thumb.h, 34, `thumb height at index ${i}`, 0.5);
+        }
+      });
+
+      test(`WEB_2_e2e_${vpName}_${theme}_sliding_thumb_x_equals_item_x_for_every_index_at_N2_N3_N4`, async ({
+        page,
+      }) => {
+        await open(page);
+        const panel = panelOf(page, theme);
+        for (const [id, n] of [
+          ["seg-sliding-lg", 2],
+          ["seg-sliding-3", 3],
+          ["seg-sliding", 4],
+        ] as const) {
+          const demo = demoOf(panel, id);
+          const items = demo.locator(".park-seg__item");
+          expect(await items.count(), id).toBe(n);
+          for (let i = 0; i < n; i++) {
+            await items.nth(i).scrollIntoViewIfNeeded();
+            await items.nth(i).click();
+            const thumb = await measure(demo.locator(".park-seg__thumb"));
+            const item = await measure(items.nth(i));
+            near(thumb.left, item.left, `${id}: thumb x at index ${i} of ${n}`, 0.3);
+            near(thumb.w, item.w, `${id}: thumb width at index ${i} of ${n}`, 0.3);
           }
         }
       });
@@ -370,6 +464,118 @@ for (const [vpName, viewport] of Object.entries(SIZES)) {
           expect(m.fontSize).toBe("13.5px");
           expect(m.fontWeight).toBe("800");
         }
+      });
+
+      test(`WEB_2_e2e_${vpName}_${theme}_status_chip_md_is_24_9_12_and_sm_is_22_8_11_5`, async ({
+        page,
+      }) => {
+        await open(page);
+        const panel = panelOf(page, theme);
+        const md = await measure(demoOf(panel, "chip").locator(".park-chip--ok").first());
+        near(md.h, 24, "chip md height");
+        expect(md.padding).toBe("0px 9px");
+        expect(md.fontSize).toBe("12px");
+        expect(md.radius).toBe("7px");
+        const sm = await measure(demoOf(panel, "list-row").locator(".park-chip--sm").first());
+        near(sm.h, 22, "chip sm height");
+        expect(sm.padding).toBe("0px 8px");
+        expect(sm.fontSize).toBe("11.5px");
+        expect(sm.radius).toBe("7px");
+        expect(sm.fontWeight).toBe("800");
+        expect(sm.display).toBe("flex");
+        expect(sm.whiteSpace).toBe("nowrap");
+      });
+
+      test(`WEB_2_e2e_${vpName}_${theme}_list_row_trail_is_a_chip_over_a_cost_line_41px_tall_with_gap_3`, async ({
+        page,
+      }) => {
+        await open(page);
+        const panel = panelOf(page, theme);
+        const trail = demoOf(panel, "list-row")
+          .locator(".park-row__trail:has(.park-chip--sm)")
+          .first();
+        const m = await measure(trail);
+        expect(m.display).toBe("flex");
+        expect(m.flexDirection).toBe("column");
+        expect(m.gap).toBe("3px");
+        near(m.h, 41, "the trail is 22 + 3 + the 12px cost line", 0.75);
+        const chip = await measure(trail.locator(".park-chip--sm"));
+        const cost = await measure(trail.locator(".park-row__cost"));
+        near(cost.top - chip.bottom, 3, "gap between chip and cost", 0.3);
+        expect(cost.fontSize).toBe("12px");
+        expect(cost.fontWeight).toBe("700");
+        expect(cost.whiteSpace).toBe("nowrap");
+        expect(cost.color).toBe(await resolved(panel, "var(--ink3)", "color"));
+      });
+
+      test(`WEB_2_e2e_${vpName}_${theme}_kpi_tone_sch_matches_the_Ledger_reference`, async ({
+        page,
+      }) => {
+        await open(page);
+        const panel = panelOf(page, theme);
+        const tile = demoOf(panel, "kpi").locator(".park-kpi--sch");
+        await expect(tile).toHaveCount(1);
+        const m = await measure(tile);
+        expect(m.radius).toBe("18px");
+        expect(m.padding).toBe("16px 18px");
+        expect(m.gap).toBe("4px");
+        expect(m.borderW).toBe("1px");
+        expect(m.borderC).toBe("rgba(0, 0, 0, 0)");
+        expect(m.bg).toBe(await resolved(panel, "var(--schSoft)"));
+        const label = await measure(tile.locator(".park-kpi__label"));
+        expect(label.fontSize).toBe("13px");
+        expect(label.fontWeight).toBe("800");
+        expect(label.color).toBe(await resolved(panel, "var(--sch)", "color"));
+        const value = await measure(tile.locator(".park-kpi__value"));
+        expect(value.fontSize).toBe("28px");
+        expect(value.fontWeight).toBe("800");
+        expect(value.letterSpacing).toBe("-0.6px");
+        expect(value.color).toBe(await resolved(panel, "var(--ink)", "color"));
+        const sub = await measure(tile.locator(".park-kpi__sub"));
+        expect(sub.fontSize).toBe("13px");
+        expect(sub.fontWeight).toBe("700");
+        expect(sub.color).toBe(await resolved(panel, "var(--ink2)", "color"));
+        // The values come from tokens.css: day #0E7C79 on rgba(14,124,121,.1), night #5FD0CB on rgba(95,208,203,.14).
+        if (theme === "day") {
+          expect(label.color).toBe("rgb(14, 124, 121)");
+          expect(m.bg).toBe("rgba(14, 124, 121, 0.1)");
+        } else {
+          expect(label.color).toBe("rgb(95, 208, 203)");
+          expect(m.bg).toBe("rgba(95, 208, 203, 0.14)");
+        }
+      });
+
+      test(`WEB_2_e2e_${vpName}_${theme}_icons_are_15px_in_md_buttons_13px_in_sm_and_17px_in_menu_rows`, async ({
+        page,
+      }) => {
+        await open(page);
+        const panel = panelOf(page, theme);
+        const iconButtons = demoOf(panel, "button-secondary").locator("button.park-btn--icon");
+        const n = await iconButtons.count();
+        expect(n).toBeGreaterThanOrEqual(1);
+        let md = 0;
+        for (let i = 0; i < n; i++) {
+          const b = iconButtons.nth(i);
+          const small = ((await b.getAttribute("class")) ?? "").includes("park-btn--sm");
+          if (!small) md++;
+          const box = await b.locator(".park-btn__icon svg").first().boundingBox();
+          const want = small ? 13 : 15;
+          near(box?.width ?? 0, want, `icon button ${i} svg width`, 0.3);
+          near(box?.height ?? 0, want, `icon button ${i} svg height`, 0.3);
+        }
+        expect(md, "an md icon button is on show").toBeGreaterThanOrEqual(1);
+        const rows = demoOf(panel, "menu-static").locator('[role="menuitem"]');
+        const nRows = await rows.count();
+        let withIcon = 0;
+        for (let i = 0; i < nRows; i++) {
+          const svg = rows.nth(i).locator("svg").first();
+          if ((await svg.count()) === 0) continue;
+          withIcon++;
+          const box = await svg.boundingBox();
+          near(box?.width ?? 0, 17, `menu row ${i} icon width`, 0.3);
+          near(box?.height ?? 0, 17, `menu row ${i} icon height`, 0.3);
+        }
+        expect(withIcon, "the menu rows carry icons").toBeGreaterThanOrEqual(3);
       });
 
       test(`WEB_2_e2e_${vpName}_${theme}_kpi_tile_and_value_match_the_README`, async ({ page }) => {
@@ -497,6 +703,9 @@ for (const [vpName, viewport] of Object.entries(SIZES)) {
         // is 4.29:1, under the 4.5:1 AA line for 15px bold text. It is the design's own value, so the
         // primary button is left out of the night scan and raised for the design-critic as a parity exception.
         if (theme === "night") axe = axe.exclude(".park-btn--primary");
+        // The Ledger "Saved by memory" label is --sch (#0E7C79) on --schSoft: 3.86:1 in the day theme, the
+        // reference's own value. design-owned exception: reference value, not changeable. Only this element.
+        if (theme === "day") axe = axe.exclude(".park-kpi--sch .park-kpi__label");
         const results = await axe.analyze();
         const bad = results.violations.filter(
           (v) => v.impact === "serious" || v.impact === "critical",
