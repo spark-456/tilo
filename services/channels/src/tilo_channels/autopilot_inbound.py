@@ -29,8 +29,9 @@ from tilo_channels.drafting import MAX_MESSAGES, ThreadReader, headers_of, messa
 AUTH_HEADER = "authentication-results"  # lower-cased: names are matched without regard to case (`headers_of`)
 CONFIG_PATH = Path(__file__).resolve().parents[4] / "config" / "mail_trust.yaml"
 _AUTHSERV = re.compile(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?")
-_DMARC = re.compile(r"\bdmarc\b")
-_VERDICT = re.compile(r"\bdmarc\s*=\s*([a-z]*)")
+AUTH_CAP = 8_000  # characters; a longer header is not read
+_METHOD = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")  # the method of a resinfo clause (RFC 8601)
+_RESULT = re.compile(r"\s*(?:/\s*[0-9]+\s*)?=\s*([A-Za-z]+)(?=\s|$)")  # "=pass", after the method
 
 
 def trusted_authserv_id() -> str | None:
@@ -46,7 +47,8 @@ def _configured_id(path: Path) -> str | None:
     except (OSError, UnicodeDecodeError, yaml.YAMLError):
         return None
     value = doc.get("gmail_authserv_id") if isinstance(doc, dict) else None
-    value = value.strip().lower() if isinstance(value, str) else ""
+    value = value.strip() if isinstance(value, str) else ""
+    value = value.lower() if value.isascii() else ""  # ASCII only: Unicode lower-casing folds U+212A to "k"
     return value if _AUTHSERV.fullmatch(value) else None
 
 
@@ -63,24 +65,82 @@ def inbound_is_clean(reader: ThreadReader, user_id: str, thread_id: str, in_repl
             return False
         message = found[0]
         text = (message["body"], message["subject"])
-        return all(isinstance(t, str) and inbound_plain(t) and not inbound_signal(t) for t in text) and _dmarc_pass(
-            message, trusted_authserv_id()
+        return (
+            _text_only(message)
+            and all(isinstance(t, str) and inbound_plain(t) and not inbound_signal(t) for t in text)
+            and _dmarc_pass(message, trusted_authserv_id())
         )
     except Exception:  # an unreadable thread or a malformed message: no undo window
         return False
 
 
+def _text_only(message: dict[str, Any]) -> bool:
+    """True only for a message that is one plain-text body: a text/plain part exists (absent text is not empty
+    text), no other body part (HTML, a second text part, an inline image) and no attachment. The reader carries these
+    as `has_text_part`, `has_other_parts` and `attachments`; a message that lacks them is not text-only."""
+    return (
+        message.get("has_text_part") is True
+        and message.get("has_other_parts") is False
+        and message.get("attachments") == []
+    )
+
+
+def _clauses(value: str) -> list[str] | None:
+    """The header split as RFC 8601 does: comments (nested; a backslash quotes the next character) are dropped,
+    quoted strings are kept whole, and ";" splits only outside both. None when a comment or quote is unbalanced."""
+    clauses: list[str] = []
+    current: list[str] = []
+    depth, quoted, i = 0, False, 0
+    while i < len(value):
+        c = value[i]
+        if c == "\\" and (depth or quoted) and i + 1 < len(value):
+            current += [] if depth else [value[i : i + 2]]
+            i += 2
+            continue
+        if depth:
+            depth += (c == "(") - (c == ")")
+        elif quoted:
+            current.append(c)
+            quoted = c != '"'
+        elif c == "(":
+            depth = 1
+            current.append(" ")
+        elif c == ")":
+            return None
+        elif c == ";":
+            clauses.append("".join(current))
+            current = []
+        else:
+            current.append(c)
+            quoted = c == '"'
+        i += 1
+    if depth or quoted:
+        return None
+    return [*clauses, "".join(current)]
+
+
 def _dmarc_pass(message: dict[str, Any], trusted: str | None) -> bool:
     """True when the Authentication-Results header is text written by the trusted server (its authserv-id, the text
-    before the first ";", is `trusted`), with at least one DMARC verdict and every one "pass". No trusted id, another
-    or no id, a `dmarc` token with no verdict, any other verdict, a pass beside a failure, a missing or non-text header
-    (or two keys that differ only by case): False."""
+    before the first top-level ";", is `trusted`, compared as ASCII) and holds at least one top-level `dmarc` clause
+    (a clause whose method is exactly `dmarc`) and every such clause is "pass". Text inside a comment, a quoted
+    string or another method's clause (Gmail copies the envelope sender's local part into its spf clause, and an arc
+    comment) is never a verdict. No trusted id, another or no id, an unbalanced comment or quote, a `dmarc` clause
+    with no result, any other result, a pass beside a failure, no dmarc clause, a missing or non-text header (or two
+    keys that differ only by case): False."""
     value = headers_of(message).get(AUTH_HEADER)
-    if not trusted or not isinstance(value, str):
+    if not trusted or not isinstance(value, str) or len(value) > AUTH_CAP:
         return False
-    server, separator, results = value.partition(";")
-    if not separator or server.strip().lower() != trusted:
+    clauses = _clauses(value)
+    if clauses is None or len(clauses) < 2:
         return False
-    lowered = results.lower()
-    verdicts = _VERDICT.findall(lowered)
-    return bool(verdicts) and set(verdicts) == {"pass"} and len(verdicts) == len(_DMARC.findall(lowered))
+    server = clauses[0].strip()
+    if not server.isascii() or server.lower() != trusted:
+        return False
+    verdicts: list[str] = []
+    for clause in clauses[1:]:
+        clause = clause.strip()
+        method = _METHOD.match(clause)
+        if method and method.group(0).lower() == "dmarc":
+            result = _RESULT.match(clause[method.end() :])
+            verdicts.append(result.group(1).lower() if result else "")
+    return bool(verdicts) and set(verdicts) == {"pass"}

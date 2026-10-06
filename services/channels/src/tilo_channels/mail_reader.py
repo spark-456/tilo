@@ -2,7 +2,8 @@
 
 Those consumers read the thread reader contract (`drafting.ThreadReader`): `thread_id`, and per message `message_id`
 (the Gmail message id, which no sender writes), `thread_id`, `from`, `to`, `cc`, `subject`, `body`, `date` and a
-`headers` map. The connectors' Gmail read speaks its own names (`id`, `body_text`; `message_id` there is the Message-ID
+`headers` map and the body shape (`has_text_part`, `has_other_parts`, `attachments`). The connectors' Gmail read speaks
+its own names (`id`, `body_text`; `message_id` there is the Message-ID
 header), so this maps one to the other. It is read only and pure: it wraps any object with the connectors' two read
 methods (production: an RPC client to tilo-connectors, never `GmailAdapter` in-process, SEC-02), has no send path, and
 holds, logs and copies no mail text. Everything it returns is untrusted data.
@@ -31,6 +32,10 @@ def reader_message(raw: dict[str, Any]) -> dict[str, Any]:
         "body": raw.get("body_text", ""),
         "date": raw.get("date", ""),
         "headers": raw.get("headers", {}),
+        # What the body is made of (absent text is not empty text); a message that lacks these is never "clean"
+        "has_text_part": raw.get("has_text_part"),
+        "has_other_parts": raw.get("has_other_parts"),
+        "attachments": raw.get("attachments"),
     }
 
 

@@ -143,11 +143,12 @@ Returns: `list_threads` / `search_threads` give `{"threads": [{"id", "snippet"}]
 str | None}`; `maxResults` sent is never above `declaration["limits"]["batch_size"]`. `get_thread`
 gives `{"id", "messages": [message]}`. A message is `{"id", "thread_id", "from", "to": [str], "cc":
 [str], "subject", "message_id", "label_ids": [str], "body_text", "attachments": [{"filename",
-"mime_type", "size"}], "headers": {name: str}, "untrusted": True}`: `body_text` is the text/plain part verbatim
+"mime_type", "size"}], "headers": {name: str}, "has_text_part": bool, "has_other_parts": bool, "untrusted": True}`: `body_text` is the text/plain part verbatim
 (data, never stripped or acted on); `message_id` is the RFC 5322 `Message-ID` header. `headers` (BQ-278 n) holds
 only `message-id`, `in-reply-to`, `references` and `authentication-results`, names lower-cased, the first
 occurrence of a repeated name (Gmail writes its own Authentication-Results above any the sender wrote); a name the
-message lacks is absent. `list_labels` gives
+message lacks is absent. `has_text_part` is True when a text/plain part with no filename exists (HTML-only: False, with
+`body_text` ""); `has_other_parts` is True when any other non-multipart part without a filename exists (text/html, a second text/plain). `list_labels` gives
 `[{"id", "name", "type"}]`.
 
 Scopes: each call asks the broker for exactly the declared scopes of the capability it uses (read
