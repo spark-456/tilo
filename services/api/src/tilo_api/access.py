@@ -41,7 +41,10 @@ class AccessStore(Protocol):
     def get(self, user_id: str) -> Declaration | None: ...
 
     def declare(self, user_id: str, declaration: Declaration) -> Declaration:
-        """Atomic, first write wins; returns what is stored (so a second, different call gets the first value)."""
+        """First write wins; returns what is stored (so a second, different call gets the first value). A Firestore
+        store must do this as one transactional create-if-absent (create the document, on AlreadyExists read it
+        back): never read-then-write, never an overwrite, so two concurrent first calls leave exactly one winner and
+        a stored declaration is never changed by a request."""
         ...
 
 
@@ -112,17 +115,29 @@ def _decide(scope: Scope) -> JSONResponse | None:
 
 
 class AccessGate:
-    """Pure ASGI middleware: runs before routing, so before any body is parsed or world looked up."""
+    """Pure ASGI middleware: runs before routing, so before any body is parsed or world looked up. Only `lifespan`
+    passes untouched; a `websocket` scope goes through the same decision and is closed (1008) before it is accepted,
+    so a websocket route, today's or a later one, is never open to a visitor. A scope type this gate does not know
+    is dropped, never passed on."""
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not enforced() or (scope["method"], scope["path"]) in PUBLIC_ROUTES:
+        kind = scope["type"]
+        if kind == "lifespan" or not enforced():
             await self.app(scope, receive, send)
             return
-        refusal = await run_in_threadpool(_decide, scope)
-        if refusal is not None:
-            await refusal(scope, receive, send)
+        if kind == "http" and (scope["method"], scope["path"]) in PUBLIC_ROUTES:
+            await self.app(scope, receive, send)
             return
-        await self.app(scope, receive, send)
+        if kind not in {"http", "websocket"}:
+            return  # fail closed on anything else
+        refusal = await run_in_threadpool(_decide, scope)
+        if refusal is None:
+            await self.app(scope, receive, send)
+        elif kind == "http":
+            await refusal(scope, receive, send)
+        else:
+            await receive()  # the connect message; the connection is refused before it is accepted
+            await send({"type": "websocket.close", "code": 1008})
