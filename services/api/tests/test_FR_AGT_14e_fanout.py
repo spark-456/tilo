@@ -421,3 +421,59 @@ def test_FR_AGT_14e_the_enqueuer_raises_when_the_client_fails_and_not_on_already
     sched.tasks.error = RuntimeError("down")
     with pytest.raises(Exception):  # noqa: B017 - the type is the client's own
         _enqueuer(sched).start(run_start(sched, "sched_a", slot=MON_0330Z + WEEK))
+
+
+# --- the real Cloud Tasks REST client, over a fake session (no network, no credentials) ---------------
+
+
+class FakeSession:
+    """The `requests.Session` shape `CloudTasksRestClient` takes; records each POST and answers `status`."""
+
+    def __init__(self, status: int) -> None:
+        self.status, self.posts = status, []
+
+    def post(self, url: str, *, json: Any = None, timeout: Any = None) -> Any:
+        from types import SimpleNamespace
+
+        self.posts.append((url, json, timeout))
+        return SimpleNamespace(status_code=self.status, text="provider says: token s3cret-value is bad")
+
+
+def _rest_task(sched: SchedApi) -> dict[str, Any]:
+    from _fr_agt_14e_lib import run_start
+
+    due_schedules(sched, "sched_a")
+    _enqueuer(sched).start(run_start(sched, "sched_a"))
+    return sched.tasks.calls[0]
+
+
+def test_FR_AGT_14e_the_rest_client_posts_the_task_to_its_queue_with_a_short_timeout(sched: SchedApi) -> None:
+    from tilo_api import schedules
+
+    task, session = _rest_task(sched), FakeSession(200)
+    assert schedules.CloudTasksRestClient(session=session).enqueue(task) is None
+    ((url, sent, timeout),) = session.posts
+    assert url == f"https://cloudtasks.googleapis.com/v2/{QUEUE}/tasks" and sent == {"task": task}
+    assert timeout == schedules.TASKS_TIMEOUT_S == 10.0
+
+
+def test_FR_AGT_14e_the_rest_client_maps_409_to_already_exists_and_raises_on_anything_else(
+    sched: SchedApi, caplog: pytest.LogCaptureFixture
+) -> None:
+    from tilo_api import schedules
+
+    task = _rest_task(sched)
+    assert isinstance(schedules.CloudTasksRestClient(session=FakeSession(409)).enqueue(task), schedules.AlreadyExists)
+    for status in (400, 403, 404, 429, 500, 503):
+        with pytest.raises(Exception) as raised:  # noqa: PT011 - the type is the client's own
+            schedules.CloudTasksRestClient(session=FakeSession(status)).enqueue(task)
+        assert str(status) in str(raised.value)
+        for leaked in ("s3cret", "provider says", task["httpRequest"]["body"]):
+            assert leaked not in str(raised.value) and leaked not in caplog.text
+
+
+def test_FR_AGT_14e_the_default_tasks_client_factory_builds_nothing_until_it_is_called() -> None:
+    from tilo_api import schedules
+
+    factory = schedules.get_tasks_client_factory()  # no credentials lookup here: that is after a caller's token
+    assert callable(factory)

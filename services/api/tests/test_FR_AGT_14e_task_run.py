@@ -603,7 +603,7 @@ def test_FR_AGT_14e_a_run_that_is_still_working_at_the_in_request_deadline_answe
     elapsed = time.monotonic() - started
     assert response.status_code == 200 and response.json() == {"ran": 1, "state": "timeout"}, response.text
     assert 0.25 <= elapsed < 30, elapsed  # it waited for the deadline, not for the run
-    assert rig.rf.runner.entered.is_set()
+    assert rig.rf.runner.entered.wait(timeout=10)  # the run thread was only slower than the 0.3 s deadline to get here
     world_id = only_world(rig, source)
     assert not rig.events(world_id, "world.completed") and not rig.events(world_id, "approval.requested")
     rig.rf.runner.release.set()  # the unit finishes: the run (its own thread) carries on to its gate
@@ -727,7 +727,8 @@ def test_FR_AGT_14e_a_prior_world_that_is_not_the_owners_own_is_never_recorded(r
     rig.store.worlds["w_theirs"] = deps.WorldRecord(owner="u_other", districts={}, run_id="r_theirs")
     response = rig.task_call(task_body("sched_a", MON_0330Z, prior_world_id=prior))
     assert response.status_code == 200 and response.json()["ran"] == 1, response.text
-    assert rig.store.worlds[only_world(rig, source)].prior_world_id is None
+    (world_id,) = rig.worlds_besides(source.world_id, "w_theirs")
+    assert rig.store.worlds[world_id].prior_world_id is None
 
 
 # --- BQ-AGT14-5 R2: the collapsed-missed-slots alert is raised by the delivery --------------------------

@@ -32,7 +32,6 @@ from _fr_agt_14_lib import (
     GOOGLE_ISSUER,
     MON_0330Z,
     SCHEDULE_SA,
-    TASKS_SA,
     TICK,
     WEEK,
     SchedApi,
@@ -113,7 +112,8 @@ def test_FR_AGT_14_the_tick_does_not_need_or_use_a_principal(sched: SchedApi) ->
 
 WRONG_CALLERS = [
     ("gmail scheduler", {"email": GMAIL_SA}),
-    ("tasks invoker", {"email": TASKS_SA}),
+    # the Tasks identity is a second, body-carrying caller of this route since FR-AGT-14e; that it can never fan out
+    # is pinned in test_FR_AGT_14e_task_run.py (test_FR_AGT_14e_the_tasks_identity_can_never_fan_out)
     ("tilo-api itself", {"email": API_SA}),
     ("same account name, another project", {"email": "tilo-schedule-scheduler@other-project.iam.gserviceaccount.com"}),
     ("a person", {"email": "someone@example.com"}),
