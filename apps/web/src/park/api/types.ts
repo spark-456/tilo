@@ -66,6 +66,10 @@ export interface DecisionFacts {
   approvedNote?: string;
   /** The activity line recorded once it is taken. */
   activity: string;
+  /** The label of the button that takes it while it waits (a page falls back to "Approve" plus the amount). */
+  approveLabel?: string;
+  /** The label and value rows of the detail panel on the activity line recorded once it is taken. */
+  details?: [label: string, value: string][];
 }
 
 export type TierName = "Village" | "Town" | "City";

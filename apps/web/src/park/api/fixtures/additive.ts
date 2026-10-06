@@ -15,12 +15,23 @@ export const decisionFacts: Record<DecisionKey, DecisionFacts> = {
     decided: "Laptop Depot approved today",
     approvedNote: "Approved · £3,420 · K1 electric scooter",
     activity: "You approved £3,420 for Laptop Depot",
+    details: [
+      ["Your limit", "No limit"],
+      ["Asked by", "Builder agent"],
+      ["Waited", "1 h 10 min"],
+    ],
   },
   mail: {
     project: "K1 electric scooter",
     subject: "Supplier brief",
     approver: "Alex Morgan",
     activity: "Sent the supplier brief to 3 battery suppliers",
+    approveLabel: "Send brief",
+    details: [
+      ["Recipients", "3 battery suppliers"],
+      ["Signed with", "Your approval"],
+      ["Waited", "1 h 20 min"],
+    ],
   },
 };
 
