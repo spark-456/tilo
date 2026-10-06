@@ -66,3 +66,17 @@ def manifest_validator() -> jsonschema.protocols.Validator:
         schema["properties"][field].pop("uniqueItems", None)
     cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
     return cls(schema, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
+def calendar_entry_validator() -> (
+    jsonschema.protocols.Validator
+):  # the JSON Schema, not the generated models (they drop if/then)
+    schema = _load_json(_CONTRACTS_DIR / "calendar_entry.schema.json")
+    return jsonschema.Draft202012Validator(schema, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
+def agenda_item_validator() -> jsonschema.protocols.Validator:  # calendar_entry.schema.json#/$defs/agenda_item
+    ref = {"$ref": "https://contracts.tilo.example/calendar_entry.schema.json#/$defs/agenda_item"}
+    return jsonschema.Draft202012Validator(ref, registry=_registry())

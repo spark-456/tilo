@@ -1460,6 +1460,7 @@ dependencies = [
     { name = "tilo-archive" },
     { name = "tilo-contracts" },
     { name = "tilo-policy" },
+    { name = "tzdata" },
     { name = "uvicorn" },
 ]
 
@@ -1473,6 +1474,7 @@ requires-dist = [
     { name = "tilo-archive", editable = "packages/archive" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tzdata", specifier = ">=2024.1" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 
