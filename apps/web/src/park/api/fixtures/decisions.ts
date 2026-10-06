@@ -11,6 +11,8 @@ export const decisions: Decision[] = [
     yes: "Approve £3,420",
     icon: "coin",
     done: "Approved · just now",
+    toast: "Approved £3,420 for Laptop Depot",
+    approvedTitle: "You approved Laptop Depot",
   },
   {
     k: "mail",
@@ -20,5 +22,7 @@ export const decisions: Decision[] = [
     yes: "Send brief",
     icon: "mail",
     done: "Sent to 3 suppliers · just now",
+    toast: "Supplier brief sent to 3 suppliers",
+    approvedTitle: "You sent the supplier brief",
   },
 ];

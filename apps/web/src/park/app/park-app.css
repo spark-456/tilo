@@ -1,4 +1,4 @@
-/* The Park app shell (WEB-3a): the root surface, the page column and the shared focus ring.
+/* The Park app shell (WEB-3a): the root surface, the page title and the shared focus ring.
    Every selector sits under [data-park]; colours come from tokens/park.css. No motion. */
 [data-park] {
   box-sizing: border-box;
@@ -6,13 +6,6 @@
   background: var(--paper);
   color: var(--ink);
   font-family: "Nunito Sans", sans-serif;
-}
-
-[data-park] .park-app__main {
-  box-sizing: border-box;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px 16px;
 }
 
 [data-park] .park-app__title {

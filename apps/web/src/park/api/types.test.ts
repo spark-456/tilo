@@ -85,6 +85,9 @@ describe("WEB_1a_types: entity shapes follow the README data model", () => {
       yes: string;
       icon: string;
       done: string;
+      // additive designed copy (WEB-3b): the shell reads the toast and the approved title from the Api
+      toast: string;
+      approvedTitle: string;
     }>();
   });
 
