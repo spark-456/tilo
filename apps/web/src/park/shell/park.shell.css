@@ -1,0 +1,598 @@
+/* Park City shell (WEB-3b): the city backdrop, the top nav, the notifications popover, the account menu,
+   the sample-data chip, the world loader, the boot splash and the page column. Every number is measured on
+   the reference (design_handoff_tilo_web_app/design/Tilo App.dc.html inline styles); colours come from the
+   tokens. Every selector sits under [data-park]. STATIC: no motion of any kind here; it returns with the
+   motion restore (BQ-WEB-3), which brings its own honesty-scan entry. Glass blur is on the nav only
+   (README "Performance"). */
+
+/* Laid out but not shown: the shell under the boot splash, and the ghost that holds the chip's place.
+   Hidden elements are not painted, so nothing here can count as a layout shift when it appears. */
+[data-park] .park-shell__booting {
+  visibility: hidden;
+}
+
+/* ---- Page column ---- */
+[data-park] .park-shell__main {
+  position: relative;
+  z-index: 1;
+}
+/* README: content column max-width 1320, padding 100px 24px 56px (the top clears the fixed nav). */
+[data-park] .park-shell__page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 100px 24px 56px;
+}
+[data-park] .park-shell__column {
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+/* ---- City backdrop: fixed, full-bleed, behind everything, never clickable ---- */
+[data-park] .park-shell__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--ground);
+}
+[data-park] .park-shell__scene {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1600px;
+  height: 1000px;
+  margin: -500px 0 0 -800px;
+  transform-origin: 50% 50%;
+}
+/* --veil dims the city on every page but Home (the opacity is set inline). */
+[data-park] .park-shell__veil {
+  position: absolute;
+  inset: 0;
+  background: var(--veil);
+}
+
+/* ---- Top nav ---- */
+[data-park] .park-shell__nav {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  top: 14px;
+  height: 62px;
+  z-index: 30;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--gBd);
+  border-radius: 22px;
+  background: var(--gBg);
+  -webkit-backdrop-filter: var(--gFx);
+  backdrop-filter: var(--gFx);
+  box-shadow: var(--sh);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+[data-park] .park-shell__nav button {
+  font-family: inherit;
+}
+[data-park] .park-shell__logo {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  color: var(--logo);
+  text-decoration: none;
+}
+[data-park] .park-shell__logomark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: var(--hero);
+}
+[data-park] .park-shell__visor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 22px;
+  height: 12px;
+  border-radius: 5px;
+  background: #ffffff;
+}
+[data-park] .park-shell__eye {
+  width: 3px;
+  height: 3px;
+  border-radius: 9px;
+  background: #1f1d2b;
+}
+[data-park] .park-shell__wordmark {
+  color: var(--logo);
+  font-family: "Nunito", sans-serif;
+  font-size: 27px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+}
+/* The six tabs scroll sideways inside the nav when they do not fit. */
+[data-park] .park-shell__tabs {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+[data-park] .park-shell__tab {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+}
+[data-park] .park-shell__tab:hover {
+  background: var(--chip);
+}
+[data-park] .park-shell__tab--on,
+[data-park] .park-shell__tab--on:hover {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+/* The amber badge: #F0A500 with #1F1D2B in both themes (README "Hard-coded on purpose"). */
+[data-park] .park-shell__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: #f0a500;
+  color: #1f1d2b;
+  font-size: 12px;
+  font-weight: 900;
+}
+[data-park] .park-shell__tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+[data-park] .park-shell__iconbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+[data-park] .park-shell__iconbtn:hover,
+[data-park] .park-shell__iconbtn--on {
+  background: var(--chip);
+}
+[data-park] .park-shell__bell {
+  position: relative;
+}
+[data-park] .park-shell__unread {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: #f0a500;
+  box-shadow: 0 0 0 2px var(--pop);
+}
+[data-park] .park-shell__avatar {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  margin-left: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: 0 0 0 2px var(--pop), 0 0 0 3.5px var(--line);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+[data-park] .park-shell__avatar--ring {
+  box-shadow: 0 0 0 2px var(--pop), 0 0 0 4px var(--hero);
+}
+/* The 3px progress bar on the nav's bottom edge, 22px in from each side (set inline: opacity, width). */
+[data-park] .park-shell__bar {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 99px;
+  overflow: hidden;
+}
+[data-park] .park-shell__barfill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--hero);
+}
+
+/* Focus ring (README "Interactions and motion"): 3px #5A3FE0, offset 2px. */
+[data-park] .park-shell__nav button:focus-visible,
+[data-park] .park-shell__nav a:focus-visible,
+[data-park] .park-shell__nrow:focus-visible,
+[data-park] .park-shell__settings:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+
+/* ---- Sample data chip: the label at normal widths, only the dot when the nav is tight ---- */
+[data-park] .park-shell__sample {
+  display: flex;
+  align-items: center;
+  margin: 0 6px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+[data-park] .park-shell__sampledot {
+  display: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--amber);
+}
+[data-park] .park-shell__samplebox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+}
+[data-park] .park-shell__samplenote {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+@media (max-width: 560px) {
+  [data-park] .park-shell__sample {
+    margin: 0;
+  }
+  [data-park] .park-shell__sampledot {
+    display: block;
+  }
+  /* Visually hidden, still the button's name. */
+  [data-park] .park-shell__samplelabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* ---- Notifications popover (392 wide, right 60 as measured) ---- */
+[data-park] .park-popover.park-shell__notif {
+  right: 60px;
+}
+@media (max-width: 450px) {
+  /* The reference keeps right 60 and runs off the left edge here; the popover stays on screen. */
+  [data-park] .park-popover.park-shell__notif {
+    right: 16px;
+  }
+}
+[data-park] .park-shell__pophead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 6px;
+}
+[data-park] .park-shell__poptitle {
+  font-size: 16px;
+  font-weight: 800;
+}
+[data-park] .park-shell__settings {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--heroInk);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+[data-park] .park-shell__nrow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+[data-park] .park-shell__nrow:hover {
+  background: var(--rowHover);
+}
+[data-park] .park-shell__ntile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+}
+[data-park] .park-shell__ntile--needs {
+  background: var(--amberTile);
+  color: var(--amberInk);
+}
+[data-park] .park-shell__ntile--done {
+  background: var(--okSoft);
+  color: var(--ok);
+}
+[data-park] .park-shell__ntile--warn {
+  background: var(--redSoft);
+  color: var(--red);
+}
+[data-park] .park-shell__ntext {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+[data-park] .park-shell__ntitle {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+[data-park] .park-shell__nsub {
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-park] .park-shell__ntime {
+  align-self: flex-start;
+  padding-top: 2px;
+  color: var(--ink3);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* ---- Account menu header (the rows are the Menu component's) ---- */
+[data-park] .park-shell__who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 12px;
+}
+[data-park] .park-shell__whoav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #e6e1f8;
+  color: #1f1d2b;
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-shell__whotext {
+  min-width: 0;
+  line-height: 1.3;
+}
+[data-park] .park-shell__whoname {
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-shell__whomail {
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-park] .park-shell__whoorg {
+  color: var(--ink3);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+[data-park] .park-shell__rule {
+  height: 1px;
+  margin: 0 6px 4px;
+  background: var(--line2);
+}
+
+/* ---- World loader: the card inside the scrim (the scrim is the ModalScrim component) ---- */
+[data-park] .park-shell__card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-sizing: border-box;
+  width: 400px;
+  max-width: calc(100vw - 48px);
+  padding: 22px 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--pop);
+  box-shadow: var(--shPop);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+[data-park] .park-shell__cardhead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+[data-park] .park-shell__cardtext {
+  min-width: 0;
+  line-height: 1.3;
+}
+[data-park] .park-shell__eyebrow {
+  color: var(--ink3);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+}
+[data-park] .park-shell__cardname {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+[data-park] .park-shell__cardmeta {
+  color: var(--ink2);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+[data-park] .park-shell__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-shell__step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-shell__step--on {
+  color: var(--ink);
+}
+[data-park] .park-shell__mark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 99px;
+  background: transparent;
+  color: #ffffff;
+}
+[data-park] .park-shell__mark--done {
+  background: var(--ok);
+}
+[data-park] .park-shell__mark--next {
+  background: var(--track);
+}
+/* The current step's ring: it does not spin here (the reference spins it, BQ-WEB-3). */
+[data-park] .park-shell__ring {
+  display: block;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 2.5px solid var(--track);
+  border-top-color: var(--hero);
+  border-radius: 99px;
+}
+[data-park] .park-shell__lbar {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-shell__lfill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--hero);
+}
+
+/* ---- Boot splash ---- */
+[data-park] .park-shell__boot {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  background: var(--paper);
+  font-family: "Nunito Sans", sans-serif;
+}
+[data-park] .park-shell__bootlogo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+[data-park] .park-shell__bootmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: var(--hero);
+}
+[data-park] .park-shell__bootvisor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 36px;
+  height: 20px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+[data-park] .park-shell__bootdot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9px;
+  background: #1f1d2b;
+}
+[data-park] .park-shell__bootword {
+  color: var(--logo);
+  font-family: "Nunito", sans-serif;
+  font-size: 48px;
+  font-weight: 900;
+  letter-spacing: -1.2px;
+}
+[data-park] .park-shell__bootstate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+[data-park] .park-shell__boottrack {
+  width: 200px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-shell__bootfill {
+  width: 42%;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--hero);
+}
+[data-park] .park-shell__boottext {
+  color: var(--ink2);
+  font-size: 14.5px;
+  font-weight: 700;
+}
