@@ -26,3 +26,12 @@ output "cost_alert_policy" {
     metric_name  = google_logging_metric.cost_alert.name
   }
 }
+
+output "eval_nightly_alert_policy" {
+  description = "EFF-05c alert on failed nightly eval executions (kept apart from alert_policies, which pins the three NFR-23 keys)."
+  value = {
+    display_name    = google_monitoring_alert_policy.eval_nightly_failed.display_name
+    threshold_value = google_monitoring_alert_policy.eval_nightly_failed.conditions[0].condition_threshold[0].threshold_value
+    filter          = google_monitoring_alert_policy.eval_nightly_failed.conditions[0].condition_threshold[0].filter
+  }
+}

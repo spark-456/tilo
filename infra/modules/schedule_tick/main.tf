@@ -2,16 +2,15 @@
 # (FR-AGT-14, PRD 6.3 "Cloud Scheduler: start schedules").
 #
 #   Cloud Scheduler (every minute, OIDC as tilo-schedule-scheduler)
-#     --> POST <target>/internal/schedules/tick on tilo-harness
+#     --> POST <target>/internal/schedules/tick on tilo-api
 #
 # ONE job for every user schedule, not one per user (quotas, IAM sprawl): the
 # tick reads the due schedules from the store. The route takes no body and no
 # query, and checks its caller itself (infra/ACCESS.md, route requirements).
 #
-# The service account is created by the caller (so the target service's
-# invoker binding can name it without a dependency cycle). It holds
-# run.invoker on the target only, through the service module's
-# extra_invokers, and no project-level role.
+# The service account is created by the caller. It holds no IAM binding at
+# all: the target (tilo-api) is public and its route verifies the OIDC caller
+# itself, so a run.invoker binding would protect nothing (FR-AGT-14, ADR-0023).
 
 resource "google_cloud_scheduler_job" "tick" {
   project          = var.project_id

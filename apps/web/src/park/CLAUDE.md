@@ -14,6 +14,14 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
   `design_handoff_tilo_web_app/design/tilo-app.js` in a vm and compares.
 - `tokens/park.css`: handoff `tokens.css` scoped to `[data-park]`, night on `[data-time="night"]`,
   values verbatim (`biome-ignore format`), no motion. `tokens/ramp.ts` is the README type ramp.
+- `components/` (WEB-2): the README "Core components", named exports from `index.ts`, all styled by
+  `park.components.css` (BEM `park-btn park-btn--primary park-btn--md`). CSS rules: every selector
+  `[data-park] .class...`, literal values, `var(--token)` colours, no `transition`/`animation`; the
+  marker `motion: restored in WEB-3 (BQ-WEB-3)` sits where the design moves (thumb, knob). A control
+  that is a button is a real `<button type="button">`; `Toast` has no timer (`TOAST_MS` only);
+  `Popover`/`Menu` share `Panel.tsx` (Escape on the document, backdrop, focus back to the opener).
+- `dev/Components.tsx`: `/dev/components` (dev build, lazy route in `screens/routes.tsx`), a day and a
+  night `data-park` panel with every component; one filled primary button per panel (UX-1).
 
 ## Local rules
 - Import nothing from `screens/`, `world/`, `stage/`; only the shared `src/api` seam may be reused.

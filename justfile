@@ -24,6 +24,12 @@ dev-api:
 e2e-cp2:
     node apps/web/scripts/e2e-cp2.mjs
 
+# Park pixel-parity harness (WEB-PARITY, dev/test only, local): design reference vs our /park pages, report in
+# apps/web/parity-report/. `just parity team` or `just parity team,profile` (default: all pages). Own ports
+# TILO_PARITY_PORT (5395) and TILO_PARITY_REF_PORT (5396). Reports diffs; never fails on one.
+parity pages="":
+    node apps/web/scripts/parity.mjs {{pages}}
+
 # Whole-stack system test (tests/system): starts the real tilo-api (dev mode, fake providers) and the other
 # services as processes and drives them over HTTP; about 3 minutes, port 8080. Docs: docs/system-test.md.
 system-test:
@@ -81,6 +87,12 @@ lint:
 typecheck:
     uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src packages/memory/src services/render/src services/channels/src services/browser/src packages/people/src
     pnpm -r exec tsc --noEmit
+
+# Validate the dev Terraform without a backend or credentials (EFF-05c). Downloads providers, changes nothing in the cloud.
+# Run it before the apply (docs/deploy-dev.md); needs the terraform binary on PATH.
+tf-validate:
+    terraform -chdir=infra/envs/dev init -backend=false -input=false
+    terraform -chdir=infra/envs/dev validate
 
 # Start the Firestore emulator and run the harness skeleton against it (P0-09).
 harness-skeleton:
