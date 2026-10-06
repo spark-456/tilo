@@ -222,13 +222,21 @@ class Run:
             return
         data, card_id, authz = part["data"], part["card_id"], part["authz"]
         requested = self.requested.get(card_id)
+        shared = part["type"] == "approval.requested"  # FR-HIL-12: the owner shared a gate; a pause stops it like any
+        summary = (
+            "The gate was shared with an Approver."
+            if shared
+            else f"The gate card was answered: {data.get('option', 'default')}."
+        )
         try:
             committed = self.put(
                 part["type"], authz["ref"] if authz else "system", data.get("gate_id", self.world_id),
-                f"The gate card was answered: {data.get('option', 'default')}.", data, district=part["district"],
+                summary, data, district=part["district"],
                 cause=requested and requested["id"], authz=authz, vis=part["vis"], severity=part.get("severity"),
-                check_pause=False, event_id=part["event_id"],  # one id per resolution: a retry is an identical resend
+                check_pause=shared, event_id=part["event_id"],  # one id per resolution: a retry is an identical resend
             )  # fmt: skip
+            if shared:
+                self.requested[card_id] = committed
         except AlreadyCommitted as exc:
             # The card resolves under the committed event (its authz opens the gate), never a second one.
             if part["type"] == "approval.resolved":
