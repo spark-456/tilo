@@ -49,6 +49,7 @@ from typing import Any, Protocol
 from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.prompts import load_prompt
 
+from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
 from tilo_harness.must_ask import Ask, MustAsk
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
@@ -100,6 +101,7 @@ class RunResult:
     skipped: list[str] = field(default_factory=list)
     parked: list[str] = field(default_factory=list)  # waiting for a person's answer (FR-AGT-05)
     held: list[str] = field(default_factory=list)  # answered, and the answer leaves the unit unrun (FR-HIL-10)
+    reused: list[str] = field(default_factory=list)  # taken from the parent run's checkpoint, not run (FR-MEM-11)
 
     @property
     def failed(self) -> list[str]:
@@ -398,6 +400,14 @@ class _Run:
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         return outcome
 
+    def reuse(self, unit: dict[str, Any], checkpoint: Checkpoint) -> UnitOutcome:
+        """A unit taken from the checkpoint: one `memory.hit` and nothing else (HR-1: no event, no animation)."""
+        finished, worker = checkpoint.units[unit["id"]], self.roster.workers[unit["id"]]
+        data = {"origin_cost": finished.origin_cost, "lookup_cost": 0, "saved": finished.origin_cost}
+        summary, district = hit_summary(finished.origin_cost), unit["district"]
+        self.emit("memory.hit", worker, worker, summary, data, district=district, cause=finished.handoff_event_id)
+        return UnitOutcome(success=True, artifact_refs=finished.artifact_refs)
+
     async def keep(
         self, unit: dict[str, Any], worker: str, outcome: UnitOutcome, trail: list[dict[str, Any]]
     ) -> tuple[UnitOutcome, list[Kept]]:
@@ -459,10 +469,17 @@ async def run_plan(
     archive: Any = None,
     redact: Callable[[str], str] | None = None,
     before_handoff: BeforeHandoff | None = None,
+    reuse: Checkpoint | None = None,
 ) -> RunResult:
     """`artifacts` (a `tilo_memory.artifacts.ArtifactStore`) comes with the run's `scope`, which must be the writer's
     org and world, and the shared secret `redact`or the store also got; `archive` (`tilo_archive.RunArchive`) is the
-    run's raw archive, for manifests. The writer then also says what its world recorded (`recorded_version`)."""
+    run's raw archive, for manifests. The writer then also says what its world recorded (`recorded_version`).
+
+    With `reuse` (FR-MEM-11) this run is a branch of the checkpoint's parent run (its run id must differ, else
+    `ValueError` before any write): a finished, unchanged unit whose dependencies are all reused is not run but
+    recorded as one `memory.hit`, a success with the parent's refs, before its dependents start (see `branch`)."""
+    if reuse is not None and getattr(writer, "run_id", None) == reuse.parent_run_id:
+        raise ValueError("run_plan: a branch needs its own run id, not the parent run's")
     if artifacts is not None:
         if scope is None or redact is None or not callable(getattr(writer, "recorded_version", None)):
             raise PlanRefused(["run_plan: an artifact store needs the scope, the redactor and the world's record"])
@@ -504,8 +521,16 @@ async def run_plan(
     slots = asyncio.Semaphore(config.limits.max_specialists)
     loop = asyncio.get_running_loop()
     finished: dict[str, asyncio.Future[bool]] = {unit["id"]: loop.create_future() for unit in order}
+    if reuse is not None:
+        reused = set(reusable_units(reuse, order, getattr(writer, "recorded_version", None)))
+        for unit in (u for u in order if u["id"] in reused):
+            result.outcomes[unit["id"]] = run.reuse(unit, reuse)
+            result.reused.append(unit["id"])
+            finished[unit["id"]].set_result(True)
 
     async def unit_task(unit: dict[str, Any]) -> None:
+        if unit["id"] in result.reused:
+            return
         dependencies_ok = [await finished[dep] for dep in unit["depends_on"]]
         if not all(dependencies_ok):
             result.skipped.append(unit["id"])
