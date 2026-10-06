@@ -275,6 +275,7 @@ def test_PPL_11c_s3_PE_17_everyone_but_an_org_owner_gets_the_one_404_on_every_di
     rig = _org_owner_rig(people_rig)
     rig.add("persons", pl.person(id="u_elsewhere", org_id=OTHER_ORG, email="e@example.org"))
     before = rig.snapshot()
+    rig.require_route(R_ROLE)
     seen = []
     for actor in (PRIYA, DEV, SAM, "u_ghost"):
         rig.as_user(actor)
@@ -378,6 +379,7 @@ def test_PPL_11c_s3_PE_17_roles_are_only_ever_promoted_and_a_member_cannot_promo
 )  # fmt: skip
 def test_PPL_11c_s3_PE_19_a_role_body_is_one_closed_field(people_rig, body):
     rig = _org_owner_rig(people_rig)
+    rig.require_route(R_ROLE)
     before = rig.snapshot()
     assert rig.client.post(path_of(R_ROLE, person_id=PRIYA), json=body).status_code == 422
     assert rig.snapshot() == before
