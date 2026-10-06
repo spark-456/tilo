@@ -114,6 +114,7 @@
 # providers.schema.json 1.1.0 sha256:ece7537b584e69f8
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
+# spend_caps.schema.json 1.0.0 sha256:b062c55a144c3719
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
@@ -2392,6 +2393,44 @@ class SkillEmbeddedSchema(BaseModel):
         extra="allow",
     )
     type: Literal["object"]
+
+
+class SpendCapsConfig(BaseModel):
+    """
+    config/spend_caps.yaml: the live-model spend caps and the per-uid rate limit (SEC-16, PRD supplement 4; FR-MTR-04, PRD 14.1, 17.3), read by tilo-api's spend loader. Money is an integer in INR minor units (paise, 1 INR = 100): never a float, a bool or a string. Every key is required and no other key is allowed; only org_day_minor may be null (ADR-0002 decision 13). The schema checks each value alone. Two rules it cannot express: a whole float such as 1000.0 is the same JSON number as 1000, so the loader also requires a YAML integer; and the shipped file keeps run_minor <= uid_lifetime_minor <= global_day_hard_minor. These caps sit beside config/metering.yaml (credits and US dollars) and replace none of it (ADR-0002 decision 16).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    currency: Literal["INR"]
+    """
+    The currency of every amount here: INR only (SEC-16). Another currency needs its own decision.
+    """
+    uid_lifetime_minor: Annotated[int, Field(ge=1)]
+    """
+    Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16: 1,000 INR).
+    """
+    run_minor: Annotated[int, Field(ge=1)]
+    """
+    Live-model spend per run, in paise, above zero and never null (PRD 14.1, FR-MTR-04).
+    """
+    org_day_minor: Annotated[int | None, Field(ge=1)]
+    """
+    Live-model spend per org per UTC day, in paise, above zero, or null for no separate per-org cap (as BQ-42 decided for credits); the key is required even when null.
+    """
+    global_day_hard_minor: Annotated[int, Field(ge=1)]
+    """
+    The whole deployment's live-model spend per UTC day, in paise, above zero and never null; reaching it switches the link to replay-only (NFR-24, PRD 17.3).
+    """
+    rate_limit_requests: Annotated[int, Field(ge=1)]
+    """
+    Requests one uid may make within one sliding window (SEC-16), above zero.
+    """
+    rate_limit_window_s: Annotated[int, Field(ge=1)]
+    """
+    The length of the per-uid rate-limit window in seconds, above zero.
+    """
 
 
 class TeamLeadAssignment(BaseModel):

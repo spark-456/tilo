@@ -1,0 +1,9 @@
+{
+  "currency": "INR",
+  "uid_lifetime_minor": 777,
+  "run_minor": 500,
+  "org_day_minor": 9999,
+  "global_day_hard_minor": 200000,
+  "rate_limit_requests": 30,
+  "rate_limit_window_s": 60
+}
