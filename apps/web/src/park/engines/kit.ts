@@ -153,8 +153,12 @@ export function createKit(h: H, deps: KitDeps) {
       TP.building(spec as string | Spec, st, dist, ht, night),
     );
   const world = (planId: string, dec?: Dec, night?: boolean): El => {
-    const key = planId === "k1" ? `k1${dec?.depot ? 1 : 0}${dec?.mail ? 1 : 0}` : planId;
-    return ck(`w|${key}|${!!night}`, () => {
+    // The key is the plan and the decisions that are on (sorted), so each decision state is its own picture.
+    const on = Object.keys(dec ?? {})
+      .filter((k) => dec?.[k as keyof Dec])
+      .sort()
+      .join("+");
+    return ck(`w|${planId}|${on}|${!!night}`, () => {
       const plan: Plan | undefined = deps.plans(dec)[planId];
       if (!plan) throw new Error(`createKit: no plan with id "${planId}"`);
       return TP.world(plan, { night });

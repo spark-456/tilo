@@ -444,7 +444,7 @@ describe("WEB_1c_memo_parity: the memoisation behaves as the prototype's, call f
     (k) => k.world("k1", {}, false), // 12 new
     (k) => k.world("k1", undefined, false), // 13 = 12
     (k) => k.world("hires", { depot: true }, false), // 14
-    (k) => k.world("hires", undefined, false), // 15 = 14 (only k1 reads the decisions)
+    (k) => k.world("hires", { depot: true, mail: false }, false), // 15 = 14 (same decision flags)
     (k) => k.world("hires", { mail: true }, true), // 16 new (night)
     (k) => k.art({ single: ["library", "active", "research"] }, 150, false), // 17 = 6
     (k) =>

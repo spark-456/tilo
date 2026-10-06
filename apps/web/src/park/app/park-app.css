@@ -1,0 +1,41 @@
+/* The Park app shell (WEB-3a): the root surface, the page title and the shared focus ring.
+   Every selector sits under [data-park]; colours come from tokens/park.css. No motion. */
+[data-park] {
+  box-sizing: border-box;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+}
+
+[data-park] .park-app__title {
+  margin: 0;
+  font-family: "Nunito", sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+[data-park] .park-app__title:focus {
+  outline: none;
+}
+
+[data-park] .park-app__note {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+
+/* Focus ring (README "Interactions and motion"): 3px #5A3FE0, offset 2px. */
+[data-park] a:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+
+[data-park] .park-app__link {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--heroInk);
+}
