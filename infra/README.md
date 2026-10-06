@@ -127,10 +127,16 @@ Expect **3 to add, 0 to change, 0 to destroy**: the service account
 `tilo-schedule-tick` (every minute, UTC, OIDC, `retry_count` 1), which POSTs
 `/internal/schedules/tick` on tilo-api, and the Firestore composite index
 `schedules` (`enabled`, `next_due`) that the due query needs. The route answers
-503 until you set `TILO_SCHEDULE_TICK_AUDIENCE` (the api URL),
-`TILO_SCHEDULE_TICK_CALLER` (`tilo-schedule-scheduler@<project>.iam.gserviceaccount.com`),
-`TILO_SCHEDULES_STORE=firestore` and `TILO_FIRESTORE_PROJECT` on tilo-api (ADR-0023);
-until then the job fires into a 503. Also deploy `firestore.rules`, which denies every
+503 until you set `TILO_SCHEDULE_TICK_AUDIENCE`, `TILO_SCHEDULE_TICK_CALLER`
+(`tilo-schedule-scheduler@<project>.iam.gserviceaccount.com`),
+`TILO_SCHEDULES_STORE=firestore` and `TILO_FIRESTORE_PROJECT` on tilo-api (ADR-0023) AND
+production wires the api store and run seams (`deps.get_store`, the artifact store,
+redactor and run archive: today they answer 503 when deployed), so setting the variables
+alone does not make the tick work; until then the job fires into a 503. Copy the audience
+from `terraform output schedule_tick` (the `audience` field) instead of retyping the api
+URL: Cloud Run has two URL forms and a mismatch is a silent 401. Deploy the rules BEFORE
+setting `TILO_SCHEDULES_STORE=firestore`:
+`pnpm exec firebase deploy --only firestore:rules --project <project>`; they deny every
 client the `schedules` collection. Terraform only: the user applies it.
 
 ## Destroy

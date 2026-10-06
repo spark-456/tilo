@@ -1,9 +1,21 @@
 ---
 name: schedule-tick-fr-agt-14
-description: FR-AGT-14 scheduled runs: r1 FAIL (6c49214), r2 PASS flagged (a7ba44d); 14b store/routes/starter/tilo-api tick r1 FAIL on licence rule only (27dd27e); open list for PR 2 (infra) and erasure
+description: FR-AGT-14 scheduled runs: r1 FAIL (6c49214), r2 PASS flagged (a7ba44d); 14b r1 FAIL licence only (27dd27e); 14c infra retarget to api r1 PASS flagged (952324e2); open code list gates the user's env vars
 metadata:
   type: project
 ---
+
+**14c infra retarget r1 (2026-10-06, 952324e2, branch feat/FR-AGT-14c-infra-retarget) PASS flagged.** Tick job -> public tilo-api, SA holds NO IAM
+(precedent: channels allUsers, ACCESS.md "no /internal route may rely on ingress or IAM"), composite index (COLLECTION scope is right: store uses a plain
+`orgs/org_tilo/schedules` collection query, not collection_group), deny-all firestore.rules. terraform test 55 pass, tests/repo 286 pass, 3 adds vs origin/main.
+Facts verified: Scheduler stamps `audience` verbatim (route compares byte-exact, user must copy `terraform output schedule_tick` audience; Cloud Run has two
+URL forms, not verifiable offline); egress needs nothing new (subnet private_ip_google_access, system default route kept, no firewall/NAT/DNS zone), but
+a cert-fetch failure is a SILENT 401 (schedules.py `except Exception` logs nothing); certs fetched per request, no cache, `requests` default timeout 120 s
+on the 40-thread sync pool; tick still resolves `store`+`run_seams` before the token (3 anonymous 401 = 3 seam builds, probe_tick.py); deployed api
+`deps.get_store` raises 503 so setting the 4 env vars alone does NOT make the tick work (docs say it does); emulator writes its own firebase.json
+(`"firestore": {}`) so repo rules never touch tests; deploy is `--only hosting`, so firestore.rules is deployed by nobody (needs
+`firebase deploy --only firestore:rules`, firebaserules.admin is user-side). Builder edited worktree files uncommitted during review (comments only).
+Gate for the user before setting TILO_SCHEDULE_TICK_*/TILO_SCHEDULES_STORE: deploy rules, short cert timeout+cache+log, seams after auth.
 
 **14b r1 (2026-10-06, 27dd27e, branch feat/FR-AGT-14b-schedule-store-routes) FAIL, one blocker, security-flagged** (new public route
 `POST /internal/schedules/tick` on tilo-api in PUBLIC_ROUTES + SEC-15 pin; ADR-0023 live Firestore door amends ADR-0003).

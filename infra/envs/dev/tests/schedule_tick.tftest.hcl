@@ -63,7 +63,7 @@ run "FR_AGT_14_one_every_minute_job_posts_the_tick_route_as_the_schedule_schedul
 
   # audience and uri come from the Cloud Run service URI, which is unknown at plan time under mock_provider (a
   # condition on it is skipped as "Unknown condition value", skipping the invoker runs below). Their equality (the
-  # audience is the harness base URL, the uri is that plus the tick path) is pinned statically in
+  # audience is the api base URL, the uri is that plus the tick path) is pinned statically in
   # tests/repo/test_FR_AGT_14_schedule_tick_terraform.py.
 }
 

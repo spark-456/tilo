@@ -2,23 +2,24 @@
 
 Design (docs/open-questions.md will carry the BQ): ONE Cloud Scheduler job, not one per user schedule.
 `tilo-schedule-tick`
-runs every minute (the Scheduler floor) and POSTs `/internal/schedules/tick` on tilo-harness with an OIDC token for a
+runs every minute (the Scheduler floor) and POSTs `/internal/schedules/tick` on tilo-api (retargeted from harness in
+FR-AGT-14c: the run lives in tilo-api) with an OIDC token for a
 new
-service account `tilo-schedule-scheduler`, which holds `run.invoker` on harness only and no other IAM. The tick reads
+service account `tilo-schedule-scheduler`, which holds no IAM at all (api is public and checks the token itself).
+The tick reads
 due
 schedules from the store.
 
 Static checks (no terraform binary, no network, no credentials, nothing is planned or applied), in the style of
 test_NFR_27_cost_alert_terraform.py. The planned IAM is pinned by `infra/envs/dev/tests/schedule_tick.tftest.hcl` and by
-the deliberate change to the harness invoker list in `cloud_run.tftest.hcl`.
+the harness invoker list in `cloud_run.tftest.hcl`, back to three accounts.
 
   * exactly one `google_service_account` with account_id `tilo-schedule-scheduler`;
   * exactly one `google_cloud_scheduler_job` named `tilo-schedule-tick`: no for_each or count (one job, not one per
     user),
     `* * * * *`, POST, OIDC (not OAuth), path `/internal/schedules/tick` with no query and no body, `retry_count = 1`;
-  * that service account appears in no project-level IAM resource, and in the Cloud Run `extra_invokers` map exactly
-    once,
-    for the harness service;
+  * that service account appears in no project-level IAM resource and in no Cloud Run `extra_invokers` entry (the
+    target, tilo-api, is public and checks the token itself);
   * infra/ACCESS.md names the account, the job and the route.
 
 Ambiguity resolved (the brief fixes `UTC`; the gmail jobs write `Etc/UTC`): either spelling of UTC is accepted.
@@ -116,7 +117,7 @@ def test_FR_AGT_14_the_job_authenticates_as_the_schedule_scheduler_and_for_the_h
     assert sa and not re.search(r"gmail|tasks_invoker|tasks-invoker", sa.group(1)), (
         "FR-AGT-14: the job must not borrow the Gmail scheduler or the Cloud Tasks identity"
     )
-    assert re.search(r"audience\s*=", oidc.group(1)), "FR-AGT-14: set the OIDC audience to the harness URL"
+    assert re.search(r"audience\s*=", oidc.group(1)), "FR-AGT-14: set the OIDC audience to the target URL"
     audience = re.search(r"audience\s*=\s*(\S+)", oidc.group(1)).group(1)
     uri = re.search(r"\buri\s*=\s*\"(.+)\"", body)
     assert uri and uri.group(1).startswith(f"${{{audience}}}"), (

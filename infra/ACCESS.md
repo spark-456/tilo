@@ -93,9 +93,11 @@ Dependencies (none of these routes exist yet):
 - `tilo-api`: `POST /internal/schedules/tick` (FR-AGT-14b, `tilo_api.schedules`; the
   run lives in tilo-api). It accepts `tilo-schedule-scheduler` only; see the route
   requirements below. It answers 503 until the user sets
-  `TILO_SCHEDULE_TICK_AUDIENCE`, `TILO_SCHEDULE_TICK_CALLER`,
-  `TILO_SCHEDULES_STORE=firestore` and `TILO_FIRESTORE_PROJECT` on tilo-api, and the
-  job fires into that 503 until then. The earlier harness route stays unused.
+  `TILO_SCHEDULE_TICK_AUDIENCE` (copy the `audience` field of `terraform output
+  schedule_tick`), `TILO_SCHEDULE_TICK_CALLER`, `TILO_SCHEDULES_STORE=firestore` and
+  `TILO_FIRESTORE_PROJECT` on tilo-api AND production wires the api store and run
+  seams (they answer 503 when deployed today); the job fires into that 503 until
+  then. The earlier harness route stays unused (to be removed in a later ticket).
 
 ## 4. Storage ownership (PRD 13.2, FR-INT-02)
 
