@@ -6,6 +6,7 @@ import type {
   AgendaSlot,
   ApiResult,
   Connector,
+  ConnectorTerms,
   Dec,
   DecideAck,
   Decision,
@@ -14,9 +15,11 @@ import type {
   Ledger,
   Notification,
   Plan,
+  ProfileSettings,
   Skill,
   StartAck,
   Team,
+  TeamPolicy,
   TierKey,
   Today,
   User,
@@ -38,6 +41,9 @@ export const API_METHODS = [
   "getTeam",
   "getConnectors",
   "getNotifications",
+  "getTeamPolicy",
+  "getConnectorTerms",
+  "getProfileSettings",
   "decide",
   "undo",
   "startWorld",
@@ -62,6 +68,9 @@ export interface Api {
   getTeam(): R<Team>;
   getConnectors(): R<Connector[]>;
   getNotifications(): R<Notification[]>;
+  getTeamPolicy(): R<TeamPolicy>;
+  getConnectorTerms(): R<ConnectorTerms>;
+  getProfileSettings(): R<ProfileSettings>;
   decide(key: DecisionKey): R<DecideAck>;
   undo(key: DecisionKey): R<DecideAck>;
   startWorld(mode: TierKey, query: string): R<StartAck>;

@@ -16,6 +16,7 @@ import re
 import pytest
 from _clint1_lib import seam
 from _ppl11a_lib import (
+    ATTEST,
     DEV,
     OWNER,
     PEOPLE_ROUTES,
@@ -62,7 +63,7 @@ def _valid_request(route) -> dict:
     if route in (R_CONFIRM_ITEM, R_CONFIRM_MEETING):
         return {"json": {}}
     if route == R_CREATE_MEETING:
-        return {"json": {"title": "Weekly sync", "source": "upload"}}
+        return {"json": {"title": "Weekly sync", "source": "upload", **ATTEST}}
     if route == R_CREATE_PERSON:
         return {"json": _NEW_PERSON}
     if route == R_CREATE_ITEM:
@@ -92,7 +93,16 @@ def test_PPL_11a_SEC_15_the_people_routes_exist_and_none_of_them_is_public(peopl
     assert (
         access.PUBLIC_ROUTES
         == PINNED_PUBLIC_ROUTES
-        == frozenset({("GET", "/health"), ("GET", "/healthz"), ("GET", "/access"), ("POST", "/access/declaration")})
+        == frozenset(
+            {
+                ("GET", "/health"),
+                ("GET", "/healthz"),
+                ("GET", "/access"),
+                ("POST", "/access/declaration"),
+                # FR-AGT-14b: the Scheduler tick checks its own OIDC caller; the owner approved this one route (6 Oct).
+                ("POST", "/internal/schedules/tick"),
+            }
+        )
     ), "a people route is never public (a new public route is the owner's decision)"
 
 
