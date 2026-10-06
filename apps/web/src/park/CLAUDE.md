@@ -32,8 +32,11 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 - `pages/Home/` (WEB-4): panels float over the shell's city (no `<main>`, no h1 but the greeting); a failed or
   unbuilt read shows "Not connected yet"; composer copy is page-local (`homeData.ts`); `Home.css` overrides the sliding SegmentedControl.
 
+## Shell (WEB-3b, `shell/`)
+- `AppShell` (named export, `children` only) holds the nav, popovers, one `<main>`, toast, loader, boot (`park.shell.css`: no motion, blur on the nav only); ParkApp owns `[data-park]`.
+- The city is STATIC (motion and its honesty-scan entry: BQ-WEB-3): `scene.ts` caches a scene per `time|motion` at module level, with the 3 pin points for `app.pins`.
+- `usePageApp()` is what pages get: `go('world')` runs the loader first (`store.openWorld`); `useApp().go` stays immediate.
+
 ## Local rules
-- Import nothing from `screens/`, `world/`, `stage/`; only the shared `src/api` and `src/router` seams may be reused.
-- No `window` globals, no clock or random or network in `api/`, no model ids, no design runtime port.
-- Ambient motion arrives in WEB-3 with its own honesty-scan entry (BQ-WEB-3); none here.
+- Import nothing from `screens/`, `world/`, `stage/` (only the shared `src/api`, `src/router` seams). No `window` globals, no model ids, no design runtime port.
 - `engines/kit.ts`: `createKit` builds a fresh cache per call; hold one kit per document (a provider), or world and building memoisation is lost.

@@ -86,7 +86,7 @@ describe("WEB_3a_shell: the page gets the app prop", () => {
       time: "day",
       night: false,
       motion: "lively",
-      pins: [],
+      pins: expect.any(Array), // WEB-3b: the pins come from the city backdrop
       ready: true,
     });
     expect(app().vw).toBeGreaterThan(0);
@@ -101,7 +101,13 @@ describe("WEB_3a_shell: the page gets the app prop", () => {
 
   it("WEB_3a_shell_go_changes_the_url_and_the_page", async () => {
     const m = await visit("/park/home");
+    // WEB-3b: a world always opens through the loader; the page swaps at its third 340 ms step.
+    vi.useFakeTimers();
     await act(async () => app().go("world", { id: "k1" }));
+    expect(window.location.pathname).toBe("/park/home");
+    await act(async () => {
+      vi.advanceTimersByTime(340 * 3);
+    });
     await settle();
     expect(window.location.pathname).toBe("/park/world/k1");
     expect(m.container.querySelector('[data-testid="probe-world"]')).not.toBeNull();

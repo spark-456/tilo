@@ -87,20 +87,29 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 
     test(`WEB_3a_e2e_${name}_the_design_fonts_are_declared_on_park_pages`, async ({ page }) => {
       await page.goto("/park/home");
-      const faces = await page.evaluate(() =>
-        [...document.fonts].map((f) => `${f.family.replace(/"/g, "")} ${f.weight}`),
-      );
+      // The faces are declared by the lazy park chunk's CSS: wait for the page, then poll the list.
+      await expect(page.getByRole("main")).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       // The design: Nunito 800 and 900 (display, logo) and Nunito Sans 400, 600, 700 and 800 (all UI text).
-      for (const face of [
+      const wanted = [
         "Nunito 800",
         "Nunito 900",
         "Nunito Sans 400",
         "Nunito Sans 600",
         "Nunito Sans 700",
         "Nunito Sans 800",
-      ]) {
-        expect(faces, face).toContain(face);
-      }
+      ];
+      await expect
+        .poll(
+          async () => {
+            const faces = await page.evaluate(() =>
+              [...document.fonts].map((f) => `${f.family.replace(/"/g, "")} ${f.weight}`),
+            );
+            return wanted.filter((face) => !faces.includes(face));
+          },
+          { message: "design faces still missing" },
+        )
+        .toEqual([]);
     });
 
     test(`WEB_3a_e2e_${name}_a_world_route_shows_its_id`, async ({ page }) => {
@@ -121,7 +130,10 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       await page.goto("/park/nope");
       await expect(page.getByTestId("park-not-found")).toBeVisible();
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Page not found");
-      await expect(page.getByRole("link", { name: /home/i })).toHaveAttribute("href", "/park/home");
+      // WEB-3b: the nav has two more Home links, so the not-found page's own link is found inside it.
+      await expect(
+        page.getByTestId("park-not-found").getByRole("link", { name: /home/i }),
+      ).toHaveAttribute("href", "/park/home");
       await expect(page.locator('[data-testid^="park-page-"]')).toHaveCount(0);
       await expect(page).toHaveTitle("Page not found · Tilo");
       expect(problems).toEqual([]);
@@ -170,7 +182,8 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     }) => {
       await page.goto("/park/nope");
       const link = page.getByTestId("park-not-found").getByRole("link");
-      for (let i = 0; i < 4; i++) {
+      // WEB-3b: the nav comes first in the tab order (logo, six tabs, chip, three buttons), then the page.
+      for (let i = 0; i < 20; i++) {
         await page.keyboard.press("Tab");
         if (await link.evaluate((el) => el === document.activeElement)) break;
       }
@@ -194,9 +207,16 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       for (const path of [...ROUTES.map((r) => r[0]), "/park/nope"]) {
         await page.goto(path);
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-        const results = await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-          .analyze();
+        const axe = new AxeBuilder({ page }).withTags([
+          "wcag2a",
+          "wcag2aa",
+          "wcag21aa",
+          "wcag22aa",
+        ]);
+        // Design-owned exception (plan 8c): the reference's own invalid-email state dims the Team page's
+        // Invite button to opacity .6 over --hero (2.89:1). Excluded on /park/team only, for that button only.
+        if (path === "/park/team") axe.exclude(".park-team-invite");
+        const results = await axe.analyze();
         const bad = results.violations.filter(
           (v) => v.impact === "serious" || v.impact === "critical",
         );
