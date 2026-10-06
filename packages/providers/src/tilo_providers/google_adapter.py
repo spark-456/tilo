@@ -23,7 +23,16 @@ from typing import Any
 from tilo_contracts import ProvidersProfile
 
 from tilo_providers.errors import ProviderError, SafetyError, map_http_status, map_transport_error
-from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
+from tilo_providers.interfaces import (
+    Capability,
+    GenerateRequest,
+    GenerateResponse,
+    ModelProvider,
+    PriceQuote,
+    cached_tokens_or_none,
+)
+
+_NO_FIELD = object()
 
 
 def _genai_module(name: str) -> Any:
@@ -203,6 +212,12 @@ class GoogleModelProvider(ModelProvider):
                 "output_tokens": (usage_metadata.candidates_token_count or 0) + thoughts,
                 "total_tokens": usage_metadata.total_token_count or 0,
             }
+            # EFF-04: the API leaves a zero cached count out, so present usage with a None count is a reported 0.
+            # An object with no such field at all (not the SDK's model) reports nothing: unknown.
+            cached = getattr(usage_metadata, "cached_content_token_count", _NO_FIELD)
+            cached = cached_tokens_or_none(0 if cached is None else cached, usage["input_tokens"])
+            if cached is not None:
+                usage["cached_tokens"] = cached
 
         return GenerateResponse(text=response.text, profile_id=self._profile_id, tool_calls=tool_calls, usage=usage)
 
