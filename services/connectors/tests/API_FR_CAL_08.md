@@ -41,7 +41,11 @@ commit is in. Nothing here opens a socket, calls a model, or reads `LIVE`.
 
 ```python
 class CalendarConfigError(ValueError): ...  # message at most 500 characters, names the key, never a value
+
+
 class CalendarSyncRefused(ValueError): ...  # register(): bad ids or a second, different connection
+
+
 class SyncTokenExpired(AdapterError):  # Google answered 410 to a request that carried a sync token
     status = 410
 ```
@@ -222,8 +226,16 @@ over 31 days, and returns one `calendar_entry#/$defs/agenda_item` per entry with
 `e.start >= start`; sorted by `(start, end, source.id)`:
 
 ```python
-{"start": e["start"], "end": e["end"], "all_day": e["all_day"], "title": e["title"], "kind": "event",
- "source": {"kind": "calendar_entry", "id": e["id"]}, "state": "confirmed", "shared": False}
+{
+    "start": e["start"],
+    "end": e["end"],
+    "all_day": e["all_day"],
+    "title": e["title"],
+    "kind": "event",
+    "source": {"kind": "calendar_entry", "id": e["id"]},
+    "state": "confirmed",
+    "shared": False,
+}
 ```
 
 It takes no provider, calls nothing but `store.entries`, and is the only render seam this ticket adds. The caller
@@ -245,6 +257,7 @@ class WorkingWindow:
     end: datetime.time  # exclusive; start < end
 
     def contains(self, now: str, time_zone: str) -> bool: ...
+
     # start <= parse_ts(now).astimezone(ZoneInfo(time_zone)).time() < end; a zone ZoneInfo cannot load raises
 
 
@@ -282,9 +295,16 @@ class Screen(Protocol):  # a tilo_providers SafetyProvider fits: check(text) -> 
 
 
 class EventSource(Protocol):  # CalendarAdapter.list_events
-    def list_events(self, user_id: str, *, page_size: int, sync_token: str | None = None,
-                    time_min: str | None = None, time_max: str | None = None,
-                    page_token: str | None = None) -> EventPage: ...
+    def list_events(
+        self,
+        user_id: str,
+        *,
+        page_size: int,
+        sync_token: str | None = None,
+        time_min: str | None = None,
+        time_max: str | None = None,
+        page_token: str | None = None,
+    ) -> EventPage: ...
 
 
 @dataclass(frozen=True)
