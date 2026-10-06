@@ -130,6 +130,7 @@ class Run:
         self.director = "system"
         self.requested: dict[str, dict] = {}  # card_id -> approval.requested
         self.resolved: dict[str, dict] = {}  # card_id -> approval.resolved
+        self.reraised: dict[str, str] = {}  # a share's new card id -> the gate card it re-raised (FR-HIL-12)
         self.sends: dict[str, dict[str, Any]] = {}  # outbox_id -> what its data.transfer needs
         self.titles: dict[str, str] = {}  # artifact_id -> the delivering unit's title
         self.delivered: list[str] = []  # artifact.delivered event ids
@@ -241,7 +242,7 @@ class Run:
                 check_pause=shared, event_id=part["event_id"],  # one id per resolution: a retry is an identical resend
             )  # fmt: skip
             if shared:
-                self.requested[card_id] = committed
+                self.requested[card_id], self.reraised[card_id] = committed, part["reraised_from"]
         except AlreadyCommitted as exc:
             # The card resolves under the committed event (its authz opens the gate), never a second one.
             if part["type"] == "approval.resolved":
@@ -425,11 +426,11 @@ class Run:
         self.requested[card_id] = requested
         if self.cards.submit(card, outbox_id=outbox_id, district=district).outcome != "accepted":
             raise _GateFailed("the gate card was refused")
-        while (card_id := self._answered_card(gate["id"])) is None:  # a person's approve on any card of this gate
+        while (answered := self._answered_card(card_id)) is None:  # a person's approve on any card of this gate
             if self.paused():
                 raise RunStopped
             await asyncio.sleep(_POLL_S)
-        resolved, requested = self.resolved[card_id], self.requested[card_id]  # the answered card's own proposal
+        resolved, requested = self.resolved[answered], self.requested[answered]  # the answered card's own proposal
         outbox_id = requested["data"]["outbox_id"]  # a share re-raised the gate under a fresh reservation (FR-HIL-12)
         if self.paused():
             raise RunStopped
@@ -457,12 +458,10 @@ class Run:
         data = {"artifact": item, "format": format_, "outbox_id": outbox_id if format_ == "email" else None}
         self._deliver(unit, worker, item, data, transfer["id"])
 
-    def _answered_card(self, gate_id: str) -> str | None:
-        """The card of this gate (the original or a re-raise) with a committed answer: a gate is one wait."""
-        return next(
-            (c for c in list(self.resolved) if self.requested.get(c, {}).get("data", {}).get("gate_id") == gate_id),
-            None,
-        )
+    def _answered_card(self, card_id: str) -> str | None:
+        """The card of this gate (`card_id` or a re-raise of it) with a committed answer: a gate is one wait."""
+        ours = {card_id, *(c for c, origin in list(self.reraised.items()) if origin == card_id)}
+        return next((c for c in list(self.resolved) if c in ours), None)
 
     def _deliver(self, unit: dict, worker: str, item: dict, data: dict, cause: str) -> None:
         delivered = self.put(
