@@ -1674,7 +1674,7 @@ def _canary_records(c):
         "own_item": ("work_item", t.own_item(title=f"t-{c}", due_text=f"d-{c}"), {}),
         "entry": ("calendar_entry", entry, {}),
         "shared": ("calendar_entry", pl.calendar_entry(title=f"t-{c}", share={"team": "tm_sales"}), {}),
-        "meeting": ("meeting", t.meeting(title=f"t-{c}", attendees=[{"name": f"n-{c}", "user": "u_riya"}]), {}),
+        "meeting": ("meeting", t.meeting(title=f"t-{c}", attendees=[{"name": f"nm-{c}", "user": "u_riya"}]), {}),
         "person": ("person", riya, {}),
     }, riya
 
@@ -1710,7 +1710,7 @@ def test_PPL_10a_PE_20_property_no_allowed_read_exposes_a_field_outside_its_view
         f"a-{c}",
         f"{c}@example.com",
         f"g{c}",
-        f"n-{c}",
+        f"nm-{c}",
         "Europe/Paris",
         "preferred_channel",
     ):
