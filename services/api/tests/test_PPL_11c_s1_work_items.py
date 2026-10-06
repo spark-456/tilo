@@ -363,7 +363,9 @@ def test_PPL_11c_s1_PE_19_eight_racing_done_calls_leave_exactly_one_done_entry(p
 
 
 @pytest.mark.parametrize("action", list(WI_ACTIONS))
-def test_PPL_11c_s1_SEC_09_a_write_reads_no_whole_org_directory_and_at_most_two_person_records(people_rig, action):
+def test_PPL_11c_s1_BQ_PPL11C_12_a_write_reads_no_whole_org_directory_and_at_most_two_person_records(
+    people_rig, action
+):
     """No per-write listing of every person of the org (PPL-11a follow-up #464): the actor's own record is read by id,
     and a person other than the actor at most once more."""
     rig = work_rig(people_rig)
@@ -511,7 +513,7 @@ def test_PPL_11c_s1_PE_07_any_sequence_of_actions_keeps_the_stamps_the_history_a
         assert after["source"] == original["source"], "source.ref never changes"
 
 
-def test_PPL_11c_s1_PR_09_the_edit_body_is_copied_never_mass_assigned(people_rig):
+def test_PPL_11c_s1_PE_19_the_edit_body_is_copied_never_mass_assigned(people_rig):
     """Sending the whole stored record back as an edit is a 422 and changes nothing."""
     rig = work_rig(people_rig)
     before = rig.snapshot()
