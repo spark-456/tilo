@@ -3,7 +3,7 @@
 // here it is a still ring (motion arrives with WEB-3b, BQ-WEB-3) and the label says the state.
 import type { Connector } from "../../api/types";
 import { icon } from "./icons";
-import { LEVEL_LABEL, type Merged, syncLine, usedLine } from "./view";
+import { LEVEL_LABEL, type Merged, bannerText, syncLine, usedLine } from "./view";
 
 export function Spin({ onRed }: { onRed?: boolean }) {
   return (
@@ -15,21 +15,21 @@ export function Spin({ onRed }: { onRed?: boolean }) {
 }
 
 export function AttentionBanner({
+  c,
   waiting,
   onReconnect,
-}: { waiting: boolean; onReconnect: () => void }) {
+}: { c: Connector; waiting: boolean; onReconnect: () => void }) {
+  const { title, sub } = bannerText(c);
   return (
     <div className="park-connectors-banner">
       <span className="park-connectors-banner-icon">{icon("plug", 18)}</span>
       <div className="park-connectors-banner-text">
-        <div className="park-connectors-banner-title">HubSpot sign-in expires in 3 days</div>
-        <div className="park-connectors-banner-sub">
-          Scan competitor prices reads contacts from it. Reconnect to keep it running.
-        </div>
+        <div className="park-connectors-banner-title">{title}</div>
+        <div className="park-connectors-banner-sub">{sub}</div>
       </div>
       <button type="button" className="park-connectors-reconnect" onClick={onReconnect}>
         {waiting ? <Spin onRed /> : null}
-        {waiting ? "Waiting for HubSpot" : "Reconnect"}
+        {waiting ? `Waiting for ${c.name}` : "Reconnect"}
       </button>
     </div>
   );

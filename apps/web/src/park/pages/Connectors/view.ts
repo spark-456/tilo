@@ -45,6 +45,17 @@ export const syncLine = (c: Connector): string =>
 export const usedLine = (c: Connector): string =>
   c.used?.length ? `Used by ${c.used.length}` : "Not used yet";
 
+/** The attention banner's two lines, built from the connector record (its sync text, first skill and scope). */
+export function bannerText(c: Connector): { title: string; sub: string } {
+  const sync = c.sync ?? "";
+  const skill = c.used?.[0];
+  const scope = c.scopes?.[0]?.[0].replace(/^Read /, "");
+  return {
+    title: `${c.name} ${sync.charAt(0).toLowerCase()}${sync.slice(1)}`,
+    sub: `${skill && scope ? `${skill} reads ${scope} from it. ` : ""}Reconnect to keep it running.`,
+  };
+}
+
 export const drawerSync = (c: Connector): string =>
   c.st === "attention"
     ? `${c.sync ?? ""}. Reconnect to keep agents working.`

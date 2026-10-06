@@ -95,7 +95,7 @@ export function ConnectorsPage({ app }: { app: AppCtx }) {
   const all = merge(load.connectors, over);
   const on = all.filter((c) => isOn(c) && matches(c, q));
   const avail = all.filter((c) => !isOn(c) && matches(c, q));
-  const attn = all.find((c) => c.id === "hubspot")?.st === "attention";
+  const attn = all.find((c) => c.st === "attention");
   const cur = all.find((c) => c.id === open);
   const nOn = `${on.length} connected`;
   const skillIds = new Map(load.skills.map((s) => [s.name, s.id]));
@@ -110,13 +110,13 @@ export function ConnectorsPage({ app }: { app: AppCtx }) {
       app.toast(`${c.name} connected with Read access`);
     });
   };
-  const reconnect = () => {
+  const reconnect = (c: Connector) => {
     if (reconnecting) return;
     setReconnecting(true);
     void Promise.resolve().then(() => {
       setReconnecting(false);
-      setOver((o) => ({ ...o, st: { ...o.st, hubspot: "connected" } }));
-      app.toast("HubSpot reconnected for 90 days");
+      setOver((o) => ({ ...o, st: { ...o.st, [c.id]: "connected" } }));
+      app.toast(`${c.name} reconnected for 90 days`);
     });
   };
 
@@ -135,7 +135,9 @@ export function ConnectorsPage({ app }: { app: AppCtx }) {
         </div>
       </Heading>
 
-      {attn ? <AttentionBanner waiting={reconnecting} onReconnect={reconnect} /> : null}
+      {attn ? (
+        <AttentionBanner c={attn} waiting={reconnecting} onReconnect={() => reconnect(attn)} />
+      ) : null}
 
       <section className="park-connectors-section" aria-label="Connected">
         <div className="park-connectors-sechead">
