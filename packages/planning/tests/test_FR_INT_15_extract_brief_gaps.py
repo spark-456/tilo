@@ -5,9 +5,11 @@ and offers alternatives. A hard refusal is only for safety or policy (FR-INT-12)
 The Director (scripted, EFF-01) names the parts of a task Tilo cannot do as `out_of_scope: [{category, part}]` in its
 existing brief call. The CODE then decides, in the order `API_FR_INT_15.md` pins: a refusal id anywhere refuses the
 whole task with FR-INT-12's text (hostile cases H1-H3); an unknown id, a near-miss, a malformed item or more than 3
-gaps fails closed with no repair and no cut (H4-H7); the label is cleaned (H8); no deliverable plus a gap is
-`NothingPossible`, never a refusal (H11); a shared id between the two configs is a `GapConfigError` before any
-Director call (H14). Text the person reads comes only from config. H-numbers are the doc's hostile-case table.
+gaps fails closed on ONE call with no repair and no cut (H4-H7: the response schema leaves `out_of_scope`
+unconstrained, so every shape and length check is the code's, and no router repair can drop a refusal id); the
+label is cleaned (H8); no deliverable plus a gap is `NothingPossible`, never a refusal (H11); a shared id between
+the two configs is a `GapConfigError` before any Director call (H14). Text the person reads comes only from
+config. H-numbers are the doc's hostile-case table.
 """
 
 from __future__ import annotations
@@ -73,19 +75,6 @@ def fails(reply, exc_type, *, task=TASK, **kwargs):
     with pytest.raises(exc_type) as raised:
         brief().extract_brief(task, router=make_router(director), **kwargs)
     return raised.value, director
-
-
-def max_schema_calls() -> int:
-    """The most Director calls a schema-rejected reply may cost: PL-03 gives each candidate of the `director` role in
-    config/models.yaml one call and one repair, then moves to the next (call, repair, escalate, repair), so the bound
-    is two per configured candidate, read from the same config `make_router` uses. A third repair or a retry loop
-    would exceed it."""
-    from tilo_providers.config import load_providers_config  # noqa: PLC0415
-
-    config = load_providers_config(REPO_ROOT / "config" / "models.yaml", REPO_ROOT / "config" / "prices.yaml")
-    role = config.roles["director"]
-    candidates = list(role.cascade or dict.fromkeys(p for p in (role.primary, role.fallback) if p))
-    return 2 * len(candidates)
 
 
 def texts():
@@ -360,7 +349,8 @@ def test_FR_INT_15_H6_the_cap_counts_gaps_after_de_duplication():
 def test_FR_INT_15_H7_out_of_scope_that_is_not_a_list_never_yields_a_brief(value):
     exc, director = fails(gap_reply(value), brief().BriefExtractionError)
 
-    assert not isinstance(exc, refusal().TaskRefused) and len(director.calls) <= max_schema_calls()
+    assert not isinstance(exc, (refusal().TaskRefused, gaps().NothingPossible))
+    assert len(director.calls) == 1, "the code decides: no router repair, no escalation"
 
 
 @pytest.mark.parametrize(
@@ -386,19 +376,7 @@ def test_FR_INT_15_H7_a_malformed_item_never_yields_a_brief_or_a_gap(item):
     exc, director = fails(gap_reply([item]), brief().BriefExtractionError)
 
     assert not isinstance(exc, (refusal().TaskRefused, gaps().NothingPossible))
-    assert 1 <= len(director.calls) <= max_schema_calls()
-
-
-def test_FR_INT_15_H7_a_schema_rejected_reply_costs_at_most_one_repair_per_candidate_and_never_a_loop():
-    """The shape of the guarantee: whatever the router does on a schema failure, it is one call and one repair per
-    configured candidate of the director role. More calls than that would be a retry loop or an extra repair."""
-    bound = max_schema_calls()
-    assert bound >= 2
-
-    for reply in (gap_reply({"category": "money_movement", "part": "x"}), gap_reply([{"category": "money_movement"}])):
-        _, director = fails(reply, brief().BriefExtractionError)
-
-        assert 1 <= len(director.calls) <= bound
+    assert len(director.calls) == 1, "the code decides: no router repair, no escalation"
 
 
 def test_FR_INT_15_H7_a_good_gap_beside_a_malformed_one_is_still_an_error_not_a_partial_list():
@@ -447,14 +425,17 @@ def test_FR_INT_15_H8_a_label_of_exactly_60_characters_passes_and_61_does_not():
     result, _ = run(gap_reply([gap_item("physical_world", "x" * 60)]))
     assert result.gaps[0].part == "x" * 60 and len(result.gaps[0].skip_line()) <= 200
 
-    exc, _ = fails(gap_reply([gap_item("physical_world", "x" * 61)]), brief().BriefExtractionError)
-    assert not isinstance(exc, refusal().TaskRefused)  # a router schema failure, repaired once, then refused
+    exc, director = fails(gap_reply([gap_item("physical_world", "x" * 61)]), brief().BriefExtractionError)
+    assert not isinstance(exc, refusal().TaskRefused)
+    assert len(director.calls) == 1, "the length check is the code's, not a schema repair"
 
 
 def test_FR_INT_15_H8_the_60_character_limit_counts_the_raw_label_too():
     raw = "x" * 60 + "\u200b\u200b"  # cleans to 60 but arrives as 62
 
-    fails(gap_reply([gap_item("physical_world", raw)]), brief().BriefExtractionError)
+    _, director = fails(gap_reply([gap_item("physical_world", raw)]), brief().BriefExtractionError)
+
+    assert len(director.calls) == 1
 
 
 # --- H9: injection in the task text ---
@@ -604,23 +585,24 @@ def test_FR_INT_15_H14_a_custom_gap_policy_that_reuses_a_shipped_refusal_id_is_r
 # --- the output schema, complete_brief and the prompt ---
 
 
-def test_FR_INT_15_the_output_schema_gains_an_optional_out_of_scope_and_relaxes_only_the_deliverables_minimum():
+def test_FR_INT_15_the_output_schema_allows_out_of_scope_unconstrained_and_relaxes_only_the_deliverables_minimum():
+    """Every shape and length check on the gap list is the code's (`_gaps`, `clean_part`): a schema constraint under
+    `out_of_scope` would make the router reject a malformed sibling before the refusal scan and re-ask the model, and
+    a repair is a fresh generation that can drop a refusal id (security review, FR-INT-15)."""
     schema = brief().output_schema()
     props = schema["properties"]
 
     assert "out_of_scope" in props and "out_of_scope" not in schema.get("required", [])
     assert {"ambiguous_fields", "out_of_policy"} <= set(props), "the earlier optional keys stay"
-    oos = props["out_of_scope"]
-    assert oos["type"] == "array"
-    for forbidden in ("maxItems", "uniqueItems", "enum"):
-        assert forbidden not in oos, f"{forbidden}: a schema repair could trade a gap or a refusal id away"
-    item = oos["items"]
-    assert item["type"] == "object" and item["additionalProperties"] is False
-    assert sorted(item["required"]) == ["category", "part"] and set(item["properties"]) == {"category", "part"}
-    assert item["properties"]["category"] == {"type": "string"}, "no enum: an unknown id is the code's to refuse"
-    part = item["properties"]["part"]
-    assert (part["type"], part["minLength"], part["maxLength"]) == ("string", 1, 60)
+    constraints = (
+        "type", "items", "required", "properties", "additionalProperties", "minLength", "maxLength", "maxItems",
+        "minItems", "uniqueItems", "enum", "anyOf", "oneOf", "allOf", "$ref", "const", "pattern",
+    )  # fmt: skip
+    present = [k for k in constraints if k in props["out_of_scope"]]
+    assert not present, f"out_of_scope must accept any JSON value; constrained by {present}"
+    assert schema.get("additionalProperties") is False, "the rest of the brief schema stays strict"
     assert props["deliverables"].get("minItems", 0) == 0, "empty deliverables reach the code (NothingPossible)"
+    assert props["deliverables"]["type"] == "array" and props["goal"]["type"] == "string"
 
 
 def test_FR_INT_15_the_brief_contract_itself_is_unchanged():
@@ -752,3 +734,92 @@ def test_FR_INT_15_H16_a_refusal_id_at_the_end_of_ten_thousand_items_still_refus
     exc, _ = fails(gap_reply(items), refusal().TaskRefused)
 
     assert exc.category == "deception"
+
+
+# --- a refusal id is never lost to a malformed sibling (the refusal scan needs the whole list, in code) ---
+
+MALFORMED_SIBLINGS = [
+    {"category": "money_movement", "part": "Pay", "extra": "x"},
+    {"category": "money_movement", "part": "x" * 61},
+    {"category": "money_movement", "part": ""},
+    {"category": "money_movement", "part": 7},
+    {"category": "money_movement"},
+    {"category": 7, "part": "Pay"},
+    "not a dict",
+    7,
+    None,
+    ["money_movement", "Pay"],
+]
+SIBLING_IDS = [
+    "extra key", "61 characters", "empty part", "part of the wrong type", "no part", "category of the wrong type",
+    "a string", "a number", "null", "a list",
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("sibling", MALFORMED_SIBLINGS, ids=SIBLING_IDS)
+@pytest.mark.parametrize("sibling_first", [True, False], ids=["sibling first", "refusal first"])
+def test_FR_INT_15_a_refusal_id_beside_a_malformed_item_is_still_a_refusal_on_one_call(sibling, sibling_first):
+    refusal_item = gap_item("deception", "Fake reviews")
+    items = [sibling, refusal_item] if sibling_first else [refusal_item, sibling]
+
+    exc, director = fails(gap_reply(items), refusal().TaskRefused)
+
+    want = refusal_texts()["deception"]
+    assert exc.category == "deception" and (exc.reason, exc.alternative) == (want.reason, want.alternative)
+    assert len(director.calls) == 1, "no repair or escalation that could drop the refusal id"
+
+
+@pytest.mark.parametrize("sibling", MALFORMED_SIBLINGS, ids=SIBLING_IDS)
+def test_FR_INT_15_out_of_policy_set_beside_a_malformed_gap_item_is_still_that_refusal_on_one_call(sibling):
+    reply = gap_reply([sibling], out_of_policy="credential_handling")
+
+    exc, director = fails(reply, refusal().TaskRefused)
+
+    want = refusal_texts()["credential_handling"]
+    assert exc.category == "credential_handling" and (exc.reason, exc.alternative) == (want.reason, want.alternative)
+    assert len(director.calls) == 1
+
+
+@pytest.mark.parametrize("value", [{"category": "deception", "part": "x"}, "deception", 7, None, True])
+def test_FR_INT_15_out_of_policy_set_beside_an_out_of_scope_that_is_not_a_list_is_still_that_refusal(value):
+    exc, director = fails(gap_reply(value, out_of_policy="unapproved_send"), refusal().TaskRefused)
+
+    assert exc.category == "unapproved_send" and len(director.calls) == 1
+
+
+def test_FR_INT_15_a_refusal_id_after_ten_thousand_valid_gaps_refuses_on_one_call():
+    items = [gap_item(GAP_IDS[i % len(GAP_IDS)], f"Part number {i}") for i in range(10_000)]
+    items.append(gap_item("bulk_or_unsolicited_sending", "Send to the purchased list"))
+    director = StageDirector(default=gap_reply(items))
+
+    with pytest.raises(refusal().TaskRefused) as raised:
+        brief().extract_brief(TASK, router=make_router(director))
+
+    assert raised.value.category == "bulk_or_unsolicited_sending"
+    assert len(director.calls) == 1
+
+
+# --- a label with nothing visible left is no label (clean_part needs a letter or digit after cleaning) ---
+
+INVISIBLE_LABELS = [
+    chr(0x3164),  # Hangul filler
+    chr(0x2800),  # Braille blank
+    chr(0x115F) + chr(0x1160),  # Hangul choseong and jungseong fillers
+    chr(0x115F),
+    chr(0x1160),
+    chr(0x34F),  # combining grapheme joiner
+    chr(0xFE0F),  # variation selector 16
+    chr(0x300),  # combining grave accent
+    chr(0x34F) + chr(0xFE0F) + chr(0x300),
+    " " + chr(0x3164) + " " + chr(0x2800) + " ",
+]
+
+
+@pytest.mark.parametrize(
+    "label", INVISIBLE_LABELS, ids=[f"U+{ord(x.strip()[0]):04X}x{len(x)}" for x in INVISIBLE_LABELS]
+)
+def test_FR_INT_15_a_label_that_cleans_to_nothing_visible_is_an_error_on_one_call(label):
+    exc, director = fails(gap_reply([gap_item("physical_world", label)]), brief().BriefExtractionError)
+
+    assert not isinstance(exc, (refusal().TaskRefused, gaps().NothingPossible))
+    assert len(director.calls) == 1

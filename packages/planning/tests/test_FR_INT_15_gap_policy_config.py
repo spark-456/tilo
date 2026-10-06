@@ -412,3 +412,20 @@ def test_FR_INT_15_property_clean_part_only_shrinks_and_never_leaves_a_C_charact
         return
     assert 1 <= len(result) <= 60 and len(result) <= len(value)
     assert no_c_chars(result) and result == result.strip() and "  " not in result
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        chr(0x3164), chr(0x2800), chr(0x115F) + chr(0x1160), chr(0x34F), chr(0xFE0F), chr(0x300),
+        chr(0x34F) + chr(0xFE0F) + chr(0x300), " " + chr(0x3164) + " " + chr(0x2800) + " ",
+    ],
+)  # fmt: skip
+def test_FR_INT_15_clean_part_returns_none_for_invisible_fillers_and_bare_combining_marks(value):
+    assert gaps().clean_part(value) is None
+
+
+def test_FR_INT_15_clean_part_keeps_a_label_whose_letters_carry_combining_marks():
+    label = "Caf" + "e" + chr(0x301) + " order"
+
+    assert gaps().clean_part(label) == label  # a visible letter is there; no NFKC, no stripping of the mark
