@@ -38,6 +38,8 @@ class CaseRunResult:
     roles: dict[str, str] = field(default_factory=dict)  # model_role -> profile name, never a model id
     cause: str | None = None
     pending_autoraters: list[str] = field(default_factory=list)
+    events: tuple[dict[str, Any], ...] = ()  # the replayed outcome, kept for the EV metrics (metrics.py)
+    outputs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -113,7 +115,10 @@ def _evaluate(case: Case, outcome: Any) -> CaseRunResult:
         if not result.passed and cause is None:  # one line, bounded: a cause can echo recorded text
             cause = _one_line(result.cause or f"{name} failed")
     passed = None if not results and pending else cause is None
-    return CaseRunResult(case, passed, results, outcome.credits or 0.0, role_costs, roles, cause, pending)
+    return CaseRunResult(
+        case, passed, results, outcome.credits or 0.0, role_costs, roles, cause, pending,
+        tuple(outcome.events), dict(outcome.outputs),
+    )  # fmt: skip
 
 
 def run_pass(
