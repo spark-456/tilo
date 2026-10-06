@@ -1,0 +1,28 @@
+{
+  "quotes": [
+    {
+      "meeting_id": "mt_q4_plan",
+      "transcript": {
+        "artifact_id": "art_transcript_q4_plan",
+        "version": 1
+      },
+      "utterance_id": "u0021",
+      "state": "shown",
+      "speaker": "Asha Rao",
+      "text": "Priya, please send the rate sheet to Acme by Friday; questions to asha@example.com",
+      "truncated": false
+    },
+    {
+      "meeting_id": "mt_q4_plan",
+      "transcript": {
+        "artifact_id": "art_transcript_q4_plan",
+        "version": 1
+      },
+      "utterance_id": "u0023",
+      "state": "shown",
+      "speaker": "Sam",
+      "text": "I can draft the launch note.",
+      "truncated": false
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+# Settings of the live scenario generator (issue #272 (b), GEN-07..GEN-10); schema: evals/generator.schema.json.
+# Kept here, not in config/evals.yaml: contracts/evals.schema.json forbids extra keys (no contract change needed).
+#
+# max_inr: the per-run spend cap, user-approved at INR 150 (issue #272 decision 3; PRD supplement SD-04). The run's cap in
+# credits is max_inr / inr_per_usd / credit_usd, where credit_usd (US$0.005) comes from config/prices.yaml.
+max_inr: 150
+# inr_per_usd: rupees per US dollar, used only to turn the INR cap into credits. 90 is the market rate as of 2026-10-06
+# (about 88, rounded up so the cap errs low). Source: general market knowledge, NOT fetched by the builder (no network):
+# the user should confirm it against the RBI reference rate (https://www.rbi.org.in) and edit this line.
+inr_per_usd: 90

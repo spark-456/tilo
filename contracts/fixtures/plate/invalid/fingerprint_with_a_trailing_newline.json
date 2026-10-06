@@ -1,0 +1,207 @@
+{
+  "v": "1.0",
+  "user": "u_priya",
+  "as_of": "2026-10-06T10:00:00.000Z",
+  "today": "2026-10-06",
+  "rows": [
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_launch_site"
+      },
+      "reason": "blocked",
+      "group": "attention",
+      "title": "Launch site refresh",
+      "due": "2026-10-10",
+      "at": "2026-10-05T12:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "card",
+        "id": "01J9B2C3D4E5F6G7H8J9K0M1N2"
+      },
+      "reason": "gate",
+      "group": "attention",
+      "title": "Send the rate sheet to Acme?",
+      "due": null,
+      "at": "2026-10-06T09:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "work_item",
+        "id": "wi_budget_notes"
+      },
+      "reason": "work_item",
+      "group": "overdue",
+      "title": "Share the budget notes",
+      "due": "2026-10-03",
+      "at": "2026-10-01T09:00:00.000Z",
+      "from": "u_owner",
+      "flagged": false,
+      "evidence": true,
+      "actions": ["open", "done", "snooze", "not_mine"]
+    },
+    {
+      "ref": {
+        "kind": "work_item",
+        "id": "wi_rate_sheet"
+      },
+      "reason": "work_item",
+      "group": "soon",
+      "title": "Send the rate sheet to Acme",
+      "due": "2026-10-07",
+      "at": "2026-10-05T10:30:00.000Z",
+      "from": "u_owner",
+      "flagged": false,
+      "evidence": true,
+      "actions": ["open", "done", "snooze", "not_mine"]
+    },
+    {
+      "ref": {
+        "kind": "card",
+        "id": "01J9B2C3D4E5F6G7H8J9K0M1N3"
+      },
+      "reason": "question",
+      "group": "soon",
+      "title": "Which discount applies to Acme?",
+      "due": null,
+      "at": "2026-10-06T08:30:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "calendar_entry",
+        "id": "ce_standup"
+      },
+      "reason": "calendar",
+      "group": "soon",
+      "title": "Stand-up",
+      "due": null,
+      "at": "2026-10-06T11:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "pinboard_item",
+        "id": "pb_q4_deadline"
+      },
+      "reason": "pin_tagged",
+      "group": "rest",
+      "title": "Q4 deadline",
+      "due": "2026-10-31",
+      "at": "2026-10-02T09:00:00.000Z",
+      "from": "u_owner",
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "work_item",
+        "id": "wi_slides"
+      },
+      "reason": "work_item",
+      "group": "rest",
+      "title": "Draft the launch slides",
+      "due": null,
+      "at": "2026-10-04T09:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open", "done", "snooze"]
+    },
+    {
+      "ref": {
+        "kind": "mail",
+        "id": "msg_18c2f0a1"
+      },
+      "reason": "mail_reply",
+      "group": "rest",
+      "title": null,
+      "due": null,
+      "at": "2026-10-06T06:15:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open", "draft_reply"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    }
+  ],
+  "parked": [
+    {
+      "ref": {
+        "kind": "work_item",
+        "id": "wi_vendor_call"
+      },
+      "reason": "work_item",
+      "group": "snoozed",
+      "title": "Call the vendor",
+      "due": "2026-10-09",
+      "at": "2026-10-02T09:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open", "put_back"]
+    },
+    {
+      "ref": {
+        "kind": "work_item",
+        "id": "wi_logo"
+      },
+      "reason": "work_item",
+      "group": "asked",
+      "title": "Pick the new logo",
+      "due": null,
+      "at": "2026-10-03T09:00:00.000Z",
+      "from": "u_owner",
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open", "put_back"]
+    },
+    {
+      "ref": {
+        "kind": "work_item",
+        "id": "wi_minutes_review"
+      },
+      "reason": "work_item",
+      "group": "done",
+      "title": "Review the minutes",
+      "due": "2026-10-05",
+      "at": "2026-10-01T09:00:00.000Z",
+      "from": "u_owner",
+      "flagged": false,
+      "evidence": true,
+      "actions": ["open", "put_back"]
+    }
+  ],
+  "truncated": false,
+  "fingerprint": "d7f68dbdccf27d9f8850ed5462d79649dbb6cdeb73b1bb54bdf20d7117c1a1c\n"
+}

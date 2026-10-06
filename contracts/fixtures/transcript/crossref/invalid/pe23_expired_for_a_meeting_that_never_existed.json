@@ -1,0 +1,146 @@
+{
+  "rule": "PE-23",
+  "note": "Expired is the owner's answer; a meeting nobody owns answers a 404.",
+  "now": "2026-10-06T10:00:00.000Z",
+  "persons": {
+    "u_owner": {
+      "id": "u_owner",
+      "org_id": "org_example",
+      "display_name": "Asha Rao",
+      "aliases": ["Asha"],
+      "email": "asha@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_priya": {
+      "id": "u_priya",
+      "org_id": "org_example",
+      "display_name": "Priya Nair",
+      "aliases": ["Priya"],
+      "email": "priya@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_dev": {
+      "id": "u_dev",
+      "org_id": "org_example",
+      "display_name": "Dev Menon",
+      "aliases": ["Dev"],
+      "email": "dev@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam": {
+      "id": "u_sam",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam"],
+      "email": "sam@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_meera": {
+      "id": "u_meera",
+      "org_id": "org_example",
+      "display_name": "Meera Shah",
+      "aliases": ["Meera"],
+      "email": "meera@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    }
+  },
+  "meeting": null,
+  "minutes": null,
+  "transcript": null,
+  "version": null,
+  "work_item": null,
+  "request": {
+    "actor": "u_dev",
+    "meeting": "mt_never_held",
+    "work_item": null,
+    "ids": ["u0001"]
+  },
+  "response": {
+    "quotes": [
+      {
+        "meeting_id": "mt_never_held",
+        "transcript": null,
+        "utterance_id": "u0001",
+        "state": "expired",
+        "speaker": null,
+        "text": null,
+        "truncated": false
+      }
+    ]
+  }
+}
