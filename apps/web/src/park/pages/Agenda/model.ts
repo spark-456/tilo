@@ -1,6 +1,9 @@
 // The Agenda's view-model, ported from renderVals in design_handoff_tilo_web_app/design/Tilo App Agenda.dc.html
 // (user's prototype, ADR-0003a): pure functions from the typed Agenda fixture, `dec` and the page's own
 // UI state. No clock, no random: a new pin's id comes from a counter the page keeps.
+//
+// Generic by rule ("No scenario-specific code"): every designed value (a world, a label, a date, a time, an
+// amount, a meeting's id) is read from the fixture/Api: `Agenda.rules` and `Decision.facts`.
 import type {
   Agenda,
   AgendaDetail,
@@ -8,12 +11,40 @@ import type {
   AgendaPin,
   AgendaSlot,
   Dec,
+  Decision,
+  DecisionKey,
+  SuggestionRule,
 } from "../../api/types";
 import type { AgentSpec } from "../../engines/types";
 
 export type CalKey = AgendaEvent["cal"] | "booked";
 export type Ev = Omit<AgendaEvent, "cal"> & { cal: CalKey };
 export type BoardKey = AgendaPin["board"];
+/** The decisions by key, as the Api serves them (`world` and `facts` are read from here). */
+export type DecisionIndex = Partial<Record<DecisionKey, Decision>>;
+
+export const indexDecisions = (list: readonly Decision[]): DecisionIndex =>
+  Object.fromEntries(list.map((d) => [d.k, d]));
+
+/** The line under a board's title: the Agenda's own, else the page's generic one. */
+export const boardSub = (A: Agenda, b: { key: BoardKey; sub: string }): string =>
+  A.rules?.boardSubs?.[b.key] ?? b.sub;
+
+/** A suggestion whose kind has no rule: it is accepted as it stands. */
+export const DEFAULT_RULE: SuggestionRule = {
+  label: "Accept",
+  action: "accept",
+  toast: "Accepted",
+};
+/** What accepting this suggested pin does, by its `kind`. */
+export const ruleOf = (A: Agenda, p: AgendaPin): SuggestionRule =>
+  (p.kind ? A.rules?.suggestions[p.kind] : undefined) ?? DEFAULT_RULE;
+/** The rule that opens the time finder, if the Agenda has one. */
+export const findRuleOf = (A: Agenda): SuggestionRule | undefined =>
+  Object.values(A.rules?.suggestions ?? {}).find((r) => r.action === "find" && r.find);
+/** The meeting the page opens with: the first one that has a brief. */
+export const defaultEventId = (A: Agenda): string =>
+  (A.events.find((e) => e.brief) ?? A.events[0])?.id ?? "";
 
 export const PX = 52;
 export const PAPER: Record<string, string> = {
@@ -60,7 +91,7 @@ export const BOARDS: {
   {
     key: "team",
     title: "Team board",
-    sub: "Northwind Ops · 5 people and Tilo",
+    sub: "Everyone on the team and Tilo",
     iconBg: "var(--heroSoft)",
     agent: { rank: "director", expr: "neutral" },
   },
@@ -98,7 +129,13 @@ export interface PinVm {
   checkLabel: string;
 }
 
-export function pinVm(p: AgendaPin, i: number, dec: Dec, doneMap: Record<string, boolean>): PinVm {
+export function pinVm(
+  p: AgendaPin,
+  i: number,
+  dec: Dec,
+  doneMap: Record<string, boolean>,
+  decisions: DecisionIndex = {},
+): PinVm {
   const done = isDone(p, dec, doneMap);
   const tilo = p.by === "tilo";
   const expr = done ? "delighted" : "neutral";
@@ -107,13 +144,14 @@ export function pinVm(p: AgendaPin, i: number, dec: Dec, doneMap: Record<string,
     : p.role === "director"
       ? { rank: "director", expr }
       : { role: p.role ?? "research", expr };
-  const world = p.dec && !dec[p.dec] ? "k1" : p.go && !done ? p.go : null;
+  const decision = p.dec ? decisions[p.dec] : undefined;
+  const world = p.dec && !dec[p.dec] ? (decision?.world ?? null) : p.go && !done ? p.go : null;
   return {
     pin: p,
     done,
     waiting: p.group === "waiting" && !done,
     tilo,
-    note: p.dec && dec[p.dec] ? "Approved · £3,420 · K1 electric scooter" : p.note,
+    note: p.dec && dec[p.dec] ? (decision?.facts?.approvedNote ?? p.note) : p.note,
     due: done ? "Done" : (p.due ?? ""),
     paper: PAPER[p.color] ?? "#FFF1A8",
     rot: ROTS[i % ROTS.length] ?? "0deg",
@@ -147,37 +185,31 @@ export function addPin(pins: AgendaPin[], board: BoardKey, title: string, id: st
   return [...pins.filter(mine), fresh, ...pins.filter((q) => !mine(q))];
 }
 
-/** Accepting Tilo's focus-time suggestion turns that pin into a blocked one. */
-export const blockFocus = (pins: AgendaPin[], id: string): AgendaPin[] =>
+/** Accepting a suggestion: the pin drops its flag and takes on what the rule's `accepted` says. */
+export const acceptPin = (pins: AgendaPin[], id: string, rule: SuggestionRule): AgendaPin[] =>
   pins.map((q) => {
     if (q.id !== id) return q;
     const { suggested: _s, ...rest } = q;
-    return {
-      ...rest,
-      title: "Focus time · Mon 28 Sep",
-      note: "09:30–11:30, added to your Google Calendar",
-      due: "Blocked by Tilo",
-      color: "lilac",
-      group: "week",
-      by: "tilo",
-    };
+    return { ...rest, ...rule.accepted };
   });
 
-/** Booking the gate review: a new pin on top, the suggestion to book it gone. */
-export const bookedPins = (pins: AgendaPin[], s: AgendaSlot): AgendaPin[] => [
-  {
-    id: "tg",
-    board: "team",
-    title: "K1 gate review booked",
-    note: `${s.l}. Invites sent to Jin, Priya and Tom.`,
-    by: "tilo",
-    role: "research",
-    due: "Tilo booked · just now",
-    color: "lilac",
-    group: "week",
-  },
-  ...pins.filter((q) => q.id !== "t0"),
-];
+/** Booking a slot: a new pin on top, the suggestions to find a time gone. */
+export function bookedPins(pins: AgendaPin[], s: AgendaSlot, A: Agenda): AgendaPin[] {
+  const f = findRuleOf(A)?.find;
+  if (!f) return pins;
+  const finders = pins.filter((q) => q.suggested && ruleOf(A, q).action === "find");
+  const { noteAfter, ...pin } = f.pin;
+  return [
+    {
+      ...pin,
+      board: finders[0]?.board ?? "team",
+      note: `${s.l}. ${noteAfter}`,
+      by: "tilo",
+      group: "week",
+    },
+    ...pins.filter((q) => !finders.includes(q)),
+  ];
+}
 
 export interface Flags {
   [key: string]: boolean | undefined;
@@ -185,20 +217,27 @@ export interface Flags {
 
 export function eventsOf(A: Agenda, booked: AgendaSlot | null): Ev[] {
   const base: Ev[] = A.events;
-  return booked
+  const f = findRuleOf(A)?.find;
+  return booked && f
     ? [
         ...base,
         {
-          id: "gate",
+          id: f.event.id,
           d: booked.d,
           s: booked.s,
           e: booked.e,
-          t: "K1 gate review",
+          t: f.event.title,
           cal: "booked",
           joins: true,
         },
       ]
     : base;
+}
+
+/** "21–25" from the day labels ("Mon 21" ... "Fri 25"), with the weekend when shown. */
+export function weekRange(A: Agenda, weekend: boolean): string {
+  const nums = A.days.concat(weekend ? A.wkend : []).map((l) => l.split(" ")[1] ?? "");
+  return `${nums[0] ?? ""}–${nums[nums.length - 1] ?? ""}`;
 }
 export const joinsOf = (e: Ev, flags: Flags): boolean => flags[`${e.id}:join`] ?? !!e.joins;
 
@@ -263,10 +302,16 @@ export function detailOf(
   briefed: Record<string, boolean>,
   dec: Dec,
 ): DetailVm {
-  const e = EV.find((x) => x.id === sel) ?? EV.find((x) => x.id === "sync") ?? EV[0];
+  const e = EV.find((x) => x.id === sel) ?? EV.find((x) => x.brief) ?? EV[0];
   if (!e) throw new Error("the Agenda has no events");
+  // A series ("su1", "su2" ...) shares the detail keyed by its stem ("su").
+  const stem = Object.keys(A.details).find(
+    (k) => e.id.startsWith(k) && /^\d+$/.test(e.id.slice(k.length)),
+  );
   const det: AgendaDetail = A.details[e.id] ??
-    (e.id.startsWith("su") ? A.details.su : undefined) ?? { people: ["AM"] };
+    (stem ? A.details[stem] : undefined) ?? {
+      people: ["AM"],
+    };
   const days = A.days.concat(A.wkend);
   const wasBriefed = !!briefed[e.id];
   const flag = (k: string, def: boolean) => flags[`${e.id}:${k}`] ?? def;
@@ -274,14 +319,14 @@ export function detailOf(
     "Tilo will gather the latest emails, docs and notes for this meeting.",
     "You’ll get it 15 minutes before it starts.",
   ];
-  if (e.id === "gate" && dec.depot)
-    brief = brief.map((x) =>
-      x.startsWith("Laptop Depot") ? "Laptop Depot budget was approved today." : x,
-    );
+  for (const r of A.rules?.briefRewrites ?? [])
+    if (r.event === e.id && dec[r.dec])
+      brief = brief.map((x) => (x.startsWith(r.startsWith) ? r.text : x));
+  const month = A.rules?.month.slice(0, 3);
   return {
     e,
     det,
-    when: `${days[e.d]} Sep · ${fmt(e.s)}–${fmt(e.e)}${e.cal === "booked" ? " · booked by Tilo" : ""}`,
+    when: `${days[e.d]}${month ? ` ${month}` : ""} · ${fmt(e.s)}–${fmt(e.e)}${e.cal === "booked" ? " · booked by Tilo" : ""}`,
     calLabel: CAL[e.cal][0] + (e.cal === "tilo" || e.cal === "booked" ? "" : " · Google Calendar"),
     hasBrief: !e.past && (!!det.brief || wasBriefed),
     brief,

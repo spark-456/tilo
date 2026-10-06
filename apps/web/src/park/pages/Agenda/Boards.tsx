@@ -2,11 +2,11 @@
 // personal board, each as sticky notes on cork or as grouped rows. Every approval is read from `app.dec`;
 // opening a world goes through `app.go`.
 import type { CSSProperties } from "react";
-import type { AgendaPin } from "../../api/types";
+import type { Agenda, AgendaPin } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { SegmentedControl } from "../../components";
 import { face, icon } from "./icons";
-import { BOARDS, type BoardKey, GROUPS, PERSON, type PinVm, pinVm } from "./model";
+import { BOARDS, type BoardKey, GROUPS, PERSON, type PinVm, boardSub, pinVm } from "./model";
 import type { AgendaUi } from "./useAgenda";
 
 interface PinProps {
@@ -22,7 +22,7 @@ function Avatar({ v, size, night }: { v: PinVm; size: number; night: boolean }) 
 function toggle(v: PinVm, ui: AgendaUi, app: AppCtx) {
   const p = v.pin;
   if (p.dec) {
-    if (!app.dec[p.dec]) app.go("world", { id: "k1" });
+    if (!app.dec[p.dec] && v.act) app.go("world", { id: v.act.world });
     return;
   }
   ui.setDone(p.id, !v.done);
@@ -30,14 +30,15 @@ function toggle(v: PinVm, ui: AgendaUi, app: AppCtx) {
 
 function Accept({ v, ui, soft }: PinProps & { soft?: boolean }) {
   const p = v.pin;
+  const rule = ui.ruleOf(p);
   return (
     <>
       <button
         type="button"
         className={soft ? "park-agenda-accept park-agenda-accept--soft" : "park-agenda-accept"}
-        onClick={() => (p.kind === "find" ? ui.findTime() : ui.block(p.id))}
+        onClick={() => (rule.action === "find" ? ui.findTime() : ui.accept(p))}
       >
-        {p.kind === "find" ? "Find a time" : "Block it"}
+        {rule.label}
       </button>
       <button
         type="button"
@@ -185,11 +186,11 @@ function SoftPin({ v, ui, app }: PinProps) {
   );
 }
 
-function Board({ k, ui, app }: { k: BoardKey; ui: AgendaUi; app: AppCtx }) {
+function Board({ A, k, ui, app }: { A: Agenda; k: BoardKey; ui: AgendaUi; app: AppCtx }) {
   const b = BOARDS.find((x) => x.key === k) ?? BOARDS[0];
   if (!b) return null;
   const ps: AgendaPin[] = ui.pins.filter((p) => p.board === k);
-  const vms = ps.map((p, i) => pinVm(p, i, app.dec, ui.done));
+  const vms = ps.map((p, i) => pinVm(p, i, app.dec, ui.done, ui.decisions));
   const open = vms.filter((v) => !v.done && !v.pin.suggested).length;
   const label = `Pin to ${b.title}`;
   const input = (cls: string) => (
@@ -212,7 +213,7 @@ function Board({ k, ui, app }: { k: BoardKey; ui: AgendaUi; app: AppCtx }) {
         </div>
         <div className="park-agenda-boardtitles">
           <div className="park-agenda-boardtitle">{b.title}</div>
-          <div className="park-agenda-boardsub">{b.sub}</div>
+          <div className="park-agenda-boardsub">{boardSub(A, b)}</div>
         </div>
         <span className="park-agenda-boardcount">{`${open} open`}</span>
       </div>
@@ -254,7 +255,7 @@ function Board({ k, ui, app }: { k: BoardKey; ui: AgendaUi; app: AppCtx }) {
   );
 }
 
-export function Boards({ ui, app }: { ui: AgendaUi; app: AppCtx }) {
+export function Boards({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
   return (
     <section aria-label="Boards" className="park-agenda-section">
       <div className="park-agenda-sechead">
@@ -281,7 +282,7 @@ export function Boards({ ui, app }: { ui: AgendaUi; app: AppCtx }) {
       </div>
       <div className="park-agenda-boards">
         {BOARDS.map((b) => (
-          <Board key={b.key} k={b.key} ui={ui} app={app} />
+          <Board key={b.key} A={A} k={b.key} ui={ui} app={app} />
         ))}
       </div>
     </section>

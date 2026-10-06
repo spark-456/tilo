@@ -13,8 +13,10 @@ import {
   dayColumns,
   detailOf,
   eventsOf,
+  findRuleOf,
   fmt,
   joinsOf,
+  weekRange,
 } from "./model";
 import type { AgendaUi } from "./useAgenda";
 
@@ -140,13 +142,14 @@ function Calendar({ A, EV, ui, app }: { A: Agenda; EV: Ev[]; ui: AgendaUi; app: 
 
 export function Week({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
   const EV = eventsOf(A, ui.booked);
+  const find = findRuleOf(A)?.find;
   const joins = EV.filter((e) => joinsOf(e, ui.flags) && !e.past).length;
   const shown = EV.filter((e) => !e.tiloOnly && e.cal !== "tilo").length;
   return (
     <section aria-label="This week" className="park-agenda-section">
       <div className="park-agenda-sechead">
         <div>
-          <h2 className="park-agenda-h2">{`This week · ${ui.weekend ? "21–27" : "21–25"} September`}</h2>
+          <h2 className="park-agenda-h2">{`This week · ${weekRange(A, ui.weekend)}${A.rules ? ` ${A.rules.month}` : ""}`}</h2>
           <div className="park-agenda-secsub">
             {`${shown} events from Google Calendar · Tilo joins ${joins} still to come`}
           </div>
@@ -181,18 +184,14 @@ export function Week({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
         </div>
       </div>
 
-      {ui.finding ? (
+      {ui.finding && find ? (
         <div className="park-agenda-find">
           <div className="park-agenda-findface">
             {face({ role: "research", expr: "focused" }, 40, app.night)}
           </div>
           <div className="park-agenda-findtext">
-            <div className="park-agenda-findtitle">
-              K1 Level 3 gate review · 30 min · Alex, Jin, Priya, Tom
-            </div>
-            <div className="park-agenda-findsub">
-              Tilo checked all four calendars. Pick a dashed slot to book it.
-            </div>
+            <div className="park-agenda-findtitle">{find.title}</div>
+            <div className="park-agenda-findsub">{find.sub}</div>
           </div>
           <button type="button" className="park-agenda-cancel" onClick={ui.cancelFind}>
             Cancel

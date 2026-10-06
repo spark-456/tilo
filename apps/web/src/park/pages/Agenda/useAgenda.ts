@@ -4,13 +4,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Api } from "../../api/index";
 import { NotBuilt } from "../../api/liveApi";
-import type { Agenda, AgendaPin, AgendaSlot, Source } from "../../api/types";
+import type { Agenda, AgendaPin, AgendaSlot, Decision, Source } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { type BoardKey, type Flags, addPin, blockFocus, bookedPins } from "./model";
+import {
+  type BoardKey,
+  DEFAULT_RULE,
+  type Flags,
+  acceptPin,
+  addPin,
+  bookedPins,
+  defaultEventId,
+  findRuleOf,
+  indexDecisions,
+  ruleOf,
+} from "./model";
 
 export type AgendaState =
   | { status: "loading" }
-  | { status: "ready"; data: Agenda; source: Source }
+  | { status: "ready"; data: Agenda; decisions: Decision[]; source: Source }
   | { status: "not-built" }
   | { status: "error" };
 
@@ -18,8 +29,15 @@ export function useAgenda(api: Api): AgendaState {
   const [state, setState] = useState<AgendaState>({ status: "loading" });
   useEffect(() => {
     let live = true;
-    api.getAgenda().then(
-      (r) => live && setState({ status: "ready", data: r.data, source: r.source }),
+    // The decisions carry the world to open and the words of a taken one; without them (a live Api that
+    // does not serve them yet) the page still shows the Agenda, with no world links.
+    const decisions = api.getDecisions().then(
+      (r) => r.data,
+      () => [],
+    );
+    Promise.all([api.getAgenda(), decisions]).then(
+      ([r, d]) =>
+        live && setState({ status: "ready", data: r.data, decisions: d, source: r.source }),
       (e: unknown) => live && setState({ status: e instanceof NotBuilt ? "not-built" : "error" }),
     );
     return () => {
@@ -29,7 +47,7 @@ export function useAgenda(api: Api): AgendaState {
   return state;
 }
 
-export function useAgendaUi(A: Agenda, app: AppCtx, api: Api) {
+export function useAgendaUi(A: Agenda, decisions: Decision[], app: AppCtx, api: Api) {
   const [style, setStyle] = useState<"cork" | "soft">("cork");
   const [newVal, setNewVal] = useState<Record<BoardKey, string>>({ team: "", me: "" });
   const [pins, setPins] = useState<AgendaPin[]>(A.pins);
@@ -39,7 +57,7 @@ export function useAgendaUi(A: Agenda, app: AppCtx, api: Api) {
     tilo: true,
   });
   const [weekend, setWeekend] = useState(false);
-  const [sel, setSel] = useState("sync");
+  const [sel, setSel] = useState(defaultEventId(A));
   const [finding, setFinding] = useState(false);
   const [booked, setBooked] = useState<AgendaSlot | null>(null);
   const [flags, setFlags] = useState<Flags>({});
@@ -58,6 +76,8 @@ export function useAgendaUi(A: Agenda, app: AppCtx, api: Api) {
     newVal,
     setNewVal: (key: BoardKey, v: string) => setNewVal((s) => ({ ...s, [key]: v })),
     pins,
+    decisions: indexDecisions(decisions),
+    ruleOf: (pin: AgendaPin) => ruleOf(A, pin),
     cals,
     toggleCal: (k: string) => setCals((c) => ({ ...c, [k]: !c[k] })),
     weekend,
@@ -80,17 +100,18 @@ export function useAgendaUi(A: Agenda, app: AppCtx, api: Api) {
       setPins((ps) => addPin(ps, key, v, `n${counter.current}`));
       setNewVal((s) => ({ ...s, [key]: "" }));
     },
-    block: (id: string) => {
-      setPins((ps) => blockFocus(ps, id));
-      app.toast("Blocked 09:30–11:30 on Monday in Google Calendar");
+    accept: (pin: AgendaPin) => {
+      const rule = ruleOf(A, pin);
+      setPins((ps) => acceptPin(ps, pin.id, rule));
+      app.toast(rule.toast ?? DEFAULT_RULE.toast ?? "");
     },
     book: (s: AgendaSlot) =>
       api.bookSlot(s).then(
         () => {
-          setPins((ps) => bookedPins(ps, s));
+          setPins((ps) => bookedPins(ps, s, A));
           setFinding(false);
           setBooked(s);
-          setSel("gate");
+          setSel(findRuleOf(A)?.find?.event.id ?? defaultEventId(A));
           app.toast(`Booked ${s.l}. Invites sent from Google Calendar`);
         },
         () => app.toast("Not connected yet"),

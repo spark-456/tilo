@@ -5,7 +5,7 @@
 // No motion until WEB-3 (BQ-WEB-3).
 import type { ReactNode } from "react";
 import type { Api } from "../../api/index";
-import type { Agenda } from "../../api/types";
+import type { Agenda, Decision } from "../../api/types";
 import { useParkApi } from "../../app/context";
 import { Button, PageSheet } from "../../components";
 import "../../components/park.components.css";
@@ -33,15 +33,20 @@ function Frame({ source, children }: { source?: string; children?: ReactNode }) 
   );
 }
 
-function Ready({ A, app, api }: { A: Agenda; app: AppCtx; api: Api }) {
-  const ui = useAgendaUi(A, app, api);
+function Ready({
+  A,
+  decisions,
+  app,
+  api,
+}: { A: Agenda; decisions: Decision[]; app: AppCtx; api: Api }) {
+  const ui = useAgendaUi(A, decisions, app, api);
   return (
     <>
       <div className="park-agenda-head">
         <div className="park-agenda-titles">
           <h1 className="park-agenda-title">Agenda</h1>
           <p className="park-agenda-lede">
-            Thursday 24 September. Pins from your team and Tilo, and a week that stays in sync.
+            {`${A.rules ? `${A.rules.dateLine}. ` : ""}Pins from your team and Tilo, and a week that stays in sync.`}
           </p>
         </div>
         <div className="park-agenda-actions">
@@ -54,7 +59,7 @@ function Ready({ A, app, api }: { A: Agenda; app: AppCtx; api: Api }) {
           </Button>
         </div>
       </div>
-      <Boards ui={ui} app={app} />
+      <Boards A={A} ui={ui} app={app} />
       <Week A={A} ui={ui} app={app} />
     </>
   );
@@ -84,7 +89,7 @@ export function AgendaPage({ app }: AgendaPageProps) {
   if (state.status === "loading") return <Frame />;
   return (
     <Frame source={state.source}>
-      <Ready A={state.data} app={app} api={api} />
+      <Ready A={state.data} decisions={state.decisions} app={app} api={api} />
     </Frame>
   );
 }

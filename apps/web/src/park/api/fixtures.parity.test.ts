@@ -8,6 +8,17 @@ import * as fx from "./fixtures";
 
 const proto = loadPrototypeData();
 
+/** `value` without the additive fields of additive.ts (`Agenda.rules`, `Decision.facts`): the prototype's own. */
+function prototypeFields(name: string, value: unknown): unknown {
+  if (name === "agenda") {
+    const { rules: _rules, ...own } = value as { rules?: unknown };
+    return own;
+  }
+  if (name === "decisions")
+    return (value as { facts?: unknown }[]).map(({ facts: _facts, ...own }) => own);
+  return value;
+}
+
 const DEC_COMBOS = [
   { depot: false, mail: false },
   { depot: true, mail: false },
@@ -51,7 +62,19 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
     "TIERS",
     "LEVELS",
   ] as const)("WEB_1a_fixtures_match_prototype %s is identical to the prototype", (name) => {
-    expect(norm(fx[name]), `fixtures.${name} differs from tilo-app.js`).toEqual(norm(proto[name]));
+    expect(
+      norm(prototypeFields(name, fx[name])),
+      `fixtures.${name} differs from tilo-app.js`,
+    ).toEqual(norm(proto[name]));
+  });
+
+  it("WEB_9c_fixtures_additive_fields_are_the_only_difference", () => {
+    // additive.ts adds `Agenda.rules` and `Decision.facts`; nothing else may differ from the prototype.
+    expect(fx.agenda.rules).toBeDefined();
+    expect(fx.decisions.every((d) => d.facts !== undefined)).toBe(true);
+    expect(Object.keys(fx.agenda).filter((k) => !(k in (proto.agenda as object)))).toEqual([
+      "rules",
+    ]);
   });
 
   it("WEB_1a_fixtures_match_prototype the merged final state is what is transcribed (skills, ledger, team)", () => {
