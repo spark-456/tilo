@@ -105,7 +105,7 @@ def create_task(
     ]
     intake_events = [intake.event, *(e for f in intake.files for e in f.events)]
     task = deps.TaskRecord(owner, intake.world_id, intake.run_id, draft, draft, [], len(intake_events) + 1)
-    task.scenario = scenario
+    task.scenario, task.gaps = scenario, extraction.gaps
     asked = generate_questions(
         draft, extraction.ambiguous_fields, memory=store.memory, base=_base(task, DIRECTOR), seq=task.next_seq
     )
@@ -233,7 +233,9 @@ def get_approaches(
         if task.approaches is None:
             try:
                 base = _base(task, DIRECTOR)
-                result = propose_approaches(task.brief, router=model_router, base=base, seq=task.next_seq)
+                result = propose_approaches(
+                    task.brief, router=model_router, base=base, seq=task.next_seq, gaps=task.gaps
+                )
             except ApproachProposalError as exc:
                 raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
             _append(store, task, [result.event])

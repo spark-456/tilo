@@ -25,6 +25,8 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | fastapi | MIT | https://pypi.org/project/fastapi/ |
 | python-multipart (`tilo-api` form uploads) | Apache-2.0 | https://pypi.org/project/python-multipart/ |
 | uvicorn | BSD-3-Clause | https://pypi.org/project/uvicorn/ |
+| google-auth (`tilo_api.schedules`: OIDC verification of the Scheduler tick, FR-AGT-14) | Apache-2.0 | https://pypi.org/project/google-auth/ |
+| requests (the transport google-auth fetches Google's public certs with) | Apache-2.0 | https://pypi.org/project/requests/ |
 
 ## Python (`packages/contracts-py`)
 
@@ -38,6 +40,7 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | --- | --- | --- |
 | google-adk | Apache-2.0 | https://pypi.org/project/google-adk/ |
 | google-cloud-firestore | Apache-2.0 | https://pypi.org/project/google-cloud-firestore/ |
+| tzdata (the IANA zone database for `zoneinfo`; scheduled runs, FR-AGT-14) | Apache-2.0 | https://pypi.org/project/tzdata/ |
 
 `services/harness` also uses `pyyaml`, `jsonschema` and `referencing` (already listed under the
 root dev dependency group), declared as its own direct dependencies since its code imports them
@@ -142,6 +145,9 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | fast-check (property tests, ticket P0-08b-player, FR-WLD-04) | MIT | https://www.npmjs.com/package/fast-check |
 | happy-dom (DOM for React component unit tests, AGW-01; dev only) | MIT | https://www.npmjs.com/package/happy-dom |
 | ajv (JSON Schema validator for the PPL-40a plate reducer test; dev only) | MIT | https://www.npmjs.com/package/ajv |
+| pixelmatch (WEB-PARITY pixel diff of design vs ours; dev/test only) | ISC | https://www.npmjs.com/package/pixelmatch |
+| pngjs (WEB-PARITY PNG decode/encode; dev/test only) | MIT | https://www.npmjs.com/package/pngjs |
+| @types/pngjs (types for pngjs; dev only) | MIT | https://www.npmjs.com/package/@types/pngjs |
 | @tilo/contracts (`packages/contracts-ts`, internal workspace package, not third-party) | n/a | `packages/contracts-ts` |
 
 ## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)
