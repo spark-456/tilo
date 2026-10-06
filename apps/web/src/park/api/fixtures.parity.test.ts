@@ -117,7 +117,7 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
     const copy = [
       r.month,
       r.dateLine,
-      r.boardSubs.team,
+      r.boardSubs?.team,
       r.suggestions.find?.label,
       find?.title,
       find?.sub,
