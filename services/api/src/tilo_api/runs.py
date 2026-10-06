@@ -29,6 +29,7 @@ from tilo_planning.compiler import DELIVER, PlanInputs
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps, events
+from tilo_api.access import Mode
 from tilo_api.cards import AlreadyCommitted, CardStore, _card_errors
 
 logger = logging.getLogger("tilo_api.runs")
@@ -79,13 +80,24 @@ class Seams:
     must_ask_providers: Mapping[str, Any]
 
 
-def run_seams(request: Request) -> Seams | None:
-    """The seams as the app wires them, overrides included; if any cannot be built, no run starts."""
+_MODE_SEAMS = frozenset({"plan_compiler", "unit_runner", "must_ask_providers"})  # the seams that build a Router
+
+
+def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_mode)]) -> Seams | None:
+    """The seams as the app wires them, overrides included; if any cannot be built, no run starts. The model
+    seams get this request's mode (SEC-15), so a judge's run is live and everyone else's is replay."""
     overrides = request.app.dependency_overrides
     names = "plan_compiler layout_builder unit_runner action_resolver skill_registry connector_registry"
     names += " connector_adapters outbox_store event_writer must_ask_providers"
+
+    def build(name: str) -> Any:
+        seam = getattr(deps, f"get_{name}")
+        if seam in overrides:
+            return overrides[seam]()
+        return seam(mode) if name in _MODE_SEAMS else seam()
+
     try:
-        return Seams(*(overrides.get(seam, seam)() for seam in (getattr(deps, f"get_{n}") for n in names.split())))
+        return Seams(*(build(n) for n in names.split()))
     except Exception as exc:
         logger.warning("the run seams are not wired, so no run starts: %s", type(exc).__name__)
         return None

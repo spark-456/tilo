@@ -8,15 +8,15 @@ service the web client and channels write through; the client reads live state f
 - `uv run --package tilo-api pytest` — tests; `just check` — gate; `just dev-api` — dev mode on 127.0.0.1:8080 (fake Director); `Dockerfile` runs `tilo_api:app`, deploy `docs/deploy-dev.md`
 
 ## Requirement IDs
-- PRD 6.2 row; SEC-05..12; FR-INT-11/12, FR-HIL-10 (API half).
+- PRD 6.2 row; SEC-05..12, SEC-15; FR-INT-11/12, FR-HIL-10 (API half).
 
 ## Contracts and config
 - Reads/writes `packages/contracts-py` types; Firestore (worlds, events, cards, policies, grants); Cloud Tasks. Config:
   `autonomy.yaml`, `flags/`, `connectors.yaml` (RBAC and routing only), `teams.yaml`, `scenarios/`, `out_of_policy.yaml`.
-- Env: `TILO_API_DEV=1`; `TILO_API_DEV_ORIGINS` (default `http://localhost:5173`); `TILO_DEV_UNIT_DELAY_S` (1.5, 0..10).
-
+- Env: `TILO_API_DEV=1`; `TILO_API_DEV_ORIGINS` (default `http://localhost:5173`); `TILO_DEV_UNIT_DELAY_S` (1.5, 0..10); `TILO_JUDGE_LIVE=1`.
 ## Local rules
 - Side effects go through the outbox and the deterministic policy engine, T3 only with a person. `/health` (Cloud Run smoke check, #397) and `/healthz` (in-container): ok. Task routes read only `application/json` (415).
+  SEC-15 (`tilo_api.access`, `tests/API_SEC_15.md`): deployed (`K_SERVICE`/`CLOUD_RUN_JOB`) the `AccessGate` middleware refuses every route not in `PUBLIC_ROUTES` (`/health`, `/healthz`, `GET /access`, `POST /access/declaration`) from the stored visitor/judge declaration (403 `under_construction`/`declaration_required`; 503 with no `deps.get_access_store`; set once, 409 `declaration_locked`). Live models only via `provider_mode` -> `deps.router_for_mode` (replay_only wins; `TILO_JUDGE_LIVE=1` is the user's, never set in code).
 - Dev mode (CL-INT-4, `tilo_api.dev`): fixed owner `u_dev_owner`, in-memory `Store`, a writer that refuses an event with no
   `vis`, CORS for `TILO_API_DEV_ORIGINS` only, Host loopback:8080; no cloud, no paid call; refuses when `K_SERVICE`,
   `CLOUD_RUN_JOB` or live is set. `dev_run` (CL-INT-5c/5d): a paced unit runner (`config/prices.dev.yaml`), a fake recipient.

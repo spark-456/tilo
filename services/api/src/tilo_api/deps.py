@@ -16,13 +16,14 @@ from __future__ import annotations
 import functools
 import logging
 import math
+import os
 import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol, cast
+from typing import Annotated, Any, Literal, Protocol, cast
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException, Request
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
 from tilo_harness.executor import DefaultUnitRunner
@@ -35,6 +36,8 @@ from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_pro
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router
 from tilo_providers.safety import build_safety_provider
+
+from tilo_api.access import AccessStore, Mode, provider_mode
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
 Channel = Literal["web", "mobile_web", "email"]  # WhatsApp removed: SD-01, ADR-0019
@@ -187,14 +190,34 @@ def budget_cap_ceiling() -> float:
     return float(value)
 
 
-def get_router() -> Router:
-    """Every model call goes through the provider layer's Router (PL-01); it replays recordings unless the
-    user turned live mode on (EFF-01)."""
+def get_access_store() -> AccessStore:
+    """SEC-15: where each person's visitor-or-judge declaration is kept. Production has none wired yet, so a
+    deployed process closes every gated route (503) rather than guess; tests and the Firestore store override it."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_mode(request: Request, flags: Annotated[FlagStore, Depends(get_flag_store)]) -> Mode:
+    """This request's model mode (SEC-15): the declaration the access gate verified (never one a client sent),
+    the environment and the `replay_only` kill switch (NFR-24), decided by `access.provider_mode`."""
+    declaration = getattr(request.state, "declaration", None)
+    return provider_mode(declaration, os.environ, replay_only=bool(flags.get("replay_only")))
+
+
+def router_for_mode(mode: Mode) -> Router:
+    """The one place a request's Router is built (PL-01). It replays recordings unless `mode` is "live", which only
+    `access.provider_mode` returns: the user's own global switch, or a deployed judge where the user set
+    `TILO_JUDGE_LIVE=1` (SEC-15). The permission is injected into the Router, never read-and-written from the
+    environment, so no request can turn live mode on for the process (EFF-01)."""
     try:
-        return Router(providers_config(), fixtures_dir=FIXTURES_DIR)
+        return Router(providers_config(), fixtures_dir=FIXTURES_DIR, live_permitted=(mode == "live"))
     except ProviderConfigError as exc:
         logger.warning("model router unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model router is not configured.") from exc
+
+
+def get_router(mode: Annotated[Mode, Depends(get_mode)] = "replay") -> Router:
+    """Every model call goes through the provider layer's Router (PL-01), built for this request's mode."""
+    return router_for_mode(mode)
 
 
 def get_safety() -> SafetyProvider:
@@ -216,12 +239,18 @@ def _no_plan_compiler(*, brief: dict, approach: dict, budget_cap: float, context
     raise NotImplementedError("no `director` role is configured, so no plan can be compiled and no run starts")
 
 
-def get_plan_compiler() -> Callable[..., dict]:
+def _seam_router(mode: Mode) -> Router:
+    """The run seams build their Router through `get_router`, the request's mode threaded in by `runs.run_seams`.
+    The replay default stays a zero-argument call, so a zero-argument override of `get_router` keeps working."""
+    return get_router() if mode == "replay" else get_router(mode)
+
+
+def get_plan_compiler(mode: Mode = "replay") -> Callable[..., dict]:
     """`compile(*, brief, approach, budget_cap, context) -> PlanGraph` (FR-INT-09). The Director drafts it through
     the Router and `validate_plan` decides (BQ-90); with no `director` role in the provider config it refuses."""
     if "director" not in providers_config().roles:
         return _no_plan_compiler
-    router = get_router()
+    router = _seam_router(mode)
 
     def compile_with_director(*, brief: dict, approach: dict, budget_cap: float, context: PlanInputs) -> dict:
         return compile_plan(brief, approach, budget_cap, context, router=router).plan
@@ -246,18 +275,18 @@ class _RoleModel:
         return self._router.generate(self._role, request).response
 
 
-def _worker_models() -> Mapping[str, Any]:
-    router = get_router()
+def _worker_models(mode: Mode = "replay") -> Mapping[str, Any]:
+    router = _seam_router(mode)
     return {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier")}
 
 
-def get_unit_runner() -> Any:
-    return DefaultUnitRunner(cast(Any, _worker_models()))
+def get_unit_runner(mode: Mode = "replay") -> Any:
+    return DefaultUnitRunner(cast(Any, _worker_models(mode)))
 
 
-def get_must_ask_providers() -> Mapping[str, Any]:
+def get_must_ask_providers(mode: Mode = "replay") -> Mapping[str, Any]:
     """The models `MustAsk` judges a unit with (FR-AGT-05), keyed by the unit's role; always the Router's roles."""
-    return _worker_models()
+    return _worker_models(mode)
 
 
 def _no_recipients(*, unit: dict, action_type: str, item: dict, brief: dict) -> dict:

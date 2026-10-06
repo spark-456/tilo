@@ -6,6 +6,8 @@ from fastapi.responses import JSONResponse
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import runs as _runs
+from tilo_api.access import AccessGate as _AccessGate
+from tilo_api.access_routes import router as _access_router
 from tilo_api.cards import build_router as _build_cards_router
 from tilo_api.console import build_router as _build_console_router
 from tilo_api.dispatch import router as _dispatch_router
@@ -17,6 +19,7 @@ from tilo_api.tasks import router as _tasks_router
 # strangers (issue #411). `app.openapi()` still works in-process for tests.
 _DOCS = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_url": None, "openapi_url": None}
 app = FastAPI(title="tilo-api", **_DOCS)
+app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration
 
 
 @app.exception_handler(_deps.ReplayOnly)
@@ -24,6 +27,7 @@ def _replay_only(_: Request, __: Exception) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": _deps.REPLAY_ONLY_MESSAGE, "replay_only": True})
 
 
+app.include_router(_access_router)
 app.include_router(intake_router)
 app.include_router(_dispatch_router)
 app.include_router(_redaction_router)
