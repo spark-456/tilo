@@ -8,6 +8,7 @@ branch | packages/providers/src/tilo_providers/dev_director.py | _block | dev-on
 branch | packages/providers/src/tilo_providers/dev_director.py | _brief_reply | dev-only fake: takes an ISO date out of the task text and echoes the text; every task gets the same shape
 branch | packages/providers/src/tilo_providers/prompts.py | neutralise_marker | neutralises prompt block delimiters in untrusted text
 branch | packages/providers/src/tilo_providers/replay.py | _scrub_authorization_like | redacts credential-shaped strings from recordings (PRD 16.1 rule 4)
+branch | services/api/src/tilo_api/dev_run.py | dev_redact | dev-only stand-in for the shared secret redactor (FR-MEM-05, BQ-109); masks fixed secret shapes in synthetic text; no branch on task content
 branch | services/browser/src/tilo_browser/login.py | _asks_in_text | detects a page asking for a password or code, so the worker stops (Tilo never handles passwords)
 branch | services/browser/src/tilo_browser/masking.py | _mask | masks secrets in page text before it is stored or shown
 branch | services/browser/src/tilo_browser/masking.py | _mask_cards | masks Luhn-valid card numbers in page text
