@@ -303,6 +303,7 @@ def test_PPL_11c_s2b_PE_24_the_minutes_text_is_cleaned_and_redacted_like_every_o
     rig = meeting_rig(people_rig)
     meeting = rig.stored("meetings", "mt_q4_plan")
     doc = copy.deepcopy(transcript_case()["minutes"])
+    doc["meeting_id"] = "mt_dirty"
     doc["summary"][0]["text"] = f"Send the rate{hidden} sheet {secret}"
     doc["decisions"][0]["text"] = f"Use the new{hidden} column"
     rig.put_doc(Scope(meeting["org_id"], meeting["world_id"], meeting["owner"]), "art_minutes_dirty", doc)

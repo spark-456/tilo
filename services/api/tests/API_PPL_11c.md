@@ -19,18 +19,21 @@ public route), leaves the SEC-16 seams alone, makes no model call, builds no rou
 `LIVE` nor `TILO_JUDGE_LIVE`; the static scan of `tilo_api/people*.py` (`test_PPL_11a_gate_seams_and_dev.py`) still applies to
 every new module.
 
-## 0. Size and suggested split (about 1,100 hand-written lines in all; each slice is 400 or fewer and green on its own)
+## 0. Size and suggested split (about 850 hand-written lines in all; each slice is far under 400 and green on its own)
+
+A throw-away spike (never pushed) made every test in this ticket pass, which shows the interface is consistent and the tests
+are satisfiable: about 830 lines, of which route boilerplate is 250. Per slice, roughly:
 
 | Slice | What | Test file | Needs | About |
 | --- | --- | --- | --- | --- |
-| **S2a** (do first) | `POST /v1/meetings/{id}/delete` removes transcript, minutes and proposed derived records, tombstone last; confirm refuses a gone source; item-quote gone path needs the owner match | `test_PPL_11c_s2a_meeting_delete_and_derived_data.py` | none | 150 |
-| **S1** | work-item list, get, edit, done, snooze, reopen, not-mine | `test_PPL_11c_s1_work_items.py` | none | 300 |
-| **S1b** | put back | `test_PPL_11c_s1b_work_item_put_back.py` | S1 | 40 |
-| **S2b** | meeting get, edit, the minutes read | `test_PPL_11c_s2b_meeting_get_edit_minutes.py` | none | 200 |
-| **S3** | first person, email rules and uniqueness, memberships, roles | `test_PPL_11c_s3_directory.py` | none | 250 |
-| **S4** | body cap, idempotency key, rate cap, no whole-org listing on writes, no-store everywhere, dev CORS | `test_PPL_11c_s4_write_limits.py` | S1, S1b, S2a, S2b, S3 for the route list of the body-cap test | 250 |
-| **S5** | PE-12 events (`work_item.created`, `work_item.changed`), Desk worlds | `test_PPL_11c_s5_work_item_events.py` | S1, S1b, S3; S4 for one test; ADR-0009 contract change for the dev test | 150 |
-| **S6** | `meeting.world_id` | `test_PPL_11c_s6_meeting_world.py` | none; a one-row addition to `tilo_people.writes` | 80 |
+| **S2a** (do first) | `POST /v1/meetings/{id}/delete` removes transcript, minutes and proposed derived records, tombstone last; confirm refuses a gone source; item-quote gone path needs the owner match | `test_PPL_11c_s2a_meeting_delete_and_derived_data.py` | none | 120 |
+| **S1** | work-item list, get, edit, done, snooze, reopen, not-mine | `test_PPL_11c_s1_work_items.py` | none | 200 |
+| **S1b** | put back | `test_PPL_11c_s1b_work_item_put_back.py` | S1 | 20 |
+| **S2b** | meeting get, edit, the minutes read | `test_PPL_11c_s2b_meeting_get_edit_minutes.py` | none | 130 |
+| **S3** | first person, email rules and uniqueness, memberships, roles | `test_PPL_11c_s3_directory.py` | none | 160 |
+| **S4** | body cap, idempotency key, rate cap, no whole-org listing on writes, no-store everywhere, dev CORS | `test_PPL_11c_s4_write_limits.py` | S1, S1b, S2a, S2b, S3, S6 (the body-cap test lists every route; the first-person retry test needs S3) | 110 |
+| **S5** | PE-12 events (`work_item.created`, `work_item.changed`), Desk worlds | `test_PPL_11c_s5_work_item_events.py` | S1, S1b, S3; S4 for one test; ADR-0009 contract change for the dev test (it skips until then) | 80 |
+| **S6** | `meeting.world_id` | `test_PPL_11c_s6_meeting_world.py` | none; a one-row addition to `tilo_people.writes` | 40 |
 
 **Gating (the answer to "how do I gate them").** One tuple, `SLICE_PENDING` in `_ppl11c_lib.py`, one entry per file
 (`test_PPL_11c_s1_`, `test_PPL_11c_s1b_`, `test_PPL_11c_s2a_`, ...). `conftest.py` marks every node id that contains an
@@ -93,6 +96,9 @@ ever comes from a request body.** Text is cleaned (`clean_line`), then redacted 
   `problems` otherwise), **put-back** (a snoozed item gets `snoozed_until` null, an asked item is simply released; history
   `edited` either way; 409 for an item that is not parked; a done item is put back with reopen). The five action routes take
   `{}` (snooze: `{until}`) and nothing else.
+* **Authorisation comes before the record's own schema check**: a request for an item the caller may not touch is the one
+  404 even when the record it would produce is schema-invalid (a Tilo-made `done` item needs `confirmed_by`); 422 is for what
+  the caller's own text and numbers got wrong.
 * Every write: `decide`, then the record rebuilt from the stored one plus `updated_at = now` and exactly one history entry
   `{at: now, by: actor, change, status}`, `check_write`, compare-and-set. A second `done` on a done item is 404 or 409 and
   changes nothing. A success moves exactly one version; a refusal moves none.
@@ -101,7 +107,8 @@ ever comes from a request body.** Text is cleaned (`clean_line`), then redacted 
 ## 3. Meetings (FR-MTG-10, PE-05, PE-07, PE-13, PE-16, PE-19, PE-22 to PE-24)
 
 * **Delete** (S2a). Order: transcript and minutes artifacts removed through the artifact store (every blob generation and
-  record, the meeting's own `Scope`), then the *proposed* work items, pins and calendar entries whose `source.ref` is the
+  record, the meeting's own `Scope`; the existing FR-MEM-09 adapter `ArtifactStore.retention().delete(record_path)` with
+  `orgs/<org>/worlds/<world>/artifacts/<artifact>/versions/<six digits>` does it), then the *proposed* work items, pins and calendar entries whose `source.ref` is the
   meeting or an action item of it (`mt_x`, `mt_x#aiN`) removed from their stores, then `meeting_tombstone` by compare-and-set
   (the last step). It needs the artifact store: unwired, every caller gets 503 `not_configured` and nothing changes (no
   oracle). A failing artifact store is 503 `unavailable`, the meeting still live, every record still there; the same call
@@ -168,10 +175,10 @@ the writer stamps the rest. Seams: `deps.get_event_writer()` (existing; producti
 object with `desk_world(org_id: str, user_id: str) -> str`**, idempotent, creates the person's one Desk world lazily
 (`w_desk_<user id without "u_">`); production default 503 `not_configured`; dev mode wires one over its `Store`
 (`WorldRecord(owner=user, districts={})`), so `DevEventWriter` accepts the event. Order: refuse first (no event, no world),
-then commit, then append once; a failed append or Desk world undoes the write by compare-and-set and answers 503 (content
-restored; the version may move twice), so no row looks changed without its event (HR-1, PE-30). A lost compare-and-set
+then commit, then resolve the Desk world and append once; a failed append or Desk world undoes the write by compare-and-set
+(a created record is deleted) and answers 503 (content restored; the version may move twice), so no row looks changed without its event (HR-1, PE-30). A lost compare-and-set
 writes nothing. Unwired event writer or Desk worlds: every work-item write is 503 `not_configured` and commits nothing.
-**Needs contract change (accepted ADR-0009, architect PR still to land):** `event.schema.json` `district_list` has
+**Needs contract change (accepted ADR-0009, architect PR still to land; the dev-mode test skips until it does):** `event.schema.json` `district_list` has
 `minItems: 1`, so `vis: []` fails the schema and the dev writer's validation. The tests assert `vis == []` and validate the
 event with `vis` widened to `"all"` until then; the dev-mode test stays red until the contract change merges.
 
@@ -249,3 +256,17 @@ pinned four.
 15. Not done here, listed for follow-ups: the `owners()` sub-dependency note and the Firestore create-if-absent (#464), the
     `google` source owner and the plate `mine` check order (#462), `_MASK` linearity and quote word-boundary fallback (#456),
     PE-23/PE-24 amendment and `maxItems` on the history arrays (architect), invalid crossref cases for the stricter gone path.
+
+## 11. Needs contract change, package change, user decision
+
+* **Contract:** none for the routes. ADR-0009's `event.schema.json` change (`district_list` loses `minItems: 1`, EV-13 allows
+  `[]` only when `district` is null) must merge before S5's dev-mode test can run; until then `vis: []` is asserted on the part
+  and the schema check widens `vis`. The architect should also add `maxItems` to the history arrays, the stricter gone path to
+  PE-23, and an invalid crossref case for it (follow-ups of #456).
+* **`packages/people` (not `contracts/`):** `check_write` needs one row for adding `world_id` (S6); `INDEXES` may want
+  `work_item`, `pinboard_item` and `calendar_entry` lookups by `source.ref` so a meeting delete does not scan the org (S2a).
+* **Existing PPL-11a test changed:** `test_PPL_11a_PE_17_an_org_owner_creates_a_person_...` created the same person twice and
+  expected two ids; with email uniqueness (S3) the second differs in its address. The property it pins (distinct minted ids)
+  is unchanged.
+* **User decisions:** (1) does deleting a meeting also delete the active personal pins and accepted calendar entries Tilo made
+  from it (ambiguity 5)? (2) FR-MTG-01 attestation: still stamped automatically on create (#464, unchanged here).

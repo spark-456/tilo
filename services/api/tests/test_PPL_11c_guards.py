@@ -12,6 +12,7 @@ from _ppl11c_lib import PERSON_BODY, confirmed_item, gone_meeting, transcript_ca
 from _sec15_lib import PINNED_PUBLIC_ROUTES
 
 CONTRACTS = pathlib.Path(__file__).resolve().parents[3] / "contracts"
+GOOD_EMAILS = ["nina@example.com", "n.p+tag@sub.example.co.uk", "A_B-c@Example.COM", "o'brien@example.com"]
 ALREADY_REFUSED_EMAILS = {
     "line separator": "ni" + u(0x2028) + "na@example.com",
     "tab": "ni\tna@example.com",
@@ -44,6 +45,17 @@ def test_PPL_11c_PE_09_an_email_the_contract_already_refuses_stays_a_422(people_
     before = rig.snapshot()
     assert rig.client.post("/v1/people", json={**PERSON_BODY, "email": email}).status_code == 422
     assert rig.snapshot() == before
+
+
+@pytest.mark.parametrize("email", GOOD_EMAILS)
+def test_PPL_11c_PE_09_an_ordinary_address_is_accepted_and_stored_as_typed(people_rig, email):
+    """The stricter email rule (slice 3) must not turn a real address away."""
+    rig = people_rig()
+    rig.add_people()
+    rig.as_user(OWNER)
+    response = rig.post("/v1/people", {**PERSON_BODY, "email": email})
+    assert response.status_code == 201, response.text[:200]
+    assert rig.stored("persons", response.json()["id"])["email"] == email
 
 
 @pytest.mark.parametrize("status", ["discarded", "deleted"])

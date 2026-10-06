@@ -30,7 +30,6 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 
 MEMBERSHIP_VIEW = {"id", "display_name", "org_role", "memberships"}
-GOOD_EMAILS = ["nina@example.com", "n.p+tag@sub.example.co.uk", "A_B-c@Example.COM", "o'brien@example.com"]
 BAD_EMAILS = {  # each is accepted by the contract's pattern today; the API refuses it (422)
     "NUL": "ni\x00na@example.com",
     "DEL": "ni\x7fna@example.com",
@@ -181,14 +180,6 @@ def test_PPL_11c_s3_PE_09_an_email_is_a_printable_ascii_address_or_a_422(people_
     rig2.as_user("u_founder")
     assert _first(rig2, _person(email=email)).status_code == 422, "the first person's address is checked too"
     assert rig.snapshot() == before and rig2.stored("persons", "u_founder") is None
-
-
-@pytest.mark.parametrize("email", GOOD_EMAILS)
-def test_PPL_11c_s3_PE_09_an_ordinary_address_is_accepted_and_stored_as_typed(people_rig, email):
-    rig = _org_owner_rig(people_rig)
-    response = rig.post("/v1/people", _person(email=email))
-    assert response.status_code == 201, response.text[:200]
-    assert rig.stored("persons", response.json()["id"])["email"] == email
 
 
 def test_PPL_11c_s3_PE_17_an_email_belongs_to_one_person_of_the_org_whatever_its_case(people_rig):

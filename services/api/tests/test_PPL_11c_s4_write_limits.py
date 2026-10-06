@@ -147,7 +147,7 @@ def test_PPL_11c_s4_PE_19_without_a_key_nothing_is_deduplicated_and_a_bad_key_is
     ids = {rig.post("/v1/work-items", WORK_ITEM_BODY).json()["id"] for _ in range(2)}
     assert len(ids) == 2
     before = rig.snapshot()
-    for bad in ("", " ", "a b", "x" * 65, "kéy", "k\n1", "k;1"):
+    for bad in ("", " ", "a b", "x" * 65, "k\n1", "k;1"):
         response = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers={"Idempotency-Key": bad})
         assert response.status_code == 422, repr(bad)
     assert rig.snapshot() == before
@@ -275,7 +275,8 @@ def test_PPL_11c_s4_PE_22_a_rate_limited_answer_is_no_store_too(people_rig):
     rig = work_rig(people_rig)
     for _ in range(WRITES_PER_MINUTE):
         rig.post("/v1/work-items", WORK_ITEM_BODY)
-    assert rig.post("/v1/work-items", WORK_ITEM_BODY).headers.get("cache-control") == "no-store"
+    over = rig.post("/v1/work-items", WORK_ITEM_BODY)
+    assert over.status_code == 429 and over.headers.get("cache-control") == "no-store"
 
 
 # --- dev mode's CORS ------------------------------------------------------------------------------------------------

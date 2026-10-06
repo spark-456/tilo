@@ -13,6 +13,8 @@ written only after the record committed; a refused or lost write writes nothing;
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 from _api_lib import FlakyEventWriter
 from _ppl11a_lib import MEERA, OWNER, PRIYA, SAM
@@ -32,6 +34,7 @@ from _ppl11c_lib import (
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+CONTRACTS = pathlib.Path(__file__).resolve().parents[3] / "contracts"
 PART_KEYS = {
     "id",
     "type",
@@ -126,7 +129,8 @@ def test_PPL_11c_s5_HR_1_a_refused_a_lost_or_a_read_only_request_writes_no_event
         rig.as_user(actor)
         assert act(rig, "done", "wi_own1").status_code == 404
     rig.as_user(PRIYA)
-    assert act(rig, "snooze", "wi_own1", {"until": "2020-01-01T00:00:00.000Z"}).status_code == 422
+    assert act(rig, "snooze", "wi_own1", {"until": "2020-01-01T00:00:00.000Z"}).status_code == 409
+    assert act(rig, "snooze", "wi_own1", {"until": "soon"}).status_code == 422
     assert act(rig, "reopen", "wi_own1").status_code == 409
     assert act(rig, "edit", "wi_own1", {"source": {"ref": "x"}}).status_code == 422
     rig.conflicting_stores("work_items")
@@ -213,13 +217,13 @@ def test_PPL_11c_s5_PE_19_without_the_writer_or_the_desk_worlds_every_work_item_
     assert rig.snapshot() == before
 
 
-def test_PPL_11c_s5_PE_19_a_desk_world_that_cannot_be_made_is_a_503_and_nothing_is_committed(people_rig):
+def test_PPL_11c_s5_PE_19_a_desk_world_that_cannot_be_made_is_a_503_and_the_write_is_undone(people_rig):
     rig = work_rig(people_rig)
-    before = rig.snapshot()
+    before = [s.record for s in rig.real.work_items.list(rig.org)]
     rig.desks.fail = True
     assert act(rig, "done", "wi_own1").status_code == 503
     assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 503
-    assert rig.snapshot() == before and emitted(rig) == []
+    assert [s.record for s in rig.real.work_items.list(rig.org)] == before and emitted(rig) == []
 
 
 def test_PPL_11c_s5_PE_19_a_retried_create_with_its_key_writes_one_event(people_rig):
@@ -261,10 +265,16 @@ def test_PPL_11c_s5_HR_1_events_equal_successful_writes_and_name_each_history_ch
 def test_PPL_11c_s5_PE_12_dev_mode_records_the_work_item_event_in_the_dev_owners_desk_world(monkeypatch):
     """Dev mode wires a Desk world per person over its in-memory `Store`, and its writer (which refuses an event with
     no `vis` and validates every event against the contract) accepts `vis: []` once ADR-0009's contract change lands."""
+    import json  # noqa: PLC0415
+
     from fastapi import FastAPI  # noqa: PLC0415
     from fastapi.testclient import TestClient  # noqa: PLC0415
     from tilo_api import deps, dev  # noqa: PLC0415
     from tilo_api.people import router  # noqa: PLC0415
+
+    contract = json.loads((CONTRACTS / "event.schema.json").read_text(encoding="utf-8"))
+    if contract["$defs"]["district_list"].get("minItems") == 1:
+        pytest.skip("needs contract change: ADR-0009 (district_list minItems 1 -> 0) is not in contracts/ yet")
 
     for name in ("LIVE", "K_SERVICE", "CLOUD_RUN_JOB"):
         monkeypatch.delenv(name, raising=False)
