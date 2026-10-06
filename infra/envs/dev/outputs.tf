@@ -145,6 +145,13 @@ output "gmail_push" {
   }
 }
 
+output "schedule_tick" {
+  description = "The scheduled-runs tick: one Scheduler job to harness (FR-AGT-14)."
+  value = merge(module.schedule_tick.tick, {
+    service_account = "${google_service_account.schedule_scheduler.account_id}@${var.project_id}.iam.gserviceaccount.com"
+  })
+}
+
 output "service_storage_grants" {
   description = "bucket::service::role => member for the bucket-scoped service grants (PRD 13.2)."
   value       = { for k, b in google_storage_bucket_iam_member.service_access : k => b.member }
