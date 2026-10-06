@@ -1,0 +1,26 @@
+{
+  "_note": "FR-PA-13 acceptance set (docs: services/api/tests/API_PPL_11b.md section 11): 20 questions, the expected fact intent, and for question 17 the title the answer narrows to. Copied from the pinned spec, not derived from any implementation.",
+  "questions": [
+    { "n": 1, "text": "What is on my plate?", "intent": "plate", "narrow_title": null },
+    { "n": 2, "text": "what's on my plate today", "intent": "plate", "narrow_title": null },
+    { "n": 3, "text": "Anything on my plate?", "intent": "plate", "narrow_title": null },
+    { "n": 4, "text": "What is waiting for me?", "intent": "waiting", "narrow_title": null },
+    { "n": 5, "text": "What needs my approval?", "intent": "waiting", "narrow_title": null },
+    { "n": 6, "text": "Is anything pending for me?", "intent": "waiting", "narrow_title": null },
+    { "n": 7, "text": "What is overdue?", "intent": "overdue", "narrow_title": null },
+    { "n": 8, "text": "Am I late on anything?", "intent": "overdue", "narrow_title": null },
+    { "n": 9, "text": "What is due soon?", "intent": "due_soon", "narrow_title": null },
+    { "n": 10, "text": "What's due in the next two days?", "intent": "due_soon", "narrow_title": null },
+    { "n": 11, "text": "What is on my calendar today?", "intent": "calendar_today", "narrow_title": null },
+    { "n": 12, "text": "What's my schedule for today?", "intent": "calendar_today", "narrow_title": null },
+    { "n": 13, "text": "Which pins am I tagged on?", "intent": "pins", "narrow_title": null },
+    { "n": 14, "text": "What is pinned for me?", "intent": "pins", "narrow_title": null },
+    { "n": 15, "text": "Which emails need a reply?", "intent": "mail", "narrow_title": null },
+    { "n": 16, "text": "How are my tasks going?", "intent": "tasks", "narrow_title": null },
+    { "n": 17, "text": "How is the launch site refresh going?", "intent": "tasks", "narrow_title": "Launch site refresh" },
+    { "n": 18, "text": "What is the status of my tasks?", "intent": "tasks", "narrow_title": null },
+    { "n": 19, "text": "What changed since yesterday?", "intent": "changed", "narrow_title": null },
+    { "n": 20, "text": "What's new?", "intent": "changed", "narrow_title": null }
+  ],
+  "unknown": ["Write me a poem about Mondays", "What is the capital of France?"]
+}
