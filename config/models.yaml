@@ -38,6 +38,9 @@ roles:
   writer: { primary: flash-38, fallback: flash-37 }
   narrator: { primary: lite-31, fallback: flash-37 } # fallback added for NFR-25 (BQ-18)
   autopilot: { primary: flash-37, fallback: lite-31, max_input_tokens: 16000 }
+  # issue #272 (b): the live scenario generator (evals/generator.yaml caps its spend) and its autorater.
+  generator: { primary: flash-38, fallback: flash-37, thinking: low }
+  autorater: { primary: flash-37, fallback: lite-31 }
   safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only; never a weaker fallback
 
 rules:

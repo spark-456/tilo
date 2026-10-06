@@ -284,7 +284,10 @@ class FakeWorld:
 
 class CaseFakeModel(ModelProvider):
     """The stand-in for the live Vertex provider of one (role, profile). Not `dev_only`: it is handed in through the
-    seam, so the live gate and the provider layer's own checks run exactly as they would for the real adapter."""
+    seam, so the live gate and the provider layer's own checks run exactly as they would for the real adapter.
+    `SYNTHETIC_FAKE` is what `record_with_fake` (issue #367) looks for before it takes a provider."""
+
+    SYNTHETIC_FAKE = True
 
     def __init__(self, world: FakeWorld, role: str, profile_id: str) -> None:
         self._world, self._role, self._profile_id = world, role, profile_id
