@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/event.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "Event",
-  "description": "TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-14 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.",
+  "description": "TiloEvent v1 (PRD 9.3). The harness is the only writer and one writer per world gives seq strictly increasing per world. type is any family.verb so that a newer type still parses (HR-5: an unknown type renders in the Trace only), but the harness emits registered types only, and data must match that type's schema in contracts/events/data/. Registry rules EV-01 to EV-16 are in contracts/event.rules.md. A side-effect type (registry side_effect: true) carries authz; the list in this schema's if equals the registry's and contracts-check fails if they drift. A policy never authorises a T3 action.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -165,7 +165,7 @@
       "items": { "$ref": "common.schema.json#/$defs/district_id" }
     },
     "trace": {
-      "description": "Trace lens columns (PRD 9.6). Each field is null when the event made no model or tool call.",
+      "description": "Trace lens columns (PRD 9.6). Each required field is null when the event made no model or tool call. tokens_cached (1.1.0, EFF-04, ADR-0022) is optional: left out means unknown, never zero; when present, tokens_in is a number and tokens_cached is at most tokens_in (EV-16).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -186,15 +186,25 @@
           "description": "Profile name from config/models.yaml, never a model id.",
           "anyOf": [{ "$ref": "providers.schema.json#/$defs/profile_id" }, { "type": "null" }]
         },
-        "tokens_in": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "tokens_in": {
+          "description": "Every input token the model calls behind this event processed, cached tokens included (ADR-0022).",
+          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        },
         "tokens_out": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
         "tool": {
           "description": "Tool or connector action called, e.g. send_email.",
           "anyOf": [{ "$ref": "common.schema.json#/$defs/slug" }, { "type": "null" }]
         },
         "latency_ms": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
-        "archive_ref": { "anyOf": [{ "$ref": "#/$defs/archive_ref" }, { "type": "null" }] }
-      }
+        "archive_ref": { "anyOf": [{ "$ref": "#/$defs/archive_ref" }, { "type": "null" }] },
+        "tokens_cached": {
+          "description": "Input tokens the provider served from its prompt cache, a part of tokens_in (EFF-04, ADR-0022). Set only when the provider reported a cached count for every model call behind this event; 0 is a reported miss. Left out means unknown, never zero; never null.",
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "if": { "required": ["tokens_cached"] },
+      "then": { "properties": { "tokens_in": { "type": "integer" } } }
     },
     "archive_ref": {
       "description": "Raw archive record (PRD 13.2): <run id>/<record seq in that run's archive>.",

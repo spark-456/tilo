@@ -57,6 +57,7 @@ class RouterAttempt:
     latency_ms: float = 0.0
     tokens_in: int | None = None
     tokens_out: int | None = None
+    tokens_cached: int | None = None  # EFF-04: cache reads, a part of tokens_in; None is unknown, never 0
     error_type: str | None = None
     reason: str | None = None  # why this attempt was made (the escalation or fallback reason)
 
@@ -102,6 +103,7 @@ def schema_error(response: GenerateResponse, schema: dict[str, Any]) -> str | No
 def _usage(attempt: RouterAttempt, response: GenerateResponse) -> None:
     if response.usage:
         attempt.tokens_in, attempt.tokens_out = response.usage.get("input_tokens"), response.usage.get("output_tokens")
+        attempt.tokens_cached = response.usage.get("cached_tokens")
 
 
 def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output_started: bool = False) -> None:
