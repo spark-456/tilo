@@ -274,12 +274,7 @@ module "service" {
       service = "harness"
       member  = "serviceAccount:${google_service_account.tasks_invoker.account_id}@${var.project_id}.iam.gserviceaccount.com"
     }
-    # The one Scheduler job that fires user schedules calls harness only
-    # (FR-AGT-14); the route checks this caller itself.
-    "harness::schedule-scheduler" = {
-      service = "harness"
-      member  = "serviceAccount:${google_service_account.schedule_scheduler.account_id}@${var.project_id}.iam.gserviceaccount.com"
-    }
+    # No entry for the schedule tick (FR-AGT-14): it calls public tilo-api, whose route checks its own OIDC caller.
   }
 
   depends_on = [google_project_service.apis]
@@ -778,8 +773,11 @@ module "gmail_push" {
 
 # ---------------------------------------------------------------------------
 # Scheduled runs (FR-AGT-14): one Scheduler job ticks every minute and POSTs
-# harness /internal/schedules/tick; the tick reads the due user schedules.
-# The service account holds run.invoker on harness only (extra_invokers).
+# api /internal/schedules/tick (the run lives in tilo-api; ADR-0023); the tick
+# reads the due user schedules. api is public and the route verifies the OIDC
+# caller itself, so the service account holds no IAM binding. The tick answers
+# 503 until the user sets TILO_SCHEDULE_TICK_AUDIENCE, TILO_SCHEDULE_TICK_CALLER
+# and TILO_SCHEDULES_STORE=firestore with TILO_FIRESTORE_PROJECT on tilo-api.
 # ---------------------------------------------------------------------------
 
 resource "google_service_account" "schedule_scheduler" {
@@ -795,8 +793,27 @@ module "schedule_tick" {
 
   project_id            = var.project_id
   region                = var.region
-  target_uri            = module.service.uris["harness"]
+  target_uri            = module.service.uris["api"]
   service_account_email = google_service_account.schedule_scheduler.email
 
   depends_on = [google_project_service.apis]
+}
+
+# The due query (`enabled == true ORDER BY next_due` on orgs/{org}/schedules, tilo_harness.schedule_store) needs this
+# composite index; without it the first live tick fails. The collection-scoped index covers every org's `schedules`.
+resource "google_firestore_index" "schedules_due" {
+  project     = var.project_id
+  database    = google_firestore_database.default.name
+  collection  = "schedules"
+  query_scope = "COLLECTION"
+
+  fields {
+    field_path = "enabled"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "next_due"
+    order      = "ASCENDING"
+  }
 }

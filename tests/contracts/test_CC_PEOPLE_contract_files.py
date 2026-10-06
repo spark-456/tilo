@@ -40,7 +40,10 @@ def test_CC_PEOPLE_FR_WLD_02_schema_file_follows_the_contract_conventions(repo_r
     jsonschema.Draft202012Validator.check_schema(schema)
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert schema["$id"] == f"https://contracts.tilo.example/{name}.schema.json"
-    assert schema["x-version"] == ("1.1.0" if name == "meeting" else "1.0.0"), "meeting 1.1.0 adds world_id (ADR-0020)"
+    if name == "meeting":  # 1.1.0 adds world_id (ADR-0020); 1.2.0 tightens the link check (ADR-0016 decision 14)
+        assert tuple(map(int, schema["x-version"].split("."))) >= (1, 2, 0), "meeting is 1.2.0 or later"
+    else:
+        assert schema["x-version"] == "1.0.0"
     assert schema["title"] == title
     assert "allOf" not in schema, "contracts/CLAUDE.md: avoid a root-level allOf (open intersection types)"
     if name != "ui_action":

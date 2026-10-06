@@ -36,6 +36,10 @@ export interface Decision {
   yes: string;
   icon: string;
   done: string;
+  /** Additive designed copy (the reference shell's toast when this is approved). */
+  toast: string;
+  /** Additive designed copy (the notification title once this is approved). */
+  approvedTitle: string;
   /** Additive (not in the prototype): what the decision is about. Merged in `fixtures/index.ts`. */
   facts?: DecisionFacts;
 }
@@ -382,4 +386,75 @@ export interface DecideAck extends Ack {
 }
 export interface StartAck extends Ack {
   world: World;
+}
+
+// Page fixtures (WEB-1d): designed content the Team, Connectors and Profile pages must not hard-code.
+// Not in tilo-app.js; hand-written from the reference pages (fixtures/teamPolicy.ts and the others).
+export interface TeamPolicy {
+  /** What a role may spend. An Approver keeps the person's own `limit` from `Team.people` until the role changes. */
+  roleLimits: Record<"Owner" | "Approver" | "Member" | "Viewer", string>;
+  /** The wait shown for the slow coverage row once a backup is added. */
+  backupWait: string;
+}
+export interface ConnectorTerms {
+  /** How long a reconnect lasts: "<name> reconnected for <reconnectDays> days". */
+  reconnectDays: number;
+}
+export type SessionIcon = "laptop" | "phone" | "screen";
+export interface ProfileSession {
+  id: string;
+  /** Device and app, e.g. "MacBook Pro · Chrome". */
+  device: string;
+  place: string;
+  /** e.g. "active now", "2 hours ago", "yesterday". */
+  lastActive: string;
+  /** Extra tail after last active; the sub line is [place, lastActive, note] joined with " · ". */
+  note?: string;
+  current?: boolean;
+  icon: SessionIcon;
+}
+export interface ProfileInvoice {
+  id: string;
+  /** e.g. "September 2026"; the row title is `${period} · ${seats} seats`. */
+  period: string;
+  seats: number;
+  amount: string;
+  status: "Paid";
+}
+export interface PaymentMethod {
+  brand: string;
+  last4: string;
+  billingEmail: string;
+}
+export interface PlanInfo {
+  name: string;
+  seats: number;
+  /** The blurb is `${seats} seats, ${perks}. Renews ${renews}.` */
+  perks: string;
+  renews: string;
+  /** Month the agent-spend card is labelled with (the eyebrow upper-cases it). */
+  spendMonth: string;
+}
+export interface NotificationRow {
+  id: "decisions" | "spend" | "finished" | "digest" | "weekly";
+  label: string;
+  description: string;
+  phone: boolean;
+  email: boolean;
+  slack: boolean;
+}
+export interface QuietHours {
+  on: boolean;
+  start: string;
+  end: string;
+  /** Phone stays silent except decisions over this amount. */
+  threshold: string;
+}
+export interface ProfileSettings {
+  sessions: ProfileSession[];
+  invoices: ProfileInvoice[];
+  payment: PaymentMethod;
+  plan: PlanInfo;
+  notifications: NotificationRow[];
+  quiet: QuietHours;
 }

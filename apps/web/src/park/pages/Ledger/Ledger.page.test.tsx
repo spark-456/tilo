@@ -14,6 +14,7 @@ import {
   q,
   qa,
 } from "../../../../test-support/park/componentsHarness";
+import { decisions } from "../../api/fixtures";
 import { NotBuilt } from "../../api/liveApi";
 import { ParkProvider, useApp, useParkStore } from "../../app/context";
 import type { ParkStore } from "../../app/store";
@@ -72,6 +73,7 @@ async function renderLedger(opts: RenderOpts = {}) {
   const store = held;
   if (!store) throw new Error("the shell did not mount");
   act(() => {
+    store.setDecisions(decisions); // what the shell hands over once the Api has returned them (WEB-3b)
     for (const [key, value] of Object.entries({ time: opts.time, ...opts.prefs }))
       if (value !== undefined) store.setPref(key, value);
   });

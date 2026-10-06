@@ -21,7 +21,7 @@ import threading
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Any, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, cast
 
 from fastapi import Depends, HTTPException, Request
 from tilo_archive import RunArchive
@@ -44,6 +44,13 @@ from tilo_providers.safety import build_safety_provider
 
 from tilo_api import events
 from tilo_api.access import AccessStore, Mode, provider_mode
+from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
+from tilo_api.people_access import NoSourceOwners
+from tilo_api.people_access import SourceOwners as PanelSourceOwners
+
+if TYPE_CHECKING:
+    from tilo_api.assistant.core import Decider
+    from tilo_api.assistant.metering import DecisionCache, SpendLedger
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
 Channel = Literal["web", "mobile_web", "email"]  # WhatsApp removed: SD-01, ADR-0019
@@ -84,6 +91,7 @@ class WorldRecord:
     run_id: str = "r_village_basic_1"  # the world's current run; tilo-api reads this, never invents it
     paused: bool = False  # true once Pause all has actually paused this world (PRD 9.4 honesty:
     # only ever true together with a world.paused event queued or committed somewhere)
+    prior_world_id: str | None = None  # a scheduled run's previous world (FR-AGT-14b): offered, never silently reused
 
 
 @dataclass
@@ -437,3 +445,84 @@ def get_attempt_abandon_after_s() -> float:
     """How long an append may stay in flight before dispatch presumes it lost and resends the same
     event id (idempotent, EV-10)."""
     return _dispatch_config("attempt_abandon_after_s", _DEFAULT_ABANDON_AFTER_S)
+
+
+# --- the assistant panel seams (PPL-11b, services/api/tests/API_PPL_11b.md): each default refuses until wired ---
+
+
+class PlateSource(Protocol):
+    """ADR-0021: the one plate builder, for the signed-in person only (PE-26). PPL-11a supplies it (BQ-PPL11B-15)."""
+
+    def build(self, user: str, now: str) -> dict: ...
+
+
+class _PlateBuilder:
+    """The panel's `PlateSource` over PPL-11a's one plate builder (ADR-0021, BQ-PPL11B-15)."""
+
+    def __init__(self, stores: PeopleStores, sources: PlateSources, owners: SourceOwners) -> None:
+        self._stores, self._sources, self._owners = stores, sources, owners
+
+    def build(self, user: str, now: str) -> dict:
+        from tilo_api.people_plate import build_plate  # noqa: PLC0415  (people_plate imports this module)
+
+        plate = build_plate(self._stores, self._sources, self._owners, ORG_ID, user, now)
+        if plate is None:
+            raise LookupError("no such person")
+        return plate
+
+
+def get_plate_source(
+    stores: Annotated[PeopleStores, Depends(get_people_stores)],
+    sources: Annotated[PlateSources, Depends(get_plate_sources)],
+    owners: Annotated[SourceOwners, Depends(get_source_owners)],
+) -> PlateSource:
+    return _PlateBuilder(stores, sources, owners)  # each seam is 503 `not_configured` until wired
+
+
+def get_panel_source_owners() -> PanelSourceOwners:
+    return NoSourceOwners()  # fail closed until PPL-31 and PPL-11a read the owner from the source store (BQ-PPL11B-13)
+
+
+def get_assistant_config() -> AssistantConfig:
+    """Read on every call; an unusable file closes the panel (503) and the log names the key path only."""
+    try:
+        return load_assistant_config()
+    except AssistantConfigError as exc:
+        logger.warning("assistant config unusable: %s", exc)
+        raise HTTPException(status_code=503, detail="not_configured") from exc
+
+
+@functools.cache
+def get_spend_ledger() -> SpendLedger:
+    """The panel's daily allowance per person (FR-PA-19): in memory and process-wide until a shared store exists
+    (BQ-PPL11B-6), like `get_outbox_store`."""
+    from tilo_api.assistant.metering import InMemorySpendLedger  # noqa: PLC0415  (metering imports the model modules)
+
+    return InMemorySpendLedger()
+
+
+@functools.cache
+def get_decision_cache() -> DecisionCache:
+    from tilo_api.assistant.metering import InMemoryDecisionCache  # noqa: PLC0415
+
+    config = get_assistant_config()
+    return InMemoryDecisionCache(per_user_entries=config.cache_per_user_entries, ttl_hours=config.cache_ttl_hours)
+
+
+def get_assistant_decider(mode: Annotated[Mode, Depends(get_mode)] = "replay") -> Decider | None:
+    """The model fallback (FR-PA-14, FR-PA-19): the metered decider over the Router, or None, and the panel answers
+    by rules only. None when the `assistant` role is not configured (dev mode), has no caps or no price, or the
+    router or the safety provider is unavailable."""
+    from tilo_api.assistant.metering import MeteredDecider  # noqa: PLC0415
+    from tilo_api.assistant.model import AssistantModelUnavailable, ModelDecider  # noqa: PLC0415
+
+    try:
+        config = get_assistant_config()
+        providers = providers_config()
+        if config.model["role"] not in providers.roles:
+            return None
+        router = _seam_router(mode)
+        inner = ModelDecider(router=router, providers=providers, safety=get_safety(), config=config)
+        return MeteredDecider(inner, ledger=get_spend_ledger(), cache=get_decision_cache(), config=config)
+    except (HTTPException, ProviderConfigError, AssistantModelUnavailable):
+        return None

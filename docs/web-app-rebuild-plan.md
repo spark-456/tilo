@@ -141,6 +141,7 @@ Parity backlog (differences known against the reference, to refine later):
 | Disabled Button and Switch | opacity .6 chosen; the reference has no single disabled style | decide with the user | WEB-2 |
 | Popover and Menu | fixed at top 86, right 16, no placement prop yet | the shell places them (WEB-3) | WEB-2 |
 | Variants | listed in 8c | page tickets | WEB-2 |
+| Parity harness reference server | `decodeURIComponent` in `e2e/park/parity/refServer.ts` sits outside its try block, so a request like `/%` throws an unhandled URIError that can stop the Playwright worker (local dev tool on 127.0.0.1 only); no test yet drives the "route found" path | wrap it and answer 400; add a "route found" case once the first `/park` page is registered | WEB-PARITY (#480 review) |
 
 ## 9. Decisions (approved 6 Oct 2026; logged in `docs/open-questions.md` as BQ-WEB-n)
 
