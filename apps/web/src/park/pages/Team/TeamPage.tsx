@@ -144,7 +144,12 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
   const [flags, setFlags] = useState<Record<string, boolean>>({});
 
   const pref = app.prefs.backup;
-  const lent = typeof pref === "string" && !backups.share ? { ...backups, share: pref } : backups;
+  // prefs.backup is the Ledger's backup for the row the fixture flags as slow.
+  const slowId = team.coverage.find((c) => c.slow)?.id;
+  const lent =
+    typeof pref === "string" && slowId && !backups[slowId]
+      ? { ...backups, [slowId]: pref }
+      : backups;
   const rows = coverRows(team, people, lent);
   const views = memberViews(people, rows, lent, data);
 
@@ -167,7 +172,7 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
     const who = people.find((p) => p.id === id);
     if (!who) return;
     setBackups((b) => ({ ...b, [row.id]: id }));
-    if (row.id === "share") app.setPref("backup", id);
+    if (row.flagged) app.setPref("backup", id);
     toast(`${who.name} is now a backup for ${row.what.toLowerCase()}`);
   };
 

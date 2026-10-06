@@ -37,6 +37,8 @@ export interface CoverRow {
   who: Member[];
   names: string;
   wait: string;
+  /** The fixture marks this row as the slow one: the row whose backup the Ledger asks for. */
+  flagged: boolean;
   slow: boolean;
   single: boolean;
   opts: { id: string; name: string }[];
@@ -56,6 +58,7 @@ export function coverRows(team: Team, people: readonly Member[], backups: Backup
       single,
       names: who.map((p) => p.name.split(" ")[0]).join(", ") + (single ? " only" : ""),
       wait: extra && c.slow ? "About 20 min" : c.wait,
+      flagged: !!c.slow,
       slow: !!c.slow && !extra,
       opts: people
         .filter((p) => !p.pending && !p.you && p.role !== "Viewer" && !ids.includes(p.id))
