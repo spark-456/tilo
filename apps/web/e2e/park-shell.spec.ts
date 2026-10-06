@@ -98,7 +98,10 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       await page.goto("/park/nope");
       await expect(page.getByTestId("park-not-found")).toBeVisible();
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Page not found");
-      await expect(page.getByRole("link", { name: /home/i })).toHaveAttribute("href", "/park/home");
+      // WEB-3b: the nav has two more Home links, so the not-found page's own link is found inside it.
+      await expect(
+        page.getByTestId("park-not-found").getByRole("link", { name: /home/i }),
+      ).toHaveAttribute("href", "/park/home");
       await expect(page.locator('[data-testid^="park-page-"]')).toHaveCount(0);
       await expect(page).toHaveTitle("Page not found · Tilo");
       expect(problems).toEqual([]);
@@ -147,7 +150,8 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     }) => {
       await page.goto("/park/nope");
       const link = page.getByTestId("park-not-found").getByRole("link");
-      for (let i = 0; i < 4; i++) {
+      // WEB-3b: the nav comes first in the tab order (logo, six tabs, chip, three buttons), then the page.
+      for (let i = 0; i < 20; i++) {
         await page.keyboard.press("Tab");
         if (await link.evaluate((el) => el === document.activeElement)) break;
       }

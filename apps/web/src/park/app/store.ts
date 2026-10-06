@@ -1,4 +1,4 @@
-import { needsLeft as countNeedsLeft, makeWorld } from "../api/fixtures/worlds";
+import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
 // The shell store (README "State and data"; the prototype class in `Tilo App.dc.html`: decide, undo,
 // addWorld, toast, go, needsLeft). Framework-free: React reads it through useSyncExternalStore in
 // context.tsx. State is replaced on every change, never mutated. The one timer is the toast's, and it
@@ -23,7 +23,7 @@ export interface ToastState {
   action: (() => void) | undefined;
 }
 
-/** The world-opening overlay of the prototype; WEB-3b sets it. */
+/** The world-opening overlay of the prototype: the world and the step the loader has reached (0 to 3). */
 export interface WorldLaunch {
   id: string;
   step: number;
@@ -53,8 +53,15 @@ export interface ParkStore {
   dismissToast(): void;
   setPref(key: string, value: unknown): void;
   go(page: PageId, params?: Params): void;
+  /** The loader first (README "Open a world"), the page at its third step. An unknown id just goes. */
+  openWorld(id: string): void;
+  /** Opens the menu, or closes it when it is the one open. Opening the notifications reads them. */
+  toggleMenu(menu: "notif" | "acct"): void;
+  closeMenu(): void;
   markRead(): void;
   noteSource(source: Source): void;
+  /** Cancels every timer the store holds (the toast's and the loader's). */
+  dispose(): void;
 }
 
 export interface ParkStoreDeps {
@@ -64,6 +71,8 @@ export interface ParkStoreDeps {
   now?: () => number;
 }
 
+/** Milliseconds per loader step: cities take longer to wake (README "Open a world"). */
+const STEP_MS = { City: 340, other: 250 } as const;
 const MOTIONS: readonly Motion[] = ["lively", "calm", "still"];
 
 const derive = (prefs: Record<string, unknown>, dec: Dec) => ({
@@ -91,6 +100,7 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
   };
   const listeners = new Set<() => void>();
   let cancelToast: (() => void) | null = null;
+  let cancelLoader: (() => void) | null = null;
 
   const set = (next: ParkState): void => {
     state = next;
@@ -118,6 +128,11 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
   };
   const toast = (message: string, actionLabel?: string, action?: () => void): void =>
     set({ ...state, toast: arm(message, actionLabel, action) });
+
+  const stopLoader = (): void => {
+    cancelLoader?.();
+    cancelLoader = null;
+  };
 
   const update = (patch: Partial<Pick<ParkState, "dec" | "added" | "prefs" | "toast">>): void => {
     const merged = { ...state, ...patch };
@@ -166,13 +181,57 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
       quiet(api.setPref(key, value));
       update({ prefs: { ...state.prefs, [key]: value } });
     },
-    go: (page, params) => navigate(parkPath(page, params)),
+    go(page, params) {
+      if (state.menu !== null) set({ ...state, menu: null });
+      navigate(parkPath(page, params));
+    },
+    openWorld(id) {
+      stopLoader();
+      const world = worlds(state.dec, state.added).find((w) => w.id === id);
+      if (!world) {
+        set({ ...state, wl: null, menu: null });
+        navigate(parkPath("world", { id }));
+        return;
+      }
+      const ms = world.tier === "City" ? STEP_MS.City : STEP_MS.other;
+      // One timer at a time: each tick sets the step and arms the next. Step 3 swaps the page under the
+      // card; the fourth tick removes the card.
+      const arm = (next: number): void => {
+        cancelLoader = schedule(() => run(next), ms);
+      };
+      const run = (step: number): void => {
+        if (step > 3) {
+          cancelLoader = null;
+          set({ ...state, wl: null });
+          return;
+        }
+        set({ ...state, wl: { id, step } });
+        if (step === 3) navigate(parkPath("world", { id }));
+        arm(step + 1);
+      };
+      set({ ...state, wl: { id, step: 0 }, menu: null });
+      arm(1);
+    },
+    toggleMenu(menu) {
+      set({
+        ...state,
+        menu: state.menu === menu ? null : menu,
+        read: menu === "notif" ? true : state.read,
+      });
+    },
+    closeMenu() {
+      if (state.menu !== null) set({ ...state, menu: null });
+    },
     markRead() {
       if (!state.read) set({ ...state, read: true });
     },
     noteSource(source) {
       if (state.sources[source]) return;
       set({ ...state, sources: { ...state.sources, [source]: true } });
+    },
+    dispose() {
+      stopLoader();
+      clearTimer();
     },
   };
 }
