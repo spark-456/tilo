@@ -156,6 +156,9 @@ _NUMBER_WORDS = frozenset(
     "eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety dozen hundred hundreds thousand thousands "
     "million millions billion billions trillion lakh lakhs lac lacs crore crores mil mn bn cr".split()
 )
+# a name word, apostrophes dropped, made only of number words (+ "k", "grand", "s") is a number ("Fifty'Thousand")
+_NUMBERISH = re.compile("(?:" + "|".join(sorted(_NUMBER_WORDS, key=len, reverse=True)) + ")+(?:k|grand|s)?")
+_NAME_WORD_MAX = 24  # a longer word is no name: the check stays bounded (a 20k-character word is read no further)
 _WORDS = frozenset(
     (
         "hi hello hey dear good morning afternoon evening night thanks thank you your very much so again for "
@@ -203,16 +206,25 @@ def _sign_off(items: list[str]) -> bool:
     return bool(words) and all(w in _SIGN_OFF for w in words) and all(i[0].isalpha() or i in ",.!" for i in items)
 
 
+def _numberish(word: str) -> bool:
+    """CHN-GATE-D: `word` (lower case) is no name: too long, or number words only once its apostrophes are dropped."""
+    word = word.replace("'", "")
+    return len(word) > _NAME_WORD_MAX or bool(_NUMBERISH.fullmatch(word))
+
+
 def _name_run(lines: list[list[str]], index: int, start: int, greeting: bool) -> list[str]:
     """CHN-GATE-D: the name run of `lines[index]` from item `start`: at most two Title-case words of two letters or more
-    that are neither listed words nor number words. It counts only when it ends properly: a greeting run with "," or
-    "!", or with its line when a blank line (or the end) follows; a signature run with its line. "-" and "_" are items
-    of their own, so "Fifty Thousand-ok" ends in "-", not in a name. Anything else gives no name at all."""
+    that are neither listed words nor number words (the join of the two too: "Fif Ty"). It counts only when it ends
+    properly: a greeting run with "," or "!", or with its line when a blank line (or the end) follows; a signature run
+    with its line. "-" and "_" are items of their own, so "Fifty Thousand-ok" ends in "-", not in a name. Anything else
+    gives no name at all."""
     items = lines[index]
     run: list[str] = []
     for item in items[start : start + 2]:
         word = item.lower()
-        if not (len(item) > 1 and item.istitle() and word not in _WORDS and word not in _NUMBER_WORDS):
+        if not (len(item) > 1 and item.istitle() and word not in _WORDS and not _numberish(word)):
+            break
+        if run and _numberish(run[-1] + word):
             break
         run.append(word)
     after = items[start + len(run)] if start + len(run) < len(items) else None
@@ -284,7 +296,7 @@ def _unlisted(cleaned: str) -> bool:
                 if len(run) > 2:
                     return True
                 joins = ("".join(run[-n:]) for n in range(2, len(run) + 1))
-                if any(p.search(j) for j in joins for _, p in _FAMILIES):
+                if any(_numberish(j) or any(p.search(j) for _, p in _FAMILIES) for j in joins):
                     return True
             else:
                 if run and item[0].isalpha():
