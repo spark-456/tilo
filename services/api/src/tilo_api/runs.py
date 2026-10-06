@@ -126,6 +126,7 @@ class Run:
     def __init__(self, store: deps.Store, task: deps.TaskRecord, approach: dict, cap: float, seams: Seams) -> None:
         self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)
         self.org_id = deps.ORG_ID  # the run's artifact Scope is (org_id, world_id, owner); never a request's
+        self.scope: Scope | None = None  # set when the run starts
         self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
         self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
@@ -332,7 +333,7 @@ class Run:
         if config is None:
             return
         try:  # the run's own Scope and raw archive (ADR-0018 T4); never named by a request
-            scope = Scope(org_id=self.org_id, world_id=self.world_id, owner=self.owner)
+            self.scope = scope = Scope(org_id=self.org_id, world_id=self.world_id, owner=self.owner)
             archive = self.seams.open_archive(org_id=self.org_id, run_id=self.run_id)
         except Exception as exc:
             logger.warning("run %s: no artifact scope or archive (%s)", self.run_id, type(exc).__name__)
@@ -423,7 +424,13 @@ class Run:
         if not (isinstance(destination, str) and destination.strip() and isinstance(recipients, list) and recipients
                 and all(isinstance(r, str) and r.strip() for r in recipients)):  # fmt: skip
             raise _GateFailed("the send has no recipients or no destination")  # fails closed, before any gate
-        facts = tilo_policy.SideEffectFacts(recipients=tuple(recipients), known_recipients=tuple(known or ()))
+        try:  # AR-07, OB-05, BQ-264: from the stored record, never a default; only a `clean` verdict clears the flag
+            flagged = self.seams.artifacts.head(self.scope, item).record["screening"] != "clean"
+        except Exception as exc:
+            raise _GateFailed("the item to send is not in the run's store") from exc
+        facts = tilo_policy.SideEffectFacts(
+            recipients=tuple(recipients), known_recipients=tuple(known or ()), safety_flags=flagged
+        )
         proposal = tilo_policy.Proposal(self.world_id, action, connector, district, destination, facts, item, 0, None)
         decision = tilo_policy.decide(
             proposal, table=tilo_policy.load_risk_table(), policies=list(self.store.policies.values()),

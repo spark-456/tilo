@@ -8,8 +8,9 @@ gets exactly the buffer's bytes (`bytes(memoryview(content))`), so a caller's `l
 `retries.max_attempts` in all; the others keep their keys. Every other failure raises `OutputRefused` and the unit
 fails with nothing announced. What a refused unit stored stays unannounced, so invisible (s6), and would put the
 store's next version ahead of EV-15's (#393), so every refusal known before a put is checked first for every output:
-kind and size, a parent the world recorded, and a dry run of the manifest (claims MF-01, MF-06, sources). Only
-refusals the store alone sees can still leave such a version (the store has no purge API).
+kind, size and text (UTF-8, not blank), a parent the world recorded (then put as that checked ref), and a dry run of
+the manifest (claims MF-01, MF-06, sources). Only refusals the store alone sees can still leave such a version (the
+store has no purge API).
 `existing` accepts refs of versions the store holds in the run's Scope (AR-03) and the world recorded (`recorded`).
 """
 
@@ -118,12 +119,12 @@ def keep(
 
     kept: list[Kept] = []
     try:
-        for out in outputs:  # every output's known refusals before the first put (#393)
-            _preflight(artifacts, scope, out, recorded, manifest_of)
-        for i, out in enumerate(outputs):
+        # every output's known refusals before the first put (#393); each parent as the store's own ref, used as is
+        parents = [_preflight(artifacts, scope, out, recorded, manifest_of) for out in outputs]
+        for i, (out, parent) in enumerate(zip(outputs, parents, strict=True)):
             for attempt in range(max_attempts):
                 try:
-                    kept.append(_put(artifacts, scope, out, run_id, unit, worker, f"{attempt}:{i}"))
+                    kept.append(_put(artifacts, scope, out, parent, run_id, unit, worker, f"{attempt}:{i}"))
                     break
                 except ArtifactCorrupt:  # never clears under that key (AR-01): only this output takes a new key
                     continue
@@ -136,18 +137,31 @@ def keep(
     return kept
 
 
-def _preflight(artifacts: Any, scope: Any, out: UnitOutput, recorded: Callable[[str], int], manifest_of: Any) -> None:
-    """Raises for what the store or the manifest would refuse that is known before a put: a unit's kind and size
-    (AR-04), a parent the world never recorded, and a dry run of the manifest (claims, sources; MF-01, MF-06)."""
+def _preflight(
+    artifacts: Any, scope: Any, out: UnitOutput, recorded: Callable[[str], int], manifest_of: Any
+) -> dict[str, Any] | None:
+    """Raises for what the store or the manifest would refuse that is known before a put: a unit's kind, size and
+    text (UTF-8, not blank; AR-04), a parent the world never recorded, and a dry run of the manifest (claims, sources;
+    MF-01, MF-06). Returns the parent as the store's own ref, or None."""
     if out.media_type not in TEXT_TYPES or not 0 < memoryview(out.content).nbytes <= MAX_TEXT:
         raise OutputRefused("an output is not 1 byte to 2 MB of text or JSON")
+    if not bytes(memoryview(out.content)).decode("utf-8").strip():  # UnicodeDecodeError on bad UTF-8
+        raise OutputRefused("an output's text is blank")
     parents = existing(artifacts, scope, [out.parent], recorded) if out.parent is not None else []
     ref = {"artifact_id": parents[0]["artifact_id"], "version": parents[0]["version"] + 1} if parents else _DRY_REF
     manifest_of(out, ref, b"", parents, [{"id": s["id"], "archive_ref": s["archive_ref"]} for s in out.sources])
+    return parents[0] if parents else None
 
 
 def _put(
-    artifacts: Any, scope: Any, out: UnitOutput, run_id: str, unit: Mapping[str, Any], worker: str, at: str
+    artifacts: Any,
+    scope: Any,
+    out: UnitOutput,
+    parent: dict[str, Any] | None,
+    run_id: str,
+    unit: Mapping[str, Any],
+    worker: str,
+    at: str,
 ) -> Kept:
     new = NewVersion(
         media_type=out.media_type,
@@ -156,7 +170,7 @@ def _put(
         origin=Origin(kind="unit", unit=unit["id"], agent=worker),
         sources=tuple(dict(source) for source in out.sources),
         idempotency_key=f"{run_id}:{unit['id']}:{at}",
-        parent=out.parent,
+        parent=parent,  # the ref the preflight checked, never the runner's object again
     )
     return Kept(artifacts.put(scope, new), out.label)
 
