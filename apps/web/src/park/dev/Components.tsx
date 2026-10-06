@@ -46,17 +46,19 @@ function ThemePanel({ time }: { time: "day" | "night" }) {
   const night = time === "night";
   const [entry, setEntry] = useState("all");
   const [level, setLevel] = useState("read");
+  const [board, setBoard] = useState("pinboard");
+  const [range, setRange] = useState("week");
   const [notes, setNotes] = useState(true);
   const [pins, setPins] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [said, setSaid] = useState("Nothing chosen yet");
 
   const menuItems: MenuItem[] = [
-    { id: "profile", label: "Profile and settings", icon: icon("pen"), onSelect: noop },
-    { id: "connectors", label: "Connectors", icon: icon("plug"), hint: "6 on", onSelect: noop },
-    { id: "team", label: "Team and roles", icon: icon("shield"), onSelect: noop },
-    { id: "mobile", label: "Mobile app", icon: icon("phone"), hint: "Concept", onSelect: noop },
-    { id: "signout", label: "Sign out", icon: icon("logout"), onSelect: noop },
+    { id: "profile", label: "Profile and settings", icon: icon("pen", 17), onSelect: noop },
+    { id: "connectors", label: "Connectors", icon: icon("plug", 17), hint: "6 on", onSelect: noop },
+    { id: "team", label: "Team and roles", icon: icon("shield", 17), onSelect: noop },
+    { id: "mobile", label: "Mobile app", icon: icon("phone", 17), hint: "Concept", onSelect: noop },
+    { id: "signout", label: "Sign out", icon: icon("logout", 17), onSelect: noop },
   ];
   const liveItems: MenuItem[] = menuItems.map((m) => ({
     ...m,
@@ -84,8 +86,11 @@ function ThemePanel({ time }: { time: "day" | "night" }) {
             <Button variant="secondary" size="sm">
               Keep learning
             </Button>
-            <Button variant="secondary" icon={icon("download")}>
+            <Button variant="secondary" icon={icon("download", 15)}>
               Export CSV
+            </Button>
+            <Button variant="secondary" size="sm" icon={icon("refresh", 13)}>
+              Sync now
             </Button>
             <Button variant="secondary" disabled>
               Save changes
@@ -118,20 +123,51 @@ function ThemePanel({ time }: { time: "day" | "night" }) {
           </div>
         </Demo>
 
-        <Demo id="seg-sliding" title="Segmented control, sliding thumb">
-          <div className="park-dev__row">
+        <Demo id="seg-sliding" title="Segmented control, sliding thumb (4)">
+          <div style={{ width: 268, maxWidth: "100%" }}>
             <SegmentedControl
               label="Tool access"
               options={[
-                { value: "off", label: "Off" },
-                { value: "read", label: "Read" },
-                { value: "draft", label: "Draft" },
-                { value: "act", label: "Act" },
+                { value: "off", label: "Off", tone: "ink2" },
+                { value: "read", label: "Read", tone: "sch" },
+                { value: "draft", label: "Draft", tone: "heroInk" },
+                { value: "act", label: "Act", tone: "amberInk" },
               ]}
               value={level}
               onChange={setLevel}
               sliding
-              itemWidth={64}
+            />
+          </div>
+        </Demo>
+
+        <Demo id="seg-sliding-lg" title="Segmented control, sliding thumb (2, large)">
+          <div style={{ width: 220, maxWidth: "100%" }}>
+            <SegmentedControl
+              label="Board style"
+              options={[
+                { value: "pinboard", label: "Pinboard" },
+                { value: "grouped", label: "Grouped" },
+              ]}
+              value={board}
+              onChange={setBoard}
+              sliding
+              size="lg"
+            />
+          </div>
+        </Demo>
+
+        <Demo id="seg-sliding-3" title="Segmented control, sliding thumb (3)">
+          <div style={{ width: 240, maxWidth: "100%" }}>
+            <SegmentedControl
+              label="Range"
+              options={[
+                { value: "day", label: "Day" },
+                { value: "week", label: "Week" },
+                { value: "month", label: "Month" },
+              ]}
+              value={range}
+              onChange={setRange}
+              sliding
             />
           </div>
         </Demo>
@@ -178,6 +214,7 @@ function ThemePanel({ time }: { time: "day" | "night" }) {
               onClick={() => setSaid("Opened the waiting tile")}
             />
             <KpiTile label="Waiting on you" value="£0" sub="Laptop Depot approved" tone="ok" />
+            <KpiTile label="Saved by memory" value="£640" sub="Up £120 on August" tone="sch" />
             <KpiTile
               label="Hours handed back"
               value="46 h"
@@ -191,14 +228,28 @@ function ThemePanel({ time }: { time: "day" | "night" }) {
           <div className="park-dev__stack">
             <ListRow
               lead={<ArtTile>{agent("builder", "neutral", 40, night)}</ArtTile>}
-              trail={<StatusChip tone="ok">Trusted</StatusChip>}
+              trail={
+                <>
+                  <StatusChip tone="ok" size="sm">
+                    Trusted
+                  </StatusChip>
+                  <span className="park-row__cost">£0.40 a run</span>
+                </>
+              }
             >
               <span className="park-row__title">Invoice run</span>
               <span className="park-row__sub">Routine · 3 agents</span>
             </ListRow>
             <ListRow
               lead={<ArtTile tint="amber">{agent("research", "needs", 40, night)}</ArtTile>}
-              trail={<StatusChip tone="amber">Needs you</StatusChip>}
+              trail={
+                <>
+                  <StatusChip tone="amber" size="sm">
+                    Needs an answer
+                  </StatusChip>
+                  <span className="park-row__cost">£0.55 a run</span>
+                </>
+              }
               onClick={() => setSaid("Opened Laptop Depot")}
             >
               <span className="park-row__title">Laptop Depot</span>
@@ -206,6 +257,7 @@ function ThemePanel({ time }: { time: "day" | "night" }) {
             </ListRow>
             <ListRow
               lead={<ArtTile tint="hero">{agent("builder", "focused", 40, night)}</ArtTile>}
+              // no cost line here: --ink3 on the selected row's --rowOn is 4.23:1 by day, the design's own pair
               trail={<StatusChip tone="hero">Learning</StatusChip>}
               selected
               onClick={() => setSaid("Opened Supplier brief")}

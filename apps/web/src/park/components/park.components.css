@@ -21,6 +21,16 @@
 [data-park] .park-menu__row {
   box-sizing: border-box;
   font-family: "Nunito Sans", sans-serif;
+}
+/* Tabular figures are app-wide in the reference, but its buttons use the browser's own reset. */
+[data-park] .park-chip,
+[data-park] .park-pill,
+[data-park] .park-kpi,
+[data-park] .park-row,
+[data-park] .park-card,
+[data-park] .park-sheet,
+[data-park] .park-toast,
+[data-park] .park-popover {
   font-variant-numeric: tabular-nums;
 }
 
@@ -148,18 +158,21 @@
   border-radius: 12px;
   background: var(--seg);
 }
+/* sliding: an N-column grid filling its container (the columns are set inline), no gap */
 [data-park] .park-seg--sliding {
   position: relative;
-  flex-wrap: nowrap;
+  display: grid;
+  gap: 0;
+  max-width: none;
 }
 [data-park] .park-seg__item {
   height: 32px;
-  padding: 0 12px;
+  padding: 0 11px;
   border: 0;
   border-radius: 9px;
   background: transparent;
   color: var(--ink2);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 800;
   cursor: pointer;
   white-space: nowrap;
@@ -169,22 +182,39 @@
   box-shadow: 0 1px 3px rgba(31, 29, 43, 0.16);
   color: var(--ink);
 }
-/* sliding: the items sit above the thumb and only change their text colour */
+/* sliding: the items sit above the thumb, flat, and only recolour their text */
 [data-park] .park-seg__item--slide {
   position: relative;
-  flex: none;
   padding: 0;
+  border-radius: 0;
 }
 [data-park] .park-seg__item--ink {
   color: var(--ink);
 }
+[data-park] .park-seg__item--ink2 {
+  color: var(--ink2);
+}
+[data-park] .park-seg__item--sch {
+  color: var(--sch);
+}
+[data-park] .park-seg__item--heroInk {
+  color: var(--heroInk);
+}
+[data-park] .park-seg__item--amberInk {
+  color: var(--amberInk);
+}
+/* lg: the reference's board-style toggle */
+[data-park] .park-seg__item--lg {
+  height: 34px;
+  font-size: 14px;
+}
 /* motion: restored in WEB-3 (BQ-WEB-3): the thumb's .4s cubic-bezier(.34,1.3,.5,1) slide. Its end state
-   is a transform set by the component (index * (item width + 2px)). */
+   is set inline by the component: width (100% - 6px) / N and translateX(index * 100%). */
 [data-park] .park-seg__thumb {
   position: absolute;
   top: 3px;
+  bottom: 3px;
   left: 3px;
-  height: 32px;
   border-radius: 9px;
   background: var(--tabOn);
   box-shadow: 0 1px 3px rgba(31, 29, 43, 0.16);
@@ -264,6 +294,17 @@
   background: var(--chip);
   color: var(--ink2);
 }
+/* sm: the reference's list-row chip (Skills library) */
+[data-park] .park-chip--sm {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
 
 /* ---- KPI tile ---- */
 [data-park] .park-kpi {
@@ -288,6 +329,10 @@
 [data-park] .park-kpi--ok {
   background: var(--okSoft);
   border-color: transparent;
+}
+[data-park] .park-kpi--sch {
+  background: var(--schSoft);
+  border: 1px solid transparent;
 }
 [data-park] .park-kpi--hero {
   background: var(--heroSoft);
@@ -316,6 +361,10 @@
 [data-park] .park-kpi--ok .park-kpi__label,
 [data-park] .park-kpi--ok .park-kpi__value {
   color: var(--okInk);
+}
+/* The design's own pair: --sch on --schSoft is 3.86:1 by day. It is the reference's value, kept as is. */
+[data-park] .park-kpi--sch .park-kpi__label {
+  color: var(--sch);
 }
 [data-park] .park-kpi--hero .park-kpi__label {
   color: var(--heroInk);
@@ -362,6 +411,12 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 3px;
+}
+[data-park] .park-row__cost {
+  color: var(--ink3);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 /* The design's row text: title 14.5/800, sub 12.5/700 --ink2, both on one line with an ellipsis. */
 [data-park] .park-row__title {

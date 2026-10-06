@@ -3,15 +3,14 @@
 import { cx } from "./cx";
 import "./park.components.css";
 
-export type KpiTone = "amber" | "ok" | "hero";
+export type KpiTone = "amber" | "ok" | "sch" | "hero";
 
 export interface KpiTileProps {
   label: string;
   value: string;
   sub?: string;
-  /** The design's tints: amber (waiting), ok (done), hero (hours). Plain when omitted. The Ledger's
-   * "Saved by memory" tint (label --sch on --schSoft, 3.86:1 by the design's own values) is not built:
-   * WEB-7 adds it with the parity decision. */
+  /** The design's tints: amber (waiting), ok (done), sch (memory), hero (hours). Plain when omitted.
+   * The sch label is --sch on --schSoft, 3.86:1 by day: the reference's own pair, kept as is. */
   tone?: KpiTone;
   onClick?: () => void;
 }
