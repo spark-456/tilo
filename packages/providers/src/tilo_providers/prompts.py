@@ -23,9 +23,11 @@ _GAP = r"[\s\u200b-\u200f\u2060\ufeff]*"  # whitespace and zero-width characters
 
 def neutralise_marker(text: str, marker: str) -> str:
     """Delimited data never closes its own block (PRD 16.3 item 1): the closing `<MARKER>>>>` is
-    broken whatever its case, spacing or zero-width characters, so only the template can end the block."""
+    broken whatever its case, spacing or zero-width characters, so only the template can end the block. The opening
+    `<<<MARKER` is broken the same way, so a block has exactly one of each (FR-INT-15 H9)."""
     closing = re.compile(_GAP.join((*map(re.escape, marker), *">>>")), re.IGNORECASE)
-    return closing.sub(f"{marker}> > >", text)
+    opening = re.compile(_GAP.join((*"<<<", *map(re.escape, marker))), re.IGNORECASE)
+    return opening.sub(f"< < <{marker}", closing.sub(f"{marker}> > >", text))
 
 
 class PromptNotFoundError(FileNotFoundError):

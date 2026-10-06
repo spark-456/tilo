@@ -120,6 +120,15 @@ notification channel and three alert policies. The Cloud Run services no
 longer show an in-place diff for the API-defaulted service-level `scaling`
 block, and the `secret_accessors` output is the same before and after a refresh.
 
+### What apply will add for scheduled runs (FR-AGT-14, on top of the above)
+
+Expect **3 to add, 0 to change, 0 to destroy**: the service account
+`tilo-schedule-scheduler`, its `run.invoker` binding on `tilo-harness` (the only
+grant it holds) and one Cloud Scheduler job, `tilo-schedule-tick` (every minute,
+UTC, OIDC, `retry_count` 1), which POSTs `/internal/schedules/tick` on harness. The
+route answers 503 until the Firestore schedule store and Cloud Tasks starter are
+wired, so the job fires into a 503 until then. Terraform only: the user applies it.
+
 ## Destroy
 
 ```powershell

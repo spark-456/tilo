@@ -1543,6 +1543,7 @@ dependencies = [
     { name = "tilo-memory" },
     { name = "tilo-policy" },
     { name = "tilo-providers" },
+    { name = "tzdata" },
     { name = "uvicorn" },
 ]
 
@@ -1565,6 +1566,7 @@ requires-dist = [
     { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-providers", editable = "packages/providers" },
+    { name = "tzdata", specifier = ">=2024.1" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 
