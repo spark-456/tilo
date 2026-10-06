@@ -79,7 +79,7 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src packages/memory/src services/render/src services/channels/src services/browser/src
+    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src packages/memory/src services/render/src services/channels/src services/browser/src packages/people/src
     pnpm -r exec tsc --noEmit
 
 # Start the Firestore emulator and run the harness skeleton against it (P0-09).
@@ -89,6 +89,10 @@ harness-skeleton:
 # Replay the eval set (no paid calls) into the git-ignored evals/results.local.md (evals/results.md is the committed pass record); exit 0 all passed, 1 a case failed, 2 error, 3 stopped at the credit cap (EFF-07).
 eval:
     uv run python -m tilo_evals run --pass full --results-md evals/results.local.md
+
+# EV-01..EV-15 metrics report from the replay set and the bank on fakes into the git-ignored evals/metrics.local.md; no paid calls; exit 2 if LIVE, K_SERVICE or CLOUD_RUN_JOB is set.
+eval-metrics:
+    uv run python -m tilo_evals metrics
 
 # PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
 conformance:

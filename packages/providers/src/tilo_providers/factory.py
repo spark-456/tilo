@@ -18,7 +18,12 @@ from tilo_providers.interfaces import Capability, ModelProvider
 
 
 def build_provider(
-    role_id: str, config: ProvidersConfig, *, fixtures_dir: Path | str, profile_id: str | None = None
+    role_id: str,
+    config: ProvidersConfig,
+    *,
+    fixtures_dir: Path | str,
+    profile_id: str | None = None,
+    live_permitted: bool = False,
 ) -> ModelProvider:
     profile_id = profile_id or config.roles[role_id].primary  # the router passes any cascade profile
     profile = config.profiles[profile_id]
@@ -34,7 +39,7 @@ def build_provider(
         return FakeModelProvider(profile_id=profile_id)
 
     def live_factory() -> ModelProvider:
-        return _build_live_provider(profile, profile_id)
+        return _build_live_provider(profile, profile_id, live_permitted=live_permitted)
 
     from tilo_providers.replay import RecordReplayProvider  # noqa: PLC0415
 
@@ -44,16 +49,19 @@ def build_provider(
         live_factory=live_factory,
         fixtures_dir=Path(fixtures_dir),
         capabilities={Capability(c) for c in profile.caps},
+        live_permitted=live_permitted,
     )
 
 
-def _build_live_provider(profile: ProvidersProfile, profile_id: str) -> ModelProvider:
+def _build_live_provider(profile: ProvidersProfile, profile_id: str, *, live_permitted: bool = False) -> ModelProvider:
     if profile.provider == "google":
         from tilo_providers.google_adapter import GoogleModelProvider  # noqa: PLC0415
 
         project = os.environ["GOOGLE_CLOUD_PROJECT"]
         location = os.environ.get("GOOGLE_LOCATION", "global")  # PRD 6.5: Gemini through the global endpoint
-        return GoogleModelProvider(profile=profile, profile_id=profile_id, project=project, location=location)
+        return GoogleModelProvider(
+            profile=profile, profile_id=profile_id, project=project, location=location, live_permitted=live_permitted
+        )
 
     if profile.provider == "openai_compat":
         from tilo_providers.openai_compat_adapter import OpenAICompatModelProvider  # noqa: PLC0415
@@ -64,7 +72,11 @@ def _build_live_provider(profile: ProvidersProfile, profile_id: str) -> ModelPro
                 "(contracts/providers.schema.json $defs.profile)"
             )
         return OpenAICompatModelProvider(
-            profile=profile, profile_id=profile_id, base_url=profile.base_url, api_key_env=profile.api_key_env
+            profile=profile,
+            profile_id=profile_id,
+            base_url=profile.base_url,
+            api_key_env=profile.api_key_env,
+            live_permitted=live_permitted,
         )
 
     raise ValueError(f"PL-02: unknown provider {profile.provider!r} for profile {profile_id!r}")

@@ -172,10 +172,11 @@ resource "google_monitoring_alert_policy" "cost_alert" {
     display_name = "Cost alert logged"
 
     condition_threshold {
-      filter          = "metric.type=\"logging.googleapis.com/user/tilo_cost_alert\""
+      filter          = "metric.type=\"logging.googleapis.com/user/tilo_cost_alert\" AND resource.type=\"cloud_run_revision\""
       comparison      = "COMPARISON_GT"
       threshold_value = 0
-      duration        = "0s"
+      # Non-zero: the API rejects evaluation_missing_data with a 0s duration. One alert line keeps the 300s sum above 0 for 300s, so 60s still fires on a single event.
+      duration = "60s"
 
       evaluation_missing_data = "EVALUATION_MISSING_DATA_INACTIVE"
 
@@ -192,12 +193,9 @@ resource "google_monitoring_alert_policy" "cost_alert" {
     }
   }
 
+  # No notification_rate_limit: the API documents it for log-match policies only; this is a metric threshold policy.
   alert_strategy {
     auto_close = "1800s"
-
-    notification_rate_limit {
-      period = "3600s"
-    }
   }
 
   depends_on = [google_logging_metric.cost_alert]
