@@ -1,9 +1,11 @@
 # ADR-0024: Bot-hosted meetings and the meeting host account
 
-- Status: Proposed (2026-10-06). The decision that the bot hosts and invites is the user's ("Have the bot
+- Status: Accepted (2026-10-06). The decision that the bot hosts and invites is the user's ("Have the bot
   start the meeting instead and then send invites to scheduled people", 6 Oct 2026, relayed by the
-  supervisor); it needs the user's own confirmation in chat, because it widens ADR-0017. Everything else here
-  is the architect's default, logged in `docs/open-questions.md` BQ-MTG09-1 to BQ-MTG09-12. Amends ADR-0017.
+  supervisor). The open points were decided by the supervisor under the user's direct instruction ("For
+  FR-MTG-09, you make the best decisions", 6 Oct 2026): see "Accepted amendments" below and
+  `docs/open-questions.md` BQ-MTG09-13 to BQ-MTG09-18 (overridable by the user). The rest is the architect's
+  default, BQ-MTG09-1 to BQ-MTG09-12. Amends ADR-0017.
   (Next free number on every remote branch at 2026-10-06; the merger may renumber.)
 - Deciders: user (the scope change; approval of the ADR-0017 change), architect (design)
 - Requirement: FR-MTG-09 (amended), FR-MTG-01, FR-MTG-10, FR-CAL-02, FR-CAL-04; PE-13, PE-14, PE-18, PE-20;
@@ -53,6 +55,25 @@ person's connectors as one Google grant (CON-D10).
    for calendar-invited accounts; a display-name allowlist is spoofable and the meet-bot's current
    admit-everyone default is off for hosted meetings. The link is never written to the bot's `out/` files,
    logs, events or the package it hands to Tilo. Its persistent named Docker volume goes (ADR-0017 terms).
+
+## Accepted amendments (supervisor, under the user's instruction of 6 Oct 2026)
+These replace the text above where they differ.
+1. The organizer is the bot's own dedicated Google account (decision 1 stands). Only the organizer is host.
+   A person's grant stays `calendar.readonly`.
+2. One scope, `calendar.events.owned`, on the bot account only; no Meet API scope (decision 2 stands).
+3. **Decision 6(c) is replaced.** The bot keeps ONE persistent, dedicated browser profile for its own account,
+   so it can enter as host at once. The user signs that profile in once, by hand; Tilo never sees the
+   password. The profile lives on the demo machine's own disk (a named volume outside the repository, the
+   image, backups, Secret Manager and every Cloud Run service). The meet-bot's admit-everyone default is OFF
+   for hosted meetings: it admits only invited addresses. The exception ends at the hackathon freeze unless
+   the user renews it.
+4. Meetings are capped at 60 minutes (`meeting_host.max_duration_min`, free-account group limit). No paid
+   Workspace; spending is the user's call.
+5. The invitation is T3 through the outbox and a gate card; the event id derives from the outbox marker;
+   `sendUpdates=all`; guests cannot invite others or see the guest list. The first real invitation goes only to
+   `tilotesting@gmail.com`, after the user's one-word go; the live switch stays the user's.
+6. Conversation quality: the cascade voice architecture already planned (`docs/VOICE_ARCHITECTURE.md`), not
+   Gemini Live.
 
 ## Alternatives considered
 - *The Owner's own calendar as organizer* (FR-CAL-04's `create_event` with `calendar.events` on the person's
