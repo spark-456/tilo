@@ -274,6 +274,12 @@ module "service" {
       service = "harness"
       member  = "serviceAccount:${google_service_account.tasks_invoker.account_id}@${var.project_id}.iam.gserviceaccount.com"
     }
+    # The one Scheduler job that fires user schedules calls harness only
+    # (FR-AGT-14); the route checks this caller itself.
+    "harness::schedule-scheduler" = {
+      service = "harness"
+      member  = "serviceAccount:${google_service_account.schedule_scheduler.account_id}@${var.project_id}.iam.gserviceaccount.com"
+    }
   }
 
   depends_on = [google_project_service.apis]
@@ -741,6 +747,31 @@ module "gmail_push" {
   push_service_account_email      = google_service_account.gmail_push.email
   scheduler_service_account_email = google_service_account.gmail_scheduler.email
   pubsub_service_agent_email      = module.events.pubsub_service_agent_email
+
+  depends_on = [google_project_service.apis]
+}
+
+# ---------------------------------------------------------------------------
+# Scheduled runs (FR-AGT-14): one Scheduler job ticks every minute and POSTs
+# harness /internal/schedules/tick; the tick reads the due user schedules.
+# The service account holds run.invoker on harness only (extra_invokers).
+# ---------------------------------------------------------------------------
+
+resource "google_service_account" "schedule_scheduler" {
+  project      = var.project_id
+  account_id   = "tilo-schedule-scheduler"
+  display_name = "Tilo scheduled runs tick (Cloud Scheduler OIDC identity)"
+
+  depends_on = [google_project_service.apis]
+}
+
+module "schedule_tick" {
+  source = "../../modules/schedule_tick"
+
+  project_id            = var.project_id
+  region                = var.region
+  target_uri            = module.service.uris["harness"]
+  service_account_email = google_service_account.schedule_scheduler.email
 
   depends_on = [google_project_service.apis]
 }

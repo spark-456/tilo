@@ -23,7 +23,7 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
   pre-flight writes nothing; `max_specialists` semaphore; deps before start), skill pins. `run_plan(artifacts=, scope=, archive=, redact=)`: `outputs.keep` stores `UnitOutcome.outputs` + `created` manifest, then `artifact.created`/`versioned` from the record (ADR-0018 T3; no store + outputs fails the unit).
 - FR-AGT-05: `must_ask.MustAsk` (rules in code; a model reply can only add a question; card stored first);
   `run_plan(must_ask=)` parks the asked unit. FR-HIL-10: `question_wait=` (`QuestionWait`) waits (no slot; a failed answer never strands the deadline, #338) and `Ask.runs` decides: Hold/default leave it held.
-- FR-AGT-12: `verifier.Verifier` (rules in code, then only the verifier-role model; `verified` recomputed); `run_plan(verifier=)` reviews every handed-over artifact.
+- FR-AGT-12: `verifier.Verifier` (rules in code, then only the verifier-role model; `verified` recomputed); `run_plan(verifier=)` reviews every handed-over artifact. FR-AGT-14: `schedule.Ticker` (claim a slot, then start; `POST /internal/schedules/tick` takes `tilo-schedule-scheduler` only, 503 until the store and starter are wired).
 
 ## Local rules
 - Never calls a model directly — always through `packages/providers`, by role (PL-01); the
