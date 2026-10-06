@@ -41,6 +41,7 @@ def _decision(outcome: str = "run_after_undo", level: str = "L2") -> tilo_policy
     return tilo_policy.Decision(
         outcome=outcome, tier="T2", level=level, modifiers=(),  # type: ignore[arg-type]
         policy_id="pol_digest_1" if allow else None, undo_window_s=60 if outcome == "run_after_undo" else None,
+        scheduled_at="2026-10-06T18:01:00.000Z" if outcome == "run_after_undo" else None,
         reason="digest policy decision", authz={"by": "policy", "ref": "pol_digest_1", "at": NOW_TS} if allow else None,
     )  # fmt: skip
 
