@@ -67,11 +67,23 @@ export function TeamPage({ app }: { app: AppCtx }) {
   const sent = useRef(0);
   useEffect(() => {
     let live = true;
-    Promise.all([api.getTeam(), api.getLearn(), api.getSkills(), api.getWorlds(dec, added)])
-      .then(([t, l, s, w]) => {
+    Promise.all([
+      api.getTeam(),
+      api.getTeamPolicy(),
+      api.getLearn(),
+      api.getSkills(),
+      api.getWorlds(dec, added),
+    ])
+      .then(([t, pol, l, s, w]) => {
         if (!live) return;
         setPeople((ps) => ps ?? t.data.people);
-        setLoaded({ team: t.data, helpers: l.data.helpers, skills: s.data, worlds: w.data });
+        setLoaded({
+          team: t.data,
+          policy: pol.data,
+          helpers: l.data.helpers,
+          skills: s.data,
+          worlds: w.data,
+        });
       })
       .catch(() => live && setLoaded("failed"));
     return () => {
@@ -160,7 +172,7 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
     typeof pref === "string" && slowId && !backups[slowId]
       ? { ...backups, [slowId]: pref }
       : backups;
-  const rows = coverRows(team, people, lent);
+  const rows = coverRows(team, data.policy, people, lent);
   const views = memberViews(people, rows, lent, data);
 
   const setRole = (p: Member, role: string) => {

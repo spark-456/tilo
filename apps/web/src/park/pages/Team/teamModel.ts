@@ -1,7 +1,7 @@
 // WEB-10 Team page: the pure view-model, ported from the `renderVals` of design "Tilo App Team.dc.html"
 // (user's prototype, ADR-0003a). No React, no clock: the coverage rows, the member rows and their facts
 // are computed from the Api data plus the page's local state (people, backups).
-import type { Learn, Skill, Team, World } from "../../api/types";
+import type { Learn, Skill, Team, TeamPolicy, World } from "../../api/types";
 
 export type Member = Omit<Team["people"][number], "limit"> & {
   limit?: string | undefined;
@@ -11,18 +11,11 @@ export type Member = Omit<Team["people"][number], "limit"> & {
 export type Backups = Record<string, string>;
 export interface Loaded {
   team: Team;
+  policy: TeamPolicy;
   helpers: Learn["helpers"];
   skills: Skill[];
   worlds: World[];
 }
-
-/** The spend limit a role gets (an approver keeps the limit the fixture gave them until the role changes). */
-const LIMIT: Record<string, string> = {
-  Owner: "No limit",
-  Approver: "£1,000",
-  Member: "£250",
-  Viewer: "—",
-};
 
 export const initialsOf = (name: string): string =>
   name
@@ -44,7 +37,12 @@ export interface CoverRow {
   opts: { id: string; name: string }[];
 }
 
-export function coverRows(team: Team, people: readonly Member[], backups: Backups): CoverRow[] {
+export function coverRows(
+  team: Team,
+  policy: TeamPolicy,
+  people: readonly Member[],
+  backups: Backups,
+): CoverRow[] {
   return team.coverage.map((c) => {
     const extra = backups[c.id];
     const ids = extra ? [...c.who, extra] : c.who;
@@ -57,7 +55,7 @@ export function coverRows(team: Team, people: readonly Member[], backups: Backup
       who,
       single,
       names: who.map((p) => p.name.split(" ")[0]).join(", ") + (single ? " only" : ""),
-      wait: extra && c.slow ? "About 20 min" : c.wait,
+      wait: extra && c.slow ? policy.backupWait : c.wait,
       flagged: !!c.slow,
       slow: !!c.slow && !extra,
       opts: people
@@ -113,7 +111,10 @@ export function memberViews(
     return {
       ...base,
       sub: `${p.email} · ${p.dept}`,
-      limit: p.limit && p.role === "Approver" ? p.limit : (LIMIT[p.role] ?? "—"),
+      limit:
+        p.limit && p.role === "Approver"
+          ? p.limit
+          : (data.policy.roleLimits[p.role as keyof TeamPolicy["roleLimits"]] ?? "—"),
       active: p.active,
       facts: [
         [
