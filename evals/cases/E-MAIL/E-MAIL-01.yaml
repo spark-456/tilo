@@ -1,0 +1,38 @@
+id: E-MAIL-01
+group: E-MAIL
+title: Client asks for engine inspection estimate and Tuesday availability
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Triage incoming email regarding engine inspection quote and availability next tuesday
+  thread:
+    thread_id: thread-e-mail-01
+    subject: Engine inspection quote and availability next Tuesday
+    messages:
+    - message_id: msg-e-mail-01-1
+      from: david.miller@harriercharters.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: Engine inspection quote and availability next Tuesday
+      body: Hi Harborview team, I noticed some rough idling on our charter vessel Kestrel 4JH4 diesel
+        engine yesterday. Could you provide an estimate for a standard inspection and let me know if Marcus
+        has availability next Tuesday morning around 10 AM? Thanks, David Miller
+ground_truth:
+  category: needs_reply
+  priority: normal
+  reason: Direct inquiry from active charter client requesting pricing estimate and scheduling confirmation.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

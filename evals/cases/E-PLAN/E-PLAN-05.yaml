@@ -1,0 +1,48 @@
+id: E-PLAN-05
+group: E-PLAN
+title: Vague task — Review our late supplier deliveries and put something together
+measures:
+- EV-02
+- EV-03
+- FR-INT-03
+- FR-INT-04
+- FR-INT-06
+status: ready
+deploy_gate: false
+inputs:
+  task_kind: vague
+  task: Look into our late supplier deliveries at Finch Timber Yard (ops@finch-timber.example) and put
+    something together for the team meeting.
+  files: []
+scripted_answers:
+- match: deliverable_format_or_audience
+  answer: A PDF report for the operations lead and purchasing team.
+- match: timeframe_or_sources
+  answer: Cover Q3 2026 deliveries using https://ops.finch-timber.example/deliveries.
+ground_truth:
+  question_count: 2
+  approach_count: 2.5
+  brief_valid: true
+checks:
+- check: schema_valid
+  args:
+    field: brief
+    schema: brief.schema.json
+- check: schema_valid
+  args:
+    field: plan
+    schema: plan.schema.json
+- check: equals_ground_truth
+  args:
+    field: question_count
+    tolerance: 1
+- check: equals_ground_truth
+  args:
+    field: approach_count
+    tolerance: 0.5
+- check: equals_ground_truth
+  args:
+    field: brief_valid
+recording: null
+notes: EV-03 estimate accuracy (median within +-25% of historical unit-type cost) is evaluated once replay
+  recordings exist.

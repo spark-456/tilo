@@ -261,10 +261,10 @@ def test_SEC_07_archive_ref_and_message_ref_are_nulled_in_scoped_views(client, s
     message_in = base_event(
         seq=1,
         type_="channel.message_in",
-        data={"channel": "whatsapp", "message_ref": "r_village_basic_1/17", "card_id": None, "destination": None},
+        data={"channel": "email", "message_ref": "r_village_basic_1/17", "card_id": None, "destination": None},
         district=D1,
         vis=[D1],
-        summary="A WhatsApp message came in",
+        summary="An email came in",
     )
     message_in["trace"]["archive_ref"] = "r_village_basic_1/17"
     store.events[WORLD] = [message_in]
@@ -298,7 +298,7 @@ def test_SEC_07_ulid_shaped_data_field_naming_an_event_is_mapped_or_nulled(clien
     instruction_hidden = base_event(
         seq=2,
         type_="channel.message_in",
-        data={"channel": "whatsapp", "message_ref": None, "card_id": None, "destination": None},
+        data={"channel": "email", "message_ref": None, "card_id": None, "destination": None},
         district=D2,
         vis=[D2],
         summary="a finance instruction, not visible to this viewer",

@@ -1,13 +1,14 @@
 """FR-HIL-05 (PRD 10.4, 10.6): "Given an L2 email policy, when the user instructs a reply, then
 it sends after the 60 s window unless cancelled." PI-08 (L2 needs the owner's own instruction
-naming this exact destination), PI-09 (the instruction must come from a channel with a known
-sender — web/mobile_web signed in, or the owner's bound WhatsApp number; never email), PI-10
+naming this exact destination), PI-09 (the instruction must come from a signed-in session: a
+world.requested on web or mobile_web; never email, never a channel.message_in, ADR-0019), PI-10
 (each instruction opens at most one entry, cancelled sends included), PI-12 (the undo window is
 kept: >= 1 s, scheduled_at = created_at (here `now`) + undo_window_s).
 """
 
 from __future__ import annotations
 
+import pytest
 import tilo_policy
 from _policy_lib import OWNER, WORLD, applied_entry, base_facts, base_instruction, base_policy
 
@@ -38,9 +39,10 @@ def _l2_policy(**overrides):
     return base_policy(**{"id_": "pol_autopilot_l2", "level": "L2", "undo_window_s": 60, **overrides})
 
 
-def test_FR_HIL_05_PI_08_PI_12_whatsapp_instruction_runs_after_undo_window_default_60s(risk_table_path):
+@pytest.mark.usefixtures("l2_action_recorded")
+def test_FR_HIL_05_PI_08_PI_12_signed_in_instruction_runs_after_undo_window_default_60s(risk_table_path):
     table = _table(risk_table_path)
-    instruction = base_instruction(channel="whatsapp", type_="channel.message_in")
+    instruction = base_instruction()
     proposal = _proposal(instruction=instruction)
     policy = _l2_policy()
     decision = tilo_policy.decide(proposal, table=table, policies=[policy], world_owner=OWNER, applied=[], now=NOW)
@@ -51,6 +53,7 @@ def test_FR_HIL_05_PI_08_PI_12_whatsapp_instruction_runs_after_undo_window_defau
     assert decision.policy_id == "pol_autopilot_l2"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_09_web_signed_in_instruction_also_counts(risk_table_path):
     table = _table(risk_table_path)
     instruction = base_instruction(channel="web", type_="world.requested")
@@ -60,6 +63,7 @@ def test_FR_HIL_05_PI_09_web_signed_in_instruction_also_counts(risk_table_path):
     assert decision.outcome == "run_after_undo"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_09_mobile_web_instruction_also_counts(risk_table_path):
     table = _table(risk_table_path)
     instruction = base_instruction(channel="mobile_web", type_="world.requested")
@@ -69,6 +73,7 @@ def test_FR_HIL_05_PI_09_mobile_web_instruction_also_counts(risk_table_path):
     assert decision.outcome == "run_after_undo"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_09_email_instruction_opens_nothing(risk_table_path):
     """An email's sender is not authenticated (PRD 10.3, 11.1): a channel.message_in or
     world.requested over email is never an instruction, whoever its actor is."""
@@ -80,6 +85,26 @@ def test_FR_HIL_05_PI_09_email_instruction_opens_nothing(risk_table_path):
     assert decision.outcome == "gate"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
+@pytest.mark.parametrize(
+    "type_, card_kind",
+    [("channel.message_in", None), ("channel.message_in", "needs_you"), ("world.requested", None)],
+    ids=["message_typed", "message_answering_a_question", "world_requested_over_whatsapp"],
+)
+def test_FR_HIL_05_PI_09_whatsapp_is_never_an_instruction(risk_table_path, type_, card_kind):
+    """ADR-0019 (SD-01): WhatsApp is out of scope. Nothing over it is an instruction, not even the
+    owner's typed answer to Tilo's question that once counted; the engine fails closed."""
+    instruction = base_instruction(channel="whatsapp", type_=type_)
+    if card_kind is not None:
+        instruction["data"] |= {"card_id": "01JB5VQ0000000000000000129", "card_kind": card_kind}
+    proposal = _proposal(instruction=instruction)
+    decision = tilo_policy.decide(
+        proposal, table=_table(risk_table_path), policies=[_l2_policy()], world_owner=OWNER, applied=[], now=NOW
+    )
+    assert decision.outcome == "gate"
+
+
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_08_no_instruction_at_all_gates(risk_table_path):
     table = _table(risk_table_path)
     proposal = _proposal(instruction=None)
@@ -88,6 +113,7 @@ def test_FR_HIL_05_PI_08_no_instruction_at_all_gates(risk_table_path):
     assert decision.outcome == "gate"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_08_instruction_from_someone_else_gates(risk_table_path):
     table = _table(risk_table_path)
     instruction = base_instruction(actor="u_someone_else")
@@ -97,6 +123,7 @@ def test_FR_HIL_05_PI_08_instruction_from_someone_else_gates(risk_table_path):
     assert decision.outcome == "gate"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_08_instruction_about_another_thread_gates(risk_table_path):
     """The instruction's destination must equal the proposal's — a draft nobody asked for or an
     instruction about another thread opens nothing."""
@@ -108,6 +135,7 @@ def test_FR_HIL_05_PI_08_instruction_about_another_thread_gates(risk_table_path)
     assert decision.outcome == "gate"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_08_instruction_given_after_the_send_gates(risk_table_path):
     table = _table(risk_table_path)
     instruction = base_instruction(ts="2026-09-29T09:50:00.000Z")  # after NOW
@@ -117,6 +145,7 @@ def test_FR_HIL_05_PI_08_instruction_given_after_the_send_gates(risk_table_path)
     assert decision.outcome == "gate"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_10_instruction_already_used_by_an_earlier_send_gates(risk_table_path):
     """PI-10: each instruction opens at most one entry; a redraft after Undo (the earlier send
     cancelled or not) needs a new instruction or a gate."""
@@ -131,6 +160,7 @@ def test_FR_HIL_05_PI_10_instruction_already_used_by_an_earlier_send_gates(risk_
     assert decision.outcome == "gate"
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_05_PI_12_undo_window_at_least_1s_is_kept_from_the_policy(risk_table_path):
     table = _table(risk_table_path)
     instruction = base_instruction()

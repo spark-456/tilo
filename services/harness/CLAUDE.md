@@ -7,23 +7,23 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 ## Commands
 - `uv run pytest services/harness/tests -m "not emulator"` — fast suite
 - `uv run pytest services/harness/tests -m emulator` — Firestore-emulator suite (Java + firebase-tools)
-- `just harness-skeleton` — runs `python -m tilo_harness.skeleton` against the emulator
-- `just check` — full gate from the repo root
+- `just harness-skeleton` — runs `python -m tilo_harness.skeleton` against the emulator; `just check` — full gate. Image: `services/harness/Dockerfile` runs `tilo_harness.app:app` (`/health` for Cloud Run smoke checks, `/healthz` for in-container probes; P0-07a, P0-07h).
 
 ## Contracts
 - Reads (read-only): `contracts/event*`, `common`, `events/{registry.yaml,data/*}`, `layout`, `plan`,
-  `envelope`, `skill`, `agents` schemas. `EventValidator` is a fresh EV-01..EV-14 implementation
+  `envelope`, `skill`, `agents`, `manifest` schemas. `EventValidator` is a fresh EV-01..EV-15 implementation
   (never imports `scripts/`); `contract_problems(name, x)` checks any other contract.
-- Writes: Firestore (worlds, events, views, checkpoints); Pub/Sub to BigQuery (later ticket).
-- Own fixtures: `fixtures/three_agent/`; test skill folders in `tests/fixtures/skills*/`.
+- Writes: Firestore (worlds, events, views, checkpoints); Pub/Sub to BigQuery (later ticket). Own fixtures: `fixtures/three_agent/`, `tests/fixtures/skills*/`.
 
 ## Config
-- `config/agents.yaml` via `config.load_agents_config()` (invalid or missing: `AgentsConfigError`,
-  start-up stops). Skills from `skills/<domain>/<id>/` via `skills.SkillRegistry`.
+- `config/agents.yaml` via `config.load_agents_config()` (invalid or missing: `AgentsConfigError`, start-up stops).
 
 ## Requirement IDs
 - P0-09 (D-11): skeleton, writer, store. FR-AGT-01/02/03: `executor.run_plan` (PG-02/03/11
-  pre-flight writes nothing; `max_specialists` semaphore; deps before start), skill pins.
+  pre-flight writes nothing; `max_specialists` semaphore; deps before start), skill pins. `run_plan(artifacts=, scope=, archive=, redact=)`: `outputs.keep` stores `UnitOutcome.outputs` + `created` manifest, then `artifact.created`/`versioned` from the record (ADR-0018 T3; no store + outputs fails the unit). T4: `scope` must be the writer's `org_id`/`world_id` (else PlanRefused); refs and parents must be versions the world recorded (`writer.recorded_version`); every known refusal is checked before the first put (#393); `before_handoff=` (tilo-api's gate) runs after the announce.
+- FR-AGT-05: `must_ask.MustAsk` (rules in code; a model reply can only add a question; card stored first);
+  `run_plan(must_ask=)` parks the asked unit. FR-HIL-10: `question_wait=` (`QuestionWait`) waits (no slot; a failed answer never strands the deadline, #338) and `Ask.runs` decides: Hold/default leave it held.
+- FR-AGT-12: `verifier.Verifier` (rules in code, then only the verifier-role model; `verified` recomputed); `run_plan(verifier=)` reviews every handed-over artifact. FR-AGT-15: `skill_proposals.SkillProposals` (a Team Lead answer -> in-memory proposal with a unified diff; only `approve` by a distinct domain expert writes SKILL.md + `version`/`reviewer`; never in a prompt or event; no model).
 
 ## Local rules
 - Never calls a model directly — always through `packages/providers`, by role (PL-01); the

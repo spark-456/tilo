@@ -57,9 +57,11 @@ def test_FR_INT_03_extracted_brief_validates_for_every_eval_intake(repo_root, re
         ("deadline", "2026-11-01"),
         ("sensitivity", "personal"),
         ("constraints", ["Board-ready formatting only"]),
+        ("deliverables", [{"title": "Board pack", "format": "pptx"}]),
+        ("sources", [{"kind": "connector", "ref": "crm-salesforce", "label": "Salesforce CRM"}]),
     ],
 )
-def test_FR_INT_03_every_chip_is_editable(repo_root, registry, tmp_path, field, value):
+def test_FR_INT_03_every_one_of_the_seven_chips_is_editable(repo_root, registry, tmp_path, field, value):
     canned = load_brief_fixture("valid_pdf_report")
     provider = ScriptedModelProvider("large", [ScriptedCall(text=json.dumps(canned))])
     router = build_test_router(tmp_path, provider)

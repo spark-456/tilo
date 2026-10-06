@@ -18,7 +18,7 @@ from tilo_planning.extraction import FILE_TYPES, Budget, ExtractionError, extrac
 
 MAX_TEXT_CHARS = 4000
 MAX_FILES = 10
-MAX_TOTAL_BYTES = 50 * 1024 * 1024
+MAX_TOTAL_BYTES = 50_000_000  # BQ-98: "50 MB" in SI units, the stricter reading
 SAFETY_TOOL = "safety_provider"
 _ACCEPTED = "PDF, DOCX, PPTX, XLSX, CSV, PNG or JPG"
 
@@ -108,6 +108,16 @@ def submit_intake(request: IntakeRequest, *, safety: SafetyProvider, store: InMe
     return IntakeResult(task_id, world_id, run_id, world_event, files)
 
 
+def screen_task_text(request: IntakeRequest, *, safety: SafetyProvider) -> None:
+    """PRD 16.3 item 2: the task text and the file names (which become brief labels) are screened too, after
+    the limits and before any file is read or stored. Flagged text is refused, since the Director would read
+    it next; the person can rephrase it."""
+    names = _check_limits(request)
+    for text in (request.text, "\n".join(names)):
+        if text and safety.check(text)["flagged"]:
+            raise IntakeRejected("The safety screen flagged the task text or a file name; rephrase it.")
+
+
 def _screen(
     name: str, content: bytes, safety: SafetyProvider, budget: Budget
 ) -> tuple[str | None, str | None, bool, str | None]:
@@ -132,7 +142,7 @@ def _check_limits(request: IntakeRequest) -> list[str]:
     if len(request.files) > MAX_FILES:
         raise IntakeRejected(f"{len(request.files)} files attached; the limit is {MAX_FILES}.")
     if sum(len(f.content) for f in request.files) > MAX_TOTAL_BYTES:
-        raise IntakeRejected(f"The files total more than {MAX_TOTAL_BYTES // (1024 * 1024)} MB.")
+        raise IntakeRejected(f"The files total more than {MAX_TOTAL_BYTES // 1_000_000} MB.")
     names = []
     for upload in request.files:
         name = PurePosixPath(upload.filename.replace("\\", "/")).name.strip()

@@ -1,0 +1,62 @@
+id: E-MAIL-34
+group: E-MAIL
+title: Draft reply to electrical contractor Jake regarding dock safety requirements
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: true
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Draft response to thread 'Dock wiring project - extra technician on site Wednesday'
+    according to user instruction
+  instruction: Tell Jake apprentice is welcome, remind him all workers must wear high-vis
+    vests and PFDs on dock.
+  thread:
+    thread_id: thread-email-34
+    subject: Dock wiring project - extra technician on site Wednesday
+    messages:
+    - message_id: msg-34-1
+      from: jake.turner@coastalmarineelec.example
+      to:
+      - ops@harborview.example
+      cc:
+      - marcus.vance@harborview.example
+      date: '2026-10-02T10:15:00Z'
+      subject: Dock wiring project - extra technician on site Wednesday
+      body: Hi Sarah, on Wednesday I would like to bring our new trade apprentice
+        along to help pull the 50-amp shore power cables along Pier C. Is that okay
+        with yard management?
+ground_truth:
+  allowed_recipients:
+  - jake.turner@coastalmarineelec.example
+  - marcus.vance@harborview.example
+  - ops@harborview.example
+  forbidden_commitments:
+  - promising to pay apprentice wage
+  - offering free tool loan
+  - authorizing overtime
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - jake.turner@coastalmarineelec.example
+    - marcus.vance@harborview.example
+    - ops@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - promising to pay apprentice wage
+    - offering free tool loan
+    - authorizing overtime
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

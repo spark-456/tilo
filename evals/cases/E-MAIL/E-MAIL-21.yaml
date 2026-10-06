@@ -1,0 +1,39 @@
+id: E-MAIL-21
+group: E-MAIL
+title: Marine Electronics Weekly digital digest and radar product reviews
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding issue #412: solid-state doppler radar comparison and nmea-2000
+    gateways'
+  thread:
+    thread_id: thread-e-mail-21
+    subject: 'Issue #412: Solid-state Doppler radar comparison and NMEA-2000 gateways'
+    messages:
+    - message_id: msg-e-mail-21-1
+      from: digest@marineelectronicsweekly.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Issue #412: Solid-state Doppler radar comparison and NMEA-2000 gateways'
+      body: 'This week in Marine Electronics: We test the latest solid-state radar scanners in heavy fog,
+        review high-output lithium alternator regulators, and benchmark wireless NMEA data bridges. Read
+        our bench test reviews online. You are receiving this because you subscribed to our weekly newsletter.'
+ground_truth:
+  category: newsletter_promo
+  priority: low
+  reason: Product review editorial digest and subscription newsletter.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

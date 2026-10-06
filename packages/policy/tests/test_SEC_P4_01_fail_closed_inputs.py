@@ -118,6 +118,7 @@ def _fixtures(repo_root, kind):
     return sorted((repo_root / "contracts" / "fixtures" / "policy" / kind).glob("*.json"))
 
 
+@pytest.mark.usefixtures("l2_action_recorded")
 def test_FR_HIL_03_PI_06_valid_l2_l3_policy_fixtures_run_for_their_own_proposal(repo_root, risk_table_path):
     """Keeps the invalid-fixture test below from passing vacuously: the same derivation runs
     for every valid L2/L3 fixture."""
@@ -221,7 +222,7 @@ def _reserved(risk_tier):
     }
 
 
-def _resolved(*, ref=OWNER, channel="whatsapp", pin_verified=False):
+def _resolved(*, ref=OWNER, channel="web", pin_verified=False):
     return {
         "type": "approval.resolved",
         "authz": {"by": "person", "ref": ref, "at": "2026-09-29T09:32:09.500Z"},
@@ -230,10 +231,17 @@ def _resolved(*, ref=OWNER, channel="whatsapp", pin_verified=False):
 
 
 @pytest.mark.parametrize("risk_tier", ["t3", " T3", "T3 ", "", None, "T4"])
-def test_SEC_06_PI_02_unknown_gate_tier_never_skips_the_whatsapp_pin(risk_tier):
+def test_SEC_06_PI_02_unknown_gate_tier_opens_nothing(risk_tier):
     decision = tilo_policy.open_gate(_reserved(risk_tier), _resolved(), world_owner=OWNER)
     assert decision.outcome == "gate"
     assert decision.authz is None
+
+
+@pytest.mark.parametrize("channel", ["whatsapp", "email", "Web", "", None])
+def test_SEC_06_PI_04_an_answer_outside_a_signed_in_session_opens_nothing(channel):
+    """ADR-0019: only web or mobile_web opens a gate; `whatsapp` is enum-valid and still refused."""
+    decision = tilo_policy.open_gate(_reserved("T2"), _resolved(channel=channel, pin_verified=True), world_owner=OWNER)
+    assert (decision.outcome, decision.authz) == ("gate", None)
 
 
 def test_FR_HIL_03_PI_02_missing_owner_and_ref_open_nothing():
@@ -619,40 +627,41 @@ def test_FR_HIL_08_PI_16_check_entry_rejects_a_trailing_newline_in_the_entry(l3_
 # --- P4-01b delta review: the whole instruction is checked against its schema -----------------
 
 
-def _gate_card_answer_without_kind(repo_root):
-    path = repo_root / "contracts/fixtures/outbox/crossref/invalid/ob01_l2_instruction_typed_on_a_gate_card.json"
-    case = json.loads(path.read_text(encoding="utf-8"))
-    assert case["instruction"]["data"].get("card_id"), "the fixture answers a card"
-    case["instruction"]["data"]["card_kind"] = None  # contract-invalid: a set card_id needs card_kind
+def _web_case(repo_root):
+    path = repo_root / "contracts/fixtures/outbox/crossref/valid/policy_reply_instructed_on_the_web.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _without_title(case):
+    del case["instruction"]["data"]["title"]  # contract-invalid: world.requested data needs its title
     return case
 
 
-def test_FR_HIL_05_PI_08_check_entry_rejects_a_card_answer_with_its_kind_blanked(repo_root):
-    """channel.message_in's if/then: card_id set means card_kind is set. An instruction that breaks
-    its schema is never the owner's typed words (ADR-0007, BQ-56)."""
-    assert tilo_policy.check_entry(_gate_card_answer_without_kind(repo_root)) is not None
+def test_FR_HIL_05_PI_08_check_entry_rejects_an_instruction_that_breaks_its_data_schema(repo_root):
+    """The whole instruction data is checked against its schema (P4-01b), so a signed-in request
+    with a field missing is not the owner's instruction (ADR-0019)."""
+    assert tilo_policy.check_entry(_web_case(repo_root)) is None
+    assert tilo_policy.check_entry(_without_title(_web_case(repo_root))) is not None
 
 
-def test_FR_HIL_05_PI_08_decide_gates_on_a_card_answer_with_its_kind_blanked(repo_root, risk_table_path):
-    instruction = _gate_card_answer_without_kind(repo_root)["instruction"]
-    proposal = tilo_policy.Proposal(
-        world_id=instruction["world_id"],
-        action_type="send_email",
-        connector="gmail",
-        district="D1",
-        destination=instruction["data"]["destination"],
-        facts=tilo_policy.SideEffectFacts(**base_facts()),
-        item={"artifact_id": "art_reply", "version": 1},
-        credits=0,
-        instruction=instruction,
-    )
-    policy = base_policy(level="L2", owner=instruction["actor"])
-    decision = tilo_policy.decide(
-        proposal,
-        table=_table(risk_table_path),
-        policies=[policy],
-        world_owner=instruction["actor"],
-        applied=[],
-        now=NOW,
-    )
-    assert decision.outcome == "gate"
+@pytest.mark.usefixtures("l2_action_recorded")
+def test_FR_HIL_05_PI_08_decide_gates_on_an_instruction_that_breaks_its_data_schema(repo_root, risk_table_path):
+    def decide(instruction):
+        proposal = tilo_policy.Proposal(
+            world_id=instruction["world_id"],
+            action_type="send_email",
+            connector="gmail",
+            district="D1",
+            destination=instruction["data"].get("destination"),
+            facts=tilo_policy.SideEffectFacts(**base_facts()),
+            item={"artifact_id": "art_reply", "version": 1},
+            credits=0,
+            instruction=instruction,
+        )
+        policy = base_policy(level="L2", owner=instruction["actor"])
+        return tilo_policy.decide(
+            proposal, table=_table(risk_table_path), policies=[policy], world_owner=OWNER, applied=[], now=NOW
+        )
+
+    assert decide(_web_case(repo_root)["instruction"]).outcome == "run_after_undo"
+    assert decide(_without_title(_web_case(repo_root))["instruction"]).outcome == "gate"

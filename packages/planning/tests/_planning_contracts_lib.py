@@ -413,25 +413,101 @@ def make_no_memory() -> Any:
     return _NoMemory()
 
 
-def make_safety_provider():
-    """Deterministic `SafetyProvider` subclass (PL layer ABC has no fake yet -- ticket
-    brief). Flags any text containing `INJECTION_PHRASE`, case-insensitive, i.e. an
-    instruction aimed at the assistant rather than the task. `.calls` records every
-    text passed to `.check()` in order, for tests that assert what got screened."""
-    from tilo_providers.interfaces import SafetyProvider
+# --- FR-INT-06/07/08 helpers (approaches, estimate, budget approval) -----------------------
 
-    class DeterministicSafetyProvider(SafetyProvider):
+APPROACHES_FIXTURES_DIR = FIXTURES_DIR / "approaches"
+POLICY_FIXTURES_DIR = FIXTURES_DIR / "policy"
+
+
+def load_approaches_fixture(name: str) -> dict[str, Any]:
+    """A canned Director-role `{"approaches": [...]}` reply from `fixtures/approaches/<name>.json`
+    (FR-INT-06): each item is already shaped like `plan.schema.json#/$defs/approach`, the same
+    shape as the real PlanGraph fixture `contracts/fixtures/plan/valid/three_approaches_policy_gate.json`."""
+    return load_json(APPROACHES_FIXTURES_DIR / f"{name}.json")
+
+
+def assert_valid_approach(repo_root: pathlib.Path, registry: Registry, approach: dict[str, Any]) -> None:
+    """One approach must validate against plan.schema.json#/$defs/approach (FR-INT-06; PG-08/PG-09
+    are checked separately in code, not by the schema)."""
+    plan_schema = load_schema(repo_root, "plan")
+    wrapper = {"$ref": f"{plan_schema['$id']}#/$defs/approach"}
+    errors = errors_for(wrapper, approach, registry)
+    msgs = [e.message for e in errors]
+    assert not errors, f"approach {approach.get('id')!r} fails plan.schema.json#/$defs/approach: {msgs}"
+
+
+def assert_valid_credit_range(repo_root: pathlib.Path, registry: Registry, value: dict[str, Any]) -> None:
+    common_schema = load_schema(repo_root, "common")
+    wrapper = {"$ref": f"{common_schema['$id']}#/$defs/credit_range"}
+    errors = errors_for(wrapper, value, registry)
+    assert not errors, f"{value!r} fails common.schema.json#/$defs/credit_range: {[e.message for e in errors]}"
+
+
+def assert_valid_time_range(repo_root: pathlib.Path, registry: Registry, value: dict[str, Any]) -> None:
+    common_schema = load_schema(repo_root, "common")
+    wrapper = {"$ref": f"{common_schema['$id']}#/$defs/time_range"}
+    errors = errors_for(wrapper, value, registry)
+    assert not errors, f"{value!r} fails common.schema.json#/$defs/time_range: {[e.message for e in errors]}"
+
+
+def budget_grant_risk_table_path() -> pathlib.Path:
+    """PRD 10.4's own T1 example is "spend credits under the run budget"; `config/autonomy.yaml`
+    (read-only context for this ticket) does not yet list a budget-grant action type (needs a
+    config change -- reported, not made here), so FR-INT-08 tests load this package-local risk
+    table instead of `tilo_policy.load_risk_table()`'s default. Same shape as
+    `contracts/fixtures/policy.risk_tier_table/valid/prd_10_4_tiers.json`, with one action added:
+    `grant_budget` at T1 (PRD 10.4's own example), max_level T1=L3 so an L3 "auto-approve" policy
+    can cover it."""
+    return POLICY_FIXTURES_DIR / "budget_grant_risk_table.json"
+
+
+def base_budget_policy(
+    *,
+    id_: str = "pol_auto_budget_100",
+    owner: str = "u_owner",
+    per_day: int | None = 50,
+    credits: float | None = 100,
+    created_at: str = "2026-09-29T09:00:00.000Z",
+) -> dict[str, Any]:
+    """A policy.schema.json record for "auto-approve under `credits` credits" (FR-INT-08's own
+    example): L3 standing rule on the `grant_budget` action type, scope unrestricted except for
+    the placeholder connector `internal` (a budget grant has no real connector; the nearest
+    existing field is used -- ambiguity noted, not a new contract requirement)."""
+    return {
+        "id": id_,
+        "owner": owner,
+        "action_type": "grant_budget",
+        "scope": {"connectors": ["internal"], "recipients": [], "domains": [], "districts": []},
+        "limits": {"per_day": per_day, "credits": credits},
+        "conditions": {"no_attachments": True, "no_new_recipients": True, "no_safety_flags": True},
+        "level": "L3",
+        "undo_window_s": 60,
+        "expiry": None,
+        "notify_channel": "email",
+        "team_lead_domains": [],
+        "created_by": {"by": owner, "at": created_at},
+        "changed_by": None,
+        "history": [{"by": owner, "at": created_at, "change": "Created", "level": "L3"}],
+    }
+
+
+def make_safety_provider():
+    """The real deterministic `FakeSafetyProvider` (it flags `INJECTION_PHRASE`, case-insensitive),
+    wrapped only to record what got screened: `.calls` holds every text-only check's text in order,
+    `.native_calls` each native check's `{content, mime_type}` (the media type already normalised)."""
+    from tilo_providers.interfaces import SafetyResult
+    from tilo_providers.safety import FakeSafetyProvider
+
+    class RecordingFakeSafetyProvider(FakeSafetyProvider):
         def __init__(self) -> None:
             self.calls: list[str] = []
             self.native_calls: list[dict[str, Any]] = []
 
-        def check(self, text: str, **kwargs: Any) -> dict[str, Any]:
-            if "content" in kwargs:
-                self.native_calls.append(kwargs)
+        def _check(self, text: str, *, content: bytes | None, mime_type: str | None) -> SafetyResult:
+            if content is not None:
+                self.native_calls.append({"content": content, "mime_type": mime_type})
             else:
                 self.calls.append(text)
-            flagged = INJECTION_PHRASE in text.upper()
-            reason = f"instruction aimed at the assistant: {INJECTION_PHRASE!r}" if flagged else None
-            return {"flagged": flagged, "reason": reason}
+            return super()._check(text, content=content, mime_type=mime_type)
 
-    return DeterministicSafetyProvider()
+    return RecordingFakeSafetyProvider()

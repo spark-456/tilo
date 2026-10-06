@@ -23,6 +23,7 @@
 import { type Page, expect, test } from "@playwright/test";
 import { PAN_STEP_PX, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from "../src/stage/camera";
 import { gotoStage, readCamera, reloadStage } from "./support/camera";
+import { collectConsoleProblems } from "./support/console";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP, reducedMotion: "reduce" }); // instant moves: no easing to wait out
@@ -63,13 +64,25 @@ async function stageCenter(page: Page): Promise<{ x: number; y: number }> {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
-function collectConsoleProblems(page: Page): string[] {
-  const problems: string[] = [];
-  page.on("console", (m) => {
-    if (m.type() === "error" || m.type() === "warning") problems.push(`[${m.type()}] ${m.text()}`);
-  });
-  page.on("pageerror", (e) => problems.push(`[pageerror] ${e.message}`));
-  return problems;
+/** A point on the stage that nothing covers. The Start card sits over the middle of the stage on
+ * "/" (Bundle D), so a real mouse wheel at the centre would land on the card, not the stage. */
+async function openStagePoint(page: Page): Promise<{ x: number; y: number }> {
+  const box = await page.getByTestId("stage-frame").boundingBox();
+  if (!box) throw new Error("stage-frame has no layout box");
+  const point = await page.evaluate(({ x, y, width, height }) => {
+    for (let i = 1; i < 20; i++) {
+      for (let j = 1; j < 20; j++) {
+        const px = x + (width * i) / 20;
+        const py = y + (height * j) / 20;
+        if (document.elementFromPoint(px, py)?.closest('[data-testid="stage-frame"]')) {
+          return { x: px, y: py };
+        }
+      }
+    }
+    return null;
+  }, box);
+  if (!point) throw new Error("nothing on the stage is uncovered");
+  return point;
 }
 
 test("P0-08b camera C2 PRD-9.7 observable camera: stage-frame starts at the documented INITIAL_CAMERA", async ({
@@ -224,8 +237,8 @@ test("P0-08b camera C3 C4 PRD-9.7 mouse Ctrl + wheel notch (100px) zooms exactly
   page,
 }) => {
   await gotoStage(page);
-  const center = await stageCenter(page);
-  await page.mouse.move(center.x, center.y);
+  const open = await openStagePoint(page);
+  await page.mouse.move(open.x, open.y);
   await page.keyboard.down("Control");
   await page.mouse.wheel(0, 100);
   await page.keyboard.up("Control");

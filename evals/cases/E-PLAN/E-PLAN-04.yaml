@@ -1,0 +1,46 @@
+id: E-PLAN-04
+group: E-PLAN
+title: Clear task — Seasonal staffing roster and overtime budget PPTX for Meadowlark Garden Centre
+measures:
+- EV-02
+- EV-03
+- FR-INT-03
+- FR-INT-04
+- FR-INT-06
+status: ready
+deploy_gate: false
+inputs:
+  task_kind: clear
+  task: Create a 5-slide PPTX briefing on November weekend shift coverage and overtime budget for store
+    supervisors at Meadowlark Garden Centre (supervisors@meadowlark-garden.example), deadline 2026-10-18.
+    Reference the published shift templates at https://hr.meadowlark-garden.example/rosters and keep total
+    weekly overtime under 25 hours across all departments.
+  files: []
+scripted_answers: []
+ground_truth:
+  question_count: 0
+  approach_count: 2.5
+  brief_valid: true
+checks:
+- check: schema_valid
+  args:
+    field: brief
+    schema: brief.schema.json
+- check: schema_valid
+  args:
+    field: plan
+    schema: plan.schema.json
+- check: equals_ground_truth
+  args:
+    field: question_count
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: approach_count
+    tolerance: 0.5
+- check: equals_ground_truth
+  args:
+    field: brief_valid
+recording: null
+notes: EV-03 estimate accuracy (median within +-25% of historical unit-type cost) is evaluated once replay
+  recordings exist.

@@ -1,0 +1,77 @@
+id: B-020
+domain: hr
+shapes:
+- attachment
+- single_deliverable
+title: A fair scorecard from two sets of interview notes
+brief: 'Turn the attached interview notes for two candidates into one scorecard that compares them on the same criteria:
+  problem solving, communication, ownership. Do not mention anything about their age or family.'
+director:
+  brief:
+    goal: Compare two candidates on problem solving, communication and ownership from interview notes.
+    deliverables:
+    - title: Scorecard
+      format: xlsx
+    audience: Hiring panel
+    deadline: null
+    constraints:
+    - Same criteria for both
+    - No age or family details
+    sources: []
+    sensitivity: personal
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: analyse
+      title: Extract evidence per criterion
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Build the scorecard
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: verify
+      title: Check no protected detail is used
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+    - id: U4
+      unit_type: deliver
+      title: Save the result to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U3
+expect:
+  outcome: completed
+files:
+- name: interview_notes.csv
+  text: 'candidate,note
+
+    A,Solved the queue problem quickly. Clear explanations. Took ownership of a failed launch.
+
+    B,Struggled at first then recovered. Quiet. Described mentoring two juniors.
+
+    '

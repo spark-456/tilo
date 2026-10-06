@@ -1,0 +1,72 @@
+id: E-DOC-01
+group: E-DOC
+title: 'PDF deliverable: Harrier Logistics Q3 corridor spend breakdown'
+measures:
+- FR-CON-09
+- FR-CON-10
+status: skeleton
+deploy_gate: false
+inputs:
+  format: pdf
+  title: 'PDF deliverable: Harrier Logistics Q3 corridor spend breakdown'
+  required_sections:
+  - Executive Summary
+  - Corridor Spend Table
+  - Lane Spend Chart
+  table_fixture: evals/fixtures/doc/harrier_lane_costs.csv
+  label_column: lane_id
+  group_column: corridor
+  metric_column: spend_gbp
+scripted_answers: []
+ground_truth:
+  required_sections:
+  - Executive Summary
+  - Corridor Spend Table
+  - Lane Spend Chart
+  chart_values:
+  - 14200
+  - 21800
+  - 9600
+  - 18400
+  - 11200
+  row_count: 5
+  total: 75200
+  by_group:
+    UK-IE: 23800
+    UK-NL: 33000
+    UK-FR: 18400
+  max_row_label: LN-102
+  max_row_value: 21800
+  files_open_cleanly: true
+checks:
+- check: equals_ground_truth
+  args:
+    field: required_sections
+- check: equals_ground_truth
+  args:
+    field: chart_values
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: row_count
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: total
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: by_group
+- check: equals_ground_truth
+  args:
+    field: max_row_label
+- check: equals_ground_truth
+  args:
+    field: max_row_value
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: files_open_cleanly
+recording: null
+notes: 'Deliverable output must report files_open_cleanly: true after opening the rendered PDF/PPTX cleanly
+  (FR-CON-09, PRD 19.2).'

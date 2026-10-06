@@ -79,6 +79,7 @@ async def _security_headers(request: Request, call_next: Any) -> Response:
     return response
 
 
+@app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}

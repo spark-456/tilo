@@ -1,0 +1,68 @@
+id: B-017
+domain: personal_admin
+shapes:
+- gated_save
+- single_deliverable
+title: A four-day family trip to Lisbon
+brief: 'Plan a four-day family trip to Lisbon in May for two adults and two kids (7 and 10): a daily outline and
+  a rough budget split between flights, stay, food and activities. Total budget 3,200 euros.'
+director:
+  brief:
+    goal: Plan a four-day Lisbon family trip in May with a daily outline and a budget split under 3,200 euros.
+    deliverables:
+    - title: Trip plan
+      format: google_docs
+    audience: A family of four
+    deadline: null
+    constraints:
+    - Budget 3,200 euros
+    - Kids aged 7 and 10
+    sources: []
+    sensitivity: personal
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: research
+      title: Find family-friendly activities
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: analyse
+      title: Split the budget
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: draft
+      title: Write the daily outline
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+    - id: U4
+      unit_type: deliver
+      title: Save the result to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U3
+expect:
+  outcome: completed

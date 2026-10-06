@@ -1,0 +1,38 @@
+id: E-MAIL-03
+group: E-MAIL
+title: Subcontractor asks to reschedule weekly electrical coordination meeting
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Triage incoming email regarding rescheduling wednesday electrical review for slip 14
+  thread:
+    thread_id: thread-e-mail-03
+    subject: Rescheduling Wednesday electrical review for Slip 14
+    messages:
+    - message_id: msg-e-mail-03-1
+      from: jake.turner@coastalmarineelec.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: Rescheduling Wednesday electrical review for Slip 14
+      body: Hi Sarah, my team is delayed on a mast rewiring project in Edmonds and won't make our 2 PM
+        meeting this Wednesday. Could we reschedule for Thursday at 11 AM or Friday at 9 AM? Let me know
+        which time slot works best for your schedule.
+ground_truth:
+  category: needs_reply
+  priority: normal
+  reason: Meeting reschedule request from primary subcontractor requiring calendar reply.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

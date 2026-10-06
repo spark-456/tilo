@@ -1,0 +1,41 @@
+{
+  "v": "1.0",
+  "user": "u_priya",
+  "as_of": "2026-10-06T10:00:00.000Z",
+  "today": "2026-10-06",
+  "rows": [
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_launch_site"
+      },
+      "reason": "blocked",
+      "group": "attention",
+      "title": "Launch site refresh",
+      "due": "2026-10-10",
+      "at": "2026-10-05T12:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "card",
+        "id": "01J9B2C3D4E5F6G7H8J9K0M1N2"
+      },
+      "reason": "gate",
+      "group": "attention",
+      "title": "Send the rate sheet to Acme?",
+      "due": null,
+      "at": "2026-10-06T09:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    }
+  ],
+  "parked": [],
+  "truncated": true,
+  "fingerprint": "c2c84d26210410f6b16538c0b4b6648931888e0be83996178c53b27abaacea5b"
+}

@@ -28,3 +28,19 @@ output "services" {
     }
   }
 }
+
+output "developer_grants" {
+  description = "Every roles/run.developer binding as planned: service name, role, member."
+  value = [
+    for key, b in google_cloud_run_v2_service_iam_member.developer : {
+      service = "tilo-${local.developer_bindings[key].service}"
+      role    = b.role
+      member  = b.member
+    }
+  ]
+}
+
+output "uris" {
+  description = "Map of service key => its run.app URL (known after apply)."
+  value       = { for k, svc in google_cloud_run_v2_service.this : k => svc.uri }
+}

@@ -8,9 +8,11 @@ from __future__ import annotations
 import enum
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, TypedDict
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from tilo_providers.errors import RequestError
 
 
 class Capability(enum.StrEnum):
@@ -34,6 +36,8 @@ class GenerateRequest(BaseModel):  # one ModelProvider.generate() / .stream() ca
     tools: list[dict[str, Any]] | None = None
     json_mode: bool = False  # PL-02 structured output: force JSON-only output, no schema
     response_schema: dict[str, Any] | None = None  # PL-02 structured output: JSON output validated against this schema
+    # google only; None sends no thinking config. A pattern, not a Literal, so callers' type checkers stay quiet.
+    thinking_level: str | None = Field(default=None, pattern="^(minimal|low|medium|high)$")
 
 
 class GenerateResponse(BaseModel):  # one generate() result, or one stream() chunk
@@ -80,9 +84,45 @@ class SearchProvider(ABC):  # PRD 6.1: grounded search
     def search(self, query: str, **kwargs: Any) -> Any: ...
 
 
-class SafetyProvider(ABC):  # PRD 10.4: safety screening, e.g. "no safety flags" conditions
+class SafetyResult(TypedDict):  # CC-SP-47: the one fixed SafetyProvider.check() result
+    flagged: bool
+    reason: str | None
+
+
+NATIVE_MIME_TYPES = frozenset({"application/pdf", "image/png", "image/jpeg"})  # issue #47 item 2
+
+
+def native_mime_type(content: bytes | None, mime_type: str | None) -> str | None:
+    """Validates the native-file arguments; returns the normalised media type,
+    or None for a text-only check. Raises `RequestError` for anything that
+    cannot be screened, so an unsupported file never passes as clean."""
+    if content is None and mime_type is None:
+        return None
+    if content is None or mime_type is None:
+        raise RequestError("FR-INT-02: a native-file safety check needs both content= and mime_type=")
+    if not isinstance(content, bytes):
+        raise RequestError("FR-INT-02: a native-file safety check needs content= as bytes")
+    normalised = mime_type.strip().lower()
+    if normalised not in NATIVE_MIME_TYPES:
+        raise RequestError(f"FR-INT-02: the safety provider cannot screen media type {mime_type!r}; refused")
+    return normalised
+
+
+class SafetyProvider(ABC):  # PRD 10.4, 16.3 item 2: screens intake, tool output, mail and model output
+    def check(self, text: str, *, content: bytes | None = None, mime_type: str | None = None) -> SafetyResult:
+        """Screens `text`, or a native file (`check("", content=..., mime_type=...)`,
+        no text extracted). Template method: the media-type gate runs here, in
+        the base class, so no adapter can skip it. A media type that cannot be
+        screened raises `RequestError`, never `flagged: False` (fails closed).
+        Adapters implement `_check`, which receives the normalised media type."""
+        normalised = native_mime_type(content, mime_type)
+        return self._check(text, content=content, mime_type=normalised)
+
     @abstractmethod
-    def check(self, text: str, **kwargs: Any) -> Any: ...
+    def _check(self, text: str, *, content: bytes | None, mime_type: str | None) -> SafetyResult: ...
+
+    def redact(self, text: str) -> str:  # same role as ModelProvider.redact (PRD 16.1 rule 4)
+        return text
 
 
 class SpeechProvider(ABC):  # FR-INT-14, FR-CHN-16: voice intake transcription

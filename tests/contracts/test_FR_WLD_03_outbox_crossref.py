@@ -5,18 +5,19 @@ OB-01 and OB-05 (contracts/outbox.rules.md; harness validator, P0-09). OB-01: th
 the outbox_id reserved for it; on a gate it was opened by an approval.resolved answering approve
 on that gate from someone who may open it (PRD 10.1: the world's owner, the Approver the owner
 assigned the gate to before the answer, or a Team Lead whose owner-assigned domain is the gate's
-while the owner's policy the gate names allows that domain; a T3 gate answered on WhatsApp also
-needs its PIN checked, SEC-06), otherwise by a policy.applied stamped by its policy under a policy
-that covers it (within its daily action and credit limits across the owner's worlds, and action type and
-undo window, created before and not expired, at the applied level when the send was authorised
+while the owner's policy the gate names allows that domain; answered in a signed-in web or
+mobile-web session, never over WhatsApp, SEC-06 and ADR-0019), otherwise by a policy.applied
+stamped by its policy under a policy that covers it (within its daily action and credit limits
+across the owner's worlds, and action type and undo window, created before and not expired, at
+the applied level when the send was authorised
 (its last history entry at or before authz.at, so not after a revocation or Stop all autopilot),
 owned by the world's owner and created and changed only by that owner (every history entry
 included, PRD 10.1), connector, recipients and district in scope; at L2 also the owner's
 own earlier instruction in this world about the same destination, PRD 10.4 "instruction is
-approval", given where Tilo knows who sent it: signed in on the web or mobile web, or typed from
-the owner's bound WhatsApp number, never by email, PRD 10.3 and 11.1, and never a tapped card
-option or an answer to a gate, consent or meeting card, BQ-56; and no earlier policy.applied
-used that instruction, even if its entry was cancelled); the entry's authz equals
+approval", given where Tilo knows who sent it: a world.requested signed in on the web or mobile
+web, never email, PRD 10.3 and 11.1, and never a channel.message_in on any channel, ADR-0019;
+and no earlier policy.applied used that instruction, even if its entry was cancelled); the
+entry's authz equals
 that event's authz, and the data.transfer it emitted carries the same authz. OB-05: its action
 type, tier and pinned item (artifact id and version) equal those approval.requested reserved or
 policy.applied assessed, and on the policy path also its connector, destination and undo window;
@@ -50,12 +51,12 @@ CASE_KEYS = {
     "transfer",
 }
 EVENT_KEYS = {"type", "authz", "data"}
-# OB-01, L2: the channels on which Tilo knows the sender is the owner, per instruction type.
-INSTRUCTION_CHANNELS = {"world.requested": ("web", "mobile_web"), "channel.message_in": ("whatsapp",)}
-# OB-01, L2 (BQ-56): a channel.message_in is an instruction only as typed words answering no card or
-# a question card; a tapped option or an answer to a gate, consent or meeting card never is.
-INSTRUCTION_CARD_KINDS = (None, "needs_you")
-INSTRUCTION_TYPES = tuple(INSTRUCTION_CHANNELS)
+# OB-01 (ADR-0019, SD-01): the signed-in sessions in which Tilo knows the person. A gate answer and
+# an L2 instruction count only there; `whatsapp` stays enum-valid and opens nothing.
+SIGNED_IN = ("web", "mobile_web")
+# OB-01, L2: only a world.requested is an instruction; a channel.message_in may fill the slot only
+# so that an invalid case can show it is refused.
+INSTRUCTION_TYPES = ("world.requested", "channel.message_in")
 SLOT_TYPES = {
     "reserved_by": ("approval.requested",),
     "authorised_by": ("approval.resolved", "policy.applied"),
@@ -133,12 +134,11 @@ def _may_answer(gate, answer, owner, lead, policy) -> bool:
     before the answer, or a Team Lead whose domain the owner assigned before the answer (PRD 16.2),
     when the gate names that domain and the owner's policy it names (same action type, in force)
     lists it. A Viewer, anyone else, an Approver someone else named (a Team Lead naming themself
-    included) or a Team Lead of another domain opens nothing. A T3 gate answered on WhatsApp also
-    needs its PIN checked (SEC-06)."""
+    included) or a Team Lead of another domain opens nothing. Only an answer in a signed-in session
+    counts, whatever its tier or `pin_verified` (SEC-06 as amended, ADR-0019)."""
     authz, allowed, approver = answer["authz"], gate["data"]["team_lead"], gate["data"]["approver"]
-    if gate["data"]["risk_tier"] == "T3" and answer["data"]["channel"] == "whatsapp":
-        if not answer["data"]["pin_verified"]:
-            return False
+    if answer["data"]["channel"] not in SIGNED_IN:
+        return False
     if authz["by"] == "person":
         return authz["ref"] == owner or (
             approver is not None
@@ -161,29 +161,17 @@ def _may_answer(gate, answer, owner, lead, policy) -> bool:
     )
 
 
-def _typed_by_owner(instruction) -> bool:
-    """OB-01, L2 (BQ-56): a WhatsApp message counts only as the owner's own typed words (no tapped
-    option) answering no card or a question card. Hold on a gate card, any tapped option and any
-    answer to a gate, consent or meeting card is recorded by its own answering event, and only
-    approve opens a gate (CR-07)."""
-    data = instruction["data"]
-    if instruction["type"] != "channel.message_in":
-        return True
-    return data["option"] is None and data["card_kind"] in INSTRUCTION_CARD_KINDS
-
-
 def _instructed(entry, applied, level, policy, instruction, earlier) -> bool:
-    """OB-01, L2: the policy owner's own earlier instruction in this world, from a signed-in session
-    or typed from the owner's bound WhatsApp number (never email, never a card answer but a typed
-    answer to a question), asked for this send, and no earlier policy.applied used it up (whatever
-    became of that entry, cancelled included)."""
+    """OB-01, L2: the policy owner's own earlier world.requested in this world, from a signed-in
+    session (never email, never a channel.message_in, ADR-0019), asked for this send, and no earlier
+    policy.applied used it up (whatever became of that entry, cancelled included)."""
     if level != "L2":
         return applied["instruction_id"] is None and instruction is None
     return (
         instruction is not None
         and instruction["id"] == applied["instruction_id"]
-        and instruction["data"]["channel"] in INSTRUCTION_CHANNELS[instruction["type"]]
-        and _typed_by_owner(instruction)
+        and instruction["type"] == "world.requested"
+        and instruction["data"]["channel"] in SIGNED_IN
         and all(used["data"]["instruction_id"] != applied["instruction_id"] for used in earlier)
         and instruction["world_id"] == entry["world_id"]
         and instruction["ts"] < entry["authz"]["at"]
@@ -345,7 +333,7 @@ def test_FR_WLD_03_OB_05_each_invalid_entry_breaks_only_its_rule(repo_root):
 
 def test_FR_WLD_03_OB_01_every_authorisation_path_has_an_invalid_case(repo_root):
     """A gate nobody approved, a gate approved by someone who may not open it (PRD 10.1, 16.2,
-    SEC-06) and a send stamped with the wrong authority each fail OB-01 (HR-7)."""
+    SEC-06, ADR-0019) and a send stamped with the wrong authority each fail OB-01 (HR-7)."""
     names = {path.stem for path in _cases(repo_root, "invalid")}
     required = {
         "ob01_gate_answered_hold",
@@ -356,7 +344,7 @@ def test_FR_WLD_03_OB_01_every_authorisation_path_has_an_invalid_case(repo_root)
         "ob01_gate_approved_by_team_lead_outside_domain",
         "ob01_gate_approved_by_team_lead_policy_does_not_allow",
         "ob01_gate_approved_by_team_lead_assigned_by_someone_else",
-        "ob01_t3_whatsapp_without_pin",
+        "ob01_gate_approved_on_whatsapp",
         "ob01_gate_approved_by_approver_assigned_by_someone_else",
         "ob01_gate_approved_by_approver_assigned_after_answer",
         "ob01_gate_approved_by_team_lead_via_self_named_approver",
@@ -366,6 +354,26 @@ def test_FR_WLD_03_OB_01_every_authorisation_path_has_an_invalid_case(repo_root)
         "ob01_transfer_stamped_other_than_entry",
     }
     assert required <= names, f"missing OB-01 cases {sorted(required - names)}"
+
+
+def _signed_in(case):
+    """The same case answered or instructed in a signed-in mobile-web session instead of WhatsApp."""
+    if case["instruction"] is not None:
+        destination = case["instruction"]["data"]["destination"]
+        case["instruction"]["type"] = "world.requested"
+        case["instruction"]["data"] = {"title": "Reply yes", "channel": "mobile_web", "destination": destination}
+    else:
+        case["authorised_by"]["data"]["channel"] = "mobile_web"
+    return case
+
+
+@pytest.mark.parametrize("name", ["ob01_gate_approved_on_whatsapp", "ob01_l2_instruction_is_a_whatsapp_message"])
+def test_FR_WLD_03_OB_01_whatsapp_alone_breaks_each_case(repo_root, name):
+    """ADR-0019 (SD-01): each case is a path that once opened a send. WhatsApp alone breaks it now:
+    the same answer or instruction from a signed-in session passes."""
+    case = load_json(contracts_dir(repo_root) / f"fixtures/outbox/crossref/invalid/{name}.json")
+    assert broken(case) == {"OB-01"}
+    assert broken(_signed_in(case)) == set()
 
 
 @pytest.mark.parametrize("by, ref", [("person", "u_owner"), ("team_lead", "tl_ops")])
@@ -403,9 +411,7 @@ def test_FR_WLD_03_OB_01_OB_05_policy_path_has_an_invalid_case_per_binding(repo_
         "ob01_l2_instruction_by_email",
         "ob01_l2_world_requested_by_email",
         "ob01_l2_instruction_reused",
-        "ob01_l2_instruction_is_a_gate_card_hold",
-        "ob01_l2_instruction_is_a_tapped_question_option",
-        "ob01_l2_instruction_typed_on_a_gate_card",
+        "ob01_l2_instruction_is_a_whatsapp_message",
         "ob01_policy_daily_limit_reached",
         "ob01_policy_daily_credits_reached",
         "ob05_policy_undo_window_dropped",

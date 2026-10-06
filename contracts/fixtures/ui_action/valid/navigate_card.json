@@ -1,0 +1,8 @@
+{
+  "kind": "navigate",
+  "route": "cards",
+  "target": {
+    "kind": "card",
+    "id": "01JB5VQ0000000000000009008"
+  }
+}

@@ -1,0 +1,101 @@
+// S-05 Inspect panel (PRD 18.3): one thing in the world (agent, building, district, level, island
+// or artifact), what it is, where it sits, its state and every recorded event that names it. State
+// comes from the reducer over the recorded events, never from a guess (HR-1, HR-5). Layout after
+// the Inspect panel in design/source "Tilo World Player.dc.html".
+import { type CSSProperties, useEffect } from "react";
+import { useClient } from "../api/ClientProvider";
+import { reduce } from "../world/reducer";
+import { useReplayedLog } from "../world/replay";
+import { elapsed } from "../world/runLog";
+import { involves, select } from "../world/selection";
+import { AppLink } from "./AppLink";
+import { Loaded } from "./FlowShell";
+import { LevelChip, levelOf } from "./LevelChip";
+import { Placeholder } from "./Placeholder";
+import { SelectionBar } from "./SelectionBar";
+import { findItem } from "./findItem";
+import { factsOf, stateTone } from "./inspectFacts";
+import { Chip } from "./kit";
+import { useRemote } from "./remote";
+import type { ScreenProps } from "./routes";
+
+export { findItem };
+
+export function S_05({ params }: ScreenProps) {
+  const [worldId = "", itemId = ""] = params;
+  const client = useClient();
+  const { events } = useReplayedLog(client, worldId);
+  const [layout, retry] = useRemote("load the world", (signal) =>
+    client.getLayout(worldId, signal),
+  );
+  const found = layout.status === "ready" ? findItem(layout.value, itemId, events) : null;
+  const exists = found !== null;
+  // Inspecting an object selects it, so the lenses show the same one (FR-WLD-06).
+  useEffect(() => {
+    if (exists) select(worldId, itemId);
+  }, [exists, worldId, itemId]);
+  return (
+    <div className="screen-body wide" data-testid="inspect-panel">
+      <p>
+        <AppLink className="back-link" to={`/world/${encodeURIComponent(worldId)}`}>
+          Back to the world
+        </AppLink>
+      </p>
+      <h1>{layout.status === "ready" ? (found ? found.name : "Not found") : "Inspect"}</h1>
+      <SelectionBar worldId={worldId} />
+      <Loaded what="the world" remote={layout} retry={retry} isEmpty={() => false}>
+        {(l) => {
+          const item = findItem(l, itemId, events);
+          if (!item) return <p>There is nothing called {itemId} in this world.</p>;
+          const mine = events.filter((e) => involves(e, itemId));
+          const now = reduce(l, events);
+          const state = item.state(now);
+          const facts = factsOf(l, itemId, now);
+          return (
+            <>
+              <p className="screen-tag">
+                {item.kind} · {item.where}
+              </p>
+              <p className="inspect-state">
+                <b>State:</b> <Chip tone={stateTone(state)}>{state}</Chip>
+              </p>
+              {facts.length > 0 && (
+                <dl
+                  className="inspect-facts"
+                  data-testid="inspect-facts"
+                  style={{ "--rows": facts.length } as CSSProperties}
+                >
+                  {facts.map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <Placeholder label="Follow in the world" />
+              <h2>What happened here</h2>
+              {mine.length === 0 ? (
+                <p>No event has named this yet.</p>
+              ) : (
+                <ol className="mini-timeline" aria-label="Events that name this, in order">
+                  {mine.map((e) => {
+                    const lv = levelOf(l, e);
+                    return (
+                      <li key={e.seq}>
+                        <span className="story-time">{elapsed(events, e)}</span>
+                        <span>
+                          {e.summary} {lv && <LevelChip level={lv} />}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </>
+          );
+        }}
+      </Loaded>
+    </div>
+  );
+}

@@ -1,0 +1,24 @@
+id: E-HAND-12
+group: E-HAND
+title: 'Context handoff: Curlew Dental autoclave sterilization log verification'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Audit daily spore test and cycle printouts across four surgery rooms for Q3.
+  target_context_threshold_pct: 70
+  handoff_stage: after_surgery_2_cycle_audit
+  sources:
+  - https://ops.curlew-dental.example/autoclave-logs
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null
+notes: 'Skeleton: cited intranet.*.example sources are synthetic placeholders until harness context-handoff
+  recordings land (CL-EVID).'

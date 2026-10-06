@@ -41,7 +41,7 @@
   "plain_name": "Mail Room",
   "icon_name": "inbox",
   "agent_role": "specialist",
-  "channel": "whatsapp",
+  "channel": "mobile_web",
   "data_class": "business",
   "deliverable_format": "pdf",
   "credit_range": {
@@ -51,5 +51,6 @@
   "time_range": {
     "min_s": 240,
     "max_s": 420
-  }
+  },
+  "media_type": "text/markdown"
 }

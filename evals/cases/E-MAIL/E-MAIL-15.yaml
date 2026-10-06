@@ -1,0 +1,38 @@
+id: E-MAIL-15
+group: E-MAIL
+title: Calendar acceptance notification for Thursday rigging consultation
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding accepted: rigging inspection review @ thu oct 8, 2026 10am -
+    11am'
+  thread:
+    thread_id: thread-e-mail-15
+    subject: 'Accepted: Rigging inspection review @ Thu Oct 8, 2026 10am - 11am'
+    messages:
+    - message_id: msg-e-mail-15-1
+      from: elena.rostova@cascadeyachts.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Accepted: Rigging inspection review @ Thu Oct 8, 2026 10am - 11am'
+      body: 'Elena Rostova has accepted your calendar invitation: Rigging inspection review for vessel
+        ''Northern Star'' on Thursday Oct 8, 2026 from 10:00 AM to 11:00 AM at Harborview Slip 4.'
+ground_truth:
+  category: fyi
+  priority: low
+  reason: Calendar invite acceptance receipt; no response or action necessary.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

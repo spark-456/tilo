@@ -27,10 +27,12 @@ writer that simply runs longer than `lease_s` loses its world out from under it.
 from __future__ import annotations
 
 import copy
+import functools
 import secrets
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from tilo_harness.ids import ORG_ID, RUN_ID, WORLD_ID, check_id
 from tilo_harness.validator import EventRejected, EventValidator, WorldState
@@ -54,11 +56,22 @@ _NULL_TRACE: dict[str, Any] = {
 }
 
 
+def _locked[F: Callable[..., Any]](method: F) -> F:
+    """Runs the method under the writer's lock: the loop's thread and an API thread both write."""
+
+    @functools.wraps(method)
+    def run(self: WorldWriter, *args: Any, **kwargs: Any) -> Any:
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return cast(F, run)
+
+
 class WriterBusy(Exception):
     """Raised when the world's lease is held by another writer."""
 
 
-def _new_ulid(now: datetime) -> str:
+def new_ulid(now: datetime) -> str:
     ms = int(now.timestamp() * 1000) & 0xFFFFFFFFFFFF
     value = (ms << 80) | int.from_bytes(secrets.token_bytes(10), "big")
     return "".join(_CROCKFORD[(value >> (i * 5)) & 0x1F] for i in range(25, -1, -1))
@@ -77,7 +90,7 @@ def _identical(a: Any, b: Any) -> bool:
     return bool(a == b)
 
 
-def _format_ts(now: datetime) -> str:
+def format_ts(now: datetime) -> str:
     return now.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
 
 
@@ -119,6 +132,32 @@ class WorldWriter:
         self._state.world_id = world_id
         self._view_ids: dict[str, set[str]] = {}
         self._view_seq: dict[str, int] = {}
+        self._lock = threading.RLock()
+
+    @property
+    def org_id(self) -> str:
+        return self._org_id
+
+    @property
+    def world_id(self) -> str:
+        return self._world_id
+
+    @_locked
+    def recorded_version(self, artifact_id: str) -> int:
+        """The highest version of `artifact_id` this world recorded (EV-15), 0 if none: versions 1..n are announced."""
+        return self._state.versions.get(artifact_id, 0)
+
+    @property
+    def run_id(self) -> str:
+        return self._run_id
+
+    @property
+    def layout(self) -> dict[str, Any]:
+        return self._layout
+
+    def now(self) -> datetime:
+        """The writer's own clock, so a card and its event agree on the time."""
+        return self._clock()
 
     def open(self) -> None:
         """Acquires the world's lease and loads the head: last seq, and every event id already
@@ -161,6 +200,7 @@ class WorldWriter:
 
         self._store.transact(self._org_id, self._world_id, _release)
 
+    @_locked
     def emit(
         self,
         *,
@@ -178,14 +218,17 @@ class WorldWriter:
         vis: str | list[str] = "all",
         authz: dict[str, Any] | None = None,
         trace: dict[str, Any] | None = None,
+        event_id: str | None = None,
     ) -> dict[str, Any]:
+        """With `event_id` the event is committed under that id (FR-HIL-07): the same id and content again is a
+        resend that returns the committed event and writes nothing; other content raises `EventRejected` (EV-10)."""
         now = self._clock()
         entry = self._validator.registry_types.get(type) if isinstance(type, str) else None
         event = {
             "v": "1.0",
-            "id": _new_ulid(now),
+            "id": event_id or new_ulid(now),
             "seq": self._state.last_seq + 1,
-            "ts": _format_ts(now),
+            "ts": format_ts(now),
             "world_id": self._world_id,
             "run_id": self._run_id,
             "type": type,
@@ -203,8 +246,12 @@ class WorldWriter:
             "data": data,
             "trace": trace if trace is not None else dict(_NULL_TRACE),
         }
+        committed = self._state.seen.get(event_id) if event_id else None
+        if committed is not None and _identical(event | {"seq": committed["seq"], "ts": committed["ts"]}, committed):
+            return copy.deepcopy(committed)
         return self._write(event)
 
+    @_locked
     def append(self, event: dict[str, Any]) -> dict[str, Any]:
         """Writes a pre-built event unchanged (the replay path): `seq` must be exactly
         `last_seq + 1`, `id` must be unused, `cause` must be null or an earlier event of this

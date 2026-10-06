@@ -1,0 +1,50 @@
+id: E-RES-10
+group: E-RES
+title: 'Research SC-06: Compare licences and first available November dates'
+measures:
+- EV-01
+- EV-05
+status: ready
+deploy_gate: false
+inputs:
+  question: Extract the BCA licence and first available November date for Riverside Kitchens and Northgate
+    Renovations.
+  seed_urls:
+  - http://sandbox-web.example/s/riverside-kitchens/profile
+  - http://sandbox-web.example/s/northgate-renovations/profile
+  seed_files:
+  - services/sandbox-web/seed/riverside-kitchens.yaml
+  - services/sandbox-web/seed/northgate-renovations.yaml
+scripted_answers: []
+ground_truth:
+  riverside_licence: SG-BCA-KRW-00231
+  riverside_first_date: '2026-11-03'
+  northgate_licence: SG-BCA-KRW-00588
+  northgate_first_date: '2026-11-05'
+checks:
+- check: equals_ground_truth
+  args:
+    field: riverside_licence
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: riverside_first_date
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: northgate_licence
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: northgate_first_date
+    tolerance: 0
+- check: groundedness
+  kind: autorater
+  args:
+    field: citations
+    sources:
+    - http://sandbox-web.example/s/riverside-kitchens/profile
+    - http://sandbox-web.example/s/northgate-renovations/profile
+recording: null
+notes: 'EV-05 groundedness check is declared as kind: autorater (reported as pending by the replay runner
+  until live autorater grading or recordings land).'

@@ -168,10 +168,12 @@ def decide(
 
 ### L2 instruction check (PI-08, PI-09, PI-10, PI-12)
 
-`proposal.instruction` counts only when all of:
+While `coverage.L2_ACTION_RECORDED` is False (until ADR-0013 lands; BQ-57, PI-21), `decide` counts no
+instruction at all: every L2-covered send gates with reason `l2_instruction_required`. The OB-01
+validator keeps `instruction_counts`. Once the flag is True, `proposal.instruction` counts only when all of:
 - it is not None and its `type` is `"world.requested"` with `data["channel"]` in
-  `("web", "mobile_web")`, or `"channel.message_in"` with `data["channel"] == "whatsapp"`
-  (never `"email"`, whoever `actor` is — PI-09);
+  `("web", "mobile_web")`, a signed-in session (never `"email"` or `"whatsapp"`, and never a
+  `"channel.message_in"` on any channel, whoever `actor` is — PI-09, ADR-0019);
 - `instruction["world_id"] == proposal.world_id` (or `instruction["data"]["world_id"]` — tests
   set both the same, see conftest factories) and `instruction["actor"] == policy["owner"]`;
 - `instruction["ts"] < now` (strictly earlier);
@@ -218,8 +220,9 @@ def open_gate(
       reserved["data"]["action_type"], reserved["data"]["team_lead"]["domain"] in
       policy["team_lead_domains"], policy["created_by"]["at"] <= authz["at"], and
       policy["expiry"] is None or authz["at"] < policy["expiry"].
-    - SEC-06: when reserved["data"]["risk_tier"] == "T3" and resolved["data"]["channel"] ==
-      "whatsapp", resolved["data"]["pin_verified"] must be true, whoever answered.
+    - SEC-06 as amended (ADR-0019): resolved["data"]["channel"] is "web" or "mobile_web" (a
+      signed-in session), whoever answered and whatever the tier; "whatsapp" opens nothing and
+      `pin_verified` is not read.
 
     On "run": tier = reserved["data"]["risk_tier"]; modifiers = () (approval.requested carries
     no modifier list — only the outbox entry does, out of scope for this event pair);

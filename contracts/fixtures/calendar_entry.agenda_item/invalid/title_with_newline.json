@@ -1,0 +1,13 @@
+{
+  "start": "2026-10-09T18:30:00.000Z",
+  "end": null,
+  "all_day": false,
+  "title": "Send\nit",
+  "kind": "due",
+  "source": {
+    "kind": "work_item",
+    "id": "wi_rate_sheet"
+  },
+  "state": "confirmed",
+  "shared": false
+}

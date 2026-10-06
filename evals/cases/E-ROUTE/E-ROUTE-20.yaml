@@ -1,0 +1,37 @@
+id: E-ROUTE-20
+group: E-ROUTE
+title: Answer repeat warehouse visitor badge policy question from owner decision
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Prepare the Solano Packaging Bristol plant visitor log for the packaging machinery technicians.
+  question: Do visiting machinery technicians require a continuous floor escort in the Bristol plant or
+    only a day badge?
+  question_domain: facilities
+  topic_key: visitor_escort_badge_policy
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3C0
+  world_id: w_solano_qa
+  district: D1
+  asked_at: '2026-10-02T11:45:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: null
+  answered_from_decision: true
+  decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E9
+checks:
+- check: routed_domain
+  args:
+    expected: null
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3C0
+- check: answered_from_decision
+  args:
+    expected: true
+    decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E9
+recording: null
+notes: Context fixture evals/fixtures/route/routing_scenarios.yaml is exercised by acceptance tests; cases
+  report not runnable (no recording) in tilo_evals run until CL-EVID replay recordings land.

@@ -1,0 +1,38 @@
+id: E-MAIL-06
+group: E-MAIL
+title: Youth sailing club asks about community regatta sponsorship
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: Triage incoming email regarding harbor youth regatta 2027 sponsorship inquiry
+  thread:
+    thread_id: thread-e-mail-06
+    subject: Harbor Youth Regatta 2027 sponsorship inquiry
+    messages:
+    - message_id: msg-e-mail-06-1
+      from: comm@baysailingfoundation.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: Harbor Youth Regatta 2027 sponsorship inquiry
+      body: Dear Harborview Marine, thank you for supporting the Youth Regatta last year! We are putting
+        together the sponsor packet for next spring's junior regatta. Would Harborview be interested in
+        sponsoring the safety boat fuel again this season? No rush, let us know when convenient.
+ground_truth:
+  category: needs_reply
+  priority: low
+  reason: Community sponsorship request seeking reply from management.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

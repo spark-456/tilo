@@ -1,0 +1,38 @@
+id: E-MAIL-11
+group: E-MAIL
+title: IT maintenance alert requiring router reboot window approval
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding action: schedule maintenance reboot for shop wi-fi access points'
+  thread:
+    thread_id: thread-e-mail-11
+    subject: 'Action: Schedule maintenance reboot for shop Wi-Fi access points'
+    messages:
+    - message_id: msg-e-mail-11-1
+      from: support@harbornetit.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Action: Schedule maintenance reboot for shop Wi-Fi access points'
+      body: Our remote management console detected a pending security firmware patch on your marina shop
+        gateways. Please select an approved 15-minute reboot window between midnight and 5 AM via the
+        maintenance scheduler link so network downtime does not impact business hours.
+ground_truth:
+  category: needs_action
+  priority: low
+  reason: IT service action needed to schedule maintenance reboot window.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

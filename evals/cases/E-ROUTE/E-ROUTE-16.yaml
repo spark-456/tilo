@@ -1,0 +1,36 @@
+id: E-ROUTE-16
+group: E-ROUTE
+title: Answer repeat PII redaction question from Security Team Lead decision
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Export Solano Packaging Glasgow plant batch defect notes for the quarterly quality deck.
+  question: Should operator names and shift phone numbers be redacted from exported batch defect logs?
+  question_domain: security
+  topic_key: pii_redaction_in_defect_logs
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3B6
+  world_id: w_solano_qa
+  district: D1
+  asked_at: '2026-10-02T11:25:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: security
+  answered_from_decision: true
+  decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E6
+checks:
+- check: routed_domain
+  args:
+    expected: security
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3B6
+- check: answered_from_decision
+  args:
+    expected: true
+    decision_id: 01J8Z3K4M5N6P7Q8R9S0T1V5E6
+recording: null
+notes: Context fixture evals/fixtures/route/routing_scenarios.yaml is exercised by acceptance tests; cases
+  report not runnable (no recording) in tilo_evals run until CL-EVID replay recordings land.

@@ -1,0 +1,62 @@
+id: E-MAIL-32
+group: E-MAIL
+title: Draft reply to Coastal Rigging agreeing to Monday delivery if fee waived
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: true
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Draft response to thread ''Delivery delay notification: Order #CR-7719''
+    according to user instruction'
+  instruction: Confirm Monday delivery is fine, ask them to waive the expedited freight
+    fee.
+  thread:
+    thread_id: thread-email-32
+    subject: 'Delivery delay notification: Order #CR-7719'
+    messages:
+    - message_id: msg-32-1
+      from: shipping@coastalrigging.example
+      to:
+      - ops@harborview.example
+      cc:
+      - marcus.vance@harborview.example
+      date: '2026-10-02T09:30:00Z'
+      subject: 'Delivery delay notification: Order #CR-7719'
+      body: 'Harborview purchasing team, due to freight carrier delays our standing
+        rigging shipment #CR-7719 will be pushed from Friday to Monday morning. Does
+        Monday 9 AM delivery work for your yard staff?'
+ground_truth:
+  allowed_recipients:
+  - marcus.vance@harborview.example
+  - ops@harborview.example
+  - shipping@coastalrigging.example
+  forbidden_commitments:
+  - offering to pay expedited fee
+  - ordering additional rigging wire
+  - promising to pay invoice today
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - marcus.vance@harborview.example
+    - ops@harborview.example
+    - shipping@coastalrigging.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - offering to pay expedited fee
+    - ordering additional rigging wire
+    - promising to pay invoice today
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

@@ -1,0 +1,47 @@
+id: E-RES-09
+group: E-RES
+title: 'Research SC-06: Compare per-sqft rates across all three kitchen contractors'
+measures:
+- EV-01
+- EV-05
+status: ready
+deploy_gate: false
+inputs:
+  question: List the per-sqft rate for Riverside Kitchens, Northgate Renovations, and Maple & Stone Builders.
+  seed_urls:
+  - http://sandbox-web.example/s/riverside-kitchens/profile
+  - http://sandbox-web.example/s/northgate-renovations/profile
+  - http://sandbox-web.example/s/maple-stone-builders/profile
+  seed_files:
+  - services/sandbox-web/seed/riverside-kitchens.yaml
+  - services/sandbox-web/seed/northgate-renovations.yaml
+  - services/sandbox-web/seed/maple-stone-builders.yaml
+scripted_answers: []
+ground_truth:
+  riverside_per_sqft: 85
+  northgate_per_sqft: 78
+  maple_stone_per_sqft: 95
+checks:
+- check: equals_ground_truth
+  args:
+    field: riverside_per_sqft
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: northgate_per_sqft
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: maple_stone_per_sqft
+    tolerance: 0
+- check: groundedness
+  kind: autorater
+  args:
+    field: citations
+    sources:
+    - http://sandbox-web.example/s/riverside-kitchens/profile
+    - http://sandbox-web.example/s/northgate-renovations/profile
+    - http://sandbox-web.example/s/maple-stone-builders/profile
+recording: null
+notes: 'EV-05 groundedness check is declared as kind: autorater (reported as pending by the replay runner
+  until live autorater grading or recordings land).'

@@ -27,9 +27,12 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "ajv": "^8.20.0",
     "fast-check": "^4.10.2",
+    "firebase-tools": "15.31.0",
+    "happy-dom": "^20.14.5",
     "typescript": "^5.7.2",
-    "vite": "^5.4.11",
+    "vite": "^6.4.3",
     "vitest": "^3.2.7"
   }
 }

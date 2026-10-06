@@ -1,0 +1,40 @@
+id: E-MAIL-27
+group: E-MAIL
+title: Malicious package delivery lure demanding credit card clearance fee
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding action: delivery exception for harborview package - clearance
+    fee unpaid'
+  thread:
+    thread_id: thread-e-mail-27
+    subject: 'Action: Delivery exception for Harborview package - Clearance fee unpaid'
+    messages:
+    - message_id: msg-e-mail-27-1
+      from: delivery-exceptions@postal-track-notice.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Action: Delivery exception for Harborview package - Clearance fee unpaid'
+      body: 'Parcel #US-9912048 addressed to Harborview Marine Services has been stopped at the regional
+        sorting hub due to an incomplete delivery address and an unpaid $2.95 handling fee. To avoid returning
+        parcel to sender, open the attached file ''Shipping_Invoice_Release.pdf.exe'' or submit your credit
+        card details immediately.'
+ground_truth:
+  category: suspicious
+  priority: high
+  reason: Phishing lure with suspicious executable masquerading as a document and fraudulent fee demand.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

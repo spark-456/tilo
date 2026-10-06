@@ -204,7 +204,7 @@ def gate_case(
             "card_id": "01JB5VQ0000000000000009099",
             "outbox_id": outbox_id,
             "option": "approve",
-            "channel": "whatsapp",
+            "channel": "web",
             "pin_verified": False,
         },
     }

@@ -1,0 +1,317 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/pinboard_item.schema.json",
+  "x-version": "1.0.0",
+  "title": "PinboardItem",
+  "description": "One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of \"get in touch\" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` (\"added by Tilo from ...\"); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "org_id",
+    "scope",
+    "title",
+    "body",
+    "kind",
+    "url",
+    "owner",
+    "due",
+    "status",
+    "created_by",
+    "set_up_by",
+    "source",
+    "confirmed_by",
+    "flagged",
+    "history",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/pin_id"
+    },
+    "org_id": {
+      "$ref": "common.schema.json#/$defs/org_id"
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/scope_personal"
+        },
+        {
+          "$ref": "#/$defs/scope_team"
+        }
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 140,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "body": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["note", "decision", "deadline", "link"]
+    },
+    "url": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 300,
+          "pattern": "^https://[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*\\.[a-z]{2,63}(/[A-Za-z0-9._~!$&'()*+,=:@%/-]*)?$",
+          "not": {
+            "pattern": "\\n"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "owner": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/user_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "due": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/calendar_date"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "active", "removed"]
+    },
+    "created_by": {
+      "$ref": "common.schema.json#/$defs/maker"
+    },
+    "set_up_by": {
+      "$ref": "common.schema.json#/$defs/user_id"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/source"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "confirmed_by": {
+      "anyOf": [
+        {
+          "$ref": "team_lead.schema.json#/$defs/assignment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flagged": {
+      "description": "True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).",
+      "type": "boolean"
+    },
+    "history": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/history_entry"
+      }
+    },
+    "created_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    }
+  },
+  "if": {
+    "properties": {
+      "scope": {
+        "properties": {
+          "kind": {
+            "const": "personal"
+          }
+        },
+        "required": ["kind"]
+      }
+    },
+    "required": ["scope"]
+  },
+  "then": {
+    "properties": {
+      "owner": {
+        "type": "null"
+      },
+      "status": {
+        "enum": ["active", "removed"]
+      }
+    },
+    "if": {
+      "properties": {
+        "created_by": {
+          "properties": {
+            "by": {
+              "const": "tilo"
+            }
+          },
+          "required": ["by"]
+        }
+      },
+      "required": ["created_by"]
+    },
+    "then": {
+      "properties": {
+        "source": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "else": {
+    "if": {
+      "properties": {
+        "created_by": {
+          "properties": {
+            "by": {
+              "const": "tilo"
+            }
+          },
+          "required": ["by"]
+        }
+      },
+      "required": ["created_by"]
+    },
+    "then": {
+      "properties": {
+        "source": {
+          "type": "object"
+        }
+      },
+      "if": {
+        "properties": {
+          "status": {
+            "const": "active"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "confirmed_by": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "scope_personal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "user"],
+      "properties": {
+        "kind": {
+          "const": "personal"
+        },
+        "user": {
+          "$ref": "common.schema.json#/$defs/user_id"
+        }
+      }
+    },
+    "scope_team": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "team"],
+      "properties": {
+        "kind": {
+          "const": "team"
+        },
+        "team": {
+          "$ref": "common.schema.json#/$defs/team_id"
+        }
+      }
+    },
+    "source": {
+      "description": "Where the entry came from: shown as added by Tilo from the source when Tilo made it (PE-08).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "evidence"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["meeting", "mail", "call", "request", "manual"]
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/opaque_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "common.schema.json#/$defs/utterance_id"
+          }
+        }
+      }
+    },
+    "history_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "by", "change", "status"],
+      "properties": {
+        "at": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        "by": {
+          "$ref": "event.schema.json#/$defs/actor"
+        },
+        "change": {
+          "type": "string",
+          "enum": ["created", "edited", "accepted", "removed", "undone", "owner_changed"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["proposed", "active", "removed"]
+        }
+      }
+    }
+  }
+}

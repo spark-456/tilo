@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/calendar.entry_changed.schema.json",
+  "x-version": "1.0.0",
+  "title": "CalendarEntryChangedData",
+  "description": "data of calendar.entry_changed (CC-PEOPLE, FR-CAL-03, FR-CAL-06). A calendar entry was accepted, declined, edited, removed, shared with a team or made private again. A write to Google is a data.transfer through the outbox, not this event.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entry_id", "change", "state"],
+  "properties": {
+    "entry_id": {
+      "$ref": "../../common.schema.json#/$defs/calendar_entry_id"
+    },
+    "change": {
+      "type": "string",
+      "enum": ["accepted", "declined", "edited", "removed", "shared", "unshared"]
+    },
+    "state": {
+      "type": "string",
+      "enum": ["proposed", "accepted", "declined", "cancelled"]
+    }
+  }
+}

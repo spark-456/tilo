@@ -17,6 +17,10 @@ data "google_storage_project_service_account" "gcs" {
 locals {
   project_number = data.google_project.current.number
 
+  # Dedicated Cloud Build identity (P0-07g; cloudbuild.yaml runs as it). Built
+  # from the account id like the other non-runtime service accounts below.
+  cloudbuild_service_account_email = "${google_service_account.cloudbuild.account_id}@${var.project_id}.iam.gserviceaccount.com"
+
   required_apis = toset([
     "run.googleapis.com",
     "artifactregistry.googleapis.com",
@@ -38,6 +42,27 @@ locals {
     "aiplatform.googleapis.com",
     "cloudbuild.googleapis.com",
     "compute.googleapis.com",
+    # PRD 6.3 services (P0-07b). The three Workspace APIs were enabled by
+    # hand first; listing them here adopts them (a no-op apply).
+    "modelarmor.googleapis.com",
+    "cloudscheduler.googleapis.com",
+    "identitytoolkit.googleapis.com",
+    "firebaseappcheck.googleapis.com",
+    "monitoring.googleapis.com",
+    "cloudtrace.googleapis.com",
+    "logging.googleapis.com",
+    "gmail.googleapis.com",
+    "calendar-json.googleapis.com",
+    "drive.googleapis.com",
+    # Access audit (infra/ACCESS.md): enabled here so nothing is enabled by
+    # hand later. No image, video or speech APIs: no profile names one.
+    "serviceusage.googleapis.com",
+    "firebaserules.googleapis.com",
+    "recaptchaenterprise.googleapis.com",
+    "docs.googleapis.com",
+    "sheets.googleapis.com",
+    "slides.googleapis.com",
+    "bigquerystorage.googleapis.com",
   ])
 
   # ALL_TRAFFIC: every request from api and harness leaves through the VPC
@@ -127,12 +152,22 @@ locals {
   # Pub/Sub publish is granted on the tilo-events topic to harness only
   # (PRD 15.3: harness is the only event writer), and Secret Manager access
   # per secret (secret_accessors below), never project-wide. tilo-channels
-  # is internet-facing and writes only through the API (PRD 6.1), so it
-  # holds no project role at all.
+  # is internet-facing and writes only through the API (PRD 6.1), so it holds
+  # no data role; it only calls models (triage, drafting) and the safety
+  # provider. The provider layer only generates, streams, embeds and counts
+  # tokens (google_adapter.py), so the two internet-facing callers (api,
+  # channels) get a custom role holding just aiplatform.endpoints.predict
+  # instead of roles/aiplatform.user (which also allows jobs, endpoint
+  # deployment and Agent Engine sessions/Memory Bank). Harness keeps
+  # aiplatform.user until its Sessions/Memory Bank/code-execution calls exist
+  # (then narrow it too). Neither Vertex publisher models nor Model Armor
+  # templates have resource-level IAM, so these stay project-level.
+  vertex_generate_role = "projects/${var.project_id}/roles/tiloVertexGenerate"
+
   service_project_roles = {
-    "api"         = ["roles/datastore.user", "roles/cloudtasks.enqueuer"]
-    "harness"     = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user"]
-    "channels"    = []
+    "api"         = ["roles/datastore.user", "roles/cloudtasks.enqueuer", local.vertex_generate_role, "roles/modelarmor.user"]
+    "harness"     = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user", "roles/modelarmor.user"]
+    "channels"    = [local.vertex_generate_role, "roles/modelarmor.user"]
     "connectors"  = ["roles/datastore.user"]
     "browser"     = []
     "render"      = ["roles/datastore.user"]
@@ -144,7 +179,12 @@ locals {
     "workspace-oauth-client"        = ["connectors"]
     "whatsapp-api-token"            = ["channels"]
     "channels-webhook-signing-key"  = ["channels"]
-    "email-action-link-signing-key" = ["api"]
+    "email-action-link-signing-key" = ["channels"] # channels issues and verifies links (links.py); no api code uses it
+    # Slots the PRD implies (names only; values are added by the user).
+    "whatsapp-webhook-verify-token" = ["channels"] # Meta GET handshake (FR-CHN-02)
+    "channel-binding-hmac-key"      = ["channels"] # binding.py HMAC (FR-CHN-03, SEC-06)
+    "channel-number-encryption-key" = ["channels"] # binding.py number cipher (FR-CHN-03)
+    "webpush-vapid-private-key"     = ["channels"] # web push (FR-CHN-17)
   }
   secret_accessor_bindings = { for combo in flatten([
     for secret, services in local.secret_accessors : [
@@ -157,7 +197,7 @@ locals {
   # The WIF deployer holds no project role: run.developer is granted on the
   # seven services (module.service developers), serviceAccountUser per
   # runtime SA and Artifact Registry write on the tilo repository (below).
-  project_bindings = { for combo in flatten([
+  project_bindings = merge({ for combo in flatten([
     for name, roles in local.service_project_roles : [
       for role in roles : {
         key    = "${name}::${role}"
@@ -166,7 +206,19 @@ locals {
       }
     ]
     ]) : combo.key => { role = combo.role, member = combo.member }
-  }
+    },
+    { for r in var.deployer_project_roles : "deployer::${r}" => {
+      role = r, member = "serviceAccount:${module.wif.deployer_service_account_email}"
+    } },
+    # tilo-cloudbuild's one project role: builds log to Cloud Logging only.
+    # Everything else it holds is scoped to a resource (below).
+    {
+      "cloudbuild::roles/logging.logWriter" = {
+        role   = "roles/logging.logWriter"
+        member = "serviceAccount:${local.cloudbuild_service_account_email}"
+      }
+    },
+  )
 
   # Secret Manager placeholders: names only. Values are added by the user
   # out of band, never in Terraform (PRD 16.1 rule 4).
@@ -199,12 +251,25 @@ module "service" {
   # CI deploys revisions of these services only (run.developer per service,
   # never project-wide). run.developer cannot set IAM, so CI can never make
   # an internal service public.
+  # tilo-cloudbuild (cloudbuild.yaml) gets the same per-service grant.
   developers = {
-    deployer = "serviceAccount:${module.wif.deployer_service_account_email}"
+    deployer   = "serviceAccount:${module.wif.deployer_service_account_email}"
+    cloudbuild = "serviceAccount:${local.cloudbuild_service_account_email}"
   }
 
   # Cloud Tasks delivers runs to harness with an OIDC token for this SA.
   extra_invokers = {
+    # Gmail push (Pub/Sub OIDC) calls channels; the watch renew/poll jobs call
+    # harness (only harness reaches connectors, PRD 6.1). Each SA holds
+    # run.invoker on that one service (FR-CHN-08).
+    "channels::gmail-push" = {
+      service = "channels"
+      member  = "serviceAccount:${google_service_account.gmail_push.account_id}@${var.project_id}.iam.gserviceaccount.com"
+    }
+    "harness::gmail-scheduler" = {
+      service = "harness"
+      member  = "serviceAccount:${google_service_account.gmail_scheduler.account_id}@${var.project_id}.iam.gserviceaccount.com"
+    }
     "harness::cloud-tasks" = {
       service = "harness"
       member  = "serviceAccount:${google_service_account.tasks_invoker.account_id}@${var.project_id}.iam.gserviceaccount.com"
@@ -255,6 +320,19 @@ module "iam" {
   project_id = var.project_id
   bindings   = local.project_bindings
 
+  depends_on = [google_project_service.apis, google_project_iam_custom_role.vertex_generate]
+}
+
+# Minimal Vertex AI role for the callers of the provider layer: generate,
+# stream, embed and count tokens on publisher models need only
+# aiplatform.endpoints.predict (same pattern as modules/events bq_ledger_inserter).
+resource "google_project_iam_custom_role" "vertex_generate" {
+  project     = var.project_id
+  role_id     = "tiloVertexGenerate"
+  title       = "Tilo Vertex generate-only"
+  description = "Model calls only (generate, stream, embed, count tokens); no jobs, endpoint deployment or Agent Engine access."
+  permissions = ["aiplatform.endpoints.predict"]
+
   depends_on = [google_project_service.apis]
 }
 
@@ -265,6 +343,25 @@ resource "google_service_account_iam_member" "deployer_act_as" {
   service_account_id = "projects/${var.project_id}/serviceAccounts/${module.service.service_accounts[each.key]}"
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${module.wif.deployer_service_account_email}"
+}
+
+# Cloud Build identity (P0-07g): the build runs `gcloud run services update`
+# (a new revision as the runtime SA), so it may act as each of the seven
+# runtime SAs, and nothing else (not tasks-invoker, gmail, deployer or itself).
+resource "google_service_account" "cloudbuild" {
+  project      = var.project_id
+  account_id   = "tilo-cloudbuild"
+  display_name = "Tilo Cloud Build (cloudbuild.yaml deploy identity)"
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_service_account_iam_member" "cloudbuild_act_as" {
+  for_each = local.cloud_run_services
+
+  service_account_id = "projects/${var.project_id}/serviceAccounts/${module.service.service_accounts[each.key]}"
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${local.cloudbuild_service_account_email}"
 }
 
 # ---------------------------------------------------------------------------
@@ -418,6 +515,17 @@ resource "google_artifact_registry_repository_iam_member" "deployer_writer" {
   member     = "serviceAccount:${module.wif.deployer_service_account_email}"
 }
 
+# Cloud Build pushes images to the tilo repository only.
+resource "google_artifact_registry_repository_iam_member" "cloudbuild_writer" {
+  project  = var.project_id
+  location = google_artifact_registry_repository.containers.location
+  # repository_id (configured), not name (computed): the grant list output is
+  # asserted at plan time (cloudbuild.tftest.hcl).
+  repository = google_artifact_registry_repository.containers.repository_id
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${local.cloudbuild_service_account_email}"
+}
+
 resource "google_secret_manager_secret" "placeholders" {
   for_each = local.secret_placeholders
 
@@ -471,8 +579,168 @@ module "budget" {
   project_number        = local.project_number
   display_name          = "tilo-${var.project_id}-monthly"
   amount_usd            = var.budget_amount_usd
+  currency_code         = var.budget_currency_code
   threshold_percentages = [0.5, 0.9, 1.0]
 
   # The budget needs billingbudgets.googleapis.com enabled first.
+  depends_on = [google_project_service.apis]
+}
+
+# ---------------------------------------------------------------------------
+# Monitoring: email channel and SLO alerts (PRD 6.3, NFR-23).
+# ---------------------------------------------------------------------------
+
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project_id              = var.project_id
+  alert_email             = var.alert_email
+  cloud_run_service_names = [for k in keys(local.cloud_run_services) : "tilo-${k}"]
+  events_subscription_id  = module.events.subscription_name
+
+  depends_on = [google_project_service.apis]
+}
+
+# ---------------------------------------------------------------------------
+# Storage ownership (PRD 13.2, FR-INT-02; assumptions in infra/ACCESS.md).
+# Bucket-scoped, create and read only: nobody but render may overwrite.
+# ---------------------------------------------------------------------------
+
+locals {
+  # bucket => service => roles
+  storage_grants = {
+    "artifacts" = {
+      api     = ["roles/storage.objectCreator", "roles/storage.objectViewer"] # uploads (FR-INT-02), downloads (PRD 6.2)
+      harness = ["roles/storage.objectCreator", "roles/storage.objectViewer"] # intermediate artifacts, masked screenshots
+    }
+    "snapshots" = {
+      harness = ["roles/storage.objectCreator", "roles/storage.objectViewer"] # world snapshots, checkpoints (PRD 13.2)
+    }
+    "archive" = {
+      harness = ["roles/storage.objectViewer"] # per-run hash-chain check (FR-MEM-04); create is granted above
+    }
+  }
+  storage_bindings = { for combo in flatten([
+    for bucket, svcs in local.storage_grants : [
+      for svc, roles in svcs : [
+        for role in roles : { key = "${bucket}::${svc}::${role}", bucket = bucket, svc = svc, role = role }
+      ]
+    ]
+  ]) : combo.key => combo }
+}
+
+resource "google_storage_bucket_iam_member" "service_access" {
+  for_each = local.storage_bindings
+
+  bucket = module.storage.buckets[each.value.bucket].name
+  role   = each.value.role
+  member = "serviceAccount:${module.service.service_accounts[each.value.svc]}"
+}
+
+# ---------------------------------------------------------------------------
+# Cloud Build source staging (P0-07g): the bucket `gcloud builds submit
+# --gcs-source-staging-dir` uploads source tarballs to. A second instance of
+# modules/storage, so it is regional (gcloud would otherwise auto-create a US
+# multi-region bucket) and stays out of output.storage_buckets (the three PRD
+# buckets). Uploaded source is disposable: deleted after 7 days. The build
+# identity only reads it; the submitting user writes it.
+# ---------------------------------------------------------------------------
+
+module "storage_cloudbuild_staging" {
+  source = "../../modules/storage"
+
+  project_id = var.project_id
+
+  buckets = {
+    "cloudbuild-staging" = {
+      location           = var.region
+      versioning_enabled = false
+      kms_key_name       = ""
+      lifecycle_rules = [
+        { action_type = "Delete", age_days = 7 },
+      ]
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_storage_bucket_iam_member" "cloudbuild_staging_viewer" {
+  bucket = module.storage_cloudbuild_staging.buckets["cloudbuild-staging"].name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${local.cloudbuild_service_account_email}"
+}
+
+# ---------------------------------------------------------------------------
+# Model Armor (PRD 6.3): the template the safety provider screens with.
+# ---------------------------------------------------------------------------
+
+resource "google_model_armor_template" "default" {
+  project     = var.project_id
+  location    = var.model_armor_location
+  template_id = "tilo-default"
+
+  # PRD 16.5 (minimise): the screened text is mail and message content, so
+  # Model Armor must not write it to logs. Both log switches stay off.
+  template_metadata {
+    log_sanitize_operations = false
+    log_template_operations = false
+  }
+
+  filter_config {
+    pi_and_jailbreak_filter_settings {
+      filter_enforcement = "ENABLED"
+      confidence_level   = "MEDIUM_AND_ABOVE"
+    }
+    # No malicious_uri_filter_settings: asia-southeast1 rejects that capability
+    # (CAPABILITY_NOT_SUPPORTED, first apply 5 Oct 2026). Link checks on
+    # untrusted text are a follow-up issue, not this template's job.
+    rai_settings {
+      dynamic "rai_filters" {
+        for_each = ["HATE_SPEECH", "HARASSMENT", "DANGEROUS", "SEXUALLY_EXPLICIT"]
+        content {
+          filter_type      = rai_filters.value
+          confidence_level = "MEDIUM_AND_ABOVE"
+        }
+      }
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+# ---------------------------------------------------------------------------
+# Gmail push (FR-CHN-08): topic, OIDC push subscription to tilo-channels and
+# the Scheduler jobs that renew and poll.
+# ---------------------------------------------------------------------------
+
+resource "google_service_account" "gmail_push" {
+  project      = var.project_id
+  account_id   = "tilo-gmail-push"
+  display_name = "Tilo Gmail push (Pub/Sub OIDC identity)"
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_service_account" "gmail_scheduler" {
+  project      = var.project_id
+  account_id   = "tilo-gmail-scheduler"
+  display_name = "Tilo Gmail watch renew/poll (Cloud Scheduler OIDC identity)"
+
+  depends_on = [google_project_service.apis]
+}
+
+module "gmail_push" {
+  source = "../../modules/gmail_push"
+
+  project_id                      = var.project_id
+  region                          = var.region
+  push_target_uri                 = module.service.uris["channels"]
+  scheduler_target_uri            = module.service.uris["harness"]
+  push_service_account_name       = google_service_account.gmail_push.name
+  push_service_account_email      = google_service_account.gmail_push.email
+  scheduler_service_account_email = google_service_account.gmail_scheduler.email
+  pubsub_service_agent_email      = module.events.pubsub_service_agent_email
+
   depends_on = [google_project_service.apis]
 }

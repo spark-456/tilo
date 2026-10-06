@@ -1,0 +1,24 @@
+id: E-HAND-13
+group: E-HAND
+title: 'Context handoff: Redkite Home Goods regional carrier SLA claim packet'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Assemble late-delivery claim evidence across 35 regional parcel dispatches.
+  target_context_threshold_pct: 70
+  handoff_stage: after_dispatch_20_pod_check
+  sources:
+  - https://claims.redkite-goods.example/q3-pods
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null
+notes: 'Skeleton: cited intranet.*.example sources are synthetic placeholders until harness context-handoff
+  recordings land (CL-EVID).'

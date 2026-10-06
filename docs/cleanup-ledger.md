@@ -170,4 +170,92 @@ Repo-hygiene pass before feature work resumes. Started 2026-09-30 after `git fet
 
 ## Decisions and actions log
 
-(filled in as each task runs)
+1. **Inventory** (read-only): this file, b06cab4.
+2. **Loose files**: none besides this ledger. The stranded security-reviewer note in worktree `agent-a3d4197de3c2bba0b` (newer than origin's copy) was carried to phase0-stack in 32d15ad. The worktree copy was then discarded after a byte-identity check against `origin/phase0-stack`.
+3. **meet-bot baseline**: `chore/meet-bot-baseline` = 000b424 (end-of-file-fixer excludes `meet-bot/tests/fixtures/`, following the read-only-data precedent of the top-level `exclude`; secret scans still run) + 70e8200 (68 files, `Req: VA-00`, fixture bytes unchanged), pushed. It was merged into phase0-stack (36703e6), then **reverted** (32af67b) for two reasons:
+   - `meet-bot/` holds Gemini model ids, so `scripts/lint_model_ids.py` (PL-01, part of `just lint`) fails.
+   - Its tests need their own rootdir, so root pytest fails to collect them.
+
+   Fixing either needs a meet-bot code change or a PL-01 rule change, and both are the user's call. The working copy stays on disk untracked, byte-identical to 70e8200. To land it later, run `git revert 32af67b` on phase0-stack once the ids live in `config/` or an ADR scopes meet-bot out of PL-01 and root pytest. Git reports the branch as merged because of the revert, so it is kept deliberately.
+   - The ignore line `C:/` never matched the stray folder: Git Bash stores it as `C` + U+F03A. `/C/` was added to `meet-bot/.gitignore`.
+   - Deleting the stray folder was denied by the auto-mode classifier (see Needs the user).
+4. **Origin sync**: phase0-stack merged `origin/phase0-stack` (a645ddf; qa-breaker MEMORY.md union). Gate steps green: 2059 passed. `--ignore=meet-bot` was passed on the command line only, because the untracked `meet-bot/` in this checkout is otherwise collected. Pushed 32af67b.
+5. **PRs** (lowest risk first). The base was merged in, ticket tests were run locally, CI (`just check`) ran on the final head, and one code-reviewer round ran on the final head:
+
+   | PR | final head | fix pass | review on final head | CI | result |
+   | --- | --- | --- | --- | --- | --- |
+   | #53 FR-HIL-07 idempotent append | cafaf22 | none | code PASS | pass | merged 0a1fb7b |
+   | #62 P0-08b camera | 5a8c2f3 | vitest ^2.1.5 -> ^3.2.7 (SEC-13, GHSA-5xrq-8626-4rwp) | code PASS | pass | merged 13d82e0 |
+   | #66 P0-08b player | c775d01 | merged camera + base; retargeted to phase0-stack | code PASS | pass | merged ead0bd7 |
+   | #54 FR-HIL-09/SEC-07 redaction | 3e0748b | concluded the paused conflict merge + base | code PASS, security re-check PASS | pass | merged ccafdc5 |
+   | #52 P8-06b eval checks | 70dcd2b | r1 FAIL (repeated check reused first args; ground-truth check passed with no ground truth) fixed in 70dcd2b | code PASS | pass | merged 3e0d4ad |
+   | #60 FR-AGT-01/02/03 executor | 52283eb | r1 FAIL (runner self-cancel hung the run; writer-rejected handoff aborted it) fixed in e58a815; 52283eb re-wraps harness CLAUDE.md to the 40-line cap | code PASS (incl. 52283eb) | pass | merged c4ac3f7 |
+   | #24 FR-AGT-04 skills | 586aad1 (backup push) | none | n/a | - | **parked**: 5 rounds + re-scope r3 all FAIL; Phase B per ADR-0008; redo in #70 |
+
+   Follow-up issues filed: #69 (vite >= 6.4.3), #70 (#24 redo), #71 (services/api, including `/intake` taking no principal), #72 (eval checks), #73 (executor).
+6. **Sweep**
+   - Backup pushes under their own names (non-force), for commits on no remote: `feat/FR-HIL-07-kill-switches` (WIP committed as 42d4789), `feat/P0-09-harness-skeleton`, `feat/P8-06a-eval-cases`, `sh/base`, `tests/FR-HIL-07`, `tests/FR-HIL-07-r2`, `tests/P8-01`. `feat/FR-AGT-04-v0-skills` was fast-forwarded as part of #24.
+   - Local branches: 97 deleted with `git branch -d`. Proof for each: `git rev-list --count origin/phase0-stack..<b>` = 0. `tests/P0-08b-camera` and `tests/P0-08b-player` needed `--unset-upstream` first (stale upstream `int/p0-08b-base`).
+   - Remote branches: 7 merged PR heads deleted: #60, #53, #54, #62, #66, #44 and #52.
+   - Worktrees removed without `--force`: `agent-a3d4…`, `agent-a6ae…` and its nested `nested-tests-P8-06b`, `agent-abb8…`, `lucid-kilby-06f5a8`, `sw-player`, `cleanup-cam`, `cleanup-p806b`. On Windows, git deregistered them but could not delete every directory (locked `node_modules`/`.venv` files). Those leftovers are in Needs the user.
+   - The interrupted vitest bump in `sw-player` was saved as a diff in the session scratchpad and discarded, per the SW pause note; the bump was redone on camera.
+7. **phase0-stack -> main**: PR #74 merged as 8f89fe2 (`gh pr merge --merge`). All gate conditions held:
+   - Every step of `just check` green locally on b449964: contracts, format, lint, model ids, mypy, tsc, 2188 Python tests and 50 web tests (`--ignore=meet-bot`, as in step 4). CI `just check` green on #74.
+   - Every PR merged here passed review on its final commit, and #24 is untouched.
+   - No open security flag, and no blocking row in docs/open-questions.md.
+
+   `origin/main` contains b449964, and `git diff b449964 origin/main` is empty. This ledger commit lands on phase0-stack after that, so main is one docs commit behind until the next promotion.
+8. **Final check**: `git fetch --prune` done. Both remaining worktrees are clean apart from the untracked `meet-bot/` in the main checkout. The only open PR is #24, which matches the list below.
+
+## Final state
+
+### Open PRs
+- None. #24 was merged from the user's account at 19:26 UTC (d4ac3b5), after this cleanup. With the user's OK it was reverted on phase0-stack on 2026-10-01 (3d37770; the tree is identical to bc66670). The FR-AGT-04 redo stays in #70.
+
+### Worktrees
+- The main checkout on `phase0-stack`. Its only untracked item is `meet-bot/`, which stays uncommitted until the PL-01 decision.
+- `.claude/worktrees/agent-aae1d4cd456e97655` on `feat/FR-HIL-07-kill-switches` @ 42d4789: clean, pushed, parked for the ST kill-switch redo.
+- `.claude/worktrees/meet-bot` on `chore/meet-bot-baseline`: the meet-bot build worktree (added 2026-10-01). meet-bot work branches from here and merges back here, not into phase0-stack, until an integration ticket moves its model calls into `packages/providers` and its model ids into `config/`.
+
+### Local branches (32)
+"+N" = commits not in `origin/phase0-stack`. Every branch is on origin under its own name, or reachable from another origin ref.
+
+| name | head | unmerged | on origin |
+| --- | --- | --- | --- |
+| `chore/meet-bot-baseline` | 70e8200 | +0 | origin/chore/meet-bot-baseline |
+| `feat/CC-SP-47-safety-provider` | 4b01dd0 | +2 | origin/feat/CC-SP-47-safety-provider |
+| `feat/CC-SP-64-grant-budget-tier` | e96094a | +1 | reachable from other origin refs |
+| `feat/FR-AGT-04-v0-skills` | 586aad1 | +11 | origin/feat/FR-AGT-04-v0-skills |
+| `feat/FR-HIL-01-cards` | ea775d2 | +3 | origin/feat/FR-HIL-01-cards |
+| `feat/FR-HIL-07-kill-switch-redaction` | 87d0d5d | +38 | origin/feat/FR-HIL-07-kill-switch-redaction |
+| `feat/FR-HIL-07-kill-switches` | 42d4789 | +2 | origin/feat/FR-HIL-07-kill-switches |
+| `feat/FR-INT-06-approaches` | 75960dd | +3 | origin/feat/FR-INT-06-approaches |
+| `feat/FR-INT-09-plangraph` | 81b44c8 | +3 | origin/feat/FR-INT-09-plangraph |
+| `feat/P0-09-harness-skeleton` | 23ab975 | +1 | origin/feat/P0-09-harness-skeleton |
+| `feat/P8-06-eval-harness` | f4b7713 | +10 | origin/feat/P8-06-eval-harness |
+| `feat/P8-06a-eval-cases` | 7123012 | +1 | origin/feat/P8-06a-eval-cases |
+| `main` | 3a94287 | +0 | origin/main |
+| `phase0-stack` | b449964 | +0 | origin/phase0-stack |
+| `sh/base` | ea69dfa | +1 | origin/sh/base |
+| `tests/CC-SP-47` | c4a94ac | +1 | origin/tests/CC-SP-47 |
+| `tests/CC-SP-64` | e96094a | +1 | origin/tests/CC-SP-64 |
+| `tests/FR-AGT-04` | 2d9781a | +2 | reachable from other origin refs |
+| `tests/FR-HIL-01` | faba0b6 | +1 | reachable from other origin refs |
+| `tests/FR-HIL-07` | 18add1a | +4 | origin/tests/FR-HIL-07 |
+| `tests/FR-HIL-07-r2` | 04c2a75 | +6 | origin/tests/FR-HIL-07-r2 |
+| `tests/FR-HIL-07-r3` | 6db698e | +6 | reachable from other origin refs |
+| `tests/FR-HIL-07-r4` | 3e355ae | +8 | reachable from other origin refs |
+| `tests/FR-HIL-07-r5` | 34036a7 | +10 | reachable from other origin refs |
+| `tests/FR-HIL-07-r6` | cfab7dc | +13 | reachable from other origin refs |
+| `tests/FR-HIL-07-r7` | b8064b4 | +15 | reachable from other origin refs |
+| `tests/FR-HIL-07-r8` | d8a191d | +39 | origin/tests/FR-HIL-07-r8 |
+| `tests/FR-INT-06` | 1a5fcb7 | +1 | origin/tests/FR-INT-06 |
+| `tests/FR-INT-09` | 0522a9a | +1 | origin/tests/FR-INT-09 |
+| `tests/P8-01` | acfe876 | +1 | origin/tests/P8-01 |
+| `tests/P8-06` | 1439637 | +2 | reachable from other origin refs |
+| `work/FR-HIL-07-a46f` | 87d0d5d | +38 | reachable from other origin refs |
+
+### Needs the user
+- Delete the stray `meet-bot/C:` folder: the auto-mode classifier denied it. It is gitignored now.
+- The leftover worktree directories were deleted on 2026-10-01, with the user's OK. Before deletion, every one of their 1,748 non-dependency files was matched to an existing git blob.
+- meet-bot and PL-01: decided on the default. meet-bot lives on its own branch line (`chore/meet-bot-baseline`, worktree `.claude/worktrees/meet-bot`). It lands in phase0-stack through an integration ticket (VA-INT: model ids to `config/`, calls through `packages/providers`), after which `git revert 32af67b` is replaced by that ticket's merge.

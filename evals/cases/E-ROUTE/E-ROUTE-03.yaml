@@ -1,0 +1,37 @@
+id: E-ROUTE-03
+group: E-ROUTE
+title: Route Bramble Foods cold-chain indemnity clause to Legal Team Lead
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Review the updated Bramble Foods regional distributor agreement before generating the redline
+    summary.
+  question: Does Bramble Foods accept a liability cap below 2x annual fees on chilled-transport spoilage
+    claims?
+  question_domain: legal
+  topic_key: coldchain_indemnity_cap
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A3
+  world_id: w_bramble_supply
+  district: D1
+  asked_at: '2026-10-02T10:10:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: legal
+  answered_from_decision: false
+  decision_id: null
+checks:
+- check: routed_domain
+  args:
+    expected: legal
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A3
+- check: answered_from_decision
+  args:
+    expected: false
+recording: null
+notes: Context fixture evals/fixtures/route/routing_scenarios.yaml is exercised by acceptance tests; cases
+  report not runnable (no recording) in tilo_evals run until CL-EVID replay recordings land.

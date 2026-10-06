@@ -2,6 +2,8 @@
 
 - Status: Accepted (2026-09-25, architect; ticket P0-03, code review after issue #21).
   Freezes with the CP0 set on 29 Sep.
+- Superseded in part by ADR-0019 (SD-01): a `channel.message_in` is never an L2 instruction, so
+  the typed-words rule for WhatsApp lapses.
 - Deciders: architect, orchestrator
 - Requirement: FR-WLD-03 (PRD 10.3, 10.4, 11.2, FR-HIL-05, CR-07)
 

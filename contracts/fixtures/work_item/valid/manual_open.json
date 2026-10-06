@@ -1,0 +1,33 @@
+{
+  "id": "wi_call_acme",
+  "org_id": "org_example",
+  "owner": "u_priya",
+  "title": "Call Acme about the invoice",
+  "due": null,
+  "due_text": null,
+  "status": "open",
+  "source": {
+    "kind": "manual",
+    "ref": null,
+    "evidence": []
+  },
+  "created_by": {
+    "by": "person",
+    "ref": "u_priya",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
+  "assigned_by": null,
+  "confirmed_by": null,
+  "snoozed_until": null,
+  "flagged": false,
+  "history": [
+    {
+      "at": "2026-10-05T10:30:00.000Z",
+      "by": "u_priya",
+      "change": "created",
+      "status": "open"
+    }
+  ],
+  "created_at": "2026-10-05T10:30:00.000Z",
+  "updated_at": "2026-10-05T10:30:00.000Z"
+}

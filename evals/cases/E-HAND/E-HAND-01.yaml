@@ -1,0 +1,26 @@
+id: E-HAND-01
+group: E-HAND
+title: 'Context handoff: multi-corridor freight audit crossing 70% context window'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: true
+inputs:
+  task: Audit 12 weeks of Harrier Logistics UK-IE and UK-NL customs manifests and produce a consolidated
+    variance table.
+  target_context_threshold_pct: 70
+  handoff_stage: after_corridor_1_manifest_extraction
+  sources:
+  - https://intranet.harrier-logistics.example/q3-manifests
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null
+notes: 'Skeleton: cited intranet.*.example sources are synthetic placeholders until harness context-handoff
+  recordings land (CL-EVID). Selected as one of the 5 E-HAND deploy_gate cases (E-HAND-01..05 spanning
+  5 distinct multi-step domains; BQ-162).'

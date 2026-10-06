@@ -1,0 +1,80 @@
+id: B-034
+domain: engineering
+shapes:
+- multi_connector
+- gated_send
+title: Incident notes saved and sent to the on-call lead
+brief: 'Summarise last sprint''s incident notes (below), save the summary to Drive and email it to the on-call lead.
+  Notes: db failover on Tuesday (9 min), bad deploy rolled back Thursday (4 min), one false alert.'
+director:
+  brief:
+    goal: Summarise last sprint's incidents, save to Drive and email the on-call lead.
+    deliverables:
+    - title: Incident summary
+      format: google_docs
+    - title: Cover email
+      format: email
+    audience: On-call lead
+    deadline: null
+    constraints: []
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: analyse
+      title: Group the incidents
+      role: specialist
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: draft
+      title: Write the summary
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U1
+    - id: U3
+      unit_type: verify
+      title: Check durations and counts
+      role: verifier
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on:
+      - U2
+    - id: U4
+      unit_type: deliver
+      title: Save the summary to Drive
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - google_drive
+      actions:
+      - save_file
+      depends_on:
+      - U3
+    - id: U5
+      unit_type: deliver
+      title: Email the on-call lead
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - gmail
+      actions:
+      - send_email
+      depends_on:
+      - U4
+expect:
+  outcome: completed

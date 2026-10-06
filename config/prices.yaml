@@ -1,36 +1,37 @@
 # Standard list prices per model profile, in US dollars per million tokens (PL-06, FR-MTR-01,
 # PRD 14.1: 1 credit = US$0.005). Shape: contracts/providers.schema.json $defs.prices.
-# Prices are never invented: status stays unset and every price, the date and the source stay
-# null until the user copies them from the provider's price page. The loader refuses live
-# metering while status is unset; setting status to set requires every value below.
+# Prices are never invented. status: set requires every price, the date and the source; the
+# loader refuses live metering while status is unset.
 #
-# FOR THE USER TO CHECK before copying in (researched 2026-09-26 from
-# https://ai.google.dev/gemini-api/docs/pricing, page last updated 2026-09-24).
-# Paid tier, Standard, text, per 1M tokens; output includes thinking tokens.
-#   flash-38 (gemini-3.8-flash):      input 0.75, output 3.75  promotional through 2026-12-31;
-#                                     1.50 / 7.50 from 2027-01-01
-#   flash-37 (gemini-3.7-flash):      input 0.75, output 3.75  same promotion and end date
-#   lite-31  (gemini-3.1-flash-lite): input 0.25, output 1.50  no promotion listed
-#   nim-gemma-*: NVIDIA's hosted trial endpoint publishes no per-token price; pick a value
-#                (0 for the free trial) or drop these profiles before setting status.
-# Suggested use: the charged (promotional) prices with effective_date 2026-09-24, so metering
-# reconciles with the bill (FR-MTR-01, 10% tolerance), then a new entry dated 2027-01-01.
-# Vertex AI usually matches the Gemini API; confirm in the Cloud console once billing is on.
-# Setting status: set also means updating the PRD 6.4 / FR-MTR-01 tests that pin this file to
-# unset (tests/contracts/test_PRD_6_4_providers_config.py,
-# packages/metering/tests/test_FR_MTR_01_prices_and_pricebook.py).
-status: unset
-effective_date: null
-source: null
+# Confirmed by the user on 2026-10-04 from the provider's price page
+# (https://ai.google.dev/gemini-api/docs/pricing, page last updated 2026-09-24; Vertex AI
+# matches, user confirmed). Paid tier, Standard, text, per 1M tokens; output includes thinking
+# tokens.
+#   flash-38 (gemini-3.8-flash):      input 0.75, output 3.75
+#   flash-37 (gemini-3.7-flash):      input 0.75, output 3.75
+#   lite-31  (gemini-3.1-flash-lite): input 0.25, output 1.50 (no promotion)
+# flash-38 and flash-37 are PROMOTIONAL through 2026-12-31 and become 1.50 / 7.50 from
+# 2027-01-01. The prices below are the charged (promotional) ones, effective 2026-09-24, so
+# metering reconciles with the bill (FR-MTR-01, 10% tolerance).
+# TODO(needs contract change: dated price entries): $defs.prices has one effective_date for
+# the whole file, so the 2027-01-01 step cannot be a second entry here. Before 2027-01-01 this
+# file must be updated (or a second dated prices file loaded by the PriceBook).
+status: set
+effective_date: "2026-09-24"
+source: "https://ai.google.dev/gemini-api/docs/pricing (Standard paid tier, text, USD per 1M tokens; page last updated 2026-09-24; Vertex AI matches; confirmed by the user 2026-10-04)"
 currency: USD
 credit_usd: 0.005
 
 profiles:
-  flash-38: { input: null, output: null }
-  flash-37: { input: null, output: null }
-  lite-31: { input: null, output: null }
+  flash-38: { input: 0.75, output: 3.75 } # promotional through 2026-12-31; 1.50 / 7.50 from 2027-01-01
+  flash-37: { input: 0.75, output: 3.75 } # promotional through 2026-12-31; 1.50 / 7.50 from 2027-01-01
+  lite-31: { input: 0.25, output: 1.50 }
+  # The profiles below make no paid call, so their price is 0 by decision (PL-06, 2026-10-04):
+  safety-fake: { input: 0, output: 0 } # the dev fake safety screen; makes no paid call
+  director-dev: { input: 0, output: 0 } # config/models.dev.yaml's fake Director; makes no paid call
   # PL-02/ADR-0003: config/models.nim.yaml's profiles need a price entry too --
   # the loader's PL-06 start-up check (every profile has one) runs whichever
   # models file TILO_MODELS_FILE selects, against this same prices.yaml.
-  nim-gemma-4-31b: { input: null, output: null }
-  nim-gemma-3-27b: { input: null, output: null }
+  # NVIDIA NIM free trial endpoint: no per-token charge, so 0.
+  nim-gemma-4-31b: { input: 0, output: 0 }
+  nim-gemma-3-27b: { input: 0, output: 0 }

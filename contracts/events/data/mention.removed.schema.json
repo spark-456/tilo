@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/mention.removed.schema.json",
+  "x-version": "1.0.0",
+  "title": "MentionRemovedData",
+  "description": "data of mention.removed (CC-PEOPLE, FR-PB-04). A tag was removed by the tagged person themselves or by the entry's setter (PE-06).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mention_id", "pin_id", "removed_by"],
+  "properties": {
+    "mention_id": {
+      "$ref": "../../common.schema.json#/$defs/mention_id"
+    },
+    "pin_id": {
+      "$ref": "../../common.schema.json#/$defs/pin_id"
+    },
+    "removed_by": {
+      "$ref": "../../common.schema.json#/$defs/user_id"
+    }
+  }
+}

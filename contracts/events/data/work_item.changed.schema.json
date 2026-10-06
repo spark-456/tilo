@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/work_item.changed.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorkItemChangedData",
+  "description": "data of work_item.changed (CC-PEOPLE, FR-PA-01, FR-PA-05). A work item moved: confirmed (proposed to open), edited, snoozed, done, dropped, reopened, reassign_requested, or reminded (the sweeper nudged the owner).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["work_item_id", "change", "status"],
+  "properties": {
+    "work_item_id": {
+      "$ref": "../../common.schema.json#/$defs/work_item_id"
+    },
+    "change": {
+      "type": "string",
+      "enum": [
+        "confirmed",
+        "edited",
+        "snoozed",
+        "done",
+        "dropped",
+        "reopened",
+        "reassign_requested",
+        "reminded"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "open", "done", "dropped"]
+    }
+  }
+}

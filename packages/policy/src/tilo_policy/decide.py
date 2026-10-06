@@ -12,7 +12,7 @@ from .coverage import (
     add_seconds,
     covering_level,
     fail_closed,
-    instruction_counts,
+    l2_may_run,
     may_cover,
     readable,
     stamped_by,
@@ -66,7 +66,8 @@ def over_limit(policy: dict, applied: list[dict], credits: float, now: str) -> s
     if per_day is None or len(mine) + 1 > per_day:  # L2 and L3 always have a daily limit (schema)
         return "l3_daily_cap_reached"
     if most_credits is None:
-        return None
+        # A budget grant spends credits, so a policy with no credit bound covers no cap at all (#106 item 1).
+        return "l3_credits_cap_reached" if policy.get("action_type") == "grant_budget" else None
     spent = [float(a["data"]["credits"]) for a in mine] + [float(credits)]
     if any(not c >= 0 for c in spent):  # negative or NaN credits never lower the total
         raise ValueError("credits must be non-negative")
@@ -115,7 +116,7 @@ def _decide(p: Proposal, table: RiskTable, policies: list[dict], owner: str, app
     if level == "L2" and not (  # PI-12: an L2 send never loses its undo window
         isinstance(window, int)
         and window >= 1
-        and instruction_counts(p.instruction, p.world_id, policy, p.destination, now, applied)
+        and l2_may_run(p.instruction, p.world_id, policy, p.destination, now, applied)
     ):
         return gate(tier, modifiers, level, policy_id, "l2_instruction_required")
     capped = over_limit(policy, applied, p.credits, now)

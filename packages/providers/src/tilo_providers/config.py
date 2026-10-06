@@ -30,6 +30,21 @@ class ProviderConfigError(Exception):
     """Config failed to parse/validate, or failed a start-up check (PL-06, PL-07, NFR-25)."""
 
 
+# Dev-only fakes (CL-INT-5): never counted as conforming for a real role (PL-05), never deployed or live (EFF-01).
+DEV_DIRECTOR_MODEL = "fake-director"
+DEV_ONLY_MODELS = frozenset({DEV_DIRECTOR_MODEL})
+
+
+def refuse_dev_only(profile_id: str, env: Mapping[str, str] | None = None) -> None:
+    """Presence, not truthiness: Cloud Run can set a variable to an empty string (the fake safety provider's rule)."""
+    env = os.environ if env is None else env
+    if "K_SERVICE" in env or "CLOUD_RUN_JOB" in env or env.get("LIVE") == "1":
+        raise ProviderConfigError(
+            f"EFF-01: refusing dev-only profile {profile_id!r} in live mode or when deployed "
+            "(K_SERVICE or CLOUD_RUN_JOB set)"
+        )
+
+
 def resolve_models_path(repo_root: Path | str | None = None, *, env: Mapping[str, str] | None = None) -> Path:
     """PL-02 / ADR-0003: picks `config/models.yaml` unless `TILO_MODELS_FILE`
     names another file (e.g. `config/models.nim.yaml`, to route roles to
@@ -117,6 +132,8 @@ def _validate_profile_endpoint_fields(models: ProvidersModels) -> None:
 
 def _validate_startup_rules(models: ProvidersModels, prices: ProvidersPrices) -> None:
     for profile_id, profile in models.profiles.items():
+        if profile.model in DEV_ONLY_MODELS:
+            refuse_dev_only(profile_id)
         for deny_glob in models.rules.deny:
             if fnmatch.fnmatchcase(profile.model, deny_glob):
                 raise ProviderConfigError(
@@ -175,6 +192,11 @@ def _validate_conformance(models: ProvidersModels, conformance_dir: Path) -> Non
         for profile_id in sorted(profiles_used_by(role)):
             path = conformance_dir / f"{profile_id}.json"
             where = f"PL-05: role {role_id!r} profile {profile_id!r} conformance result {path}"
+            if models.profiles[profile_id].model in DEV_ONLY_MODELS:  # a result file for a dev fake never counts
+                if os.environ.get("TILO_REQUIRE_CONFORMANCE") == "1":
+                    raise ProviderConfigError(f"{where}: a dev-only fake never conforms")
+                warnings.warn(f"{where} is a dev-only fake -- allowed in dev", stacklevel=2)
+                continue
             if not path.is_file() and os.environ.get("TILO_REQUIRE_CONFORMANCE") != "1":
                 warnings.warn(f"{where} is missing -- allowed in dev", stacklevel=2)
                 continue

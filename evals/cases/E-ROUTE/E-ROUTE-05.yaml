@@ -1,0 +1,36 @@
+id: E-ROUTE-05
+group: E-ROUTE
+title: Route Dunlin Energy regional grid benchmark methodology to Research Team Lead
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Compile the Dunlin Energy Q3 wind-site output comparison across Yorkshire and Scotland.
+  question: Should regional wind capacity factors be normalised against the 5-year seasonal average or
+    the prior quarter baseline?
+  question_domain: research
+  topic_key: grid_benchmark_window
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A5
+  world_id: w_dunlin_grid
+  district: D1
+  asked_at: '2026-10-02T10:20:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: research
+  answered_from_decision: false
+  decision_id: null
+checks:
+- check: routed_domain
+  args:
+    expected: research
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A5
+- check: answered_from_decision
+  args:
+    expected: false
+recording: null
+notes: Context fixture evals/fixtures/route/routing_scenarios.yaml is exercised by acceptance tests; cases
+  report not runnable (no recording) in tilo_evals run until CL-EVID replay recordings land.

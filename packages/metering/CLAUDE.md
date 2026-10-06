@@ -11,7 +11,7 @@ both on `commit` and pre-emptively in `reserve` when a reservation alone would c
 
 ## Contracts and config
 - Reads `contracts/providers.schema.json` `$defs.prices` via `tilo_contracts.ProvidersPrices` (strict). No events.
-- `config/prices.yaml` (PL-06, owned by S0) stays `status: unset`.
+- `config/prices.yaml` (PL-06, owned by S0) is `status: set` (user-confirmed 2026-10-04); never edit prices here.
 - `config/metering.yaml` does not exist yet (contract change #7, batch CC-SE): `MeteringConfig.load` is a local
   stub; tests use `tests/data/metering.stub.yaml` (PRD 14.1/14.5 demo defaults).
 
@@ -28,3 +28,4 @@ both on `commit` and pre-emptively in `reserve` when a reservation alone would c
 - Every price, cap, limit and ratio goes through `errors.number` (int or float, not bool or string, finite).
 - Both loaders turn any unreadable, malformed or invalid file into `MeteringConfigError` naming the path.
 - `Treasury` validates amounts (`errors.number`) and `at` (timezone-aware); thread-safe; the ledger is append-only.
+- FR-MTR-06: `savings.credits_saved` sums `origin_cost - lookup_cost` over `memory.hit` events (id once, never `data.saved`).

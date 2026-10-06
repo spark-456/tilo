@@ -1,0 +1,27 @@
+id: E-HAND-03
+group: E-HAND
+title: 'Context handoff: three-contractor kitchen renovation quote comparison'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: true
+inputs:
+  task: Evaluate Riverside Kitchens, Northgate Renovations, and Maple & Stone Builders across 14 line-item
+    specifications.
+  target_context_threshold_pct: 70
+  handoff_stage: after_contractor_2_rate_sheet_parse
+  sources:
+  - http://sandbox-web.example/s/riverside-kitchens/profile
+  - http://sandbox-web.example/s/northgate-renovations/profile
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null
+notes: 'Skeleton: cited intranet.*.example sources are synthetic placeholders until harness context-handoff
+  recordings land (CL-EVID). Selected as one of the 5 E-HAND deploy_gate cases (E-HAND-01..05 spanning
+  5 distinct multi-step domains; BQ-162).'

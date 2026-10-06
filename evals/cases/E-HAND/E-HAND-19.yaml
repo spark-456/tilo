@@ -1,0 +1,24 @@
+id: E-HAND-19
+group: E-HAND
+title: 'Context handoff: Kestrel Artisan Bakery wholesale route profitability review'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Combine daily bake yields, stale returns, and van fuel logs across 12 cafe routes.
+  target_context_threshold_pct: 70
+  handoff_stage: after_route_7_margin_rollup
+  sources:
+  - https://intranet.kestrel-bakery.example/route-margins
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null
+notes: 'Skeleton: cited intranet.*.example sources are synthetic placeholders until harness context-handoff
+  recordings land (CL-EVID).'

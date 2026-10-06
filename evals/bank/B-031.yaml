@@ -1,0 +1,48 @@
+id: B-031
+domain: education
+shapes:
+- gated_send
+- held_at_gate
+title: Email parents the term dates, held for review
+brief: 'Email the parents of Class 4B the term dates: autumn term ends 18 December, spring term starts 5 January.
+  Show me the email before it goes anywhere.'
+director:
+  brief:
+    goal: Email Class 4B parents the autumn and spring term dates.
+    deliverables:
+    - title: Term dates email
+      format: email
+    audience: Parents of Class 4B
+    deadline: null
+    constraints:
+    - Hold for review
+    sources: []
+    sensitivity: business
+    ambiguous_fields: []
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: draft
+      title: Write the term-dates email
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+    - id: U2
+      unit_type: deliver
+      title: Send the email
+      role: writer
+      district: D1
+      skills: []
+      connectors:
+      - gmail
+      actions:
+      - send_email
+      depends_on:
+      - U1
+expect:
+  outcome: held_at_gate
+gates: hold

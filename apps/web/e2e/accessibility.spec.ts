@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { gotoStage } from "./support/camera";
 import { DESKTOP, MOBILE } from "./support/viewports";
 
 const SIZES = { desktop: DESKTOP, mobile: MOBILE } as const;
@@ -11,7 +12,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`PRD-17.5 accessibility: WCAG 2.2 AA axe scan is clean at ${name} size`, async ({
       page,
     }) => {
-      await page.goto("/");
+      await gotoStage(page);
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
         .analyze();
@@ -19,7 +20,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     });
 
     test(`PRD-17.5 accessibility: landmarks exist at ${name} size`, async ({ page }) => {
-      await page.goto("/");
+      await gotoStage(page);
       await expect(page.getByRole("navigation")).toBeVisible();
       await expect(page.getByRole("main")).toBeVisible();
     });
@@ -27,7 +28,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`PRD-17.5 accessibility: interactive targets meet the ${
       name === "mobile" ? "44x44" : "24x24"
     } px minimum`, async ({ page }) => {
-      await page.goto("/");
+      await gotoStage(page);
       const minSide = name === "mobile" ? 44 : 24;
       const targets = page.getByRole("link").or(page.getByRole("button"));
       const count = await targets.count();
@@ -47,7 +48,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 }
 
 test("PRD-17.5 accessibility: keyboard focus is always visible", async ({ page }) => {
-  await page.goto("/");
+  await gotoStage(page);
   await page.keyboard.press("Tab");
 
   const outline = await page.evaluate(() => {

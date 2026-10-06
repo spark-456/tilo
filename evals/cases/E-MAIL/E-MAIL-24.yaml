@@ -1,0 +1,39 @@
+id: E-MAIL-24
+group: E-MAIL
+title: Safety supply distributor quarterly clearance sale announcement
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding end of q3 clearance: discounts on commercial life vests and flare
+    packs'
+  thread:
+    thread_id: thread-e-mail-24
+    subject: 'End of Q3 Clearance: Discounts on commercial life vests and flare packs'
+    messages:
+    - message_id: msg-e-mail-24-1
+      from: deals@industrialmarinegear.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'End of Q3 Clearance: Discounts on commercial life vests and flare packs'
+      body: Clearance pricing on USCG approved commercial Type I PFDs, emergency distress beacons, and
+        first aid kits. Save up to 35% on excess inventory while supplies last. Browse clearance inventory
+        online. Manage email alerts or unsubscribe.
+ground_truth:
+  category: newsletter_promo
+  priority: low
+  reason: Quarterly commercial product clearance marketing blast.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

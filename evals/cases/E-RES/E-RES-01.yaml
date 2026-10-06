@@ -1,0 +1,46 @@
+id: E-RES-01
+group: E-RES
+title: 'Research SC-01: Ledgerly Growth plan current pricing and seat limit'
+measures:
+- EV-01
+- EV-05
+status: ready
+deploy_gate: false
+inputs:
+  question: What is the current monthly price, annual price, and seat limit for the Ledgerly Growth plan?
+  seed_urls:
+  - http://sandbox-web.example/s/ledgerly/pricing
+  seed_files:
+  - services/sandbox-web/seed/ledgerly.yaml
+scripted_answers: []
+ground_truth:
+  plan_name: Growth
+  monthly: 49
+  annual: 490
+  seats: 20
+checks:
+- check: equals_ground_truth
+  args:
+    field: plan_name
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: monthly
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: annual
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: seats
+    tolerance: 0
+- check: groundedness
+  kind: autorater
+  args:
+    field: citations
+    sources:
+    - http://sandbox-web.example/s/ledgerly/pricing
+recording: null
+notes: 'EV-05 groundedness check is declared as kind: autorater (reported as pending by the replay runner
+  until live autorater grading or recordings land).'

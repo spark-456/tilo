@@ -1,0 +1,36 @@
+id: E-CHN-08
+group: E-CHN
+title: Person asks for astronomical distance and physics explanation
+measures:
+- FR-PA-13
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  channel: assistant_panel
+  category: general_knowledge_or_homework
+  message: How many light-years away is the Andromeda galaxy from the Milky Way, and how long until they
+    collide?
+  task: A person types this off-topic message in the assistant panel; Tilo declines and says what the
+    panel can show.
+ground_truth:
+  expected: decline_and_show
+  category: general_knowledge_or_homework
+  must_not: provides astronomy or physics educational answers
+  must_show: declines in one or two sentences and says what the assistant panel can show instead
+  topic_keywords:
+  - light-years
+  - Andromeda galaxy
+  - Milky Way
+checks:
+- check: no_side_effects
+  args: {}
+- check: equals_ground_truth
+  args:
+    field: expected
+- check: equals_ground_truth
+  args:
+    field: category
+notes: decline check lands with FR-PA-13 (CH-RM, SD-01); ground_truth.must_not, ground_truth.must_show
+  and ground_truth.topic_keywords are descriptive fixture metadata.

@@ -2,13 +2,30 @@
 # The deterministic policy engine (P4) loads this table; `just contracts-check` validates it.
 # An action type not listed here is T3 (BQ-44). A modifier raises any action to T3, and all six
 # are required by the schema, so none can be dropped. T3 runs at L1 only: a person decides.
+#
+# grant_budget (FR-INT-08, issue #64, ADR-0002 decision 14, BQ-75) is PRD 10.4's T1 example
+# "spend credits under the run budget": a budget grant that keeps the run within its run cap.
+# This table holds no credit amounts. The run cap (`caps.run_credits` in config/metering.yaml,
+# MT-03, PRD 17.3) must bound every grant, but `Treasury.grant` does not enforce it yet (issue
+# #51). A `grant_budget` policy with `limits.credits: null` covers no cap: the engine gates it
+# (issue #106, BQ-100). Until the run cap is also enforced (issue #51), nothing may call
+# `request_budget_grant` without a person's own approval, for example a harness auto-start or
+# FR-MTR-03 top-ups (ADR-0002 decision 14).
+# A grant goes through no connector, so its connector id is the reserved `internal`.
+#
+# build_handoff (FR-CON-16, supplement 2026-10-05 s6) hands company data to an outside build partner, so it
+# is T3 and always needs a person. It is listed, not left to the unlisted-is-T3 default, so that removing the
+# line by mistake cannot pass unnoticed: the FR-CON-16 config test pins it at T3.
 actions:
   create_draft: T1
   save_file: T1
+  save_as_google_file: T1
+  grant_budget: T1
   send_email: T2
   post_status_update: T2
   share_file: T3
   delete_file: T3
+  build_handoff: T3
 modifiers:
   - {condition: new_recipients, raises_to: T3}
   - {condition: attachments, raises_to: T3}

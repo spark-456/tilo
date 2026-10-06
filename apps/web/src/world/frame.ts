@@ -1,10 +1,16 @@
-// FR-WLD-04: a pure frame function (layout, state) -> plain-data display list. Placeholder
-// shapes only (art port is P0-08c); colours from tokens only, geometry from the solver only.
+// FR-WLD-04: a pure frame function (layout, state) -> plain-data display list. Geometry comes from
+// the solver only; district tints are the solver's roles mapped onto token colours; a building's
+// look follows only what the reducer has recorded (status), never a guess. Drawing is art/ and
+// renderer.ts; nothing in this file knows about Pixi.
 import type { Layout } from "@tilo/contracts";
 import tokens from "../design/tokens";
-import type { BuildingStatus, WorldState } from "./reducer";
+import type { BuildingShown, Facade, Roof } from "./art/building";
+import { hash } from "./art/color";
+import { type Bridge, type GateLook, LEVEL_RISE, type Link, MARGIN, type Rect } from "./art/ground";
+import { P } from "./art/iso";
+import { styleOf } from "./art/style";
+import type { WorldState } from "./reducer";
 
-const { tileWidth: TW, tileHeight: TH } = tokens.stage;
 // The solver assigns one of 6 numbered district roles (district.1..6); the design exports have
 // no numbered slots (design/tokens.json note on `color.district`), so this cycles the named tint
 // pool it does expose, in the fixed order the tokens module already lists them.
@@ -15,91 +21,278 @@ function districtTint(tint: string): string {
   return DISTRICT_TINTS[(n - 1) % DISTRICT_TINTS.length] ?? tokens.color.ink["3"];
 }
 
-const BUILDING_COLOR: Readonly<Record<BuildingStatus, string | null>> = {
-  hidden: null, // not drawn at all until building.planned
-  planned: tokens.color.ink["3"],
-  constructing: tokens.color.signal.needs,
-  operational: null, // filled in with the owning district's tint (see buildingColor below)
-  completed: tokens.color.signal.done,
-  archived: tokens.color.ink["2"],
-};
-
-function buildingColor(status: BuildingStatus, tint: string): string | null {
-  if (status === "operational") return districtTint(tint);
-  return BUILDING_COLOR[status];
-}
-
+/** What every ringed or hit-tested thing carries: its centre on the ground, and its footprint. */
 export interface FrameRect {
   readonly id: string;
-  readonly cx: number; // projected world-space centre (iso projection of the grid footprint)
+  readonly cx: number; // projected world-space centre of the footprint (at its level's height)
   readonly cy: number;
   readonly gw: number; // grid footprint, for the renderer's own iso diamond sizing
   readonly gd: number;
-  readonly color: string;
 }
-
+export interface FrameDistrict extends FrameRect {
+  readonly name: string;
+  readonly rect: Rect;
+  readonly tint: string;
+  readonly lift: number;
+}
+export interface FrameBuilding extends FrameRect {
+  readonly name: string;
+  readonly rect: Rect;
+  readonly floors: number;
+  readonly status: BuildingShown;
+  readonly tint: string;
+  readonly roof: Roof;
+  readonly facade: Facade;
+  readonly lift: number;
+}
+export interface FrameIsland extends FrameRect {
+  readonly name: string;
+  readonly rect: Rect;
+  readonly state: Link;
+  readonly lift: number;
+}
+export interface FramePath {
+  readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>;
+  readonly lift: number;
+}
+export interface FrameBridge extends FramePath {
+  readonly island: string;
+  readonly kind: Bridge;
+  readonly state: Link;
+}
+export interface FrameGate {
+  readonly id: string;
+  readonly cell: { readonly x: number; readonly y: number };
+  readonly state: GateLook;
+  readonly lift: number;
+}
 export interface FrameAgent {
   readonly id: string;
-  readonly cx: number;
+  readonly cx: number; // where its feet stand
   readonly cy: number;
-  readonly color: string;
+  readonly rank: string;
+  readonly tint: string;
+  readonly level: number; // stacking order of the level it stands on, for draw order
 }
 
 export interface Frame {
   readonly status: WorldState["status"];
-  readonly districts: readonly FrameRect[];
-  readonly buildings: readonly FrameRect[];
+  readonly plates: ReadonlyArray<{
+    readonly id: string;
+    readonly rect: Rect;
+    readonly lift: number;
+  }>;
+  readonly districts: readonly FrameDistrict[];
+  readonly buildings: readonly FrameBuilding[];
+  readonly islands: readonly FrameIsland[];
+  readonly roads: readonly FramePath[];
+  readonly bridges: readonly FrameBridge[];
+  readonly gates: readonly FrameGate[];
   readonly agents: readonly FrameAgent[];
+  /** The world's extent in px (from the plates), the same for every state: the stage frames it. */
+  readonly bounds: {
+    readonly x0: number;
+    readonly y0: number;
+    readonly x1: number;
+    readonly y1: number;
+  };
 }
 
-/** Standard 2:1 iso projection of a grid-space point, in the same world-unit space Stage.tsx's
- * own iso grid is drawn in (tokens.stage tileWidth/tileHeight). */
-function project(gx: number, gy: number): { x: number; y: number } {
-  return { x: ((gx - gy) * TW) / 2, y: ((gx + gy) * TH) / 2 };
+const centreOf = (r: Rect, lift: number): { cx: number; cy: number } => {
+  const [cx, cy] = P(r.x + r.w / 2, r.y + r.d / 2, lift);
+  return { cx, cy };
+};
+
+/** Where an agent stands at a building, district or level: on the ground in front of a building,
+ * on the plot's front lane, on the plate's front edge. `slot` (its place in the layout's roster)
+ * fans out agents that share a spot, and never changes, so nobody shifts when another arrives. */
+function standAt(r: Rect, kind: "building" | "district" | "level", lift: number, slot: number) {
+  const [sx, sy] =
+    kind === "building"
+      ? [r.x + r.w * 0.3, r.y + r.d + 0.5]
+      : [r.x + r.w / 2, r.y + r.d - (kind === "district" ? 0.6 : 0.5)];
+  const [x, y] = P(sx + ((slot % 4) - 1.5) * 0.4, sy + Math.floor(slot / 4) * 0.4, lift);
+  return { cx: x, cy: y };
 }
 
-/** The building/district/level id `target` resolves to, for placing an agent. */
-function locationCentre(layout: Layout, id: string | null): { x: number; y: number } | null {
-  if (!id || !layout.geometry) return null;
-  const rects = [
-    ...layout.geometry.buildings.map((b) => ({ id: b.id, ...b.footprint })),
-    ...layout.geometry.districts.map((d) => ({ id: d.id, ...d.plot })),
-    ...layout.geometry.levels.map((l) => ({ id: l.id, ...l.plate })),
-  ];
-  const r = rects.find((r) => r.id === id);
-  return r ? project(r.x + r.w / 2, r.y + r.d / 2) : null;
+/** The ground in front of a building where agents rest (the first row of `standAt`'s four slots),
+ * in world px: feet only, so a caller pads it by a figure's size. From the layout alone, so a
+ * building's tag can keep clear of it whoever is standing there (nothing here moves). */
+export function standZone(r: Rect, lift: number) {
+  const feet = [0, 1, 2, 3].map((slot) => standAt(r, "building", lift, slot));
+  const xs = feet.map((f) => f.cx);
+  const ys = feet.map((f) => f.cy);
+  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
 }
 
 export function frameOf(layout: Layout, state: WorldState): Frame {
   const geometry = layout.geometry;
-  const districtTintById = new Map(geometry?.districts.map((d) => [d.id, d.tint]) ?? []);
+  const levelIndex = new Map(geometry?.levels.map((l) => [l.id, l.index]));
+  const liftOf = (levelId: string | undefined) => (levelIndex.get(levelId ?? "") ?? 0) * LEVEL_RISE;
+  const buildingLevel = new Map<string, string>();
   const buildingDistrict = new Map<string, string>();
+  const districtLevel = new Map<string, string>();
+  const names = new Map<string, string>();
+  const common = new Map<string, string | undefined>();
+  const leads = new Map<string, string>();
   for (const level of layout.semantic.levels) {
     for (const district of level.districts) {
-      for (const building of district.buildings) buildingDistrict.set(building.id, district.id);
+      districtLevel.set(district.id, level.id);
+      names.set(district.id, district.name);
+      leads.set(district.lead, district.id);
+      for (const building of district.buildings) {
+        buildingLevel.set(building.id, level.id);
+        buildingDistrict.set(building.id, district.id);
+        names.set(building.id, building.name);
+        common.set(building.id, building.common_type);
+      }
     }
   }
+  const tints = new Map(geometry?.districts.map((d) => [d.id, districtTint(d.tint)]));
 
-  const districts: FrameRect[] = (geometry?.districts ?? []).map((d) => {
-    const c = project(d.plot.x + d.plot.w / 2, d.plot.y + d.plot.d / 2);
-    return { id: d.id, cx: c.x, cy: c.y, gw: d.plot.w, gd: d.plot.d, color: districtTint(d.tint) };
+  const plates = (geometry?.levels ?? []).map((l) => ({
+    id: l.id,
+    rect: l.plate,
+    lift: liftOf(l.id),
+  }));
+  const districts: FrameDistrict[] = (geometry?.districts ?? []).map((d) => {
+    const lift = liftOf(districtLevel.get(d.id));
+    return {
+      id: d.id,
+      name: names.get(d.id) ?? d.id,
+      rect: d.plot,
+      tint: tints.get(d.id) ?? tokens.color.ink["3"],
+      lift,
+      ...centreOf(d.plot, lift),
+      gw: d.plot.w,
+      gd: d.plot.d,
+    };
   });
-
-  const buildings: FrameRect[] = (geometry?.buildings ?? []).flatMap((b) => {
+  const buildings: FrameBuilding[] = (geometry?.buildings ?? []).flatMap((b) => {
     const status = state.buildings[b.id]?.status ?? "hidden";
-    const tint = districtTintById.get(buildingDistrict.get(b.id) ?? "") ?? "district.1";
-    const color = buildingColor(status, tint);
-    if (!color) return [];
-    const c = project(b.footprint.x + b.footprint.w / 2, b.footprint.y + b.footprint.d / 2);
-    return [{ id: b.id, cx: c.x, cy: c.y, gw: b.footprint.w, gd: b.footprint.d, color }];
+    if (status === "hidden") return []; // nothing is drawn until building.planned
+    const lift = liftOf(buildingLevel.get(b.id));
+    return [
+      {
+        id: b.id,
+        name: names.get(b.id) ?? b.id,
+        rect: b.footprint,
+        floors: b.floors,
+        status,
+        tint: tints.get(buildingDistrict.get(b.id) ?? "") ?? tokens.color.ink["3"],
+        ...styleOf({ id: b.id, common_type: common.get(b.id) as never }),
+        lift,
+        ...centreOf(b.footprint, lift),
+        gw: b.footprint.w,
+        gd: b.footprint.d,
+      },
+    ];
   });
+  const islandState = new Map(layout.semantic.islands.map((i) => [i.id, i]));
+  const islands: FrameIsland[] = (geometry?.islands ?? []).flatMap((i) => {
+    const sem = islandState.get(i.id);
+    const lift = liftOf(i.level);
+    return [
+      {
+        id: i.id,
+        name: sem?.name ?? i.id,
+        rect: i.plot,
+        state: sem?.state ?? "connected",
+        lift,
+        ...centreOf(i.plot, lift),
+        gw: i.plot.w,
+        gd: i.plot.d,
+      },
+    ];
+  });
+  const roads: FramePath[] = (geometry?.roads ?? []).map((r) => ({
+    points: r.path,
+    lift: liftOf(buildingLevel.get(r.from)),
+  }));
+  const bridges: FrameBridge[] = (geometry?.bridges ?? []).map((b) => ({
+    island: b.island,
+    kind: islandState.get(b.island)?.bridge ?? "road",
+    state: islandState.get(b.island)?.state ?? "connected",
+    points: b.path,
+    lift: liftOf(buildingLevel.get(b.from)),
+  }));
+  const gateBuilding = new Map(layout.semantic.gates.map((g) => [g.id, g.between[0]]));
+  const gates: FrameGate[] = (geometry?.gates ?? []).map((g) => ({
+    id: g.id,
+    cell: g.cell,
+    state: state.gates[g.id] ?? "closed",
+    lift: liftOf(buildingLevel.get(gateBuilding.get(g.id) ?? "")),
+  }));
 
+  // Where each placed agent stands: a building, district or level it was last sent to.
+  const spots = new Map<
+    string,
+    { r: Rect; kind: "building" | "district" | "level"; lift: number; level: number }
+  >();
+  for (const b of geometry?.buildings ?? []) {
+    spots.set(b.id, {
+      r: b.footprint,
+      kind: "building",
+      lift: liftOf(buildingLevel.get(b.id)),
+      level: levelIndex.get(buildingLevel.get(b.id) ?? "") ?? 0,
+    });
+  }
+  for (const d of geometry?.districts ?? []) {
+    spots.set(d.id, {
+      r: d.plot,
+      kind: "district",
+      lift: liftOf(districtLevel.get(d.id)),
+      level: levelIndex.get(districtLevel.get(d.id) ?? "") ?? 0,
+    });
+  }
+  for (const l of geometry?.levels ?? [])
+    spots.set(l.id, { r: l.plate, kind: "level", lift: liftOf(l.id), level: l.index });
+  const rank = new Map(layout.semantic.agents.map((a, i) => [a.id, { rank: a.rank, slot: i }]));
   const agents: FrameAgent[] = Object.values(state.agents).flatMap((agent) => {
-    if (!agent.spawned) return [];
-    const c = locationCentre(layout, agent.location);
-    if (!c) return [];
-    return [{ id: agent.id, cx: c.x, cy: c.y, color: tokens.color.ink["1"] }];
+    const spot = agent.spawned && agent.location ? spots.get(agent.location) : undefined;
+    const meta = rank.get(agent.id);
+    if (!spot || !meta) return [];
+    const ledDistrict = leads.get(agent.id);
+    const tint =
+      (ledDistrict && tints.get(ledDistrict)) ||
+      DISTRICT_TINTS[hash(agent.id) % DISTRICT_TINTS.length] ||
+      tokens.color.ink["2"];
+    return [
+      {
+        id: agent.id,
+        ...standAt(spot.r, spot.kind, spot.lift, meta.slot),
+        rank: meta.rank,
+        tint,
+        level: spot.level,
+      },
+    ];
   });
 
-  return { status: state.status, districts, buildings, agents };
+  const corners = plates.flatMap((p) => {
+    const [x, y] = [p.rect.x - MARGIN, p.rect.y - MARGIN]; // the slab runs MARGIN past its plate
+    const [w, d] = [p.rect.w + 2 * MARGIN, p.rect.d + 2 * MARGIN];
+    return [P(x, y, p.lift), P(x + w, y, p.lift), P(x + w, y + d, p.lift), P(x, y + d, p.lift)];
+  });
+  const xs = corners.map((c) => c[0]);
+  const ys = corners.map((c) => c[1]);
+  const bounds = corners.length
+    ? {
+        x0: Math.min(...xs),
+        y0: Math.min(...ys) - 90,
+        x1: Math.max(...xs),
+        y1: Math.max(...ys) + 20,
+      }
+    : { x0: 0, y0: 0, x1: 0, y1: 0 };
+  return {
+    status: state.status,
+    plates,
+    districts,
+    buildings,
+    islands,
+    roads,
+    bridges,
+    gates,
+    agents,
+    bounds,
+  };
 }

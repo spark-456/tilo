@@ -1,0 +1,13 @@
+{
+  "start": "2026-10-09T18:30:00.000Z",
+  "end": null,
+  "all_day": false,
+  "title": "Send the rate sheet to Acme",
+  "kind": "due",
+  "source": {
+    "kind": "mail",
+    "id": "t1"
+  },
+  "state": "confirmed",
+  "shared": false
+}

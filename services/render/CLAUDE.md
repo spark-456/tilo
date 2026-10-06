@@ -5,8 +5,9 @@ Cloud Run service (PRD 6.2): deliverables — PPTX, PDF, charts; Google Slides a
 `tilo-connectors`. Priority "Must" covers PPTX and PDF for the hackathon build.
 
 ## Commands
-- Package and dev/test commands land with the render code (ticket P6+).
+- `uv run pytest "services/render" -q` — render tests (built by the AG-RENDER lane, `docs/lanes.md`).
 - `just check` — full gate from the repo root.
+- Image: `Dockerfile` runs `tilo_render.app:app` (`/health` for Cloud Run smoke checks, `/healthz` for in-container probes; P0-07a, P0-07h); deploy: `docs/deploy-dev.md`.
 
 ## Contracts
 - Reads: `packages/contracts-py` deliverable-spec types; `templates/`.
@@ -16,7 +17,8 @@ Cloud Run service (PRD 6.2): deliverables — PPTX, PDF, charts; Google Slides a
 - `templates/` (deliverable templates), `config/themes/` (chart styling).
 
 ## Requirement IDs
-- Section 6.2 `tilo-render` row; charting/rendering acceptance tests as pillars land.
+- Section 6.2 `tilo-render` row; FR-CON-09 (PDF and PPTX, data-bound charts); the render side of
+  FR-CON-10 (provenance appendix). The HTTP service, auth and storage wiring are Claude lane CL-INT.
 
 ## Local rules
 - Parsing, arithmetic, geometry, templates and charts are deterministic code, never a model

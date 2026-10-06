@@ -1,0 +1,24 @@
+id: E-HAND-17
+group: E-HAND
+title: 'Context handoff: Wren Appliances warranty return failure-mode clustering'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Categorise technician bench notes from 90 September warranty returns into failure modes.
+  target_context_threshold_pct: 70
+  handoff_stage: after_return_55_bench_note_cluster
+  sources:
+  - https://helpdesk.wren-appliances.example/sep-returns
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null
+notes: 'Skeleton: cited intranet.*.example sources are synthetic placeholders until harness context-handoff
+  recordings land (CL-EVID).'

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/pinboard.item_changed.schema.json",
+  "x-version": "1.0.0",
+  "title": "PinboardItemChangedData",
+  "description": "data of pinboard.item_changed (CC-PEOPLE, FR-PB-05, -06). An entry was edited, accepted (proposed to active by the meeting Owner), removed, undone (a person took back what Tilo added) or given another owner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pin_id", "change", "status"],
+  "properties": {
+    "pin_id": {
+      "$ref": "../../common.schema.json#/$defs/pin_id"
+    },
+    "change": {
+      "type": "string",
+      "enum": ["edited", "accepted", "removed", "undone", "owner_changed"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "active", "removed"]
+    }
+  }
+}

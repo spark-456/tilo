@@ -1,0 +1,35 @@
+id: E-ROUTE-01
+group: E-ROUTE
+title: Route inbound supplier portal link review to Security Team Lead
+measures:
+- FR-AGT-06
+- FR-AGT-07
+- EV-14
+status: ready
+deploy_gate: false
+inputs:
+  task: Audit Harrier Logistics inbound freight manifest emails and verify customs attachments.
+  question: Can the agent open the unverified supplier portal link https://portal.harrier-customs.example/manifest-84?
+  question_domain: security
+  topic_key: supplier_portal_allowlist
+  card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A1
+  world_id: w_harrier_ops
+  district: D1
+  asked_at: '2026-10-02T10:00:00.000Z'
+  context_fixture: evals/fixtures/route/routing_scenarios.yaml
+scripted_answers: []
+ground_truth:
+  domain: security
+  answered_from_decision: false
+  decision_id: null
+checks:
+- check: routed_domain
+  args:
+    expected: security
+    card_id: 01J8Z3K4M5N6P7Q8R9S0T1V3A1
+- check: answered_from_decision
+  args:
+    expected: false
+recording: null
+notes: Context fixture evals/fixtures/route/routing_scenarios.yaml is exercised by acceptance tests; cases
+  report not runnable (no recording) in tilo_evals run until CL-EVID replay recordings land.

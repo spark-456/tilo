@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/scenario.schema.json",
+  "x-version": "1.0.0",
+  "title": "Scenario",
+  "description": "A scenario config, config/scenarios/<id>.yaml (PRD 4.3, 7.1 FR-INT-11, ADR-0014): the skill set, connectors, seed data, autonomy policy and world theme a scenario preloads, and nothing else. Data only: no code, prompt, model id, brief text or plan, so a scenario that needs any of those becomes a pillar requirement first, and no platform source names a scenario id. The same shape serves any scenario, a demo, a held-out bank case or a generated brief. theme is the world theme, the same slug as layout.schema.json theme (config/themes/, FR-WLD-15; only its shape is checked until that folder exists, BQ-202). Rules that need other files (the id equals the file name, connectors in config/connectors.yaml, seed files exist inside the repo, each autonomy level within its risk tier's max_level, T3 at L1 only) are SN-01 to SN-09 in contracts/scenario.rules.md, checked by the loader.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "skills", "connectors", "seed_data", "theme"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "title": {
+      "description": "Display name of the scenario, plain text.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "skills": {
+      "description": "Skill ids the scenario preloads (skills/<domain>/<skill-id>/skill.yaml, FR-AGT-04); at least one.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/skill_id" }
+    },
+    "connectors": {
+      "description": "Connector ids the scenario uses, each declared in config/connectors.yaml (SN-03); may be empty. Preloading a connector never connects it: the person still grants it on a consent card (PRD 10.3, FR-HIL-08).",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/connector_id" }
+    },
+    "seed_data": {
+      "description": "Seed files the scenario loads, as repo-relative paths (SN-04); may be empty.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/seed_path" }
+    },
+    "theme": { "$ref": "common.schema.json#/$defs/slug" },
+    "autonomy": {
+      "description": "Policy seeds (PRD 10.4). Each entry becomes one policy.schema.json record only when the owner approves the task, as the owner's own (SN-08); absent or empty preloads none. Each level is at most its action type's max_level in config/autonomy.yaml, so a T3 action never goes above L1 (SN-06).",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/autonomy_entry" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "description": "Scenario id: a letter, then up to 31 letters, digits, hyphens or underscores. Equals the file name without .yaml (SN-01). The not-pattern rejects a final line break, which a Python validator's $ lets through.",
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$",
+      "not": { "pattern": "\n" }
+    },
+    "seed_path": {
+      "description": "A repo-relative file path with forward slashes. Each segment starts with a letter, digit or underscore, so there is no absolute path, drive letter, backslash, empty segment, . or .. segment, and no hidden file such as .env or .git. The not-pattern rejects a final line break, which a Python validator's $ lets through.",
+      "type": "string",
+      "maxLength": 240,
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$",
+      "not": { "pattern": "\n" }
+    },
+    "autonomy_entry": {
+      "description": "One policy seed: the policy.schema.json fields a scenario may set. Everything else is fixed when the policy is created (SN-08): owner and stamps from the approving owner, scope recipients, domains and districts empty, limits.credits null, conditions all true, expiry null, notify_channel web, no Team Lead domains. A scenario never sets a tier: tiers come from config/autonomy.yaml and its modifiers.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_type", "level", "connectors"],
+      "properties": {
+        "action_type": { "$ref": "common.schema.json#/$defs/action_type" },
+        "level": { "$ref": "common.schema.json#/$defs/autonomy_level" },
+        "connectors": {
+          "description": "The policy's scope.connectors: ids from the scenario's own connectors, or the reserved internal for an action that goes through no connector (SN-07).",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/connector_id" }
+        },
+        "per_day": {
+          "description": "The policy's limits.per_day: most actions per UTC day. Required at L2 and L3 (policy.schema.json, BQ-30); left out at L0 and L1 means no daily cap (null in the policy).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "undo_window_s": {
+          "description": "The policy's undo_window_s: seconds an L2 action can still be undone; left out means the policy default, 60.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600,
+          "default": 60
+        }
+      },
+      "if": { "properties": { "level": { "enum": ["L2", "L3"] } }, "required": ["level"] },
+      "then": {
+        "description": "A policy that acts without a person at the gate needs a daily limit (policy.schema.json).",
+        "required": ["per_day"]
+      }
+    }
+  }
+}

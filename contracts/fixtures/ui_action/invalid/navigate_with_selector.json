@@ -1,0 +1,6 @@
+{
+  "kind": "navigate",
+  "route": "plate",
+  "target": null,
+  "selector": "a[href='/admin']"
+}

@@ -1,0 +1,78 @@
+import { describe, expect, it } from "vitest";
+import { ALL_ROUTES } from "../../e2e/support/routes";
+import { matchFlowRoute } from "../router";
+import { sectionOf } from "./PrimaryNav";
+import { SCREENS } from "./meta";
+import { matchScreen } from "./routes";
+
+const FLOW_SCREENS = ["S-01", "S-02", "S-03", "S-04"];
+
+describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
+  it("S-01..S-29 are all listed (S-26 to S-29 are the people screens, PPL-40a and PPL-40b), and only the Should screens have no address", () => {
+    expect(SCREENS.map((s) => s.id)).toEqual(
+      Array.from({ length: 29 }, (_, i) => `S-${String(i + 1).padStart(2, "0")}`),
+    );
+    for (const s of SCREENS) expect(s.path === null).toBe(s.priority === "Should");
+  });
+
+  for (const s of SCREENS.filter((s) => s.path !== null)) {
+    it(`${s.id} ${s.name} resolves from its own address`, () => {
+      const path = s.path ?? "";
+      if (FLOW_SCREENS.includes(s.id)) {
+        expect(matchScreen(path)).toBeNull();
+        if (s.id !== "S-01") expect(matchFlowRoute(path).screen).not.toBe("Start");
+      } else {
+        expect(matchScreen(path)?.id).toBe(s.id);
+      }
+    });
+  }
+
+  it("FR-WLD-11: the accessibility sweep's route list holds every screen address", () => {
+    const missing = SCREENS.flatMap((s) => (s.path === null ? [] : [s.path])).filter(
+      (path) => !ALL_ROUTES.includes(path),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("passes URL-decoded captures to the screen, and unknown paths belong to the flow shell", () => {
+    expect(matchScreen("/world/w%201/inspect/B1")?.params).toEqual(["w 1", "B1"]);
+    expect(matchScreen("/world/w%E0/inspect/B1")?.params).toEqual(["w%E0", "B1"]);
+    expect(matchScreen("/nowhere")).toBeNull();
+  });
+
+  it("UX_1 a path under /world/ or /task/ that no screen owns is Not found, never Start", () => {
+    for (const path of [
+      "/world/w/inspect/B1/x",
+      "/world/w/inspect/B1//",
+      "/world/w/inspect",
+      "/world/w/unknown",
+      "/world/",
+      "/task/t/unknown",
+      "/world/%E0/x",
+    ]) {
+      expect(matchScreen(path)?.id, path).toBe("not-found");
+    }
+    // Real addresses are untouched: the flow shell and every screen keep theirs.
+    expect(matchScreen("/world/w/inspect/B1")?.id).toBe("S-05");
+    expect(matchScreen("/world/w/delivery")?.id).toBe("S-12");
+    expect(matchScreen("/world/w")).toBeNull();
+    expect(matchScreen("/task/t/approaches")).toBeNull();
+    expect(matchScreen("/nowhere")).toBeNull();
+  });
+
+  it("serves /more and, in dev, /screens", () => {
+    expect(matchScreen("/more")?.id).toBe("more");
+    expect(matchScreen("/screens")?.id).toBe("screens");
+  });
+
+  it("highlights one primary item per path, with More for everything else", () => {
+    expect(sectionOf("/")).toBe("home");
+    expect(sectionOf("/world/w1")).toBe("world");
+    expect(sectionOf("/world/w1/delivery")).toBe("world");
+    expect(sectionOf("/world/w1/trace")).toBe("story");
+    expect(sectionOf("/needs-you/gate")).toBe("needs");
+    expect(sectionOf("/library/artifacts")).toBe("library");
+    expect(sectionOf("/autonomy")).toBe("more");
+    expect(sectionOf("/worlds")).toBe("world"); // S-14 lists worlds (#227 C4)
+  });
+});

@@ -1,0 +1,30 @@
+[project]
+name = "tilo-render"
+version = "0.1.0"
+description = "tilo_render: PDF and PPTX deliverables from templates with data-bound charts (PRD 12.4, FR-CON-09)"
+requires-python = "==3.12.*"
+dependencies = [
+    "pydantic>=2.13.5",
+    "python-pptx>=1.0.2",
+    "pyyaml>=6.0.2",
+    "reportlab>=4.2.5",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "tilo-contracts",
+]
+
+[dependency-groups]
+dev = [
+    "pypdf>=5.0.0",  # used only in tests to read back the generated PDF bytes
+    "pytest>=8.0.0",
+]
+
+[tool.uv.sources]
+tilo-contracts = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tilo_render"]

@@ -1,0 +1,24 @@
+id: E-HAND-07
+group: E-HAND
+title: 'Context handoff: Solano Packaging multi-plant defect root-cause log review'
+measures:
+- EV-10
+- FR-AGT-09
+status: skeleton
+deploy_gate: false
+inputs:
+  task: Synthesise shift supervisor logs from Bristol, Leeds, and Glasgow plants over 90 days.
+  target_context_threshold_pct: 70
+  handoff_stage: after_leeds_shift_log_compaction
+  sources:
+  - https://ops.solano-packaging.example/defect-logs
+scripted_answers: []
+ground_truth:
+  rework: false
+checks:
+- check: equals_ground_truth
+  args:
+    field: rework
+recording: null
+notes: 'Skeleton: cited intranet.*.example sources are synthetic placeholders until harness context-handoff
+  recordings land (CL-EVID).'

@@ -1,0 +1,22 @@
+id: B-028
+domain: support
+shapes:
+- director_fails
+title: The Director cannot draft a brief
+brief: Write the macro replies for our five most common billing questions.
+director:
+  brief: null
+  approaches: standard
+  plan:
+    units:
+    - id: U1
+      unit_type: draft
+      title: Write the macros
+      role: writer
+      district: D1
+      skills: []
+      connectors: []
+      actions: []
+      depends_on: []
+expect:
+  outcome: refused

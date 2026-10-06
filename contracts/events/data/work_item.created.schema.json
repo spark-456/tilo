@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/work_item.created.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorkItemCreatedData",
+  "description": "data of work_item.created (CC-PEOPLE, FR-PA-01). A work item exists: proposed (Tilo made it, awaiting the meeting Owner) or open (a person made it). No title: the record holds it (PE-03). actor is who made it; the world is the maker's.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["work_item_id", "owner", "status", "source_kind"],
+  "properties": {
+    "work_item_id": {
+      "$ref": "../../common.schema.json#/$defs/work_item_id"
+    },
+    "owner": {
+      "$ref": "../../common.schema.json#/$defs/user_id"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "open"]
+    },
+    "source_kind": {
+      "type": "string",
+      "enum": ["meeting", "mail", "manual", "pinboard", "request"]
+    }
+  }
+}

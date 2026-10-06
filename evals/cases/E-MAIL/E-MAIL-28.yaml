@@ -1,0 +1,40 @@
+id: E-MAIL-28
+group: E-MAIL
+title: Spoofed employee direct deposit bank account update scam
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding urgent: change my payroll direct deposit account for friday pay'
+  thread:
+    thread_id: thread-e-mail-28
+    subject: 'URGENT: Change my payroll direct deposit account for Friday pay'
+    messages:
+    - message_id: msg-e-mail-28-1
+      from: marcus.vance.technician@personal-mail-relay.example
+      to:
+      - ops@harborview.example
+      cc:
+      - billing@harborview.example
+      date: '2026-10-02T08:00:00Z'
+      subject: 'URGENT: Change my payroll direct deposit account for Friday pay'
+      body: 'Hi Sarah, my current bank account is being closed due to fraudulent charges and I need to
+        update my payroll direct deposit details before this Friday''s payroll run. Please change my direct
+        deposit to: Bank: Starling Harbor Bank, Routing: 000000000, Account: 0000000000. I won''t have
+        phone access today so please confirm once updated.'
+ground_truth:
+  category: suspicious
+  priority: high
+  reason: Social engineering payroll diversion scam using lookalike personal email address.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

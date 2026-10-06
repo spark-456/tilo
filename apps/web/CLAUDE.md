@@ -2,39 +2,39 @@
 
 ## Purpose
 The Firebase-hosted web client (PRD 6.2): React UI, the PixiJS v8 isometric world, Story and
-Trace lenses, cards and settings. P0-08a shipped the shell: tokens, layout frame and iso stage.
+Trace lenses, cards and settings.
 
 ## Commands
-- `pnpm --filter @tilo/web run dev` / `build` / `test` / `test:e2e` — dev server / build / Vitest / Playwright
-- `just tokens` — regenerate the committed token files from `design/tokens.json`
-- `just check` — full gate from the repo root
+- `pnpm --filter @tilo/web run dev` / `build` / `test` / `test:e2e` — dev server / build / Vitest / Playwright (always `TILO_WEB_PORT=<own port>`; a filtered run also runs the whole `timing` project unless `--no-deps`)
+- `just tokens` — regenerate token files from `design/tokens.json`; `just check` — full gate; `just e2e-cp2` — `@cp2` Playwright walk on the real dev API (starts `tilo-api` + its own Vite; local only, never CI)
 
 ## Contracts
-- Reads `packages/contracts-ts` types and Firestore docs under security rules (never calls
-  models/connectors/storage directly — writes only through `tilo-api`). Writes: none yet.
+- Reads `packages/contracts-ts` types and Firestore docs under security rules; writes only through `tilo-api` (`src/api/http.ts`, chosen by `VITE_TILO_API_URL`, else the fixture client; polls events by seq).
 
-## Config
-`config/themes/` (world themes), feature flags.
+## Config and requirement IDs
+`config/themes/` (world themes), feature flags. UX-1–UX-9 (18.1); FR-WLD-*; owned from P0-08.
 
-## Requirement IDs
-UX-1–UX-9 (18.1); FR-WLD-* (world rendering); owned starting P0-08.
+## Stage and world (`src/stage/`, `src/world/`)
+- `Stage.tsx`: the camera is the Pixi world container's transform (`camera.ts`); no CSS transform, no always-on ticker (HR-2). `data-stage-ready="true"` appears with the first frame. Zoom in/out buttons send the stage's own `+`/`-` keys (one camera path). `pixi.js`, `runWorld`, every `S_NN` screen (`routes.tsx`) and S-02/S-03 load by dynamic import (NFR-01) under `ChunkBoundary` + Suspense; keep them off the landing bundle.
+- FR-WLD-04: `registry` → `reducer` (HR-5) → `store` → `frame` → `renderer.ts` (art in `world/art/`, ported
+  from the design prototypes, ADR-0003); `choreographer.ts` (HR-3) alone animates. The stage draws a `?fixture=` replay
+  (`runWorld`) or, on /world/:id, the client's own run: `useClientWorld` → `runClientWorld` (FR-WLD-05, any client; the one path). It waits for the layout via `getLayout` (until `world.started`); events held already fold in as a jump, later ones animate; no solver geometry = empty stage + a note; a failed load shows a note and retry. Needs-you reads `?world=<id>`, else the run `approve` last started (`worldContext.ts`, `lastWorld.ts`); live with none, `inARun.tsx` says "No run yet". `?seq=N`, `?speed=N`.
+- FR-WLD-06: `selection.ts` keeps one selection per world (display state, never an event); the stage rings it.
+- FR-WLD-08: `replay.ts` holds one replay point per world (display state); `ReplayScrubber` (right rail, or above the mobile tabs) scrubs a finished run, disabled while live. Stage shows `stateAt(seq)`, Story/Trace/HUD the events up to it (in `?fixture=` mode `WorldPanels` gets them as `replayed`; the HUD meter adds credits saved by memory, a phone's closed sheet shows `HudGlance`); the HR-4 banner ("Replay of run #… recorded …", fixtures add "dev fixture") shows once finished. The scrubber track marks decisions, finishes and problems; `LevelsPanel` (left of the stage from 1280 px, `world/levels.ts`) lists levels with progress and their latest line, all from the events.
 
-## Stage (`src/stage/`)
-- `camera.ts`: pure camera maths (pan/`zoomAt`/`normalizeWheel`/easing), unit-tested. `Stage.tsx`:
-  the camera is the Pixi world container's transform; no CSS transform, no always-on ticker, one
-  render per camera change/resize/DPR/visibility change (HR-2). Every drawn frame writes
-  `data-camera-x/y/zoom`. World content plugs in through `onWorld(world, requestRender)`.
-- `data-stage-ready="true"` appears with the first frame (after Pixi init); e2e specs navigate
-  with `gotoStage`/`reloadStage` (`e2e/support/camera.ts`), which wait for it.
+## Screens (`src/screens/`, AGW-08)
+- `meta.ts` is the PRD 18.3 table (S-01..S-29, status, route pattern); `routes.tsx` maps each
+  routed screen to its `S_NN.tsx`. Build one: replace the stub, flip its status. `/more`, `/screens`. `ScreenPage` (the routed `<main>`) is tabbable and named only while it scrolls (#361).
+- A control that does nothing yet is `aria-disabled="true"` with a "Coming soon" title. Nothing to list yet is `EmptyState` (`kit.tsx`: glyph, title, line, one action), in the reserved box the loading state held.
+- `?speed=` is parsed in `world/speed.ts` (clamped 0.1..1000); the HR-6 badge says "Replay at N× speed"; it and the HR-4 pill sit in the fixed `.status-strip`; under it the shared `TopBar` (logo, place, real Needs-you count; no user/plan data, none exists) — fixed layers start below `--chrome-h`; keep its text from moving (CLS).
+- An unknown world id or an unowned path under `/world/` or `/task/` shows `NotFound`, not Start.
 
-## World (`src/world/`)
-- FR-WLD-04 pure pipeline: `registry.ts` (generated from `contracts/events/registry.yaml`) →
-  `reducer.ts` (`WorldState`/`reduce`/`applyEvent`, HR-5) → `store.ts` (snapshots) → `frame.ts`
-  (plain-data list, token colours) → `renderer.ts` (Pixi placeholders). `choreographer.ts` (HR-3)
-  alone animates anything; `runWorld.ts` wires it up, owns the real clock.
-- Fixture mode: `?fixture=<name>` plays a layout+stream into the world; `?seq=N`/`?speed=N`
-  control replay. DOM contract: `apps/web/e2e/support/world.ts`.
+## Needs you (`src/needs-you/`, AGW-05)
+- `reduce.ts` (one reducer; queue.ts, gates.ts wrap it) derives queue and gates from events only,
+  by run (HR-1); a card joins on same id and run id. A gate opens on `approval.resolved` (approve)
+  or `policy.applied` (stamp, HR-7). `/screens/cards`.
 
 ## Local rules
-- Nothing animates without a recorded event (honesty rules HR-1–HR-7, PRD 9.4).
-- One primary filled button per screen (UX-1); no streaks, hearts or fake urgency (UX-7).
+- Nothing animates without a recorded event (HR-1–HR-7, PRD 9.4); `src/honesty/` (FR-WLD-09) fails on animation APIs outside `choreographer.ts` (allowlist: `test-support/honestyScan.ts`).
+- One primary filled button per screen (UX-1, iris + 4px lip; `.secondary` is quiet); no streaks, hearts or fake urgency (UX-7).
+  Type and spacing are tokens (PRD 18.2): `var(--text-N)` 12/14/16/20/24/32/40, `--space-N` 4..32, no `em` sizing; `e2e/type-ramp.spec.ts` pins it.

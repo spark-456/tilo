@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/pinboard.item_added.schema.json",
+  "x-version": "1.0.0",
+  "title": "PinboardItemAddedData",
+  "description": "data of pinboard.item_added (CC-PEOPLE, FR-PB-01, -02, -06). An entry was added to a personal board (team null) or a team board (team set). made_by tilo with status proposed is a Tilo entry awaiting the meeting Owner's confirmation (PE-07).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pin_id", "scope_kind", "team", "status", "made_by", "source_kind"],
+  "properties": {
+    "pin_id": {
+      "$ref": "../../common.schema.json#/$defs/pin_id"
+    },
+    "scope_kind": {
+      "type": "string",
+      "enum": ["personal", "team"]
+    },
+    "team": {
+      "anyOf": [
+        {
+          "$ref": "../../common.schema.json#/$defs/team_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "active"]
+    },
+    "made_by": {
+      "type": "string",
+      "enum": ["person", "tilo"]
+    },
+    "source_kind": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": ["meeting", "mail", "call", "request", "manual"]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "if": {
+    "properties": {
+      "scope_kind": {
+        "const": "team"
+      }
+    },
+    "required": ["scope_kind"]
+  },
+  "then": {
+    "properties": {
+      "team": {
+        "type": "string"
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "team": {
+        "type": "null"
+      }
+    }
+  }
+}

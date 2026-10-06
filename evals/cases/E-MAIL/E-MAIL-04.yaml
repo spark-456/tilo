@@ -1,0 +1,38 @@
+id: E-MAIL-04
+group: E-MAIL
+title: Prospective marina tenant inquires about winter storage for 45ft catamaran
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding inquiry: winter dry storage rates for 45ft catamaran'
+  thread:
+    thread_id: thread-e-mail-04
+    subject: 'Inquiry: Winter dry storage rates for 45ft catamaran'
+    messages:
+    - message_id: msg-e-mail-04-1
+      from: rachel.adams@soundvoyagers.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Inquiry: Winter dry storage rates for 45ft catamaran'
+      body: Hello, we are planning to bring our Fontaine Pajot 45ft catamaran to Puget Sound this October.
+        Do you have yard space with appropriate beam width for dry storage from November through April,
+        and what are your seasonal rates? Looking forward to your response.
+ground_truth:
+  category: needs_reply
+  priority: normal
+  reason: Prospective customer lead requesting availability and seasonal pricing details.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

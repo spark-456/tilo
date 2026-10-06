@@ -22,7 +22,7 @@ import os
 import re
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
 
@@ -39,7 +39,11 @@ def _scrub_authorization_like(text: str) -> str:
     return _AUTHORIZATION_LIKE_RE.sub("[redacted]", text)
 
 
-def _redact_strings(value: Any, live_provider: ModelProvider | None) -> Any:
+class Redactor(Protocol):  # ModelProvider and SafetyProvider both expose redact()
+    def redact(self, text: str) -> str: ...
+
+
+def redact_strings(value: Any, live_provider: Redactor | None) -> Any:
     """Walks a JSON-able structure and applies `live_provider.redact()` plus
     the Authorization/Bearer backstop to every string (PRD 16.1 rule 4)."""
     if isinstance(value, str):
@@ -49,11 +53,9 @@ def _redact_strings(value: Any, live_provider: ModelProvider | None) -> Any:
     if isinstance(value, dict):
         # A dict key (e.g. a tool-call argument name) can echo a secret
         # back just as readily as a value, so it is redacted the same way.
-        return {
-            _redact_strings(key, live_provider): _redact_strings(item, live_provider) for key, item in value.items()
-        }
+        return {redact_strings(key, live_provider): redact_strings(item, live_provider) for key, item in value.items()}
     if isinstance(value, list):
-        return [_redact_strings(item, live_provider) for item in value]
+        return [redact_strings(item, live_provider) for item in value]
     return value
 
 
@@ -88,6 +90,11 @@ def _join_chunks(chunks: list[GenerateResponse], profile_id: str) -> GenerateRes
     )
 
 
+def is_live_mode() -> bool:
+    """The one definition of live mode (EFF-01): only `LIVE=1`; "true", "0" and "" are not live."""
+    return os.environ.get("LIVE") == "1"
+
+
 class ReplayMissError(Exception):
     """No recording exists for a (role, profile, request) key. Record one
     with `LIVE=1 TILO_RECORD=1`, or use `tilo_providers.fake` for UI work."""
@@ -110,7 +117,7 @@ class RecordReplayProvider(ModelProvider):
         self._recordings_dir = Path(fixtures_dir) / "model-recordings" / role
 
     def _is_live(self) -> bool:
-        return os.environ.get("LIVE") == "1"
+        return is_live_mode()
 
     def _is_record(self) -> bool:
         return self._is_live() and os.environ.get("TILO_RECORD") == "1"
@@ -209,13 +216,15 @@ class RecordReplayProvider(ModelProvider):
         }
         # PRD 16.1 rule 4: redact every string value before serialising, not
         # the serialised text -- see the module docstring for why.
-        redacted = _redact_strings(payload, self._live_provider)
-        path.write_text(json.dumps(redacted, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        redacted = redact_strings(payload, self._live_provider)
+        text = json.dumps(redacted, indent=2, sort_keys=True) + "\n"
+        path.write_text(text, encoding="utf-8", newline="\n")  # LF on Windows too (.gitattributes)
 
     def _write_embed_recording(self, path: Path, key: str, embedding: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"role": self._role, "profile": self._profile_id, "key": key, "embedding": embedding}
         # PRD 16.1 rule 4: same redact-before-serialise rule as `_write_recording` -- an embedding vector
         # is numeric, but a provider may echo request metadata (e.g. a model name) back as a string.
-        redacted = _redact_strings(payload, self._live_provider)
-        path.write_text(json.dumps(redacted, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        redacted = redact_strings(payload, self._live_provider)
+        text = json.dumps(redacted, indent=2, sort_keys=True) + "\n"
+        path.write_text(text, encoding="utf-8", newline="\n")

@@ -6,10 +6,18 @@ import "./styles/app.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { initDensity } from "./display/density";
+
+initDensity(); // the saved display mode is on <html> before the first paint
 
 // Render once the UI faces load, so text never reflows (no layout shift).
 const root = createRoot(document.getElementById("root") as HTMLElement);
-const fonts = ["400 1em 'Nunito Sans'", "700 1em 'Nunito Sans'"].map((f) => document.fonts.load(f));
+const fonts = [
+  "900 1em 'Nunito'",
+  "400 1em 'Nunito Sans'",
+  "700 1em 'Nunito Sans'",
+  "500 1em 'JetBrains Mono'",
+].map((f) => document.fonts.load(f));
 Promise.all(fonts)
   .catch(() => undefined)
   .then(() =>

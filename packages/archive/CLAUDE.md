@@ -8,8 +8,9 @@ redactor; FR-MEM-05 / SEC-14 supply the real one (shared redaction module, pendi
 
 ## Commands
 - `uv run --package tilo-archive pytest packages/archive/tests` — tests
-- `uv run python -m tilo_archive.verify <path to a run's .jsonl>` — verify one run's chain;
-  prints `{"ok": bool, "records": N, "problems": [...]}`, exits 1 on any problem
+- `uv run python -m tilo_archive.verify <path to a run's .jsonl> [--head <seq>:<hash>]` — verify
+  one run's chain (`--head` also catches a cut tail); prints
+  `{"ok": bool, "records": N, "problems": [...]}`, exits 1 on any problem
 - `just check` — full gate (fmt, lint, typecheck, tests) from the repo root
 
 ## Contracts
@@ -26,6 +27,8 @@ redactor; FR-MEM-05 / SEC-14 supply the real one (shared redaction module, pendi
 - `RunArchive.append` runs the redactor, then hashes and serialises the redactor's output. A
   raising redactor, NaN/Infinity or a non-JSON-serialisable payload is a `ValueError` with
   nothing written (fail closed); the redactor's own message is not chained into the error.
+- Error messages never echo caller input or stored content: an invalid kind names the allowed
+  kinds, a non-object stored line names its JSON type, a redactor failure its exception type.
 - `LocalDirStore` never rewrites an existing line. A `GcsStore` was left out (optional per the
   brief); add it behind the same `Store` protocol, tested only against a mock client.
 - Encryption at rest is the bucket's KMS key (infra, P0-07) — nothing here encrypts anything.

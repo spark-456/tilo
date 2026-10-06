@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Any
 
 from tilo_planning.brief import CHIP_FIELDS, BriefValidationError, complete_brief, validate_brief
@@ -21,6 +22,8 @@ from tilo_planning.events import build_event, clip
 from tilo_planning.memory import MemoryHit, MemoryLookup
 
 MAX_QUESTIONS = 3
+DESCRIBE_GOAL = "Something else, which I will describe"  # a goal prompt, never a goal (BQ-99)
+WEB_SOURCE = {"kind": "web", "ref": "web", "label": "The web"}  # no query yet: the goal is never one (BQ-99)
 
 # Expected change to the plan when a field's answer differs from the Director's guess: the deliverable
 # shapes every unit; goal and sources change the work itself; sensitivity changes tiers and gates; audience,
@@ -36,7 +39,7 @@ EXPECTED_CHANGE = {
 }
 
 _WORDING: dict[str, tuple[str, str, tuple[str, ...]]] = {  # field: (label, question, other suggested answers)
-    "goal": ("Goal", "What should this work achieve?", ("Something else, which I will describe",)),
+    "goal": ("Goal", "What should this work achieve?", (DESCRIBE_GOAL,)),
     "deliverables": (
         "Deliverables",
         "What should Tilo deliver, and in which format?",
@@ -104,12 +107,51 @@ def generate_questions(
     return QuestionsResult(brief, questions, event, hit_events)
 
 
-def record_assumption(brief: dict[str, Any], question: Question, assumed: str | None = None) -> dict[str, Any]:
-    """A skipped question keeps `assumed` (default: the Director's guess), shown as "Assumed: ..."."""
-    updated = copy.deepcopy(brief)
-    value = clip(assumed if assumed is not None else question.suggested_answers[0], 300)
-    updated["assumptions"].append({"question": question.text, "assumed": value})
+def record_assumption(
+    brief: dict[str, Any], question: Question, assumed: str | None = None, *, today: date | None = None
+) -> dict[str, Any]:
+    """A skipped question keeps `assumed` (default: the Director's guess), recorded as "Label: value" like
+    an assumption over the cap, and shown as "Assumed: ...". The assumption is the value the plan uses
+    (BQ-97), so the field takes it too: the guess leaves the chip as it is, another value is applied as
+    an answer would be."""
+    value = assumed if assumed is not None else question.suggested_answers[0]
+    updated = apply_answer(brief, question, value, today=today or date.today())
+    updated["assumptions"].append(
+        {"question": question.text, "assumed": clip(f"{_WORDING[question.field][0]}: {value}", 300)}
+    )
     return validate_brief(updated)
+
+
+def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, today: date) -> dict[str, Any]:
+    """The person's answer to `question` (FR-INT-04). The Director's guess (the first suggested answer) keeps
+    the chip; another suggested answer sets the chip value it stands for; anything else is set as typed. An
+    answer the chip cannot hold raises BriefValidationError, and the person edits the chip instead.
+    The goal prompt is not a goal, so it is refused the same way (BQ-99)."""
+    if answer == question.suggested_answers[0]:
+        return validate_brief(copy.deepcopy(brief))
+    field = question.field
+    if field == "goal" and answer == DESCRIBE_GOAL:
+        raise BriefValidationError("Describe the goal in the goal chip; that answer is not a goal.")
+    value: Any = _ANSWER_VALUES.get(field, {}).get(answer, answer)
+    if field == "deliverables":
+        value = [{**d, "format": value} for d in brief["deliverables"]]
+    elif field == "constraints":
+        value = [] if value is None else list(dict.fromkeys([*brief["constraints"], value]))
+    elif field == "sources" and value in (None, "web"):
+        kept = [s for s in brief["sources"] if s["kind"] != "web"]
+        value = kept if value is None else [*kept, dict(WEB_SOURCE)]
+    elif field == "deadline" and value == "end_of_week":
+        value = (today + timedelta(days=(4 - today.weekday()) % 7)).isoformat()  # the coming Friday
+    return validate_brief({**copy.deepcopy(brief), field: value})
+
+
+# Suggested answers (from _WORDING) that stand for a chip value; any other answer is set as typed.
+_ANSWER_VALUES: dict[str, dict[str, Any]] = {
+    "deliverables": {"A PDF report": "pdf", "A slide deck": "pptx", "A document I can edit": "docx"},
+    "deadline": {"No firm deadline": None, "By the end of this week": "end_of_week"},
+    "constraints": {"No extra rules": None},
+    "sources": {"Only what I attached": None, "The web as well": "web"},
+}
 
 
 def _current(brief: dict[str, Any], field: str) -> str:

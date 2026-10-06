@@ -1,0 +1,38 @@
+id: E-MAIL-18
+group: E-MAIL
+title: Monthly credit card merchant processing fee statement
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding merchant processing monthly summary for september 2026 (mid #88410)'
+  thread:
+    thread_id: thread-e-mail-18
+    subject: 'Merchant Processing Monthly Summary for September 2026 (MID #88410)'
+    messages:
+    - message_id: msg-e-mail-18-1
+      from: reporting@merchantsolutions.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Merchant Processing Monthly Summary for September 2026 (MID #88410)'
+      body: 'Your monthly merchant processing summary for MID #88410 is ready. Total card volume: $48,310.20
+        across 114 transactions. Effective discount rate: 2.14%. Total processing fees debited: $1,033.84.
+        Statement available in dashboard.'
+ground_truth:
+  category: fyi
+  priority: low
+  reason: Routine informational merchant account statement.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

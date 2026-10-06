@@ -47,13 +47,15 @@ profiles:
     caps: [json, tools]
 
 roles:
-  director: { primary: flash-38, fallback: flash-37, thinking: high }
+  director: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000 }
   lead: { primary: flash-38, fallback: flash-37, thinking: medium }
   specialist: { primary: flash-37, fallback: lite-31 }
   verifier: { primary: flash-38, fallback: flash-37, thinking: high }
   writer: { primary: flash-38, fallback: flash-37 }
   narrator: { primary: lite-31, fallback: flash-37 }
-  autopilot: { primary: flash-37, fallback: lite-31 }
+  autopilot: { primary: flash-37, fallback: lite-31, max_input_tokens: 16000 }
+  generator: { primary: flash-38, fallback: flash-37, thinking: low }
+  autorater: { primary: flash-37, fallback: lite-31 }
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]

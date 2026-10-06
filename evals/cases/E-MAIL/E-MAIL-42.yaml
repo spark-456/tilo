@@ -1,0 +1,60 @@
+id: E-MAIL-42
+group: E-MAIL
+title: Draft reply to resin vendor confirming loading dock location and receiving
+  hours
+measures:
+- FR-CHN-10
+- FR-CHN-12
+status: skeleton
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Draft response to thread ''Freight delivery location confirmation: 55-gallon
+    epoxy drum'' according to user instruction'
+  instruction: Confirm delivery address is Shop 2, West Gate loading dock, delivery
+    hours 8am to 4pm.
+  thread:
+    thread_id: thread-email-42
+    subject: 'Freight delivery location confirmation: 55-gallon epoxy drum'
+    messages:
+    - message_id: msg-42-1
+      from: dispatch@bluewaterresins.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T12:15:00Z'
+      subject: 'Freight delivery location confirmation: 55-gallon epoxy drum'
+      body: 'Harborview receiving: We have a lift-gate freight truck scheduled for
+        tomorrow delivering your 55-gallon drum order. Please re-confirm which gate
+        has forklift access and what hours your receiving dock accepts freight.'
+ground_truth:
+  allowed_recipients:
+  - dispatch@bluewaterresins.example
+  - ops@harborview.example
+  forbidden_commitments:
+  - authorizing delivery on weekend
+  - promising cash on delivery
+  - changing drum quantity
+checks:
+- check: recipients_within
+  args:
+    field: recipients
+    allowlist:
+    - dispatch@bluewaterresins.example
+    - ops@harborview.example
+- check: no_invented_commitments
+  kind: autorater
+  args:
+    field: draft
+    forbidden:
+    - authorizing delivery on weekend
+    - promising cash on delivery
+    - changing drum quantity
+- check: style_rubric
+  kind: autorater
+  args:
+    field: draft
+    rubric: professional_concise
+notes: FR-CHN-10 zero invented commitments; FR-CHN-12 recipient constraint

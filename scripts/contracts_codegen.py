@@ -7,7 +7,7 @@ Both commands validate every schema under contracts/ (2020-12, $id, x-version, t
 fixture: contracts/fixtures/<name>/ against the schema root, contracts/fixtures/<name>.<def>/
 against $defs.<def>; valid fixtures must also round-trip through the generated pydantic models.
 The event registry, event fixtures and fixture streams are checked by scripts/contracts_events.py
-(rules EV-01 to EV-14, contracts/event.rules.md). The config/ files listed in CONFIG_SHAPES must
+(rules EV-01 to EV-15, contracts/event.rules.md). The config/ files listed in CONFIG_SHAPES must
 validate against the contract that owns their shape.
 Generation bundles contracts/**/*.schema.json into one schema whose $defs names cannot collide
 (common defs keep their name, e.g. RiskTier; other defs get their contract as prefix, e.g.
@@ -36,6 +36,7 @@ from urllib.parse import urljoin
 import contracts_events as events
 import jsonschema
 import yaml
+from pydantic import TypeAdapter
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
@@ -45,8 +46,8 @@ PY_OUT = Path("packages/contracts-py/src/tilo_contracts")
 TS_OUT = Path("packages/contracts-ts/src")
 TS_PKG = ROOT / "packages/contracts-ts"
 BASE_URI = "https://contracts.tilo.example/"
-# config/ file -> the contract (or "<contract>#<$defs entry>") that owns its shape; a trailing
-# "[]" means the file is a list of such documents.
+# config/ file (or glob) -> the contract (or "<contract>#<$defs entry>") that owns its shape; a
+# trailing "[]" means the file is a list of such documents.
 CONFIG_SHAPES = {
     "config/models.yaml": "providers#models",
     "config/prices.yaml": "providers#prices",
@@ -55,9 +56,10 @@ CONFIG_SHAPES = {
     "config/teams.yaml": "team_lead[]",
     "config/metering.yaml": "metering",
     "config/evals.yaml": "evals",
+    "config/scenarios/*.yaml": "scenario",
 }
 # Contract roots whose generated name is not the PascalCase file name.
-ROOT_NAMES = {"events/registry": "EventRegistry", "agents": "AgentsConfig"}
+ROOT_NAMES = {"events/registry": "EventRegistry", "agents": "AgentsConfig", "artifact": "ArtifactVersion"}
 # Fixture folders with their own layout, checked by contracts_events.
 EVENT_FIXTURES = {"events", "streams"}
 SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
@@ -182,21 +184,25 @@ def check_fixtures(schemas: dict[str, dict], validate: events.Validate) -> list[
 
 def check_config(validate: events.Validate) -> list[str]:
     """config/ files whose shape a contract owns must validate against it (when present; the
-    loaders in packages/providers and the policy engine require them)."""
+    loaders in packages/providers, packages/planning and the policy engine require them)."""
     errors = []
-    for relative, shape in CONFIG_SHAPES.items():
-        path = ROOT / relative
-        if not path.is_file():
-            continue
-        document, name = yaml.safe_load(path.read_text(encoding="utf-8")), shape.removesuffix("[]")
-        items = (document or []) if shape.endswith("[]") else [document]
-        if not isinstance(items, list):
-            errors.append(f"{relative} must be a list of {name} documents")
-            continue
-        for index, item in enumerate(items):
-            if found := validate(name, item):
-                errors.append(f"{relative} item {index} fails {name}: {found[:3]}")
+    for pattern, shape in CONFIG_SHAPES.items():
+        for path in sorted(p for p in ROOT.glob(pattern) if p.is_file()):
+            errors += check_config_file(path, shape, validate)
     return errors
+
+
+def check_config_file(path: Path, shape: str, validate: events.Validate) -> list[str]:
+    relative, name = path.relative_to(ROOT).as_posix(), shape.removesuffix("[]")
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    items = (document or []) if shape.endswith("[]") else [document]
+    if not isinstance(items, list):
+        return [f"{relative} must be a list of {name} documents"]
+    return [
+        f"{relative} item {index} fails {name}: {found[:3]}"
+        for index, item in enumerate(items)
+        if (found := validate(name, item))
+    ]
 
 
 def load_module(python: str) -> object:
@@ -217,7 +223,13 @@ def check_models(schemas: dict[str, dict], module: object) -> list[str]:
         if kind == "valid":
             data, model = load(path), getattr(module, type_name(name, key or None))
             try:
-                dumped = model.model_validate(data).model_dump(mode="json", by_alias=True, exclude_unset=True)
+                if hasattr(model, "model_validate"):
+                    dumped = model.model_validate(data).model_dump(mode="json", by_alias=True, exclude_unset=True)
+                else:  # a root union (ui_action.schema.json) generates a type alias, not a model
+                    adapter = TypeAdapter(model)
+                    dumped = adapter.dump_python(
+                        adapter.validate_python(data), mode="json", by_alias=True, exclude_unset=True
+                    )
             except ValueError as error:
                 dumped = str(error)
             if dumped != data:

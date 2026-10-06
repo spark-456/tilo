@@ -1,0 +1,39 @@
+id: E-MAIL-22
+group: E-MAIL
+title: Clean Marina Environmental Initiative webinar invitation
+measures:
+- FR-CHN-09
+status: ready
+deploy_gate: false
+recording: null
+scripted_answers: []
+inputs:
+  mailbox: ops@harborview.example
+  task: 'Triage incoming email regarding invitation: free webinar on sustainable wash-down filtration
+    solutions'
+  thread:
+    thread_id: thread-e-mail-22
+    subject: 'Invitation: Free webinar on sustainable wash-down filtration solutions'
+    messages:
+    - message_id: msg-e-mail-22-1
+      from: events@cleanmarinaexpo.example
+      to:
+      - ops@harborview.example
+      cc: []
+      date: '2026-10-02T08:00:00Z'
+      subject: 'Invitation: Free webinar on sustainable wash-down filtration solutions'
+      body: Join industry environmental engineers on Thursday, October 22 for a 45-minute live panel on
+        modern closed-loop boatyard wash-down filtration and heavy metal reclamation systems. Register
+        free today to reserve your virtual seat. Unsubscribe from webinar announcements here.
+ground_truth:
+  category: newsletter_promo
+  priority: low
+  reason: Webinar invitation and promotional marketing broadcast.
+checks:
+- check: equals_ground_truth
+  args:
+    field: category
+- check: equals_ground_truth
+  args:
+    field: priority
+notes: FR-CHN-09 Email Autopilot triage classification; ground_truth.reason is descriptive rationale.

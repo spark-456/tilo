@@ -38,13 +38,15 @@ profiles:
     caps: [json, tools]
 
 roles:
-  director: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high }
+  director: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high, max_input_tokens: 100000 }
   lead: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: medium }
   specialist: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
   verifier: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high }
   writer: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b }
   narrator: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
-  autopilot: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
+  autopilot: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b, max_input_tokens: 16000 }
+  generator: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: low }
+  autorater: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]

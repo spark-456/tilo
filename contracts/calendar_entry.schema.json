@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/calendar_entry.schema.json",
+  "x-version": "1.0.0",
+  "title": "CalendarEntry",
+  "description": "One entry on a person's calendar that Tilo stores (FR-CAL-01, -03): a cached Google Calendar event, an entry the person made, or one Tilo proposed. Work-item due dates, pin deadlines and Tilo's meetings are not stored here: the agenda merges them at read time as `agenda_item` rows that cite their record. Private to `owner` unless `share` names a team (PE-04), which only an accepted entry may do; teammates otherwise get `free_busy` only. A Tilo-made entry (`created_by.by` tilo, source manual or tilo) is accepted only with `confirmed_by` (PE-07). What a Google event keeps is title, times, an all-day flag and a count of other attendees: no description, attendee names or addresses, conference link or location (PE-13). `attendee_count` above 0 makes a write to Google T3 (PE-14).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "org_id",
+    "owner",
+    "title",
+    "start",
+    "end",
+    "all_day",
+    "attendee_count",
+    "source",
+    "state",
+    "share",
+    "created_by",
+    "confirmed_by",
+    "flagged",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/calendar_entry_id"
+    },
+    "org_id": {
+      "$ref": "common.schema.json#/$defs/org_id"
+    },
+    "owner": {
+      "$ref": "common.schema.json#/$defs/user_id"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 140,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "start": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "end": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "all_day": {
+      "type": "boolean"
+    },
+    "attendee_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 500
+    },
+    "source": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/source_google"
+        },
+        {
+          "$ref": "#/$defs/source_manual"
+        },
+        {
+          "$ref": "#/$defs/source_tilo"
+        }
+      ]
+    },
+    "state": {
+      "type": "string",
+      "enum": ["proposed", "accepted", "declined", "cancelled"]
+    },
+    "share": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/share"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "created_by": {
+      "$ref": "common.schema.json#/$defs/maker"
+    },
+    "confirmed_by": {
+      "anyOf": [
+        {
+          "$ref": "team_lead.schema.json#/$defs/assignment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flagged": {
+      "description": "True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).",
+      "type": "boolean"
+    },
+    "updated_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    }
+  },
+  "if": {
+    "properties": {
+      "state": {
+        "const": "accepted"
+      }
+    },
+    "required": ["state"]
+  },
+  "then": {
+    "if": {
+      "anyOf": [
+        {
+          "properties": {
+            "created_by": {
+              "properties": {
+                "by": {
+                  "const": "tilo"
+                }
+              },
+              "required": ["by"]
+            },
+            "source": {
+              "properties": {
+                "kind": {
+                  "enum": ["manual", "tilo"]
+                }
+              },
+              "required": ["kind"]
+            }
+          },
+          "required": ["created_by", "source"]
+        },
+        {
+          "properties": {
+            "source": {
+              "properties": {
+                "kind": {
+                  "const": "tilo"
+                }
+              },
+              "required": ["kind"]
+            }
+          },
+          "required": ["source"]
+        }
+      ]
+    },
+    "then": {
+      "properties": {
+        "confirmed_by": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "share": {
+        "type": "null"
+      }
+    }
+  },
+  "$defs": {
+    "share": {
+      "description": "The team the owner shared this entry with (PE-04); no sharing is null.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["team"],
+      "properties": {
+        "team": {
+          "$ref": "common.schema.json#/$defs/team_id"
+        }
+      }
+    },
+    "source_google": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "synced_at"],
+      "properties": {
+        "kind": {
+          "const": "google"
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "synced_at": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        }
+      }
+    },
+    "source_manual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "const": "manual"
+        }
+      }
+    },
+    "source_tilo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "from", "ref"],
+      "properties": {
+        "kind": {
+          "const": "tilo"
+        },
+        "from": {
+          "type": "string",
+          "enum": ["meeting", "transcript", "request", "mail"]
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/opaque_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "agenda_item": {
+      "description": "One row of the merged agenda read model (FR-CAL-01): never stored.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "all_day", "title", "kind", "source", "state", "shared"],
+      "properties": {
+        "start": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "all_day": {
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["event", "due", "reminder", "meeting", "deadline"]
+        },
+        "source": {
+          "$ref": "#/$defs/agenda_source"
+        },
+        "state": {
+          "type": "string",
+          "enum": ["proposed", "confirmed"]
+        },
+        "shared": {
+          "type": "boolean"
+        }
+      }
+    },
+    "agenda_source": {
+      "description": "The record an agenda row cites (FR-CAL-01).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["calendar_entry", "work_item", "meeting", "pinboard_item"]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]{1,64}$"
+        }
+      }
+    },
+    "busy_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        "end": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        }
+      }
+    },
+    "free_busy": {
+      "description": "What a teammate gets of another person's calendar (PE-04): intervals only, no title, source or count.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user", "from", "to", "busy"],
+      "properties": {
+        "user": {
+          "$ref": "common.schema.json#/$defs/user_id"
+        },
+        "from": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        "to": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        "busy": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/busy_interval"
+          }
+        }
+      }
+    }
+  }
+}

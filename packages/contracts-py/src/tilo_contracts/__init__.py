@@ -2,10 +2,12 @@
 # contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
+# artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
+# calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.0.0 sha256:cdb1a1ceeeebb299
+# common.schema.json 1.3.0 sha256:f819a7e2e62bf60b
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -34,11 +36,13 @@
 # events/data/app.tested.schema.json 1.0.0 sha256:7cc150abdade1ee3
 # events/data/approval.requested.schema.json 1.0.0 sha256:fa01c18f73338a6d
 # events/data/approval.resolved.schema.json 1.0.0 sha256:3c56d4ad96d63941
-# events/data/artifact.created.schema.json 1.0.0 sha256:1e70d4b7f7bc11a7
+# events/data/artifact.created.schema.json 1.1.0 sha256:e796f958760d0464
 # events/data/artifact.delivered.schema.json 1.0.0 sha256:a0e7a46e56965c1d
 # events/data/artifact.reviewed.schema.json 1.0.0 sha256:fee51f5f590c73c4
 # events/data/artifact.rolled_back.schema.json 1.0.0 sha256:4c4dac77a4b5c873
 # events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
+# events/data/assistant.asked.schema.json 1.0.0 sha256:8775120b73c4ed38
+# events/data/assistant.replied.schema.json 1.0.0 sha256:48fb513dadef290d
 # events/data/budget.granted.schema.json 1.0.0 sha256:34e26044aeb0114d
 # events/data/budget.requested.schema.json 1.1.0 sha256:abda889558ab1c91
 # events/data/building.archived.schema.json 1.0.0 sha256:638f47ef89001f58
@@ -47,6 +51,9 @@
 # events/data/building.operational.schema.json 1.0.0 sha256:9fcf73cb4c895c6f
 # events/data/building.planned.schema.json 1.0.0 sha256:b44f9bbe889e72d7
 # events/data/building.scaled.schema.json 1.0.0 sha256:6acdd4fb4e291cd1
+# events/data/calendar.entry_changed.schema.json 1.0.0 sha256:b7fd2ebc2311bf4b
+# events/data/calendar.entry_proposed.schema.json 1.0.0 sha256:88f4a35ac61e77bf
+# events/data/calendar.synced.schema.json 1.0.0 sha256:4cdf1d3efc5170be
 # events/data/channel.message_in.schema.json 1.0.0 sha256:2b052fa89605631c
 # events/data/channel.message_out.schema.json 1.0.0 sha256:dd42d2db8385a110
 # events/data/connection.consented.schema.json 1.0.0 sha256:6664b8f2558850bd
@@ -63,10 +70,15 @@
 # events/data/level.created.schema.json 1.0.0 sha256:f404c2d35df9da17
 # events/data/meeting.called.schema.json 1.0.0 sha256:af1b23d42d145e42
 # events/data/meeting.decision.schema.json 1.0.0 sha256:359fc3bc20f11676
-# events/data/meeting.ended.schema.json 1.0.0 sha256:2f486a0b840fe431
-# events/data/meeting.started.schema.json 1.0.0 sha256:1c39ad9c6da3e04d
+# events/data/meeting.ended.schema.json 1.1.0 sha256:9219b0e4934a318e
+# events/data/meeting.minuted.schema.json 1.0.0 sha256:f2a9c646721e5b64
+# events/data/meeting.started.schema.json 1.1.0 sha256:3ee754f6effc0b32
 # events/data/memory.hit.schema.json 1.0.0 sha256:ae1d0919f97240c5
 # events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
+# events/data/mention.added.schema.json 1.0.0 sha256:6872181c4b6047f1
+# events/data/mention.removed.schema.json 1.0.0 sha256:fa5d648280a1518c
+# events/data/pinboard.item_added.schema.json 1.0.0 sha256:f36dccb547318b08
+# events/data/pinboard.item_changed.schema.json 1.0.0 sha256:2db181d1a51c6c84
 # events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
 # events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
 # events/data/policy.applied.schema.json 1.0.0 sha256:3ca104f308b12dce
@@ -74,6 +86,8 @@
 # events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
 # events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
 # events/data/skill.loaded.schema.json 1.0.0 sha256:acddc05d7bde55d2
+# events/data/work_item.changed.schema.json 1.0.0 sha256:8740c0c65f424dc5
+# events/data/work_item.created.schema.json 1.0.0 sha256:a9fbffc5d3854c81
 # events/data/world.completed.schema.json 1.0.0 sha256:0370652b0ac84eea
 # events/data/world.failed.schema.json 1.0.0 sha256:17a50a9c70ba8ae1
 # events/data/world.paused.schema.json 1.0.0 sha256:1b190f91f08a918c
@@ -81,20 +95,30 @@
 # events/data/world.requested.schema.json 1.0.0 sha256:d59a584d7d9b0cf8
 # events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
 # events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
-# events/registry.schema.json 1.0.0 sha256:42c04358933101ef
+# events/registry.schema.json 1.1.0 sha256:22ae30d4e99499c8
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
+# meeting.schema.json 1.1.0 sha256:10547b42a2268966
+# mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
+# minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
+# person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
+# pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
+# plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
 # providers.schema.json 1.1.0 sha256:ece7537b584e69f8
+# scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
-# events/registry.yaml 1.0.0 sha256:29d7a2b0b4a0cef2
+# transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
+# ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
+# work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
+# events/registry.yaml 1.1.0 sha256:2db78f63298c923a
 
 from __future__ import annotations
 
@@ -172,6 +196,14 @@ class AgentsConfigQuestions(BaseModel):
     hourly_cap_per_person: Annotated[int, Field(ge=1)]
 
 
+type ArtifactVersionIdempotencyKey = Annotated[
+    str, Field(pattern="^r_[0-9A-Za-z_]{1,48}:U[0-9]{1,4}:(0|[1-9][0-9]{0,3}):[0-9]$")
+]
+"""
+<run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257).
+"""
+
+
 type Constraint = Annotated[str, Field(max_length=300, min_length=1)]
 
 
@@ -197,6 +229,25 @@ class BriefAssumption(BaseModel):
     The clarifying question that was skipped, or null when nothing was asked.
     """
     assumed: Annotated[str, Field(max_length=300, min_length=1)]
+
+
+class CalendarEntrySourceManual(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["manual"]
+
+
+class CalendarEntryAgendaSource(BaseModel):
+    """
+    The record an agenda row cites (FR-CAL-01).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["calendar_entry", "work_item", "meeting", "pinboard_item"]
+    id: Annotated[str, Field(pattern="^[A-Za-z0-9_]{1,64}$")]
 
 
 type CardKind = Literal["needs_you", "gate", "consent", "meeting"]
@@ -430,6 +481,12 @@ Deliverable format (PRD 12.4), plus email for replies and in_app for answers sho
 """
 
 
+type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg"]
+"""
+Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it from the role and the pinned skill, never a model, a file name or sniffing. Closed: no HTML or SVG.
+"""
+
+
 class CreditRange(BaseModel):
     """
     Estimated credits as a range; min <= max is checked by validators.
@@ -452,6 +509,58 @@ class TimeRange(BaseModel):
     )
     min_s: Annotated[int, Field(ge=0)]
     max_s: Annotated[int, Field(ge=0)]
+
+
+type WorkItemId = Annotated[str, Field(pattern="^wi_[0-9A-Za-z_]{1,48}$")]
+
+
+type MeetingId = Annotated[str, Field(pattern="^mt_[0-9A-Za-z_]{1,48}$")]
+
+
+type PinId = Annotated[str, Field(pattern="^pb_[0-9A-Za-z_]{1,48}$")]
+
+
+type MentionId = Annotated[str, Field(pattern="^mn_[0-9A-Za-z_]{1,48}$")]
+
+
+type CalendarEntryId = Annotated[str, Field(pattern="^ce_[0-9A-Za-z_]{1,48}$")]
+
+
+type TeamId = Annotated[str, Field(pattern="^tm_[0-9a-z_]{1,48}$")]
+
+
+type UtteranceId = Annotated[str, Field(pattern="^u[0-9]{4,6}$")]
+
+
+type OpaqueRef = Annotated[str, Field(pattern="^[A-Za-z0-9_#-]{1,96}$")]
+"""
+An opaque reference to a record or a place in one (for example mt_x#ai3): letters, digits, underscore, hash and hyphen only, so no URL, domain, path or address fits (the destination rule).
+"""
+
+
+class Maker(BaseModel):
+    """
+    Who made a record: a person (ref is a user id) or Tilo (ref is an agent id, or system for the sweeper and syncs), and when. Provenance, not authority: a record Tilo made starts proposed and leaves that state only with a person's confirmed_by (PE-07, PE-08).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    by: Literal["person", "tilo"]
+    ref: Annotated[str, Field(max_length=128, min_length=1)]
+    at: Timestamp
+
+
+class RecordRef(BaseModel):
+    """
+    A pointer to a record a claim rests on (assistant answers cite these, HR-1): its kind and id, never its content. For mail the id is the triage message id (1.3.0, ADR-0021); no kind names a transcript (ADR-0020).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["work_item", "calendar_entry", "meeting", "pinboard_item", "mention", "card", "world", "event", "mail"]
+    id: Annotated[str, Field(pattern="^[A-Za-z0-9_]{1,64}$")]
 
 
 type ConnectorCapability = Literal["read", "list", "search", "write", "send", "share", "delete"]
@@ -903,6 +1012,43 @@ class BuildingScaledData(BaseModel):
     floors: Annotated[int, Field(ge=1, le=4)]
 
 
+class CalendarEntryChangedData(BaseModel):
+    """
+    data of calendar.entry_changed (CC-PEOPLE, FR-CAL-03, FR-CAL-06). A calendar entry was accepted, declined, edited, removed, shared with a team or made private again. A write to Google is a data.transfer through the outbox, not this event.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    entry_id: CalendarEntryId
+    change: Literal["accepted", "declined", "edited", "removed", "shared", "unshared"]
+    state: Literal["proposed", "accepted", "declined", "cancelled"]
+
+
+class CalendarEntryProposedData(BaseModel):
+    """
+    data of calendar.entry_proposed (CC-PEOPLE, FR-CAL-03). Tilo proposed a calendar entry from a meeting, a transcript, a request or a mail; it stays proposed and private until the person accepts.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    entry_id: CalendarEntryId
+    source_kind: Literal["meeting", "transcript", "request", "mail"]
+
+
+class CalendarSyncedData(BaseModel):
+    """
+    data of calendar.synced (CC-PEOPLE, FR-CAL-02, -08). The cached Google events of a person were refreshed: incremental by sync token, or full after the token expired. A count, never a title (PE-13).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["incremental", "full"]
+    changed: Annotated[int, Field(ge=0)]
+
+
 class ChannelMessageInData(BaseModel):
     """
     data of channel.message_in (PRD 9.5). A message from a bound WhatsApp number or to Tilo's email address. Never the body: message_ref points at the redacted raw archive record (PRD 13.2). card_id is set when the message answers a card; card_kind is then that card's kind, copied by the channels service from the card, and null otherwise. option is the id of the card option the person tapped (a WhatsApp reply button), taken from the button's payload; null when the person typed the message. destination is the thread or folder the message was sent about (an email thread forwarded to Tilo, or the one the card it answers showed), as an opaque id set by the channel, never read out of the text by a model; null otherwise (BQ-29). For whatsapp, actor is the user whose number is bound and confirmed (FR-CHN-03), looked up after the webhook signature check. An L2 policy acts only on the destination its owner's instruction names (policy.applied instruction_id, OB-01), and counts this event as that instruction only when channel is whatsapp, option is null (the owner's own typed words) and card_kind is null or needs_you (BQ-56): a tapped option, such as Hold on a gate card, and any answer to a gate, consent or meeting card is recorded by its own answering event and is never an instruction. An email's sender is not authenticated, so an email is never an instruction, whoever its actor is.
@@ -1084,22 +1230,27 @@ class MeetingDecisionData(BaseModel):
 
 class MeetingEndedData(BaseModel):
     """
-    data of meeting.ended (PRD 9.5).
+    data of meeting.ended (PRD 9.5). 1.1.0: optional meeting_id as on meeting.started, and the optional reason an external meeting ended (left_on_request is a participant's `Tilo leave`, FR-MTG-10). Optional means absent, never null.
     """
 
     model_config = ConfigDict(
         extra="forbid",
+    )
+    meeting_id: MeetingId | None = None
+    reason: Literal["completed", "left_on_request", "removed", "timeout", "failed"] | None = (
+        None
     )
 
 
 class MeetingStartedData(BaseModel):
     """
-    data of meeting.started (PRD 9.5).
+    data of meeting.started (PRD 9.5). 1.1.0: the optional meeting_id names the Meeting record of an external meeting a bot or an upload brought in (FR-MTG-01); absent for a meeting the agents called. Optional means absent, never null.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
+    meeting_id: MeetingId | None = None
 
 
 class MemoryHitData(BaseModel):
@@ -1125,6 +1276,62 @@ class MemorySavedData(BaseModel):
     )
     layer: Literal["result_cache", "artifact_memory", "decisions", "preferences"]
     item_count: Annotated[int, Field(ge=1)]
+
+
+class MentionAddedData(BaseModel):
+    """
+    data of mention.added (CC-PEOPLE, FR-PB-04). A team member was tagged on a team entry. The tagged person is told through their own plate, not this event.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    mention_id: MentionId
+    pin_id: PinId
+    team: TeamId
+    user: UserId
+
+
+class MentionRemovedData(BaseModel):
+    """
+    data of mention.removed (CC-PEOPLE, FR-PB-04). A tag was removed by the tagged person themselves or by the entry's setter (PE-06).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    mention_id: MentionId
+    pin_id: PinId
+    removed_by: UserId
+
+
+class PinboardItemAddedData(BaseModel):
+    """
+    data of pinboard.item_added (CC-PEOPLE, FR-PB-01, -02, -06). An entry was added to a personal board (team null) or a team board (team set). made_by tilo with status proposed is a Tilo entry awaiting the meeting Owner's confirmation (PE-07).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    pin_id: PinId
+    scope_kind: Literal["personal", "team"]
+    team: TeamId | None
+    status: Literal["proposed", "active"]
+    made_by: Literal["person", "tilo"]
+    source_kind: Literal["meeting", "mail", "call", "request", "manual"] | None
+
+
+class PinboardItemChangedData(BaseModel):
+    """
+    data of pinboard.item_changed (CC-PEOPLE, FR-PB-05, -06). An entry was edited, accepted (proposed to active by the meeting Owner), removed, undone (a person took back what Tilo added) or given another owner.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    pin_id: PinId
+    change: Literal["edited", "accepted", "removed", "undone", "owner_changed"]
+    status: Literal["proposed", "active", "removed"]
 
 
 class PlanApproachesProposedData(BaseModel):
@@ -1196,6 +1403,33 @@ class SkillLoadedData(BaseModel):
     )
     skill: SkillId
     version: Semver
+
+
+class WorkItemChangedData(BaseModel):
+    """
+    data of work_item.changed (CC-PEOPLE, FR-PA-01, FR-PA-05). A work item moved: confirmed (proposed to open), edited, snoozed, done, dropped, reopened, reassign_requested, or reminded (the sweeper nudged the owner).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    work_item_id: WorkItemId
+    change: Literal["confirmed", "edited", "snoozed", "done", "dropped", "reopened", "reassign_requested", "reminded"]
+    status: Literal["proposed", "open", "done", "dropped"]
+
+
+class WorkItemCreatedData(BaseModel):
+    """
+    data of work_item.created (CC-PEOPLE, FR-PA-01). A work item exists: proposed (Tilo made it, awaiting the meeting Owner) or open (a person made it). No title: the record holds it (PE-03). actor is who made it; the world is the maker's.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    work_item_id: WorkItemId
+    owner: UserId
+    status: Literal["proposed", "open"]
+    source_kind: Literal["meeting", "mail", "manual", "pinboard", "request"]
 
 
 class WorldCompletedData(BaseModel):
@@ -1283,9 +1517,9 @@ class WorldStartedData(BaseModel):
     budget_cap: Credits
 
 
-type EventRegistryFamily = Literal["world", "plan", "budget", "level", "district", "building", "agent", "skill", "question", "meeting", "connection", "data", "channel", "artifact", "approval", "policy", "alert", "memory", "app"]
+type EventRegistryFamily = Literal["world", "plan", "budget", "level", "district", "building", "agent", "skill", "question", "meeting", "connection", "data", "channel", "artifact", "approval", "policy", "alert", "memory", "app", "work_item", "pinboard", "mention", "calendar", "assistant"]
 """
-Event families of PRD 9.5.
+Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0).
 """
 
 
@@ -1509,6 +1743,62 @@ class ManifestClaim(BaseModel):
     verified: bool
 
 
+type Series = Annotated[str, Field(pattern="^[a-z0-9_-]{1,64}$")]
+
+
+class MeetingScheduledWindow(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    start: Timestamp
+    end: Timestamp | None
+
+
+type MeetingAgendaMinutes = Annotated[int, Field(ge=1, le=240)]
+"""
+Planned minutes for an agenda item.
+"""
+
+
+class MeetingAttendee(BaseModel):
+    """
+    An attendee as the meeting named them; user is set when the name resolved to a person (PE-15).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[
+        str, Field(max_length=80, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    user: UserId | None
+
+
+class MeetingAttestation(BaseModel):
+    """
+    The Owner's attestation of the right to record or process this meeting (FR-MTG-01); by equals owner and is a person of the org (PE-18).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    by: UserId
+    at: Timestamp
+    notice_version: Semver
+
+
+class MentionRemoval(BaseModel):
+    """
+    Who removed the tag and when: the tagged person or the entry's setter (PE-06).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    by: UserId
+    at: Timestamp
+
+
 type MeterMethodUrl = Annotated[
     str,
     Field(
@@ -1579,6 +1869,76 @@ A service name as the billing export writes it: letters, digits, spaces and . _ 
 """
 
 
+type MinutesEvidence = Annotated[list[UtteranceId], Field(max_length=20)]
+"""
+Utterance ids of the pinned transcript version that support the item.
+"""
+
+
+class MinutesSummaryPoint(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: Annotated[
+        str, Field(max_length=240, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    evidence: MinutesEvidence
+
+
+class MinutesClaim(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: Annotated[
+        str, Field(max_length=240, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    state: Literal["verified", "unverified"]
+    evidence: MinutesEvidence
+
+
+type OwnerText = Annotated[
+    str, Field(max_length=80, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+]
+
+
+type DueText = Annotated[
+    str, Field(max_length=60, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+]
+
+
+class MinutesActionItem(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Annotated[str, Field(pattern="^ai[0-9]{1,3}$")]
+    text: Annotated[
+        str, Field(max_length=240, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    state: Literal["verified", "unverified"]
+    evidence: MinutesEvidence
+    owner_text: OwnerText | None
+    owner: UserId | None
+    due_text: DueText | None
+    due: CalendarDate | None
+    work_item_id: WorkItemId | None
+
+
+class MinutesAgendaPoint(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[
+        str, Field(max_length=120, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    coverage: Literal["covered", "partial", "not_discussed"]
+    evidence: MinutesEvidence
+
+
+type Alias = Annotated[
+    str, Field(max_length=40, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+]
+
+
 type PilotTesterId = Annotated[str, Field(pattern="^t_[a-z0-9]{6,32}$")]
 """
 Pseudonymous tester id: t_ and 6 to 32 lower-case letters or digits, assigned by Tilo. Never an email address, a name or a Tilo user id (PRD 16.5). The not-pattern rejects a final line break, which a Python validator's $ lets through.
@@ -1645,6 +2005,59 @@ class PilotSurveyResponse(BaseModel):
     reinvested_how: Annotated[str, Field(max_length=500)]
     quote: Annotated[str | None, Field(max_length=280, min_length=1)]
     quote_consent: bool
+
+
+type Body = Annotated[
+    str, Field(max_length=600, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+]
+
+
+type Url = Annotated[
+    str,
+    Field(
+        max_length=300,
+        pattern="^https://[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*\\.[a-z]{2,63}(/[A-Za-z0-9._~!$&'()*+,=:@%/-]*)?$",
+    ),
+]
+
+
+class PinboardItemScopePersonal(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["personal"]
+    user: UserId
+
+
+class PinboardItemScopeTeam(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["team"]
+    team: TeamId
+
+
+class PinboardItemSource(BaseModel):
+    """
+    Where the entry came from: shown as added by Tilo from the source when Tilo made it (PE-08).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["meeting", "mail", "call", "request", "manual"]
+    ref: OpaqueRef | None
+    evidence: Annotated[list[UtteranceId], Field(max_length=5)]
+
+
+class PinboardItemHistoryEntry(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    at: Timestamp
+    by: EventActor
+    change: Literal["created", "edited", "accepted", "removed", "undone", "owner_changed"]
+    status: Literal["proposed", "active", "removed"]
 
 
 type PlanApproachId = Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,31}$")]
@@ -1717,6 +2130,46 @@ class PlanGate(BaseModel):
     """
     Policy that may open this gate, or null when only a person can.
     """
+
+
+class PlateRowRef(BaseModel):
+    """
+    A common `record_ref` narrowed to the six plate sources (PE-27): a run row points at its world, a mail row at the triage message id.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["work_item", "card", "world", "mail", "pinboard_item", "calendar_entry"]
+    id: Annotated[str, Field(pattern="^[A-Za-z0-9_]{1,64}$")]
+
+
+type PlateReason = Literal["gate", "consent", "blocked", "question", "meeting_card", "run", "work_item", "mail_reply", "pin_owner", "pin_tagged", "calendar"]
+"""
+Why the row is here (PE-27): a gate, consent, blocked, question or meeting card; a blocked or running run (`blocked`, `run`); the person's work item; mail that needs a reply; a pin they own or are tagged on; today's calendar entry.
+"""
+
+
+type PlateGroup = Literal["attention", "overdue", "soon", "rest", "snoozed", "asked", "done"]
+"""
+`attention`, `overdue`, `soon` and `rest` order `rows` (PE-28); `snoozed`, `asked` and `done` are the `parked` lanes, work items only.
+"""
+
+
+type PlateTitle = Annotated[
+    str,
+    Field(
+        max_length=140,
+        min_length=1,
+        pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF\\uFFF9-\\uFFFB]+$",
+    ),
+]
+"""
+The record's own title, cut to 140 characters and cleaned like a quote line (no Cc, no Zl or Zp, no Basic Multilingual Plane Cf; astral Cf removed by code, PE-29): one line, untrusted, shown as plain text.
+"""
+
+
+type PlateAction = Literal["open", "done", "snooze", "not_mine", "put_back", "draft_reply"]
 
 
 type Domain = Annotated[
@@ -1888,6 +2341,48 @@ class ProvidersPrice(BaseModel):
     output: Annotated[float | None, Field(ge=0.0)]
 
 
+type ScenarioId = Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,31}$")]
+"""
+Scenario id: a letter, then up to 31 letters, digits, hyphens or underscores. Equals the file name without .yaml (SN-01). The not-pattern rejects a final line break, which a Python validator's $ lets through.
+"""
+
+
+type ScenarioSeedPath = Annotated[
+    str,
+    Field(
+        max_length=240,
+        pattern="^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$",
+    ),
+]
+"""
+A repo-relative file path with forward slashes. Each segment starts with a letter, digit or underscore, so there is no absolute path, drive letter, backslash, empty segment, . or .. segment, and no hidden file such as .env or .git. The not-pattern rejects a final line break, which a Python validator's $ lets through.
+"""
+
+
+class ScenarioAutonomyEntry(BaseModel):
+    """
+    One policy seed: the policy.schema.json fields a scenario may set. Everything else is fixed when the policy is created (SN-08): owner and stamps from the approving owner, scope recipients, domains and districts empty, limits.credits null, conditions all true, expiry null, notify_channel web, no Team Lead domains. A scenario never sets a tier: tiers come from config/autonomy.yaml and its modifiers.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    action_type: ActionType
+    level: AutonomyLevel
+    connectors: Annotated[list[ConnectorId], Field(min_length=1)]
+    """
+    The policy's scope.connectors: ids from the scenario's own connectors, or the reserved internal for an action that goes through no connector (SN-07).
+    """
+    per_day: Annotated[int | None, Field(ge=0)] = None
+    """
+    The policy's limits.per_day: most actions per UTC day. Required at L2 and L3 (policy.schema.json, BQ-30); left out at L0 and L1 means no daily cap (null in the policy).
+    """
+    undo_window_s: Annotated[int, Field(ge=0, le=3600)] = 60
+    """
+    The policy's undo_window_s: seconds an L2 action can still be undone; left out means the policy default, 60.
+    """
+
+
 class SkillEmbeddedSchema(BaseModel):
     """
     A JSON Schema (2020-12) for the skill's inputs or outputs. Deliberately open: the skill loader checks it against the 2020-12 meta-schema.
@@ -1911,6 +2406,158 @@ class TeamLeadAssignment(BaseModel):
     at: Timestamp
 
 
+class TranscriptUtterance(BaseModel):
+    """
+    One utterance: the speaker label as captioned or uploaded (untrusted, not a person id) and the offset from the start of the meeting.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: UtteranceId
+    speaker: Annotated[
+        str, Field(max_length=80, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    t_ms: Annotated[int, Field(ge=0)]
+    text: Annotated[
+        str,
+        Field(max_length=4000, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$"),
+    ]
+
+
+type TranscriptQuoteLine = Annotated[
+    str,
+    Field(
+        max_length=240,
+        min_length=1,
+        pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF\\uFFF9-\\uFFFB]+$",
+    ),
+]
+"""
+Quote text or speaker: one line of at most 240 characters with no control character (Cc), no line or paragraph separator and no format character (Cf) of the Basic Multilingual Plane, so no bidi override or zero-width character. Astral format characters (tag characters U+E0000 to U+E007F and others) are removed by code (PE-24, validator only).
+"""
+
+
+type UiActionRoute = Literal["plate", "calendar", "meetings", "meeting", "pinboard_team", "pinboard_personal", "worlds", "world", "cards", "connections", "channels", "autonomy", "settings"]
+"""
+A screen of the web app (PRD 18.3), closed list.
+"""
+
+
+class UiActionTargetWorld(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["world"]
+    id: WorldId
+
+
+class UiActionTargetMeeting(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["meeting"]
+    id: MeetingId
+
+
+class UiActionTargetCard(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["card"]
+    id: Ulid
+
+
+class UiActionTargetPin(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["pin"]
+    id: PinId
+
+
+class UiActionTargetWorkItem(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["work_item"]
+    id: WorkItemId
+
+
+class UiActionTargetCalendarEntry(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["calendar_entry"]
+    id: CalendarEntryId
+
+
+class UiActionMarkDone(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["mark_done"]
+    work_item_id: WorkItemId
+
+
+class UiActionSnooze(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["snooze"]
+    work_item_id: WorkItemId
+    until: Timestamp
+
+
+class UiActionDraftReply(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["draft_reply"]
+    thread: Destination
+
+
+class UiActionTag(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["tag"]
+    pin_id: PinId
+    user: UserId
+
+
+class UiActionUntag(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["untag"]
+    pin_id: PinId
+    user: UserId
+
+
+class WorkItemSource(BaseModel):
+    """
+    Where the item came from; evidence lists the utterances of a meeting transcript.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["meeting", "mail", "manual", "pinboard", "request"]
+    ref: OpaqueRef | None
+    evidence: Annotated[list[UtteranceId], Field(max_length=5)]
+
+
+class WorkItemHistoryEntry(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    at: Timestamp
+    by: EventActor
+    change: Literal["created", "confirmed", "edited", "snoozed", "done", "dropped", "reopened", "reassign_requested", "reminded"]
+    status: Literal["proposed", "open", "done", "dropped"]
+
+
 class AgentsConfig(BaseModel):
     """
     config/agents.yaml: the harness's role limits (PRD 8.1, FR-AGT-01), context thresholds and liveness timings (8.5, FR-AGT-09, FR-AGT-10), retries (FR-AGT-13) and question load control (8.3). Values the PRD fixes are const; the rest are bounded so config cannot loosen a stated limit.
@@ -1924,6 +2571,31 @@ class AgentsConfig(BaseModel):
     liveness: AgentsConfigLiveness
     retries: AgentsConfigRetries
     questions: AgentsConfigQuestions
+
+
+class ArtifactVersionOrigin(BaseModel):
+    """
+    What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither) or a restore (FR-MEM-06; no unit). Set by the store from the run, never by a runner.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["unit", "render", "upload", "restore"]
+    unit: UnitId | None
+    agent: AgentId | None
+
+
+class ArtifactVersionSource(BaseModel):
+    """
+    Where one source's text is in the raw archive: id is the manifest source id, archive_ref the tool call record. A pointer, never content.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Slug
+    archive_ref: EventArchiveRef
 
 
 class Attention(BaseModel):
@@ -1966,6 +2638,79 @@ class BriefCitation(BaseModel):
     kind: Literal["preference", "decision"]
     ref: Annotated[str, Field(max_length=128, min_length=1)]
     recorded_at: Timestamp
+
+
+class CalendarEntryShare(BaseModel):
+    """
+    The team the owner shared this entry with (PE-04); no sharing is null.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    team: TeamId
+
+
+class CalendarEntrySourceGoogle(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["google"]
+    ref: Annotated[str, Field(pattern="^[A-Za-z0-9_-]{1,128}$")]
+    synced_at: Timestamp
+
+
+class CalendarEntrySourceTilo(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["tilo"]
+    from_: Annotated[
+        Literal["meeting", "transcript", "request", "mail"], Field(alias="from")
+    ]
+    ref: OpaqueRef | None
+
+
+class CalendarEntryAgendaItem(BaseModel):
+    """
+    One row of the merged agenda read model (FR-CAL-01): never stored.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    start: Timestamp
+    end: Timestamp | None
+    all_day: bool
+    title: Annotated[
+        str, Field(max_length=140, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    kind: Literal["event", "due", "reminder", "meeting", "deadline"]
+    source: CalendarEntryAgendaSource
+    state: Literal["proposed", "confirmed"]
+    shared: bool
+
+
+class CalendarEntryBusyInterval(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    start: Timestamp
+    end: Timestamp
+
+
+class CalendarEntryFreeBusy(BaseModel):
+    """
+    What a teammate gets of another person's calendar (PE-04): intervals only, no title, source or count.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    user: UserId
+    from_: Annotated[Timestamp, Field(alias="from")]
+    to: Timestamp
+    busy: Annotated[list[CalendarEntryBusyInterval], Field(max_length=200)]
 
 
 class CardHeader(BaseModel):
@@ -2237,13 +2982,24 @@ class ApprovalRequestedDataApproverAssignment(BaseModel):
 
 class ArtifactCreatedData(BaseModel):
     """
-    data of artifact.created (PRD 9.5).
+    data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape).
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
     artifact: ArtifactRef
+    content_sha256: Annotated[
+        str | None, Field(max_length=64, min_length=64, pattern="^[0-9a-f]{64}$")
+    ] = None
+    """
+    SHA-256 of the stored bytes, lower-case hex, as the store recorded it (AR-01).
+    """
+    media_type: MediaType | None = None
+    size_bytes: Annotated[int | None, Field(ge=1, le=50000000)] = None
+    """
+    Stored size: at least 1 byte, at most 50,000,000 for a file and 2,000,000 for text or JSON (BQ-257).
+    """
 
 
 class ArtifactDeliveredData(BaseModel):
@@ -2295,6 +3051,19 @@ class ArtifactVersionedData(BaseModel):
     previous_version: Annotated[int, Field(ge=1)]
 
 
+class AssistantAskedData(BaseModel):
+    """
+    data of assistant.asked (CC-PEOPLE, FR-PA-12). A person asked the assistant panel something. The text is in the redacted raw archive (message_ref), never here. screen is the route the panel was opened on.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    conversation_id: Ulid
+    message_ref: EventArchiveRef
+    screen: UiActionRoute | None
+
+
 class BudgetRequestedData(BaseModel):
     """
     data of budget.requested (PRD 9.5). Raised at 80% of the approved budget with the remaining plan and a new estimate (PRD 14.1, FR-MTR-03). remaining_units are the plan units not finished yet, in plan order; estimate is the new estimate of the run's total credits, spent plus the remaining units (added in 1.1.0; rule MT-04 in contracts/metering.rules.md).
@@ -2326,6 +3095,22 @@ class DataTransferData(BaseModel):
     artifact: ArtifactRef | None
     outbox_id: Ulid | None
     risk_tier: RiskTier
+
+
+class MeetingMinutedData(BaseModel):
+    """
+    data of meeting.minuted (CC-PEOPLE, FR-MTG-03). The minutes artifact is ready for the Owner to review; the counts let the HUD say what is waiting without carrying any text. unverified counts items whose evidence check failed (FR-MTG-04). flagged is the safety provider's verdict on the transcript.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    meeting_id: MeetingId
+    minutes: ArtifactRef
+    decisions: Annotated[int, Field(ge=0)]
+    action_items: Annotated[int, Field(ge=0)]
+    unverified: Annotated[int, Field(ge=0)]
+    flagged: bool
 
 
 class PolicyAppliedData(BaseModel):
@@ -2462,6 +3247,33 @@ class ManifestProducer(BaseModel):
     profile: ProvidersProfileId | None
 
 
+class MeetingAgendaItem(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[
+        str, Field(max_length=120, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    minutes: MeetingAgendaMinutes | None
+
+
+class Mention(BaseModel):
+    """
+    An @mention of a team member on a team pinboard entry (FR-PB-04). It names a team because a personal entry cannot be tagged (PE-01, PE-06). The tagged person is a member of the team when tagged; they can always remove themselves, and the entry's `set_up_by` person can remove anyone (PE-06). A removed mention stays as a record; a new tag is a new mention.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: MentionId
+    org_id: OrgId
+    pin_id: PinId
+    team: TeamId
+    user: UserId
+    added_by: Maker
+    removed: MentionRemoval | None
+
+
 class MeterTimeSaved(BaseModel):
     """
     Time saved in minutes (PRD 14.2, FR-MTR-05): finished, verified units times the EV-G2 median minutes per unit, minus measured steering and review minutes. low and high use the EV-G2 25th and 75th percentiles. It can be negative when steering took longer than the baseline and is shown as it is, never clamped. steering_measured is false when the run has no measured attention spans; the meter then says that steering time was not measured instead of subtracting zero. method_url links to the method page; the meter always shows it as an estimate with its range.
@@ -2500,6 +3312,27 @@ class MeteringReconciliation(BaseModel):
     )
     tolerance: Annotated[float, Field(ge=0.1, le=0.1)]
     billing_services: Annotated[list[MeteringBillingService], Field(max_length=20)]
+
+
+class Minutes(BaseModel):
+    """
+    The structured minutes of one meeting, the content of a `minutes` artifact (FR-MTG-03, -04). Every item cites utterance ids of the pinned transcript version; a `verified` item cites at least one (the evidence check by code, then the Verifier model for failures). Owner and due are resolved by code, never by a model (PE-15). Owner-only (PE-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    meeting_id: MeetingId
+    transcript: ArtifactRef
+    generated_at: Timestamp
+    flagged: bool
+    """
+    The safety provider flagged the transcript: any draft from these minutes is T3.
+    """
+    summary: Annotated[list[MinutesSummaryPoint], Field(max_length=8)]
+    decisions: Annotated[list[MinutesClaim], Field(max_length=30)]
+    action_items: Annotated[list[MinutesActionItem], Field(max_length=60)]
+    agenda: Annotated[list[MinutesAgendaPoint], Field(max_length=20)]
 
 
 class Outbox(BaseModel):
@@ -2555,6 +3388,18 @@ class Outbox(BaseModel):
     created_at: Timestamp
 
 
+class PersonMembership(BaseModel):
+    """
+    Membership of a team, counted only as people.rules.md defines it (PE-02).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    team: TeamId
+    assigned_by: TeamLeadAssignment
+
+
 class Pilot(BaseModel):
     """
     Records of the EV-G3 pilot (PRD 2.4, 14.4 'Pilot instrumentation', FR-MTR-09): consent, run and card tags, daily diary entries and exit-survey responses, each keyed by a pseudonymous tester id. S-24 and tilo-api write them; packages/metering reads them for the pilot report, which shows aggregates only. They hold the tester id, numbers and the tester's own short answers, never a name, an email address or task content (PRD 16.5). Each record is written on its own, so the root is a sampler with one optional property per definition, like common's; nothing sends a Pilot document. Rules MT-12 to MT-14 in contracts/metering.rules.md.
@@ -2568,6 +3413,39 @@ class Pilot(BaseModel):
     tag: PilotTag | None = None
     diary_entry: PilotDiaryEntry | None = None
     survey_response: PilotSurveyResponse | None = None
+
+
+class PinboardItem(BaseModel):
+    """
+    One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: PinId
+    org_id: OrgId
+    scope: PinboardItemScopePersonal | PinboardItemScopeTeam
+    title: Annotated[
+        str, Field(max_length=140, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    body: Body | None
+    kind: Literal["note", "decision", "deadline", "link"]
+    url: Url | None
+    owner: UserId | None
+    due: CalendarDate | None
+    status: Literal["proposed", "active", "removed"]
+    created_by: Maker
+    set_up_by: UserId
+    source: PinboardItemSource | None
+    confirmed_by: TeamLeadAssignment | None
+    flagged: bool
+    """
+    True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+    """
+    history: Annotated[list[PinboardItemHistoryEntry], Field(min_length=1)]
+    created_at: Timestamp
+    updated_at: Timestamp
 
 
 class PlanApproach(BaseModel):
@@ -2585,6 +3463,26 @@ class PlanApproach(BaseModel):
     """
     What this approach leaves out.
     """
+
+
+class PlatePlateRow(BaseModel):
+    """
+    One row: what it points at, why it is here, its group, and a title, due date, time and assigner at most; never a body, quote, address, link or transcript line (PE-29). `title` is null for mail (BQ-269). `evidence` is true for a work item from a meeting that cites an utterance, whose quote the person may ask for (PE-23). `actions` is a hint; tilo-api checks every action again at the write (PE-10).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ref: PlateRowRef
+    reason: PlateReason
+    group: PlateGroup
+    title: PlateTitle | None
+    due: CalendarDate | None
+    at: Timestamp | None
+    from_: Annotated[UserId | None, Field(alias="from")]
+    flagged: bool
+    evidence: bool
+    actions: Annotated[list[PlateAction], Field(max_length=6)]
 
 
 class Policy(BaseModel):
@@ -2666,6 +3564,38 @@ class ProvidersPrices(BaseModel):
     profiles: Annotated[dict[ProvidersProfileId, ProvidersPrice], Field(min_length=1)]
 
 
+class Scenario(BaseModel):
+    """
+    A scenario config, config/scenarios/<id>.yaml (PRD 4.3, 7.1 FR-INT-11, ADR-0014): the skill set, connectors, seed data, autonomy policy and world theme a scenario preloads, and nothing else. Data only: no code, prompt, model id, brief text or plan, so a scenario that needs any of those becomes a pillar requirement first, and no platform source names a scenario id. The same shape serves any scenario, a demo, a held-out bank case or a generated brief. theme is the world theme, the same slug as layout.schema.json theme (config/themes/, FR-WLD-15; only its shape is checked until that folder exists, BQ-202). Rules that need other files (the id equals the file name, connectors in config/connectors.yaml, seed files exist inside the repo, each autonomy level within its risk tier's max_level, T3 at L1 only) are SN-01 to SN-09 in contracts/scenario.rules.md, checked by the loader.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: ScenarioId
+    title: Annotated[str, Field(max_length=120, min_length=1)]
+    """
+    Display name of the scenario, plain text.
+    """
+    skills: Annotated[list[SkillId], Field(min_length=1)]
+    """
+    Skill ids the scenario preloads (skills/<domain>/<skill-id>/skill.yaml, FR-AGT-04); at least one.
+    """
+    connectors: list[ConnectorId]
+    """
+    Connector ids the scenario uses, each declared in config/connectors.yaml (SN-03); may be empty. Preloading a connector never connects it: the person still grants it on a consent card (PRD 10.3, FR-HIL-08).
+    """
+    seed_data: list[ScenarioSeedPath]
+    """
+    Seed files the scenario loads, as repo-relative paths (SN-04); may be empty.
+    """
+    theme: Slug
+    autonomy: list[ScenarioAutonomyEntry] | None = None
+    """
+    Policy seeds (PRD 10.4). Each entry becomes one policy.schema.json record only when the owner approves the task, as the owner's own (SN-08); absent or empty preloads none. Each level is at most its action type's max_level in config/autonomy.yaml, so a T3 action never goes above L1 (SN-06).
+    """
+
+
 class Skill(BaseModel):
     """
     skill.yaml in skills/<domain>/<skill-id>/ (PRD 8.2). The planner sees only id and the one-line description; the executing agent loads the full skill.
@@ -2707,6 +3637,146 @@ class TeamLead(BaseModel):
     assigned_by: TeamLeadAssignment
 
 
+class Transcript(BaseModel):
+    """
+    The content of a transcript artifact version (FR-MTG-02; ADR-0018 store, application/json, inside the 2,000,000-byte text cap; ADR-0020). Ingest writes it; utterance ids strictly increase (PE-22, validator). Owner-only (PE-05): another person gets at most one `evidence_quote`, cut per request by tilo-api (PE-23). Speaker labels and text are untrusted.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    meeting_id: MeetingId
+    utterances: Annotated[list[TranscriptUtterance], Field(max_length=10000)]
+
+
+class TranscriptEvidenceQuote(BaseModel):
+    """
+    One evidence quote as tilo-api serves it (ADR-0020): a read-model row computed per request from the pinned transcript version, never stored, logged, archived, sent or put in an event or a prompt (PE-22). Code removes control and format characters and cuts the text at 240 characters on a word boundary (`truncated`); for a viewer other than the meeting owner it masks addresses, phone numbers and links, and the speaker is a teammate's display name or null (PE-24). Only `shown` carries text (PE-25). An `expired` quote has `transcript` null: the answer for a swept transcript or a missing, discarded or deleted meeting, given only to a reader PE-23 admits (PE-22).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    meeting_id: MeetingId
+    transcript: ArtifactRef | None
+    utterance_id: UtteranceId
+    state: Literal["shown", "missing", "expired", "withheld"]
+    speaker: TranscriptQuoteLine | None
+    text: TranscriptQuoteLine | None
+    truncated: bool
+
+
+class TranscriptEvidenceQuotes(BaseModel):
+    """
+    The answer of a quote request: one quote per requested utterance for the meeting owner, at most one for a work item's owner, none when the item cites nothing (PE-23).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    quotes: Annotated[list[TranscriptEvidenceQuote], Field(max_length=20)]
+
+
+type UiActionTarget = UiActionTargetWorld | UiActionTargetMeeting | UiActionTargetCard | UiActionTargetPin | UiActionTargetWorkItem | UiActionTargetCalendarEntry
+"""
+The record a route opens, if any.
+"""
+
+
+class UiActionNavigate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["navigate"]
+    route: UiActionRoute
+    target: UiActionTarget | None
+
+
+class WorkItem(BaseModel):
+    """
+    One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: WorkItemId
+    org_id: OrgId
+    owner: UserId
+    title: Annotated[
+        str, Field(max_length=140, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    due: CalendarDate | None
+    due_text: DueText | None
+    status: Literal["proposed", "open", "done", "dropped"]
+    source: WorkItemSource
+    created_by: Maker
+    assigned_by: TeamLeadAssignment | None
+    confirmed_by: TeamLeadAssignment | None
+    snoozed_until: Timestamp | None
+    flagged: bool
+    """
+    True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+    """
+    history: Annotated[list[WorkItemHistoryEntry], Field(min_length=1)]
+    created_at: Timestamp
+    updated_at: Timestamp
+
+
+class ArtifactVersion(BaseModel):
+    """
+    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-08 in artifact.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    artifact: ArtifactRef
+    org_id: OrgId
+    world_id: WorldId
+    run_id: RunId
+    owner: UserId
+    media_type: MediaType
+    size_bytes: Annotated[int, Field(ge=1, le=50000000)]
+    """
+    Stored size: at least 1 byte, at most 50,000,000 for a file and 2,000,000 for text or JSON (BQ-257, AR-04).
+    """
+    content_sha256: Annotated[
+        str, Field(max_length=64, min_length=64, pattern="^[0-9a-f]{64}$")
+    ]
+    """
+    SHA-256 of the stored bytes, lower-case hex; every read recomputes it (AR-01).
+    """
+    parents: Annotated[list[ArtifactRef], Field(max_length=1)]
+    """
+    The earlier version of the same artifact this one continues, or the version a restore copies (AR-02); empty for version 1.
+    """
+    origin: ArtifactVersionOrigin
+    sources: list[ArtifactVersionSource]
+    """
+    Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).
+    """
+    screening: Literal["clean", "flagged", "unscreened"]
+    """
+    The SafetyProvider verdict on the exact stored bytes (PRD 16.3 item 2), unscreened when there is none. A version that is not clean raises safety_flag in the policy engine (AR-07).
+    """
+    screened_at: Timestamp | None
+    """
+    When that verdict came back; null exactly when screening is unscreened (AR-07).
+    """
+    redacted: bool
+    """
+    true when the secret redactor changed text or JSON before it was stored (SEC-01, BQ-258). The redactor reads only text and JSON, so false on a file means it did not run (AR-07).
+    """
+    idempotency_key: ArtifactVersionIdempotencyKey | None
+    """
+    Set for unit and render outputs (AR-05); null for uploads and restores.
+    """
+    created_at: Timestamp
+
+
 class BriefAppliedPreference(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -2717,6 +3787,36 @@ class BriefAppliedPreference(BaseModel):
     """
     value: Annotated[str, Field(max_length=300, min_length=1)]
     citation: BriefCitation
+
+
+class CalendarEntry(BaseModel):
+    """
+    One entry on a person's calendar that Tilo stores (FR-CAL-01, -03): a cached Google Calendar event, an entry the person made, or one Tilo proposed. Work-item due dates, pin deadlines and Tilo's meetings are not stored here: the agenda merges them at read time as `agenda_item` rows that cite their record. Private to `owner` unless `share` names a team (PE-04), which only an accepted entry may do; teammates otherwise get `free_busy` only. A Tilo-made entry (`created_by.by` tilo, source manual or tilo) is accepted only with `confirmed_by` (PE-07). What a Google event keeps is title, times, an all-day flag and a count of other attendees: no description, attendee names or addresses, conference link or location (PE-13). `attendee_count` above 0 makes a write to Google T3 (PE-14).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: CalendarEntryId
+    org_id: OrgId
+    owner: UserId
+    title: Annotated[
+        str, Field(max_length=140, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    start: Timestamp
+    end: Timestamp | None
+    all_day: bool
+    attendee_count: Annotated[int, Field(ge=0, le=500)]
+    source: CalendarEntrySourceGoogle | CalendarEntrySourceManual | CalendarEntrySourceTilo
+    state: Literal["proposed", "accepted", "declined", "cancelled"]
+    share: CalendarEntryShare | None
+    created_by: Maker
+    confirmed_by: TeamLeadAssignment | None
+    flagged: bool
+    """
+    True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+    """
+    updated_at: Timestamp
 
 
 class CardGateAction(BaseModel):
@@ -2784,8 +3884,19 @@ class Common(BaseModel):
     channel: Channel | None = None
     data_class: DataClass | None = None
     deliverable_format: DeliverableFormat | None = None
+    media_type: MediaType | None = None
     credit_range: CreditRange | None = None
     time_range: TimeRange | None = None
+    work_item_id: WorkItemId | None = None
+    meeting_id: MeetingId | None = None
+    pin_id: PinId | None = None
+    mention_id: MentionId | None = None
+    calendar_entry_id: CalendarEntryId | None = None
+    team_id: TeamId | None = None
+    utterance_id: UtteranceId | None = None
+    opaque_ref: OpaqueRef | None = None
+    maker: Maker | None = None
+    record_ref: RecordRef | None = None
 
 
 class Decision(BaseModel):
@@ -2972,6 +4083,37 @@ class Manifest(BaseModel):
     """
 
 
+class Meeting(BaseModel):
+    """
+    A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: MeetingId
+    org_id: OrgId
+    owner: UserId
+    world_id: WorldId | None = None
+    title: Annotated[
+        str, Field(max_length=120, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    series: Series | None
+    scheduled: MeetingScheduledWindow | None
+    agenda: Annotated[list[MeetingAgendaItem], Field(max_length=20)]
+    attendees: Annotated[list[MeetingAttendee], Field(max_length=50)]
+    attestation: MeetingAttestation
+    source: Literal["bot", "upload"]
+    status: Literal["scheduled", "joining", "live", "ended", "minuted", "discarded", "deleted"]
+    ended_reason: Literal["completed", "left_on_request", "removed", "timeout", "failed"] | None
+    minutes_confirmed_by: TeamLeadAssignment | None
+    transcript: ArtifactRef | None
+    minutes: ArtifactRef | None
+    delete_transcript_after: Timestamp | None
+    delete_minutes_after: Timestamp | None
+    created_at: Timestamp
+
+
 class Meter(BaseModel):
     """
     The HUD meter's state for one run (PRD 14.4, FR-MTR-07): credits used (the sum of the run's event credits), credits saved (origin cost minus lookup cost over accepted reuses, PRD 14.3), time saved (estimate) and the run's budget. packages/metering computes it from the run's events up to last_seq, and apps/web renders it. Rules MT-05 and MT-06 in contracts/metering.rules.md.
@@ -3005,6 +4147,39 @@ class Metering(BaseModel):
     reconciliation: MeteringReconciliation
 
 
+class Person(BaseModel):
+    """
+    A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: UserId
+    org_id: OrgId
+    display_name: Annotated[
+        str, Field(max_length=80, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    aliases: Annotated[list[Alias], Field(max_length=8)]
+    email: EmailAddress
+    time_zone: Annotated[
+        str,
+        Field(
+            max_length=64, pattern="^(UTC|[A-Z][A-Za-z_+-]*(/[A-Za-z0-9_+-]+){1,2})$"
+        ),
+    ]
+    """
+    IANA time zone name (Asia/Kolkata) or UTC: the zone of due dates and the reminder window.
+    """
+    preferred_channel: Literal["web", "mobile_web", "email"]
+    """
+    Where Tilo reaches the person: in the app (web, mobile_web) or by email (FR-PB-03). Narrower than the common channel list on purpose: no new record names a channel outside these three.
+    """
+    org_role: Literal["owner", "member"]
+    memberships: Annotated[list[PersonMembership], Field(max_length=8)]
+    created_by: TeamLeadAssignment
+
+
 class Plan(BaseModel):
     """
     PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.
@@ -3024,6 +4199,24 @@ class Plan(BaseModel):
     """
     Budget cap in credits the user confirmed (FR-INT-08).
     """
+
+
+class Plate(BaseModel):
+    """
+    A person's plate (FR-PA-02, ADR-0021): a read model tilo-api builds per request for the signed-in person only, never stored and never an event (PE-26). S-27, the digest and the panel read the same `rows`; `parked` holds the person's own snoozed, reassign-asked and recently done work items for S-27 only (PE-27). Groups and order are code (PE-28): `today` is the date in the person's time zone at `as_of`. A row is a reference with at most a title (PE-29). `truncated` says more rows passing PE-26 and PE-27 exist than a full lane holds (200 rows or 100 parked), so it is true only with a full lane (PE-27); `fingerprint` is the SHA-256 of `rows` as JSON with sorted keys and no whitespace (PE-30).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    user: UserId
+    as_of: Timestamp
+    today: CalendarDate
+    rows: Annotated[list[PlatePlateRow], Field(max_length=200)]
+    parked: Annotated[list[PlatePlateRow], Field(max_length=100)]
+    truncated: bool
+    fingerprint: Annotated[str, Field(max_length=64, pattern="^[0-9a-f]{64}$")]
 
 
 class PolicyRiskTierTable(BaseModel):
@@ -3052,6 +4245,29 @@ class Providers(BaseModel):
     )
     models: ProvidersModels
     prices: ProvidersPrices
+
+
+type UiAction = Annotated[
+    UiActionNavigate | UiActionMarkDone | UiActionSnooze | UiActionDraftReply | UiActionTag | UiActionUntag,
+    Field(title="UiAction"),
+]
+"""
+The allow-list of what the assistant panel may do on the page (FR-PA-14, PE-10): a closed union on `kind`. The web app has one executor that maps each kind to a handler; a document that does not validate is dropped, so a model can never click, type, read the page or go anywhere outside these routes and targets. State-changing kinds act on the signed-in person's own records through the same API routes as the buttons; `draft_reply` makes a draft (T1) and sends nothing; no kind sends to another person.
+"""
+
+
+class ArtifactVersionManifestRevision(BaseModel):
+    """
+    One append-only revision of a version's provenance manifest, at .../versions/{version:06d}/manifests/{n:04d} (AR-06): created at put, reviewed after the Verifier (cause its artifact.reviewed), sent (cause the data.transfer out) or exported when the version leaves Tilo. Readers take the highest n.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    n: Annotated[int, Field(ge=1, le=9999)]
+    stage: Literal["created", "reviewed", "sent", "exported"]
+    cause: Ulid | None
+    manifest: Manifest
 
 
 class Brief(BaseModel):
@@ -3098,6 +4314,23 @@ class CardGate(BaseModel):
     recipients: Annotated[list[EmailAddress], Field(max_length=50)]
     irreversible: bool
     risk_tier: RiskTier
+
+
+class AssistantRepliedData(BaseModel):
+    """
+    data of assistant.replied (CC-PEOPLE, FR-PA-13, -14, -19, PE-10, PE-11). The panel answered. decided_by says whether deterministic rules or the cheap model picked the read model or action; the answer text is a template over read-model rows and sits in the raw archive (message_ref). sources are the records every claim cites (HR-1): an answered outcome has at least one. ui_action is the one validated allow-list action the panel took or offers; a navigated outcome has one. cached is true when the answer was served from an unchanged-records cache.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    conversation_id: Ulid
+    message_ref: EventArchiveRef
+    outcome: Literal["answered", "navigated", "declined", "failed"]
+    decided_by: Literal["rules", "model"]
+    sources: Annotated[list[RecordRef], Field(max_length=20)]
+    ui_action: UiAction | None
+    cached: bool
 
 
 class LayoutLevel(BaseModel):
@@ -3258,6 +4491,18 @@ type RegisteredEventType = Literal[
     "app.tested",
     "app.deployed",
     "app.refreshed",
+    "meeting.minuted",
+    "work_item.created",
+    "work_item.changed",
+    "pinboard.item_added",
+    "pinboard.item_changed",
+    "mention.added",
+    "mention.removed",
+    "calendar.synced",
+    "calendar.entry_proposed",
+    "calendar.entry_changed",
+    "assistant.asked",
+    "assistant.replied",
 ]
 
 EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
@@ -3331,6 +4576,18 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "app.tested",
     "app.deployed",
     "app.refreshed",
+    "meeting.minuted",
+    "work_item.created",
+    "work_item.changed",
+    "pinboard.item_added",
+    "pinboard.item_changed",
+    "mention.added",
+    "mention.removed",
+    "calendar.synced",
+    "calendar.entry_proposed",
+    "calendar.entry_changed",
+    "assistant.asked",
+    "assistant.replied",
 )
 
 SIDE_EFFECT_EVENT_TYPES: Final[frozenset[RegisteredEventType]] = frozenset(
@@ -3415,10 +4672,22 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "app.tested": AppTestedData,
     "app.deployed": AppDeployedData,
     "app.refreshed": AppRefreshedData,
+    "meeting.minuted": MeetingMinutedData,
+    "work_item.created": WorkItemCreatedData,
+    "work_item.changed": WorkItemChangedData,
+    "pinboard.item_added": PinboardItemAddedData,
+    "pinboard.item_changed": PinboardItemChangedData,
+    "mention.added": MentionAddedData,
+    "mention.removed": MentionRemovedData,
+    "calendar.synced": CalendarSyncedData,
+    "calendar.entry_proposed": CalendarEntryProposedData,
+    "calendar.entry_changed": CalendarEntryChangedData,
+    "assistant.asked": AssistantAskedData,
+    "assistant.replied": AssistantRepliedData,
 }
 
 EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
-    {'version': '1.0.0',
+    {'version': '1.1.0',
      'unknown_types': 'trace_only',
      'types': {'world.requested': {'family': 'world',
                                    'verb': 'requested',
@@ -4320,5 +5589,167 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                  'story_template': 'The app refreshed its data.',
                                  'trace_row': 'spec={data.spec}',
                                  'data_schema': 'events/data/app.refreshed.schema.json',
-                                 'fixture': 'fixtures/events/valid/app.refreshed.json'}}}
+                                 'fixture': 'fixtures/events/valid/app.refreshed.json'},
+               'meeting.minuted': {'family': 'meeting',
+                                   'verb': 'minuted',
+                                   'priority': 'must',
+                                   'pillar': 'P2',
+                                   'default_severity': 'info',
+                                   'side_effect': False,
+                                   'world_effect': 'The minutes scroll goes from the Meeting Hall to '
+                                                   'the Town Hall.',
+                                   'hud_effect': 'A minutes card opens for the Owner (S-26).',
+                                   'story_template': 'The minutes are ready: {data.decisions} '
+                                                     'decisions, {data.action_items} action items.',
+                                   'trace_row': 'meeting={data.meeting_id} '
+                                                'unverified={data.unverified} flagged={data.flagged}',
+                                   'data_schema': 'events/data/meeting.minuted.schema.json',
+                                   'fixture': 'fixtures/events/valid/meeting.minuted.json'},
+               'work_item.created': {'family': 'work_item',
+                                     'verb': 'created',
+                                     'priority': 'must',
+                                     'pillar': 'P2',
+                                     'default_severity': 'info',
+                                     'side_effect': False,
+                                     'world_effect': "A note lands on the owner's desk.",
+                                     'hud_effect': 'The plate gains a row.',
+                                     'story_template': 'A work item was added ({data.status}).',
+                                     'trace_row': 'work_item={data.work_item_id} owner={data.owner} '
+                                                  'source={data.source_kind}',
+                                     'data_schema': 'events/data/work_item.created.schema.json',
+                                     'fixture': 'fixtures/events/valid/work_item.created.json'},
+               'work_item.changed': {'family': 'work_item',
+                                     'verb': 'changed',
+                                     'priority': 'must',
+                                     'pillar': 'P2',
+                                     'default_severity': 'info',
+                                     'side_effect': False,
+                                     'world_effect': 'The note on the desk gets a stamp, a snooze tag '
+                                                     'or a check.',
+                                     'hud_effect': 'The plate row updates.',
+                                     'story_template': 'A work item changed: {data.change}.',
+                                     'trace_row': 'work_item={data.work_item_id} change={data.change} '
+                                                  'status={data.status}',
+                                     'data_schema': 'events/data/work_item.changed.schema.json',
+                                     'fixture': 'fixtures/events/valid/work_item.changed.json'},
+               'pinboard.item_added': {'family': 'pinboard',
+                                       'verb': 'item_added',
+                                       'priority': 'must',
+                                       'pillar': 'P2',
+                                       'default_severity': 'info',
+                                       'side_effect': False,
+                                       'world_effect': 'A pin appears on the board beside Your Desk.',
+                                       'hud_effect': 'The pinboard table gains a row.',
+                                       'story_template': 'A pin was added to the {data.scope_kind} '
+                                                         'board ({data.status}).',
+                                       'trace_row': 'pin={data.pin_id} scope={data.scope_kind} '
+                                                    'made_by={data.made_by}',
+                                       'data_schema': 'events/data/pinboard.item_added.schema.json',
+                                       'fixture': 'fixtures/events/valid/pinboard.item_added.json'},
+               'pinboard.item_changed': {'family': 'pinboard',
+                                         'verb': 'item_changed',
+                                         'priority': 'must',
+                                         'pillar': 'P2',
+                                         'default_severity': 'info',
+                                         'side_effect': False,
+                                         'world_effect': 'The pin is re-stamped, lifted off or taken '
+                                                         'down.',
+                                         'hud_effect': 'The pinboard row updates.',
+                                         'story_template': 'A pin changed: {data.change}.',
+                                         'trace_row': 'pin={data.pin_id} change={data.change} '
+                                                      'status={data.status}',
+                                         'data_schema': 'events/data/pinboard.item_changed.schema.json',
+                                         'fixture': 'fixtures/events/valid/pinboard.item_changed.json'},
+               'mention.added': {'family': 'mention',
+                                 'verb': 'added',
+                                 'priority': 'must',
+                                 'pillar': 'P2',
+                                 'default_severity': 'info',
+                                 'side_effect': False,
+                                 'world_effect': 'A small tag flutters onto the pin.',
+                                 'hud_effect': 'The pinboard row shows the tag.',
+                                 'story_template': 'Someone was tagged on a pin.',
+                                 'trace_row': 'mention={data.mention_id} pin={data.pin_id} '
+                                              'user={data.user}',
+                                 'data_schema': 'events/data/mention.added.schema.json',
+                                 'fixture': 'fixtures/events/valid/mention.added.json'},
+               'mention.removed': {'family': 'mention',
+                                   'verb': 'removed',
+                                   'priority': 'must',
+                                   'pillar': 'P2',
+                                   'default_severity': 'info',
+                                   'side_effect': False,
+                                   'world_effect': 'The tag drops off the pin.',
+                                   'hud_effect': 'The plate row clears.',
+                                   'story_template': 'A tag was removed from a pin.',
+                                   'trace_row': 'mention={data.mention_id} pin={data.pin_id} '
+                                                'removed_by={data.removed_by}',
+                                   'data_schema': 'events/data/mention.removed.schema.json',
+                                   'fixture': 'fixtures/events/valid/mention.removed.json'},
+               'calendar.synced': {'family': 'calendar',
+                                   'verb': 'synced',
+                                   'priority': 'must',
+                                   'pillar': 'P6',
+                                   'default_severity': 'info',
+                                   'side_effect': False,
+                                   'world_effect': 'The Clock Tower bell rings once.',
+                                   'hud_effect': 'The calendar refreshes.',
+                                   'story_template': 'The calendar synced ({data.changed} changes).',
+                                   'trace_row': 'kind={data.kind} changed={data.changed}',
+                                   'data_schema': 'events/data/calendar.synced.schema.json',
+                                   'fixture': 'fixtures/events/valid/calendar.synced.json'},
+               'calendar.entry_proposed': {'family': 'calendar',
+                                           'verb': 'entry_proposed',
+                                           'priority': 'must',
+                                           'pillar': 'P6',
+                                           'default_severity': 'info',
+                                           'side_effect': False,
+                                           'world_effect': 'An unstamped dated card slides onto the '
+                                                           'calendar board.',
+                                           'hud_effect': 'The calendar shows a proposed entry.',
+                                           'story_template': 'A calendar entry was proposed from a '
+                                                             '{data.source_kind}.',
+                                           'trace_row': 'entry={data.entry_id} '
+                                                        'source={data.source_kind}',
+                                           'data_schema': 'events/data/calendar.entry_proposed.schema.json',
+                                           'fixture': 'fixtures/events/valid/calendar.entry_proposed.json'},
+               'calendar.entry_changed': {'family': 'calendar',
+                                          'verb': 'entry_changed',
+                                          'priority': 'must',
+                                          'pillar': 'P6',
+                                          'default_severity': 'info',
+                                          'side_effect': False,
+                                          'world_effect': 'The dated card is stamped, crossed out or '
+                                                          'moved.',
+                                          'hud_effect': 'The calendar row updates.',
+                                          'story_template': 'A calendar entry changed: {data.change}.',
+                                          'trace_row': 'entry={data.entry_id} change={data.change} '
+                                                       'state={data.state}',
+                                          'data_schema': 'events/data/calendar.entry_changed.schema.json',
+                                          'fixture': 'fixtures/events/valid/calendar.entry_changed.json'},
+               'assistant.asked': {'family': 'assistant',
+                                   'verb': 'asked',
+                                   'priority': 'must',
+                                   'pillar': 'P5',
+                                   'default_severity': 'info',
+                                   'side_effect': False,
+                                   'world_effect': 'The lamp on Your Desk lights.',
+                                   'hud_effect': 'The panel shows the question.',
+                                   'story_template': 'A question was asked in the assistant panel.',
+                                   'trace_row': 'conversation={data.conversation_id}',
+                                   'data_schema': 'events/data/assistant.asked.schema.json',
+                                   'fixture': 'fixtures/events/valid/assistant.asked.json'},
+               'assistant.replied': {'family': 'assistant',
+                                     'verb': 'replied',
+                                     'priority': 'must',
+                                     'pillar': 'P5',
+                                     'default_severity': 'info',
+                                     'side_effect': False,
+                                     'world_effect': 'A sealed note returns to Your Desk.',
+                                     'hud_effect': 'The panel streams the answer with its sources.',
+                                     'story_template': 'The assistant answered ({data.outcome}).',
+                                     'trace_row': 'conversation={data.conversation_id} '
+                                                  'outcome={data.outcome} decided_by={data.decided_by}',
+                                     'data_schema': 'events/data/assistant.replied.schema.json',
+                                     'fixture': 'fixtures/events/valid/assistant.replied.json'}}}
 )

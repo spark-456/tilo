@@ -1,0 +1,46 @@
+id: E-PLAN-10
+group: E-PLAN
+title: File intake — Night-shift bake schedule and driver handoff PDF from onboarding notes
+measures:
+- EV-02
+- EV-03
+- FR-INT-03
+- FR-INT-04
+- FR-INT-06
+status: ready
+deploy_gate: false
+inputs:
+  task_kind: with_files
+  task: From the attached Q4 wholesale onboarding notes for Kestrel Artisan Bakery (mara@kestrel-bakery.example),
+    produce the PDF bake schedule and route driver handoff checklist for the night shift lead by 2026-10-12,
+    honouring the 18-hour cold-proof constraint and the delivery windows for both cafes.
+  files:
+  - evals/fixtures/plan/kestrel_onboarding_notes.md
+scripted_answers: []
+ground_truth:
+  question_count: 0
+  approach_count: 2.5
+  brief_valid: true
+checks:
+- check: schema_valid
+  args:
+    field: brief
+    schema: brief.schema.json
+- check: schema_valid
+  args:
+    field: plan
+    schema: plan.schema.json
+- check: equals_ground_truth
+  args:
+    field: question_count
+    tolerance: 0
+- check: equals_ground_truth
+  args:
+    field: approach_count
+    tolerance: 0.5
+- check: equals_ground_truth
+  args:
+    field: brief_valid
+recording: null
+notes: EV-03 estimate accuracy (median within +-25% of historical unit-type cost) is evaluated once replay
+  recordings exist.

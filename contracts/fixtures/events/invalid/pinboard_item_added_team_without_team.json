@@ -1,0 +1,37 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000304",
+  "seq": 304,
+  "ts": "2026-10-05T09:05:04.000Z",
+  "world_id": "w_meeting_q4_plan",
+  "run_id": "r_meeting_q4_plan_1",
+  "type": "pinboard.item_added",
+  "actor": "A_analyst",
+  "target": "u_owner",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "Tilo proposed a pin for the launch team from the planning meeting.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "pin_id": "pb_launch_date",
+    "scope_kind": "team",
+    "team": null,
+    "status": "proposed",
+    "made_by": "tilo",
+    "source_kind": "meeting"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

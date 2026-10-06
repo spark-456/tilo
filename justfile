@@ -17,7 +17,17 @@ dev:
     pnpm --filter @tilo/web run dev
 
 dev-api:
-    uv run --package tilo-api uvicorn tilo_api:app --reload --port 8080
+    uv run --package tilo-api python -m tilo_api
+
+# CP2 browser walk on the real dev API (fake providers, no credentials, no live mode). Starts tilo-api
+# on 127.0.0.1:8080 and its own Vite on TILO_CP2_PORT (default 5391); local only, CI never runs it.
+e2e-cp2:
+    node apps/web/scripts/e2e-cp2.mjs
+
+# Whole-stack system test (tests/system): starts the real tilo-api (dev mode, fake providers) and the other
+# services as processes and drives them over HTTP; about 3 minutes, port 8080. Docs: docs/system-test.md.
+system-test:
+    uv run pytest tests/system -q -p no:cacheprovider
 
 # Regenerate apps/web design tokens from design/tokens.json (drift-tested).
 tokens:
@@ -43,13 +53,13 @@ check-fast:
     uv run ruff format --check .
     uv run ruff check .
     pnpm exec biome check .
-    uv run pytest -q -m "not emulator"
+    uv run pytest -q -m "not emulator and not system"
 
 # Run every test suite (Python + JS, once JS suites exist). Emulator-marked tests
 # (services/harness, P0-09) need Java + firebase-tools and run separately in CI
 # (see .github/workflows/ci.yml) and with `uv run pytest services/harness/tests -m emulator`.
 test:
-    uv run pytest -q -m "not emulator"
+    uv run pytest -q -m "not emulator and not system"
     pnpm -r run test
 
 # Format everything in place.
@@ -69,20 +79,28 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src
+    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src packages/memory/src services/render/src services/channels/src services/browser/src packages/people/src
     pnpm -r exec tsc --noEmit
 
 # Start the Firestore emulator and run the harness skeleton against it (P0-09).
 harness-skeleton:
     uv run --package tilo-harness python -m tilo_harness.skeleton --world w_harness_skeleton --run r_harness_skeleton
 
-# Run the eval harness (not built yet — ticket P3).
+# Replay the eval set (no paid calls) into the git-ignored evals/results.local.md (evals/results.md is the committed pass record); exit 0 all passed, 1 a case failed, 2 error, 3 stopped at the credit cap (EFF-07).
 eval:
-    python -c "print('eval harness not built yet (ticket P3); nothing to run')"
+    uv run python -m tilo_evals run --pass full --results-md evals/results.local.md
 
 # PL-05 conformance suite -> config/conformance/<profile>.json (replay by default; a miss fails)
 conformance:
     uv run python -m tilo_providers.conformance
+
+# PL-02 live Vertex smoke: one capped call per role. Refuses unless the user sets the live switch; `just vertex-smoke --replay` is free.
+vertex-smoke *args:
+    uv run python packages/providers/scripts/live_vertex_smoke.py {{args}}
+
+# PL-LIVE-E2E (#340): one bank case through the real pipeline. Live only when the user sets LIVE=1; `--dry-run` and `--replay` are free.
+live-e2e *args:
+    uv run python evals/scripts/live_e2e.py {{args}}
 
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated
@@ -95,3 +113,28 @@ skills-test:
 # too, so the older documented form keeps working).
 deploy env="dev":
     python -c "import sys; env='{{env}}'; env=env[4:] if env.startswith('env=') else env; sys.exit(sys.stderr.write(f'deploy: only env=dev is allowed here, got {env!r}\n') or 1) if env != 'dev' else sys.exit(sys.stderr.write('deploy: infra/ is not applied yet (ticket P0-07 defines the plan; the user runs terraform apply)\n') or 1)"
+
+# Dispatch the tilo-dev deploy workflow (P0-07a) on main: it builds the images, swaps them on Cloud Run and
+# smoke-tests. Refuses everything but dev; needs `gh` signed in. Steps and variables: docs/deploy-dev.md.
+deploy-dev env="dev":
+    python -c "import sys; env='{{env}}'; env=env[4:] if env.startswith('env=') else env; sys.exit(sys.stderr.write(f'deploy-dev: only env=dev is allowed, got {env!r}\n') or 1) if env != 'dev' else None"
+    gh workflow run deploy-dev.yml --ref main
+
+# Deploy the tilo-dev services with Google Cloud Build instead of GitHub Actions minutes (P0-07f): uploads the repo
+# (.gcloudignore allowlist), builds the images, pushes them to Artifact Registry and swaps them on Cloud Run by
+# digest (cloudbuild.yaml, run as the tilo-cloudbuild service account; source goes to the Terraform-managed regional
+# staging bucket, not the auto-created US one). Usage: `just deploy-dev-cloudbuild api`, then
+# `just deploy-dev-cloudbuild`. Pinned to the dev project like `deploy-web`: no parameter can change it. `env` must
+# be dev and `service` must be all or one of the seven names; both are checked by just itself (error()) before any
+# shell runs, so nothing in them can reach a shell or gcloud. Needs `gcloud auth login` (docs/deploy-dev.md).
+deploy-dev-cloudbuild service="all" env="dev":
+    python -c "print('deploy-dev-cloudbuild: env and service accepted')" {{ if env != 'dev' { error('deploy-dev-cloudbuild: only env=dev is allowed, got ' + env) } else { '' } }} {{ if service =~ '^(all|api|harness|channels|connectors|browser|render|sandbox-web)$' { '' } else { error('deploy-dev-cloudbuild: service must be all or one of api, harness, channels, connectors, browser, render, sandbox-web, got ' + service) } }}
+    gcloud builds submit --config cloudbuild.yaml --project essential-wares-510320-f0 --substitutions "_SERVICE={{service}}" --region asia-southeast1 --gcs-source-staging-dir gs://essential-wares-510320-f0-cloudbuild-staging/source .
+
+# Build the web app and deploy it to Firebase Hosting on the tilo-dev project (P0-07c). The build is given an empty
+# VITE_TILO_API_URL, so the deployed app runs the fixture / replay world with no backend. Pinned to the dev project:
+# no parameter, no other project, never tilo-demo. Needs your own `firebase login` first (the CI deployer has no
+# Firebase role). Steps and the resulting URL: docs/deploy-dev.md.
+deploy-web:
+    python -c "import os,subprocess,sys; sys.exit(subprocess.call('pnpm --filter @tilo/web run build', shell=True, env=dict(os.environ, VITE_TILO_API_URL='' )))"
+    pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0
