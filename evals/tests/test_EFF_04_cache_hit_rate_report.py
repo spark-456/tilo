@@ -93,7 +93,7 @@ def test_EFF_04_a_pass_with_no_model_events_says_so(fake_repo):
     assert main(["run", "--pass", "full", "--results-json", "results.json"]) == 0
     assert _json(fake_repo)["cache_hit_rate_per_role"] == {}
     md = (fake_repo / "evals" / "results.md").read_text(encoding="utf-8")
-    assert "### Cache-hit rate per role\n- none" in md
+    assert "### Cache-hit rate per role" in md and "- none (no model events in this pass)" in md
 
 
 def test_EFF_04_the_report_makes_no_model_call_and_needs_no_live_switch(mixed_pass):
