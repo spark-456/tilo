@@ -157,23 +157,6 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     };
   }, [api]);
 
-  if (!user || !form) {
-    return (
-      <div data-testid="park-page-profile">
-        <PageSheet>
-          <h1 className="park-profile-name" tabIndex={-1}>
-            Profile
-          </h1>
-          {problem ? (
-            <p className="park-profile-sub">
-              {problem === "missing" ? "Not connected yet" : "Your profile could not be loaded"}
-            </p>
-          ) : null}
-        </PageSheet>
-      </div>
-    );
-  }
-
   const wide = app.vw >= 980;
   const flip = (r: number, c: number) => {
     const row = notif[r] ?? [];
@@ -187,18 +170,27 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     setSessions(sessions.filter((o) => o !== s));
     app.toast(`Signed out of ${s.title}`);
   };
+  // One head for every state, so the h1 is the same node while the data loads (focus stays on it).
+  const subtitle =
+    user && form
+      ? `${form.title} · ${user.org} · Owner on the ${user.plan} plan`
+      : problem === "missing"
+        ? "Not connected yet"
+        : problem === "failed"
+          ? "Your profile could not be loaded"
+          : "";
   const motion = MOTIONS.find((m) => m[0] === app.motion) ?? MOTIONS[0];
 
   return (
     <div data-testid="park-page-profile">
       <PageSheet>
         <div className="park-profile-head">
-          <div className="park-profile-avatar">{user.initials}</div>
+          <div className="park-profile-avatar">{user?.initials}</div>
           <div className="park-profile-who">
             <h1 className="park-profile-name" tabIndex={-1}>
-              {form.name}
+              {user && form ? form.name : "Profile"}
             </h1>
-            <p className="park-profile-sub">{`${form.title} · ${user.org} · Owner on the ${user.plan} plan`}</p>
+            <p className="park-profile-sub">{subtitle}</p>
           </div>
           <button
             type="button"
@@ -209,306 +201,311 @@ export function ProfilePage({ app }: { app: AppCtx }) {
             Connectors
           </button>
         </div>
-        <div className={cls("park-profile-layout", wide && "park-profile-layout--wide")}>
-          <nav
-            aria-label="Settings"
-            className={cls("park-profile-nav", wide && "park-profile-nav--wide")}
-          >
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                aria-current={t.id === tab ? "page" : undefined}
-                className={cls("park-profile-tab", t.id === tab && "park-profile-tab--on")}
-                onClick={() => setTab(t.id)}
-              >
-                {t.icon}
-                {t.label}
-              </button>
-            ))}
-          </nav>
-
-          {tab === "profile" ? (
-            <section aria-label="Profile" className="park-profile-card">
-              <Head title="Profile" sub="How you appear to your team and how Tilo addresses you." />
-              <div className="park-profile-form">
-                {FIELDS.map(([key, label, help]) => (
-                  <label key={key} className="park-profile-field">
-                    <span className="park-profile-label">{label}</span>
-                    <input
-                      className="park-profile-input"
-                      type={key === "email" ? "email" : "text"}
-                      value={form[key]}
-                      onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                    />
-                    <span className="park-profile-help">{help}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="park-profile-foot">
-                <button
-                  type="button"
-                  className="park-profile-btn park-profile-btn--quiet"
-                  onClick={() => setForm(formOf(user))}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="park-profile-btn park-btn--primary"
-                  onClick={() => app.toast("Profile saved")}
-                >
-                  Save changes
-                </button>
-              </div>
-            </section>
-          ) : null}
-
-          {tab === "notifications" ? (
-            <section
-              aria-label="Notifications"
-              className="park-profile-card park-profile-card--list"
+        {user && form ? (
+          <div className={cls("park-profile-layout", wide && "park-profile-layout--wide")}>
+            <nav
+              aria-label="Settings"
+              className={cls("park-profile-nav", wide && "park-profile-nav--wide")}
             >
-              <Head
-                title="Notifications"
-                sub="Choose where Tilo reaches you. Decisions always reach you somewhere."
-              />
-              <div className="park-profile-scroll">
-                <div className="park-profile-matrix">
-                  <div className="park-profile-mhead">
-                    <span>WHEN</span>
-                    {CHANNELS.map((c) => (
-                      <span key={c} className="park-profile-cell">
-                        {c.toUpperCase()}
-                      </span>
-                    ))}
-                  </div>
-                  {NOTIFS.map(([label, sub], r) => (
-                    <div key={label} className="park-profile-mrow">
-                      <div>
-                        <div className="park-profile-mlabel">{label}</div>
-                        <div className="park-profile-msub">{sub}</div>
-                      </div>
-                      {CHANNELS.map((c, i) => (
-                        <div key={c} className="park-profile-cell">
-                          <Toggle
-                            label={`${label} by ${c}`}
-                            on={notif[r]?.[i] ?? false}
-                            onChange={() => flip(r, i)}
-                          />
-                        </div>
-                      ))}
-                    </div>
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-current={t.id === tab ? "page" : undefined}
+                  className={cls("park-profile-tab", t.id === tab && "park-profile-tab--on")}
+                  onClick={() => setTab(t.id)}
+                >
+                  {t.icon}
+                  {t.label}
+                </button>
+              ))}
+            </nav>
+
+            {tab === "profile" ? (
+              <section aria-label="Profile" className="park-profile-card">
+                <Head
+                  title="Profile"
+                  sub="How you appear to your team and how Tilo addresses you."
+                />
+                <div className="park-profile-form">
+                  {FIELDS.map(([key, label, help]) => (
+                    <label key={key} className="park-profile-field">
+                      <span className="park-profile-label">{label}</span>
+                      <input
+                        className="park-profile-input"
+                        type={key === "email" ? "email" : "text"}
+                        value={form[key]}
+                        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                      />
+                      <span className="park-profile-help">{help}</span>
+                    </label>
                   ))}
                 </div>
-              </div>
-              <div className="park-profile-quiet">
-                <Tile tone="hero">{ICONS.moon}</Tile>
-                <div className="park-profile-grow">
-                  <div className="park-profile-mlabel">Quiet hours · 19:00 to 08:00</div>
-                  <div className="park-profile-msub">
-                    Phone stays silent, except decisions over £1,000.
+                <div className="park-profile-foot">
+                  <button
+                    type="button"
+                    className="park-profile-btn park-profile-btn--quiet"
+                    onClick={() => setForm(formOf(user))}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="park-profile-btn park-btn--primary"
+                    onClick={() => app.toast("Profile saved")}
+                  >
+                    Save changes
+                  </button>
+                </div>
+              </section>
+            ) : null}
+
+            {tab === "notifications" ? (
+              <section
+                aria-label="Notifications"
+                className="park-profile-card park-profile-card--list"
+              >
+                <Head
+                  title="Notifications"
+                  sub="Choose where Tilo reaches you. Decisions always reach you somewhere."
+                />
+                <div className="park-profile-scroll">
+                  <div className="park-profile-matrix">
+                    <div className="park-profile-mhead">
+                      <span>WHEN</span>
+                      {CHANNELS.map((c) => (
+                        <span key={c} className="park-profile-cell">
+                          {c.toUpperCase()}
+                        </span>
+                      ))}
+                    </div>
+                    {NOTIFS.map(([label, sub], r) => (
+                      <div key={label} className="park-profile-mrow">
+                        <div>
+                          <div className="park-profile-mlabel">{label}</div>
+                          <div className="park-profile-msub">{sub}</div>
+                        </div>
+                        {CHANNELS.map((c, i) => (
+                          <div key={c} className="park-profile-cell">
+                            <Toggle
+                              label={`${label} by ${c}`}
+                              on={notif[r]?.[i] ?? false}
+                              onChange={() => flip(r, i)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <Switch label="Quiet hours" checked={quiet} onChange={setQuiet} />
-              </div>
-            </section>
-          ) : null}
+                <div className="park-profile-quiet">
+                  <Tile tone="hero">{ICONS.moon}</Tile>
+                  <div className="park-profile-grow">
+                    <div className="park-profile-mlabel">Quiet hours · 19:00 to 08:00</div>
+                    <div className="park-profile-msub">
+                      Phone stays silent, except decisions over £1,000.
+                    </div>
+                  </div>
+                  <Switch label="Quiet hours" checked={quiet} onChange={setQuiet} />
+                </div>
+              </section>
+            ) : null}
 
-          {tab === "appearance" ? (
-            <section
-              aria-label="Appearance"
-              className="park-profile-card park-profile-card--appearance"
-            >
-              <Head title="Appearance" sub="Your city, your way. Changes apply straight away." />
-              <h3 className="park-profile-group">Time of day</h3>
-              <div className="park-profile-times">
-                {TIMES.map(([id, name, sub]) => {
-                  const [ground, a, b, c] = SWATCH[id];
-                  return (
+            {tab === "appearance" ? (
+              <section
+                aria-label="Appearance"
+                className="park-profile-card park-profile-card--appearance"
+              >
+                <Head title="Appearance" sub="Your city, your way. Changes apply straight away." />
+                <h3 className="park-profile-group">Time of day</h3>
+                <div className="park-profile-times">
+                  {TIMES.map(([id, name, sub]) => {
+                    const [ground, a, b, c] = SWATCH[id];
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={app.time === id}
+                        className={cls(
+                          "park-profile-time",
+                          app.time === id && "park-profile-time--on",
+                        )}
+                        onClick={() => app.setPref("time", id)}
+                      >
+                        <div className="park-profile-swatch" style={{ background: ground }}>
+                          <div
+                            className="park-profile-block park-profile-block--a"
+                            style={{ background: a }}
+                          />
+                          <div
+                            className="park-profile-block park-profile-block--b"
+                            style={{ background: b }}
+                          />
+                          <div
+                            className="park-profile-block park-profile-block--c"
+                            style={{ background: c }}
+                          />
+                        </div>
+                        <div>
+                          <div className="park-profile-tname">{name}</div>
+                          <div className="park-profile-tsub">{sub}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <h3 className="park-profile-group">Motion in the city</h3>
+                <div className="park-profile-motion">
+                  {MOTIONS.map(([id, name]) => (
                     <button
                       key={id}
                       type="button"
-                      aria-pressed={app.time === id}
+                      aria-pressed={app.motion === id}
                       className={cls(
-                        "park-profile-time",
-                        app.time === id && "park-profile-time--on",
+                        "park-profile-mopt",
+                        app.motion === id && "park-profile-mopt--on",
                       )}
-                      onClick={() => app.setPref("time", id)}
+                      onClick={() => app.setPref("motion", id)}
                     >
-                      <div className="park-profile-swatch" style={{ background: ground }}>
-                        <div
-                          className="park-profile-block park-profile-block--a"
-                          style={{ background: a }}
-                        />
-                        <div
-                          className="park-profile-block park-profile-block--b"
-                          style={{ background: b }}
-                        />
-                        <div
-                          className="park-profile-block park-profile-block--c"
-                          style={{ background: c }}
-                        />
-                      </div>
-                      <div>
-                        <div className="park-profile-tname">{name}</div>
-                        <div className="park-profile-tsub">{sub}</div>
-                      </div>
+                      {name}
                     </button>
-                  );
-                })}
-              </div>
-              <h3 className="park-profile-group">Motion in the city</h3>
-              <div className="park-profile-motion">
-                {MOTIONS.map(([id, name]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    aria-pressed={app.motion === id}
-                    className={cls(
-                      "park-profile-mopt",
-                      app.motion === id && "park-profile-mopt--on",
-                    )}
-                    onClick={() => app.setPref("motion", id)}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-              <p className="park-profile-motion-help">{motion[2]}</p>
-            </section>
-          ) : null}
+                  ))}
+                </div>
+                <p className="park-profile-motion-help">{motion[2]}</p>
+              </section>
+            ) : null}
 
-          {tab === "security" ? (
-            <section aria-label="Security" className="park-profile-card park-profile-card--list">
-              <Head title="Security" sub="Sign-in, devices and how approvals are confirmed." />
-              {SECURITY_ROWS.map(([title, sub, action, message], i) => (
-                <div key={title} className="park-profile-srow">
-                  <Tile tone="ok">{i === 0 ? ICONS.security : ICONS.phone}</Tile>
+            {tab === "security" ? (
+              <section aria-label="Security" className="park-profile-card park-profile-card--list">
+                <Head title="Security" sub="Sign-in, devices and how approvals are confirmed." />
+                {SECURITY_ROWS.map(([title, sub, action, message], i) => (
+                  <div key={title} className="park-profile-srow">
+                    <Tile tone="ok">{i === 0 ? ICONS.security : ICONS.phone}</Tile>
+                    <div className="park-profile-grow">
+                      <div className="park-profile-stitle">{title}</div>
+                      <div className="park-profile-ssub">{sub}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="park-profile-small"
+                      onClick={() => app.toast(message)}
+                    >
+                      {action}
+                    </button>
+                  </div>
+                ))}
+                <div className="park-profile-signed">
+                  <h3 className="park-profile-group">Signed in on</h3>
+                  <button
+                    type="button"
+                    className="park-profile-link"
+                    onClick={() => {
+                      setSessions(sessions.filter((s) => s.current));
+                      app.toast("Signed out everywhere except this device");
+                    }}
+                  >
+                    Sign out everywhere else
+                  </button>
+                </div>
+                {sessions.map((s) => (
+                  <div key={s.title} className="park-profile-session">
+                    <Tile tone="sunk">{s.icon}</Tile>
+                    <div className="park-profile-grow">
+                      <div className="park-profile-stitle">{s.title}</div>
+                      <div className="park-profile-ssub">{s.sub}</div>
+                    </div>
+                    {s.current ? (
+                      <StatusChip tone="ok">This device</StatusChip>
+                    ) : (
+                      <button
+                        type="button"
+                        className="park-profile-signout"
+                        onClick={() => signOut(s)}
+                      >
+                        Sign out
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </section>
+            ) : null}
+
+            {tab === "billing" ? (
+              <section
+                aria-label="Plan and billing"
+                className="park-profile-card park-profile-card--billing"
+              >
+                <div className="park-profile-cards">
+                  <div className="park-profile-plan">
+                    <span className="park-profile-eyebrow">PLAN</span>
+                    <span className="park-profile-planname">Team</span>
+                    <span className="park-profile-blurb">
+                      5 seats, shared boards, two-person approvals. Renews 1 October.
+                    </span>
+                    <button
+                      type="button"
+                      className="park-profile-btn park-btn--primary park-profile-btn--fit"
+                      onClick={() => app.toast("Plan comparison opens here")}
+                    >
+                      Compare plans
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="park-profile-spend"
+                    onClick={() => app.go("ledger")}
+                  >
+                    <span className="park-profile-eyebrow">AGENT SPEND · SEPTEMBER</span>
+                    <span className="park-profile-amount">
+                      <span className="park-profile-big">£2,412</span>
+                      <span className="park-profile-of">of £8,000</span>
+                    </span>
+                    <span className="park-profile-bar">
+                      <span
+                        className="park-profile-fill"
+                        style={{ width: `${Math.round((SPENT / LIMIT) * 100)}%` }}
+                      />
+                    </span>
+                    <span className="park-profile-open">Open the Ledger</span>
+                  </button>
+                </div>
+                <div className="park-profile-pay">
+                  <Tile tone="hero">{ICONS.billing}</Tile>
                   <div className="park-profile-grow">
-                    <div className="park-profile-stitle">{title}</div>
-                    <div className="park-profile-ssub">{sub}</div>
+                    <span className="park-profile-eyebrow">PAYMENT</span>
+                    <div className="park-profile-stitle">Visa ending 4242</div>
+                    <div className="park-profile-ssub">Invoices go to finance@northwind.co</div>
                   </div>
                   <button
                     type="button"
                     className="park-profile-small"
-                    onClick={() => app.toast(message)}
+                    onClick={() => app.toast("Card update is handled by our payment provider")}
                   >
-                    {action}
+                    Update
                   </button>
                 </div>
-              ))}
-              <div className="park-profile-signed">
-                <h3 className="park-profile-group">Signed in on</h3>
-                <button
-                  type="button"
-                  className="park-profile-link"
-                  onClick={() => {
-                    setSessions(sessions.filter((s) => s.current));
-                    app.toast("Signed out everywhere except this device");
-                  }}
-                >
-                  Sign out everywhere else
-                </button>
-              </div>
-              {sessions.map((s) => (
-                <div key={s.title} className="park-profile-session">
-                  <Tile tone="sunk">{s.icon}</Tile>
-                  <div className="park-profile-grow">
-                    <div className="park-profile-stitle">{s.title}</div>
-                    <div className="park-profile-ssub">{s.sub}</div>
-                  </div>
-                  {s.current ? (
-                    <StatusChip tone="ok">This device</StatusChip>
-                  ) : (
-                    <button
-                      type="button"
-                      className="park-profile-signout"
-                      onClick={() => signOut(s)}
-                    >
-                      Sign out
-                    </button>
-                  )}
+                <div className="park-profile-invoices">
+                  <h2 className="park-profile-invoices-title">Invoices</h2>
+                  {INVOICES.map(([title, amount, month]) => (
+                    <div key={title} className="park-profile-invoice">
+                      <span>{title}</span>
+                      <span className="park-profile-money">{amount}</span>
+                      <StatusChip tone="ok">Paid</StatusChip>
+                      <button
+                        type="button"
+                        aria-label="Download"
+                        className="park-profile-download"
+                        onClick={() => app.toast(`Downloaded ${month} invoice`)}
+                      >
+                        {ICONS.download}
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </section>
-          ) : null}
-
-          {tab === "billing" ? (
-            <section
-              aria-label="Plan and billing"
-              className="park-profile-card park-profile-card--billing"
-            >
-              <div className="park-profile-cards">
-                <div className="park-profile-plan">
-                  <span className="park-profile-eyebrow">PLAN</span>
-                  <span className="park-profile-planname">Team</span>
-                  <span className="park-profile-blurb">
-                    5 seats, shared boards, two-person approvals. Renews 1 October.
-                  </span>
-                  <button
-                    type="button"
-                    className="park-profile-btn park-btn--primary park-profile-btn--fit"
-                    onClick={() => app.toast("Plan comparison opens here")}
-                  >
-                    Compare plans
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  className="park-profile-spend"
-                  onClick={() => app.go("ledger")}
-                >
-                  <span className="park-profile-eyebrow">AGENT SPEND · SEPTEMBER</span>
-                  <span className="park-profile-amount">
-                    <span className="park-profile-big">£2,412</span>
-                    <span className="park-profile-of">of £8,000</span>
-                  </span>
-                  <span className="park-profile-bar">
-                    <span
-                      className="park-profile-fill"
-                      style={{ width: `${Math.round((SPENT / LIMIT) * 100)}%` }}
-                    />
-                  </span>
-                  <span className="park-profile-open">Open the Ledger</span>
-                </button>
-              </div>
-              <div className="park-profile-pay">
-                <Tile tone="hero">{ICONS.billing}</Tile>
-                <div className="park-profile-grow">
-                  <span className="park-profile-eyebrow">PAYMENT</span>
-                  <div className="park-profile-stitle">Visa ending 4242</div>
-                  <div className="park-profile-ssub">Invoices go to finance@northwind.co</div>
-                </div>
-                <button
-                  type="button"
-                  className="park-profile-small"
-                  onClick={() => app.toast("Card update is handled by our payment provider")}
-                >
-                  Update
-                </button>
-              </div>
-              <div className="park-profile-invoices">
-                <h2 className="park-profile-invoices-title">Invoices</h2>
-                {INVOICES.map(([title, amount, month]) => (
-                  <div key={title} className="park-profile-invoice">
-                    <span>{title}</span>
-                    <span className="park-profile-money">{amount}</span>
-                    <StatusChip tone="ok">Paid</StatusChip>
-                    <button
-                      type="button"
-                      aria-label="Download"
-                      className="park-profile-download"
-                      onClick={() => app.toast(`Downloaded ${month} invoice`)}
-                    >
-                      {ICONS.download}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </div>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
       </PageSheet>
     </div>
   );
