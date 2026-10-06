@@ -68,8 +68,11 @@ read from the existing `Store` (`worlds[w].owner`, `worlds[w].run_id`, `events[w
 
 | Route | Success | Errors |
 | --- | --- | --- |
-| `GET /worlds/{world_id}/costs` | 200 `{"world_id": ..., **report}` for that world's run(s) | 401, 403, 404, 503 |
-| `GET /costs` | 200 `report` over every world whose `owner` is the principal's `user_id` | 401, 403, 503 |
+| `GET /worlds/{world_id}/costs` | 200 `{"world_id": ..., **report}` for that world's run(s) | 401, 403, 404, 422, 503 |
+| `GET /costs` | 200 `report` over every world whose `owner` is the principal's `user_id` | 401, 403, 422, 503 |
+
+422 `inconsistent_ledger` is only `InconsistentMemoryHit` (any other `ValueError` surfaces); 503 `not_configured` is a
+missing ledger seam or an unreadable `config/prices.yaml` (read once, only a good read kept, retried otherwise).
 
 - **Scope of a world's runs**: `WorldRecord.run_id` plus every `run_id` on that world's events. A ledger entry of any
   other run is never counted. Task types come from the world's `store.runs[world_id].plan["units"]` (`id`,
