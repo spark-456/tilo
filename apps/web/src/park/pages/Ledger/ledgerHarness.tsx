@@ -6,8 +6,8 @@ import { mount } from "../../../../test-support/park/componentsHarness";
 import { createFixtureApi } from "../../api/fixtureApi";
 import type { Api } from "../../api/index";
 import type { DecisionKey } from "../../api/types";
-import type { AppCtx } from "./appCtx";
 import { LedgerPage } from "./LedgerPage";
+import type { AppCtx } from "./appCtx";
 
 export interface Calls {
   go: ReturnType<typeof vi.fn>;
@@ -24,6 +24,7 @@ export interface HarnessOpts {
 
 function Host({ opts, calls }: { opts: HarnessOpts; calls: Calls }): ReactElement {
   const [dec, setDec] = useState<Partial<Record<DecisionKey, boolean>>>({});
+  const [api] = useState(() => opts.api ?? createFixtureApi());
   const time = opts.time ?? "day";
   const app: AppCtx = {
     page: "ledger",
@@ -52,7 +53,7 @@ function Host({ opts, calls }: { opts: HarnessOpts; calls: Calls }): ReactElemen
   };
   return (
     <div data-park="" data-time={time}>
-      <LedgerPage app={app} api={opts.api ?? createFixtureApi()} />
+      <LedgerPage app={app} api={api} />
     </div>
   );
 }

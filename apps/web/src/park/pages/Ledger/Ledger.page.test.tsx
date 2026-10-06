@@ -156,7 +156,7 @@ describe("WEB_7_ledger_interactions", () => {
     expect(tip.style.opacity).toBe("1");
     expect(tip.textContent).toBe("Thu 24 Sep · £31Running total £2,412");
     act(() => {
-      box.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+      box.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
     });
     expect(tip.style.opacity).toBe("0");
   });
@@ -251,9 +251,10 @@ describe("WEB_7_ledger_decide: every approval goes through app.decide(key)", () 
     expect(t).toContain("You approved £3,420 for Laptop Depot");
     expect(t).not.toContain("Laptop Depot asked for sign-off");
     expect(t).toContain("Waiting · 1");
+    // the amber tile turns green and is no longer a button
     expect(
       qa(container, "button").some((b) => (b.textContent ?? "").startsWith("Waiting on you")),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("WEB_7_ledger_waiting_filter_lists_the_two_asks_and_the_mail_row_sends_the_brief", async () => {
@@ -311,7 +312,7 @@ describe("WEB_7_ledger_honesty_and_states", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     for (const time of ["day", "night"] as const) {
       const { container } = await renderLedger({ time });
-      expect(container.querySelector('[data-time="' + time + '"]')).not.toBeNull();
+      expect(container.querySelector(`[data-time="${time}"]`)).not.toBeNull();
       click(byText(container, '[role="radio"]', "Tool"));
       click(byText(container, '[role="radio"]', "Spend"));
       await settle();

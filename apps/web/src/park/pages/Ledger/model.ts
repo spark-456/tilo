@@ -1,0 +1,343 @@
+import type { Dec, Ledger, LedgerEntry } from "../../api/types";
+// The Ledger page's arithmetic: a typed port of the renderVals() of
+// design_handoff_tilo_web_app/design/Tilo App Ledger.dc.html (user's prototype, ADR-0003a). Pure functions
+// of the Ledger fixture and `dec`, so a test can pin every number. No clock, no random, no network.
+import type { KpiTone } from "../../components";
+
+export const gbp = (v: number): string =>
+  `£${v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB")}`;
+
+/** The amount the depot purchase is waiting on (the fixture's one `dec: "depot"` transaction). */
+export const waitingAmount = (L: Ledger): number => L.tx.find((t) => t.dec === "depot")?.amt ?? 0;
+
+// ---- KPI tiles ----
+export interface KpiRow {
+  label: string;
+  value: string;
+  sub: string;
+  tone?: KpiTone;
+  /** The amber tile opens the world that is waiting. */
+  opensWorld?: string;
+}
+
+const sum = (xs: readonly number[]): number => xs.reduce((a, v) => a + v, 0);
+
+export function kpis(L: Ledger, dec: Dec): KpiRow[] {
+  const waiting = waitingAmount(L);
+  const spent = dec.depot ? L.spent + waiting : L.spent;
+  return [
+    {
+      label: "Spent so far",
+      value: gbp(spent),
+      sub: `${Math.round((spent / L.budget) * 100)}% of ${gbp(L.budget)}`,
+    },
+    {
+      label: "Month-end forecast",
+      value: gbp(L.forecast),
+      sub: `${gbp(L.budget - L.forecast)} under budget`,
+    },
+    dec.depot
+      ? { label: "Waiting on you", value: "£0", sub: "Laptop Depot approved today", tone: "ok" }
+      : {
+          label: "Waiting on you",
+          value: gbp(waiting),
+          sub: "Laptop Depot sign-off",
+          tone: "amber",
+          opensWorld: "k1",
+        },
+    { label: "Saved by memory", value: gbp(sum(L.memory)), sub: "Up £120 on August", tone: "sch" },
+    {
+      label: "Hours handed back",
+      value: `${sum(L.hours.map((h) => h[1]))} h`,
+      sub: "About 6 working days",
+      tone: "hero",
+    },
+  ];
+}
+
+// ---- Spend over time (SVG 720x270) ----
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const X = (d: number): number => 48 + (d - 1) * (652 / 29);
+const pct = (v: number, of: number): string => `${((v / of) * 100).toFixed(2)}%`;
+
+/** The hovered day (1..) for a pointer at `fx` (0..1 across the chart box). The chart clamps it to 1..24. */
+export const dayFromX = (fx: number): number => Math.round((fx * 720 - 48) / (652 / 29)) + 1;
+
+export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
+  const waiting = waitingAmount(L);
+  const Y = (v: number): number => 236 - (v / L.budget) * 206;
+  const daily = L.daily.slice();
+  if (dec.depot && daily.length) daily[daily.length - 1] = (daily[daily.length - 1] ?? 0) + waiting;
+  const cum: number[] = [];
+  daily.reduce((a, v, i) => {
+    cum[i] = a + v;
+    return cum[i] ?? 0;
+  }, 0);
+  const pts: [number, number][] = cum.map((v, i) => [X(i + 1), Y(v)]);
+  const P = (a: [number, number][]): string =>
+    a.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+  const now = pts[pts.length - 1] ?? [48, 236];
+  const fcPts: [number, number][] = dec.depot
+    ? [now, [X(30), Y(L.forecast)]]
+    : [now, [X(25), Y(L.spent + waiting + 70)], [X(30), Y(L.forecast)]];
+  const hd = hover != null ? Math.min(24, Math.max(1, hover)) : null;
+  const hx = hd != null ? X(hd) : 0;
+  const hv = hd != null ? (cum[hd - 1] ?? 0) : 0;
+  return {
+    grid: [0, 2000, 4000, 6000].map((v) => `M48 ${Y(v).toFixed(1)} H700`).join(" "),
+    line: P(pts),
+    area: `${P(pts)} L${now[0].toFixed(1)} 236 L48 236 Z`,
+    fc: P(fcPts),
+    pace: `M${X(1).toFixed(1)} ${Y(0).toFixed(1)} L${X(30).toFixed(1)} ${Y(L.budget).toFixed(1)}`,
+    cap: `M48 ${Y(L.budget).toFixed(1)} H700`,
+    today: `M${now[0].toFixed(1)} 24 V236`,
+    nowX: now[0].toFixed(1),
+    nowY: now[1].toFixed(1),
+    endX: X(30).toFixed(1),
+    endY: Y(L.forecast).toFixed(1),
+    yLabels: (
+      [
+        [0, "£0"],
+        [2000, "£2k"],
+        [4000, "£4k"],
+        [6000, "£6k"],
+      ] as const
+    ).map(([v, t]) => ({ t, top: pct(Y(v), 270) })),
+    xLabels: (
+      [
+        [1, "1 Sep"],
+        [8, "8"],
+        [15, "15"],
+        [24, "Today"],
+        [30, "30 Sep"],
+      ] as const
+    ).map(([d, t]) => ({ t, left: pct(X(d), 720) })),
+    capTop: pct(Y(L.budget), 270),
+    spikeLeft: pct(X(21) - 4, 720),
+    spikeTop: pct(Y(cum[20] ?? 0), 270),
+    fcLeft: pct(X(27.4), 720),
+    fcTop: pct(Y(5950), 270),
+    fcLabel: dec.depot ? `Forecast ${gbp(L.forecast)}` : `If you approve ${gbp(waiting)}`,
+    hOp: hd != null ? "1" : "0",
+    hx: hd != null ? hx.toFixed(1) : "0",
+    hy: hd != null ? Y(hv).toFixed(1) : "0",
+    hLine: hd != null ? `M${hx.toFixed(1)} 24 V236` : "M0 0",
+    tipLeft: hd != null ? pct(hx, 720) : "0%",
+    tipA: hd != null ? `${DAY_NAMES[(hd + 1) % 7]} ${hd} Sep · ${gbp(daily[hd - 1] ?? 0)}` : "",
+    tipB: hd != null ? `Running total ${gbp(hv)}` : "",
+  };
+}
+
+// ---- Where it goes ----
+const PALETTE = ["#5A3FE0", "#0E7C79", "#F0A500", "#D9588C", "#3F7FE0", "#8C8899"] as const;
+export type By = keyof Ledger["by"];
+
+export function donut(L: Ledger, by: By) {
+  const B = L.by[by];
+  const tot = sum(B.rows.map((r) => r[1]));
+  let acc = 0;
+  const stops = B.rows.map((r, i) => {
+    const a = (acc / tot) * 100;
+    acc += r[1];
+    const b = (acc / tot) * 100;
+    return `${PALETTE[i]} ${a.toFixed(2)}% ${(b - 0.5).toFixed(2)}%, transparent ${(b - 0.5).toFixed(2)}% ${b.toFixed(2)}%`;
+  });
+  return {
+    head: B.head,
+    conic: `conic-gradient(${stops.join(", ")})`,
+    rows: B.rows.map((r, i) => ({
+      name: r[0],
+      amt: gbp(r[1]),
+      pct: `${Math.round((r[1] / tot) * 100)}%`,
+      c: PALETTE[i] ?? "#8C8899",
+    })),
+  };
+}
+
+// ---- Cost per run, approval waits, what Tilo gave back ----
+export function runCards(L: Ledger) {
+  return L.runs.map(([name, v, n, skill]) => {
+    const mx = v[0] ?? 1;
+    const line = v
+      .map(
+        (c, i) =>
+          `${i ? "L" : "M"}${((i / (v.length - 1)) * 200).toFixed(1)} ${(6 + (1 - c / mx) * 50).toFixed(1)}`,
+      )
+      .join(" ");
+    const first = v[0] ?? 0;
+    const last = v[v.length - 1] ?? 0;
+    return {
+      name,
+      n: String(n),
+      skill,
+      line,
+      area: `${line} L200 60 L0 60 Z`,
+      first: `£${first.toFixed(2)}`,
+      now: `£${last.toFixed(2)}`,
+      drop: `−${Math.round((1 - last / first) * 100)}%`,
+    };
+  });
+}
+
+export function waitBuckets(L: Ledger) {
+  const bmax = Math.max(...L.waits.buckets.map((b) => b[1]));
+  return L.waits.buckets.map(([label, n], i) => ({
+    label,
+    n: String(n),
+    w: `${(n / bmax) * 100}%`,
+    c: i < 2 ? "var(--ok)" : i < 3 ? "var(--sch)" : "#F0A500",
+  }));
+}
+
+export function waitTypes(L: Ledger, backup: unknown) {
+  return L.waits.types.map(([name, v, tone]) => ({
+    name,
+    v: name.startsWith("Sharing") && backup ? "About 20 min with a backup" : v,
+    c:
+      tone === "ok"
+        ? "var(--okInk)"
+        : tone === "amber" && !backup
+          ? "var(--amberInk)"
+          : "var(--ink)",
+  }));
+}
+
+export const memoryBars = (L: Ledger) =>
+  L.memory.map((v, i) => ({
+    v: `£${v}`,
+    h: `${(v / 200) * 120}px`,
+    c: i === 3 ? "var(--sch)" : "var(--schSoft)",
+  }));
+
+export const hourBars = (L: Ledger) =>
+  L.hours.map(([name, h, c, what]) => ({ name, h: `${h} h`, w: `${(h / 46) * 100}%`, c, what }));
+
+// ---- Activity ----
+/** Kind -> [icon, tile, ink, tag, filter group]. */
+const KM: Record<string, readonly [string, string, string, string, string]> = {
+  spend: ["coin", "var(--heroSoft)", "var(--heroInk)", "Spend", "spend"],
+  approval: ["check", "var(--okSoft)", "var(--ok)", "Approved", "approval"],
+  declined: ["lock", "var(--redSoft)", "var(--redInk)", "Declined", "approval"],
+  gate: ["flag", "var(--chip)", "var(--ink2)", "Gate passed", "gate"],
+  waiting: ["help", "var(--amberTile)", "var(--amberInk)", "Waiting on you", "waiting"],
+  waitshare: ["help", "var(--amberTile)", "var(--amberInk)", "Waiting on you", "waiting"],
+  share: ["up", "var(--blueSoft)", "var(--blueInk)", "Shared outside", "share"],
+  saved: ["vault", "var(--schSoft)", "var(--sch)", "Memory saving", "saved"],
+};
+const FALLBACK = KM.spend as readonly [string, string, string, string, string];
+
+export const KINDS = [
+  ["all", "All"],
+  ["waiting", "Waiting"],
+  ["spend", "Spend"],
+  ["approval", "Approvals"],
+  ["gate", "Gates"],
+  ["share", "Shared"],
+  ["saved", "Savings"],
+] as const;
+export type Kind = (typeof KINDS)[number][0];
+
+const TODAY = "Today · Thu 24 Sep";
+
+export interface ActivityRow {
+  /** Index in the whole feed (the open row is tracked by it, as in the reference). */
+  index: number;
+  time: string;
+  what: string;
+  sub: string;
+  amt: string;
+  tag: string;
+  icon: string;
+  tile: string;
+  ink: string;
+  amtColor: string;
+  tagColor: string;
+  waiting: boolean;
+  world: string;
+  detail: { k: string; v: string }[];
+  decKey: LedgerEntry["dec"];
+  approveLabel: string;
+}
+
+export function activityGroups(L: Ledger, dec: Dec, kind: Kind) {
+  const waiting = waitingAmount(L);
+  let E: LedgerEntry[] = L.activity.filter((e) => !(e.dec && dec[e.dec]));
+  if (dec.mail)
+    E = [
+      {
+        day: TODAY,
+        t: "Just now",
+        k: "share",
+        world: "k1",
+        what: "Sent the supplier brief to 3 battery suppliers",
+        sub: "K1 electric scooter · approved by you",
+        amt: "—",
+        detail: [
+          ["Recipients", "3 battery suppliers"],
+          ["Signed with", "Your approval"],
+          ["Waited", "1 h 20 min"],
+        ],
+      },
+      ...E,
+    ];
+  if (dec.depot)
+    E = [
+      {
+        day: TODAY,
+        t: "Just now",
+        k: "approval",
+        world: "k1",
+        what: `You approved ${gbp(waiting)} for Laptop Depot`,
+        sub: "K1 electric scooter · Alex Morgan",
+        amt: gbp(waiting),
+        detail: [
+          ["Your limit", "No limit"],
+          ["Asked by", "Builder agent"],
+          ["Waited", "1 h 10 min"],
+        ],
+      },
+      ...E,
+    ];
+  const waitN = L.activity.filter((e) => e.dec && !dec[e.dec]).length;
+  const groups: { day: string; rows: ActivityRow[] }[] = [];
+  E.forEach((e, index) => {
+    const m = KM[e.k] ?? FALLBACK;
+    if (kind !== "all" && m[4] !== kind) return;
+    let g = groups.find((x) => x.day === e.day);
+    if (!g) {
+      g = { day: e.day, rows: [] };
+      groups.push(g);
+    }
+    const isWaiting = !!e.dec;
+    g.rows.push({
+      index,
+      time: e.t,
+      what: e.what,
+      sub: e.sub,
+      amt: e.amt,
+      tag: m[3],
+      icon: m[0],
+      tile: m[1],
+      ink: m[2],
+      amtColor:
+        e.k === "saved"
+          ? "var(--okInk)"
+          : isWaiting
+            ? "var(--amberInk)"
+            : e.k === "spend"
+              ? "var(--ink)"
+              : "var(--ink2)",
+      tagColor: isWaiting
+        ? "var(--amberInk)"
+        : e.k === "declined"
+          ? "var(--redInk)"
+          : "var(--ink3)",
+      waiting: isWaiting,
+      world: e.world,
+      detail: e.detail.map(([k, v]) => ({ k, v })),
+      decKey: e.dec,
+      approveLabel: e.dec === "depot" ? `Approve ${gbp(waiting)}` : "Send brief",
+    });
+  });
+  return { entries: E, groups, waitN };
+}
