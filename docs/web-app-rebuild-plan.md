@@ -98,11 +98,23 @@ Line cap: CLAUDE.md caps a diff at 400 hand-written lines. A mechanical port of 
 
 Nothing is deleted before the cutover PR, and the cutover PR lists each file here for approval. Replaced (route handed to Park): S-01 Start, S-14 Worlds list, S-18 route `/team` (its console moves to `/team/console`), S-19 Connections list, S-22 Settings, S-28 Pinboards and S-29 Calendar (visual). Replaced screens' tests are ported to the Park page or removed in the same PR with the list. Kept as they are: everything in the "Not covered" list in section 3. Files that become dead after cutover (candidates, to be confirmed with a reference check): `screens/S_14.tsx`, `S_22.tsx`, `S_28.tsx`, `S_29.tsx`, the S-01 body in `FlowShell.tsx`, and their tests and e2e specs. The `people/` data layer stays.
 
+## 8a. Parity bar and review (user instruction, 6 Oct 2026 10:35 IST, relayed)
+
+Pixel parity with the served `.dc.html` reference is the bar: layout, copy, colours, type, radii, spacing, motion timings, day and night, at 1440 and at the narrow width. design-critic checks parity (side-by-side screenshots at the same viewport and theme plus a pixel diff where possible), not "ours wins or ties". Any difference is a FAIL unless the PR lists it as an approved exception. No UI element is dropped or simplified because the PRD has no requirement for it; it is built as designed and runs on the typed fixtures through `api/`. No backend work for those elements now.
+
+## 8b. Designed but not in the PRD
+
+Running list; each designed element with no PRD requirement, so it can be wired up later. Filled in by each page phase (empty until then).
+
+| Page | Element (feature, page, control) | Fixture source | Status |
+| --- | --- | --- | --- |
+| (none yet) | | | |
+
 ## 9. Decisions (approved 6 Oct 2026; logged in `docs/open-questions.md` as BQ-WEB-n)
 
 - **A (BQ-WEB-2). World page**: the Park SVG overview, linking to the Pixi stage and to S-05, S-10, S-11, S-12. The stage is not replaced; no ADR.
-- **B (BQ-WEB-3). Ambient motion**: NOT approved for now; the user decides. `honestyScan.ts` and FR-WLD-09 stay untouched. Until then the backdrop ships static: cars and walkers off, which equals motion `still` as the default. Only agents animate, and only from events. All ambient motion (cars, walkers, boot slide) sits behind one flag, `PARK_AMBIENT_MOTION` (default off), so it can be switched on if the user says yes. UI feedback keyframes (spinner, toast, page transition, `tiloGhost`, `tiloPulse`) are not agent motion, but they also trip the scan, so each page that needs one lists it in its ticket, and none is added before the user decides; until then they are static or instant.
-- **C (BQ-WEB-4). Type tokens**: Park pages are scoped under `[data-park]` with their own ramp test pinning the design's sizes. The existing `type-ramp.spec.ts` stays unchanged for the old screens. The user's final design differs from PRD 18.2; this is recorded here as the reason.
+- **B (BQ-WEB-3). Ambient motion**: first held for the user; then decided by the user's 6 Oct 2026 10:35 IST instruction as relayed by the supervisor ("ensure the frontend design is perfectly the same as the one I have provided"). Built as designed, on by default as in the reference: the city animates on Home only, is paused elsewhere and is frozen by motion `still` and reduced motion. One flag, `PARK_AMBIENT_MOTION` (default on), still gates it. Agent figures and world progress animate only from recorded events (HR-1). The scan stays untouched until WEB-3, where a narrow allowlist entry in `honestyScan.ts` for the non-agent layers only (cars, walkers, backdrop scroll, UI feedback keyframes), each with its reason, goes through code-reviewer and security-reviewer. WEB-1 to WEB-2 add no keyframes.
+- **C (BQ-WEB-4). Type tokens**: Park pages are scoped under `[data-park]` with their own ramp test pinning the design's sizes; the design's type ramp wins on Park pages. The existing `type-ramp.spec.ts` stays unchanged for the old screens. The user's final design differs from PRD 18.2; this is recorded here as the reason.
 - **D (BQ-WEB-5). Line cap**: engine ports and fixture transcriptions count as generated only when the PR body shows the diff against the prototype file, or a script that checks the port is faithful (each port ticket ships a parity test that runs the prototype in Node and the TS port with the same inputs and compares). Hand-written page code, logic and tests stay under 400 lines per PR. Pages are split as needed (Skills in two or more PRs).
 - **E (BQ-WEB-6). Prototype approval**: `docs/adr/0003a-park-prototype-porting.md` cites the user's 6 Oct 2026 handoff. Root CLAUDE.md is not edited by this lane; the supervisor asks the user to add the file names there. `support.js` is never ported.
 - **F (BQ-WEB-1). Connector logos**: monograms stay.

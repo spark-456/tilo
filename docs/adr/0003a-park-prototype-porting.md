@@ -11,8 +11,9 @@ ADR-0003 item 4 allows Tilo's own design prototypes `tilo-kit.js`, `tilo-world.j
 2. `support.js` (Claude Design's runtime, here and under `design/source/`) is never ported or imported.
 3. A port keeps the prototype's behaviour: the same names, numbers and cache keys, no `window.*` globals, typed React output instead of strings of markup. Each port ships a parity test that runs the prototype in Node and the TypeScript module with the same inputs and compares the output (PR bodies cite it, BQ-WEB-5).
 4. The ported files carry a header naming their source file and this ADR. Every dependency or font keeps its entry in `docs/licences.md`; no third-party asset is copied (UX-8), so connector tiles stay monograms (BQ-WEB-1).
-5. Root CLAUDE.md is not edited by this change. The user adds the three file names to its hard rule; until then this ADR is the record.
+5. Ambient non-agent motion on the Park backdrop (cars, walkers, the city animating on Home only, paused elsewhere, frozen by motion `still` and reduced motion) is allowed. This is the user's 6 Oct 2026 10:35 IST decision ("ensure the frontend design is perfectly the same as the one I have provided"), relayed by the supervisor. Agents still animate only from recorded events, and world progress stays event-driven (HR-1, HR-2). The honesty scan is relaxed only by a narrow allowlist entry, with a reason, for the non-agent layers, made in WEB-3 and reviewed by code-reviewer and security-reviewer.
+6. Root CLAUDE.md is not edited by this change. The user adds the three file names to its hard rule; until then this ADR is the record.
 
 ## Consequences
 - The web lane may start WEB-1 (engines, kit, fixtures) now.
-- Ambient motion in the ported backdrop stays behind one off-by-default flag until the user decides BQ-WEB-3; the honesty scan is untouched.
+- Ambient motion ships on by default behind one flag (`PARK_AMBIENT_MOTION`); the honesty scan is touched only in WEB-3, narrowly, after review.
