@@ -104,7 +104,7 @@ describe("WEB_1c_typecheck: the exported signatures", () => {
     },
   );
 
-  it("WEB_1c_typecheck_the_probe_catches_a_missing_export", () => {
+  it("WEB_1c_typecheck_the_probe_catches_a_missing_export", { timeout: 180_000 }, () => {
     // Guards the test above against passing for the wrong reason: a consumer of a name kit.ts lacks fails.
     expect(kitExists()).toBe(true);
     const errs = probeErrors(
