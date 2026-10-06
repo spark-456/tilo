@@ -10,15 +10,23 @@ dependencies = [
     "httpx>=0.27",
     "tilo-contracts",
     "tilo-api",
+    "tilo-archive",
+    "tilo-harness",
+    "tilo-memory",
     "tilo-planning",
     "tilo-providers",
+    "tilo-metering",
 ]
 
 [tool.uv.sources]
 tilo-contracts = { workspace = true }
 tilo-api = { workspace = true }
+tilo-archive = { workspace = true }
+tilo-harness = { workspace = true }
+tilo-memory = { workspace = true }
 tilo-planning = { workspace = true }
 tilo-providers = { workspace = true }
+tilo-metering = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
