@@ -8,7 +8,7 @@ const Placeholder = lazy(() => import("./Placeholder"));
 
 export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppCtx }>>> = {
   home: Placeholder,
-  worlds: Placeholder,
+  worlds: lazy(() => import("../pages/Worlds")),
   world: Placeholder,
   skills: Placeholder,
   ledger: Placeholder,

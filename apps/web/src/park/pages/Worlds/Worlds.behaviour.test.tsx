@@ -282,7 +282,7 @@ describe("WEB_5_worlds: cards", () => {
     const { c } = await renderWorlds();
     const t = text(card(c, id));
     for (const w of wanted) has(t, w);
-    expect(card(c, id).querySelector("svg"), "a mini world map").not.toBeNull();
+    expect(card(c, id).querySelector("img"), "a mini world map").not.toBeNull();
   });
 
   it.each<[string, (string | RegExp)[], string[]]>([
@@ -315,7 +315,7 @@ describe("WEB_5_worlds: cards", () => {
     const t = text(card(c, id));
     for (const w of wanted) has(t, w);
     for (const a of absent) expect(t).not.toContain(a);
-    expect(card(c, id).querySelector("svg"), "a building strip").not.toBeNull();
+    expect(card(c, id).querySelector("img"), "a building strip").not.toBeNull();
   });
 
   it.each<[string, string[]]>([
@@ -327,7 +327,7 @@ describe("WEB_5_worlds: cards", () => {
     for (const w of wanted) expect(t).toContain(w);
     for (const hidden of ["QUICK TASK", "Spend", "Agents", "%"])
       expect(t, hidden).not.toContain(hidden);
-    expect(card(c, id).querySelector("svg")).not.toBeNull();
+    expect(card(c, id).querySelector("img")).not.toBeNull();
   });
 
   it.each([
@@ -361,8 +361,10 @@ describe("WEB_5_worlds: cards", () => {
   });
 
   const widths = (el: Element) =>
-    qa(el, "*").flatMap(
-      (e) => /(?:^|[;\s])width:\s*(\d+)%/.exec(e.getAttribute("style") ?? "")?.[1] ?? [],
+    qa(el, "*").flatMap((e) =>
+      e.tagName === "IMG"
+        ? []
+        : (/(?:^|[;\s])width:\s*(\d+)%/.exec(e.getAttribute("style") ?? "")?.[1] ?? []),
     );
 
   it("WEB_5_worlds_progress_bar_width_and_label_follow_prog", async () => {

@@ -93,8 +93,10 @@ const CHIP: Spec = {
 };
 const DOT: Spec = { width: "7px", height: "7px", "border-radius": "99px" };
 const widthBar = (card: Element, pct: string) =>
-  qa(card, "*").find((e) =>
-    new RegExp(`(?:^|[;\\s])width:\\s*${pct}`).test(e.getAttribute("style") ?? ""),
+  qa(card, "*").find(
+    (e) =>
+      e.tagName !== "IMG" &&
+      new RegExp(`(?:^|[;\\s])width:\\s*${pct}`).test(e.getAttribute("style") ?? ""),
   );
 const A = {
   added: [
@@ -367,7 +369,7 @@ describe("WEB_5_worlds_styles: sections and cards", () => {
         background: bar as string,
       });
     }
-    const art = k1.querySelector("svg");
+    const art = k1.querySelector("img");
     check("art box", art && childOf(k1, art), {
       background: "var(--sunk)",
       "border-radius": "16px",
@@ -463,7 +465,7 @@ describe("WEB_5_worlds_styles: sections and cards", () => {
       height: "3px",
       background: "var(--track)",
     });
-    expect(n.querySelector("svg"), "the building strip").not.toBeNull();
+    expect(n.querySelector("img"), "the building strip").not.toBeNull();
     expect(diffs).toEqual([]);
   });
 
@@ -490,7 +492,7 @@ describe("WEB_5_worlds_styles: sections and cards", () => {
       ...DOT,
       background: "var(--ok)",
     });
-    let tile = v.querySelector("svg")?.parentElement ?? null;
+    let tile = v.querySelector("img")?.parentElement ?? null;
     while (tile && tile !== v && val(declared(tile), "width") !== "46px") tile = tile.parentElement;
     check("art tile", tile === v ? null : tile, {
       width: "46px",
