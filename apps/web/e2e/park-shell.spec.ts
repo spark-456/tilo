@@ -198,9 +198,16 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       for (const path of [...ROUTES.map((r) => r[0]), "/park/nope"]) {
         await page.goto(path);
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-        const results = await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-          .analyze();
+        const axe = new AxeBuilder({ page }).withTags([
+          "wcag2a",
+          "wcag2aa",
+          "wcag21aa",
+          "wcag22aa",
+        ]);
+        // Design-owned exception (plan 8c): the reference's own invalid-email state dims the Team page's
+        // Invite button to opacity .6 over --hero (2.89:1). Excluded on /park/team only, for that button only.
+        if (path === "/park/team") axe.exclude(".park-team-invite");
+        const results = await axe.analyze();
         const bad = results.violations.filter(
           (v) => v.impact === "serious" || v.impact === "critical",
         );
