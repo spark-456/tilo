@@ -11,7 +11,6 @@ import pytest
 from _cards_lib import card_errors
 from _clint2_lib import (
     DESTINATION,
-    DRAFT_REF,
     FLOW_USER,
     KNOWN_RECIPIENT,
     MOCK_ID,
@@ -40,12 +39,15 @@ def _nothing_past_the_gate(rf):
 
 def test_FR_HIL_03_the_irreversible_step_stops_at_a_gate_with_a_card_and_nothing_is_sent(run_flow, registry):
     requested, card = run_flow.run_to_gate()
+    draft = run_flow.artifact_of("U4")  # the version the store minted for the draft: read from artifact.created
 
     data = requested["data"]
     assert data["gate_id"] == "G1" and data["action_type"] == "send_email"
     assert data["risk_tier"] == "T3"  # a recipient the owner has not written to before (PRD 10.4)
     assert data["irreversible"] is True  # the connector declares send_email irreversible
-    assert data["item"] == DRAFT_REF and data["card_id"] == card["id"]
+    assert data["item"] == draft and data["card_id"] == card["id"]
+    made = next(e for e in run_flow.events("artifact.created") if e["data"]["artifact"] == draft)
+    assert made["seq"] < requested["seq"]  # the gate holds an item the world already saw made (HR-1)
     assert data["approver"] is None and data["team_lead"] is None
     assert requested["authz"] is None  # a request authorises nothing
     assert not card_errors(card, registry), card_errors(card, registry)
@@ -54,13 +56,13 @@ def test_FR_HIL_03_the_irreversible_step_stops_at_a_gate_with_a_card_and_nothing
     assert gate["id"] == "G1" and gate["risk_tier"] == "T3" and gate["irreversible"] is True
     assert gate["action"]["type"] == "send_email" and gate["action"]["connector"] == MOCK_ID
     assert gate["action"]["destination"] == DESTINATION and gate["recipients"] == [NEW_RECIPIENT]
-    assert gate["action"]["item"]["artifact_id"] == DRAFT_REF["artifact_id"]
+    assert gate["action"]["item"]["artifact_id"] == draft["artifact_id"]
     assert card["safe_default"] == "hold"  # gates never time out to "go" (PRD 10.3)
     assert {"approve", "hold"} <= {o["id"] for o in card["options"]}
     assert not [o for o in card["options"] if o["suggested"] and o["irreversible"]]  # CR: never suggest the send
     assert "web" in card["answer_channels"]
     (call,) = run_flow.resolver_calls
-    assert call["unit"] == "U4" and call["action_type"] == "send_email" and call["item"] == DRAFT_REF
+    assert call["unit"] == "U4" and call["action_type"] == "send_email" and call["item"] == draft
     _nothing_past_the_gate(run_flow)  # FR-HIL-03: the action waits; HR-1: nothing is reported done
     assert run_flow.delivery().status_code == 409
 
@@ -88,6 +90,7 @@ def test_FR_HIL_01_only_the_owner_reads_the_gate_card(run_flow):
 
 def test_FR_HIL_03_the_owner_approving_resolves_the_gate_with_person_authz_and_enqueues_one_entry(run_flow, registry):
     requested, card = run_flow.run_to_gate()
+    draft = run_flow.artifact_of("U4")
 
     response = run_flow.answer(card["id"], "approve")
 
@@ -107,7 +110,7 @@ def test_FR_HIL_03_the_owner_approving_resolves_the_gate_with_person_authz_and_e
     assert entry["world_id"] == run_flow.world_id
     assert entry["run_id"] == run_flow.store.worlds[run_flow.world_id].run_id
     assert (entry["action_type"], entry["connector"], entry["destination"]) == ("send_email", MOCK_ID, DESTINATION)
-    assert entry["recipients"] == [NEW_RECIPIENT] and entry["attachments"] == [] and entry["item"] == DRAFT_REF
+    assert entry["recipients"] == [NEW_RECIPIENT] and entry["attachments"] == [] and entry["item"] == draft
     assert entry["risk_tier"] == "T3" and entry["modifiers"] == ["new_recipients"]
     assert entry["authz"] == resolved["authz"]  # the person's approval, not a policy's and not the Director's
     assert entry["state"] == "sent" and entry["undo_window_s"] == 0
@@ -115,6 +118,7 @@ def test_FR_HIL_03_the_owner_approving_resolves_the_gate_with_person_authz_and_e
 
 def test_FR_HIL_03_after_approval_the_mock_sends_once_and_the_run_is_delivered(run_flow, registry):
     requested, _ = run_flow.run_to_completion()
+    draft = run_flow.artifact_of("U4")
 
     events = assert_stream_valid(run_flow, registry)
     resolved, transfer = only(events, "approval.resolved"), only(events, "data.transfer")
@@ -123,17 +127,17 @@ def test_FR_HIL_03_after_approval_the_mock_sends_once_and_the_run_is_delivered(r
     assert order == sorted(order) and len(set(order)) == 5
     outbox_id = requested["data"]["outbox_id"]
     assert transfer["data"] == {
-        "connector": MOCK_ID, "action_type": "send_email", "direction": "out", "artifact": DRAFT_REF,
+        "connector": MOCK_ID, "action_type": "send_email", "direction": "out", "artifact": draft,
         "outbox_id": outbox_id, "risk_tier": "T3",
     }  # fmt: skip
     assert (
         transfer["authz"] == resolved["authz"] and transfer["authz"]["by"] == "person"
     )  # HR-7: linked to the approval
-    assert delivered["data"] == {"artifact": DRAFT_REF, "format": "email", "outbox_id": outbox_id}
+    assert delivered["data"] == {"artifact": draft, "format": "email", "outbox_id": outbox_id}
     assert delivered["cause"] == transfer["id"] and delivered["authz"] is None  # EV-14: the notice, not the side effect
     assert completed["data"]["deliverable_count"] == 1
     (sent,) = run_flow.adapter.sent
-    assert sent["thread_id"] == DESTINATION and sent["recipients"] == [NEW_RECIPIENT] and sent["item"] == DRAFT_REF
+    assert sent["thread_id"] == DESTINATION and sent["recipients"] == [NEW_RECIPIENT] and sent["item"] == draft
     (entry,) = run_flow.outbox_store.all_entries()
     assert sent["idempotency_key"] == entry["idempotency_key"]
 
@@ -198,7 +202,7 @@ def test_FR_HIL_04_a_T3_send_still_waits_for_a_person_with_an_owner_L3_policy_in
     known = tilo_policy.SideEffectFacts(recipients=(KNOWN_RECIPIENT,), known_recipients=(KNOWN_RECIPIENT,))
     proposal = tilo_policy.Proposal(
         world_id="w_check", action_type="send_email", connector=MOCK_ID, district="D2", destination=DESTINATION,
-        facts=known, item=DRAFT_REF, credits=0, instruction=None,
+        facts=known, item={"artifact_id": "art_policy_probe", "version": 1}, credits=0, instruction=None,
     )  # fmt: skip
     table = tilo_policy.load_risk_table()
     covered = tilo_policy.decide(proposal, table=table, policies=[policy], world_owner=FLOW_USER, applied=[], now=now())

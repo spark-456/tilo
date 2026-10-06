@@ -119,6 +119,10 @@ class Msg:
             "body": self.body,
             "date": self.date,
             "headers": headers,
+            # the body shape the production reader carries (a lone plain-text body, no files)
+            "has_text_part": True,
+            "has_other_parts": False,
+            "attachments": [],
         }
 
 
