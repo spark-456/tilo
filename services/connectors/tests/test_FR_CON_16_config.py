@@ -34,7 +34,8 @@ def _lovable() -> dict:
 
 def test_FR_CON_16_lovable_is_declared_after_gmail_and_drive_and_loads_through_the_registry():
     reg = registry()
-    assert reg.ids() == ("gmail", "google_drive", "lovable")
+    # google_calendar (FR-CAL-08) joins after these three: the order of the first three stays pinned.
+    assert reg.ids()[:3] == ("gmail", "google_drive", "lovable")
 
 
 def test_FR_CON_16_lovable_declaration_is_the_pinned_link_route_connector():

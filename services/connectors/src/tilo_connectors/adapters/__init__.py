@@ -1,4 +1,4 @@
-"""tilo_connectors.adapters — Gmail and Drive adapters (FR-CON-04, FR-CON-05). tests/API_FR_CON_04_05.md.
+"""tilo_connectors.adapters — Gmail, Drive and Calendar adapters (FR-CON-04, FR-CON-05, FR-CAL-08).
 
 Only these modules and `tokens.py` call `access_token_for_adapter` (SEC-02).
 """
@@ -13,8 +13,11 @@ from ._transport import NotPicked as NotPicked
 from ._transport import ProviderUnavailable as ProviderUnavailable
 from ._transport import RateLimited as RateLimited
 from ._transport import SideEffectRefused as SideEffectRefused
+from ._transport import SyncTokenExpired as SyncTokenExpired
 from ._transport import Transport as Transport
 from ._transport import TransportError as TransportError
+from .calendar import CALENDAR_API as CALENDAR_API
+from .calendar import CalendarAdapter as CalendarAdapter
 from .drive import DRIVE_API as DRIVE_API
 from .drive import DRIVE_UPLOAD_API as DRIVE_UPLOAD_API
 from .drive import MAX_DOWNLOAD_BYTES as MAX_DOWNLOAD_BYTES

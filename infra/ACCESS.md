@@ -53,6 +53,8 @@ Other identities:
 | Cloud Storage service agent | `cryptoKeyEncrypterDecrypter` on key `archive` | present |
 | `tilo-deployer` (WIF, `refs/heads/main` only) | `run.developer` per service; `serviceAccountUser` per runtime SA; Artifact Registry writer on repo `tilo`. No project role, and `deployer_project_roles` stays `[]` for dev | present |
 | `tilo-cloudbuild` (Cloud Build, `cloudbuild.yaml` runs as it; P0-07g) | Five roles, 17 bindings, no key: `roles/artifactregistry.writer` on repo `tilo`; `roles/run.developer` on each of the seven services; `roles/iam.serviceAccountUser` on each of the seven runtime SAs (not tasks-invoker, gmail, deployer or itself); `roles/logging.logWriter` at project level (the only project role); `roles/storage.objectViewer` on bucket `<project>-cloudbuild-staging` | added |
+| `tilo-eval-scheduler` (Cloud Scheduler OAuth identity; EFF-05b) | One grant: `roles/run.invoker` on the Cloud Run job `tilo-eval-nightly` only (it includes `run.jobs.run`). No project role, no `serviceAccountUser`, used for nothing else | added |
+| `tilo-eval-runner` (runtime identity of the job `tilo-eval-nightly`; EFF-05b) | None. The replay reads files in its image and writes to its log; no secret, no live switch | added |
 
 Bucket `<project>-cloudbuild-staging` (P0-07g): source staging for
 `gcloud builds submit --gcs-source-staging-dir`. Regional (`asia-southeast1`),
@@ -74,6 +76,7 @@ output; the grants by `cloudbuild_grants`.
 | Scheduler `tilo-gmail-poll` (every 5 min) | `POST /internal/gmail/poll` on **harness** (polling fallback) | added |
 | Cloud Tasks queue `runs` | api to harness | present |
 | Scheduler `tilo-schedule-tick` (every minute, `* * * * *` UTC, `retry_count` 1) | `POST /internal/schedules/tick` on **harness**, OIDC as `tilo-schedule-scheduler`, audience = harness URL, no body, no query. ONE job for every user schedule (not one per user): the tick reads the due schedules from the store and fires each exactly once per slot (FR-AGT-14) | added |
+| Scheduler `tilo-eval-nightly` (daily 19:00 UTC) | OAuth `POST` to the Cloud Run Admin API `.../jobs/tilo-eval-nightly:run`: the replay smoke `python -m tilo_evals nightly` (parallelism 1, one task, 1 retry, 3600 s). Image from `evals/cloudbuild.yaml` (`just build-evals-image`) | added (EFF-05b) |
 | Scheduler job for the sweeper | PRD 6.3 | deferred: no sweeper endpoint exists; add with that ticket |
 
 Dependencies (none of these routes exist yet):

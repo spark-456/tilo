@@ -14,6 +14,7 @@ from ..errors import AdapterError as AdapterError
 from ..errors import ProviderUnavailable as ProviderUnavailable
 from ..errors import RateLimited as RateLimited
 from ..errors import SideEffectRefused as SideEffectRefused
+from ..errors import SyncTokenExpired as SyncTokenExpired
 
 MAX_ATTEMPTS = 3  # requests per HTTP call, the first one included
 
