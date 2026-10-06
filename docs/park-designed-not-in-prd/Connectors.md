@@ -10,5 +10,5 @@ Rows for plan section 8b (`docs/web-app-rebuild-plan.md`). AG-WEB folds them int
 | Disconnect and the access level (Read, Draft, Act) in the detail drawer | `getConnectors()` | Page-local: no Api call; the level and the disconnect last only while the page is open |
 | Sync now | none | Toast only ("Syncing <tool>..."); no Api call |
 | Monogram tiles instead of logos | `Connector.mono`, `Connector.col` | Decided: BQ-WEB-1, monograms stay |
-| Banner text "HubSpot sign-in expires in 3 days" | none (hard-coded, as in the design) | Shown while HubSpot is in the `attention` state; the "3 days" is not derived from data |
+| Banner text "HubSpot sign-in expires in 3 days" | the connector record (`bannerText` in `view.ts`: its `sync` text, first skill and scope) | Shown for any connector in the `attention` state; the "3 days" comes from the fixture `sync` text, not hard-coded. The reconnect toast's days come from `getConnectorTerms().reconnectDays` |
 | "Healthy" line in the drawer | `Connector.st`, `Connector.sync` | Static copy built from the sync text; no health check exists |
