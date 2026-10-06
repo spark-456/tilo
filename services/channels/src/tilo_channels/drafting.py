@@ -64,7 +64,7 @@ class ReplyTargetMoved(Exception):
 class Draft:
     artifact_id: str
     version: int
-    thread_id: str
+    thread_id: str | None
     mode: str
     to: tuple[str, ...]
     cc: tuple[str, ...]
