@@ -16,7 +16,8 @@ const proto = loadPrototypeData();
 // contains. A lane that needs another additive member adds one entry here and one in
 // scripts/park-fixtures.mjs; drift in any other property of the prototype's data still fails.
 const ADDITIVE_PATHS: Record<string, readonly string[]> = {
-  decisions: ["[].toast", "[].approvedTitle"],
+  decisions: ["[].toast", "[].approvedTitle", "[].facts"],
+  agenda: ["rules"],
 };
 const ADDITIVE_VALUES: readonly (readonly [
   member: string,
@@ -87,7 +88,53 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
     "TIERS",
     "LEVELS",
   ] as const)("WEB_1a_fixtures_match_prototype %s is identical to the prototype", (name) => {
-    expect(norm(fx[name]), `fixtures.${name} differs from tilo-app.js`).toEqual(norm(proto[name]));
+    expect(
+      norm(withoutAdditive(name, fx[name])),
+      `fixtures.${name} differs from tilo-app.js`,
+    ).toEqual(norm(proto[name]));
+  });
+
+  it("WEB_9c_fixtures_additive_fields_are_the_only_difference", () => {
+    // additive.ts adds `Agenda.rules` and `Decision.facts`; the identical-to-prototype checks strip exactly
+    // the ADDITIVE_PATHS and still fail on any other drift. Here: the additions exist and nothing else is extra.
+    expect(fx.agenda.rules).toBeDefined();
+    expect(fx.decisions.every((d) => d.facts !== undefined)).toBe(true);
+    expect(Object.keys(fx.agenda).filter((k) => !(k in (proto.agenda as object)))).toEqual([
+      "rules",
+    ]);
+  });
+
+  it("WEB_9c_fixtures_agenda_rules_hold_the_designed_agenda_page_copy", () => {
+    // The rules' display strings are pinned to the Agenda reference page (`design/Tilo App Agenda.dc.html`).
+    const reference = fs.readFileSync(
+      path.join(HANDOFF_DIR, "design", "Tilo App Agenda.dc.html"),
+      "utf8",
+    );
+    const r = fx.agenda.rules;
+    if (r === undefined) throw new Error("fixtures.agenda.rules is missing");
+    const find = r.suggestions.find?.find;
+    const focus = r.suggestions.focus;
+    const copy = [
+      r.month,
+      r.dateLine,
+      r.boardSubs?.team,
+      r.suggestions.find?.label,
+      find?.title,
+      find?.sub,
+      find?.pin.title,
+      find?.pin.due,
+      find?.pin.noteAfter,
+      focus?.label,
+      focus?.toast,
+      focus?.accepted?.title,
+      focus?.accepted?.note,
+      focus?.accepted?.due,
+      r.briefRewrites[0]?.text,
+    ];
+    for (const text of copy) {
+      expect(text, "an agenda rule string is missing").toBeTruthy();
+      expect(reference, `the Agenda reference page has "${text}"`).toContain(text as string);
+    }
   });
 
   it("WEB_1a_fixtures_match_prototype decisions: the prototype's own data is identical, only the listed paths are extra", () => {
@@ -104,7 +151,7 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
       expect(reference, `the reference shell has "${want}"`).toContain(want);
     }
     // no extra key outside the listed ones: stripping them leaves exactly the prototype's keys (the test above)
-    expect(Object.keys(ADDITIVE_PATHS)).toEqual(["decisions"]);
+    expect(Object.keys(ADDITIVE_PATHS)).toEqual(["decisions", "agenda"]);
   });
 
   it("WEB_1a_fixtures_match_prototype the merged final state is what is transcribed (skills, ledger, team)", () => {

@@ -12,9 +12,11 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   world: Placeholder,
   // biome-ignore format: the registry keeps one line per page
   skills: lazy(() => import("../pages/Skills/SkillsPage").then((m) => ({ default: m.SkillsPage }))),
-  ledger: Placeholder,
-  agenda: Placeholder,
+  ledger: lazy(() => import("../pages/Ledger/LedgerPage").then((m) => ({ default: m.LedgerPage }))),
+  agenda: lazy(() => import("../pages/Agenda/AgendaPage").then((m) => ({ default: m.AgendaPage }))),
   team: Placeholder,
   profile: Placeholder,
-  connectors: Placeholder,
+  connectors: lazy(() =>
+    import("../pages/Connectors/ConnectorsPage").then((m) => ({ default: m.ConnectorsPage })),
+  ),
 };
