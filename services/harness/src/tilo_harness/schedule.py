@@ -187,11 +187,13 @@ class RunStart:
 
 class StartSkipped(Exception):
     """A start that deliberately did nothing. `advance`: next_due moves to the first slot after the one skipped (retry
-    next week); otherwise the slot stays and is retried after the backoff. `code` is a short fixed code, never text."""
+    next week); otherwise the slot stays and is retried after the backoff. `code` is a short fixed code, never text.
+    `count=False` is for a condition of the whole service, not of one schedule: the claim is released and NOTHING is
+    recorded (no failure, no backoff, no move), whatever `advance` says."""
 
-    def __init__(self, code: str, *, advance: bool = False) -> None:
+    def __init__(self, code: str, *, advance: bool = False, count: bool = True) -> None:
         super().__init__(code)
-        self.code, self.advance = code, advance
+        self.code, self.advance, self.count = code, advance, count
 
 
 GOOGLE_ISSUERS = frozenset({"https://accounts.google.com", "accounts.google.com"})  # exact, case-sensitive
@@ -296,6 +298,7 @@ class Ticker:
         ):  # NFR-24: a replay-only link starts nothing; the slot fires once when cleared
             return TickResult(0)
         fired = 0
+        uncounted: set[str] = set()  # fixed codes of uncounted skips, each logged once per tick
         for schedule in self._store.due(now, MAX_FIRES_PER_TICK)[:MAX_FIRES_PER_TICK]:
             if not schedule.enabled or schedule.next_due > now:  # never trust the store with either rule
                 continue
@@ -320,6 +323,12 @@ class Ticker:
                 )
                 world_id = self._starter.start(run)
             except StartSkipped as skip:  # a deliberate no-op: recorded, and may give the slot up until next week
+                if not skip.count:  # a global condition: nothing is recorded, the slot is claimable on the next tick
+                    if skip.code not in uncounted:
+                        uncounted.add(skip.code)
+                        log.warning("schedule starts skipped, not counted (%s)", skip.code)
+                    self._release(schedule.schedule_id, due)
+                    continue
                 log.info("schedule start skipped (%s)", skip.code)
                 after = next_slot(schedule.cadence, slot) if skip.advance and slot is not None else None
                 self._fail(schedule.schedule_id, due, skip.code, after)

@@ -256,7 +256,9 @@ class SchedApi:
     def starter(self, **over: Any) -> Any:
         from tilo_api import schedules  # noqa: PLC0415
 
-        kwargs = {"store": self.store, "schedules": self.schedules, "seams": self.seams(), "clock": self.clock}
+        kwargs = {"store": self.store, "schedules": self.schedules, "clock": self.clock}
+        if "seams" not in over:  # `seams=None` is the unwired case: it must not need wired seams to be built
+            kwargs["seams"] = self.seams()
         return schedules.ScheduleStarter(**{**kwargs, **over})
 
     # --- what a fired run left behind -----------------------------------------------------------
