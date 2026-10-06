@@ -29,5 +29,8 @@ branch | packages/providers/src/tilo_providers/vertex_smoke.py | classify | maps
 branch | services/connectors/src/tilo_connectors/handoff.py | _fence | picks a Markdown fence longer than any backtick run in granted text, so an excerpt cannot close its own fence; no word of the text is read
 branch | services/connectors/src/tilo_connectors/handoff.py | record | compares the stored prompt's hash and ids with the prepared ones (BH-07); the prompt text is never read
 branch | services/connectors/src/tilo_connectors/grants.py | _excerpt | cuts a granted text to the requested part and checks its hash and size (DG-04); compares task text with the owner's own request and the file, never with a literal
+branch | packages/memory/src/tilo_memory/artifacts.py | import_version | checks a bundled record's own fields (hash, size, media type, ids) against the bytes and the scope (FR-MEM-10); a task's words are never read
+branch | services/harness/src/tilo_harness/run_bundle.py | _stamp | validates that a bundle time string is a fixed-format timestamp; not task content
+branch | services/harness/src/tilo_harness/run_bundle.py | export_run | compares recorded artifact fields and the run's archive records with the event stream (FR-MEM-10); a task's words are never read
 branch | services/connectors/src/tilo_connectors/calendar_sync.py | _diff | PE-13/PE-21: compares a synced title with the stored copy of the same event so an unchanged title keeps its verdict and is not screened again; no word of the title is read
 branch | packages/providers/src/tilo_providers/model_armor_adapter.py | redact | scrubs the bearer token and credentials (ya29./AIza) from provider and error text; never task text
