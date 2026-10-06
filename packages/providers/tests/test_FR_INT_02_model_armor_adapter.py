@@ -469,9 +469,12 @@ def test_FR_INT_02_model_armor_no_match_with_success_is_clean():
     assert provider.check("clean") == {"flagged": False, "reason": None}
 
 
-def test_FR_INT_02_model_armor_no_match_without_filter_detail_but_success_is_clean():
+def test_FR_INT_02_model_armor_no_match_without_filter_detail_raises_even_with_success():
+    """Fix pass: stricter than the first version (which called this clean). Google's REST omits default
+    enums, so a result with no filterResults proves nothing ran."""
     provider, _ = _provider(lambda request: _json(_body("NO_MATCH_FOUND", "SUCCESS")))
-    assert provider.check("clean") == {"flagged": False, "reason": None}
+    with pytest.raises(ProviderError):
+        provider.check("clean")
 
 
 def _skipped(key: str, detail: dict[str, Any]) -> dict[str, Any]:
@@ -538,7 +541,8 @@ _EXECUTIONS = ["EXECUTION_SUCCESS", "EXECUTION_SKIPPED"]
     executions=st.lists(st.sampled_from(_EXECUTIONS), min_size=0, max_size=3),
 )
 def test_FR_INT_02_model_armor_never_passes_unless_no_match_success_and_every_filter_ran(state, invocation, executions):
-    """Invariant: `flagged: False` only for NO_MATCH_FOUND + SUCCESS + all filters EXECUTION_SUCCESS;
+    """Invariant: `flagged: False` only for NO_MATCH_FOUND + SUCCESS + `pi_and_jailbreak` present and every
+    filter entry EXECUTION_SUCCESS (at least one entry, so an empty filterResults raises);
     MATCH_FOUND is always flagged; every other shape raises (fail closed)."""
     shapes = [_pi, _sdp, _rai]
     filters = {
@@ -552,7 +556,12 @@ def test_FR_INT_02_model_armor_never_passes_unless_no_match_success_and_every_fi
         result = provider.check("x")
         assert result["flagged"] is True
         assert result["reason"] in SAFETY_REASON_CATEGORIES
-    elif state == "NO_MATCH_FOUND" and invocation == "SUCCESS" and all(e == "EXECUTION_SUCCESS" for e in executions):
+    elif (
+        state == "NO_MATCH_FOUND"
+        and invocation == "SUCCESS"
+        and len(executions) >= 1  # pi_and_jailbreak is the first filter built
+        and all(e == "EXECUTION_SUCCESS" for e in executions)
+    ):
         assert provider.check("x") == {"flagged": False, "reason": None}
     else:
         with pytest.raises(ProviderError):
@@ -868,7 +877,7 @@ def test_FR_INT_02_models_yaml_safety_primary_is_model_armor():
     models = _yaml("config/models.yaml")
 
     safety = models["roles"]["safety"]
-    assert safety == {"primary": "armor-default", "fallback": "armor-default"}
+    assert safety == {"primary": "armor-default", "fallback": "armor-default", "max_input_tokens": 65536}
     assert models["profiles"]["armor-default"] == {
         "provider": "model_armor",
         "model": "tilo-default",
@@ -935,3 +944,240 @@ def test_FR_INT_02_model_armor_host_appears_only_in_the_provider_layer_config_in
     assert offenders == [], (
         f"FR-INT-02/PL-01: 'modelarmor' outside the provider layer, config, infra and docs: {offenders}"
     )
+
+
+# --- fix pass: strict "ran" rule, EFF-03 cap, header and parse hardening -------------------------
+
+
+def _no_match(filters: Any) -> dict[str, Any]:
+    return {
+        "sanitizationResult": {
+            "filterMatchState": "NO_MATCH_FOUND",
+            "invocationResult": "SUCCESS",
+            "filterResults": filters,
+        }
+    }
+
+
+def _with_filter(key: str, detail: Any) -> dict[str, Any]:
+    filters = _clean_filters()
+    filters[key] = detail
+    return _no_match(filters)
+
+
+_NOT_PROVEN_TO_RUN: list[tuple[str, Any]] = [
+    ("filter entry without executionState", _with_filter("rai", {"raiFilterResult": {"matchState": "NO_MATCH_FOUND"}})),
+    ("pi entry without executionState", _with_filter("pi_and_jailbreak", {"piAndJailbreakFilterResult": {}})),
+    ("empty filter entry", _with_filter("sdp", {})),
+    ("filterResults as a string", _no_match("everything ran")),
+    ("filterResults as a list", _no_match([_pi()])),
+    ("empty filterResults", _no_match({})),
+    ("missing pi_and_jailbreak", _no_match({"sdp": _sdp(), "rai": _rai(), "csam": _csam()})),
+    ("executionState of the wrong type", _with_filter("rai", {"raiFilterResult": {"executionState": True}})),
+]
+
+
+@pytest.mark.parametrize(("label", "body"), _NOT_PROVEN_TO_RUN, ids=[label for label, _ in _NOT_PROVEN_TO_RUN])
+def test_FR_INT_02_model_armor_a_filter_not_proven_to_have_run_raises(label, body):
+    provider, _ = _provider(lambda request: _json(body))
+    with pytest.raises(ProviderError):
+        provider.check("hello")
+
+
+def test_FR_INT_02_model_armor_a_nested_match_under_an_overall_no_match_is_flagged():
+    body = _with_filter("sdp", _sdp("MATCH_FOUND"))
+    assert body["sanitizationResult"]["filterMatchState"] == "NO_MATCH_FOUND"
+    provider, _ = _provider(lambda request: _json(body))
+    assert provider.check("my card") == {"flagged": True, "reason": "sensitive_data"}
+
+
+def test_FR_INT_02_model_armor_a_match_in_an_unknown_filter_is_flagged_as_other():
+    unknown = {"maliciousUriFilterResult": {"executionState": "EXECUTION_SUCCESS", "matchState": "MATCH_FOUND"}}
+    provider, _ = _provider(lambda request: _json(_with_filter("malicious_uris", unknown)))
+    assert provider.check("x") == {"flagged": True, "reason": "other"}
+
+
+# EFF-03: the input cap
+
+
+def test_FR_INT_02_model_armor_oversize_text_is_refused_with_no_request():
+    provider, calls = _provider(max_input_tokens=100)
+    with pytest.raises(RequestError):
+        provider.check("x" * 301)  # ceil(301 / 3) = 101 estimated tokens
+    assert calls.requests == []
+
+
+def test_FR_INT_02_model_armor_oversize_file_is_refused_with_no_request():
+    provider, calls = _provider(max_input_tokens=100)
+    with pytest.raises(RequestError):
+        provider.check("", content=b"\x00" * 301, mime_type="image/png")
+    assert calls.requests == []
+
+
+def test_FR_INT_02_model_armor_text_plus_file_share_one_cap_and_multibyte_text_counts_bytes():
+    provider, calls = _provider(max_input_tokens=100)
+    with pytest.raises(RequestError):
+        provider.check("x" * 150, content=b"\x00" * 151, mime_type="application/pdf")
+    with pytest.raises(RequestError):
+        provider.check("\u20ac" * 101)  # 303 UTF-8 bytes
+    assert calls.requests == []
+
+
+def test_FR_INT_02_model_armor_input_at_the_cap_is_screened():
+    provider, calls = _provider(max_input_tokens=100)
+    assert provider.check("x" * 300) == {"flagged": False, "reason": None}
+    assert len(calls.requests) == 1
+
+
+def _armor_config_with_cap(tmp_path, cap: int | None):
+    models = {
+        "example": True,
+        "profiles": {
+            "armor-default": {"provider": "model_armor", "model": TEMPLATE, "context": 1_000_000, "caps": []},
+        },
+        "roles": {"safety": {"primary": "armor-default", "fallback": "armor-default"}},
+        "rules": {"deny": []},
+    }
+    if cap is not None:
+        models["roles"]["safety"]["max_input_tokens"] = cap
+    prices = prices_config_for({"armor-default": (0.0, 0.0)})
+    return load_providers_config(*write_providers_config(tmp_path, models, prices))
+
+
+def test_FR_INT_02_replay_oversize_request_raises_before_the_recording_lookup(tmp_path, monkeypatch):
+    _forbid_adapter_construction(monkeypatch)
+    fixtures = tmp_path / "fixtures"
+    big = "y" * 3001
+    _write_recording(fixtures, big, {"flagged": False, "reason": None})  # a recording exists, and must not be served
+    provider = build_safety_provider(_armor_config_with_cap(tmp_path, 1000), fixtures_dir=fixtures)
+
+    with pytest.raises(RequestError):
+        provider.check(big)
+    with pytest.raises(RequestError):
+        provider.check("", content=b"\x89" * 3001, mime_type="image/png")  # also not a ReplayMissError
+
+
+def test_FR_INT_02_live_oversize_request_makes_no_call_and_passes_the_cap_to_the_adapter(tmp_path, monkeypatch):
+    calls, constructed = _Calls(), []
+    _wire_adapter(monkeypatch, lambda request: _json(_clean()), calls, constructed)
+    monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", PROJECT)
+    provider = build_safety_provider(_armor_config_with_cap(tmp_path, 1000), fixtures_dir=tmp_path / "fixtures")
+
+    with pytest.raises(RequestError):
+        provider.check("z" * 3001)
+    assert calls.requests == []
+    provider.check("z" * 3000)
+    assert constructed[0]["max_input_tokens"] == 1000
+    assert len(calls.requests) == 1
+
+
+# hardening folded into the fix pass
+
+
+def test_FR_INT_02_model_armor_a_response_with_a_duplicate_key_raises():
+    raw = (
+        b'{"sanitizationResult": {"filterMatchState": "MATCH_FOUND", "filterMatchState": "NO_MATCH_FOUND",'
+        b' "invocationResult": "SUCCESS", "filterResults": {}}}'
+    )
+    provider, _ = _provider(lambda request: httpx.Response(200, content=raw))
+    with pytest.raises(ProviderError, match="duplicate key"):
+        provider.check("hello")
+
+
+@pytest.mark.parametrize("status", [201, 202, 204, 206, 301, 302, 307])
+def test_FR_INT_02_model_armor_only_http_200_is_a_verdict(status):
+    provider, _ = _provider(
+        lambda request: httpx.Response(status, json=_clean(), headers={"location": "https://x.example/"})
+    )
+    with pytest.raises(ProviderError):
+        provider.check("hello")
+
+
+@pytest.mark.parametrize("exc_type", [httpx.ReadTimeout, httpx.ConnectError])
+def test_FR_INT_02_model_armor_transport_error_carries_no_token_in_context_or_cause(exc_type):
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise exc_type(f"boom {TOKEN}", request=request)
+
+    provider, _ = _provider(handler)
+    with pytest.raises(RetryableError) as excinfo:
+        provider.check("hello")
+    error = excinfo.value
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert TOKEN not in "".join(traceback.format_exception(error))
+
+
+@pytest.mark.parametrize(
+    "bad", ["", "has space", "tab\there", "line\nbreak", "caf\u00e9", "a\x7fb", "ya29.\r\nX-Evil: 1"]
+)
+def test_FR_INT_02_model_armor_a_token_outside_visible_ascii_raises_without_echoing_it(bad):
+    provider, calls = _provider(token=bad)
+    with pytest.raises(ProviderError) as excinfo:
+        provider.check("hello")
+    assert calls.requests == []
+    assert bad == "" or bad not in str(excinfo.value)
+
+
+def test_FR_INT_02_model_armor_a_failing_token_provider_raises_a_provider_error_without_context():
+    def failing() -> str:
+        raise RuntimeError(f"cannot refresh {TOKEN}")
+
+    provider, calls = _provider(token=failing)
+    with pytest.raises(ProviderError) as excinfo:
+        provider.check("hello")
+    assert calls.requests == []
+    assert TOKEN not in "".join(traceback.format_exception(excinfo.value))
+
+
+def test_FR_INT_02_model_armor_ignores_proxy_environment(monkeypatch):
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
+    monkeypatch.setenv("ALL_PROXY", "http://127.0.0.1:9")
+    provider, calls = _provider()
+    assert provider.check("hello") == {"flagged": False, "reason": None}
+    assert provider._client._trust_env is False
+
+
+def test_FR_INT_02_model_armor_redact_also_removes_google_tokens_it_did_not_send():
+    provider, _ = _provider()
+    other = "ya29." + "someOtherToken" + "".join(str(n) for n in range(9))
+    assert other not in provider.redact(f"seen {other} in a log")
+
+
+def test_FR_INT_02_model_armor_sends_the_credentials_quota_project_header():
+    class Tokens:
+        quota_project_id = "billing-proj-123"
+
+        def __call__(self) -> str:
+            return TOKEN
+
+    provider, calls = _provider(token=Tokens())
+    provider.check("hello")
+    assert calls.requests[0].headers["x-goog-user-project"] == "billing-proj-123"
+    plain, plain_calls = _provider()
+    plain.check("hello")
+    assert "x-goog-user-project" not in plain_calls.requests[0].headers
+
+
+def test_FR_INT_02_model_armor_a_bad_quota_project_raises_before_any_request():
+    class Tokens:
+        quota_project_id = "evil\r\nX: 1"
+
+        def __call__(self) -> str:
+            return TOKEN
+
+    provider, calls = _provider(token=Tokens())
+    with pytest.raises(ProviderError):
+        provider.check("hello")
+    assert calls.requests == []
+
+
+@pytest.mark.parametrize("text", ["", "   ", "\n"])
+def test_FR_INT_02_model_armor_empty_input_without_a_file_is_clean_with_no_call(text):
+    provider, calls = _provider()
+    result = provider.check(text)
+    if text == "":
+        assert result == {"flagged": False, "reason": None}
+        assert calls.requests == []
+    else:  # whitespace is still text: it is screened, not skipped
+        assert len(calls.requests) == 1

@@ -48,7 +48,9 @@ roles:
   # issue #272 (b): the live scenario generator (evals/generator.yaml caps its spend) and its autorater.
   generator: { primary: flash-38, fallback: flash-37, thinking: low }
   autorater: { primary: flash-37, fallback: lite-31 }
-  safety: { primary: armor-default, fallback: armor-default } # screens use the primary only; never a weaker fallback
+  # EFF-03: 65536 is Model Armor's own per-request limit for the prompt-injection, RAI and CSAM filters
+  # (https://docs.cloud.google.com/model-armor/quotas, read 2026-10-06); the screen refuses a larger input.
+  safety: { primary: armor-default, fallback: armor-default, max_input_tokens: 65536 } # primary only; never a weaker fallback
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]

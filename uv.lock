@@ -1643,6 +1643,7 @@ name = "tilo-providers"
 version = "0.1.0"
 source = { editable = "packages/providers" }
 dependencies = [
+    { name = "google-auth", extra = ["requests"] },
     { name = "google-genai" },
     { name = "httpx" },
     { name = "jsonschema" },
@@ -1651,6 +1652,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "google-auth", extras = ["requests"], specifier = ">=2.0" },
     { name = "google-genai", specifier = ">=1.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.18" },

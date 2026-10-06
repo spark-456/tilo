@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import tempfile
@@ -24,7 +25,7 @@ from typing import Any
 from tilo_contracts import ProvidersProfile
 
 from tilo_providers.config import ProviderConfigError, ProvidersConfig
-from tilo_providers.errors import ProviderError
+from tilo_providers.errors import ProviderError, RequestError
 from tilo_providers.interfaces import NATIVE_MIME_TYPES, SafetyProvider, SafetyResult, native_mime_type
 from tilo_providers.replay import ReplayMissError, is_live_mode, redact_strings
 
@@ -46,6 +47,18 @@ _INJECTION_MARKERS = (  # FakeSafetyProvider only: a fixed, case-insensitive phr
     "disregard previous instructions",
     "ignore the above instructions",
 )
+
+
+def estimate_safety_tokens(text: str, content: bytes | None = None) -> int:
+    """A deliberately high token estimate (about one token per 3 bytes, text plus file): errs toward refusing."""
+    return math.ceil(len(text.encode("utf-8")) / 3) + (math.ceil(len(content) / 3) if content is not None else 0)
+
+
+def enforce_input_cap(text: str, content: bytes | None, max_input_tokens: int | None) -> None:
+    """EFF-03: an input over the role's `max_input_tokens` is refused before any lookup or request, never sent
+    or screened as clean (fails closed). `None` means the role sets no cap."""
+    if max_input_tokens is not None and estimate_safety_tokens(text, content) > max_input_tokens:
+        raise RequestError(f"EFF-03: the safety input is over the role's max_input_tokens cap of {max_input_tokens}")
 
 
 def as_safety_result(raw: Any) -> SafetyResult:
@@ -105,8 +118,14 @@ def safety_recording_key(
 
 class SafetyRecordReplayProvider(SafetyProvider):
     def __init__(
-        self, role: str, profile_id: str, live_factory: Callable[[], SafetyProvider], fixtures_dir: Path | str
+        self,
+        role: str,
+        profile_id: str,
+        live_factory: Callable[[], SafetyProvider],
+        fixtures_dir: Path | str,
+        max_input_tokens: int | None = None,
     ) -> None:
+        self._max_input_tokens = max_input_tokens
         self._role = role
         self._profile_id = profile_id
         self._live_factory = live_factory
@@ -121,6 +140,7 @@ class SafetyRecordReplayProvider(SafetyProvider):
             return self._live_provider
 
     def _check(self, text: str, *, content: bytes | None, mime_type: str | None) -> SafetyResult:
+        enforce_input_cap(text, content, self._max_input_tokens)  # EFF-03: before the lookup, replay or live
         native = mime_type  # already gated and normalised by SafetyProvider.check
         key = safety_recording_key(self._role, self._profile_id, text, content=content, mime_type=native)
         path = self._recordings_dir / f"{key}.json"
@@ -203,13 +223,15 @@ def build_safety_provider(config: ProvidersConfig, *, fixtures_dir: Path | str) 
     if profile.provider not in _LIVE_SAFETY_PROVIDERS:
         raise ProviderConfigError(f"FR-INT-02: unknown safety provider {profile.provider!r} for {profile_id!r}")
 
+    cap = config.roles[SAFETY_ROLE].max_input_tokens
+
     def live_factory() -> SafetyProvider:
-        return _build_live_safety_provider(profile, profile_id)
+        return _build_live_safety_provider(profile, profile_id, cap)
 
-    return SafetyRecordReplayProvider(SAFETY_ROLE, profile_id, live_factory, fixtures_dir)
+    return SafetyRecordReplayProvider(SAFETY_ROLE, profile_id, live_factory, fixtures_dir, cap)
 
 
-def _build_live_safety_provider(profile: ProvidersProfile, profile_id: str) -> SafetyProvider:
+def _build_live_safety_provider(profile: ProvidersProfile, profile_id: str, cap: int | None) -> SafetyProvider:
     """The live Model Armor adapter: the profile's `model` is the template id, the project is
     `GOOGLE_CLOUD_PROJECT` and the location `TILO_MODEL_ARMOR_LOCATION` (default asia-southeast1)."""
     project = os.environ.get("GOOGLE_CLOUD_PROJECT")
@@ -219,5 +241,5 @@ def _build_live_safety_provider(profile: ProvidersProfile, profile_id: str) -> S
     from tilo_providers import model_armor_adapter  # noqa: PLC0415  (lazy: replay never loads it)
 
     return model_armor_adapter.ModelArmorSafetyProvider(
-        profile_id=profile_id, template_id=profile.model, project=project, location=location
+        profile_id=profile_id, template_id=profile.model, project=project, location=location, max_input_tokens=cap
     )

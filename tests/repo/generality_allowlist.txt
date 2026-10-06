@@ -29,3 +29,4 @@ branch | packages/providers/src/tilo_providers/vertex_smoke.py | classify | maps
 branch | services/connectors/src/tilo_connectors/handoff.py | _fence | picks a Markdown fence longer than any backtick run in granted text, so an excerpt cannot close its own fence; no word of the text is read
 branch | services/connectors/src/tilo_connectors/handoff.py | record | compares the stored prompt's hash and ids with the prepared ones (BH-07); the prompt text is never read
 branch | services/connectors/src/tilo_connectors/grants.py | _excerpt | cuts a granted text to the requested part and checks its hash and size (DG-04); compares task text with the owner's own request and the file, never with a literal
+branch | packages/providers/src/tilo_providers/model_armor_adapter.py | redact | scrubs the bearer token and credentials (ya29./AIza) from provider and error text; never task text
