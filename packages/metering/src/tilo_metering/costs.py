@@ -10,9 +10,9 @@ the same report.
 from __future__ import annotations
 
 import math
-import os
 import re
 from collections.abc import Callable, Iterable, Mapping
+from pathlib import Path
 from typing import Any, NamedTuple
 
 from .prices import PriceBook
@@ -102,7 +102,7 @@ def _row(runs: set[str], amounts: list[float], credit_usd: float) -> dict[str, A
     }
 
 
-def load_credit_usd(path: str | os.PathLike[str]) -> float:
+def load_credit_usd(path: str | Path) -> float:
     """US$ per credit from a prices file (FR-MTR-01): the one place callers of `cost_report` get it from.
     Raises `MeteringConfigError` when the file is unreadable or invalid."""
     return PriceBook.load(path).credit_usd
