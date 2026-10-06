@@ -5,7 +5,7 @@ The Park City web app (design handoff of 6 Oct 2026, `docs/web-app-rebuild-plan.
 old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures and the `api/` layer.
 
 ## Contracts
-- `api/index.ts`: `Api` (20 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`.
+- `api/index.ts`: `Api` (23 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`.
   `parkApi(env)` (`api/select.ts`): no `VITE_TILO_API_URL` = fixture Api (`source: "fixture"`), a url =
   live Api, whose methods reject with `NotBuilt` until each endpoint exists. Never sample data as live.
 - `api/fixtures/`: the prototype's data, typed (`api/types.ts`). `worlds.ts` and `index.ts` are
