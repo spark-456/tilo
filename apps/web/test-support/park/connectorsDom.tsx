@@ -3,7 +3,7 @@
 // `stubApp`, an Api spy wrapper and DOM queries (happy-dom; the repo has no @testing-library). Same pattern as
 // teamHarness.ts. Lives here, not in the page folder, because park.static.test.ts reads page folder files as
 // park code (which may import nothing from outside park). No timers: the scheduler is the injected fake.
-import { type ReactElement, act, createElement } from "react";
+import { type ReactElement, act } from "react";
 import { type Mock, vi } from "vitest";
 import { createFixtureApi } from "../../src/park/api/fixtureApi";
 import { API_METHODS, type Api, type ApiMethod } from "../../src/park/api/index";
@@ -48,14 +48,12 @@ export async function renderPage(
   time: "day" | "night" = "day",
 ): Promise<Rendered> {
   const sch = fakeScheduler();
-  const tree: ReactElement = createElement(
-    ParkProvider,
-    { api, schedule: sch.schedule, viewport: { vw: app.vw, vh: app.vh } },
-    createElement(
-      "div",
-      { "data-park": "", "data-time": time },
-      createElement(ConnectorsPage, { app }),
-    ),
+  const tree: ReactElement = (
+    <ParkProvider api={api} schedule={sch.schedule} viewport={{ vw: app.vw, vh: app.vh }}>
+      <div data-park="" data-time={time}>
+        <ConnectorsPage app={app} />
+      </div>
+    </ParkProvider>
   );
   const m = mount(tree);
   // The page loads its data on mount; let that settle inside act so no update lands outside it.
