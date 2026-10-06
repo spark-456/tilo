@@ -29,12 +29,12 @@ The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `Search
 - Adapters map SDK/HTTP errors onto `tilo_providers.errors`; `json_mode`/`.response_schema` map to `response_mime_type`/
   `response_schema` (google) or `response_format` (openai_compat). `openai_compat_adapter` rejects a dirty API key (names the
   env var, never the value); `base_url` must be `https://` (loopback `http://` ok).
-- The `LIVE=1` gate lives in every adapter and `RecordReplayProvider`; only an injected `client=`/`transport=` is exempt.
+- The `LIVE=1` gate lives in every adapter and `RecordReplayProvider`; only an injected `client=`/`transport=` or `live_permitted=True` (SEC-15, `Router`/`build_provider`, default False, never from env, never records) is exempt.
 - `redact(text)` (default no-op) scrubs a provider's own secret before a recording is written (`replay.redact_strings`).
 - `safety` (CC-SP-47, FR-INT-02, BQ-68): `check()` returns `{flagged, reason}`; adapters implement `_check`, `check` gates the media
   type (`content=`/`mime_type=`: PDF/PNG/JPEG only, else `RequestError`, fail closed). `build_safety_provider` reads only the
   primary, never a fallback: `fake` -> `FakeSafetyProvider` (refused if `LIVE=1` or `K_SERVICE`/`CLOUD_RUN_JOB` is set at all),
-  `model_armor` -> `SafetyRecordReplayProvider` (live stub refuses); reasons are fixed categories, writes atomic, corrupt -> `ProviderError`.
+  `model_armor` -> `SafetyRecordReplayProvider`, live `model_armor_adapter` (REST `:sanitizeUserPrompt`, ADC bearer, `model`=template id, env `GOOGLE_CLOUD_PROJECT`/`TILO_MODEL_ARMOR_LOCATION`; clean only on NO_MATCH+SUCCESS+every filter ran, else raises; `max_input_tokens` cap -> `RequestError`); reasons are fixed categories, writes atomic, corrupt -> `ProviderError`.
 - `Router._candidate` is the one choke point for every candidate touch (build, count_tokens, calls, first chunk): `RequestError`/
   stream-embed `SafetyError` raise (generate: `safety_blocked`), mid-stream -> `StreamInterruptedError`, anything else falls back
   (over budget: never sent). Only `RouterError`s leave, with `.attempts` and `__cause__`.

@@ -267,3 +267,12 @@ Option A, chosen by the user on 2026-10-05. The tickets run in this order. Each 
   redactor leaves unchanged, or the unit fails.
 - Until T4, tilo-api passes no store: `_GatedRunner` drops `outputs` (as before T3), and refs
   without a store pass unchecked as before. A harness run with outputs and no store fails the unit.
+
+## T4 notes (tilo-api on the store, 2026-10-06; defaults in BQ-AGT02-T4-1 and -2)
+- `run_plan` refuses a `scope` whose org or world is not the writer's (`writer.org_id`, `writer.world_id`), before
+  anything is written. Refs and parents must be versions the world recorded (`writer.recorded_version`, EV-15).
+- Every refusal known before a put (kind, size, parent, a dry run of the manifest) is checked for every output before
+  the first put (#393); a corrupt blob re-keys only its own output (T3 re-keyed all). There is no purge, so a refusal
+  only the store sees can still leave an unannounced version.
+- tilo-api's gate runs after the announce, in `run_plan(before_handoff=)`: `_GatedRunner` and `Run.foreign` are gone.
+  Production artifact, redactor and archive seams refuse (no run starts) until T8 and FR-MEM-05; dev mode is in memory.

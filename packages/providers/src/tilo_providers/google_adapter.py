@@ -67,6 +67,12 @@ def validate_google_settings(project: str, location: str, environ: Mapping[str, 
         )
     if not _PROJECT_RE.fullmatch(project):
         raise GoogleSettingsError("project_invalid", "GOOGLE_CLOUD_PROJECT is not a valid project id")
+    refuse_service_account_key(environ)
+
+
+def refuse_service_account_key(environ: Mapping[str, str] | None = None) -> None:
+    """Refuses a service-account key file as ADC (user ADC only); shared with the Model Armor adapter."""
+    environ = os.environ if environ is None else environ
     explicit = environ.get(_CREDENTIALS_VAR)
     path = explicit or _well_known_adc_path(environ)  # ADC reads the variable's file, else gcloud's well-known one
     try:
@@ -104,6 +110,7 @@ class GoogleModelProvider(ModelProvider):
         location: str,
         client: Any | None = None,
         price: PriceQuote | None = None,
+        live_permitted: bool = False,
     ) -> None:
         self._profile = profile
         self._profile_id = profile_id
@@ -111,8 +118,9 @@ class GoogleModelProvider(ModelProvider):
         self._location = location
         self._price = price
         if client is None:
-            # EFF-01: reachable directly (not only via RecordReplayProvider).
-            if os.environ.get("LIVE") != "1":
+            # EFF-01: reachable directly (not only via RecordReplayProvider). `live_permitted` is the SEC-15
+            # injected permission (the deployed-judge path); it is never read from the environment.
+            if os.environ.get("LIVE") != "1" and not live_permitted:
                 raise ProviderError(
                     "PL-02/EFF-01: refusing to build a real network client without LIVE=1 (inject client= for tests)"
                 )

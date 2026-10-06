@@ -1,0 +1,16 @@
+[project]
+name = "tilo-people"
+version = "0.1.0"
+description = "tilo_people — people core: visibility oracle, write checks, name and due-date resolution, record stores (PPL-10)"
+requires-python = "==3.12.*"
+dependencies = ["tilo-policy", "tzdata>=2024.1"]
+
+[tool.uv.sources]
+tilo-policy = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tilo_people"]

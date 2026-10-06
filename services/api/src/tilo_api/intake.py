@@ -32,6 +32,7 @@ from tilo_planning.intake import (
 )
 from tilo_planning.refusal import RefusalConfigError, TaskRefused
 from tilo_planning.scenarios import ScenarioError, load_scenario
+from tilo_providers.config import ProviderConfigError
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
@@ -107,7 +108,7 @@ async def intake(
         result = await run_in_threadpool(submit_intake, request, safety=safety, store=store)
     except IntakeRejected as exc:
         return _rejected(exc.reason)
-    except (ProviderError, ReplayMissError) as exc:
+    except (ProviderError, ProviderConfigError, ReplayMissError) as exc:
         logger.warning("safety screen failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing was stored.") from exc
     task_id, task = create_task(tasks, result, extraction, scenario=scenario)

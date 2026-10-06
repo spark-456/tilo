@@ -30,6 +30,7 @@ _ADDRESS = re.compile(r"[^@\s,;:<>()\[\]\"\\]+@[^@\s,;:<>()\[\]\"\\]+")
 _MSG_ID = re.compile(r"<[^<>\s]+>")
 _MIME = re.compile(r"[A-Za-z0-9][\w.+-]*/[\w.+-]+")
 _RE_PREFIX = re.compile(r"^(\s*re\s*:\s*)+", re.I)
+_KEPT_HEADERS = ("message-id", "in-reply-to", "references", "authentication-results")  # what channels reads
 _CHARSET = re.compile(r"charset=\"?([\w.:-]+)", re.I)
 _TOPIC = re.compile(r"projects/[a-z][a-z0-9.:-]{4,62}/topics/[A-Za-z][\w.~+%-]{2,254}")  # Pub/Sub resource names
 
@@ -309,6 +310,12 @@ def _message(resource: Mapping[str, Any]) -> dict[str, Any]:
     headers = _headers(payload)
     parts = list(_parts(payload))
     text = next((p for p in parts if p.get("mimeType") == "text/plain" and not p.get("filename")), None)
+    if text is not None and ((text.get("body") or {}).get("attachmentId") or "data" not in (text.get("body") or {})):
+        text = None  # its content is served separately (or absent): not text this message carries; it counts as "other"
+    # What the body is made of, so a reader can tell "no text part" (HTML-only) from "empty text": a leaf part that is
+    # neither the text part nor a named file (text/html, a second text/plain, an inline image) is "other".
+    leaves = [p for p in parts if not (str(p.get("mimeType", "")).startswith("multipart/") or p.get("parts"))]
+    other = [p for p in leaves if p is not text and not p.get("filename")]
     return {
         "id": str(resource.get("id", "")),
         "thread_id": str(resource.get("threadId", "")),
@@ -318,8 +325,13 @@ def _message(resource: Mapping[str, Any]) -> dict[str, Any]:
         "cc": _addresses(headers.get("cc", "")),
         "subject": headers.get("subject", ""),
         "message_id": headers.get("message-id", "").strip(),
+        # lower-case names, only those four, the first of a repeated name (Gmail writes its own Authentication-Results
+        # above any the sender wrote); the rest of the header block never leaves the adapter
+        "headers": {name: headers[name] for name in _KEPT_HEADERS if name in headers},
         "label_ids": [str(x) for x in resource.get("labelIds") or []],
         "body_text": _decoded(text) if text is not None else "",
         "attachments": [_attachment(p) for p in parts if p.get("filename")],
+        "has_text_part": text is not None,
+        "has_other_parts": bool(other),
         "untrusted": True,
     }

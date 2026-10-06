@@ -8,10 +8,17 @@ branch | packages/providers/src/tilo_providers/dev_director.py | _block | dev-on
 branch | packages/providers/src/tilo_providers/dev_director.py | _brief_reply | dev-only fake: takes an ISO date out of the task text and echoes the text; every task gets the same shape
 branch | packages/providers/src/tilo_providers/prompts.py | neutralise_marker | neutralises prompt block delimiters in untrusted text
 branch | packages/providers/src/tilo_providers/replay.py | _scrub_authorization_like | redacts credential-shaped strings from recordings (PRD 16.1 rule 4)
+branch | services/api/src/tilo_api/dev_run.py | dev_redact | dev-only stand-in for the shared secret redactor (FR-MEM-05, BQ-109); masks fixed secret shapes in synthetic text; no branch on task content
 branch | services/browser/src/tilo_browser/login.py | _asks_in_text | detects a page asking for a password or code, so the worker stops (Tilo never handles passwords)
 branch | services/browser/src/tilo_browser/masking.py | _mask | masks secrets in page text before it is stored or shown
 branch | services/browser/src/tilo_browser/masking.py | _mask_cards | masks Luhn-valid card numbers in page text
 branch | services/channels/src/tilo_channels/autopilot_t3.py | clean_text | strips control and format characters from message text
+# autopilot_t3 (FR-CHN-11, ADR-0013): the next three are one safety screen of message or draft text for the L2 gate. They match
+# fixed money, legal and commitment word families in untrusted text to decide whether a person must approve; none chooses what a run
+# does from the subject of a task, and a hit only makes the card wait for a person.
+branch | services/channels/src/tilo_channels/autopilot_t3.py | _prepare_cuts | marks line-break, space and time-of-day cuts in message or draft text; part of the safety screen above
+branch | services/channels/src/tilo_channels/autopilot_t3.py | _signal | runs the word families over the prepared message or draft text; part of the safety screen above
+branch | services/channels/src/tilo_channels/autopilot_t3.py | _word_hits | finds family words in the pieces of the message or draft text; part of the safety screen above
 branch | services/channels/src/tilo_channels/drafting_check.py | _obfuscations | finds direction controls and mixed-script words in model text (PRD 11.4 checks)
 branch | services/channels/src/tilo_channels/drafting_check.py | _read | reads contacts, numbers, dates and commitment words from a draft, to compare with its sources
 branch | services/channels/src/tilo_channels/links.py | _b64d | strict decoding of a signed link's parts
@@ -22,3 +29,4 @@ branch | packages/providers/src/tilo_providers/vertex_smoke.py | classify | maps
 branch | services/connectors/src/tilo_connectors/handoff.py | _fence | picks a Markdown fence longer than any backtick run in granted text, so an excerpt cannot close its own fence; no word of the text is read
 branch | services/connectors/src/tilo_connectors/handoff.py | record | compares the stored prompt's hash and ids with the prepared ones (BH-07); the prompt text is never read
 branch | services/connectors/src/tilo_connectors/grants.py | _excerpt | cuts a granted text to the requested part and checks its hash and size (DG-04); compares task text with the owner's own request and the file, never with a literal
+branch | packages/providers/src/tilo_providers/model_armor_adapter.py | redact | scrubs the bearer token and credentials (ya29./AIza) from provider and error text; never task text
