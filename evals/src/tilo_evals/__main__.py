@@ -2,6 +2,8 @@
 PRD 3.5; exit 0, or 2 when refused in a live or deployed environment or a case file is bad).
 `python -m tilo_evals run --pass smoke|full|gate [--group G] [--case ID]... [--results-md PATH]
 [--results-json PATH] [--live]` (EFF-07; PRD 19.5, 6.6). `just eval` runs the replay set.
+`python -m tilo_evals nightly [--idempotency-key K] [--results-md P] [--results-json P] [--poll-interval-s S]
+[--max-wait-s S] [--live]`: the smoke pass through the batch path (EFF-05; see `nightly.py`).
 
 Exit codes: 0 every case that ran passed; 1 at least one case failed; 2 the pass could not run (bad config or
 case file, an unknown --case or --group, `--live` refused); 3 the pass stopped at its credit cap with no failure
@@ -17,14 +19,27 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+from tilo_providers.batch import BatchProvider
 from tilo_providers.interfaces import ModelProvider, SafetyProvider
 
 from .cases import CaseError
 from .config import EvalsConfig, EvalsConfigError
+from .nightly import add_arguments as nightly_arguments
+from .nightly import run_nightly
 from .results import build_hash, merge_results_md, render_json, render_section, summary_text
 from .runner import PASS_KINDS, SelectionError, run_pass
 
 EXIT_OK, EXIT_FAILED, EXIT_ERROR, EXIT_PARTIAL = 0, 1, 2, 3
+
+
+def _positive(text: str) -> int:
+    try:
+        value = int(text)
+    except ValueError:
+        value = 0
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a positive integer")
+    return value
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -50,6 +65,12 @@ def _parser() -> argparse.ArgumentParser:
     metrics.add_argument("--cases-root", dest="cases_root", default="evals/cases")
     metrics.add_argument("--results-md", dest="results_md", default="evals/metrics.local.md")
     metrics.add_argument("--results-json", dest="results_json", default=None)
+    metrics.add_argument("--latency-n", dest="latency_n", type=_positive, default=3, help="samples per NFR measure")
+    lat = commands.add_parser("latency", help="NFR-02/03/05: Tilo's own latency overhead on fakes (PRD 17.1)")
+    lat.add_argument("--n", type=_positive, required=True, help="samples per measure (at least 1)")
+    lat.add_argument("--json", action="store_true", help="print the report as one JSON document")
+    nightly = commands.add_parser("nightly", help="the nightly smoke through the batch path (EFF-05)")
+    nightly_arguments(nightly)
     run = commands.add_parser("run", help="run an eval pass")
     run.add_argument("--pass", dest="pass_kind", choices=PASS_KINDS, required=True)
     run.add_argument("--group", default=None)
@@ -116,6 +137,18 @@ def _bank(args: argparse.Namespace) -> int:
     return EXIT_OK if passed == len(results) else EXIT_FAILED
 
 
+def _latency(args: argparse.Namespace) -> int:
+    from .latency import LatencyError, LatencyRefused, measure, text_lines  # noqa: PLC0415 (loads the services)
+
+    try:
+        report = measure(args.n)
+    except (LatencyRefused, LatencyError) as exc:
+        print(f"tilo_evals: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json else "\n".join(text_lines(report)))
+    return EXIT_OK
+
+
 def _metrics(args: argparse.Namespace) -> int:
     """Replays the case set (a full pass under the credit cap), runs the bank on fakes, writes the EV rows."""
     from tilo_metering.costs import load_credit_usd  # noqa: PLC0415 (the loader behind FR-MTR-10's cost_report)
@@ -125,6 +158,7 @@ def _metrics(args: argparse.Namespace) -> int:
     from .bank_report import run_bank  # noqa: PLC0415
     from .bank_run import BankRefused  # noqa: PLC0415
     from .cases import load_cases  # noqa: PLC0415
+    from .latency import LatencyError, LatencyRefused, measure  # noqa: PLC0415
     from .metrics import (  # noqa: PLC0415
         bank_measures,
         compute_metrics,
@@ -154,16 +188,26 @@ def _metrics(args: argparse.Namespace) -> int:
             else PassResult("full")
         )
         banked = run_bank([c for c in bank if not args.case_ids or c.id in args.case_ids])
-    except (EvalsConfigError, CaseError, SelectionError, BankError, BankRefused, MeteringConfigError) as exc:
+        latency = measure(args.latency_n)  # NFR-02/03/05 (PRD 17.1): local overhead on fakes, a table apart from EV
+    except (
+        EvalsConfigError,
+        CaseError,
+        SelectionError,
+        BankError,
+        BankRefused,
+        MeteringConfigError,
+        LatencyError,
+        LatencyRefused,
+    ) as exc:
         print(f"tilo_evals: {exc}", file=sys.stderr)
         return EXIT_ERROR
     records = [*records_from_pass(replayed), *records_from_bank(banked)]
     coverage = coverage_from([*(c.measures for c in replay), *(bank_measures(c) for c in bank)], records)
     rows = compute_metrics(records, credit_usd=credit_usd, coverage=coverage)
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    _write(Path(args.results_md), render_markdown(rows, build_hash=build_hash(), now_utc=now))
+    _write(Path(args.results_md), render_markdown(rows, build_hash=build_hash(), now_utc=now, latency=latency))
     if args.results_json:
-        _write(Path(args.results_json), json.dumps(rows_json(rows), indent=2, sort_keys=True))
+        _write(Path(args.results_json), json.dumps({**rows_json(rows), "latency": latency}, indent=2, sort_keys=True))
     ids = {s: {r.id for r in rows if r.status == s} for s in ("computed", "no_data", "needs_live_or_pilot")}
     print(
         f"metrics: {len(ids['computed'])} computed, {len(ids['no_data'])} no data, "
@@ -216,13 +260,18 @@ def main(
     environ: Mapping[str, str] | None = None,
     live_provider_factory: Callable[[str, str], ModelProvider] | None = None,
     safety: SafetyProvider | None = None,
+    batch_provider: BatchProvider | None = None,
 ) -> int:
-    """`environ`, `live_provider_factory` and `safety` are test seams used by `generate` only."""
+    """Test seams: `environ`, `live_provider_factory`, `safety` (`generate` only), `batch_provider` (`nightly` only)."""
     args = _parser().parse_args(argv)
+    if args.command == "nightly":
+        return run_nightly(args, batch_provider)
     if args.command == "generate":
         return _generate(args, environ, live_provider_factory, safety)
     if args.command == "metrics":
         return _metrics(args)
+    if args.command == "latency":
+        return _latency(args)
     return _bank(args) if args.command == "bank" else _run(args)
 
 

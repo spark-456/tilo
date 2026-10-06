@@ -213,7 +213,7 @@ def _line(r: Reader, text: str, owner: bool) -> tuple[str, bool]:
 def _speaker(r: Reader, directory: Directory, m: Mapping[str, Any], label: str) -> str | None:
     """A non-owner sees the display name of the attendee the label resolved to, only for themselves or a teammate."""
     user = next((a["user"] for a in m["attendees"] if a["name"] == label and a["user"]), None)
-    person = directory.record(user)
-    if person is None or (user != r.actor and not directory.teammates(r.actor, user, r.now)):
+    person = directory.record(user) if user is not None else None
+    if user is None or person is None or (user != r.actor and not directory.teammates(r.actor, user, r.now)):
         return None
     return clean_line(person["display_name"]) or None
