@@ -97,6 +97,10 @@ class SkillRegistry:
         """What the planner sees (PRD 8.2 Selection): (id, one-line description) per skill."""
         return sorted(self._descriptions.items())
 
+    def folder(self, skill_id: str) -> Path | None:
+        """The skill's folder, `<root>/<domain>/<skill-id>`, or None if it is not in the registry (FR-AGT-15)."""
+        return self._folders.get(skill_id)
+
     def load(self, skill_id: str) -> LoadedSkill:
         folder = self._folders.get(skill_id)
         if folder is None:

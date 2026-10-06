@@ -26,7 +26,7 @@ service the web client and channels write through; the client reads live state f
   Approve builds the scenario's policies and events first, then stores: the owner's own, one `policy.changed` each.
 - Team Lead console (FR-HIL-10, `tilo_api.console`): `GET /worlds/{id}/console`, `POST .../console/cards/{id}/answer`;
   role `team_lead` + an owner-assigned, schema-valid `config/teams.yaml` record; only its domain's questions (never on the
-  cards routes); same Pause-all guard as cards.
+  cards routes); same Pause-all guard as cards. Skill proposals (FR-AGT-15, `tilo_api.skill_proposals`, `tests/API_FR_AGT_15.md`): `/worlds/{id}/skill-proposals[/{pid}[/approve|reject]]`; the answering Lead promotes, another current Team Lead of the domain decides; never the owner as such.
 - CP2 flow (CL-INT-1, `tilo_api.tasks`): intake also returns the `brief` and `questions`; then `POST /tasks/{id}/answers`,
   `GET .../approaches`, `POST .../approve`. Principal required; another user's task is 404. `deps.get_safety` (the
   `safety` role, 503 without one) screens every typed string; models only via `deps.get_router`; one budget grant per
