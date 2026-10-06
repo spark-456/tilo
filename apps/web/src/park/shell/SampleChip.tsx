@@ -8,8 +8,19 @@ import { Popover, StatusChip } from "../components";
 export const SAMPLE_NOTE =
   "Northwind Ops is a fictional team. Amounts are examples (£), dates are September 2026.";
 
-export function SampleChip() {
+/** `ghost`: the same box, invisible and out of the accessibility tree, held where the chip will appear. */
+export function SampleChip({ ghost = false }: { ghost?: boolean }) {
   const [open, setOpen] = useState(false);
+  if (ghost) {
+    return (
+      <span aria-hidden="true" className="park-shell__sample park-shell__booting">
+        <StatusChip tone="neutral">
+          <span className="park-shell__sampledot" />
+          <span className="park-shell__samplelabel">Sample data</span>
+        </StatusChip>
+      </span>
+    );
+  }
   return (
     <>
       <button

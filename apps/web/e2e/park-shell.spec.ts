@@ -87,20 +87,29 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 
     test(`WEB_3a_e2e_${name}_the_design_fonts_are_declared_on_park_pages`, async ({ page }) => {
       await page.goto("/park/home");
-      const faces = await page.evaluate(() =>
-        [...document.fonts].map((f) => `${f.family.replace(/"/g, "")} ${f.weight}`),
-      );
+      // The faces are declared by the lazy park chunk's CSS: wait for the page, then poll the list.
+      await expect(page.getByRole("main")).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       // The design: Nunito 800 and 900 (display, logo) and Nunito Sans 400, 600, 700 and 800 (all UI text).
-      for (const face of [
+      const wanted = [
         "Nunito 800",
         "Nunito 900",
         "Nunito Sans 400",
         "Nunito Sans 600",
         "Nunito Sans 700",
         "Nunito Sans 800",
-      ]) {
-        expect(faces, face).toContain(face);
-      }
+      ];
+      await expect
+        .poll(
+          async () => {
+            const faces = await page.evaluate(() =>
+              [...document.fonts].map((f) => `${f.family.replace(/"/g, "")} ${f.weight}`),
+            );
+            return wanted.filter((face) => !faces.includes(face));
+          },
+          { message: "design faces still missing" },
+        )
+        .toEqual([]);
     });
 
     test(`WEB_3a_e2e_${name}_a_world_route_shows_its_id`, async ({ page }) => {

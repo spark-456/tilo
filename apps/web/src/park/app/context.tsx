@@ -30,6 +30,8 @@ export interface ParkProviderProps {
 interface Held {
   store: ParkStore;
   api: Api;
+  /** The default Api is the fixture one, so every page will read sample data (no injected Api, no url). */
+  expectsSample: boolean;
 }
 
 interface Viewport {
@@ -79,7 +81,7 @@ export function ParkProvider({ api, navigate, schedule, viewport, children }: Pa
       navigate: navigate ?? navigatePark,
       schedule: schedule ?? realSchedule,
     });
-    return { store, api: wrapped };
+    return { store, api: wrapped, expectsSample: api === undefined && !API_URL };
   });
   const [win, setWin] = useState(windowSize);
   useEffect(() => {
@@ -115,6 +117,9 @@ function useHeld(): Held {
 
 export const useParkStore = (): ParkStore => useHeld().store;
 export const useParkApi = (): Api => useHeld().api;
+
+/** True when the Sample data chip is going to show (the fixture Api is the default), so its place can be kept. */
+export const useExpectsSample = (): boolean => useHeld().expectsSample;
 
 /** For the city backdrop: where the three map pins sit on the scene (1600x1000). */
 export function useReportPins(): (pins: readonly Pin[]) => void {

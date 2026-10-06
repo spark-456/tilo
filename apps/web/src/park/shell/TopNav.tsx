@@ -30,6 +30,10 @@ export interface TopNavProps {
   unread: boolean;
   initials: string;
   sample: boolean;
+  /** The Api is the fixture one, so the chip is coming: keep its place so it moves nothing when it shows. */
+  reserveSample: boolean;
+  /** The boot splash is up: the nav is laid out but not shown. */
+  booting: boolean;
   /** Where the world loader has got to as a percentage, or null when no world is opening. */
   progress: number | null;
   go: (page: PageId) => void;
@@ -47,7 +51,7 @@ export function TopNav(p: TopNavProps) {
   const timeLabel = p.night ? "Switch to day" : "Switch to night";
   const ringed = p.menu === "acct" || p.page === "profile" || p.page === "connectors";
   return (
-    <header className="park-shell__nav">
+    <header className={`park-shell__nav ${p.booting ? "park-shell__booting" : ""}`}>
       <a
         href={parkPath("home")}
         aria-label="Tilo home"
@@ -82,7 +86,7 @@ export function TopNav(p: TopNavProps) {
         })}
       </nav>
       <div className="park-shell__tools">
-        {p.sample ? <SampleChip /> : null}
+        {p.sample ? <SampleChip /> : p.reserveSample ? <SampleChip ghost /> : null}
         <button
           type="button"
           aria-label={timeLabel}

@@ -8,12 +8,14 @@ import { icon } from "./kit";
 
 export interface AccountMenuProps {
   user: User | null;
+  /** Connectors that are on (connected or needing attention), or null until they have been read. */
+  connectorsOn: number | null;
   go: (page: PageId) => void;
   onSignOut: () => void;
   onClose: () => void;
 }
 
-export function AccountMenu({ user, go, onSignOut, onClose }: AccountMenuProps) {
+export function AccountMenu({ user, connectorsOn, go, onSignOut, onClose }: AccountMenuProps) {
   const items: MenuItem[] = [
     {
       id: "profile",
@@ -25,7 +27,7 @@ export function AccountMenu({ user, go, onSignOut, onClose }: AccountMenuProps) 
       id: "connectors",
       label: "Connectors",
       icon: icon("plug", 17),
-      hint: "6 on",
+      ...(connectorsOn === null ? {} : { hint: `${connectorsOn} on` }),
       onSelect: () => go("connectors"),
     },
     { id: "team", label: "Team and roles", icon: icon("people", 17), onSelect: () => go("team") },

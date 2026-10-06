@@ -5,6 +5,12 @@
    motion restore (BQ-WEB-3), which brings its own honesty-scan entry. Glass blur is on the nav only
    (README "Performance"). */
 
+/* Laid out but not shown: the shell under the boot splash, and the ghost that holds the chip's place.
+   Hidden elements are not painted, so nothing here can count as a layout shift when it appears. */
+[data-park] .park-shell__booting {
+  visibility: hidden;
+}
+
 /* ---- Page column ---- */
 [data-park] .park-shell__main {
   position: relative;
