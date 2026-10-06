@@ -13,6 +13,7 @@ import type {
   Dec,
   DecideAck,
   Decision,
+  DecisionFacts,
   DecisionKey,
   Learn,
   Ledger,
@@ -72,7 +73,17 @@ describe("WEB_1a_types: entity shapes follow the README data model", () => {
       | "activity"
     >();
     expectTypeOf<keyof Agenda>().toEqualTypeOf<
-      "days" | "wkend" | "today" | "start" | "end" | "now" | "events" | "slots" | "details" | "pins"
+      | "days"
+      | "wkend"
+      | "today"
+      | "start"
+      | "end"
+      | "now"
+      | "events"
+      | "slots"
+      | "details"
+      | "pins"
+      | "rules" // additive (WEB-9c), not in the prototype
     >();
   });
 
@@ -85,6 +96,7 @@ describe("WEB_1a_types: entity shapes follow the README data model", () => {
       yes: string;
       icon: string;
       done: string;
+      facts?: DecisionFacts; // additive (WEB-9c), not in the prototype
     }>();
   });
 

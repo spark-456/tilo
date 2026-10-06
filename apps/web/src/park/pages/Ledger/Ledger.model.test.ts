@@ -1,6 +1,8 @@
 // WEB-7 Ledger model: the reference's arithmetic (Tilo App Ledger.dc.html renderVals) as pure functions.
 import { describe, expect, it } from "vitest";
+import { decisions } from "../../api/fixtures";
 import { ledger } from "../../api/fixtures/ledger";
+import type { DecisionFacts } from "../../api/types";
 import { activityGroups, chartGeometry, dayFromX, donut, gbp, kpis, waitingAmount } from "./model";
 
 describe("WEB_7_ledger_model", () => {
@@ -19,7 +21,7 @@ describe("WEB_7_ledger_model", () => {
   });
 
   it("WEB_7_ledger_kpis_before_and_after_the_depot_decision", () => {
-    const before = kpis(ledger, {});
+    const before = kpis(ledger, {}, decisions);
     expect(before.map((k) => [k.label, k.value, k.sub])).toEqual([
       ["Spent so far", "£2,412", "30% of £8,000"],
       ["Month-end forecast", "£6,300", "£1,700 under budget"],
@@ -29,7 +31,7 @@ describe("WEB_7_ledger_model", () => {
     ]);
     expect(before[2]?.tone).toBe("amber");
     expect(before[2]?.opensWorld).toBe("k1");
-    const after = kpis(ledger, { depot: true });
+    const after = kpis(ledger, { depot: true }, decisions);
     expect(after[0]).toMatchObject({ value: "£5,832", sub: "73% of £8,000" });
     expect(after[2]).toMatchObject({ value: "£0", sub: "Laptop Depot approved today", tone: "ok" });
     expect(after[2]?.opensWorld).toBeUndefined();
@@ -71,13 +73,48 @@ describe("WEB_7_ledger_model", () => {
   });
 
   it("WEB_7_ledger_activity_filters_and_prepends_the_decisions", () => {
-    const all = activityGroups(ledger, {}, "all");
+    const all = activityGroups(ledger, {}, "all", decisions);
     expect(all.waitN).toBe(2);
     expect(all.groups[0]?.day).toBe("Today · Thu 24 Sep");
-    const done = activityGroups(ledger, { depot: true, mail: true }, "all");
+    const done = activityGroups(ledger, { depot: true, mail: true }, "all", decisions);
     expect(done.waitN).toBe(0);
     expect(done.entries[0]?.what).toBe("You approved £3,420 for Laptop Depot");
     expect(done.entries[1]?.what).toBe("Sent the supplier brief to 3 battery suppliers");
-    expect(activityGroups(ledger, { depot: true, mail: true }, "waiting").groups).toEqual([]);
+    expect(
+      activityGroups(ledger, { depot: true, mail: true }, "waiting", decisions).groups,
+    ).toEqual([]);
+  });
+
+  it("WEB_7_ledger_words_and_world_come_from_the_decisions_not_the_page", () => {
+    const other = decisions.map((d) => ({
+      ...d,
+      world: `${d.world}-other`,
+      facts: {
+        ...(d.facts as DecisionFacts),
+        project: "Project P",
+        approver: "Person Q",
+        waiting: "Waiting S",
+        decided: "Decided T",
+        activity: `Activity of ${d.k}`,
+      },
+    }));
+    const before = kpis(ledger, {}, other)[2];
+    expect(before).toMatchObject({ sub: "Waiting S", opensWorld: "k1-other" });
+    expect(kpis(ledger, { depot: true }, other)[2]?.sub).toBe("Decided T");
+    const rows = activityGroups(ledger, { depot: true, mail: true }, "all", other).entries;
+    expect(rows.slice(0, 2).map((e) => [e.world, e.what, e.sub])).toEqual([
+      ["k1-other", "Activity of depot", "Project P · Person Q"],
+      ["k1-other", "Activity of mail", "Project P · approved by you"],
+    ]);
+  });
+
+  it("WEB_7_ledger_without_decisions_the_tile_has_no_world_link_and_no_scenario_words", () => {
+    const tile = kpis(ledger, {})[2];
+    expect(tile?.opensWorld).toBeUndefined();
+    expect(tile?.sub).toBe("Needs your sign-off");
+    // A taken decision the Api does not describe adds no row (the waiting rows still leave).
+    expect(activityGroups(ledger, { depot: true, mail: true }, "all").entries).toEqual(
+      ledger.activity.filter((e) => !e.dec),
+    );
   });
 });

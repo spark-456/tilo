@@ -1,15 +1,19 @@
 import { useState } from "react";
-import type { Ledger } from "../../api/types";
+import type { Decision, Ledger } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { Button, SegmentedControl } from "../../components";
 import { icon } from "./icons";
 import { KINDS, type Kind, activityGroups } from "./model";
 
 /** Activity: filter tabs, day-grouped rows, and a row that opens to its detail (Approve, Open in world). */
-export function Activity({ L, app }: { L: Ledger; app: AppCtx }) {
+export function Activity({
+  L,
+  decisions,
+  app,
+}: { L: Ledger; decisions: readonly Decision[]; app: AppCtx }) {
   const [kind, setKind] = useState<Kind>("all");
   const [open, setOpen] = useState(0);
-  const { groups, waitN } = activityGroups(L, app.dec, kind);
+  const { groups, waitN } = activityGroups(L, app.dec, kind, decisions);
   const options = KINDS.map(([value, label]) => ({
     value,
     label: value === "waiting" && waitN ? `${label} · ${waitN}` : label,

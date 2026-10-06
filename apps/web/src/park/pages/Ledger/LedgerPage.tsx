@@ -86,7 +86,7 @@ export function LedgerPage({ app }: LedgerPageProps) {
       </div>
 
       <div className="park-ledger-kpis">
-        {kpis(L, app.dec).map((k) => (
+        {kpis(L, app.dec, state.decisions).map((k) => (
           <KpiTile
             key={k.label}
             label={k.label}
@@ -147,7 +147,7 @@ export function LedgerPage({ app }: LedgerPageProps) {
       </div>
 
       <GaveBack L={L} />
-      <Activity L={L} app={app} />
+      <Activity L={L} decisions={state.decisions} app={app} />
     </Frame>
   );
 }

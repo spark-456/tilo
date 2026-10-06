@@ -1,4 +1,4 @@
-import type { Dec, Ledger, LedgerEntry } from "../../api/types";
+import type { Dec, Decision, DecisionKey, Ledger, LedgerEntry } from "../../api/types";
 // The Ledger page's arithmetic: a typed port of the renderVals() of
 // design_handoff_tilo_web_app/design/Tilo App Ledger.dc.html (user's prototype, ADR-0003a). Pure functions
 // of the Ledger fixture and `dec`, so a test can pin every number. No clock, no random, no network.
@@ -7,8 +7,21 @@ import type { KpiTone } from "../../components";
 export const gbp = (v: number): string =>
   `£${v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB")}`;
 
-/** The amount the depot purchase is waiting on (the fixture's one `dec: "depot"` transaction). */
-export const waitingAmount = (L: Ledger): number => L.tx.find((t) => t.dec === "depot")?.amt ?? 0;
+/** The decision the ledger is waiting on: the one its pending transaction is tied to. */
+const waitingKey = (L: Ledger): DecisionKey | undefined => L.tx.find((t) => t.dec)?.dec;
+
+/** The amount that pending transaction is waiting on. */
+export const waitingAmount = (L: Ledger): number => L.tx.find((t) => t.dec)?.amt ?? 0;
+
+/** Whether the person has taken the decision the ledger was waiting on. */
+const waitingTaken = (L: Ledger, dec: Dec): boolean => {
+  const k = waitingKey(L);
+  return k !== undefined && !!dec[k];
+};
+
+/** The decision for `key` from the Api: its `world` to open and its `facts` (the words) come from there. */
+const decisionOf = (decisions: readonly Decision[], key: DecisionKey | undefined) =>
+  decisions.find((d) => d.k === key);
 
 // ---- KPI tiles ----
 export interface KpiRow {
@@ -22,9 +35,11 @@ export interface KpiRow {
 
 const sum = (xs: readonly number[]): number => xs.reduce((a, v) => a + v, 0);
 
-export function kpis(L: Ledger, dec: Dec): KpiRow[] {
+export function kpis(L: Ledger, dec: Dec, decisions: readonly Decision[] = []): KpiRow[] {
   const waiting = waitingAmount(L);
-  const spent = dec.depot ? L.spent + waiting : L.spent;
+  const taken = waitingTaken(L, dec);
+  const pending = decisionOf(decisions, waitingKey(L));
+  const spent = taken ? L.spent + waiting : L.spent;
   return [
     {
       label: "Spent so far",
@@ -36,14 +51,19 @@ export function kpis(L: Ledger, dec: Dec): KpiRow[] {
       value: gbp(L.forecast),
       sub: `${gbp(L.budget - L.forecast)} under budget`,
     },
-    dec.depot
-      ? { label: "Waiting on you", value: "£0", sub: "Laptop Depot approved today", tone: "ok" }
+    taken
+      ? {
+          label: "Waiting on you",
+          value: "£0",
+          sub: pending?.facts?.decided ?? "Approved today",
+          tone: "ok",
+        }
       : {
           label: "Waiting on you",
           value: gbp(waiting),
-          sub: "Laptop Depot sign-off",
+          sub: pending?.facts?.waiting ?? "Needs your sign-off",
           tone: "amber",
-          opensWorld: "k1",
+          ...(pending ? { opensWorld: pending.world } : {}),
         },
     { label: "Saved by memory", value: gbp(sum(L.memory)), sub: "Up £120 on August", tone: "sch" },
     {
@@ -65,9 +85,10 @@ export const dayFromX = (fx: number): number => Math.round((fx * 720 - 48) / (65
 
 export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
   const waiting = waitingAmount(L);
+  const taken = waitingTaken(L, dec);
   const Y = (v: number): number => 236 - (v / L.budget) * 206;
   const daily = L.daily.slice();
-  if (dec.depot && daily.length) daily[daily.length - 1] = (daily[daily.length - 1] ?? 0) + waiting;
+  if (taken && daily.length) daily[daily.length - 1] = (daily[daily.length - 1] ?? 0) + waiting;
   const cum: number[] = [];
   daily.reduce((a, v, i) => {
     cum[i] = a + v;
@@ -77,7 +98,7 @@ export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
   const P = (a: [number, number][]): string =>
     a.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
   const now = pts[pts.length - 1] ?? [48, 236];
-  const fcPts: [number, number][] = dec.depot
+  const fcPts: [number, number][] = taken
     ? [now, [X(30), Y(L.forecast)]]
     : [now, [X(25), Y(L.spent + waiting + 70)], [X(30), Y(L.forecast)]];
   const hd = hover != null ? Math.min(24, Math.max(1, hover)) : null;
@@ -117,7 +138,7 @@ export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
     spikeTop: pct(Y(cum[20] ?? 0), 270),
     fcLeft: pct(X(27.4), 720),
     fcTop: pct(Y(5950), 270),
-    fcLabel: dec.depot ? `Forecast ${gbp(L.forecast)}` : `If you approve ${gbp(waiting)}`,
+    fcLabel: taken ? `Forecast ${gbp(L.forecast)}` : `If you approve ${gbp(waiting)}`,
     hOp: hd != null ? "1" : "0",
     hx: hd != null ? hx.toFixed(1) : "0",
     hy: hd != null ? Y(hv).toFixed(1) : "0",
@@ -259,18 +280,27 @@ export interface ActivityRow {
   approveLabel: string;
 }
 
-export function activityGroups(L: Ledger, dec: Dec, kind: Kind) {
+export function activityGroups(
+  L: Ledger,
+  dec: Dec,
+  kind: Kind,
+  decisions: readonly Decision[] = [],
+) {
   const waiting = waitingAmount(L);
   let E: LedgerEntry[] = L.activity.filter((e) => !(e.dec && dec[e.dec]));
-  if (dec.mail)
+  // A decision taken is recorded as its own row, worded by the decision's `facts`; a decision the Api
+  // does not describe adds no row.
+  const mail = decisions.find((d) => d.k === "mail");
+  const depot = decisions.find((d) => d.k === "depot");
+  if (dec.mail && mail?.facts)
     E = [
       {
         day: TODAY,
         t: "Just now",
         k: "share",
-        world: "k1",
-        what: "Sent the supplier brief to 3 battery suppliers",
-        sub: "K1 electric scooter · approved by you",
+        world: mail.world,
+        what: mail.facts.activity,
+        sub: `${mail.facts.project} · approved by you`,
         amt: "—",
         detail: [
           ["Recipients", "3 battery suppliers"],
@@ -280,15 +310,15 @@ export function activityGroups(L: Ledger, dec: Dec, kind: Kind) {
       },
       ...E,
     ];
-  if (dec.depot)
+  if (dec.depot && depot?.facts)
     E = [
       {
         day: TODAY,
         t: "Just now",
         k: "approval",
-        world: "k1",
-        what: `You approved ${gbp(waiting)} for Laptop Depot`,
-        sub: "K1 electric scooter · Alex Morgan",
+        world: depot.world,
+        what: depot.facts.activity,
+        sub: `${depot.facts.project} · ${depot.facts.approver}`,
         amt: gbp(waiting),
         detail: [
           ["Your limit", "No limit"],
