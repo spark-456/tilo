@@ -69,6 +69,15 @@ Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject
 (`tilo_providers.factory`); dev/CI tests fake the `google.genai` import path at the
 `sys.modules` boundary and never install real credentials (EFF-01).
 
+## Python (`packages/people`)
+
+`tilo-people` (PPL-10) depends on the in-workspace `tilo-policy` (schema checks; not external) and adds
+one runtime dependency, the IANA zone database for `zoneinfo` (Windows and slim images ship none):
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| tzdata | Apache-2.0 | https://pypi.org/project/tzdata/ |
+
 ## Python (`services/connectors`)
 
 `tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
