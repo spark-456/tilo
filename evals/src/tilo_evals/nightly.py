@@ -3,8 +3,9 @@
 One `BatchProvider.submit` for the whole smoke selection (one case per group, `run_pass`'s own selection), `poll` until
 terminal, `results` once; each case's outcome is its batch answer (`executors.parse_batch_answer`), and the checks,
 credit cap and counts then run exactly as in `run_pass`. Default wiring replays each case's recording through an
-in-memory batch job: no model client is ever built, deployed or not, whatever `LIVE` says. The EFF-04 per-role
-cache-hit section is not here yet (its inputs do not exist; ADR-0022 follow-up EFF-04b)."""
+in-memory batch job: no model client is ever built, deployed or not, and the only flag, `--live`, is a hard
+refusal (live nightly is not built yet). The EFF-04 per-role cache-hit section is not here yet (its inputs do not
+exist; ADR-0022 follow-up EFF-04b)."""
 
 import argparse
 import json
