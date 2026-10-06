@@ -4,8 +4,9 @@
   start the meeting instead and then send invites to scheduled people", 6 Oct 2026, relayed by the
   supervisor). The open points were decided by the supervisor under the user's direct instruction ("For
   FR-MTG-09, you make the best decisions", 6 Oct 2026): see "Accepted amendments" below and
-  `docs/open-questions.md` BQ-MTG09-13 to BQ-MTG09-18 (overridable by the user). The rest is the architect's
-  default, BQ-MTG09-1 to BQ-MTG09-12. Amends ADR-0017.
+  `docs/open-questions.md` BQ-MTG09-13 to BQ-MTG09-19 (overridable by the user; BQ-MTG09-19 records the bot
+  account tiloagent@gmail.com without 2-step verification). The rest is the architect's default,
+  BQ-MTG09-2 to BQ-MTG09-11 (BQ-MTG09-1 and -12 are superseded). Amends ADR-0017.
   (Next free number on every remote branch at 2026-10-06; the merger may renumber.)
 - Deciders: user (the scope change; approval of the ADR-0017 change), architect (design)
 - Requirement: FR-MTG-09 (amended), FR-MTG-01, FR-MTG-10, FR-CAL-02, FR-CAL-04; PE-13, PE-14, PE-18, PE-20;
@@ -45,16 +46,18 @@ person's connectors as one Google grant (CON-D10).
    meetings: the user's 6 Oct decision replaces the guest-first experiment (D-2), which is no longer required.
    (b) Its decision 2 said Tilo gets no Gmail, Drive or Calendar access to the bot account; Tilo now holds one
    OAuth grant on it with the single scope above, sealed by the token broker like every grant, and nothing
-   else. (c) Unchanged: the bot's browser session is signed in by a human through noVNC inside the demo
-   container, per meeting, on tmpfs; it is never in the image, the repository, a backup, Secret Manager or a
-   Cloud Run service; the container is started by hand and removed after; the deployed services never hold
-   or see that session; the exception ends at the hackathon freeze unless the user renews it.
+   else. (c) Replaced (Accepted amendment 3, BQ-MTG09-15): the bot keeps ONE persistent, dedicated browser
+   profile for its own account, signed in once by a human by hand; it is never in the image, the repository,
+   a backup, Secret Manager or a Cloud Run service; the deployed services never hold or see that session; the
+   exception ends at the hackathon freeze unless the user renews it. (The per-meeting noVNC sign-in on tmpfs
+   of ADR-0017 no longer applies.)
 7. **What the bot does at meeting time.** Signed in as the organizer, it opens the link and enters as host
    without admission, posts the versioned disclosure first (FR-MTG-01), leaves on `Tilo leave` (FR-MTG-10) and
    never ends the call for everyone. It admits nobody by itself: invited attendees join under Meet's own rule
    for calendar-invited accounts; a display-name allowlist is spoofable and the meet-bot's current
    admit-everyone default is off for hosted meetings. The link is never written to the bot's `out/` files,
-   logs, events or the package it hands to Tilo. Its persistent named Docker volume goes (ADR-0017 terms).
+   logs, events or the package it hands to Tilo. Its persistent profile stays on its named volume between
+   meetings (amendment 3).
 
 ## Accepted amendments (supervisor, under the user's instruction of 6 Oct 2026)
 These replace the text above where they differ.

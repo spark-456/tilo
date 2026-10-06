@@ -378,8 +378,9 @@ long zone name; never cut). The limit comes from the loaded config (a test file 
 **FR-MTG-09 (e) the report (the user's live run, `docs/meeting-bot-hosting-report.md`).** Date, accounts by
 role only (host account, two test attendees, never an address), browser; the invitation came from the host
 account and showed a Meet link; the bot entered as host with no admission prompt; the disclosure was the
-first chat line; whether an invited attendee had to knock; `Tilo leave` worked; afterwards the container
-holds no browser profile and no volume of one, and no cookie file is in the image or the repository.
+first chat line; whether an invited attendee had to knock; `Tilo leave` worked; the bot's one persistent profile
+(ADR-0024 amendment 3, BQ-MTG09-15) sits on its named volume on the demo machine, and no cookie file or profile
+is in the image, the repository, a backup, Secret Manager or any Cloud Run service.
 
 ## Hostile cases (reviewers will probe these)
 
@@ -422,8 +423,9 @@ from dev or CI; the Calendar API is free, but the rule is no live call without `
    the script creates one event and prints the conference status and event id (never the link). Check the
    invitation in the test inbox.
 5. After MTG09-b and -c: host a test meeting from S-26 with two test accounts you own, approve the card, start
-   the bot container by hand at meeting time, sign the bot in through noVNC, join with the link from your own
-   invitation, then remove the container. Notes go into the report (FR-MTG-09 (e)).
+   the bot container by hand at meeting time (its one persistent profile is signed in once by hand, ADR-0024
+   amendment 3), join with the link from your own
+   invitation, then stop the container (the profile volume stays). Notes go into the report (FR-MTG-09 (e)).
 
 ## Builder notes and ticket split
 
@@ -437,8 +439,8 @@ from dev or CI; the Calendar API is free, but the rule is no live call without `
   seams (resolver as step 5; `exact` from `draft.exact` for this action instead of `_exact`, whose
   address list would hit the 500 limit), abandon on `meeting_host` disconnect, the `needs_you` card on
   `conference: failure`.
-- MTG09-c (MEET lane, `meet-bot/` on its own branch): ADR-0024 bot rules (host join, admit nobody, tmpfs
-  profile, link never written to `out/`, logs or the package).
+- MTG09-c (MEET lane, `meet-bot/` on its own branch): ADR-0024 bot rules (host join, admit only invited
+  addresses, one persistent dedicated profile on a named volume, link never written to `out/`, logs or the package).
 - PPL-60c (later): `MeetingHostAdapter.join_link(owner: str, receipt: HostReceipt) -> str` (a read with
   `fields: "status,hangoutLink"`; MH-20 a cancelled event, MH-21 a link that does not fullmatch
   `https://meet\.google\.com/[a-z]{3}-[a-z]{4}-[a-z]{3}`); the string lives in memory for the bot's start

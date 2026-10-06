@@ -26,8 +26,8 @@ ADR-0024 (Proposed until the user confirms it in chat), `services/connectors/tes
   test user; no person re-consents (people's Calendar stays `calendar.readonly`).
 - **Plan rows (addendum 8):** PPL-60b (guest-join experiment) is replaced by MTG09-a (CL-REACH: connector,
   adapter, token grant groups, config, fake, live smoke script; security review), MTG09-b (CL-PEOPLE, CL-INT:
-  `POST /v1/meetings/{id}/host`, fixed one-gate plan, S-26 button), MTG09-c (MEET: host join, admit nobody,
-  tmpfs profile) and the user's live run with the report. PPL-60c (later) hands the link to the bot in memory.
+  `POST /v1/meetings/{id}/host`, fixed one-gate plan, S-26 button), MTG09-c (MEET: host join, admit only
+  invited addresses, one persistent dedicated profile) and the user's live run with the report. PPL-60c (later) hands the link to the bot in memory.
 - **CC-PEOPLE-2** config list: `meeting_host` in `config/connectors.yaml`, `create_meeting_event: T3` in
   `config/autonomy.yaml`, `meeting_host.max_duration_min: 60` in `config/personal.yaml` (MTG09-a adds them;
   B-007 regen by the orchestrator or the user).
