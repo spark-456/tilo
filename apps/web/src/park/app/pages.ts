@@ -10,7 +10,8 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   home: Placeholder,
   worlds: Placeholder,
   world: Placeholder,
-  skills: Placeholder,
+  // biome-ignore format: the registry keeps one line per page
+  skills: lazy(() => import("../pages/Skills/SkillsPage").then((m) => ({ default: m.SkillsPage }))),
   ledger: Placeholder,
   agenda: Placeholder,
   team: Placeholder,
