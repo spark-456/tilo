@@ -411,8 +411,8 @@ from dev or CI; the Calendar API is free, but the rule is no live call without `
 ## First live step (the user only)
 
 1. Confirm ADR-0024 (or choose the Owner's own calendar instead, BQ-MTG09-2).
-2. Use a bot Google account that nothing else uses, with 2-step verification on (the meet-bot's existing bot
-   account qualifies if that holds). Tilo and its agents never ask for its password.
+2. Use a bot Google account that nothing else uses (tiloagent@gmail.com; 2-step verification was declined by
+   the user, 7 Oct 2026, BQ-MTG09-19). Tilo and its agents never ask for its password.
 3. Google Cloud console, OAuth consent screen (Testing): on Data Access add
    `https://www.googleapis.com/auth/calendar.events.owned`; on Audience add the bot account as a test user;
    enable the Google Calendar API if it is not enabled yet.

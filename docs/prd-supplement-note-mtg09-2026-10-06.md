@@ -35,6 +35,6 @@ ADR-0024 (Proposed until the user confirms it in chat), `services/connectors/tes
 ## Still needs the user
 
 1. Confirm ADR-0024 (it widens ADR-0017), or choose the Owner's own calendar as organizer (BQ-MTG09-2).
-2. A bot Google account used by nothing else, 2-step verification on; never a password to Tilo or an agent.
+2. A bot Google account used by nothing else (tiloagent@gmail.com); 2-step verification was declined by the user; never a password to Tilo or an agent.
 3. Consent screen: the scope above and the bot account as a test user.
 4. The first live run (`LIVE=1` is the user's): the smoke script, then a test meeting with test accounts only.
