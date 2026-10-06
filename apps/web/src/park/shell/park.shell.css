@@ -118,13 +118,6 @@
   font-weight: 900;
   letter-spacing: -0.5px;
 }
-/* Narrow phones: the logo tile is the home link (named "Tilo home"), so the wordmark steps aside and the tab
-   strip keeps room for the first tab (Home) whole next to the sample chip's dot. The rest scroll sideways. */
-@media (max-width: 430px) {
-  [data-park] .park-shell__wordmark {
-    display: none;
-  }
-}
 /* The six tabs scroll sideways inside the nav when they do not fit. */
 [data-park] .park-shell__tabs {
   display: flex;
@@ -293,6 +286,25 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+}
+/* Narrow phones: in the reference nav (wordmark + three buttons) the Home tab gets ~78px at 390 and needs 68. Here the
+   chip is only its dot and gives back the pill chrome and the tools gap, so it costs 8px and Home stays whole at 390
+   (the reference itself scrolls the strip below ~380). The click area stays large. */
+@media (max-width: 430px) {
+  [data-park] .park-shell__sample {
+    position: relative;
+    margin: 0 -4px 0 0;
+  }
+  [data-park] .park-shell__sample::before {
+    content: "";
+    position: absolute;
+    inset: -8px -2px;
+  }
+  [data-park] .park-shell__sample .park-chip {
+    height: auto;
+    padding: 0;
+    background: transparent;
   }
 }
 
