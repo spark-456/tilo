@@ -23,6 +23,8 @@ export class TiloApiError extends Error {
     readonly retryable: boolean,
     /** The call changes something on the server: a retryable failure may still have happened there. */
     readonly write = false,
+    /** The server's stable refusal code (SEC-15: `under_construction`, `declaration_required`), or null. */
+    readonly code: string | null = null,
   ) {
     super(message);
     this.name = "TiloApiError";
@@ -82,6 +84,16 @@ function reasonOf(status: number, text: string): string {
     return said;
   }
   return GENERIC_4XX[status] ?? "Tilo could not accept that.";
+}
+
+/** The refusal's `code` only when it is a short lower-case token (SEC-15); anything else is null. */
+function codeOf(text: string): string | null {
+  try {
+    const code = (JSON.parse(text) as { code?: unknown } | null)?.code;
+    return typeof code === "string" && /^[a-z][a-z0-9_]{0,39}$/.test(code) ? code : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The window is phone-width: the one breakpoint the shell uses for mobile web (App.tsx). */
@@ -189,8 +201,8 @@ export class HttpClient implements TiloClient {
     }
     if (!res.ok) {
       if (res.status >= 500) throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
-      const reason = reasonOf(res.status, await res.text().catch(() => ""));
-      throw new TiloApiError(reason, res.status, false, write);
+      const body = await res.text().catch(() => "");
+      throw new TiloApiError(reasonOf(res.status, body), res.status, false, write, codeOf(body));
     }
     try {
       return (await res.json()) as T;

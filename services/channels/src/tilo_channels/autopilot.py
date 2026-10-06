@@ -171,6 +171,11 @@ class Autopilot:
     def _owns(self, user_id: str) -> bool:
         return self._fake or (self._world_owner() is not None and user_id == self._world_owner())
 
+    def owns(self, user_id: str) -> bool:
+        """Whether `user_id` is this world's owner: the check `preview` makes first, for callers that must not draft
+        for anyone else (FR-PA-07). No behaviour of the card path changes."""
+        return self._owns(user_id)
+
     def _get(self, user_id: str, card_id: str) -> dict[str, Any] | None:
         """The stored card as it stands: an L2 card's newest decision, or L1 once its decision was dropped."""
         return self._port.view(user_id, self._cards.get(user_id, card_id))

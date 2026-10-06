@@ -206,6 +206,12 @@ class FakeGmailApi:
                 if messages is None:
                     return FakeResponse(404, {"error": "no such thread"})
                 return FakeResponse(200, {"id": path[len("/threads/") :], "messages": copy.deepcopy(messages)})
+            if method == "GET" and path.startswith("/messages/"):  # one message by its Gmail id (FR-PA-07 reads)
+                wanted = path[len("/messages/") :]
+                found = next((m for messages in self._threads.values() for m in messages if m["id"] == wanted), None)
+                if found is None:
+                    return FakeResponse(404, {"error": "no such message"})
+                return FakeResponse(200, copy.deepcopy(found))
             if method != "POST" or path != "/messages/send":
                 return FakeResponse(400, {"error": "FR-CHN-13 fake: unexpected Gmail call"})
             fault = self.faults.pop(0) if self.faults else None
@@ -254,7 +260,11 @@ def _metadata(thread_id: str, msg: Msg) -> dict[str, Any]:
         "id": msg.message_id,
         "threadId": thread_id,
         "labelIds": ["SENT"] if own else ["INBOX"],
-        "payload": {"headers": [{"name": k, "value": v} for k, v in headers.items() if v]},
+        "payload": {
+            "mimeType": "text/plain",
+            "headers": [{"name": k, "value": v} for k, v in headers.items() if v],
+            "body": {"data": base64.urlsafe_b64encode(msg.body.encode()).decode()},
+        },
     }
 
 

@@ -1,0 +1,3072 @@
+{
+  "v": "1.0",
+  "user": "u_priya",
+  "as_of": "2026-10-06T10:00:00.000Z",
+  "today": "2026-10-06",
+  "rows": [
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    },
+    {
+      "ref": {
+        "kind": "world",
+        "id": "w_supplier_scan"
+      },
+      "reason": "run",
+      "group": "rest",
+      "title": "Supplier price scan",
+      "due": null,
+      "at": "2026-10-06T07:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open"]
+    }
+  ],
+  "parked": [
+    {
+      "ref": {
+        "kind": "work_item",
+        "id": "wi_vendor_call"
+      },
+      "reason": "work_item",
+      "group": "snoozed",
+      "title": "Call the vendor",
+      "due": "2026-10-09",
+      "at": "2026-10-02T09:00:00.000Z",
+      "from": null,
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open", "put_back"]
+    },
+    {
+      "ref": {
+        "kind": "work_item",
+        "id": "wi_logo"
+      },
+      "reason": "work_item",
+      "group": "asked",
+      "title": "Pick the new logo",
+      "due": null,
+      "at": "2026-10-03T09:00:00.000Z",
+      "from": "u_owner",
+      "flagged": false,
+      "evidence": false,
+      "actions": ["open", "put_back"]
+    },
+    {
+      "ref": {
+        "kind": "work_item",
+        "id": "wi_minutes_review"
+      },
+      "reason": "work_item",
+      "group": "done",
+      "title": "Review the minutes",
+      "due": "2026-10-05",
+      "at": "2026-10-01T09:00:00.000Z",
+      "from": "u_owner",
+      "flagged": false,
+      "evidence": true,
+      "actions": ["open", "put_back"]
+    }
+  ],
+  "truncated": false,
+  "fingerprint": "d7f68dbdccf27d9f8850ed5462d79649dbb6cdeb73b1bb54bdf20d7117c1a1c5"
+}

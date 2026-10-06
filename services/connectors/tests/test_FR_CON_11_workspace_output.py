@@ -30,7 +30,9 @@ KINDS = [  # (artifact media type, native type Google must store, editor URL pre
 
 
 def _case(g, *, media=PPTX, name="deck.pptx", artifact="art_deck_1", **kw):
-    item = g.artifacts.put_file(artifact, name=name, mime_type=media, content=b"PK\x03\x04 ooxml bytes")
+    item = g.artifacts.put_file(
+        artifact, name=name, mime_type=media, content=b"PK\x03\x04 ooxml bytes", origin_kind="render"
+    )
     return drive_case(item=item, action_type=ACTION, **kw)
 
 

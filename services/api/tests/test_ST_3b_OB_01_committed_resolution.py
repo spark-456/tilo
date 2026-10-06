@@ -64,17 +64,19 @@ def test_ST_3b_OB_01_another_channel_after_a_commit_then_raise_resolves_under_th
 ):
     _, card = run_flow.run_to_gate()
     _commit_then_raise(run_flow, monkeypatch)
-    url = f"/worlds/{run_flow.world_id}/cards/{card['id']}/answer"
-    post = run_flow.flow.client.post
+    run_flow.sessions_by_channel()
 
-    assert post(url, json={"option": "approve", **first}).status_code == 503  # committed, the caller saw a failure
-    later = post(url, json={"option": "approve", **second})
+    def post(body: dict):
+        return run_flow.answer_on(card["id"], body)
+
+    assert post({"option": "approve", **first}).status_code == 503  # committed, the caller saw a failure
+    later = post({"option": "approve", **second})
     assert (later.status_code, later.json()) == (400, REFUSED)  # no lasting 503: the committed answer won
     wait_for(lambda: run_flow.events("world.completed"), what="world.completed")  # the gate opened
     run_flow.quiet_stream()
 
     for body in ({"option": "approve", **first}, {"option": "approve", **second}):  # and nothing re-opens it
-        again = post(url, json=body)
+        again = post(body)
         assert (again.status_code, again.json()) == (400, REFUSED)
     (entry,) = run_flow.outbox_store.all_entries()
     assert entry["authz"] == run_flow.events("approval.resolved")[0]["authz"]  # opened by the committed event

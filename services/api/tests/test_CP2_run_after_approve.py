@@ -12,7 +12,6 @@ import pytest
 from _clint2_lib import (
     BAD_PLANS,
     CAP,
-    UNIT_ARTIFACT,
     bad_plan,
     base_plan,
     connector_registry,
@@ -31,6 +30,9 @@ RUN_SEAMS = (
     "get_connector_registry",
     "get_connector_adapters",
     "get_outbox_store",
+    "get_artifact_store",  # ADR-0018 T4: where the run's outputs go (API_FR_AGT_02_T4.md)
+    "get_redactor",
+    "get_run_archive",
 )
 
 
@@ -146,10 +148,14 @@ def test_CP2_units_run_in_dependency_order_each_with_agent_and_artifact_events(r
     assert len(working) == 1 and working[0]["seq"] < requested["seq"]  # the sender is at work before it is gated
     loaded = {(worker_unit[e["actor"]], e["data"]["skill"]) for e in events if e["type"] == "skill.loaded"}
     assert loaded == {("U1", "web_research"), ("U2", "web_research"), ("U3", "exec_summary")}  # FR-AGT-03
-    created = {e["data"]["artifact"]["artifact_id"]: e for e in events if e["type"] == "artifact.created"}
-    assert set(created) == set(UNIT_ARTIFACT.values())
-    assert all(e["data"]["artifact"]["version"] == 1 for e in created.values())
-    assert created[UNIT_ARTIFACT["U4"]]["seq"] < requested["seq"]  # the draft exists before it is gated
+    made = [e for e in events if e["type"] == "artifact.created"]
+    created = {
+        worker_unit[e["actor"]]: e for e in made
+    }  # ADR-0018 T4: the store mints ids, so a unit is found by its worker
+    assert set(created) == {"U1", "U2", "U3", "U4"} and len(made) == 4, "one item per unit, none made by anyone else"
+    assert all(e["data"]["artifact"]["version"] == 1 for e in made)
+    assert len({e["data"]["artifact"]["artifact_id"] for e in made}) == 4
+    assert created["U4"]["seq"] < requested["seq"]  # the draft exists before it is gated
 
 
 def test_PRD_9_4_HR_1_the_world_only_moves_on_recorded_events(run_flow):

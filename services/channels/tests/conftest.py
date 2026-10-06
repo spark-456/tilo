@@ -9,8 +9,19 @@ mode puts it on sys.path (the same pattern services/api/tests uses).
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 from _channels_lib import FakeClock, MemoryDedupeStore
+
+MX_EXAMPLE_CONFIG = pathlib.Path(__file__).parent / "fixtures" / "mail_trust_mx_example.yaml"
+
+
+@pytest.fixture(autouse=True)
+def _trusted_authserv(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The FR-CHN-11 header fixtures name `mx.example` as the server that wrote Authentication-Results; point the
+    pin at a config that trusts it. A module that tests the real `config/mail_trust.yaml` overrides this fixture."""
+    monkeypatch.setattr("tilo_channels.autopilot_inbound.CONFIG_PATH", MX_EXAMPLE_CONFIG)
 
 
 @pytest.fixture()

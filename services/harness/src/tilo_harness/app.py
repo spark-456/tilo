@@ -33,6 +33,7 @@ def _bearer(request: Request) -> str | None:
 
 
 def create_app(*, schedule_tick: TickWiring | None = None) -> FastAPI:
+    # No generated docs: the service may be public, and the route list is not for strangers (issue #411).
     app = FastAPI(title="tilo-harness", docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)

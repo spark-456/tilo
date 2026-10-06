@@ -19,15 +19,18 @@ import copy
 import json
 import pathlib
 import sys
+import tempfile
 import threading
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 from _api_contracts_lib import assert_valid_event
 from _api_lib import FakeEventWriter
 from _cards_lib import build_registry as build_schema_registry
 from _clint1_lib import FLOW_USER, OTHER_USER, Flow, registered_event_types, seam
+from fastapi import Request
 from tilo_connectors.mock import MockConnector
 from tilo_connectors.registry import ConnectorRegistry
 from tilo_providers.fake import FakeModelProvider
@@ -43,9 +46,10 @@ NEW_RECIPIENT = "finance@example.com"
 KNOWN_RECIPIENT = "ops@example.com"
 POOL = (NEW_RECIPIENT, KNOWN_RECIPIENT, "riya@example.com", "sam@example.org")
 
-# The artifact each scripted unit produces (U4 produces the draft that the gate holds).
-UNIT_ARTIFACT = {"U1": "art_u1_notes", "U2": "art_u2_compare", "U3": "art_summary", "U4": "art_reply_draft"}
-DRAFT_REF = {"artifact_id": UNIT_ARTIFACT["U4"], "version": 1}
+# Since ADR-0018 T4 (FR-AGT-02, FR-MEM-06) no test names an artifact id: each scripted unit returns Markdown
+# (`UnitOutput`), the executor puts it on the artifact store, the store mints the id and `artifact.created` carries it.
+# Read an id from the stream with `RunFlow.artifact_of("U4")` (U4 makes the draft that the gate holds).
+FAKE_SECRET = "fake-secret-" + "".join(["0x", "CAFE", "F00D"])  # assembled at runtime, never a literal secret
 
 # Event types that mean "the agents are doing something" (the pause and gate tests assert none follow).
 WORK_PREFIXES = ("agent.", "artifact.", "building.", "skill.", "level.", "district.", "meeting.", "question.")
@@ -186,9 +190,93 @@ def schema_errors(name: str, instance: Any) -> list[str]:
 # --- doubles ----------------------------------------------------------------------------------------------
 
 
+def org_id() -> str:
+    """The org tilo-api puts every run's Scope in: `deps.ORG_ID` (pinned by API_FR_AGT_02_T4: a single constant until
+    sign-in gives a world its org). Until it exists this is a placeholder, so a missing constant shows up as a store
+    that holds nothing for the run, not as an AttributeError in test setup."""
+    from tilo_api import deps  # noqa: PLC0415
+
+    return getattr(deps, "ORG_ID", "org_missing_constant")
+
+
+class _CleanScreener:
+    """SafetyProvider-shaped screener (`check(text, *, content, mime_type)`): every version is clean."""
+
+    def check(self, text: str, *, content: bytes | None = None, mime_type: str | None = None) -> dict[str, Any]:
+        return {"flagged": False, "reason": None}
+
+
+class FakeRedactor:
+    """The shared secret redactor, faked: replaces FAKE_SECRET. Records every input."""
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def __call__(self, text: str) -> str:
+        self.calls.append(text)
+        return text.replace(FAKE_SECRET, "[REDACTED]")
+
+
+class ArtifactRig:
+    """The artifact seams of API_FR_AGT_02_T4.md, all fakes: an `ArtifactStore` over the memory backends, the fake
+    redactor, and a RunArchive factory over a throwaway directory. `opened` records each (org_id, run_id, archive)
+    the run asked for."""
+
+    def __init__(self) -> None:
+        from tilo_memory.artifacts import ArtifactStore, MemoryBlobBackend, MemoryMetaBackend  # noqa: PLC0415
+
+        self._dir = tempfile.TemporaryDirectory()
+        self.meta, self.blobs = MemoryMetaBackend(), MemoryBlobBackend()
+        self.redactor, self.alerts = FakeRedactor(), []
+        self.opened: list[tuple[str, str, Any]] = []
+        self.store = ArtifactStore(
+            self.meta,
+            self.blobs,
+            clock=lambda: datetime.now(UTC),
+            redactor=self.redactor,
+            archive_lookup=lambda scope, archive_ref: None,
+            alert_sink=self.alerts.append,
+            screener=_CleanScreener(),
+        )
+
+    def open_archive(self, *, org_id: str, run_id: str) -> Any:
+        """What `deps.get_run_archive()` returns: opens the run's raw archive (hash-chained, redacted)."""
+        from tilo_archive import LocalDirStore, RunArchive  # noqa: PLC0415
+
+        archive = RunArchive(
+            LocalDirStore(pathlib.Path(self._dir.name)),
+            org_id=org_id,
+            run_id=run_id,
+            redactor=lambda payload: payload,
+            clock=lambda: datetime.now(UTC),
+        )
+        self.opened.append((org_id, run_id, archive))
+        return archive
+
+    def scope(self, world_id: str, owner: str = FLOW_USER, org: str | None = None) -> Any:
+        from tilo_memory.artifacts import Scope  # noqa: PLC0415
+
+        return Scope(org_id=org or org_id(), world_id=world_id, owner=owner)
+
+    def seed(self, scope: Any, content: bytes = b"# Another item\n") -> dict[str, Any]:
+        """A version held in `scope` (an upload), which a run of another Scope can only name by ref; returns its ref."""
+        from tilo_memory.artifacts import NewVersion, Origin  # noqa: PLC0415
+
+        new = NewVersion(media_type="text/markdown", content=content, run_id="r_seeded_1", origin=Origin(kind="upload"))
+        return self.store.put(scope, new).ref
+
+    def close(self) -> None:
+        self._dir.cleanup()
+
+
+def markdown_for(unit: Any) -> bytes:
+    return f"# {unit['title']}\n\nUnit {unit['id']} finished.\n".encode()
+
+
 class ScriptedRunner:
-    """The harness `UnitRunner`: no model, no network. Each unit succeeds with one artifact, or fails when its id is
-    in `fail`. A unit named in `block_on` waits (without blocking the loop) until `release` is set."""
+    """The harness `UnitRunner`: no model, no network. Each unit succeeds with one Markdown output (the executor
+    stores it and announces it, ADR-0018), or fails when its id is in `fail`. A unit named in `block_on` waits
+    (without blocking the loop) until `release` is set."""
 
     def __init__(self, timeline: list[str]) -> None:
         self.timeline = timeline
@@ -199,7 +287,7 @@ class ScriptedRunner:
         self.release = threading.Event()
 
     async def run(self, unit: Any, context: Any) -> Any:
-        from tilo_harness.executor import UnitOutcome  # noqa: PLC0415
+        from tilo_harness.executor import UnitOutcome, UnitOutput  # noqa: PLC0415
 
         self.ran.append(unit["id"])
         self.timeline.append(f"run:{unit['id']}")
@@ -209,8 +297,8 @@ class ScriptedRunner:
                 await asyncio.sleep(0.01)
         if unit["id"] in self.fail:
             return UnitOutcome(success=False, summary="scripted failure")
-        ref = {"artifact_id": UNIT_ARTIFACT[unit["id"]], "version": 1}
-        return UnitOutcome(success=True, summary=f"Finished {unit['title']}.", artifact_refs=(ref,))
+        output = UnitOutput(media_type="text/markdown", content=markdown_for(unit))
+        return UnitOutcome(success=True, summary=f"Finished {unit['title']}.", outputs=(output,))
 
 
 class ClearModel(FakeModelProvider):
@@ -322,6 +410,7 @@ class RunFlow:
         self.adapter = adapter or MockConnector(self.registry.get(MOCK_ID))
         self.outbox_store = outbox_store
         self.runner = ScriptedRunner(self.timeline)
+        self.rig = ArtifactRig()  # the run's artifact store, redactor and archive factory (ADR-0018 T4)
         self.writer = StreamWriter(self.store, self.timeline)
         self.skills = SkillRegistry(SKILLS_ROOT)
         self.recipients: list[str] = [NEW_RECIPIENT]
@@ -343,6 +432,9 @@ class RunFlow:
         overrides[seam(deps, "get_connector_adapters")] = lambda: {MOCK_ID: self.adapter}
         overrides[seam(deps, "get_outbox_store")] = lambda: self.outbox_store
         overrides[deps.get_event_writer] = lambda: self.writer
+        overrides[seam(deps, "get_artifact_store")] = lambda: self.rig.store
+        overrides[seam(deps, "get_redactor")] = lambda: self.rig.redactor
+        overrides[seam(deps, "get_run_archive")] = lambda: self.rig.open_archive
         roles = ("director", "lead", "specialist", "verifier", "writer", "narrator")
         providers = {role: ClearModel() for role in roles}
         overrides[seam(deps, "get_must_ask_providers")] = lambda: providers  # judges every unit clear
@@ -421,6 +513,29 @@ class RunFlow:
     def types(self) -> list[str]:
         return [e["type"] for e in self.events()]
 
+    def scope(self, owner: str = FLOW_USER) -> Any:
+        """The Scope the run puts this world's artifacts in (org `deps.ORG_ID`, this world, the world's owner)."""
+        return self.rig.scope(self.world_id, owner)
+
+    def artifact_of(self, unit_id: str) -> dict[str, Any]:
+        """The ref `artifact.created` announced for the one item `unit_id` made: its worker is the target of the
+        unit's `agent.assigned`. Ids come from the stream, because the store mints them (ADR-0018 s6)."""
+        stream = self.events()
+        worker = next(e["target"] for e in stream if e["type"] == "agent.assigned" and e["data"]["unit"] == unit_id)
+        made = [e for e in stream if e["type"] == "artifact.created" and e["actor"] == worker]
+        assert len(made) == 1, f"expected one artifact.created by {unit_id}'s worker, got {len(made)}"
+        return dict(made[0]["data"]["artifact"])
+
+    def created_by_unit(self) -> dict[str, list[dict[str, Any]]]:
+        """unit id -> the `artifact.created` events its worker wrote, in stream order."""
+        stream = self.events()
+        worker_of = {e["target"]: e["data"]["unit"] for e in stream if e["type"] == "agent.assigned"}
+        found: dict[str, list[dict[str, Any]]] = {}
+        for event in stream:
+            if event["type"] == "artifact.created" and event["actor"] in worker_of:
+                found.setdefault(worker_of[event["actor"]], []).append(event)
+        return found
+
     def stream(self) -> list[dict[str, Any]]:
         return self.events()
 
@@ -435,6 +550,27 @@ class RunFlow:
     def answer(self, card_id: str, option: str, client: Any = None):
         return (client or self.flow.client).post(
             f"/worlds/{self.world_id}/cards/{card_id}/answer", json={"option": option}
+        )
+
+    def sessions_by_channel(self) -> None:
+        """Each request's principal takes its channel from an `x-session-channel` header (default web), so one run can
+        be answered from a web and a mobile-web session at once; the body's channel must match it (CH-RM, SEC-06)."""
+        import dataclasses  # noqa: PLC0415
+
+        from tilo_api import deps  # noqa: PLC0415
+
+        base = self.flow.principal
+
+        def current(request: Request) -> Any:
+            return dataclasses.replace(base, channel=request.headers.get("x-session-channel", "web"))
+
+        self.flow.app.dependency_overrides[deps.get_current_principal] = current
+
+    def answer_on(self, card_id: str, body: dict[str, Any]):
+        return self.flow.client.post(
+            f"/worlds/{self.world_id}/cards/{card_id}/answer",
+            json=body,
+            headers={"x-session-channel": body.get("channel", "web")},
         )
 
     def pause(self, client: Any = None):
@@ -468,6 +604,7 @@ class RunFlow:
     def close(self) -> None:
         self.runner.release.set()
         self.flow.close()
+        self.rig.close()
 
 
 # --- assertions shared by several test files --------------------------------------------------------------
@@ -534,7 +671,7 @@ def build_run_flow(
 __all__ = [
     "CAP",
     "DESTINATION",
-    "DRAFT_REF",
+    "FAKE_SECRET",
     "FLOW_USER",
     "KNOWN_RECIPIENT",
     "MOCK_ID",
@@ -542,9 +679,9 @@ __all__ = [
     "OTHER_USER",
     "POOL",
     "REPO_ROOT",
-    "UNIT_ARTIFACT",
     "WORK_PREFIXES",
     "BAD_PLANS",
+    "ArtifactRig",
     "ClearModel",
     "CrashAfterSendMock",
     "RunFlow",
@@ -554,8 +691,10 @@ __all__ = [
     "build_run_flow",
     "covering_policy",
     "index_of",
+    "markdown_for",
     "layout_for",
     "only",
+    "org_id",
     "plan_violations",
     "schema_errors",
     "settle",

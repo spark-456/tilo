@@ -10,38 +10,54 @@ import sys
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from _clint2_lib import DESTINATION, NEW_RECIPIENT, ScriptedRunner, wait_for
 
 
-def _created(artifact_id: str) -> dict[str, Any]:
-    return {"type": "artifact.created", "data": {"artifact": {"artifact_id": artifact_id, "version": 1}}}
-
-
 class _ForeignRunner(ScriptedRunner):
-    """Every unit says its artifact is one that another world already holds."""
+    """Every unit says its artifact is a version that another Scope holds (ADR-0018 T4: a ref is only ever checked
+    against the store, so `art_OTHER_TENANT` is now a ref held in a Scope that is not this run's)."""
+
+    def __init__(self, timeline: list[str], ref: dict[str, Any]) -> None:
+        super().__init__(timeline)
+        self.ref = ref
 
     async def run(self, unit: Any, context: Any) -> Any:
         from tilo_harness.executor import UnitOutcome  # noqa: PLC0415
 
         self.ran.append(unit["id"])
-        return UnitOutcome(
-            success=True, summary="done", artifact_refs=({"artifact_id": "art_OTHER_TENANT", "version": 1},)
-        )
+        return UnitOutcome(success=True, summary="done", artifact_refs=(self.ref,))
 
 
-def test_FR_HIL_03_a_unit_naming_another_worlds_item_fails_the_world_and_sends_nothing(run_flow):
-    run_flow.store.events["w_other"] = [_created("art_OTHER_TENANT")]
-    run_flow.runner = _ForeignRunner(run_flow.timeline)
-    run_flow.start()
+@pytest.mark.parametrize("where", ["another_world_of_the_owner", "another_owner_in_this_world"])
+def test_FR_HIL_03_a_unit_naming_another_scopes_item_fails_the_world_and_sends_nothing(run_flow, where):
+    run_flow.start()  # the world exists now; its Scope is (org, this world, this owner)
+    scope = (
+        run_flow.rig.scope("w_other")
+        if where == "another_world_of_the_owner"
+        else run_flow.rig.scope(run_flow.world_id, owner="u_flow_mallory")
+    )
+    held_elsewhere = run_flow.rig.seed(scope)
+    run_flow.runner = _ForeignRunner(run_flow.timeline, held_elsewhere)
     assert run_flow.approve().status_code == 200
 
     wait_for(lambda: run_flow.events("world.failed"), what="world.failed")
     run_flow.quiet_stream()
 
     assert run_flow.events("artifact.created") == []  # not even recorded in this world
+    assert held_elsewhere["artifact_id"] not in str(run_flow.stream()), "the stream never names it"
     assert run_flow.events("approval.requested") == [] and run_flow.cards().json() == []
     assert run_flow.outbox_store.all_entries() == [] and run_flow.adapter.sent == []
     assert run_flow.events("data.transfer") == [] and run_flow.events("world.completed") == []
+    assert run_flow.rig.store.head(scope, held_elsewhere) is not None, "the other Scope's version is untouched"
+
+
+def test_FR_HIL_03_the_runs_own_foreign_id_scan_is_gone_the_store_scope_check_replaced_it():
+    """ADR-0018 T4: `Run.foreign` scanned other worlds' event streams for an id a runner named. A runner names no id
+    any more, and a ref is checked by the artifact store's Scope (AR-03), so the scan is removed."""
+    from tilo_api.runs import Run  # noqa: PLC0415
+
+    assert not hasattr(Run, "foreign")
 
 
 def test_FR_HIL_03_the_gate_card_says_what_the_send_is_not_what_the_unit_title_says(run_flow):

@@ -1,0 +1,172 @@
+{
+  "rule": "PE-27",
+  "note": "Only a gate names an Approver; a consent card in Asha's world is Asha's.",
+  "now": "2026-10-06T10:00:00.000Z",
+  "persons": {
+    "u_owner": {
+      "id": "u_owner",
+      "org_id": "org_example",
+      "display_name": "Asha Rao",
+      "aliases": ["Asha"],
+      "email": "asha@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_priya": {
+      "id": "u_priya",
+      "org_id": "org_example",
+      "display_name": "Priya Nair",
+      "aliases": ["Priya"],
+      "email": "priya@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_dev": {
+      "id": "u_dev",
+      "org_id": "org_example",
+      "display_name": "Dev Menon",
+      "aliases": ["Dev"],
+      "email": "dev@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam": {
+      "id": "u_sam",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam"],
+      "email": "sam@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_meera": {
+      "id": "u_meera",
+      "org_id": "org_example",
+      "display_name": "Meera Shah",
+      "aliases": ["Meera"],
+      "email": "meera@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    }
+  },
+  "request": {
+    "actor": "u_priya",
+    "user": "u_priya"
+  },
+  "source": {
+    "kind": "card",
+    "data": {
+      "id": "01J8Z3K4M5N6P7Q8R9S0T1V2W5",
+      "world_id": "w_01",
+      "run_id": "r_01J8Z3K4M5",
+      "header": {
+        "building": "B1",
+        "agent": "A_dir"
+      },
+      "add_context": false,
+      "created_at": "2026-10-06T09:00:00.000Z",
+      "timeout": 86400,
+      "gate": null,
+      "consent": {
+        "connector": "google_drive",
+        "scopes": ["Create and edit files in the Tilo folder only"]
+      },
+      "kind": "consent",
+      "rung": "consent",
+      "what_happened": "Saving the report needs access to one Drive folder.",
+      "why_it_matters": "Without it the report stays in Tilo only.",
+      "options": [
+        {
+          "id": "connect",
+          "label": "Connect",
+          "suggested": true,
+          "reason": "Only the Tilo folder is requested.",
+          "irreversible": false
+        },
+        {
+          "id": "hold",
+          "label": "Hold",
+          "suggested": false,
+          "irreversible": false
+        }
+      ],
+      "actions": ["show_me", "snooze"],
+      "answer_channels": ["web", "mobile_web"],
+      "safe_default": "hold"
+    },
+    "world_owner": "u_owner",
+    "approver": "u_priya",
+    "answered": false
+  },
+  "join": "rows"
+}

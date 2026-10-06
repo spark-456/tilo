@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-2026-10-06: FR-AGT-14 (scheduled runs) added `schedule` to `common.schema.json` `channel` (common 1.4.0) and a scheduled-run note to `world.requested` (1.1.0), fixture `world.requested--scheduled.json`, BQ-279.
+2026-10-06: FR-AGT-14 (scheduled runs) added `schedule` to `common.schema.json` `channel` (common 1.4.0) and a scheduled-run note to `world.requested` (1.1.0), fixture `world.requested--scheduled.json`, BQ-AGT14-1.
 
 **Actor is the schedule's owner, never `system`.** The brief said `system`. OB-01 takes the world's owner from the actor of the world's first `world.requested`, and the crossref validator requires `world_owner` to match `^u_`. A `system` owner means nobody can open a T3 gate in the scheduled world. Orchestrator briefs can be wrong about this; check OB-01 before writing any "actor system" into a contract.
 

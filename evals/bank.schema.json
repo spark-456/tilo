@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["id", "title", "domain", "shapes", "brief", "director", "expect"],
   "properties": {
-    "id": { "type": "string", "pattern": "^B-[0-9]{3}$" },
+    "id": { "type": "string", "pattern": "^[BG]-[0-9]{3}$" },
     "title": { "type": "string", "minLength": 1, "maxLength": 120 },
     "domain": {
       "type": "string",

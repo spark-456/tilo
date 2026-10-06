@@ -126,3 +126,11 @@
 - BQ-272: time and caps. Default: `today` in the person's time zone; "due in 48 h" means a due
   date up to `today` + 2 days (the preview's rule); personal pins only with a `due`; caps 200 and
   100.
+
+## Implementation (CC-PEOPLE-3, 2026-10-06)
+- `plate.schema.json` 1.0.0, `common.schema.json` 1.3.0 (`mail` in `record_ref.kind`), rules PE-26 to
+  PE-30. The schema also ties `ref.kind` to the work item and mail reasons, `attention` to gate,
+  consent and blocked rows, and `evidence` and the per-kind `actions` to their kinds.
+- `evidence` is a boolean (BQ-CCP3-1). The crossref cases are `fixtures/plate/crossref/` for work
+  items, pins and cards; runs, mail and calendar rows are left to the builder's tests (PPL-11a).
+  E-PA's 10 seeded states stay with PPL-50.

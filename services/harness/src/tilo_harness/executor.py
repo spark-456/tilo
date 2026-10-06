@@ -22,9 +22,11 @@ itself. Once a successful unit has handed over, each artifact it handed over get
 With `artifacts` and `scope` (FR-AGT-02, FR-MEM-06; ADR-0018 s5) a successful unit's `outputs` are stored with their
 `created` manifests (`outputs.keep`) after the runner returns and before `agent.handoff`, then announced: one
 `artifact.created` (or `artifact.versioned` for an output with a `parent`) per version, its data from the store's
-record, the unit's credits on the first. Its `artifact_refs` must be versions the store holds in `scope`. The envelope
-names the stored refs, then those. Any refusal fails the unit with no artifact event. Without a store, a unit that
-returns outputs fails (nowhere to put them) and its refs pass unchecked as before (tilo-api until ADR-0018 T4).
+record, the unit's credits on the first. Its `artifact_refs` must be versions the store holds in `scope` and the world
+recorded (`writer.recorded_version`). The envelope names the stored refs, then those. Any refusal fails the unit with no
+artifact event. `scope` must be the writer's org and world, or the plan is refused. Without a store, a unit that returns
+outputs fails (nowhere to put them) and its refs pass unchecked. With `before_handoff` (tilo-api's gate), a unit whose
+items are announced hands off only if it returns True; False fails the unit.
 
 Per unit: agent.spawned (Lead spawns the worker), agent.assigned, skill.loaded per pinned skill,
 agent.working, the `UnitRunner`'s work, agent.handoff (typed envelope, worker to Lead) when it
@@ -40,7 +42,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import math
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -85,6 +87,10 @@ class UnitContext:
 
 class UnitRunner(Protocol):
     async def run(self, unit: Mapping[str, Any], context: UnitContext) -> UnitOutcome: ...
+
+
+# (unit, worker, [(announced ref, its artifact event id)]) -> whether the unit may hand off (e.g. tilo-api's gate)
+BeforeHandoff = Callable[[dict[str, Any], str, list[tuple[dict[str, Any], str]]], Awaitable[bool]]
 
 
 @dataclass
@@ -242,10 +248,12 @@ class _Run:
         verifier: Verifier | None,
         question_wait: QuestionWait | None,
         store: dict[str, Any],
+        before_handoff: BeforeHandoff | None,
     ) -> None:
         self.writer, self.roster, self.skills, self.pins, self.runner = writer, roster, skills, pins, runner
         self.must_ask, self.verifier, self.question_wait = must_ask, verifier, question_wait
-        self.store = store  # artifacts, scope, archive, redact, max_attempts (ADR-0018); empty without a store
+        self.store = store  # artifacts, scope, archive, redact, max_attempts, recorded (ADR-0018); empty without one
+        self.before_handoff = before_handoff
         self.held: set[str] = set()
         self.handoffs: dict[str, str] = {}  # unit -> the agent.handoff event that carried its artifacts
 
@@ -372,8 +380,14 @@ class _Run:
             outcome = UnitOutcome(success=False, summary="The unit's result was not a valid handoff.")
         if envelope is not None:
             credits = getattr(outcome, "credits", 0)  # the unit's credits ride on its first item (HR-1: the meter)
-            for index, item in enumerate(made):
-                self.announce(item, worker, cause, district, credits if index == 0 else 0)
+            announced = [
+                (item.version.ref, self.announce(item, worker, cause, district, credits if index == 0 else 0))
+                for index, item in enumerate(made)
+            ]
+            if self.before_handoff is not None and not await self.before_handoff(unit, worker, announced):
+                outcome = UnitOutcome(success=False, summary="The unit's step before its handoff did not finish.")
+                envelope = None
+        if envelope is not None:
             summary = "The agent handed its result to the Lead."
             try:
                 cause = self.emit("agent.handoff", worker, lead, summary, {"envelope": envelope}, cause=cause, **at)
@@ -396,7 +410,7 @@ class _Run:
             credits = getattr(outcome, "credits", 0)
             if isinstance(credits, bool) or not isinstance(credits, int | float) or not 0 <= credits < math.inf:
                 raise ValueError("the unit's credits are not a finite number of at least 0")
-            selected = existing(store["artifacts"], store["scope"], outcome.artifact_refs)
+            selected = existing(store["artifacts"], store["scope"], outcome.artifact_refs, store["recorded"])
             made = await asyncio.to_thread(
                 keep, outcome.outputs, run_id=self.writer.run_id, unit=unit, worker=worker, events=list(trail), **store
             )
@@ -405,7 +419,7 @@ class _Run:
         except Exception:  # a refused put, manifest or ref, or a backend error: no artifact event for this unit
             return UnitOutcome(success=False, summary="The unit's result could not be stored."), []
 
-    def announce(self, item: Kept, worker: str, cause: str, district: str, credits: float) -> None:
+    def announce(self, item: Kept, worker: str, cause: str, district: str, credits: float) -> str:
         """One event per stored version, its data from the store's record (ADR-0018 s6): no runner-named id or hash."""
         record, ref = item.version.record, item.version.ref
         if record["parents"]:  # EV-15: created names version 1 only; a later version is recorded as versioned
@@ -416,7 +430,7 @@ class _Run:
             data = {"artifact": ref} | {k: record[k] for k in ("content_sha256", "media_type", "size_bytes")}
         labelled = {"item": {"kind": "document", "artifact_id": ref["artifact_id"], "label": item.label}}
         extra = labelled if item.label is not None else {}
-        self.emit(
+        return self.emit(
             type_, worker, ref["artifact_id"], summary, data, cause=cause, district=district, credits=credits, **extra
         )
 
@@ -444,11 +458,17 @@ async def run_plan(
     scope: Any = None,
     archive: Any = None,
     redact: Callable[[str], str] | None = None,
+    before_handoff: BeforeHandoff | None = None,
 ) -> RunResult:
-    """`artifacts` (a `tilo_memory.artifacts.ArtifactStore`) comes with the run's `scope` and the shared secret
-    `redact`or the store also got; `archive` (`tilo_archive.RunArchive`) is the run's raw archive, for manifests."""
-    if artifacts is not None and (scope is None or redact is None):
-        raise PlanRefused(["run_plan: an artifact store needs the run's scope and the secret redactor"])
+    """`artifacts` (a `tilo_memory.artifacts.ArtifactStore`) comes with the run's `scope`, which must be the writer's
+    org and world, and the shared secret `redact`or the store also got; `archive` (`tilo_archive.RunArchive`) is the
+    run's raw archive, for manifests. The writer then also says what its world recorded (`recorded_version`)."""
+    if artifacts is not None:
+        if scope is None or redact is None or not callable(getattr(writer, "recorded_version", None)):
+            raise PlanRefused(["run_plan: an artifact store needs the scope, the redactor and the world's record"])
+        writer_at = (getattr(writer, "org_id", None), getattr(writer, "world_id", None))
+        if (getattr(scope, "org_id", None), getattr(scope, "world_id", None)) != writer_at:
+            raise PlanRefused(["run_plan: the artifact scope is not the writer's org and world"])
     validator = repo_validator()
     problems = validator.contract_problems("plan", plan) + validator.contract_problems("layout", layout)
     if problems:
@@ -466,9 +486,19 @@ async def run_plan(
 
     result = RunResult(pins=pins)
     store = {"artifacts": artifacts, "scope": scope, "archive": archive, "redact": redact}
-    store |= {"max_attempts": config.retries.max_attempts}
+    if artifacts is not None:
+        store |= {"max_attempts": config.retries.max_attempts, "recorded": writer.recorded_version}
     run = _Run(
-        writer, roster, skills, pins, runner, must_ask, verifier, question_wait, store if artifacts is not None else {}
+        writer,
+        roster,
+        skills,
+        pins,
+        runner,
+        must_ask,
+        verifier,
+        question_wait,
+        store if artifacts is not None else {},
+        before_handoff,
     )
     run.spawn_team()
     slots = asyncio.Semaphore(config.limits.max_specialists)

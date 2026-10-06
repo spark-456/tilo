@@ -5,8 +5,10 @@ The eval harness (PRD 19, EFF-06, EFF-07). P8-06a/b: case schema/loader, `EvalsC
 
 ## Commands
 - `just eval` — replay every case under `evals/cases/` (full pass) into the git-ignored `evals/results.local.md`; `uv run python -m tilo_evals run --pass smoke|full|gate [--group G] [--case ID] [--results-md P] [--results-json P]`
+- `just eval-metrics` / `uv run python -m tilo_evals metrics [--case ID] [--bank-dir D] [--results-json P]` — a full replay pass plus the bank on fakes into the git-ignored `evals/metrics.local.md`; exit 0, or 2 when refused (LIVE, K_SERVICE, CLOUD_RUN_JOB) or a case file is bad
 - `uv run python -m tilo_evals bank [--case B-007] [--repeat 3]` — the generality bank (`evals/bank/B-NNN.yaml`, own `bank.schema.json`) end to end on fakes into git-ignored `evals/bank-results.local.md`; exit 0 all hard checks pass, 1 any fails, 2 refused (LIVE, K_SERVICE or CLOUD_RUN_JOB set) or bad bank
 - `just live-e2e [--case B-007] [--dry-run|--replay]` (PL-LIVE-E2E, `live_e2e.py`, `docs/live-e2e.md`) — one bank case through the real pipeline on the real profiles; live only with the user's `LIVE=1` (never CI or Cloud Run), ADC only, capped (default 40, max 200 credits), `TILO_RECORD=1` records to `evals/bank/live/<case>/model-recordings/`; `--replay` is free and runs in CI
+- `uv run python -m tilo_evals generate --n N [--dry-run] [--max-inr X]` — the live scenario generator (`generator.py`, GEN-07..GEN-10); the user's live switch only, never CI or Cloud Run, gate first; exit 0 ran, 1 a hard check failed or no case written, 2 refused, 3 stopped at the cap
 - `uv run pytest "evals/tests" -q` — the tests (fake repos under `tmp_path`, never `evals/cases`)
 - Exit codes: 0 every case that ran passed (or none ran), 1 a case failed, 2 the pass could not run (bad config or case file, unknown `--case` or `--group`, `--live` refused), 3 stopped at the credit cap with no failure.
 
@@ -21,8 +23,11 @@ The eval harness (PRD 19, EFF-06, EFF-07). P8-06a/b: case schema/loader, `EvalsC
 - Frozen and held out: `evals/bank/MANIFEST.sha256` pins the set; a change needs the user's approval. A failing case is fixed in code in general, never by naming its brief anywhere outside `evals/bank/`.
 - Hard checks (GEN-03): no crash, events valid, plan valid, gates as policy, honest terminal state, budget. `delivers_something` is reported, not gated (items made but none delivered; the plan's `deliver` unit delivers them, BQ-218).
 
+## Live generator (#272 b)
+- Roles `generator` and `autorater` (config/models.yaml, PL-01); cap `max_inr` / `inr_per_usd` in `evals/generator.yaml` (INR 150, schema beside it). Briefs are untrusted (shape, length, language, near-duplicate, safety screen), then one live run each through `live_e2e._execute`. Kept cases go to git-ignored `evals/generated/<date>/G-NNN.yaml`, replay with `bank --bank <folder>`, and the user promotes one into `evals/bank/` by PR. Autorater scores have their own report section, labelled live, and never count (GEN-10).
+
 ## Requirement IDs
-- EFF-07 (a to d); GEN-01 to GEN-05, GEN-11 (bank, issue #272). Supports EFF-06 (nightly cost regression, later) and the PRD 19.2 case set.
+- EFF-07 (a to d); EV-01 to EV-15 (metrics); GEN-01 to GEN-05, GEN-11 (bank), GEN-07 to GEN-10 (generator), issue #272. Supports EFF-06 (nightly cost regression, later) and the PRD 19.2 case set.
 
 ## Local rules
 - No paid calls: only `ReplayExecutor` exists. `--live` refuses without the user's `LIVE=1` and, with it, says no live executor is built (it would go through `packages/providers`). No model id here (PL-01): results show profile names from each event's own trace.
@@ -30,6 +35,6 @@ The eval harness (PRD 19, EFF-06, EFF-07). P8-06a/b: case schema/loader, `EvalsC
 - Credit cap (MT-09): a case that would take the spend over `credit_cap[pass]`, and every case after it, is listed as not run with a stop reason; a pass whose cap is reached starts nothing more. Bad recordings (unreadable; credits negative, NaN, huge, a bool or a string) make a case not runnable, with the reason recorded, and never crash the pass.
 - Autorater checks (`kind: autorater`) are never run here: reported as pending, never counted as passed.
 - `evals/results.md` is the official file (PRD 19.5): the CLI default, committed deliberately on pass dates (7, 12, 15 Oct); `just eval` writes `evals/results.local.md` instead so dev runs never dirty the tree. It keeps the latest run of each pass kind (counts first, per case group, spread, failures by cause, not runnable, not run).
-- `load_cases` rejects an unregistered check (a `kind: autorater` check is skipped, not looked up). A check is `get(name)(case, outcome, args)`; `args` is that entry's `checks[i].args`.
-- Case YAML is parsed with a no-alias loader: any `&anchor`/`*alias` in a case file is rejected, never expanded.
+- `load_cases` rejects an unregistered check (a `kind: autorater` check is skipped, not looked up). A check is `get(name)(case, outcome, args)`; `args` is that entry's `checks[i].args`. Case YAML is parsed with a no-alias loader: any `&anchor`/`*alias` is rejected, never expanded.
+- Metrics (EV-01..EV-15, `metrics.py`, `metrics_report.py`): `compute_metrics` is pure, over `RunRecord`s with basis `recorded` (replay) or `scripted_fakes` (bank), never pooled; a fake row says "mechanics only" and never claims a target; no data or live-only metrics (EV-02, 05, 11-15) carry no number. `credit_usd` comes from `config/prices.yaml` via tilo-metering, never a literal; EV-08 reuses `credits_saved`.
 - A check never passes on a missing or mistyped field: `schema_valid` and `recipients_within` fail with "field missing"; `recipients_within` needs a list of strings; `schema_valid` refuses a `schema` path outside `contracts/` and fails (never skips) on an unreadable contract schema; `equals_ground_truth` is bool-vs-number strict at every depth; `register` accepts only `deterministic` or `autorater`. `flagged_or_blocked` still accepts any `alert.raised` (open question BQ-108: needs a contract marker).

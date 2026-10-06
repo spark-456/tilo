@@ -15,6 +15,7 @@ members = [
     "tilo-harness",
     "tilo-memory",
     "tilo-metering",
+    "tilo-people",
     "tilo-planning",
     "tilo-policy",
     "tilo-providers",
@@ -1372,8 +1373,10 @@ dependencies = [
     { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "referencing" },
+    { name = "tilo-archive" },
     { name = "tilo-connectors" },
     { name = "tilo-harness" },
+    { name = "tilo-memory" },
     { name = "tilo-metering" },
     { name = "tilo-planning" },
     { name = "tilo-policy" },
@@ -1388,8 +1391,10 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.18" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-archive", editable = "packages/archive" },
     { name = "tilo-connectors", editable = "services/connectors" },
     { name = "tilo-harness", editable = "services/harness" },
+    { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-metering", editable = "packages/metering" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-policy", editable = "packages/policy" },
@@ -1427,6 +1432,7 @@ version = "0.1.0"
 source = { editable = "services/channels" }
 dependencies = [
     { name = "fastapi" },
+    { name = "pyyaml" },
     { name = "tilo-policy" },
     { name = "tilo-providers" },
     { name = "uvicorn" },
@@ -1435,6 +1441,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-providers", editable = "packages/providers" },
     { name = "uvicorn", specifier = ">=0.32" },
@@ -1491,6 +1498,7 @@ dependencies = [
     { name = "referencing" },
     { name = "tilo-api" },
     { name = "tilo-contracts" },
+    { name = "tilo-metering" },
     { name = "tilo-planning" },
     { name = "tilo-providers" },
 ]
@@ -1503,6 +1511,7 @@ requires-dist = [
     { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-api", editable = "services/api" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-metering", editable = "packages/metering" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-providers", editable = "packages/providers" },
 ]
@@ -1576,6 +1585,21 @@ dependencies = [
 requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+]
+
+[[package]]
+name = "tilo-people"
+version = "0.1.0"
+source = { editable = "packages/people" }
+dependencies = [
+    { name = "tilo-policy" },
+    { name = "tzdata" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tzdata", specifier = ">=2024.1" },
 ]
 
 [[package]]

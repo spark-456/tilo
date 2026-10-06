@@ -30,7 +30,7 @@ Open (check on the store / starter / wiring tickets, not failed here):
 - Store/starter must: take owner from the signed-in session never a body, verify approved_brief_ref and prior_world_id belong to that owner and org,
   re-derive plan and gates (no carried approvals), start deterministic world id from the key, use server time for the lease, disable schedules on
   user erasure and consent revoke. cache_namespace = schedule_id only (must be server-assigned and unique, or include org/owner).
-- `schedule` also valid in card.answer_channels (needs_you/blocked), world.paused.channel, policy.notify_channel (BQ-279 e): narrow before any notify consumer exists.
+- `schedule` also valid in card.answer_channels (needs_you/blocked), world.paused.channel, policy.notify_channel (BQ-AGT14-1 e): narrow before any notify consumer exists.
 - ACCESS.md first Route-requirements bullet does not name tilo-schedule-scheduler; add a 403 test for it when the Gmail renew/poll and Tasks run routes land.
 
 **Why:** the tick is the first route reachable by four run.invoker identities and the first unattended starter of runs.

@@ -108,7 +108,11 @@ class RecordReplayProvider(ModelProvider):
         live_factory: Callable[[], ModelProvider],
         fixtures_dir: Path | str,
         capabilities: set[Capability] | None = None,
+        live_permitted: bool = False,
     ) -> None:
+        # SEC-15: an explicit, injected permission (never read from the environment, never set by a request): the
+        # caller that built this provider decided this call may go live. Default False: only `LIVE=1` goes live.
+        self._live_permitted = live_permitted
         self._capabilities = frozenset(capabilities or ())
         self._role = role
         self._profile_id = profile_id
@@ -117,10 +121,10 @@ class RecordReplayProvider(ModelProvider):
         self._recordings_dir = Path(fixtures_dir) / "model-recordings" / role
 
     def _is_live(self) -> bool:
-        return is_live_mode()
+        return self._live_permitted or is_live_mode()
 
     def _is_record(self) -> bool:
-        return self._is_live() and os.environ.get("TILO_RECORD") == "1"
+        return is_live_mode() and os.environ.get("TILO_RECORD") == "1"  # a permitted call never records
 
     def _live(self) -> ModelProvider:
         if self._live_provider is None:
