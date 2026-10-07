@@ -290,19 +290,16 @@
 }
 /* Narrow phones: in the reference nav (wordmark + three buttons) the Home tab gets ~78px at 390 and needs 68. Here the
    chip is only its dot and gives back the pill chrome and the tools gap, so it takes ~4px of the strip (dot 8px, tools gap -4px) and Home stays whole at 390
-   (the reference itself scrolls the strip below ~380). The click area stays large. */
+   (the reference itself scrolls the strip below ~380). The button's own box is 24x24 (WCAG 2.5.8; axe measures the
+   element box, not a pseudo-element): the box fills the 16px tab-strip gap to its left (padding-left 16) plus 8px above and
+   below the dot, all cancelled by negative margins so the strip is unchanged; it touches, never covers, its neighbours. */
 @media (max-width: 430px) {
   [data-park] .park-shell__sample {
-    position: relative;
-    margin: 0 -4px 0 0;
-  }
-  [data-park] .park-shell__sample::before {
-    content: "";
-    position: absolute;
-    inset: -8px -2px;
+    padding: 8px 0 8px 16px;
+    margin: -8px -4px -8px -16px;
   }
   /* The invisible boot ghost must never take a tap meant for the next button. */
-  [data-park] .park-shell__sample.park-shell__booting::before {
+  [data-park] .park-shell__sample.park-shell__booting {
     pointer-events: none;
   }
   [data-park] .park-shell__sample .park-chip {
