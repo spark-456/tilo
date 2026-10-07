@@ -9,10 +9,14 @@ interface RulesProps {
   rules: Team["rules"];
   on: Record<string, boolean>;
   art: ReactNode;
+  /** FR-TEAM-04: Must-ask rule keys: shown on, and they can't be switched off. */
+  locked: readonly string[];
+  /** Every switch change this session, newest last (sample: nothing is stored). */
+  log: readonly { key: string; when: string; to: boolean }[];
   onToggle: (key: string, next: boolean) => void;
 }
 
-export function RulesCard({ rules, on, art, onToggle }: RulesProps) {
+export function RulesCard({ rules, on, art, locked, log, onToggle }: RulesProps) {
   return (
     <section className="park-team-card park-team-rules" aria-label="Approval rules">
       <div className="park-team-cardhead">
@@ -28,9 +32,24 @@ export function RulesCard({ rules, on, art, onToggle }: RulesProps) {
             <div className="park-team-what">{when}</div>
             <div className="park-team-ruleby">{who}</div>
           </div>
-          <Switch label={when} checked={on[key] ?? dflt} onChange={(next) => onToggle(key, next)} />
+          <Switch
+            label={when}
+            checked={locked.includes(key) || (on[key] ?? dflt)}
+            disabled={locked.includes(key)}
+            onChange={(next) => onToggle(key, next)}
+          />
         </div>
       ))}
+      {log.length ? (
+        <ul className="park-team-ruleby park-team-rulelog" aria-label="Rule changes">
+          {log.map((e, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: an append-only list, never reordered
+            <li key={i}>
+              {e.when}: {e.to ? "On" : "Off"}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }

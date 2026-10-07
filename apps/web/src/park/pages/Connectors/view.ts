@@ -2,7 +2,21 @@
 // Connectors.dc.html). The page keeps the local overrides (`st`, `lvl`); nothing here touches the Api.
 import type { Connector } from "../../api/types";
 
-export const LEVEL_LABEL = ["", "Read", "Draft", "Act"] as const;
+export const LEVEL_LABEL = ["Off", "Read", "Draft", "Act"] as const;
+
+/** FR-ACC-01 / BQ-DSN-04: what each level lets agents do, as a ceiling on the risk tier. The policy engine enforces
+ * it (tilo_policy.access_levels); this is the plain-language line, shown on sample data. */
+const CEILING = [
+  "Off blocks every call to this tool.",
+  "Read allows read-only actions (T0).",
+  "Draft allows drafts and internal staging (T0 to T1), never an external send.",
+  "Act goes no further than the policy engine allows (T2 within policy). T3 actions always need an approval card.",
+] as const;
+export const ceilingOf = (level: number): string => CEILING[level] ?? CEILING[0];
+
+/** A skill's level can only restrict the team's level, never raise it (FR-ACC-02): the lower of the two. */
+export const effectiveLevel = (team: number, skill: number | undefined): number =>
+  skill === undefined ? team : Math.min(team, skill);
 export const DEFAULT_SCOPES: [string, number][] = [
   ["Read", 1],
   ["Draft", 2],

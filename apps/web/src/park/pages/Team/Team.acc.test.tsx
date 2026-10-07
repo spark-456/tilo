@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
 // FR-TEAM-02 / FR-TEAM-04 on the Team page (fixture data, labelled sample): nobody changes their own role;
 // the Must-ask switches are locked on and every switch change is logged on the page.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, makeApp, renderTeam } from "../../../../test-support/park/teamHarness";
-import { canChangeRole } from "./teamModel";
+import { MUST_ASK_RULES, canChangeRole } from "./teamModel";
 import { clickAndSettle, region, switchNamed } from "./testApp";
 
 afterEach(cleanup);
@@ -26,6 +28,15 @@ describe("FR-TEAM-02 roles", () => {
 });
 
 describe("FR-TEAM-04 stop-and-ask switches", () => {
+  it("FR-TEAM-04 the page's locked keys are the config's must_ask keys", () => {
+    const yaml = readFileSync(
+      resolve(__dirname, "../../../../../../config/team_rules.yaml"),
+      "utf8",
+    );
+    const keys = [...yaml.matchAll(/key: (\w+), default: true, must_ask: true/g)].map((m) => m[1]);
+    expect([...MUST_ASK_RULES]).toEqual(keys);
+  });
+
   it("FR-TEAM-04 Must-ask switches are locked on; the optional one changes and is logged", async () => {
     const { root } = await renderTeam(makeApp());
     const rules = region(root, "Approval rules");
