@@ -431,8 +431,37 @@ class SourceOwners(Protocol):
     def owner_of(self, kind: str, ref: str) -> str | None: ...  # kind "mail" or "request"
 
 
+_people_stores_lock = threading.Lock()
+_people_stores: PeopleStores | None = None
+
+
 def get_people_stores() -> PeopleStores:
-    raise HTTPException(status_code=503, detail="not_configured")  # no Firestore adapter yet (ticket PPL-11c)
+    """The process's one `PeopleStores` (the write limiter and idempotency keys live on it, #549). Built on the first
+    request, single-flight, only for `TILO_PEOPLE_STORE=firestore` plus a valid `TILO_FIRESTORE_PROJECT` (ADR-0023);
+    anything else, or a build that fails, is 503 `not_configured` (never cached, the error never echoed)."""
+    global _people_stores
+    built = _people_stores
+    if built is not None:
+        return built
+    with _people_stores_lock:
+        if _people_stores is None:
+            from tilo_api.people_firestore import open_people_stores  # noqa: PLC0415
+
+            try:
+                _people_stores = open_people_stores()
+            except Exception as exc:
+                logger.warning("people stores not built (%s)", type(exc).__name__)
+                raise HTTPException(status_code=503, detail="not_configured") from None
+        return _people_stores
+
+
+def _forget_people_stores() -> None:
+    global _people_stores
+    with _people_stores_lock:
+        _people_stores = None
+
+
+get_people_stores.cache_clear = _forget_people_stores  # type: ignore[attr-defined]  # tests start from a cold process
 
 
 _BOOTSTRAP_UID = re.compile(r"u_[0-9A-Za-z_]{1,48}")
