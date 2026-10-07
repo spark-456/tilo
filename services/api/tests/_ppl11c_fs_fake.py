@@ -28,6 +28,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from google.api_core import exceptions as gexc
+from google.cloud.firestore_v1 import ReadAfterWriteError
 from google.cloud.firestore_v1.base_transaction import BaseTransaction
 from google.cloud.firestore_v1.transaction import Transaction
 
@@ -39,6 +40,13 @@ def _dig(data: Mapping[str, Any] | None, field_path: str) -> Any:
     for part in field_path.split("."):
         current = current[part]
     return current
+
+
+def _refuse_read_after_write(transaction: Any) -> None:
+    """The SDK refuses (client side, `ReadAfterWriteError`) a transactional read once the transaction has a buffered
+    write; the emulator and the server say the same, so a store that interleaves them works nowhere."""
+    if transaction is not None and getattr(transaction, "_ops", None):
+        raise ReadAfterWriteError("Attempted read after write in a transaction.")
 
 
 class FakeSnapshot:
@@ -66,6 +74,7 @@ class FakeRef:
         self._db, self.path, self.id = db, path, path.rsplit("/", 1)[-1]
 
     def get(self, transaction: Any = None, **_: Any) -> FakeSnapshot:
+        _refuse_read_after_write(transaction)
         return self._db.read(self.path)
 
     # Direct (non-transactional) writes: one operation, atomic, with its own precondition.
@@ -93,6 +102,7 @@ class FakeQuery:
         raise NotImplementedError("the fake serves the person store's calls only (no index queries)")
 
     def stream(self, transaction: Any = None, **_: Any) -> Any:
+        _refuse_read_after_write(transaction)
         paths = sorted(p for p in self._db.docs if p.startswith(self._prefix) and "/" not in p[len(self._prefix) :])
         for path in paths[: self._limit]:
             yield self._db.read(path)

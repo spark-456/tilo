@@ -236,21 +236,27 @@ class FirestorePersonStore(FirestoreRecordStore):
             _pause(attempt)
         raise PeopleError("the people store is busy")
 
-    def _claim(self, txn: Any, org: str, email: str, pid: str) -> None:
-        """Reserves an address for the person: created (never set) when the read found none, `EmailTaken` when another
-        person holds it; one the person already holds is left as it is."""
+    # A transaction reads first and writes last (the SDK refuses a read after a buffered write): `_slot` is the read
+    # of an address's reservation, `_claim` and `_release` are the writes that follow once every read is done.
+    def _slot(self, txn: Any, org: str, email: str) -> tuple[Any, Any]:
         ref = self._reservation(org, email)
-        held = ref.get(transaction=txn)
+        return ref, ref.get(transaction=txn)
+
+    @staticmethod
+    def _claim(txn: Any, slot: tuple[Any, Any], pid: str) -> None:
+        """Reserves the address for the person: created (never set) when the read found none, `EmailTaken` when another
+        person holds it; one the person already holds is left as it is."""
+        ref, held = slot
         if not held.exists:
             txn.create(ref, {"person_id": pid})
         elif held.get("person_id") != pid:
             raise EmailTaken(f"EmailTaken: person {pid}")
 
-    def _release(self, txn: Any, org: str, email: str, pid: str) -> None:
+    @staticmethod
+    def _release(txn: Any, slot: tuple[Any, Any], pid: str) -> None:
         """Deletes the person's reservation; one held by someone else fails the whole transaction (nothing is written,
         no address or text in the error), an absent one is no error."""
-        ref = self._reservation(org, email)
-        held = ref.get(transaction=txn)
+        ref, held = slot
         if held.exists:
             if held.get("person_id") != pid:
                 raise PeopleError("the people store is inconsistent")
@@ -261,9 +267,10 @@ class FirestorePersonStore(FirestoreRecordStore):
         data, ref = _doc(1, record), self._ref(org, pid)
 
         def work(txn: Any) -> None:
-            if ref.get(transaction=txn).exists:
+            exists, slot = ref.get(transaction=txn).exists, self._slot(txn, org, record["email"])
+            if exists:
                 raise AlreadyExists(f"AlreadyExists: person {pid}")
-            self._claim(txn, org, record["email"], pid)
+            self._claim(txn, slot, pid)
             txn.create(ref, data)
 
         with _guarded():
@@ -280,9 +287,10 @@ class FirestorePersonStore(FirestoreRecordStore):
             anyone = any(True for _ in self._collection(org).limit(1).stream(transaction=txn))
             if founder.get(transaction=txn).exists or anyone:
                 raise OrgAlreadyFounded("OrgAlreadyFounded")
-            if ref.get(transaction=txn).exists:
+            exists, slot = ref.get(transaction=txn).exists, self._slot(txn, org, record["email"])
+            if exists:
                 raise AlreadyExists(f"AlreadyExists: person {pid}")
-            self._claim(txn, org, record["email"], pid)
+            self._claim(txn, slot, pid)
             txn.create(founder, {"uid": pid})
             txn.create(ref, data)
 
@@ -309,8 +317,9 @@ class FirestorePersonStore(FirestoreRecordStore):
                 raise self._conflict(pid, expected, snap.get("version"))
             old, new = str(snap.get("record")["email"]).lower(), record["email"].lower()
             if old != new:
-                self._release(txn, org, old, pid)
-                self._claim(txn, org, new, pid)
+                old_slot, new_slot = self._slot(txn, org, old), self._slot(txn, org, new)  # both reads, then the writes
+                self._release(txn, old_slot, pid)
+                self._claim(txn, new_slot, pid)
             txn.update(ref, data)
 
         with _guarded():
@@ -341,7 +350,7 @@ class FirestorePersonStore(FirestoreRecordStore):
                 people = [s.id for s in self._collection(org_id).limit(2).stream(transaction=txn)]
                 if people == [record_id] and not self._directory(org_id, "founder").get(transaction=txn).exists:
                     raise LastPerson(f"LastPerson: person {record_id}")
-            self._release(txn, org_id, snap.get("record")["email"], record_id)
+            self._release(txn, self._slot(txn, org_id, snap.get("record")["email"]), record_id)
             txn.delete(ref)
 
         with _guarded():
@@ -354,7 +363,9 @@ def _collided(where: str, pid: str) -> PeopleError:
         return OrgAlreadyFounded("OrgAlreadyFounded")
     if "/people_directory/email_" in where:
         return EmailTaken(f"EmailTaken: person {pid}")
-    return AlreadyExists(f"AlreadyExists: person {pid}")
+    if "/people_person/" in where:
+        return AlreadyExists(f"AlreadyExists: person {pid}")
+    return PeopleError("the people store is unavailable")  # an unknown path: no class we cannot vouch for
 
 
 def firestore_people_stores(client: Any) -> PeopleStores:
