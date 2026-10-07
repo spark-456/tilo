@@ -352,6 +352,34 @@ def test_FR_AGT_09_no_rework_and_same_outputs_as_a_run_without_handoff(tmp_path)
     assert len(ran.of("agent.handoff")) == 2, "one handoff envelope per unit, from the agent that finished it"
 
 
+def test_FR_AGT_09_concurrent_handoffs_get_distinct_successors(tmp_path) -> None:
+    """Two independent same-rank units hand off at the same time; the note's put yields to the loop, so a spare that
+    were reserved only after the put could go to both. Each successor must be a different agent, spawned once."""
+    ids = ["U1", "U2"]
+    layout = build_layout(
+        world_id=WORLD,
+        district_specs=[{"id": "D1", "lead": "A_lead", "specialists": [f"A_s{i}" for i in range(4)], "unit_ids": ids}],
+    )
+    plan = build_plan([build_unit(u, district="D1") for u in ids])  # no dependency: both run concurrently
+    config = load_config_sync(write_agents_config(tmp_path / "agents.yaml"))
+    skills = make_skill_registry(copy_skills_fixture_tree(tmp_path / "skills"))
+    writer, store = make_memory_writer(layout, world_id=WORLD)
+    rig = make_rig(world_id=WORLD)
+    runner = StepRunner(steps=6, cost=20, base=10)
+    run = run_plan(
+        plan, layout, writer=writer, config=config, skills=skills, runner=runner,
+        artifacts=rig.store, scope=rig.scope, redact=rig.redactor,
+    )  # fmt: skip
+    result = asyncio.run(asyncio.wait_for(run, 30))
+    ran = Ran(WORLD, rig, writer, store, result, layout, {u: f"A_s{i}" for i, u in enumerate(ids)}, runner)
+
+    successors = [e["actor"] for e in ran.of("agent.context_handoff_completed")]
+    assert len(successors) == 2 and len(set(successors)) == 2, successors
+    spawned = [e["target"] for e in ran.of("agent.spawned") if e["target"] in successors]
+    assert sorted(spawned) == sorted(successors), "each successor is spawned exactly once"
+    assert result.failed == [] and all(result.outcomes[u].success for u in ids)
+
+
 def test_FR_AGT_09_repeated_handoffs_chain_predecessors(tmp_path) -> None:
     runner = StepRunner(steps=12)  # three steps per agent: 4 agents, 3 handoffs
     ran = drive(tmp_path, runner)

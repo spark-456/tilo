@@ -428,13 +428,14 @@ class _Run:
             successor = next_spare(self.roster.ranks, unit["role"], self.used)
             if pct is None or not note_is_valid(note) or not self.store or successor is None:
                 return closed, worker, cause  # nothing handoff-shaped is written
+            self.used.add(successor)  # reserved before any await, so a concurrent handoff cannot pick the same spare
             try:
                 ref = await asyncio.to_thread(
                     store_note, self.store, self.writer.run_id, unit["id"], worker, note, handoffs
                 )
-            except Exception:  # a refused or failed put: fail closed
+            except Exception:  # a refused or failed put: fail closed, and the unused spare goes back
+                self.used.discard(successor)
                 return closed, worker, cause
-            self.used.add(successor)
             handoffs += 1
 
             def say(type_: str, actor: str, target: str, text: str, data: dict[str, Any]) -> str:
