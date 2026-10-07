@@ -265,6 +265,7 @@ export const worlds = (dec: Dec = {}, added: readonly World[] = []): World[] => 
       owner: "Alex Morgan",
       started: "2 Sep",
       plan: "k1",
+      heroTag: "Level 3 of 6 · Prototypes and suppliers",
       districts: [
         {
           name: "Town Hall",

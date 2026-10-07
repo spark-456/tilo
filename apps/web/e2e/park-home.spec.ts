@@ -958,7 +958,7 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
       await expect(input(page)).toHaveValue("");
       await toast.getByRole("button", { name: "Open" }).click();
       await expect(page).toHaveURL(/\/park\/world\/new1$/);
-      await expect(page.getByTestId("park-page-world")).toContainText("new1");
+      await expect(page.getByTestId("park-page-world")).toHaveAttribute("data-world-id", "new1");
       expect(problems).toEqual([]);
     });
 
@@ -1000,7 +1000,7 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
       const problems = await openHome(page, "day");
       await pill(page).click();
       await expect(page).toHaveURL(/\/park\/world\/k1$/);
-      await expect(page.getByTestId("park-page-world")).toContainText("k1");
+      await expect(page.getByTestId("park-page-world")).toHaveAttribute("data-world-id", "k1");
       expect(problems).toEqual([]);
     });
 
