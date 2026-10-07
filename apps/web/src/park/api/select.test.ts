@@ -38,9 +38,10 @@ describe("WEB_1a_select: no API url means fixtures, labelled as such", () => {
 
 describe("WEB_1a_select: an API url means the live Api and no sample values", () => {
   it("WEB_1a_select_with_url_every_method_rejects_NotBuilt", async () => {
+    // WIRE-1/WIRE-2: getLedger (GET /costs) and getWorlds (GET /worlds) are built (liveApi.wire1/wire2 tests).
     const api = parkApi(LIVE_ENV);
     const args = callTable();
-    for (const m of API_METHODS) {
+    for (const m of API_METHODS.filter((x) => x !== "getLedger" && x !== "getWorlds")) {
       const p = invoke(api, m, args);
       expect(p, `${m} returns a Promise`).toBeInstanceOf(Promise);
       const outcome = await (p as Promise<unknown>).then(
@@ -56,13 +57,13 @@ describe("WEB_1a_select: an API url means the live Api and no sample values", ()
     }
   });
 
-  it("WEB_1a_select_with_url_no_network_request_is_made_yet", async () => {
+  it("WEB_1a_select_with_url_no_network_request_is_made_for_an_unbuilt_method", async () => {
     const fetchSpy = vi.fn(async () => {
       throw new Error("WEB-1a: nothing to fetch yet");
     });
     vi.stubGlobal("fetch", fetchSpy);
     const api = parkApi(LIVE_ENV);
-    await expect(api.getLedger()).rejects.toBeInstanceOf(NotBuilt);
+    await expect(api.getUser()).rejects.toBeInstanceOf(NotBuilt);
     await expect(api.decide("depot")).rejects.toBeInstanceOf(NotBuilt);
     expect(fetchSpy).not.toHaveBeenCalled();
   });

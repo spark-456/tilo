@@ -65,7 +65,8 @@ def test_CL_INT_5_dev_replies_are_deterministic_across_tasks(dev_client):
 
 
 def test_CL_INT_5_dev_models_file_is_selected_by_just_dev_api(monkeypatch):
-    monkeypatch.delenv("TILO_MODELS_FILE", raising=False)
+    monkeypatch.setenv("TILO_MODELS_FILE", "unset-below")  # records the original, so dev.main's write is undone too
+    monkeypatch.delenv("TILO_MODELS_FILE")
     monkeypatch.setenv("TILO_API_DEV", "1")  # dev.main() sets it in os.environ: monkeypatch must undo that afterwards
     monkeypatch.setattr("uvicorn.run", lambda *a, **k: None)
 

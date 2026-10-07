@@ -15,6 +15,10 @@ export const decisionFacts: Record<DecisionKey, DecisionFacts> = {
     decided: "Laptop Depot approved today",
     approvedNote: "Approved · £3,420 · K1 electric scooter",
     activity: "You approved £3,420 for Laptop Depot",
+    spendNote: {
+      waiting: "£3,420 is waiting for your sign-off at Laptop Depot.",
+      decided: "Laptop Depot approved today for £3,420. It’s billed on delivery.",
+    },
     details: [
       ["Your limit", "No limit"],
       ["Asked by", "Builder agent"],

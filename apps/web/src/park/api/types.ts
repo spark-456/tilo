@@ -70,6 +70,7 @@ export interface DecisionFacts {
   approveLabel?: string;
   /** The label and value rows of the detail panel on the activity line recorded once it is taken. */
   details?: [label: string, value: string][];
+  spendNote?: { waiting: string; decided: string };
 }
 
 export type TierName = "Village" | "Town" | "City";
@@ -173,6 +174,7 @@ export interface World {
   runs?: WorldRun[] | null;
   skill?: string;
   out?: string | null;
+  heroTag?: string;
 }
 
 // Skills and learning
@@ -247,6 +249,8 @@ export interface Ledger {
   memory: number[];
   hours: [string, number, string, string][];
   activity: LedgerEntry[];
+  /** The currency the amounts are in, as served; absent means pounds (the fixture). */
+  currency?: "GBP" | "USD";
 }
 
 // Agenda
