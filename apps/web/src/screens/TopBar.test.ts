@@ -10,7 +10,7 @@ describe("UX-227-C the top bar's current place", () => {
       sub: "Approaches",
       world: null,
     });
-    expect(placeOf("/world/w_a")).toEqual({ name: "World", sub: null, world: "w_a" });
+    expect(placeOf("/world/w_a/stage")).toEqual({ name: "World", sub: null, world: "w_a" });
     expect(placeOf("/world/w_a/story")).toEqual({ name: "World", sub: "Story", world: "w_a" });
     expect(placeOf("/world/w_a/delivery").sub).toBe("Delivery");
   });

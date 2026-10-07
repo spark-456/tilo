@@ -237,6 +237,7 @@ def get_approaches(
                     task.brief, router=model_router, base=base, seq=task.next_seq, gaps=task.gaps
                 )
             except ApproachProposalError as exc:
+                deps.raise_if_model_unavailable(exc)
                 raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
             _append(store, task, [result.event])
             task.approaches = result.approaches

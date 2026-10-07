@@ -28,7 +28,7 @@ test("S_17 renders, no console errors, placeholders aria-disabled", async ({ pag
 test("S_18 renders, no console errors, placeholders aria-disabled", async ({ page }) => {
   test.setTimeout(90_000);
   const problems = watchConsole(page);
-  await visit(page, "/team", "Team Lead console", async () => {
+  await visit(page, "/team/console", "Team Lead console", async () => {
     // The run's one question is answered at the end: nothing is waiting, one answer is recorded.
     await expect(page.getByTestId("lead-empty")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("You approved sending the reply.")).toBeVisible();
@@ -43,7 +43,7 @@ test("S_18 lists the run's question while it waits, with a link named after it",
 }) => {
   await page.setViewportSize(DESKTOP);
   // The gate is open from seq 34 to seq 37 (44 s recorded, 4.4 s at ?speed=10).
-  await page.goto("/team?speed=10");
+  await page.goto("/team/console?speed=10");
   const queue = page.getByTestId("lead-queue");
   await expect(queue).toContainText("The reply is ready. Sending it needs your approval.", {
     timeout: 20_000,
@@ -78,6 +78,6 @@ test("S_19 shows one loading box, then the data, with a slow client", async ({ p
 // UX-1: with a slow client and events arriving, nothing on S-17..S-19 moves.
 noLayoutShift([
   ["S_17", "/mail", "About 8 to 18 min saved"],
-  ["S_18", "/team", "You approved sending the reply."],
+  ["S_18", "/team/console", "You approved sending the reply."],
   ["S_19", "/connections", "Send email needs a gate"],
 ]);

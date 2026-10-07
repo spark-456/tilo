@@ -2,6 +2,7 @@ import type { PlanApproach } from "@tilo/contracts";
 import { useState } from "react";
 import { useClient } from "../../api/ClientProvider";
 import type { ApproachesResult } from "../../api/client";
+import { stagePath } from "../../router";
 import { rememberWorld } from "../../world/lastWorld";
 import { AppLink } from "../AppLink";
 import { Loaded, Primary } from "../FlowShell";
@@ -62,7 +63,7 @@ export function Approaches({ taskId }: { taskId: string }) {
       budget_cap: validCap,
     });
     rememberWorld(world_id); // a bare /needs-you or /library shows this run next
-    return `/world/${encodeURIComponent(world_id)}`;
+    return stagePath(world_id);
   });
 
   // biome-ignore format: compact JSX

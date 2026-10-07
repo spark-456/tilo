@@ -4,7 +4,14 @@
 import { expect, test } from "@playwright/test";
 import { DESKTOP, MOBILE } from "../support/viewports";
 
-const ROUTES = ["/channels", "/library", "/autonomy", "/team", "/worlds", "/settings"];
+const ROUTES = [
+  "/channels",
+  "/library",
+  "/autonomy",
+  "/team/console",
+  "/worlds/replays",
+  "/settings",
+];
 
 for (const viewport of [DESKTOP, MOBILE]) {
   const at = `${viewport.width}x${viewport.height}`;

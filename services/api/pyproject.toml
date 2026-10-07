@@ -11,6 +11,7 @@ dependencies = [
     "referencing>=0.30",
     "python-multipart>=0.0.18",
     "google-auth>=2.30",
+    "google-cloud-firestore>=2.20.0",
     "requests>=2.31",
     "tilo-planning",
     "tilo-policy",
