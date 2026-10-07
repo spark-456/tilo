@@ -778,3 +778,139 @@ def test_PPL_11c_s4_BQ_PPL11C_14_a_principal_with_a_create_in_flight_survives_pr
     first.join(5)
     retry.join(5)
     assert calls == ["first"] and results == [{"id": "one"}, {"id": "one"}], (calls, results)
+
+
+# --- #549 / #553 re-check: the principal-level bound is pinned one mutant at a time ----------------------------------
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_a_members_store_after_strangers_refusals_evicts_nobody(people_rig, monkeypatch):
+    """With room for 3 principals' keys: six strangers' keyed creates are refused (403), then Sam (a member) stores one,
+    then Priya retries. A limiter that keeps the empty principal map of a refused create is over the bound at Sam's
+    store and pushes Priya out; with the fix her retry is the first answer."""
+    _shrink_principal_bound(monkeypatch, 3)
+    rig = work_rig(people_rig)
+    first = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+    assert first.status_code == 201
+    for n in range(6):
+        rig.as_user(f"u_stranger_{n}")
+        assert _create_item(rig, f"stranger-{n}") == 403, n
+    rig.as_user(SAM)
+    assert _create_item(rig, "sam-0") == 201
+    rig.as_user(PRIYA)
+    snapshot = rig.snapshot()
+    again = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+    assert again.status_code == 201 and again.content == first.content, "the first answer, not a second record"
+    assert rig.snapshot() == snapshot
+
+
+def _limits_with_bound(monkeypatch, n: int):
+    from pydantic import BaseModel
+    from tilo_api.people_limits import Limits
+
+    class Body(BaseModel):
+        n: int = 1
+
+    _shrink_principal_bound(monkeypatch, n)
+    return Limits(), Body
+
+
+def _store(limits, body, user: str, key: str = "k") -> None:
+    limits.once(user, "/r", key, body(), lambda: {"id": f"{user}-{key}"})
+
+
+def _never_called() -> dict:
+    raise AssertionError("a replay must not call make")
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_the_principal_bound_forgets_the_least_recently_used_idle_principal(monkeypatch):
+    """Bound 2, three principals store: the first one's key is forgotten (its replay creates again)."""
+    limits, body = _limits_with_bound(monkeypatch, 2)
+    for user in ("a", "b", "c"):
+        _store(limits, body, user)
+    assert set(limits._keys) == {"b", "c"}
+    created: list[str] = []
+    limits.once("a", "/r", "k", body(), lambda: created.append("a") or {"id": "new"})
+    assert created == ["a"], "a's key was forgotten, so its retry runs make again"
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_a_replay_refreshes_the_principal_order(monkeypatch):
+    """Bound 2: a, b store, a replays (now the most recently used), c stores: b goes, a stays."""
+    limits, body = _limits_with_bound(monkeypatch, 2)
+    _store(limits, body, "a")
+    _store(limits, body, "b")
+    limits.once("a", "/r", "k", body(), _never_called)
+    _store(limits, body, "c")
+    assert set(limits._keys) == {"a", "c"}
+    limits.once("a", "/r", "k", body(), _never_called)
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_the_principal_that_is_storing_is_never_the_one_evicted(monkeypatch):
+    """Bound 2: a's create is slow while b and c store; when a's answer lands, a is the oldest principal in the order
+    but it is the one storing, so b goes and a's answer is kept (its replay is the first answer)."""
+    import threading
+
+    limits, body = _limits_with_bound(monkeypatch, 2)
+    started, release = threading.Event(), threading.Event()
+
+    def slow() -> dict:
+        started.set()
+        release.wait(5)
+        return {"id": "a-k"}
+
+    first = threading.Thread(target=lambda: limits.once("a", "/r", "k", body(), slow))
+    first.start()
+    assert started.wait(5)
+    _store(limits, body, "b")
+    _store(limits, body, "c")
+    release.set()
+    first.join(5)
+    assert set(limits._keys) == {"a", "c"}
+    assert limits.once("a", "/r", "k", body(), _never_called) == {"id": "a-k"}
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_a_refused_create_leaves_no_principal_map_behind(monkeypatch):
+    """A refused keyed create keeps no key and no (empty) principal map, so refusals never grow the table."""
+    limits, body = _limits_with_bound(monkeypatch, 2)
+
+    def refuse() -> dict:
+        raise ValueError("refused")
+
+    for n in range(20):
+        with pytest.raises(ValueError):
+            limits.once(f"stranger-{n}", "/r", "k", body(), refuse)
+    assert len(limits._keys) == 0
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_an_in_flight_create_by_a_stranger_takes_no_principal_slot(monkeypatch):
+    """Bound 2, a and b hold stored answers. A stranger's create is in flight (make blocked); a member stores a second
+    key. The in-flight work is no stored answer, so it takes no slot and that store evicts nobody."""
+    import threading
+
+    limits, body = _limits_with_bound(monkeypatch, 2)
+    _store(limits, body, "a")
+    _store(limits, body, "b")
+    started, release = threading.Event(), threading.Event()
+    outcome: list[str] = []
+
+    def blocked() -> dict:
+        started.set()
+        release.wait(5)
+        raise ValueError("refused")
+
+    def stranger() -> None:
+        try:
+            limits.once("s", "/r", "k", body(), blocked)
+        except ValueError:
+            outcome.append("refused")
+
+    thread = threading.Thread(target=stranger)
+    thread.start()
+    assert started.wait(5)
+    _store(limits, body, "a", "k2")
+    try:
+        assert set(limits._keys) == {"a", "b", "s"}, "nobody was evicted"
+        limits.once("b", "/r", "k", body(), _never_called)
+    finally:
+        release.set()
+        thread.join(5)
+    assert outcome == ["refused"] and set(limits._keys) == {"a", "b"}

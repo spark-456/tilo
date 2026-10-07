@@ -5,8 +5,9 @@
 * `idempotent`: an optional `Idempotency-Key` on a create; the same principal, route, key and body again is the first
   answer, with nothing created twice; another body is a 422; a create that failed leaves the key free and takes no
   slot. Keys are bounded: 16 per principal (its own least recently used goes first, so one caller cannot push out
-  another's) and 512 principals, 8,192 stored answers in all. Only principals with a stored answer take a slot; if 512
-  or more principals have created something, the least recently used idle principal's keys are forgotten.
+  another's) and 512 principals, 8,192 stored answers in all. Only a principal with a stored answer takes a slot (a
+  refused or in-flight create never does, and never pushes anyone out); past 512 such principals, the least recently
+  used idle one's keys are forgotten, never the one that is storing.
 * `NoStore`: every `/v1/` answer is `Cache-Control: no-store`, the SEC-15 gate's 403 and a validation 422 included.
 
 Counters and keys live in a `Limits` that belongs to one install's `PeopleStores` (never to the module), keyed by the
@@ -108,12 +109,15 @@ class Limits:
         if mine is not None and len(mine) > _MAX_KEYS_PER_PRINCIPAL:
             for k in [k for k, e in mine.items() if e.holders == 0][: len(mine) - _MAX_KEYS_PER_PRINCIPAL]:
                 del mine[k]
-        if len(self._keys) > _MAX_KEY_PRINCIPALS:
-            for u, m in list(self._keys.items()):
-                if len(self._keys) <= _MAX_KEY_PRINCIPALS:
+        if len(self._keys) > _MAX_KEY_PRINCIPALS:  # in-flight and refused work holds no slot: only stored answers count
+            stored = [u for u, m in self._keys.items() if any(e.answer is not None for e in m.values())]
+            excess = len(stored) - _MAX_KEY_PRINCIPALS
+            for u in stored:
+                if excess <= 0:
                     break
-                if u != user_id and not any(e.holders for e in m.values()):
+                if u != user_id and not any(e.holders for e in self._keys[u].values()):
                     del self._keys[u]
+                    excess -= 1
 
 
 _LIMITS: dict[int, Limits] = {}
