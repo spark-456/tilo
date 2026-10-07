@@ -454,6 +454,16 @@ def get_meeting_worlds() -> MeetingWorlds:
     raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Outpost world
 
 
+class DeskWorlds(Protocol):
+    """The one Desk world of a person, made lazily and idempotently: where their work-item events go (PE-12)."""
+
+    def desk_world(self, org_id: str, user_id: str) -> str: ...
+
+
+def get_desk_worlds() -> DeskWorlds:
+    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
+
+
 def get_run_archive() -> Callable[..., RunArchive]:
     """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses."""
     raise NotImplementedError("no raw-archive store is configured, so no run starts")
