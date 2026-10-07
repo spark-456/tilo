@@ -186,12 +186,19 @@ function SoftPin({ v, ui, app }: PinProps) {
   );
 }
 
-function Board({ A, k, ui, app }: { A: Agenda; k: BoardKey; ui: AgendaUi; app: AppCtx }) {
+function Board({
+  A,
+  k,
+  ui,
+  app,
+  limit,
+}: { A: Agenda; k: BoardKey; ui: AgendaUi; app: AppCtx; limit: number }) {
   const b = BOARDS.find((x) => x.key === k) ?? BOARDS[0];
   if (!b) return null;
   const ps: AgendaPin[] = ui.pins.filter((p) => p.board === k);
   const vms = ps.map((p, i) => pinVm(p, i, app.dec, ui.done, ui.decisions));
   const open = vms.filter((v) => !v.done && !v.pin.suggested).length;
+  const shown = vms.slice(0, limit); // the pins are drawn a few tasks at a time (WEB-MOTION-2), top to bottom
   const label = `Pin to ${b.title}`;
   const input = (cls: string) => (
     <input
@@ -219,7 +226,7 @@ function Board({ A, k, ui, app }: { A: Agenda; k: BoardKey; ui: AgendaUi; app: A
       </div>
       {ui.style === "cork" ? (
         <div className="park-agenda-cork">
-          {vms.map((v) => (
+          {shown.map((v) => (
             <CorkPin key={v.pin.id} v={v} ui={ui} app={app} />
           ))}
           <div className="park-agenda-newpin">
@@ -239,7 +246,7 @@ function Board({ A, k, ui, app }: { A: Agenda; k: BoardKey; ui: AgendaUi; app: A
             </button>
           </div>
           {GROUPS.map(([title, f]) => {
-            const list = vms.filter(f);
+            const list = shown.filter(f);
             return list.length ? (
               <div key={title} className="park-agenda-group">
                 <div className="park-agenda-grouptitle">{`${title} · ${list.length}`}</div>
@@ -255,7 +262,12 @@ function Board({ A, k, ui, app }: { A: Agenda; k: BoardKey; ui: AgendaUi; app: A
   );
 }
 
-export function Boards({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
+export function Boards({
+  A,
+  ui,
+  app,
+  limit,
+}: { A: Agenda; ui: AgendaUi; app: AppCtx; limit: number }) {
   return (
     <section aria-label="Boards" className="park-agenda-section">
       <div className="park-agenda-sechead">
@@ -282,7 +294,7 @@ export function Boards({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx })
       </div>
       <div className="park-agenda-boards">
         {BOARDS.map((b) => (
-          <Board key={b.key} A={A} k={b.key} ui={ui} app={app} />
+          <Board key={b.key} A={A} k={b.key} ui={ui} app={app} limit={limit} />
         ))}
       </div>
     </section>

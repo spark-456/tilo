@@ -1,10 +1,11 @@
 // The Worlds page (design_handoff_tilo_web_app/design/"Tilo App Worlds.dc.html", ported to React; plan section
 // 10). Data comes only from the Api (getWorlds, getDecisions, getPlans for the city art); a person moves with
 // app.go and approves with app.decide. Filters are page state. No timers: nothing here moves by itself.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Decision, Plan, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { useStaged } from "../../app/useStaged";
 import { PageSheet } from "../../components";
 import { CityCard, TownCard, VillageCard } from "./Cards";
 import { Filters } from "./Filters";
@@ -30,6 +31,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [tier, setTier] = useState<TierFilter>("all");
   const [query, setQuery] = useState("");
+  // The sections are drawn top to bottom, one task each, so the page never holds the main thread (WEB-MOTION-2).
 
   useEffect(() => {
     let live = true;
@@ -53,14 +55,22 @@ export function WorldsPage({ app }: { app: AppCtx }) {
     };
   }, [api, dec, added]);
 
-  const art = makeArt(kit, () => plans.current, dec, night);
-  const open = (id: string) => app.go("world", { id });
+  // One object per input, so the memoised cards below are not rendered again for nothing.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `data` is when the plans in the ref have arrived
+  const art = useMemo(() => makeArt(kit, () => plans.current, dec, night), [kit, dec, night, data]);
+  const go = useRef(app.go);
+  go.current = app.go;
+  const open = useCallback((id: string) => go.current("world", { id }), []);
   const all = data?.worlds ?? [];
   const list = visibleWorlds(all, query, tier, status);
   const by = (scale: World["tier"]) => list.filter((w) => w.tier === scale);
   const cities = by("City");
   const towns = by("Town");
   const villages = by("Village");
+  // Cards are drawn one per task, in page order (the grids are auto-fill, so a card added later moves none).
+  const part = useStaged(2 + cities.length + towns.length + villages.length);
+  const at = (scale: World["tier"], i: number): number =>
+    3 + i + (scale === "City" ? 0 : cities.length + (scale === "Town" ? 0 : towns.length));
 
   return (
     <div data-testid="park-page-worlds">
@@ -83,52 +93,60 @@ export function WorldsPage({ app }: { app: AppCtx }) {
               onStatus={setStatus}
               onTier={setTier}
             />
-            <Spotlight
-              art={art}
-              decisions={data.decisions}
-              worldName={all.find((w) => w.id === data.decisions[0]?.world)?.name ?? ""}
-              dec={dec}
-              needsLeft={needsLeft}
-              onDecide={(key) => app.decide(key)}
-              onOpen={open}
-            />
-            {cities.length > 0 ? (
+            {part(2) ? (
+              <Spotlight
+                art={art}
+                decisions={data.decisions}
+                worldName={all.find((w) => w.id === data.decisions[0]?.world)?.name ?? ""}
+                dec={dec}
+                needsLeft={needsLeft}
+                onDecide={(key) => app.decide(key)}
+                onOpen={open}
+              />
+            ) : null}
+            {part(at("City", 0)) && cities.length > 0 ? (
               <Section scale="City" count={cities.length}>
-                {cities.map((w) => (
-                  <CityCard
-                    key={w.id}
-                    w={w}
-                    art={art}
-                    status={statusOf(w, needsLeft)}
-                    onOpen={open}
-                  />
-                ))}
+                {cities.map((w, i) =>
+                  part(at("City", i)) ? (
+                    <CityCard
+                      key={w.id}
+                      w={w}
+                      art={art}
+                      status={statusOf(w, needsLeft)}
+                      onOpen={open}
+                    />
+                  ) : null,
+                )}
               </Section>
             ) : null}
-            {towns.length > 0 ? (
+            {part(at("Town", 0)) && towns.length > 0 ? (
               <Section scale="Town" count={towns.length}>
-                {towns.map((w) => (
-                  <TownCard
-                    key={w.id}
-                    w={w}
-                    art={art}
-                    status={statusOf(w, needsLeft)}
-                    onOpen={open}
-                  />
-                ))}
+                {towns.map((w, i) =>
+                  part(at("Town", i)) ? (
+                    <TownCard
+                      key={w.id}
+                      w={w}
+                      art={art}
+                      status={statusOf(w, needsLeft)}
+                      onOpen={open}
+                    />
+                  ) : null,
+                )}
               </Section>
             ) : null}
-            {villages.length > 0 ? (
+            {part(at("Village", 0)) && villages.length > 0 ? (
               <Section scale="Village" count={villages.length}>
-                {villages.map((w) => (
-                  <VillageCard
-                    key={w.id}
-                    w={w}
-                    art={art}
-                    status={statusOf(w, needsLeft)}
-                    onOpen={open}
-                  />
-                ))}
+                {villages.map((w, i) =>
+                  part(at("Village", i)) ? (
+                    <VillageCard
+                      key={w.id}
+                      w={w}
+                      art={art}
+                      status={statusOf(w, needsLeft)}
+                      onOpen={open}
+                    />
+                  ) : null,
+                )}
               </Section>
             ) : null}
             {list.length === 0 ? (
