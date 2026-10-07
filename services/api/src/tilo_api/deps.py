@@ -444,6 +444,16 @@ def get_source_owners() -> SourceOwners:
     raise HTTPException(status_code=503, detail="not_configured")
 
 
+class MeetingWorlds(Protocol):
+    """Creates the Outpost world that holds a meeting's transcript and minutes (FR-MTG-07, BQ-273)."""
+
+    def make_meeting_world(self, *, org_id: str, owner: str, meeting_id: str) -> str: ...
+
+
+def get_meeting_worlds() -> MeetingWorlds:
+    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Outpost world
+
+
 def get_run_archive() -> Callable[..., RunArchive]:
     """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses."""
     raise NotImplementedError("no raw-archive store is configured, so no run starts")
