@@ -118,6 +118,11 @@ vertex-smoke *args:
 live-e2e *args:
     uv run python evals/scripts/live_e2e.py {{args}}
 
+# PL-LIVE-E2E: one real end-to-end run on any typed topic (`--topic` or `--topic-file`), screened by the safety role
+# (Model Armor) first; questions, the approach and gate cards are answered in the terminal. Live switch as live-e2e.
+live-run *args:
+    uv run python evals/scripts/live_run.py {{args}}
+
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated
 # as success so the recipe still passes with zero skills present.

@@ -109,8 +109,9 @@ def _detail(response: Any) -> str:
     return said if isinstance(said, str) and said else f"HTTP {response.status_code}"
 
 
-def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any) -> None:
-    """Intake to a terminal state through `app`'s own routes (the live runner passes its own wiring)."""
+def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any, person: Any = None) -> None:
+    """Intake to a terminal state through `app`'s own routes (the live runner passes its own wiring). With `person`,
+    a person answers the questions, picks or declines the approach and says yes or no to each gate card."""
     from fastapi.testclient import TestClient  # noqa: PLC0415
     from tilo_api import deps, dev  # noqa: PLC0415
 
@@ -147,7 +148,8 @@ def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any) -> None:
             obs.outcome = "needs_answers" if obs.questions else None
             return
         given = case.answers or {}
-        answers = [{"field": q["field"], "answer": given.get(q["field"])} for q in task["questions"]]
+        pick = person.answer if person else lambda q: given.get(q["field"])
+        answers = [{"field": q["field"], "answer": pick(q)} for q in task["questions"]]
         obs.answered = {a["field"]: a["answer"] for a in answers}
         if fail(call("POST", f"/tasks/{task['task_id']}/answers", json={"answers": answers, "brief_edits": {}})):
             return
@@ -156,6 +158,9 @@ def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any) -> None:
             return
         offered = approaches.json()
         wanted = (case.approve or {}).get("approach") or offered["recommended"]
+        if person is not None and (wanted := person.approach(offered)) is None:
+            obs.outcome, obs.reason = "declined", "the person declined the approach; nothing ran"
+            return
         obs.cap = float((case.approve or {}).get("cap", DEFAULT_CAP))
         body = {"approach_id": wanted, "budget_cap": obs.cap}
         if fail(call("POST", f"/tasks/{task['task_id']}/approve", json=body)):
@@ -177,9 +182,11 @@ def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any) -> None:
                     continue
                 if obs.sent_at_first_gate is None:
                     obs.sent_at_first_gate = sent()
-                if case.gates == "hold":
+                asked = time.monotonic()
+                if case.gates == "hold" or (person is not None and not person.gate(card)):
                     obs.outcome = "held_at_gate"
                     break
+                deadline += time.monotonic() - asked  # the time a person takes is not the run's
                 answered.add(card["id"])
                 reply = call("POST", f"/worlds/{obs.world_id}/cards/{card['id']}/answer", json={"option": "approve"})
                 if reply.status_code == 200:
