@@ -21,7 +21,9 @@ const ROUTES = [
   { name: "fixture-world", path: FIXTURE },
   { name: "more", path: "/more" },
   { name: "screens-index", path: "/screens" },
-  { name: "not-found", path: "/world/none/unknown" },
+  // WEB-CUTOVER: "/world/none/unknown" owns no screen, so it is the Park "Page not found" now (the Park shell
+  // follows its own ramp, like the Park Home). An unknown world on a kept address is still the old NotFound.
+  { name: "not-found", path: "/world/none/story" },
 ];
 
 /** Selector and size of every element that draws text (an own text node, an SVG label, or a form

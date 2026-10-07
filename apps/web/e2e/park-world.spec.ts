@@ -1096,7 +1096,9 @@ test.describe("park world: the other tiers at 1440", () => {
     const problems = await openWorld(page, "hires");
     await expect(h1(page)).toHaveText("Onboard 12 new hires");
     await expect(root(page).getByText("WAITING FOR YOU")).toHaveCount(0);
-    await expect(live(page)).toHaveAttribute("href", "/world/hires/stage");
+    // a sample world has no stage (WEB-CUTOVER): the live view is disabled; the live-source href is a vitest case
+    await expect(live(page)).toHaveAttribute("aria-disabled", "true");
+    await expect(live(page)).not.toHaveAttribute("href", /.*/);
     await expect(region(page, "Districts").getByText("4 districts", { exact: true })).toBeVisible();
     await expect(btn(page, "Set up a new starter")).toBeVisible();
     for (const tool of ["Google Workspace", "BambooHR", "Slack"]) {
@@ -1240,20 +1242,29 @@ test.describe("park world: behaviour in the browser", () => {
     expect(problems).toEqual([]);
   });
 
-  test("WEB_6_e2e_the_live_view_and_the_lenses_are_real_links_to_the_stage_routes", async ({
+  test("WEB_6_e2e_a_sample_worlds_live_view_and_lenses_are_disabled_not_links_to_a_missing_stage", async ({
     page,
   }) => {
+    // WEB-CUTOVER: a stage exists only for a live-source world (World.stage.test.tsx pins the live hrefs:
+    // /world/k1/stage, story, trace, delivery, inspect/B1). A sample world renders the same elements, disabled.
     await openWorld(page, "k1");
-    await expect(live(page)).toHaveAttribute("href", "/world/k1/stage");
-    for (const href of ["/world/k1/story", "/world/k1/trace", "/world/k1/delivery"]) {
-      await expect(root(page).locator(`a[href="${href}"]`), href).toHaveCount(1);
+    const reason = "Sample world: there is no recorded run to open";
+    await expect(live(page)).toHaveAttribute("aria-disabled", "true");
+    await expect(live(page)).toHaveAttribute("title", reason);
+    await expect(live(page)).not.toHaveAttribute("href", /.*/);
+    for (const name of ["Story", "Trace", "Delivery", "Inspect"]) {
+      const lens = root(page)
+        .getByRole("navigation", { name: "Run views" })
+        .getByRole("link", { name });
+      await expect(lens, name).toHaveAttribute("aria-disabled", "true");
+      await expect(lens, name).not.toHaveAttribute("href", /.*/);
     }
-    await expect(root(page).locator('a[href^="/world/k1/inspect/"]')).toHaveCount(1);
-    // a modified click does not leave this page (the browser opens a tab); the plain click goes to the stage
-    await live(page).click({ modifiers: ["ControlOrMeta"] });
-    await expect(page).toHaveURL(/\/world\/k1$/);
-    await Promise.all([page.waitForURL(/\/world\/k1\/stage$/), live(page).click()]);
-    expect(new URL(page.url()).pathname).toBe("/world/k1/stage");
+    await expect(root(page).locator('a[href^="/world/k1/"]')).toHaveCount(0);
+    await expect(root(page).getByText(reason).first()).toBeAttached();
+    // a click, plain or modified, goes nowhere (force: Playwright treats aria-disabled as not clickable)
+    await live(page).click({ modifiers: ["ControlOrMeta"], force: true });
+    await live(page).click({ force: true });
+    expect(new URL(page.url()).pathname).toBe("/world/k1");
   });
 
   test("WEB_6_e2e_a_keyboard_reaches_every_control_in_reading_order_with_the_README_focus_ring", async ({
@@ -1265,7 +1276,8 @@ test.describe("park world: behaviour in the browser", () => {
     await page.keyboard.press("Tab"); // keyboard modality: the ring is :focus-visible from here on
     await page.keyboard.press("Shift+Tab");
     await expect(back).toBeFocused();
-    const order = [btn(page, "Pause"), btn(page, "Share"), live(page)];
+    // the live view of a sample world is disabled (no href), so the keyboard skips it
+    const order = [btn(page, "Pause"), btn(page, "Share")];
     const ring = async (loc: Locator) => {
       const f = await facts(loc, [
         "outline-style",

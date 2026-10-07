@@ -53,17 +53,17 @@ describe("WEB_3a_root: old app or park app by path", () => {
     expect(loaded.park).toBe(0);
   });
 
+  // `/world`, `/parkour` and `/parks/home` own no screen: they are the Park "Page not found" now
+  // (Root.kept.test.tsx), so the old app's list is the addresses it keeps.
   it("WEB_3a_root_every_non_park_path_is_the_old_app", async () => {
     for (const path of [
       "/more",
       "/world/w/stage",
       "/world/w/story",
-      "/world",
+      "/start",
       "/team/console",
       "/worlds/replays",
       "/task/t1/understanding",
-      "/parkour",
-      "/parks/home",
     ]) {
       const m = await visit(path);
       expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(1);

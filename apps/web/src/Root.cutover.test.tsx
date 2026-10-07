@@ -75,7 +75,7 @@ describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
       "/library",
       "/settings",
       "/more",
-      "/parkour",
+      "/start",
     ]) {
       const m = await visit(path);
       expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(1);

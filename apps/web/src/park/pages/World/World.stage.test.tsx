@@ -9,29 +9,17 @@ import {
   clickEl,
   control,
   goCalls,
+  liveWorldsApi,
   mountWorld,
   pageText,
   spiedApi,
   textOf,
 } from "../../../../test-support/park/worldHarness";
-import type { Api } from "../../api/index";
 
 afterEach(cleanup);
 
 const REASON = "Sample world: there is no recorded run to open";
 const LENSES = ["Story", "Trace", "Delivery", "Inspect"] as const;
-
-/** The fixture Api whose world list reports `source: "live"`, as the live Api's does. */
-function liveWorlds(): Api {
-  const base = spiedApi();
-  return {
-    ...base,
-    getWorlds: async (...a: Parameters<typeof base.getWorlds>) => ({
-      ...(await base.getWorlds(...a)),
-      source: "live" as const,
-    }),
-  } as Api;
-}
 
 const lensNav = (el: HTMLElement) => el.querySelector('nav[aria-label="Run views"]') as HTMLElement;
 
@@ -80,7 +68,7 @@ describe("WEB_CUTOVER_world_stage: a sample world has no stage to open", () => {
 
   it("WEB_CUTOVER_world_stage_a_world_started_here_has_no_stage_even_from_a_live_list", async () => {
     // A world the composer started is local state (app.added); no run exists for it whatever the list says.
-    const api = liveWorlds();
+    const api = liveWorldsApi();
     const started = (await api.getWorlds({}, [])).data.find((w) => w.id === "hires");
     if (!started) throw new Error("no hires world in the list");
     const { el } = await mountWorld({ id: "hires", api, added: [started] });
@@ -90,7 +78,7 @@ describe("WEB_CUTOVER_world_stage: a sample world has no stage to open", () => {
 
 describe("WEB_CUTOVER_world_stage: a live-source world links its stage", () => {
   it("WEB_CUTOVER_world_stage_live_open_live_view_is_the_stage_link", async () => {
-    const { el } = await mountWorld({ api: liveWorlds() });
+    const { el } = await mountWorld({ api: liveWorldsApi() });
     const live = control(el, "Open live view");
     expect(live.tagName).toBe("A");
     expect(live.getAttribute("href")).toBe("/world/k1/stage");
@@ -101,14 +89,14 @@ describe("WEB_CUTOVER_world_stage: a live-source world links its stage", () => {
   });
 
   it("WEB_CUTOVER_world_stage_live_the_lenses_link_story_trace_delivery_and_inspect", async () => {
-    const { el } = await mountWorld({ api: liveWorlds() });
+    const { el } = await mountWorld({ api: liveWorldsApi() });
     const hrefs = qa<HTMLAnchorElement>(lensNav(el), "a").map((a) => a.getAttribute("href"));
     expect(hrefs.slice(0, 3)).toEqual(["/world/k1/story", "/world/k1/trace", "/world/k1/delivery"]);
     expect(hrefs[3]).toMatch(/^\/world\/k1\/inspect\/[^/]+$/);
   });
 
   it("WEB_CUTOVER_world_stage_live_the_links_use_the_second_city_id_and_never_app_go", async () => {
-    const rig = await mountWorld({ id: "hires", api: liveWorlds() });
+    const rig = await mountWorld({ id: "hires", api: liveWorldsApi() });
     expect(control(rig.el, "Open live view").getAttribute("href")).toBe("/world/hires/stage");
     for (const a of qa<HTMLAnchorElement>(rig.el, 'a[href^="/world/"]')) {
       clickEl(a);
@@ -119,7 +107,7 @@ describe("WEB_CUTOVER_world_stage: a live-source world links its stage", () => {
 
   it("WEB_CUTOVER_world_stage_live_a_town_and_a_village_still_have_no_live_view", async () => {
     for (const id of ["northline", "calls"]) {
-      const { el } = await mountWorld({ id, api: liveWorlds() });
+      const { el } = await mountWorld({ id, api: liveWorldsApi() });
       expect(pageText(el), id).not.toContain("Open live view");
       cleanup();
     }

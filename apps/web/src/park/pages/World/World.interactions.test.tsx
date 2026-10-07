@@ -26,6 +26,7 @@ import {
   goCalls,
   hasControl,
   lastGo,
+  liveWorldsApi,
   mapBlock,
   mountWorld,
   pageText,
@@ -35,6 +36,7 @@ import {
   textOf,
   toastCalls,
 } from "../../../../test-support/park/worldHarness";
+import type { World } from "../../api/types";
 
 afterEach(() => {
   cleanup();
@@ -350,11 +352,13 @@ describe("WEB_6_world_interactions: links that stay in the Park app", () => {
   });
 });
 
+// WEB-CUTOVER: only a world whose data came from the live API has a stage, so these run on a live-source Api
+// (the sample-world case, disabled with its reason, is World.stage.test.tsx).
 describe("WEB_6_world_interactions: the live stage and its lenses (plan question A)", () => {
   const stageLinks = (el: HTMLElement) => qa<HTMLAnchorElement>(el, 'a[href^="/world/"]');
 
   it("WEB_6_world_interactions_a_City_opens_the_live_view_S_04_as_a_real_link", async () => {
-    const { el } = await mountWorld();
+    const { el } = await mountWorld({ api: liveWorldsApi() });
     const live = control(el, "Open live view");
     expect(live.tagName).toBe("A");
     expect(live.getAttribute("href")).toBe("/world/k1/stage");
@@ -363,7 +367,7 @@ describe("WEB_6_world_interactions: the live stage and its lenses (plan question
 
   it("WEB_6_world_interactions_the_lenses_Story_Trace_Delivery_and_Inspect_are_linked_for_a_City", async () => {
     // S-04 /world/:id/stage (WEB-CUTOVER), S-10 /world/:id/story, S-11 /trace, S-12 /delivery, S-05 /world/:id/inspect/:building (screens/meta.ts).
-    const { el } = await mountWorld();
+    const { el } = await mountWorld({ api: liveWorldsApi() });
     const hrefs = stageLinks(el).map((a) => a.getAttribute("href"));
     for (const want of [
       "/world/k1/stage",
@@ -383,7 +387,7 @@ describe("WEB_6_world_interactions: the live stage and its lenses (plan question
   });
 
   it("WEB_6_world_interactions_the_links_use_the_second_city_id", async () => {
-    const { el } = await mountWorld({ id: "hires" });
+    const { el } = await mountWorld({ id: "hires", api: liveWorldsApi() });
     expect(control(el, "Open live view").getAttribute("href")).toBe("/world/hires/stage");
     const hrefs = stageLinks(el).map((a) => a.getAttribute("href"));
     expect(hrefs).toContain("/world/hires/story");
@@ -392,7 +396,7 @@ describe("WEB_6_world_interactions: the live stage and its lenses (plan question
 
   it("WEB_6_world_interactions_a_Town_and_a_Village_have_no_live_view", async () => {
     for (const id of ["northline", "invoice", "calls", "comp"]) {
-      const { el } = await mountWorld({ id });
+      const { el } = await mountWorld({ id, api: liveWorldsApi() });
       expect(pageText(el), id).not.toContain("Open live view");
       expect(
         stageLinks(el).map((a) => a.getAttribute("href")),
@@ -403,7 +407,7 @@ describe("WEB_6_world_interactions: the live stage and its lenses (plan question
   });
 
   it("WEB_6_world_interactions_the_stage_links_never_go_through_app_go", async () => {
-    const rig = await mountWorld();
+    const rig = await mountWorld({ api: liveWorldsApi() });
     for (const a of qa<HTMLAnchorElement>(rig.el, 'a[href^="/world/"]')) {
       clickEl(a);
       clickEl(a, { ctrlKey: true });
@@ -412,20 +416,22 @@ describe("WEB_6_world_interactions: the live stage and its lenses (plan question
   });
 
   it("WEB_6_world_interactions_a_modified_click_on_the_live_view_is_not_cancelled", async () => {
-    const rig = await mountWorld();
+    const rig = await mountWorld({ api: liveWorldsApi() });
     const live = control(rig.el, "Open live view");
     for (const [name, init] of MODIFIED) expect(clickEl(live, init), name).toBe(true);
   });
 
   it("WEB_6_world_interactions_the_world_id_is_encoded_in_the_address", async () => {
     // A world id is data: it can hold a space or a slash, and must not change the path it is put in.
-    const { createFixtureApi } = await import("../../api/fixtureApi");
-    const base = createFixtureApi();
+    const base = liveWorldsApi();
     const odd = {
       ...base,
       getWorlds: async (...a: Parameters<typeof base.getWorlds>) => {
         const r = await base.getWorlds(...a);
-        return { ...r, data: r.data.map((w) => (w.id === "hires" ? { ...w, id: "q 1/2" } : w)) };
+        return {
+          ...r,
+          data: r.data.map((w: World) => (w.id === "hires" ? { ...w, id: "q 1/2" } : w)),
+        };
       },
     };
     const { el } = await mountWorld({ id: "q 1/2", api: odd });

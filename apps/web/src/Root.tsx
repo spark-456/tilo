@@ -1,8 +1,10 @@
-// The mount point: the Park app serves the root paths (/, /worlds, /world/:id, /team, ...) and the /park
-// alias; the old app serves every other address (the stage at /world/:id/stage and the kept screens). The
-// Park app is a dynamic import, so a visit to a kept screen never loads it (NFR-01). `isParkPath` is the one
-// shared predicate for the split (WEB-CUTOVER).
+// The mount point: the Park app serves the root paths (/, /worlds, /world/:id, /team, ...), the /park alias
+// and every address no screen owns (its own "Page not found"); the old app serves exactly the addresses it
+// keeps (`isKeptPath`: /start, the stage at /world/:id/stage and the other kept screens). Both apps are
+// dynamic imports, so a visit to a kept screen never loads the Park app (NFR-01). `isParkPath` and
+// `isKeptPath` are the shared predicates for the split (WEB-CUTOVER).
 import { Suspense, lazy } from "react";
+import { isKeptPath } from "./keptPaths";
 import { isParkPath } from "./park/app/router";
 import { usePathname } from "./router";
 
@@ -13,5 +15,6 @@ const ParkApp = lazy(() => import("./park/app/ParkApp"));
 
 export function Root() {
   const pathname = usePathname();
-  return <Suspense fallback={null}>{isParkPath(pathname) ? <ParkApp /> : <App />}</Suspense>;
+  const park = isParkPath(pathname) || !isKeptPath(pathname);
+  return <Suspense fallback={null}>{park ? <ParkApp /> : <App />}</Suspense>;
 }

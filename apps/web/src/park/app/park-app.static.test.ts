@@ -217,8 +217,10 @@ describe("WEB_3a_static: the mount point keeps the landing bundle free of the pa
 
   it("WEB_3a_static_Root_uses_the_pure_isParkPath_and_the_shared_usePathname", () => {
     expect(rootSrc()).toMatch(/\bisParkPath\b/);
+    expect(rootSrc()).toMatch(/\bisKeptPath\b/); // the old app owns only the addresses keptPaths.ts lists
     expect(rootSrc()).toMatch(/\busePathname\b/);
-    expect(rootSrc()).toMatch(/from\s*["']\.\/App["']/); // the old app stays a normal import
+    // the old app is a chunk too since 7073de5d (the landing never ships its shell, NFR-01): a dynamic import
+    expect(rootSrc()).toMatch(/import\(\s*["']\.\/App["']\s*\)/);
   });
 
   it("WEB_3a_static_main_still_renders_through_Root_with_the_old_boot_steps", () => {

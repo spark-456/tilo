@@ -100,8 +100,14 @@ for (const path of [...UNKNOWN_WORLDS, ...EXTRA_SEGMENTS]) {
   test(`HR_1 ${path} says Not found and shows no run`, async ({ page }) => {
     const problems = watchConsole(page);
     await page.goto(`${path}${FAST.replace("?", path.includes("?") ? "&" : "?")}`);
-    await expect(page.getByRole("heading", { level: 1, name: "Not found" })).toBeVisible();
-    await expect(page.getByTestId("not-found")).toBeVisible();
+    if (EXTRA_SEGMENTS.includes(path)) {
+      // WEB-CUTOVER: an address no screen owns is the Park "Page not found" (Root.tsx, isKeptPath), not the old one
+      await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
+      await expect(page.getByTestId("park-not-found")).toBeVisible();
+    } else {
+      await expect(page.getByRole("heading", { level: 1, name: "Not found" })).toBeVisible();
+      await expect(page.getByTestId("not-found")).toBeVisible();
+    }
     // Nothing of the village run, and not the Start screen either.
     for (const id of ["story-lens", "trace-lens", "delivery", "inspect-panel", "world-hud"]) {
       await expect(page.getByTestId(id)).toHaveCount(0);

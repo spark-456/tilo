@@ -226,7 +226,7 @@ test("WEB_CUTOVER_e2e_a_sample_world_has_a_disabled_live_view_and_nothing_to_ope
     await expect(a, lens).not.toHaveAttribute("href", /.*/);
   }
   await expect(world.getByText(NO_STAGE).first()).toBeAttached();
-  await live.click();
+  await live.click({ force: true }); // Playwright treats aria-disabled as not clickable
   await expect(page).toHaveURL(/\/world\/k1$/);
   await expect(world).toBeVisible();
   expect(problems).toEqual([]);
