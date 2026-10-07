@@ -25,12 +25,18 @@ def test_FR_TEAM_02_members_and_viewers_change_no_roles(actor):
         change_role(PEOPLE, actor, "u_view" if actor == "u_mem" else "u_mem", "Approver")
 
 
-def test_FR_TEAM_02_only_the_owner_grants_or_takes_owner():
+def test_FR_TEAM_02_only_the_owner_changes_roles_BQ_TEAMACC_2():
+    # Changed deliberately after the security review: an Approver changes no roles at all (BQ-TEAMACC-2).
+    for target, new in (("u_mem", "Owner"), ("u_owner", "Member"), ("u_mem", "Viewer"), ("u_view", "Approver")):
+        with pytest.raises(RoleChangeRefused) as err:
+            change_role(PEOPLE, "u_appr", target, new)
+        assert err.value.reason == "not_allowed"
+    assert change_role(PEOPLE, "u_owner", "u_mem", "Viewer")["u_mem"] == "Viewer"
+
+
+def test_FR_TEAM_02_a_target_with_an_unknown_current_role_is_refused():
     with pytest.raises(RoleChangeRefused):
-        change_role(PEOPLE, "u_appr", "u_mem", "Owner")
-    with pytest.raises(RoleChangeRefused):
-        change_role(PEOPLE, "u_appr", "u_owner", "Member")
-    assert change_role(PEOPLE, "u_appr", "u_mem", "Viewer")["u_mem"] == "Viewer"
+        change_role({**PEOPLE, "u_odd": "Root"}, "u_owner", "u_odd", "Member")
 
 
 @pytest.mark.parametrize(("actor", "target", "new"), [("u_owner", "nobody", "Member"), ("u_owner", "u_mem", "Admin")])

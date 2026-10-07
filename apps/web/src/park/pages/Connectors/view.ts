@@ -4,8 +4,8 @@ import type { Connector } from "../../api/types";
 
 export const LEVEL_LABEL = ["Off", "Read", "Draft", "Act"] as const;
 
-/** FR-ACC-01 / BQ-DSN-04: what each level lets agents do, as a ceiling on the risk tier. The policy engine enforces
- * it (tilo_policy.access_levels); this is the plain-language line, shown on sample data. */
+/** FR-ACC-01 / BQ-DSN-04: what each level is meant to let agents do, as a ceiling on the risk tier. Plain-language
+ * line on sample data; the mapping lives in tilo_policy.access_levels, which no connector call enforces yet. */
 const CEILING = [
   "Off blocks every call to this tool.",
   "Read allows read-only actions (T0).",

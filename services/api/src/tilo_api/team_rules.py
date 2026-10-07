@@ -27,16 +27,14 @@ class MustAskLocked(Exception):
 
 
 def change_role(roles: Mapping[str, str], actor: str, target: str, new_role: str) -> dict[str, str]:
-    """A new person -> role map with `target` set to `new_role`. Nobody changes their own role; only an Owner or
-    Approver changes roles; only an Owner grants or takes Owner."""
-    if new_role not in ROLES or actor not in roles or target not in roles:
+    """A new person -> role map with `target` set to `new_role`. Nobody changes their own role, and only an Owner
+    changes roles (BQ-TEAMACC-2: PRD 10.1 gives the Approver no admin rights)."""
+    if new_role not in ROLES or actor not in roles or target not in roles or roles[target] not in ROLES:
         raise RoleChangeRefused("unknown")
     if actor == target:
         raise RoleChangeRefused("own_role")
-    if roles[actor] not in ("Owner", "Approver"):
+    if roles[actor] != "Owner":
         raise RoleChangeRefused("not_allowed")
-    if roles[actor] != "Owner" and "Owner" in (new_role, roles[target]):
-        raise RoleChangeRefused("owner_only")
     return {**roles, target: new_role}
 
 
@@ -57,7 +55,8 @@ def effective_user_cap(
     limit of that kind). A team limit can lower a person's cap, never lift the lifetime cap."""
     limits = [_minor(role_limit_minor, "role_limit_minor"), _minor(personal_limit_minor, "personal_limit_minor")]
     cap = _minor(lifetime_cap_minor, "lifetime_cap_minor")
-    assert cap is not None
+    if cap is None:
+        raise TypeError("lifetime_cap_minor is required")
     return min([cap, *[x for x in limits if x is not None]])
 
 
@@ -68,6 +67,10 @@ class Switch:
     must_ask: bool
 
 
+MUST_ASK_KEYS = frozenset({"spend", "share", "undo"})  # pinned in code: a config edit can't unlock one (PRD 8.3)
+OWNER_ONLY_SWITCHES = frozenset({"tools"})  # the design: only the owner changes tool access
+
+
 def load_switches(path: str | Path | None = None) -> dict[str, Switch]:
     doc = yaml.safe_load(Path(path if path is not None else _CONFIG).read_text(encoding="utf-8"))
     rows = doc["switches"] if isinstance(doc, dict) else None
@@ -75,7 +78,7 @@ def load_switches(path: str | Path | None = None) -> dict[str, Switch]:
         raise ValueError("team_rules.yaml: switches must be a list")
     out: dict[str, Switch] = {}
     for r in rows:
-        s = Switch(str(r["key"]), r["default"], r["must_ask"])
+        s = Switch(str(r["key"]), r["default"], r["must_ask"] or str(r["key"]) in MUST_ASK_KEYS)
         if type(s.default) is not bool or type(s.must_ask) is not bool or s.key in out:
             raise ValueError("team_rules.yaml: bad switch")
         if s.must_ask and not s.default:
@@ -85,11 +88,13 @@ def load_switches(path: str | Path | None = None) -> dict[str, Switch]:
 
 
 def set_switch(
-    state: Mapping[str, bool], key: str, value: bool, *, actor: str, at: str
+    state: Mapping[str, bool], key: str, value: bool, *, actor: str, actor_role: str, at: str
 ) -> tuple[dict[str, bool], dict[str, object]]:
     """The new switch state and the audit record of this change. A Must-ask switch can't go off; an unknown key is a
     KeyError, a non-bool a TypeError."""
     switch = load_switches()[key]
+    if actor_role not in ("Owner", "Approver") or (key in OWNER_ONLY_SWITCHES and actor_role != "Owner"):
+        raise PermissionError(key)
     if type(value) is not bool:
         raise TypeError("a switch is on or off")
     if switch.must_ask and not value:

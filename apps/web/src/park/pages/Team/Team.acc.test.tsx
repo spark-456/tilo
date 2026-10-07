@@ -16,6 +16,8 @@ describe("FR-TEAM-02 roles", () => {
     expect(canChangeRole({ id: "a", role: "Owner" }, { id: "b", role: "Member" })).toBe(true);
     expect(canChangeRole({ id: "a", role: "Member" }, { id: "b", role: "Viewer" })).toBe(false);
     expect(canChangeRole({ id: "a", role: "Approver" }, { id: "b", role: "Owner" })).toBe(false);
+    // BQ-TEAMACC-2: only an Owner changes roles
+    expect(canChangeRole({ id: "a", role: "Approver" }, { id: "b", role: "Member" })).toBe(false);
   });
 
   it("FR-TEAM-02 your own role select is the only disabled one on the page", async () => {

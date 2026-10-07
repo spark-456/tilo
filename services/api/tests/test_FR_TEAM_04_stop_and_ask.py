@@ -19,12 +19,12 @@ def test_FR_TEAM_04_must_ask_switches_cannot_be_turned_off():
     for key in locked:
         assert state[key] is True
         with pytest.raises(MustAskLocked):
-            set_switch(state, key, False, actor="u_owner", at=AT)
+            set_switch(state, key, False, actor="u_owner", actor_role="Owner", at=AT)
 
 
 def test_FR_TEAM_04_optional_switch_changes_and_the_change_is_logged():
     state = {k: s.default for k, s in load_switches().items()}
-    new, record = set_switch(state, "weekend", True, actor="u_owner", at=AT)
+    new, record = set_switch(state, "weekend", True, actor="u_owner", actor_role="Owner", at=AT)
     assert new["weekend"] is True and state["weekend"] is False
     assert record == {
         "kind": "team_rule_changed",
@@ -39,9 +39,9 @@ def test_FR_TEAM_04_optional_switch_changes_and_the_change_is_logged():
 def test_FR_TEAM_04_unknown_switch_or_non_bool_is_refused():
     state = {k: s.default for k, s in load_switches().items()}
     with pytest.raises(KeyError):
-        set_switch(state, "nope", True, actor="u", at=AT)
+        set_switch(state, "nope", True, actor="u", actor_role="Owner", at=AT)
     with pytest.raises(TypeError):
-        set_switch(state, "weekend", "yes", actor="u", at=AT)  # type: ignore[arg-type]
+        set_switch(state, "weekend", "yes", actor="u", actor_role="Owner", at=AT)  # type: ignore[arg-type]
 
 
 def test_FR_TEAM_04_a_config_that_defaults_a_must_ask_rule_off_is_refused(tmp_path):
@@ -49,3 +49,25 @@ def test_FR_TEAM_04_a_config_that_defaults_a_must_ask_rule_off_is_refused(tmp_pa
     bad.write_text(yaml.safe_dump({"switches": [{"key": "spend", "default": False, "must_ask": True}]}))
     with pytest.raises(ValueError):
         load_switches(bad)
+
+
+@pytest.mark.parametrize("role", ["Member", "Viewer", "Root", None])
+def test_FR_TEAM_04_only_owners_and_approvers_change_switches(role):
+    state = {k: s.default for k, s in load_switches().items()}
+    with pytest.raises(PermissionError):
+        set_switch(state, "weekend", True, actor="u", actor_role=role, at=AT)  # type: ignore[arg-type]
+
+
+def test_FR_TEAM_04_tools_switch_is_owner_only():
+    state = {k: s.default for k, s in load_switches().items()}
+    with pytest.raises(PermissionError):
+        set_switch(state, "tools", False, actor="u", actor_role="Approver", at=AT)
+    assert set_switch(state, "tools", False, actor="u", actor_role="Owner", at=AT)[0]["tools"] is False
+    assert set_switch(state, "weekend", True, actor="u", actor_role="Approver", at=AT)[0]["weekend"] is True
+
+
+def test_FR_TEAM_04_a_config_edit_cannot_unlock_a_must_ask_rule(tmp_path):
+    rows = [{"key": k, "default": True, "must_ask": False} for k in ("spend", "share", "undo", "tools")]
+    cfg = tmp_path / "t.yaml"
+    cfg.write_text(yaml.safe_dump({"switches": rows}))
+    assert all(load_switches(cfg)[k].must_ask for k in ("spend", "share", "undo"))

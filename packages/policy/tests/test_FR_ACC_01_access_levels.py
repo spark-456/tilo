@@ -51,3 +51,25 @@ def test_FR_ACC_01_skill_level_can_only_restrict():
             assert got == min(team, skill) and got <= team
     assert effective_level(Level.READ, Level.ACT) == Level.READ
     assert effective_level(Level.ACT, Level.DRAFT) == Level.DRAFT
+
+
+@pytest.mark.parametrize("level", ["read", "draft", "act"])
+@pytest.mark.parametrize("tier", ["T2", "T3"])
+def test_FR_ACC_01_read_only_flag_never_turns_a_send_into_a_read(level, tier):
+    out = permits(parse_level(level), tier, read_only=True)
+    assert out != "allow" or (level == "act" and tier == "T2")  # Act allows T2 anyway; Read and Draft never do
+    if level != "act":
+        assert out == "block"
+
+
+@pytest.mark.parametrize("flag", ["no", [0], 1, None])
+def test_FR_ACC_01_a_non_bool_read_only_blocks_a_read(flag):
+    assert permits(Level.READ, "T1", read_only=flag) == "block"  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("team", "skill"), [(True, Level.READ), (9, Level.READ), (Level.READ, 1), (Level.ACT, float("nan"))]
+)
+def test_FR_ACC_01_effective_level_needs_real_levels(team, skill):
+    with pytest.raises(TypeError):
+        effective_level(team, skill)

@@ -21,14 +21,13 @@ export interface Loaded {
  * config/team_rules.yaml (a test compares them); a live Api would send them. */
 export const MUST_ASK_RULES: readonly string[] = ["spend", "share", "undo"];
 
-/** FR-TEAM-02: nobody changes their own role; only an Owner or Approver changes roles; only an Owner grants or takes
- * Owner. The same rule as tilo_api.team_rules.change_role, for the page's controls. */
+/** FR-TEAM-02: nobody changes their own role, and only an Owner changes roles (BQ-TEAMACC-2). The same rule as
+ * tilo_api.team_rules.change_role, for the page's controls. */
 export function canChangeRole(
   actor: { id: string; role: string },
   target: { id: string; role: string },
 ): boolean {
-  if (actor.id === target.id || (actor.role !== "Owner" && actor.role !== "Approver")) return false;
-  return actor.role === "Owner" || target.role !== "Owner";
+  return actor.id !== target.id && actor.role === "Owner";
 }
 
 export const initialsOf = (name: string): string =>
