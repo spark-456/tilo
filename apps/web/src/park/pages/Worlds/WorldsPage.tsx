@@ -33,7 +33,11 @@ export function WorldsPage({ app }: { app: AppCtx }) {
 
   useEffect(() => {
     let live = true;
-    Promise.all([api.getWorlds(dec, added), api.getDecisions(), api.getPlans(dec)]).then(
+    Promise.all([
+      api.getWorlds(dec, added),
+      api.getDecisions(),
+      api.getPlans(dec).catch(() => ({ data: {} as Record<string, Plan> })),
+    ]).then(
       ([w, d, p]) => {
         if (!live) return;
         plans.current = p.data;
