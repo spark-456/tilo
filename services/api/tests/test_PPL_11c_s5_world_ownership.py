@@ -6,7 +6,7 @@ echoed), and `DevDeskWorlds` never takes over a Desk id that another person owns
 from __future__ import annotations
 
 import pytest
-from _ppl11a_lib import OWNER, PRIYA, SAM, FakeDesks
+from _ppl11a_lib import OWNER, PRIYA, SAM, FakeDesks, u
 from _ppl11c_lib import WORK_ITEM_BODY, act, emitted, item_for, meeting_rig, stamped, work_rig
 
 UNAVAILABLE = {"detail": "unavailable"}
@@ -42,6 +42,10 @@ HOSTILE = [
     pytest.param("w_desk_priya", OWNER, id="owner-not-the-record-owner"),
     pytest.param(None, PRIYA, id="not-a-string"),
     pytest.param(["w_desk_priya"], PRIYA, id="a-list"),
+    pytest.param("w_desk_" + u(0x661, 0x662, 0x663), PRIYA, id="arabic-indic-digits"),
+    pytest.param("w_desk_" + u(0xFF50, 0xFF52, 0xFF49, 0xFF59, 0xFF41), PRIYA, id="fullwidth-letters"),
+    pytest.param("w_desk_pri" + u(0x443) + "a", PRIYA, id="cyrillic-u-lookalike"),
+    pytest.param("w_desk_" + u(0x212A) + "1", PRIYA, id="kelvin-sign"),
 ]
 
 
@@ -144,3 +148,20 @@ def test_PPL_11c_s5_PE_12_dev_desk_worlds_stay_idempotent_for_their_own_person_a
     assert desks.desk_world("org_tilo", PRIYA) == desks.desk_world("org_tilo", PRIYA) == "w_desk_priya"
     assert desks.desk_owner("w_desk_priya") == PRIYA and store.worlds["w_desk_priya"].owner == PRIYA
     assert desks.desk_owner("w_desk_sam") is None and desks.desk_owner("w_village_basic") is None
+
+
+class _LyingStr(str):
+    """Its value is a well-formed Desk id (so a pattern match and an owner lookup accept it) but it prints as a
+    world that is not a Desk world."""
+
+    def __str__(self) -> str:
+        return "w_village_basic"
+
+
+def test_PPL_11c_s5_HR_1_a_str_subclass_that_lies_about_itself_is_refused(people_rig):
+    rig = work_rig(people_rig)
+    rig.desks = _Desks(_LyingStr("w_desk_priya"), PRIYA)
+    before = rig.snapshot()
+    response = rig.post("/v1/work-items", WORK_ITEM_BODY)
+    assert response.status_code == 503 and response.json() == UNAVAILABLE, response.text[:200]
+    assert rig.snapshot() == before and emitted(rig) == [] and _all_events(rig) == []

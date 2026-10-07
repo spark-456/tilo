@@ -54,7 +54,7 @@ class WorkEvents:
             "data": {"work_item_id": after["id"], **data},
         }
         world = self.desks.desk_world(org, owner)
-        if not isinstance(world, str) or _DESK_WORLD.fullmatch(world) is None or self.desks.desk_owner(world) != owner:
+        if type(world) is not str or _DESK_WORLD.fullmatch(world) is None or self.desks.desk_owner(world) != owner:
             raise ValueError("not the owner's Desk world")  # fail closed: write nothing, never echo the answer
         self.writer.append(world, part)
 
