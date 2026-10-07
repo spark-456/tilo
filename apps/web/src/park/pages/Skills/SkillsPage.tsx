@@ -10,6 +10,7 @@ import { useParkApi } from "../../app/context";
 import { PageSheet } from "../../components";
 import "./Skills.css";
 import { TeachCard } from "./TeachCard";
+import { ToolAccess } from "./ToolAccess";
 import { icon } from "./skillsKit";
 import { INTRO, pillTotal } from "./teachData";
 import { useTeach } from "./useTeach";
@@ -139,6 +140,7 @@ function Ready({ app, data }: { app: AppCtx; data: Data }) {
         </div>
       </Header>
       <TeachCard t={t} night={app.night} user={user} cardRef={teachRef} />
+      <ToolAccess skills={skills} tools={learn.tools} />
     </>
   );
 }

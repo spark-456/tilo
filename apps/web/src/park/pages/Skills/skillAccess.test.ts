@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { LEVEL_LABEL } from "../Connectors/view";
-import { allowedLevels, shownLevel } from "./skillAccess";
+import { LEVELS, allowedLevels, shownLevel } from "./skillAccess";
 
 const url = new URL(
   "../../../../../../packages/policy/tests/fixtures/effective_level_pairs.json",
@@ -17,6 +17,7 @@ const fx = JSON.parse(readFileSync(url, "utf8")) as {
 describe("FR-ACC-02 skill tool level picker", () => {
   it("FR-ACC-02 the level labels are the engine's four levels in order", () => {
     expect(LEVEL_LABEL.map((l) => l.toLowerCase())).toEqual(fx.levels);
+    expect([...LEVELS]).toEqual([...LEVEL_LABEL]);
   });
 
   it("FR-ACC-02 shownLevel equals the engine's effective level for every pair", () => {

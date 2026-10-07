@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 // FR-ACC-02 on the Skills page: each skill's tools get a level picker that offers nothing above the team level.
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, qa } from "../../../../test-support/park/componentsHarness";
 import { mountSkills } from "../../../../test-support/park/skillsHarness";
@@ -45,7 +46,9 @@ describe("FR-ACC-02 Skills page tool access", () => {
     const sel = pickers(el).find((s) => Number(s.dataset.teamLevel) >= 2);
     if (!sel) throw new Error("no picker with a team level of Draft or Act");
     sel.value = "1";
-    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    await act(async () => {
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
     expect(sel.value).toBe("1");
   });
 });
