@@ -1,11 +1,19 @@
-// The live Api (WEB-1a, WIRE-1, WIRE-2): `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
-// pages; every other method is NotBuilt and
+// The live Api (WEB-1a, WIRE-1..3): `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
+// pages, `getDecisions` walks `GET {base}/cards` pages and `decide` answers one card with one POST (the
+// person's tap, never a retry); every other method is NotBuilt and
 // fetches nothing. With no base url nothing is fetched at all. It never imports the fixtures, so sample
 // numbers cannot pass as live (HR-1..HR-7). Failures are the shared `TiloApiError` (src/api/http.ts).
-import { HttpClient, TiloApiError } from "../../api/http";
+import { HttpClient, TiloApiError, reasonOf } from "../../api/http";
 import { API_METHODS, type Api, type ApiMethod } from "./index";
+import {
+  type CardFeedItem,
+  answerOption,
+  decisionKey,
+  decisionsFromCards,
+} from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
+import type { Dec, DecisionKey } from "./types";
 
 export class NotBuilt extends Error {
   readonly code = "not_built";
@@ -67,6 +75,50 @@ function isWorldPage(v: unknown): v is { worlds: WorldListItem[]; next_cursor: s
   );
 }
 
+const KINDS = new Set(["needs_you", "meeting", "gate", "consent"]);
+const isText = (v: unknown): v is string => typeof v === "string";
+const isTexts = (v: unknown): boolean => Array.isArray(v) && v.every(isText);
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+
+/** A card the Api can show and answer: its kind, words and options are read, the option a tap sends exists, the
+ * gate's exact action and recipients (or the consent scopes) the person sees are there, and it matches its wrapper. */
+function isFeedItem(v: unknown): v is CardFeedItem {
+  if (!isObject(v) || !isText(v.world_id) || !isText(v.card_id) || !isObject(v.card)) return false;
+  const c = v.card as Record<string, unknown>;
+  const gate = c.gate as { action?: { exact?: unknown }; recipients?: unknown } | null;
+  const consent = c.consent as { scopes?: unknown } | null;
+  return (
+    c.world_id === v.world_id &&
+    c.id === v.card_id &&
+    isText(c.kind) &&
+    KINDS.has(c.kind) &&
+    isText(c.what_happened) &&
+    isText(c.why_it_matters) &&
+    Array.isArray(c.options) &&
+    c.options.every((o) => isObject(o) && isText(o.id) && isText(o.label)) &&
+    (c.kind !== "gate" || (isText(gate?.action?.exact) && isTexts(gate?.recipients))) &&
+    (c.kind !== "consent" || isTexts(consent?.scopes)) &&
+    answerOption(c as unknown as CardFeedItem["card"]) !== null
+  );
+}
+
+/** A body that is not a card feed page is an unreadable reply, never decisions. */
+function isCardPage(v: unknown): v is { cards: CardFeedItem[]; next_cursor: string | null } {
+  const p = v as { cards?: unknown; next_cursor?: unknown } | null;
+  return (
+    isObject(p) &&
+    Array.isArray(p.cards) &&
+    p.cards.every(isFeedItem) &&
+    (p.next_cursor === null || isText(p.next_cursor))
+  );
+}
+
+/** How `decide` finds its card again: only keys this Api served (BQ-WIRE3-1). */
+interface Answerable {
+  path: string;
+  option: string;
+}
+
 export function createLiveApi(options: LiveApiOptions = {}): Api {
   const stubs = API_METHODS.map((m) => [m, () => Promise.reject(new NotBuilt(m))]);
   const api = Object.fromEntries(stubs) as unknown as Api;
@@ -94,6 +146,45 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     const live = worldsFromList(items);
     const liveIds = new Set(live.map((w) => w.id));
     return { data: [...added.filter((w) => !liveIds.has(w.id)), ...live], source: "live" };
+  };
+  const served = new Map<string, Answerable>();
+  const answered: Dec = {};
+  api.getDecisions = async () => {
+    const items: CardFeedItem[] = [];
+    let cursor: string | null = null;
+    for (let n = 0; n < MAX_PAGES && (n === 0 || cursor !== null); n++) {
+      const query = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+      const body = await http.getJson(`/cards?limit=100${query}`);
+      if (!isCardPage(body)) throw new TiloApiError(BAD_REPLY, 200, true);
+      items.push(...body.cards);
+      cursor = body.next_cursor;
+    }
+    for (const { world_id, card_id, card } of items) {
+      const path = `/worlds/${encodeURIComponent(world_id)}/cards/${encodeURIComponent(card_id)}/answer`;
+      served.set(decisionKey(world_id, card_id), { path, option: answerOption(card) as string });
+    }
+    return { data: decisionsFromCards(items), source: "live" };
+  };
+  // One POST per call: no retry, no refresh (a person answers once, HR-1..HR-7). A 404 means the session's world is
+  // not the card's world, so the page offers "Open in world" (code open_in_world; `Decision.world` is that world).
+  api.decide = async (key: DecisionKey) => {
+    const target = served.get(key);
+    if (!target) throw new TiloApiError("That decision is not on this page any more.", null, false);
+    let body: unknown;
+    try {
+      body = await http.postJson(target.path, { option: target.option });
+    } catch (e) {
+      if (e instanceof TiloApiError && e.status === 404) {
+        throw new TiloApiError(e.message, 404, false, true, "open_in_world");
+      }
+      throw e;
+    }
+    const outcome = isObject(body) ? body.outcome : undefined;
+    if (outcome === "rejected")
+      throw new TiloApiError(reasonOf(200, JSON.stringify(body)), 200, false, true);
+    if (outcome !== "answered") throw new TiloApiError(BAD_REPLY, 200, true, true);
+    answered[key] = true;
+    return { data: { ok: true, dec: { ...answered } }, source: "live" };
   };
   return api;
 }
