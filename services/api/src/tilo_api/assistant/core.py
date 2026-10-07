@@ -20,10 +20,11 @@ from tilo_api.assistant.facts import Line, fact_lines, match_fact, moment_of, re
 from tilo_api.assistant.gate import Ref, RefGate
 from tilo_api.assistant.navigation import match_navigation, route_for, vet_navigate
 from tilo_api.assistant.status import status_lines, weekly_lines
+from tilo_api.assistant.updates import Update, match_update, vet_update
 from tilo_api.assistant.words import about_someone_else, question_key
 
 logger = logging.getLogger("tilo_api.assistant.core")
-Choice = Literal["intent", "navigate", "decline", "dropped", "unavailable", "budget", "flagged"]
+Choice = Literal["intent", "navigate", "update", "decline", "dropped", "unavailable", "budget", "flagged"]
 _TITLE_MAX = 140
 
 
@@ -72,7 +73,7 @@ class ModelAsk:
 class ModelDecision:
     choice: Choice
     intent: str | None = None
-    action: Mapping[str, Any] | None = None  # unvetted; core runs vet_navigate
+    action: Mapping[str, Any] | None = None  # unvetted; core runs vet_navigate, or vet_update for `update`
     cached: bool = False
     model_calls: int = 0
     credits: float = 0.0  # committed for this question
@@ -205,6 +206,11 @@ def _navigated(
     return Answer("navigated", by, (_opening(action, config),), action, None, "navigate", model)
 
 
+def _proposed(upd: Update, by: Literal["rules", "model"], model: ModelDecision | None) -> Answer:
+    """FR-PA-10: a confirmable proposal; the line names the item and cites it. The ask route never writes."""
+    return Answer("answered", by, (Line(str(upd.line), upd.ref),), upd.action, None, "update", model)
+
+
 def _report(
     intent: FactIntent,
     rows: Sequence[Mapping[str, Any]],
@@ -267,6 +273,14 @@ def answer(
     def report(intent: FactIntent) -> tuple[tuple[Line, ...], Mapping[str, Any] | None]:
         return _report(intent, rows, ask, plate, gate, finished, time_zone, config)
 
+    upd = match_update(key, rows, ask, gate, config, time_zone)  # before navigation and facts: "wait" is no fact here
+    if upd is not None:
+        if upd.decline is not None:
+            return _decline(config, upd.decline, "rules")
+        if upd.hand_off:  # no ui_action kind for reopen, not mine, put back yet (BQ-PPL11C-34): open the item instead
+            menu = build_menu(rows, ask.context, gate, config, limit=len(rows))
+            return _navigated(vet_navigate(upd.action, menu, gate), config, "rules", None)
+        return _proposed(upd, "rules", None)
     nav = match_navigation(key, rows, ask.context, gate, config)
     if nav is not None:
         if nav.decline is not None:
@@ -299,6 +313,10 @@ def answer(
         vetted = vet_navigate(d.action, menu, gate)
         if vetted is not None:
             return _navigated(vetted, config, "model", d)
+    if d.choice == "update":
+        vetted_update = vet_update(d.action, menu, ask, gate, config, time_zone)
+        if vetted_update is not None:
+            return _proposed(vetted_update, "model", d)
     if d.choice == "decline":
         return _decline(config, "unknown", "model", d)
     refusals = {"unavailable": "rules_only", "budget": "budget", "flagged": "flagged"}

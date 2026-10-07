@@ -144,6 +144,13 @@ def test_P0_07c_firebase_json_caches_hashed_assets_forever_and_never_caches_inde
 
 def test_P0_07c_firebase_json_has_no_project_ids_or_secrets(repo_root: pathlib.Path) -> None:
     text = (repo_root / "firebase.json").read_text(encoding="utf-8")
+    # SEC-15 / SIGNIN (documented test change, BQ-SIGNIN-5): the Content-Security-Policy must name two origins whose
+    # spelling contains a word this guard searches for: the project's own sign-in iframe on its auth domain (it IS the
+    # project id; `/__/auth/` is where Firebase serves it) and the SDK's Secure Token REST host (`token`). They are
+    # public hostnames, not ids or secrets; they are removed here and nothing else is.
+    for origin in ("https://essential-wares-510320-f0.firebaseapp.com/__/auth/", "https://securetoken.googleapis.com"):
+        assert text.count(origin) == 1, f"{origin} is named exactly once, in the CSP"
+        text = text.replace(origin, "")
     assert not re.search(r"tilo-demo|apiKey|secret|token|essential-wares", text, re.I)
 
 
