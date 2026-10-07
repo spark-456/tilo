@@ -38,10 +38,10 @@ profiles:
     caps: [json, tools]
 
 roles:
-  director: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high, max_input_tokens: 100000 }
-  lead: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: medium }
+  director: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
+  lead: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: medium, max_output_tokens: 16384 }
   specialist: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
-  verifier: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high }
+  verifier: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high, max_output_tokens: 16384 }
   writer: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b }
   narrator: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
   autopilot: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b, max_input_tokens: 16000 }

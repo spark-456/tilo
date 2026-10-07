@@ -29,6 +29,25 @@ class SafetyError(ProviderError):
     """The model or platform blocked the response on safety grounds (PRD 10.4)."""
 
 
+class OutputTruncatedError(ProviderError):
+    """The reply stopped because it hit its output-token cap (Gemini MAX_TOKENS, OpenAI-compatible `length`). Thinking
+    tokens count against the cap, so a reply can be empty. Not retried or repaired: the same cap burns the same
+    tokens. Counts are None when the provider reported no usage (0 when usage is present but the field is missing);
+    the message names the counts and never the reply text (it can carry personal data)."""
+
+    def __init__(self, message: str, *, output_tokens: int | None = None, thinking_tokens: int | None = None) -> None:
+        super().__init__(message)
+        self.output_tokens = output_tokens
+        self.thinking_tokens = thinking_tokens
+
+
+def truncated_message(output_tokens: int | None, thinking_tokens: int | None) -> str:
+    """The OutputTruncatedError text: the known counts only, never any reply text."""
+    known = [f"{n} {what}" for n, what in ((output_tokens, "output"), (thinking_tokens, "thinking")) if n is not None]
+    spent = f" ({', '.join(known)} tokens used)" if known else ""
+    return f"PL-02: the reply hit its max_output_tokens cap{spent}; raise the role's max_output_tokens"
+
+
 def map_http_status(status_code: int, message: str) -> ProviderError:
     """Maps an HTTP-ish status code to a ProviderError subclass (PL-02
     conformance: 429 -> QuotaError, 5xx -> RetryableError, other 4xx ->
