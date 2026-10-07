@@ -374,7 +374,9 @@ def test_EFF_04_the_router_passes_each_roles_static_parts_through_byte_for_byte(
 # per-call value belongs in the task template, after the static prefix.
 # `intents` and `routes` (assistant/route_system.md, PPL-11b) are the closed menus read once from config/assistant.yaml:
 # the same on every call of a process, so the prefix stays byte-stable and cacheable.
-_STATIC_PLACEHOLDERS = {"categories", "intents", "routes"}
+# `gaps` and `services` (director/brief_system.md, FR-INT-15) are read once from config/capability_gaps.yaml in the
+# same way.
+_STATIC_PLACEHOLDERS = {"categories", "gaps", "intents", "routes", "services"}
 
 
 def _system_templates() -> list[Path]:

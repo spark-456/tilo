@@ -18,6 +18,7 @@ import logging
 import math
 import os
 import threading
+import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,8 +43,8 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router
 from tilo_providers.safety import build_safety_provider
 
-from tilo_api import events
-from tilo_api.access import AccessStore, Mode, provider_mode
+from tilo_api import events, spend
+from tilo_api.access import AccessStore, Mode, enforced, provider_mode
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
@@ -74,6 +75,8 @@ class Principal:
     channel: Channel = "web"  # the session channel sign-in resolved for this request (FR-HIL-07,
     # world.paused.data.channel is derived from here, never from a request body
     districts: tuple[str, ...] = ()  # visible beyond vis: "all"; ignored for role == "owner"
+    full_session: bool = False  # a full web sign-in session (BQ-XWORLD-10): set only by the server that resolves the
+    # session, never from anything in a request; needed to answer, or read in full, another owned world's cards
 
 
 @dataclass
@@ -221,11 +224,64 @@ def get_access_store() -> AccessStore:
     raise HTTPException(status_code=503, detail="not_configured")
 
 
-def get_mode(request: Request, flags: Annotated[FlagStore, Depends(get_flag_store)]) -> Mode:
-    """This request's model mode (SEC-15): the declaration the access gate verified (never one a client sent),
-    the environment and the `replay_only` kill switch (NFR-24), decided by `access.provider_mode`."""
-    declaration = getattr(request.state, "declaration", None)
-    return provider_mode(declaration, os.environ, replay_only=bool(flags.get("replay_only")))
+def get_spend_caps() -> spend.SpendCaps:
+    """SEC-16: `config/spend_caps.yaml`, read on every call (a cap is a config edit, never code)."""
+    return spend.load_spend_caps(None)
+
+
+@functools.cache
+def get_rate_limiter() -> spend.RateLimiter:
+    """SEC-16: one process-wide limiter from config (per instance on Cloud Run; a shared one is a later decision)."""
+    caps = get_spend_caps()
+    return spend.RateLimiter(limit=caps.rate_limit_requests, window_s=caps.rate_limit_window_s, clock=time.monotonic)
+
+
+def get_spend_cap_ledger() -> spend.SpendLedger:
+    """SEC-16's ledger (not FR-PA-19's `get_spend_ledger`). Unwired, a deployed judge is replay, never uncapped; wire
+    it only with the per-unit `SpendGuard.begin_unit`/`settle_unit` wiring (BQ-SEC16-1), or live spend is unmetered."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def _resolve(request: Request, seam: Callable[[], Any]) -> Any:
+    try:  # the seam as the app is wired (overrides included), or None when it refuses or fails
+        return request.app.dependency_overrides.get(seam, seam)()
+    except Exception:
+        return None
+
+
+def get_switches(request: Request, flags: Annotated[FlagStore, Depends(get_flag_store)]) -> FlagStore:
+    """Deployed, NFR-24's flags plus the ledger's durable `replay_only` (FR-MTR-04); not deployed, the flags alone."""
+    return spend.Switches(flags, _resolve(request, get_spend_cap_ledger)) if enforced() else flags
+
+
+def spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:
+    """(mode, capped): SEC-15's decision, then deployed the `SpendGuard`'s; any doubt is replay (fail closed)."""
+    mode = provider_mode(declaration, os.environ, replay_only=bool(switches.get("replay_only")))
+    if mode != "live" or uid is None or not isinstance(switches, spend.Switches):
+        return mode, False
+    caps = _resolve(request, get_spend_caps)
+    if switches.ledger is None or caps is None:
+        return "replay", False
+    guard = spend.SpendGuard(switches.ledger, switches.flags, caps)
+    capped = guard.uid_capped(uid)
+    return provider_mode(declaration, os.environ, replay_only=not guard.live_allowed(uid), capped=capped), capped
+
+
+def get_mode(request: Request, switches: Annotated[FlagStore, Depends(get_switches)]) -> Mode:
+    """This request's model mode from what the access gate verified (never what a client sent): SEC-15, SEC-16."""
+    state = request.state
+    return spend_mode(request, getattr(state, "uid", None), getattr(state, "declaration", None), switches)[0]
+
+
+def get_work_mode(request: Request, switches: Annotated[FlagStore, Depends(get_switches)]) -> Mode:
+    """`get_mode` for new work, refused before any router is built: a switch set (503) or the uid capped (403)."""
+    if isinstance(switches, spend.Switches) and switches.get("replay_only"):
+        raise ReplayOnly
+    state = request.state
+    mode, capped = spend_mode(request, getattr(state, "uid", None), getattr(state, "declaration", None), switches)
+    if capped:
+        raise spend.SpendCapReached
+    return mode
 
 
 def router_for_mode(mode: Mode) -> Router:
@@ -240,7 +296,7 @@ def router_for_mode(mode: Mode) -> Router:
         raise HTTPException(status_code=503, detail="The model router is not configured.") from exc
 
 
-def get_router(mode: Annotated[Mode, Depends(get_mode)] = "replay") -> Router:
+def get_router(mode: Annotated[Mode, Depends(get_work_mode)] = "replay") -> Router:
     """Every model call goes through the provider layer's Router (PL-01), built for this request's mode."""
     return router_for_mode(mode)
 
@@ -388,6 +444,26 @@ def get_plate_sources() -> PlateSources:
 
 def get_source_owners() -> SourceOwners:
     raise HTTPException(status_code=503, detail="not_configured")
+
+
+class MeetingWorlds(Protocol):
+    """Creates the Outpost world that holds a meeting's transcript and minutes (FR-MTG-07, BQ-273)."""
+
+    def make_meeting_world(self, *, org_id: str, owner: str, meeting_id: str) -> str: ...
+
+
+def get_meeting_worlds() -> MeetingWorlds:
+    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Outpost world
+
+
+class DeskWorlds(Protocol):
+    """The one Desk world of a person, made lazily and idempotently: where their work-item events go (PE-12)."""
+
+    def desk_world(self, org_id: str, user_id: str) -> str: ...
+
+
+def get_desk_worlds() -> DeskWorlds:
+    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
 
 
 def get_run_archive() -> Callable[..., RunArchive]:

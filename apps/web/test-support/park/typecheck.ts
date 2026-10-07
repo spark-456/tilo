@@ -1,35 +1,49 @@
 // WEB-1a test support: type-checks every file under src/park (sources and tests) with the web app's
 // own tsconfig, through the TypeScript API, so the expectTypeOf checks in the park tests are really
 // enforced (Vitest does not evaluate types at runtime). Scoped to park files, so it stays fast.
-import fs from "node:fs";
+//
+// The compiler runs in a child process (typecheckWorker.mjs) and the result is awaited: ts.createProgram is
+// synchronous and takes ~10 s alone and up to ~80 s on a loaded machine, and a vitest worker that blocks that
+// long misses vitest's 60 s worker RPC ("Timeout calling onTaskUpdate", exit 1 with every test green). The
+// answer is built once per process, so the files that ask share one child (vitest.config.ts runs the
+// typecheck tests together in one fork).
+import { spawn } from "node:child_process";
 import path from "node:path";
-import ts from "typescript";
 import { PARK_DIR } from "./prototype";
 
 const WEB_DIR = path.resolve(PARK_DIR, "..", "..");
+const WORKER = path.join(WEB_DIR, "test-support", "park", "typecheckWorker.mjs");
 
-function walk(dir: string): string[] {
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-    const p = path.join(dir, e.name);
-    if (e.isDirectory()) return walk(p);
-    return /\.(ts|tsx)$/.test(e.name) ? [p] : [];
+let cached: Promise<string[]> | undefined;
+
+function build(): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [WORKER, WEB_DIR], {
+      cwd: WEB_DIR,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    let err = "";
+    child.stdout.on("data", (d: Buffer) => {
+      out += d.toString();
+    });
+    child.stderr.on("data", (d: Buffer) => {
+      err += d.toString();
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0)
+        return reject(new Error(`typecheck worker exited ${code}: ${err.slice(0, 2000)}`));
+      try {
+        resolve(JSON.parse(out) as string[]);
+      } catch (e) {
+        reject(new Error(`typecheck worker printed no JSON: ${String(e)} ${out.slice(0, 500)}`));
+      }
+    });
   });
 }
 
-export function parkTypeErrors(): string[] {
-  const cfgPath = path.join(WEB_DIR, "tsconfig.json");
-  const read = ts.readConfigFile(cfgPath, ts.sys.readFile);
-  const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, WEB_DIR);
-  const roots = [...walk(PARK_DIR), ...walk(path.join(WEB_DIR, "test-support", "park"))];
-  const program = ts.createProgram({ rootNames: roots, options: parsed.options });
-  const parkFiles = new Set(roots.map((r) => path.resolve(r)));
-  return ts
-    .getPreEmitDiagnostics(program)
-    .filter((d) => d.file && parkFiles.has(path.resolve(d.file.fileName)))
-    .map((d) => {
-      const { line } = d.file?.getLineAndCharacterOfPosition(d.start ?? 0) ?? { line: 0 };
-      const rel = path.relative(WEB_DIR, d.file?.fileName ?? "").replaceAll("\\", "/");
-      return `${rel}:${line + 1} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`;
-    });
+export function parkTypeErrors(): Promise<string[]> {
+  cached ??= build();
+  return cached;
 }

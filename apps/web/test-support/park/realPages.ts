@@ -6,11 +6,13 @@ import { PAGE_IDS, type PageId } from "../../src/park/app/AppCtx";
 
 export const REAL_PAGES: readonly PageId[] = [
   "home",
+  "world",
   "skills",
   "ledger",
   "agenda",
   "connectors",
   "team",
+  "worlds",
   "profile",
 ];
 

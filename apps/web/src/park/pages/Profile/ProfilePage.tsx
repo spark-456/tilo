@@ -68,6 +68,9 @@ const SESSION_ICONS = { laptop: ICONS.laptop, phone: ICONS.phone, screen: ICONS.
 const sessionSub = (s: ProfileSession): string =>
   [s.place, s.lastActive, s.note].filter(Boolean).join(" · ");
 const money = (n: number): string => `£${n.toLocaleString("en-GB")}`;
+/** The spend bar's fill: 0 when there is no budget to measure against, never past the track. */
+const spendPercent = (spent: number, budget: number): number =>
+  budget > 0 ? Math.min(100, Math.max(0, Math.round((spent / budget) * 100))) : 0;
 
 interface Loaded {
   user: User;
@@ -169,7 +172,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
         : problem === "failed"
           ? "Your profile could not be loaded"
           : "";
-  const motion = MOTIONS.find((m) => m[0] === app.motion) ?? MOTIONS[0];
+  // An unknown value reads as the default, calm (the store and the handoff default), not as the first option.
+  const motion = MOTIONS.find((m) => m[0] === app.motion) ?? MOTIONS[1];
 
   return (
     <div data-testid="park-page-profile">
@@ -350,10 +354,10 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     <button
                       key={id}
                       type="button"
-                      aria-pressed={app.motion === id}
+                      aria-pressed={motion[0] === id}
                       className={cls(
                         "park-profile-mopt",
-                        app.motion === id && "park-profile-mopt--on",
+                        motion[0] === id && "park-profile-mopt--on",
                       )}
                       onClick={() => app.setPref("motion", id)}
                     >
@@ -448,13 +452,15 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     <span className="park-profile-eyebrow">{`AGENT SPEND · ${loaded.settings.plan.spendMonth.toUpperCase()}`}</span>
                     <span className="park-profile-amount">
                       <span className="park-profile-big">{money(loaded.spend.spent)}</span>
-                      <span className="park-profile-of">{`of ${money(loaded.spend.budget)}`}</span>
+                      {loaded.spend.budget > 0 ? (
+                        <span className="park-profile-of">{`of ${money(loaded.spend.budget)}`}</span>
+                      ) : null}
                     </span>
                     <span className="park-profile-bar">
                       <span
                         className="park-profile-fill"
                         style={{
-                          width: `${Math.round((loaded.spend.spent / loaded.spend.budget) * 100)}%`,
+                          width: `${spendPercent(loaded.spend.spent, loaded.spend.budget)}%`,
                         }}
                       />
                     </span>
