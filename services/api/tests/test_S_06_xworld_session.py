@@ -278,7 +278,10 @@ def test_S_06_xworld_a_session_without_the_marker_still_answers_in_its_bound_wor
     with_marker = _answer_once(client, kind, session_world=B, full_session=True, channel=channel)
     without = _answer_once(client, kind, session_world=B, full_session=False, channel=channel)
 
-    assert without["response"] == (200, ANSWERED)
+    # The meeting fixture's answer_channels is ["web"], so mobile_web is invalid_channel either way (SEC-06):
+    # the claim is that the marker changes nothing in the bound world (test fixed: it contradicted the fixture).
+    if kind != "meeting" or channel == "web":
+        assert without["response"] == (200, ANSWERED)
     assert without == with_marker
 
 
@@ -412,7 +415,10 @@ def test_S_06_xworld_the_feed_shows_a_session_without_the_marker_summaries_for_o
     for world_id in (B, C):
         per_world = client.get(f"/worlds/{world_id}/cards")
         assert per_world.status_code == 200 and per_world.json() == by_world[world_id]
-    assert all(r not in feed.text for c in seeded if c["kind"] == "gate" for r in c["gate"]["recipients"])
+    # Only the other worlds' items are redacted; the bound world A is served in full (test fixed: `mine` shares
+    # the fixture's recipient, which correctly appears in A's full card).
+    others = json.dumps(by_world[B] + by_world[C])
+    assert all(r not in others for c in seeded if c["kind"] == "gate" for r in c["gate"]["recipients"])
 
 
 def test_S_06_xworld_a_full_session_feed_is_unchanged(client, store):
