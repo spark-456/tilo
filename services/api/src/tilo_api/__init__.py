@@ -25,6 +25,7 @@ from tilo_api.redaction import router as _redaction_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
 from tilo_api.tasks import router as _tasks_router
+from tilo_api.worlds_list import router as _worlds_list_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
 # strangers (issue #411). `app.openapi()` still works in-process for tests.
@@ -60,6 +61,7 @@ app.include_router(intake_router)
 app.include_router(_dispatch_router)
 app.include_router(_redaction_router)
 app.include_router(_costs_router)
+app.include_router(_worlds_list_router)
 app.include_router(_tasks_router)
 app.include_router(_build_cards_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
 app.include_router(_build_console_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
