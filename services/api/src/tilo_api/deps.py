@@ -190,6 +190,13 @@ def get_ledger() -> Sequence[LedgerEntry]:
     raise HTTPException(status_code=503, detail="not_configured")
 
 
+def get_time_baselines() -> Any:
+    """The EV-G2 time-saved baselines (FR-PA-20, PRD 14.2):
+    `{method_url, units: {unit_type: {p25, median, p75}}}`, minutes
+    per unit. Not measured and no config shape yet (BQ-PA20-2), so no production wiring: fail closed."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
 def prices_path() -> Path:
     """config/prices.yaml, the price sheet (FR-MTR-01): the one public way for a route to find it."""
     return _REPO_ROOT / "config" / "prices.yaml"
