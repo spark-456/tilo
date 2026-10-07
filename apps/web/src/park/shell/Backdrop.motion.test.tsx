@@ -72,22 +72,22 @@ const k = () => Number(scene().getAttribute("data-k"));
 const builds = () => sceneSpy.mock.calls.length;
 
 describe("WEB-MOTION-1 motion preference: lively, calm, still", () => {
-  it("WEB-MOTION-1 lively (the default) shows the full, live city: not still, k = 1", async () => {
+  it("WEB-MOTION-1 calm (the default, as in the handoff) shows a live city that is slower: not still, k = 1.9", async () => {
     await mountApp();
-    expect(still()).toBe("false");
-    expect(k()).toBe(1);
-  });
-
-  it("WEB-MOTION-1 calm shows a live city that is slower: not still, k = 1.9 (the handoff's value)", async () => {
-    await mountApp();
-    act(() => seen.app.setPref("motion", "calm"));
     expect(still()).toBe("false");
     expect(k()).toBeCloseTo(1.9, 5);
   });
 
+  it("WEB-MOTION-1 lively shows the full, live city at full speed: not still, k = 1", async () => {
+    await mountApp();
+    act(() => seen.app.setPref("motion", "lively"));
+    expect(still()).toBe("false");
+    expect(k()).toBe(1);
+  });
+
   it("WEB-MOTION-1 still shows a frozen city: still = true", async () => {
     await mountApp();
-    expect(still(), "the lively city it starts from is not frozen").toBe("false");
+    expect(still(), "the live city it starts from is not frozen").toBe("false");
     act(() => seen.app.setPref("motion", "still"));
     expect(still()).toBe("true");
   });
@@ -109,6 +109,16 @@ describe("WEB-MOTION-1 motion preference: lively, calm, still", () => {
     expect(scene().getAttribute("data-night")).toBe("true");
     expect(still()).toBe("false");
     expect(k()).toBeCloseTo(1.9, 5);
+  });
+});
+
+describe("WEB-MOTION-1 the city holds still while the world loader is open (as the handoff does)", () => {
+  it("WEB-MOTION-1 opening a world on Home pauses the city, and it is not paused before", async () => {
+    await mountApp();
+    const backdrop = () => q(document.body, ".park-shell__backdrop");
+    expect(backdrop().hasAttribute("data-paused"), "Home, no loader: the city moves").toBe(false);
+    act(() => seen.store.openWorld("k1"));
+    expect(backdrop().hasAttribute("data-paused"), "the loader is open: the city holds").toBe(true);
   });
 });
 

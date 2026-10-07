@@ -85,7 +85,7 @@ describe("WEB_3a_shell: the page gets the app prop", () => {
       added: [],
       time: "day",
       night: false,
-      motion: "lively",
+      motion: "calm",
       pins: expect.any(Array), // WEB-3b: the pins come from the city backdrop
       ready: true,
     });

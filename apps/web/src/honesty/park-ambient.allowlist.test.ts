@@ -1,6 +1,6 @@
 // WEB-MOTION-1 (PRD 9.4 HR-1 to HR-7; docs/open-questions.md BQ-WEB-3, decided by the user 6 Oct 2026;
 // ADR-0003a 5): the Park city's ambient motion (cars and walkers) is allowed, and nothing that depicts Tilo's
-// own agents is. "Ambient non-agent motion built as designed, on by default, one flag PARK_AMBIENT_MOTION;
+// own agents is. "Ambient non-agent motion built as designed, on by default, one off switch (the motion setting "still" or reduced motion; no build variable, see BQ-WEB-MOTION-1 (z));
 // agents animate only from events; narrow reasoned honestyScan.ts allowlist entry".
 // This pins the allowlist's SHAPE: where the exceptions may live and what they must say. It does not name a
 // file the builder must use; any file under park/shell or park/engines will do.
@@ -92,11 +92,15 @@ describe("WEB-MOTION-1 honesty: ambient city motion is allowed, agent motion is 
     }
   });
 
-  it("WEB-MOTION-1 one flag, PARK_AMBIENT_MOTION, gates the city motion: exactly one source file reads it", () => {
+  it("WEB-MOTION-1 the city's motion has no build-time env switch: still comes only from the person's setting or reduced motion", () => {
+    // BQ-WEB-3 asked for one off switch; the P0-07c deploy guard allows the web source to read only
+    // VITE_TILO_API_URL, so the switch is the app's own motion setting ("still") plus prefers-reduced-motion,
+    // decided in one place (cityMotion.ts).
     const readers = parkFiles.filter((f) =>
-      /PARK_AMBIENT_MOTION/.test(readFileSync(join(SRC, f), "utf8")),
+      /VITE_PARK_AMBIENT_MOTION|PARK_AMBIENT_MOTION/.test(readFileSync(join(SRC, f), "utf8")),
     );
-    expect(readers.length, "BQ-WEB-3: one flag, default on").toBe(1);
-    expect(readers[0]).toMatch(/^park\/(?:shell|app|engines)\//);
+    expect(readers.filter((f) => !/\.test\.tsx?$/.test(f))).toEqual([]);
+    const motion = readFileSync(join(SRC, "park/shell/cityMotion.ts"), "utf8");
+    expect(motion).toMatch(/reduced \|\| pref === "still"/);
   });
 });

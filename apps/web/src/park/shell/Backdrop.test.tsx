@@ -154,10 +154,10 @@ describe("WEB_3b_pins: the scene's free spots become app.pins", () => {
 describe("WEB_3b_motion: motion is part of the cache key", () => {
   it("WEB_3b_motion_a_motion_change_is_a_new_cache_key_and_the_first_comes_back_unchanged", async () => {
     await mountApp();
-    const lively = scene().getAttribute("data-build");
-    act(() => seen.app.setPref("motion", "calm"));
-    expect(scene().getAttribute("data-build")).not.toBe(lively);
+    const calm = scene().getAttribute("data-build");
     act(() => seen.app.setPref("motion", "lively"));
-    expect(scene().getAttribute("data-build")).toBe(lively);
+    expect(scene().getAttribute("data-build")).not.toBe(calm);
+    act(() => seen.app.setPref("motion", "calm"));
+    expect(scene().getAttribute("data-build")).toBe(calm);
   });
 });
