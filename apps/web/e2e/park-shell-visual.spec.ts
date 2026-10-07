@@ -48,6 +48,10 @@ async function open(page: Page, path: string, theme: Theme = "day"): Promise<voi
   await page.goto(path);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(nav(page)).toBeVisible();
+  // Updated for NFR-01-LANDING: the page is painted first and the city is drawn after it (a poster stands in), so
+  // wait for the boot splash to be gone and the city to be drawn before measuring anything on top of it.
+  await expect(page.getByText("Loading your city")).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByTestId("park-shell-poster")).toHaveCount(0, { timeout: 30_000 });
   if (theme === "night") {
     await page.getByRole("button", { name: "Switch to night" }).click();
     await expect(root(page)).toHaveAttribute("data-time", "night");
