@@ -1,4 +1,4 @@
-// WEB-4 acceptance (plan sections 8a and 10; README "Home"): /park/home in a real browser at 1440x900 and
+// WEB-4 acceptance (plan sections 8a and 10; README "Home"): / (home) in a real browser at 1440x900 and
 // 390x844, day and night. Home runs alone inside ParkApp here (the shell, WEB-3b, adds the nav and the city).
 // Every expected number was measured as a computed value on the reference page, served from
 // design_handoff_tilo_web_app/design (`python -m http.server <port>`, open `Tilo App.dc.html#home`) at the
@@ -8,7 +8,7 @@
 //     border, blur, radius 28 / 26 / 28, paddings 24 26 22 / 8 / 10, gaps 12 / 6 / 8;
 //   - type: h1 Nunito 900 50 / -1.4 / 50, summary 17/600, rows 14/800 and 12.5/700, composer 20/700;
 //   - copy and the flow: composer idle -> drafting -> plan -> Change brief -> start -> toast Open, in real time;
-//   - Review opens /park/world/k1; no console error, no sideways scroll at 390, axe finds nothing serious.
+//   - Review opens /world/k1; no console error, no sideways scroll at 390, axe finds nothing serious.
 // Night: the shell flips `data-time` on the data-park root; here the attribute is set on the page, which is
 // all the CSS reads (colours are tokens), so this checks the night tokens reach every part of Home.
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
@@ -130,7 +130,7 @@ const near = (label: string, got: number, want: number, tol = 1.5) =>
 
 async function openHome(page: Page, theme: Theme): Promise<string[]> {
   const problems = collectConsoleProblems(page);
-  await page.goto("/park/home");
+  await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     /^Good (morning|evening), Alex\.$/,
   );
@@ -158,7 +158,7 @@ const caught = (page: Page) => page.getByText("You’re all caught up");
 test.beforeAll(async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const page = await browser.newPage(baseURL ? { baseURL } : {});
-  await page.goto("/park/home", { timeout: 120_000 });
+  await page.goto("/", { timeout: 120_000 });
   await page
     .getByRole("heading", { level: 1 })
     .waitFor({ timeout: 120_000 })
@@ -957,8 +957,8 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
       await expect(toast).toBeVisible();
       await expect(input(page)).toHaveValue("");
       await toast.getByRole("button", { name: "Open" }).click();
-      await expect(page).toHaveURL(/\/park\/world\/new1$/);
-      await expect(page.getByTestId("park-page-world")).toContainText("new1");
+      await expect(page).toHaveURL(/\/world\/new1$/);
+      await expect(page.getByTestId("park-page-world")).toHaveAttribute("data-world-id", "new1");
       expect(problems).toEqual([]);
     });
 
@@ -999,8 +999,8 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
     test(`WEB_4_e2e_${sizeName}_Review_opens_the_K1_world`, async ({ page }) => {
       const problems = await openHome(page, "day");
       await pill(page).click();
-      await expect(page).toHaveURL(/\/park\/world\/k1$/);
-      await expect(page.getByTestId("park-page-world")).toContainText("k1");
+      await expect(page).toHaveURL(/\/world\/k1$/);
+      await expect(page.getByTestId("park-page-world")).toHaveAttribute("data-world-id", "k1");
       expect(problems).toEqual([]);
     });
 
@@ -1034,18 +1034,18 @@ test.describe("park home at 1440x900: the links of the Today panel", () => {
   test.use({ viewport: DESKTOP });
 
   const LINKS: [string, (p: Page) => Locator, RegExp][] = [
-    ["a live row", (p) => row(p, "Onboard 12 new hires"), /\/park\/world\/hires$/],
-    ["All worlds", (p) => today(p).getByText("All worlds", { exact: true }), /\/park\/worlds$/],
-    ["Agenda", (p) => today(p).getByText("Agenda", { exact: true }), /\/park\/agenda$/],
+    ["a live row", (p) => row(p, "Onboard 12 new hires"), /\/world\/hires$/],
+    ["All worlds", (p) => today(p).getByText("All worlds", { exact: true }), /\/worlds$/],
+    ["Agenda", (p) => today(p).getByText("Agenda", { exact: true }), /\/agenda$/],
     [
       "an up-next row",
       (p) => today(p).getByRole("button", { name: /Supplier sync · Northline/ }),
-      /\/park\/agenda$/,
+      /\/agenda$/,
     ],
     [
       "September spend",
       (p) => today(p).getByRole("button", { name: /September spend/ }),
-      /\/park\/ledger$/,
+      /\/ledger$/,
     ],
   ];
   for (const [label, target, url] of LINKS) {

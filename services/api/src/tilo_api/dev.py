@@ -121,6 +121,30 @@ class DevEventWriter:
             return stamped
 
 
+class DevDeskWorlds:
+    """One Desk world per person over the in-memory `Store`: `w_desk_<user id without "u_">`, owned by that person with
+    no districts, made on first use (idempotent). A user id that cannot make a valid world id raises."""
+
+    def __init__(self, store: deps.Store) -> None:
+        self._store, self._lock = store, threading.Lock()
+
+    def desk_world(self, org_id: str, user_id: str) -> str:
+        refuse_if_unsafe()
+        suffix = user_id[2:] if user_id.startswith("u_") else ""
+        if re.fullmatch(r"[0-9A-Za-z_]{1,43}", suffix) is None:
+            raise ValueError("no Desk world for this user id")
+        world_id = f"w_desk_{suffix}"
+        with self._lock:
+            held = self._store.worlds.setdefault(world_id, deps.WorldRecord(owner=user_id, districts={}))
+            if getattr(held, "owner", None) != user_id:
+                raise ValueError("that Desk world belongs to someone else")  # never adopted (as `desk.ensure_desk`)
+        return world_id
+
+    def desk_owner(self, world_id: str) -> str | None:
+        refuse_if_unsafe()
+        return getattr(self._store.worlds.get(world_id), "owner", None)
+
+
 class _NoSources:
     """Dev plate sources and source owners: nothing to join and no owner to name (a stand-in, never a second store)."""
 
@@ -168,8 +192,10 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
     def principal(request: Request) -> deps.Principal:
         refuse_if_unsafe()
         # The one owner is a member of whichever of its own worlds the path names; an unknown world is
-        # the same 404 as ever, because the route looks the world up in the store.
-        return deps.Principal(user_id=DEV_OWNER, role="owner", world_id=request.path_params.get("world_id"))
+        # the same 404 as ever, because the route looks the world up in the store. The dev owner is the person at the
+        # keyboard: a full web sign-in session (BQ-XWORLD-10).
+        world_id = request.path_params.get("world_id")
+        return deps.Principal(user_id=DEV_OWNER, role="owner", world_id=world_id, full_session=True)
 
     def get_store() -> deps.Store:
         refuse_if_unsafe()
@@ -183,13 +209,21 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
         return writer
 
     app.dependency_overrides[deps.get_event_writer] = get_writer
+    desks = DevDeskWorlds(store)
+
+    def get_desks() -> DevDeskWorlds:
+        refuse_if_unsafe()
+        return desks
+
+    app.dependency_overrides[deps.get_desk_worlds] = get_desks  # the Desk worlds of the work-item events (PE-12)
     app.dependency_overrides.update(dev_run.overrides())  # fake unit runner, recipient and send (CL-INT-5c)
     app.dependency_overrides.update(_dev_people())  # in-memory people stores, the dev owner an org owner
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Idempotency-Key"],
+        expose_headers=["Retry-After"],
     )  # no credentials: the dev principal reads no cookie or header
     app.add_middleware(_LocalHostOnly)  # added last, so it runs first
 

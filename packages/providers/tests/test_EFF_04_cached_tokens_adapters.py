@@ -347,8 +347,8 @@ def test_EFF_04_google_sends_system_tools_and_schema_in_that_order_ahead_of_the_
 
     first, second = api.calls
     order = list(vars(first["config"]))
-    assert order.index("system_instruction") < order.index("tools") < order.index("response_schema")
-    for key in ("system_instruction", "tools", "response_schema"):
+    assert order.index("system_instruction") < order.index("tools") < order.index("response_json_schema")
+    for key in ("system_instruction", "tools", "response_json_schema"):
         assert json.dumps(getattr(first["config"], key)) == json.dumps(getattr(second["config"], key))
     assert first["contents"] != second["contents"], "only the per-call text differs"
 
@@ -374,7 +374,9 @@ def test_EFF_04_the_router_passes_each_roles_static_parts_through_byte_for_byte(
 # per-call value belongs in the task template, after the static prefix.
 # `intents` and `routes` (assistant/route_system.md, PPL-11b) are the closed menus read once from config/assistant.yaml:
 # the same on every call of a process, so the prefix stays byte-stable and cacheable.
-_STATIC_PLACEHOLDERS = {"categories", "intents", "routes"}
+# `gaps` and `services` (director/brief_system.md, FR-INT-15) are read once from config/capability_gaps.yaml in the
+# same way.
+_STATIC_PLACEHOLDERS = {"categories", "gaps", "intents", "routes", "services"}
 
 
 def _system_templates() -> list[Path]:

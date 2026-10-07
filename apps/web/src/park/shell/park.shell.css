@@ -1,9 +1,66 @@
 /* Park City shell (WEB-3b): the city backdrop, the top nav, the notifications popover, the account menu,
    the sample-data chip, the world loader, the boot splash and the page column. Every number is measured on
    the reference (design_handoff_tilo_web_app/design/Tilo App.dc.html inline styles); colours come from the
-   tokens. Every selector sits under [data-park]. STATIC: no motion of any kind here; it returns with the
-   motion restore (BQ-WEB-3), which brings its own honesty-scan entry. Glass blur is on the nav only
-   (README "Performance"). */
+   tokens. Every selector sits under [data-park]. Motion is of two kinds, both with honesty-scan entries in
+   test-support/honestyScan.ts: the city's ambient cars and walkers (WEB-MOTION-1, BQ-WEB-3), and the shell's own
+   chrome (WEB-MOTION-2: the boot splash, the page swap, the progress bar, the world card), which moves only
+   because a person acted. Transform and opacity only, never a layout property; reduced motion switches all of
+   it off at the end of the file. Glass blur is on the nav only (README "Performance"). */
+
+/* The city's movers (the engine puts the animation on each layer; reference Tilo App.dc.html keyframes).
+   The walker's two frames flip by opacity instead of the reference's background-position (walkFrame). */
+@keyframes mvXY {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(var(--dx), var(--dy));
+  }
+}
+@keyframes waddle {
+  0%,
+  100% {
+    transform: rotate(-6deg) translateY(0);
+  }
+  25% {
+    transform: rotate(0deg) translateY(-2.5px);
+  }
+  50% {
+    transform: rotate(6deg) translateY(0);
+  }
+  75% {
+    transform: rotate(0deg) translateY(-2.5px);
+  }
+}
+@keyframes walkFrame {
+  0% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Chrome motion (README "Interactions and motion"; reference Tilo App.dc.html keyframes). */
+@keyframes tiloSlide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+@keyframes tiloSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes tiloFade {
+  to {
+    opacity: 0;
+  }
+}
 
 /* Laid out but not shown: the shell under the boot splash, and the ghost that holds the chip's place.
    Hidden elements are not painted, so nothing here can count as a layout shift when it appears. */
@@ -12,9 +69,35 @@
 }
 
 /* ---- Page column ---- */
+/* A page change (README "Page change"): the old page goes out in 200 ms (opacity 0, up 4px), the swap puts the
+   new one at opacity 0 and down 10px with no transition, then it comes in (opacity .24s, transform .38s).
+   data-phase is set by the shell (motion.ts); a settled page has no data-phase and no transform. */
 [data-park] .park-shell__main {
   position: relative;
   z-index: 1;
+  transition: opacity 0.24s ease, transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Out of sight, so out of reach: no click lands on a page that is fading out, waiting or not yet in. */
+[data-park] .park-shell__main[data-phase="out"],
+[data-park] .park-shell__main[data-phase="pre"],
+[data-park] .park-shell__main[data-phase="wait"],
+[data-park] .park-shell__main[data-phase="hold"] {
+  pointer-events: none;
+}
+[data-park] .park-shell__main[data-phase="out"] {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+[data-park] .park-shell__main[data-phase="pre"] {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: none;
+}
+/* An instant swap between Home and another page: out of sight for 40 ms (not painted, so the new box is no
+   layout shift), then shown at once. */
+[data-park] .park-shell__main[data-phase="hold"] {
+  visibility: hidden;
 }
 /* README: content column max-width 1320, padding 100px 24px 56px (the top clears the fixed nav). */
 [data-park] .park-shell__page {
@@ -44,6 +127,17 @@
   height: 1000px;
   margin: -500px 0 0 -800px;
   transform-origin: 50% 50%;
+}
+/* Paused (under the veil, in a hidden tab): every mover holds its place. !important beats the shorthand
+   the engine writes inline. */
+[data-park] .park-shell__backdrop[data-paused] .park-shell__scene * {
+  animation-play-state: paused !important;
+}
+/* Sprite cap (narrow window or weak device): every second mover layer is not drawn. This relies on the
+   scene's root div holding the static pictures as <img> and ONLY movers as div children, one per car or
+   walker (nth-of-type counts divs only); engines/park.sprite-cap.test.ts pins that structure. */
+[data-park] .park-shell__backdrop[data-lite] .park-shell__scene > div > div:nth-of-type(even) {
+  display: none;
 }
 /* --veil dims the city on every page but Home (the opacity is set inline). */
 [data-park] .park-shell__veil {
@@ -216,20 +310,33 @@
 [data-park] .park-shell__avatar--ring {
   box-shadow: 0 0 0 2px var(--pop), 0 0 0 4px var(--hero);
 }
-/* The 3px progress bar on the nav's bottom edge, 22px in from each side (set inline: opacity, width). */
+/* The 3px progress bar on the nav's bottom edge, 22px in from each side (the nav is fixed at left and right 16,
+   top 14, 62 high, so the bar's top is 14 + 62 + 1 - 3). It sits beside the nav, not in it: the nav's glass blur
+   must not be under a moving layer. The opacity is set inline. */
 [data-park] .park-shell__bar {
-  position: absolute;
-  left: 22px;
-  right: 22px;
-  bottom: -1px;
+  position: fixed;
+  left: 38px;
+  right: 38px;
+  top: 74px;
+  z-index: 31;
+  pointer-events: none;
   height: 3px;
   border-radius: 99px;
   overflow: hidden;
+  transition: opacity 0.3s ease;
 }
+/* The fill is always full width and scaled from its left edge (the shell sets the scaleX): it never animates width. */
 [data-park] .park-shell__barfill {
+  width: 100%;
   height: 100%;
   border-radius: 99px;
   background: var(--hero);
+  transform-origin: 0 50%;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Empty again (the bar has hidden): back to zero at once, not as a slide you cannot see. */
+[data-park] .park-shell__barfill--rest {
+  transition: none;
 }
 
 /* Focus ring (README "Interactions and motion"): 3px #5A3FE0, offset 2px. */
@@ -286,6 +393,34 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+}
+/* Narrow phones: in the reference nav (wordmark + three buttons) the Home tab gets ~78px at 390 and needs 68. Here the
+   chip is only its dot and gives back the pill chrome and the tools gap, so it takes ~4px of the strip (dot 8px, tools gap -4px) and Home stays whole at 390
+   (the reference itself scrolls the strip below ~380). The button's own box is 24x24 (WCAG 2.5.8; axe measures the
+   element box, not a pseudo-element): the box fills the 16px tab-strip gap to its left (padding-left 16) plus 8px above and
+   below the dot, all cancelled by negative margins so the strip is unchanged; it touches, never covers, its neighbours. */
+@media (max-width: 430px) {
+  [data-park] .park-shell__sample {
+    padding: 8px 0 8px 16px;
+    margin: -8px -4px -8px -16px;
+  }
+  /* The focus ring hugs the dot (as before the 24px box), not the padded box. */
+  [data-park] .park-shell__nav .park-shell__sample:focus-visible {
+    outline: none;
+  }
+  [data-park] .park-shell__sample:focus-visible .park-shell__sampledot {
+    outline: 3px solid #5a3fe0;
+    outline-offset: 2px;
+  }
+  /* The invisible boot ghost must never take a tap meant for the next button. */
+  [data-park] .park-shell__sample.park-shell__booting {
+    pointer-events: none;
+  }
+  [data-park] .park-shell__sample .park-chip {
+    height: auto;
+    padding: 0;
+    background: transparent;
   }
 }
 
@@ -500,8 +635,18 @@
 [data-park] .park-shell__mark--next {
   background: var(--track);
 }
-/* The current step's ring: it does not spin here (the reference spins it, BQ-WEB-3). */
+/* The world card: the wrapper only catches animationend; when the last step is done the scrim fades over 280 ms
+   (the card inside it leaves with it) and the shell drops it at the animation's end. */
+[data-park] .park-shell__wl {
+  display: contents;
+}
+[data-park] .park-scrim:has(> .park-shell__card--leaving) {
+  animation: tiloFade 0.28s ease forwards;
+  pointer-events: none; /* a card on its way out takes no click */
+}
+/* The current step's ring spins (README Async actions: tiloSpin .7s). */
 [data-park] .park-shell__ring {
+  animation: tiloSpin 0.7s linear infinite;
   display: block;
   box-sizing: border-box;
   width: 16px;
@@ -535,6 +680,11 @@
   background: var(--paper);
   font-family: "Nunito Sans", sans-serif;
 }
+/* Ready: the splash fades over .45s (README Boot) and the shell drops it at animationend. */
+[data-park] .park-shell__boot--out {
+  pointer-events: none;
+  animation: tiloFade 0.45s ease forwards;
+}
 [data-park] .park-shell__bootlogo {
   display: flex;
   align-items: center;
@@ -566,6 +716,7 @@
   background: #1f1d2b;
 }
 [data-park] .park-shell__bootword {
+  line-height: 1; /* the row stays 56px tall in the fallback face and in Nunito: nothing recentres when it loads */
   color: var(--logo);
   font-family: "Nunito", sans-serif;
   font-size: 48px;
@@ -590,9 +741,26 @@
   height: 100%;
   border-radius: 99px;
   background: var(--hero);
+  animation: tiloSlide 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 [data-park] .park-shell__boottext {
+  line-height: 20px; /* fixed, so the fallback face and Nunito Sans give the same height (no shift when it loads) */
   color: var(--ink2);
   font-size: 14.5px;
   font-weight: 700;
+}
+
+/* Reduced motion (README): no animation and no transition at all in the shell's chrome. The shell also skips
+   its own waits (motion.ts), so a page swaps at once and a splash or card goes the moment it is done. */
+@media (prefers-reduced-motion: reduce) {
+  [data-park] .park-shell__main,
+  [data-park] .park-shell__bar,
+  [data-park] .park-shell__barfill,
+  [data-park] .park-shell__bootfill,
+  [data-park] .park-shell__boot--out,
+  [data-park] .park-shell__ring,
+  [data-park] .park-scrim:has(> .park-shell__card--leaving) {
+    animation: none !important;
+    transition: none !important;
+  }
 }

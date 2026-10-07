@@ -175,6 +175,14 @@ def build(monkeypatch: Any, *, declarations: dict[str, str] | None = None, deplo
     app.dependency_overrides[intake_module.get_safety] = lambda: safety
     app.dependency_overrides[deps.get_safety] = lambda: safety
     app.dependency_overrides[seam(deps, "get_access_store")] = lambda: access
+    # SEC-16: live needs a wired ledger (a fresh one) and each test gets its own limiter; _sec16_lib.py replaces both
+    from tilo_api.spend import InMemorySpendLedger, RateLimiter, load_spend_caps  # noqa: PLC0415
+
+    caps = load_spend_caps(None)
+    ledger = InMemorySpendLedger(caps)
+    limiter = RateLimiter(limit=caps.rate_limit_requests, window_s=caps.rate_limit_window_s)
+    app.dependency_overrides[seam(deps, "get_spend_cap_ledger")] = lambda: ledger
+    app.dependency_overrides[seam(deps, "get_rate_limiter")] = lambda: limiter
     # `deps.get_router` itself is never overridden: it must reach `router_for_mode(mode)`, the pinned seam.
     monkeypatch.setattr(deps, "router_for_mode", spy_router_for_mode, raising=False)
     h.client = TestClient(app, raise_server_exceptions=False)

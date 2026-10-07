@@ -3,6 +3,7 @@
 // Every client call has loading, empty and error states with a retry (PRD 18.4); one filled
 // primary button per screen (UX-1).
 import { type ReactNode, Suspense, lazy, useEffect, useRef } from "react";
+import { ReplayBanner } from "../components/ReplayBanner";
 import { useFlowRoute } from "../router";
 import { ChunkBoundary } from "./ChunkBoundary";
 import { StartScreen } from "./flow/StartScreen";
@@ -60,6 +61,8 @@ export function Loaded<T>({
   let body: ReactNode;
   if (remote.status === "loading") {
     body = <output className="flow-loading">Loading {what}…</output>;
+  } else if (remote.status === "error" && remote.replayOnly) {
+    body = <ReplayBanner />; // NFR-22: the label replaces the generic error, in the same slot
   } else if (remote.status === "error") {
     body = <Notice message={remote.message} onRetry={retry} />;
   } else if (isEmpty(remote.value)) {
@@ -83,7 +86,11 @@ export function Primary({
 }: { label: string; action: Action; disabled?: boolean }) {
   return (
     <>
-      {action.error && <Notice message={action.error} onRetry={action.go} />}
+      {action.replayOnly ? (
+        <ReplayBanner />
+      ) : (
+        action.error && <Notice message={action.error} onRetry={action.go} />
+      )}
       <button
         type="button"
         className="primary"

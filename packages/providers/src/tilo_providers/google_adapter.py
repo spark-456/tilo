@@ -1,8 +1,12 @@
 """tilo_providers.google_adapter — Google Gen AI SDK adapter (PL-02, PRD 6.4,
 6.5). Wraps `google.genai.Client` against Agent Platform / Vertex, through
 the global endpoint, behind `ModelProvider`. Structured output maps onto
-`GenerateContentConfig(response_mime_type=..., response_schema=...)`;
-SDK/transport errors map onto `tilo_providers.errors`.
+`GenerateContentConfig(response_mime_type=..., response_json_schema=...)`: the JSON Schema field, never
+`response_schema`, which is the SDK's OpenAPI-subset `Schema` type and rejects ordinary JSON Schema (`uniqueItems`,
+a list `type`) while the request body is built, before anything is sent. The schema goes out as a sanitized copy
+(`schema_subset.to_gemini_schema`: Gemini answers 400 to `default`, `pattern`, `maxLength`...).
+SDK/transport errors map onto `tilo_providers.errors`; a request the SDK refuses to build (pydantic
+`ValidationError`) is a `RequestError`.
 
 Imports `google.genai`/`.types`/`.errors` via `importlib.import_module`
 rather than `from google import genai`, so the module works whether that
@@ -20,9 +24,18 @@ import re
 from collections.abc import Iterator, Mapping
 from typing import Any
 
+import pydantic
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.errors import ProviderError, SafetyError, map_http_status, map_transport_error
+from tilo_providers.errors import (
+    OutputTruncatedError,
+    ProviderError,
+    RequestError,
+    SafetyError,
+    map_http_status,
+    map_transport_error,
+    truncated_message,
+)
 from tilo_providers.interfaces import (
     Capability,
     GenerateRequest,
@@ -31,6 +44,7 @@ from tilo_providers.interfaces import (
     PriceQuote,
     cached_tokens_or_none,
 )
+from tilo_providers.schema_subset import to_gemini_schema
 
 _NO_FIELD = object()
 
@@ -110,6 +124,10 @@ class _RedactedAPIError(Exception):
         self.code = code
 
 
+class _ClientSideFailure(Exception):
+    """Stands in for a pydantic error from the SDK as the `__cause__` of a mapped error: its class name, no values."""
+
+
 class GoogleModelProvider(ModelProvider):
     def __init__(
         self,
@@ -138,6 +156,16 @@ class GoogleModelProvider(ModelProvider):
             client = genai.Client(vertexai=True, project=project, location=location)
         self._client = client
 
+    def _schema_for_send(self, schema: dict[str, Any]) -> dict[str, Any]:
+        """A sanitized copy: Gemini accepts a subset of JSON Schema and answers 400 to the rest (`schema_subset`)."""
+        return to_gemini_schema(schema)
+
+    def _thinking_for_send(self, level: str) -> str:
+        """Vertex answers HTTP 400 to thinking level "minimal" (live, 5 Oct 2026; packages/providers/CLAUDE.md, "the
+        smoke sends no `thinking_level`"), so it goes out as "low". This adapter is Vertex-only, so no other
+        endpoint needs "minimal"; the OpenAI-compatible adapter ignores thinking levels and is untouched."""
+        return "low" if level == "minimal" else level
+
     def _config(self, request: GenerateRequest) -> Any | None:
         kwargs: dict[str, Any] = {}
         if request.system is not None:
@@ -149,7 +177,7 @@ class GoogleModelProvider(ModelProvider):
         if request.response_schema is not None:
             # PL-02 structured output: a schema implies JSON output.
             kwargs["response_mime_type"] = "application/json"
-            kwargs["response_schema"] = request.response_schema
+            kwargs["response_json_schema"] = self._schema_for_send(request.response_schema)  # not `response_schema`
         elif request.json_mode:
             kwargs["response_mime_type"] = "application/json"
         if not kwargs and request.thinking_level is None:
@@ -157,7 +185,9 @@ class GoogleModelProvider(ModelProvider):
         types_mod = _genai_module("google.genai.types")
         if request.thinking_level is not None and Capability.THINKING.value in self._profile.caps:
             # A profile without the capability (e.g. a fallback) would answer a thinking config with a 400: omit it.
-            kwargs["thinking_config"] = types_mod.ThinkingConfig(thinking_level=request.thinking_level.upper())
+            kwargs["thinking_config"] = types_mod.ThinkingConfig(
+                thinking_level=self._thinking_for_send(request.thinking_level).upper()
+            )
         return types_mod.GenerateContentConfig(**kwargs) if kwargs else None
 
     def _map_error(self, error: Exception) -> Exception:
@@ -165,6 +195,10 @@ class GoogleModelProvider(ModelProvider):
         if isinstance(error, errors_mod.APIError):
             message = self.redact(str(getattr(error, "message", error)))  # a server message can echo a token
             return map_http_status(error.code, message)
+        if isinstance(error, pydantic.ValidationError):
+            # The SDK refused to build the request (nothing was sent): rejected, not unknown. Class name only: the
+            # validation text echoes the schema and prompt values it was given.
+            return RequestError(f"PL-02: the Gen AI SDK refused to build the request ({type(error).__name__})")
         # The SDK's transport is httpx too, so this maps the same as
         # openai_compat_adapter's (mapping must not depend on the adapter).
         return map_transport_error(error) or error
@@ -176,6 +210,8 @@ class GoogleModelProvider(ModelProvider):
             if isinstance(error, _genai_module("google.genai.errors").APIError):
                 # The raw SDK error carries the unredacted server message: keep only its code and redacted text.
                 mapped.__cause__ = _RedactedAPIError(getattr(error, "code", None), str(mapped))
+            elif isinstance(error, pydantic.ValidationError):
+                mapped.__cause__ = _ClientSideFailure(type(error).__name__)  # the raw error carries input values
             else:
                 mapped.__cause__ = error
         return mapped
@@ -196,13 +232,25 @@ class GoogleModelProvider(ModelProvider):
             # success instead of a safety block.
             raise SafetyError(f"blocked by safety filter: finish_reason={finish_reason!r}")
 
+        usage_metadata = getattr(response, "usage_metadata", None)
+        if str(getattr(finish_reason, "value", finish_reason)) == "MAX_TOKENS":
+            # The reply hit its output cap (thinking tokens count against it): empty or cut off, never a reply.
+            # Vertex leaves a visible-output count out when it is 0 (so 0 with usage present, None with no usage); a
+            # missing thinking count stays None: the model did not report one.
+            output = thoughts = None
+            if usage_metadata is not None:
+                output = getattr(usage_metadata, "candidates_token_count", None) or 0
+                thoughts = getattr(usage_metadata, "thoughts_token_count", None)
+            raise OutputTruncatedError(
+                truncated_message(output, thoughts), output_tokens=output, thinking_tokens=thoughts
+            )
+
         tool_calls: list[dict[str, Any]] | None = None
         function_calls = getattr(response, "function_calls", None)
         if function_calls:
             tool_calls = [{"name": call.name, "args": call.args} for call in function_calls]
 
         usage: dict[str, int] | None = None
-        usage_metadata = getattr(response, "usage_metadata", None)
         if usage_metadata is not None:
             # Thinking tokens are billed as output, so metering counts them there (FR-MTR-01).
             # Vertex leaves a count None when thinking used the whole output cap: that is zero, never a crash.

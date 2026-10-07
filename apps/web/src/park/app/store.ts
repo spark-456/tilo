@@ -1,13 +1,17 @@
-import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
 // The shell store (README "State and data"; the prototype class in `Tilo App.dc.html`: decide, undo,
 // addWorld, toast, go, needsLeft). Framework-free: React reads it through useSyncExternalStore in
 // context.tsx. State is replaced on every change, never mutated. The one timer is the toast's, and it
 // is injected as `schedule` so a test never waits.
+import { TiloApiError } from "../../api/http";
+import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
 import type { Api } from "../api/index";
 import type { Dec, Decision, DecisionKey, Source, TierKey, World } from "../api/types";
 import { TOAST_MS } from "../components/Toast";
 import type { Motion, PageId, Params } from "./AppCtx";
 import { parkPath } from "./router";
+
+/** A live answer that failed in a way the Api did not describe. */
+const NOT_RECORDED = "Tilo could not record that answer. Nothing was sent.";
 
 /** Runs `fn` after `ms` and returns the function that cancels it. */
 export type Schedule = (fn: () => void, ms: number) => () => void;
@@ -79,7 +83,7 @@ const MOTIONS: readonly Motion[] = ["lively", "calm", "still"];
 
 const derive = (prefs: Record<string, unknown>, dec: Dec) => ({
   time: prefs.time === "night" ? ("night" as const) : ("day" as const),
-  motion: MOTIONS.find((m) => m === prefs.motion) ?? "lively",
+  motion: MOTIONS.find((m) => m === prefs.motion) ?? "calm",
   needsLeft: countNeedsLeft(dec),
 });
 
@@ -87,7 +91,12 @@ const derive = (prefs: Record<string, unknown>, dec: Dec) => ({
  * built from the item's own fields (the Api may not have it: live mode before the endpoint exists). */
 function decidedText(decision: Decision | undefined): string {
   if (!decision) return "Decision recorded";
-  return decision.toast || `${decision.title}: ${decision.done}`;
+  return decision.toast || (decision.done ? `${decision.title}: ${decision.done}` : decision.title);
+}
+
+/** A live answer says what was recorded, never that the work is done: the outbox still has to act (HR-1). */
+function answeredText(decision: Decision | undefined): string {
+  return decision ? `${decision.yes} recorded: ${decision.title}` : "Answer recorded";
 }
 
 export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): ParkStore {
@@ -105,6 +114,8 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
   const listeners = new Set<() => void>();
   // The decisions with their designed copy, handed over by the shell once the Api has returned them.
   let decisions: readonly Decision[] = [];
+  // Live answers in flight: a second tap sends nothing until the first one is settled.
+  const pending = new Set<DecisionKey>();
   let cancelToast: (() => void) | null = null;
   let cancelLoader: (() => void) | null = null;
 
@@ -160,7 +171,33 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
       };
     },
     decide(key) {
-      if (state.dec[key]) return;
+      if (state.dec[key] || pending.has(key)) return;
+      if (state.sources.live) {
+        // Live (WIRE-3): a decision is taken only when tilo-api recorded the answer (HR-1). No Undo: no route
+        // reopens a card. A failure leaves the card open and says why; another world's card offers to open it.
+        pending.add(key);
+        api.decide(key).then(
+          () => {
+            pending.delete(key);
+            update({
+              dec: { ...state.dec, [key]: true },
+              toast: arm(answeredText(decisions.find((d) => d.k === key))),
+            });
+          },
+          (e: unknown) => {
+            pending.delete(key);
+            const said = e instanceof TiloApiError ? e.message : NOT_RECORDED;
+            const world = decisions.find((d) => d.k === key)?.world;
+            if (e instanceof TiloApiError && e.code === "open_in_world" && world) {
+              toast(said, "Open in world", () => {
+                dismissToast();
+                navigate(parkPath("world", { id: world }));
+              });
+            } else toast(said);
+          },
+        );
+        return;
+      }
       quiet(api.decide(key));
       update({
         dec: { ...state.dec, [key]: true },

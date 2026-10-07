@@ -171,7 +171,7 @@ def _foreign_sources(task: deps.TaskRecord, edits: dict[str, Any]) -> bool:
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 StoreDep = Annotated[deps.Store, Depends(deps.get_store)]
-FlagsDep = Annotated[FlagStore, Depends(deps.get_flag_store)]
+FlagsDep = Annotated[FlagStore, Depends(deps.get_switches)]  # deployed: NFR-24's flag or the spend ledger's switch
 
 
 @router.post("/tasks/{task_id}/answers")
@@ -237,6 +237,7 @@ def get_approaches(
                     task.brief, router=model_router, base=base, seq=task.next_seq, gaps=task.gaps
                 )
             except ApproachProposalError as exc:
+                deps.raise_if_model_unavailable(exc)
                 raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
             _append(store, task, [result.event])
             task.approaches = result.approaches

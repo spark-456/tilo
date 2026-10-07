@@ -13,7 +13,7 @@
  * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
  * evals.schema.json 1.0.0 sha256:ac8bab7830371705
- * event.schema.json 1.1.0 sha256:623dffe796a61450
+ * event.schema.json 1.2.0 sha256:df0b13a4dbc110ce
  * events/data/agent.assigned.schema.json 1.0.0 sha256:f7672c62780b8b4b
  * events/data/agent.blocked.schema.json 1.0.0 sha256:a4b1f97998b1d554
  * events/data/agent.cloned.schema.json 1.0.0 sha256:99567a48c7c65f6f
@@ -115,6 +115,7 @@
  * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
+ * spend_caps.schema.json 1.1.0 sha256:d337adf13a5337f9
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
@@ -512,19 +513,17 @@ export type EventTarget =
 export type EventItemKind =
   "document" | "crate" | "scroll" | "parcel" | "blueprint" | "note" | "decision" | "backpack";
 /**
- * Server-side redaction scope (PRD 10.1): all, or the districts whose viewers may see it; a list includes the event's own district (EV-13).
+ * Server-side redaction scope (PRD 10.1, 15.3): all, or the districts whose viewers may see it; a list includes the event's own district (EV-13). An empty list (1.2.0, ADR-0009) puts the event in no scoped view: only the owner's full stream carries it (owner-only, for example a Desk-world event, PE-12, or a card with no known district, BQ-69). It is allowed only when district is null (EV-13). Never null: a writer must not default a missing vis.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "EventVis".
  */
 export type EventVis = "all" | EventDistrictList;
 /**
- * @minItems 1
- *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "EventDistrictList".
  */
-export type EventDistrictList = [DistrictId, ...DistrictId[]];
+export type EventDistrictList = DistrictId[];
 /**
  * Who answered a question or meeting (BQ-04): a person, a Team Lead, the card's safe default applied at timeout, or an earlier decision (FR-AGT-07). Never a model's own choice.
  *
@@ -4205,6 +4204,46 @@ export interface Skill {
 export interface SkillEmbeddedSchema {
   type: "object";
   [k: string]: unknown;
+}
+/**
+ * config/spend_caps.yaml: the live-model spend caps, the flat reservation per live unit and the per-uid rate limit (SEC-16, PRD supplement 4; FR-MTR-04, PRD 14.1, 17.3), read by tilo-api's spend loader. Money is an integer in INR minor units (paise, 1 INR = 100): never a float, a bool or a string. Every key is required and no other key is allowed; only org_day_minor may be null (ADR-0002 decision 13). The schema checks each value alone. Two rules it cannot express: a whole float such as 1000.0 is the same JSON number as 1000, so the loader also requires a YAML integer; and the shipped file keeps unit_reserve_minor <= run_minor <= uid_lifetime_minor <= global_day_hard_minor. These caps sit beside config/metering.yaml (credits and US dollars) and replace none of it (ADR-0002 decision 16). 1.1.0 adds unit_reserve_minor (BQ-SEC16-1).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SpendCapsConfig".
+ */
+export interface SpendCapsConfig {
+  /**
+   * The currency of every amount here: INR only (SEC-16). Another currency needs its own decision.
+   */
+  currency: "INR";
+  /**
+   * Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16: 1,000 INR).
+   */
+  uid_lifetime_minor: number;
+  /**
+   * Live-model spend per run, in paise, above zero and never null (PRD 14.1, FR-MTR-04).
+   */
+  run_minor: number;
+  /**
+   * Live-model spend per org per UTC day, in paise, above zero, or null for no separate per-org cap (as BQ-42 decided for credits); the key is required even when null.
+   */
+  org_day_minor: number | null;
+  /**
+   * The whole deployment's live-model spend per UTC day, in paise, above zero and never null; reaching it switches the link to replay-only (NFR-24, PRD 17.3).
+   */
+  global_day_hard_minor: number;
+  /**
+   * The flat amount, in paise, that each live unit and each Director call (intake, approaches, MustAsk) reserves against these caps and settles at, until a price table (PL-06) and a US$ to INR rate exist (BQ-SEC16-1). Above zero, never null.
+   */
+  unit_reserve_minor: number;
+  /**
+   * Requests one uid may make within one sliding window (SEC-16), above zero.
+   */
+  rate_limit_requests: number;
+  /**
+   * The length of the per-uid rate-limit window in seconds, above zero.
+   */
+  rate_limit_window_s: number;
 }
 /**
  * A Team Lead assignment (PRD 8.3, 10.1, 16.2): the person (user) who acts as Team Lead id, and the one expert domain the owner assigned them. The shape of each entry of config/teams.yaml and of a Team Lead set in the Team Lead console. authz.ref of a Team Lead's answer is id. A Team Lead opens a gate only when the gate names this domain and the owner's policy it names lists the domain in team_lead_domains, and only when the world's owner made this assignment before the answer (outbox OB-01). Removing a Team Lead deletes the record, so a removed Team Lead answers nothing.

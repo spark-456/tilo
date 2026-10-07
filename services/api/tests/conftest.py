@@ -29,6 +29,16 @@ from tilo_api.intake import get_safety
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    # The same registration as services/harness/tests/conftest.py (PPL-11c-FS emulator tests), so running only this
+    # directory with `-m "not emulator"` does not warn about an unknown marker.
+    config.addinivalue_line(
+        "markers",
+        "emulator: exercises the real Firestore emulator via tilo_harness.emulator "
+        "(needs Java + firebase-tools); slower than the rest of the suite.",
+    )
+
+
 @pytest.fixture(autouse=True)
 def _no_dev_unit_delay(monkeypatch: pytest.MonkeyPatch) -> None:
     """CL-INT-5d: the dev unit runner paces a dev run by default; the suite runs it unpaced unless a test sets it."""
@@ -158,6 +168,23 @@ def sec15_factory(monkeypatch: pytest.MonkeyPatch):
     _sec15_lib.close()
 
 
+# --- SEC-16 (per-uid rate limit, spend caps, durable replay-only): see API_SEC_16.md and _sec16_lib.py ---------
+
+
+@pytest.fixture()
+def sec16_factory(monkeypatch: pytest.MonkeyPatch):
+    """`make(declarations=..., deployed=True, judge_live=True, ledger=..., flags=..., **cap_overrides)` -> a `Sec16`:
+    the SEC-15 harness (deployed-style app, fake access store, scripted router behind a spy) plus a spy over the real
+    in-memory ledger, a rate limiter on a fake clock and small test caps. `ledger=None` leaves the seam unwired."""
+    import _sec16_lib
+
+    def make(**kwargs):
+        return _sec16_lib.build(monkeypatch, **kwargs)
+
+    yield make
+    _sec16_lib.close()
+
+
 # --- PPL-11a (people API: quotes, plate, confirm, writes): see API_PPL_11a.md and _ppl11a_lib.py ----------------------
 
 
@@ -179,6 +206,39 @@ def people_rig(monkeypatch: pytest.MonkeyPatch):
         rig.close()
 
 
+# --- PPL-11c-FS (Firestore people stores): see API_PPL_11c_FS.md and _ppl11c_fs_lib.py --------
+
+
+@pytest.fixture(scope="session")
+def people_fs_client():
+    """One Firestore client on the emulator for the whole session (`tilo_harness.emulator.running_emulator()`, a
+    `demo-` project, no credentials), for every `@pytest.mark.emulator` PPL-11c-FS test."""
+    from tilo_harness.emulator import running_emulator
+
+    with running_emulator():
+        from google.cloud import firestore
+
+        yield firestore.Client(project="demo-tilo")
+
+
+@pytest.fixture(params=["memory", pytest.param("firestore", marks=pytest.mark.emulator)])
+def backend(request):
+    """A `_ppl11c_fs_lib.Backend`: `MemoryStore` or the Firestore store behind the same `PeopleStores` (FS-02)."""
+    import _ppl11c_fs_lib
+
+    if request.param == "memory":
+        return _ppl11c_fs_lib.Backend("memory", None)
+    return _ppl11c_fs_lib.Backend("firestore", request.getfixturevalue("people_fs_client"))
+
+
+@pytest.fixture
+def fs_backend(people_fs_client):
+    """The Firestore backend alone, for the tests that only make sense against it."""
+    import _ppl11c_fs_lib
+
+    return _ppl11c_fs_lib.Backend("firestore", people_fs_client)
+
+
 def pytest_collection_modifyitems(items):
     """PPL-11a: tests that need a slice B or C route are strict xfails until that slice lands (`SLICE_BC_PENDING`).
     PPL-11c: the same for each slice of the rest of the people API (`SLICE_PENDING`, API_PPL_11c.md section 0)."""
@@ -189,8 +249,27 @@ def pytest_collection_modifyitems(items):
             if "test_PPL_11a_" in item.nodeid and any(entry in item.nodeid for entry in SLICE_BC_PENDING):
                 item.add_marker(pytest.mark.xfail(strict=True, reason="PPL-11a slice B/C"))
     if any("test_PPL_11c_" in item.nodeid for item in items):
-        from _ppl11c_lib import SLICE_PENDING
+        from _ppl11c_lib import PENDING_EXEMPT, SLICE_PENDING
 
         for item in items:
+            if any(entry in item.nodeid for entry in PENDING_EXEMPT):
+                continue  # passes once an earlier slice lands: pinned, never a strict xfail
             if "test_PPL_11c_" in item.nodeid and any(entry in item.nodeid for entry in SLICE_PENDING):
                 item.add_marker(pytest.mark.xfail(strict=True, reason="PPL-11c slice pending"))
+    if any("test_PPL_11c_FS_" in item.nodeid for item in items):
+        from _ppl11c_fs_lib import is_pending
+
+        for item in items:
+            if "test_PPL_11c_FS_" in item.nodeid and is_pending(item.nodeid):
+                item.add_marker(pytest.mark.xfail(strict=True, reason="PPL-11c-FS-1 pending (API_PPL_11c_FS.md)"))
+    if any("test_FR_PA_08_" in item.nodeid for item in items):
+        # FR-PA-08 (people assistant STATUS and weekly summary, API_FR_PA_08.md section 0): a slice is a strict xfail
+        # until its builder deletes its entry from `SLICE_PENDING`; the guards file is never pending.
+        from _fr_pa_08_lib import PENDING_EXEMPT as FR_PA_08_EXEMPT
+        from _fr_pa_08_lib import SLICE_PENDING as FR_PA_08_PENDING
+
+        for item in items:
+            if any(entry in item.nodeid for entry in FR_PA_08_EXEMPT):
+                continue
+            if any(entry in item.nodeid for entry in FR_PA_08_PENDING):
+                item.add_marker(pytest.mark.xfail(strict=True, reason="FR-PA-08 slice pending"))

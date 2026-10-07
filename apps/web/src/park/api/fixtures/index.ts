@@ -3,10 +3,21 @@
 export const gbp = (v: number): string =>
   `£${v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB")}`;
 
-export { agenda } from "./agenda";
+import type { Agenda, Decision } from "../types";
+import { agendaRules, decisionFacts } from "./additive";
+import { agenda as generatedAgenda } from "./agenda";
+import { decisions as generatedDecisions } from "./decisions";
+
+/** The prototype's Agenda plus the additive `rules` (additive.ts). */
+export const agenda: Agenda = { ...generatedAgenda, rules: agendaRules };
+/** The prototype's decisions plus the additive `facts` (additive.ts). */
+export const decisions: Decision[] = generatedDecisions.map((d) => ({
+  ...d,
+  facts: decisionFacts[d.k],
+}));
+
 export { connectors } from "./connectors";
 export { connectorTerms } from "./connectorTerms";
-export { decisions } from "./decisions";
 export { learn } from "./learn";
 export { ledger } from "./ledger";
 export { notifications } from "./notifications";

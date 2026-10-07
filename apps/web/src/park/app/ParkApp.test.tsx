@@ -2,7 +2,7 @@
 // WEB-3a: <ParkApp/> with the real registry (every page is still the Placeholder). Pinned surface,
 // park/app/ParkApp.tsx: named export `ParkApp` and the same as the default export (Root lazy-imports it).
 // The root is `<div data-park data-time>`, the page sits in one <main> inside <Suspense>; an unknown
-// /park path shows `data-testid="park-not-found"` (h1 "Page not found", a link to /park/home);
+// /park path shows `data-testid="park-not-found"` (h1 "Page not found", a link to /);
 // document.title is "<Page> · Tilo" ("Page not found · Tilo" for the not-found page; the prototype sets no
 // title, so this is the default taken); focus moves to the page <h1> (tabindex -1) after a route change.
 import { act } from "react";
@@ -135,10 +135,10 @@ describe("WEB_3a_parkapp: a path that is not a page", () => {
     expect(document.title).toBe("Page not found · Tilo");
   });
 
-  it("WEB_3a_parkapp_not_found_links_back_to_park_home", async () => {
+  it("WEB_3a_parkapp_not_found_links_back_to_home", async () => {
     const m = await visit("/park/nope");
     const link = q<HTMLAnchorElement>(m.container, '[data-testid="park-not-found"] a');
-    expect(link.getAttribute("href")).toBe("/park/home");
+    expect(link.getAttribute("href")).toBe("/");
     expect(link.textContent?.trim().length).toBeGreaterThan(0);
   });
 
@@ -151,7 +151,7 @@ describe("WEB_3a_parkapp: a path that is not a page", () => {
     });
     await settle();
     expect(ev.defaultPrevented).toBe(true);
-    expect(window.location.pathname).toBe("/park/home");
+    expect(window.location.pathname).toBe("/");
     expect(m.container.querySelector('[data-testid="park-page-home"]')).not.toBeNull();
     expect(m.container.querySelector('[data-testid="park-not-found"]')).toBeNull();
   });

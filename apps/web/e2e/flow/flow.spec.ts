@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
+import { INTAKE_PATH } from "../support/intake";
 import { DESKTOP, MOBILE } from "../support/viewports";
 
 const SCREENS = ["Start", "Understanding", "Approaches", "World", "Delivery"] as const;
@@ -7,6 +8,8 @@ const SCREENS = ["Start", "Understanding", "Approaches", "World", "Delivery"] as
 const heading = (screen: string) => (screen === "Start" ? "What should Tilo do?" : screen);
 const BANNER = "Fixture replay — dev data, not a real run";
 
+// WEB-CUTOVER: "/" is the Park Home; the intake form (S-01's body) is opened by INTAKE_PATH (support/intake.ts),
+// and the last screen's primary ("New task") now leads to "/", the Park Home.
 /** S-01 starts only with text in the task box. */
 const fillStart = (page: Page) => page.getByLabel("Describe your task").fill("Triage my inbox");
 
@@ -34,7 +37,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
       if (msg.type() === "error" || msg.type() === "warning") errors.push(msg.text());
     });
 
-    await page.goto("/");
+    await page.goto(INTAKE_PATH);
     for (const [i, screen] of SCREENS.entries()) {
       await checkScreen(page, screen);
       if (screen === "World") {
@@ -62,7 +65,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
   }) => {
     test.setTimeout(60_000);
     await page.setViewportSize(viewport);
-    await page.goto("/?client_delay_ms=400");
+    await page.goto(`${INTAKE_PATH}?client_delay_ms=400`);
     for (const [i, screen] of SCREENS.entries()) {
       await expect(page.getByRole("heading", { level: 1, name: heading(screen) })).toBeVisible();
       if (screen === "Start") await fillStart(page);
@@ -85,8 +88,13 @@ for (const viewport of [DESKTOP, MOBILE]) {
           }),
       );
       expect(ms, `${screen} busy feedback`).toBeLessThan(100);
-      const next = SCREENS[i + 1] ?? "Start";
-      await expect(page.getByRole("heading", { level: 1, name: heading(next) })).toBeVisible();
+      const next = SCREENS[i + 1];
+      if (next) {
+        await expect(page.getByRole("heading", { level: 1, name: heading(next) })).toBeVisible();
+      } else {
+        await expect(page).toHaveURL(/\/$/); // the Park Home
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Good \w+, Alex\.$/);
+      }
     }
   });
 }

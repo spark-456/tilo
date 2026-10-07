@@ -20,8 +20,8 @@ describe("PRD-18.3 flow: the router maps each flow path to its screen and unknow
     });
   });
 
-  it("maps /world/:worldId to World", () => {
-    expect(matchFlowRoute("/world/abc")).toEqual({
+  it("maps /world/:worldId/stage to World", () => {
+    expect(matchFlowRoute("/world/abc/stage")).toEqual({
       screen: "World",
       worldId: "abc",
     });
@@ -39,7 +39,8 @@ describe("PRD-18.3 flow: the router maps each flow path to its screen and unknow
     for (const path of [
       "/task/%E0/understanding",
       "/task/%/approaches",
-      "/world/%E0%A4%A",
+      "/world/%E0%A4%A/stage",
+      "/world/%E0/stage",
       "/world/%E0/delivery",
     ]) {
       expect(matchFlowRoute(path)).toEqual({ screen: "Start" });
@@ -47,6 +48,6 @@ describe("PRD-18.3 flow: the router maps each flow path to its screen and unknow
   });
 
   it("decodes a well-formed escape", () => {
-    expect(matchFlowRoute("/world/a%20b")).toEqual({ screen: "World", worldId: "a b" });
+    expect(matchFlowRoute("/world/a%20b/stage")).toEqual({ screen: "World", worldId: "a b" });
   });
 });

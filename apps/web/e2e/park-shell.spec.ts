@@ -1,8 +1,10 @@
 // WEB-3a acceptance (plan sections 1 and 10; README "Routes", "The `app` prop", "Focus"): the Park app
-// skeleton in a real browser at 1440x900 and 390x844. /park/<page> renders the page registry's placeholder
-// for each of the nine pages inside one [data-park] root; an unknown /park path shows the Park not-found
-// page; history back and forward switch pages without a reload; the old app is untouched at / and
-// /worlds; the park chunk is not fetched by a landing visit (NFR-01).
+// skeleton in a real browser at 1440x900 and 390x844. The root paths (/, /worlds, /world/<id>, ...) render the
+// page registry's placeholder for each of the nine pages inside one [data-park] root (WEB-CUTOVER: /park/<page>
+// stays an alias); an
+// unknown /park path shows the Park not-found page; history back and forward switch pages without a reload;
+// the old app is untouched at its kept paths (/more, /world/<id>/stage); a kept path never fetches the park
+// chunk and the landing / loads the Park shell without the old app's stage engine (NFR-01).
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
 // e2e/park-shell.spec.ts --project=chromium --no-deps --workers=3
 import AxeBuilder from "@axe-core/playwright";
@@ -15,15 +17,15 @@ const SIZES = { desktop: DESKTOP, mobile: MOBILE } as const;
 
 const ROUTES = (
   [
-    ["/park/home", "home", "Home"],
-    ["/park/worlds", "worlds", "Worlds"],
-    ["/park/world/k1", "world", "World"],
-    ["/park/skills", "skills", "Skills"],
-    ["/park/ledger", "ledger", "Ledger"],
-    ["/park/agenda", "agenda", "Agenda"],
-    ["/park/team", "team", "Team"],
-    ["/park/profile", "profile", "Profile"],
-    ["/park/connectors", "connectors", "Connectors"],
+    ["/", "home", "Home"],
+    ["/worlds", "worlds", "Worlds"],
+    ["/world/k1", "world", "World"],
+    ["/skills", "skills", "Skills"],
+    ["/ledger", "ledger", "Ledger"],
+    ["/agenda", "agenda", "Agenda"],
+    ["/team", "team", "Team"],
+    ["/profile", "profile", "Profile"],
+    ["/connectors", "connectors", "Connectors"],
   ] as const
 ).filter(([, id]) => PLACEHOLDER_PAGES.includes(id)); // a real page has its own spec
 
@@ -45,7 +47,7 @@ const marker = (page: Page) => page.evaluate(() => Reflect.get(window, "__shellM
 test.beforeAll(async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const page = await browser.newPage(baseURL ? { baseURL } : {});
-  await page.goto("/park/home", { timeout: 120_000 });
+  await page.goto("/", { timeout: 120_000 });
   await page
     .getByTestId("park-page-home")
     .waitFor({ timeout: 120_000 })
@@ -61,7 +63,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       page,
     }) => {
       const problems = collectConsoleProblems(page);
-      await page.goto("/park/home");
+      await page.goto("/");
       await expect(page.locator("[data-park]")).toHaveCount(1);
       await expect(page.locator("[data-park]")).toHaveAttribute("data-time", "day");
       await expect(page.getByTestId("park-page-home")).toBeVisible();
@@ -86,7 +88,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     }
 
     test(`WEB_3a_e2e_${name}_the_design_fonts_are_declared_on_park_pages`, async ({ page }) => {
-      await page.goto("/park/home");
+      await page.goto("/");
       // The faces are declared by the lazy park chunk's CSS: wait for the page, then poll the list.
       await expect(page.getByRole("main")).toBeVisible();
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -113,14 +115,18 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     });
 
     test(`WEB_3a_e2e_${name}_a_world_route_shows_its_id`, async ({ page }) => {
-      await page.goto("/park/world/k1");
-      await expect(page.getByTestId("park-page-world")).toContainText("k1");
+      await page.goto("/world/k1");
+      await expect(page.getByTestId("park-page-world")).toHaveAttribute("data-world-id", "k1");
     });
 
-    test(`WEB_3a_e2e_${name}_/park_is_home_and_unknown_params_are_ignored`, async ({ page }) => {
+    test(`WEB_3a_e2e_${name}_slash_and_the_park_alias_are_home_and_unknown_params_are_ignored`, async ({
+      page,
+    }) => {
       await page.goto("/park");
       await expect(page.getByTestId("park-page-home")).toBeVisible();
       await page.goto("/park/home?x=1");
+      await expect(page.getByTestId("park-page-home")).toBeVisible();
+      await page.goto("/?x=1");
       await expect(page.getByTestId("park-page-home")).toBeVisible();
       await expect(page.getByTestId("park-page-home")).not.toContainText("x=1");
     });
@@ -133,7 +139,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       // WEB-3b: the nav has two more Home links, so the not-found page's own link is found inside it.
       await expect(
         page.getByTestId("park-not-found").getByRole("link", { name: /home/i }),
-      ).toHaveAttribute("href", "/park/home");
+      ).toHaveAttribute("href", "/");
       await expect(page.locator('[data-testid^="park-page-"]')).toHaveCount(0);
       await expect(page).toHaveTitle("Page not found · Tilo");
       expect(problems).toEqual([]);
@@ -144,7 +150,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       await markDocument(page);
       await page.getByTestId("park-not-found").getByRole("link").click();
       await expect(page.getByTestId("park-page-home")).toBeVisible();
-      expect(page.url()).toMatch(/\/park\/home$/);
+      expect(new URL(page.url()).pathname).toBe("/");
       expect(await marker(page), "no page load happened").toBe("same document");
       await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
       await page.goBack();
@@ -155,16 +161,16 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     });
 
     test(`WEB_3a_e2e_${name}_browser_back_and_forward_switch_pages`, async ({ page }) => {
-      await page.goto("/park/home");
+      await page.goto("/");
       await markDocument(page);
       await page.evaluate(() => {
-        window.history.pushState({}, "", "/park/ledger");
+        window.history.pushState({}, "", "/ledger");
         window.dispatchEvent(new PopStateEvent("popstate"));
       });
       await expect(page.getByTestId("park-page-ledger")).toBeVisible();
       await expect(page).toHaveTitle("Ledger · Tilo");
       await page.evaluate(() => {
-        window.history.pushState({}, "", "/park/team?focus=share");
+        window.history.pushState({}, "", "/team?focus=share");
         window.dispatchEvent(new PopStateEvent("popstate"));
       });
       await expect(page.getByTestId("park-page-team")).toBeVisible();
@@ -214,8 +220,8 @@ for (const [name, viewport] of Object.entries(SIZES)) {
           "wcag22aa",
         ]);
         // Design-owned exception (plan 8c): the reference's own invalid-email state dims the Team page's
-        // Invite button to opacity .6 over --hero (2.89:1). Excluded on /park/team only, for that button only.
-        if (path === "/park/team") axe.exclude(".park-team-invite");
+        // Invite button to opacity .6 over --hero (2.89:1). Excluded on /team only, for that button only.
+        if (path === "/team") axe.exclude(".park-team-invite");
         const results = await axe.analyze();
         const bad = results.violations.filter(
           (v) => v.impact === "serious" || v.impact === "critical",
@@ -225,7 +231,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     });
 
     test(`WEB_3a_e2e_${name}_the_page_does_not_scroll_sideways`, async ({ page }) => {
-      await page.goto("/park/home");
+      await page.goto("/");
       await expect(page.getByTestId("park-page-home")).toBeVisible();
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -238,31 +244,54 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 test.describe("the old app and the landing bundle", () => {
   test.use({ viewport: DESKTOP });
 
-  test("WEB_3a_e2e_slash_still_renders_the_old_app", async ({ page }) => {
+  const PARK_CHUNK = /\/src\/park\/app\/(ParkApp|context|pages|store)/;
+
+  test("WEB_3a_e2e_slash_and_worlds_are_the_park_app_now", async ({ page }) => {
     const problems = collectConsoleProblems(page);
     await page.goto("/");
+    await expect(page.getByTestId("park-page-home")).toBeVisible();
+    await expect(page.locator("[data-park]")).toHaveCount(1);
+    await expect(page.getByTestId("stage-frame")).toHaveCount(0);
+    await page.goto("/worlds");
+    await expect(page.getByTestId("park-page-worlds")).toBeVisible();
+    await expect(page.getByTestId("screen-page")).toHaveCount(0);
+    expect(problems).toEqual([]);
+  });
+
+  test("WEB_3a_e2e_the_old_app_is_untouched_at_more_and_the_stage_path", async ({ page }) => {
+    const problems = collectConsoleProblems(page);
+    await page.goto("/more");
+    await expect(page.getByTestId("screen-page")).toBeVisible();
+    await expect(page.getByTestId("top-bar")).toBeVisible();
+    await expect(page.locator("[data-park]")).toHaveCount(0);
+    await page.goto("/world/w_village_basic/stage");
     await expect(page.getByTestId("stage-frame")).toBeVisible();
     await expect(page.locator("[data-park]")).toHaveCount(0);
     expect(problems).toEqual([]);
   });
 
-  test("WEB_3a_e2e_worlds_still_renders_the_old_screen", async ({ page }) => {
-    await page.goto("/worlds");
-    await expect(page.getByTestId("screen-page")).toBeVisible();
-    await expect(page.getByTestId("top-bar")).toBeVisible();
-    await expect(page.locator("[data-park]")).toHaveCount(0);
-  });
-
-  test("WEB_3a_e2e_a_landing_visit_does_not_fetch_the_park_app_chunk", async ({ page }) => {
+  test("WEB_3a_e2e_a_kept_old_app_path_does_not_fetch_the_park_app_chunk", async ({ page }) => {
     const parkModules: string[] = [];
     page.on("request", (r) => {
-      if (/\/src\/park\/app\/(ParkApp|context|pages|store)/.test(r.url()))
-        parkModules.push(r.url());
+      if (PARK_CHUNK.test(r.url())) parkModules.push(r.url());
+    });
+    await page.goto("/more");
+    await expect(page.getByTestId("screen-page")).toBeVisible();
+    expect(parkModules, "NFR-01: the park chunk loads only on a Park path").toEqual([]);
+    await page.goto("/");
+    await expect(page.getByTestId("park-page-home")).toBeVisible();
+  });
+
+  test("WEB_3a_e2e_the_landing_loads_the_park_shell_and_not_the_stage_engine", async ({ page }) => {
+    const parkModules: string[] = [];
+    const engine: string[] = [];
+    page.on("request", (r) => {
+      if (PARK_CHUNK.test(r.url())) parkModules.push(r.url());
+      if (/pixi/i.test(r.url())) engine.push(r.url());
     });
     await page.goto("/");
-    await expect(page.getByTestId("stage-frame")).toBeVisible();
-    expect(parkModules, "NFR-01: the park chunk loads only under /park").toEqual([]);
-    await page.goto("/park/home");
     await expect(page.getByTestId("park-page-home")).toBeVisible();
+    expect(parkModules.length, "the landing is the Park app: its chunk loads").toBeGreaterThan(0);
+    expect(engine, "NFR-01: no Pixi stage engine on the landing").toEqual([]);
   });
 });

@@ -54,14 +54,17 @@ describe("WEB_3a_pages: the registry", () => {
 
 describe("WEB_3a_pages: a page with no real page yet renders the Placeholder", () => {
   it("WEB_3a_pages_placeholder_prints_the_params_it_was_given", async () => {
-    const Page = PAGES.world;
+    // Any page still on the Placeholder prints its params (WEB-6 made `world` real, so it is no longer the one).
+    const id = PLACEHOLDER_PAGES[0];
+    if (!id) return;
+    const Page = PAGES[id];
     const m = mount(
       <Suspense fallback={null}>
-        <Page app={stubApp("world", { params: { id: "k1" } })} />
+        <Page app={stubApp(id, { params: { id: "k1" } })} />
       </Suspense>,
     );
     await settle();
-    expect(q(m.container, '[data-testid="park-page-world"]').textContent).toContain("k1");
+    expect(q(m.container, `[data-testid="park-page-${id}"]`).textContent).toContain("k1");
   });
 
   it("WEB_3a_pages_placeholder_for_every_page_that_has_no_real_page_yet", async () => {

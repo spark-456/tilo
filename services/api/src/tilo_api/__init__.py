@@ -12,29 +12,47 @@ from tilo_api import people as _people
 from tilo_api import runs as _runs
 from tilo_api import schedules as _schedules
 from tilo_api import skill_proposals as _skill_proposals
+from tilo_api import spend as _spend
 from tilo_api.access import AccessGate as _AccessGate
 from tilo_api.access_routes import router as _access_router
 from tilo_api.assistant.route import router as _assistant_router
 from tilo_api.cards import build_router as _build_cards_router
+from tilo_api.cards_feed import router as _cards_feed_router
 from tilo_api.console import build_router as _build_console_router
 from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.intake import router as intake_router
+from tilo_api.people_limits import NoStore as _NoStore
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
 from tilo_api.tasks import router as _tasks_router
+from tilo_api.worlds_list import router as _worlds_list_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
 # strangers (issue #411). `app.openapi()` still works in-process for tests.
 _DOCS: dict[str, Any] = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_url": None, "openapi_url": None}
 app = FastAPI(title="tilo-api", **_DOCS)
 app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration
+app.add_middleware(_NoStore)  # added after the gate, so it is outside it: the gate's 403 on `/v1/` is no-store too
 
 
 @app.exception_handler(_deps.ReplayOnly)
 def _replay_only(_: Request, __: Exception) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": _deps.REPLAY_ONLY_MESSAGE, "replay_only": True})
+
+
+@app.exception_handler(_deps.ModelUnavailable)
+def _model_unavailable(_: Request, __: Exception) -> JSONResponse:  # NFR-22: the same labelled replay offer
+    return JSONResponse(
+        status_code=503,
+        content={"detail": _deps.MODEL_UNAVAILABLE_MESSAGE, "replay_only": True, "code": "model_unavailable"},
+    )
+
+
+@app.exception_handler(_spend.SpendCapReached)
+def _spend_cap_reached(_: Request, __: Exception) -> JSONResponse:  # SEC-16: new live work over the uid's cap
+    return JSONResponse(status_code=403, content={"detail": _spend.CAP_REACHED, "code": "spend_cap_reached"})
 
 
 def _world_views(store: Annotated[_deps.Store, Depends(_deps.get_store)]) -> Callable[[str], WorldView]:
@@ -54,8 +72,12 @@ app.include_router(intake_router)
 app.include_router(_dispatch_router)
 app.include_router(_redaction_router)
 app.include_router(_costs_router)
+app.include_router(_worlds_list_router)
+app.include_router(_cards_feed_router)
 app.include_router(_tasks_router)
-app.include_router(_build_cards_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
+app.include_router(
+    _build_cards_router(_runs.get_card_store, answer_guard=_runs.answer_guard, world_owner=_runs.world_owner)
+)
 app.include_router(_build_console_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
 app.include_router(_build_sharing_router(_world_views))
 app.include_router(_runs.router)

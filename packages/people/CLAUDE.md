@@ -3,7 +3,7 @@
 ## Purpose
 People core for meetings, plates, pinboards and calendars (addendum PPL-10): the visibility oracle
 (`decide`, `read`, `project`), write checks (`check_write`), deterministic name matching and due-date
-resolution, and in-memory record stores whose interface `tilo-api` implements on Firestore.
+resolution, and in-memory record stores whose interface `tilo-api` implements on Firestore (the person store also holds the founder marker and one address reservation per person; `erase_person` refuses an unfounded org's last person, PPL-11c-FS).
 
 ## Commands
 - `uv run pytest packages/people/tests -q` (public API pinned in `tests/API.md`); `just check`
@@ -29,4 +29,5 @@ FR-CAL-03, FR-CAL-06 (oracle half); PPL-10a to PPL-10d.
 - Fail closed: `decide` and `check_write` never raise; unknown or malformed input refuses.
 - Never put record text (titles, names, aliases, emails, due phrases) in an error or a repr.
 - A model never resolves identity, dates or access: code only (PE-15, PE-11).
+- `check_write` lets a meeting's `world_id` go from absent to a world id as an owner `edit`, alone and once (PPL-11c S6, BQ-273); any other `world_id` change is `immutable`.
 - Change `decide` only together with the reference oracle and the crossref fixtures (architect).

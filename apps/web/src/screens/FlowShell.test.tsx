@@ -41,7 +41,7 @@ async function show(path: string, client: TiloClient): Promise<void> {
   });
 }
 const settle = (ms = PRESS_MS + 20) =>
-  act(async () => void (await new Promise((r) => setTimeout(r, ms))));
+  act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 /** S-01 starts only with text in the box. */
 async function fillTask(text = "Triage my inbox") {
   const box = container.querySelector("textarea");
@@ -63,6 +63,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+  vi.useFakeTimers();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -74,6 +75,7 @@ afterEach(async () => {
   process.off("unhandledRejection", onUnhandled);
   unhandled.length = 0;
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("PRD-18.3 flow: a rejecting client shows the error and a retry, never a console error", () => {
@@ -177,7 +179,7 @@ describe("PRD-18.3 flow: loading and empty states", () => {
     await act(async () => button("primary")?.click());
     await settle();
     expect(approve).toHaveBeenCalledWith("t1", { approach_id: "quick", budget_cap: 45 });
-    expect(window.location.pathname).toBe("/world/w9");
+    expect(window.location.pathname).toBe("/world/w9/stage");
   });
 
   it("an empty approaches list is an empty state with a retry, and nothing to approve", async () => {
@@ -212,7 +214,7 @@ describe("PRD-18.3 flow: loading and empty states", () => {
 
   it("every screen has exactly one primary button", async () => {
     const client = new FixtureClient();
-    for (const path of ["/", "/task/t/understanding", "/task/t/approaches", "/world/w"]) {
+    for (const path of ["/", "/task/t/understanding", "/task/t/approaches", "/world/w/stage"]) {
       await show(path, client);
       await settle(0);
       expect(container.querySelectorAll("button.primary")).toHaveLength(1);

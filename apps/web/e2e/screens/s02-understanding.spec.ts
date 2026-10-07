@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { startTask } from "../support/intake";
 import { watchConsole } from "../support/screens";
 import { DESKTOP, MOBILE } from "../support/viewports";
 
@@ -9,9 +10,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     test.setTimeout(60_000);
     const problems = watchConsole(page);
     await page.setViewportSize(viewport);
-    await page.goto("/");
-    await page.getByLabel("Describe your task").fill("Compare the two supplier quotes"); // S-01 needs text
-    await page.getByRole("button", { name: "Start task" }).click();
+    await startTask(page, "Compare the two supplier quotes"); // WEB-CUTOVER: S-02 holds the brief the intake returned
 
     await expect(page.getByRole("heading", { level: 1, name: "Understanding" })).toBeVisible();
     const goalInput = page.getByTestId("brief-chip-goal").locator("input");

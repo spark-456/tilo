@@ -21,6 +21,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from ._time import add_seconds, parse_ts
+from .meeting_host import CALENDAR_EVENTS_OWNED, CONNECTOR_ID
 from .tokens import TOKEN_URL, OAuthSettings, TokenBroker, post_form
 
 _MAX_FLOWS_PER_USER = 20
@@ -169,6 +170,11 @@ class ConsentService:
         response = answer[1]
         scope = response.get("scope")
         granted = frozenset(scope.split()) if isinstance(scope, str) else frozenset()
+        if flow.connector == CONNECTOR_ID and granted and granted != {CALENDAR_EVENTS_OWNED}:
+            # MH-C1: with include_granted_scopes, anything more means this account already granted this client
+            # Gmail, Drive or Calendar read: a person's own account, not the bot's. Nothing stored, nothing
+            # revoked (a revoke would end that account's other grant, CON-D10). A heuristic, not proof.
+            raise ConsentRefused("this is not the meeting bot account: sign in with the bot's account")
         lines = list(dict.fromkeys(line for s, line in flow.lines.items() if s in granted))  # one per text
         if not lines:
             self._discard(user_id, flow.connector, response)

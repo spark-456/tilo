@@ -5,8 +5,8 @@
 //   through the injectable env), no support.js, no eval or innerHTML, no model id;
 // - no clock and no Math.random (the prototype's seeded rng stays);
 // - imports only from within park/engines;
-// - WEB-1b adds no animation: the honesty scan (FR-WLD-09) finds nothing in the engine files, and its
-//   allowlist is not edited for them.
+// - WEB-1b added no animation: the honesty scan (FR-WLD-09) finds nothing in the engine files; WEB-MOTION-1
+//   allows the city movers in park.ts only (two allowlist entries, nothing else in the engines).
 // Test files are excluded from the walk (they name these patterns on purpose).
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -198,15 +198,26 @@ describe("WEB_1b_static: imports stay inside park/engines", () => {
   });
 });
 
-describe("WEB_1b_static: no animation in the engines (BQ-WEB-3, ADR-0003a 5; HR-1 to HR-3)", () => {
-  it("WEB_1b_static_honesty_scan_finds_nothing_in_the_engine_files", () => {
+// WEB-MOTION-1: park.ts (the city scene) draws the ambient cars and walkers with their own animation shorthand
+// and has two allowlist entries (HR-1: non-agent scenery). Every other engine file stays animation-free.
+const MOVER_FILE = "park.ts";
+const AMBIENT = [
+  "src/park/engines/park.ts:inline-motion-style",
+  "src/park/engines/park.ts:css-animation",
+];
+describe("WEB_1b_static: no animation in the engines but the city's movers (BQ-WEB-3, ADR-0003a 5; HR-1 to HR-3)", () => {
+  it("WEB_1b_static_honesty_scan_finds_nothing_in_the_engine_files_but_the_allowlisted_movers", () => {
     expect(files.length).toBeGreaterThanOrEqual(3);
-    const found = codeFiles.flatMap((p) => scanSource(`src/park/engines/${rel(p)}`, text(p)));
+    const found = codeFiles
+      .flatMap((p) => scanSource(`src/park/engines/${rel(p)}`, text(p)))
+      .filter((v) => !ALLOWLIST.some((a) => a.file === v.file && a.rule === v.rule));
     expect(found.map((v) => `${v.file}:${v.line} ${v.rule}: ${v.text}`)).toEqual([]);
   });
 
-  it("WEB_1b_static_the_honesty_allowlist_is_untouched_by_this_ticket", () => {
-    expect(ALLOWLIST.filter((a) => /park/.test(a.file))).toEqual([]);
+  it("WEB_1b_static_the_honesty_allowlist_has_only_the_city_movers_in_the_engines", () => {
+    expect(
+      ALLOWLIST.filter((a) => /park\/engines/.test(a.file)).map((a) => `${a.file}:${a.rule}`),
+    ).toEqual(AMBIENT);
   });
 
   it("WEB_1b_static_the_scan_is_not_vacuous_it_flags_each_form_the_prototype_used", () => {
@@ -222,8 +233,9 @@ describe("WEB_1b_static: no animation in the engines (BQ-WEB-3, ADR-0003a 5; HR-
     // Belt and braces for the scan's blind spots (quoted keys, computed names, timers): the prototype's
     // keyframe names, a timer or a Web Animations call may not appear anywhere in code.
     const re =
-      /animation|keyframes|\bmvXY\b|\bwaddle\b|\bsprite2\b|\btiloDash\b|\btiloBob\b|\btiloGhost\b|\bsetTimeout\b|\bsetInterval\b|requestAnimationFrame|requestIdleCallback|\.animate\b|<animate|\btransition\b/i;
+      /animation|keyframes|\bmvXY\b|\bwaddle\b|\bwalkFrame\b|\bsprite2\b|tilo(?:Dash|Bob|Ghost|Pulse)|\bsetTimeout\b|\bsetInterval\b|requestAnimationFrame|requestIdleCallback|\.animate\b|<animate|transition/i;
     const hits = codeFiles
+      .filter((p) => rel(p) !== MOVER_FILE)
       .flatMap((p) =>
         code(p)
           .split(/\r?\n/)
@@ -232,5 +244,19 @@ describe("WEB_1b_static: no animation in the engines (BQ-WEB-3, ADR-0003a 5; HR-
       )
       .map((l) => `${l.file}:${l.line} ${l.text}`);
     expect(hits).toEqual([]);
+  });
+
+  it("WEB_1b_static_the_mover_file_keeps_to_css_keyframes_no_timer_frame_loop_transition_or_waapi", () => {
+    // WEB-MOTION-1: the city's motion is declared (keyframe names in the animation shorthand), never driven.
+    const src = code(join(ENGINES_DIR, MOVER_FILE));
+    expect(src).not.toMatch(
+      /\bsetTimeout\b|\bsetInterval\b|requestAnimationFrame|requestIdleCallback|\.animate\b|<animate|transition|keyframes|\bsprite2\b|tilo(?:Dash|Bob|Ghost|Pulse)/i,
+    );
+    // The animation names are exactly the three keyframes of park.shell.css, written only as the shorthand.
+    const names = [...src.matchAll(/animation:\s*`(\w+)\s/g)].map((m) => m[1]);
+    expect([...new Set(names)].sort()).toEqual(["mvXY", "waddle", "walkFrame"]);
+    expect(src).not.toMatch(
+      /animation(?:Name|Duration|Delay|Direction|Iteration|Timing|Fill|PlayState)|animation-/,
+    );
   });
 });

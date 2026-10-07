@@ -47,10 +47,10 @@ profiles:
     caps: [json, tools]
 
 roles:
-  director: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000 }
-  lead: { primary: flash-38, fallback: flash-37, thinking: medium }
+  director: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
+  lead: { primary: flash-38, fallback: flash-37, thinking: medium, max_output_tokens: 16384 }
   specialist: { primary: flash-37, fallback: lite-31 }
-  verifier: { primary: flash-38, fallback: flash-37, thinking: high }
+  verifier: { primary: flash-38, fallback: flash-37, thinking: high, max_output_tokens: 16384 }
   writer: { primary: flash-38, fallback: flash-37 }
   narrator: { primary: lite-31, fallback: flash-37 }
   autopilot: { primary: flash-37, fallback: lite-31, max_input_tokens: 16000 }
