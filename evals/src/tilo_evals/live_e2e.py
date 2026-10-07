@@ -153,6 +153,7 @@ class LiveE2EReport:
     expected: str | None = None
     recordings: str | None = None  # replay only: "synthetic" (a fake provider wrote them) or "unmarked"
     story_note: str | None = None  # why the Narrator left no Story, as a code only
+    quoted_calls: int = 0  # calls charged at the pre-call quote because they returned no usage
 
     @property
     def event_count(self) -> int:
@@ -280,6 +281,7 @@ class _Meter:
             None  # (outcome class, role, detail, stage): the first thing that ended the run
         )
         self.failure: tuple[str, BaseException] | None = None  # (role, error): the first call the Router gave up on
+        self.quoted_calls = 0  # calls that returned no usage: charged at the pre-call quote, not at what was used
         self.lock = threading.RLock()  # one model call at a time, so the cap is checked against what was really spent
 
     def cost(self, profile: str, tokens_in: int, tokens_out: int) -> float:
@@ -316,14 +318,16 @@ class _Meter:
         self, role: str, profile: str, request: GenerateRequest, tokens_in: int, latency_ms: float
     ) -> None:
         """A call that raised after it may have been billed (a blocked reply, a timeout): charged at the Router's own
-        pre-call quote, the input and the full output cap, because the provider reported no usage for it."""
+        pre-call quote, the input and the full output cap, because the provider reported no usage for it. The cap is a
+        quote, not usage, so it is left out of `tokens_out` (`quoted_calls` counts them for the printed note)."""
         with self.lock:
             key = (_stage(role, request), role, profile)
             row = self.rows.setdefault(key, Row(*key))
-            tokens_out = request.max_output_tokens or 0
+            quote_out = request.max_output_tokens or 0
             row.calls += 1
-            row.tokens_in, row.tokens_out = row.tokens_in + tokens_in, row.tokens_out + tokens_out
-            row.credits += self.cost(profile, tokens_in, tokens_out)
+            self.quoted_calls += 1
+            row.tokens_in += tokens_in
+            row.credits += self.cost(profile, tokens_in, quote_out)
             row.latency_ms += latency_ms
 
     def stopped(self, kind: str, role: str, detail: str = "", stage: str = "") -> None:
@@ -897,7 +901,7 @@ def run_live_e2e(
     found = check_case(obs)
     report.findings = [f for f in found if not (stopped and f.check == terminal_honest.__name__)]
     report.checks_run = [c.__name__ for c in CHECKS if not (stopped and c is terminal_honest)]
-    report.rows, report.total_credits = list(meter.rows.values()), meter.total
+    report.rows, report.total_credits, report.quoted_calls = list(meter.rows.values()), meter.total, meter.quoted_calls
     report.events, report.questions, report.answered = obs.events, obs.questions, obs.answered
     return report
 
@@ -961,6 +965,11 @@ def _print_report(report: LiveE2EReport) -> None:
         print(
             f"stage={r.stage} role={r.role} profile={r.profile} calls={r.calls} tokens_in={r.tokens_in} "
             f"tokens_out={r.tokens_out} credits={r.credits:.4f} latency_ms={r.latency_ms:.1f}"
+        )
+    if quoted := report.quoted_calls:
+        print(
+            f"note: {quoted} call(s) returned no usage; their credits are the pre-call quote (input plus the full "
+            "output cap) and their tokens_out is left out"
         )
     print(f"outcome={report.outcome_class} events={report.event_count}")
     for name in report.checks_run:

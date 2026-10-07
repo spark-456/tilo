@@ -20,7 +20,7 @@ test("UX-1 G2a figures carry a state chip in words on S-13, S-17 and S-18 (HR-1)
   await page.goto("/mail");
   await expect(tile(page, "mail", "Waiting for you")).toContainText("All clear");
   await expect(tile(page, "mail", "Replies sent")).toContainText("None yet");
-  await page.goto("/team");
+  await page.goto("/team/console");
   await expect(tile(page, "team-lead", "Questions waiting")).toContainText("All clear");
   // After the run: the same figures change their words with their numbers.
   await page.goto("/library?speed=100");
@@ -29,7 +29,7 @@ test("UX-1 G2a figures carry a state chip in words on S-13, S-17 and S-18 (HR-1)
   });
   await page.goto("/mail?speed=100");
   await expect(tile(page, "mail", "Replies sent")).toContainText("Sent", { timeout: 20_000 });
-  await page.goto("/team?speed=100");
+  await page.goto("/team/console?speed=100");
   await expect(tile(page, "team-lead", "Answers recorded")).toContainText("Recorded", {
     timeout: 20_000,
   });

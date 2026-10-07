@@ -124,7 +124,7 @@ test.describe("@cp2 CP2 live run on the real dev API", () => {
 
     // world.completed is on record: only then is the delivery asked for (no 409 on the console)
     await page.getByRole("link", { name: "World", exact: true }).first().click();
-    await expect(page).toHaveURL(new RegExp(`/world/${world}$`));
+    await expect(page).toHaveURL(new RegExp(`/world/${world}/stage$`));
     await expect(page.getByTestId("hud-meter")).toContainText("Done", { timeout: 30_000 });
     await page.getByRole("button", { name: "View delivery" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Delivery" })).toBeVisible();
@@ -194,7 +194,7 @@ test.describe("@cp2 CP2 live run on the real dev API", () => {
     page.on("request", (req) => {
       if (req.url().endsWith("/worlds/bogus/events")) events.push(req.url());
     });
-    await page.goto("/world/bogus");
+    await page.goto("/world/bogus/stage");
     await expect(page.getByTestId("not-found")).toBeVisible();
     await page.waitForTimeout(3_500); // longer than three poll gaps: a repeating poll would show here
     expect(events).toHaveLength(1);

@@ -29,6 +29,11 @@ afterEach(() => {
 const loader = () =>
   qa(document.body, '[role="status"]').find((e) => (e.textContent ?? "").includes("OPENING")) ??
   null;
+/** The browser's own "the fade has finished" (WEB-MOTION-2: the card and the splash fade out, then go). */
+const animationEnd = (el: Element | null) =>
+  act(() => {
+    el?.dispatchEvent(new Event("animationend", { bubbles: true }));
+  });
 const labelEl = (root: HTMLElement, label: string): Element => {
   const hits = qa(root, "*").filter((e) => (e.textContent ?? "").trim() === label);
   const deepest = hits[hits.length - 1];
@@ -143,7 +148,7 @@ describe("WEB_3b_loader: the card", () => {
   });
 });
 
-describe("WEB_3b_loader: the steps tick and the bar widens, with no animation", () => {
+describe("WEB_3b_loader: the steps tick and the bar widens by its inline width, with no inline motion style", () => {
   it("WEB_3b_loader_step_0_has_no_check_yet_and_the_bar_is_at_30_percent", async () => {
     await mountApp();
     open("k1");
@@ -171,9 +176,12 @@ describe("WEB_3b_loader: the steps tick and the bar widens, with no animation", 
     tick(sch, 2);
     expect(navigate).not.toHaveBeenCalled();
     tick(sch);
-    expect(navigate).toHaveBeenCalledWith("/park/world/comp");
+    expect(navigate).toHaveBeenCalledWith("/world/comp");
     expect(loader()).not.toBeNull();
     tick(sch);
+    // Updated for WEB-MOTION-2: the card now fades out over 280 ms after the last step, and goes at animationend.
+    expect(loader()).not.toBeNull();
+    animationEnd(loader());
     expect(loader()).toBeNull();
     expect(
       qa(document.body, "[role=status]").filter((e) => (e.textContent ?? "").includes("OPENING")),
@@ -226,6 +234,9 @@ describe("WEB_3b_boot: the splash", () => {
     const { m } = mountShell(<Host />);
     expect(m.container.querySelector('[aria-label="Loading Tilo"]')).not.toBeNull();
     act(() => setReady(true));
+    // Updated for WEB-MOTION-2: the splash fades over .45 s once ready, and goes at animationend.
+    expect(m.container.querySelector('[aria-label="Loading Tilo"]')).not.toBeNull();
+    animationEnd(m.container.querySelector('[aria-label="Loading Tilo"]'));
     expect(m.container.querySelector('[aria-label="Loading Tilo"]')).toBeNull();
   });
 
@@ -238,6 +249,9 @@ describe("WEB_3b_boot: the splash", () => {
 
   it("WEB_3b_boot_the_shell_has_dropped_it_once_the_engines_are_built", async () => {
     await mountApp();
+    // Updated for WEB-MOTION-2: it fades first (no longer a loading status), and goes at animationend.
+    expect(document.querySelector('[role="status"][aria-label="Loading Tilo"]')).toBeNull();
+    animationEnd(document.querySelector('[aria-label="Loading Tilo"]'));
     expect(document.querySelector('[aria-label="Loading Tilo"]')).toBeNull();
   });
 });

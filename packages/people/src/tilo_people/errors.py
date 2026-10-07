@@ -25,3 +25,15 @@ class NotFound(PeopleError):
 
 class VersionConflict(PeopleError):
     """replace or delete: `expected_version` is not the current version."""
+
+
+class EmailTaken(PeopleError):
+    """create, replace or create_founder: another person of the org holds the address (any case). Names no address."""
+
+
+class OrgAlreadyFounded(PeopleError):
+    """create_founder: the org has a founder marker or already has a person."""
+
+
+class LastPerson(PeopleError):
+    """erase_person: the user is the org's only person and the org was never founded (no founder marker)."""

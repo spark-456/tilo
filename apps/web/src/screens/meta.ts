@@ -52,7 +52,7 @@ export const SCREENS: readonly ScreenMeta[] = [
   built(must("S-01", "Start", "P1", "/")),
   built(must("S-02", "Understanding", "P1", `${T}/understanding`)),
   built(must("S-03", "Approaches and budget", "P1", `${T}/approaches`)),
-  built(must("S-04", "World with HUD", "P3", W)),
+  built(must("S-04", "World with HUD", "P3", `${W}/stage`)),
   built(
     must(
       "S-05",
@@ -86,11 +86,11 @@ export const SCREENS: readonly ScreenMeta[] = [
     ),
   ),
   built(must("S-13", "Library and Memory Vault", "P7", "/library", /^\/library\/?$/)),
-  built(must("S-14", "Worlds list and replays", "P3", "/worlds", /^\/worlds\/?$/)),
+  built(must("S-14", "Worlds list and replays", "P3", "/worlds/replays", /^\/worlds\/replays\/?$/)),
   built(must("S-15", "Autonomy", "P4", "/autonomy", /^\/autonomy\/?$/)),
   built(must("S-16", "Channels", "P5", "/channels", /^\/channels\/?$/)),
   built(must("S-17", "Email Autopilot home", "P5", "/mail", /^\/mail\/?$/)),
-  built(must("S-18", "Team Lead console", "P4", "/team", /^\/team\/?$/)),
+  built(must("S-18", "Team Lead console", "P4", "/team/console", /^\/team\/console\/?$/)),
   built(must("S-19", "Connections", "P6", "/connections", /^\/connections\/?$/)),
   later("S-20", "Skills library", "P2"),
   built(

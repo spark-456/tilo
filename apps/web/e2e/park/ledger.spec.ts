@@ -1,9 +1,9 @@
-// WEB-7 acceptance: the Ledger page in the real Park shell at /park/ledger, 1440x900 and 390x844, on the
+// WEB-7 acceptance: the Ledger page in the real Park shell at /ledger, 1440x900 and 390x844, on the
 // fixture Api. It loads inside the one [data-park] root with its key copy and no console output, one
 // approval goes through decide() (the KPIs, the toast and the Activity row all follow, and Undo restores
 // them), and axe finds nothing serious.
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
-// e2e/park/ledger.spec.ts --project=chromium --no-deps --workers=3
+// e2e/ledger.spec.ts --project=chromium --no-deps --workers=3
 import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
 import { collectConsoleProblems } from "../support/console";
@@ -19,7 +19,7 @@ const spentTile = (page: Page) => page.locator(".park-kpi", { hasText: "Spent so
 test.beforeAll(async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const page = await browser.newPage(baseURL ? { baseURL } : {});
-  await page.goto("/park/ledger", { timeout: 120_000 });
+  await page.goto("/ledger", { timeout: 120_000 });
   await page
     .getByRole("heading", { level: 1, name: "Ledger" })
     .waitFor({ timeout: 120_000 })
@@ -33,7 +33,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 
     test(`WEB_7_e2e_${name}_loads_with_its_copy_and_no_console_output`, async ({ page }) => {
       const problems = collectConsoleProblems(page);
-      await page.goto("/park/ledger");
+      await page.goto("/ledger");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ledger");
       await expect(page).toHaveTitle("Ledger · Tilo");
       await expect(page.getByRole("main")).toHaveCount(1);
@@ -63,7 +63,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     });
 
     test(`WEB_7_e2e_${name}_activity_titles_have_room_to_read`, async ({ page }) => {
-      await page.goto("/park/ledger");
+      await page.goto("/ledger");
       const title = page.locator(".park-ledger-what-title").first();
       await expect(title).toBeVisible();
       const box = await title.boundingBox();
@@ -80,7 +80,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       page,
     }) => {
       const problems = collectConsoleProblems(page);
-      await page.goto("/park/ledger");
+      await page.goto("/ledger");
       const waiting = page.getByRole("button", { name: /^Waiting on you/ });
       await expect(waiting).toBeVisible();
       await expect(spentTile(page)).toContainText("£2,412");
@@ -104,7 +104,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       test.setTimeout(90_000);
       const problems = collectConsoleProblems(page);
       for (const time of ["day", "night"] as const) {
-        await page.goto("/park/ledger");
+        await page.goto("/ledger");
         await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ledger");
         if (time === "night")
           await page.evaluate(() => {
