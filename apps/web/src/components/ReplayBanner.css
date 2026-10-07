@@ -1,6 +1,7 @@
 /* NFR-22 replay-only banner. Neutral role tokens only; the label is words, not colour. The box
    has no size of its own beyond its text, so it fills the flow-slot it replaces (UX-1, CLS). */
 .replay-banner {
+  display: block;
   box-sizing: border-box;
   margin: 0 0 var(--space-12);
   padding: var(--space-12) var(--space-16);

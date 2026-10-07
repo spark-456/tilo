@@ -215,6 +215,10 @@ export class HttpClient implements TiloClient {
       throw new TiloApiError(UNREACHABLE, null, true, write); // the cause (host, port) is not for people
     }
     if (!res.ok) {
+      // Only a 503 (the replay-only label) or a 4xx has a body worth reading; other 5xx are not awaited.
+      if (res.status >= 500 && res.status !== 503) {
+        throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
+      }
       const body = await res.text().catch(() => "");
       if (isReplayOnly(res.status, body)) {
         throw new TiloApiError(REPLAY_ONLY, 503, false, write, codeOf(body), true);

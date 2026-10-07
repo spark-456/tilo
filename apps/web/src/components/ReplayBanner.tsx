@@ -7,16 +7,11 @@ import { useId } from "react";
 import "./ReplayBanner.css";
 
 export function ReplayBanner({ replaysHref = "/worlds" }: { replaysHref?: string }) {
-  const titleId = useId();
+  const id = useId();
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a persistent status region with a label of its own, not a form or calculation result.
-    <div
-      className="replay-banner"
-      data-testid="replay-banner"
-      role="status"
-      aria-labelledby={titleId}
-    >
-      <p id={titleId} className="replay-banner-title">
+    // biome-ignore lint/a11y/useSemanticElements: a persistent labelled status banner, not a form result (as App.tsx's fixture banner).
+    <div className="replay-banner" data-testid="replay-banner" role="status" aria-labelledby={id}>
+      <p id={id} className="replay-banner-title">
         Live models are unavailable
       </p>
       <p className="replay-banner-body">
