@@ -176,14 +176,9 @@ def _refusal_cases() -> list:
             },
             id="MH-03-other-org",
         ),  # fmt: skip
-        pytest.param(
-            "MH-03",
-            {
-                "people": [person("u_twin", "PRIYA@example.com")],
-                "meeting": meeting(attendees=attendees_of(OWNER, PRIYA, "u_twin")),
-            },
-            id="MH-03-same-address-twice",
-        ),  # fmt: skip
+        # MH-03 "two users share an address" has no API case any more: the people store reserves an address per person
+        # (phase0-stack) and the route lists a repeated person once, so the state cannot be built here. The rule stays
+        # covered in services/connectors (test_FR_MTG_09_MH_03_two_users_with_one_address_NFKC_casefold_refuse).
         pytest.param("MH-03", {"people": _persons_p(50), "meeting": _many(50)}, id="MH-03-51-recipients"),
         pytest.param(
             "MH-04",
