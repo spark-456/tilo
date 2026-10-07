@@ -44,6 +44,12 @@ const LIVE_API_PORT = Number(process.env.TILO_LIVE_API_PORT ?? 5398);
 const LIVE_ORIGIN = `http://127.0.0.1:${LIVE_PORT}`;
 const LIVE_API = `http://127.0.0.1:${LIVE_API_PORT}`;
 const LIVE_SPECS = "**/live/**";
+// FR-WLD-13 (`TILO_PERF_PHONE=1`, local only): the phone frame-rate measurement runs on the production build
+// served by `vite preview`, on its own private port. CI never sets it.
+const PERF_PHONE = process.env.TILO_PERF_PHONE === "1";
+const PERF_PHONE_PORT = Number(process.env.TILO_PERF_PHONE_PORT ?? 5321);
+const PERF_PHONE_ORIGIN = `http://127.0.0.1:${PERF_PHONE_PORT}`;
+const PERF_PHONE_SPECS = "**/world-perf-phone.spec.ts";
 const TIMING_SPECS = [
   "**/world-perf.spec.ts",
   "**/world-reduced-motion-toggle.spec.ts",
@@ -66,7 +72,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: [...TIMING_SPECS, CP2_SPECS, NFR01_SPECS, PARITY_SPECS, LIVE_SPECS],
+      testIgnore: [...TIMING_SPECS, PERF_PHONE_SPECS, CP2_SPECS, NFR01_SPECS, PARITY_SPECS, LIVE_SPECS],
       // Runs the timing project after this one finishes, pass or fail. A `dependencies` link would
       // skip the C8 freeze and perf specs whenever any chromium test failed.
       teardown: "timing",
@@ -92,6 +98,16 @@ export default defineConfig({
             testMatch: LIVE_SPECS,
             workers: 1,
             use: { ...BROWSER, baseURL: LIVE_ORIGIN },
+          },
+        ]
+      : []),
+    ...(PERF_PHONE
+      ? [
+          {
+            name: "perf-phone",
+            testMatch: PERF_PHONE_SPECS,
+            workers: 1,
+            use: { ...BROWSER, baseURL: PERF_PHONE_ORIGIN },
           },
         ]
       : []),
@@ -121,6 +137,16 @@ export default defineConfig({
           {
             command: `pnpm exec vite build && pnpm exec vite preview --host 127.0.0.1 --port ${NFR01_PORT} --strictPort`,
             url: `${NFR01_ORIGIN}/`,
+            reuseExistingServer: false,
+            timeout: 240_000,
+          },
+        ]
+      : []),
+    ...(PERF_PHONE
+      ? [
+          {
+            command: `pnpm exec vite build && pnpm exec vite preview --host 127.0.0.1 --port ${PERF_PHONE_PORT} --strictPort`,
+            url: `${PERF_PHONE_ORIGIN}/`,
             reuseExistingServer: false,
             timeout: 240_000,
           },
