@@ -145,6 +145,9 @@ class MemoryStore:
         return Stored(self.kind, copy.deepcopy(copied), version)
 
     def delete(self, org_id: str, record_id: str, *, expected_version: int) -> None:
+        self._delete(org_id, record_id, expected_version, keep_one=False)
+
+    def _delete(self, org_id: str, record_id: str, expected_version: int, *, keep_one: bool) -> None:
         expected = self._version(expected_version)
         key = (org_id, record_id)
         with self._lock:
@@ -155,8 +158,13 @@ class MemoryStore:
                 raise VersionConflict(
                     f"VersionConflict: {self.kind} {_safe(record_id)} expected {expected} current {row[0]}"
                 )
+            if keep_one:
+                self._refuse_sole(key)
             self._release(key, row[1])
             del self._rows[key]
+
+    def _refuse_sole(self, key: tuple[str, str]) -> None:
+        """Hook of the person store (`delete_not_last`); called under `_lock`."""
 
     def _reserve(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
         """Hook of the person store (an address reservation); called under `_lock`."""
@@ -221,6 +229,15 @@ class _PersonMemoryStore(MemoryStore):
         with self._lock:
             return isinstance(org_id, str) and org_id in self._founders
 
+    def delete_not_last(self, org_id: str, record_id: str, *, expected_version: int) -> None:
+        """`delete`, but `LastPerson` (nothing changed) for the sole person of an org nobody founded; the check and the
+        delete are one step under `_lock` (PPL-11c-FS FS-17)."""
+        self._delete(org_id, record_id, expected_version, keep_one=True)
+
+    def _refuse_sole(self, key: tuple[str, str]) -> None:
+        if key[0] not in self._founders and not any(org == key[0] and rid != key[1] for org, rid in self._rows):
+            raise LastPerson(f"LastPerson: person {_safe(key[1])}")
+
 
 @dataclass(frozen=True)
 class PeopleStores:
@@ -277,15 +294,20 @@ def delete_meeting(stores: PeopleStores, org_id: str, meeting_id: str, *, expect
 
 
 def _delete_matching(
-    store: RecordStore, org_id: str, record_id: str, wanted: Callable[[Mapping[str, Any]], bool]
+    store: RecordStore,
+    org_id: str,
+    record_id: str,
+    wanted: Callable[[Mapping[str, Any]], bool],
+    delete: Callable[..., None] | None = None,
 ) -> bool:
-    """Deletes the record when it still exists and `wanted`; a racing writer is retried, then reported."""
+    """Deletes the record (with `delete`, default `store.delete`) when it still exists and `wanted`; a racing writer is
+    retried, then reported."""
     for attempt in range(_ATTEMPTS):
         current = store.get(org_id, record_id)
         if current is None or not wanted(current.record):
             return False
         try:
-            store.delete(org_id, record_id, expected_version=current.version)
+            (delete or store.delete)(org_id, record_id, expected_version=current.version)
         except NotFound:
             return False
         except VersionConflict:
@@ -364,5 +386,7 @@ def erase_person(stores: PeopleStores, org_id: str, user: str) -> dict[str, int]
     for name, store, index in plan:
         for stored in store.list(org_id, index, user):
             counts[name] += _delete_matching(store, org_id, stored.record["id"], _holds(index, user))
-    counts["person"] += _delete_matching(stores.persons, org_id, user, _always)
+    # the sole-person check is repeated inside the delete, atomically, by a store that has `delete_not_last` (FS-17)
+    delete = getattr(stores.persons, "delete_not_last", None)
+    counts["person"] += _delete_matching(stores.persons, org_id, user, _always, delete)
     return counts

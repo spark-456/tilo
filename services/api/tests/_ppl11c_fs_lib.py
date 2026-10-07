@@ -56,6 +56,10 @@ FS_EXEMPT: tuple[str, ...] = (
     "test_PPL_11c_FS_13_the_default_is_503_and_builds_no_client",
     "test_PPL_11c_FS_14_an_address_taken_by_a_person_who_is_then_erased",
     "test_PPL_11c_FS_15_",  # regression guard for issue #541 item 4a
+    "test_PPL_11c_FS_16_guard_",  # FS-1c guards: pass today and must stay green
+    "test_PPL_11c_FS_17_guard_",
+    "test_PPL_11c_FS_18_guard_",
+    "test_PPL_11c_FS_19_guard_",
 )
 
 
