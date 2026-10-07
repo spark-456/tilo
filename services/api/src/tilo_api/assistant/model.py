@@ -38,7 +38,7 @@ def _no_constant(name: str) -> Any:
 
 
 def parse_decision(text: object, *, intents: frozenset[str]) -> tuple[Choice, str | None, Mapping[str, Any] | None]:
-    """Exactly three reply shapes with exact key sets and exact JSON types; anything else is `dropped`."""
+    """Exactly four reply shapes with exact key sets and exact JSON types; anything else is `dropped`."""
     dropped: tuple[Choice, None, None] = ("dropped", None, None)
     if type(text) is not str:
         return dropped
@@ -55,6 +55,10 @@ def parse_decision(text: object, *, intents: frozenset[str]) -> tuple[Choice, st
         return "navigate", None, doc["action"]
     if keys == {"choice"} and choice == "decline":
         return "decline", None, None
+    if choice == "update" and doc.get("kind") in ("mark_done", "snooze") and type(doc.get("work_item_id")) is str:
+        when = {"when"} if doc["kind"] == "snooze" else set()  # FR-PA-10: the day is a phrase, never a timestamp
+        if keys == {"choice", "kind", "work_item_id"} | when and all(type(doc[k]) is str for k in when):
+            return "update", None, {k: v for k, v in doc.items() if k != "choice"}
     return dropped
 
 

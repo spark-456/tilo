@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import math
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import MagicMock
@@ -372,8 +373,10 @@ def test_FR_AGT_14_store_only_one_of_many_concurrent_claimers_wins(rig: StoreRig
     threads = [threading.Thread(target=worker, daemon=True) for _ in range(16)]
     for t in threads:
         t.start()
+    deadline = time.monotonic() + 120  # one shared deadline: the emulator's transaction retries are slow under load
     for t in threads:
-        t.join(timeout=30)
+        t.join(timeout=max(0.0, deadline - time.monotonic()))
+    assert not any(t.is_alive() for t in threads), "a claimer was still running after 120 s"
     assert wins.count(True) == 1 and len(wins) == 16
 
 
@@ -455,6 +458,56 @@ def test_FR_AGT_14_store_a_skipped_slot_can_move_next_due_in_the_same_write(rig:
     assert (got.next_due, got.failures, got.last_error) == (DUE + WEEK, 1, "budget_not_granted")
     assert got.last_slot is None and got.last_world_id is None  # nothing ran
     assert rig.store.claim("sched_a", DUE) is False  # the old slot is gone
+
+
+def test_FR_AGT_14e_store_record_refusal_sets_only_last_error(rig: StoreRig) -> None:
+    """FR-AGT-14e (BQ-AGT14-5 R3): a permanent refusal of a delivered task is recorded as a fixed code and nothing else:
+    not a failure (no count, no backoff, no disabling), the slot and the claim are untouched."""
+    rig.add(make_record("sched_a"))
+    before = rig.store.read_doc("sched_a")
+    rig.store.record_refusal("sched_a", "budget_not_granted")
+    after = rig.store.read_doc("sched_a")
+    assert after["last_error"] == "budget_not_granted"
+    assert {k: v for k, v in after.items() if k != "last_error"} == {
+        k: v for k, v in before.items() if k != "last_error"
+    }
+    assert (after["failures"], after["backoff_until"], after["enabled"], after["next_due"]) == (0, None, True, DUE)
+    assert _ids(rig.store.due(DUE, 20)) == ["sched_a"]  # still due: a refusal parks nothing
+
+
+def test_FR_AGT_14e_store_record_refusal_leaves_a_held_claim_and_a_slot_that_moved_alone(rig: StoreRig) -> None:
+    rig.add(make_record("sched_a"))
+    assert rig.store.claim("sched_a", DUE)
+    rig.store.record_refusal("sched_a", "owner_mismatch")
+    assert rig.store.claim("sched_a", DUE) is False  # the claim is still held
+    rig.store.complete("sched_a", DUE, next_due=DUE + WEEK, last_world_id="w_run_1")
+    got = rig.store.get("sched_a")
+    assert (got.next_due, got.last_error) == (DUE + WEEK, None)  # the next completion clears the code, as it clears any
+    rig.store.record_refusal("sched_a", "snapshot_missing")
+    got = rig.store.get("sched_a")
+    assert (got.next_due, got.last_slot, got.last_world_id, got.last_error) == (
+        DUE + WEEK,
+        slot_key("sched_a", DUE),
+        "w_run_1",
+        "snapshot_missing",
+    )
+
+
+@pytest.mark.parametrize("bad_id", ["sched_missing", "", "a/b", "..", "sched_a b", "w_world"])
+def test_FR_AGT_14e_store_record_refusal_for_an_unknown_or_bad_id_is_a_no_op(rig: StoreRig, bad_id: str) -> None:
+    rig.add(make_record("sched_a"))
+    before = rig.store.documents()
+    rig.store.record_refusal(bad_id, "budget_not_granted")  # never raises, never creates a record, never a path
+    assert rig.store.documents() == before
+    assert rig.store.get(bad_id) is None
+
+
+@pytest.mark.parametrize("code", ["Not A Code", "budget not granted", "", "x" * 200, "1abc", "a/b", "café"])
+def test_FR_AGT_14e_store_record_refusal_stores_only_a_fixed_code(rig: StoreRig, code: str) -> None:
+    """Checked like every other fixed code (`record_failure`): free text never lands in `last_error`."""
+    rig.add(make_record("sched_a"))
+    rig.store.record_refusal("sched_a", code)
+    assert rig.store.read_doc("sched_a")["last_error"] == "start_failed"
 
 
 def test_FR_AGT_14_store_backoff_doubles_on_each_failure_and_the_schedule_is_disabled_after_the_limit(

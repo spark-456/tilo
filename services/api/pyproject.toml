@@ -13,6 +13,7 @@ dependencies = [
     "google-auth>=2.30",
     "google-cloud-firestore>=2.20.0",
     "requests>=2.31",
+    "cryptography>=42",
     "tilo-planning",
     "tilo-policy",
     "tilo-harness",
@@ -22,10 +23,12 @@ dependencies = [
     "tilo-archive",
     "tilo-memory",
     "tilo-people",
+    "tilo-logging",
 ]
 
 [tool.uv.sources]
 tilo-archive = { workspace = true }
+tilo-logging = { workspace = true }
 tilo-memory = { workspace = true }
 tilo-people = { workspace = true }
 tilo-planning = { workspace = true }

@@ -15,6 +15,7 @@ from tilo_policy.schemas import conforms
 from tilo_api import deps
 from tilo_api.assistant.config import AssistantConfig
 from tilo_api.people_access import SourceOwners, read_as
+from tilo_api.people_vet import decide_as
 
 _PEOPLE_KINDS = ("work_item", "pinboard_item", "calendar_entry", "meeting", "person")
 _ALLOWED_PEOPLE = ("work_item", "pinboard_item", "calendar_entry", "meeting")
@@ -77,6 +78,21 @@ class RefGate:
                 source_owners=self._owners,
             )
         return self._seen[key]
+
+    def stored(self, ref: Ref, action: str) -> Mapping[str, Any] | None:
+        """FR-PA-10: the work item as stored now, only when `decide` lets the signed-in person do `action` to it."""
+        if ref.kind != "work_item" or not _plain(ref):
+            return None
+        return decide_as(
+            self._people,
+            self._directory,
+            actor=self._user,
+            org_id=self._org,
+            record_id=ref.id,
+            action=action,
+            now=self._now,
+            source_owners=self._owners,
+        )
 
     def allows(self, ref: Ref) -> bool:
         try:

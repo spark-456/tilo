@@ -184,6 +184,9 @@ answer:
     tasks: "Tasks in progress: $n"
     waiting: "Waiting for you: $n"
     truncated: "+"
+  update: # FR-PA-10 (the confirm line of a proposed update); $label: the item's title; $day: its local date, YYYY-MM-DD
+    done: "Mark \"$label\" as done."
+    snooze: "Snooze \"$label\" until $day."
   lines: # one claim per row, by plate reason. $label: the row title; $time: HH:MM in your time zone
     gate: "$label: waiting for your approval"
     consent: "$label: waiting for your consent"
@@ -208,6 +211,10 @@ declines:
   budget: "Today's assistant allowance is used up, so I can only answer common questions until tomorrow (UTC)."
   flagged: "I can't help with that question."
   failed: "I can't read your plate right now. Please try again in a moment."
+  which_item: "Which work item do you mean? Select it, or say its title."
+  which_day: "Which day do you mean? Say a day like tomorrow, monday, oct 12 or in 3 days."
+  update_refused: "I can't change that item. It may be done already, or not yours to change."
+  snooze_range: "I can only snooze until a day that is later than now and within the next 30 days."
 
 model: # the fallback (FR-PA-14, FR-PA-19); never asked when a rule matched
   role: assistant
