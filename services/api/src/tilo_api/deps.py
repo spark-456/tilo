@@ -40,7 +40,7 @@ from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.interfaces import SafetyProvider
-from tilo_providers.router import Router
+from tilo_providers.router import Router, RouterExhaustedError
 from tilo_providers.safety import build_safety_provider
 
 from tilo_api import events, spend
@@ -484,6 +484,30 @@ REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; f
 class ReplayOnly(Exception):
     """NFR-24: the answer is 503 with `replay_only: true` beside the text (tilo_api.app's handler), the labelled
     replay offer."""
+
+
+MODEL_UNAVAILABLE_MESSAGE = (
+    "The model is unavailable right now (quota or outage), so nothing new was started; finished runs can still be "
+    "replayed."
+)
+_UNAVAILABLE = frozenset({"QuotaError", "RetryableError"})  # PL-02: 429 and 5xx/timeouts, not a bad reply
+
+
+class ModelUnavailable(Exception):
+    """NFR-22: every model candidate failed on quota or availability. Answered like NFR-24's refusal (503,
+    `replay_only: true`, a detail that says replay), for this request only: the `replay_only` flag is not set."""
+
+
+def raise_if_model_unavailable(error: BaseException) -> None:
+    """NFR-22 (PRD 17.2): a planning error whose cause is the router running out of candidates, every attempt on
+    quota or availability, becomes ModelUnavailable. A reply the model did send but got wrong stays the caller's."""
+    cause = error.__cause__
+    if (
+        isinstance(cause, RouterExhaustedError)
+        and cause.attempts
+        and all(a.error_type in _UNAVAILABLE for a in cause.attempts)
+    ):
+        raise ModelUnavailable from error
 
 
 def get_flag_store() -> FlagStore:

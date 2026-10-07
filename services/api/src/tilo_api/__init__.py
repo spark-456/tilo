@@ -44,6 +44,14 @@ def _replay_only(_: Request, __: Exception) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": _deps.REPLAY_ONLY_MESSAGE, "replay_only": True})
 
 
+@app.exception_handler(_deps.ModelUnavailable)
+def _model_unavailable(_: Request, __: Exception) -> JSONResponse:  # NFR-22: the same labelled replay offer
+    return JSONResponse(
+        status_code=503,
+        content={"detail": _deps.MODEL_UNAVAILABLE_MESSAGE, "replay_only": True, "code": "model_unavailable"},
+    )
+
+
 @app.exception_handler(_spend.SpendCapReached)
 def _spend_cap_reached(_: Request, __: Exception) -> JSONResponse:  # SEC-16: new live work over the uid's cap
     return JSONResponse(status_code=403, content={"detail": _spend.CAP_REACHED, "code": "spend_cap_reached"})

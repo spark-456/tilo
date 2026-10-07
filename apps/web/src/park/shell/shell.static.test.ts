@@ -1,7 +1,7 @@
 // WEB-3b static checks over apps/web/src/park/shell (plan sections 6, 8d, 10; root CLAUDE.md):
 // - AppShell.tsx and park.shell.css exist, AppShell loads the stylesheet, ParkApp renders AppShell;
-// - the honesty scan finds nothing and its ALLOWLIST is unchanged (the allowlist edit comes with the motion
-//   restore, BQ-WEB-3); no transition / animation / keyframes / rAF / interval, and no timer of the shell's
+// - the honesty scan finds nothing beyond the city's allowlisted entries (WEB-MOTION-1: ambient cars and
+//   walkers, BQ-WEB-3); no transition / animation / rAF / interval in the shell's code, and no timer of the shell's
 //   own: the loader runs on the store's injected scheduler;
 // - no window globals, any, ts-ignore, raw HTML, model ids or support.js;
 // - only router.ts touches window.location under park/ (the WEB-3a rule);
@@ -64,24 +64,36 @@ describe("WEB_3b_static: the shell exists and is wired", () => {
   });
 });
 
-describe("WEB_3b_static: honesty (HR-1..HR-7; the scan and its allowlist are untouched)", () => {
-  it("WEB_3b_static_ALLOWLIST_is_unchanged", () => {
+describe("WEB_3b_static: honesty (HR-1..HR-7; the scan and its allowlist, WEB-MOTION-1 edit)", () => {
+  it("WEB_3b_static_ALLOWLIST_has_only_the_two_choreographer_clocks_and_the_city_layer_entries", () => {
+    // WEB-MOTION-1 added the city's ambient entries (engines/park.ts and shell/park.shell.css only).
     expect(ALLOWLIST.map((e) => `${e.file}:${e.rule}`)).toEqual([
       "src/world/runWorld.ts:raf",
       "src/stage/Stage.tsx:raf",
+      "src/park/engines/park.ts:inline-motion-style",
+      "src/park/engines/park.ts:css-animation",
+      "src/park/shell/park.shell.css:css-keyframes",
+      "src/park/shell/park.shell.css:css-animation",
     ]);
   });
 
-  it("WEB_3b_static_the_honesty_scan_finds_nothing_in_park_shell", () => {
+  it("WEB_3b_static_the_honesty_scan_finds_nothing_in_park_shell_but_the_allowlisted_city_css", () => {
     expect(sources.length).toBeGreaterThanOrEqual(2);
-    const hits = sources.flatMap((p) => scanSource(`src/park/shell/${shellRel(p)}`, text(p)));
+    const hits = sources
+      .flatMap((p) => scanSource(`src/park/shell/${shellRel(p)}`, text(p)))
+      .filter((v) => !ALLOWLIST.some((a) => a.file === v.file && a.rule === v.rule));
     expect(hits.map((v) => `${v.file}:${v.line} ${v.rule}`)).toEqual([]);
   });
 
   it("WEB_3b_static_no_transition_animation_keyframes_raf_or_animate_call", () => {
+    // The shell's code starts no animation; only park.shell.css holds the city's keyframes and pause rule.
     const banned =
       /\btransition\b|\banimation\b|@keyframes|requestAnimationFrame|cancelAnimationFrame|\.animate\s*\(/;
-    expect(sources.filter((p) => banned.test(code(p))).map(shellRel)).toEqual([]);
+    expect(ts.filter((p) => banned.test(code(p))).map(shellRel)).toEqual([]);
+    const cssBanned = /\btransition\b|requestAnimationFrame|\.animate\s*\(/;
+    expect(
+      sources.filter((p) => p.endsWith(".css") && cssBanned.test(code(p))).map(shellRel),
+    ).toEqual([]);
   });
 
   it("WEB_3b_static_the_shell_starts_no_timer_of_its_own", () => {
