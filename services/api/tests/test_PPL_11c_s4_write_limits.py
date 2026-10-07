@@ -681,3 +681,100 @@ def test_PPL_11c_s4_SEC_10_the_429_pin_catches_a_limiter_that_counts_its_refusal
 
     monkeypatch.setattr(people_limits.Limits, "attempt", counting_mutant)
     assert _sixty_writes_then_429s_then_a_late_write(work_rig(people_rig)) == 429
+
+
+# --- #553 fix pass: principal slots, LRU order, in-flight principals --------------------------------------------------
+
+
+def _shrink_principal_bound(monkeypatch, n: int) -> None:
+    from tilo_api import people_limits
+
+    # both names (the bound on principals with keys was `_MAX_PRINCIPALS` before it got its own constant)
+    for name in ("_MAX_KEY_PRINCIPALS", "_MAX_PRINCIPALS"):
+        monkeypatch.setattr(people_limits, name, n, raising=False)
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_strangers_refused_keyed_creates_take_no_principal_slot(people_rig, monkeypatch):
+    """With room for 3 principals' keys: six non-members each send one keyed create (403). None of them keeps a key or
+    a principal slot, so the victim's retry is a byte-identical replay and nothing is created."""
+    _shrink_principal_bound(monkeypatch, 3)
+    rig = work_rig(people_rig)
+    first = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+    assert first.status_code == 201
+    for n in range(6):
+        rig.as_user(f"u_stranger_{n}")
+        assert _create_item(rig, f"stranger-{n}") == 403, n
+    rig.as_user(PRIYA)
+    snapshot = rig.snapshot()
+    again = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+    assert again.status_code == 201 and again.content == first.content, "the first answer, not a second record"
+    assert rig.snapshot() == snapshot
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_a_key_past_the_bound_is_forgotten_oldest_first_and_a_replay_refreshes_the_order(
+    people_rig, monkeypatch
+):
+    _shrink_key_bound(monkeypatch, 3)
+    rig = work_rig(people_rig)
+
+    def create(key: str) -> str:
+        response = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers={"Idempotency-Key": key})
+        assert response.status_code == 201
+        return response.json()["id"]
+
+    ids = [create(f"k-{n}") for n in range(3)]
+    assert create("k-0") == ids[0], "a replay, and it makes k-0 the most recently used"
+    assert create("k-3") not in ids  # a fourth key: k-1 is now the oldest and goes
+    assert create("k-0") == ids[0], "kept: the replay refreshed it"
+    assert create("k-2") == ids[2]
+    assert create("k-1") != ids[1], "forgotten: its replay is a new record"
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_the_oldest_key_past_the_bound_is_forgotten(people_rig, monkeypatch):
+    _shrink_key_bound(monkeypatch, 3)
+    rig = work_rig(people_rig)
+    ids = [
+        rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers={"Idempotency-Key": f"k-{n}"}).json()["id"]
+        for n in range(4)
+    ]
+    first_again = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers={"Idempotency-Key": "k-0"})
+    assert first_again.json()["id"] not in ids, "k-0 was the oldest of four: its bound is three"
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_a_principal_with_a_create_in_flight_survives_principal_level_eviction(monkeypatch):
+    import threading
+    import time
+
+    from pydantic import BaseModel
+    from tilo_api.people_limits import Limits
+
+    class Body(BaseModel):
+        n: int = 1
+
+    _shrink_principal_bound(monkeypatch, 2)
+    limits, started, release = Limits(), threading.Event(), threading.Event()
+    calls: list[str] = []
+    results: list[dict] = []
+
+    def slow() -> dict:
+        calls.append("first")
+        started.set()
+        release.wait(5)
+        return {"id": "one"}
+
+    def duplicate() -> dict:
+        calls.append("duplicate")
+        return {"id": "two"}
+
+    first = threading.Thread(target=lambda: results.append(limits.once("a", "/r", "k", Body(), slow)))
+    first.start()
+    assert started.wait(5)
+    for other in ("b", "c", "d", "e"):  # more principals with stored answers than there is room for
+        limits.once(other, "/r", "k", Body(), lambda: {"id": "x"})
+    retry = threading.Thread(target=lambda: results.append(limits.once("a", "/r", "k", Body(), duplicate)))
+    retry.start()
+    time.sleep(0.2)
+    release.set()
+    first.join(5)
+    retry.join(5)
+    assert calls == ["first"] and results == [{"id": "one"}, {"id": "one"}], (calls, results)

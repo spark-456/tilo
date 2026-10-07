@@ -4,7 +4,9 @@
   read (a refused attempt, a 413 and a replay count; a read does not). The 61st is a 429 with `Retry-After`.
 * `idempotent`: an optional `Idempotency-Key` on a create; the same principal, route, key and body again is the first
   answer, with nothing created twice; another body is a 422; a create that failed leaves the key free and takes no
-  slot. Keys are bounded per principal, so no caller can push out another's.
+  slot. Keys are bounded: 16 per principal (its own least recently used goes first, so one caller cannot push out
+  another's) and 512 principals, 8,192 stored answers in all. Only principals with a stored answer take a slot; if 512
+  or more principals have created something, the least recently used idle principal's keys are forgotten.
 * `NoStore`: every `/v1/` answer is `Cache-Control: no-store`, the SEC-15 gate's 403 and a validation 422 included.
 
 Counters and keys live in a `Limits` that belongs to one install's `PeopleStores` (never to the module), keyed by the
@@ -35,8 +37,9 @@ from tilo_api.people_writes import Refusal
 
 WRITES_PER_MINUTE = 60  # BQ-PPL11C-2 (SEC-10 gives no number)
 _KEY = re.compile(r"[A-Za-z0-9_-]{1,64}")
-_MAX_KEYS_PER_PRINCIPAL = 128  # a principal's least recently used key is forgotten first, and only by that principal
-_MAX_PRINCIPALS = 1_024  # also the most principals whose keys are kept (the idle, least recently used go first)
+_MAX_KEYS_PER_PRINCIPAL = 16  # a principal's least recently used key is forgotten first, by that principal only
+_MAX_KEY_PRINCIPALS = 512  # 16 * 512 = 8,192 stored answers at most; past it the idle, least recently used go first
+_MAX_PRINCIPALS = 1_024  # rate-limit counters kept before idle ones are dropped
 
 
 class _Entry:
@@ -78,7 +81,6 @@ class Limits:
             entry = mine.setdefault((route, key), _Entry())
             mine.move_to_end((route, key))
             entry.holders += 1
-            self._evict(user_id)
         try:
             with entry.lock:
                 if entry.answer is not None:
@@ -91,22 +93,27 @@ class Limits:
         finally:
             with self._lock:
                 entry.holders -= 1
-                if entry.answer is None and entry.holders == 0:  # nothing was created: the attempt takes no slot
-                    held = self._keys.get(user_id)
-                    if held is not None and held.get((route, key)) is entry:
+                held = self._keys.get(user_id)
+                if entry.answer is None and entry.holders == 0 and held is not None:
+                    if held.get((route, key)) is entry:  # nothing was created: no key, and no principal slot
                         del held[(route, key)]
+                    if not held:
+                        del self._keys[user_id]
+                elif entry.answer is not None:
+                    self._evict(user_id)  # only a stored answer can push anything out
 
     def _evict(self, user_id: str) -> None:
-        """Bounds the keys; a principal can only push out its own keys, and never an entry someone is inside of."""
-        mine = self._keys[user_id]
-        for k in [k for k, e in mine.items() if e.holders == 0]:
-            if len(mine) <= _MAX_KEYS_PER_PRINCIPAL:
-                break
-            del mine[k]
-        for u in [u for u, m in self._keys.items() if u != user_id and not any(e.holders for e in m.values())]:
-            if len(self._keys) <= _MAX_PRINCIPALS:
-                break
-            del self._keys[u]
+        """Bounds the keys after `user_id` stored one: its own least recently used first, then idle principals."""
+        mine = self._keys.get(user_id)
+        if mine is not None and len(mine) > _MAX_KEYS_PER_PRINCIPAL:
+            for k in [k for k, e in mine.items() if e.holders == 0][: len(mine) - _MAX_KEYS_PER_PRINCIPAL]:
+                del mine[k]
+        if len(self._keys) > _MAX_KEY_PRINCIPALS:
+            for u, m in list(self._keys.items()):
+                if len(self._keys) <= _MAX_KEY_PRINCIPALS:
+                    break
+                if u != user_id and not any(e.holders for e in m.values()):
+                    del self._keys[u]
 
 
 _LIMITS: dict[int, Limits] = {}
