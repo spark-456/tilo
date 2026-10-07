@@ -28,7 +28,7 @@ from tilo_providers.speech import SpeechConfig, build_speech_provider
 
 LIMITS = RecordingLimits(max_bytes=1_000_000, max_duration_ms=7_200_000)
 CONFIG = SpeechConfig(
-    vendor="google", profile_id="gemini-audio", model="m", max_bytes=1_000_000, max_duration_ms=7_200_000
+    vendor="google", profile_id="google-audio", model="m", max_bytes=1_000_000, max_duration_ms=7_200_000
 )
 
 

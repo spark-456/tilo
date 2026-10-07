@@ -1,0 +1,14 @@
+# Speech-to-text for uploaded meeting recordings (FR-MTG-17) and the other speech paths (FR-MTG-11): the vendor and
+# model are config, Google only (D-1: Gemini audio on Agent Platform; `fake` is the dev vendor). Read by
+# tilo_providers.speech.load_speech_config; a vendor other than google or fake, a denylisted model id (the rules.deny
+# list in config/models.yaml, PL-07) or a non-positive cap fails start-up loudly. Model ids appear only here and in
+# packages/providers (PL-01). Dev and CI replay a recording (EFF-01); a live call needs LIVE=1, which only the user sets.
+speech:
+  vendor: google
+  profile: google-audio
+  model: gemini-3.7-flash
+  # Caps for one upload, enforced before any request is sent (fails closed). 15 MiB (about 16 minutes of 128 kbit/s
+  # audio) stays under the believed 20 MB inline request limit, BQ-MTG17-2; the duration cap is the transcript's last
+  # utterance offset (2 hours).
+  max_bytes: 15728640
+  max_duration_ms: 7200000

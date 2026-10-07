@@ -33,7 +33,7 @@ SEGMENTS = [
     {"speaker": "Speaker 2", "start_ms": 900, "text": "Hi."},
 ]
 CONFIG = SpeechConfig(
-    vendor="google", profile_id="gemini-audio", model="speech-model-x", max_bytes=10_000, max_duration_ms=60_000
+    vendor="google", profile_id="google-audio", model="speech-model-x", max_bytes=10_000, max_duration_ms=60_000
 )
 
 
@@ -46,7 +46,7 @@ def _clean_env(monkeypatch):
 def write_speech_yaml(tmp_path: pathlib.Path, **overrides: Any) -> pathlib.Path:
     speech = {
         "vendor": "google",
-        "profile": "gemini-audio",
+        "profile": "google-audio",
         "model": "speech-model-x",
         "max_bytes": 1000,
         "max_duration_ms": 5000,
@@ -119,21 +119,21 @@ def test_FR_MTG_17_factory_builds_fake_or_replay_and_refuses_any_other_vendor(tm
 
 def test_FR_MTG_17_replay_miss_names_the_key_and_never_goes_live(tmp_path):
     provider = build_speech_provider(CONFIG, fixtures_dir=tmp_path)
-    with pytest.raises(ReplayMissError, match=speech_recording_key("gemini-audio", AUDIO, "audio/mpeg", None)):
+    with pytest.raises(ReplayMissError, match=speech_recording_key("google-audio", AUDIO, "audio/mpeg", None)):
         provider.transcribe(AUDIO, media_type="audio/mpeg")  # the socket guard would fail any real call
 
 
 def test_FR_MTG_17_record_then_replay_round_trip_keeps_audio_and_secrets_out_of_the_recording(tmp_path, monkeypatch):
     # The fake refuses to be built in live mode, so build it first and switch live mode on for the call only.
     live = FakeSpeechProvider(segments=[{**SEGMENTS[0], "text": "Authorization: Bearer abc.def-ghi"}, SEGMENTS[1]])
-    provider = SpeechRecordReplayProvider("gemini-audio", lambda: live, tmp_path, max_bytes=10_000)
+    provider = SpeechRecordReplayProvider("google-audio", lambda: live, tmp_path, max_bytes=10_000)
     monkeypatch.setenv("LIVE", "1")
     monkeypatch.setenv("TILO_RECORD", "1")
     provider.transcribe(AUDIO, media_type="audio/mpeg")
     monkeypatch.delenv("LIVE")
     monkeypatch.delenv("TILO_RECORD")
     (file,) = (tmp_path / "speech-recordings").glob("*.json")
-    assert file.stem == speech_recording_key("gemini-audio", AUDIO, "audio/mpeg", None)
+    assert file.stem == speech_recording_key("google-audio", AUDIO, "audio/mpeg", None)
     text = file.read_text(encoding="utf-8")
     assert "abc.def-ghi" not in text and AUDIO.decode() not in text
     replayed = provider.transcribe(AUDIO, media_type="audio/mpeg")  # replay: the live provider is not touched
@@ -153,8 +153,8 @@ def test_FR_MTG_17_recording_key_depends_on_profile_audio_media_type_and_languag
 
 
 def test_FR_MTG_17_replay_fails_closed_on_a_corrupt_or_malformed_recording(tmp_path):
-    provider = SpeechRecordReplayProvider("gemini-audio", lambda: FakeSpeechProvider(), tmp_path, max_bytes=10_000)
-    path = tmp_path / "speech-recordings" / f"{speech_recording_key('gemini-audio', AUDIO, 'audio/mpeg', None)}.json"
+    provider = SpeechRecordReplayProvider("google-audio", lambda: FakeSpeechProvider(), tmp_path, max_bytes=10_000)
+    path = tmp_path / "speech-recordings" / f"{speech_recording_key('google-audio', AUDIO, 'audio/mpeg', None)}.json"
     path.parent.mkdir(parents=True)
     for body in ("{not json", "[]", json.dumps({"result": {"segments": [{"text": "x"}]}}), json.dumps({"nope": 1})):
         path.write_text(body, encoding="utf-8")
@@ -241,7 +241,7 @@ def test_FR_MTG_17_google_adapter_needs_a_media_type_and_audio(fake_genai_sdk):
 def test_FR_MTG_17_the_transcribe_prompt_is_a_template_not_a_string_in_code():
     from tilo_providers.prompts import load_prompt
 
-    assert "transcribe" in load_prompt("speech", "transcribe.md").lower()
+    assert "Language of the recording: en-GB" in load_prompt("speech", "transcribe.md", {"language": "en-GB"})
     code = (REPO / "packages/providers/src/tilo_providers/google_speech_adapter.py").read_text(encoding="utf-8")
     assert "load_prompt(" in code
 
