@@ -513,6 +513,14 @@ class TasksError(RuntimeError):
     """Cloud Tasks refused an enqueue. Carries the status only: never the request, the response or a credential."""
 
 
+class TasksUnavailable(TasksError):
+    """A refusal that is the service's, not one schedule's (401, 403, 404: wrong caller, missing actAs, no queue): the
+    fan-out records nothing against any schedule for it."""
+
+
+_SERVICE_WIDE = frozenset({401, 403, 404})
+
+
 def _error_status(response: Any) -> str | None:
     """The google.rpc status name of an error answer ("ALREADY_EXISTS"), or None; never raises, never the text."""
     try:
@@ -538,12 +546,15 @@ class CloudTasksRestClient:
 
     def enqueue(self, task: Mapping[str, Any]) -> None | AlreadyExists:
         queue = str(task["name"]).rpartition("/tasks/")[0]
-        response = self._session.post(f"{TASKS_API}/{queue}/tasks", json={"task": dict(task)}, timeout=self._timeout_s)
+        response = self._session.post(
+            f"{TASKS_API}/{queue}/tasks", json={"task": dict(task)}, timeout=self._timeout_s,
+            max_allowed_time=self._timeout_s,
+        )  # fmt: skip
         status = response.status_code
         if status == 409 and _error_status(response) == "ALREADY_EXISTS":  # ABORTED is a 409 too: that one is a failure
             return AlreadyExists()
         if not 200 <= status < 300:
-            raise TasksError(f"cloud tasks answered {status}")
+            raise (TasksUnavailable if status in _SERVICE_WIDE else TasksError)(f"cloud tasks answered {status}")
         return None
 
 
@@ -579,7 +590,10 @@ class TaskEnqueuer:
                 "oidcToken": {"serviceAccountEmail": self._caller, "audience": self._audience},
             },
         }  # no retry config (the queue owns it) and no Authorization header (the OIDC token is Cloud Tasks' own)
-        self._client.enqueue(task)  # None or AlreadyExists: handed over either way
+        try:
+            self._client.enqueue(task)  # None or AlreadyExists: handed over either way
+        except TasksUnavailable as exc:  # the whole service's setting: no schedule is to blame, nothing is recorded
+            raise StartSkipped("tasks_unavailable", count=False) from exc
         return world_id
 
 

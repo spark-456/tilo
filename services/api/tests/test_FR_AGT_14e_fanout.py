@@ -252,6 +252,40 @@ def test_FR_AGT_14e_one_failing_enqueue_does_not_stop_the_others(sched: SchedApi
     assert (failed.next_due, failed.failures) == (MON_0330Z, 1)
 
 
+def test_FR_AGT_14e_a_service_wide_tasks_failure_counts_against_no_schedule(sched: SchedApi) -> None:
+    """A 401/403/404 from Cloud Tasks (wrong caller, missing actAs, no queue) is the service's, not any schedule's:
+    the claim is released and nothing is recorded, so eight ticks do not disable every schedule."""
+    from tilo_api import schedules
+
+    due_schedules(sched, "sched_a", "sched_b")
+    sched.tasks.error = schedules.TasksUnavailable("cloud tasks answered 403")
+    for minute in range(10):
+        sched.clock.set(MON_0330Z + timedelta(minutes=minute))
+        assert sched.tick().json() == {"fired": 0}
+    for schedule_id in ("sched_a", "sched_b"):
+        record = sched.schedules.get(schedule_id)
+        assert (record.enabled, record.failures, record.next_due, record.last_error, record.backoff_until) == (
+            True, 0, MON_0330Z, None, None,
+        )  # fmt: skip
+    sched.tasks.error = None  # the user fixes the setting
+    sched.clock.set(MON_0330Z + timedelta(minutes=11))
+    assert sched.tick().json() == {"fired": 2}  # the same slots, at once: no backoff was recorded
+    assert sched.schedules.get("sched_a").next_due == MON_0330Z + WEEK
+
+
+def test_FR_AGT_14e_only_a_service_wide_status_is_a_tasks_unavailable(sched: SchedApi) -> None:
+    from tilo_api import schedules
+
+    task = _rest_task(sched)
+    for status in (401, 403, 404):
+        with pytest.raises(schedules.TasksUnavailable):
+            schedules.CloudTasksRestClient(session=FakeSession(status)).enqueue(task)
+    for status in (400, 429, 500, 503):  # a schedule-level or transient failure keeps counting
+        with pytest.raises(schedules.TasksError) as raised:
+            schedules.CloudTasksRestClient(session=FakeSession(status)).enqueue(task)
+        assert not isinstance(raised.value, schedules.TasksUnavailable)
+
+
 def test_FR_AGT_14e_already_exists_counts_as_success(sched: SchedApi) -> None:
     """Cloud Tasks answers ALREADY_EXISTS for a name used within its reuse window (a retried tick whose first attempt
     did enqueue): the slot was handed over, so it completes and nothing is counted against the schedule."""
@@ -432,7 +466,7 @@ class FakeSession:
     def __init__(self, status: int, error_status: str | None = None) -> None:
         self.status, self.error_status, self.posts = status, error_status, []
 
-    def post(self, url: str, *, json: Any = None, timeout: Any = None) -> Any:
+    def post(self, url: str, *, json: Any = None, timeout: Any = None, max_allowed_time: Any = None) -> Any:
         from types import SimpleNamespace
 
         def body() -> Any:
@@ -441,6 +475,7 @@ class FakeSession:
             return {"error": {"code": self.status, "status": self.error_status, "message": "token s3cret-value"}}
 
         self.posts.append((url, json, timeout))
+        self.max_allowed_time = max_allowed_time
         return SimpleNamespace(status_code=self.status, text="provider says: token s3cret-value is bad", json=body)
 
 
@@ -460,6 +495,7 @@ def test_FR_AGT_14e_the_rest_client_posts_the_task_to_its_queue_with_a_short_tim
     ((url, sent, timeout),) = session.posts
     assert url == f"https://cloudtasks.googleapis.com/v2/{QUEUE}/tasks" and sent == {"task": task}
     assert timeout == schedules.TASKS_TIMEOUT_S == 10.0
+    assert session.max_allowed_time == timeout  # the whole call, a credential refresh included, is bounded too
 
 
 def test_FR_AGT_14e_the_rest_client_maps_only_already_exists_to_already_exists_and_raises_on_anything_else(
