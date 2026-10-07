@@ -38,7 +38,6 @@ from _ppl11a_lib import (
 SLICE_PENDING: tuple[str, ...] = (
     "test_PPL_11c_s1_",  # work items: list, get, edit, done, snooze, reopen, not-mine
     "test_PPL_11c_s1b_",  # work items: put back
-    "test_PPL_11c_s2a_",  # meetings: delete drops derived data; confirm refuses a gone source; quote owner match
     "test_PPL_11c_s2b_",  # meetings: get, edit, the minutes read
     "test_PPL_11c_s3_",  # directory: first person, email rules, memberships, roles
     "test_PPL_11c_s4_",  # limits: body cap, idempotency key, rate cap, no whole-org listing, no-store, dev CORS
