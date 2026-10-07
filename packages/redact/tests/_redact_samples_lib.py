@@ -41,7 +41,8 @@ def luhn_complete(body: str) -> str:
 def card_number(tail: str, spaced: str = "") -> tuple[str, str]:
     """(shown, digits): a Luhn-valid number of 13 to 19 digits from `tail`, shown plain or in groups of four."""
     size = 13 + ord(tail[-1]) % 7
-    body = str(1 + ord(tail[0]) % 9) + "".join(str(ord(c) % 10) for c in tail[1 : size - 1])
+    # Leading digit 2..9: no real card starts with 1 (BQ-FRMEM05-1 keeps a 13-digit epoch-ms run, which starts with 1).
+    body = str(2 + ord(tail[0]) % 8) + "".join(str(ord(c) % 10) for c in tail[1 : size - 1])
     digits = luhn_complete(body)
     return (spaced.join(digits[i : i + 4] for i in range(0, size, 4)) if spaced else digits), digits
 
