@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // FR-SET-04 page behaviour: per-session sign out has an accessible name with the device, and the bulk
 // action asks for an in-page confirmation first. Sample data only; nothing is sent anywhere.
+import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { makeApp } from "../../../../test-support/park/profileApp";
 import { SESSIONS } from "../../../../test-support/park/profileExpect";
@@ -66,5 +67,49 @@ describe("FR_SET_04 security sessions", () => {
     );
     await clickAndSettle(buttonNamed(root, EVERYWHERE));
     expect(root.querySelector('[aria-label="Confirm sign out of other sessions"]')).toBeNull();
+  });
+});
+
+const BOX = '[aria-label="Confirm sign out of other sessions"]';
+const escape = async (from: Element): Promise<void> => {
+  await act(async () => {
+    from.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  });
+};
+
+describe("FR_SET_04 keyboard focus", () => {
+  it("FR_SET_04_focus_moves_into_the_confirmation_escape_closes_and_focus_returns_to_the_trigger", async () => {
+    const { root } = await renderProfile(makeApp());
+    await openTab(root, "Security");
+    const trigger = buttonNamed(root, EVERYWHERE);
+    await clickAndSettle(trigger);
+    const box = root.querySelector(BOX) as HTMLElement;
+    expect(box.getAttribute("role")).toBe("alertdialog");
+    expect(box.contains(document.activeElement)).toBe(true);
+    await escape(document.activeElement as Element);
+    expect(root.querySelector(BOX)).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("FR_SET_04_cancel_and_confirm_leave_focus_on_the_trigger_not_the_body", async () => {
+    const { root } = await renderProfile(makeApp());
+    await openTab(root, "Security");
+    const trigger = buttonNamed(root, EVERYWHERE);
+    await clickAndSettle(trigger);
+    await clickAndSettle(buttonNamed(region(root, "Confirm sign out of other sessions"), "Cancel"));
+    expect(document.activeElement).toBe(trigger);
+    await clickAndSettle(trigger);
+    await clickAndSettle(buttonNamed(root, "Sign out the other sessions"));
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("FR_SET_04_after_a_single_sign_out_focus_is_not_dropped_to_the_body", async () => {
+    const { root } = await renderProfile(makeApp());
+    await openTab(root, "Security");
+    const b = buttonNamed(root, `Sign out ${SESSIONS[1][0]}`);
+    b.focus();
+    await clickAndSettle(b);
+    expect(document.activeElement).not.toBe(document.body);
+    expect(root.contains(document.activeElement)).toBe(true);
   });
 });
