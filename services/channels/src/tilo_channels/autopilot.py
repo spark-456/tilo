@@ -18,7 +18,7 @@ import copy
 import hashlib
 import logging
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from typing import Any, Protocol
 
 import tilo_policy
@@ -50,6 +50,7 @@ from tilo_channels.drafting import (
     _addresses,
     _base,
 )
+from tilo_channels.participants import Participant, read_participants
 
 __all__ = ["ACTION_TYPE", "Autopilot", "CancelPending", "DraftContext", "Outbox", "Outcome", "Preview", "clean_text"]
 __all__ += ["CardStore", "StopQueue", "t3_content_signal", "DECISION_MAX_AGE_S"]
@@ -73,6 +74,8 @@ class DraftContext:
     instruction: str
     mailbox: str
     mode: str = "reply"
+    # CHN-GATE-E (ADR-0025): filled by `Autopilot._card` from its own reader, never by a caller; never stored or sent
+    participants: tuple[Participant, ...] = ()
 
 
 class AutonomyPolicy(Protocol):
@@ -313,6 +316,9 @@ class Autopilot:
         card_id = _card_id(user_id, context.instruction_id)
         doc = self._cards.get(user_id, card_id)
         if doc is None:  # one atomic record fixes tier, level and entry id before any enqueue; first writer wins
+            context = replace(  # a caller's participants are thrown away (ADR-0025): only this reader names anybody
+                context, participants=read_participants(self._reader, user_id, context.thread_id, context.mailbox)
+            )
             doc = self._decision(user_id, card_id, context, result, instructed)
             if self._cards.create(user_id, card_id, doc):
                 if "approval_requested" in doc:  # once: only the instance whose create won emits the gate
@@ -390,7 +396,8 @@ class Autopilot:
             "references": draft.references if draft else "",
         }
         if ready and draft is not None:
-            modifiers = ["money_or_legal"] if t3_content_signal(draft.body) else []  # hidden characters too
+            vouched = t3_content_signal(draft.body, self._names(context, draft))  # hidden characters too
+            modifiers = ["money_or_legal"] if vouched else []
             modifiers += ["safety_flag"] if self._flagged(user_id, context, result) else []
             modifiers += ["new_recipients"] if self._adds_recipient(user_id, context, draft) else []
             modifiers += ["attachments"] if draft.attachments else []
@@ -421,6 +428,14 @@ class Autopilot:
                 doc["outbox_id"] = ulid(round(self._clock() * 1000))
                 doc["approval_requested"] = requested_part(doc, doc["outbox_id"])
         return doc
+
+    @staticmethod
+    def _names(context: DraftContext, draft: Draft) -> frozenset[str]:
+        """ADR-0025: the name words of the participants that are this draft's own To or Cc and the mailbox, and no one
+        else's, so a name a sender chose only ever goes back to that sender."""
+        mailbox = _address(context.mailbox)
+        wanted = {_base(a) for raw in (*draft.to, *draft.cc, mailbox) if isinstance(raw, str) and (a := _address(raw))}
+        return frozenset(w for p in context.participants if _base(p.address) in wanted for w in p.names)
 
     def _flagged(self, user_id: str, context: DraftContext, result: DraftResult) -> bool:
         """BQ-183: the passed result's flags or those of the draft FR-CHN-10 stored for the instruction, if any."""
