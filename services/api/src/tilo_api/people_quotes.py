@@ -103,7 +103,7 @@ def _quote(meeting_id: str, ref: Mapping[str, Any] | None, uid: str, state: str)
     }
 
 
-def _read(artifacts: ArtifactStore, scope: Scope, ref: Mapping[str, Any]) -> dict[str, Any] | None:
+def read_doc(artifacts: ArtifactStore, scope: Scope, ref: Mapping[str, Any]) -> dict[str, Any] | None:
     """A stored JSON document, or None when the scope holds no such version. A corrupt one raises (the route's 503)."""
     try:
         doc = json.loads(artifacts.read(scope, ref))
@@ -138,7 +138,7 @@ def _answer(
     if world is None or m["status"] != "minuted" or minutes_ref is None:
         return None  # a meeting with no world yields no quote (BQ-273)
     scope = Scope(m["org_id"], world, m["owner"])
-    mins = _read(r.artifacts, scope, minutes_ref)
+    mins = read_doc(r.artifacts, scope, minutes_ref)
     if mins is None or mins["meeting_id"] != m["id"]:
         return None
     ref = {k: mins["transcript"][k] for k in ("artifact_id", "version")}
@@ -159,7 +159,7 @@ def _answer(
     held = wi is not None and (head.doc["screening"] != "clean" or bool(mins["flagged"]))
     utterances: dict[str, Any] = {}
     if not held:
-        tr = _read(r.artifacts, scope, ref)
+        tr = read_doc(r.artifacts, scope, ref)
         if tr is None:
             return gone
         if tr["meeting_id"] != m["id"]:
