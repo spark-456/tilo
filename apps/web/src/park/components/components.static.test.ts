@@ -254,8 +254,8 @@ describe("WEB_2_typecheck: the new files compile with the repo's strict options"
   it(
     "WEB_2_typecheck_components_dev_and_their_tests_have_no_type_errors",
     { timeout: 180_000 },
-    () => {
-      const mine = parkTypeErrors().filter((e) =>
+    async () => {
+      const mine = (await parkTypeErrors()).filter((e) =>
         /^(?:src\/park\/components\/|src\/park\/dev\/|test-support\/park\/components)/.test(e),
       );
       expect(mine).toEqual([]);

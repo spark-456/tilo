@@ -104,6 +104,7 @@ async def intake(
         except BriefExtractionError as exc:
             # A category only: the error text can quote the model's output.
             logger.warning("brief extraction failed: %s", type(exc.__cause__ or exc).__name__)
+            deps.raise_if_model_unavailable(exc)
             raise HTTPException(status_code=502, detail="The Director could not draft a brief.") from exc
         result = await run_in_threadpool(submit_intake, request, safety=safety, store=store)
     except IntakeRejected as exc:
