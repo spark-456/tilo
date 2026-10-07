@@ -22,6 +22,7 @@
 // shipped markup the specs rely on is the shell's own: the nav's `.park-shell__bar` (its first child is the fill),
 // the splash `[aria-label="Loading Tilo"]`, the loader's `[role=status]` with "OPENING" and `.park-shell__lbar`.
 // Tabs are clicked from script (not input), so any layout shift they cause still counts toward CLS.
+// The 4x-CPU long-task test runs against a production build, not the dev server (see the comment on it).
 // Run on a private port, one worker:
 //   TILO_WEB_PORT=5393 pnpm --filter @tilo/web exec playwright test e2e/park-motion-transitions.spec.ts --project=chromium --no-deps --workers=1
 import { type Browser, type Page, expect, test } from "@playwright/test";
@@ -252,7 +253,7 @@ const when = (samples: readonly Sample[], pick: (s: Sample) => boolean): number 
 
 for (const [size, viewport] of SIZES) {
   test.describe(`WEB-MOTION-2 boot at ${size}`, () => {
-    test(`WEB-MOTION-2 e2e: at ${size} the splash shows the logo, "Loading your city" and a bar sliding with tiloSlide 1.1 s while the fonts load; the shell stays hidden and nothing shifts`, async ({
+    test(`FR_UX_12 WEB-MOTION-2 e2e: at ${size} the splash shows the logo, "Loading your city" and a bar sliding with tiloSlide 1.1 s while the fonts load; the shell stays hidden and nothing shifts`, async ({
       browser,
       baseURL,
     }) => {
@@ -321,7 +322,7 @@ for (const [size, viewport] of SIZES) {
       await page.context().close();
     });
 
-    test(`WEB-MOTION-2 e2e: at ${size} once the shell is ready the splash fades over .45 s, is not cut early, and then goes`, async ({
+    test(`FR_UX_12 WEB-MOTION-2 e2e: at ${size} once the shell is ready the splash fades over .45 s, is not cut early, and then goes`, async ({
       browser,
       baseURL,
     }) => {
@@ -405,7 +406,7 @@ test("WEB-MOTION-2 e2e: after the splash has gone the page bundles of the other 
   await page.context().close();
 });
 
-test("WEB-MOTION-2 e2e: with reduced motion the splash draws its bar at rest (nothing runs) and goes the moment the shell is ready, with no fade", async ({
+test("FR_UX_12 WEB-MOTION-2 e2e: with reduced motion the splash draws its bar at rest (nothing runs) and goes the moment the shell is ready, with no fade", async ({
   browser,
   baseURL,
 }) => {
@@ -532,7 +533,7 @@ function expectPageChange(data: ProbeData, at: string): { swapAt: number } {
 
 for (const [size, viewport] of SIZES) {
   test.describe(`WEB-MOTION-2 page change at ${size}`, () => {
-    test(`WEB-MOTION-2 e2e: at ${size} a tab click from Home fades the old page out in 200 ms, swaps, and brings the new one in (.24 s opacity, .38 s transform); the bar steps to 100% and goes; CLS 0; nothing runs afterwards`, async ({
+    test(`FR_UX_12 WEB-MOTION-2 e2e: at ${size} a tab click from Home fades the old page out in 200 ms, swaps, and brings the new one in (.24 s opacity, .38 s transform); the bar steps to 100% and goes; CLS 0; nothing runs afterwards`, async ({
       browser,
       baseURL,
     }) => {
@@ -554,7 +555,7 @@ for (const [size, viewport] of SIZES) {
       await page.context().close();
     });
 
-    test(`WEB-MOTION-2 e2e: at ${size} a tab click between two inner pages does the same, scrolls to the top at the swap (not before), and runs no requestAnimationFrame loop`, async ({
+    test(`FR_UX_12 WEB-MOTION-2 e2e: at ${size} a tab click between two inner pages does the same, scrolls to the top at the swap (not before), and runs no requestAnimationFrame loop`, async ({
       browser,
       baseURL,
     }) => {
@@ -648,7 +649,7 @@ test("WEB-MOTION-2 e2e: a settled page shows no motion of its own (nothing pulse
   await page.context().close();
 });
 
-test("WEB-MOTION-2 e2e: with prefers-reduced-motion a tab click swaps the page at once and starts no animation or transition anywhere", async ({
+test("FR_UX_12 WEB-MOTION-2 e2e: with prefers-reduced-motion a tab click swaps the page at once and starts no animation or transition anywhere", async ({
   browser,
   baseURL,
 }) => {
@@ -678,7 +679,7 @@ test("WEB-MOTION-2 e2e: with prefers-reduced-motion a tab click swaps the page a
   await page.context().close();
 });
 
-test("WEB-MOTION-2 e2e: with the 'still' motion preference (Profile > Appearance) a tab click is instant and starts no animation or transition", async ({
+test("FR_UX_12 WEB-MOTION-2 e2e: with the 'still' motion preference (Profile > Appearance) a tab click is instant and starts no animation or transition", async ({
   browser,
   baseURL,
 }) => {
@@ -706,37 +707,89 @@ test("WEB-MOTION-2 e2e: with the 'still' motion preference (Profile > Appearance
   await page.context().close();
 });
 
-test("WEB-MOTION-2 e2e: at 390x844 with the CPU slowed 4x, no long task over 50 ms while pages change (Home, Ledger, Agenda, Team, Skills, Home)", async ({
+// CHANGED ON THE SUPERVISOR'S RULING (the user's standing delegation, 7 Oct 2026; docs/open-questions.md BQ-WEB-MOTION-2b):
+// this budget was "no long task over 50 ms" on the dev server. The 50 ms bar was the test-writer's, not a PRD
+// requirement, and on a dev build (unminified React, dev warnings) with browser-extension scripts on the page it
+// could not be met. It now runs against a PRODUCTION build (`vite build` then `vite preview`, see the header) with
+// Long Animation Frame attribution: a task over 150 ms counts unless every script of the frame that holds it comes
+// from a browser extension, named exactly (chrome-extension:// or edge-extension://; page scripts are never
+// ignored). Every page mount and page change is in the tour. To be tightened to 100 ms after the phone pass (f).
+// Run: vite build --outDir <dir> then vite preview --outDir <dir> --port 5393, and
+//   TILO_WEB_PORT=5393 pnpm --filter @tilo/web exec playwright test e2e/park-motion-transitions.spec.ts -g "long task" ...
+const LONG_TASK_BUDGET_MS = 150;
+const EXTENSION_SCHEMES = ["chrome-extension://", "edge-extension://"] as const;
+
+test("WEB-MOTION-2 e2e: at 390x844 with the CPU slowed 4x, no task over 150 ms (extension scripts aside) while every page mounts and changes (Home, Ledger, Agenda, Team, Skills, Worlds, Profile, Connectors, a world, Home)", async ({
   browser,
   baseURL,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const page = await settled(browser, baseURL, "home", { viewport: MOBILE, probe: false });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
   await page.waitForTimeout(500);
-  const supported = await page.evaluate(() =>
-    PerformanceObserver.supportedEntryTypes.includes("longtask"),
-  );
-  expect(supported, "the browser must report long tasks").toBe(true);
+  const supported = await page.evaluate(() => ({
+    longtask: PerformanceObserver.supportedEntryTypes.includes("longtask"),
+    loaf: PerformanceObserver.supportedEntryTypes.includes("long-animation-frame"),
+  }));
+  expect(supported.longtask, "the browser must report long tasks").toBe(true);
+  expect(supported.loaf, "the browser must report long animation frames (attribution)").toBe(true);
   await page.evaluate(() => {
-    const seen: number[] = [];
-    Reflect.set(window, "__long", seen);
+    const tasks: { start: number; end: number; step: string }[] = [];
+    const frames: { start: number; end: number; scripts: string[] }[] = [];
+    Reflect.set(window, "__tasks", tasks);
+    Reflect.set(window, "__frames", frames);
+    Reflect.set(window, "__step", "");
+    const step = () => String(Reflect.get(window, "__step"));
     new PerformanceObserver((list) => {
-      for (const e of list.getEntries()) seen.push(e.duration);
+      for (const e of list.getEntries())
+        tasks.push({ start: e.startTime, end: e.startTime + e.duration, step: step() });
     }).observe({ type: "longtask" });
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) {
+        const f = e as unknown as { scripts?: { sourceURL: string }[] };
+        frames.push({
+          start: e.startTime,
+          end: e.startTime + e.duration,
+          scripts: (f.scripts ?? []).map((x) => x.sourceURL),
+        });
+      }
+    }).observe({ type: "long-animation-frame" });
   });
-  const tour = ["Ledger", "Agenda", "Team", "Skills", "Home"];
-  for (const label of tour) {
+  const mark = (name: string) => page.evaluate((n) => Reflect.set(window, "__step", n), name);
+  for (const label of ["Ledger", "Agenda", "Team", "Skills", "Worlds"]) {
+    await mark(`tab ${label}`);
     await clickTab(page, label, false);
     await page.waitForTimeout(1_800);
   }
-  const long = await page.evaluate(() => Reflect.get(window, "__long") as number[]);
+  for (const path of ["profile", "connectors", "world/k1"]) {
+    await mark(`mount ${path}`);
+    await go(page, path);
+    await page.waitForTimeout(1_800);
+  }
+  await mark("tab Home");
+  await clickTab(page, "Home", false);
+  await page.waitForTimeout(1_800);
+  const { tasks, frames } = await page.evaluate(() => ({
+    tasks: Reflect.get(window, "__tasks") as { start: number; end: number; step: string }[],
+    frames: Reflect.get(window, "__frames") as { start: number; end: number; scripts: string[] }[],
+  }));
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
-  expect(
-    long.filter((d) => d > 50),
-    "long tasks (ms) while pages change at 4x",
-  ).toEqual([]);
+  const fromExtension = (t: { start: number; end: number }): boolean => {
+    const holding = frames.filter((f) => f.start <= t.end && f.end >= t.start);
+    return (
+      holding.length > 0 &&
+      holding.every(
+        (f) =>
+          f.scripts.length > 0 &&
+          f.scripts.every((u) => EXTENSION_SCHEMES.some((scheme) => u.startsWith(scheme))),
+      )
+    );
+  };
+  const over = tasks
+    .filter((t) => t.end - t.start > LONG_TASK_BUDGET_MS && !fromExtension(t))
+    .map((t) => `${t.step}: ${Math.round(t.end - t.start)} ms`);
+  expect(over, `tasks over ${LONG_TASK_BUDGET_MS} ms at 4x (production build)`).toEqual([]);
   await page.context().close();
 });
 
@@ -855,7 +908,7 @@ async function openFromBell(page: Page, title: RegExp): Promise<void> {
 
 for (const [size, viewport] of SIZES) {
   test.describe(`WEB-MOTION-2 open a world at ${size}`, () => {
-    test(`WEB-MOTION-2 e2e: at ${size} a city's steps tick every 340 ms, the page swaps at step 3, the ring spins (tiloSpin .7 s), the card fades out over 280 ms, bars one way`, async ({
+    test(`FR_UX_12 WEB-MOTION-2 e2e: at ${size} a city's steps tick every 340 ms, the page swaps at step 3, the ring spins (tiloSpin .7 s), the card fades out over 280 ms, bars one way`, async ({
       browser,
       baseURL,
     }) => {
@@ -878,7 +931,7 @@ for (const [size, viewport] of SIZES) {
       await page.context().close();
     });
 
-    test(`WEB-MOTION-2 e2e: at ${size} a village's steps tick every 250 ms, with the same swap at step 3 and the same 280 ms fade`, async ({
+    test(`FR_UX_12 WEB-MOTION-2 e2e: at ${size} a village's steps tick every 250 ms, with the same swap at step 3 and the same 280 ms fade`, async ({
       browser,
       baseURL,
     }) => {
@@ -894,7 +947,7 @@ for (const [size, viewport] of SIZES) {
   });
 }
 
-test("WEB-MOTION-2 e2e: with prefers-reduced-motion opening a world still ticks its steps and swaps at step 3, but nothing spins, fades or slides, and the card goes at the last step", async ({
+test("FR_UX_12 WEB-MOTION-2 e2e: with prefers-reduced-motion opening a world still ticks its steps and swaps at step 3, but nothing spins, fades or slides, and the card goes at the last step", async ({
   browser,
   baseURL,
 }) => {

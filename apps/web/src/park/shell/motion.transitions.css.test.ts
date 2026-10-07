@@ -68,7 +68,7 @@ describe("WEB-MOTION-2 css: the boot splash's bar and the loader's ring use the 
     expect(body).toMatch(/translateX/);
   });
 
-  it("WEB-MOTION-2 css: the splash's bar runs tiloSlide for 1.1s on cubic-bezier(.4,0,.2,1), forever (README Boot: tiloSlide 1.1s)", () => {
+  it("FR_UX_12 WEB-MOTION-2 css: the splash's bar runs tiloSlide for 1.1s on cubic-bezier(.4,0,.2,1), forever (README Boot: tiloSlide 1.1s)", () => {
     const hits = animationOf(parseRules(css()).rules, "tiloSlide");
     expect(hits.length, "no rule animates with tiloSlide").toBeGreaterThan(0);
     for (const h of hits) {
@@ -85,7 +85,7 @@ describe("WEB-MOTION-2 css: the boot splash's bar and the loader's ring use the 
     expect(body).toMatch(/rotate\(\s*360deg\s*\)/);
   });
 
-  it("WEB-MOTION-2 css: the loader's ring spins with tiloSpin .7s linear, forever (README Async actions: tiloSpin .7s)", () => {
+  it("FR_UX_12 WEB-MOTION-2 css: the loader's ring spins with tiloSpin .7s linear, forever (README Async actions: tiloSpin .7s)", () => {
     const hits = animationOf(parseRules(css()).rules, "tiloSpin");
     expect(hits.length, "no rule animates with tiloSpin").toBeGreaterThan(0);
     for (const h of hits) {

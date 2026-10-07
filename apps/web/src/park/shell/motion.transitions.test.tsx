@@ -122,7 +122,7 @@ describe("WEB-MOTION-2 unit: the boot splash fades, then goes (README Boot: fade
     expect(document.body.textContent).not.toContain("Loading your city");
   });
 
-  it("WEB-MOTION-2 unit: with reduced motion the splash goes the moment the shell is ready (no fade to wait for)", () => {
+  it("FR_UX_12 WEB-MOTION-2 unit: with reduced motion the splash goes the moment the shell is ready (no fade to wait for)", () => {
     reduceMotion();
     let setReady: (v: boolean) => void = () => undefined;
     mountShell(
@@ -170,7 +170,7 @@ describe("WEB-MOTION-2 unit: the world loader's card fades after the last step (
     expect(loader()).toBeNull();
   });
 
-  it("WEB-MOTION-2 unit: with reduced motion the card goes at the last step (nothing fades)", async () => {
+  it("FR_UX_12 WEB-MOTION-2 unit: with reduced motion the card goes at the last step (nothing fades)", async () => {
     reduceMotion();
     const { sch } = await mountApp();
     open("comp");
@@ -180,7 +180,7 @@ describe("WEB-MOTION-2 unit: the world loader's card fades after the last step (
     expect(loader(), "reduced motion keeps the card for a fade that is turned off").toBeNull();
   });
 
-  it("WEB-MOTION-2 unit: with the 'still' motion preference the card goes at the last step too (README: motion 'still' freezes motion)", async () => {
+  it("FR_UX_12 WEB-MOTION-2 unit: with the 'still' motion preference the card goes at the last step too (README: motion 'still' freezes motion)", async () => {
     const { sch } = await mountApp();
     act(() => seen.app.setPref("motion", "still"));
     expect(seen.app.motion).toBe("still");

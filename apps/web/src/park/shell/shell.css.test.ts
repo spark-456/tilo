@@ -25,9 +25,18 @@ describe("WEB_3b_css: park.shell.css", () => {
     // transform and opacity (pinned in motion.transitions.css.test.ts) and the keyframes tiloSlide, tiloSpin,
     // tiloFade; every animation declaration is the pause, "none" (reduced motion) or one of those.
     const text = stripComments(css());
-    for (const d of text.match(/\banimation(?:-[a-z-]+)?\s*:[^;]*;/gi) ?? []) {
+    // (a last declaration may have no semicolon: the match stops at `;` or `}`)
+    for (const d of text.match(/\banimation(?:-[a-z-]+)?\s*:[^;}]*/gi) ?? []) {
       expect(d).toMatch(/^animation-play-state:|:\s*none\b|\btilo(?:Slide|Spin|Fade)\b/i);
     }
+    // tiloFade belongs to the two things that fade out and go: the ready splash and the leaving world card.
+    const fades = parseRules(css()).rules.filter((r) =>
+      (r.decls.get("animation") ?? "").includes("tiloFade"),
+    );
+    expect(fades.map((r) => r.selector).sort()).toEqual([
+      "[data-park] .park-scrim:has(> .park-shell__card--leaving)",
+      "[data-park] .park-shell__boot--out",
+    ]);
     expect(parseRules(css()).others.map((o) => o.head)).toEqual([
       "@keyframes mvXY",
       "@keyframes waddle",
