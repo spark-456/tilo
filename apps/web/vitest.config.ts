@@ -3,19 +3,43 @@ import { defineConfig } from "vitest/config";
 // Unit tests only (apps/web/src/**/*.test.ts, apps/web/test-support). End-to-end
 // / layout / renderer / accessibility acceptance tests live under apps/web/e2e
 // and run with Playwright (see playwright.config.ts), not Vitest.
+//
+// Two projects. The *typecheck.test.ts files build a TypeScript program synchronously (ts.createProgram, ~10 s
+// alone, up to ~80 s when a dozen run in parallel workers on 16 cores). That blocks the worker's event loop past
+// vitest's 60 s worker RPC timeout, so a run ended "Timeout calling onTaskUpdate" (exit 1) with every test green,
+// and starved the DOM tests next to them (the 5 s timeout of Profile.styles). They now run together in one
+// non-isolated fork: one process, one file at a time, with the program shared (test-support/park/typecheck.ts).
+const TYPECHECK = ["src/**/typecheck.test.ts", "src/**/*.typecheck.test.ts"];
+
 export default defineConfig({
   // vite-node leaves "%20" in file:// import ids, and this repo's path has spaces.
   resolve: { alias: [{ find: /%20/g, replacement: " " }] },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-    exclude: ["e2e/**", "node_modules/**"],
-    // A jsdom render is a few hundred ms alone but 6 s+ while a dozen ts.createProgram typecheck tests run in
-    // parallel workers (the 5 s default timed out Profile.styles once). A timeout only has to catch a hang.
+    // A jsdom render is a few hundred ms alone but seconds under load; a timeout only has to catch a hang.
     testTimeout: 30_000,
-    // Each *.typecheck.test.ts builds a ts program synchronously (up to ~80 s with 15 workers on 16 cores), which blocks
-    // its worker past vitest's 60 s RPC timeout: "Timeout calling onTaskUpdate" fails the run with every test green.
-    // 6 workers: no RPC errors in 3 runs (15 workers: errors in 4 of 4), and the park suite takes ~118 s instead of ~88 s.
-    maxWorkers: 6,
+    maxWorkers: 8,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+          exclude: ["e2e/**", "node_modules/**", ...TYPECHECK],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "typecheck",
+          include: TYPECHECK,
+          exclude: ["e2e/**", "node_modules/**"],
+          pool: "forks",
+          poolOptions: { forks: { singleFork: true } },
+          isolate: false,
+          testTimeout: 180_000,
+        },
+      },
+    ],
   },
 });

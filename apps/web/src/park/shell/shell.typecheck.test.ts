@@ -23,8 +23,8 @@ describe("WEB_3b_typecheck: the pinned surface", () => {
 });
 
 describe("WEB_3b_typecheck: park/shell compiles with the repo's strict options", () => {
-  it("WEB_3b_typecheck_park_shell_has_no_type_errors", { timeout: 240_000 }, () => {
-    const errors = parkTypeErrors().filter(
+  it("WEB_3b_typecheck_park_shell_has_no_type_errors", { timeout: 240_000 }, async () => {
+    const errors = (await parkTypeErrors()).filter(
       (e) =>
         e.startsWith("src/park/shell/") ||
         e.startsWith("src/park/app/") ||
