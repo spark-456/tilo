@@ -10,7 +10,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { API_URL, appCheckToken } from "../../api/ClientProvider";
+import { API_URL, appCheckToken, authToken } from "../../api/ClientProvider";
+export { endSession } from "../../api/signOut"; // FR-UX-10: the shell's Sign out, through the one api seam
 import { API_METHODS, type Api, type ApiMethod } from "../api/index";
 import { parkApi } from "../api/select";
 import type { ApiResult, Source } from "../api/types";
@@ -74,8 +75,8 @@ const windowSize = () => ({ vw: window.innerWidth, vh: window.innerHeight });
 
 export function ParkProvider({ api, navigate, schedule, viewport, children }: ParkProviderProps) {
   const [held] = useState<Held>(() => {
-    // SEC-10: the live Api's requests carry the App Check token; none on local hosts or in fixture mode.
-    const raw = api ?? parkApi({ VITE_TILO_API_URL: API_URL }, appCheckToken);
+    // SEC-10, SEC-15: the live Api's requests carry the App Check token and the sign-in token; none on local hosts or in fixture mode.
+    const raw = api ?? parkApi({ VITE_TILO_API_URL: API_URL }, appCheckToken, authToken);
     let store: ParkStore | null = null;
     const wrapped = noting(raw, (source) => store?.noteSource(source));
     const timer = schedule ?? realSchedule;

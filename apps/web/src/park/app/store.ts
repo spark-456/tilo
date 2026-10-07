@@ -80,6 +80,33 @@ export interface ParkStoreDeps {
 /** Milliseconds per loader step: cities take longer to wake (README "Open a world"). */
 const STEP_MS = { City: 340, other: 250 } as const;
 const MOTIONS: readonly Motion[] = ["lively", "calm", "still"];
+const TIME_STORAGE_KEY = "tilo.time";
+const MOTION_STORAGE_KEY = "tilo.motion";
+
+function readStoredPrefs(): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  try {
+    const t = window.localStorage.getItem(TIME_STORAGE_KEY);
+    if (t === "day" || t === "night") out.time = t;
+    const m = window.localStorage.getItem(MOTION_STORAGE_KEY);
+    if (m === "lively" || m === "calm" || m === "still") out.motion = m;
+  } catch {
+    // storage absent (Node tests) or blocked (private mode)
+  }
+  return out;
+}
+
+function writeStoredPref(key: string, value: unknown): void {
+  if (key !== "time" && key !== "motion") return;
+  try {
+    window.localStorage.setItem(
+      key === "time" ? TIME_STORAGE_KEY : MOTION_STORAGE_KEY,
+      String(value),
+    );
+  } catch {
+    // storage absent or blocked: preference still applies for this session
+  }
+}
 
 const derive = (prefs: Record<string, unknown>, dec: Dec) => ({
   time: prefs.time === "night" ? ("night" as const) : ("day" as const),
@@ -100,16 +127,17 @@ function answeredText(decision: Decision | undefined): string {
 }
 
 export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): ParkStore {
+  const initialPrefs = readStoredPrefs();
   let state: ParkState = {
     dec: {},
     added: [],
-    prefs: {},
+    prefs: initialPrefs,
     toast: null,
     read: false,
     menu: null,
     wl: null,
     sources: { fixture: false, live: false },
-    ...derive({}, {}),
+    ...derive(initialPrefs, {}),
   };
   const listeners = new Set<() => void>();
   // The decisions with their designed copy, handed over by the shell once the Api has returned them.
@@ -221,6 +249,7 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
     toast,
     dismissToast,
     setPref(key, value) {
+      writeStoredPref(key, value);
       quiet(api.setPref(key, value));
       update({ prefs: { ...state.prefs, [key]: value } });
     },

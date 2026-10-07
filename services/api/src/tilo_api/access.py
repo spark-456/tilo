@@ -13,6 +13,7 @@ is read or any world looked up. Not deployed (no `K_SERVICE` or
 
 from __future__ import annotations
 
+import inspect
 import logging
 import os
 import threading
@@ -21,6 +22,7 @@ from typing import Literal, Protocol
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+from starlette.requests import HTTPConnection
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -113,7 +115,9 @@ def _decide(scope: Scope) -> JSONResponse | None:
 
     overrides = scope["app"].dependency_overrides
     try:
-        principal = overrides.get(deps.get_current_principal, deps.get_current_principal)()
+        resolver = overrides.get(deps.get_current_principal, deps.get_current_principal)
+        # SEC-15 sign-in reads the request's Authorization header; a test double that takes no argument still works
+        principal = resolver(HTTPConnection(scope)) if inspect.signature(resolver).parameters else resolver()
         store = overrides.get(deps.get_access_store, deps.get_access_store)()
         declaration = store.get(principal.user_id)
     except HTTPException as exc:
@@ -134,6 +138,8 @@ def _decide(scope: Scope) -> JSONResponse | None:
         return _refusal(429, RATE_LIMITED, "rate_limited", {"Retry-After": str(decision.retry_after_s)})
     state = scope.setdefault("state", {})
     state["declaration"], state["uid"] = declaration, principal.user_id
+    state["principal"] = principal  # resolved once per request: the route's own dependency reuses it (BQ-SIGNIN-9)
+    state["demo_session"] = principal.demo_session  # an anonymous demo session: replay models only (BQ-SIGNIN-10)
     return None
 
 
