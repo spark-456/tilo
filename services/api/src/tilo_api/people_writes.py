@@ -28,6 +28,7 @@ from tilo_people.writes import check_write
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps
+from tilo_api.people_events import WorkEvents
 from tilo_api.people_quotes import GONE, MAX_HISTORY
 
 
@@ -225,6 +226,7 @@ class Writer:
     actor: str
     now: str
     redact: Callable[[str], str] = _identity
+    events: WorkEvents | None = None  # a work-item write needs it (PE-12); the other writes emit nothing
 
     def directory(self) -> Directory:
         """The actor's own record, read by id: a write lists no whole-org directory (BQ-PPL11C-12)."""
@@ -268,17 +270,35 @@ class Writer:
             also()
         if problems:
             raise Refusal(409, "write_refused", code="write_refused", problems=list(problems))
+        work_events = self.events if request.record_kind == "work_item" else None
+        if request.record_kind == "work_item" and work_events is None:
+            raise Refusal(503, "not_configured")  # a write whose event could never be recorded does not happen
         try:
-            if version is None:
-                store.create(after)
-            else:
-                store.replace(after, expected_version=version)
+            stored = store.create(after) if version is None else store.replace(after, expected_version=version)
         except VersionConflict:
             raise Refusal(409, "version_conflict", code="version_conflict") from None
         except NotFound:
             raise denied from None
         except EmailTaken:  # only the person store; the store holds the address, so this is atomic (no process lock)
             raise Refusal(409, "email_taken", code="email_taken") from None
+        if work_events is not None:
+            try:
+                work_events.record(self.org, self.actor, after)
+            except Exception:
+                self._undo(store, request, stored.version, created=version is None)
+                raise Refusal(503, "unavailable") from None  # never the record's text or the cause
+
+    def _undo(self, store: RecordStore, request: AccessRequest, version: int, *, created: bool) -> None:
+        """The event could not be written: no row may look changed without it (HR-1, PE-30). A created record is
+        deleted, a changed one restored by compare-and-set (content back; the version has moved twice). A record
+        another write has since changed is left alone."""
+        try:
+            if created:
+                store.delete(self.org, request.record["id"], expected_version=version)
+            else:
+                store.replace(request.record, expected_version=version)
+        except (VersionConflict, NotFound):
+            pass
 
     def create(
         self,
