@@ -11,6 +11,7 @@ the writer assigns `seq`, and `TaskRecord.next_seq` is only the helpers' `seq=` 
 from __future__ import annotations
 
 import copy
+import dataclasses
 import logging
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import UTC, date, datetime
@@ -86,24 +87,21 @@ def _base(task: deps.TaskRecord, actor: str) -> dict[str, Any]:
     return {"v": "1.0", "ts": now_ts(), "world_id": task.world_id, "run_id": task.run_id, "actor": actor}
 
 
-def _append(writer: deps.EventWriter, task: deps.TaskRecord, events: list[dict[str, Any]]) -> None:
-    """Commits each event through the single writer, oldest first, and moves the helpers' `seq` hint past what the
-    writer committed. A writer that cannot answer is 503 `store_unavailable`; a refusal is 409 with a fixed detail,
-    never the validator's text (it names world, run and event ids)."""
-    last = task.next_seq - 1
-    try:
-        for event in events:
-            last = max(last, writer.append(task.world_id, event)["seq"])
-    except HTTPException:
-        raise
-    except deps.EventRejected as exc:
-        logger.warning("event refused for world %s (%s)", task.world_id, type(exc).__name__)
-        raise HTTPException(status_code=409, detail="the event was refused") from None
-    except Exception as exc:
-        logger.warning("event writer failed for world %s (%s)", task.world_id, type(exc).__name__)
-        raise HTTPException(status_code=503, detail="store_unavailable") from exc
-    finally:
-        task.next_seq = last + 1
+def _saved(
+    store: deps.Store,
+    writer: deps.EventWriter | None,
+    task_id: str,
+    task: deps.TaskRecord,
+    parts: list[dict[str, Any]],
+    changes: dict[str, Any],
+    **records: Any,
+) -> deps.TaskRecord:
+    """The task with `changes` applied, saved with its event parts through `Store.save` (ADR-0026 decisions 3, 4): the
+    store's records change only when that returns, so a refused request changes nothing. `next_seq` is only the helpers'
+    `seq=` hint, moved past the parts; the writer assigns the real `seq`."""
+    new = dataclasses.replace(task, next_seq=task.next_seq + len(parts), **changes)  # shares the task's lock
+    store.save(writer, tasks={task_id: new}, parts={task.world_id: parts} if parts else None, **records)
+    return new
 
 
 def create_task(
@@ -130,13 +128,17 @@ def create_task(
     )
     task.draft = task.brief = asked.brief
     task.questions = asked.questions
-    store.worlds[task.world_id] = deps.WorldRecord(owner=owner, districts={}, run_id=task.run_id)
-    try:  # the writer needs the world's record, so it is stored first and removed again if the events fail
-        _append(writer, task, [*intake_events, *asked.memory_hit_events, *([asked.event] if asked.event else [])])
-    except BaseException:
-        store.worlds.pop(task.world_id, None)
-        raise
-    store.tasks[intake.task_id] = task
+    parts = [*intake_events, *asked.memory_hit_events, *([asked.event] if asked.event else [])]
+    task.next_seq = len(parts) + 1
+    world = deps.WorldRecord(owner=owner, districts={}, run_id=task.run_id)
+    created = [("worlds", task.world_id), ("tasks", intake.task_id)]
+    store.save(
+        writer,
+        worlds={task.world_id: world},
+        tasks={intake.task_id: task},
+        parts={task.world_id: parts},
+        create=created,
+    )
     return intake.task_id, task
 
 
@@ -229,9 +231,10 @@ def answer_questions(
             brief = _brief(task, answers, edits)
         except BriefValidationError as exc:
             raise HTTPException(status_code=422, detail=f"That change does not fit the brief: {exc}") from exc
+        changes: dict[str, Any] = {"answers": answers, "edits": edits, "brief": brief}
         if brief != task.brief:
-            task.approaches = None  # proposed for the old brief
-        task.answers, task.edits, task.brief = answers, edits, brief
+            changes["approaches"] = None  # proposed for the old brief
+        _saved(store, None, task_id, task, [], changes)
     return {"brief": brief}
 
 
@@ -264,8 +267,8 @@ def get_approaches(
             except ApproachProposalError as exc:
                 deps.raise_if_model_unavailable(exc)
                 raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
-            _append(writer, task, [result.event])
-            task.approaches = result.approaches
+            task = _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
+        assert task.approaches is not None
         approaches = task.approaches
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
@@ -330,6 +333,7 @@ def approve(
             raise HTTPException(status_code=422, detail="Pick one of the proposed approaches.")
         preload = _load_scenario(task)  # before anything changes: a scenario that no longer loads stops the approval
         now, base, cap = now_ts(), _base(task, task.owner), body.budget_cap
+        store.load_owner(task.owner)  # the earlier grants and the policies are read across all of the owner's worlds
         owned = {w for w, record in store.worlds.items() if record.owner == task.owner}
         earlier = [e for w in owned for e in store.events.get(w, []) if e.get("type") == "budget.granted"]
         outcome = budget.request_budget_grant(
@@ -344,12 +348,12 @@ def approve(
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail="Only the world's owner sets budgets.") from exc
         policies, policy_events = _scenario_policies(task, preload, event["seq"] + 1)  # built before anything is stored
-        _append(writer, task, [event, *policy_events])
-        for policy in policies:
-            store.policies[policy["id"]] = policy
-            store.policy_worlds[policy["id"]] = task.world_id
-        task.granted = True
         approach = next(a for a in task.approaches if a["id"] == body.approach_id)
+        # One save: the grant, its policy events, the policies and the task, or none of them (ADR-0026 decision 3).
+        task = _saved(
+            store, writer, task_id, task, [event, *policy_events], {"granted": True},
+            policies={p["id"]: p for p in policies}, policy_worlds={p["id"]: task.world_id for p in policies},
+        )  # fmt: skip
     if seams is not None:
         try:
             runs.start_run(store, task, approach=approach, budget_cap=cap, seams=seams)

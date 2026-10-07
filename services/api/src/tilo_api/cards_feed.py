@@ -79,8 +79,10 @@ def _decode_cursor(user_id: str, cursor: str) -> _Position:
 
 def _scope(principal: Principal, store: Store) -> list[str]:
     if principal.role == "owner":
+        store.load_owner(principal.user_id)
         return [w for w, rec in store.worlds.items() if rec.owner == principal.user_id]
-    return [principal.world_id] if principal.world_id is not None and principal.world_id in store.worlds else []
+    named = store.load_world(principal.world_id) if principal.world_id is not None else None
+    return [principal.world_id] if principal.world_id is not None and named is not None else []
 
 
 def _world_cards(principal: Principal, store: Store, world_id: str) -> list[tuple[_Position, dict[str, Any]]]:

@@ -91,5 +91,6 @@ def get_costs(
     """Every world the signed-in owner owns, whatever world their principal names."""
     if principal.role != "owner":
         raise HTTPException(status_code=403)
+    store.load_owner(principal.user_id)
     mine = sorted((w, rec) for w, rec in store.worlds.items() if rec.owner == principal.user_id)
     return JSONResponse(content=_report(store, ledger, mine))

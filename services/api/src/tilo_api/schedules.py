@@ -57,6 +57,7 @@ from tilo_planning.events import build_event
 
 from tilo_api import deps, dev, events, runs
 from tilo_api.access import Mode
+from tilo_api.durable_store import DurableStore
 from tilo_api.tasks import _json_body
 
 logger = logging.getLogger("tilo_api.schedules")
@@ -322,7 +323,7 @@ def create_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
-    task = store.tasks.get(body.task_id)
+    task = store.load_task(body.task_id)
     if task is None or task.owner != principal.user_id:  # unknown and another user's task answer alike
         raise HTTPException(status_code=404, detail="No such task.")
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check
@@ -426,11 +427,13 @@ class ScheduleStarter:
         digest = _digest(run.idempotency_key)
         world_id, run_id, owner, store = f"w_s{digest}", f"r_s{digest}", record.owner_user_id, self._store
         with store.grant_lock(owner):  # one owner's grants at a time: daily limits count every earlier grant
-            existing = store.worlds.get(world_id)
+            existing = store.load_world(world_id)
             if existing is None:
                 self._create_world(run, record, world_id, run_id)
             elif existing.owner != owner:
                 raise StartSkipped("owner_mismatch")
+            elif isinstance(store, DurableStore):  # a retry: the events an earlier attempt queued go first, by id
+                store.drain(world_id, self._seams.writer)
         task = deps.TaskRecord(
             owner, world_id, run_id, copy.deepcopy(record.brief), copy.deepcopy(record.brief), [], 3,
             approaches=[copy.deepcopy(record.approach)], granted=True,
@@ -443,6 +446,7 @@ class ScheduleStarter:
         """world.requested, then the budget grant by the owner's own policy; stored only if the grant ran."""
         store, owner, stamp = self._store, record.owner_user_id, _stamp(self._clock())
         base = {"v": "1.0", "ts": stamp, "world_id": world_id, "run_id": run_id, "actor": owner}
+        store.load_owner(owner)  # the earlier grants and the policies are read across all of the owner's worlds
         owned = {w for w, r in store.worlds.items() if r.owner == owner}
         earlier = [e for w in owned for e in store.events.get(w, []) if e.get("type") == "budget.granted"]
         outcome = budget.request_budget_grant(
@@ -455,18 +459,17 @@ class ScheduleStarter:
         fields = world_requested_kwargs(dataclasses.replace(run, title=record.title), world_id)
         requested = build_event(base, seq=1, item=None, severity="info", tool=None, cause=None, **fields)
         assert self._seams is not None  # `start` returned before this without the run seams
-        store.worlds[world_id] = deps.WorldRecord(  # the writer needs the record; removed again if the events fail
-            owner=owner, districts={}, run_id=run_id, prior_world_id=run.prior_world_id
-        )
-        try:
-            for part in (requested, outcome.granted_event):  # through the single writer (ADR-0026 decision 4)
-                self._seams.writer.append(world_id, part)
-        except deps.EventRejected as exc:  # a fixed code, never the validator's text
-            store.worlds.pop(world_id, None)
-            logger.warning("scheduled start refused by the event writer (%s)", type(exc).__name__)
-            raise StartSkipped("event_refused") from None
-        except BaseException:
-            store.worlds.pop(world_id, None)
+        world = deps.WorldRecord(owner=owner, districts={}, run_id=run_id, prior_world_id=run.prior_world_id)
+        try:  # the world and its two events in one save, through the single writer (ADR-0026 decisions 3, 4)
+            store.save(
+                self._seams.writer, worlds={world_id: world}, parts={world_id: [requested, outcome.granted_event]},
+                create=[("worlds", world_id)],
+            )  # fmt: skip
+        except HTTPException as exc:
+            if (
+                exc.status_code == 409 and exc.detail == "the event was refused"
+            ):  # a fixed code, never the validator's text
+                raise StartSkipped("event_refused") from None
             raise
 
 

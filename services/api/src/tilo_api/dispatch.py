@@ -40,6 +40,7 @@ from tilo_api.deps import (
     get_part_write_deadline_s,
     get_store,
 )
+from tilo_api.durable_store import DurableStore
 
 router = APIRouter()
 logger = logging.getLogger("tilo_api.dispatch")
@@ -130,6 +131,7 @@ def _run_attempt(store: Store, world_id: str, part: dict, writer: EventWriter, a
     try:
         writer.append(world_id, part)
         _remove_pending(store, world_id, part["id"])
+        store.ack(world_id, part["id"])  # a durable store forgets it in its queue too
     except Exception as exc:
         error = exc
         with locks["queue"]:
@@ -324,6 +326,24 @@ def _apply_plan(store: Store, plan, owner: str, change: str, at: str) -> None:
         _enqueue(store, target, part)
 
 
+def _persist(store: Store, touched, **records) -> None:
+    """A durable store commits what a kill switch applied here and the parts it queued (FR-HIL-07's order: applied
+    first, committed after, never under a mutate lock). If that fails the change stays applied in this process, so
+    a run still stops (FR-WLD-07), and the answer is 503 "not saved"; the parts then wait, here only, unsent."""
+    if not isinstance(store, DurableStore):
+        return
+    parts = {w: list(q) for w in touched if isinstance(q := store.pending_events.get(w), list) and q}
+    try:
+        store.commit(parts=parts, evict=False, **records)
+    except HTTPException as exc:
+        logger.warning("kill switch applied but not saved (%s)", exc.detail)
+        raise HTTPException(status_code=503, detail="not saved") from None
+
+
+def _policy_ids(plan) -> dict[str, dict]:
+    return {part["data"]["policy_id"]: policy for policy, _, part in plan}
+
+
 def _drain_touched(
     store: Store, touched, writer: EventWriter, deadline_at: float, part_deadline_s: float, abandon_after_s: float
 ) -> int:
@@ -344,11 +364,13 @@ def stop_autopilot(
     world = _require_member_world(principal, store, world_id)
     _require_owner(principal, world)
 
+    store.load_owner(world.owner)  # every policy and world of the owner, not only this request's
     at = events.now()
     touched = _touched_worlds(store, world_id, world.owner)
     with _locked(store, touched):
         plan, already_l1 = _plan_stop_all(store, world.owner, world_id, "stop_all", at)
         _apply_plan(store, plan, world.owner, "stop_all", at)
+    _persist(store, touched, policies=_policy_ids(plan))
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
     pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s, abandon_after_s)
@@ -379,6 +401,7 @@ def pause_world(
     _require_owner(principal, world)
     del body  # validated against the schema enum (422 outside it); principal.channel is authoritative
 
+    store.load_owner(world.owner)
     at = events.now()
     touched = _touched_worlds(store, world_id, world.owner)
     with _locked(store, touched):
@@ -391,6 +414,7 @@ def pause_world(
                 part_id=events.new_part_id(), world_id=world_id, actor=principal.user_id, channel=principal.channel
             )
             _enqueue(store, world_id, part, front=True)
+    _persist(store, touched, worlds={world_id: world}, policies=_policy_ids(plan))
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
     drain(store, world_id, writer, deadline_at, part_deadline_s, abandon_after_s, only_type="world.paused")
@@ -421,6 +445,7 @@ def revoke_policy(
         # Nowhere to send an event; the level change alone still needs a per-policy lock.
         with _policy_lock(store, policy_id):
             events.apply_level_change(policy, owner=owner, change="revoked", at=at)
+        _persist(store, [], policies={policy_id: policy})
         return {"policy_id": policy_id, "level": "L1"}
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
@@ -435,5 +460,6 @@ def revoke_policy(
         )
         events.apply_level_change(policy, owner=owner, change="revoked", at=at)
         _enqueue(store, target, part)
+    _persist(store, [target], policies={policy_id: policy})
     drain(store, target, writer, deadline_at, part_deadline_s, abandon_after_s)
     return {"policy_id": policy_id, "level": "L1"}

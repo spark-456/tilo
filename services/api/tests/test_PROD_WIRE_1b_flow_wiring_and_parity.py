@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 import pytest
 from _clint1_lib import FLOW_USER
 from _pw1b_lib import RUN, W1, commits_fail, part, requested, wire, world
+from _sec15_lib import FakeAccessStore
 from fastapi.testclient import TestClient
 from tilo_api import app, deps, store_door
 from tilo_api.durable_store import DurableStore, FirestoreBackend
@@ -138,6 +139,8 @@ def test_PROD_WIRE_1b_a_deployed_route_serves_a_world_an_earlier_process_wrote(
     saved = dict(app.dependency_overrides)
     app.dependency_overrides.clear()
     app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal("u_pw1b_owner", "owner", world_id)
+    # K_SERVICE is set, so SEC-15's gate is enforced: with no stored declaration it answers 503 before any route runs.
+    app.dependency_overrides[deps.get_access_store] = lambda: FakeAccessStore({"u_pw1b_owner": "judge"})
     try:
         response = TestClient(app).get(f"/worlds/{world_id}/events")
     finally:

@@ -151,10 +151,73 @@ class Store:
         with self._grant_locks_guard:
             return self.grant_locks.setdefault(owner, threading.Lock())
 
+    # The seams a route uses to read and write records and events. Here (dev mode, tests) the dicts are the store:
+    # loads read the cache, and `save` sends events through the writer first. `DurableStore` overrides all of them.
+    def load_world(self, world_id: str) -> WorldRecord | None:
+        return self.worlds.get(world_id)
+
+    def load_task(self, task_id: str) -> TaskRecord | None:
+        return self.tasks.get(task_id)
+
+    def load_owner(self, owner: str) -> None:
+        """Called before a route iterates an owner's worlds or policies; the cache already holds them."""
+
+    def load_path(self, params: Mapping[str, Any]) -> Store:
+        return self
+
+    def commit(
+        self,
+        *,
+        worlds: Mapping[str, WorldRecord] | None = None,
+        tasks: Mapping[str, TaskRecord] | None = None,
+        policies: Mapping[str, dict] | None = None,
+        policy_worlds: Mapping[str, str] | None = None,
+        parts: Mapping[str, list[dict]] | None = None,  # a plain store has no queue: the caller sends its parts
+        create: Iterable[tuple[str, str]] = (),
+        evict: bool = True,
+    ) -> None:
+        self.worlds.update(worlds or {})
+        self.tasks.update(tasks or {})
+        self.policies.update(policies or {})
+        self.policy_worlds.update(policy_worlds or {})
+
+    def save(
+        self, writer: EventWriter | None, *, parts: Mapping[str, list[dict]] | None = None, **records: Any
+    ) -> None:
+        """A route's new records and events. The events go through `writer` first (it reads the world's record, so a
+        new one is stored before them); a failure removes the worlds this call created and changes nothing else."""
+        self.worlds.update(records.get("worlds") or {})
+        sending = ""
+        try:
+            for sending, world_parts in (parts or {}).items():
+                for part in world_parts:
+                    assert writer is not None
+                    writer.append(sending, part)
+        except Exception as exc:
+            for kind, world_id in records.get("create", ()):
+                if kind == "worlds":
+                    self.worlds.pop(world_id, None)
+            raise event_failure(sending, exc) from None
+        self.commit(parts=parts, **records)
+
+    def ack(self, world_id: str, part_id: str) -> None:
+        """A queued part is committed: a durable store forgets it in its queue too."""
+
 
 class EventRejected(Exception):
     """Raised by EventWriter.append when a caller resends an `id` already committed for that
     world with genuinely different content (EV-10 conflict, never a silent overwrite)."""
+
+
+def event_failure(world_id: str, exc: Exception) -> HTTPException:
+    """A writer's failure as the route's answer: a refused event is a fixed 409, anything else 503 `store_unavailable`;
+    never the validator's text (it names world, run and event ids)."""
+    if isinstance(exc, HTTPException):
+        return exc
+    logger.warning("event writer failed for world %s (%s)", world_id, type(exc).__name__)
+    if isinstance(exc, EventRejected):
+        return HTTPException(status_code=409, detail="the event was refused")
+    return HTTPException(status_code=503, detail="store_unavailable")
 
 
 class EventWriter(Protocol):
@@ -179,12 +242,19 @@ def get_current_principal() -> Principal:
     raise HTTPException(status_code=401, detail="Sign in to use this.")  # no sign-in is wired: fail closed, cleanly
 
 
-def get_store() -> Store:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_store(request: Request = None) -> Store:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere
+    """Deployed: the durable store for `TILO_API_STORE`, with the request's path ids loaded (ADR-0026 decisions 1, 3);
+    without a valid config 503 `not_configured`, never cached. Dev mode and the tests override this seam."""
+    from tilo_api.durable_store import deployed
+
+    store = deployed()[0]
+    return store.load_path(request.path_params) if request is not None else store
 
 
 def get_event_writer() -> EventWriter:
-    raise HTTPException(status_code=503, detail="not_configured")
+    from tilo_api.durable_store import deployed
+
+    return deployed()[1]
 
 
 def get_ledger() -> Sequence[LedgerEntry]:

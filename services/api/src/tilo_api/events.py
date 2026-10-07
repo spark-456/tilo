@@ -82,6 +82,15 @@ def policy_changed_part(*, part_id: str, policy_id: str, change: str, owner: str
     }
 
 
+def world_failed_part(world_id: str, reason: str) -> dict:
+    """The one `world.failed` of a restart: the run that held this world is gone (ADR-0026 decision 5)."""
+    return {
+        "id": new_part_id(), "type": "world.failed", "actor": "system", "target": world_id, "level": None,
+        "district": None, "item": None, "severity": "blocked", "credits": 0, "cause": None, "vis": "all",
+        "authz": None, "summary": f"Stopped: {reason}"[:140], "data": {"reason": reason, "unit": None},
+    }  # fmt: skip
+
+
 def world_paused_part(*, part_id: str, world_id: str, actor: str, channel: str | None) -> dict:
     return {
         "id": part_id,

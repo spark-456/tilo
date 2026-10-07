@@ -8,7 +8,9 @@ opens nothing, and importing this module builds no client. Anything else raises 
 answer 503 `not_configured`, never cache the refusal and never fall back to memory. The harness `FirestoreStore` and
 its own guard are untouched.
 
-Slice 1a ships the door and the holder; the Firestore-backed `Store` that fills `FirestoreApiStore` is slice 1b.
+The handle holds the client and two backends over it (slice 1b): `records` (`durable_store.FirestoreBackend`) and
+`events` (the harness store protocol, the documents `WorldWriter` writes). A `demo-` project may keep an emulator host
+on Cloud Run (it can only be the emulator); any other project may not.
 """
 
 from __future__ import annotations
@@ -17,10 +19,12 @@ import logging
 import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any
 
 from fastapi import HTTPException
 from tilo_harness.schedule_store import _PROJECT as GCP_PROJECT  # one project-id shape for both Firestore doors
+from tilo_harness.store import FirestoreStore
 
 logger = logging.getLogger("tilo_api.store_door")
 
@@ -38,12 +42,36 @@ class ApiStoreUnavailable(HTTPException):
         super().__init__(status_code=503, detail="store_unavailable")
 
 
+class _ClientEvents(FirestoreStore):
+    """The harness events store over the door's client: the same documents, the guard being the door's own."""
+
+    def __init__(self, project: str, client: Any) -> None:  # no super().__init__: it would build its own client
+        self.project_id, self._client = project, client
+
+
 @dataclass(frozen=True)
 class FirestoreApiStore:
-    """The opened handle: the project and its Firestore client. Slice 1b adds the records and events backends."""
+    """The opened handle: the project, its Firestore client and the two backends over that one client."""
 
     project: str
     client: Any
+
+    @cached_property
+    def records(self) -> Any:
+        from tilo_api.durable_store import FirestoreBackend  # it imports this module
+
+        return FirestoreBackend(self.client)
+
+    @cached_property
+    def events(self) -> FirestoreStore:
+        return _ClientEvents(self.project, self.client)
+
+
+def client_factory(project: str) -> Any:
+    """Builds the Firestore client for `project` with the runtime identity's ADC; tests inject theirs in its place."""
+    from google.cloud import firestore
+
+    return firestore.Client(project=project)
 
 
 def open_api_store(
@@ -55,7 +83,8 @@ def open_api_store(
         raise ApiStoreNotConfigured(f"set {ENV_STORE}=firestore and {ENV_PROJECT} to a project id")
     emulator = values.get("FIRESTORE_EMULATOR_HOST", "")
     if values.get("K_SERVICE"):
-        if emulator or os.environ.get("FIRESTORE_EMULATOR_HOST"):  # a deployed process never talks to an emulator host
+        if (emulator or os.environ.get("FIRESTORE_EMULATOR_HOST")) and not project.startswith("demo-"):
+            # a deployed process never talks to an emulator host
             raise ApiStoreNotConfigured("FIRESTORE_EMULATOR_HOST is set on Cloud Run")
     elif not (emulator and project.startswith("demo-")):
         raise ApiStoreNotConfigured("outside Cloud Run only the emulator and a demo- project open")
@@ -68,12 +97,7 @@ def open_api_store(
     ):
         raise ApiStoreNotConfigured("the client reads os.environ, which names another emulator host than env")
     try:
-        if firestore_client_factory is not None:
-            client = firestore_client_factory(project)
-        else:
-            from google.cloud import firestore
-
-            client = firestore.Client(project=project)
+        client = (firestore_client_factory or client_factory)(project)
     except Exception as exc:  # no credentials or no network: closed, and never the text
         logger.warning("api store client unavailable (%s)", type(exc).__name__)
         raise ApiStoreUnavailable from exc

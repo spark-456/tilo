@@ -17,6 +17,7 @@ from __future__ import annotations
 import copy
 import logging
 import threading
+import zlib
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
@@ -34,6 +35,7 @@ PREPLAN_LAYOUT: dict[str, Any] = {
 }
 _WRITER_ID = "tilo-api"
 _REOPEN_LOCK_WAIT_S = 1.0
+_STRIPES = 256
 
 
 class WorldWriterAdapter:
@@ -49,12 +51,13 @@ class WorldWriterAdapter:
         self._store, self._backend, self._org_id, self._clock, self._lease_s = store, backend, org_id, clock, lease_s
         # world -> ((run_id, layout) it was opened for, its writer)
         self._open: dict[str, tuple[tuple[str, dict[str, Any] | None], WorldWriter]] = {}
-        self._locks: dict[str, threading.RLock] = {}  # one per world ever seen; pruned with the cache in slice 1b
+        # A fixed table, so it never grows: a world takes the stripe of its id (two worlds sharing one only take turns;
+        # nothing here ever holds two stripes, so they cannot deadlock).
+        self._locks = [threading.RLock() for _ in range(_STRIPES)]
         self._guard = threading.Lock()
 
     def _lock(self, world_id: str) -> threading.RLock:
-        with self._guard:
-            return self._locks.setdefault(world_id, threading.RLock())
+        return self._locks[zlib.crc32(world_id.encode()) % _STRIPES]
 
     def _writer(self, world_id: str, record: deps.WorldRecord) -> WorldWriter:
         """The world's open writer for the record's run and layout; a changed run or layout closes it and opens anew."""
