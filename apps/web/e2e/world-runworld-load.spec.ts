@@ -11,7 +11,7 @@ test.use({ viewport: DESKTOP });
 
 const RUN_WORLD_CHUNK = /\/world\/runWorld\.ts/; // the dev server's name; the build's is runWorld-<hash>.js
 
-test("NFR-01 a runWorld chunk that fails to load on /world/:id says so, and Try again reloads and draws it", async ({
+test("NFR-01 a runWorld chunk that fails to load on /world/:id/stage says so, and Try again reloads and draws it", async ({
   page,
 }) => {
   const problems: string[] = [];
@@ -26,7 +26,7 @@ test("NFR-01 a runWorld chunk that fails to load on /world/:id says so, and Try 
     blocked += 1;
     return route.abort();
   });
-  await page.goto("/world/w_village_basic?speed=1000");
+  await page.goto("/world/w_village_basic/stage?speed=1000");
 
   const note = page.getByTestId("live-world-note");
   await expect(note).toBeVisible();

@@ -1,5 +1,5 @@
 // WEB-6 acceptance (plan sections 8a and 10; README "World detail" and "Interactions and motion"):
-// /park/world/<id> in the real Park shell at 1440x900 and 390x844, day and night, on the fixture Api.
+// /world/<id> in the real Park shell at 1440x900 and 390x844, day and night, on the fixture Api.
 // Every expected number follows from the reference page (design_handoff_tilo_web_app/design/Tilo App World.dc.html,
 // inline styles) inside the shell's page column (x=60 w=1320 at 1440, x=24 w=342 at 390, WEB-3b):
 //   - sheet r28, padding 24 32 36, gap 22 -> content width 1320 - 2 - 64 = 1254 (276 at 390);
@@ -97,7 +97,7 @@ async function token(page: Page, name: string): Promise<string> {
 
 async function openWorld(page: Page, id: string, theme: Theme = "day"): Promise<string[]> {
   const problems = collectConsoleProblems(page);
-  await page.goto(`/park/world/${id}`);
+  await page.goto(`/world/${id}`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByTestId("park-page-world")).toBeVisible();
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
@@ -124,7 +124,7 @@ const region = (page: Page, name: string) => root(page).locator(`section[aria-la
 test.beforeAll(async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const page = await browser.newPage(baseURL ? { baseURL } : {});
-  await page.goto("/park/world/k1", { timeout: 120_000 });
+  await page.goto("/world/k1", { timeout: 120_000 });
   await page
     .getByRole("heading", { level: 1 })
     .waitFor({ timeout: 120_000 })
@@ -997,7 +997,7 @@ test.describe("park world: the other tiers at 1440", () => {
     ).toBeVisible();
     // See in Agenda goes to the agenda page
     await runs.getByRole("button", { name: "See in Agenda" }).click();
-    await expect(page).toHaveURL(/\/park\/agenda$/);
+    await expect(page).toHaveURL(/\/agenda$/);
     expect(problems).toEqual([]);
   });
 
@@ -1048,7 +1048,7 @@ test.describe("park world: the other tiers at 1440", () => {
     });
     await expect(result.getByRole("button", { name: "Open result" })).toHaveCount(0);
     // a finished one has the two buttons: Open result (h38 `0 16px` --hero) and Share to Slack (h38 `0 14px`)
-    await page.goto("/park/world/comp");
+    await page.goto("/world/comp");
     await expect(h1(page)).toHaveText("Competitor pricing");
     const open = await facts(region(page, "Result").getByRole("button", { name: "Open result" }), [
       "padding",
@@ -1096,7 +1096,9 @@ test.describe("park world: the other tiers at 1440", () => {
     const problems = await openWorld(page, "hires");
     await expect(h1(page)).toHaveText("Onboard 12 new hires");
     await expect(root(page).getByText("WAITING FOR YOU")).toHaveCount(0);
-    await expect(live(page)).toHaveAttribute("href", "/world/hires");
+    // a sample world has no stage (WEB-CUTOVER): the live view is disabled; the live-source href is a vitest case
+    await expect(live(page)).toHaveAttribute("aria-disabled", "true");
+    await expect(live(page)).not.toHaveAttribute("href", /.*/);
     await expect(region(page, "Districts").getByText("4 districts", { exact: true })).toBeVisible();
     await expect(btn(page, "Set up a new starter")).toBeVisible();
     for (const tool of ["Google Workspace", "BambooHR", "Slack"]) {
@@ -1114,21 +1116,21 @@ test.describe("park world: behaviour in the browser", () => {
     page,
   }) => {
     const problems = collectConsoleProblems(page);
-    await page.goto("/park/home");
+    await page.goto("/");
     const review = page.getByRole("button", {
       name: /\d decisions? waiting in K1 electric scooter/,
     });
     await review.click();
     await expect(page.getByText("OPENING CITY", { exact: true })).toBeVisible(); // the WorldLoader of the shell
     await expect(h1(page)).toHaveText("K1 electric scooter");
-    await expect(page).toHaveURL(/\/park\/world\/k1$/);
+    await expect(page).toHaveURL(/\/world\/k1$/);
     await expect(page.getByText("OPENING CITY", { exact: true })).toHaveCount(0);
     expect(problems).toEqual([]);
   });
 
   test("WEB_6_e2e_opening_the_page_shifts_nothing", async ({ page }) => {
     await watchShifts(page);
-    await page.goto("/park/world/k1");
+    await page.goto("/world/k1");
     await expect(h1(page)).toBeVisible();
     await expect(region(page, "Districts")).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.fonts.status)).toBe("loaded");
@@ -1216,43 +1218,52 @@ test.describe("park world: behaviour in the browser", () => {
       page.getByRole("status").filter({ hasText: "Link copied. Only your team can open it" }),
     ).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(page.url());
-    expect(page.url()).toMatch(/\/park\/world\/k1$/);
+    expect(page.url()).toMatch(/\/world\/k1$/);
     expect(problems).toEqual([]);
   });
 
   test("WEB_6_e2e_the_links_go_where_the_design_says", async ({ page }) => {
     const problems = await openWorld(page, "k1");
     await crumb(page).getByRole("link", { name: "Worlds" }).click();
-    await expect(page).toHaveURL(/\/park\/worlds$/);
+    await expect(page).toHaveURL(/\/worlds$/);
     await page.goBack();
     await expect(h1(page)).toHaveText("K1 electric scooter");
     await root(page).getByRole("link", { name: "Ledger" }).click();
-    await expect(page).toHaveURL(/\/park\/ledger$/);
+    await expect(page).toHaveURL(/\/ledger$/);
     await page.goBack();
     await btn(page, "Draft a supplier brief").click();
-    await expect(page).toHaveURL(/\/park\/skills\?id=brief$/);
+    await expect(page).toHaveURL(/\/skills\?id=brief$/);
     await page.goBack();
     await btn(page, "Google Drive")
       .or(root(page).getByRole("button", { name: /Google Drive$/ }))
       .first()
       .click();
-    await expect(page).toHaveURL(/\/park\/connectors$/);
+    await expect(page).toHaveURL(/\/connectors$/);
     expect(problems).toEqual([]);
   });
 
-  test("WEB_6_e2e_the_live_view_and_the_lenses_are_real_links_to_the_stage_routes", async ({
+  test("WEB_6_e2e_a_sample_worlds_live_view_and_lenses_are_disabled_not_links_to_a_missing_stage", async ({
     page,
   }) => {
+    // WEB-CUTOVER: a stage exists only for a live-source world (World.stage.test.tsx pins the live hrefs:
+    // /world/k1/stage, story, trace, delivery, inspect/B1). A sample world renders the same elements, disabled.
     await openWorld(page, "k1");
-    await expect(live(page)).toHaveAttribute("href", "/world/k1");
-    for (const href of ["/world/k1/story", "/world/k1/trace", "/world/k1/delivery"]) {
-      await expect(root(page).locator(`a[href="${href}"]`), href).toHaveCount(1);
+    const reason = "Sample world: there is no recorded run to open";
+    await expect(live(page)).toHaveAttribute("aria-disabled", "true");
+    await expect(live(page)).toHaveAttribute("title", reason);
+    await expect(live(page)).not.toHaveAttribute("href", /.*/);
+    for (const name of ["Story", "Trace", "Delivery", "Inspect"]) {
+      const lens = root(page)
+        .getByRole("navigation", { name: "Run views" })
+        .getByRole("link", { name });
+      await expect(lens, name).toHaveAttribute("aria-disabled", "true");
+      await expect(lens, name).not.toHaveAttribute("href", /.*/);
     }
-    await expect(root(page).locator('a[href^="/world/k1/inspect/"]')).toHaveCount(1);
-    // a modified click does not leave this page (the browser opens a tab); the plain click goes to the stage
-    await live(page).click({ modifiers: ["ControlOrMeta"] });
-    await expect(page).toHaveURL(/\/park\/world\/k1$/);
-    await Promise.all([page.waitForURL(/\/world\/k1$/), live(page).click()]);
+    await expect(root(page).locator('a[href^="/world/k1/"]')).toHaveCount(0);
+    await expect(root(page).getByText(reason).first()).toBeAttached();
+    // a click, plain or modified, goes nowhere (force: Playwright treats aria-disabled as not clickable)
+    await live(page).click({ modifiers: ["ControlOrMeta"], force: true });
+    await live(page).click({ force: true });
     expect(new URL(page.url()).pathname).toBe("/world/k1");
   });
 
@@ -1265,7 +1276,8 @@ test.describe("park world: behaviour in the browser", () => {
     await page.keyboard.press("Tab"); // keyboard modality: the ring is :focus-visible from here on
     await page.keyboard.press("Shift+Tab");
     await expect(back).toBeFocused();
-    const order = [btn(page, "Pause"), btn(page, "Share"), live(page)];
+    // the live view of a sample world is disabled (no href), so the keyboard skips it
+    const order = [btn(page, "Pause"), btn(page, "Share")];
     const ring = async (loc: Locator) => {
       const f = await facts(loc, [
         "outline-style",
@@ -1330,7 +1342,7 @@ test.describe("park world: behaviour in the browser", () => {
       1,
     );
     expect(fill["background-color"], "running: --run").toBe(await token(page, "--run"));
-    await page.goto("/park/world/comp");
+    await page.goto("/world/comp");
     await expect(h1(page)).toHaveText("Competitor pricing");
     const done = text(page, "100%")
       .locator("xpath=..")

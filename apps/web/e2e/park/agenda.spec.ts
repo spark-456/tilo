@@ -1,9 +1,9 @@
-// WEB-9 acceptance in a real browser: the Park Agenda at /park/agenda, 1440x900 and 390x844. The page
+// WEB-9 acceptance in a real browser: the Park Agenda at /agenda, 1440x900 and 390x844. The page
 // renders the designed copy on the fixture Api, the pinboard and calendar controls work, "Find a time"
 // books a slot, "Review and approve" goes to the world through the shell (no reload), and nothing is
 // written to the console.
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
-// e2e/park/agenda.spec.ts --project=chromium --no-deps --workers=3
+// e2e/agenda.spec.ts --project=chromium --no-deps --workers=3
 import { type Page, expect, test } from "@playwright/test";
 import { collectConsoleProblems } from "../support/console";
 import { DESKTOP, MOBILE } from "../support/viewports";
@@ -15,7 +15,7 @@ const SIZES = { desktop: DESKTOP, mobile: MOBILE } as const;
 test.beforeAll(async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const page = await browser.newPage(baseURL ? { baseURL } : {});
-  await page.goto("/park/agenda", { timeout: 120_000 });
+  await page.goto("/agenda", { timeout: 120_000 });
   await page
     .getByRole("heading", { level: 1, name: "Agenda" })
     .waitFor({ timeout: 120_000 })
@@ -24,7 +24,7 @@ test.beforeAll(async ({ browser, baseURL }) => {
 });
 
 const open = async (page: Page) => {
-  await page.goto("/park/agenda");
+  await page.goto("/agenda");
   await expect(page.getByRole("heading", { level: 1, name: "Agenda" })).toBeVisible();
 };
 
@@ -99,7 +99,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
         .locator('[data-pin="t1"]')
         .getByRole("button", { name: "Review and approve" })
         .click();
-      await expect(page).toHaveURL(/\/park\/world\/k1$/);
+      await expect(page).toHaveURL(/\/world\/k1$/);
       expect(await page.evaluate(() => Reflect.get(window, "__marker"))).toBe("same document");
     });
   });

@@ -3,8 +3,10 @@
 // shown as images; only the movers are separate layers. Faithful port: same names, numbers, rounding,
 // call order and seeded rng as the prototype. Differences by design: `createPark(h, makeWorld, env)`
 // instead of `window.TiloPark(h)` (the world engine is built from the factory on the park's own string
-// builder; the browser calls Blob and URL.createObjectURL come in through `env`), and no animation: the
-// cars and walkers are always drawn frozen at their seeded phase (motion returns in WEB-3, BQ-WEB-3).
+// builder; the browser calls Blob and URL.createObjectURL come in through `env`), and the walker's two
+// frames flip by opacity (two stacked frames), not by the prototype's background-position, so every moving
+// layer animates transform and opacity only (WEB-MOTION-1, README "Performance"). The keyframes live in
+// shell/park.shell.css. `still` draws every mover frozen at its seeded phase; `k` slows the cars.
 import type {
   AgentSpec,
   El,
@@ -149,18 +151,25 @@ export function createPark(
         pointerEvents: "none",
       },
     });
-  // motion: restored in WEB-3 (BQ-WEB-3). Until then every mover sits at its seeded phase along the road.
-  const motion = (dx: number, dy: number, f: number): Props => ({
-    transform: `translate(${(dx * f).toFixed(1)}px, ${(dy * f).toFixed(1)}px)`,
-  });
+  /** A mover's position: frozen at its seeded phase, or the prototype's linear back-and-forth run. */
+  const motion = (dx: number, dy: number, dur: number, f: number, still: boolean): Props =>
+    still
+      ? { transform: `translate(${(dx * f).toFixed(1)}px, ${(dy * f).toFixed(1)}px)` }
+      : {
+          animation: `mvXY ${dur.toFixed(1)}s linear ${(-f * dur).toFixed(1)}s infinite`,
+          "--dx": `${dx.toFixed(1)}px`,
+          "--dy": `${dy.toFixed(1)}px`,
+        };
   function mover(
     x: number,
     y: number,
     dx: number,
     dy: number,
+    dur: number,
     f: number,
     vb: Walk5,
     child: unknown,
+    still: boolean,
   ): El {
     const sc = vb[4];
     const src = svgUrl(vb[2] * sc, vb[3] * sc, vb.slice(0, 4).join(" "), child, "xMidYMid meet");
@@ -175,7 +184,7 @@ export function createPark(
           height: 0,
           willChange: "transform",
           pointerEvents: "none",
-          ...motion(dx, dy, f),
+          ...motion(dx, dy, dur, f, still),
         },
       },
       h("img", {
@@ -198,9 +207,12 @@ export function createPark(
     y: number,
     dx: number,
     dy: number,
+    dur: number,
     f: number,
     vb: Walk5,
     frames: [unknown, unknown],
+    still: boolean,
+    cyc: number,
   ): El {
     const sc = vb[4];
     const w = vb[2] * sc;
@@ -212,6 +224,27 @@ export function createPark(
       [frames[0], E("g", { transform: `translate(${vb[2]} 0)` }, frames[1])],
       "xMidYMid meet",
     );
+    const lag = -(f * 7) % cyc;
+    // The sheet holds both frames side by side. Still: one div shows the first. Live: two stacked divs, each
+    // showing one half, and their opacity steps swap them twice per cycle (no background-position).
+    const frame = (pos: string, flip: Props): El =>
+      h("div", {
+        style: {
+          position: "absolute",
+          left: `${vb[0] * sc}px`,
+          top: `${vb[1] * sc}px`,
+          width: `${w}px`,
+          height: `${hh}px`,
+          backgroundImage: `url("${src}")`,
+          backgroundSize: "200% 100%",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: pos,
+          ...flip,
+        },
+      });
+    const flip = (delay: number): Props => ({
+      animation: `walkFrame ${cyc}s steps(1, end) ${delay.toFixed(2)}s infinite`,
+    });
     return h(
       "div",
       {
@@ -223,7 +256,7 @@ export function createPark(
           height: 0,
           willChange: "transform",
           pointerEvents: "none",
-          ...motion(dx, dy, f),
+          ...motion(dx, dy, dur, f, still),
         },
       },
       h(
@@ -236,21 +269,14 @@ export function createPark(
             width: 0,
             height: 0,
             transformOrigin: "0 0",
+            ...(still
+              ? {}
+              : { animation: `waddle ${cyc}s ease-in-out ${lag.toFixed(2)}s infinite` }),
           },
         },
-        h("div", {
-          style: {
-            position: "absolute",
-            left: `${vb[0] * sc}px`,
-            top: `${vb[1] * sc}px`,
-            width: `${w}px`,
-            height: `${hh}px`,
-            backgroundImage: `url("${src}")`,
-            backgroundSize: "200% 100%",
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "0% 0",
-          },
-        }),
+        ...(still
+          ? [frame("0% 0", {})]
+          : [frame("0% 0", flip(lag)), frame("100% 0", flip(lag - cyc / 2))]),
       ),
     );
   }
@@ -297,7 +323,7 @@ export function createPark(
     }
     return out;
   }
-  /* o: {w,h} artboard px, night, mute (0..1 pull towards paper); k and still are accepted and ignored */
+  /* o: {w,h} artboard px, night, k (slow-down), still (frozen movers), mute (0..1 pull towards paper) */
   function scene(o0?: SceneOpts): { el: El; spots: Spot[] } {
     const o = Object.assign(
       { w: 1440, h: 900, vw: 1120, seed: 23, night: false, k: 1, still: false, mute: 0 },
@@ -308,6 +334,8 @@ export function createPark(
     const r = rng(o.seed);
     const pick = <V>(a: readonly V[]): V => a[Math.floor(r() * a.length)] as V;
     const night = o.night;
+    const still = o.still;
+    const k = o.k;
     const SM = night ? toward(NAVY, 0.64, true) : o.mute ? toward(PAPER, o.mute) : null;
     const MM = night ? toward(NAVY, 0.3) : o.mute ? toward(PAPER, o.mute * 0.5) : null;
     const prev = cmap;
@@ -628,6 +656,7 @@ export function createPark(
             }
         }
       }
+      const cyc = 0.56 * (k > 1 ? 1.4 : 1);
       const movers: unknown[][] = [];
       for (let j = 0; j <= R; j++) {
         const y = j * PY;
@@ -638,17 +667,18 @@ export function createPark(
         if (x1 - x0 > 80) {
           const nc = r() < 0.75 ? 1 : 0;
           const nw = r() < 0.7 ? (r() < 0.35 ? 2 : 1) : 0;
-          // `speed` only set the duration of the animation (restored in WEB-3, BQ-WEB-3); its draw from the rng stays.
+          const span = x1 - x0;
           const place = (
             dir: number,
             ly: number,
-            _speed: number,
+            speed: number,
             vb: Walk5,
             make: (a: number) => unknown,
             walk: boolean,
           ): void => {
             const a = dir > 0 ? x0 : x1;
             const b = dir > 0 ? x1 : x0;
+            const dur = (span / speed) * k;
             const f = r();
             const p0 = P(a, ly, 0);
             const q = toPx(p0);
@@ -665,11 +695,14 @@ export function createPark(
                     q[1],
                     dx,
                     dy,
+                    dur,
                     f,
                     vb,
                     (made as unknown[]).map(wrap) as [unknown, unknown],
+                    still,
+                    cyc,
                   )
-                : mover(q[0], q[1], dx, dy, f, vb, wrap(made)),
+                : mover(q[0], q[1], dx, dy, dur, f, vb, wrap(made), still),
             });
           };
           for (let n = 0; n < nc; n++) {

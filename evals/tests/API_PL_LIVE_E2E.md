@@ -87,6 +87,8 @@ stdout, in this order, `key=value` like the Vertex smoke:
 estimate credits_low=0.0000 credits_high=0.0000 cap=40.0000        # FIRST line, before any model call; a dry run stops here
 mode=<live|replay> case=<id>
 stage=<stage> role=<role> profile=<profile id> calls=<n> tokens_in=<n> tokens_out=<n> credits=<x.xxxx> latency_ms=<x.x>   # one per row
+note: <n> call(s) returned no usage; ...                          # only if a call raised after it may have been billed: its
+                                                                    # credits are the pre-call quote, its tokens_out is left out
 outcome=<outcome class> events=<n>
 check=<GEN-a check name> findings=<n>                               # one per check
 total credits=<x.xxxx> cap=<x.xxxx>

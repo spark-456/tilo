@@ -13,6 +13,10 @@ import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ALLOWLIST, scanSource } from "../../../test-support/honestyScan";
 
+// The Park city's ambient scenery (shell and engines) is decoration, not work: its animation entries are
+// pinned by src/honesty/park-ambient.allowlist.test.ts. Every other entry stays pinned exactly here.
+const AMBIENT = /^src\/park\/(shell|engines)\//;
+
 const APP = __dirname;
 const PARK = resolve(APP, "..");
 const SRC = resolve(PARK, "..");
@@ -69,10 +73,9 @@ describe("WEB_3a_static: the skeleton files exist", () => {
 
 describe("WEB_3a_static: honesty (HR-1..HR-7; the scan and its allowlist are untouched)", () => {
   it("WEB_3a_static_ALLOWLIST_is_unchanged", () => {
-    expect(ALLOWLIST.map((e) => `${e.file}:${e.rule}`)).toEqual([
-      "src/world/runWorld.ts:raf",
-      "src/stage/Stage.tsx:raf",
-    ]);
+    expect(
+      ALLOWLIST.filter((e) => !AMBIENT.test(e.file)).map((e) => `${e.file}:${e.rule}`),
+    ).toEqual(["src/world/runWorld.ts:raf", "src/stage/Stage.tsx:raf"]);
   });
 
   it("WEB_3a_static_the_honesty_scan_finds_nothing_in_park_app", () => {
@@ -217,8 +220,10 @@ describe("WEB_3a_static: the mount point keeps the landing bundle free of the pa
 
   it("WEB_3a_static_Root_uses_the_pure_isParkPath_and_the_shared_usePathname", () => {
     expect(rootSrc()).toMatch(/\bisParkPath\b/);
+    expect(rootSrc()).toMatch(/\bisKeptPath\b/); // the old app owns only the addresses keptPaths.ts lists
     expect(rootSrc()).toMatch(/\busePathname\b/);
-    expect(rootSrc()).toMatch(/from\s*["']\.\/App["']/); // the old app stays a normal import
+    // the old app is a chunk too since 7073de5d (the landing never ships its shell, NFR-01): a dynamic import
+    expect(rootSrc()).toMatch(/import\(\s*["']\.\/App["']\s*\)/);
   });
 
   it("WEB_3a_static_main_still_renders_through_Root_with_the_old_boot_steps", () => {

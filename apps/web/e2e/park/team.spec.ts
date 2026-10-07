@@ -1,10 +1,10 @@
-// WEB-10 acceptance in a real browser: /park/team (the route lands with WEB-3a, so this fails until then) at
+// WEB-10 acceptance in a real browser: /team (the route lands with WEB-3a, so this fails until then) at
 // 1440x900 and 390x844, day and night. The page heading is visible, the five members are on screen, the key computed values match the design, nothing overflows the page
 // sideways (the 820px members table scrolls inside its card), and there are ZERO console errors or warnings.
 // The shell's "Sample data" chip (WEB-3b nav) is asserted by the last test per viewport; the page itself
 // renders no chip, which Team.static.test.ts pins.
 // Run on a private port, three workers (a cold Vite start can time out the first test):
-//   TILO_WEB_PORT=5411 pnpm --filter @tilo/web exec playwright test e2e/park/team.spec.ts --project=chromium --no-deps --workers=3
+//   TILO_WEB_PORT=5411 pnpm --filter @tilo/web exec playwright test e2e/team.spec.ts --project=chromium --no-deps --workers=3
 //
 // Assumption to settle in WEB-3a: the day/night toggle is the nav button whose accessible name mentions
 // "day" or "night"; the theme is read back from data-time on the [data-park] root (tokens/park.css).
@@ -18,7 +18,7 @@ type Theme = (typeof THEMES)[number];
 const MEMBERS = ["Alex Morgan", "Priya Shah", "Jin Park", "Tom Reyes", "Sam Ode"];
 
 async function open(page: Page, theme: Theme): Promise<void> {
-  await page.goto("/park/team");
+  await page.goto("/team");
   await expect(page.getByRole("heading", { level: 1, name: "Team", exact: true })).toBeVisible();
   const root = page.locator("[data-park]").first();
   const isNight = async (): Promise<boolean> => (await root.getAttribute("data-time")) === "night";
@@ -33,7 +33,7 @@ async function open(page: Page, theme: Theme): Promise<void> {
 }
 
 for (const [vpName, viewport] of Object.entries(SIZES)) {
-  test.describe(`WEB_10 /park/team at ${vpName}`, () => {
+  test.describe(`WEB_10 /team at ${vpName}`, () => {
     test.use({ viewport });
 
     for (const theme of THEMES) {

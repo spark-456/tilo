@@ -4,6 +4,7 @@
 // the Inspect panel in design/source "Tilo World Player.dc.html".
 import { type CSSProperties, useEffect } from "react";
 import { useClient } from "../api/ClientProvider";
+import { stagePath } from "../router";
 import { reduce } from "../world/reducer";
 import { useReplayedLog } from "../world/replay";
 import { elapsed } from "../world/runLog";
@@ -37,7 +38,7 @@ export function S_05({ params }: ScreenProps) {
   return (
     <div className="screen-body wide" data-testid="inspect-panel">
       <p>
-        <AppLink className="back-link" to={`/world/${encodeURIComponent(worldId)}`}>
+        <AppLink className="back-link" to={stagePath(worldId)}>
           Back to the world
         </AppLink>
       </p>
