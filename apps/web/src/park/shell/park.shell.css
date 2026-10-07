@@ -298,6 +298,14 @@
     padding: 8px 0 8px 16px;
     margin: -8px -4px -8px -16px;
   }
+  /* The focus ring hugs the dot (as before the 24px box), not the padded box. */
+  [data-park] .park-shell__nav .park-shell__sample:focus-visible {
+    outline: none;
+  }
+  [data-park] .park-shell__sample:focus-visible .park-shell__sampledot {
+    outline: 3px solid #5a3fe0;
+    outline-offset: 2px;
+  }
   /* The invisible boot ghost must never take a tap meant for the next button. */
   [data-park] .park-shell__sample.park-shell__booting {
     pointer-events: none;

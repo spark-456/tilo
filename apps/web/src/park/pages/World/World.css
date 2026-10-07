@@ -824,6 +824,13 @@
     grid-row: 3;
     justify-self: start;
   }
+  /* A Town's row or a Village's building shrinks to the card's width, so the 440px map would be mostly empty
+     grey: the map takes the art's height (the tag keeps its corner) instead. */
+  [data-park] .park-world-map--art {
+    height: auto;
+    min-height: 240px;
+    padding: 56px 12px 20px;
+  }
   /* Skills and Tools: the label sits above its chips, so a chip has the card's width. */
   [data-park] .park-world-skillsrow--stack,
   [data-park] .park-world-toolsrow--stack {

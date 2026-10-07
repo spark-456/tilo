@@ -12,6 +12,7 @@ export const REAL_PAGES: readonly PageId[] = [
   "agenda",
   "connectors",
   "team",
+  "worlds",
   "profile",
 ];
 

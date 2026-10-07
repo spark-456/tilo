@@ -38,10 +38,13 @@ describe("WEB_1a_select: no API url means fixtures, labelled as such", () => {
 
 describe("WEB_1a_select: an API url means the live Api and no sample values", () => {
   it("WEB_1a_select_with_url_every_method_rejects_NotBuilt", async () => {
-    // WIRE-1/WIRE-2: getLedger (GET /costs) and getWorlds (GET /worlds) are built (liveApi.wire1/wire2 tests).
+    // WIRE-1/2/3: getLedger (GET /costs), getWorlds (GET /worlds), getDecisions (GET /cards) and decide (the answer
+    // route) are built (liveApi.wire1/wire2/wire3 tests).
     const api = parkApi(LIVE_ENV);
     const args = callTable();
-    for (const m of API_METHODS.filter((x) => x !== "getLedger" && x !== "getWorlds")) {
+    for (const m of API_METHODS.filter(
+      (x) => !["getLedger", "getWorlds", "getDecisions", "decide"].includes(x),
+    )) {
       const p = invoke(api, m, args);
       expect(p, `${m} returns a Promise`).toBeInstanceOf(Promise);
       const outcome = await (p as Promise<unknown>).then(
@@ -64,7 +67,8 @@ describe("WEB_1a_select: an API url means the live Api and no sample values", ()
     vi.stubGlobal("fetch", fetchSpy);
     const api = parkApi(LIVE_ENV);
     await expect(api.getUser()).rejects.toBeInstanceOf(NotBuilt);
-    await expect(api.decide("depot")).rejects.toBeInstanceOf(NotBuilt);
+    // WIRE-3 built `decide` (a key the live feed never served is a TiloApiError, liveApi.wire3.test.ts); `undo` has no route.
+    await expect(api.undo("depot")).rejects.toBeInstanceOf(NotBuilt);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
