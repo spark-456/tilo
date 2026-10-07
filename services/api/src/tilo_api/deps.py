@@ -534,6 +534,16 @@ def get_run_archive() -> Callable[..., RunArchive]:
     raise NotImplementedError("no raw-archive store is configured, so no run starts")
 
 
+def get_token_broker() -> Any:
+    """FR-MTG-09: the token broker's adapter-facing half (`access_token_for_adapter`). Unwired: no host run."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_meeting_host_transport() -> Any:
+    """FR-MTG-09: the `Transport` behind `MeetingHostAdapter`. No live transport in dev (EFF-01): refuses."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."
 
 
