@@ -91,7 +91,7 @@ const derive = (prefs: Record<string, unknown>, dec: Dec) => ({
  * built from the item's own fields (the Api may not have it: live mode before the endpoint exists). */
 function decidedText(decision: Decision | undefined): string {
   if (!decision) return "Decision recorded";
-  return decision.toast || `${decision.title}: ${decision.done}`;
+  return decision.toast || (decision.done ? `${decision.title}: ${decision.done}` : decision.title);
 }
 
 export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): ParkStore {

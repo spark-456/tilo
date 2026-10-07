@@ -113,7 +113,12 @@ describe("WIRE_3_store_live: a decision is taken only when tilo-api recorded it"
 
   it("WIRE_3_store_live_a_second_tap_while_the_first_is_in_flight_sends_nothing", async () => {
     let release: (r: Response) => void = () => undefined;
-    const { store, k, posts } = await setup(() => new Promise<Response>((r) => (release = r)));
+    const { store, k, posts } = await setup(
+      () =>
+        new Promise<Response>((r) => {
+          release = r;
+        }),
+    );
     store.decide(k);
     store.decide(k);
     await flush();
