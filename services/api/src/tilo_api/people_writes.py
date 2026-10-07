@@ -44,6 +44,34 @@ def _identity(text: str) -> str:
 
 
 _ASCII_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+_FILLERS = frozenset({0x115F, 0x1160, 0x3164, 0xFFA0})  # default-ignorable letters: invisible, never meaningful
+_UNASSIGNED_IGNORABLE = frozenset({0x2065, 0x2800})  # unassigned default-ignorable, and the blank braille cell
+
+
+def _plane14_hidden(o: int) -> bool:
+    """Plane 14 is variation selectors and unassigned points. Tag characters already go in `clean_line` (Cf), on
+    purpose: they are the ASCII-smuggling channel, so subdivision flags are stored as a bare black flag."""
+    return 0xE0000 <= o <= 0xE0FFF and not 0xE0020 <= o <= 0xE007F
+
+
+def _unhide(text: str) -> str:
+    """Invisible characters `clean_line` leaves (default-ignorable Lo and Mn) out, so none can split a token or a link
+    before the redactor runs. An invisible mark stays only after a non-ASCII character (an emoji keeps its variation
+    selector), and U+FE0E/U+FE0F after a keycap base only when U+20E3 follows (`1` `FE0F` `20E3`)."""
+    out: list[str] = []
+    for i, c in enumerate(text):
+        o = ord(c)
+        if o in _FILLERS or o in _UNASSIGNED_IGNORABLE or 0xFFF0 <= o <= 0xFFF8 or _plane14_hidden(o):
+            continue
+        if o in (0x34F, 0x17B4, 0x17B5) or 0x180B <= o <= 0x180F or 0xFE00 <= o <= 0xFE0F:
+            before = out[-1] if out else ""
+            keycap = before != "" and before in "#*0123456789" and o in (0xFE0E, 0xFE0F) and text[i + 1 : i + 2] == "⃣"
+            if before.isascii() and not keycap:
+                continue
+        out.append(c)
+    return "".join(out)
+
+
 DUE_TEXT_MAX = 60  # work_item.due_text maxLength
 _FROM = ("meeting", "transcript")  # calendar_entry.source.from values that name a meeting
 
@@ -167,7 +195,7 @@ class Writer:
         character cannot hide a link from the redactor or the schema), then the secret redactor, then the schema.
         ASCII controls are never stripped or joined: the schema refuses them (a line break is a 422), and the
         redactor's output is checked again, since one that removes a multi-line block could otherwise hide them."""
-        cleaned = "".join(c for c in value if c.isascii() or clean_line(c))
+        cleaned = _unhide("".join(c for c in value if c.isascii() or clean_line(c)))
         redacted = self.redact(cleaned)
         if _ASCII_CONTROL.search(redacted):
             raise Refusal(422, "invalid_record")

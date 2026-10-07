@@ -18,7 +18,7 @@ from fastapi.routing import APIRoute
 from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
-from tilo_api import deps
+from tilo_api import deps, people_items
 from tilo_api.people_plate import build_plate
 from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
 from tilo_api.people_writes import (
@@ -231,3 +231,91 @@ def create_work_item_route(
         return request.app.dependency_overrides.get(deps.get_source_owners, deps.get_source_owners)()  # type: ignore[no-any-return]
 
     return _answer(lambda: create_item(_writer(principal, stores, clock, redact), body, owners))
+
+
+def _item_writer(
+    item_id: str,
+    principal: deps.Principal,
+    stores: PeopleStores,
+    clock: Callable[[], str],
+    redact: Callable[[str], str] | None = None,
+) -> Writer:
+    if _ITEM_ID.fullmatch(item_id) is None:
+        raise _not_found()
+    return _writer(principal, stores, clock, redact)
+
+
+@router.get("/v1/work-items")
+def list_work_items_route(
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    status: Annotated[str | None, Query()] = None,
+) -> dict[str, Any]:
+    """The caller's own open, done and dropped items (PE-03); `status` narrows it (checked here: a 422 is no-store)."""
+    if status is not None and status not in people_items.LIST_STATUSES:
+        raise Refusal(422, "invalid_query")
+    return _answer(lambda: people_items.list_items(_writer(principal, stores, clock), status))
+
+
+@router.get("/v1/work-items/{work_item_id}")
+def get_work_item_route(
+    work_item_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The owner reads the full record, the assigner of a confirmed item its status view (PE-03)."""
+    w = _item_writer(work_item_id, principal, stores, clock)
+    return _answer(lambda: people_items.get_item(w, work_item_id))
+
+
+@router.post("/v1/work-items/{work_item_id}/edit")
+def edit_work_item_route(
+    work_item_id: str,
+    body: Annotated[people_items.EditIn, Depends(json_body(people_items.EditIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The owner changes the title and the due phrase; `source` and every stamp are immutable (PE-07)."""
+    w = _item_writer(work_item_id, principal, stores, clock, redact)
+    return _answer(lambda: people_items.edit_item(w, work_item_id, body))
+
+
+@router.post("/v1/work-items/{work_item_id}/snooze")
+def snooze_work_item_route(
+    work_item_id: str,
+    body: Annotated[people_items.SnoozeIn, Depends(json_body(people_items.SnoozeIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The owner parks an open item until a time within the next 30 days (PE-19)."""
+    w = _item_writer(work_item_id, principal, stores, clock)
+    return _answer(lambda: people_items.snooze_item(w, work_item_id, body))
+
+
+def _plain_action(name: str, act: Callable[[Writer, str], dict[str, Any]], summary: str) -> None:
+    """One owner action that takes `{}` and nothing else (done, reopen, not-mine, put-back)."""
+
+    def route(
+        work_item_id: str,
+        _: Annotated[Empty, Depends(json_body(Empty))],
+        principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+        stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+        clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    ) -> dict[str, Any]:
+        w = _item_writer(work_item_id, principal, stores, clock)
+        return _answer(lambda: act(w, work_item_id))
+
+    route.__name__ = f"{name.replace('-', '_')}_work_item_route"
+    route.__doc__ = summary
+    router.post(f"/v1/work-items/{{work_item_id}}/{name}")(route)
+
+
+_plain_action("done", people_items.done_item, "The owner marks an open item done (PE-30).")
+_plain_action("reopen", people_items.reopen_item, "The owner reopens a done item (PE-30).")
+_plain_action("not-mine", people_items.not_mine, "The owner asks the assigner to reassign an item (PE-29).")
+_plain_action("put-back", people_items.put_back, "The owner puts a snoozed or asked item back on the plate (PE-29).")
