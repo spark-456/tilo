@@ -113,19 +113,19 @@ def test_PROD_WIRE_1b_a_failed_commit_changes_no_cache_evicts_and_answers_503(pw
         "the record and its queue land whole, or not at all"
     )
     assert (pw1b_rig.backend.queue(W1) == [part(1)]) is applied
-    assert store.load_world(W1) == world(paused=applied), "the next access reloads what is really stored"
+    assert store.load_world(W1, settle=True) == world(paused=applied), "the next access reloads what is really stored"
 
 
 def test_PROD_WIRE_1b_a_rev_mismatch_is_409_stale_and_a_create_never_overwrites(pw1b_rig) -> None:
     one, _ = pw1b_rig.process()
     two, _ = pw1b_rig.process()
     seed(one, worlds={W1: world()})
-    two.load_world(W1)
+    two.load_world(W1, settle=True)
     one.commit(worlds={W1: world(paused=True)})
     with refused(409, "stale"):
         two.commit(worlds={W1: world(owner_channels=("web",))})
     assert W1 not in two.worlds and tuple(pw1b_rig.backend.read("worlds", W1)["owner_channels"]) == ("web", "email")
-    assert two.load_world(W1) == world(paused=True)
+    assert two.load_world(W1, settle=True) == world(paused=True)
     with refused(409, "stale"):
         two.commit(worlds={W1: world(owner=OTHER)}, create=[("worlds", W1)])
     assert pw1b_rig.backend.read("worlds", W1)["owner"] == OWNER
@@ -134,14 +134,20 @@ def test_PROD_WIRE_1b_a_rev_mismatch_is_409_stale_and_a_create_never_overwrites(
 def test_PROD_WIRE_1b_a_missing_document_is_not_cached_and_a_bad_id_never_reaches_the_backend(pw1b_rig) -> None:
     one, _ = pw1b_rig.process()
     two, _ = pw1b_rig.process()
-    assert one.load_world(W1) is None and one.load_task(T1) is None
+    assert one.load_world(W1, settle=True) is None and one.load_task(T1, settle=True) is None
     assert W1 not in one.worlds and T1 not in one.tasks
     seed(two, worlds={W1: world()}, tasks={T1: task()})
-    assert one.load_world(W1) == world() and one.load_task(T1) == task(), "a miss is a 404 once, never remembered"
+    assert one.load_world(W1, settle=True) == world() and one.load_task(T1, settle=True) == task(), (
+        "a miss is a 404 once, never remembered"
+    )
     reads, real = [], pw1b_rig.backend.read
     pw1b_rig.backend.read = lambda *a: (reads.append(a), real(*a))[1]
     try:
-        assert [one.load_world("w_x/../../o"), one.load_world(W1 + "/events"), one.load_task("t_../x")] == [None] * 3
+        assert [
+            one.load_world("w_x/../../o", settle=True),
+            one.load_world(W1 + "/events", settle=True),
+            one.load_task("t_../x", settle=True),
+        ] == [None] * 3
     finally:
         del pw1b_rig.backend.read
     assert reads == []
@@ -173,7 +179,7 @@ def test_PROD_WIRE_1b_a_failed_drain_leaves_parts_queued_and_the_next_load_resen
     assert ids(pw1b_rig.backend.queue(W1)) == ids(parts)[1:], "the first part is out; the failed one and the rest wait"
     writer.reopen()  # the process exits cleanly: its lease is released
     cold, _ = pw1b_rig.process()
-    cold.load_world(W1)
+    cold.load_world(W1, settle=True)
     stream = pw1b_rig.stream(W1)
     assert ids(stream) == ids(parts) and [e["seq"] for e in stream] == [1, 2, 3], "every event once, none twice"
     assert pw1b_rig.backend.queue(W1) == [] and cold.events[W1] == stream and not cold.pending_events.get(W1)
@@ -189,10 +195,10 @@ def test_PROD_WIRE_1b_a_cold_store_equals_the_warm_one_after_lazy_loads(pw1b_rig
     writer.reopen()
     cold, _ = pw1b_rig.process()
     assert not (cold.worlds or cold.tasks or cold.policies), "nothing is loaded at start"
-    cold.load_world(W1)
-    cold.load_world(W2)
-    cold.load_task(T1)
-    cold.load_owner(OWNER)
+    cold.load_world(W1, settle=True)
+    cold.load_world(W2, settle=True)
+    cold.load_task(T1, settle=True)
+    cold.load_owner(OWNER, settle=True)
 
     def seen(s):
         return (s.worlds, s.tasks, s.policies, s.policy_worlds, {w: e for w, e in s.events.items() if e})
@@ -213,7 +219,7 @@ def test_PROD_WIRE_1b_load_owner_counts_the_earlier_grants_after_a_restart(pw1b_
         warm.drain(w)
     writer.reopen()
     cold, _ = pw1b_rig.process()
-    cold.load_owner(OWNER)
+    cold.load_owner(OWNER, settle=True)
 
     def earlier(s):  # the approve route's own expression for FR-INT-08's daily limits
         owned = sorted(w for w, r in s.worlds.items() if r.owner == OWNER)
@@ -231,7 +237,7 @@ def test_PROD_WIRE_1b_property_no_record_without_its_events_and_no_event_twice(o
     seed(store, worlds={W1: world()})
     start, landed = rig.backend.read("worlds", W1)["rev"], []
     for n, op in enumerate(ops, 1):
-        store.load_world(W1)  # an evicted entry reloads, and a load resends what is still queued
+        store.load_world(W1, settle=True)  # an evicted entry reloads, and a load resends what is still queued
         change = {"worlds": {W1: world(run_id=f"r_pw1b_{n}")}, "parts": {W1: [part(n)]}}
         if op == "ok":
             store.commit(**change)
@@ -240,12 +246,12 @@ def test_PROD_WIRE_1b_property_no_record_without_its_events_and_no_event_twice(o
                 store.commit(**change)
         if op != "refused":
             landed.append(part(n)["id"])
-    store.load_world(W1)
+    store.load_world(W1, settle=True)
     store.drain(W1)
     stream = rig.stream(W1)
     assert ids(stream) == landed and [e["seq"] for e in stream] == list(range(1, len(landed) + 1))
     assert rig.backend.read("worlds", W1)["rev"] == start + len(landed) and rig.backend.queue(W1) == []
     writer.reopen()
     cold, _ = rig.process()
-    cold.load_world(W1)
+    cold.load_world(W1, settle=True)
     assert cold.worlds[W1] == store.worlds[W1] and cold.events.get(W1, []) == store.events.get(W1, [])

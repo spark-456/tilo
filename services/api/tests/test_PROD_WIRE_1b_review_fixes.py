@@ -413,3 +413,70 @@ def test_PROD_WIRE_1b_an_anonymous_tick_opens_no_client_and_is_401_before_any_50
     bad = TestClient(app).post("/internal/schedules/tick", headers={"Authorization": "Bearer not-a-token"})
     assert bad.status_code == 401
     assert _tick_deployed == [], "no Firestore client was built for a caller with no valid token"
+
+
+# --- round 2 of the security review: an unsaved Pause all survives every later failure and every racing commit -------
+
+
+def test_PROD_WIRE_1b_an_eviction_never_drops_a_world_a_kill_switch_left_unsaved(
+    pw1b_rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pause all fails to save; another commit on that world fails too, and its queue cannot be read: the paused world
+    stays cached (FR-WLD-07, BQ-90), and the next kill switch stores `paused`."""
+    store, _ = _rig(pw1b_rig)
+    store.worlds[W1].paused = True  # applied in place, as Pause all does
+    with commits_fail(pw1b_rig.backend), pytest.raises(HTTPException):
+        store.commit_unsaved(worlds=[W1])
+
+    def unreadable(*_a: object) -> list:
+        raise TimeoutError("the queue did not answer")
+
+    monkeypatch.setattr(pw1b_rig.backend, "queue", unreadable)
+    with commits_fail(pw1b_rig.backend), pytest.raises(HTTPException):
+        store.commit(tasks={T1: task()}, parts={W1: [part(1)]}, create=[("tasks", T1)])
+    monkeypatch.undo()
+    assert W1 in store.worlds and store.worlds[W1].paused is True, "an unsaved pause is never evicted"
+    assert store.unsaved["worlds"] == {W1}
+    store.commit_unsaved()  # the next switch
+    assert pw1b_rig.backend.read("worlds", W1)["paused"] is True and not store.unsaved["worlds"]
+
+
+def test_PROD_WIRE_1b_a_commit_that_read_a_record_before_the_pause_never_clears_its_mark(pw1b_rig) -> None:
+    """A commit whose snapshot of the world was taken before Pause all lands after it: the mark stays, the cached pause
+    is not replaced by the caller's older copy, and the next commit stores `paused`."""
+    store, _ = _rig(pw1b_rig)
+    before = copy.deepcopy(store.worlds[W1])  # what a slow commit read before the pause
+    real_commit = pw1b_rig.backend.commit
+
+    def pause_meanwhile(*args: object, **kwargs: object) -> None:
+        store.worlds[W1].paused = True  # Pause all applies and marks while this commit is in flight
+        with store._marks:
+            store._gen += 1
+            store.unsaved["worlds"].add(W1)
+            store._mark_gen[("worlds", W1)] = store._gen
+        real_commit(*args, **kwargs)
+
+    pw1b_rig.backend.commit = pause_meanwhile
+    try:
+        store.commit(worlds={W1: before})
+    finally:
+        del pw1b_rig.backend.commit
+    assert pw1b_rig.backend.read("worlds", W1)["paused"] is False, "the slow commit wrote its older copy"
+    assert store.unsaved["worlds"] == {W1}, "so the pause stays marked"
+    assert store.worlds[W1].paused is True, "and the cache keeps the pause, not the caller's copy"
+    store.commit_unsaved()
+    assert pw1b_rig.backend.read("worlds", W1)["paused"] is True and not store.unsaved["worlds"]
+
+
+def test_PROD_WIRE_1b_loads_are_read_only_unless_asked_to_settle(pw1b_rig) -> None:
+    """`load_world`, `load_task` and `load_owner` write nothing by default; only `settle=True` (after a route's own
+    check) drains the queue and closes a world the restart left open."""
+    store, _ = pw1b_rig.process()
+    seed(store, worlds={W1: world()}, tasks={T1: task()}, parts={W1: [requested(1), started(2)]})
+    cold, _ = pw1b_rig.process()
+    cold.load_owner(OWNER)
+    cold.load_task(T1)
+    cold.load_world(W1)
+    assert pw1b_rig.stream(W1) == [] and len(pw1b_rig.backend.queue(W1)) == 2, "a default load writes nothing"
+    cold.load_world(W1, settle=True)
+    assert [e["type"] for e in pw1b_rig.stream(W1)][-1] == "world.failed"

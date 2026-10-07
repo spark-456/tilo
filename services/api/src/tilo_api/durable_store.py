@@ -241,6 +241,8 @@ class DurableStore(deps.Store):
         self._settled: set[str] = set()
         self._lock = threading.RLock()
         self._marks = threading.Lock()  # for `unsaved` alone, so marking a change never waits behind a commit
+        self._mark_gen: dict[tuple[str, str], int] = {}  # each mark's generation: a commit clears only what it saw
+        self._gen = 0
         self._wait = threading.local()
 
     # -- the process-wide lock: held for dict changes and across a commit (so `rev`s stay in order), never for a load
@@ -316,14 +318,14 @@ class DurableStore(deps.Store):
         except Exception as exc:  # a busy lease belongs to whoever holds it; the next look tries again
             logger.warning("settling world %s failed (%s)", world_id, type(exc).__name__)
 
-    def load_world(self, world_id: str, settle: bool = True) -> deps.WorldRecord | None:
+    def load_world(self, world_id: str, settle: bool = False) -> deps.WorldRecord | None:
         if world_id not in self.worlds and (d := self._doc("worlds", world_id)) is not None:
             self._adopt_world(world_id, d)
         if settle:
             self.settle(world_id)
         return self.worlds.get(world_id)
 
-    def load_task(self, task_id: str, settle: bool = True) -> deps.TaskRecord | None:
+    def load_task(self, task_id: str, settle: bool = False) -> deps.TaskRecord | None:
         if task_id not in self.tasks and (d := self._doc("tasks", task_id)) is not None:
             with _io():
                 task, rev = _task_from(d), d["rev"]
@@ -334,7 +336,7 @@ class DurableStore(deps.Store):
             self.load_world(found.world_id, settle=settle)
         return found
 
-    def load_owner(self, owner: str, settle: bool = True) -> None:
+    def load_owner(self, owner: str, settle: bool = False) -> None:
         if owner not in self._owners:
             with _io():
                 worlds, policies = (
@@ -381,6 +383,9 @@ class DurableStore(deps.Store):
         made, parts = set(create), {w: list(p) for w, p in (parts or {}).items() if p}
         with self._held():
             mapped = {p: (policy_worlds or {}).get(p, self.policy_worlds.get(p)) for p in policies or {}}
+            with self._marks:  # the marks before these records are read: a later mark is a change they may not hold
+                seen = {("worlds", i): self._mark_gen.get(("worlds", i)) for i in worlds or {}}
+                seen |= {("policies", i): self._mark_gen.get(("policies", i)) for i in policies or {}}
             records = [("worlds", i, _plain(r)) for i, r in (worlds or {}).items()]
             records += [("tasks", i, _task_doc(r)) for i, r in (tasks or {}).items()]
             records += [
@@ -398,13 +403,21 @@ class DurableStore(deps.Store):
                 raise HTTPException(status_code=503, detail="store_unavailable") from exc
             for c, i, _, expect in writes:
                 self.revs[(c, i)] = (expect or 0) + 1
-            self.worlds.update(worlds or {})
+            with self._marks:  # a mark set after `seen` is a change this commit did not write: it stays
+                for (c, i), gen in seen.items():
+                    if gen is not None and self._mark_gen.get((c, i)) == gen:
+                        self.unsaved[c].discard(i)
+                        del self._mark_gen[(c, i)]
+                held = {c: set(ids) for c, ids in self.unsaved.items()}
+            # a cached record a kill switch changed in place and has not saved is never replaced by a caller's copy
+            self.worlds.update(
+                {i: r for i, r in (worlds or {}).items() if i not in held["worlds"] or i not in self.worlds}
+            )
             self.tasks.update(tasks or {})
-            self.policies.update(policies or {})
+            self.policies.update(
+                {i: r for i, r in (policies or {}).items() if i not in held["policies"] or i not in self.policies}
+            )
             self.policy_worlds.update({p: w for p, w in mapped.items() if w})
-            with self._marks:
-                self.unsaved["worlds"] -= set(worlds or {})
-                self.unsaved["policies"] -= set(policies or {})
             for w, new in parts.items():
                 queued = self.pending_events.get(w, [])
                 self.pending_events[w] = [*queued, *(p for p in new if p["id"] not in {q["id"] for q in queued})]
@@ -416,8 +429,11 @@ class DurableStore(deps.Store):
         (this call's and any earlier failed one's) with the queued parts of every world they belong to. Raises 503 or
         409 if that does not land; the changes stay applied here and marked."""
         with self._marks:  # marked first, outside the big lock: a commit that cannot start still leaves them marked
-            self.unsaved["policies"] |= set(policies)
-            self.unsaved["worlds"] |= set(worlds)
+            for coll, ids in (("policies", policies), ("worlds", worlds)):
+                for i in ids:
+                    self._gen += 1
+                    self.unsaved[coll].add(i)
+                    self._mark_gen[(coll, i)] = self._gen
             marked_policies, marked_worlds = set(self.unsaved["policies"]), set(self.unsaved["worlds"])
         with self._held():
             ps = {p: self.policies[p] for p in marked_policies if p in self.policies}
@@ -429,7 +445,9 @@ class DurableStore(deps.Store):
 
     def _expect(self, coll: str, doc_id: str, creating: bool, authoritative: bool) -> int | None:
         """The `rev` a write must find: none for a create. An in-place change (a kill switch, the layout) is
-        authoritative here, so a `rev` that a failed commit made unknown is read again rather than refused."""
+        authoritative here, so a `rev` that a failed commit made unknown is read again rather than refused. Any other
+        write whose `rev` is unknown expects none, which `_fresh` reads as a create: on an existing document that is a
+        409 `stale` (safe, if confusing after a failed kill switch; the entry was evicted and reloads)."""
         if creating:
             return None
         if (coll, doc_id) in self.revs or not authoritative:
@@ -454,7 +472,7 @@ class DurableStore(deps.Store):
             return
         self._owners.clear()  # an evicted world is found again by the next `load_owner`
         for w in parts:
-            if w not in self.worlds:
+            if w not in self.worlds or w in self.unsaved["worlds"]:  # a kill switch's unsaved world keeps its cache
                 continue
             try:
                 self.pending_events[w] = self.backend.queue(w)

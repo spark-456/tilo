@@ -327,7 +327,7 @@ class Run:
         """Compile, validate, lay out. Returns the agents config, or None when no run may start."""
         registry = self.seams.connectors
         try:  # the policy context and the PI-11 history are read across all of the owner's worlds
-            self.store.load_owner(self.owner)
+            self.store.load_owner(self.owner, settle=True)
         except Exception as exc:
             logger.warning("run %s: the owner's records could not be read (%s)", self.run_id, type(exc).__name__)
             self._fail("the owner's records could not be read", None)

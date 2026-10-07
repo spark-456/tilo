@@ -155,13 +155,13 @@ class Store:
     # The seams a route uses to read and write records and events. Here (dev mode, tests) the dicts are the store:
     # loads read the cache, and `save` sends events through the writer first. `DurableStore` overrides all of them.
     # `settle=False` is for a caller that has not yet checked who is asking: a load that settles also writes.
-    def load_world(self, world_id: str, settle: bool = True) -> WorldRecord | None:
+    def load_world(self, world_id: str, settle: bool = False) -> WorldRecord | None:
         return self.worlds.get(world_id)
 
-    def load_task(self, task_id: str, settle: bool = True) -> TaskRecord | None:
+    def load_task(self, task_id: str, settle: bool = False) -> TaskRecord | None:
         return self.tasks.get(task_id)
 
-    def load_owner(self, owner: str, settle: bool = True) -> None:
+    def load_owner(self, owner: str, settle: bool = False) -> None:
         """Called before a route iterates an owner's worlds or policies; the cache already holds them."""
 
     def load_path(self, params: Mapping[str, Any]) -> Store:

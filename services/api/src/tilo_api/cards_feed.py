@@ -79,9 +79,9 @@ def _decode_cursor(user_id: str, cursor: str) -> _Position:
 
 def _scope(principal: Principal, store: Store) -> list[str]:
     if principal.role == "owner":
-        store.load_owner(principal.user_id)
+        store.load_owner(principal.user_id, settle=True)
         return [w for w, rec in store.worlds.items() if rec.owner == principal.user_id]
-    named = store.load_world(principal.world_id) if principal.world_id is not None else None
+    named = store.load_world(principal.world_id, settle=True) if principal.world_id is not None else None
     return [principal.world_id] if principal.world_id is not None and named is not None else []
 
 

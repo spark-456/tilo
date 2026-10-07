@@ -79,7 +79,7 @@ def test_PROD_WIRE_1b_a_kill_switch_keeps_its_202_when_the_drain_fails_and_the_q
     assert pw1b_rig.backend.read("worlds", W1)["paused"] is True and not pw1b_rig.stream(W1)
     assert {"world.paused", "policy.changed"} <= {p["type"] for p in pw1b_rig.backend.queue(W1)}
     cold, _ = pw1b_rig.process()
-    cold.load_world(W1)  # the restart resends the queued parts by id
+    cold.load_world(W1, settle=True)  # the restart resends the queued parts by id
     types = [e["type"] for e in pw1b_rig.stream(W1)]
     assert types.count("world.paused") == 1 and types.count("policy.changed") == 1
     assert pw1b_rig.backend.queue(W1) == []
@@ -113,10 +113,10 @@ def test_PROD_WIRE_1b_a_world_whose_stream_has_world_started_never_gets_a_second
 ) -> None:
     _stopped_process(pw1b_rig, [requested(1), started(2)])
     cold, _ = pw1b_rig.process()
-    cold.load_world(W1)
+    cold.load_world(W1, settle=True)
     made: list[tuple] = []
     monkeypatch.setattr(runs, "Run", lambda *a: (made.append(a), SimpleNamespace(main=lambda: None))[1])
-    runs.start_run(cold, cold.load_task(T1), approach={}, budget_cap=40.0, seams=None)
+    runs.start_run(cold, cold.load_task(T1, settle=True), approach={}, budget_cap=40.0, seams=None)
     assert made == [] and cold.runs == {}, "world.started is in the stream: no second run, in any process"
     seed(cold, worlds={W2: world()}, tasks={T2: task(W2, granted=True)}, parts={W2: [requested(4, W2)]})
     runs.start_run(cold, cold.tasks[T2], approach={}, budget_cap=40.0, seams=None)
@@ -126,13 +126,13 @@ def test_PROD_WIRE_1b_a_world_whose_stream_has_world_started_never_gets_a_second
 def test_PROD_WIRE_1b_a_restart_writes_exactly_one_world_failed_for_a_world_that_started(pw1b_rig) -> None:
     _stopped_process(pw1b_rig, [requested(1), started(2)])
     cold, cold_writer = pw1b_rig.process()
-    cold.load_world(W1)
+    cold.load_world(W1, settle=True)
     (failed,) = _failures(pw1b_rig)
     assert failed["actor"] == "system" and failed["data"] == {"reason": RESTARTED, "unit": None}
     assert failed["run_id"] == RUN and pw1b_rig.stream(W1)[-1] == failed and cold.events[W1] == pw1b_rig.stream(W1)
     cold_writer.reopen()
     again, _ = pw1b_rig.process()
-    again.load_world(W1)
+    again.load_world(W1, settle=True)
     assert len(_failures(pw1b_rig)) == 1, "a terminal event is in the stream: a second process adds nothing"
 
 
@@ -146,7 +146,7 @@ def test_PROD_WIRE_1b_a_restart_writes_no_world_failed_when(pw1b_rig, case: str)
     cold, _ = pw1b_rig.process()
     if case == "a run of its own":
         cold.runs[W1] = object()
-    cold.load_world(W1)
+    cold.load_world(W1, settle=True)
     assert _failures(pw1b_rig) == [] and [e["type"] for e in pw1b_rig.stream(W1)] == [p["type"] for p in parts]
 
 
@@ -157,8 +157,10 @@ def test_PROD_WIRE_1b_a_restart_leaves_the_failure_to_whoever_holds_the_lease(pw
     )
     rival.open()
     cold, _ = pw1b_rig.process()
-    assert cold.load_world(W1) is not None and _failures(pw1b_rig) == [], "a busy lease is skipped, never raised"
+    assert cold.load_world(W1, settle=True) is not None and _failures(pw1b_rig) == [], (
+        "a busy lease is skipped, never raised"
+    )
     rival.close()
     later, _ = pw1b_rig.process()
-    later.load_world(W1)
+    later.load_world(W1, settle=True)
     assert len(_failures(pw1b_rig)) == 1

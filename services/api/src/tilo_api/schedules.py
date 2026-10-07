@@ -439,8 +439,9 @@ class ScheduleStarter:
         digest = _digest(run.idempotency_key)
         world_id, run_id, owner, store = f"w_s{digest}", f"r_s{digest}", record.owner_user_id, self._store
         with store.grant_lock(owner):  # one owner's grants at a time: daily limits count every earlier grant
-            store.load_owner(owner)  # the earlier grants, the policies and the history a run reads: all of the owner's
-            existing = store.load_world(world_id)
+            # the earlier grants, the policies and the history a run reads: all of the owner's
+            store.load_owner(owner, settle=True)
+            existing = store.load_world(world_id, settle=False)  # its owner is checked below; :442 settled theirs
             if existing is None:
                 self._create_world(run, record, world_id, run_id)
             elif existing.owner != owner:
@@ -459,7 +460,8 @@ class ScheduleStarter:
         """world.requested, then the budget grant by the owner's own policy; stored only if the grant ran."""
         store, owner, stamp = self._store, record.owner_user_id, _stamp(self._clock())
         base = {"v": "1.0", "ts": stamp, "world_id": world_id, "run_id": run_id, "actor": owner}
-        store.load_owner(owner)  # the earlier grants and the policies are read across all of the owner's worlds
+        # the earlier grants and the policies are read across all of the owner's worlds
+        store.load_owner(owner, settle=True)
         owned = {w for w, r in store.worlds.items() if r.owner == owner}
         earlier = [e for w in owned for e in store.events.get(w, []) if e.get("type") == "budget.granted"]
         outcome = budget.request_budget_grant(

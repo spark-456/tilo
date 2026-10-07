@@ -6,9 +6,11 @@ Pinned interface, the same for every test of slice 1b (`tilo_api.durable_store`)
   `policies`, `policy_worlds`, `events`, `pending_events`) plus `.backend`, `.events_backend` and `.writer` (an
   `EventWriter` or None; the loads drain and fail through it). The store calls `backend.commit(...)` at call time,
   exactly once per `store.commit(...)`. A `rev` starts at 1 and grows by 1 per commit that writes the record.
-  - `load_world(w)`, `load_task(t)`: the record from the backend or None; a miss is never cached; an id that does
-    not match its common.schema.json pattern is None with no backend read. Loading a world reads its events by
-    `seq` from `events_backend`, reads its queue, drains it through `writer`, then applies decision 5's restart rule.
+  - `load_world(w, settle=False)`, `load_task(t, settle=False)`: read-only by default (`settle=True` drains the
+    queue and applies the restart rule; only after a route's ownership check). The record from the backend or None;
+    a miss is never cached; an id that does not match its common.schema.json pattern is None with no backend read.
+    Loading a world reads its events by `seq` from `events_backend` and its queue; with `settle=True` it then drains
+    the queue through `writer` and applies decision 5's restart rule.
   - `load_owner(owner)` loads that owner's worlds (events included) and policies; `load_path(path_params)` loads
     the `world_id`, `task_id` and `policy_id` of a request and returns the store (`deps.get_store(request)` does it).
   - `commit(*, worlds=None, tasks=None, policies=None, policy_worlds=None, parts=None, create=())`: `worlds`, `tasks`

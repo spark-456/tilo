@@ -130,7 +130,7 @@ def test_PROD_WIRE_1b_budget_granted_then_a_failed_policy_changed_never_claims_a
     assert [e["type"] for e in pw1b_rig.stream(world_id)].count("budget.granted") == 1
     writer.reopen()
     cold, _ = pw1b_rig.process()
-    cold.load_world(world_id)  # the restart resends what is queued, by id
+    cold.load_world(world_id, settle=True)  # the restart resends what is queued, by id
     types = [e["type"] for e in pw1b_rig.stream(world_id)]
     assert types.count("budget.granted") == 1 and types.count("policy.changed") == len(store.policies)
     assert pw1b_rig.backend.queue(world_id) == []

@@ -333,7 +333,8 @@ def approve(
             raise HTTPException(status_code=422, detail="Pick one of the proposed approaches.")
         preload = _load_scenario(task)  # before anything changes: a scenario that no longer loads stops the approval
         now, base, cap = now_ts(), _base(task, task.owner), body.budget_cap
-        store.load_owner(task.owner)  # the earlier grants and the policies are read across all of the owner's worlds
+        # the earlier grants and the policies are read across all of the owner's worlds
+        store.load_owner(task.owner, settle=True)
         owned = {w for w, record in store.worlds.items() if record.owner == task.owner}
         earlier = [e for w in owned for e in store.events.get(w, []) if e.get("type") == "budget.granted"]
         outcome = budget.request_budget_grant(
