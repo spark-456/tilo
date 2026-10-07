@@ -10,11 +10,13 @@ import copy
 import logging
 import math
 import threading
+import time
 import unicodedata
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import tilo_planning.plangraph as plangraph
 import tilo_policy
@@ -138,6 +140,18 @@ class _NoCards:
         raise RuntimeError("a world with no run holds no cards")
 
 
+class _ObservedWait(QuestionWait):
+    """The run's `QuestionWait`, which also says when a unit is asleep waiting for a person's answer (FR-AGT-14e)."""
+
+    def __init__(self, run: Run) -> None:
+        super().__init__(run)
+        self._run = run
+
+    async def wait_for(self, card: dict[str, Any], *, lead: str, director: str, district: str | None) -> Any:
+        with self._run.asleep():
+            return await super().wait_for(card, lead=lead, director=director, district=district)
+
+
 class Run:
     """Also the executor's writer (`emit`, `org_id`, `world_id`, `recorded_version`) and its CardStore's (`write`):
     both end at the single writer."""
@@ -151,7 +165,7 @@ class Run:
         self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
         self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
-        self.question_wait = QuestionWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)
+        self.question_wait = _ObservedWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)
         self.plan: dict[str, Any] = {}
         self.layout: dict[str, Any] = {}
         self.levels: dict[str, str] = {}
@@ -166,6 +180,14 @@ class Run:
         self._built: dict[str, dict] = {}  # event id -> the event as first built, resent as is on an exact retry
         self.failure: str | None = None
         self._failed = False
+        # What `wait_until_parked_or_done` looks at (FR-AGT-14e). Written from the run's thread, read from any thread.
+        self._ended = threading.Event()  # the run's thread has finished, whichever way out
+        self._seen = threading.Lock()
+        self._unit_of: dict[str, str] = {}  # worker -> the unit it was assigned
+        self._started: set[str] = set()  # units that were assigned
+        self._live: set[str] = set()  # assigned and not yet retired
+        self._handed: set[str] = set()  # units that handed their result over (their dependents may start)
+        self._asleep = 0  # live units waiting for a person: a gate card or a question
 
     def now(self) -> datetime:
         return datetime.now(UTC)
@@ -236,9 +258,62 @@ class Run:
             if defaulted:  # an answer already committed this card's question: the deadline closes the card as well
                 self._close_defaulted()
             raise
+        self._observe(type, actor, target, data)
         if defaulted:
             self._close_defaulted()  # the harness applied a deadline default: close that card here too (BQ-208)
         return event
+
+    def _observe(self, type_: str, actor: str, target: str, data: dict) -> None:
+        """Which units are at work: assigned, handed over and retired are the executor's own events."""
+        with self._seen:
+            if type_ == "agent.assigned":
+                self._unit_of[target] = data["unit"]
+                self._started.add(data["unit"])
+                self._live.add(data["unit"])
+            elif type_ == "agent.handoff" and actor in self._unit_of:
+                self._handed.add(self._unit_of[actor])
+            elif type_ == "agent.retired":
+                self._live.discard(self._unit_of.get(target, ""))
+
+    @contextmanager
+    def asleep(self) -> Iterator[None]:
+        """A live unit is waiting for a person (a gate card or a question) from here until the block ends."""
+        with self._seen:
+            self._asleep += 1
+        try:
+            yield
+        finally:
+            with self._seen:
+                self._asleep -= 1
+
+    def _quiet(self) -> bool:
+        """Nothing goes on until a person answers: someone waits for one, every live unit is that waiting, and no unit
+        is about to start (not started, every dependency handed over). A paused world is winding down, not waiting."""
+        if self.paused():
+            return False
+        with self._seen:
+            if self._asleep == 0 or len(self._live) != self._asleep:
+                return False
+            units = self.plan.get("units", [])
+            return not any(
+                u["id"] not in self._started and all(d in self._handed for d in u["depends_on"]) for u in units
+            )
+
+    def wait_until_parked_or_done(
+        self, timeout_s: float, *, clock: Callable[[], float] = time.monotonic, poll_s: float = 0.25
+    ) -> Literal["done", "parked", "timeout"]:
+        """FR-AGT-14e: for a Cloud Tasks delivery, which holds a request only while the run works. "done": the run's
+        thread has ended. "parked": the run is quiet at a person (see `_quiet`), never while a unit computes.
+        "timeout": `timeout_s` of `clock()` passed. The run itself is untouched either way."""
+        deadline = clock() + timeout_s
+        while True:
+            if self._ended.is_set():
+                return "done"
+            if self._quiet():
+                return "parked"
+            if clock() >= deadline:
+                return "timeout"
+            self._ended.wait(poll_s)
 
     def _close_defaulted(self) -> None:
         try:
@@ -312,6 +387,7 @@ class Run:
                 raise
         finally:
             self._abandon_unsent()
+            self._ended.set()
 
     def _outbox(self) -> Outbox:
         """The run dispatches and records only its own world's entries, and claims none once the world is paused
@@ -503,10 +579,11 @@ class Run:
         self.requested[card_id] = requested
         if self.cards.submit(card, outbox_id=outbox_id, district=district).outcome != "accepted":
             raise _GateFailed("the gate card was refused")
-        while (answered := self._answered_card(card_id)) is None:  # a person's approve on any card of this gate
-            if self.paused():
-                raise RunStopped
-            await asyncio.sleep(_POLL_S)
+        with self.asleep():  # FR-AGT-14e: a person's approve on any card of this gate
+            while (answered := self._answered_card(card_id)) is None:
+                if self.paused():
+                    raise RunStopped
+                await asyncio.sleep(_POLL_S)
         resolved, requested = self.resolved[answered], self.requested[answered]  # the answered card's own proposal
         outbox_id = requested["data"]["outbox_id"]  # a share re-raised the gate under a fresh reservation (FR-HIL-12)
         if self.paused():

@@ -260,8 +260,10 @@ def test_SEC_08_tick_expired_token_is_rejected_and_starts_nothing(sched: SchedAp
 
 @pytest.mark.parametrize(
     "claims",
-    [{"email": GMAIL_SA}, {"email": TASKS_SA}, {"email": API_SA}, {"email_verified": False}],
-    ids=["gmail-scheduler", "tasks-invoker", "tilo-api-itself", "unverified-email"],
+    # changed deliberately (FR-AGT-14e, BQ-AGT14-5): the Cloud Tasks invoker is a legitimate caller of this route
+    # (one-run delivery); what it may do is pinned in the test below.
+    [{"email": GMAIL_SA}, {"email": API_SA}, {"email_verified": False}],
+    ids=["gmail-scheduler", "tilo-api-itself", "unverified-email"],
 )
 def test_SEC_08_tick_really_signed_token_of_another_caller_is_rejected_and_starts_nothing(
     sched: SchedApi, keys: Keys, claims: dict[str, Any]
@@ -271,6 +273,19 @@ def test_SEC_08_tick_really_signed_token_of_another_caller_is_rejected_and_start
     response = sched.tick(keys.token(**claims))
 
     assert response.status_code == 403
+    _assert_nothing_started(sched, worlds)
+
+
+def test_SEC_08_tick_tasks_invoker_without_a_task_body_is_refused_and_starts_nothing(
+    sched: SchedApi, keys: Keys
+) -> None:
+    """The Cloud Tasks invoker may only deliver one run with a valid task body (FR-AGT-14e); a really signed invoker
+    token with no body is refused and starts nothing, so the identity cannot fan out the tick."""
+    worlds = _with_due_schedule(sched)
+
+    response = sched.tick(keys.token(email=TASKS_SA))
+
+    assert response.status_code == 422
     _assert_nothing_started(sched, worlds)
 
 

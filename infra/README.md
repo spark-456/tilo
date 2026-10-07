@@ -139,6 +139,26 @@ setting `TILO_SCHEDULES_STORE=firestore`:
 `pnpm exec firebase deploy --only firestore:rules --project <project>`; they deny every
 client the `schedules` collection. Terraform only: the user applies it.
 
+### Cloud Tasks hand-off for scheduled runs (FR-AGT-14e)
+
+No Terraform change: the tick no longer starts the run on the Scheduler's request (Cloud Run
+bills request-based CPU, so a run thread there is throttled and lost on scale-to-zero). It
+hands each due slot to the existing Cloud Tasks queue `runs`, and Cloud Tasks delivers it to
+the same tick route as `tilo-tasks-invoker`, where the run executes inside that request.
+`tilo-api` (and `tilo-harness`) already hold `roles/cloudtasks.enqueuer` and `serviceAccountUser` on
+`tilo-tasks-invoker`, and api is public, so a task reaches it without any `run.invoker`.
+Two more variables on tilo-api are yours to set (the tick answers 503 until both are set):
+
+- `TILO_TASKS_CALLER` = `tilo-tasks-invoker@<project>.iam.gserviceaccount.com`
+- `TILO_RUNS_QUEUE` = `projects/<project>/locations/asia-southeast1/queues/runs`
+
+They must differ from `TILO_SCHEDULE_TICK_CALLER`: the Scheduler never gets the task mode
+and Cloud Tasks never gets the fan-out (one account for both is refused). One setting is
+not in Terraform yet: the request timeout of `tilo-api` is Cloud Run's 300 s default, and
+a delivery waits up to 1500 s for its run, so set it to 1800 s,
+`gcloud run services update tilo-api --timeout=1800 --region asia-southeast1`, until an
+infra ticket adds `timeout` to the service module (open in BQ-AGT14-5).
+
 ## Destroy
 
 ```powershell

@@ -9,10 +9,12 @@ configured through the two environment names the document pins, with `monkeypatc
 
 from __future__ import annotations
 
+import base64
 import copy
+import json
 import secrets
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -42,6 +44,56 @@ TICK = "/internal/schedules/tick"
 ENV_AUDIENCE = "TILO_SCHEDULE_TICK_AUDIENCE"
 ENV_CALLER = "TILO_SCHEDULE_TICK_CALLER"
 ENV_STORE = "TILO_SCHEDULES_STORE"
+# FR-AGT-14e (API_FR_AGT_14e.md): the Cloud Tasks hand-off (the Scheduler fans out; Cloud Tasks calls the same route).
+ENV_QUEUE = "TILO_RUNS_QUEUE"
+ENV_TASKS_CALLER = "TILO_TASKS_CALLER"
+QUEUE = f"projects/{PROJECT}/locations/asia-southeast1/queues/runs"
+
+
+class FakeTasksClient:
+    """The `TasksClient` Protocol of API_FR_AGT_14e.md, with no network: `enqueue(task) -> None | AlreadyExists`.
+
+    Records a deep copy of every task it is handed (`calls`). A task NAME it has already accepted answers
+    `AlreadyExists()` (Cloud Tasks' ALREADY_EXISTS inside the name-reuse window) and is not stored twice. `error` makes
+    every call raise it (a transport or permission failure); `fail_when(task)` raises for chosen tasks only."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.created: dict[str, dict[str, Any]] = {}
+        self.error: BaseException | None = None
+        self.fail_when: Callable[[dict[str, Any]], BaseException | None] | None = None
+        self._lock = threading.Lock()
+
+    def enqueue(self, task: Mapping[str, Any]) -> Any:
+        from tilo_api.schedules import AlreadyExists  # noqa: PLC0415 - a missing name fails the test that needs it
+
+        snapshot = copy.deepcopy(dict(task))
+        with self._lock:
+            self.calls.append(snapshot)
+            if self.error is not None:
+                raise self.error
+            if self.fail_when is not None and (failure := self.fail_when(snapshot)) is not None:
+                raise failure
+            if snapshot["name"] in self.created:
+                return AlreadyExists()
+            self.created[snapshot["name"]] = snapshot
+            return None
+
+
+def task_payload(task: Mapping[str, Any]) -> dict[str, Any]:
+    """The JSON body of a Cloud Tasks HTTP task (the REST resource carries it base64-encoded)."""
+    return json.loads(base64.b64decode(task["httpRequest"]["body"]))
+
+
+def task_body(schedule_id: str, due: datetime, **extra: Any) -> dict[str, Any]:
+    """The body Cloud Tasks delivers for one slot: `schedule_id`, `slot` (the slot key) and `due` (ISO, UTC), plus what
+    the fan-out also writes (`skipped`, `prior_world_id`; BQ-AGT14-5 R1), which a test passes as `extra` (both are
+    optional: a body without them means 0 and None)."""
+    from tilo_harness.schedule import slot_key  # noqa: PLC0415
+
+    return {
+        "schedule_id": schedule_id, "slot": slot_key(schedule_id, due), "due": due.astimezone(UTC).isoformat(), **extra,
+    }  # fmt: skip
 
 
 class Clock:
@@ -147,14 +199,21 @@ class SchedApi:
         if deps.get_event_writer not in overrides:  # the tick's alerts and a fired run write through the single writer
             writer = make_writer(flow.store)
             overrides[deps.get_event_writer] = lambda: writer
+        self.tasks = FakeTasksClient()  # FR-AGT-14e: what the tick's fan-out enqueues into (never the network)
+        if hasattr(schedules, "get_tasks_client_factory"):  # absent before the 14e builder: the old tests keep running
+            overrides[schedules.get_tasks_client_factory] = lambda: lambda: self.tasks
+        self._delivered = 0
         if configured:
             monkeypatch.setenv(ENV_AUDIENCE, AUDIENCE)
             monkeypatch.setenv(ENV_CALLER, SCHEDULE_SA)
+            monkeypatch.setenv(ENV_QUEUE, QUEUE)
+            monkeypatch.setenv(ENV_TASKS_CALLER, TASKS_SA)
         else:
-            monkeypatch.delenv(ENV_AUDIENCE, raising=False)
-            monkeypatch.delenv(ENV_CALLER, raising=False)
+            for name in (ENV_AUDIENCE, ENV_CALLER, ENV_QUEUE, ENV_TASKS_CALLER):
+                monkeypatch.delenv(name, raising=False)
         monkeypatch.delenv(ENV_STORE, raising=False)
         self.good_token = self.verifier.register(SCHEDULE_SA)
+        self.tasks_token = self.verifier.register(TASKS_SA)  # the identity Cloud Tasks signs its deliveries with
 
     # --- who is calling -------------------------------------------------------------------------
 
@@ -225,6 +284,25 @@ class SchedApi:
             headers = bearer(token or self.good_token)
         return self.flow.client.post(TICK, headers=headers, **kwargs)
 
+    def task_call(self, body: Any, token: str | None = None, **kwargs: Any):
+        """What Cloud Tasks does: the same route, the Tasks identity's token and the task's JSON body."""
+        headers = kwargs.pop("headers", None)
+        if headers is None:
+            headers = bearer(token or self.tasks_token)
+        return self.flow.client.post(TICK, headers=headers, json=body, **kwargs)
+
+    def deliver_new_tasks(self) -> int:
+        """Delivers, in order, every task the fan-out enqueued since the last call, as Cloud Tasks would (each body
+        POSTed once to the tick with the Tasks identity). Returns how many answered 200 with `{"ran": 1, ...}`.
+        A refused or failed delivery is simply not counted (Cloud Tasks would retry a 5xx; a test does that itself)."""
+        ran = 0
+        for task in self.tasks.calls[self._delivered :]:
+            self._delivered += 1
+            response = self.task_call(task_payload(task))
+            if response.status_code == 200 and response.json().get("ran") == 1:
+                ran += 1
+        return ran
+
     # --- records the tests put straight into the store ------------------------------------------
 
     def record(self, task: ApprovedTask, schedule_id: str, **over: Any) -> Schedule:
@@ -277,12 +355,15 @@ __all__ = [
     "CAP",
     "ENV_AUDIENCE",
     "ENV_CALLER",
+    "ENV_QUEUE",
     "ENV_STORE",
+    "ENV_TASKS_CALLER",
     "FLOW_USER",
     "GMAIL_SA",
     "GOOGLE_ISSUER",
     "MON_0330Z",
     "OTHER_USER",
+    "QUEUE",
     "SCHEDULE_SA",
     "SUNDAY",
     "TASKS_SA",
@@ -292,7 +373,10 @@ __all__ = [
     "ApprovedTask",
     "Clock",
     "FakeOidcVerifier",
+    "FakeTasksClient",
     "SchedApi",
     "bearer",
     "l3_budget_policy",
+    "task_body",
+    "task_payload",
 ]
