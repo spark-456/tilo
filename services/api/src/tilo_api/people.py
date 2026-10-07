@@ -19,6 +19,7 @@ from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, people_items
+from tilo_api.people_limits import idempotent, write_limit
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, read_minutes, set_world
 from tilo_api.people_plate import build_plate
 from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
@@ -52,7 +53,13 @@ _IDS = r"^u[0-9]{4,6}(,u[0-9]{4,6}){0,19}$"  # 1 to 20 utterance ids, comma sepa
 
 class _PeopleRoute(APIRoute):
     """A seam with no production wiring raises `NotImplementedError` (T4's artifact store and redactor): 503
-    `not_configured`, like the seams that raise it as an HTTP error."""
+    `not_configured`, like the seams that raise it as an HTTP error. Every POST route counts one write attempt first
+    (SEC-10: `write_limit`, before the body is read)."""
+
+    def __init__(self, path: str, endpoint: Callable[..., Any], *, dependencies: Any = None, **kwargs: Any) -> None:
+        if "POST" in kwargs.get("methods", ()):
+            dependencies = [*(dependencies or []), Depends(write_limit)]
+        super().__init__(path, endpoint, dependencies=dependencies, **kwargs)
 
     def get_route_handler(self) -> Callable[[Request], Any]:
         handler = super().get_route_handler()
@@ -266,6 +273,7 @@ def confirm_work_item_route(
 
 @router.post("/v1/meetings", status_code=201)
 def create_meeting_route(
+    request: Request,
     body: Annotated[MeetingIn, Depends(json_body(MeetingIn))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
@@ -273,11 +281,16 @@ def create_meeting_route(
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
     """A person of the org adds a meeting; the server mints the id and stamps the attestation (PE-18)."""
-    return _answer(lambda: create_meeting(_writer(principal, stores, clock, redact), body))
+    return _answer(
+        lambda: idempotent(
+            request, principal, stores, body, lambda: create_meeting(_writer(principal, stores, clock, redact), body)
+        )
+    )
 
 
 @router.post("/v1/people", status_code=201)
 def create_person_route(
+    request: Request,
     body: Annotated[PersonIn, Depends(json_body(PersonIn))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
@@ -285,11 +298,16 @@ def create_person_route(
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
     """An org owner adds a person; the server mints the id and the org is `deps.ORG_ID` (PE-17)."""
-    return _answer(lambda: create_person(_writer(principal, stores, clock, redact), body))
+    return _answer(
+        lambda: idempotent(
+            request, principal, stores, body, lambda: create_person(_writer(principal, stores, clock, redact), body)
+        )
+    )
 
 
 @router.post("/v1/people/first", status_code=201)
 def create_first_person_route(
+    request: Request,
     body: Annotated[PersonIn, Depends(json_body(PersonIn))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
@@ -297,7 +315,15 @@ def create_first_person_route(
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
     """The signed-in principal founds an empty org as its owner (PE-17); 403 once the org has a person."""
-    return _answer(lambda: create_first_person(_writer(principal, stores, clock, redact), body))
+    return _answer(
+        lambda: idempotent(
+            request,
+            principal,
+            stores,
+            body,
+            lambda: create_first_person(_writer(principal, stores, clock, redact), body),
+        )
+    )
 
 
 @router.post("/v1/people/{person_id}/memberships")
@@ -350,7 +376,15 @@ def create_work_item_route(
     def owners() -> deps.SourceOwners:  # resolved only when the source is mail or a request
         return request.app.dependency_overrides.get(deps.get_source_owners, deps.get_source_owners)()  # type: ignore[no-any-return]
 
-    return _answer(lambda: create_item(_writer(principal, stores, clock, redact), body, owners))
+    return _answer(
+        lambda: idempotent(
+            request,
+            principal,
+            stores,
+            body,
+            lambda: create_item(_writer(principal, stores, clock, redact), body, owners),
+        )
+    )
 
 
 def _item_writer(

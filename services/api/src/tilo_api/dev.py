@@ -189,7 +189,8 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
         CORSMiddleware,
         allow_origins=origins,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Idempotency-Key"],
+        expose_headers=["Retry-After"],
     )  # no credentials: the dev principal reads no cookie or header
     app.add_middleware(_LocalHostOnly)  # added last, so it runs first
 

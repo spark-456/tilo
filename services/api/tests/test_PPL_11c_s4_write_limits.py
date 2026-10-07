@@ -17,6 +17,7 @@ API_PPL_11c.md section 7).
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 from _ppl11a_lib import OWNER, PRIYA, SAM, fixture_case, run_threads
@@ -24,12 +25,31 @@ from _ppl11c_lib import (
     MAX_BODY_BYTES,
     MEETING_BODY,
     PERSON_BODY,
+    R_MT_DELETE,
+    R_MT_EDIT,
+    R_MT_GET,
+    R_MT_MINUTES,
+    R_MT_WORLD,
+    R_PERSON_FIRST,
+    R_ROLE,
+    R_TEAM_ADD,
+    R_TEAM_REMOVE,
+    R_WI_DONE,
+    R_WI_EDIT,
+    R_WI_GET,
+    R_WI_LIST,
+    R_WI_NOT_MINE,
+    R_WI_PUT_BACK,
+    R_WI_REOPEN,
+    R_WI_SNOOZE,
     WORK_ITEM_BODY,
     WRITES_PER_MINUTE,
     at,
     meeting_rig,
     padded,
+    path_of,
     stream_post,
+    valid_request,
     work_rig,
 )
 from fastapi import FastAPI
@@ -75,6 +95,23 @@ def test_PPL_11c_s4_BQ_PPL11C_1_an_oversize_body_is_a_413_and_the_rest_of_it_is_
     status, consumed, headers, text = stream_post(rig.app, path, total_bytes=10, declared_length=50_000_000)
     assert status == 413 and consumed <= 4096, "a declared length over the cap is refused before reading"
     assert rig.snapshot() == before
+
+
+def test_PPL_11c_s4_BQ_PPL11C_1_every_people_post_route_is_in_the_body_cap_list(people_rig):
+    """A guard (passes once S1 to S3 and S6 have landed, and must keep passing): a people POST route added later
+    without a line in `BODY_ROUTES` would silently have no cap. `/v1/assistant/ask` is PPL-11b's, not a people write."""
+    rig = people_rig()
+    not_people_writes = {"/v1/assistant/ask"}
+    templates = [
+        t
+        for t, methods in rig.app.openapi()["paths"].items()
+        if "post" in methods and t.startswith("/v1/") and t not in not_people_writes
+    ]
+    patterns = {t: re.compile("^" + re.sub(r"\{[^/}]+\}", "[^/]+", t) + "$") for t in templates}
+    uncovered = [t for t, p in patterns.items() if not any(p.match(path) for path in BODY_ROUTES.values())]
+    assert not uncovered, f"people POST routes with no body-cap case: {uncovered}"
+    stale = [path for path in BODY_ROUTES.values() if not any(p.match(path) for p in patterns.values())]
+    assert not stale, f"body-cap cases for routes the app does not serve: {stale}"
 
 
 def test_PPL_11c_s4_BQ_PPL11C_1_a_body_of_exactly_the_cap_is_read_and_one_byte_more_is_not(people_rig):
@@ -176,6 +213,53 @@ def test_PPL_11c_s4_PE_17_a_retry_of_the_first_person_claim_is_the_first_answer(
     assert len(rig.real.persons.list(rig.org)) == 1
 
 
+CHANGED_FIELD = {"meeting": "title", "work item": "title", "person": "display_name", "first person": "display_name"}
+
+
+def _create_rig(people_rig, what):
+    """(rig, path, body) for one of the four creates, signed in as someone who may make it."""
+    if what == "first person":
+        rig = people_rig()
+        rig.as_user("u_founder")
+        return rig, "/v1/people/first", PERSON_BODY
+    path, body, actor = CREATES[what]
+    rig = work_rig(people_rig)
+    rig.as_user(actor)
+    return rig, path, body
+
+
+@pytest.mark.parametrize("what", list(CHANGED_FIELD))
+def test_PPL_11c_s4_PE_19_the_same_key_with_another_body_is_refused_on_every_create(people_rig, what):
+    rig, path, body = _create_rig(people_rig, what)
+    assert rig.client.post(path, json=body, headers=KEY).status_code == 201
+    snapshot = rig.snapshot()
+    other = {**body, CHANGED_FIELD[what]: "Something else entirely"}
+    reused = rig.client.post(path, json=other, headers=KEY)
+    assert reused.status_code == 422, (reused.status_code, reused.text[:200])
+    assert reused.json() == {"detail": "idempotency_key_reused", "code": "idempotency_key_reused"}
+    assert rig.snapshot() == snapshot
+
+
+@pytest.mark.parametrize("what", list(CHANGED_FIELD))
+def test_PPL_11c_s4_PE_19_a_malformed_key_is_a_422_on_every_create_and_creates_nothing(people_rig, what):
+    rig, path, body = _create_rig(people_rig, what)
+    before = rig.snapshot()
+    for bad in ("", "a b", "x" * 65, "k;1", "k/1"):
+        response = rig.client.post(path, json=body, headers={"Idempotency-Key": bad})
+        assert response.status_code == 422, (what, repr(bad), response.status_code)
+    assert rig.snapshot() == before
+
+
+@pytest.mark.parametrize("key", ["a" * 64, "A_b-9", "0"], ids=["64 characters", "mixed", "one character"])
+def test_PPL_11c_s4_PE_19_a_key_of_one_to_sixty_four_letters_digits_underscores_and_hyphens_is_a_key(people_rig, key):
+    rig = work_rig(people_rig)
+    first = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers={"Idempotency-Key": key})
+    assert first.status_code == 201, first.text[:200]
+    again = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers={"Idempotency-Key": key})
+    assert again.status_code == 201 and again.content == first.content
+    assert len(rig.real.work_items.list(rig.org, "owner", PRIYA)) == 3, "the two seeded items and one new one"
+
+
 # --- the rate cap ---------------------------------------------------------------------------------------------------
 
 
@@ -213,6 +297,77 @@ def test_PPL_11c_s4_SEC_10_a_principal_never_gets_more_than_the_cap_accepted_in_
     assert accepted == min(count, WRITES_PER_MINUTE)
 
 
+@pytest.mark.parametrize(
+    ("path", "body", "status"),
+    [
+        ("/v1/work-items/wi_never_made/done", {}, 404),
+        ("/v1/work-items", {"nonsense": 1}, 422),
+    ],
+    ids=["a 404", "a 422"],
+)
+def test_PPL_11c_s4_SEC_10_every_attempt_past_sign_in_counts_a_404_and_a_422_too(people_rig, path, body, status):
+    rig = work_rig(people_rig)
+    for n in range(WRITES_PER_MINUTE):
+        assert rig.post(path, body).status_code == status, n
+    over = rig.post("/v1/work-items", WORK_ITEM_BODY)
+    assert over.status_code == 429 and over.json()["code"] == "rate_limited", over.text[:200]
+
+
+def test_PPL_11c_s4_SEC_10_reads_are_never_counted(people_rig):
+    rig = work_rig(people_rig)
+    for n in range(WRITES_PER_MINUTE + 10):
+        assert (rig.plate() if n % 2 else rig.get("/v1/work-items")).status_code == 200, n
+    for n in range(WRITES_PER_MINUTE):
+        assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 201, n
+    assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 429
+
+
+def test_PPL_11c_s4_SEC_10_a_retry_with_the_same_key_is_an_attempt_and_the_cap_is_decided_before_the_key(people_rig):
+    rig = work_rig(people_rig)
+    first = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+    assert first.status_code == 201
+    for n in range(WRITES_PER_MINUTE - 1):
+        again = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+        assert again.status_code == 201 and again.content == first.content, n
+    over = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+    assert over.status_code == 429 and over.json()["code"] == "rate_limited", "the 61st attempt, a replay included"
+
+
+def test_PPL_11c_s4_SEC_10_the_window_is_a_minute_of_the_injected_clock(people_rig):
+    rig = work_rig(people_rig)
+    for _ in range(WRITES_PER_MINUTE):
+        assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 201
+    rig.set_now(at(seconds=59))
+    assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 429, (
+        "59 s after the first write is inside a minute"
+    )
+    rig.set_now(at(seconds=61))
+    assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 201
+
+
+def test_PPL_11c_s4_SEC_10_a_limited_caller_is_refused_before_any_of_the_body_is_read(people_rig):
+    rig = work_rig(people_rig)
+    for _ in range(WRITES_PER_MINUTE):
+        rig.post("/v1/work-items", WORK_ITEM_BODY)
+    before = rig.snapshot()
+    status, consumed, headers, text = stream_post(rig.app, "/v1/work-items", total_bytes=30_000)  # under the 32 KiB cap
+    assert status == 429 and json.loads(text)["code"] == "rate_limited", (status, text[:120])
+    assert 1 <= int(headers["retry-after"]) <= 60
+    assert consumed <= 4096, f"the app read {consumed} bytes of the body of a request it was going to refuse"
+    assert rig.snapshot() == before
+
+
+def test_PPL_11c_s4_SEC_10_the_counter_belongs_to_the_install_not_to_the_module(people_rig):
+    """A second install (a fresh `PeopleStores`) starts at zero for the same person at the same time of day; if the
+    counter were module state, one test's writes would limit the next test's."""
+    rig = work_rig(people_rig)
+    for _ in range(WRITES_PER_MINUTE):
+        assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 201
+    assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 429
+    fresh = work_rig(people_rig)
+    assert fresh.post("/v1/work-items", WORK_ITEM_BODY).status_code == 201
+
+
 # --- no whole-org directory per write -------------------------------------------------------------------------------
 
 
@@ -244,6 +399,17 @@ def test_PPL_11c_s4_BQ_PPL11C_12_the_existing_writes_read_the_actor_by_id_and_li
     assert not _listed(other), "confirming minutes listed the whole org directory"
 
 
+def test_PPL_11c_s4_BQ_PPL11C_12_meeting_world_and_delete_read_the_actor_by_id_and_list_no_directory(people_rig):
+    """S6 and S2a writes: no whole-org directory, no more than two person records (S1 and S2b have their own)."""
+    rig = meeting_rig(people_rig)
+    for path in ("/v1/meetings/mt_q4_plan/world", "/v1/meetings/mt_q4_plan/delete"):
+        del rig.store_calls[:]
+        response = rig.post(path)
+        assert response.status_code == 200, (path, response.status_code, response.text[:200])
+        assert not _listed(rig), f"{path} listed the whole org directory"
+        assert len([c for c in rig.store_calls if c[:2] == ("person", "get")]) <= 2, path
+
+
 # --- no-store on every answer ---------------------------------------------------------------------------------------
 
 
@@ -272,6 +438,54 @@ def test_PPL_11c_s4_PE_22_every_answer_is_no_store_the_gates_403_and_a_validatio
     for label, response in answers.items():
         assert response.headers.get("cache-control") == "no-store", (label, response.status_code)
     assert [answers[k].status_code for k in ("gate 403 (visitor)", "413", "422 (bad query)")] == [403, 413, 422]
+
+
+def test_PPL_11c_s4_PE_22_every_people_route_of_this_ticket_answers_no_store_whatever_the_status(people_rig):
+    """Each route of API_PPL_11c.md section 1, asked by someone it may succeed for and by an id it never will, plus
+    the directory routes: the Cache-Control header is on the answer, not on the happy path only."""
+    rig = work_rig(people_rig)
+    mine, theirs, meeting = {"work_item_id": "wi_own1"}, {"work_item_id": "wi_never_made"}, {"meeting_id": "mt_q4_plan"}
+    nobody = {"person_id": "u_never_made"}
+    calls = [
+        (PRIYA, R_WI_LIST, {}),
+        (PRIYA, R_WI_GET, mine),
+        (PRIYA, R_WI_GET, theirs),
+        (PRIYA, R_WI_EDIT, mine),
+        (PRIYA, R_WI_SNOOZE, mine),
+        (PRIYA, R_WI_PUT_BACK, mine),
+        (PRIYA, R_WI_DONE, mine),
+        (PRIYA, R_WI_REOPEN, mine),
+        (PRIYA, R_WI_NOT_MINE, {"work_item_id": "wi_rate_sheet"}),
+        (PRIYA, R_WI_DONE, theirs),
+        (PRIYA, R_PERSON_FIRST, {}),
+        (OWNER, R_MT_GET, meeting),
+        (OWNER, R_MT_GET, {"meeting_id": "mt_never_made"}),
+        (OWNER, R_MT_EDIT, meeting),
+        (OWNER, R_MT_MINUTES, meeting),
+        (OWNER, R_MT_WORLD, meeting),
+        (OWNER, R_TEAM_ADD, {"person_id": PRIYA}),
+        (OWNER, R_TEAM_REMOVE, {"person_id": PRIYA}),
+        (OWNER, R_ROLE, {"person_id": PRIYA}),
+        (OWNER, R_TEAM_ADD, nobody),
+        (OWNER, R_MT_DELETE, meeting),  # last: the meeting is gone after it
+    ]
+    for actor, route, ids in calls:
+        rig.require_route(route)
+        rig.as_user(actor)
+        response = rig.client.request(route[0], path_of(route, **ids), **valid_request(route))
+        assert response.headers.get("cache-control") == "no-store", (route, ids, response.status_code)
+
+
+def test_PPL_11c_s4_PE_22_a_409_and_a_503_are_no_store_too(people_rig):
+    rig = work_rig(people_rig)
+    rig.conflicting_stores("work_items")
+    conflict = rig.post("/v1/work-items/wi_own1/done")
+    assert conflict.status_code == 409, (conflict.status_code, conflict.text[:200])
+    assert conflict.headers.get("cache-control") == "no-store", "409"
+    rig.unwire("redactor")
+    unavailable = rig.post("/v1/work-items", WORK_ITEM_BODY)
+    assert unavailable.status_code == 503, (unavailable.status_code, unavailable.text[:200])
+    assert unavailable.headers.get("cache-control") == "no-store", "503"
 
 
 def test_PPL_11c_s4_PE_22_a_rate_limited_answer_is_no_store_too(people_rig):
@@ -316,3 +530,31 @@ def test_PPL_11c_s4_BQ_PPL11C_4_the_dev_browser_may_send_an_idempotency_key_and_
     real = client.get("/v1/plate", headers={"Origin": dev.DEFAULT_ORIGIN})
     assert real.status_code == 200
     assert "retry-after" in real.headers.get("access-control-expose-headers", "").lower()
+
+
+# --- supervisor decisions of 7 Oct (BQ-PPL11C-13, BQ-PPL11C-14) -------------------------------------------------------
+
+
+def test_PPL_11c_s4_BQ_PPL11C_13_an_oversize_body_counts_against_the_rate_cap(people_rig):
+    """Every authenticated write attempt counts, a 413 included: oversized-payload spam cannot bypass the limiter."""
+    rig = work_rig(people_rig)
+    for n in range(WRITES_PER_MINUTE):
+        oversize = rig.client.post(
+            "/v1/work-items", content=b" " * (MAX_BODY_BYTES + 1), headers={"content-type": "application/json"}
+        )
+        assert oversize.status_code == 413, n
+    over = rig.post("/v1/work-items", WORK_ITEM_BODY)
+    assert over.status_code == 429 and over.json()["code"] == "rate_limited", over.text[:200]
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_an_idempotency_key_is_scoped_to_the_route_as_well_as_the_principal(people_rig):
+    """The same key on another create route is another request, never a replay (or a reuse) of the first route's."""
+    rig = work_rig(people_rig)
+    item = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+    assert item.status_code == 201
+    meetings = len(rig.real.meetings.list(rig.org))
+    meeting = rig.client.post("/v1/meetings", json=MEETING_BODY, headers=KEY)
+    assert meeting.status_code == 201 and meeting.json()["id"].startswith("mt_"), meeting.text[:200]
+    assert len(rig.real.meetings.list(rig.org)) == meetings + 1
+    assert rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY).content == item.content
+    assert rig.client.post("/v1/meetings", json=MEETING_BODY, headers=KEY).content == meeting.content
