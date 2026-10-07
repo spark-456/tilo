@@ -11,8 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
 import { ClientProvider } from "../api/ClientProvider";
 import { FixtureClient } from "../api/fixtureClient";
-import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
 import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
+import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
 import { forgetWorld, rememberWorld, useLastStartedWorld } from "../world/lastWorld";
 import { getReplayPoint, setReplayPoint } from "../world/replayPoint";
 import { useRunLog } from "../world/runLog";
@@ -134,11 +134,12 @@ describe("FR_WLD_12 stage mode (1920x1080 layout, presenter hotkeys, reset with 
       expect(claudeMd).toContain(hk.key);
     }
 
-    const client = new FixtureClient(1000);
-    const container = await mountApp(`/world/${FIXTURE_WORLD_ID}/stage?speed=1000`, client);
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 80));
-    });
+    const client = new FixtureClient();
+    client.subscribeEvents = (_world, onEvent) => {
+      for (const e of EVENTS_VILLAGE_BASIC) onEvent(e);
+      return () => undefined;
+    };
+    const container = await mountApp(`/world/${FIXTURE_WORLD_ID}/stage`, client);
 
     expect(getStageMode()).toBe(false);
     await act(async () => {
@@ -283,20 +284,21 @@ describe("FR_WLD_12 stage mode (1920x1080 layout, presenter hotkeys, reset with 
   });
 
   it("FR_WLD_12_honesty_stage_mode_and_reset_change_layout_only_and_never_invent_events", async () => {
-    const client = new FixtureClient(1000);
+    const client = new FixtureClient();
+    client.subscribeEvents = (_world, onEvent) => {
+      for (const e of EVENTS_VILLAGE_BASIC) onEvent(e);
+      return () => undefined;
+    };
     let loggedEvents: readonly unknown[] = [];
     function LogProbe() {
       loggedEvents = useRunLog(client, FIXTURE_WORLD_ID);
       return null;
     }
 
-    const container = await mountApp(`/world/${FIXTURE_WORLD_ID}/stage?speed=1000`, client);
+    const container = await mountApp(`/world/${FIXTURE_WORLD_ID}/stage`, client);
     const probeRoot = createRoot(document.body.appendChild(document.createElement("div")));
     await act(async () => {
       probeRoot.render(<LogProbe />);
-    });
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 80));
     });
 
     const beforeCount = loggedEvents.length;
