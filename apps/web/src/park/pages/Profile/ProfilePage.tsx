@@ -110,7 +110,10 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<"missing" | "failed" | null>(null);
   const [form, setForm] = useState<Form | null>(null);
-  const [tab, setTab] = useState<TabId>(() => tabFrom(app.params.tab));
+  const routeTab = tabFrom(app.params.tab);
+  const [tab, setTab] = useState<TabId>(routeTab);
+  // The address names a tab ("?tab=appearance", the notification menu's settings link): follow it when it changes.
+  useEffect(() => setTab(routeTab), [routeTab]);
   const [notif, setNotif] = useState<boolean[][]>([]);
   const [quiet, setQuiet] = useState(false);
   const [sessions, setSessions] = useState<ProfileSession[]>([]);

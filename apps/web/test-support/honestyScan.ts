@@ -150,17 +150,26 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     reason:
       "Same ambient scenery as above, written as the animation shorthand: cars and anonymous agent-styled pedestrians that stand for no run, drawn frozen when still. Agent motion comes only from recorded events (HR-1).",
   },
+  // The Park shell's own chrome (WEB-MOTION-2): the boot splash, the page change, the progress bar and the world
+  // card. It moves because a person opened the app, clicked a tab or opened a world, never because of an agent or
+  // a run state (src/honesty/park-transitions.allowlist.test.ts pins how narrow these entries stay).
   {
     file: "src/park/shell/park.shell.css",
     rule: "css-keyframes",
     reason:
-      "Keyframes for the Park city's ambient scenery, cars and anonymous pedestrians drawn with agent-style art that stand for no run (mvXY, waddle, walkFrame): transform and opacity only. Agents animate only from recorded events (HR-1).",
+      "Keyframes of the Park shell. The city's ambient scenery, cars and anonymous pedestrians drawn with agent-style art that stand for no run (mvXY, waddle, walkFrame), and non-agent UI chrome that moves when a person acts: the boot splash's bar and fade and the world loader's ring and card fade (tiloSlide, tiloSpin, tiloFade). Transform and opacity only. Agents animate only from recorded events (HR-1).",
   },
   {
     file: "src/park/shell/park.shell.css",
     rule: "css-animation",
     reason:
-      "animation-play-state pauses the ambient city scenery (anonymous cars and pedestrians that stand for no run) under the veil and in a hidden tab. It starts nothing; agents animate only from recorded events (HR-1).",
+      "Ambient city scenery and non-agent UI chrome. animation-play-state pauses the city's anonymous cars and pedestrians (they stand for no run) under the veil and in a hidden tab. The boot splash's sliding bar and fade and the world loader's spinning ring and card fade run only while a person waits for the app or a world to open, and reduced motion turns them off. None starts from or implies the state of a run; agents animate only from recorded events (HR-1).",
+  },
+  {
+    file: "src/park/shell/park.shell.css",
+    rule: "css-transition",
+    reason:
+      "UI chrome only, non-agent: the page change fade and slide, the top progress bar and its fill. Each runs after a person's click and animates transform and opacity only, never a layout property; reduced motion turns them off. Nothing here shows or implies an agent, a run or a decision; agents animate only from recorded events (HR-1).",
   },
 ];
 
