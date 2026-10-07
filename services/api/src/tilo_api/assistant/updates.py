@@ -33,6 +33,7 @@ _LABEL_MAX = 140
 _SNOOZE_MAX = timedelta(days=30)
 _PRON = ("it", "this", "that")
 _PREP = frozenset({"to", "until", "till", "for", "on", "in"})
+_MAX_PREP = 3  # a real ask has one or two; more is refused, so a hostile one cannot fan out into hundreds of splits
 _SNOOZE = frozenset({"snooze", "postpone", "defer", "push", "move", "reschedule"})
 _DONE = frozenset(
     {("done",), ("all", "done"), ("finished",), ("it", "is", "done"), ("it's", "done"), ("that", "is", "done")}
@@ -82,6 +83,8 @@ def _parse(key: str, config: AssistantConfig) -> tuple[str, Sequence[Split]] | N
     if verb == "finished" and rest:
         return "mark_done", [(rest, None)]
     if verb in _SNOOZE:  # the last preposition first: a title may hold "for" or "in"
+        if sum(w in _PREP for w in rest) > _MAX_PREP:
+            return None
         splits = [
             (rest[:i], " ".join(rest[i:] if rest[i] == "in" else rest[i + 1 :]))
             for i in reversed(range(len(rest)))
@@ -91,8 +94,17 @@ def _parse(key: str, config: AssistantConfig) -> tuple[str, Sequence[Split]] | N
     return None
 
 
+def _titles(rows: Sequence[Mapping[str, Any]], config: AssistantConfig) -> list[tuple[str, frozenset[str]]]:
+    """(work item id, its title words), computed once per request: the same row is tried against every split."""
+    return [
+        (r["ref"]["id"], frozenset(words(question_key(r["title"]), config)))
+        for r in rows
+        if r["ref"]["kind"] == "work_item" and isinstance(r["title"], str)
+    ]
+
+
 def _target(
-    named: tuple[str, ...], rows: Sequence[Mapping[str, Any]], ask: Ask, config: AssistantConfig
+    named: tuple[str, ...], titles: Sequence[tuple[str, frozenset[str]]], ask: Ask, config: AssistantConfig
 ) -> tuple[bool, Ref | None]:
     """(decided, item): the words name one gated work item, the selection (pronoun or no title), or are ambiguous
     (decided, None). A title that names nothing is not decided: the rules cannot read the phrase."""
@@ -101,14 +113,8 @@ def _target(
         return True, ask.context if ask.context is not None and ask.context.kind == "work_item" else None
     if not any(len(w) >= 3 for w in wanted):
         return False, None
-    hits = [
-        r
-        for r in rows
-        if r["ref"]["kind"] == "work_item"
-        and isinstance(r["title"], str)
-        and wanted <= set(words(question_key(r["title"]), config))
-    ]
-    return (len(hits) > 0), (Ref("work_item", hits[0]["ref"]["id"]) if len(hits) == 1 else None)
+    hits = [item for item, got in titles if wanted <= got]
+    return (len(hits) > 0), (Ref("work_item", hits[0]) if len(hits) == 1 else None)
 
 
 def _window_start() -> time:
@@ -161,8 +167,9 @@ def match_update(
     if parsed is None:
         return None
     kind, splits = parsed
+    titles = _titles(rows, config)
     for named, phrase in splits:
-        decided, ref = _target(named, rows, ask, config)
+        decided, ref = _target(named, titles, ask, config)
         if decided:
             break
     else:
