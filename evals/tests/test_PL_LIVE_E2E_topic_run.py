@@ -1,17 +1,23 @@
-"""PL-LIVE-E2E / FR-INT-15: `just live-run --topic` through the SAME runner as `just live-e2e` (#340). Fake live
+"""PL-LIVE-E2E / FR-INT-15: `just live-run` through the SAME runner as `just live-e2e` (#340). Fake live
 provider (scripted from a bank case's Director data, whatever the topic) and fake safety screen injected; the live
 switch is set only in a patched environment; every host but loopback is blocked. No paid or network call."""
 
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import importlib
 import io
+import os
+import re
+import shutil
+import subprocess
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
 import _live_e2e_lib as lib
+import pytest
 import yaml
 from _live_e2e_lib import network_guard  # noqa: F401  (autouse fixture)
 from tilo_providers.safety import FakeSafetyProvider
@@ -35,17 +41,17 @@ def reader(answers: Iterable[str]) -> tuple[Callable[[str], str], list[str]]:  #
 
 def run(
     tmp_path: Path, extra: list[str], *, answers: Iterable[str] = GO, environ: dict[str, str] | None = None,
-    case: str = "B-007", safety: bool = True,
+    case: str = "B-007", safety: Any = True, tty: bool = True, leak: str = "",
 ) -> tuple[int, str, str, Any, list[str]]:  # fmt: skip
-    world = lib.world_for(case)
-    argv = ["--prices-file", str(lib.write_prices(tmp_path)), "--recordings-dir", str(tmp_path / "rec"), *extra]
+    world = lib.world_for(case, leak=leak)
+    argv = ["--prices-file", str(lib.write_prices(tmp_path)), *extra]  # recordings: none written without TILO_RECORD
     read, prompts = reader(answers)
     out, err = io.StringIO(), io.StringIO()
-    kwargs = {"safety": FakeSafetyProvider()} if safety else {}
+    kwargs = {"safety": FakeSafetyProvider() if safety is True else safety} if safety else {}
     with lib.env(**(LIVE_ENV if environ is None else environ)), contextlib.redirect_stdout(out):
         with contextlib.redirect_stderr(err):
             main = importlib.import_module("tilo_evals.live_topic").main
-            code = main(argv, live_provider_factory=world.factory, read=read, **kwargs)
+            code = main(argv, live_provider_factory=world.factory, read=read, tty=lambda: tty, **kwargs)
     return code, out.getvalue(), err.getvalue(), world, prompts
 
 
@@ -107,9 +113,14 @@ def test_PL_LIVE_E2E_FR_INT_15_a_T3_gate_is_never_approved_by_a_flag(tmp_path: P
         ({"risk_tier": "T2", "action": {"type": "send"}}, (), True, False),
     ):
         read, prompts = reader(answers)
-        someone = person(auto_answer=True, auto_approve_t1t2=True, read=read, write=lambda _: None)
+        someone = person(auto_answer=True, auto_approve_t1t2=True, read=read, write=lambda _: None, tty=lambda: True)
         assert someone.gate({**card, "gate": gate}) is want and bool(prompts) is asked
     assert any("--auto-approve-t1t2 (a CLI flag, not a person)" in line for line in someone.log)
+    for tier in ("T3", None):  # piped input (no interactive terminal) never approves T3 or an unknown tier, even "y"
+        read, prompts = reader(("y", "sure"))
+        piped = person(read=read, write=lambda _: None, tty=lambda: False)
+        assert piped.gate({**card, "gate": {"risk_tier": tier, "action": {"type": "send"}}}) is False and not prompts
+        assert "held (no interactive terminal" in piped.log[-1]
     # In a real run, B-007's save_file gate is T3: the flag never reaches it, the person is asked (input closes: held).
     code, out, err, _, prompts = run(tmp_path, ["--topic", TOPIC, "--auto-approve-t1t2"], answers=GO[:3])
     assert code == 0 and any("approve this step?" in p for p in prompts), err + out
@@ -141,5 +152,60 @@ def test_PL_LIVE_E2E_FR_INT_15_dry_run_and_topic_file_print_the_estimate_and_mak
     path.write_text(TOPIC, encoding="utf-8")
     for source in (["--topic", TOPIC], ["--topic-file", str(path)]):
         code, out, err, world, _ = run(tmp_path, [*source, "--dry-run"], environ={})
-        assert code == 0 and lib.ESTIMATE_RE.match(out.strip().splitlines()[0]) and "safety: " in out, err
+        assert code == 0 and any(lib.ESTIMATE_RE.match(line) for line in out.splitlines()), err
+        assert "safety screen named (not called in a dry run)" in out
         assert world.calls == [] and world.built == []
+
+
+class _BrokenScreen(FakeSafetyProvider):
+    def _check(self, text: str, *, content: bytes | None, mime_type: str | None) -> Any:
+        raise RuntimeError("the screen is down")
+
+
+def test_PL_LIVE_E2E_FR_INT_15_a_screen_error_or_a_missing_person_refuses_and_never_falls_back(tmp_path: Path) -> None:
+    code, _, err, world, _ = run(tmp_path, ["--topic", TOPIC], safety=_BrokenScreen())
+    assert code == 2 and refusal(err) == "safety_unavailable" and world.built == []  # never a fake screen instead
+    module = importlib.import_module("tilo_evals.live_topic")
+    prices = lib.write_prices(tmp_path)
+    for kwargs, want in (
+        ({"safety": FakeSafetyProvider(), "person": module.TerminalPerson()}, "safety_unavailable"),  # real run: Armor
+        ({"safety": FakeSafetyProvider(), "live_provider_factory": world.factory}, "no_person"),
+        ({"person": module.TerminalPerson(), "recordings_dir": tmp_path / "rec"}, "recordings_dir_outside"),
+    ):
+        with lib.env(**LIVE_ENV), pytest.raises(module.e2e.LiveE2ERefused) as refused:
+            module.run_topic(TOPIC, prices_path=prices, **kwargs)
+        assert refused.value.code == want and world.built == []
+
+
+def test_PL_LIVE_E2E_FR_INT_15_bad_numbers_ask_again_and_model_text_is_cleaned(tmp_path: Path) -> None:
+    leak = "‮evil⁦ \x1b[2J\x9b"
+    answers = ("²", "9", "1", "the legal team", "7", "", "y", "ok", "y", "fine")
+    code, out, err, _, prompts = run(tmp_path, ["--topic", TOPIC], case="B-016", answers=answers, leak=leak)
+    assert code == 0 and outcome(out) == "completed", err + out
+    assert sum("answer (" in p for p in prompts) == 4 and sum("approach number" in p for p in prompts) == 2
+    assert "pick a number from 1 to" in out and "evil" in out
+    assert not re.search("[‮⁦\x1b\x9b]", out)  # no control, C1 or bidi character reaches the terminal
+    assert "exactly: save_file by Google Drive to" in out  # the gate shows the deterministic send, not only a title
+
+
+@pytest.mark.skipif(shutil.which("just") is None, reason="just is not installed")
+def test_PL_LIVE_E2E_FR_INT_15_the_recipe_never_lets_a_shell_see_the_topic(tmp_path: Path) -> None:
+    nasty = "Plan a \"launch\"; $(Get-Date) $env:USERNAME `whoami` | Out-Null & echo 'pwned' -- for 20 people"
+    want = hashlib.sha256(nasty.encode("utf-8")).hexdigest()
+    keep = {k: v for k, v in os.environ.items() if k not in lib.ENV_KEYS_CLEARED}
+    env = {**keep, "UV_NO_SYNC": "1", "PYTHONUTF8": "1"}
+    folder = tmp_path / "a b;$(echo hi)&`x"
+    folder.mkdir()
+    (folder / "topic file.txt").write_text(nasty, encoding="utf-8")
+    just = [shutil.which("just") or "just", "--justfile", str(lib.REPO_ROOT / "justfile")]
+
+    def recipe(*args: str, stdin: str = "") -> subprocess.CompletedProcess[str]:
+        return subprocess.run([*just, *args], input=stdin, capture_output=True, text=True, env=env, check=False,
+                              encoding="utf-8", timeout=300)  # fmt: skip
+
+    for done in (recipe("live-run", "--dry-run", stdin=nasty + "\n\n"),
+                 recipe("live-run-file", str(folder / "topic file.txt"), "--dry-run")):  # fmt: skip
+        assert done.returncode == 0, done.stderr
+        assert f"topic: {len(nasty)} characters, sha256 {want}" in done.stdout  # byte-identical, nothing evaluated
+    smuggled = recipe("live-run", "--dry-run", "$(echo pwned)")
+    assert smuggled.returncode != 0 and "topic:" not in smuggled.stdout  # just refuses before any shell runs

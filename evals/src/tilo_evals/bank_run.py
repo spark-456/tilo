@@ -183,7 +183,7 @@ def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any, person: 
                 if obs.sent_at_first_gate is None:
                     obs.sent_at_first_gate = sent()
                 asked = time.monotonic()
-                if case.gates == "hold" or (person is not None and not person.gate(card)):
+                if not (person.gate(card) if person is not None else case.gates != "hold"):
                     obs.outcome = "held_at_gate"
                     break
                 deadline += time.monotonic() - asked  # the time a person takes is not the run's
