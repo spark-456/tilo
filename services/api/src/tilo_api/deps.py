@@ -17,6 +17,7 @@ import functools
 import logging
 import math
 import os
+import re
 import threading
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -40,7 +41,7 @@ from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.interfaces import SafetyProvider
-from tilo_providers.router import Router
+from tilo_providers.router import Router, RouterExhaustedError
 from tilo_providers.safety import build_safety_provider
 
 from tilo_api import events, spend
@@ -430,8 +431,66 @@ class SourceOwners(Protocol):
     def owner_of(self, kind: str, ref: str) -> str | None: ...  # kind "mail" or "request"
 
 
+_people_stores_lock = threading.Lock()
+_people_stores: PeopleStores | None = None
+_people_stores_retry_at: float | None = None
+PEOPLE_STORES_BACKOFF_S = 5.0  # after a failed build, no new attempt for this long (FS-18; fixed, 1 to 60 s)
+people_stores_clock: Callable[[], float] = time.monotonic  # read at call time, so a test can replace it
+
+
+def _inside_backoff() -> bool:
+    retry_at = _people_stores_retry_at
+    return retry_at is not None and people_stores_clock() < retry_at
+
+
 def get_people_stores() -> PeopleStores:
-    raise HTTPException(status_code=503, detail="not_configured")  # no Firestore adapter yet (ticket PPL-11c)
+    """The process's one `PeopleStores` (the write limiter and idempotency keys live on it, #549). Built on the first
+    request, single-flight, only for `TILO_PEOPLE_STORE=firestore` plus a valid `TILO_FIRESTORE_PROJECT` (ADR-0023);
+    anything else, or a build that fails, is 503 `not_configured` (the error never echoed). A failed build is
+    remembered for `PEOPLE_STORES_BACKOFF_S`: inside the window a request is refused at once, without the lock and
+    without a client call; after it one request tries again (FS-18)."""
+    global _people_stores, _people_stores_retry_at
+    built = _people_stores
+    if built is not None:
+        return built
+    if _inside_backoff():
+        raise HTTPException(status_code=503, detail="not_configured")
+    with _people_stores_lock:
+        if _people_stores is None:
+            if _inside_backoff():  # the request that held the lock failed while this one waited
+                raise HTTPException(status_code=503, detail="not_configured")
+            from tilo_api.people_firestore import PeopleStoreNotConfigured, open_people_stores  # noqa: PLC0415
+
+            try:
+                _people_stores = open_people_stores()
+                _people_stores_retry_at = None
+            except Exception as exc:
+                logger.warning("people stores not built (%s)", type(exc).__name__)
+                if not isinstance(exc, PeopleStoreNotConfigured):  # no client was tried: nothing to back off from
+                    _people_stores_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+                raise HTTPException(status_code=503, detail="not_configured") from None
+        return _people_stores
+
+
+def _forget_people_stores() -> None:
+    global _people_stores, _people_stores_retry_at
+    with _people_stores_lock:
+        _people_stores, _people_stores_retry_at = None, None
+
+
+get_people_stores.cache_clear = _forget_people_stores  # type: ignore[attr-defined]  # tests start from a cold process
+
+
+_BOOTSTRAP_UID = re.compile(r"u_[0-9A-Za-z_]{1,48}")
+
+
+def get_founder_gate() -> Callable[[str], bool]:
+    """Who may found an empty org (issue #541 item 1, BQ-PPL11C-15): only the uid in `TILO_PEOPLE_BOOTSTRAP_UID`, read
+    on every call and valid only as a `common#user_id` exactly as written. Unset or malformed refuses everyone."""
+    configured = os.environ.get("TILO_PEOPLE_BOOTSTRAP_UID", "")
+    if _BOOTSTRAP_UID.fullmatch(configured) is None:
+        return lambda user_id: False
+    return lambda user_id: user_id == configured
 
 
 def get_clock() -> Callable[[], str]:
@@ -461,6 +520,10 @@ class DeskWorlds(Protocol):
 
     def desk_world(self, org_id: str, user_id: str) -> str: ...
 
+    def desk_owner(self, world_id: str) -> str | None:
+        """Who owns that Desk world now (None: unknown), so a caller can check an answer before it writes there."""
+        ...
+
 
 def get_desk_worlds() -> DeskWorlds:
     raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
@@ -487,6 +550,30 @@ REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; f
 class ReplayOnly(Exception):
     """NFR-24: the answer is 503 with `replay_only: true` beside the text (tilo_api.app's handler), the labelled
     replay offer."""
+
+
+MODEL_UNAVAILABLE_MESSAGE = (
+    "The model is unavailable right now (quota or outage), so nothing new was started; finished runs can still be "
+    "replayed."
+)
+_UNAVAILABLE = frozenset({"QuotaError", "RetryableError"})  # PL-02: 429 and 5xx/timeouts, not a bad reply
+
+
+class ModelUnavailable(Exception):
+    """NFR-22: every model candidate failed on quota or availability. Answered like NFR-24's refusal (503,
+    `replay_only: true`, a detail that says replay), for this request only: the `replay_only` flag is not set."""
+
+
+def raise_if_model_unavailable(error: BaseException) -> None:
+    """NFR-22 (PRD 17.2): a planning error whose cause is the router running out of candidates, every attempt on
+    quota or availability, becomes ModelUnavailable. A reply the model did send but got wrong stays the caller's."""
+    cause = error.__cause__
+    if (
+        isinstance(cause, RouterExhaustedError)
+        and cause.attempts
+        and all(a.error_type in _UNAVAILABLE for a in cause.attempts)
+    ):
+        raise ModelUnavailable from error
 
 
 def get_flag_store() -> FlagStore:

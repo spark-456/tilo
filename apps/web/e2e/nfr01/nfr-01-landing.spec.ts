@@ -4,7 +4,8 @@
 // measured on tilo-dev after the deploy (docs/open-questions.md): no CDN, no TLS and no real radio here.
 //
 // "Interactive" = the person can type: the task box is there and a first character typed into it comes
-// back through the app (the counter changes), measured from the start of navigation.
+// back through the app (Enter on it starts the drafting line, a React state change), measured from the
+// start of navigation. WEB-CUTOVER: the landing page is the Park Home (the old Start screen is gone).
 //   desktop broadband: no throttling.
 //   mid-range phone on 4G: a 390x844 viewport, CPU slowed 4x, the WebPageTest "4G" profile
 //   (9 Mbps down, 1.5 Mbps up, 170 ms round trip).
@@ -18,7 +19,9 @@ async function msToInteractive(page: Page): Promise<number> {
   await page.goto("/", { waitUntil: "commit" });
   const box = page.getByLabel("Describe your task");
   await box.fill("x");
-  await expect(page.locator(".task-count")).toHaveText(/^1 \/ 4,000$/); // the input went through React
+  await box.press("Enter");
+  // the input went through React: the drafting line is drawn at once
+  await expect(page.getByRole("status").filter({ hasText: "Tilo is drafting" })).toBeVisible();
   return performance.now() - start;
 }
 

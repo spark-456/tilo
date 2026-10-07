@@ -1,4 +1,4 @@
-// WEB-PARITY: captures the design reference and our /park pages side by side, diffs them and writes
+// WEB-PARITY: captures the design reference and our root-path pages side by side, diffs them and writes
 // parity-report/. Opt-in (`TILO_PARITY=1`, `just parity [page]`); it reports, it never fails on a diff.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";

@@ -4,7 +4,7 @@
 // (`{ id, step }` or null):
 //   - a known world: wl = { id, step: 0 } and any open menu closes; then ONE injected `schedule(fn, ms)` per
 //     step, ms = 340 for a City world and 250 for a Town or Village; step 1 and 2 only advance wl; at the
-//     third tick (step 3) the page swaps in (navigate to /park/world/<id>) and all three steps read done; the
+//     third tick (step 3) the page swaps in (navigate to /world/<id>) and all three steps read done; the
 //     fourth tick removes the card (wl = null) and leaves nothing scheduled;
 //   - an unknown id shows no loader and `go` still goes to the page (which then handles not found);
 //   - opening another world restarts the loader and the old timer is cancelled.
@@ -45,7 +45,7 @@ describe("WEB_3b_loader_store: openWorld runs the loader", () => {
     tickAll(sch, 1);
     expect(store.getState().wl).toEqual({ id: "k1", step: 3 });
     expect(navigate).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith("/park/world/k1");
+    expect(navigate).toHaveBeenCalledWith("/world/k1");
     expect(sch.timers.map((t) => t.ms)).toEqual([340, 340, 340, 340]);
   });
 
@@ -94,7 +94,7 @@ describe("WEB_3b_loader_store: openWorld runs the loader", () => {
     expect(store.getState().wl).toBeNull();
     expect(sch.schedule).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith("/park/world/nope");
+    expect(navigate).toHaveBeenCalledWith("/world/nope");
   });
 
   it("WEB_3b_loader_store_opening_another_world_restarts_and_the_old_timer_is_dead", () => {
@@ -108,7 +108,7 @@ describe("WEB_3b_loader_store: openWorld runs the loader", () => {
     expect(store.getState().wl).toEqual({ id: "comp", step: 0 });
     tickAll(sch, 4);
     expect(navigate).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith("/park/world/comp");
+    expect(navigate).toHaveBeenCalledWith("/world/comp");
   });
 
   it("WEB_3b_loader_store_it_leaves_the_toast_timer_alone", () => {

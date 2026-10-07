@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 import re
 import secrets
-import threading
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
@@ -23,7 +22,7 @@ from tilo_memory.artifacts import ArtifactNotFound, ArtifactStore, Scope
 from tilo_people.access import AccessRequest, decide, project
 from tilo_people.dates import resolve_due
 from tilo_people.directory import Directory
-from tilo_people.errors import NotFound, VersionConflict
+from tilo_people.errors import AlreadyExists, EmailTaken, NotFound, OrgAlreadyFounded, VersionConflict
 from tilo_people.stores import PeopleStores, RecordStore, meeting_tombstone
 from tilo_people.text import clean_line
 from tilo_people.writes import check_write
@@ -281,6 +280,8 @@ class Writer:
             raise Refusal(409, "version_conflict", code="version_conflict") from None
         except NotFound:
             raise denied from None
+        except EmailTaken:  # only the person store; the store holds the address, so this is atomic (no process lock)
+            raise Refusal(409, "email_taken", code="email_taken") from None
         if work_events is not None:
             try:
                 work_events.record(self.org, self.actor, after)
@@ -468,11 +469,6 @@ def create_meeting(w: Writer, body: MeetingIn) -> dict[str, Any]:
     return w.create("meeting", record, w.stores.meetings, w.directory())
 
 
-_DIRECTORY_LOCK = (
-    threading.Lock()
-)  # makes "address free, then create" and "org empty, then create" one step per process
-
-
 def _person_record(w: Writer, body: PersonIn, record_id: str, role: str) -> dict[str, Any]:
     r = w.text
     return {
@@ -491,29 +487,29 @@ def _person_record(w: Writer, body: PersonIn, record_id: str, role: str) -> dict
 
 def create_person(w: Writer, body: PersonIn) -> dict[str, Any]:
     """An org owner adds a member; the id and the org are the server's (PE-17, G1). The address is the org's alone
-    (409 `email_taken`, case-insensitive, checked once the actor is allowed). Answers the membership view."""
+    (409 `email_taken`, case-insensitive, held by the store, so decided once the actor is allowed). Answers the
+    membership view."""
     record = _person_record(w, body, _mint("u"), "member")
-
-    def address_is_free() -> None:
-        wanted = body.email.lower()
-        if any(str(s.record.get("email", "")).lower() == wanted for s in w.stores.persons.list(w.org)):
-            raise Refusal(409, "email_taken", code="email_taken")
-
-    with _DIRECTORY_LOCK:
-        made = w.create("person", record, w.stores.persons, w.org_directory(), address_is_free)
+    made = w.create("person", record, w.stores.persons, w.org_directory())
     return project("person", "membership", made) or {}
 
 
 def create_first_person(w: Writer, body: PersonIn) -> dict[str, Any]:
     """The first person of an empty org is the signed-in principal, as its owner (PE-17, BQ-PPL10-3: minted by
-    tilo-api, outside `decide`). Anyone else, or anyone once the org has a person, is a 403 with no reason."""
+    tilo-api, outside `decide`). The route has already checked the bootstrap uid; the store's `create_founder` is the
+    one atomic step, so an org with a person or a founder marker is a 403 with no reason."""
     record = _person_record(w, body, w.actor, "owner")
     if not conforms("person.schema.json", record):
         raise Refusal(422, "invalid_record")
-    with _DIRECTORY_LOCK:
-        if w.stores.persons.list(w.org):
-            raise Refusal(403, "forbidden")
-        w.create("person", record, w.stores.persons, Directory.of([record]))  # the founder is its own org owner
+    request = AccessRequest(w.actor, "create", "person", record, w.now)
+    if check_write(request, record, Directory.of([record])):  # the founder is its own org owner
+        raise Refusal(403, "forbidden")
+    try:
+        w.stores.persons.create_founder(record)  # type: ignore[attr-defined]  # only the person store has it
+    except (OrgAlreadyFounded, AlreadyExists):
+        raise Refusal(403, "forbidden") from None
+    except EmailTaken:
+        raise Refusal(409, "email_taken", code="email_taken") from None
     return project("person", "membership", record) or {}
 
 

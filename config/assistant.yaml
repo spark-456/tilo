@@ -59,6 +59,20 @@ facts:
     rows: { reasons: [calendar] }
     header: "On your calendar today:"
     empty: "Nothing is on your calendar today."
+  - id: tasks
+    describe: "how your running and blocked tasks are going"
+    when: [[task, tasks, run, runs, going, progress, world, worlds]]
+    rows: { reasons: [run, blocked], kinds: [world] }
+    header: "Your tasks:"
+    empty: "None of your tasks is running."
+    narrow: true # the selected world, or the one row whose title holds the question's other words
+  - id: status
+    describe: "your running tasks and what changed since the start of yesterday"
+    when: [[status]]
+    rows: {}
+    header: "Your tasks:"
+    empty: "Nothing is running and nothing changed since yesterday."
+    report: status # FR-PA-08: running tasks, then items changed since 00:00 yesterday in your time zone
   - id: changed
     describe: "what is new on your plate in the last 24 hours"
     when: [[changed, change, changes, new, updated, update, updates, happened, since]]
@@ -73,19 +87,19 @@ facts:
     rows: { reasons: [pin_owner, pin_tagged] }
     header: "Your pins:"
     empty: "No pins need you."
-  - id: tasks
-    describe: "how your running and blocked tasks are going"
-    when: [[task, tasks, run, runs, going, progress, status, world, worlds]]
-    rows: { reasons: [run, blocked], kinds: [world] }
-    header: "Your tasks:"
-    empty: "None of your tasks is running."
-    narrow: true # the selected world, or the one row whose title holds the question's other words
   - id: plate
     describe: "everything on your plate, most urgent first"
     when: [[plate, plates, todo, todos]]
     rows: { groups: [attention, overdue, soon, rest] }
     header: null # the plate answer puts answer.group_headers before each group instead
     empty: "Your plate is empty."
+  - id: weekly
+    describe: "five counts for the last seven days: done, open, overdue, tasks in progress, waiting for you"
+    when: [[week, weekly]]
+    rows: {}
+    header: "Your week:"
+    empty: "Nothing to report for the last 7 days."
+    report: weekly # FR-PA-08: seven local days including today; counts only, no title
 
 # FR-PA-14: a verb from words.nav_verbs, then (after words.nav_skip) exactly one of these phrases; a
 # leading "my" is tried with and then without it. `with_context`: when the selected record is of that
@@ -158,6 +172,18 @@ answer:
     overdue: "Overdue:"
     soon: "Soon:"
     rest: "Later:"
+  status: # FR-PA-08 (intent `status`; its first header and its empty text are the intent's own `header` and `empty`)
+    tasks_empty: "No task is running."
+    changed_header: "Changed since yesterday:"
+    changed_empty: "Nothing changed since yesterday."
+    done: "$label: done" # a work item of the `done` lane; $label: the row title
+  weekly: # FR-PA-08 (intent `weekly`); $n: the count, with `truncated` added when the plate is cut at 200 rows
+    done: "Done in the last 7 days: $n"
+    open: "Open work items: $n"
+    overdue: "Overdue: $n"
+    tasks: "Tasks in progress: $n"
+    waiting: "Waiting for you: $n"
+    truncated: "+"
   lines: # one claim per row, by plate reason. $label: the row title; $time: HH:MM in your time zone
     gate: "$label: waiting for your approval"
     consent: "$label: waiting for your consent"

@@ -5,16 +5,17 @@ import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
 import { DESKTOP, MOBILE } from "./support/viewports";
 
+// WEB-CUTOVER: "/", "/worlds" and "/team" are Park pages now (they have no assistant panel); the old
+// Start row is removed with the replaced S-01 screen, S-14 and S-18 moved to /worlds/replays and /team/console.
 const SCREENS = [
-  ["/", "Start"],
   ["/task/task_fixture_1/understanding", "Understanding"],
   ["/task/task_fixture_1/approaches", "Approaches"],
-  ["/world/w_village_basic", "World"],
+  ["/world/w_village_basic/stage", "World"],
   ["/needs-you", "Needs-you queue"],
   ["/library", "Library"],
   ["/channels", "Channels"],
   ["/settings", "Settings"],
-  ["/worlds", "Worlds"],
+  ["/worlds/replays", "Worlds"],
 ] as const;
 
 async function watchShifts(page: Page) {
@@ -78,7 +79,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
       "/no-such-page",
       "/more",
       "/estimate",
-      "/team",
+      "/team/console",
       "/pilot",
       "/needs-you/gate",
       "/world/w_village_basic/story",
