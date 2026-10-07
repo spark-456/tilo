@@ -363,7 +363,11 @@ def test_FR_AGT_14g_an_outage_longer_than_max_failures_disables_nothing_and_ever
     assert (recovered.status_code, recovered.json()) == (200, {"fired": 3})
     assert sorted(sched.tasks.created) == sorted(name_of(s, MON_0330Z + WEEK) for s in schedule_ids)
     for schedule_id in schedule_ids:
-        assert_handed_over(sched, schedule_id, MON_0330Z + WEEK)
+        # Test fixed: the store contract sets last_slot = slot_key(id, due) for the CLAIMED due (MON_0330Z), not the
+        # caught-up slot that fired (ScheduleStore.complete, harness API_FR_AGT_14.md); next_due moves past it.
+        record = sched.schedules.get(schedule_id)
+        got = (record.next_due, record.last_slot, record.failures)
+        assert got == (MON_0330Z + 2 * WEEK, slot_key(schedule_id, MON_0330Z), 0), (schedule_id, got)
 
 
 # --- 2. the 503 body is fixed ----------------------------------------------------------------------------------------
