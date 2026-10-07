@@ -4,17 +4,18 @@
 // that wanted it changes or the page goes: a captured step and a run step each take 900 ms.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Api } from "../../api/index";
-import type { Skill, User } from "../../api/types";
+import type { Skill, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useSchedule } from "../../app/context";
 import {
+  CAPTURE_FIXTURE_EVENTS,
   CAPTURE_STEPS,
   DEFAULT_ASK,
   DEFAULT_DESC,
   type MethodKey,
   PLAN,
-  STEP_MS,
   type Scope,
+  TRY_RUN_FIXTURE_EVENTS,
   type Trigger,
   blankSkill,
   savedOverride,
@@ -28,6 +29,8 @@ export interface TeachInput {
   user: User;
   /** The draft skill the flow turns into a learning one; none when the data holds no draft. */
   draft: Skill | undefined;
+  /** Source of the loaded Skills data; fixture capture and try-run events only fire when source is "fixture". */
+  source?: Source;
 }
 
 /** What every pane of the card gets. */
@@ -76,7 +79,7 @@ export interface Teach {
 const together = <T>(call: () => Promise<T>): Promise<T> =>
   new Promise((resolve) => resolve(call()));
 
-export function useTeach({ app, api, user, draft }: TeachInput): Teach {
+export function useTeach({ app, api, user, draft, source = "fixture" }: TeachInput): Teach {
   const schedule = useSchedule();
   const defaultName = draft?.name ?? "";
   const [stage, setStage] = useState<Stage>(0);
@@ -95,16 +98,18 @@ export function useTeach({ app, api, user, draft }: TeachInput): Teach {
   const [saved, setSaved] = useState(false);
   const [taught, setTaught] = useState<Skill | null>(null);
 
-  // A recording takes a step at a time: one pending wait, replaced whenever `rec` or `cap` changes.
+  // A recording takes one fixture event at a time: never advances on a timer when source !== "fixture".
   useEffect(() => {
-    if (!rec) return;
+    if (!rec || source !== "fixture") return;
+    const ev = CAPTURE_FIXTURE_EVENTS[method]?.[cap];
+    if (!ev) return;
     return schedule(() => {
       if (cap + 1 >= CAPTURE_STEPS) {
         setCap(CAPTURE_STEPS);
         setRec(false);
       } else setCap(cap + 1);
-    }, STEP_MS);
-  }, [rec, cap, schedule]);
+    }, ev.delayMs);
+  }, [rec, cap, method, source, schedule]);
 
   const advance = useCallback(() => {
     const n = run + 1;
@@ -115,14 +120,17 @@ export function useTeach({ app, api, user, draft }: TeachInput): Teach {
     setWaiting(false);
   }, [run]);
 
-  // The practice run: a step every 900 ms; a step set to ask first stops it until the person answers.
+  // The practice run advances only on fixture events; never advances on a timer pretending to work.
   useEffect(() => {
-    if (stage !== 2 || run < 0 || run >= PLAN.length || waiting || runDone) return;
+    if (stage !== 2 || run < 0 || run >= PLAN.length || waiting || runDone || source !== "fixture")
+      return;
+    const ev = TRY_RUN_FIXTURE_EVENTS[run];
+    if (!ev) return;
     return schedule(() => {
       if (ask[run]) setWaiting(true);
       else advance();
-    }, STEP_MS);
-  }, [stage, run, waiting, runDone, ask, advance, schedule]);
+    }, ev.delayMs);
+  }, [stage, run, waiting, runDone, ask, advance, source, schedule]);
 
   const startRun = () => {
     setRun(0);

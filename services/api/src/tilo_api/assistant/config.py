@@ -41,7 +41,20 @@ WORD_LISTS = (
     "self_possessives",
     "third_person",
 )
-DECLINE_KEYS = ("unknown", "other_person", "no_selection", "dropped", "rules_only", "budget", "flagged", "failed")
+DECLINE_KEYS = (
+    "unknown",
+    "other_person",
+    "no_selection",
+    "dropped",
+    "rules_only",
+    "budget",
+    "flagged",
+    "failed",
+    "which_item",
+    "which_day",
+    "update_refused",
+    "snooze_range",
+)
 REPORTS = ("status", "weekly")
 ROW_KEYS = ("reasons", "groups", "kinds", "has_due", "within_hours")
 
@@ -275,6 +288,7 @@ def _answer(node: Any) -> Mapping[str, Any]:
         "group_headers",
         "status",
         "weekly",
+        "update",
         "lines",
     )
     a = _mapping("answer", node, keys)
@@ -285,6 +299,7 @@ def _answer(node: Any) -> Mapping[str, Any]:
     headers = _mapping("answer.group_headers", a["group_headers"], GROUPS)
     status = _mapping("answer.status", a["status"], ("tasks_empty", "changed_header", "changed_empty", "done"))
     weekly = _mapping("answer.weekly", a["weekly"], ("done", "open", "overdue", "tasks", "waiting", "truncated"))
+    update = _mapping("answer.update", a["update"], ("done", "snooze"))
     return MappingProxyType(
         {
             "max_lines": _int("answer.max_lines", a["max_lines"], 1, 20),
@@ -306,6 +321,12 @@ def _answer(node: Any) -> Mapping[str, Any]:
                 {
                     k: _text(f"answer.weekly.{k}", v, frozenset() if k == "truncated" else frozenset({"n"}))
                     for k, v in weekly.items()
+                }
+            ),
+            "update": MappingProxyType(
+                {
+                    k: _text(f"answer.update.{k}", v, frozenset({"label"}) | ({"day"} if k == "snooze" else set()))
+                    for k, v in update.items()
                 }
             ),
             "lines": MappingProxyType(

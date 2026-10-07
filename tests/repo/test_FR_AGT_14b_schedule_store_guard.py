@@ -4,8 +4,8 @@
   `open_schedule_store` with no explicit config raises before any client is built. The emulator/demo- guard of
   `tilo_harness.store.FirestoreStore` is still there, untouched;
 - the new sources carry no model id, no secret and no hard-coded service-account address;
-- the decision is written down: an ADR-0003 addendum (or a new ADR) names the switch, and ONE BQ row, BQ-AGT14-3, ends
-  docs/open-questions.md.
+- the decision is written down: an ADR-0003 addendum (or a new ADR) names the switch, and ONE BQ row per
+  ticket (BQ-AGT14-3, -4, -5) ends docs/open-questions.md, the newest last.
 
 Needs the uv workspace (it imports tilo_harness); run with `uv run pytest tests/repo`.
 """
@@ -139,3 +139,6 @@ def test_FR_AGT_14_one_bq_row_logs_the_decisions_exactly_once(repo_root: pathlib
     fourth = [line for line in rows if line.startswith("| BQ-AGT14-4 |")]
     assert len(fourth) == 1, "log the 14d decisions as ONE row, BQ-AGT14-4"
     assert "FR-AGT-14d" in fourth[0], "BQ-AGT14-4 holds the FR-AGT-14d decisions"
+    fifth = [line for line in rows if line.startswith("| BQ-AGT14-5 |")]
+    assert len(fifth) == 1, "the 14e decisions are ONE row, BQ-AGT14-5"
+    assert "FR-AGT-14e" in fifth[0], "BQ-AGT14-5 holds the FR-AGT-14e decisions"

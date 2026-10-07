@@ -2,14 +2,15 @@
 // person, the estimates and the way on (design: Tilo App Skills.dc.html, `t.isLearn`).
 import { cx } from "../../components/cx";
 import { agent, icon } from "./skillsKit";
-import { BUBBLE_TAIL, EST, LEARN_NOTE, PLAN, QUESTION, stopsToAsk } from "./teachData";
+import { BUBBLE_TAIL, LEARN_NOTE, PLAN, QUESTION, estimateSkillPlan } from "./teachData";
 import type { PaneProps } from "./useTeach";
 
 export function LearnPane({ t, night }: PaneProps) {
+  const est = estimateSkillPlan(PLAN, t.ask);
   const estimates = [
-    { k: "Each run", v: EST.run },
-    { k: "Time", v: EST.time },
-    { k: "Stops to ask", v: stopsToAsk(t.ask) },
+    { k: "Each run", v: est.run },
+    { k: "Time", v: est.time },
+    { k: "Stops to ask", v: est.stops },
   ];
   return (
     <div className="park-skills-pane park-skills-pane--grid">

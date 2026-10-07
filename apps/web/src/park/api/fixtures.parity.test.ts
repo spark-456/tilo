@@ -18,6 +18,7 @@ const proto = loadPrototypeData();
 const ADDITIVE_PATHS: Record<string, readonly string[]> = {
   decisions: ["[].toast", "[].approvedTitle", "[].facts"],
   agenda: ["rules"],
+  ledger: ["memoryUp"],
   worlds: ["[].heroTag"],
 };
 const ADDITIVE_VALUES: readonly (readonly [
@@ -165,7 +166,7 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
       expect(reference, `the reference shell has "${want}"`).toContain(want);
     }
     // no extra key outside the listed ones: stripping them leaves exactly the prototype's keys (the test above)
-    expect(Object.keys(ADDITIVE_PATHS)).toEqual(["decisions", "agenda", "worlds"]);
+    expect(Object.keys(ADDITIVE_PATHS)).toEqual(["decisions", "agenda", "ledger", "worlds"]);
     // WEB-6: the K1 hero tag is the World reference page's own line (`heroTag` is the only extra world key, on one world)
     const world = fs.readFileSync(
       path.join(HANDOFF_DIR, "design", "Tilo App World.dc.html"),
@@ -179,7 +180,9 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
   it("WEB_1a_fixtures_match_prototype the merged final state is what is transcribed (skills, ledger, team)", () => {
     // tilo-app.js builds these in several passes (SX merge, splice, Object.assign); the fixtures hold the end state.
     expect(fx.skills.map((s) => s.id)).toEqual((proto.skills as { id: string }[]).map((s) => s.id));
-    expect(Object.keys(fx.ledger)).toEqual(Object.keys(proto.ledger as object));
+    expect(Object.keys(withoutAdditive("ledger", fx.ledger) as object)).toEqual(
+      Object.keys(proto.ledger as object),
+    );
     expect(norm(fx.team.coverage)).toEqual(norm((proto.team as { coverage: unknown }).coverage));
   });
 });
