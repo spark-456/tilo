@@ -7,7 +7,8 @@
 import { type Page, expect, test } from "@playwright/test";
 import { collectConsoleProblems } from "./support/console";
 import { watchConsole } from "./support/screens";
-import { DESKTOP } from "./support/viewports";
+import { readShifts, watchShifts } from "./support/shifts";
+import { DESKTOP, MOBILE } from "./support/viewports";
 
 test.use({ viewport: DESKTOP });
 
@@ -135,5 +136,98 @@ test("WEB_CUTOVER_e2e_a_kept_task_screen_still_loads", async ({ page }) => {
   await page.goto(`/task/${TASK}/understanding`);
   await expect(page.getByRole("heading", { level: 1, name: "Understanding" })).toBeVisible();
   await expect(page.locator("[data-park]")).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+// ---- the fix pass: real intake stays reachable, unknown paths are Park "Not found", samples have no stage ----
+
+const NO_STAGE = "Sample world: there is no recorded run to open";
+
+for (const path of ["/xyz", "/world/x/unknown", "/start/x", "/team/x"]) {
+  test(`WEB_CUTOVER_e2e_${path.slice(1).replace(/\//g, "_")}_is_the_park_not_found_with_a_home_link`, async ({
+    page,
+  }) => {
+    const problems = collectConsoleProblems(page);
+    await page.goto(path);
+    const nf = page.getByTestId("park-not-found");
+    await expect(nf).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
+    await expect(nf.getByRole("link", { name: "Go to Home" })).toHaveAttribute("href", "/");
+    // never the old Start screen
+    await expect(page.getByLabel("Describe your task")).toHaveCount(0);
+    expect(problems).toEqual([]);
+  });
+}
+
+test("WEB_CUTOVER_e2e_the_not_found_home_link_goes_home", async ({ page }) => {
+  await page.goto("/xyz");
+  await page.getByTestId("park-not-found").getByRole("link", { name: "Go to Home" }).click();
+  await expect(page.getByTestId("park-page-home")).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/");
+});
+
+test("WEB_CUTOVER_e2e_start_is_the_intake_form", async ({ page }) => {
+  const problems = watchConsole(page);
+  await page.goto("/start");
+  await expect(page.getByLabel("Describe your task")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start task", exact: true })).toBeVisible();
+  await expect(page.locator("[data-park]")).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+for (const [name, viewport] of [
+  ["desktop", DESKTOP],
+  ["phone", MOBILE],
+] as const) {
+  test(`WEB_CUTOVER_e2e_home_${name}_start_a_real_task_links_to_the_intake_without_a_layout_shift`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await watchShifts(page);
+    const problems = collectConsoleProblems(page);
+    await page.goto("/");
+    const link = page.getByRole("link", { name: "Start a real task", exact: true });
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("href", "/start");
+    // inside the viewport, clear of the composer panel above it, big enough to hit
+    const box = await link.boundingBox();
+    const panel = await page.locator(".park-home-panel").boundingBox();
+    if (!box || !panel) throw new Error("no boxes");
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    expect(box.y).toBeGreaterThanOrEqual(panel.y + panel.height - 0.5);
+    expect(box.height).toBeGreaterThanOrEqual(24);
+    // the composer stays where the design puts it: its panel's bottom edge is the column's bottom edge
+    expect(await readShifts(page)).toEqual([]);
+    await Promise.all([page.waitForURL(/\/start$/), link.click()]);
+    await expect(page.getByLabel("Describe your task")).toBeVisible();
+    expect(problems).toEqual([]);
+  });
+}
+
+test("WEB_CUTOVER_e2e_a_sample_world_has_a_disabled_live_view_and_nothing_to_open", async ({
+  page,
+}) => {
+  const problems = collectConsoleProblems(page);
+  await page.goto("/world/k1");
+  const world = page.getByTestId("park-page-world");
+  await expect(world).toBeVisible();
+  const live = world.getByRole("link", { name: "Open live view" });
+  await expect(live).toBeVisible();
+  await expect(live).toHaveAttribute("aria-disabled", "true");
+  await expect(live).not.toHaveAttribute("href", /.*/);
+  await expect(live).toHaveAttribute("title", NO_STAGE);
+  for (const lens of ["Story", "Trace", "Delivery", "Inspect"]) {
+    const a = world
+      .getByRole("navigation", { name: "Run views" })
+      .getByRole("link", { name: lens });
+    await expect(a, lens).toHaveAttribute("aria-disabled", "true");
+    await expect(a, lens).not.toHaveAttribute("href", /.*/);
+  }
+  await expect(world.getByText(NO_STAGE).first()).toBeAttached();
+  await live.click();
+  await expect(page).toHaveURL(/\/world\/k1$/);
+  await expect(world).toBeVisible();
   expect(problems).toEqual([]);
 });
