@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from string import Template
 from typing import Any, Literal, Protocol
@@ -16,9 +16,10 @@ from tilo_people.text import clean_line
 from tilo_policy.schemas import conforms
 
 from tilo_api.assistant.config import AssistantConfig, FactIntent
-from tilo_api.assistant.facts import Line, fact_lines, match_fact, remainder_of
+from tilo_api.assistant.facts import Line, fact_lines, match_fact, moment_of, remainder_of, zone_of
 from tilo_api.assistant.gate import Ref, RefGate
 from tilo_api.assistant.navigation import match_navigation, route_for, vet_navigate
+from tilo_api.assistant.status import status_lines, weekly_lines
 from tilo_api.assistant.words import about_someone_else, question_key
 
 logger = logging.getLogger("tilo_api.assistant.core")
@@ -113,11 +114,11 @@ def _ref(row: Mapping[str, Any]) -> Ref:
     return Ref(row["ref"]["kind"], row["ref"]["id"])
 
 
-def _gated_rows(plate: Mapping[str, Any], gate: RefGate) -> list[Mapping[str, Any]]:
-    """The plate rows whose ref conforms and the gate admits, in plate order; the builder and the oracle should
-    agree, so a refused row is logged by kind (never by id or title)."""
+def _gated_rows(rows: Sequence[Mapping[str, Any]], gate: RefGate) -> list[Mapping[str, Any]]:
+    """The plate rows (or parked rows) whose ref conforms and the gate admits, in plate order; the builder and the
+    oracle should agree, so a refused row is logged by kind (never by id or title)."""
     kept = []
-    for row in plate["rows"]:
+    for row in rows:
         if not conforms("common.schema.json#/$defs/record_ref", row.get("ref")):
             continue
         ref = _ref(row)
@@ -204,6 +205,28 @@ def _navigated(
     return Answer("navigated", by, (_opening(action, config),), action, None, "navigate", model)
 
 
+def _report(
+    intent: FactIntent,
+    rows: Sequence[Mapping[str, Any]],
+    ask: Ask,
+    plate: Mapping[str, Any],
+    gate: RefGate,
+    finished: Callable[[], Sequence[Mapping[str, Any]]] | None,
+    tz: str | None,
+    config: AssistantConfig,
+) -> tuple[tuple[Line, ...], Mapping[str, Any] | None]:
+    """FR-PA-08: `status` also reads the gated `done` lane, `weekly` the person's finished items (route-supplied)."""
+    now, zone = moment_of(ask.now), zone_of(tz)
+    if now is None:
+        raise ValueError("now")
+    if intent.report == "status":
+        done = [r for r in plate["parked"] if r.get("group") == "done" and r["ref"]["kind"] == "work_item"]
+        return status_lines(intent, rows, _gated_rows(done, gate), now=now, zone=zone, config=config)
+    if finished is None:
+        raise ValueError("finished")
+    return weekly_lines(intent, rows, finished(), truncated=bool(plate["truncated"]), now=now, zone=zone, config=config)
+
+
 def _facts(
     intent: FactIntent,
     rows: Sequence[Mapping[str, Any]],
@@ -213,10 +236,14 @@ def _facts(
     config: AssistantConfig,
     by: Literal["rules", "model"],
     model: ModelDecision | None,
+    report: Callable[[FactIntent], tuple[tuple[Line, ...], Mapping[str, Any] | None]],
 ) -> Answer:
-    lines, offer = fact_lines(
-        intent, rows, as_of=ask.now, context=ask.context, remainder=remainder, time_zone=tz, config=config
-    )
+    if intent.report is None:
+        lines, offer = fact_lines(
+            intent, rows, as_of=ask.now, context=ask.context, remainder=remainder, time_zone=tz, config=config
+        )
+    else:
+        lines, offer = report(intent)
     if not any(line.source is not None for line in lines):  # nothing to cite is never `answered` (HR-1)
         return Answer("declined", by, lines, None, "empty", intent.id, model)
     return Answer("answered", by, lines, offer, None, intent.id, model)
@@ -230,11 +257,16 @@ def answer(
     config: AssistantConfig,
     time_zone: str | None,
     decider: Decider | None,
+    finished: Callable[[], Sequence[Mapping[str, Any]]] | None = None,
 ) -> Answer:
     key = question_key(ask.question)
     if about_someone_else(key, config):  # words only: nothing is looked up, so the reply never depends on anyone else
         return _decline(config, "other_person", "rules")
-    rows = _gated_rows(plate, gate)
+    rows = _gated_rows(plate["rows"], gate)
+
+    def report(intent: FactIntent) -> tuple[tuple[Line, ...], Mapping[str, Any] | None]:
+        return _report(intent, rows, ask, plate, gate, finished, time_zone, config)
+
     nav = match_navigation(key, rows, ask.context, gate, config)
     if nav is not None:
         if nav.decline is not None:
@@ -243,7 +275,7 @@ def answer(
         return _navigated(vet_navigate(nav.action, menu, gate), config, "rules", None)
     intent = match_fact(key, config)
     if intent is not None:
-        return _facts(intent, rows, ask, remainder_of(key, intent, config), time_zone, config, "rules", None)
+        return _facts(intent, rows, ask, remainder_of(key, intent, config), time_zone, config, "rules", None, report)
     if decider is None:
         return _decline(config, "unknown", "rules")
     menu = build_menu(rows, ask.context, gate, config)
@@ -262,7 +294,7 @@ def answer(
     )
     chosen = next((f for f in config.facts if type(d.intent) is str and f.id == d.intent), None)
     if d.choice == "intent" and chosen is not None:
-        return _facts(chosen, rows, ask, frozenset(), time_zone, config, "model", d)
+        return _facts(chosen, rows, ask, frozenset(), time_zone, config, "model", d, report)
     if d.choice == "navigate":
         vetted = vet_navigate(d.action, menu, gate)
         if vetted is not None:

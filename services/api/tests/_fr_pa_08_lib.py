@@ -47,7 +47,7 @@ from tilo_api import deps
 # Each slice is a strict xfail until its builder deletes its entry (API_FR_PA_08.md section 0). An entry is a substring
 # of a pytest node id, so it names a whole file. `test_FR_PA_08_guards.py` is never pending: it passes today and must
 # keep passing.
-SLICE_PENDING: tuple[str, ...] = ("test_FR_PA_08_s1_", "test_FR_PA_08_s2_")
+SLICE_PENDING: tuple[str, ...] = ()
 PENDING_EXEMPT: tuple[str, ...] = ()
 
 # The fixed words of the new answers (API_FR_PA_08.md sections 3 and 4). $n and $label are the only placeholders.

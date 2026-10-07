@@ -161,6 +161,16 @@ def _plate_of(source: deps.PlateSource, user: str, now: str) -> dict[str, Any]:
     return plate
 
 
+def _finished(people: PeopleStores, gate: RefGate, org: str, user: str) -> Callable[[], list[Mapping[str, Any]]]:
+    """FR-PA-08: the person's own work items as the oracle shows them to them (one owner-index read per request)."""
+
+    def read() -> list[Mapping[str, Any]]:
+        views = (gate.record(Ref("work_item", s.record["id"])) for s in people.work_items.list(org, "owner", user))
+        return [v for v in views if v is not None]
+
+    return read
+
+
 def _sources(lines: tuple[Line, ...]) -> list[dict[str, str]]:
     seen: list[dict[str, str]] = []
     for line in lines:
@@ -267,6 +277,7 @@ def _handle(
                 config=config,
                 time_zone=zone,
                 decider=UNAVAILABLE if replay_only else decider,
+                finished=_finished(people, gate, org, user),
             )
         except Exception as exc:
             logger.warning("assistant.answer_failed %s", type(exc).__name__)
